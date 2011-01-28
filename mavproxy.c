@@ -48,6 +48,11 @@ static void comm_send_ch(mavlink_channel_t chan, uint8_t c);
 #define QGCS_LISTEN_PORT        14551
 #define QGCS_SEND_PORT          14550
 
+/* frequency of IMU send to FlightGear */
+#define FG_FREQUENCY		50
+
+#define DEFAULT_SERIAL_SPEED 115200
+
 /*
  * Binary packet as exchanged with FG.
  *
@@ -92,6 +97,8 @@ static struct fgControlData fgcontrol, fg_swapped;
 static int fd_serial;
 static int fg_in, fg_out;
 static int gc_in, gc_out;
+static const char *serial_port;
+static unsigned serial_speed = DEFAULT_SERIAL_SPEED;
 
 static struct wpoint {
 	int action;
@@ -113,11 +120,9 @@ static struct status {
  */
 static void comm_send_ch(mavlink_channel_t chan, uint8_t c)
 {
-#if 1
         if (write(fd_serial, &c, 1) != 1) {
 		printf("Failed to write mavlink char\n");
 	}
-#endif
 }
 
 
@@ -382,17 +387,186 @@ static void load_waypoints(const char *filename)
 	mavlink_msg_waypoint_count_send(0, TARGET_SYSTEM, TARGET_COMPONENT, wpoint_count);
 }
 
+
+static void process_stdin(void)
+{
+	char line[500]="";
+	const int max_toks = 20;
+	char *tok, *toks[max_toks];
+	int num_toks;
+
+	fgets(line, sizeof(line)-2, stdin);
+
+	num_toks = 0;
+	for (tok = strtok(line, "\r\n "); tok; tok=strtok(NULL, "\r\n ")) {
+		toks[num_toks++] = tok;
+		if (num_toks == max_toks) {
+			printf("too many tokens\n");
+			continue;
+		}
+	}
+	if (num_toks == 0) return;
+	
+	if (strcmp(toks[0], "loiter") == 0) {
+		mavlink_msg_action_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
+					MAV_ACTION_LOITER);
+	} else if (strcmp(toks[0], "auto") == 0) {
+		mavlink_msg_action_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
+					MAV_ACTION_SET_AUTO);
+	} else if (strcmp(toks[0], "manual") == 0) {
+		mavlink_msg_action_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
+					MAV_ACTION_SET_MANUAL);
+	} else if (strcmp(toks[0], "rtl") == 0) {
+		mavlink_msg_action_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
+					MAV_ACTION_RETURN);
+	} else if (strcmp(toks[0], "takeoff") == 0) {
+		mavlink_msg_action_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
+					MAV_ACTION_TAKEOFF);
+	} else if (strcmp(toks[0], "land") == 0) {
+		mavlink_msg_action_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
+					MAV_ACTION_LAND);
+	} else if (strcmp(toks[0], "next") == 0) {
+		mavlink_msg_action_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
+					MAV_ACTION_CONTINUE);
+	} else if (strcmp(toks[0], "command") == 0) {
+		if (num_toks != 2) {
+			printf("usage: command <commandnum>\n");
+			return;
+		}
+		mavlink_msg_waypoint_set_current_send(0, TARGET_SYSTEM, 
+						      TARGET_COMPONENT, atoi(toks[1]));
+	} else if (strcmp(toks[0], "param") == 0) {
+		if (num_toks < 2) {
+			printf("usage: param list\n");
+			return;
+		}
+		if (strcmp(toks[1], "list") == 0) {
+			mavlink_msg_param_request_list_send(0, TARGET_SYSTEM, TARGET_COMPONENT);
+		}
+	} else if (strcmp(toks[0], "load") == 0) {
+		if (num_toks != 2) {
+			printf("usage: load <filename>\n");
+			return;
+		}				
+		load_waypoints(toks[1]);
+	} else {
+		printf("unknown command '%s'\n", tok);
+	}
+}
+
+
+static void process_serial(void)
+{
+	static char serial_buf[1024];
+	static int serial_len;
+	static bool is_mavlink;
+	static mavlink_message_t msg;
+	char c;
+	mavlink_status_t mstatus;
+	
+	if (read(fd_serial, &c, 1) != 1) {
+		close(fd_serial);
+		printf("reopening serial port '%s'\n", serial_port);
+		while ((fd_serial = open_serial(serial_port, serial_speed)) == -1) {
+			sleep(1);
+		}
+		return;
+	}
+
+	/*
+	  attempt to cope with debug text on the same
+	  port - just hope a message doesn't start
+	  with 'U' !
+	*/
+	if (serial_len == 0 && !is_mavlink) {
+		is_mavlink = (c == MAVLINK_STX);
+	}
+	
+	if (is_mavlink) {
+		if (mavlink_parse_char(0, c, &msg, &mstatus)) {
+			handle_mavlink_msg(&msg);
+			is_mavlink = false;
+		}
+		return;
+	}
+	
+	serial_buf[serial_len++] = c;
+	serial_buf[serial_len] = 0;
+	
+	if (serial_len == sizeof(serial_buf)) {
+		printf("serial buffer overflow\n");
+		serial_len = 0;
+		return;
+	}
+	if (c != '\n') return;
+	status.serial_counter++;
+	printf("APM: %s", serial_buf);
+	strcpy(status.apm_buf, serial_buf);
+	serial_len = 0;
+}
+
+static void process_fg(void)
+{
+	struct fgIMUData buf;
+	ssize_t len;
+
+	len = read(fg_in, &buf, sizeof(buf));
+	if (len != sizeof(buf)) {
+		printf("Bad packet length %d from FG - expected %d\n", 
+		       (int)len, (int)sizeof(buf));
+		return;
+	}
+	if (ntohl(buf.magic) != 0x4c56414d) {
+		printf("Bad FG magic 0x%08x\n", buf.magic);
+		return;
+	}
+	swap64(&buf, (sizeof(buf)-4)/8);
+	ins = buf;
+	ins.altitude = ft2m(ins.altitude);
+	status.ins_counter++;
+	send_imu();
+	send_gps();
+}
+
+static void process_gc(void)
+{
+	char buf[2048];
+	ssize_t len;
+
+	/* pass mavlink packets from gcs to APM */
+	len = read(gc_in, buf, sizeof(buf));
+	if (len > 0) {
+		write(fd_serial, buf, len);
+	}
+}
+
+static void send_to_fg(void)
+{
+	struct timeval tv;
+	static uint64_t lastt;
+	uint64_t t;
+
+	gettimeofday(&tv, NULL);
+	t = (((uint64_t)tv.tv_sec) * 1000000) + tv.tv_usec;
+	if ((t-lastt) > (1000*1000)/FG_FREQUENCY) {
+		write(fg_out, &fg_swapped, sizeof(fg_swapped));
+		lastt = t;
+	}
+}
+
+	
 int main(int argc, char* argv[])
 {
-	const char *serial_port;
-
 	if (argc < 2) {
-		printf("Usage: proxy <serialport>\n");
+		printf("Usage: mavproxy <serialport> [speed]\n");
 		exit(1);
 	}
 	serial_port = argv[1];
+	if (argc > 2) {
+		serial_speed = atoi(argv[2]);
+	}
 
-	fd_serial     = open_serial(serial_port, 115200);
+	fd_serial     = open_serial(serial_port, serial_speed);
 	fg_in         = open_socket_in("127.0.0.1", IMU_LISTEN_PORT);
 	fg_out        = open_socket_out("127.0.0.1", CTRL_SEND_PORT);
 	gc_in         = open_socket_in("127.0.0.1", QGCS_LISTEN_PORT);
@@ -411,6 +585,9 @@ int main(int argc, char* argv[])
 		FD_SET(gc_in, &fds);
 		FD_SET(0, &fds);
 
+		/* send data to flight gear every 20ms */
+		send_to_fg();
+
 		tv.tv_sec = 0;
 		tv.tv_usec = 100000;
 
@@ -423,127 +600,23 @@ int main(int argc, char* argv[])
 		}
 		
 		if (FD_ISSET(fg_in, &fds)) {
-			struct fgIMUData buf;
-			ssize_t len;
-
-			len = read(fg_in, &buf, sizeof(buf));
-			if (len != sizeof(buf)) {
-				printf("Bad packet length %d from FG - expected %d\n", 
-				       (int)len, (int)sizeof(buf));
-				continue;
-			}
-			if (ntohl(buf.magic) != 0x4c56414d) {
-				printf("Bad FG magic 0x%08x\n", buf.magic);
-				continue;
-			}
-			swap64(&buf, (sizeof(buf)-4)/8);
-			ins = buf;
-			ins.altitude = ft2m(ins.altitude);
-			status.ins_counter++;
-			write(fg_out, &fg_swapped, sizeof(fg_swapped));
-			send_imu();
-			send_gps();
+			process_fg();
+			continue;
 		}
 
 		if (FD_ISSET(gc_in, &fds)) {
-			char buf[2048];
-			ssize_t len;
-
-			len = read(gc_in, buf, sizeof(buf));
-			if (len > 0) {
-#if 1
-				write(fd_serial, buf, len);
-#endif
-			}
+			process_gc();
+			continue;
 		}
 
 		if (FD_ISSET(0, &fds)) {
-			char line[100]="";
-			char *tok;
-
-			fgets(line, sizeof(line)-2, stdin);
-
-			tok = strtok(line, "\r\n ");
-			if (tok == NULL) continue;
-#if 1
-			if (strcmp(tok, "loiter") == 0) {
-				mavlink_msg_action_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
-							    MAV_ACTION_LOITER);
-			} else if (strcmp(tok, "auto") == 0) {
-				mavlink_msg_action_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
-							    MAV_ACTION_SET_AUTO);
-			} else if (strcmp(tok, "manual") == 0) {
-				mavlink_msg_action_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
-							    MAV_ACTION_SET_MANUAL);
-			} else if (strcmp(tok, "rtl") == 0) {
-				mavlink_msg_action_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
-							    MAV_ACTION_RETURN);
-			} else if (strcmp(tok, "takeoff") == 0) {
-				mavlink_msg_action_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
-							    MAV_ACTION_TAKEOFF);
-			} else if (strcmp(tok, "land") == 0) {
-				mavlink_msg_action_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
-							    MAV_ACTION_LAND);
-			} else if (strcmp(tok, "next") == 0) {
-				mavlink_msg_action_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
-							    MAV_ACTION_CONTINUE);
-			} else if (strcmp(tok, "command") == 0) {
-				mavlink_msg_waypoint_set_current_send(0, TARGET_SYSTEM, TARGET_COMPONENT,
-								      atoi(strtok(NULL, "\r\n ")));
-			} else if (strcmp(tok, "load") == 0) {
-				const char *filename = strtok(NULL, "\r\n ");
-				if (filename == NULL) {
-					printf("usage: load <FILENAME>\n");
-					continue;
-				}
-				load_waypoints(filename);
-			} else {
-				printf("unknown command '%s'\n", tok);
-			}
-#endif
+			process_stdin();
 			continue;
 		}
 
 		if (FD_ISSET(fd_serial, &fds)) {
-			static char serial_buf[1024];
-			static int serial_len;
-			static bool is_mavlink;
-			static mavlink_message_t msg;
-			char c;
-			mavlink_status_t mstatus;
-			
-			if (read(fd_serial, &c, 1) != 1) continue;
-
-			/*
-			  attempt to cope with debug text on the same
-			  port - just hope a message doesn't start
-			  with 'U' !
-			 */
-			if (serial_len == 0 && !is_mavlink) {
-				is_mavlink = (c == MAVLINK_STX);
-			}
-
-			if (is_mavlink) {
-				if (mavlink_parse_char(0, c, &msg, &mstatus)) {
-					handle_mavlink_msg(&msg);
-					is_mavlink = false;
-				}
-				continue;
-			}
-
-			serial_buf[serial_len++] = c;
-			serial_buf[serial_len] = 0;
-
-			if (serial_len == sizeof(serial_buf)) {
-				printf("serial buffer overflow\n");
-				serial_len = 0;
-				continue;
-			}
-			if (c != '\n') continue;
-			status.serial_counter++;
-			printf("APM: %s", serial_buf);
-			strcpy(status.apm_buf, serial_buf);
-			serial_len = 0;
+			process_serial();
+			continue;
 		}
 	}
 	return 0;
