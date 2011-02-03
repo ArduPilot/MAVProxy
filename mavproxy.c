@@ -523,9 +523,11 @@ static void process_fg(void)
 	swap64(&buf, (sizeof(buf)-4)/8);
 	ins = buf;
 	ins.altitude = ft2m(ins.altitude);
-	status.ins_counter++;
-	send_imu();
-	send_gps();
+	if (ins.altitude > 0.0) {
+		status.ins_counter++;
+		send_imu();
+		send_gps();
+	}
 }
 
 static void process_gc(void)
