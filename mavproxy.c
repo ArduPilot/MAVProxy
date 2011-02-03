@@ -237,7 +237,6 @@ static void handle_mavlink_msg(mavlink_message_t *msg)
 			printf("Request for bad wpoint %u\n", seq);
 			break;
 		}
-#if 1
 		mavlink_msg_waypoint_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
 					  seq, MAV_FRAME_GLOBAL, MAV_ACTION_NAVIGATE,
 					  0, 0, 0, 0, 0,
@@ -245,7 +244,7 @@ static void handle_mavlink_msg(mavlink_message_t *msg)
 					  wpoints[seq].lat, 	
 					  wpoints[seq].alt, 
 					  0, 1);
-#endif		
+		printf("Sent waypoint %u\n", seq);
 		break;
 	}
 
@@ -383,6 +382,8 @@ static void load_waypoints(const char *filename)
 
 	mavlink_msg_waypoint_clear_all_send(0, TARGET_SYSTEM, TARGET_COMPONENT);
 	if (wpoint_count == 0) return;
+
+	printf("Loaded %u waypoints\n", wpoint_count);
 
 	mavlink_msg_waypoint_count_send(0, TARGET_SYSTEM, TARGET_COMPONENT, wpoint_count);
 }
