@@ -2,7 +2,9 @@
    MAVlink proxy for FlightGear
    Andrew Tridgell
 
-   partly based on FGShim.c by Michael Smith
+   Released under the GNU GPL version 3 or later
+
+   inspired by FGShim.c by Michael Smith
  */ 
 
 #define _GNU_SOURCE
