@@ -29,6 +29,7 @@
 #include <ctype.h>
 #include <sys/time.h>
 #include <time.h>
+#include <fnmatch.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 #include "util.h"
@@ -182,6 +183,17 @@ static void write_status(void)
 	close(fd);
 }
 
+static int param_find(const char *id)
+{
+	int i;
+	for (i=0; i<num_mav_param; i++) {
+		if (strcmp(id, (char *)mav_param[i].param_id) == 0) {
+			return i;
+		}
+	}
+	return -1;
+}
+
 
 /*
   called when the user has finished editing a parameter list
@@ -193,6 +205,11 @@ static void edit_param_callback(const char *fname, int status)
 	float value;
 
 	printf("Finished edit status=%d\n", status);
+	if (status != 0) {
+		unlink(fname);
+		return;
+	}
+
 	f = fopen(fname, "r");
 	if (f == NULL) {
 		printf("Unable to open edit file '%s'\n", fname);
@@ -202,15 +219,10 @@ static void edit_param_callback(const char *fname, int status)
 	while (fscanf(f, "%15s %f", id, &value) == 2) {
 		int i;
 
-		/* find it */
-		for (i=0; i<num_mav_param; i++) {
-			if (strcmp(id, (char *)mav_param[i].param_id) == 0) {
-				break;
-			}
-		}
-		if (i == num_mav_param) {
-			printf("Unable to find MAV parameter '%s'\n", id);
-			continue;
+		i = param_find(id);
+		if (i == -1) {
+			printf("Unable to find parameter '%s'\n", id);
+			break;
 		}
 
 		/* see if its changed */
@@ -219,6 +231,7 @@ static void edit_param_callback(const char *fname, int status)
 		mavlink_msg_param_set_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
 					   mav_param[i].param_id, value);
 		printf("Setting %s to %f\n", id, value);
+		mav_param[i].param_value = value;
 	}
 	fclose(f);
 	
@@ -260,6 +273,7 @@ static void process_param_value(mavlink_message_t *msg)
 		for (i=0; i<num_mav_param; i++) {
 			printf("%-15.15s %f\n", mav_param[i].param_id, mav_param[i].param_value);
 		}
+		param_op = PARAM_NONE;
 		break;
 
 	case PARAM_EDIT: {
@@ -275,6 +289,7 @@ static void process_param_value(mavlink_message_t *msg)
 		}
 		close(fd);
 		edit_file_background(fname, edit_param_callback);
+		param_op = PARAM_NONE;
 		break;
 	}
 	}
@@ -507,6 +522,7 @@ static void load_waypoints(const char *filename)
 	mavlink_msg_waypoint_count_send(0, TARGET_SYSTEM, TARGET_COMPONENT, wpoint_count);
 }
 
+
 static void cmd_command(int num_args, char **args)
 {
 	if (num_args != 1) {
@@ -517,10 +533,11 @@ static void cmd_command(int num_args, char **args)
 					      TARGET_COMPONENT, atoi(args[0]));
 }
 
+
 static void cmd_param(int num_args, char **args)
 {
-	if (num_args != 1) {
-		printf("usage: param <list|edit>\n");
+	if (num_args < 1) {
+		printf("usage: param <list|edit|set|show>\n");
 		return;
 	}
 	if (strcmp(args[0], "list") == 0) {
@@ -531,8 +548,31 @@ static void cmd_param(int num_args, char **args)
 		mavlink_msg_param_request_list_send(0, TARGET_SYSTEM, TARGET_COMPONENT);
 		printf("Requested parameter list for editing\n");
 		param_op = PARAM_EDIT;
+	} else if (strcmp(args[0], "set") == 0) {
+		if (num_args != 3) {
+			printf("Usage: param set PARMNAME VALUE\n");
+			return;
+		}
+		if (param_find(args[1]) == -1) {
+			printf("Unable to find parameter '%s'\n", args[1]);
+			return;
+		}
+		mavlink_msg_param_set_send(0, TARGET_SYSTEM, TARGET_COMPONENT, (const int8_t *)args[1], atof(args[2]));
+		param_op = PARAM_NONE;
+	} else if (strcmp(args[0], "show") == 0) {
+		const char *pattern = "*";
+		int i;
+		if (num_args > 1) {
+			pattern = args[1];
+		}
+		for (i=0; i<num_mav_param; i++) {
+			if (fnmatch(pattern, (char *)mav_param[i].param_id, 0) == 0) {
+				printf("%-15.15s %f\n", mav_param[i].param_id, mav_param[i].param_value);
+			}
+		}
+		param_op = PARAM_NONE;
 	} else {
-		printf("Unknown subcommand '%s' (try 'list' or 'edit'\n", args[0]);
+		printf("Unknown subcommand '%s' (try 'list', 'edit' or 'set'\n", args[0]);
 	}
 }
 
