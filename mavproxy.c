@@ -28,6 +28,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include "util.h"
+#include "editfile.h"
 
 #pragma pack(1)
 #include "mavlink_types.h"
@@ -107,6 +108,10 @@ static struct wpoint {
 } *wpoints;
 static unsigned wpoint_count;
 
+static unsigned num_mav_param;
+static mavlink_param_value_t *mav_param;
+static enum param_op { PARAM_NONE, PARAM_LIST, PARAM_EDIT } param_op;
+
 #define NUM_MSG_LINES 8
 
 static struct status {
@@ -116,6 +121,8 @@ static struct status {
 	char apm_buf[1024];
 	char msg_buf[NUM_MSG_LINES][200];
 } status;
+
+
 
 
 /*
@@ -129,6 +136,11 @@ static void comm_send_ch(mavlink_channel_t chan, uint8_t c)
 }
 
 
+/*
+  show current status in status.txt. This is a very crude ground
+  control station! Use "watch -n1 cat status.txt" to view the status
+  while running
+ */
 static void write_status(void)
 {
 	char buf[1024];
@@ -157,6 +169,69 @@ static void write_status(void)
 	close(fd);
 }
 
+
+/*
+  called when the user has finished editing a parameter list
+ */
+static void edit_param_callback(const char *fname, int status)
+{
+	printf("Finished edit status=%d\n", status);
+}
+
+/*
+  handle an incoming parameter value from APM via MAVLink
+ */
+static void process_param_value(mavlink_message_t *msg)
+{
+	unsigned count = mavlink_msg_param_value_get_param_count(msg);
+	unsigned idx   = mavlink_msg_param_value_get_param_index(msg);
+	int i;
+
+	if (count != num_mav_param) {
+		if (mav_param) free(mav_param);
+		mav_param = calloc(sizeof(mav_param[0]), count);
+		if (mav_param == NULL) {
+			printf("Out of memory allocating mav_param\n");
+			num_mav_param = 0;
+			return;
+		}
+		num_mav_param = count;
+	}
+
+	mavlink_msg_param_value_decode(msg, &mav_param[idx]);
+	if (idx < count - 1) {
+		return;
+	}
+
+	printf("Received %u parameter values\n", count);
+
+	switch (param_op) {
+	case PARAM_NONE:
+		break;
+
+	case PARAM_LIST:
+		for (i=0; i<num_mav_param; i++) {
+			printf("%-15.15s %f\n", mav_param[i].param_id, mav_param[i].param_value);
+		}
+		break;
+
+	case PARAM_EDIT: {
+		char fname[] = "/tmp/mavlink_param.XXXXXX";
+		int fd = mkstemp(fname);
+		if (fd == -1) {
+			printf("Unable to create temporary file for editing : %s\n",
+			       strerror(errno));
+			break;
+		}
+		for (i=0; i<num_mav_param; i++) {
+			dprintf(fd, "%-15.15s %f\n", mav_param[i].param_id, mav_param[i].param_value);
+		}
+		close(fd);
+		edit_file_background(fname, edit_param_callback);
+		break;
+	}
+	}
+}
 
 /*
   handle a mavlink message from APM
@@ -230,7 +305,7 @@ static void handle_mavlink_msg(mavlink_message_t *msg)
 		break;
 
         case MAVLINK_MSG_ID_PARAM_VALUE:
-		status.mav_param_value++;
+		process_param_value(msg);
 		break;
 
         case MAVLINK_MSG_ID_SYS_STATUS:
@@ -453,6 +528,14 @@ static void process_stdin(void)
 		}
 		if (strcmp(toks[1], "list") == 0) {
 			mavlink_msg_param_request_list_send(0, TARGET_SYSTEM, TARGET_COMPONENT);
+			printf("Requested parameter list\n");
+			param_op = PARAM_LIST;
+		} else if (strcmp(toks[1], "edit") == 0) {
+			mavlink_msg_param_request_list_send(0, TARGET_SYSTEM, TARGET_COMPONENT);
+			printf("Requested parameter list for editing\n");
+			param_op = PARAM_EDIT;
+		} else {
+			printf("Unknown subcommand '%s'\n", toks[1]);
 		}
 	} else if (strcmp(toks[0], "load") == 0) {
 		if (num_toks != 2) {

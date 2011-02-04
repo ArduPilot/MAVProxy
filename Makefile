@@ -1,11 +1,15 @@
 CC=gcc
-CFLAGS=-g -std=c99 -D_XOPEN_SOURCE=600 -Wall
+CFLAGS=-g -std=c99 -D_XOPEN_SOURCE=600 -Wall -I../mavlink/include
+LIBS=-lm
 
 all: mavproxy
 
-mavproxy: mavproxy.c
-	$(CC) $(CFLAGS) -o $@ mavproxy.c util.c -Wall -I../mavlink/include -lm
+SRC=mavproxy.c util.c editfile.c
+OBJ=$(SRC:.c=.o)
+
+
+mavproxy: $(OBJ)
+	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LIBS)
 
 clean:
-	rm -f mavproxy *~
-
+	rm -f mavproxy *~ *.o
