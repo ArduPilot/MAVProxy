@@ -184,7 +184,41 @@ static void write_status(void)
  */
 static void edit_param_callback(const char *fname, int status)
 {
+	FILE *f;
+	char id[16];
+	float value;
+
 	printf("Finished edit status=%d\n", status);
+	f = fopen(fname, "r");
+	if (f == NULL) {
+		printf("Unable to open edit file '%s'\n", fname);
+		return;
+	}
+
+	while (fscanf(f, "%15s %f", id, &value) == 2) {
+		int i;
+
+		/* find it */
+		for (i=0; i<num_mav_param; i++) {
+			if (strcmp(id, (char *)mav_param[i].param_id) == 0) {
+				break;
+			}
+		}
+		if (i == num_mav_param) {
+			printf("Unable to find MAV parameter '%s'\n", id);
+			continue;
+		}
+
+		/* see if its changed */
+		if (value == mav_param[i].param_value) continue;
+
+		mavlink_msg_param_set_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
+					   mav_param[i].param_id, value);
+		printf("Setting %s to %f\n", id, value);
+	}
+	fclose(f);
+	
+	unlink(fname);
 }
 
 /*
@@ -564,8 +598,13 @@ static void process_serial(void)
 	static mavlink_message_t msg;
 	char c;
 	mavlink_status_t mstatus;
-	
-	if (read(fd_serial, &c, 1) != 1) {
+	ssize_t len;
+
+	len = read(fd_serial, &c, 1);
+	if (len == -1 && (errno == EINTR || errno == EAGAIN)) {
+		return;
+	}
+	if (len != 1) {
 		close(fd_serial);
 		printf("reopening serial port '%s'\n", serial_port);
 		while ((fd_serial = open_serial(serial_port, serial_speed)) == -1) {
@@ -625,9 +664,12 @@ static void process_fg(void)
 	ssize_t len;
 
 	len = read(fg_in, &buf, sizeof(buf));
+	if (len == -1 && (errno == EINTR || errno == EAGAIN)) {
+		return;
+	}
 	if (len != sizeof(buf)) {
-		printf("Bad packet length %d from FG - expected %d\n", 
-		       (int)len, (int)sizeof(buf));
+		printf("Bad packet length %d from FG - expected %d : %s\n", 
+		       (int)len, (int)sizeof(buf), strerror(errno));
 		return;
 	}
 	if (ntohl(buf.magic) != 0x4c56414d) {
