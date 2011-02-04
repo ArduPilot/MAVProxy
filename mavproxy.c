@@ -46,7 +46,6 @@ static void comm_send_ch(mavlink_channel_t chan, uint8_t c);
 #define CTRL_SEND_PORT          5500
 
 /* local port addresses for communication with QGroundControl */
-#define QGCS_LISTEN_PORT        14551
 #define QGCS_SEND_PORT          14550
 
 /* frequency of IMU send to FlightGear */
@@ -97,7 +96,7 @@ static struct fgIMUData ins;
 static struct fgControlData fgcontrol, fg_swapped;
 static int fd_serial;
 static int fg_in, fg_out;
-static int gc_in, gc_out;
+static int gc_sock;
 static const char *serial_port;
 static unsigned serial_speed = DEFAULT_SERIAL_SPEED;
 
@@ -349,10 +348,8 @@ static void handle_mavlink_msg(mavlink_message_t *msg)
         }
 
         /* pass all messages on to QGCS */
-#if 1
         len = mavlink_msg_to_send_buffer(buf, msg);
-        write(gc_out, buf, len);
-#endif
+        write(gc_sock, buf, len);
 }
 
 
@@ -643,7 +640,7 @@ static void process_gc(void)
 	ssize_t len;
 
 	/* pass mavlink packets from gcs to APM */
-	len = read(gc_in, buf, sizeof(buf));
+	len = read(gc_sock, buf, sizeof(buf));
 	if (len > 0) {
 		write(fd_serial, buf, len);
 		status.gc_counter++;
@@ -679,8 +676,7 @@ int main(int argc, char* argv[])
 	fd_serial     = open_serial(serial_port, serial_speed);
 	fg_in         = open_socket_in("127.0.0.1", IMU_LISTEN_PORT);
 	fg_out        = open_socket_out("127.0.0.1", CTRL_SEND_PORT);
-	gc_in         = open_socket_in("127.0.0.1", QGCS_LISTEN_PORT);
-	gc_out        = open_socket_out("127.0.0.1", QGCS_SEND_PORT);
+	gc_sock       = open_socket_out("127.0.0.1", QGCS_SEND_PORT);
 
 	printf("mavproxy started\n");
 
@@ -692,7 +688,7 @@ int main(int argc, char* argv[])
 		FD_ZERO(&fds);
 		FD_SET(fd_serial, &fds);
 		FD_SET(fg_in, &fds);
-		FD_SET(gc_in, &fds);
+		FD_SET(gc_sock, &fds);
 		FD_SET(0, &fds);
 
 		/* send data to flight gear every 20ms */
@@ -714,7 +710,7 @@ int main(int argc, char* argv[])
 			continue;
 		}
 
-		if (FD_ISSET(gc_in, &fds)) {
+		if (FD_ISSET(gc_sock, &fds)) {
 			process_gc();
 			continue;
 		}
