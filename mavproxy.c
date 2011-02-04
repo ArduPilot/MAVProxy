@@ -529,76 +529,110 @@ static void load_waypoints(const char *filename)
 	mavlink_msg_waypoint_count_send(0, TARGET_SYSTEM, TARGET_COMPONENT, wpoint_count);
 }
 
+static void cmd_command(int num_args, char **args)
+{
+	if (num_args != 1) {
+		printf("usage: command <commandnum>\n");
+		return;
+	}
+	mavlink_msg_waypoint_set_current_send(0, TARGET_SYSTEM, 
+					      TARGET_COMPONENT, atoi(args[0]));
+}
+
+static void cmd_param(int num_args, char **args)
+{
+	if (num_args != 1) {
+		printf("usage: param <list|edit>\n");
+		return;
+	}
+	if (strcmp(args[0], "list") == 0) {
+		mavlink_msg_param_request_list_send(0, TARGET_SYSTEM, TARGET_COMPONENT);
+		printf("Requested parameter list\n");
+		param_op = PARAM_LIST;
+	} else if (strcmp(args[0], "edit") == 0) {
+		mavlink_msg_param_request_list_send(0, TARGET_SYSTEM, TARGET_COMPONENT);
+		printf("Requested parameter list for editing\n");
+		param_op = PARAM_EDIT;
+	} else {
+		printf("Unknown subcommand '%s' (try 'list' or 'edit'\n", args[0]);
+	}
+}
+
+static void cmd_load(int num_args, char **args)
+{
+	if (num_args != 1) {
+		printf("usage: load <filename>\n");
+		return;
+	}
+	load_waypoints(args[0]);
+}
+
+
+static struct {
+	char *command;
+	int mav_action;
+	void (*f)(int num_args, char **args);
+	const char *description;
+} commands[] = {
+	{ "loiter", MAV_ACTION_LOITER,     NULL, "loiter in current position" },
+	{ "auto",   MAV_ACTION_SET_AUTO,   NULL, "set APM to auto mode" },
+	{ "manual", MAV_ACTION_SET_MANUAL, NULL, "set APM to manual mode" },
+	{ "rtl",    MAV_ACTION_RETURN,     NULL, "return to launch point and loiter" },
+	{ "takeoff",MAV_ACTION_TAKEOFF,    NULL, "start takeoff" },
+	{ "land",   MAV_ACTION_LAND,       NULL, "start landing" },
+	{ "command",0,                     cmd_command, "set next command number" },
+	{ "load",   0,                     cmd_load,    "load waypoints from a file" },
+	{ "param",  0,                     cmd_param,   "list or edit parameters" },
+	{ NULL, 0, NULL, NULL }
+};
+
+static void show_help(void)
+{
+	int i;
+	for (i=0; commands[i].command; i++) {
+		printf("\t%-10s   : %s\n", commands[i].command, commands[i].description);
+	}
+}
 
 static void process_stdin(char *line)
 {
 	const int max_toks = 20;
 	char *tok, *toks[max_toks];
 	int num_toks;
+	int i;
 
 	num_toks = 0;
 	for (tok = strtok(line, "\r\n "); tok; tok=strtok(NULL, "\r\n ")) {
 		toks[num_toks++] = tok;
-		if (num_toks == max_toks) {
+		if (num_toks == max_toks-1) {
 			printf("too many tokens\n");
 			continue;
 		}
 	}
 	if (num_toks == 0) return;
+
+	toks[num_toks] = NULL;
 	
-	if (strcmp(toks[0], "loiter") == 0) {
-		mavlink_msg_action_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
-					MAV_ACTION_LOITER);
-	} else if (strcmp(toks[0], "auto") == 0) {
-		mavlink_msg_action_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
-					MAV_ACTION_SET_AUTO);
-	} else if (strcmp(toks[0], "manual") == 0) {
-		mavlink_msg_action_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
-					MAV_ACTION_SET_MANUAL);
-	} else if (strcmp(toks[0], "rtl") == 0) {
-		mavlink_msg_action_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
-					MAV_ACTION_RETURN);
-	} else if (strcmp(toks[0], "takeoff") == 0) {
-		mavlink_msg_action_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
-					MAV_ACTION_TAKEOFF);
-	} else if (strcmp(toks[0], "land") == 0) {
-		mavlink_msg_action_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
-					MAV_ACTION_LAND);
-	} else if (strcmp(toks[0], "next") == 0) {
-		mavlink_msg_action_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
-					MAV_ACTION_CONTINUE);
-	} else if (strcmp(toks[0], "command") == 0) {
-		if (num_toks != 2) {
-			printf("usage: command <commandnum>\n");
-			return;
-		}
-		mavlink_msg_waypoint_set_current_send(0, TARGET_SYSTEM, 
-						      TARGET_COMPONENT, atoi(toks[1]));
-	} else if (strcmp(toks[0], "param") == 0) {
-		if (num_toks < 2) {
-			printf("usage: param list\n");
-			return;
-		}
-		if (strcmp(toks[1], "list") == 0) {
-			mavlink_msg_param_request_list_send(0, TARGET_SYSTEM, TARGET_COMPONENT);
-			printf("Requested parameter list\n");
-			param_op = PARAM_LIST;
-		} else if (strcmp(toks[1], "edit") == 0) {
-			mavlink_msg_param_request_list_send(0, TARGET_SYSTEM, TARGET_COMPONENT);
-			printf("Requested parameter list for editing\n");
-			param_op = PARAM_EDIT;
-		} else {
-			printf("Unknown subcommand '%s'\n", toks[1]);
-		}
-	} else if (strcmp(toks[0], "load") == 0) {
-		if (num_toks != 2) {
-			printf("usage: load <filename>\n");
-			return;
-		}				
-		load_waypoints(toks[1]);
-	} else {
-		printf("unknown command '%s'\n", tok);
+	if (strcmp(toks[0], "help") == 0) {
+		show_help();
+		return;
 	}
+
+	for (i=0; commands[i].command; i++) {
+		if (strcmp(toks[0], commands[i].command) == 0) {
+			if (commands[i].f == NULL) {
+				/* its a mavlink action */
+				mavlink_msg_action_send(0, TARGET_SYSTEM, 
+							TARGET_COMPONENT, 
+							commands[i].mav_action);
+				return;
+			}
+			commands[i].f(num_toks-1, &toks[1]);
+			return;
+		}
+	}
+
+	printf("unknown command '%s' (try 'help')\n", toks[0]);
 }
 
 static void process_serial(void)
