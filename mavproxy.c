@@ -319,7 +319,7 @@ static void handle_mavlink_msg(mavlink_message_t *msg)
                 fgcontrol.rudder   = (double)mavlink_msg_rc_channels_scaled_get_chan4_scaled(msg) / 10000.0;
 		fg = fgcontrol;
 		fg.throttle = constrain(fg.throttle, 0, 0.8);
-		fg.aileron  = fg.aileron + (fg.throttle*0.144);
+		fg.aileron  = fg.aileron;
 		fg.elevator = -fg.elevator;
 		fg.rudder   = fg.rudder;
 
