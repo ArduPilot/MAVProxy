@@ -123,6 +123,8 @@ static struct status {
 	char msg_buf[NUM_MSG_LINES][200];
 } status;
 
+static bool loading_waypoints;
+static time_t loading_waypoint_lasttime;
 
 
 
@@ -360,6 +362,10 @@ static void handle_mavlink_msg(mavlink_message_t *msg)
 		break;
 
         case MAVLINK_MSG_ID_WAYPOINT_REQUEST: {
+		if (!loading_waypoints || 
+		    time(NULL) > loading_waypoint_lasttime + 10) {
+			break;
+		}
 		unsigned seq = mavlink_msg_waypoint_request_get_seq(msg);
 		if (seq >= wpoint_count) {
 			printf("Request for bad wpoint %u\n", seq);
@@ -372,6 +378,10 @@ static void handle_mavlink_msg(mavlink_message_t *msg)
 					  wpoints[seq].lat, 	
 					  wpoints[seq].alt, 
 					  0, 1);
+		loading_waypoint_lasttime = time(NULL);
+		if (seq == wpoint_count -1 ) {
+			loading_waypoints = false;
+		}
 		printf("Sent waypoint %u\n", seq);
 		break;
 	}
@@ -510,6 +520,9 @@ static void load_waypoints(const char *filename)
 	if (wpoint_count == 0) return;
 
 	printf("Loaded %u waypoints\n", wpoint_count);
+
+	loading_waypoints = true;
+	loading_waypoint_lasttime = time(NULL);
 
 	mavlink_msg_waypoint_count_send(0, TARGET_SYSTEM, TARGET_COMPONENT, wpoint_count);
 }
