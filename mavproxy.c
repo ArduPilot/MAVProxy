@@ -145,8 +145,16 @@ static void comm_send_ch(mavlink_channel_t chan, uint8_t c)
 static void write_status(void)
 {
 	char buf[1024];
-	int fd = open("status.txt", O_WRONLY|O_CREAT, 0644);
+	int fd;
 	int i;
+	static time_t last_time;
+	time_t t;
+
+	t = time(NULL);
+	if (t == last_time) return;
+	last_time = t;
+	
+	fd = open("status.txt", O_WRONLY|O_CREAT, 0644);
 
 	dprintf(fd, "Counters:  INS=%u MAV=%u SER=%u GC=%u\n",
 		status.ins_counter, status.mav_counter, status.serial_counter, status.gc_counter);
