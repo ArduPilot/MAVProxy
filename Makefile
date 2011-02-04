@@ -1,6 +1,6 @@
 CC=gcc
 CFLAGS=-g -std=c99 -D_XOPEN_SOURCE=600 -Wall -I../mavlink/include
-LIBS=-lm
+LIBS=-lm -lreadline
 
 all: mavproxy
 

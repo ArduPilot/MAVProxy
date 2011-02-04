@@ -29,6 +29,8 @@
 #include <ctype.h>
 #include <sys/time.h>
 #include <time.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 #include "util.h"
 #include "editfile.h"
 
@@ -528,14 +530,11 @@ static void load_waypoints(const char *filename)
 }
 
 
-static void process_stdin(void)
+static void process_stdin(char *line)
 {
-	char line[500]="";
 	const int max_toks = 20;
 	char *tok, *toks[max_toks];
 	int num_toks;
-
-	fgets(line, sizeof(line)-2, stdin);
 
 	num_toks = 0;
 	for (tok = strtok(line, "\r\n "); tok; tok=strtok(NULL, "\r\n ")) {
@@ -601,7 +600,6 @@ static void process_stdin(void)
 		printf("unknown command '%s'\n", tok);
 	}
 }
-
 
 static void process_serial(void)
 {
@@ -739,11 +737,19 @@ int main(int argc, char* argv[])
 	}
 
 	fd_serial     = open_serial(serial_port, serial_speed);
+	if (fd_serial == -1) {
+		printf("Unable to open serial port: %s\n", strerror(errno));
+		exit(1);
+	}
 	fg_in         = open_socket_in("127.0.0.1", IMU_LISTEN_PORT);
 	fg_out        = open_socket_out("127.0.0.1", CTRL_SEND_PORT);
 	gc_sock       = open_socket_out("127.0.0.1", QGCS_SEND_PORT);
 
+	/* setup for readline handling */
+	rl_callback_handler_install("MAV> ", process_stdin);
+
 	printf("mavproxy started\n");
+
 
 	while (1) {
 		fd_set fds;
@@ -781,7 +787,7 @@ int main(int argc, char* argv[])
 		}
 
 		if (FD_ISSET(0, &fds)) {
-			process_stdin();
+			rl_callback_read_char();
 			continue;
 		}
 
