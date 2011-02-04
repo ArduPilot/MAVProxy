@@ -107,11 +107,14 @@ static struct wpoint {
 } *wpoints;
 static unsigned wpoint_count;
 
+#define NUM_MSG_LINES 8
+
 static struct status {
-	uint32_t ins_counter, serial_counter, mav_counter;
+	uint32_t ins_counter, serial_counter, mav_counter, gc_counter;
 	uint32_t mav_rc, mav_heartbeat, mav_attitude, mav_global_position;
 	uint32_t mav_airspeed, mav_param_value;
 	char apm_buf[1024];
+	char msg_buf[NUM_MSG_LINES][200];
 } status;
 
 
@@ -130,8 +133,10 @@ static void write_status(void)
 {
 	char buf[1024];
 	int fd = open("status.txt", O_WRONLY|O_CREAT, 0644);
-	dprintf(fd, "Counters:  INS=%u MAV=%u SER=%u\n",
-		status.ins_counter, status.mav_counter, status.serial_counter);
+	int i;
+
+	dprintf(fd, "Counters:  INS=%u MAV=%u SER=%u GC=%u\n",
+		status.ins_counter, status.mav_counter, status.serial_counter, status.gc_counter);
 	dprintf(fd, "MAV: HBEAT=%u RC=%u ATT=%u GPOS=%u ASP=%u PVAL=%u\n",
 		status.mav_heartbeat, status.mav_rc, status.mav_attitude,
 		status.mav_global_position, status.mav_airspeed, status.mav_param_value);
@@ -139,9 +144,14 @@ static void write_status(void)
 		ins.latitude, ins.longitude, ins.altitude, ins.heading);
 	dprintf(fd, "Att: Roll=%5.2f Pitch=%5.2f Yaw=%5.2f dRoll=%5.2f dPitch=%5.2f dYaw=%5.2f\n",
 		ins.Roll, ins.Pitch, ins.Yaw, ins.rateRoll, ins.ratePitch, ins.rateYaw);
-	dprintf(fd, "APM: %s", status.apm_buf);
 	dprintf(fd, "Ctrl: aileron=%6.2f elevator=%6.2f rudder=%6.2f throttle=%6.2f\n",
 		fgcontrol.aileron, fgcontrol.elevator, fgcontrol.rudder, fgcontrol.throttle);
+	for (i=0; i<NUM_MSG_LINES; i++) {
+		if (status.msg_buf[i][0] != 0) {
+			dprintf(fd, "%s", status.msg_buf[i]);			
+		}
+	}
+	dprintf(fd, "APM: %s", status.apm_buf);
 	memset(buf, 0, sizeof(buf));
 	write(fd, buf, sizeof(buf));
 	close(fd);
@@ -500,6 +510,19 @@ static void process_serial(void)
 		return;
 	}
 	if (c != '\n') return;
+
+	if (serial_buf[0] == '@') {
+		int i, linenum = atoi(&serial_buf[1]);
+		if (linenum >= 0 && linenum < NUM_MSG_LINES) {
+			strncpy(status.msg_buf[linenum], &serial_buf[3], sizeof(status.msg_buf[0]));
+			serial_len = 0;
+			for (i=linenum+1; i<NUM_MSG_LINES; i++) {
+				status.msg_buf[i][0] = 0;
+			}
+			return;
+		}
+	}
+
 	status.serial_counter++;
 	printf("APM: %s", serial_buf);
 	strcpy(status.apm_buf, serial_buf);
@@ -540,6 +563,7 @@ static void process_gc(void)
 	len = read(gc_in, buf, sizeof(buf));
 	if (len > 0) {
 		write(fd_serial, buf, len);
+		status.gc_counter++;
 	}
 }
 
