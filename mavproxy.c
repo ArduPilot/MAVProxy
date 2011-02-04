@@ -601,6 +601,10 @@ static void process_stdin(char *line)
 	int num_toks;
 	int i;
 
+	if (line[0] && !isspace(line[0])) {
+		add_history(line);
+	}
+
 	num_toks = 0;
 	for (tok = strtok(line, "\r\n "); tok; tok=strtok(NULL, "\r\n ")) {
 		toks[num_toks++] = tok;
