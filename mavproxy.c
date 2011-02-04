@@ -45,11 +45,11 @@ static void comm_send_ch(mavlink_channel_t chan, uint8_t c);
 #define TARGET_SYSTEM           7
 #define TARGET_COMPONENT        1
 
-/* local port addresses for communication with FlightGear - these are the FG defaults */
+/* local port addresses for communication with FlightGear */
 #define IMU_LISTEN_PORT         5501
 #define CTRL_SEND_PORT          5500
 
-/* local port addresses for communication with QGroundControl */
+/* local port address for communication with QGroundControl */
 #define QGCS_SEND_PORT          14550
 
 /* frequency of IMU send to FlightGear */
@@ -285,8 +285,6 @@ static void process_param_value(mavlink_message_t *msg)
  */
 static void handle_mavlink_msg(mavlink_message_t *msg)
 {
-        static time_t lastRCMessage;
-	time_t now;
         uint8_t buf[1024];
         uint16_t len;
 
@@ -295,21 +293,6 @@ static void handle_mavlink_msg(mavlink_message_t *msg)
         switch (msg->msgid) {
         case MAVLINK_MSG_ID_HEARTBEAT:
 		status.mav_heartbeat++;
-		time(&now);
-                if ((now - lastRCMessage) > 2) {
-			/*
-			  its been more than 2 seconds since the last RC message
-			 */
-#if 0
-                        mavlink_msg_request_data_stream_send(0,
-                                                             TARGET_SYSTEM,
-                                                             TARGET_COMPONENT, 
-                                                             MAV_DATA_STREAM_RAW_CONTROLLER,
-                                                             10, /* 10Hz enough? */
-                                                             1); /* start */
-#endif
-                        lastRCMessage = now;
-                }
                 break;
                 
         case MAVLINK_MSG_ID_RC_CHANNELS_SCALED: {
@@ -322,20 +305,13 @@ static void handle_mavlink_msg(mavlink_message_t *msg)
                 fgcontrol.throttle = (double)mavlink_msg_rc_channels_scaled_get_chan3_scaled(msg) / 10000.0;
                 fgcontrol.rudder   = (double)mavlink_msg_rc_channels_scaled_get_chan4_scaled(msg) / 10000.0;
 		fg = fgcontrol;
-		fg.throttle = constrain(fg.throttle, 0, 0.8);
+		fg.throttle = constrain(fg.throttle, 0, 1.0);
 		fg.aileron  = fg.aileron;
 		fg.elevator = -fg.elevator;
 		fg.rudder   = fg.rudder;
 
-//		fg.aileron = 0;
-//		fg.elevator = 0;
-//		fg.throttle = 0.75;
-//		fg.rudder = 0;
-//		printf("aileron=%f elevator=%f throttle=%f rudder=%f\n",
-//		       fg.aileron, fg.elevator, fg.throttle, fg.rudder);
 		swap64(&fg, 4);
 		fg_swapped = fg;
-                lastRCMessage = now;
 		break;
 	}
 
@@ -408,7 +384,9 @@ static void handle_mavlink_msg(mavlink_message_t *msg)
         write(gc_sock, buf, len);
 }
 
-
+/*
+  send instrument data to APM
+ */
 static void send_imu(void)
 {
 #if 0
@@ -594,6 +572,9 @@ static void show_help(void)
 	}
 }
 
+/*
+  process input from the keyboard
+ */
 static void process_stdin(char *line)
 {
 	const int max_toks = 20;
@@ -639,6 +620,10 @@ static void process_stdin(char *line)
 	printf("unknown command '%s' (try 'help')\n", toks[0]);
 }
 
+
+/*
+  process input from the serial port
+ */
 static void process_serial(void)
 {
 	static char serial_buf[1024];
@@ -707,6 +692,10 @@ static void process_serial(void)
 	serial_len = 0;
 }
 
+
+/*
+  process a packet from flightgear
+ */
 static void process_fg(void)
 {
 	struct fgIMUData buf;
@@ -735,6 +724,9 @@ static void process_fg(void)
 	}
 }
 
+/*
+  process a packet from the ground control station
+ */
 static void process_gc(void)
 {
 	char buf[2048];
@@ -748,6 +740,10 @@ static void process_gc(void)
 	}
 }
 
+
+/*
+  send current APM controls to flightgear
+ */
 static void send_to_fg(void)
 {
 	struct timeval tv;
