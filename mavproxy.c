@@ -449,6 +449,8 @@ static void handle_mavlink_msg(mavlink_message_t *msg)
         case MAVLINK_MSG_ID_WAYPOINT_CURRENT:
         case MAVLINK_MSG_ID_GPS_RAW:
         case MAVLINK_MSG_ID_WAYPOINT_ACK:
+        case MAVLINK_MSG_ID_RAW_IMU:
+        case MAVLINK_MSG_ID_RAW_PRESSURE:
 		break;
 
         case MAVLINK_MSG_ID_WAYPOINT_REQUEST:
@@ -509,11 +511,11 @@ static void send_imu(void)
 				  deg2rad(ins.rateRoll),
 				  deg2rad(ins.ratePitch),
 				  deg2rad(ins.rateYaw));
+#endif
 	mavlink_msg_airspeed_send(0,
 				  ft2m(sqrt((ins.velocityN * ins.velocityN) +
 					    (ins.velocityE * ins.velocityE))));
 
-#endif
 }
 
 static void send_gps(void)
