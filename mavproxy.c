@@ -509,6 +509,9 @@ static void send_imu(void)
 				  deg2rad(ins.rateRoll),
 				  deg2rad(ins.ratePitch),
 				  deg2rad(ins.rateYaw));
+	mavlink_msg_airspeed_send(0,
+				  ft2m(sqrt((ins.velocityN * ins.velocityN) +
+					    (ins.velocityE * ins.velocityE))));
 
 #endif
 }
@@ -926,6 +929,12 @@ int main(int argc, char* argv[])
 	rl_callback_handler_install("MAV> ", process_stdin);
 
 	printf("mavproxy started\n");
+
+	fg_swapped.throttle = 0.0;
+	fg_swapped.aileron  = 0.0;
+	fg_swapped.elevator = 0.0;
+	fg_swapped.rudder   = 0.0;
+	swap64(&fg_swapped, 4);
 
 
 	while (1) {
