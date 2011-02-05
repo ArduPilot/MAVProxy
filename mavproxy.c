@@ -105,16 +105,14 @@ static int gc_sock;
 static const char *serial_port;
 static unsigned serial_speed = DEFAULT_SERIAL_SPEED;
 
-static struct wpoint {
-	int action;
-	float param1, param2;
-	float lat, lon, alt;
-} *wpoints;
-static unsigned wpoint_count;
-
 static unsigned num_mav_param;
 static mavlink_param_value_t *mav_param;
 static enum param_op { PARAM_NONE, PARAM_LIST, PARAM_EDIT } param_op;
+
+static unsigned wp_count;
+static mavlink_waypoint_t *wp_list;
+static enum wp_op { WP_NONE, WP_LIST, WP_SAVE } wp_op;
+static char *wp_save_filename;
 
 #define NUM_MSG_LINES 8
 
@@ -295,6 +293,104 @@ static void process_param_value(mavlink_message_t *msg)
 	}
 }
 
+
+/*
+  handle an incoming waypoint request via MAVLink
+ */
+static void process_waypoint_request(mavlink_message_t *msg)
+{
+	mavlink_waypoint_t *wp;
+	if (!loading_waypoints || 
+	    time(NULL) > loading_waypoint_lasttime + 10) {
+		return;
+	}
+	unsigned seq = mavlink_msg_waypoint_request_get_seq(msg);
+	if (seq >= wp_count) {
+		printf("Request for bad wpoint %u (max %u)\n", seq, wp_count);
+		return;
+	}
+	wp = &wp_list[seq];
+
+	mavlink_msg_waypoint_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
+				  wp->seq, wp->frame, wp->action,
+				  wp->orbit, wp->orbit_direction, wp->param1, 
+				  wp->param2, wp->current, wp->x, wp->y, wp->z, wp->yaw, wp->autocontinue);
+	loading_waypoint_lasttime = time(NULL);
+	if (seq == wp_count -1 ) {
+		loading_waypoints = false;
+	}
+	printf("Sent waypoint %u\n", seq);
+}
+
+/*
+  handle an incoming waypoint count via MAVLink
+ */
+static void process_waypoint_count(mavlink_message_t *msg)
+{
+	if (wp_op == WP_NONE) return;
+
+	if (wp_list) free(wp_list);
+	wp_count = mavlink_msg_waypoint_count_get_count(msg);
+	wp_list = calloc(sizeof(mavlink_waypoint_t), wp_count);
+	if (wp_count > 0) {
+		printf("Requesting %u waypoints\n", wp_count);
+		mavlink_msg_waypoint_request_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 0);
+	}
+}
+
+
+/*
+  handle an incoming waypoint via MAVLink
+ */
+static void process_waypoint(mavlink_message_t *msg)
+{
+	uint16_t i;
+	if (wp_op == WP_NONE) return;
+
+	i = mavlink_msg_waypoint_get_seq(msg);
+	if (i >= wp_count) {
+		printf("Invalid waypoint index %u\n", i);
+		return;
+	}
+	mavlink_msg_waypoint_decode(msg, &wp_list[i]);
+	if (i < wp_count-1) {
+		mavlink_msg_waypoint_request_send(0, TARGET_SYSTEM, TARGET_COMPONENT, i+1);
+		return;
+	}
+
+	switch (wp_op) {
+	case WP_NONE:
+		break;
+	case WP_LIST:
+		for (i=0; i<wp_count; i++) {
+			printf("%.10f %.10f %f\n", wp_list[i].x, wp_list[i].y, wp_list[i].z);
+		}
+		break;
+	case WP_SAVE: {
+		FILE *f = fopen(wp_save_filename, "w");
+		if (f == NULL) {
+			printf("Unable to open %s : %s\n", wp_save_filename, strerror(errno));
+			break;
+		}
+		/* use qgroundcontrol format - see src/Waypoint.cc */
+		fprintf(f, "QGC WPL 100\n");
+		for (i=0; i<wp_count; i++) {
+			mavlink_waypoint_t *wp = &wp_list[i];
+			fprintf(f, "%u\t%u\t%u\t%.0f\t%u\t%.0f\t%.0f\t%u\t%f\t%f\t%.2f\t%.0f\t%u\n", 
+				wp->seq, wp->frame, wp->action, wp->orbit, wp->orbit_direction, wp->param1, 
+				wp->param2, wp->current, wp->x, wp->y, wp->z, wp->yaw, wp->autocontinue);
+		}
+		fclose(f);
+		printf("Saved %u waypoints to %s\n", wp_count, wp_save_filename);
+		free(wp_save_filename);
+		wp_save_filename = NULL;
+		break;
+	}
+	}
+
+	wp_op = WP_NONE;
+}
+
 /*
   handle a mavlink message from APM
  */
@@ -352,32 +448,20 @@ static void handle_mavlink_msg(mavlink_message_t *msg)
         case MAVLINK_MSG_ID_RC_CHANNELS_RAW:
         case MAVLINK_MSG_ID_WAYPOINT_CURRENT:
         case MAVLINK_MSG_ID_GPS_RAW:
+        case MAVLINK_MSG_ID_WAYPOINT_ACK:
 		break;
 
-        case MAVLINK_MSG_ID_WAYPOINT_REQUEST: {
-		if (!loading_waypoints || 
-		    time(NULL) > loading_waypoint_lasttime + 10) {
-			break;
-		}
-		unsigned seq = mavlink_msg_waypoint_request_get_seq(msg);
-		if (seq >= wpoint_count) {
-			printf("Request for bad wpoint %u\n", seq);
-			break;
-		}
-		mavlink_msg_waypoint_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
-					  seq, MAV_FRAME_GLOBAL, MAV_ACTION_NAVIGATE,
-					  0, 0, 0, 0, 0,
-					  wpoints[seq].lon, 
-					  wpoints[seq].lat, 	
-					  wpoints[seq].alt, 
-					  0, 1);
-		loading_waypoint_lasttime = time(NULL);
-		if (seq == wpoint_count -1 ) {
-			loading_waypoints = false;
-		}
-		printf("Sent waypoint %u\n", seq);
+        case MAVLINK_MSG_ID_WAYPOINT_REQUEST:
+		process_waypoint_request(msg);
 		break;
-	}
+
+        case MAVLINK_MSG_ID_WAYPOINT:
+		process_waypoint(msg);
+		break;
+
+        case MAVLINK_MSG_ID_WAYPOINT_COUNT:
+		process_waypoint_count(msg);
+		break;
 
         case MAVLINK_MSG_ID_STATUSTEXT: {
 		int8_t buf[100];
@@ -444,96 +528,78 @@ static void send_gps(void)
 				 ins.heading);
 }
 
-
+/*
+  load waypoints from a file
+ */
 static void load_waypoints(const char *filename)
 {
 	FILE *f = fopen(filename, "r");
 	char line[200];
-	static struct {
-		const char *command_string;
-		int action;
-	} commands[] = {
-		{ "TAKEOFF", MAV_ACTION_TAKEOFF },
-		{ "NAVIGATE", MAV_ACTION_NAVIGATE },
-		{ NULL, 0 }
-	};
-
 	if (f == NULL) {
 		printf("Failed to open '%s' : %s\n", filename, strerror(errno));
 		return;
 	}
 
-	if (wpoints) free(wpoints);
-	wpoints = NULL;
-	wpoint_count = 0;
+	if (wp_list) free(wp_list);
+	wp_list = NULL;
+	wp_count = 0;
+
 
 	while (fgets(line, sizeof(line), f)) {
-		struct wpoint w;
-		char cmd[200];
+		mavlink_waypoint_t *wp;
 		const char *p = &line[0];
-		int i;
+		unsigned seq, frame, action, orbit_direction, current, autocontinue;
+		float orbit, param1, param2, x, y, z, yaw;
 
 		while (isspace(*p)) p++;
-		if (!isupper(p[0])) continue;
+		if (!isdigit(p[0])) continue;
 
-		if (sscanf(p, "%s %f %f %f %f %f", 
-			   cmd,
-			   &w.param1, &w.param2,
-			   &w.lat, &w.lon, &w.alt) != 6) {
+		if (sscanf(p, "%u\t%u\t%u\t%f\t%u\t%f\t%f\t%u\t%f\t%f\t%f\t%f\t%u\n", 
+			   &seq, &frame, &action, &orbit, &orbit_direction, &param1, 
+			   &param2, &current, &x, &y, &z, &yaw, &autocontinue) != 13) {
 			printf("Bad waypoint line '%s'\n", p);
 			fclose(f);
-			if (wpoints) free(wpoints);
-			wpoint_count = 0;
 			return;
 		}
 
-		for (i=0; commands[i].command_string; i++) {
-			if (strcmp(cmd, commands[i].command_string) == 0) {
-				w.action = commands[i].action;
-				break;
-			}
-		}
-		if (commands[i].command_string == NULL) {
-			printf("Unknown command '%s'\n", cmd);
-			fclose(f);
-			if (wpoints) free(wpoints);
-			wpoint_count = 0;
-			return;
-		}
-
-		if (wpoint_count == 0) {
-			wpoints = malloc(sizeof(struct wpoint));
+		if (wp_count == 0) {
+			wp_list = malloc(sizeof(mavlink_waypoint_t));
 		} else {
-			wpoints = realloc(wpoints, sizeof(struct wpoint)*(wpoint_count+1));
+			wp_list = realloc(wp_list, sizeof(mavlink_waypoint_t)*(wp_count+1));
 		}
-		wpoints[wpoint_count] = w;
-		wpoint_count++;
+		wp = &wp_list[wp_count];
+
+		wp->seq = seq;
+		wp->frame = frame;
+		wp->action = action;
+		wp->orbit = orbit;
+		wp->orbit_direction = orbit_direction;
+		wp->param1 = param1;
+		wp->param2 = param2;
+		wp->current = current;
+		wp->x = x;
+		wp->y = y;
+		wp->z = z;
+		wp->yaw = yaw;
+		wp->autocontinue = autocontinue;
+		wp_count++;
 	}
 	fclose(f);
 
 	mavlink_msg_waypoint_clear_all_send(0, TARGET_SYSTEM, TARGET_COMPONENT);
-	if (wpoint_count == 0) return;
+	if (wp_count == 0) return;
 
-	printf("Loaded %u waypoints\n", wpoint_count);
+	printf("Loaded %u waypoints\n", wp_count);
 
 	loading_waypoints = true;
 	loading_waypoint_lasttime = time(NULL);
 
-	mavlink_msg_waypoint_count_send(0, TARGET_SYSTEM, TARGET_COMPONENT, wpoint_count);
+	mavlink_msg_waypoint_count_send(0, TARGET_SYSTEM, TARGET_COMPONENT, wp_count);
 }
 
-
-static void cmd_command(int num_args, char **args)
-{
-	if (num_args != 1) {
-		printf("usage: command <commandnum>\n");
-		return;
-	}
-	mavlink_msg_waypoint_set_current_send(0, TARGET_SYSTEM, 
-					      TARGET_COMPONENT, atoi(args[0]));
-}
-
-
+/*
+  handle parameter commands
+ */
 static void cmd_param(int num_args, char **args)
 {
 	if (num_args < 1) {
@@ -576,13 +642,51 @@ static void cmd_param(int num_args, char **args)
 	}
 }
 
-static void cmd_load(int num_args, char **args)
+/*
+  handle waypoint commands
+ */
+static void cmd_wp(int num_args, char **args)
 {
-	if (num_args != 1) {
-		printf("usage: load <filename>\n");
+	if (num_args < 1) {
+		printf("usage: wp <list|load|save|set>\n");
 		return;
 	}
-	load_waypoints(args[0]);
+	if (strcmp(args[0], "load") == 0) {
+		if (num_args != 2) {
+			printf("usage: wp load <filename>\n");
+			return;
+		}
+		load_waypoints(args[1]);
+		return;
+	}
+	if (strcmp(args[0], "list") == 0) {
+		wp_op = WP_LIST;
+		mavlink_msg_waypoint_request_list_send(0, TARGET_SYSTEM, TARGET_COMPONENT);
+		return;
+	}
+	if (strcmp(args[0], "save") == 0) {
+		if (num_args != 2) {
+			printf("usage: wp save <filename>\n");
+			return;
+		}
+		if (wp_save_filename) free(wp_save_filename);
+		wp_save_filename = strdup(args[1]);
+		wp_op = WP_SAVE;
+		mavlink_msg_waypoint_request_list_send(0, TARGET_SYSTEM, TARGET_COMPONENT);
+		return;
+	}
+
+	if (strcmp(args[0], "set") == 0) {
+		if (num_args != 2) {
+			printf("usage: wp set <wpindex>\n");
+			return;
+		}
+		mavlink_msg_waypoint_set_current_send(0, TARGET_SYSTEM, 
+						      TARGET_COMPONENT, atoi(args[1]));
+		return;
+	}
+	
+	printf("Usage: wp <list|load|save|set>\n");
 }
 
 
@@ -598,8 +702,7 @@ static struct {
 	{ "rtl",    MAV_ACTION_RETURN,     NULL, "return to launch point and loiter" },
 	{ "takeoff",MAV_ACTION_TAKEOFF,    NULL, "start takeoff" },
 	{ "land",   MAV_ACTION_LAND,       NULL, "start landing" },
-	{ "command",0,                     cmd_command, "set next command number" },
-	{ "load",   0,                     cmd_load,    "load waypoints from a file" },
+	{ "wp",	    0,			   cmd_wp,      "waypoint commands" },
 	{ "param",  0,                     cmd_param,   "list or edit parameters" },
 	{ NULL, 0, NULL, NULL }
 };
