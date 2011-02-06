@@ -109,7 +109,9 @@ static unsigned serial_speed = DEFAULT_SERIAL_SPEED;
 
 static unsigned num_mav_param;
 static mavlink_param_value_t *mav_param;
-static enum param_op { PARAM_NONE, PARAM_LIST, PARAM_EDIT } param_op;
+static enum param_op { PARAM_NONE, PARAM_FETCH, PARAM_EDIT, PARAM_SAVE } param_op;
+static char *param_save_filename;
+static char *param_wildcard;
 
 static unsigned wp_count;
 static mavlink_waypoint_t *wp_list;
@@ -198,17 +200,11 @@ static int param_find(const char *id)
 /*
   called when the user has finished editing a parameter list
  */
-static void edit_param_callback(const char *fname, int status)
+static void param_load_file(const char *fname)
 {
 	FILE *f;
 	char id[16];
 	float value;
-
-	printf("Finished edit status=%d\n", status);
-	if (status != 0) {
-		unlink(fname);
-		return;
-	}
 
 	f = fopen(fname, "r");
 	if (f == NULL) {
@@ -231,9 +227,22 @@ static void edit_param_callback(const char *fname, int status)
 		mavlink_msg_param_set_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 
 					   mav_param[i].param_id, value);
 		printf("Setting %s to %f\n", id, value);
-		mav_param[i].param_value = value;
 	}
 	fclose(f);
+}
+
+/*
+  called when the user has finished editing a parameter list
+ */
+static void edit_param_callback(const char *fname, int status)
+{
+	printf("Finished edit status=%d\n", status);
+	if (status != 0) {
+		unlink(fname);
+		return;
+	}
+
+	param_load_file(fname);
 	
 	unlink(fname);
 }
@@ -269,10 +278,7 @@ static void process_param_value(mavlink_message_t *msg)
 	case PARAM_NONE:
 		break;
 
-	case PARAM_LIST:
-		for (i=0; i<num_mav_param; i++) {
-			printf("%-15.15s %f\n", mav_param[i].param_id, mav_param[i].param_value);
-		}
+	case PARAM_FETCH:
 		param_op = PARAM_NONE;
 		break;
 
@@ -285,10 +291,36 @@ static void process_param_value(mavlink_message_t *msg)
 			break;
 		}
 		for (i=0; i<num_mav_param; i++) {
+			if (param_wildcard && 
+			    fnmatch(param_wildcard, (char *)mav_param[i].param_id, 0) != 0) {
+				continue;
+			}
 			dprintf(fd, "%-15.15s %f\n", mav_param[i].param_id, mav_param[i].param_value);
 		}
 		close(fd);
 		edit_file_background(fname, edit_param_callback);
+		param_op = PARAM_NONE;
+		break;
+	}
+
+	case PARAM_SAVE: {
+		int fd = open(param_save_filename, O_WRONLY|O_CREAT|O_TRUNC, 0666);
+		unsigned count = 0;
+		if (fd == -1) {
+			printf("Unable to create parameter save file : %s\n",
+			       strerror(errno));
+			break;
+		}
+		for (i=0; i<num_mav_param; i++) {
+			if (param_wildcard && 
+			    fnmatch(param_wildcard, (char *)mav_param[i].param_id, 0) != 0) {
+				continue;
+			}
+			count++;
+			dprintf(fd, "%-15.15s %f\n", mav_param[i].param_id, mav_param[i].param_value);
+		}
+		close(fd);
+		printf("Saved %u parameters to %s\n", count, param_save_filename);
 		param_op = PARAM_NONE;
 		break;
 	}
@@ -608,17 +640,39 @@ static void load_waypoints(const char *filename)
 static void cmd_param(int num_args, char **args)
 {
 	if (num_args < 1) {
-		printf("usage: param <list|edit|set|show>\n");
+		printf("usage: param <fetch|edit|set|show>\n");
 		return;
 	}
-	if (strcmp(args[0], "list") == 0) {
+	if (strcmp(args[0], "fetch") == 0) {
 		mavlink_msg_param_request_list_send(0, TARGET_SYSTEM, TARGET_COMPONENT);
 		printf("Requested parameter list\n");
-		param_op = PARAM_LIST;
+		param_op = PARAM_FETCH;
 	} else if (strcmp(args[0], "edit") == 0) {
+		if (param_wildcard) free(param_wildcard);
+		if (num_args > 1) {
+			param_wildcard = strdup(args[1]);
+		} else {
+			param_wildcard = NULL;
+		}
 		mavlink_msg_param_request_list_send(0, TARGET_SYSTEM, TARGET_COMPONENT);
 		printf("Requested parameter list for editing\n");
 		param_op = PARAM_EDIT;
+	} else if (strcmp(args[0], "save") == 0) {
+		if (num_args < 2) {
+			printf("usage: param save <filename> [wildcard]\n");
+			return;
+		}
+		if (param_save_filename) free(param_save_filename);
+		param_save_filename = strdup(args[1]);
+		if (param_wildcard) free(param_wildcard);
+		if (num_args > 2) {
+			param_wildcard = strdup(args[2]);
+		} else {
+			param_wildcard = NULL;
+		}
+		mavlink_msg_param_request_list_send(0, TARGET_SYSTEM, TARGET_COMPONENT);
+		printf("Requested parameter list for saving\n");
+		param_op = PARAM_SAVE;
 	} else if (strcmp(args[0], "set") == 0) {
 		if (num_args != 3) {
 			printf("Usage: param set PARMNAME VALUE\n");
@@ -629,6 +683,13 @@ static void cmd_param(int num_args, char **args)
 			return;
 		}
 		mavlink_msg_param_set_send(0, TARGET_SYSTEM, TARGET_COMPONENT, (const int8_t *)args[1], atof(args[2]));
+		param_op = PARAM_NONE;
+	} else if (strcmp(args[0], "load") == 0) {
+		if (num_args != 2) {
+			printf("Usage: param load <filename>\n");
+			return;
+		}
+		param_load_file(args[1]);
 		param_op = PARAM_NONE;
 	} else if (strcmp(args[0], "show") == 0) {
 		const char *pattern = "*";
@@ -695,6 +756,93 @@ static void cmd_wp(int num_args, char **args)
 }
 
 
+/*
+  force a PWM value
+ */
+static void control_set(int num_args, char **args, const char *name, const char *parm_name)
+{
+	uint16_t value;
+	if (num_args != 1) {
+		printf("Usage: %s <value>\n", name);
+		return;
+	}
+	value = atoi(args[0]);
+	mavlink_msg_param_set_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 	
+				   (int8_t *)parm_name, value);
+	if (value == 0) {
+		printf("Disabled %s override\n", name);
+	} else {
+		printf("Set %s override to %u\n", name, value);
+	}
+}
+
+/*
+  force throttle
+ */
+static void cmd_throttle(int num_args, char **args)
+{
+	control_set(num_args, args, "throttle", "PWM_THR_FIX");
+}
+
+/*
+  force roll
+ */
+static void cmd_roll(int num_args, char **args)
+{
+	control_set(num_args, args, "roll", "PWM_ROLL_FIX");
+}
+
+/*
+  force pitch
+ */
+static void cmd_pitch(int num_args, char **args)
+{
+	control_set(num_args, args, "pitch", "PWM_PITCH_FIX");
+}
+
+/*
+  force rudder
+ */
+static void cmd_rudder(int num_args, char **args)
+{
+	control_set(num_args, args, "rudder", "PWM_YAW_FIX");
+}
+
+
+/*
+  set a override RC switch value
+ */
+static void cmd_switch(int num_args, char **args)
+{
+	int value;
+	uint16_t mapping[] = { 0, 1295, 1425, 1555, 1685, 1815 };
+	int flite_mode_ch_parm;
+	char parm_name[] = "PWM_CHn_FIX";
+
+	if (num_args != 1) {
+		printf("Usage: switch <value>\n");
+		return;
+	}
+	value = atoi(args[0]);
+	if (value < 0 || value > 5) {
+		printf("Invalid switch value. Use 1-5 for control modes, 0 to disable\n");
+		return;
+	}
+	flite_mode_ch_parm = param_find("FLITE_MODE_CH");
+	if (flite_mode_ch_parm == -1) {
+		printf("Unable to find FLITE_MODE_CH parameter\n");
+		return;
+	}
+	parm_name[6] = (unsigned)mav_param[flite_mode_ch_parm].param_value;
+	mavlink_msg_param_set_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 	
+				   (int8_t *)parm_name, mapping[value]);
+	if (value == 0) {
+		printf("Disabled RC switch override\n");
+	} else {
+		printf("Set RC switch override to %u (PWM=%u)\n", value, mapping[value]);
+	}
+}
+
 static struct {
 	char *command;
 	int mav_action;
@@ -707,8 +855,13 @@ static struct {
 	{ "rtl",    MAV_ACTION_RETURN,     NULL, "return to launch point and loiter" },
 	{ "takeoff",MAV_ACTION_TAKEOFF,    NULL, "start takeoff" },
 	{ "land",   MAV_ACTION_LAND,       NULL, "start landing" },
-	{ "wp",	    0,			   cmd_wp,      "waypoint commands" },
-	{ "param",  0,                     cmd_param,   "list or edit parameters" },
+	{ "roll",     0,		   cmd_roll,    "set fixed roll PWM" },
+	{ "pitch",    0,		   cmd_pitch,   "set fixed pitch PWM" },
+	{ "rudder",   0,		   cmd_rudder,  "set fixed rudder PWM" },
+	{ "throttle", 0,		   cmd_throttle,"set fixed throttle PWM" },
+	{ "switch", 0,       		   cmd_switch,  "set RC switch value (1-5), 0 disables" },
+	{ "wp",	    0,			   cmd_wp,      "waypoint management (<load|save|list>)" },
+	{ "param",  0,                     cmd_param,   "manage APM parameters (<fetch|edit|save|load>)" },
 	{ NULL, 0, NULL, NULL }
 };
 
