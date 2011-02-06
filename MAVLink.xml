@@ -131,6 +131,12 @@
 	<node>/orientation/yaw-deg</node>
       </chunk>
 
+      <chunk>
+	<name>airspeed-kt</name>
+	<type>double</type>
+	<node>/velocities/airspeed-kt</node>
+      </chunk>
+
     </output>
 
   </generic>

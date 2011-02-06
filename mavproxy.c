@@ -84,6 +84,8 @@ struct fgIMUData {
         double          Pitch;
         double          Yaw;
 
+        double          airspeed_kt;
+
         // trailer
 #define MSG_MAGIC       0x4c56414d
         uint32_t        magic;
@@ -513,9 +515,7 @@ static void send_imu(void)
 				  deg2rad(ins.rateYaw));
 #endif
 	mavlink_msg_airspeed_send(0,
-				  ft2m(sqrt((ins.velocityN * ins.velocityN) +
-					    (ins.velocityE * ins.velocityE))));
-
+				  kt2mps(ins.airspeed_kt));
 }
 
 static void send_gps(void)

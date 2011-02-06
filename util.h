@@ -12,3 +12,4 @@ void swap64(void *p, int n);
 #define fpss2mg(_x)     ((_x) * 1000/ 32.2)                     /* feet per second per second to milligees */
 #define rad2deg(_x)     fmod((((_x) * 57.29578) + 360), 360)    /* radians to degrees */
 #define deg2rad(_x)     (((_x) / 360.0) * 2.0*M_PI)             /* degrees to radians */
+#define kt2mps(_x)      ((_x)*1.94384449)                       /* knots to m/s */
