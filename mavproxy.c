@@ -207,6 +207,7 @@ static void param_load_file(const char *fname)
 	FILE *f;
 	char id[16];
 	float value;
+	char line[100];
 
 	f = fopen(fname, "r");
 	if (f == NULL) {
@@ -214,8 +215,16 @@ static void param_load_file(const char *fname)
 		return;
 	}
 
-	while (fscanf(f, "%15s %f", id, &value) == 2) {
+	while (fgets(line, sizeof(line), f)) {
 		int i;
+		char *p = line;
+
+		while (isspace(*p)) p++;
+		if (*p == '#') continue;
+
+		if (sscanf(line, "%15s %f", id, &value) != 2) {
+			continue;
+		}
 
 		i = param_find(id);
 		if (i == -1) {
@@ -706,7 +715,7 @@ static void cmd_param(int num_args, char **args)
 		}
 		param_op = PARAM_NONE;
 	} else {
-		printf("Unknown subcommand '%s' (try 'list', 'edit' or 'set'\n", args[0]);
+		printf("Unknown subcommand '%s' (try 'edit', 'save', 'set', 'show' or 'load')\n", args[0]);
 	}
 }
 
@@ -817,7 +826,7 @@ static void cmd_rudder(int num_args, char **args)
 static void cmd_switch(int num_args, char **args)
 {
 	int value;
-	uint16_t mapping[] = { 0, 1295, 1425, 1555, 1685, 1815 };
+	uint16_t mapping[] = { 0, 1165, 1295, 1425, 1555, 1685, 1815 };
 	int flite_mode_ch_parm;
 	char *parm_name;
 
@@ -826,8 +835,8 @@ static void cmd_switch(int num_args, char **args)
 		return;
 	}
 	value = atoi(args[0]);
-	if (value < 0 || value > 5) {
-		printf("Invalid switch value. Use 1-5 for control modes, 0 to disable\n");
+	if (value < 0 || value > 6) {
+		printf("Invalid switch value. Use 1-6 for flight modes, '0' to disable\n");
 		return;
 	}
 	flite_mode_ch_parm = param_find("FLITE_MODE_CH");
@@ -1087,10 +1096,10 @@ static void send_to_fg(void)
 	uint64_t t;
 
 	gettimeofday(&tv, NULL);
-	t = (((uint64_t)tv.tv_sec) * 1000000) + tv.tv_usec;
+	t = (((uint64_t)tv.tv_sec) * 1000*1000) + tv.tv_usec;
 	if ((t-lastt) > (1000*1000)/FG_FREQUENCY) {
-		write(fg_out, &fg_swapped, sizeof(fg_swapped));
 		lastt = t;
+		write(fg_out, &fg_swapped, sizeof(fg_swapped));
 	}
 }
 
@@ -1142,7 +1151,7 @@ int main(int argc, char* argv[])
 		send_to_fg();
 
 		tv.tv_sec = 0;
-		tv.tv_usec = 100000;
+		tv.tv_usec = 1000;
 
 		write_status();
 		fflush(stdout);
