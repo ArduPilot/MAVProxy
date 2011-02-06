@@ -102,7 +102,7 @@ struct fgControlData {
 static bool setup_mode;
 
 static struct fgIMUData ins;
-static struct fgControlData fgcontrol, fg_swapped;
+static struct fgControlData fgcontrol;
 static int fd_serial;
 static int fg_in, fg_out;
 static int gc_sock;
@@ -462,18 +462,11 @@ static void handle_mavlink_msg(mavlink_message_t *msg)
                 break;
                 
         case MAVLINK_MSG_ID_RC_CHANNELS_RAW: {
-		struct fgControlData fg;
-
 		status.mav_rc++;
                 fgcontrol.aileron  = scale_rc(mavlink_msg_rc_channels_raw_get_chan1_raw(msg), -1, 1);
-                fgcontrol.elevator = scale_rc(mavlink_msg_rc_channels_raw_get_chan2_raw(msg), -1, 1);
+                fgcontrol.elevator = - scale_rc(mavlink_msg_rc_channels_raw_get_chan2_raw(msg), -1, 1);
                 fgcontrol.throttle = scale_rc(mavlink_msg_rc_channels_raw_get_chan3_raw(msg), 0, 1);
                 fgcontrol.rudder   = scale_rc(mavlink_msg_rc_channels_raw_get_chan4_raw(msg), -1, 1);
-		fg = fgcontrol;
-		fg.elevator = -fg.elevator;
-
-		swap64(&fg, 4);
-		fg_swapped = fg;
 		break;
 	}
 
@@ -1092,6 +1085,16 @@ static void process_gc(void)
 }
 
 
+static void limit_servo_speed(double *v, double last_v)
+{
+	const double change_limit = 0.02;
+	if ((*v) - last_v > change_limit) {
+		(*v) += change_limit;
+	} else if (last_v - (*v) > change_limit) {
+		(*v) -= change_limit;
+	}
+}
+
 /*
   send current APM controls to flightgear
  */
@@ -1100,12 +1103,24 @@ static void send_to_fg(void)
 	struct timeval tv;
 	static uint64_t lastt;
 	uint64_t t;
+	static struct fgControlData last_fg;
 
 	gettimeofday(&tv, NULL);
 	t = (((uint64_t)tv.tv_sec) * 1000*1000) + tv.tv_usec;
 	if ((t-lastt) > (1000*1000)/FG_FREQUENCY) {
+		struct fgControlData fg = fgcontrol;		
+
+		/* ensure we don't change values too rapidly - a real
+		 * servo has movement limits */
+		limit_servo_speed(&fg.aileron, last_fg.aileron);
+		limit_servo_speed(&fg.elevator, last_fg.elevator);
+		limit_servo_speed(&fg.throttle, last_fg.throttle);
+		limit_servo_speed(&fg.rudder, last_fg.rudder);
+		last_fg = fg;
+
+		swap64(&fg, sizeof(fg)/8);
 		lastt = t;
-		write(fg_out, &fg_swapped, sizeof(fg_swapped));
+		write(fg_out, &fg, sizeof(fg));
 	}
 }
 
@@ -1134,13 +1149,6 @@ int main(int argc, char* argv[])
 	rl_callback_handler_install("MAV> ", process_stdin);
 
 	printf("mavproxy started\n");
-
-	fg_swapped.throttle = 0.0;
-	fg_swapped.aileron  = 0.0;
-	fg_swapped.elevator = 0.0;
-	fg_swapped.rudder   = 0.0;
-	swap64(&fg_swapped, 4);
-
 
 	while (1) {
 		fd_set fds;
