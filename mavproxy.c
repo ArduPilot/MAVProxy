@@ -437,6 +437,16 @@ static void process_waypoint(mavlink_message_t *msg)
 }
 
 /*
+  scale servo inputs into fg controls
+ */
+static double scale_rc(uint16_t servo, double minv, double maxv)
+{
+	/* assume a servo range of 1000 to 2000 */
+	double v = (servo - 1000.0) / 1000.0;
+	return minv + v*(maxv-minv);
+}
+
+/*
   handle a mavlink message from APM
  */
 static void handle_mavlink_msg(mavlink_message_t *msg)
@@ -451,20 +461,16 @@ static void handle_mavlink_msg(mavlink_message_t *msg)
 		status.mav_heartbeat++;
                 break;
                 
-        case MAVLINK_MSG_ID_RC_CHANNELS_SCALED: {
+        case MAVLINK_MSG_ID_RC_CHANNELS_RAW: {
 		struct fgControlData fg;
 
 		status.mav_rc++;
-                /* XXX ArduPilotMega channel ordering */
-                fgcontrol.aileron  = (double)mavlink_msg_rc_channels_scaled_get_chan1_scaled(msg) / 10000.0;
-                fgcontrol.elevator = (double)mavlink_msg_rc_channels_scaled_get_chan2_scaled(msg) / 10000.0;
-                fgcontrol.throttle = (double)mavlink_msg_rc_channels_scaled_get_chan3_scaled(msg) / 10000.0;
-                fgcontrol.rudder   = (double)mavlink_msg_rc_channels_scaled_get_chan4_scaled(msg) / 10000.0;
+                fgcontrol.aileron  = scale_rc(mavlink_msg_rc_channels_raw_get_chan1_raw(msg), -1, 1);
+                fgcontrol.elevator = scale_rc(mavlink_msg_rc_channels_raw_get_chan2_raw(msg), -1, 1);
+                fgcontrol.throttle = scale_rc(mavlink_msg_rc_channels_raw_get_chan3_raw(msg), 0, 1);
+                fgcontrol.rudder   = scale_rc(mavlink_msg_rc_channels_raw_get_chan4_raw(msg), -1, 1);
 		fg = fgcontrol;
-		fg.throttle = constrain(fg.throttle, 0, 1.0);
-		fg.aileron  = fg.aileron;
 		fg.elevator = -fg.elevator;
-		fg.rudder   = fg.rudder;
 
 		swap64(&fg, 4);
 		fg_swapped = fg;
@@ -490,7 +496,7 @@ static void handle_mavlink_msg(mavlink_message_t *msg)
         case MAVLINK_MSG_ID_SYS_STATUS:
         case MAVLINK_MSG_ID_GPS_STATUS:
         case MAVLINK_MSG_ID_LOCAL_POSITION:
-        case MAVLINK_MSG_ID_RC_CHANNELS_RAW:
+        case MAVLINK_MSG_ID_RC_CHANNELS_SCALED:
         case MAVLINK_MSG_ID_WAYPOINT_CURRENT:
         case MAVLINK_MSG_ID_GPS_RAW:
         case MAVLINK_MSG_ID_WAYPOINT_ACK:
