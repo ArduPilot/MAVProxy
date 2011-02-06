@@ -99,6 +99,8 @@ struct fgControlData {
 } __attribute__((packed));
 
 
+static bool setup_mode;
+
 static struct fgIMUData ins;
 static struct fgControlData fgcontrol, fg_swapped;
 static int fd_serial;
@@ -817,7 +819,7 @@ static void cmd_switch(int num_args, char **args)
 	int value;
 	uint16_t mapping[] = { 0, 1295, 1425, 1555, 1685, 1815 };
 	int flite_mode_ch_parm;
-	char parm_name[] = "PWM_CHn_FIX";
+	char *parm_name;
 
 	if (num_args != 1) {
 		printf("Usage: switch <value>\n");
@@ -833,14 +835,26 @@ static void cmd_switch(int num_args, char **args)
 		printf("Unable to find FLITE_MODE_CH parameter\n");
 		return;
 	}
-	parm_name[6] = (unsigned)mav_param[flite_mode_ch_parm].param_value;
+	asprintf(&parm_name, "PWM_CH%u_FIX", (unsigned)mav_param[flite_mode_ch_parm].param_value);
 	mavlink_msg_param_set_send(0, TARGET_SYSTEM, TARGET_COMPONENT, 	
 				   (int8_t *)parm_name, mapping[value]);
 	if (value == 0) {
 		printf("Disabled RC switch override\n");
 	} else {
-		printf("Set RC switch override to %u (PWM=%u)\n", value, mapping[value]);
+		printf("Set RC switch override to %u (PWM=%u %s)\n", value, mapping[value], parm_name);
 	}
+	free(parm_name);
+}
+
+
+/*
+  go into setup mode
+ */
+static void cmd_setup(int num_args, char **args)
+{
+	setup_mode = true;
+	printf("Entering setup mode - use '.' on a line by itself to exit\n");
+	rl_set_prompt("setup> ");
 }
 
 static struct {
@@ -862,6 +876,7 @@ static struct {
 	{ "switch", 0,       		   cmd_switch,  "set RC switch value (1-5), 0 disables" },
 	{ "wp",	    0,			   cmd_wp,      "waypoint management (<load|save|list>)" },
 	{ "param",  0,                     cmd_param,   "manage APM parameters (<fetch|edit|save|load>)" },
+	{ "setup",  0,                     cmd_setup,   "go into setup mode (direct serial control)" },
 	{ NULL, 0, NULL, NULL }
 };
 
@@ -883,8 +898,23 @@ static void process_stdin(char *line)
 	int num_toks;
 	int i;
 
+	if (line == NULL) {
+		exit(0);
+	}
+
 	if (line[0] && !isspace(line[0])) {
 		add_history(line);
+	}
+
+	if (setup_mode) {
+		if (strcmp(line, ".") == 0) {
+			setup_mode = false;
+			rl_set_prompt("MAV> ");
+			return;
+		}
+		write(fd_serial, line, strlen(line));
+		write(fd_serial, "\r\n", 2);
+		return;
 	}
 
 	num_toks = 0;
@@ -945,6 +975,11 @@ static void process_serial(void)
 		while ((fd_serial = open_serial(serial_port, serial_speed)) == -1) {
 			sleep(1);
 		}
+		return;
+	}
+
+	if (setup_mode) {
+		write(1, &c, 1);
 		return;
 	}
 
