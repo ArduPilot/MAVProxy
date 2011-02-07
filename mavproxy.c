@@ -1099,11 +1099,11 @@ static void process_gc(void)
 
 static void limit_servo_speed(double *v, double last_v)
 {
-	const double change_limit = 0.02;
+	const double change_limit = 0.04;
 	if ((*v) - last_v > change_limit) {
-		(*v) += change_limit;
+		(*v) = last_v + change_limit;
 	} else if (last_v - (*v) > change_limit) {
-		(*v) -= change_limit;
+		(*v) = last_v - change_limit;
 	}
 }
 
