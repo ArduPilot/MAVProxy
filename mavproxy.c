@@ -865,6 +865,17 @@ static void cmd_setup(int num_args, char **args)
 	rl_set_prompt("setup> ");
 }
 
+/*
+  reopen the APM serial link
+ */
+static void cmd_reset(int num_args, char **args)
+{
+	close(fd_serial);
+	while ((fd_serial = open_serial(serial_port, serial_speed)) == -1) {
+		sleep(1);
+	}
+}
+
 static struct {
 	char *command;
 	int mav_action;
@@ -885,6 +896,7 @@ static struct {
 	{ "wp",	    0,			   cmd_wp,      "waypoint management (<load|save|list>)" },
 	{ "param",  0,                     cmd_param,   "manage APM parameters (<fetch|edit|save|load>)" },
 	{ "setup",  0,                     cmd_setup,   "go into setup mode (direct serial control)" },
+	{ "reset",  0,                     cmd_reset,   "reopen the connection to the APM" },
 	{ NULL, 0, NULL, NULL }
 };
 
