@@ -616,7 +616,7 @@ static void load_waypoints(const char *filename)
 		}
 		wp = &wp_list[wp_count];
 
-		wp->seq = seq;
+		wp->seq = wp_count;
 		wp->frame = frame;
 		wp->action = action;
 		wp->orbit = orbit;
