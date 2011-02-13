@@ -375,6 +375,10 @@ def master_callback(m, master, recipients):
 def process_master(m):
     '''process packets from the MAVLink master'''
     c = m.read()
+    if status.setup_mode:
+        sys.stdout.write(c)
+        sys.stdout.flush()
+        return
     if len(m.buf) == 0:
         # start of a line
         if c == 'U':
@@ -508,14 +512,15 @@ def main_loop():
             if fg_input and fd == fg_input.fd:
                 process_flightgear(fg_input, mav_master)
 
-        if fg_output and fg_period.trigger():
-            send_flightgear_controls(fg_output)
+        if not status.setup_mode:
+            if fg_output and fg_period.trigger():
+                send_flightgear_controls(fg_output)
 
-        if status.gps and gps_period.trigger():
-            mav_master.mav.send(status.gps)
+            if status.gps and gps_period.trigger():
+                mav_master.mav.send(status.gps)
 
-        if status_period.trigger():
-            status.write()
+            if status_period.trigger():
+                status.write()
 
 
 if __name__ == '__main__':
