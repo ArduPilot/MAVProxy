@@ -52,6 +52,7 @@ static void comm_send_ch(mavlink_channel_t chan, uint8_t c);
 
 /* local port address for communication with QGroundControl */
 #define QGCS_SEND_PORT          14550
+#define MAV_LISTEN_PORT         14551
 
 /* frequency of IMU send to FlightGear */
 #define FG_FREQUENCY		50
@@ -96,6 +97,7 @@ struct fgControlData {
         double          elevator;
         double          rudder;
         double          throttle;
+        uint32_t        magic;
 } __attribute__((packed));
 
 
@@ -106,6 +108,7 @@ static struct fgControlData fgcontrol;
 static int fd_serial;
 static int fg_in, fg_out;
 static int gc_sock;
+static int mav_fd;
 static const char *serial_port;
 static unsigned serial_speed = DEFAULT_SERIAL_SPEED;
 
@@ -133,6 +136,7 @@ static struct status {
 static bool loading_waypoints;
 static time_t loading_waypoint_lasttime;
 
+static int log_fd;
 
 
 /*
@@ -140,8 +144,26 @@ static time_t loading_waypoint_lasttime;
  */
 static void comm_send_ch(mavlink_channel_t chan, uint8_t c)
 {
+	static int mavlog2;
+	if (mavlog2 == 0) 
+		mavlog2 = open("mav2.log", O_WRONLY|O_CREAT|O_TRUNC, 0666);
+
+	write(mavlog2, &c, 1);
         if (write(fd_serial, &c, 1) != 1) {
 		printf("Failed to write mavlink char\n");
+	}
+}
+
+
+/*
+  open a mavlink protocol log
+ */
+static void reopen_mav_log(void)
+{
+	log_fd = open("mav.log", O_WRONLY|O_CREAT|O_TRUNC, 0666);
+	if (log_fd == -1) {
+		printf("Failed to open mav.log : %s\n", strerror(errno));
+		exit(1);
 	}
 }
 
@@ -453,6 +475,7 @@ static void handle_mavlink_msg(mavlink_message_t *msg)
 {
         uint8_t buf[1024];
         uint16_t len;
+	uint64_t usec;
 
 	status.mav_counter++;
 
@@ -527,6 +550,11 @@ static void handle_mavlink_msg(mavlink_message_t *msg)
         /* pass all messages on to QGCS */
         len = mavlink_msg_to_send_buffer(buf, msg);
         write(gc_sock, buf, len);
+
+	/* and log it */
+	usec = get_usec();
+	write(log_fd, &usec, sizeof(usec));
+	write(log_fd, buf, len);
 }
 
 /*
@@ -684,6 +712,7 @@ static void cmd_param(int num_args, char **args)
 		printf("Requested parameter list for saving\n");
 		param_op = PARAM_SAVE;
 	} else if (strcmp(args[0], "set") == 0) {
+		int8_t id[15] = {0, };
 		if (num_args != 3) {
 			printf("Usage: param set PARMNAME VALUE\n");
 			return;
@@ -692,7 +721,8 @@ static void cmd_param(int num_args, char **args)
 			printf("Unable to find parameter '%s'\n", args[1]);
 			return;
 		}
-		mavlink_msg_param_set_send(0, TARGET_SYSTEM, TARGET_COMPONENT, (const int8_t *)args[1], atof(args[2]));
+		strncpy((char *)id, args[1], 15);
+		mavlink_msg_param_set_send(0, TARGET_SYSTEM, TARGET_COMPONENT, id, atof(args[2]));
 		param_op = PARAM_NONE;
 	} else if (strcmp(args[0], "load") == 0) {
 		if (num_args != 2) {
@@ -1073,6 +1103,9 @@ static void process_fg(void)
 	swap64(&buf, (sizeof(buf)-4)/8);
 	ins = buf;
 	ins.altitude = ft2m(ins.altitude);
+	if (ins.Yaw == 0.0) {
+		ins.Yaw = ins.heading;
+	}
 	if (ins.altitude > 0.0) {
 		status.ins_counter++;
 		send_imu();
@@ -1083,13 +1116,13 @@ static void process_fg(void)
 /*
   process a packet from the ground control station
  */
-static void process_gc(void)
+static void process_mavlink(int fd)
 {
 	char buf[2048];
 	ssize_t len;
 
 	/* pass mavlink packets from gcs to APM */
-	len = read(gc_sock, buf, sizeof(buf));
+	len = read(fd, buf, sizeof(buf));
 	if (len > 0) {
 		write(fd_serial, buf, len);
 		status.gc_counter++;
@@ -1128,9 +1161,10 @@ static void send_to_fg(void)
 		limit_servo_speed(&fg.elevator, last_fg.elevator);
 		limit_servo_speed(&fg.throttle, last_fg.throttle);
 		limit_servo_speed(&fg.rudder, last_fg.rudder);
+		fg.magic = MSG_MAGIC;
 		last_fg = fg;
 
-		swap64(&fg, sizeof(fg)/8);
+		swap64(&fg, (sizeof(fg)-4)/8);
 		lastt = t;
 		write(fg_out, &fg, sizeof(fg));
 	}
@@ -1156,9 +1190,12 @@ int main(int argc, char* argv[])
 	fg_in         = open_socket_in("127.0.0.1", IMU_LISTEN_PORT);
 	fg_out        = open_socket_out("127.0.0.1", CTRL_SEND_PORT);
 	gc_sock       = open_socket_out("127.0.0.1", QGCS_SEND_PORT);
+	mav_fd        = open_socket_in("127.0.0.1", MAV_LISTEN_PORT);
 
 	/* setup for readline handling */
 	rl_callback_handler_install("MAV> ", process_stdin);
+
+	reopen_mav_log();
 
 	printf("mavproxy started\n");
 
@@ -1171,6 +1208,7 @@ int main(int argc, char* argv[])
 		FD_SET(fd_serial, &fds);
 		FD_SET(fg_in, &fds);
 		FD_SET(gc_sock, &fds);
+		FD_SET(mav_fd, &fds);
 		FD_SET(0, &fds);
 
 		/* send data to flight gear every 20ms */
@@ -1193,7 +1231,12 @@ int main(int argc, char* argv[])
 		}
 
 		if (FD_ISSET(gc_sock, &fds)) {
-			process_gc();
+			process_mavlink(gc_sock);
+			continue;
+		}
+
+		if (FD_ISSET(mav_fd, &fds)) {
+			process_mavlink(mav_fd);
 			continue;
 		}
 
