@@ -73,8 +73,10 @@ class status(object):
         self.rc_throttle = 0
         self.rc_rudder   = 0
         self.gps	 = None
-        status.msgs = {}
-        status.counters = {'Master' : 0, 'FGear' : 0, 'Slave' : 0}
+        self.msgs = {}
+        self.counters = {'Master' : 0, 'FGear' : 0, 'Slave' : 0}
+        self.setup_mode = False
+
 
     def write(self):
         '''write status to status.txt'''
@@ -193,11 +195,14 @@ def cmd_param(args, rl, mav_master):
         print("Unknown subcommand '%s' (try 'save', 'set', 'show' or 'load'", args[0]);
 
 
-def cmd_setup():
-    pass
+def cmd_setup(args, rl, mav_master):
+    status.setup_mode = True
+    rl.set_prompt("setup> ")
 
-def cmd_reset():
-    pass
+
+def cmd_reset(args, rl, mav_master):
+    print("Resetting master")
+    mav_master.reset()
 
 command_map = {
     'roll'    : (cmd_roll,     'set fixed roll PWM'),
@@ -211,26 +216,22 @@ command_map = {
     'reset'   : (cmd_reset,    'reopen the connection to the MAVLink master')
     };
 
-setup_mode = False
-        
 def process_stdin(rl, line, mav_master):
     '''handle commands from user'''
-    global setup_mode
     line = line.strip()
     if not line:
         return
     rl.add_history(line)
-    if line == 'setup':
-        setup_mode = True
-        rl.set_prompt("setup> ")
-        return
-    if setup_mode:
+
+    if status.setup_mode:
+        # in setup mode we send strings straight to the master
         if line == '.':
-            setup_mode = False
+            status.setup_mode = False
             rl.set_prompt("MAV> ")
             return
         mav_master.mav.write(line + '\r\n')
         return
+    
     args = line.split(" ")
     cmd = args[0]
     if cmd == 'help':
@@ -258,7 +259,9 @@ class mavserial(mavfd):
     '''a serial mavlink port'''
     def __init__(self, device, baud=57600):
         import serial
-        self.port = serial.Serial(device, baud, timeout=0)
+        self.baud = baud
+        self.device = device
+        self.port = serial.Serial(self.device, self.baud, timeout=0)
         mavfd.__init__(self, self.port.fileno(), device)
         self.buf = ""
         self.in_mavlink = False
@@ -270,6 +273,17 @@ class mavserial(mavfd):
 
     def write(self, buf):
         return self.port.write(buf)
+
+    def reset(self):
+        import serial
+        self.port.close()
+        while True:
+            try:
+                self.port = serial.Serial(self.device, self.baud, timeout=0)
+                return
+            except Exception, msg:
+                print("Failed to reopen %s - %s" % (self.device, msg))
+                time.sleep(1)
         
 
 class mavudp(mavfd):
