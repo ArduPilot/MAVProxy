@@ -76,7 +76,10 @@ class status(object):
         self.msgs = {}
         self.counters = {'Master' : 0, 'FGear' : 0, 'Slave' : 0}
         self.setup_mode = False
-
+        self.wp_op = None
+        self.wp_save_filename = None
+        self.wp_count = 0
+        self.wpoints = []
 
     def write(self):
         '''write status to status.txt'''
@@ -142,8 +145,34 @@ def cmd_switch(args, rl, mav_master):
     else:
         print("Set RC switch override to %u (PWM=%u)" % (value, mapping[value]))
 
-def cmd_wp():
-    pass
+def cmd_wp(args, rl, mav_master):
+    '''waypoint commands'''
+    if len(args) < 1:
+        print("usage: wp <list|load|save|set>")
+        return
+
+    if args[0] == "load":
+        if len(args) != 2:
+            print("usage: wp load <filename>")
+            return
+        load_waypoints(args[1])
+    elif args[0] == "list":
+        status.wp_op = "list"
+        mav_master.mav.waypoint_request_list_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT)
+    elif args == "save":
+        if len(args) != 2:
+            print("usage: wp save <filename>")
+            return
+        status.wp_save_filename = args[1]
+        wp_op = "save"
+        mav_master.mav.waypoint_request_list_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT)
+    elif args[0] == "set":
+        if len(args) != 2:
+            print("usage: wp set <wpindex>")
+            return
+        mav_master.mav.waypoint_set_current_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT, int(args[1]))
+    else:
+        print("Usage: wp <list|load|save|set>")
 
 param_op = None
 param_wildcard = "*"
@@ -344,6 +373,7 @@ def master_callback(m, master, recipients):
             print("")
         if m.param_index+1 == m.param_count:
             print("Received %u parameters" % m.param_count)
+
     elif mtype == 'RC_CHANNELS_RAW':
         status.rc_aileron  = limit_servo_speed(status.rc_aileron,
                                                scale_rc(m.chan1_raw, -1.0, 1.0))
@@ -353,6 +383,23 @@ def master_callback(m, master, recipients):
                                                scale_rc(m.chan3_raw, 0.0, 1.0))
         status.rc_rudder   = limit_servo_speed(status.rc_rudder,
                                                scale_rc(m.chan4_raw, -1.0, 1.0))
+
+    elif mtype == 'WAYPOINT_COUNT' and status.wp_op != None:
+        status.wp_count = m.count
+        status.wpoints = [None]*m.count
+        print("Requesting %u waypoints" % m.count)
+        mav_master.mav.waypoint_request_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT, 0)
+
+    elif mtype == 'WAYPOINT' and status.wp_op != None:
+        status.wpoints[m.seq] = m
+        if m.seq+1 < status.wp_count:
+            mav_master.mav.waypoint_request_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT, m.seq+1)
+            return
+        if status.wp_op == 'list':
+            for w in status.wpoints:
+                print("%.10f %.10f %f" % (w.x, w.y, w.z))
+        status.wp_op = None
+
     elif mtype in [ 'HEARTBEAT', 'GLOBAL_POSITION', 'RC_CHANNELS_SCALED',
                     'ATTITUDE', 'RC_CHANNELS_RAW', 'GPS_STATUS', 'WAYPOINT_CURRENT',
                     'SYS_STATUS', 'GPS_RAW']:
