@@ -315,6 +315,9 @@ def master_callback(m, master, recipients):
     '''process mavlink message m on master, sending any messages to recipients'''
     master.in_mavlink = False
     master.buf = ""
+
+    status.counters['Master'] += 1
+
     mtype = m.get_type()
     if mtype == 'STATUSTEXT':
         print("APM: %s" % m.text)
@@ -394,6 +397,7 @@ def process_mavlink(slave, master):
         print("Bad MAVLink slave message from %s: %s" % (slave.address, msg))
         return
     master.write(m.get_msgbuf())
+    status.counters['Slave'] += 1
     
         
 def send_flightgear_controls(fg):
@@ -425,6 +429,8 @@ def process_flightgear(m, master):
         # the first packet from flightgear is sometimes rubbish
         return
 
+    status.counters['FGear'] += 1
+
     if yawDeg == 0.0:
         # not all planes give a yaw value
         yawDeg = heading
@@ -435,7 +441,6 @@ def process_flightgear(m, master):
                              deg2rad(rollRate),deg2rad(pitchRate),deg2rad(yawRate))
     # and airspeed
     master.mav.airspeed_send(kt2mps(airspeed))
-    status.fg_counter += 1
 
     # remember GPS fix, we send this at opts.gpsrate
     status.gps = mavlink.MAVLink_gps_raw_message(get_usec(),
