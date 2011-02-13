@@ -229,7 +229,7 @@ def process_stdin(rl, line, mav_master):
             status.setup_mode = False
             rl.set_prompt("MAV> ")
             return
-        mav_master.mav.write(line + '\r\n')
+        mav_master.write(line + '\r\n')
         return
     
     args = line.split(" ")
