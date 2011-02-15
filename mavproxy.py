@@ -505,7 +505,7 @@ def process_flightgear(m, master):
                              deg2rad(rollDeg), deg2rad(pitchDeg), deg2rad(yawDeg),
                              deg2rad(rollRate),deg2rad(pitchRate),deg2rad(yawRate))
     # and airspeed
-    master.mav.airspeed_send(kt2mps(airspeed))
+#    master.mav.airspeed_send(kt2mps(airspeed))
 
     # remember GPS fix, we send this at opts.gpsrate
     status.gps = mavlink.MAVLink_gps_raw_message(get_usec(),
