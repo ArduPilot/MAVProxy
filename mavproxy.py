@@ -89,8 +89,7 @@ class status(object):
             f.write('%s:%u ' % (c, status.counters[c]))
         f.write('\n')
         f.write(str(self.gps)+'\n')
-        for m in ['ATTITUDE', 'SYS_STATUS', 'RC_CHANNELS_RAW', 'GPS_RAW']:
-            if m in status.msgs:
+        for m in status.msgs:
                 f.write(str(status.msgs[m])+'\n')
         for i in range(0, len(self.msg_lines)):
             f.write(self.msg_lines[i]+'\n')
@@ -217,16 +216,18 @@ def cmd_param(args, rl, mav_master):
             pattern = args[1]
         else:
             pattern = "*"
-        for p in mav_param:
+        k = mav_param.keys()
+        k.sort()
+        for p in k:
             if fnmatch.fnmatch(p, pattern):
                 print("%-15.15s %f" % (p, mav_param[p]))
     else:
-        print("Unknown subcommand '%s' (try 'save', 'set', 'show' or 'load'", args[0]);
+        print("Unknown subcommand '%s' (try 'fetch', 'save', 'set', 'show' or 'load')" % args[0]);
 
 
 def cmd_setup(args, rl, mav_master):
     status.setup_mode = True
-    rl.set_prompt("setup> ")
+    rl.set_prompt("")
 
 
 def cmd_reset(args, rl, mav_master):
@@ -248,9 +249,6 @@ command_map = {
 def process_stdin(rl, line, mav_master):
     '''handle commands from user'''
     line = line.strip()
-    if not line:
-        return
-    rl.add_history(line)
 
     if status.setup_mode:
         # in setup mode we send strings straight to the master
@@ -258,9 +256,14 @@ def process_stdin(rl, line, mav_master):
             status.setup_mode = False
             rl.set_prompt("MAV> ")
             return
-        mav_master.write(line + '\r\n')
+        rl.add_history(line)
+        mav_master.write(line + '\r')
         return
-    
+
+    if not line:
+        return
+
+    rl.add_history(line)
     args = line.split(" ")
     cmd = args[0]
     if cmd == 'help':
@@ -374,15 +377,15 @@ def master_callback(m, master, recipients):
         if m.param_index+1 == m.param_count:
             print("Received %u parameters" % m.param_count)
 
-    elif mtype == 'RC_CHANNELS_RAW':
+    elif mtype == 'SERVO_OUTPUT_RAW':
         status.rc_aileron  = limit_servo_speed(status.rc_aileron,
-                                               scale_rc(m.chan1_raw, -1.0, 1.0))
+                                               scale_rc(m.servo1_raw, -1.0, 1.0))
         status.rc_elevator = limit_servo_speed(status.rc_elevator,
-                                               scale_rc(m.chan2_raw, -1.0, 1.0))
+                                               scale_rc(m.servo2_raw, -1.0, 1.0))
         status.rc_throttle = limit_servo_speed(status.rc_throttle,
-                                               scale_rc(m.chan3_raw, 0.0, 1.0))
+                                               scale_rc(m.servo3_raw, 0.0, 1.0))
         status.rc_rudder   = limit_servo_speed(status.rc_rudder,
-                                               scale_rc(m.chan4_raw, -1.0, 1.0))
+                                               scale_rc(m.servo4_raw, -1.0, 1.0))
 
     elif mtype == 'WAYPOINT_COUNT' and status.wp_op != None:
         status.wp_count = m.count
@@ -402,7 +405,7 @@ def master_callback(m, master, recipients):
 
     elif mtype in [ 'HEARTBEAT', 'GLOBAL_POSITION', 'RC_CHANNELS_SCALED',
                     'ATTITUDE', 'RC_CHANNELS_RAW', 'GPS_STATUS', 'WAYPOINT_CURRENT',
-                    'SYS_STATUS', 'GPS_RAW']:
+                    'SYS_STATUS', 'GPS_RAW', 'SERVO_OUTPUT_RAW', 'VFR_HUD', 'GLOBAL_POSITION_INT' ]:
         pass
     else:
         print("Got MAVLink msg: %s" % m)
@@ -537,6 +540,7 @@ def main_loop():
     fg_period = periodic_event(opts.fgrate)
     gps_period = periodic_event(opts.gpsrate)
     status_period = periodic_event(1.0)
+    msg_period = periodic_event(2.0)
 
     while True:
         rin = [0, mav_master.fd]
@@ -568,6 +572,10 @@ def main_loop():
 
             if status_period.trigger():
                 status.write()
+
+            if msg_period.trigger():
+                mav_master.mav.request_data_stream_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT,
+                                                        mavlink.MAV_DATA_STREAM_ALL, 1, 1)
 
 
 if __name__ == '__main__':
