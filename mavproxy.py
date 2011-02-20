@@ -173,6 +173,42 @@ def cmd_wp(args, rl, mav_master):
     else:
         print("Usage: wp <list|load|save|set>")
 
+
+def param_save(filename, wildcard):
+    '''save parameters to a file'''
+    f = open(filename, mode='w')
+    k = mav_param.keys()
+    k.sort()
+    count = 0
+    for p in k:
+        if p and fnmatch.fnmatch(p, wildcard):
+            f.write("%-15.15s %f\n" % (p, mav_param[p]))
+            count += 1
+    f.close()
+    print("Saved %u parameters to %s" % (count, filename))
+
+
+def param_load_file(filename, wildcard, mav_master):
+    '''load parameters from a file'''
+    f = open(filename, mode='r')
+    count = 0
+    for line in f:
+        line = line.strip()
+        if line[0] == "#":
+            continue
+        a = line.split()
+        if len(a) != 2:
+            print("Invalid line: %s" % line)
+            continue
+        if not fnmatch.fnmatch(a[0], wildcard):
+            continue
+        mav_master.mav.param_set_send(opts.TARGET_SYSTEM,
+                                      opts.TARGET_COMPONENT, a[0], float(a[1]))
+        count += 1
+    f.close()
+    print("Loaded %u parameters from %s" % (count, filename))
+    
+
 param_op = None
 param_wildcard = "*"
 
@@ -191,10 +227,10 @@ def cmd_param(args, rl, mav_master):
             print("usage: param save <filename> [wildcard]")
             return
         if len(args) > 2:
-            param_wildcard = args[1]
+            param_wildcard = args[2]
         else:
             param_wildcard = "*"
-        param_save(args[0], param_wildcard)
+        param_save(args[1], param_wildcard)
     elif args[0] == "set":
         if len(args) != 3:
             print("Usage: param set PARMNAME VALUE")
@@ -207,10 +243,14 @@ def cmd_param(args, rl, mav_master):
         mav_master.mav.param_set_send(opts.TARGET_SYSTEM,
                                       opts.TARGET_COMPONENT, param, float(value))
     elif args[0] == "load":
-        if len(args) != 2:
-            print("Usage: param load <filename>")
+        if len(args) < 2:
+            print("Usage: param load <filename> [wildcard]")
             return
-        param_load_file(args[1]);
+        if len(args) > 2:
+            param_wildcard = args[2]
+        else:
+            param_wildcard = "*"
+        param_load_file(args[1], param_wildcard, mav_master);
     elif args[0] == "show":
         if len(args) > 1:
             pattern = args[1]
@@ -304,7 +344,11 @@ class mavserial(mavfd):
         return self.port.read()
 
     def write(self, buf):
-        return self.port.write(buf)
+        try:
+            return self.port.write(buf)
+        except OSError:
+            self.reset()
+            return -1
 
     def reset(self):
         import serial
@@ -349,6 +393,8 @@ def scale_rc(servo, min, max):
 
 def limit_servo_speed(oldv, newv):
     '''limit servo rate of change'''
+    if oldv == 0:
+        oldv == newv
     change_limit = 0.04
     if newv - oldv > change_limit:
         return oldv + change_limit
