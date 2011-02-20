@@ -78,8 +78,9 @@ class status(object):
         self.setup_mode = False
         self.wp_op = None
         self.wp_save_filename = None
-        self.wp_count = 0
         self.wpoints = []
+        self.loading_waypoints = False
+        self.loading_waypoint_lasttime = time.time()
 
     def write(self):
         '''write status to status.txt'''
@@ -144,10 +145,128 @@ def cmd_switch(args, rl, mav_master):
     else:
         print("Set RC switch override to %u (PWM=%u)" % (value, mapping[value]))
 
+def process_waypoint_request(m, mav_master):
+    '''process a waypoint request from the master'''
+    if (not status.loading_waypoints or
+        time.time() > status.loading_waypoint_lasttime + 10.0):
+        return
+    if m.seq >= len(status.wpoints):
+        print("Request for bad waypoint %u (max %u)" % (m.seq, len(status.wpoints)))
+        return
+    mav_master.mav.send(status.wpoints[m.seq])
+    status.loading_waypoint_lasttime = time.time()
+    if m.seq == len(status.wpoints) - 1:
+        status.loading_waypoints = False
+        print("Sent all %u waypoints" % len(status.wpoints))
+    else:
+        print("Sent waypoint %u" % m.seq)
+
+
+def read_waypoint_v100(line):
+    '''read a version 100 waypoint'''
+    cmdmap = {
+        2 : mavlink.MAV_CMD_NAV_TAKEOFF,
+        3 : mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH,
+        4 : mavlink.MAV_CMD_NAV_LAND,
+        24: mavlink.MAV_CMD_NAV_TAKEOFF,
+        26: mavlink.MAV_CMD_NAV_LAND,
+        25: mavlink.MAV_CMD_NAV_WAYPOINT ,
+        27: mavlink.MAV_CMD_NAV_LOITER_UNLIM
+        }
+    a = line.split()
+    if len(a) != 13:
+        raise RuntimeError("invalid waypoint line with %u values" % len(a))
+    w = mavlink.MAVLink_waypoint_message(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT,
+                                         int(a[0]),    # seq
+                                         int(a[1]),    # frame
+                                         int(a[2]),    # action
+                                         int(a[7]),    # current
+                                         int(a[12]),   # autocontinue
+                                         float(a[5]),  # param1,
+                                         float(a[6]),  # param2,
+                                         float(a[3]),  # param3
+                                         float(a[4]),  # param4
+                                         float(a[9]),  # x
+                                         float(a[8]),  # y
+                                         float(a[10])  # z
+                                         )
+    if not w.command in cmdmap:
+        print("Unknown v100 waypoint action %u" % w.command)
+        return None
+    
+    w.command = cmdmap[w.command]
+    return w
+
+def read_waypoint_v110(line):
+    '''read a version 110 waypoint'''
+    a = line.split()
+    if len(a) != 12:
+        raise RuntimeError("invalid waypoint line with %u values" % len(a))
+    w = mavlink.MAVLink_waypoint_message(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT,
+                                         int(a[0]),    # seq
+                                         int(a[1]),    # frame
+                                         int(a[2]),    # command
+                                         int(a[3]),    # current
+                                         int(a[4]),    # autocontinue
+                                         float(a[5]),  # param1,
+                                         float(a[6]),  # param2,
+                                         float(a[7]),  # param3
+                                         float(a[8]),  # param4
+                                         float(a[9]),  # x
+                                         float(a[10]), # y
+                                         float(a[11])  # z
+                                         )
+    return w
+
+
+def load_waypoints(filename):
+    '''load waypoints from a file'''
+    f = open(filename, mode='r')
+    version_line = f.readline().strip()
+    if version_line == "QGC WPL 100":
+        readfn = read_waypoint_v100
+    elif version_line == "QGC WPL 110":
+        readfn = read_waypoint_v110
+    else:
+        print("Unsupported waypoint format '%s'" % version_line)
+        f.close()
+        return
+
+    status.wpoints = []
+
+    for line in f:
+        w = readfn(line)
+        if w is not None:
+            w.seq = len(status.wpoints)
+            status.wpoints.append(w)
+    f.close()
+    print("Loaded %u waypoints from %s" % (len(status.wpoints), filename))
+
+    mav_master.mav.waypoint_clear_all_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT)
+    if len(status.wpoints) == 0:
+        return
+
+    status.loading_waypoints = True
+    status.loading_waypoint_lasttime = time.time()
+    mav_master.mav.waypoint_count_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT, len(status.wpoints))
+
+def save_waypoints(filename):
+    '''save waypoints to a file'''
+    f = open(filename, mode='w')
+    f.write("QGC WPL 110\n")
+    for w in status.wpoints:
+        f.write("%u\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%u\n" % (
+            w.seq, w.current, w.frame, w.command,
+            w.param1, w.param2, w.param3, w.param4,
+            w.x, w.y, w.z, w.autocontinue))
+    f.close()
+    print("Saved %u waypoints to %s" % (len(status.wpoints), filename))
+             
+
 def cmd_wp(args, rl, mav_master):
     '''waypoint commands'''
     if len(args) < 1:
-        print("usage: wp <list|load|save|set>")
+        print("usage: wp <list|load|save|set|clear>")
         return
 
     if args[0] == "load":
@@ -158,20 +277,22 @@ def cmd_wp(args, rl, mav_master):
     elif args[0] == "list":
         status.wp_op = "list"
         mav_master.mav.waypoint_request_list_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT)
-    elif args == "save":
+    elif args[0] == "save":
         if len(args) != 2:
             print("usage: wp save <filename>")
             return
         status.wp_save_filename = args[1]
-        wp_op = "save"
+        status.wp_op = "save"
         mav_master.mav.waypoint_request_list_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT)
     elif args[0] == "set":
         if len(args) != 2:
             print("usage: wp set <wpindex>")
             return
         mav_master.mav.waypoint_set_current_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT, int(args[1]))
+    elif args[0] == "clear":
+        mav_master.mav.waypoint_clear_all_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT)
     else:
-        print("Usage: wp <list|load|save|set>")
+        print("Usage: wp <list|load|save|set|clear>")
 
 
 def param_save(filename, wildcard):
@@ -434,20 +555,24 @@ def master_callback(m, master, recipients):
                                                scale_rc(m.servo4_raw, -1.0, 1.0))
 
     elif mtype == 'WAYPOINT_COUNT' and status.wp_op != None:
-        status.wp_count = m.count
         status.wpoints = [None]*m.count
         print("Requesting %u waypoints" % m.count)
         mav_master.mav.waypoint_request_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT, 0)
 
     elif mtype == 'WAYPOINT' and status.wp_op != None:
         status.wpoints[m.seq] = m
-        if m.seq+1 < status.wp_count:
+        if m.seq+1 < len(status.wpoints):
             mav_master.mav.waypoint_request_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT, m.seq+1)
             return
         if status.wp_op == 'list':
             for w in status.wpoints:
-                print("%.10f %.10f %f" % (w.x, w.y, w.z))
+                print("%u %.10f %.10f %f" % (w.command, w.x, w.y, w.z))
+        elif status.wp_op == "save":
+            save_waypoints(status.wp_save_filename)
         status.wp_op = None
+
+    elif mtype == "WAYPOINT_REQUEST":
+        process_waypoint_request(m, master)
 
     elif mtype in [ 'HEARTBEAT', 'GLOBAL_POSITION', 'RC_CHANNELS_SCALED',
                     'ATTITUDE', 'RC_CHANNELS_RAW', 'GPS_STATUS', 'WAYPOINT_CURRENT',
