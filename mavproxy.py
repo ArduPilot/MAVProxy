@@ -634,12 +634,7 @@ def process_master(m):
             m.buf = ""
         return
     if c == '\n':
-        if len(m.buf) > 2 and m.buf[0] == '@':
-            id = int(m.buf[1])
-            if id < len(status.msg_lines):
-                status.msg_lines[id] = m.buf[2:].strip()
-        else:
-            print("APM: %s" % m.buf)
+        print("APM: %s" % m.buf)
         m.buf = ""
         return
     m.buf += c
@@ -656,7 +651,8 @@ def process_mavlink(slave, master):
     except mavlink.MAVError, msg:
         print("Bad MAVLink slave message from %s: %s" % (slave.address, msg))
         return
-    master.write(m.get_msgbuf())
+    if not status.setup_mode:
+        master.write(m.get_msgbuf())
     status.counters['Slave'] += 1
     
         
