@@ -181,7 +181,7 @@ def process_waypoint_request(m, mav_master):
         status.loading_waypoints = False
         print("Sent all %u waypoints" % len(status.wpoints))
     else:
-        print("Sent waypoint %u" % m.seq)
+        print("Sent waypoint %u : %s" % (m.seq, status.wpoints[m.seq]))
 
 
 def read_waypoint_v100(line):
@@ -208,8 +208,8 @@ def read_waypoint_v100(line):
                                          float(a[6]),  # param2,
                                          float(a[3]),  # param3
                                          float(a[4]),  # param4
-                                         float(a[9]),  # x
-                                         float(a[8]),  # y
+                                         float(a[9]),  # x, latitude
+                                         float(a[8]),  # y, longitude
                                          float(a[10])  # z
                                          )
     if not w.command in cmdmap:
@@ -226,17 +226,17 @@ def read_waypoint_v110(line):
         raise RuntimeError("invalid waypoint line with %u values" % len(a))
     w = mavlink.MAVLink_waypoint_message(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT,
                                          int(a[0]),    # seq
-                                         int(a[1]),    # frame
-                                         int(a[2]),    # command
-                                         int(a[3]),    # current
-                                         int(a[4]),    # autocontinue
-                                         float(a[5]),  # param1,
-                                         float(a[6]),  # param2,
-                                         float(a[7]),  # param3
-                                         float(a[8]),  # param4
-                                         float(a[9]),  # x
-                                         float(a[10]), # y
-                                         float(a[11])  # z
+                                         int(a[2]),    # frame
+                                         int(a[3]),    # command
+                                         int(a[1]),    # current
+                                         int(a[11]),   # autocontinue
+                                         float(a[4]),  # param1,
+                                         float(a[5]),  # param2,
+                                         float(a[6]),  # param3
+                                         float(a[7]),  # param4
+                                         float(a[8]),  # x (latitude)
+                                         float(a[9]),  # y (longitude)
+                                         float(a[10])  # z (altitude)
                                          )
     return w
 
@@ -704,8 +704,8 @@ def process_flightgear(m, master):
     groundspeed = ft2m(math.sqrt((speedN * speedN) + (speedE * speedE)))
 
     # and airspeed
-    master.mav.vfr_hud_send(kt2mps(airspeed), groundspeed, heading,
-                            status.rc_throttle, ft2m(altitude), 0)
+    master.mav.vfr_hud_send(kt2mps(airspeed), groundspeed, int(heading),
+                            int(status.rc_throttle*100), ft2m(altitude), 0)
 
     # remember GPS fix, we send this at opts.gpsrate
     status.gps = mavlink.MAVLink_gps_raw_message(get_usec(),
