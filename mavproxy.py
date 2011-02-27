@@ -693,12 +693,19 @@ def process_flightgear(m, master):
         # not all planes give a yaw value
         yawDeg = heading
 
+    if status.setup_mode:
+        return
+
     # send IMU data to the master
     master.mav.attitude_send(get_usec(),
                              deg2rad(rollDeg), deg2rad(pitchDeg), deg2rad(yawDeg),
                              deg2rad(rollRate),deg2rad(pitchRate),deg2rad(yawRate))
+
+    groundspeed = ft2m(math.sqrt((speedN * speedN) + (speedE * speedE)))
+
     # and airspeed
-#    master.mav.airspeed_send(kt2mps(airspeed))
+    master.mav.vfr_hud_send(kt2mps(airspeed), groundspeed, heading,
+                            status.rc_throttle, ft2m(altitude), 0)
 
     # remember GPS fix, we send this at opts.gpsrate
     status.gps = mavlink.MAVLink_gps_raw_message(get_usec(),
