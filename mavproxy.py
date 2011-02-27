@@ -103,25 +103,28 @@ status = status()
 mav_param = {}
     
 
-def control_set(mav_master, name, param_name, args):
+def control_set(mav_master, name, channel, args):
     '''set a fixed RC control PWM value'''
     if len(args) != 1:
         print("Usage: %s <pwmvalue>" % name)
         return
-    mav_master.mav.param_set_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT,
-                                  param_name, float(args[0]))
+    values = [ 65535 ] * 8
+    values[channel-1] = int(args[0])
+    values.append(0)
+    mav_master.mav.rc_channels_raw_send(*values)
     
 def cmd_roll(args, rl, mav_master):
-    control_set(mav_master, 'roll', 'PWM_ROLL_FIX', args)
+    control_set(mav_master, 'roll', 1, args)
 
 def cmd_pitch(args, rl, mav_master):
-    control_set(mav_master, 'pitch', 'PWM_PITCH_FIX', args)
+    control_set(mav_master, 'pitch', 2, args)
 
 def cmd_rudder(args, rl, mav_master):
-    control_set(mav_master, 'rudder', 'PWM_YAW_FIX', args)
+    control_set(mav_master, 'rudder', 4, args)
 
 def cmd_throttle(args, rl, mav_master):
-    control_set(mav_master, 'throttle', 'PWM_THR_FIX', args)
+    control_set(mav_master, 'throttle', 3, args)
+
 
 def cmd_switch(args, rl, mav_master):
     '''handle RC switch changes'''
@@ -133,17 +136,36 @@ def cmd_switch(args, rl, mav_master):
     if value < 0 or value > 6:
         print("Invalid switch value. Use 1-6 for flight modes, '0' to disable")
         return
-    if not 'FLITE_MODE_CH' in mav_param:
-        print("Unable to find FLITE_MODE_CH parameter")
+    if not 'FLT_MODE_CH' in mav_param:
+        print("Unable to find FLT_MODE_CH parameter")
         return
-    flite_mode_ch_parm = int(mav_param["FLITE_MODE_CH"])
-    mav_master.mav.param_set_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT, 	
-                                  "PWM_CH%u_FIX" % flite_mode_ch_parm,
-                                  mapping[value])
+    flite_mode_ch_parm = int(mav_param["FLT_MODE_CH"])
+    values = [ 65535 ] * 8
+    values[flite_mode_ch_parm-1] = mapping[value]
+    values.append(0)
+    mav_master.mav.rc_channels_raw_send(*values)
     if value == 0:
         print("Disabled RC switch override")
     else:
         print("Set RC switch override to %u (PWM=%u)" % (value, mapping[value]))
+
+
+def cmd_rc(args, rl, mav_master):
+    '''handle RC value override'''
+    if len(args) != 2:
+        print("Usage: rc <channel> <pwmvalue>")
+        return
+    channel = int(args[0])
+    value   = int(args[1])
+    if value == -1:
+        value = 65535
+    if channel < 1 or channel > 8:
+        print("Channel must be between 1 and 8")
+        return
+    values = [ 65535 ] * 8
+    values[channel-1] = value
+    values.append(0)
+    mav_master.mav.rc_channels_raw_send(*values)
 
 def process_waypoint_request(m, mav_master):
     '''process a waypoint request from the master'''
@@ -302,7 +324,7 @@ def param_save(filename, wildcard):
     k.sort()
     count = 0
     for p in k:
-        if p and fnmatch.fnmatch(p, wildcard):
+        if p and fnmatch.fnmatch(str(p), wildcard):
             f.write("%-15.15s %f\n" % (p, mav_param[p]))
             count += 1
     f.close()
@@ -330,19 +352,16 @@ def param_load_file(filename, wildcard, mav_master):
     print("Loaded %u parameters from %s" % (count, filename))
     
 
-param_op = None
 param_wildcard = "*"
 
 def cmd_param(args, rl, mav_master):
     '''control parameters'''
-    global param_op
     if len(args) < 1:
         print("usage: param <fetch|edit|set|show>")
         return
     if args[0] == "fetch":
         mav_master.mav.param_request_list_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT)
         print("Requested parameter list")
-        param_op = "fetch"
     elif args[0] == "save":
         if len(args) < 2:
             print("usage: param save <filename> [wildcard]")
@@ -380,7 +399,7 @@ def cmd_param(args, rl, mav_master):
         k = mav_param.keys()
         k.sort()
         for p in k:
-            if fnmatch.fnmatch(p, pattern):
+            if fnmatch.fnmatch(str(p), pattern):
                 print("%-15.15s %f" % (p, mav_param[p]))
     else:
         print("Unknown subcommand '%s' (try 'fetch', 'save', 'set', 'show' or 'load')" % args[0]);
@@ -401,6 +420,7 @@ command_map = {
     'rudder'  : (cmd_rudder,   'set fixed rudder PWM'),
     'throttle': (cmd_throttle, 'set fixed throttle PWM'),
     'switch'  : (cmd_switch,   'set RC switch (1-5), 0 disables'),
+    'rc'      : (cmd_rc,       'override a RC channel value'),
     'wp'      : (cmd_wp,       'waypoint management'),
     'param'   : (cmd_param,    'manage APM parameters'),
     'setup'   : (cmd_setup,    'go into setup mode'),
@@ -535,7 +555,7 @@ def master_callback(m, master, recipients):
     if mtype == 'STATUSTEXT':
         print("APM: %s" % m.text)
     elif mtype == 'PARAM_VALUE':
-        mav_param[m.param_id] = m.param_value
+        mav_param[str(m.param_id)] = m.param_value
         if m.param_id.find("=") != -1:
             buf = m.get_msgbuf()
             for i in range(0, len(buf)):
@@ -590,7 +610,8 @@ def master_callback(m, master, recipients):
 
     # and log them
     if master.logfile:
-        master.logfile.write(struct.pack('>Qs', get_usec(), m.get_msgbuf()))
+        master.logfile.write(struct.pack('>Q', get_usec()))
+        master.logfile.write(m.get_msgbuf())
 
 
 def process_master(m):
@@ -650,6 +671,8 @@ def send_flightgear_controls(fg):
 def process_flightgear(m, master):
     '''process flightgear protocol input'''
     buf = m.recv()
+    if len(buf) == 0:
+        return
     # see MAVLink.xml for the protocol format
     try:
         (latitude, longitude, altitude, heading,
@@ -659,7 +682,7 @@ def process_flightgear(m, master):
          rollDeg, pitchDeg, yawDeg,
          airspeed, magic) = struct.unpack('>ddddddddddddddddI', buf)
     except struct.error, msg:
-        print("Bad flightgear input: %s" % msg)
+        print("Bad flightgear input of length %u: %s" % (len(buf), msg))
         return
     if magic != 0x4c56414d:
         print("Bad flightgear magic 0x%08x should be 0x4c56414d" % magic)
@@ -747,6 +770,8 @@ def main_loop():
             if msg_period.trigger():
                 mav_master.mav.request_data_stream_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT,
                                                         mavlink.MAV_DATA_STREAM_ALL, 1, 1)
+                if len(mav_param) == 0:
+                    mav_master.mav.param_request_list_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT)
 
 
 if __name__ == '__main__':
