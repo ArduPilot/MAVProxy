@@ -68,10 +68,13 @@ class status(object):
     '''hold status information about the master'''
     def __init__(self):
         self.msg_lines   = ['', '', '', '', '', '', '', '']
-        self.rc_aileron  = 0
-        self.rc_elevator = 0
-        self.rc_throttle = 0
-        self.rc_rudder   = 0
+        if opts.quadcopter:
+            self.rc_throttle = [ 0.0, 0.0, 0.0, 0.0 ]
+        else:
+            self.rc_aileron  = 0
+            self.rc_elevator = 0
+            self.rc_throttle = 0
+            self.rc_rudder   = 0
         self.gps	 = None
         self.msgs = {}
         self.counters = {'Master' : 0, 'FGear' : 0, 'Slave' : 0}
@@ -81,6 +84,7 @@ class status(object):
         self.wpoints = []
         self.loading_waypoints = False
         self.loading_waypoint_lasttime = time.time()
+        self.mav_error = 0
 
     def write(self):
         '''write status to status.txt'''
@@ -89,15 +93,13 @@ class status(object):
         for c in status.counters:
             f.write('%s:%u ' % (c, status.counters[c]))
         f.write('\n')
+        f.write('MAV Errors: %u\n' % status.mav_error)
         f.write(str(self.gps)+'\n')
         for m in status.msgs:
                 f.write(str(status.msgs[m])+'\n')
         for i in range(0, len(self.msg_lines)):
             f.write(self.msg_lines[i]+'\n')
         f.close()
-
-# container for status information
-status = status()
 
 # current MAV master parameters
 mav_param = {}
@@ -138,8 +140,9 @@ def cmd_switch(args, rl, mav_master):
         return
     if not 'FLT_MODE_CH' in mav_param:
         print("Unable to find FLT_MODE_CH parameter")
-        return
-    flite_mode_ch_parm = int(mav_param["FLT_MODE_CH"])
+        flite_mode_ch_parm = 5
+    else:
+        flite_mode_ch_parm = int(mav_param["FLT_MODE_CH"])
     values = [ 65535 ] * 8
     values[flite_mode_ch_parm-1] = mapping[value]
     values.append(0)
@@ -165,6 +168,32 @@ def cmd_rc(args, rl, mav_master):
     values = [ 65535 ] * 8
     values[channel-1] = value
     values.append(0)
+    mav_master.mav.rc_channels_raw_send(*values)
+
+def cmd_disarm(args, rl, mav_master):
+    '''disarm the motors'''
+    values = [ 65535 ] * 8
+    values[3] = 1000
+    values[2] = 1000
+    values.append(0)
+    mav_master.mav.rc_channels_raw_send(*values)
+    mav_master.mav.rc_channels_raw_send(*values)
+    mav_master.mav.rc_channels_raw_send(*values)
+
+def cmd_arm(args, rl, mav_master):
+    '''arm the motors'''
+    values = [ 65535 ] * 8
+    values[3] = 2000
+    values[2] = 1000
+    values.append(0)
+    mav_master.mav.rc_channels_raw_send(*values)
+    mav_master.mav.rc_channels_raw_send(*values)
+    mav_master.mav.rc_channels_raw_send(*values)
+    time.sleep(3)
+    values[3] = 1500
+    values[2] = 1000
+    mav_master.mav.rc_channels_raw_send(*values)
+    mav_master.mav.rc_channels_raw_send(*values)
     mav_master.mav.rc_channels_raw_send(*values)
 
 def process_waypoint_request(m, mav_master):
@@ -424,7 +453,10 @@ command_map = {
     'wp'      : (cmd_wp,       'waypoint management'),
     'param'   : (cmd_param,    'manage APM parameters'),
     'setup'   : (cmd_setup,    'go into setup mode'),
-    'reset'   : (cmd_reset,    'reopen the connection to the MAVLink master')
+    'reset'   : (cmd_reset,    'reopen the connection to the MAVLink master'),
+    'd'       : (cmd_disarm,   'disarm the motors'),
+    'disarm'  : (cmd_disarm,   'disarm the motors'),
+    'arm'     : (cmd_arm,      'arm the motors')
     };
 
 def process_stdin(rl, line, mav_master):
@@ -476,10 +508,9 @@ class mavserial(mavfd):
         self.device = device
         self.port = serial.Serial(self.device, self.baud, timeout=0)
         mavfd.__init__(self, self.port.fileno(), device)
-        self.buf = ""
-        self.in_mavlink = False
         self.mav = mavlink.MAVLink(self)
         self.logfile = None
+        self.logfile_raw = None
 
     def read(self):
         return self.port.read()
@@ -529,7 +560,12 @@ def scale_rc(servo, min, max):
     '''scale a PWM value'''
     # assume a servo range of 1000 to 2000
     v = (servo - 1000.0) / 1000.0
-    return min + (v*(max-min))
+    ret = min + (v*(max-min))
+    if ret < min:
+        ret = min
+    if ret > max:
+        ret = max
+    return ret
     
 
 def limit_servo_speed(oldv, newv):
@@ -546,8 +582,6 @@ def limit_servo_speed(oldv, newv):
 
 def master_callback(m, master, recipients):
     '''process mavlink message m on master, sending any messages to recipients'''
-    master.in_mavlink = False
-    master.buf = ""
 
     status.counters['Master'] += 1
 
@@ -565,14 +599,24 @@ def master_callback(m, master, recipients):
             print("Received %u parameters" % m.param_count)
 
     elif mtype == 'SERVO_OUTPUT_RAW':
-        status.rc_aileron  = limit_servo_speed(status.rc_aileron,
-                                               scale_rc(m.servo1_raw, -1.0, 1.0))
-        status.rc_elevator = limit_servo_speed(status.rc_elevator,
-                                               scale_rc(m.servo2_raw, -1.0, 1.0))
-        status.rc_throttle = limit_servo_speed(status.rc_throttle,
-                                               scale_rc(m.servo3_raw, 0.0, 1.0))
-        status.rc_rudder   = limit_servo_speed(status.rc_rudder,
-                                               scale_rc(m.servo4_raw, -1.0, 1.0))
+        if opts.quadcopter:
+            status.rc_throttle[0] = limit_servo_speed(status.rc_throttle[0], # right
+                                                      scale_rc(m.servo1_raw, 0.0, 1.0))
+            status.rc_throttle[1] = limit_servo_speed(status.rc_throttle[1], # left
+                                                      scale_rc(m.servo2_raw, 0.0, 1.0))
+            status.rc_throttle[2] = limit_servo_speed(status.rc_throttle[2], # front
+                                                      scale_rc(m.servo3_raw, 0.0, 1.0))
+            status.rc_throttle[3] = limit_servo_speed(status.rc_throttle[3], # back
+                                                      scale_rc(m.servo4_raw, 0.0, 1.0))
+        else:
+            status.rc_aileron  = limit_servo_speed(status.rc_aileron,
+                                                   scale_rc(m.servo1_raw, -1.0, 1.0))
+            status.rc_elevator = limit_servo_speed(status.rc_elevator,
+                                                   scale_rc(m.servo2_raw, -1.0, 1.0))
+            status.rc_throttle = limit_servo_speed(status.rc_throttle,
+                                                   scale_rc(m.servo3_raw, 0.0, 1.0))
+            status.rc_rudder   = limit_servo_speed(status.rc_rudder,
+                                                   scale_rc(m.servo4_raw, -1.0, 1.0))
 
     elif mtype == 'WAYPOINT_COUNT' and status.wp_op != None:
         status.wpoints = [None]*m.count
@@ -596,7 +640,8 @@ def master_callback(m, master, recipients):
 
     elif mtype in [ 'HEARTBEAT', 'GLOBAL_POSITION', 'RC_CHANNELS_SCALED',
                     'ATTITUDE', 'RC_CHANNELS_RAW', 'GPS_STATUS', 'WAYPOINT_CURRENT',
-                    'SYS_STATUS', 'GPS_RAW', 'SERVO_OUTPUT_RAW', 'VFR_HUD', 'GLOBAL_POSITION_INT' ]:
+                    'SYS_STATUS', 'GPS_RAW', 'SERVO_OUTPUT_RAW', 'VFR_HUD',
+                    'GLOBAL_POSITION_INT', 'RAW_PRESSURE', 'RAW_IMU' ]:
         pass
     else:
         print("Got MAVLink msg: %s" % m)
@@ -617,27 +662,19 @@ def master_callback(m, master, recipients):
 def process_master(m):
     '''process packets from the MAVLink master'''
     c = m.read()
+    if m.logfile_raw:
+        m.logfile_raw.write(c)
+
     if status.setup_mode:
         sys.stdout.write(c)
         sys.stdout.flush()
         return
-    if len(m.buf) == 0:
-        # start of a line
-        if c == 'U':
-            m.in_mavlink = True
-    if m.in_mavlink:
-        try:
-            m.mav.parse_char(c)
-        except mavlink.MAVError, msg:
-            print("Bad MAVLink master message: %s" % msg)
-            m.in_mavlink = False
-            m.buf = ""
+
+    try:
+        m.mav.parse_char(c)
+    except mavlink.MAVError, msg:
+        status.mav_error += 1
         return
-    if c == '\n':
-        print("APM: %s" % m.buf)
-        m.buf = ""
-        return
-    m.buf += c
     
 
 def process_mavlink(slave, master):
@@ -654,12 +691,18 @@ def process_mavlink(slave, master):
     if not status.setup_mode:
         master.write(m.get_msgbuf())
     status.counters['Slave'] += 1
-    
-        
+
 def send_flightgear_controls(fg):
     '''send control values to flightgear'''
-    buf = struct.pack('>ddddI', status.rc_aileron, - status.rc_elevator,
-                      status.rc_rudder, status.rc_throttle, 0x4c56414d)
+    if opts.quadcopter:
+        buf = struct.pack('>ddddI',
+                          status.rc_throttle[3],
+                          status.rc_throttle[2],
+                          status.rc_throttle[0],
+                          status.rc_throttle[1], 0x4c56414d)
+    else:
+        buf = struct.pack('>ddddI', status.rc_aileron, - status.rc_elevator,
+                          status.rc_rudder, status.rc_throttle, 0x4c56414d)
     fg.write(buf)
     
 
@@ -703,9 +746,16 @@ def process_flightgear(m, master):
 
     groundspeed = ft2m(math.sqrt((speedN * speedN) + (speedE * speedE)))
 
+    if math.isnan(heading):
+        heading = 0.0
+
     # and airspeed
-    master.mav.vfr_hud_send(kt2mps(airspeed), groundspeed, int(heading),
-                            int(status.rc_throttle*100), ft2m(altitude), 0)
+    if opts.quadcopter:
+        master.mav.vfr_hud_send(kt2mps(airspeed), groundspeed, int(heading),
+                                int(status.rc_throttle[0]*100), ft2m(altitude), 0)
+    else:
+        master.mav.vfr_hud_send(kt2mps(airspeed), groundspeed, int(heading),
+                                int(status.rc_throttle*100), ft2m(altitude), 0)
 
     # remember GPS fix, we send this at opts.gpsrate
     status.gps = mavlink.MAVLink_gps_raw_message(get_usec(),
@@ -799,6 +849,8 @@ if __name__ == '__main__':
                       default=1, help='MAVLink target master component')
     parser.add_option("--logfile", dest="logfile", help="MAVLink master logfile",
                       default='mav.log')
+    parser.add_option("--quadcopter", dest="quadcopter", help="use quadcopter controls",
+                      action='store_true', default=False)
     
     
     (opts, args) = parser.parse_args()
@@ -806,12 +858,16 @@ if __name__ == '__main__':
     if not opts.master:
         parser.error("You must specify a MAVLink master serial port")
 
+    # container for status information
+    status = status()
+
     # open serial link
     mav_master = mavserial(opts.master)
     mav_master.mav.set_callback(master_callback, mav_master, mav_outputs)
 
     # log all packets from the master, for later replay
     mav_master.logfile = open(opts.logfile, mode='w')
+    mav_master.logfile_raw = open(opts.logfile+'.raw', mode='w')
 
     # open any mavlink UDP ports
     for p in opts.output:
