@@ -77,8 +77,9 @@ class status(object):
             self.rc_rudder   = 0
         self.gps	 = None
         self.msgs = {}
-        self.counters = {'Master' : 0, 'FGear' : 0, 'Slave' : 0}
-        self.setup_mode = False
+        self.msg_count = {}
+        self.counters = {'MasterIn' : 0, 'MasterOut' : 0, 'FGearIn' : 0, 'FGearOut' : 0, 'Slave' : 0}
+        self.setup_mode = opts.setup
         self.wp_op = None
         self.wp_save_filename = None
         self.wpoints = []
@@ -96,7 +97,7 @@ class status(object):
         f.write('MAV Errors: %u\n' % status.mav_error)
         f.write(str(self.gps)+'\n')
         for m in status.msgs:
-                f.write(str(status.msgs[m])+'\n')
+                f.write("%u: %s\n" % (status.msg_count[m], str(status.msgs[m])))
         for i in range(0, len(self.msg_lines)):
             f.write(self.msg_lines[i]+'\n')
         f.close()
@@ -189,7 +190,7 @@ def cmd_arm(args, rl, mav_master):
     mav_master.mav.rc_channels_raw_send(*values)
     mav_master.mav.rc_channels_raw_send(*values)
     mav_master.mav.rc_channels_raw_send(*values)
-    time.sleep(3)
+    time.sleep(2)
     values[3] = 1500
     values[2] = 1000
     mav_master.mav.rc_channels_raw_send(*values)
@@ -386,7 +387,7 @@ param_wildcard = "*"
 def cmd_param(args, rl, mav_master):
     '''control parameters'''
     if len(args) < 1:
-        print("usage: param <fetch|edit|set|show>")
+        print("usage: param <fetch|edit|set|show|store>")
         return
     if args[0] == "fetch":
         mav_master.mav.param_request_list_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT)
@@ -430,8 +431,11 @@ def cmd_param(args, rl, mav_master):
         for p in k:
             if fnmatch.fnmatch(str(p), pattern):
                 print("%-15.15s %f" % (p, mav_param[p]))
+    elif args[0] == "store":
+        MAV_ACTION_STORAGE_WRITE = 15
+        mav_master.mav.action_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT, MAV_ACTION_STORAGE_WRITE)
     else:
-        print("Unknown subcommand '%s' (try 'fetch', 'save', 'set', 'show' or 'load')" % args[0]);
+        print("Unknown subcommand '%s' (try 'fetch', 'save', 'set', 'show', 'load' or 'store')" % args[0]);
 
 
 def cmd_setup(args, rl, mav_master):
@@ -502,7 +506,7 @@ class mavfd(object):
 
 class mavserial(mavfd):
     '''a serial mavlink port'''
-    def __init__(self, device, baud=57600):
+    def __init__(self, device, baud=115200):
         import serial
         self.baud = baud
         self.device = device
@@ -570,6 +574,9 @@ def scale_rc(servo, min, max):
 
 def limit_servo_speed(oldv, newv):
     '''limit servo rate of change'''
+    if opts.quadcopter:
+        # quad needs fast response
+        return newv
     if oldv == 0:
         oldv == newv
     change_limit = 0.04
@@ -583,7 +590,7 @@ def limit_servo_speed(oldv, newv):
 def master_callback(m, master, recipients):
     '''process mavlink message m on master, sending any messages to recipients'''
 
-    status.counters['Master'] += 1
+    status.counters['MasterIn'] += 1
 
     mtype = m.get_type()
     if mtype == 'STATUSTEXT':
@@ -648,6 +655,9 @@ def master_callback(m, master, recipients):
 
     # keep the last message of each type around
     status.msgs[m.get_type()] = m
+    if not m.get_type() in status.msg_count:
+        status.msg_count[m.get_type()] = 0
+    status.msg_count[m.get_type()] += 1
 
     # also send the message on to all the slaves
     for r in recipients:
@@ -694,12 +704,14 @@ def process_mavlink(slave, master):
 
 def send_flightgear_controls(fg):
     '''send control values to flightgear'''
+    status.counters['FGearOut'] += 1
     if opts.quadcopter:
         buf = struct.pack('>ddddI',
-                          status.rc_throttle[3],
-                          status.rc_throttle[2],
-                          status.rc_throttle[0],
-                          status.rc_throttle[1], 0x4c56414d)
+                          status.rc_throttle[2], # front
+                          status.rc_throttle[3], # back
+                          status.rc_throttle[1], # left
+                          status.rc_throttle[0], # right
+                          0x4c56414d)
     else:
         buf = struct.pack('>ddddI', status.rc_aileron, - status.rc_elevator,
                           status.rc_rudder, status.rc_throttle, 0x4c56414d)
@@ -730,7 +742,7 @@ def process_flightgear(m, master):
         # the first packet from flightgear is sometimes rubbish
         return
 
-    status.counters['FGear'] += 1
+    status.counters['FGearIn'] += 1
 
     if yawDeg == 0.0:
         # not all planes give a yaw value
@@ -740,6 +752,7 @@ def process_flightgear(m, master):
         return
 
     # send IMU data to the master
+    status.counters['MasterOut'] += 1
     master.mav.attitude_send(get_usec(),
                              deg2rad(rollDeg), deg2rad(pitchDeg), deg2rad(yawDeg),
                              deg2rad(rollRate),deg2rad(pitchRate),deg2rad(yawRate))
@@ -750,6 +763,7 @@ def process_flightgear(m, master):
         heading = 0.0
 
     # and airspeed
+    status.counters['MasterOut'] += 1
     if opts.quadcopter:
         master.mav.vfr_hud_send(kt2mps(airspeed), groundspeed, int(heading),
                                 int(status.rc_throttle[0]*100), ft2m(altitude), 0)
@@ -787,7 +801,7 @@ def main_loop():
     fg_period = periodic_event(opts.fgrate)
     gps_period = periodic_event(opts.gpsrate)
     status_period = periodic_event(1.0)
-    msg_period = periodic_event(2.0)
+    msg_period = periodic_event(1.0)
 
     while True:
         rin = [0, mav_master.fd]
@@ -815,15 +829,18 @@ def main_loop():
                 send_flightgear_controls(fg_output)
 
             if status.gps and gps_period.trigger():
+                status.counters['MasterOut'] += 1
                 mav_master.mav.send(status.gps)
 
             if status_period.trigger():
                 status.write()
 
             if msg_period.trigger():
+                status.counters['MasterOut'] += 1
                 mav_master.mav.request_data_stream_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT,
                                                         mavlink.MAV_DATA_STREAM_ALL, 1, 1)
                 if len(mav_param) == 0:
+                    status.counters['MasterOut'] += 1
                     mav_master.mav.param_request_list_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT)
 
 
@@ -850,6 +867,8 @@ if __name__ == '__main__':
     parser.add_option("--logfile", dest="logfile", help="MAVLink master logfile",
                       default='mav.log')
     parser.add_option("--quadcopter", dest="quadcopter", help="use quadcopter controls",
+                      action='store_true', default=False)
+    parser.add_option("--setup", dest="setup", help="start in setup mode",
                       action='store_true', default=False)
     
     
@@ -880,6 +899,8 @@ if __name__ == '__main__':
         fg_output = mavudp(opts.fgout)
     
     rl = rline(process_stdin, "MAV> ", mav_master)
+    if opts.setup:
+        rl.set_prompt("")
     try:
         main_loop()
         rl.cleanup()
