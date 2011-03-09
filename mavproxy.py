@@ -540,7 +540,7 @@ class mavserial(mavfd):
 
 class mavudp(mavfd):
     '''a UDP mavlink socket'''
-    def __init__(self, device, baud=57600, input=False):
+    def __init__(self, device, input=False):
         a = device.split(':')
         if len(a) != 2:
             print("UDP ports must be specified as host:port")
@@ -597,11 +597,6 @@ def master_callback(m, master, recipients):
         print("APM: %s" % m.text)
     elif mtype == 'PARAM_VALUE':
         mav_param[str(m.param_id)] = m.param_value
-        if m.param_id.find("=") != -1:
-            buf = m.get_msgbuf()
-            for i in range(0, len(buf)):
-                print "%02x " % ord(buf[i]),
-            print("")
         if m.param_index+1 == m.param_count:
             print("Received %u parameters" % m.param_count)
 
@@ -850,6 +845,8 @@ if __name__ == '__main__':
     parser = OptionParser("mavproxy.py [options]")
 
     parser.add_option("--master",dest="master", help="MAVLink master port")
+    parser.add_option("--baudrate", dest="baudrate", type='int',
+                      help="master port baud rate", default=115200)
     parser.add_option("--in",    dest="input",  help="MAVLink input port",
                       action='append')
     parser.add_option("--out",   dest="output", help="MAVLink output port",
@@ -881,7 +878,7 @@ if __name__ == '__main__':
     status = status()
 
     # open serial link
-    mav_master = mavserial(opts.master)
+    mav_master = mavserial(opts.master, baud=opts.baudrate)
     mav_master.mav.set_callback(master_callback, mav_master, mav_outputs)
 
     # log all packets from the master, for later replay
@@ -910,4 +907,4 @@ if __name__ == '__main__':
     except Exception:
         rl.cleanup()
         raise
-
+    
