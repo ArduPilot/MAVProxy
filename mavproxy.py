@@ -39,7 +39,7 @@ class rline(object):
             handler(self, line, *args, **kwargs)
         self.args = args
         self.kwargs = kwargs
-        self.rl_lib = ctypes.cdll.LoadLibrary("libreadline.so")
+        self.rl_lib = ctypes.cdll.LoadLibrary("libreadline.so.6")
         self.cHandler = ctypes.CFUNCTYPE(None, ctypes.c_char_p)(callback)
         self.rl_lib.rl_callback_handler_install(prompt, self.cHandler)
     def set_prompt(self, prompt):
@@ -465,6 +465,8 @@ command_map = {
 
 def process_stdin(rl, line, mav_master):
     '''handle commands from user'''
+    if line is None:
+        sys.exit(0)
     line = line.strip()
 
     if status.setup_mode:
@@ -850,7 +852,7 @@ if __name__ == '__main__':
     parser.add_option("--in",    dest="input",  help="MAVLink input port",
                       action='append')
     parser.add_option("--out",   dest="output", help="MAVLink output port",
-                      action='append')
+                      action='append', default=[])
     parser.add_option("--fgin",  dest="fgin",   help="flightgear input")
     parser.add_option("--fgout", dest="fgout",  help="flightgear output")
     parser.add_option("--fgrate",dest="fgrate", default=50.0, type='float',
