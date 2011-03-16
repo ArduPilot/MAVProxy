@@ -86,6 +86,8 @@ class status(object):
         self.loading_waypoints = False
         self.loading_waypoint_lasttime = time.time()
         self.mav_error = 0
+        self.in_mavlink = False
+        self.master_buffer = ""
 
     def write(self):
         '''write status to status.txt'''
@@ -677,11 +679,24 @@ def process_master(m):
         sys.stdout.flush()
         return
 
-    try:
-        m.mav.parse_char(c)
-    except mavlink.MAVError, msg:
-        status.mav_error += 1
-        return
+    if not status.in_mavlink:
+        if c == 'U' and status.master_buffer == "":
+            status.in_mavlink = True
+        else:
+            status.master_buffer += c
+            if c == '\n':
+                sys.stdout.write(status.master_buffer)
+                status.master_buffer = ""
+
+    if status.in_mavlink:
+        try:
+            msg = m.mav.parse_char(c)
+            if msg is not None:
+                status.in_mavlink = False
+                status.master_buffer = ""
+        except mavlink.MAVError, msg:
+            status.mav_error += 1
+            return
     
 
 def process_mavlink(slave, master):
