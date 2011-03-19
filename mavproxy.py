@@ -67,7 +67,6 @@ class periodic_event(object):
 class status(object):
     '''hold status information about the master'''
     def __init__(self):
-        self.msg_lines   = ['', '', '', '', '', '', '', '']
         if opts.quadcopter:
             self.rc_throttle = [ 0.0, 0.0, 0.0, 0.0 ]
         else:
@@ -89,9 +88,8 @@ class status(object):
         self.in_mavlink = False
         self.master_buffer = ""
 
-    def write(self):
+    def show(self, f):
         '''write status to status.txt'''
-        f = open('status.txt', mode='w')
         f.write('Counters: ')
         for c in status.counters:
             f.write('%s:%u ' % (c, status.counters[c]))
@@ -100,8 +98,11 @@ class status(object):
         f.write(str(self.gps)+'\n')
         for m in status.msgs:
                 f.write("%u: %s\n" % (status.msg_count[m], str(status.msgs[m])))
-        for i in range(0, len(self.msg_lines)):
-            f.write(self.msg_lines[i]+'\n')
+
+    def write(self):
+        '''write status to status.txt'''
+        f = open('status.txt', mode='w')
+        self.show(f)
         f.close()
 
 # current MAV master parameters
@@ -440,6 +441,11 @@ def cmd_param(args, rl, mav_master):
         print("Unknown subcommand '%s' (try 'fetch', 'save', 'set', 'show', 'load' or 'store')" % args[0]);
 
 
+def cmd_status(args, rl, mav_master):
+    '''show status'''
+    status.show(sys.stdout)
+
+
 def cmd_setup(args, rl, mav_master):
     status.setup_mode = True
     rl.set_prompt("")
@@ -462,7 +468,8 @@ command_map = {
     'reset'   : (cmd_reset,    'reopen the connection to the MAVLink master'),
     'd'       : (cmd_disarm,   'disarm the motors'),
     'disarm'  : (cmd_disarm,   'disarm the motors'),
-    'arm'     : (cmd_arm,      'arm the motors')
+    'arm'     : (cmd_arm,      'arm the motors'),
+    'status'  : (cmd_status,   'show status')
     };
 
 def process_stdin(rl, line, mav_master):
@@ -514,8 +521,17 @@ class mavserial(mavfd):
         import serial
         self.baud = baud
         self.device = device
-        self.port = serial.Serial(self.device, self.baud, timeout=0)
+        self.port = serial.Serial(self.device, self.baud, timeout=0, dsrdtr=not opts.nodtr)
+
         mavfd.__init__(self, self.port.fileno(), device)
+
+        if opts.nodtr:
+            # prevent DTR reset on close
+            import termios
+            tattr = termios.tcgetattr(self.fd)
+            tattr[2] &= ~termios.HUPCL
+            termios.tcsetattr(self.fd, termios.TCSANOW, tattr)
+
         self.mav = mavlink.MAVLink(self)
         self.logfile = None
         self.logfile_raw = None
@@ -535,7 +551,14 @@ class mavserial(mavfd):
         self.port.close()
         while True:
             try:
-                self.port = serial.Serial(self.device, self.baud, timeout=0)
+                self.port = serial.Serial(self.device, self.baud, timeout=0, dsrdtr=not opts.nodtr)
+                self.fd = self.port.fileno()
+                if opts.nodtr:
+                    # prevent DTR reset on close
+                    import termios
+                    tattr = termios.tcgetattr(self.fd)
+                    tattr[2] &= ~termios.HUPCL
+                    termios.tcsetattr(self.fd, termios.TCSANOW, tattr)
                 return
             except Exception, msg:
                 print("Failed to reopen %s - %s" % (self.device, msg))
@@ -606,14 +629,10 @@ def master_callback(m, master, recipients):
 
     elif mtype == 'SERVO_OUTPUT_RAW':
         if opts.quadcopter:
-            status.rc_throttle[0] = limit_servo_speed(status.rc_throttle[0], # right
-                                                      scale_rc(m.servo1_raw, 0.0, 1.0))
-            status.rc_throttle[1] = limit_servo_speed(status.rc_throttle[1], # left
-                                                      scale_rc(m.servo2_raw, 0.0, 1.0))
-            status.rc_throttle[2] = limit_servo_speed(status.rc_throttle[2], # front
-                                                      scale_rc(m.servo3_raw, 0.0, 1.0))
-            status.rc_throttle[3] = limit_servo_speed(status.rc_throttle[3], # back
-                                                      scale_rc(m.servo4_raw, 0.0, 1.0))
+            status.rc_throttle[0] = scale_rc(m.servo1_raw, 0.0, 1.0)
+            status.rc_throttle[1] = scale_rc(m.servo2_raw, 0.0, 1.0)
+            status.rc_throttle[2] = scale_rc(m.servo3_raw, 0.0, 1.0)
+            status.rc_throttle[3] = scale_rc(m.servo4_raw, 0.0, 1.0)
         else:
             status.rc_aileron  = limit_servo_speed(status.rc_aileron,
                                                    scale_rc(m.servo1_raw, -1.0, 1.0))
@@ -695,6 +714,7 @@ def process_master(m):
                 status.in_mavlink = False
                 status.master_buffer = ""
         except mavlink.MAVError, msg:
+            print("MAV error: %s" % msg)
             status.mav_error += 1
             return
     
@@ -847,7 +867,7 @@ def main_loop():
             if status_period.trigger():
                 status.write()
 
-            if msg_period.trigger():
+            if msg_period.trigger() and not status.setup_mode:
                 status.counters['MasterOut'] += 1
                 mav_master.mav.request_data_stream_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT,
                                                         mavlink.MAV_DATA_STREAM_ALL, 1, 1)
@@ -883,6 +903,8 @@ if __name__ == '__main__':
     parser.add_option("--quadcopter", dest="quadcopter", help="use quadcopter controls",
                       action='store_true', default=False)
     parser.add_option("--setup", dest="setup", help="start in setup mode",
+                      action='store_true', default=False)
+    parser.add_option("--nodtr", dest="nodtr", help="disable DTR drop on close",
                       action='store_true', default=False)
     
     
