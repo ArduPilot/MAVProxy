@@ -666,7 +666,7 @@ def master_callback(m, master, recipients):
     elif mtype in [ 'HEARTBEAT', 'GLOBAL_POSITION', 'RC_CHANNELS_SCALED',
                     'ATTITUDE', 'RC_CHANNELS_RAW', 'GPS_STATUS', 'WAYPOINT_CURRENT',
                     'SYS_STATUS', 'GPS_RAW', 'SERVO_OUTPUT_RAW', 'VFR_HUD',
-                    'GLOBAL_POSITION_INT', 'RAW_PRESSURE', 'RAW_IMU' ]:
+                    'GLOBAL_POSITION_INT', 'RAW_PRESSURE', 'RAW_IMU', 'WAYPOINT_ACK' ]:
         pass
     else:
         print("Got MAVLink msg: %s" % m)
