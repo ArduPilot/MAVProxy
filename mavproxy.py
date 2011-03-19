@@ -17,7 +17,7 @@ import mavlink, readline, select
 
 def kt2mps(x):
     '''knots to meters per second'''
-    return float(x)*1.94384449
+    return float(x)*0.514444444
 
 def deg2rad(x):
     '''degrees to radians'''
@@ -606,7 +606,7 @@ def limit_servo_speed(oldv, newv):
         return newv
     if oldv == 0:
         oldv == newv
-    change_limit = 0.04
+    change_limit = 0.4
     if newv - oldv > change_limit:
         return oldv + change_limit
     if oldv - newv > change_limit:
@@ -642,6 +642,8 @@ def master_callback(m, master, recipients):
                                                    scale_rc(m.servo3_raw, 0.0, 1.0))
             status.rc_rudder   = limit_servo_speed(status.rc_rudder,
                                                    scale_rc(m.servo4_raw, -1.0, 1.0))
+            if status.rc_throttle < 0.1:
+                status.rc_throttle = 0
 
     elif mtype == 'WAYPOINT_COUNT' and status.wp_op != None:
         status.wpoints = [None]*m.count
@@ -655,7 +657,7 @@ def master_callback(m, master, recipients):
             return
         if status.wp_op == 'list':
             for w in status.wpoints:
-                print("%u %.10f %.10f %f" % (w.command, w.x, w.y, w.z))
+                print("%u %u %.10f %.10f %f" % (w.command, w.frame, w.x, w.y, w.z))
         elif status.wp_op == "save":
             save_waypoints(status.wp_save_filename)
         status.wp_op = None
@@ -666,7 +668,8 @@ def master_callback(m, master, recipients):
     elif mtype in [ 'HEARTBEAT', 'GLOBAL_POSITION', 'RC_CHANNELS_SCALED',
                     'ATTITUDE', 'RC_CHANNELS_RAW', 'GPS_STATUS', 'WAYPOINT_CURRENT',
                     'SYS_STATUS', 'GPS_RAW', 'SERVO_OUTPUT_RAW', 'VFR_HUD',
-                    'GLOBAL_POSITION_INT', 'RAW_PRESSURE', 'RAW_IMU', 'WAYPOINT_ACK' ]:
+                    'GLOBAL_POSITION_INT', 'RAW_PRESSURE', 'RAW_IMU', 'WAYPOINT_ACK',
+                    'NAV_CONTROLLER_OUTPUT' ]:
         pass
     else:
         print("Got MAVLink msg: %s" % m)
