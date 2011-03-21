@@ -87,6 +87,7 @@ class status(object):
         self.mav_error = 0
         self.in_mavlink = False
         self.master_buffer = ""
+        self.show_pwm = False
 
     def show(self, f):
         '''write status to status.txt'''
@@ -445,6 +446,10 @@ def cmd_status(args, rl, mav_master):
     '''show status'''
     status.show(sys.stdout)
 
+def cmd_pwm(args, rl, mav_master):
+    '''show PWM values'''
+    status.show_pwm = not status.show_pwm
+
 
 def cmd_setup(args, rl, mav_master):
     status.setup_mode = True
@@ -469,7 +474,8 @@ command_map = {
     'd'       : (cmd_disarm,   'disarm the motors'),
     'disarm'  : (cmd_disarm,   'disarm the motors'),
     'arm'     : (cmd_arm,      'arm the motors'),
-    'status'  : (cmd_status,   'show status')
+    'status'  : (cmd_status,   'show status'),
+    'pwm'     : (cmd_pwm,      'show PWM input')
     };
 
 def process_stdin(rl, line, mav_master):
@@ -661,6 +667,9 @@ def master_callback(m, master, recipients):
         elif status.wp_op == "save":
             save_waypoints(status.wp_save_filename)
         status.wp_op = None
+
+    elif mtype == "RC_CHANNELS_RAW" and status.show_pwm:
+        print(m)
 
     elif mtype == "WAYPOINT_REQUEST":
         process_waypoint_request(m, master)
