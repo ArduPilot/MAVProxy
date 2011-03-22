@@ -157,6 +157,28 @@ def cmd_switch(args, rl, mav_master):
     else:
         print("Set RC switch override to %u (PWM=%u)" % (value, mapping[value]))
 
+def cmd_trim(args, rl, mav_master):
+    '''trim aileron, elevator and rudder to current values'''
+    if not 'RC_CHANNELS_RAW' in status.msgs:
+        print("No RC_CHANNELS_RAW to trim with")
+        return
+    m = status.msgs['RC_CHANNELS_RAW']
+
+    mav_master.mav.param_set_send(opts.TARGET_SYSTEM,
+                                  opts.TARGET_COMPONENT,
+                                  'ROLL_TRIM',
+                                  m.chan1_raw)
+    mav_master.mav.param_set_send(opts.TARGET_SYSTEM,
+                                  opts.TARGET_COMPONENT,
+                                  'PITCH_TRIM',
+                                  m.chan2_raw)
+    mav_master.mav.param_set_send(opts.TARGET_SYSTEM,
+                                  opts.TARGET_COMPONENT,
+                                  'YAW_TRIM',
+                                  m.chan4_raw)
+    print("Trimmed to aileron=%u elevator=%u rudder=%u" % (
+        m.chan1_raw, m.chan2_raw, m.chan4_raw))
+    
 
 def cmd_rc(args, rl, mav_master):
     '''handle RC value override'''
@@ -475,7 +497,8 @@ command_map = {
     'disarm'  : (cmd_disarm,   'disarm the motors'),
     'arm'     : (cmd_arm,      'arm the motors'),
     'status'  : (cmd_status,   'show status'),
-    'pwm'     : (cmd_pwm,      'show PWM input')
+    'pwm'     : (cmd_pwm,      'show PWM input'),
+    'trim'    : (cmd_trim,     'trim aileron, elevator and rudder to current values')
     };
 
 def process_stdin(rl, line, mav_master):
