@@ -756,7 +756,8 @@ def process_master(m):
                 status.in_mavlink = False
                 status.master_buffer = ""
         except mavlink.MAVError, msg:
-            print("MAV error: %s" % msg)
+            if opts.show_errors:
+                print("MAV error: %s" % msg)
             status.mav_error += 1
             return
     
@@ -947,6 +948,8 @@ if __name__ == '__main__':
     parser.add_option("--setup", dest="setup", help="start in setup mode",
                       action='store_true', default=False)
     parser.add_option("--nodtr", dest="nodtr", help="disable DTR drop on close",
+                      action='store_true', default=False)
+    parser.add_option("--show-errors", dest="show_errors", help="show MAVLink error packets",
                       action='store_true', default=False)
     
     
