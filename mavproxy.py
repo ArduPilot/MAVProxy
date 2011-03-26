@@ -39,7 +39,14 @@ class rline(object):
             handler(self, line, *args, **kwargs)
         self.args = args
         self.kwargs = kwargs
-        self.rl_lib = ctypes.cdll.LoadLibrary("libreadline.so.6")
+        for lib in [ 'libreadline.so.6', 'libreadline.so.5', 'libreadline.so' ]:
+            try:
+                self.rl_lib = ctypes.cdll.LoadLibrary(lib)
+                break
+            except:
+                pass
+        if self.rl_lib is None:
+            raise RuntimeError("Unable to find readline library")
         self.cHandler = ctypes.CFUNCTYPE(None, ctypes.c_char_p)(callback)
         self.rl_lib.rl_callback_handler_install(prompt, self.cHandler)
     def set_prompt(self, prompt):
