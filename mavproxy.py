@@ -154,7 +154,7 @@ def cmd_switch(args, rl, mav_master):
         return
     if not 'FLT_MODE_CH' in mav_param:
         print("Unable to find FLT_MODE_CH parameter")
-        flite_mode_ch_parm = 5
+        flite_mode_ch_parm = 8
     else:
         flite_mode_ch_parm = int(mav_param["FLT_MODE_CH"])
     values = [ 65535 ] * 8
@@ -231,6 +231,29 @@ def cmd_arm(args, rl, mav_master):
     mav_master.mav.rc_channels_raw_send(*values)
     mav_master.mav.rc_channels_raw_send(*values)
     mav_master.mav.rc_channels_raw_send(*values)
+
+
+def cmd_loiter(args, rl, mav_master):
+    '''set LOITER mode'''
+    MAV_ACTION_LOITER = 27
+    mav_master.mav.action_send(status.target_system, status.target_component, MAV_ACTION_LOITER)
+
+def cmd_auto(args, rl, mav_master):
+    '''set AUTO mode'''
+    MAV_ACTION_SET_AUTO = 13
+    mav_master.mav.action_send(status.target_system, status.target_component, MAV_ACTION_SET_AUTO)
+
+def cmd_rtl(args, rl, mav_master):
+    '''set RTL mode'''
+    MAV_ACTION_RETURN = 3
+    mav_master.mav.action_send(status.target_system, status.target_component, MAV_ACTION_RETURN)
+
+def cmd_manual(args, rl, mav_master):
+    '''set MANUAL mode'''
+    MAV_ACTION_SET_MANUAL = 12
+    mav_master.mav.action_send(status.target_system, status.target_component, MAV_ACTION_SET_MANUAL)
+
+
 
 def process_waypoint_request(m, mav_master):
     '''process a waypoint request from the master'''
@@ -507,7 +530,11 @@ command_map = {
     'arm'     : (cmd_arm,      'arm the motors'),
     'status'  : (cmd_status,   'show status'),
     'pwm'     : (cmd_pwm,      'show PWM input'),
-    'trim'    : (cmd_trim,     'trim aileron, elevator and rudder to current values')
+    'trim'    : (cmd_trim,     'trim aileron, elevator and rudder to current values'),
+    'auto'    : (cmd_auto,     'set AUTO mode'),
+    'loiter'  : (cmd_loiter,   'set LOITER mode'),
+    'rtl'     : (cmd_rtl,      'set RTL mode'),
+    'manual'  : (cmd_manual,   'set MANUAL mode'),
     };
 
 def process_stdin(rl, line, mav_master):
