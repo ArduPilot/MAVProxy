@@ -95,6 +95,8 @@ class status(object):
         self.in_mavlink = False
         self.master_buffer = ""
         self.show_pwm = False
+        self.target_system = -1
+        self.target_component = -1
 
     def show(self, f):
         '''write status to status.txt'''
@@ -171,16 +173,16 @@ def cmd_trim(args, rl, mav_master):
         return
     m = status.msgs['RC_CHANNELS_RAW']
 
-    mav_master.mav.param_set_send(opts.TARGET_SYSTEM,
-                                  opts.TARGET_COMPONENT,
+    mav_master.mav.param_set_send(status.target_system,
+                                  status.target_component,
                                   'ROLL_TRIM',
                                   m.chan1_raw)
-    mav_master.mav.param_set_send(opts.TARGET_SYSTEM,
-                                  opts.TARGET_COMPONENT,
+    mav_master.mav.param_set_send(status.target_system,
+                                  status.target_component,
                                   'PITCH_TRIM',
                                   m.chan2_raw)
-    mav_master.mav.param_set_send(opts.TARGET_SYSTEM,
-                                  opts.TARGET_COMPONENT,
+    mav_master.mav.param_set_send(status.target_system,
+                                  status.target_component,
                                   'YAW_TRIM',
                                   m.chan4_raw)
     print("Trimmed to aileron=%u elevator=%u rudder=%u" % (
@@ -261,7 +263,7 @@ def read_waypoint_v100(line):
     a = line.split()
     if len(a) != 13:
         raise RuntimeError("invalid waypoint line with %u values" % len(a))
-    w = mavlink.MAVLink_waypoint_message(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT,
+    w = mavlink.MAVLink_waypoint_message(status.target_system, status.target_component,
                                          int(a[0]),    # seq
                                          int(a[1]),    # frame
                                          int(a[2]),    # action
@@ -287,7 +289,7 @@ def read_waypoint_v110(line):
     a = line.split()
     if len(a) != 12:
         raise RuntimeError("invalid waypoint line with %u values" % len(a))
-    w = mavlink.MAVLink_waypoint_message(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT,
+    w = mavlink.MAVLink_waypoint_message(status.target_system, status.target_component,
                                          int(a[0]),    # seq
                                          int(a[2]),    # frame
                                          int(a[3]),    # command
@@ -327,13 +329,13 @@ def load_waypoints(filename):
     f.close()
     print("Loaded %u waypoints from %s" % (len(status.wpoints), filename))
 
-    mav_master.mav.waypoint_clear_all_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT)
+    mav_master.mav.waypoint_clear_all_send(status.target_system, status.target_component)
     if len(status.wpoints) == 0:
         return
 
     status.loading_waypoints = True
     status.loading_waypoint_lasttime = time.time()
-    mav_master.mav.waypoint_count_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT, len(status.wpoints))
+    mav_master.mav.waypoint_count_send(status.target_system, status.target_component, len(status.wpoints))
 
 def save_waypoints(filename):
     '''save waypoints to a file'''
@@ -361,21 +363,21 @@ def cmd_wp(args, rl, mav_master):
         load_waypoints(args[1])
     elif args[0] == "list":
         status.wp_op = "list"
-        mav_master.mav.waypoint_request_list_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT)
+        mav_master.mav.waypoint_request_list_send(status.target_system, status.target_component)
     elif args[0] == "save":
         if len(args) != 2:
             print("usage: wp save <filename>")
             return
         status.wp_save_filename = args[1]
         status.wp_op = "save"
-        mav_master.mav.waypoint_request_list_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT)
+        mav_master.mav.waypoint_request_list_send(status.target_system, status.target_component)
     elif args[0] == "set":
         if len(args) != 2:
             print("usage: wp set <wpindex>")
             return
-        mav_master.mav.waypoint_set_current_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT, int(args[1]))
+        mav_master.mav.waypoint_set_current_send(status.target_system, status.target_component, int(args[1]))
     elif args[0] == "clear":
-        mav_master.mav.waypoint_clear_all_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT)
+        mav_master.mav.waypoint_clear_all_send(status.target_system, status.target_component)
     else:
         print("Usage: wp <list|load|save|set|clear>")
 
@@ -408,8 +410,8 @@ def param_load_file(filename, wildcard, mav_master):
             continue
         if not fnmatch.fnmatch(a[0], wildcard):
             continue
-        mav_master.mav.param_set_send(opts.TARGET_SYSTEM,
-                                      opts.TARGET_COMPONENT, a[0], float(a[1]))
+        mav_master.mav.param_set_send(status.target_system,
+                                      status.target_component, a[0], float(a[1]))
         count += 1
     f.close()
     print("Loaded %u parameters from %s" % (count, filename))
@@ -423,7 +425,7 @@ def cmd_param(args, rl, mav_master):
         print("usage: param <fetch|edit|set|show|store>")
         return
     if args[0] == "fetch":
-        mav_master.mav.param_request_list_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT)
+        mav_master.mav.param_request_list_send(status.target_system, status.target_component)
         print("Requested parameter list")
     elif args[0] == "save":
         if len(args) < 2:
@@ -443,8 +445,8 @@ def cmd_param(args, rl, mav_master):
         if not param in mav_param:
             print("Unable to find parameter '%s'" % param)
             return
-        mav_master.mav.param_set_send(opts.TARGET_SYSTEM,
-                                      opts.TARGET_COMPONENT, param, float(value))
+        mav_master.mav.param_set_send(status.target_system,
+                                      status.target_component, param, float(value))
     elif args[0] == "load":
         if len(args) < 2:
             print("Usage: param load <filename> [wildcard]")
@@ -466,7 +468,7 @@ def cmd_param(args, rl, mav_master):
                 print("%-15.15s %f" % (p, mav_param[p]))
     elif args[0] == "store":
         MAV_ACTION_STORAGE_WRITE = 15
-        mav_master.mav.action_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT, MAV_ACTION_STORAGE_WRITE)
+        mav_master.mav.action_send(status.target_system, status.target_component, MAV_ACTION_STORAGE_WRITE)
     else:
         print("Unknown subcommand '%s' (try 'fetch', 'save', 'set', 'show', 'load' or 'store')" % args[0]);
 
@@ -656,7 +658,13 @@ def master_callback(m, master, recipients):
     status.counters['MasterIn'] += 1
 
     mtype = m.get_type()
-    if mtype == 'STATUSTEXT':
+    if mtype == 'HEARTBEAT':
+        if (status.target_system != m.get_srcSystem() or
+            status.target_component != m.get_srcComponent()):
+            status.target_system = m.get_srcSystem()
+            status.target_component = m.get_srcComponent()
+            print("MAV online: system=%u component=%u" % (status.target_system, status.target_component))
+    elif mtype == 'STATUSTEXT':
         print("APM: %s" % m.text)
     elif mtype == 'PARAM_VALUE':
         mav_param[str(m.param_id)] = m.param_value
@@ -684,12 +692,12 @@ def master_callback(m, master, recipients):
     elif mtype == 'WAYPOINT_COUNT' and status.wp_op != None:
         status.wpoints = [None]*m.count
         print("Requesting %u waypoints" % m.count)
-        mav_master.mav.waypoint_request_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT, 0)
+        mav_master.mav.waypoint_request_send(status.target_system, status.target_component, 0)
 
     elif mtype == 'WAYPOINT' and status.wp_op != None:
         status.wpoints[m.seq] = m
         if m.seq+1 < len(status.wpoints):
-            mav_master.mav.waypoint_request_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT, m.seq+1)
+            mav_master.mav.waypoint_request_send(status.target_system, status.target_component, m.seq+1)
             return
         if status.wp_op == 'list':
             for w in status.wpoints:
@@ -910,13 +918,16 @@ def main_loop():
             if status_period.trigger():
                 status.write()
 
-            if msg_period.trigger() and not status.setup_mode:
+            if (msg_period.trigger() and
+                not status.setup_mode and
+                status.target_system != -1 and
+                status.target_component != -1):
                 status.counters['MasterOut'] += 1
-                mav_master.mav.request_data_stream_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT,
+                mav_master.mav.request_data_stream_send(status.target_system, status.target_component,
                                                         mavlink.MAV_DATA_STREAM_ALL, 1, 1)
                 if len(mav_param) == 0:
                     status.counters['MasterOut'] += 1
-                    mav_master.mav.param_request_list_send(opts.TARGET_SYSTEM, opts.TARGET_COMPONENT)
+                    mav_master.mav.param_request_list_send(status.target_system, status.target_component)
 
 
 if __name__ == '__main__':
@@ -938,9 +949,9 @@ if __name__ == '__main__':
     parser.add_option("--gpsrate",dest="gpsrate", default=4.0, type='float',
                       help="GPS update rate")
     parser.add_option("--target-system", dest='TARGET_SYSTEM', type='int',
-                      default=7, help='MAVLink target master system')
+                      default=-1, help='MAVLink target master system')
     parser.add_option("--target-component", dest='TARGET_COMPONENT', type='int',
-                      default=1, help='MAVLink target master component')
+                      default=-1, help='MAVLink target master component')
     parser.add_option("--logfile", dest="logfile", help="MAVLink master logfile",
                       default='mav.log')
     parser.add_option("--quadcopter", dest="quadcopter", help="use quadcopter controls",
@@ -960,6 +971,8 @@ if __name__ == '__main__':
 
     # container for status information
     status = status()
+    status.target_system = opts.TARGET_SYSTEM
+    status.target_component = opts.TARGET_COMPONENT
 
     # open serial link
     mav_master = mavserial(opts.master, baud=opts.baudrate)
