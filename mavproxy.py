@@ -8,6 +8,7 @@ Released under the GNU GPL version 3 or later
 
 import sys, os, struct, math, time, socket
 import fnmatch, errno
+from curses import ascii
 
 # find the mavlink.py module
 for d in [ 'pymavlink', '../pymavlink' ]:
@@ -598,6 +599,7 @@ class mavserial(mavfd):
             termios.tcsetattr(self.fd, termios.TCSANOW, tattr)
 
         self.mav = mavlink.MAVLink(self)
+        self.mav.robust_parsing = True
         self.logfile = None
         self.logfile_raw = None
 
@@ -739,6 +741,10 @@ def master_callback(m, master, recipients):
     elif mtype == "WAYPOINT_REQUEST":
         process_waypoint_request(m, master)
 
+    elif mtype == "BAD_DATA":
+        if all_printable(m.data):
+            sys.stdout.write(m.data)
+            sys.stdout.flush()
     elif mtype in [ 'HEARTBEAT', 'GLOBAL_POSITION', 'RC_CHANNELS_SCALED',
                     'ATTITUDE', 'RC_CHANNELS_RAW', 'GPS_STATUS', 'WAYPOINT_CURRENT',
                     'SYS_STATUS', 'GPS_RAW', 'SERVO_OUTPUT_RAW', 'VFR_HUD',
@@ -755,8 +761,9 @@ def master_callback(m, master, recipients):
     status.msg_count[m.get_type()] += 1
 
     # also send the message on to all the slaves
-    for r in recipients:
-        r.write(m.get_msgbuf())
+    if mtype != "BAD_DATA":
+        for r in recipients:
+            r.write(m.get_msgbuf())
 
     # and log them
     if master.logfile:
@@ -775,26 +782,12 @@ def process_master(m):
         sys.stdout.flush()
         return
 
-    if not status.in_mavlink:
-        if c == 'U' and status.master_buffer == "":
-            status.in_mavlink = True
-        else:
-            status.master_buffer += c
-            if c == '\n':
-                sys.stdout.write(status.master_buffer)
-                status.master_buffer = ""
+    msg = m.mav.parse_char(c)
+    if msg and msg.get_type() == "BAD_DATA":
+        if opts.show_errors:
+            print("MAV error: %s" % msg)
+        status.mav_error += 1
 
-    if status.in_mavlink:
-        try:
-            msg = m.mav.parse_char(c)
-            if msg is not None:
-                status.in_mavlink = False
-                status.master_buffer = ""
-        except mavlink.MAVError, msg:
-            if opts.show_errors:
-                print("MAV error: %s" % msg)
-            status.mav_error += 1
-            return
     
 
 def process_mavlink(slave, master):
