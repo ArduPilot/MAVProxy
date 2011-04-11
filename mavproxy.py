@@ -680,6 +680,46 @@ def limit_servo_speed(oldv, newv):
         return oldv - change_limit
     return newv
 
+def all_printable(buf):
+    '''see if a string is all printable'''
+    for c in buf:
+        if not ascii.isprint(c) and not c in ['\r', '\n', '\t']:
+            return False
+    return True
+
+def mode_string(mode, nav_mode):
+    '''work out autopilot mode'''
+    MAV_MODE_MANUAL = 2
+    MAV_MODE_GUIDED = 3
+    MAV_MODE_AUTO = 4
+    MAV_MODE_TEST1 = 5
+    MAV_MODE_TEST2 = 6
+    MAV_MODE_TEST3 = 7
+    MAV_NAV_LIFTOFF = 1
+    MAV_NAV_HOLD = 2
+    MAV_NAV_WAYPOINT = 3
+    MAV_NAV_VECTOR = 4
+    MAV_NAV_RETURNING = 5
+    MAV_NAV_LANDING = 6
+    MAV_NAV_LOST = 7
+    MAV_NAV_LOITER = 8
+    cmode = (mode, nav_mode)
+    mapping = {
+        (MAV_MODE_MANUAL, MAV_NAV_VECTOR)    : "MANUAL",
+        (MAV_MODE_TEST3,  MAV_NAV_VECTOR)    : "CIRCLE",
+        (MAV_MODE_GUIDED, MAV_NAV_VECTOR)    : "STABILIZE",
+        (MAV_MODE_TEST1,  MAV_NAV_VECTOR)    : "FBWA",
+        (MAV_MODE_TEST2,  MAV_NAV_VECTOR)    : "FBWB",
+        (MAV_MODE_AUTO,   MAV_NAV_WAYPOINT)  : "AUTO",
+        (MAV_MODE_AUTO,   MAV_NAV_RETURNING) : "RTL",
+        (MAV_MODE_AUTO,   MAV_NAV_HOLD)      : "LOITER",
+        (MAV_MODE_AUTO,   MAV_NAV_LIFTOFF)   : "TAKEOFF",
+        (MAV_MODE_AUTO,   MAV_NAV_LANDING)   : "LANDING",
+        }
+    if cmode in mapping:
+        return mapping[cmode]
+    return "Mode%s" % cmode
+    
 
 def master_callback(m, master, recipients):
     '''process mavlink message m on master, sending any messages to recipients'''
@@ -740,6 +780,9 @@ def master_callback(m, master, recipients):
 
     elif mtype == "WAYPOINT_REQUEST":
         process_waypoint_request(m, master)
+
+    elif mtype == "SYS_STATUS":
+        rl.set_prompt(mode_string(m.mode, m.nav_mode) + "> ")
 
     elif mtype == "BAD_DATA":
         if all_printable(m.data):
