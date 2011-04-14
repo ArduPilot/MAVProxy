@@ -1017,6 +1017,8 @@ if __name__ == '__main__':
                       default=-1, help='MAVLink target master component')
     parser.add_option("--logfile", dest="logfile", help="MAVLink master logfile",
                       default='mav.log')
+    parser.add_option("-a", "--append-log", dest="append_log", help="Append to log files",
+                      action='store_true', default=False)
     parser.add_option("--quadcopter", dest="quadcopter", help="use quadcopter controls",
                       action='store_true', default=False)
     parser.add_option("--setup", dest="setup", help="start in setup mode",
@@ -1042,8 +1044,12 @@ if __name__ == '__main__':
     mav_master.mav.set_callback(master_callback, mav_master, mav_outputs)
 
     # log all packets from the master, for later replay
-    mav_master.logfile = open(opts.logfile, mode='w')
-    mav_master.logfile_raw = open(opts.logfile+'.raw', mode='w')
+    if opts.append_log:
+        mode = 'a'
+    else:
+        mode = 'w'
+    mav_master.logfile = open(opts.logfile, mode=mode)
+    mav_master.logfile_raw = open(opts.logfile+'.raw', mode=mode)
 
     # open any mavlink UDP ports
     for p in opts.output:
