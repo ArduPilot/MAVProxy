@@ -52,12 +52,26 @@ class rline(object):
         self.rl_lib.rl_callback_handler_install(prompt, self.cHandler)
     def set_prompt(self, prompt):
         self.rl_lib.rl_set_prompt(prompt)
+        self.rl_lib.rl_redisplay(prompt)
     def read_char(self):
         self.rl_lib.rl_callback_read_char()
     def cleanup(self):
         self.rl_lib.rl_cleanup_after_signal()
     def add_history(self, line):
         self.rl_lib.add_history(line)
+
+def say(text):
+    '''speak some text'''
+    print(text)
+    if opts.speech:
+        import speechd
+        status.speech = speechd.SSIPClient('MAVProxy%u' % os.getpid())
+        status.speech.set_output_module('festival')
+        status.speech.set_language('en')
+        status.speech.set_punctuation(speechd.PunctuationMode.SOME)
+        status.speech.speak(text)
+        status.speech.close()
+
 
 class periodic_event(object):
     '''a class for fixed frequency events'''
@@ -98,6 +112,10 @@ class status(object):
         self.show_pwm = False
         self.target_system = -1
         self.target_component = -1
+        self.speech = None
+        self.mode_string = None
+        self.first_altitude = 0.0
+        self.last_altitude_announce = 0.0
 
     def show(self, f):
         '''write status to status.txt'''
@@ -732,7 +750,7 @@ def master_callback(m, master, recipients):
             status.target_component != m.get_srcComponent()):
             status.target_system = m.get_srcSystem()
             status.target_component = m.get_srcComponent()
-            print("MAV online: system=%u component=%u" % (status.target_system, status.target_component))
+            say("online system %u component %u" % (status.target_system, status.target_component))
     elif mtype == 'STATUSTEXT':
         print("APM: %s" % m.text)
     elif mtype == 'PARAM_VALUE':
@@ -782,7 +800,22 @@ def master_callback(m, master, recipients):
         process_waypoint_request(m, master)
 
     elif mtype == "SYS_STATUS":
-        rl.set_prompt(mode_string(m.mode, m.nav_mode) + "> ")
+        mstring = mode_string(m.mode, m.nav_mode)
+        if mstring != status.mode_string:
+            status.mode_string = mstring
+            rl.set_prompt(mstring + "> ")
+            say("Mode " + mstring)
+
+    elif mtype == "GPS_RAW":
+        if m.fix_type == 2:
+            if self.first_altitude == 0:
+                self.first_altitude = m.alt
+                self.last_altitude_announce = 0.0
+                say("GPS lock at %u meters" % m.alt)
+            if math.fabs(m.alt - self.last_altitude_announce) >= 10.0:
+                self.last_altitude_announce = m.alt
+                rounded_alt = 10 * ((5+int(m.alt - self.first_altitude)) / 10)
+                say("%u meters" % rounded_alt)
 
     elif mtype == "BAD_DATA":
         if all_printable(m.data):
@@ -790,7 +823,7 @@ def master_callback(m, master, recipients):
             sys.stdout.flush()
     elif mtype in [ 'HEARTBEAT', 'GLOBAL_POSITION', 'RC_CHANNELS_SCALED',
                     'ATTITUDE', 'RC_CHANNELS_RAW', 'GPS_STATUS', 'WAYPOINT_CURRENT',
-                    'SYS_STATUS', 'GPS_RAW', 'SERVO_OUTPUT_RAW', 'VFR_HUD',
+                    'SERVO_OUTPUT_RAW', 'VFR_HUD',
                     'GLOBAL_POSITION_INT', 'RAW_PRESSURE', 'RAW_IMU', 'WAYPOINT_ACK',
                     'NAV_CONTROLLER_OUTPUT' ]:
         pass
@@ -1026,6 +1059,8 @@ if __name__ == '__main__':
     parser.add_option("--nodtr", dest="nodtr", help="disable DTR drop on close",
                       action='store_true', default=False)
     parser.add_option("--show-errors", dest="show_errors", help="show MAVLink error packets",
+                      action='store_true', default=False)
+    parser.add_option("--speech", dest="speech", help="use text to speach",
                       action='store_true', default=False)
     
     
