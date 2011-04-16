@@ -842,7 +842,7 @@ def master_callback(m, master, recipients):
             r.write(m.get_msgbuf())
 
     # and log them
-    if master.logfile:
+    if master.logfile and mtype != "BAD_DATA":
         master.logfile.write(struct.pack('>Q', get_usec()))
         master.logfile.write(m.get_msgbuf())
 
