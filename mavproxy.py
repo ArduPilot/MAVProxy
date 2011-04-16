@@ -808,13 +808,16 @@ def master_callback(m, master, recipients):
 
     elif mtype == "GPS_RAW":
         if m.fix_type == 2:
-            if self.first_altitude == 0:
-                self.first_altitude = m.alt
-                self.last_altitude_announce = 0.0
+            if status.first_altitude == 0:
+                status.first_altitude = m.alt
+                status.last_altitude_announce = 0.0
                 say("GPS lock at %u meters" % m.alt)
-            if math.fabs(m.alt - self.last_altitude_announce) >= 10.0:
-                self.last_altitude_announce = m.alt
-                rounded_alt = 10 * ((5+int(m.alt - self.first_altitude)) / 10)
+            if m.alt < status.first_altitude:
+                status.first_altitude = m.alt
+                status.last_altitude_announce = m.alt
+            if math.fabs(m.alt - status.last_altitude_announce) >= 10.0:
+                status.last_altitude_announce = m.alt
+                rounded_alt = 10 * ((5+int(m.alt - status.first_altitude)) / 10)
                 say("%u meters" % rounded_alt)
 
     elif mtype == "BAD_DATA":
