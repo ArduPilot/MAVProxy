@@ -835,7 +835,7 @@ def master_callback(m, master, recipients):
                     'ATTITUDE', 'RC_CHANNELS_RAW', 'GPS_STATUS', 'WAYPOINT_CURRENT',
                     'SERVO_OUTPUT_RAW', 'VFR_HUD',
                     'GLOBAL_POSITION_INT', 'RAW_PRESSURE', 'RAW_IMU', 'WAYPOINT_ACK',
-                    'NAV_CONTROLLER_OUTPUT' ]:
+                    'NAV_CONTROLLER_OUTPUT', 'GPS_RAW' ]:
         pass
     else:
         print("Got MAVLink msg: %s" % m)
