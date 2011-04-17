@@ -116,6 +116,7 @@ class status(object):
         self.mode_string = None
         self.first_altitude = 0.0
         self.last_altitude_announce = 0.0
+        self.last_waypoint = 0
 
     def show(self, f):
         '''write status to status.txt'''
@@ -799,6 +800,11 @@ def master_callback(m, master, recipients):
     elif mtype == "WAYPOINT_REQUEST":
         process_waypoint_request(m, master)
 
+    elif mtype == "WAYPOINT_CURRENT":
+        if m.seq != status.last_waypoint:
+            status.last_waypoint = m.seq
+            say("waypoint %u" % m.seq)
+
     elif mtype == "SYS_STATUS":
         mstring = mode_string(m.mode, m.nav_mode)
         if mstring != status.mode_string:
@@ -806,12 +812,13 @@ def master_callback(m, master, recipients):
             rl.set_prompt(mstring + "> ")
             say("Mode " + mstring)
 
-    elif mtype == "GPS_RAW":
-        if m.fix_type == 2:
-            if status.first_altitude == 0:
-                status.first_altitude = m.alt
-                status.last_altitude_announce = 0.0
-                say("GPS lock at %u meters" % m.alt)
+    elif (mtype == "VFR_HUD"
+          and 'GPS_RAW' in status.msgs
+          and status.msgs['GPS_RAW'].fix_type == 2):
+        if status.first_altitude == 0:
+            status.first_altitude = m.alt
+            status.last_altitude_announce = 0.0
+            say("GPS lock at %u meters" % m.alt)
             if m.alt < status.first_altitude:
                 status.first_altitude = m.alt
                 status.last_altitude_announce = m.alt
