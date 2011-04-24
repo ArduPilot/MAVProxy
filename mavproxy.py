@@ -706,6 +706,32 @@ def all_printable(buf):
             return False
     return True
 
+def system_check():
+    '''check that the system is ready to fly'''
+    ok = True
+    
+    if (not 'GPS_RAW' in status.msgs or
+        status.msgs['GPS_RAW'].fix_type != 2):
+        say("WARNING no GPS lock")
+        ok = False
+        
+    if (not 'PITCH_MIN' in mav_param or
+        int(mav_param['PITCH_MIN']) > 1300):
+        say("WARNING PITCH MINIMUM not set")
+        ok = False
+
+    if (not 'ATTITUDE' in status.msgs or
+        math.fabs(status.msgs['ATTITUDE'].pitch) > math.radians(5)):
+        say("WARNING pitch is %u degrees" % math.degrees(status.msgs['ATTITUDE'].pitch))
+        ok = False
+
+    if (not 'ATTITUDE' in status.msgs or
+        math.fabs(status.msgs['ATTITUDE'].roll) > math.radians(5)):
+        say("WARNING roll is %u degrees" % math.degrees(status.msgs['ATTITUDE'].roll))
+        ok = False
+    if ok:
+        say("All OK SYSTEM READY TO FLY")
+
 def mode_string(mode, nav_mode):
     '''work out autopilot mode'''
     MAV_MODE_MANUAL = 2
@@ -826,6 +852,10 @@ def master_callback(m, master, recipients):
                 status.last_altitude_announce = m.alt
                 rounded_alt = 10 * ((5+int(m.alt - status.first_altitude)) / 10)
                 say("%u meters" % rounded_alt)
+
+    elif mtype == "RC_CHANNELS_RAW":
+        if (m.chan7_raw > 1700 and status.mode_string = "MANUAL"):
+            system_check()
 
     elif mtype == "BAD_DATA":
         if all_printable(m.data):
