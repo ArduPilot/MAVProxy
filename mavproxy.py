@@ -709,28 +709,38 @@ def all_printable(buf):
 def system_check():
     '''check that the system is ready to fly'''
     ok = True
+
+    if not 'GPS_RAW' in status.msgs:
+        say("WARNING no GPS status")
+        return
     
-    if (not 'GPS_RAW' in status.msgs or
-        status.msgs['GPS_RAW'].fix_type != 2):
+    if status.msgs['GPS_RAW'].fix_type != 2:
         say("WARNING no GPS lock")
         ok = False
+
+    if not 'PITCH_MIN' in mav_param:
+        say("WARNING no pitch parameter available")
+        return
         
-    if (not 'PITCH_MIN' in mav_param or
-        int(mav_param['PITCH_MIN']) > 1300):
+    if int(mav_param['PITCH_MIN']) > 1300:
         say("WARNING PITCH MINIMUM not set")
         ok = False
 
-    if (not 'ATTITUDE' in status.msgs or
-        math.fabs(status.msgs['ATTITUDE'].pitch) > math.radians(5)):
+    if not 'ATTITUDE' in status.msgs:
+        say("WARNING no attitude recorded")
+        return
+
+    if math.fabs(status.msgs['ATTITUDE'].pitch) > math.radians(5):
         say("WARNING pitch is %u degrees" % math.degrees(status.msgs['ATTITUDE'].pitch))
         ok = False
 
-    if (not 'ATTITUDE' in status.msgs or
-        math.fabs(status.msgs['ATTITUDE'].roll) > math.radians(5)):
+    if math.fabs(status.msgs['ATTITUDE'].roll) > math.radians(5):
         say("WARNING roll is %u degrees" % math.degrees(status.msgs['ATTITUDE'].roll))
         ok = False
+
     if ok:
         say("All OK SYSTEM READY TO FLY")
+
 
 def mode_string(mode, nav_mode):
     '''work out autopilot mode'''
