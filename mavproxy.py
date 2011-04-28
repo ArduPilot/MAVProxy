@@ -854,7 +854,7 @@ def master_callback(m, master, recipients):
                 say("%u meters" % rounded_alt)
 
     elif mtype == "RC_CHANNELS_RAW":
-        if (m.chan7_raw > 1700 and status.mode_string = "MANUAL"):
+        if (m.chan7_raw > 1700 and status.mode_string == "MANUAL"):
             system_check()
 
     elif mtype == "BAD_DATA":
