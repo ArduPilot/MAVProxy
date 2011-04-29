@@ -625,6 +625,9 @@ class mavserial(mavfd):
     def read(self):
         return self.port.read()
 
+    def recv(self):
+        return self.read()
+
     def write(self, buf):
         try:
             return self.port.write(buf)
@@ -661,15 +664,22 @@ class mavudp(mavfd):
         self.port = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         if input:
             self.port.bind((a[0], int(a[1])))
+            self.connected = False
         else:
             self.port.connect((a[0], int(a[1])))
+            self.connected = True
+        self.last_address = None
         mavfd.__init__(self, self.port.fileno(), device)
         self.mav = mavlink.MAVLink(self)
     def recv(self):
-        return self.port.recv(300)
+        data, self.last_address = self.port.recvfrom(300)
+        return data
     def write(self, buf):
         try:
-            self.port.send(buf)
+            if self.connected:
+                self.port.send(buf)
+            else:
+                self.port.sendto(buf, self.last_address)
         except socket.error:
             pass
 
@@ -822,13 +832,13 @@ def master_callback(m, master, recipients):
         status.wpoints[m.seq] = m
         if m.seq+1 < len(status.wpoints):
             mav_master.mav.waypoint_request_send(status.target_system, status.target_component, m.seq+1)
-            return
-        if status.wp_op == 'list':
-            for w in status.wpoints:
-                print("%u %u %.10f %.10f %f" % (w.command, w.frame, w.x, w.y, w.z))
-        elif status.wp_op == "save":
-            save_waypoints(status.wp_save_filename)
-        status.wp_op = None
+        else:
+            if status.wp_op == 'list':
+                for w in status.wpoints:
+                    print("%u %u %.10f %.10f %f" % (w.command, w.frame, w.x, w.y, w.z))
+            elif status.wp_op == "save":
+                save_waypoints(status.wp_save_filename)
+            status.wp_op = None
 
     elif mtype == "RC_CHANNELS_RAW" and status.show_pwm:
         print(m)
@@ -875,7 +885,7 @@ def master_callback(m, master, recipients):
                     'ATTITUDE', 'RC_CHANNELS_RAW', 'GPS_STATUS', 'WAYPOINT_CURRENT',
                     'SERVO_OUTPUT_RAW', 'VFR_HUD',
                     'GLOBAL_POSITION_INT', 'RAW_PRESSURE', 'RAW_IMU', 'WAYPOINT_ACK',
-                    'NAV_CONTROLLER_OUTPUT', 'GPS_RAW' ]:
+                    'NAV_CONTROLLER_OUTPUT', 'GPS_RAW', 'WAYPOINT' ]:
         pass
     else:
         print("Got MAVLink msg: %s" % m)
@@ -899,20 +909,21 @@ def master_callback(m, master, recipients):
 
 def process_master(m):
     '''process packets from the MAVLink master'''
-    c = m.read()
+    s = m.recv()
     if m.logfile_raw:
-        m.logfile_raw.write(c)
+        m.logfile_raw.write(s)
 
     if status.setup_mode:
-        sys.stdout.write(c)
+        sys.stdout.write(s)
         sys.stdout.flush()
         return
 
-    msg = m.mav.parse_char(c)
-    if msg and msg.get_type() == "BAD_DATA":
-        if opts.show_errors:
-            print("MAV error: %s" % msg)
-        status.mav_error += 1
+    for c in s:
+        msg = m.mav.parse_char(c)
+        if msg and msg.get_type() == "BAD_DATA":
+            if opts.show_errors:
+                print("MAV error: %s" % msg)
+            status.mav_error += 1
 
     
 
@@ -1124,8 +1135,11 @@ if __name__ == '__main__':
     status.target_system = opts.TARGET_SYSTEM
     status.target_component = opts.TARGET_COMPONENT
 
-    # open serial link
-    mav_master = mavserial(opts.master, baud=opts.baudrate)
+    # open master link
+    if opts.master.find(':') != -1:
+        mav_master = mavudp(opts.master, input=True)
+    else:
+        mav_master = mavserial(opts.master, baud=opts.baudrate)
     mav_master.mav.set_callback(master_callback, mav_master, mav_outputs)
 
     # log all packets from the master, for later replay
