@@ -263,6 +263,11 @@ def cmd_auto(args, rl, mav_master):
     MAV_ACTION_SET_AUTO = 13
     mav_master.mav.action_send(status.target_system, status.target_component, MAV_ACTION_SET_AUTO)
 
+def cmd_ground(args, rl, mav_master):
+    '''do a ground start mode'''
+    MAV_ACTION_CALIBRATE_GYRO = 17
+    mav_master.mav.action_send(status.target_system, status.target_component, MAV_ACTION_CALIBRATE_GYRO)
+
 def cmd_rtl(args, rl, mav_master):
     '''set RTL mode'''
     MAV_ACTION_RETURN = 3
@@ -552,6 +557,7 @@ command_map = {
     'pwm'     : (cmd_pwm,      'show PWM input'),
     'trim'    : (cmd_trim,     'trim aileron, elevator and rudder to current values'),
     'auto'    : (cmd_auto,     'set AUTO mode'),
+    'ground'  : (cmd_ground,   'do a ground start'),
     'loiter'  : (cmd_loiter,   'set LOITER mode'),
     'rtl'     : (cmd_rtl,      'set RTL mode'),
     'manual'  : (cmd_manual,   'set MANUAL mode'),
