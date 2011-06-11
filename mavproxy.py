@@ -778,18 +778,18 @@ def mode_string(mode, nav_mode):
     mapping = {
         (MAV_MODE_MANUAL, MAV_NAV_VECTOR)    : "MANUAL",
         (MAV_MODE_TEST3,  MAV_NAV_VECTOR)    : "CIRCLE",
-        (MAV_MODE_GUIDED, MAV_NAV_VECTOR)    : "STABILIZE",
-        (MAV_MODE_TEST1,  MAV_NAV_VECTOR)    : "FBWA",
-        (MAV_MODE_TEST2,  MAV_NAV_VECTOR)    : "FBWB",
+        (MAV_MODE_GUIDED, MAV_NAV_VECTOR)    : "GUIDED",
+        (MAV_MODE_TEST1,  MAV_NAV_VECTOR)    : "STABILIZE",
+        (MAV_MODE_TEST2,  MAV_NAV_VECTOR)    : "FBWA",
         (MAV_MODE_AUTO,   MAV_NAV_WAYPOINT)  : "AUTO",
         (MAV_MODE_AUTO,   MAV_NAV_RETURNING) : "RTL",
-        (MAV_MODE_AUTO,   MAV_NAV_HOLD)      : "LOITER",
+        (MAV_MODE_AUTO,   MAV_NAV_LOITER)    : "LOITER",
         (MAV_MODE_AUTO,   MAV_NAV_LIFTOFF)   : "TAKEOFF",
         (MAV_MODE_AUTO,   MAV_NAV_LANDING)   : "LANDING",
         }
     if cmode in mapping:
         return mapping[cmode]
-    return "Mode%s" % cmode
+    return "Mode%s%s" % cmode
     
 
 def master_callback(m, master, recipients):
