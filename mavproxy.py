@@ -790,7 +790,7 @@ def mode_string(mode, nav_mode):
         }
     if cmode in mapping:
         return mapping[cmode]
-    return "Mode%s%s" % cmode
+    return "Mode%s%s%s" % cmode
     
 
 def master_callback(m, master, recipients):
