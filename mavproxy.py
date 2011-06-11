@@ -674,6 +674,7 @@ class mavudp(mavfd):
         else:
             self.port.connect((a[0], int(a[1])))
             self.connected = True
+        self.port.setblocking(0)
         self.last_address = None
         mavfd.__init__(self, self.port.fileno(), device)
         self.mav = mavlink.MAVLink(self)
