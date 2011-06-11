@@ -871,6 +871,7 @@ def master_callback(m, master, recipients):
             status.first_altitude = m.alt
             status.last_altitude_announce = 0.0
             say("GPS lock at %u meters" % m.alt)
+        else:
             if m.alt < status.first_altitude:
                 status.first_altitude = m.alt
                 status.last_altitude_announce = m.alt
