@@ -690,10 +690,10 @@ class mavudp(mavfd):
         except socket.error:
             pass
 
-def scale_rc(servo, min, max):
+def scale_rc(servo, min, max, min_pwm=1000, max_pwm=2000):
     '''scale a PWM value'''
-    # assume a servo range of 1000 to 2000
-    v = (servo - 1000.0) / 1000.0
+    # default to servo range of 1000 to 2000
+    v = (servo - min_pwm) / float(max_pwm-min_pwm)
     ret = min + (v*(max-min))
     if ret < min:
         ret = min
@@ -701,20 +701,6 @@ def scale_rc(servo, min, max):
         ret = max
     return ret
     
-
-def limit_servo_speed(oldv, newv):
-    '''limit servo rate of change'''
-    if opts.quadcopter:
-        # quad needs fast response
-        return newv
-    if oldv == 0:
-        oldv == newv
-    change_limit = 0.4
-    if newv - oldv > change_limit:
-        return oldv + change_limit
-    if oldv - newv > change_limit:
-        return oldv - change_limit
-    return newv
 
 def all_printable(buf):
     '''see if a string is all printable'''
@@ -819,14 +805,10 @@ def master_callback(m, master, recipients):
             status.rc_throttle[2] = scale_rc(m.servo3_raw, 0.0, 1.0)
             status.rc_throttle[3] = scale_rc(m.servo4_raw, 0.0, 1.0)
         else:
-            status.rc_aileron  = limit_servo_speed(status.rc_aileron,
-                                                   scale_rc(m.servo1_raw, -1.0, 1.0))
-            status.rc_elevator = limit_servo_speed(status.rc_elevator,
-                                                   scale_rc(m.servo2_raw, -1.0, 1.0))
-            status.rc_throttle = limit_servo_speed(status.rc_throttle,
-                                                   scale_rc(m.servo3_raw, 0.0, 1.0))
-            status.rc_rudder   = limit_servo_speed(status.rc_rudder,
-                                                   scale_rc(m.servo4_raw, -1.0, 1.0))
+            status.rc_aileron  = scale_rc(m.servo1_raw, -1.0, 1.0)
+            status.rc_elevator = scale_rc(m.servo2_raw, -1.0, 1.0)
+            status.rc_throttle = scale_rc(m.servo3_raw, 0.0, 1.0, min_pwm=1500, max_pwm=2000)
+            status.rc_rudder   = scale_rc(m.servo4_raw, -1.0, 1.0)
             if status.rc_throttle < 0.1:
                 status.rc_throttle = 0
 
@@ -961,7 +943,7 @@ def send_flightgear_controls(fg):
                           status.rc_throttle[0], # right
                           0x4c56414d)
     else:
-        buf = struct.pack('>ddddI', status.rc_aileron, - status.rc_elevator,
+        buf = struct.pack('>ddddI', status.rc_aileron, status.rc_elevator,
                           status.rc_rudder, status.rc_throttle, 0x4c56414d)
     fg.write(buf)
     
@@ -1089,7 +1071,7 @@ def main_loop():
                 status.target_component != -1):
                 status.counters['MasterOut'] += 1
                 mav_master.mav.request_data_stream_send(status.target_system, status.target_component,
-                                                        mavlink.MAV_DATA_STREAM_ALL, 1, 1)
+                                                        mavlink.MAV_DATA_STREAM_ALL, 4, 1)
                 if len(mav_param) == 0:
                     status.counters['MasterOut'] += 1
                     mav_master.mav.param_request_list_send(status.target_system, status.target_component)
