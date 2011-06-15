@@ -448,6 +448,7 @@ def param_load_file(filename, wildcard, mav_master):
     '''load parameters from a file'''
     f = open(filename, mode='r')
     count = 0
+    changed = 0
     for line in f:
         line = line.strip()
         if line[0] == "#":
@@ -458,11 +459,15 @@ def param_load_file(filename, wildcard, mav_master):
             continue
         if not fnmatch.fnmatch(a[0], wildcard):
             continue
-        mav_master.mav.param_set_send(status.target_system,
-                                      status.target_component, a[0], float(a[1]))
+        if math.fabs(mav_param[a[0]] - float(a[1])) > 0.000001:
+            mav_master.mav.param_set_send(status.target_system,
+                                          status.target_component, a[0], float(a[1]))
+            changed += 1
+            time.sleep(0.1)
+            print("changed %s from %f to %f" % (a[0], mav_param[a[0]], float(a[1])))
         count += 1
     f.close()
-    print("Loaded %u parameters from %s" % (count, filename))
+    print("Loaded %u parameters from %s (changed %u)" % (count, filename, changed))
     
 
 param_wildcard = "*"
