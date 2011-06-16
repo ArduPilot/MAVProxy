@@ -4,6 +4,15 @@ mavproxy - a MAVLink proxy program
 
 Copyright Andrew Tridgell 2011
 Released under the GNU GPL version 3 or later
+
+RTL
+wind baro
+upgrade eeprom
+MODE parameters
+reset now on format version
+FLTMODE_1
+
+
 '''
 
 import sys, os, struct, math, time, socket
@@ -781,7 +790,7 @@ def mode_string(mode, nav_mode):
         }
     if cmode in mapping:
         return mapping[cmode]
-    return "Mode%s%s%s" % cmode
+    return "Mode%s%s" % cmode
     
 
 def master_callback(m, master, recipients):
