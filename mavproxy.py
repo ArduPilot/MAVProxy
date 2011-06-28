@@ -155,8 +155,7 @@ def control_set(mav_master, name, channel, args):
         return
     values = [ 65535 ] * 8
     values[channel-1] = int(args[0])
-    values.append(0)
-    mav_master.mav.rc_channels_raw_send(*values)
+    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
     
 def cmd_roll(args, rl, mav_master):
     control_set(mav_master, 'roll', 1, args)
@@ -181,15 +180,14 @@ def cmd_switch(args, rl, mav_master):
     if value < 0 or value > 6:
         print("Invalid switch value. Use 1-6 for flight modes, '0' to disable")
         return
-    if not 'FLT_MODE_CH' in mav_param:
-        print("Unable to find FLT_MODE_CH parameter")
+    if not 'FLTMODE_CH' in mav_param:
+        print("Unable to find FLTMODE_CH parameter")
         flite_mode_ch_parm = 8
     else:
-        flite_mode_ch_parm = int(mav_param["FLT_MODE_CH"])
+        flite_mode_ch_parm = int(mav_param["FLTMODE_CH"])
     values = [ 65535 ] * 8
     values[flite_mode_ch_parm-1] = mapping[value]
-    values.append(0)
-    mav_master.mav.rc_channels_raw_send(*values)
+    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
     if value == 0:
         print("Disabled RC switch override")
     else:
@@ -232,34 +230,31 @@ def cmd_rc(args, rl, mav_master):
         return
     values = [ 65535 ] * 8
     values[channel-1] = value
-    values.append(0)
-    mav_master.mav.rc_channels_raw_send(*values)
+    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
 
 def cmd_disarm(args, rl, mav_master):
     '''disarm the motors'''
     values = [ 65535 ] * 8
     values[3] = 1000
     values[2] = 1000
-    values.append(0)
-    mav_master.mav.rc_channels_raw_send(*values)
-    mav_master.mav.rc_channels_raw_send(*values)
-    mav_master.mav.rc_channels_raw_send(*values)
+    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
+    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
+    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
 
 def cmd_arm(args, rl, mav_master):
     '''arm the motors'''
     values = [ 65535 ] * 8
     values[3] = 2000
     values[2] = 1000
-    values.append(0)
-    mav_master.mav.rc_channels_raw_send(*values)
-    mav_master.mav.rc_channels_raw_send(*values)
-    mav_master.mav.rc_channels_raw_send(*values)
+    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
+    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
+    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
     time.sleep(2)
     values[3] = 1500
     values[2] = 1000
-    mav_master.mav.rc_channels_raw_send(*values)
-    mav_master.mav.rc_channels_raw_send(*values)
-    mav_master.mav.rc_channels_raw_send(*values)
+    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
+    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
+    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
 
 
 def cmd_loiter(args, rl, mav_master):
@@ -637,7 +632,7 @@ class mavserial(mavfd):
             tattr[2] &= ~termios.HUPCL
             termios.tcsetattr(self.fd, termios.TCSANOW, tattr)
 
-        self.mav = mavlink.MAVLink(self)
+        self.mav = mavlink.MAVLink(self, srcSystem=opts.SOURCE_SYSTEM)
         self.mav.robust_parsing = True
         self.logfile = None
         self.logfile_raw = None
@@ -691,7 +686,7 @@ class mavudp(mavfd):
         self.port.setblocking(0)
         self.last_address = None
         mavfd.__init__(self, self.port.fileno(), device)
-        self.mav = mavlink.MAVLink(self)
+        self.mav = mavlink.MAVLink(self, srcSystem=opts.SOURCE_SYSTEM)
     def recv(self):
         data, self.last_address = self.port.recvfrom(300)
         return data
@@ -1046,6 +1041,7 @@ def main_loop():
     gps_period = periodic_event(opts.gpsrate)
     status_period = periodic_event(1.0)
     msg_period = periodic_event(1.0)
+    heartbeat_period = periodic_event(0.5)
 
     while True:
         rin = [0, mav_master.fd]
@@ -1079,6 +1075,16 @@ def main_loop():
             if status_period.trigger():
                 status.write()
 
+            if (heartbeat_period.trigger() and
+                not status.setup_mode and
+                status.target_system != -1 and
+                status.target_component != -1):
+                status.counters['MasterOut'] += 1
+                MAV_GROUND = 5
+                MAV_AUTOPILOT_NONE = 4
+                MAVLINK_VERSION = 2
+                mav_master.mav.heartbeat_send(MAV_GROUND, MAV_AUTOPILOT_NONE, MAVLINK_VERSION)
+
             if (msg_period.trigger() and
                 not status.setup_mode and
                 status.target_system != -1 and
@@ -1109,6 +1115,8 @@ if __name__ == '__main__':
                       help="flightgear update rate")
     parser.add_option("--gpsrate",dest="gpsrate", default=4.0, type='float',
                       help="GPS update rate")
+    parser.add_option("--source-system", dest='SOURCE_SYSTEM', type='int',
+                      default=255, help='MAVLink source system for this GCS')
     parser.add_option("--target-system", dest='TARGET_SYSTEM', type='int',
                       default=-1, help='MAVLink target master system')
     parser.add_option("--target-component", dest='TARGET_COMPONENT', type='int',
