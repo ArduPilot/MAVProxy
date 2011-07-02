@@ -125,6 +125,7 @@ class status(object):
         self.mode_string = None
         self.first_altitude = 0.0
         self.last_altitude_announce = 0.0
+        self.last_battery_announce = 0
         self.last_waypoint = 0
 
     def show(self, f):
@@ -786,6 +787,30 @@ def mode_string(mode, nav_mode):
     if cmode in mapping:
         return mapping[cmode]
     return "Mode%s%s" % cmode
+
+def beep():
+    f = open("/dev/tty", mode="w")
+    f.write(chr(7))
+    f.close()
+
+def battery_report():
+    '''report battery level'''
+    if not 'SYS_STATUS' in status.msgs:
+        return
+
+    voltage = status.msgs['SYS_STATUS'].vbat / (opts.num_cells * 1000.0)
+    levels = [ 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 4.1 ]
+    battery_level = 100
+    for i in range(0, len(levels)):
+        if voltage <= levels[i]:
+            battery_level = 10 * i
+            break
+    if battery_level != status.last_battery_announce:
+        say("Battery %u percent" % battery_level)
+        status.last_battery_announce = battery_level
+    if battery_level <= 20:
+        say("battery warning")
+
     
 
 def master_callback(m, master, recipients):
@@ -1042,6 +1067,7 @@ def main_loop():
     status_period = periodic_event(1.0)
     msg_period = periodic_event(1.0)
     heartbeat_period = periodic_event(0.5)
+    battery_period = periodic_event(0.1)
 
     while True:
         rin = [0, mav_master.fd]
@@ -1064,38 +1090,40 @@ def main_loop():
             if fg_input and fd == fg_input.fd:
                 process_flightgear(fg_input, mav_master)
 
-        if not status.setup_mode:
-            if fg_output and fg_period.trigger():
-                send_flightgear_controls(fg_output)
+        if (status.setup_mode or
+            status.target_system == -1 or
+            status.target_component == -1):
+            continue
+        
+        if fg_output and fg_period.trigger():
+            send_flightgear_controls(fg_output)
 
-            if status.gps and gps_period.trigger():
+        if status.gps and gps_period.trigger():
+            status.counters['MasterOut'] += 1
+            mav_master.mav.send(status.gps)
+
+        if status_period.trigger():
+            status.write()
+
+        if heartbeat_period.trigger():
+            status.counters['MasterOut'] += 1
+            MAV_GROUND = 5
+            MAV_AUTOPILOT_NONE = 4
+            MAVLINK_VERSION = 2
+            mav_master.mav.heartbeat_send(MAV_GROUND, MAV_AUTOPILOT_NONE, MAVLINK_VERSION)
+
+        if msg_period.trigger():
+            status.counters['MasterOut'] += 1
+            mav_master.mav.request_data_stream_send(status.target_system, status.target_component,
+                                                    mavlink.MAV_DATA_STREAM_ALL, 4, 1)
+            if len(mav_param) == 0:
                 status.counters['MasterOut'] += 1
-                mav_master.mav.send(status.gps)
-
-            if status_period.trigger():
-                status.write()
-
-            if (heartbeat_period.trigger() and
-                not status.setup_mode and
-                status.target_system != -1 and
-                status.target_component != -1):
-                status.counters['MasterOut'] += 1
-                MAV_GROUND = 5
-                MAV_AUTOPILOT_NONE = 4
-                MAVLINK_VERSION = 2
-                mav_master.mav.heartbeat_send(MAV_GROUND, MAV_AUTOPILOT_NONE, MAVLINK_VERSION)
-
-            if (msg_period.trigger() and
-                not status.setup_mode and
-                status.target_system != -1 and
-                status.target_component != -1):
-                status.counters['MasterOut'] += 1
-                mav_master.mav.request_data_stream_send(status.target_system, status.target_component,
-                                                        mavlink.MAV_DATA_STREAM_ALL, 4, 1)
-                if len(mav_param) == 0:
-                    status.counters['MasterOut'] += 1
-                    mav_master.mav.param_request_list_send(status.target_system, status.target_component)
-
+                mav_master.mav.param_request_list_send(status.target_system, status.target_component)
+ 
+        if battery_period.trigger():
+            battery_report()
+            
+       
 
 if __name__ == '__main__':
 
@@ -1135,6 +1163,8 @@ if __name__ == '__main__':
                       action='store_true', default=False)
     parser.add_option("--speech", dest="speech", help="use text to speach",
                       action='store_true', default=False)
+    parser.add_option("--num-cells", dest="num_cells", help="number of LiPo battery cells",
+                      type='int', default=4)
     
     
     (opts, args) = parser.parse_args()
