@@ -777,7 +777,7 @@ def mode_string(mode, nav_mode):
         (MAV_MODE_TEST3,  MAV_NAV_VECTOR)    : "CIRCLE",
         (MAV_MODE_GUIDED, MAV_NAV_VECTOR)    : "GUIDED",
         (MAV_MODE_TEST1,  MAV_NAV_VECTOR)    : "STABILIZE",
-        (MAV_MODE_TEST2,  MAV_NAV_VECTOR)    : "FBWA",
+        (MAV_MODE_TEST2,  MAV_NAV_LIFTOFF)   : "FBWA",
         (MAV_MODE_AUTO,   MAV_NAV_WAYPOINT)  : "AUTO",
         (MAV_MODE_AUTO,   MAV_NAV_RETURNING) : "RTL",
         (MAV_MODE_AUTO,   MAV_NAV_LOITER)    : "LOITER",
@@ -796,6 +796,9 @@ def beep():
 def battery_report():
     '''report battery level'''
     if not 'SYS_STATUS' in status.msgs:
+        return
+
+    if opts.num_cells == 0:
         return
 
     voltage = status.msgs['SYS_STATUS'].vbat / (opts.num_cells * 1000.0)
@@ -1164,7 +1167,7 @@ if __name__ == '__main__':
     parser.add_option("--speech", dest="speech", help="use text to speach",
                       action='store_true', default=False)
     parser.add_option("--num-cells", dest="num_cells", help="number of LiPo battery cells",
-                      type='int', default=4)
+                      type='int', default=0)
     
     
     (opts, args) = parser.parse_args()
