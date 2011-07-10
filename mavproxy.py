@@ -12,7 +12,6 @@ MODE parameters
 reset now on format version
 FLTMODE_1
 
-
 '''
 
 import sys, os, struct, math, time, socket
@@ -69,14 +68,16 @@ class rline(object):
     def add_history(self, line):
         self.rl_lib.add_history(line)
 
-def say(text):
+def say(text, priority):
     '''speak some text'''
+    ''' http://cvs.freebsoft.org/doc/speechd/ssip.html see 4.3.1 for priorities'''
     print(text)
     if opts.speech:
         import speechd
         status.speech = speechd.SSIPClient('MAVProxy%u' % os.getpid())
         status.speech.set_output_module('festival')
         status.speech.set_language('en')
+	status.speech.set_priority(priority)
         status.speech.set_punctuation(speechd.PunctuationMode.SOME)
         status.speech.speak(text)
         status.speech.close()
@@ -724,35 +725,35 @@ def system_check():
     ok = True
 
     if not 'GPS_RAW' in status.msgs:
-        say("WARNING no GPS status")
+        say("WARNING no GPS status",'important')
         return
     
     if status.msgs['GPS_RAW'].fix_type != 2:
-        say("WARNING no GPS lock")
+        say("WARNING no GPS lock",'important')
         ok = False
 
     if not 'PITCH_MIN' in mav_param:
-        say("WARNING no pitch parameter available")
+        say("WARNING no pitch parameter available",'important')
         return
         
     if int(mav_param['PITCH_MIN']) > 1300:
-        say("WARNING PITCH MINIMUM not set")
+        say("WARNING PITCH MINIMUM not set",'important')
         ok = False
 
     if not 'ATTITUDE' in status.msgs:
-        say("WARNING no attitude recorded")
+        say("WARNING no attitude recorded",'important')
         return
 
     if math.fabs(status.msgs['ATTITUDE'].pitch) > math.radians(5):
-        say("WARNING pitch is %u degrees" % math.degrees(status.msgs['ATTITUDE'].pitch))
+        say("WARNING pitch is %u degrees" % math.degrees(status.msgs['ATTITUDE'].pitch),'important')
         ok = False
 
     if math.fabs(status.msgs['ATTITUDE'].roll) > math.radians(5):
-        say("WARNING roll is %u degrees" % math.degrees(status.msgs['ATTITUDE'].roll))
+        say("WARNING roll is %u degrees" % math.degrees(status.msgs['ATTITUDE'].roll),'important')
         ok = False
 
     if ok:
-        say("All OK SYSTEM READY TO FLY")
+        say("All OK SYSTEM READY TO FLY",'important')
 
 
 def mode_string(mode, nav_mode):
@@ -809,10 +810,10 @@ def battery_report():
             battery_level = 10 * i
             break
     if battery_level != status.last_battery_announce:
-        say("Battery %u percent" % battery_level)
+        say("Battery %u percent" % battery_level,'notification')
         status.last_battery_announce = battery_level
     if battery_level <= 20:
-        say("battery warning")
+        say("battery warning",'important')
 
     
 
@@ -827,7 +828,7 @@ def master_callback(m, master, recipients):
             status.target_component != m.get_srcComponent()):
             status.target_system = m.get_srcSystem()
             status.target_component = m.get_srcComponent()
-            say("online system %u component %u" % (status.target_system, status.target_component))
+            say("online system %u component %u" % (status.target_system, status.target_component),'message')
     elif mtype == 'STATUSTEXT':
         print("APM: %s" % m.text)
     elif mtype == 'PARAM_VALUE':
@@ -875,14 +876,14 @@ def master_callback(m, master, recipients):
     elif mtype == "WAYPOINT_CURRENT":
         if m.seq != status.last_waypoint:
             status.last_waypoint = m.seq
-            say("waypoint %u" % m.seq)
+            say("waypoint %u" % m.seq,'message')
 
     elif mtype == "SYS_STATUS":
         mstring = mode_string(m.mode, m.nav_mode)
         if mstring != status.mode_string:
             status.mode_string = mstring
             rl.set_prompt(mstring + "> ")
-            say("Mode " + mstring)
+            say("Mode " + mstring,'important')
 
     elif (mtype == "VFR_HUD"
           and 'GPS_RAW' in status.msgs
@@ -890,7 +891,7 @@ def master_callback(m, master, recipients):
         if status.first_altitude == 0:
             status.first_altitude = m.alt
             status.last_altitude_announce = 0.0
-            say("GPS lock at %u meters" % m.alt)
+            say("GPS lock at %u meters" % m.alt,'notification')
         else:
             if m.alt < status.first_altitude:
                 status.first_altitude = m.alt
@@ -898,7 +899,7 @@ def master_callback(m, master, recipients):
             if math.fabs(m.alt - status.last_altitude_announce) >= 10.0:
                 status.last_altitude_announce = m.alt
                 rounded_alt = 10 * ((5+int(m.alt - status.first_altitude)) / 10)
-                say("%u meters" % rounded_alt)
+                say("%u meters" % rounded_alt,'notification')
 
     elif mtype == "RC_CHANNELS_RAW":
         if (m.chan7_raw > 1700 and status.mode_string == "MANUAL"):
