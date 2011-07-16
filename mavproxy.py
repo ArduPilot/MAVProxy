@@ -710,7 +710,10 @@ def scale_rc(servo, min, max, min_pwm=1000, max_pwm=2000, param=None):
     if param:
         min_pwm  = get_mav_param('%s_MIN'  % param, min_pwm)
         max_pwm  = get_mav_param('%s_MAX'  % param, max_pwm)
-    p = (servo-min_pwm) / float(max_pwm-min_pwm)
+    if max_pwm == min_pwm:
+        p = 0.0
+    else:
+        p = (servo-min_pwm) / float(max_pwm-min_pwm)
     v = min + p*(max-min)
     if v < min:
         v = min
