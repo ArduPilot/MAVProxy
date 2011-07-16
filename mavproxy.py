@@ -1055,7 +1055,44 @@ def process_flightgear(m, master):
                                                  ft2m(math.sqrt((speedN * speedN) +
                                                                 (speedE * speedE))),
                                                  heading);
+
+def mkdir_p(dir):
+    '''like mkdir -p'''
+    if not dir:
+        return
+    if dir.endswith("/"):
+        mkdir_p(dir[:-1])
+        return
+    if os.path.isdir(dir):
+        return
+    mkdir_p(os.path.dirname(dir))
+    os.mkdir(dir)
                              
+
+def open_logs(mav_master):
+    '''open log files'''
+    if opts.append_log:
+        mode = 'a'
+    else:
+        mode = 'w'
+    logfile = opts.logfile
+    if opts.aircraft is not None:
+        dirname = "%s/logs/%s" % (opts.aircraft, time.strftime("%Y-%m-%d"))
+        mkdir_p(dirname)
+        for i in range(1, 10000):
+            fdir = os.path.join(dirname, 'flight%u' % i)
+            if not os.path.exists(fdir):
+                break
+        if os.path.exists(fdir):
+            print("Flight logs full")
+            sys.exit(1)
+        mkdir_p(fdir)
+        print(fdir)
+        logfile = os.path.join(fdir, logfile)
+    print("Logging to %s" % logfile)
+    mav_master.logfile = open(logfile, mode=mode)
+    mav_master.logfile_raw = open(logfile+'.raw', mode=mode)
+
 
 # master mavlink device
 mav_master = None
@@ -1149,7 +1186,7 @@ if __name__ == '__main__':
                       action='append', default=[])
     parser.add_option("--fgin",  dest="fgin",   help="flightgear input")
     parser.add_option("--fgout", dest="fgout",  help="flightgear output")
-    parser.add_option("--fgrate",dest="fgrate", default=50.0, type='float',
+    parser.add_option("--fgrate",dest="fgrate", default=20.0, type='float',
                       help="flightgear update rate")
     parser.add_option("--gpsrate",dest="gpsrate", default=4.0, type='float',
                       help="GPS update rate")
@@ -1175,6 +1212,7 @@ if __name__ == '__main__':
                       action='store_true', default=False)
     parser.add_option("--num-cells", dest="num_cells", help="number of LiPo battery cells",
                       type='int', default=0)
+    parser.add_option("--aircraft", dest="aircraft", help="aircraft name", default=None)
     
     
     (opts, args) = parser.parse_args()
@@ -1195,12 +1233,7 @@ if __name__ == '__main__':
     mav_master.mav.set_callback(master_callback, mav_master, mav_outputs)
 
     # log all packets from the master, for later replay
-    if opts.append_log:
-        mode = 'a'
-    else:
-        mode = 'w'
-    mav_master.logfile = open(opts.logfile, mode=mode)
-    mav_master.logfile_raw = open(opts.logfile+'.raw', mode=mode)
+    open_logs(mav_master)
 
     # open any mavlink UDP ports
     for p in opts.output:
