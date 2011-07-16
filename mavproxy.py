@@ -148,6 +148,13 @@ class status(object):
 
 # current MAV master parameters
 mav_param = {}
+
+def get_mav_param(param, default=None):
+    '''return a EEPROM parameter value'''
+    global mav_param
+    if not param in mav_param:
+        return default
+    return mav_param[param]
     
 
 def control_set(mav_master, name, channel, args):
@@ -182,11 +189,7 @@ def cmd_switch(args, rl, mav_master):
     if value < 0 or value > 6:
         print("Invalid switch value. Use 1-6 for flight modes, '0' to disable")
         return
-    if not 'FLTMODE_CH' in mav_param:
-        print("Unable to find FLTMODE_CH parameter")
-        flite_mode_ch_parm = 8
-    else:
-        flite_mode_ch_parm = int(mav_param["FLTMODE_CH"])
+    flite_mode_ch_parm = int(get_mav_param("FLTMODE_CH", 8))
     values = [ 65535 ] * 8
     values[flite_mode_ch_parm-1] = mapping[value]
     mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
@@ -701,16 +704,19 @@ class mavudp(mavfd):
         except socket.error:
             pass
 
-def scale_rc(servo, min, max, min_pwm=1000, max_pwm=2000):
+def scale_rc(servo, min, max, min_pwm=1000, max_pwm=2000, param=None):
     '''scale a PWM value'''
     # default to servo range of 1000 to 2000
-    v = (servo - min_pwm) / float(max_pwm-min_pwm)
-    ret = min + (v*(max-min))
-    if ret < min:
-        ret = min
-    if ret > max:
-        ret = max
-    return ret
+    if param:
+        min_pwm  = get_mav_param('%s_MIN'  % param, min_pwm)
+        max_pwm  = get_mav_param('%s_MAX'  % param, max_pwm)
+    p = (servo-min_pwm) / float(max_pwm-min_pwm)
+    v = min + p*(max-min)
+    if v < min:
+        v = min
+    if v > max:
+        v = max
+    return v
     
 
 def all_printable(buf):
@@ -838,15 +844,15 @@ def master_callback(m, master, recipients):
 
     elif mtype == 'SERVO_OUTPUT_RAW':
         if opts.quadcopter:
-            status.rc_throttle[0] = scale_rc(m.servo1_raw, 0.0, 1.0)
-            status.rc_throttle[1] = scale_rc(m.servo2_raw, 0.0, 1.0)
-            status.rc_throttle[2] = scale_rc(m.servo3_raw, 0.0, 1.0)
-            status.rc_throttle[3] = scale_rc(m.servo4_raw, 0.0, 1.0)
+            status.rc_throttle[0] = scale_rc(m.servo1_raw, 0.0, 1.0, param='RC1')
+            status.rc_throttle[1] = scale_rc(m.servo2_raw, 0.0, 1.0, param='RC2')
+            status.rc_throttle[2] = scale_rc(m.servo3_raw, 0.0, 1.0, param='RC3')
+            status.rc_throttle[3] = scale_rc(m.servo4_raw, 0.0, 1.0, param='RC4')
         else:
-            status.rc_aileron  = scale_rc(m.servo1_raw, -1.0, 1.0)
-            status.rc_elevator = scale_rc(m.servo2_raw, -1.0, 1.0)
-            status.rc_throttle = scale_rc(m.servo3_raw, 0.0, 1.0, min_pwm=1500, max_pwm=2000)
-            status.rc_rudder   = scale_rc(m.servo4_raw, -1.0, 1.0)
+            status.rc_aileron  = scale_rc(m.servo1_raw, -1.0, 1.0, param='RC1')
+            status.rc_elevator = scale_rc(m.servo2_raw, -1.0, 1.0, param='RC2')
+            status.rc_throttle = scale_rc(m.servo3_raw, 0.0, 1.0, param='RC3')
+            status.rc_rudder   = scale_rc(m.servo4_raw, -1.0, 1.0, param='RC4')
             if status.rc_throttle < 0.1:
                 status.rc_throttle = 0
 
