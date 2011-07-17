@@ -34,7 +34,7 @@ def deg2rad(x):
 
 def ft2m(x):
     '''feet to meters'''
-    return float(x) * 0.3408
+    return float(x) * 0.3048
 
 def get_usec():
     '''time since 1970 in microseconds'''
