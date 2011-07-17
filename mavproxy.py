@@ -857,10 +857,10 @@ def master_callback(m, master, recipients):
 
     elif mtype == 'SERVO_OUTPUT_RAW':
         if opts.quadcopter:
-            status.rc_throttle[0] = scale_rc(m.servo1_raw, 0.0, 1.0, param='RC1')
-            status.rc_throttle[1] = scale_rc(m.servo2_raw, 0.0, 1.0, param='RC2')
+            status.rc_throttle[0] = scale_rc(m.servo1_raw, 0.0, 1.0, param='RC3')
+            status.rc_throttle[1] = scale_rc(m.servo2_raw, 0.0, 1.0, param='RC3')
             status.rc_throttle[2] = scale_rc(m.servo3_raw, 0.0, 1.0, param='RC3')
-            status.rc_throttle[3] = scale_rc(m.servo4_raw, 0.0, 1.0, param='RC4')
+            status.rc_throttle[3] = scale_rc(m.servo4_raw, 0.0, 1.0, param='RC3')
         else:
             status.rc_aileron  = scale_rc(m.servo1_raw, -1.0, 1.0, param='RC1')
             status.rc_elevator = scale_rc(m.servo2_raw, -1.0, 1.0, param='RC2')
@@ -994,10 +994,10 @@ def send_flightgear_controls(fg):
     status.counters['FGearOut'] += 1
     if opts.quadcopter:
         buf = struct.pack('>ddddI',
+                          status.rc_throttle[0], # right
+                          status.rc_throttle[1], # left
                           status.rc_throttle[2], # front
                           status.rc_throttle[3], # back
-                          status.rc_throttle[1], # left
-                          status.rc_throttle[0], # right
                           0x4c56414d)
     else:
         buf = struct.pack('>ddddI', status.rc_aileron, status.rc_elevator,
@@ -1199,7 +1199,7 @@ if __name__ == '__main__':
                       action='append', default=[])
     parser.add_option("--fgin",  dest="fgin",   help="flightgear input")
     parser.add_option("--fgout", dest="fgout",  help="flightgear output")
-    parser.add_option("--fgrate",dest="fgrate", default=20.0, type='float',
+    parser.add_option("--fgrate",dest="fgrate", default=50.0, type='float',
                       help="flightgear update rate")
     parser.add_option("--gpsrate",dest="gpsrate", default=4.0, type='float',
                       help="GPS update rate")
