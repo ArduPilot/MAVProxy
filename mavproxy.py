@@ -48,6 +48,10 @@ class rline(object):
             handler(self, line, *args, **kwargs)
         self.args = args
         self.kwargs = kwargs
+        self.rl_lib = None
+        self.buffer = ""
+        self.prompt = ""
+        self.handler = handler
         for lib in [ 'libreadline.so.6', 'libreadline.so.5', 'libreadline.so' ]:
             try:
                 self.rl_lib = ctypes.cdll.LoadLibrary(lib)
@@ -55,18 +59,41 @@ class rline(object):
             except:
                 pass
         if self.rl_lib is None:
-            raise RuntimeError("Unable to find readline library")
+            print("no readline support")
+            return
         self.cHandler = ctypes.CFUNCTYPE(None, ctypes.c_char_p)(callback)
         self.rl_lib.rl_callback_handler_install(prompt, self.cHandler)
+        
     def set_prompt(self, prompt):
-        self.rl_lib.rl_set_prompt(prompt)
-        self.rl_lib.rl_redisplay(prompt)
+        self.prompt = prompt
+        if self.rl_lib is not None:
+            self.rl_lib.rl_set_prompt(prompt)
+            self.rl_lib.rl_redisplay(prompt)
+        else:
+            print(prompt)
+
     def read_char(self):
+        if self.rl_lib is None:
+            c = sys.stdin.read(1)
+            if c == -1:
+                print("Exiting")
+                sys.exit(1)
+            self.buffer += c
+            if c in [ '\n', '\r' ]:
+                line = self.buffer
+                self.buffer = ""
+                self.handler(self, line, *self.args, **self.kwargs)
+                print(self.prompt)
+            return
         self.rl_lib.rl_callback_read_char()
+
     def cleanup(self):
-        self.rl_lib.rl_cleanup_after_signal()
+        if self.rl_lib is not None:
+            self.rl_lib.rl_cleanup_after_signal()
+
     def add_history(self, line):
-        self.rl_lib.add_history(line)
+        if self.rl_lib is not None:
+            self.rl_lib.add_history(line)
 
 def say(text, priority):
     '''speak some text'''
