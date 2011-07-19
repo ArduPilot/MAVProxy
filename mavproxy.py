@@ -151,7 +151,7 @@ class status(object):
         self.target_component = -1
         self.speech = None
         self.mode_string = None
-        self.first_altitude = 0.0
+        self.first_altitude = -1
         self.last_altitude_announce = 0.0
         self.last_battery_announce = 0
         self.last_waypoint = 0
@@ -934,7 +934,7 @@ def master_callback(m, master, recipients):
     elif (mtype == "VFR_HUD"
           and 'GPS_RAW' in status.msgs
           and status.msgs['GPS_RAW'].fix_type == 2):
-        if status.first_altitude == 0:
+        if status.first_altitude == -1:
             status.first_altitude = m.alt
             status.last_altitude_announce = 0.0
             say("GPS lock at %u meters" % m.alt,'notification')
