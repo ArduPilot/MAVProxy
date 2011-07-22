@@ -849,7 +849,7 @@ def battery_report():
         return
 
     voltage = status.msgs['SYS_STATUS'].vbat / (opts.num_cells * 1000.0)
-    levels = [ 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 4.1 ]
+    levels = [ 3.22, 3.29, 3.36, 3.43, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 4.1 ]
     battery_level = 100
     for i in range(0, len(levels)):
         if voltage <= levels[i]:
