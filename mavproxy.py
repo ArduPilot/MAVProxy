@@ -493,7 +493,12 @@ def param_load_file(filename, wildcard, mav_master):
         if len(a) != 2:
             print("Invalid line: %s" % line)
             continue
+        if a[0] == 'SYSID_SW_MREV':
+            continue
         if not fnmatch.fnmatch(a[0], wildcard):
+            continue
+        if a[0] not in mav_param:
+            print("Unknown parameter %s" % a[0])
             continue
         if math.fabs(mav_param[a[0]] - float(a[1])) > 0.000001:
             mav_master.mav.param_set_send(status.target_system,
