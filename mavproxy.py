@@ -1025,11 +1025,16 @@ def send_flightgear_controls(fg):
     '''send control values to flightgear'''
     status.counters['FGearOut'] += 1
     if opts.quadcopter:
-        buf = struct.pack('>ddddI',
+        r = [0, 0, 0, 0, 0, 0, 0, 0]
+        if 'RC_CHANNELS_RAW' in status.msgs:
+            for i in range(0, 8):
+                r[i] = getattr(status.msgs['RC_CHANNELS_RAW'], 'chan%u_raw' % (i+1))
+        buf = struct.pack('>ffffHHHHHHHHI',
                           status.rc_throttle[0], # right
                           status.rc_throttle[1], # left
                           status.rc_throttle[2], # front
                           status.rc_throttle[3], # back
+                          r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], # raw PWM in
                           0x4c56414d)
     else:
         buf = struct.pack('>ddddI', status.rc_aileron, status.rc_elevator,
