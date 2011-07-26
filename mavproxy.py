@@ -736,12 +736,13 @@ class mavudp(mavfd):
         except socket.error:
             pass
 
-def scale_rc(servo, min, max, min_pwm=1000, max_pwm=2000, param=None):
+def scale_rc(servo, min, max, param):
     '''scale a PWM value'''
     # default to servo range of 1000 to 2000
-    if param:
-        min_pwm  = get_mav_param('%s_MIN'  % param, min_pwm)
-        max_pwm  = get_mav_param('%s_MAX'  % param, max_pwm)
+    min_pwm  = get_mav_param('%s_MIN'  % param, 0)
+    max_pwm  = get_mav_param('%s_MAX'  % param, 0)
+    if min_pwm == 0 or max_pwm == 0:
+        return 0
     if max_pwm == min_pwm:
         p = 0.0
     else:
