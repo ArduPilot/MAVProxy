@@ -820,6 +820,7 @@ def mode_string(mode, nav_mode):
             (100, 4)    : "STABILIZE",
             (102, 4)    : "SIMPLE",
             (101, 4)    : "ACRO",
+            (103, 4)    : "ALT_HOLD",
             (4,   2)    : "LOITER",
             (4,   5)    : "RTL",
             (4,   3)    : "AUTO",
