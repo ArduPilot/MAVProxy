@@ -855,13 +855,22 @@ def battery_report():
     if opts.num_cells == 0:
         return
 
-    voltage = status.msgs['SYS_STATUS'].vbat / (opts.num_cells * 1000.0)
-    levels = [ 3.22, 3.29, 3.36, 3.43, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 4.1 ]
-    battery_level = 100
-    for i in range(0, len(levels)):
-        if voltage <= levels[i]:
-            battery_level = 10 * i
-            break
+    vcell = status.msgs['SYS_STATUS'].vbat / (opts.num_cells * 1000.0)
+
+    if vcell > 4.1:
+        # above 4.1 is 100% battery
+        battery_level = 100.0
+    elif vcell > 3.81:
+        # 3.81 is 17% remaining, from flight logs
+        battery_level = 17.0 + 83.0 * (vcell - 3.81) / (4.1 - 3.81)
+    elif vcell > 3.81:
+        # below 3.2 it degrades fast. It's dead at 3.2
+        battery_level = 0.0 + 17.0 * (vcell - 3.20) / (3.81 - 3.20)
+    else:
+        battery_level = 0
+
+    battery_level = int(battery_level)
+
     if battery_level != status.last_battery_announce:
         say("Battery %u percent" % battery_level,'notification')
         status.last_battery_announce = battery_level
