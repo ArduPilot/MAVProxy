@@ -14,7 +14,6 @@
 
     <input>
       <binary_mode>true</binary_mode>
-      <binary_footer>magic,0x4c56414d</binary_footer>
 
       <!-- ##### Flight Controls -->
       <chunk>
