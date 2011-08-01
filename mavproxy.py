@@ -800,12 +800,15 @@ def system_check():
 
 def mode_string(mode, nav_mode):
     '''work out autopilot mode'''
+    MAV_MODE_UNINIT = 0
     MAV_MODE_MANUAL = 2
     MAV_MODE_GUIDED = 3
     MAV_MODE_AUTO = 4
     MAV_MODE_TEST1 = 5
     MAV_MODE_TEST2 = 6
     MAV_MODE_TEST3 = 7
+
+    MAV_NAV_GROUNDED = 0
     MAV_NAV_LIFTOFF = 1
     MAV_NAV_HOLD = 2
     MAV_NAV_WAYPOINT = 3
@@ -827,6 +830,7 @@ def mode_string(mode, nav_mode):
             }
     else:
         mapping = {
+            (MAV_MODE_UNINIT, MAV_NAV_GROUNDED)  : "INITIALISING",
             (MAV_MODE_MANUAL, MAV_NAV_VECTOR)    : "MANUAL",
             (MAV_MODE_TEST3,  MAV_NAV_VECTOR)    : "CIRCLE",
             (MAV_MODE_GUIDED, MAV_NAV_VECTOR)    : "GUIDED",
