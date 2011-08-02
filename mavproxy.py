@@ -74,16 +74,17 @@ class rline(object):
 
     def read_char(self):
         if self.rl_lib is None:
-            c = sys.stdin.read(1)
-            if c == -1:
+            s = sys.stdin.readline()
+            if s == "":
                 print("Exiting")
                 sys.exit(1)
-            self.buffer += c
-            if c in [ '\n', '\r' ]:
-                line = self.buffer
-                self.buffer = ""
-                self.handler(self, line, *self.args, **self.kwargs)
-                print(self.prompt)
+            for c in s:
+                self.buffer += c
+                if c in [ '\n', '\r' ]:
+                    line = self.buffer
+                    self.buffer = ""
+                    self.handler(self, line, *self.args, **self.kwargs)
+                    sys.stdout.write(self.prompt)
             return
         self.rl_lib.rl_callback_read_char()
 
