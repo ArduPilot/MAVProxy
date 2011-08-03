@@ -5,24 +5,23 @@ mavproxy - a MAVLink proxy program
 Copyright Andrew Tridgell 2011
 Released under the GNU GPL version 3 or later
 
-RTL
-wind baro
-upgrade eeprom
-MODE parameters
-reset now on format version
-FLTMODE_1
-
 '''
 
 import sys, os, struct, math, time, socket
 import fnmatch, errno
-from curses import ascii
 
 # find the mavlink.py module
-for d in [ 'pymavlink', '../pymavlink' ]:
+for d in [ 'pymavlink', os.path.join('..', 'pymavlink') ]:
     if os.path.exists(d):
         sys.path.insert(0, d)
-import mavlink, readline, select
+        if os.name == 'nt':
+            try:
+                # broken python compilation of mavlink.py on windows!
+                os.unlink(os.path.join(d, 'mavlink.pyc'))
+            except:
+                pass
+import mavlink
+import select
 
 def kt2mps(x):
     '''knots to meters per second'''
@@ -40,62 +39,40 @@ def get_usec():
     '''time since 1970 in microseconds'''
     return long(time.time() * float(1000*1000))
 
+def readline_thread(self):
+    while True:
+        while self.line != None:
+            time.sleep(0.1)
+        try:
+            s = raw_input(self.prompt)
+        except KeyboardInterrupt:
+            sys.exit(1)
+        except Exception, e:
+            self.line = ""
+            sys.exit(0)
+        self.line = s
+
 class rline(object):
     '''async readline abstraction'''
-    def __init__(self, handler, prompt, *args, **kwargs):
-        import ctypes
-        def callback(line):
-            handler(self, line, *args, **kwargs)
-        self.args = args
-        self.kwargs = kwargs
-        self.rl_lib = None
-        self.buffer = ""
-        self.prompt = ""
-        self.handler = handler
-        for lib in [ 'libreadline.so.6', 'libreadline.so.5', 'libreadline.so' ]:
-            try:
-                self.rl_lib = ctypes.cdll.LoadLibrary(lib)
-                break
-            except:
-                pass
-        if self.rl_lib is None:
-            print("no readline support")
-            return
-        self.cHandler = ctypes.CFUNCTYPE(None, ctypes.c_char_p)(callback)
-        self.rl_lib.rl_callback_handler_install(prompt, self.cHandler)
-        
-    def set_prompt(self, prompt):
+    def __init__(self, prompt):
+        import threading
         self.prompt = prompt
-        if self.rl_lib is not None:
-            self.rl_lib.rl_set_prompt(prompt)
-            self.rl_lib.rl_redisplay(prompt)
-        else:
-            print(prompt)
+        self.line = None
+        try:
+            import readline
+        except:
+            pass
+        self.thread = threading.Thread(target=readline_thread, args=[self])
+        # setting this thread as a daemon allows us to exit without waiting for this
+        # thread
+        self.thread.daemon = True
+        self.thread.start()
 
-    def read_char(self):
-        if self.rl_lib is None:
-            s = sys.stdin.readline()
-            if s == "":
-                print("Exiting")
-                sys.exit(1)
-            for c in s:
-                self.buffer += c
-                if c in [ '\n', '\r' ]:
-                    line = self.buffer
-                    self.buffer = ""
-                    self.handler(self, line, *self.args, **self.kwargs)
-                    sys.stdout.write(self.prompt)
-            return
-        self.rl_lib.rl_callback_read_char()
-
-    def cleanup(self):
-        if self.rl_lib is not None:
-            self.rl_lib.rl_cleanup_after_signal()
-
-    def add_history(self, line):
-        if self.rl_lib is not None:
-            self.rl_lib.add_history(line)
-
+    def set_prompt(self, prompt):
+        if prompt != self.prompt:
+            self.prompt = prompt
+            sys.stdout.write(prompt)
+            
 def say(text, priority):
     '''speak some text'''
     ''' http://cvs.freebsoft.org/doc/speechd/ssip.html see 4.3.1 for priorities'''
@@ -622,14 +599,12 @@ def process_stdin(rl, line, mav_master):
             status.setup_mode = False
             rl.set_prompt("MAV> ")
             return
-        rl.add_history(line)
         mav_master.write(line + '\r')
         return
 
     if not line:
         return
 
-    rl.add_history(line)
     args = line.split(" ")
     cmd = args[0]
     if cmd == 'help':
@@ -661,9 +636,13 @@ class mavserial(mavfd):
         self.device = device
         self.port = serial.Serial(self.device, self.baud, timeout=0, dsrdtr=not opts.nodtr)
 
-        mavfd.__init__(self, self.port.fileno(), device)
+        try:
+            fd = self.port.fileno()
+        except Exception:
+            fd = None
+        mavfd.__init__(self, fd, device)
 
-        if opts.nodtr:
+        if opts.nodtr and self.fd is not None:
             # prevent DTR reset on close
             import termios
             tattr = termios.tcgetattr(self.fd)
@@ -694,8 +673,11 @@ class mavserial(mavfd):
         while True:
             try:
                 self.port = serial.Serial(self.device, self.baud, timeout=0, dsrdtr=not opts.nodtr)
-                self.fd = self.port.fileno()
-                if opts.nodtr:
+                try:
+                    self.fd = self.port.fileno()
+                except Exception:
+                    self.fd = None
+                if opts.nodtr and self.fd is not None:
                     # prevent DTR reset on close
                     import termios
                     tattr = termios.tcgetattr(self.fd)
@@ -754,12 +736,25 @@ def scale_rc(servo, min, max, param):
     if v > max:
         v = max
     return v
-    
+
+
+try:
+    from curses import ascii
+    have_ascii = True
+except:
+    have_ascii = False
+
+def is_printable(c):
+    '''see if a character is printable'''
+    global have_ascii
+    if have_ascii:
+        return ascii.isprint(c)
+    return ord(c) <= 'z'
 
 def all_printable(buf):
     '''see if a string is all printable'''
     for c in buf:
-        if not ascii.isprint(c) and not c in ['\r', '\n', '\t']:
+        if not is_printable(c) and not c in ['\r', '\n', '\t']:
             return False
     return True
 
@@ -1186,7 +1181,15 @@ def main_loop():
     battery_period = periodic_event(0.1)
 
     while True:
-        rin = [0, mav_master.fd]
+        if rl.line is not None:
+            process_stdin(rl, rl.line, mav_master)
+            rl.line = None
+        rin = []
+        if mav_master.fd is None:
+            if mav_master.port.inWaiting() != 0:
+                process_master(mav_master)
+        else:
+            rin.append(mav_master.fd)
         for m in mav_outputs:
             rin.append(m.fd)
         if fg_input:
@@ -1314,16 +1317,14 @@ if __name__ == '__main__':
     if opts.fgout:
         fg_output = mavudp(opts.fgout)
     
-    rl = rline(process_stdin, "MAV> ", mav_master)
+    rl = rline("MAV> ")
     if opts.setup:
         rl.set_prompt("")
     try:
         main_loop()
-        rl.cleanup()
     except KeyboardInterrupt:
-        rl.cleanup()
         sys.exit(1)
     except Exception:
-        rl.cleanup()
+        rl.thread.join()
         raise
     
