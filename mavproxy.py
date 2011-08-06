@@ -639,6 +639,8 @@ class mavserial(mavfd):
         self.logfile_raw = None
 
     def read(self):
+        if self.fd is None:
+            return self.port.read(self.port.inWaiting())
         return self.port.read()
 
     def recv(self):
@@ -1207,11 +1209,12 @@ def main_loop():
             process_stdin(rl, rl.line, mav_master)
             rl.line = None
 
-        if mav_master.fd is None and mav_master.port.inWaiting() != 0:
-            process_master(mav_master)
+        if mav_master.fd is None:
+            if mav_master.port.inWaiting() > 0:
+                process_master(mav_master)
 
         periodic_tasks(mav_master)
-
+    
         rin = []
         if mav_master.fd is not None:
             rin.append(mav_master.fd)
@@ -1219,10 +1222,14 @@ def main_loop():
             rin.append(m.fd)
         if fg_input:
             rin.append(fg_input.fd)
+        if rin == []:
+            time.sleep(0.001)
+            continue
         try:
             (rin, win, xin) = select.select(rin, [], [], 0.001)
         except select.error, (errno, msg):
             continue
+
         for fd in rin:
             if fd == mav_master.fd:
                 process_master(mav_master)
@@ -1231,6 +1238,7 @@ def main_loop():
                     process_mavlink(m, mav_master)
             if fg_input and fd == fg_input.fd:
                 process_flightgear(fg_input, mav_master)
+
 
 def input_loop():
     '''wait for user input'''
