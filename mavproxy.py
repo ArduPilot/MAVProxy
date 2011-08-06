@@ -8,7 +8,8 @@ Released under the GNU GPL version 3 or later
 '''
 
 import sys, os, struct, math, time, socket
-import fnmatch, errno
+import fnmatch, errno, threading
+import serial
 
 # find the mavlink.py module
 for d in [ 'pymavlink', os.path.join('..', 'pymavlink') ]:
@@ -39,19 +40,6 @@ def get_usec():
     '''time since 1970 in microseconds'''
     return long(time.time() * float(1000*1000))
 
-def readline_thread(self):
-    while True:
-        while self.line != None:
-            time.sleep(0.1)
-        try:
-            s = raw_input(self.prompt)
-        except KeyboardInterrupt:
-            sys.exit(1)
-        except Exception, e:
-            self.line = ""
-            sys.exit(0)
-        self.line = s
-
 class rline(object):
     '''async readline abstraction'''
     def __init__(self, prompt):
@@ -60,20 +48,15 @@ class rline(object):
         self.line = None
         try:
             import readline
-        except:
+        except Exception:
             pass
-        self.thread = threading.Thread(target=readline_thread, args=[self])
-        # setting this thread as a daemon allows us to exit without waiting for this
-        # thread
-        self.thread.daemon = True
-        self.thread.start()
 
     def set_prompt(self, prompt):
         if prompt != self.prompt:
             self.prompt = prompt
             sys.stdout.write(prompt)
             
-def say(text, priority):
+def say(text, priority='important'):
     '''speak some text'''
     ''' http://cvs.freebsoft.org/doc/speechd/ssip.html see 4.3.1 for priorities'''
     print(text)
@@ -133,6 +116,7 @@ class status(object):
         self.last_altitude_announce = 0.0
         self.last_battery_announce = 0
         self.last_waypoint = 0
+        self.exit = False
 
     def show(self, f):
         '''write status to status.txt'''
@@ -631,10 +615,10 @@ class mavfd(object):
 class mavserial(mavfd):
     '''a serial mavlink port'''
     def __init__(self, device, baud=115200):
-        import serial
         self.baud = baud
         self.device = device
-        self.port = serial.Serial(self.device, self.baud, timeout=0, dsrdtr=not opts.nodtr)
+        self.port = serial.Serial(self.device, self.baud, timeout=1,
+                                  dsrdtr=False, rtscts=False, xonxoff=False)
 
         try:
             fd = self.port.fileno()
@@ -666,6 +650,10 @@ class mavserial(mavfd):
         except OSError:
             self.reset()
             return -1
+        except Exception, e:
+            print("serial write error: %s", e)
+            return -1
+            
 
     def reset(self):
         import serial
@@ -763,35 +751,35 @@ def system_check():
     ok = True
 
     if not 'GPS_RAW' in status.msgs:
-        say("WARNING no GPS status",'important')
+        say("WARNING no GPS status")
         return
     
     if status.msgs['GPS_RAW'].fix_type != 2:
-        say("WARNING no GPS lock",'important')
+        say("WARNING no GPS lock")
         ok = False
 
     if not 'PITCH_MIN' in mav_param:
-        say("WARNING no pitch parameter available",'important')
+        say("WARNING no pitch parameter available")
         return
         
     if int(mav_param['PITCH_MIN']) > 1300:
-        say("WARNING PITCH MINIMUM not set",'important')
+        say("WARNING PITCH MINIMUM not set")
         ok = False
 
     if not 'ATTITUDE' in status.msgs:
-        say("WARNING no attitude recorded",'important')
+        say("WARNING no attitude recorded")
         return
 
     if math.fabs(status.msgs['ATTITUDE'].pitch) > math.radians(5):
-        say("WARNING pitch is %u degrees" % math.degrees(status.msgs['ATTITUDE'].pitch),'important')
+        say("WARNING pitch is %u degrees" % math.degrees(status.msgs['ATTITUDE'].pitch))
         ok = False
 
     if math.fabs(status.msgs['ATTITUDE'].roll) > math.radians(5):
-        say("WARNING roll is %u degrees" % math.degrees(status.msgs['ATTITUDE'].roll),'important')
+        say("WARNING roll is %u degrees" % math.degrees(status.msgs['ATTITUDE'].roll))
         ok = False
 
     if ok:
-        say("All OK SYSTEM READY TO FLY",'important')
+        say("All OK SYSTEM READY TO FLY")
 
 
 def mode_string(mode, nav_mode):
@@ -872,10 +860,10 @@ def battery_report():
     battery_level = int(battery_level)
 
     if battery_level != status.last_battery_announce:
-        say("Battery %u percent" % battery_level,'notification')
+        say("Battery %u percent" % battery_level,priority='notification')
         status.last_battery_announce = battery_level
     if battery_level <= 20:
-        say("battery warning",'important')
+        say("battery warning")
 
     
 
@@ -883,6 +871,8 @@ def master_callback(m, master, recipients):
     '''process mavlink message m on master, sending any messages to recipients'''
 
     status.counters['MasterIn'] += 1
+
+#    print("Got MAVLink msg: %s" % m)
 
     mtype = m.get_type()
     if mtype == 'HEARTBEAT':
@@ -941,14 +931,14 @@ def master_callback(m, master, recipients):
     elif mtype == "WAYPOINT_CURRENT":
         if m.seq != status.last_waypoint:
             status.last_waypoint = m.seq
-            say("waypoint %u" % m.seq,'message')
+            say("waypoint %u" % m.seq,priority='message')
 
     elif mtype == "SYS_STATUS":
         mstring = mode_string(m.mode, m.nav_mode)
         if mstring != status.mode_string:
             status.mode_string = mstring
             rl.set_prompt(mstring + "> ")
-            say("Mode " + mstring,'important')
+            say("Mode " + mstring)
 
     elif (mtype == "VFR_HUD"
           and 'GPS_RAW' in status.msgs
@@ -956,7 +946,7 @@ def master_callback(m, master, recipients):
         if status.first_altitude == -1:
             status.first_altitude = m.alt
             status.last_altitude_announce = 0.0
-            say("GPS lock at %u meters" % m.alt,'notification')
+            say("GPS lock at %u meters" % m.alt,priority='notification')
         else:
             if m.alt < status.first_altitude:
                 status.first_altitude = m.alt
@@ -964,7 +954,7 @@ def master_callback(m, master, recipients):
             if math.fabs(m.alt - status.last_altitude_announce) >= 10.0:
                 status.last_altitude_announce = m.alt
                 rounded_alt = 10 * ((5+int(m.alt - status.first_altitude)) / 10)
-                say("%u meters" % rounded_alt,'notification')
+                say("%u meters" % rounded_alt,priority='notification')
 
     elif mtype == "RC_CHANNELS_RAW":
         if (m.chan7_raw > 1700 and status.mode_string == "MANUAL"):
@@ -1171,24 +1161,59 @@ fg_input = None
 fg_output = None
 
 
+def periodic_tasks(mav_master):
+    '''run periodic checks'''
+    if (status.setup_mode or
+        status.target_system == -1 or
+        status.target_component == -1):
+        return
+
+    if fg_output and fg_period.trigger():
+        send_flightgear_controls(fg_output)
+
+    if status.gps and gps_period.trigger():
+        status.counters['MasterOut'] += 1
+        mav_master.mav.send(status.gps)
+
+    if status_period.trigger():
+        status.write()
+
+    if heartbeat_period.trigger():
+        status.counters['MasterOut'] += 1
+        MAV_GROUND = 5
+        MAV_AUTOPILOT_NONE = 4
+        MAVLINK_VERSION = 2
+        mav_master.mav.heartbeat_send(MAV_GROUND, MAV_AUTOPILOT_NONE, MAVLINK_VERSION)
+
+    if msg_period.trigger():
+        status.counters['MasterOut'] += 1
+        mav_master.mav.request_data_stream_send(status.target_system, status.target_component,
+                                                mavlink.MAV_DATA_STREAM_ALL, 4, 1)
+        return
+        if len(mav_param) == 0:
+            status.counters['MasterOut'] += 1
+            mav_master.mav.param_request_list_send(status.target_system, status.target_component)
+ 
+    if battery_period.trigger():
+        battery_report()
+
+
 def main_loop():
     '''main processing loop'''
-    fg_period = periodic_event(opts.fgrate)
-    gps_period = periodic_event(opts.gpsrate)
-    status_period = periodic_event(1.0)
-    msg_period = periodic_event(1.0)
-    heartbeat_period = periodic_event(0.5)
-    battery_period = periodic_event(0.1)
-
     while True:
+        if status.exit:
+            return
         if rl.line is not None:
             process_stdin(rl, rl.line, mav_master)
             rl.line = None
+
+        if mav_master.fd is None and mav_master.port.inWaiting() != 0:
+            process_master(mav_master)
+
+        periodic_tasks(mav_master)
+
         rin = []
-        if mav_master.fd is None:
-            if mav_master.port.inWaiting() != 0:
-                process_master(mav_master)
-        else:
+        if mav_master.fd is not None:
             rin.append(mav_master.fd)
         for m in mav_outputs:
             rin.append(m.fd)
@@ -1199,8 +1224,6 @@ def main_loop():
         except select.error, (errno, msg):
             continue
         for fd in rin:
-            if fd == 0:
-                rl.read_char()
             if fd == mav_master.fd:
                 process_master(mav_master)
             for m in mav_outputs:
@@ -1209,38 +1232,17 @@ def main_loop():
             if fg_input and fd == fg_input.fd:
                 process_flightgear(fg_input, mav_master)
 
-        if (status.setup_mode or
-            status.target_system == -1 or
-            status.target_component == -1):
-            continue
-        
-        if fg_output and fg_period.trigger():
-            send_flightgear_controls(fg_output)
-
-        if status.gps and gps_period.trigger():
-            status.counters['MasterOut'] += 1
-            mav_master.mav.send(status.gps)
-
-        if status_period.trigger():
-            status.write()
-
-        if heartbeat_period.trigger():
-            status.counters['MasterOut'] += 1
-            MAV_GROUND = 5
-            MAV_AUTOPILOT_NONE = 4
-            MAVLINK_VERSION = 2
-            mav_master.mav.heartbeat_send(MAV_GROUND, MAV_AUTOPILOT_NONE, MAVLINK_VERSION)
-
-        if msg_period.trigger():
-            status.counters['MasterOut'] += 1
-            mav_master.mav.request_data_stream_send(status.target_system, status.target_component,
-                                                    mavlink.MAV_DATA_STREAM_ALL, 4, 1)
-            if len(mav_param) == 0:
-                status.counters['MasterOut'] += 1
-                mav_master.mav.param_request_list_send(status.target_system, status.target_component)
- 
-        if battery_period.trigger():
-            battery_report()
+def input_loop():
+    '''wait for user input'''
+    while True:
+        while rl.line is not None:
+            time.sleep(0.01)
+        try:
+            line = raw_input(rl.prompt)
+        except EOFError:
+            status.exit = True
+            sys.exit(1)
+        rl.line = line
             
        
 
@@ -1252,8 +1254,6 @@ if __name__ == '__main__':
     parser.add_option("--master",dest="master", help="MAVLink master port")
     parser.add_option("--baudrate", dest="baudrate", type='int',
                       help="master port baud rate", default=115200)
-    parser.add_option("--in",    dest="input",  help="MAVLink input port",
-                      action='append')
     parser.add_option("--out",   dest="output", help="MAVLink output port",
                       action='append', default=[])
     parser.add_option("--fgin",  dest="fgin",   help="flightgear input")
@@ -1316,15 +1316,29 @@ if __name__ == '__main__':
         fg_input = mavudp(opts.fgin, input=True)
     if opts.fgout:
         fg_output = mavudp(opts.fgout)
-    
+
+    fg_period = periodic_event(opts.fgrate)
+    gps_period = periodic_event(opts.gpsrate)
+    status_period = periodic_event(1.0)
+    msg_period = periodic_event(1.0)
+    heartbeat_period = periodic_event(0.5)
+    battery_period = periodic_event(0.1)
+
     rl = rline("MAV> ")
     if opts.setup:
         rl.set_prompt("")
+
+    # run main loop as a thread
+    status.thread = threading.Thread(target=main_loop)
+    status.thread.daemon = True
+    status.thread.start()
+
+    # use main program for input. This ensures the terminal cleans
+    # up on exit
     try:
-        main_loop()
+        input_loop()
     except KeyboardInterrupt:
+        print("exiting")
+        status.exit = True
         sys.exit(1)
-    except Exception:
-        rl.thread.join()
-        raise
-    
+        
