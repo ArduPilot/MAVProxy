@@ -21,7 +21,8 @@ for d in [ 'pymavlink', os.path.join('..', 'pymavlink') ]:
                 os.unlink(os.path.join(d, 'mavlink.pyc'))
             except:
                 pass
-import mavlink
+
+import mavlink, mavutil
 import select
 
 def kt2mps(x):
@@ -38,7 +39,7 @@ def ft2m(x):
 
 def get_usec():
     '''time since 1970 in microseconds'''
-    return long(time.time() * float(1000*1000))
+    return long(time.time() * 1.0e6)
 
 class rline(object):
     '''async readline abstraction'''
@@ -71,19 +72,6 @@ def say(text, priority='important'):
         status.speech.close()
 
 
-class periodic_event(object):
-    '''a class for fixed frequency events'''
-    def __init__(self, frequency):
-        self.frequency = float(frequency)
-        self.last_time = time.time()
-    def trigger(self):
-        '''return True if we should trigger now'''
-        tnow = time.time()
-        if self.last_time + (1.0/self.frequency) <= tnow:
-            self.last_time = tnow
-            return True
-        return False
-
 class status(object):
     '''hold status information about the master'''
     def __init__(self):
@@ -105,9 +93,6 @@ class status(object):
         self.loading_waypoints = False
         self.loading_waypoint_lasttime = time.time()
         self.mav_error = 0
-        self.in_mavlink = False
-        self.master_buffer = ""
-        self.show_pwm = False
         self.target_system = -1
         self.target_component = -1
         self.speech = None
@@ -178,7 +163,11 @@ def cmd_switch(args, rl, mav_master):
     if value < 0 or value > 6:
         print("Invalid switch value. Use 1-6 for flight modes, '0' to disable")
         return
-    flite_mode_ch_parm = int(get_mav_param("FLTMODE_CH", 8))
+    if opts.quadcopter:
+        default_channel = 5
+    else:
+        default_channel = 8
+    flite_mode_ch_parm = int(get_mav_param("FLTMODE_CH", default_channel))
     values = [ 65535 ] * 8
     values[flite_mode_ch_parm-1] = mapping[value]
     mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
@@ -533,11 +522,6 @@ def cmd_status(args, rl, mav_master):
     '''show status'''
     status.show(sys.stdout)
 
-def cmd_pwm(args, rl, mav_master):
-    '''show PWM values'''
-    status.show_pwm = not status.show_pwm
-
-
 def cmd_setup(args, rl, mav_master):
     status.setup_mode = True
     rl.set_prompt("")
@@ -562,7 +546,6 @@ command_map = {
     'disarm'  : (cmd_disarm,   'disarm the motors'),
     'arm'     : (cmd_arm,      'arm the motors'),
     'status'  : (cmd_status,   'show status'),
-    'pwm'     : (cmd_pwm,      'show PWM input'),
     'trim'    : (cmd_trim,     'trim aileron, elevator and rudder to current values'),
     'auto'    : (cmd_auto,     'set AUTO mode'),
     'ground'  : (cmd_ground,   'do a ground start'),
@@ -604,110 +587,6 @@ def process_stdin(rl, line, mav_master):
     (fn, help) = command_map[cmd]
     fn(args[1:], rl, mav_master)
 
-
-class mavfd(object):
-    '''a generic mavlink port'''
-    def __init__(self, fd, address):
-        self.fd = fd
-        self.address = address
-
-
-class mavserial(mavfd):
-    '''a serial mavlink port'''
-    def __init__(self, device, baud=115200):
-        self.baud = baud
-        self.device = device
-        self.port = serial.Serial(self.device, self.baud, timeout=1,
-                                  dsrdtr=False, rtscts=False, xonxoff=False)
-
-        try:
-            fd = self.port.fileno()
-        except Exception:
-            fd = None
-        mavfd.__init__(self, fd, device)
-
-        if opts.nodtr and self.fd is not None:
-            # prevent DTR reset on close
-            import termios
-            tattr = termios.tcgetattr(self.fd)
-            tattr[2] &= ~termios.HUPCL
-            termios.tcsetattr(self.fd, termios.TCSANOW, tattr)
-
-        self.mav = mavlink.MAVLink(self, srcSystem=opts.SOURCE_SYSTEM)
-        self.mav.robust_parsing = True
-        self.logfile = None
-        self.logfile_raw = None
-
-    def read(self):
-        if self.fd is None:
-            return self.port.read(self.port.inWaiting())
-        return self.port.read()
-
-    def recv(self):
-        return self.read()
-
-    def write(self, buf):
-        try:
-            return self.port.write(buf)
-        except OSError:
-            self.reset()
-            return -1
-        except Exception, e:
-            print("serial write error: %s", e)
-            return -1
-            
-
-    def reset(self):
-        import serial
-        self.port.close()
-        while True:
-            try:
-                self.port = serial.Serial(self.device, self.baud, timeout=0, dsrdtr=not opts.nodtr)
-                try:
-                    self.fd = self.port.fileno()
-                except Exception:
-                    self.fd = None
-                if opts.nodtr and self.fd is not None:
-                    # prevent DTR reset on close
-                    import termios
-                    tattr = termios.tcgetattr(self.fd)
-                    tattr[2] &= ~termios.HUPCL
-                    termios.tcsetattr(self.fd, termios.TCSANOW, tattr)
-                return
-            except Exception, msg:
-                print("Failed to reopen %s - %s" % (self.device, msg))
-                time.sleep(1)
-        
-
-class mavudp(mavfd):
-    '''a UDP mavlink socket'''
-    def __init__(self, device, input=False):
-        a = device.split(':')
-        if len(a) != 2:
-            print("UDP ports must be specified as host:port")
-            sys.exit(1)
-        self.port = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        if input:
-            self.port.bind((a[0], int(a[1])))
-            self.connected = False
-        else:
-            self.port.connect((a[0], int(a[1])))
-            self.connected = True
-        self.port.setblocking(0)
-        self.last_address = None
-        mavfd.__init__(self, self.port.fileno(), device)
-        self.mav = mavlink.MAVLink(self, srcSystem=opts.SOURCE_SYSTEM)
-    def recv(self):
-        data, self.last_address = self.port.recvfrom(300)
-        return data
-    def write(self, buf):
-        try:
-            if self.connected:
-                self.port.send(buf)
-            else:
-                self.port.sendto(buf, self.last_address)
-        except socket.error:
-            pass
 
 def scale_rc(servo, min, max, param):
     '''scale a PWM value'''
@@ -924,9 +803,6 @@ def master_callback(m, master, recipients):
                 save_waypoints(status.wp_save_filename)
             status.wp_op = None
 
-    elif mtype == "RC_CHANNELS_RAW" and status.show_pwm:
-        print(m)
-
     elif mtype == "WAYPOINT_REQUEST":
         process_waypoint_request(m, master)
 
@@ -970,7 +846,8 @@ def master_callback(m, master, recipients):
                     'ATTITUDE', 'RC_CHANNELS_RAW', 'GPS_STATUS', 'WAYPOINT_CURRENT',
                     'SERVO_OUTPUT_RAW', 'VFR_HUD',
                     'GLOBAL_POSITION_INT', 'RAW_PRESSURE', 'RAW_IMU', 'WAYPOINT_ACK',
-                    'NAV_CONTROLLER_OUTPUT', 'GPS_RAW', 'WAYPOINT' ]:
+                    'NAV_CONTROLLER_OUTPUT', 'GPS_RAW', 'WAYPOINT',
+                    'SCALED_PRESSURE', 'SENSOR_OFFSETS' ]:
         pass
     else:
         print("Got MAVLink msg: %s" % m)
@@ -1307,9 +1184,9 @@ if __name__ == '__main__':
 
     # open master link
     if opts.master.find(':') != -1:
-        mav_master = mavudp(opts.master, input=True)
+        mav_master = mavutil.mavudp(opts.master, input=True)
     else:
-        mav_master = mavserial(opts.master, baud=opts.baudrate)
+        mav_master = mavutil.mavserial(opts.master, baud=opts.baudrate)
     mav_master.mav.set_callback(master_callback, mav_master, mav_outputs)
 
     # log all packets from the master, for later replay
@@ -1317,20 +1194,20 @@ if __name__ == '__main__':
 
     # open any mavlink UDP ports
     for p in opts.output:
-        mav_outputs.append(mavudp(p))
+        mav_outputs.append(mavutil.mavudp(p))
 
     # open any flightgear UDP ports
     if opts.fgin:
-        fg_input = mavudp(opts.fgin, input=True)
+        fg_input = mavutil.mavudp(opts.fgin, input=True)
     if opts.fgout:
-        fg_output = mavudp(opts.fgout)
+        fg_output = mavutil.mavudp(opts.fgout)
 
-    fg_period = periodic_event(opts.fgrate)
-    gps_period = periodic_event(opts.gpsrate)
-    status_period = periodic_event(1.0)
-    msg_period = periodic_event(1.0)
-    heartbeat_period = periodic_event(0.5)
-    battery_period = periodic_event(0.1)
+    fg_period = mavutil.periodic_event(opts.fgrate)
+    gps_period = mavutil.periodic_event(opts.gpsrate)
+    status_period = mavutil.periodic_event(1.0)
+    msg_period = mavutil.periodic_event(1.0)
+    heartbeat_period = mavutil.periodic_event(0.5)
+    battery_period = mavutil.periodic_event(0.1)
 
     rl = rline("MAV> ")
     if opts.setup:
