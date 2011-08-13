@@ -265,6 +265,10 @@ def cmd_manual(args, rl, mav_master):
     MAV_ACTION_SET_MANUAL = 12
     mav_master.mav.action_send(status.target_system, status.target_component, MAV_ACTION_SET_MANUAL)
 
+def cmd_magreset(args, rl, mav_master):
+    '''reset magnetometer offsets'''
+    mav_master.mav.set_mag_offsets_send(status.target_system, status.target_component,
+                                        0, 0, 0)
 
 
 def process_waypoint_request(m, mav_master):
@@ -552,6 +556,7 @@ command_map = {
     'loiter'  : (cmd_loiter,   'set LOITER mode'),
     'rtl'     : (cmd_rtl,      'set RTL mode'),
     'manual'  : (cmd_manual,   'set MANUAL mode'),
+    'magreset': (cmd_magreset, 'reset magnetometer offsets'),
     };
 
 def process_stdin(rl, line, mav_master):
