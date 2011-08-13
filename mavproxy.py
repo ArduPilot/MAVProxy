@@ -100,6 +100,7 @@ class status(object):
         self.first_altitude = -1
         self.last_altitude_announce = 0.0
         self.last_battery_announce = 0
+        self.battery_level = -1
         self.last_waypoint = 0
         self.exit = False
 
@@ -721,15 +722,12 @@ def beep():
     f.write(chr(7))
     f.close()
 
-def battery_report():
-    '''report battery level'''
-    if not 'SYS_STATUS' in status.msgs:
-        return
-
+def battery_update(SYS_STATUS):
+    '''update battery level'''
     if opts.num_cells == 0:
         return
 
-    vcell = status.msgs['SYS_STATUS'].vbat / (opts.num_cells * 1000.0)
+    vcell = SYS_STATUS.vbat / (opts.num_cells * 1000.0)
 
     if vcell > 4.1:
         # above 4.1 is 100% battery
@@ -743,12 +741,23 @@ def battery_report():
     else:
         battery_level = 0
 
-    battery_level = int(battery_level)
+    if status.battery_level == -1 or abs(battery_level-status.battery_level) > 70:
+        status.battery_level = battery_level
+    else:
+        status.battery_level = (95*status.battery_level + 5*battery_level)/100
 
-    if battery_level != status.last_battery_announce:
-        say("Battery %u percent" % battery_level,priority='notification')
-        status.last_battery_announce = battery_level
-    if battery_level <= 20:
+
+def battery_report():
+    '''report battery level'''
+    if opts.num_cells == 0:
+        return
+
+    rbattery_level = int((status.battery_level+5)/10)*10;
+
+    if rbattery_level != status.last_battery_announce:
+        say("Battery %u percent" % rbattery_level,priority='notification')
+        status.last_battery_announce = rbattery_level
+    if rbattery_level <= 20:
         say("battery warning")
 
     
@@ -818,6 +827,7 @@ def master_callback(m, master, recipients):
 
     elif mtype == "SYS_STATUS":
         mstring = mode_string(m.mode, m.nav_mode)
+        battery_update(m)
         if mstring != status.mode_string:
             status.mode_string = mstring
             rl.set_prompt(mstring + "> ")
