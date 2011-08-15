@@ -104,16 +104,19 @@ class status(object):
         self.last_waypoint = 0
         self.exit = False
 
-    def show(self, f):
+    def show(self, f, pattern=None):
         '''write status to status.txt'''
-        f.write('Counters: ')
-        for c in status.counters:
-            f.write('%s:%u ' % (c, status.counters[c]))
-        f.write('\n')
-        f.write('MAV Errors: %u\n' % status.mav_error)
-        f.write(str(self.gps)+'\n')
-        for m in status.msgs:
-                f.write("%u: %s\n" % (status.msg_count[m], str(status.msgs[m])))
+        if pattern is None:
+            f.write('Counters: ')
+            for c in status.counters:
+                f.write('%s:%u ' % (c, status.counters[c]))
+            f.write('\n')
+            f.write('MAV Errors: %u\n' % status.mav_error)
+            f.write(str(self.gps)+'\n')
+        for m in sorted(status.msgs.keys()):
+            if pattern is not None and not fnmatch.fnmatch(str(m), pattern):
+                continue
+            f.write("%u: %s\n" % (status.msg_count[m], str(status.msgs[m])))
 
     def write(self):
         '''write status to status.txt'''
@@ -525,7 +528,11 @@ def cmd_param(args, rl, mav_master):
 
 def cmd_status(args, rl, mav_master):
     '''show status'''
-    status.show(sys.stdout)
+    if len(args) > 0:
+        pattern = args[0]
+    else:
+        pattern = None
+    status.show(sys.stdout, pattern=pattern)
 
 def cmd_setup(args, rl, mav_master):
     status.setup_mode = True
@@ -927,7 +934,7 @@ def send_flightgear_controls(fg):
         if 'RC_CHANNELS_RAW' in status.msgs:
             for i in range(0, 8):
                 r[i] = getattr(status.msgs['RC_CHANNELS_RAW'], 'chan%u_raw' % (i+1))
-        buf = struct.pack('>ffffHHHHHHHHI',
+        buf = struct.pack('>ffffHHHHHHHH',
                           status.rc_throttle[0], # right
                           status.rc_throttle[1], # left
                           status.rc_throttle[2], # front
