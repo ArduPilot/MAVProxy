@@ -103,6 +103,7 @@ class status(object):
         self.battery_level = -1
         self.last_waypoint = 0
         self.exit = False
+        self.override = [ 0 ] * 8
 
     def show(self, f, pattern=None):
         '''write status to status.txt'''
@@ -140,9 +141,10 @@ def control_set(mav_master, name, channel, args):
     if len(args) != 1:
         print("Usage: %s <pwmvalue>" % name)
         return
-    values = [ 65535 ] * 8
-    values[channel-1] = int(args[0])
-    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
+    status.override[channel-1] = int(args[0])
+    mav_master.mav.rc_channels_override_send(status.target_system,
+                                             status.target_component,
+                                             *status.override)
     
 def cmd_roll(args, rl, mav_master):
     control_set(mav_master, 'roll', 1, args)
@@ -172,9 +174,9 @@ def cmd_switch(args, rl, mav_master):
     else:
         default_channel = 8
     flite_mode_ch_parm = int(get_mav_param("FLTMODE_CH", default_channel))
-    values = [ 65535 ] * 8
-    values[flite_mode_ch_parm-1] = mapping[value]
-    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
+    status.override[flite_mode_ch_parm-1] = mapping[value]
+    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component,
+                                             *status.override)
     if value == 0:
         print("Disabled RC switch override")
     else:
@@ -215,9 +217,10 @@ def cmd_rc(args, rl, mav_master):
     if channel < 1 or channel > 8:
         print("Channel must be between 1 and 8")
         return
-    values = [ 65535 ] * 8
-    values[channel-1] = value
-    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
+    status.override[channel-1] = value
+    mav_master.mav.rc_channels_override_send(status.target_system,
+                                             status.target_component,
+                                             *status.override)
 
 def cmd_disarm(args, rl, mav_master):
     '''disarm the motors'''
@@ -887,8 +890,8 @@ def master_callback(m, master, recipients):
 
     # and log them
     if master.logfile and mtype != "BAD_DATA":
-        master.logfile.write(struct.pack('>Q', get_usec()))
-        master.logfile.write(m.get_msgbuf())
+        master.logfile.write(struct.pack('>Q', get_usec()) + m.get_msgbuf())
+        master.logfile.flush()
 
 
 def process_master(m):
@@ -1098,6 +1101,13 @@ def periodic_tasks(mav_master):
     if battery_period.trigger():
         battery_report()
 
+    if override_period.trigger():
+        if status.override != [ 0 ] * 8:
+            mav_master.mav.rc_channels_override_send(status.target_system,
+                                                     status.target_component,
+                                                     *status.override)
+            
+
 
 def main_loop():
     '''main processing loop'''
@@ -1230,6 +1240,7 @@ if __name__ == '__main__':
     msg_period = mavutil.periodic_event(1.0)
     heartbeat_period = mavutil.periodic_event(0.5)
     battery_period = mavutil.periodic_event(0.1)
+    override_period = mavutil.periodic_event(1)
 
     rl = rline("MAV> ")
     if opts.setup:
