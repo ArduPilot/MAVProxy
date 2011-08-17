@@ -481,7 +481,7 @@ def cmd_param(args, rl, mav_master):
         print("usage: param <fetch|edit|set|show|store>")
         return
     if args[0] == "fetch":
-        mav_master.mav.param_request_list_send(status.target_system, status.target_component)
+        mav_master.param_fetch_all()
         print("Requested parameter list")
     elif args[0] == "save":
         if len(args) < 2:
@@ -499,8 +499,7 @@ def cmd_param(args, rl, mav_master):
         param = args[1]
         value = args[2]
         if not param in mav_param:
-            print("Unable to find parameter '%s'" % param)
-            return
+            print("Warning: Unable to find parameter '%s'" % param)
         mav_master.mav.param_set_send(status.target_system,
                                       status.target_component, param, float(value))
     elif args[0] == "load":
@@ -899,15 +898,17 @@ def process_master(m):
     s = m.recv()
     if m.logfile_raw:
         m.logfile_raw.write(s)
+        m.logfile_raw.flush()
 
     if status.setup_mode:
         sys.stdout.write(s)
         sys.stdout.flush()
         return
 
-    for c in s:
-        msg = m.mav.parse_char(c)
-        if msg and msg.get_type() == "BAD_DATA":
+    msg = m.mav.parse_char(s)
+    if msg:
+        m.post_message(msg)
+        if msg.get_type() == "BAD_DATA":
             if opts.show_errors:
                 print("MAV error: %s" % msg)
             status.mav_error += 1
@@ -1090,13 +1091,10 @@ def periodic_tasks(mav_master):
         mav_master.mav.heartbeat_send(MAV_GROUND, MAV_AUTOPILOT_NONE, MAVLINK_VERSION)
 
     if msg_period.trigger():
-        status.counters['MasterOut'] += 1
         mav_master.mav.request_data_stream_send(status.target_system, status.target_component,
                                                 mavlink.MAV_DATA_STREAM_ALL, 4, 1)
-        return
-        if len(mav_param) == 0:
-            status.counters['MasterOut'] += 1
-            mav_master.mav.param_request_list_send(status.target_system, status.target_component)
+    if not mav_master.param_fetch_complete and mav_master.time_since('PARAM_VALUE') > 2:
+        mav_master.param_fetch_all()
  
     if battery_period.trigger():
         battery_report()
@@ -1111,6 +1109,11 @@ def periodic_tasks(mav_master):
 
 def main_loop():
     '''main processing loop'''
+    mav_master.wait_heartbeat()
+    mav_master.mav.request_data_stream_send(mav_master.target_system, mav_master.target_component,
+                                            mavlink.MAV_DATA_STREAM_ALL, 4, 1)
+    mav_master.param_fetch_all()
+
     while True:
         if status.exit:
             return
@@ -1226,19 +1229,19 @@ if __name__ == '__main__':
 
     # open any mavlink UDP ports
     for p in opts.output:
-        mav_outputs.append(mavutil.mavudp(p))
+        mav_outputs.append(mavutil.mavudp(p, input=False))
 
     # open any flightgear UDP ports
     if opts.fgin:
         fg_input = mavutil.mavudp(opts.fgin, input=True)
     if opts.fgout:
-        fg_output = mavutil.mavudp(opts.fgout)
+        fg_output = mavutil.mavudp(opts.fgout, input=False)
 
     fg_period = mavutil.periodic_event(opts.fgrate)
     gps_period = mavutil.periodic_event(opts.gpsrate)
     status_period = mavutil.periodic_event(1.0)
-    msg_period = mavutil.periodic_event(1.0)
-    heartbeat_period = mavutil.periodic_event(0.5)
+    msg_period = mavutil.periodic_event(2.0)
+    heartbeat_period = mavutil.periodic_event(1)
     battery_period = mavutil.periodic_event(0.1)
     override_period = mavutil.periodic_event(1)
 
