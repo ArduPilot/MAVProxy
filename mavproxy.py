@@ -66,7 +66,7 @@ def say(text, priority='important'):
         status.speech = speechd.SSIPClient('MAVProxy%u' % os.getpid())
         status.speech.set_output_module('festival')
         status.speech.set_language('en')
-	status.speech.set_priority(priority)
+        status.speech.set_priority(priority)
         status.speech.set_punctuation(speechd.PunctuationMode.SOME)
         status.speech.speak(text)
         status.speech.close()
