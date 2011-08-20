@@ -1190,7 +1190,22 @@ if __name__ == '__main__':
     (opts, args) = parser.parse_args()
 
     if not opts.master:
-        parser.error("You must specify a MAVLink master serial port")
+        serial_list = mavutil.auto_detect_serial(preferred='*FTDI*')
+        if len(serial_list) == 1:
+            opts.master = serial_list[0].device
+        else:
+            print('''
+Please choose a MAVLink master with --master
+For example:
+    --master=com14
+    --master=/dev/ttyUSB0
+    --master=127.0.0.1:14550
+
+Auto-detected serial ports are:
+''')
+            for port in serial_list:
+                print("%s" % port)
+            sys.exit(1)
 
     # container for status information
     status = status()
