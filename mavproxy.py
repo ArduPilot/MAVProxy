@@ -96,7 +96,6 @@ class status(object):
         self.target_system = -1
         self.target_component = -1
         self.speech = None
-        self.mode_string = None
         self.first_altitude = -1
         self.last_altitude_announce = 0.0
         self.last_battery_announce = 0
@@ -104,6 +103,7 @@ class status(object):
         self.last_waypoint = 0
         self.exit = False
         self.override = [ 0 ] * 8
+        self.flightmode = 'MAV'
 
     def show(self, f, pattern=None):
         '''write status to status.txt'''
@@ -658,54 +658,6 @@ def system_check():
         say("All OK SYSTEM READY TO FLY")
 
 
-def mode_string(mode, nav_mode):
-    '''work out autopilot mode'''
-    MAV_MODE_UNINIT = 0
-    MAV_MODE_MANUAL = 2
-    MAV_MODE_GUIDED = 3
-    MAV_MODE_AUTO = 4
-    MAV_MODE_TEST1 = 5
-    MAV_MODE_TEST2 = 6
-    MAV_MODE_TEST3 = 7
-
-    MAV_NAV_GROUNDED = 0
-    MAV_NAV_LIFTOFF = 1
-    MAV_NAV_HOLD = 2
-    MAV_NAV_WAYPOINT = 3
-    MAV_NAV_VECTOR = 4
-    MAV_NAV_RETURNING = 5
-    MAV_NAV_LANDING = 6
-    MAV_NAV_LOST = 7
-    MAV_NAV_LOITER = 8
-    cmode = (mode, nav_mode)
-    if opts.quadcopter:
-        mapping = {
-            (100, 4)    : "STABILIZE",
-            (102, 4)    : "SIMPLE",
-            (101, 4)    : "ACRO",
-            (103, 4)    : "ALT_HOLD",
-            (4,   2)    : "LOITER",
-            (4,   5)    : "RTL",
-            (4,   3)    : "AUTO",
-            }
-    else:
-        mapping = {
-            (MAV_MODE_UNINIT, MAV_NAV_GROUNDED)  : "INITIALISING",
-            (MAV_MODE_MANUAL, MAV_NAV_VECTOR)    : "MANUAL",
-            (MAV_MODE_TEST3,  MAV_NAV_VECTOR)    : "CIRCLE",
-            (MAV_MODE_GUIDED, MAV_NAV_VECTOR)    : "GUIDED",
-            (MAV_MODE_TEST1,  MAV_NAV_VECTOR)    : "STABILIZE",
-            (MAV_MODE_TEST2,  MAV_NAV_LIFTOFF)   : "FBWA",
-            (MAV_MODE_AUTO,   MAV_NAV_WAYPOINT)  : "AUTO",
-            (MAV_MODE_AUTO,   MAV_NAV_RETURNING) : "RTL",
-            (MAV_MODE_AUTO,   MAV_NAV_LOITER)    : "LOITER",
-            (MAV_MODE_AUTO,   MAV_NAV_LIFTOFF)   : "TAKEOFF",
-            (MAV_MODE_AUTO,   MAV_NAV_LANDING)   : "LANDING",
-            }
-    if cmode in mapping:
-        return mapping[cmode]
-    return "Mode(%s,%s)" % cmode
-
 def beep():
     f = open("/dev/tty", mode="w")
     f.write(chr(7))
@@ -815,12 +767,11 @@ def master_callback(m, master, recipients):
             say("waypoint %u" % m.seq,priority='message')
 
     elif mtype == "SYS_STATUS":
-        mstring = mode_string(m.mode, m.nav_mode)
         battery_update(m)
-        if mstring != status.mode_string:
-            status.mode_string = mstring
-            rl.set_prompt(mstring + "> ")
-            say("Mode " + mstring)
+        if mav_master.flightmode != status.flightmode:
+            status.flightmode = mav_master.flightmode
+            rl.set_prompt(status.flightmode + "> ")
+            say("Mode " + status.flightmode)
 
     elif (mtype == "VFR_HUD"
           and 'GPS_RAW' in status.msgs
@@ -839,7 +790,7 @@ def master_callback(m, master, recipients):
                 say("%u meters" % rounded_alt,priority='notification')
 
     elif mtype == "RC_CHANNELS_RAW":
-        if (m.chan7_raw > 1700 and status.mode_string == "MANUAL"):
+        if (m.chan7_raw > 1700 and status.flightmode == "MANUAL"):
             system_check()
 
     elif mtype == "BAD_DATA":
