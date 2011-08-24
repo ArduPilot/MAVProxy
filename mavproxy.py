@@ -816,11 +816,11 @@ def master_callback(m, master, recipients):
     # also send the message on to all the slaves
     if mtype != "BAD_DATA":
         for r in recipients:
-            r.write(m.get_msgbuf())
+            r.write(m.get_msgbuf().tostring())
 
     # and log them
     if master.logfile and mtype != "BAD_DATA":
-        master.logfile.write(struct.pack('>Q', get_usec()) + str(m.get_msgbuf()))
+        master.logfile.write(struct.pack('>Q', get_usec()) + m.get_msgbuf().tostring())
         master.logfile.flush()
 
 
@@ -858,7 +858,7 @@ def process_mavlink(slave, master):
         print("Bad MAVLink slave message from %s: %s" % (slave.address, e.message))
         return
     if not status.setup_mode:
-        master.write(m.get_msgbuf())
+        master.write(m.get_msgbuf().tostring())
     status.counters['Slave'] += 1
 
 def send_flightgear_controls(fg):
