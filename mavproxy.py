@@ -820,7 +820,7 @@ def master_callback(m, master, recipients):
 
     # and log them
     if master.logfile and mtype != "BAD_DATA":
-        master.logfile.write(struct.pack('>Q', get_usec()) + m.get_msgbuf())
+        master.logfile.write(struct.pack('>Q', get_usec()) + str(m.get_msgbuf()))
         master.logfile.flush()
 
 
@@ -854,8 +854,8 @@ def process_mavlink(slave, master):
         return
     try:
         m = slave.mav.decode(buf)
-    except mavlink.MAVError, msg:
-        print("Bad MAVLink slave message from %s: %s" % (slave.address, msg))
+    except mavlink.MAVError as e:
+        print("Bad MAVLink slave message from %s: %s" % (slave.address, e.message))
         return
     if not status.setup_mode:
         master.write(m.get_msgbuf())
@@ -896,8 +896,8 @@ def process_flightgear(m, master):
          rollRate, pitchRate, yawRate,
          rollDeg, pitchDeg, yawDeg,
          airspeed, magic) = struct.unpack('>ddddddddddddddddI', buf)
-    except struct.error, msg:
-        print("Bad flightgear input of length %u: %s" % (len(buf), msg))
+    except struct.error as e:
+        print("Bad flightgear input of length %u: %s" % (len(buf), e.message))
         return
     if magic != 0x4c56414d:
         print("Bad flightgear magic 0x%08x should be 0x4c56414d" % magic)
@@ -1070,7 +1070,7 @@ def main_loop():
             continue
         try:
             (rin, win, xin) = select.select(rin, [], [], 0.001)
-        except select.error, (errno, msg):
+        except select.error:
             continue
 
         for fd in rin:
