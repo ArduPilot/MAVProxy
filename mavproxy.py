@@ -444,7 +444,11 @@ def param_save(filename, wildcard):
 
 def param_load_file(filename, wildcard, mav_master):
     '''load parameters from a file'''
-    f = open(filename, mode='r')
+    try:
+        f = open(filename, mode='r')
+    except:
+        print("Failed to open file '%s'" % filename)
+        return
     count = 0
     changed = 0
     for line in f:
@@ -455,7 +459,7 @@ def param_load_file(filename, wildcard, mav_master):
         if len(a) != 2:
             print("Invalid line: %s" % line)
             continue
-        if a[0] == 'SYSID_SW_MREV':
+        if a[0] in ['SYSID_SW_MREV', 'SYS_NUM_REBOOT']:
             continue
         if not fnmatch.fnmatch(a[0], wildcard):
             continue
@@ -802,7 +806,7 @@ def master_callback(m, master, recipients):
                     'SERVO_OUTPUT_RAW', 'VFR_HUD',
                     'GLOBAL_POSITION_INT', 'RAW_PRESSURE', 'RAW_IMU', 'WAYPOINT_ACK',
                     'NAV_CONTROLLER_OUTPUT', 'GPS_RAW', 'WAYPOINT',
-                    'SCALED_PRESSURE', 'SENSOR_OFFSETS' ]:
+                    'SCALED_PRESSURE', 'SENSOR_OFFSETS', 'MEMINFO' ]:
         pass
     else:
         print("Got MAVLink msg: %s" % m)
