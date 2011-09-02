@@ -71,6 +71,35 @@ def say(text, priority='important'):
         status.speech.speak(text)
         status.speech.close()
 
+class settings(object):
+    def __init__(self):
+        self.vars = [ ('altreadout', int),
+                      ('battreadout', int),
+                      ('basealtitude', int) ]
+        self.altreadout = 10
+        self.battreadout = 1
+        self.basealtitude = -1
+
+    def set(self, vname, value):
+        '''set a setting'''
+        for (v,t) in sorted(self.vars):
+            if v == vname:
+                try:
+                    value = t(value)
+                except:
+                    print("Unable to convert %s to type %s" % (value, t))
+                    return
+                setattr(self, vname, value)
+                return
+
+    def show(self, v):
+        '''show settings'''
+        print("%20s %s" % (v, getattr(self, v)))
+
+    def show_all(self):
+        '''show all settings'''
+        for (v,t) in sorted(self.vars):
+            self.show(v)
 
 class status(object):
     '''hold status information about the master'''
@@ -96,7 +125,6 @@ class status(object):
         self.target_system = -1
         self.target_component = -1
         self.speech = None
-        self.first_altitude = -1
         self.last_altitude_announce = 0.0
         self.last_battery_announce = 0
         self.battery_level = -1
@@ -531,6 +559,19 @@ def cmd_param(args, rl, mav_master):
     else:
         print("Unknown subcommand '%s' (try 'fetch', 'save', 'set', 'show', 'load' or 'store')" % args[0]);
 
+def cmd_set(args, rl, mav_master):
+    '''control mavproxy options'''
+    if len(args) == 0:
+        settings.show_all()
+        return
+
+    if getattr(settings, args[0], None) is None:
+        print("Unknown setting '%s'" % args[0])
+        return
+    if len(args) == 1:
+        settings.show(args[0])
+    else:
+        settings.set(args[0], args[1])
 
 def cmd_status(args, rl, mav_master):
     '''show status'''
@@ -571,6 +612,7 @@ command_map = {
     'rtl'     : (cmd_rtl,      'set RTL mode'),
     'manual'  : (cmd_manual,   'set MANUAL mode'),
     'magreset': (cmd_magreset, 'reset magnetometer offsets'),
+    'set'     : (cmd_set,      'mavproxy settings'),
     };
 
 def process_stdin(rl, line, mav_master):
@@ -694,7 +736,7 @@ def battery_update(SYS_STATUS):
 
 def battery_report():
     '''report battery level'''
-    if opts.num_cells == 0:
+    if opts.num_cells == 0 or int(settings.battreadout) == 0:
         return
 
     rbattery_level = int((status.battery_level+5)/10)*10;
@@ -780,18 +822,19 @@ def master_callback(m, master, recipients):
     elif (mtype == "VFR_HUD"
           and 'GPS_RAW' in status.msgs
           and status.msgs['GPS_RAW'].fix_type == 2):
-        if status.first_altitude == -1:
-            status.first_altitude = m.alt
+        if settings.basealtitude == -1:
+            settings.basealtitude = m.alt
             status.last_altitude_announce = 0.0
             say("GPS lock at %u meters" % m.alt,priority='notification')
         else:
-            if m.alt < status.first_altitude:
-                status.first_altitude = m.alt
+            if m.alt < settings.basealtitude:
+                settings.basealtitude = m.alt
                 status.last_altitude_announce = m.alt
-            if math.fabs(m.alt - status.last_altitude_announce) >= 10.0:
+            if (int(settings.altreadout) > 0 and
+                math.fabs(m.alt - status.last_altitude_announce) >= int(settings.altreadout)):
                 status.last_altitude_announce = m.alt
-                rounded_alt = 10 * ((5+int(m.alt - status.first_altitude)) / 10)
-                say("%u meters" % rounded_alt,priority='notification')
+                rounded_alt = int(settings.altreadout) * ((5+int(m.alt - settings.basealtitude)) / int(settings.altreadout))
+                say("%u meters" % rounded_alt, priority='notification')
 
     elif mtype == "RC_CHANNELS_RAW":
         if (m.chan7_raw > 1700 and status.flightmode == "MANUAL"):
@@ -1000,6 +1043,7 @@ fg_input = None
 # flightgear output
 fg_output = None
 
+settings = settings()
 
 def periodic_tasks(mav_master):
     '''run periodic checks'''
