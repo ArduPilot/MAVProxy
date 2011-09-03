@@ -905,7 +905,7 @@ def process_mavlink(slave, master):
         print("Bad MAVLink slave message from %s: %s" % (slave.address, e.message))
         return
     if not status.setup_mode:
-        master.write(m.get_msgbuf().tostring())
+        master.write(m.get_msgbuf())
     status.counters['Slave'] += 1
 
 def send_flightgear_controls(fg):
