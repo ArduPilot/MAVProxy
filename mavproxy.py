@@ -39,7 +39,7 @@ def ft2m(x):
 
 def get_usec():
     '''time since 1970 in microseconds'''
-    return long(time.time() * 1.0e6)
+    return int(time.time() * 1.0e6)
 
 class rline(object):
     '''async readline abstraction'''
@@ -487,7 +487,7 @@ def param_load_file(filename, wildcard, mav_master):
         if len(a) != 2:
             print("Invalid line: %s" % line)
             continue
-        if a[0] in ['SYSID_SW_MREV', 'SYS_NUM_REBOOT']:
+        if a[0] in ['SYSID_SW_MREV', 'SYS_NUM_RESETS']:
             continue
         if not fnmatch.fnmatch(a[0], wildcard):
             continue
@@ -548,11 +548,10 @@ def cmd_param(args, rl, mav_master):
             pattern = args[1]
         else:
             pattern = "*"
-        k = mav_param.keys()
-        k.sort()
+        k = sorted(mav_param.keys())
         for p in k:
             if fnmatch.fnmatch(str(p), pattern):
-                print("%-15.15s %f" % (p, mav_param[p]))
+                print("%-15.15s %f" % (str(p), mav_param[p]))
     elif args[0] == "store":
         MAV_ACTION_STORAGE_WRITE = 15
         mav_master.mav.action_send(status.target_system, status.target_component, MAV_ACTION_STORAGE_WRITE)
@@ -867,7 +866,7 @@ def master_callback(m, master, recipients):
 
     # and log them
     if master.logfile and mtype != "BAD_DATA":
-        master.logfile.write(struct.pack('>Q', get_usec()) + m.get_msgbuf().tostring())
+        master.logfile.write(str(struct.pack('>Q', get_usec()) + m.get_msgbuf().tostring()))
         master.logfile.flush()
 
 
@@ -875,11 +874,11 @@ def process_master(m):
     '''process packets from the MAVLink master'''
     s = m.recv()
     if m.logfile_raw:
-        m.logfile_raw.write(s)
+        m.logfile_raw.write(str(s))
         m.logfile_raw.flush()
 
     if status.setup_mode:
-        sys.stdout.write(s)
+        sys.stdout.write(str(s))
         sys.stdout.flush()
         return
 
@@ -906,6 +905,7 @@ def process_mavlink(slave, master):
         return
     if not status.setup_mode:
         master.write(m.get_msgbuf())
+        print(m)
     status.counters['Slave'] += 1
 
 def send_flightgear_controls(fg):
@@ -1235,7 +1235,7 @@ Auto-detected serial ports are:
     fg_period = mavutil.periodic_event(opts.fgrate)
     gps_period = mavutil.periodic_event(opts.gpsrate)
     status_period = mavutil.periodic_event(1.0)
-    msg_period = mavutil.periodic_event(2.0)
+    msg_period = mavutil.periodic_event(0.01)
     heartbeat_period = mavutil.periodic_event(1)
     battery_period = mavutil.periodic_event(0.1)
     override_period = mavutil.periodic_event(1)
