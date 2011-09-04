@@ -494,12 +494,25 @@ def param_load_file(filename, wildcard, mav_master):
         if a[0] not in mav_param:
             print("Unknown parameter %s" % a[0])
             continue
-        if math.fabs(mav_param[a[0]] - float(a[1])) > 0.000001:
+        old_value = mav_param[a[0]]
+        if math.fabs(old_value - float(a[1])) > 0.000001:
             mav_master.mav.param_set_send(status.target_system,
                                           status.target_component, a[0], float(a[1]))
             changed += 1
-            time.sleep(0.1)
-            print("changed %s from %f to %f" % (a[0], mav_param[a[0]], float(a[1])))
+            tstart = time.time()
+            got_ack = False
+            while time.time() - tstart < 3:
+                ack = mav_master.recv_match(type='PARAM_VALUE', blocking=False)
+                if ack == None:
+                    continue
+                if str(a[0]) == str(ack.param_id):
+                    got_ack = True
+                    break
+                time.sleep(0.1)
+            if not got_ack:
+                print("timeout setting %s to %f" % (a[0], float(a[1])))
+                continue
+            print("changed %s from %f to %f" % (a[0], old_value, float(a[1])))
         count += 1
     f.close()
     print("Loaded %u parameters from %s (changed %u)" % (count, filename, changed))
@@ -905,7 +918,6 @@ def process_mavlink(slave, master):
         return
     if not status.setup_mode:
         master.write(m.get_msgbuf())
-        print(m)
     status.counters['Slave'] += 1
 
 def send_flightgear_controls(fg):
