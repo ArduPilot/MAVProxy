@@ -933,8 +933,7 @@ def send_flightgear_controls(fg):
                           status.rc_throttle[1], # left
                           status.rc_throttle[2], # front
                           status.rc_throttle[3], # back
-                          r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], # raw PWM in
-                          0x4c56414d)
+                          r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7])
     else:
         buf = struct.pack('>dddd', status.rc_aileron, status.rc_elevator,
                           status.rc_rudder, status.rc_throttle)
