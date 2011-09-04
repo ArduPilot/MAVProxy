@@ -75,10 +75,12 @@ class settings(object):
     def __init__(self):
         self.vars = [ ('altreadout', int),
                       ('battreadout', int),
-                      ('basealtitude', int) ]
+                      ('basealtitude', int),
+                      ('heartbeat', int)]
         self.altreadout = 10
         self.battreadout = 1
         self.basealtitude = -1
+        self.heartbeat = 1
 
     def set(self, vname, value):
         '''set a setting'''
@@ -456,6 +458,28 @@ def cmd_wp(args, rl, mav_master):
         print("Usage: wp <list|load|save|set|clear>")
 
 
+def param_set(mav_master, name, value, retries=3):
+    '''set a parameter'''
+    got_ack = False
+    while retries > 0 and not got_ack:
+        retries -= 1
+        mav_master.mav.param_set_send(status.target_system,
+                                      status.target_component, name, float(value))
+        tstart = time.time()
+        while time.time() - tstart < 1:
+            ack = mav_master.recv_match(type='PARAM_VALUE', blocking=False)
+            if ack == None:
+                time.sleep(0.1)
+                continue
+            if str(name) == str(ack.param_id):
+                got_ack = True
+                break
+    if not got_ack:
+        print("timeout setting %s to %f" % (name, float(value)))
+        return False
+    return True
+
+
 def param_save(filename, wildcard):
     '''save parameters to a file'''
     f = open(filename, mode='w')
@@ -496,23 +520,9 @@ def param_load_file(filename, wildcard, mav_master):
             continue
         old_value = mav_param[a[0]]
         if math.fabs(old_value - float(a[1])) > 0.000001:
-            mav_master.mav.param_set_send(status.target_system,
-                                          status.target_component, a[0], float(a[1]))
+            if param_set(mav_master, a[0], a[1]):
+                print("changed %s from %f to %f" % (a[0], old_value, float(a[1])))
             changed += 1
-            tstart = time.time()
-            got_ack = False
-            while time.time() - tstart < 3:
-                ack = mav_master.recv_match(type='PARAM_VALUE', blocking=False)
-                if ack == None:
-                    continue
-                if str(a[0]) == str(ack.param_id):
-                    got_ack = True
-                    break
-                time.sleep(0.1)
-            if not got_ack:
-                print("timeout setting %s to %f" % (a[0], float(a[1])))
-                continue
-            print("changed %s from %f to %f" % (a[0], old_value, float(a[1])))
         count += 1
     f.close()
     print("Loaded %u parameters from %s (changed %u)" % (count, filename, changed))
@@ -545,8 +555,7 @@ def cmd_param(args, rl, mav_master):
         value = args[2]
         if not param in mav_param:
             print("Warning: Unable to find parameter '%s'" % param)
-        mav_master.mav.param_set_send(status.target_system,
-                                      status.target_component, param, float(value))
+        param_set(mav_master, param, value)
     elif args[0] == "load":
         if len(args) < 2:
             print("Usage: param load <filename> [wildcard]")
@@ -658,7 +667,10 @@ def process_stdin(rl, line, mav_master):
         print("Unknown command '%s'" % line)
         return
     (fn, help) = command_map[cmd]
-    fn(args[1:], rl, mav_master)
+    try:
+        fn(args[1:], rl, mav_master)
+    except Exception as e:
+        print("ERROR in command: %s" % str(e))
 
 
 def scale_rc(servo, min, max, param):
@@ -1073,12 +1085,11 @@ def periodic_tasks(mav_master):
     if status_period.trigger():
         status.write()
 
-    if heartbeat_period.trigger():
+    if heartbeat_period.trigger() and settings.heartbeat != 0:
         status.counters['MasterOut'] += 1
         MAV_GROUND = 5
         MAV_AUTOPILOT_NONE = 4
-        MAVLINK_VERSION = 2
-        mav_master.mav.heartbeat_send(MAV_GROUND, MAV_AUTOPILOT_NONE, MAVLINK_VERSION)
+        mav_master.mav.heartbeat_send(MAV_GROUND, MAV_AUTOPILOT_NONE)
 
     if msg_period.trigger():
         mav_master.mav.request_data_stream_send(status.target_system, status.target_component,
@@ -1268,4 +1279,3 @@ Auto-detected serial ports are:
         print("exiting")
         status.exit = True
         sys.exit(1)
-        
