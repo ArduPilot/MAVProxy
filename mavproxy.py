@@ -130,7 +130,9 @@ class status(object):
         self.speech = None
         self.last_altitude_announce = 0.0
         self.last_battery_announce = 0
+        self.last_avionics_battery_announce = 0
         self.battery_level = -1
+        self.avionics_battery_level = -1
         self.last_waypoint = 0
         self.exit = False
         self.override = [ 0 ] * 8
@@ -734,29 +736,52 @@ def beep():
     f.write(chr(7))
     f.close()
 
+def vcell_to_battery_percent(vcell):
+    '''convert a cell voltage to a percentage battery level'''
+    if vcell > 4.1:
+        # above 4.1 is 100% battery
+        return 100.0
+    elif vcell > 3.81:
+        # 3.81 is 17% remaining, from flight logs
+        return 17.0 + 83.0 * (vcell - 3.81) / (4.1 - 3.81)
+    elif vcell > 3.81:
+        # below 3.2 it degrades fast. It's dead at 3.2
+        return 0.0 + 17.0 * (vcell - 3.20) / (3.81 - 3.20)
+    # it's dead or disconnected
+    return 0.0
+
+
 def battery_update(SYS_STATUS):
     '''update battery level'''
     if opts.num_cells == 0:
         return
 
+    # main flight battery
     vcell = SYS_STATUS.vbat / (opts.num_cells * 1000.0)
 
-    if vcell > 4.1:
-        # above 4.1 is 100% battery
-        battery_level = 100.0
-    elif vcell > 3.81:
-        # 3.81 is 17% remaining, from flight logs
-        battery_level = 17.0 + 83.0 * (vcell - 3.81) / (4.1 - 3.81)
-    elif vcell > 3.81:
-        # below 3.2 it degrades fast. It's dead at 3.2
-        battery_level = 0.0 + 17.0 * (vcell - 3.20) / (3.81 - 3.20)
-    else:
-        battery_level = 0
+    battery_level = vcell_to_battery_percent(vcell)
 
     if status.battery_level == -1 or abs(battery_level-status.battery_level) > 70:
         status.battery_level = battery_level
     else:
         status.battery_level = (95*status.battery_level + 5*battery_level)/100
+
+    # avionics battery
+    if not 'AP_ADC' in status.msgs:
+        return
+    rawvalue = float(status.msgs['AP_ADC'].adc2)
+    INPUT_VOLTAGE = 4.68
+    VOLT_DIV_RATIO = 3.56
+    voltage = rawvalue*(INPUT_VOLTAGE/1024.0)*VOLT_DIV_RATIO
+    vcell = voltage / opts.num_cells
+
+    avionics_battery_level = vcell_to_battery_percent(vcell)
+
+    if status.avionics_battery_level == -1 or abs(avionics_battery_level-status.avionics_battery_level) > 70:
+        status.avionics_battery_level = avionics_battery_level
+    else:
+        status.avionics_battery_level = (95*status.avionics_battery_level + 5*avionics_battery_level)/100
+
 
 
 def battery_report():
@@ -767,10 +792,18 @@ def battery_report():
     rbattery_level = int((status.battery_level+5)/10)*10;
 
     if rbattery_level != status.last_battery_announce:
-        say("Battery %u percent" % rbattery_level,priority='notification')
+        say("Flight battery %u percent" % rbattery_level,priority='notification')
         status.last_battery_announce = rbattery_level
     if rbattery_level <= 20:
-        say("battery warning")
+        say("Flight battery warning")
+
+    avionics_rbattery_level = int((status.avionics_battery_level+5)/10)*10;
+
+    if avionics_rbattery_level != status.last_avionics_battery_announce:
+        say("Avionics Battery %u percent" % avionics_rbattery_level,priority='notification')
+        status.last_avionics_battery_announce = avionics_rbattery_level
+    if avionics_rbattery_level <= 20:
+        say("Avionics battery warning")
 
     
 
@@ -874,7 +907,7 @@ def master_callback(m, master, recipients):
                     'SERVO_OUTPUT_RAW', 'VFR_HUD',
                     'GLOBAL_POSITION_INT', 'RAW_PRESSURE', 'RAW_IMU', 'WAYPOINT_ACK',
                     'NAV_CONTROLLER_OUTPUT', 'GPS_RAW', 'WAYPOINT',
-                    'SCALED_PRESSURE', 'SENSOR_OFFSETS', 'MEMINFO' ]:
+                    'SCALED_PRESSURE', 'SENSOR_OFFSETS', 'MEMINFO', 'AP_ADC' ]:
         pass
     else:
         print("Got MAVLink msg: %s" % m)
