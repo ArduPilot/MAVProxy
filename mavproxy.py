@@ -148,7 +148,7 @@ class status(object):
             f.write('MAV Errors: %u\n' % status.mav_error)
             f.write(str(self.gps)+'\n')
         for m in sorted(status.msgs.keys()):
-            if pattern is not None and not fnmatch.fnmatch(str(m), pattern):
+            if pattern is not None and not fnmatch.fnmatch(str(m).upper(), pattern.upper()):
                 continue
             f.write("%u: %s\n" % (status.msg_count[m], str(status.msgs[m])))
 
@@ -490,7 +490,7 @@ def param_save(filename, wildcard):
     k.sort()
     count = 0
     for p in k:
-        if p and fnmatch.fnmatch(str(p), wildcard):
+        if p and fnmatch.fnmatch(str(p).upper(), wildcard.upper()):
             f.write("%-15.15s %f\n" % (p, mav_param[p]))
             count += 1
     f.close()
@@ -516,7 +516,7 @@ def param_load_file(filename, wildcard, mav_master):
             continue
         if a[0] in ['SYSID_SW_MREV', 'SYS_NUM_RESETS']:
             continue
-        if not fnmatch.fnmatch(a[0], wildcard):
+        if not fnmatch.fnmatch(a[0].upper(), wildcard.upper()):
             continue
         if a[0] not in mav_param:
             print("Unknown parameter %s" % a[0])
@@ -575,7 +575,7 @@ def cmd_param(args, rl, mav_master):
             pattern = "*"
         k = sorted(mav_param.keys())
         for p in k:
-            if fnmatch.fnmatch(str(p), pattern):
+            if fnmatch.fnmatch(str(p).upper(), pattern.upper()):
                 print("%-15.15s %f" % (str(p), mav_param[p]))
     elif args[0] == "store":
         MAV_ACTION_STORAGE_WRITE = 15
