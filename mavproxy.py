@@ -1127,7 +1127,7 @@ def periodic_tasks(mav_master):
 
     if msg_period.trigger():
         mav_master.mav.request_data_stream_send(status.target_system, status.target_component,
-                                                mavlink.MAV_DATA_STREAM_ALL, 4, 1)
+                                                mavlink.MAV_DATA_STREAM_ALL, 1, 1)
     if not mav_master.param_fetch_complete and mav_master.time_since('PARAM_VALUE') > 2:
         mav_master.param_fetch_all()
  
@@ -1147,7 +1147,7 @@ def main_loop():
     if not status.setup_mode:
         mav_master.wait_heartbeat()
         mav_master.mav.request_data_stream_send(mav_master.target_system, mav_master.target_component,
-                                            mavlink.MAV_DATA_STREAM_ALL, 4, 1)
+                                            mavlink.MAV_DATA_STREAM_ALL, 1, 1)
         mav_master.param_fetch_all()
 
     while True:
