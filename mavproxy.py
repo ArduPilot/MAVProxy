@@ -12,7 +12,8 @@ import fnmatch, errno, threading
 import serial
 
 # find the mavlink.py module
-for d in [ 'pymavlink', os.path.join('..', 'pymavlink') ]:
+for d in [ 'pymavlink',
+           os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'pymavlink') ]:
     if os.path.exists(d):
         sys.path.insert(0, d)
         if os.name == 'nt':
