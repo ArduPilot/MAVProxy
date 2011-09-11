@@ -77,11 +77,13 @@ class settings(object):
         self.vars = [ ('altreadout', int),
                       ('battreadout', int),
                       ('basealtitude', int),
-                      ('heartbeat', int)]
+                      ('heartbeat', int),
+                      ('numcells', int)]
         self.altreadout = 10
         self.battreadout = 1
         self.basealtitude = -1
         self.heartbeat = 1
+        self.numcells = 0
 
     def set(self, vname, value):
         '''set a setting'''
@@ -605,6 +607,11 @@ def cmd_status(args, rl, mav_master):
         pattern = None
     status.show(sys.stdout, pattern=pattern)
 
+def cmd_bat(args, rl, mav_master):
+    '''show battery levels'''
+    print("Flight battery:   %u%%" % status.battery_level)
+    print("Avionics battery: %u%%" % status.avionics_battery_level)
+
 def cmd_setup(args, rl, mav_master):
     status.setup_mode = True
     rl.set_prompt("")
@@ -637,6 +644,7 @@ command_map = {
     'manual'  : (cmd_manual,   'set MANUAL mode'),
     'magreset': (cmd_magreset, 'reset magnetometer offsets'),
     'set'     : (cmd_set,      'mavproxy settings'),
+    'bat'     : (cmd_bat,      'show battery levels'),
     };
 
 def process_stdin(rl, line, mav_master):
@@ -753,11 +761,11 @@ def vcell_to_battery_percent(vcell):
 
 def battery_update(SYS_STATUS):
     '''update battery level'''
-    if opts.num_cells == 0:
+    if settings.numcells == 0:
         return
 
     # main flight battery
-    vcell = SYS_STATUS.vbat / (opts.num_cells * 1000.0)
+    vcell = SYS_STATUS.vbat / (settings.numcells * 1000.0)
 
     battery_level = vcell_to_battery_percent(vcell)
 
@@ -773,7 +781,7 @@ def battery_update(SYS_STATUS):
     INPUT_VOLTAGE = 4.68
     VOLT_DIV_RATIO = 3.56
     voltage = rawvalue*(INPUT_VOLTAGE/1024.0)*VOLT_DIV_RATIO
-    vcell = voltage / opts.num_cells
+    vcell = voltage / settings.numcells
 
     avionics_battery_level = vcell_to_battery_percent(vcell)
 
@@ -786,7 +794,7 @@ def battery_update(SYS_STATUS):
 
 def battery_report():
     '''report battery level'''
-    if opts.num_cells == 0 or int(settings.battreadout) == 0:
+    if settings.numcells == 0 or int(settings.battreadout) == 0:
         return
 
     rbattery_level = int((status.battery_level+5)/10)*10;
@@ -1287,6 +1295,8 @@ Auto-detected serial ports are:
         fg_input = mavutil.mavudp(opts.fgin, input=True)
     if opts.fgout:
         fg_output = mavutil.mavudp(opts.fgout, input=False)
+
+    settings.numcells = settings.numcells
 
     fg_period = mavutil.periodic_event(opts.fgrate)
     gps_period = mavutil.periodic_event(opts.gpsrate)
