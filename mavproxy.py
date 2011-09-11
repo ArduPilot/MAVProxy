@@ -62,7 +62,7 @@ def say(text, priority='important'):
     '''speak some text'''
     ''' http://cvs.freebsoft.org/doc/speechd/ssip.html see 4.3.1 for priorities'''
     print(text)
-    if opts.speech:
+    if settings.speech:
         import speechd
         status.speech = speechd.SSIPClient('MAVProxy%u' % os.getpid())
         status.speech.set_output_module('festival')
@@ -78,12 +78,14 @@ class settings(object):
                       ('battreadout', int),
                       ('basealtitude', int),
                       ('heartbeat', int),
-                      ('numcells', int)]
+                      ('numcells', int),
+                      ('speech', int)]
         self.altreadout = 10
         self.battreadout = 1
         self.basealtitude = -1
         self.heartbeat = 1
         self.numcells = 0
+        self.speech = 0
 
     def set(self, vname, value):
         '''set a setting'''
@@ -1296,7 +1298,8 @@ Auto-detected serial ports are:
     if opts.fgout:
         fg_output = mavutil.mavudp(opts.fgout, input=False)
 
-    settings.numcells = settings.numcells
+    settings.numcells = opts.num_cells
+    settings.speech = opts.speech
 
     fg_period = mavutil.periodic_event(opts.fgrate)
     gps_period = mavutil.periodic_event(opts.gpsrate)
