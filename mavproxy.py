@@ -79,13 +79,15 @@ class settings(object):
                       ('basealtitude', int),
                       ('heartbeat', int),
                       ('numcells', int),
-                      ('speech', int)]
+                      ('speech', int),
+                      ('radiosetup', int)]
         self.altreadout = 10
         self.battreadout = 1
         self.basealtitude = -1
         self.heartbeat = 1
         self.numcells = 0
         self.speech = 0
+        self.radiosetup = 0
 
     def set(self, vname, value):
         '''set a setting'''
@@ -907,6 +909,18 @@ def master_callback(m, master, recipients):
     elif mtype == "RC_CHANNELS_RAW":
         if (m.chan7_raw > 1700 and status.flightmode == "MANUAL"):
             system_check()
+        if settings.radiosetup:
+            for i in range(1,9):
+                v = getattr(m, 'chan%u_raw' % i)
+                rcmin = get_mav_param('RC%u_MIN' % i, 0)
+                if rcmin > v:
+                    if param_set(mav_master, 'RC%u_MIN' % i, v):
+                        print("Set RC%u_MIN=%u" % (i, v))
+                rcmax = get_mav_param('RC%u_MAX' % i, 0)
+                if rcmax < v:
+                    if param_set(mav_master, 'RC%u_MAX' % i, v):
+                        print("Set RC%u_MAX=%u" % (i, v))
+                    
 
     elif mtype == "BAD_DATA":
         if mavutil.all_printable(m.data):
