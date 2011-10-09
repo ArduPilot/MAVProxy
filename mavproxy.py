@@ -395,7 +395,11 @@ def read_waypoint_v110(line):
 
 def load_waypoints(filename):
     '''load waypoints from a file'''
-    f = open(filename, mode='r')
+    try:
+        f = open(filename, mode='r')
+    except Exception:
+        print("Failed to open %s" % filename)
+        return
     version_line = f.readline().strip()
     if version_line == "QGC WPL 100":
         readfn = read_waypoint_v100
@@ -426,7 +430,11 @@ def load_waypoints(filename):
 
 def save_waypoints(filename):
     '''save waypoints to a file'''
-    f = open(filename, mode='w')
+    try:
+        f = open(filename, mode='w')
+    except Exception:
+        print("Failed to open %s" % filename)
+        return
     f.write("QGC WPL 110\n")
     for w in status.wpoints:
         f.write("%u\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%u\n" % (
