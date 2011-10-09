@@ -80,6 +80,7 @@ class settings(object):
                       ('heartbeat', int),
                       ('numcells', int),
                       ('speech', int),
+                      ('streamrate', int),
                       ('radiosetup', int)]
         self.altreadout = 10
         self.battreadout = 1
@@ -87,6 +88,7 @@ class settings(object):
         self.heartbeat = 1
         self.numcells = 0
         self.speech = 0
+        self.streamrate = 4
         self.radiosetup = 0
 
     def set(self, vname, value):
@@ -1151,7 +1153,8 @@ def periodic_tasks(mav_master):
 
     if msg_period.trigger():
         mav_master.mav.request_data_stream_send(status.target_system, status.target_component,
-                                                mavlink.MAV_DATA_STREAM_ALL, 1, 1)
+                                                mavlink.MAV_DATA_STREAM_ALL,
+                                                settings.streamrate, 1)
     if not mav_master.param_fetch_complete and mav_master.time_since('PARAM_VALUE') > 2:
         mav_master.param_fetch_all()
  
@@ -1242,6 +1245,8 @@ if __name__ == '__main__':
                       help="flightgear update rate")
     parser.add_option("--gpsrate",dest="gpsrate", default=4.0, type='float',
                       help="GPS update rate")
+    parser.add_option("--streamrate",dest="streamrate", default=4, type='int',
+                      help="MAVLink stream rate")
     parser.add_option("--source-system", dest='SOURCE_SYSTEM', type='int',
                       default=255, help='MAVLink source system for this GCS')
     parser.add_option("--target-system", dest='TARGET_SYSTEM', type='int',
@@ -1314,6 +1319,7 @@ Auto-detected serial ports are:
 
     settings.numcells = opts.num_cells
     settings.speech = opts.speech
+    settings.streamrate = opts.streamrate
 
     fg_period = mavutil.periodic_event(opts.fgrate)
     gps_period = mavutil.periodic_event(opts.gpsrate)
