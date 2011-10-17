@@ -1307,8 +1307,12 @@ Auto-detected serial ports are:
     status.target_component = opts.TARGET_COMPONENT
 
     # open master link
-    if opts.master.find(':') != -1:
+    if opts.master.startswith('tcp:'):
+        mav_master = mavutil.mavtcp(opts.master[4:])
+    elif opts.master.find(':') != -1:
         mav_master = mavutil.mavudp(opts.master, input=True)
+    elif opts.master.endswith(".elf"):
+        mav_master = mavutil.mavchildexec(opts.master)  
     else:
         mav_master = mavutil.mavserial(opts.master, baud=opts.baudrate)
     mav_master.mav.set_callback(master_callback, mav_master, mav_outputs)
