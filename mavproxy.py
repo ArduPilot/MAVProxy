@@ -876,10 +876,11 @@ def master_callback(m, master, recipients):
         else:
             if status.wp_op == 'list':
                 for w in status.wpoints:
-                    print("%u %u %.10f %.10f %f p1=%.1f p2=%.1f p3=%.1f p4=%.1f cur=%u auto=%u" % (
-                        w.command, w.frame, w.x, w.y, w.z,
-                        w.param1, w.param2, w.param3, w.param4,
-                        w.current, w.autocontinue))
+                    if w is not None:
+                        print("%u %u %.10f %.10f %f p1=%.1f p2=%.1f p3=%.1f p4=%.1f cur=%u auto=%u" % (
+                            w.command, w.frame, w.x, w.y, w.z,
+                            w.param1, w.param2, w.param3, w.param4,
+                            w.current, w.autocontinue))
             elif status.wp_op == "save":
                 save_waypoints(status.wp_save_filename)
             status.wp_op = None
