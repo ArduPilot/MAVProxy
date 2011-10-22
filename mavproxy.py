@@ -775,18 +775,9 @@ def vcell_to_battery_percent(vcell):
 
 def battery_update(SYS_STATUS):
     '''update battery level'''
-    if settings.numcells == 0:
-        return
 
     # main flight battery
-    vcell = SYS_STATUS.vbat / (settings.numcells * 1000.0)
-
-    battery_level = vcell_to_battery_percent(vcell)
-
-    if status.battery_level == -1 or abs(battery_level-status.battery_level) > 70:
-        status.battery_level = battery_level
-    else:
-        status.battery_level = (95*status.battery_level + 5*battery_level)/100
+    status.battery_level = SYS_STATUS.battery_remaining/10.0
 
     # avionics battery
     if not 'AP_ADC' in status.msgs:
@@ -808,7 +799,7 @@ def battery_update(SYS_STATUS):
 
 def battery_report():
     '''report battery level'''
-    if settings.numcells == 0 or int(settings.battreadout) == 0:
+    if int(settings.battreadout) == 0:
         return
 
     rbattery_level = int((status.battery_level+5)/10)*10;
@@ -819,6 +810,8 @@ def battery_report():
     if rbattery_level <= 20:
         say("Flight battery warning")
 
+    # avionics battery reporting disabled for now
+    return
     avionics_rbattery_level = int((status.avionics_battery_level+5)/10)*10;
 
     if avionics_rbattery_level != status.last_avionics_battery_announce:
