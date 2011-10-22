@@ -145,6 +145,7 @@ class status(object):
         self.exit = False
         self.override = [ 0 ] * 8
         self.flightmode = 'MAV'
+        self.logdir = None
 
     def show(self, f, pattern=None):
         '''write status to status.txt'''
@@ -842,6 +843,8 @@ def master_callback(m, master, recipients):
         mav_param[str(m.param_id)] = m.param_value
         if m.param_index+1 == m.param_count:
             print("Received %u parameters" % m.param_count)
+            if status.logdir != None:
+                param_save(os.path.join(status.logdir, 'mav.parm'), '*')
 
     elif mtype == 'SERVO_OUTPUT_RAW':
         if opts.quadcopter:
@@ -1111,6 +1114,7 @@ def open_logs(mav_master):
         mkdir_p(fdir)
         print(fdir)
         logfile = os.path.join(fdir, logfile)
+        status.logdir = fdir
     print("Logging to %s" % logfile)
     mav_master.logfile = open(logfile, mode=mode)
     mav_master.logfile_raw = open(logfile+'.raw', mode=mode)
