@@ -81,6 +81,7 @@ class settings(object):
                       ('numcells', int),
                       ('speech', int),
                       ('streamrate', int),
+                      ('heartbeatreport', int),
                       ('radiosetup', int)]
         self.altreadout = 10
         self.battreadout = 1
@@ -90,6 +91,7 @@ class settings(object):
         self.speech = 0
         self.streamrate = 4
         self.radiosetup = 0
+        self.heartbeatreport = 1
 
     def set(self, vname, value):
         '''set a setting'''
@@ -146,6 +148,7 @@ class status(object):
         self.override = [ 0 ] * 8
         self.flightmode = 'MAV'
         self.logdir = None
+        self.last_heartbeat = 0
 
     def show(self, f, pattern=None):
         '''write status to status.txt'''
@@ -837,6 +840,7 @@ def master_callback(m, master, recipients):
             status.target_system = m.get_srcSystem()
             status.target_component = m.get_srcComponent()
             say("online system %u component %u" % (status.target_system, status.target_component),'message')
+        status.last_heartbeat = time.time()
     elif mtype == 'STATUSTEXT':
         print("APM: %s" % m.text)
     elif mtype == 'PARAM_VALUE':
@@ -1157,6 +1161,10 @@ def periodic_tasks(mav_master):
         MAV_AUTOPILOT_NONE = 4
         mav_master.mav.heartbeat_send(MAV_GROUND, MAV_AUTOPILOT_NONE)
 
+    if heartbeat_check_period.trigger() and (
+        status.last_heartbeat != 0 and time.time() > status.last_heartbeat + 5):
+        say("no heartbeat")
+
     if msg_period.trigger():
         mav_master.mav.request_data_stream_send(status.target_system, status.target_component,
                                                 mavlink.MAV_DATA_STREAM_ALL,
@@ -1339,6 +1347,7 @@ Auto-detected serial ports are:
     heartbeat_period = mavutil.periodic_event(1)
     battery_period = mavutil.periodic_event(0.1)
     override_period = mavutil.periodic_event(1)
+    heartbeat_check_period = mavutil.periodic_event(0.2)
 
     rl = rline("MAV> ")
     if opts.setup:
