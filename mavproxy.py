@@ -1242,7 +1242,22 @@ def input_loop():
             sys.exit(1)
         rl.line = line
             
-       
+
+def run_script(scriptfile):
+    '''run a script file'''
+    try:
+        f = open(scriptfile, mode='r')
+    except Exception:
+        return
+    print("Running script %s" % scriptfile)
+    for line in f:
+        line = line.strip()
+        if line == "":
+            continue
+        print("-> %s" % line)
+        process_stdin(rl, line, mav_master)
+    f.close()
+        
 
 if __name__ == '__main__':
 
@@ -1352,6 +1367,11 @@ Auto-detected serial ports are:
     rl = rline("MAV> ")
     if opts.setup:
         rl.set_prompt("")
+
+    if opts.aircraft is not None:
+        start_script = os.path.join(opts.aircraft, "mavinit.scr")
+        if os.path.exists(start_script):
+            run_script(start_script)
 
     # run main loop as a thread
     status.thread = threading.Thread(target=main_loop)
