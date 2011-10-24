@@ -149,6 +149,7 @@ class status(object):
         self.flightmode = 'MAV'
         self.logdir = None
         self.last_heartbeat = 0
+        self.heartbeat_error = False
 
     def show(self, f, pattern=None):
         '''write status to status.txt'''
@@ -840,6 +841,9 @@ def master_callback(m, master, recipients):
             status.target_system = m.get_srcSystem()
             status.target_component = m.get_srcComponent()
             say("online system %u component %u" % (status.target_system, status.target_component),'message')
+        if status.heartbeat_error:
+            status.heartbeat_error = False
+            say("heartbeat OK")
         status.last_heartbeat = time.time()
     elif mtype == 'STATUSTEXT':
         print("APM: %s" % m.text)
@@ -1164,6 +1168,7 @@ def periodic_tasks(mav_master):
     if heartbeat_check_period.trigger() and (
         status.last_heartbeat != 0 and time.time() > status.last_heartbeat + 5):
         say("no heartbeat")
+        status.heartbeat_error = True
 
     if msg_period.trigger():
         mav_master.mav.request_data_stream_send(status.target_system, status.target_component,
