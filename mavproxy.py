@@ -23,7 +23,11 @@ for d in [ 'pymavlink',
             except:
                 pass
 
-import mavlink, mavutil
+if os.getenv('MAVLINK10'):
+    import mavlinkv10 as mavlink
+else:
+    import mavlink
+import mavutil
 import select
 
 def kt2mps(x):
@@ -235,18 +239,9 @@ def cmd_trim(args, rl, mav_master):
         return
     m = status.msgs['RC_CHANNELS_RAW']
 
-    mav_master.mav.param_set_send(status.target_system,
-                                  status.target_component,
-                                  'ROLL_TRIM',
-                                  m.chan1_raw)
-    mav_master.mav.param_set_send(status.target_system,
-                                  status.target_component,
-                                  'PITCH_TRIM',
-                                  m.chan2_raw)
-    mav_master.mav.param_set_send(status.target_system,
-                                  status.target_component,
-                                  'YAW_TRIM',
-                                  m.chan4_raw)
+    mav_master.param_set_send('ROLL_TRIM',  m.chan1_raw)
+    mav_master.param_set_send('PITCH_TRIM', m.chan2_raw)
+    mav_master.param_set_send('YAW_TRIM',   m.chan4_raw)
     print("Trimmed to aileron=%u elevator=%u rudder=%u" % (
         m.chan1_raw, m.chan2_raw, m.chan4_raw))
     
@@ -425,13 +420,13 @@ def load_waypoints(filename):
     f.close()
     print("Loaded %u waypoints from %s" % (len(status.wpoints), filename))
 
-    mav_master.mav.waypoint_clear_all_send(status.target_system, status.target_component)
+    mav_master.waypoint_clear_all_send()
     if len(status.wpoints) == 0:
         return
 
     status.loading_waypoints = True
     status.loading_waypoint_lasttime = time.time()
-    mav_master.mav.waypoint_count_send(status.target_system, status.target_component, len(status.wpoints))
+    mav_master.waypoint_count_send(len(status.wpoints))
 
 def save_waypoints(filename):
     '''save waypoints to a file'''
@@ -463,21 +458,21 @@ def cmd_wp(args, rl, mav_master):
         load_waypoints(args[1])
     elif args[0] == "list":
         status.wp_op = "list"
-        mav_master.mav.waypoint_request_list_send(status.target_system, status.target_component)
+        mav_master.waypoint_request_list_send()
     elif args[0] == "save":
         if len(args) != 2:
             print("usage: wp save <filename>")
             return
         status.wp_save_filename = args[1]
         status.wp_op = "save"
-        mav_master.mav.waypoint_request_list_send(status.target_system, status.target_component)
+        mav_master.waypoint_request_list_send()
     elif args[0] == "set":
         if len(args) != 2:
             print("usage: wp set <wpindex>")
             return
-        mav_master.mav.waypoint_set_current_send(status.target_system, status.target_component, int(args[1]))
+        mav_master.waypoint_set_current_send(int(args[1]))
     elif args[0] == "clear":
-        mav_master.mav.waypoint_clear_all_send(status.target_system, status.target_component)
+        mav_master.waypoint_clear_all_send()
     else:
         print("Usage: wp <list|load|save|set|clear>")
 
@@ -487,8 +482,7 @@ def param_set(mav_master, name, value, retries=3):
     got_ack = False
     while retries > 0 and not got_ack:
         retries -= 1
-        mav_master.mav.param_set_send(status.target_system,
-                                      status.target_component, name, float(value))
+        mav_master.param_set_send(name, float(value))
         tstart = time.time()
         while time.time() - tstart < 1:
             ack = mav_master.recv_match(type='PARAM_VALUE', blocking=False)
@@ -726,13 +720,20 @@ def system_check():
     '''check that the system is ready to fly'''
     ok = True
 
-    if not 'GPS_RAW' in status.msgs:
-        say("WARNING no GPS status")
-        return
-    
-    if status.msgs['GPS_RAW'].fix_type != 2:
-        say("WARNING no GPS lock")
-        ok = False
+    if mavlink.wire_protocol_version == '1.0':
+        if not 'GPS_RAW_INT' in status.msgs:
+            say("WARNING no GPS status")
+            return
+        if status.msgs['GPS_RAW_INT'].fix_type != 2:
+            say("WARNING no GPS lock")
+            ok = False
+    else:
+        if not 'GPS_RAW' in status.msgs and not 'GPS_RAW_INT' in status.msgs:
+            say("WARNING no GPS status")
+            return
+        if status.msgs['GPS_RAW'].fix_type != 2:
+            say("WARNING no GPS lock")
+            ok = False
 
     if not 'PITCH_MIN' in mav_param:
         say("WARNING no pitch parameter available")
@@ -868,15 +869,15 @@ def master_callback(m, master, recipients):
             if status.rc_throttle < 0.1:
                 status.rc_throttle = 0
 
-    elif mtype == 'WAYPOINT_COUNT' and status.wp_op != None:
+    elif mtype in ['WAYPOINT_COUNT','MISSION_COUNT'] and status.wp_op != None:
         status.wpoints = [None]*m.count
         print("Requesting %u waypoints" % m.count)
-        mav_master.mav.waypoint_request_send(status.target_system, status.target_component, 0)
+        mav_master.waypoint_request_send(0)
 
-    elif mtype == 'WAYPOINT' and status.wp_op != None:
+    elif mtype in ['WAYPOINT', 'MISSION_ITEM'] and status.wp_op != None:
         status.wpoints[m.seq] = m
         if m.seq+1 < len(status.wpoints):
-            mav_master.mav.waypoint_request_send(status.target_system, status.target_component, m.seq+1)
+            mav_master.waypoint_request_send(m.seq+1)
         else:
             if status.wp_op == 'list':
                 for w in status.wpoints:
@@ -889,10 +890,10 @@ def master_callback(m, master, recipients):
                 save_waypoints(status.wp_save_filename)
             status.wp_op = None
 
-    elif mtype == "WAYPOINT_REQUEST":
+    elif mtype in ["WAYPOINT_REQUEST", "MISSION_REQUEST"]:
         process_waypoint_request(m, master)
 
-    elif mtype == "WAYPOINT_CURRENT":
+    elif mtype in ["WAYPOINT_CURRENT", "MISSION_CURRENT"]:
         if m.seq != status.last_waypoint:
             status.last_waypoint = m.seq
             say("waypoint %u" % m.seq,priority='message')
@@ -904,22 +905,26 @@ def master_callback(m, master, recipients):
             rl.set_prompt(status.flightmode + "> ")
             say("Mode " + status.flightmode)
 
-    elif (mtype == "VFR_HUD"
-          and 'GPS_RAW' in status.msgs
-          and status.msgs['GPS_RAW'].fix_type == 2):
-        if settings.basealtitude == -1:
-            settings.basealtitude = m.alt
-            status.last_altitude_announce = 0.0
-            say("GPS lock at %u meters" % m.alt,priority='notification')
-        else:
-            if m.alt < settings.basealtitude:
+    elif mtype == "VFR_HUD":
+        have_gps_fix = False
+        if 'GPS_RAW' in status.msgs and status.msgs['GPS_RAW'].fix_type == 2:
+            have_gps_fix = True
+        if 'GPS_RAW_INT' in status.msgs and status.msgs['GPS_RAW_INT'].fix_type == 2:
+            have_gps_fix = True
+        if have_gps_fix:
+            if settings.basealtitude == -1:
                 settings.basealtitude = m.alt
-                status.last_altitude_announce = m.alt
-            if (int(settings.altreadout) > 0 and
-                math.fabs(m.alt - status.last_altitude_announce) >= int(settings.altreadout)):
-                status.last_altitude_announce = m.alt
-                rounded_alt = int(settings.altreadout) * ((5+int(m.alt - settings.basealtitude)) / int(settings.altreadout))
-                say("%u meters" % rounded_alt, priority='notification')
+                status.last_altitude_announce = 0.0
+                say("GPS lock at %u meters" % m.alt, priority='notification')
+            else:
+                if m.alt < settings.basealtitude:
+                    settings.basealtitude = m.alt
+                    status.last_altitude_announce = m.alt
+                if (int(settings.altreadout) > 0 and
+                    math.fabs(m.alt - status.last_altitude_announce) >= int(settings.altreadout)):
+                    status.last_altitude_announce = m.alt
+                    rounded_alt = int(settings.altreadout) * ((5+int(m.alt - settings.basealtitude)) / int(settings.altreadout))
+                    say("%u meters" % rounded_alt, priority='notification')
 
     elif mtype == "RC_CHANNELS_RAW":
         if (m.chan7_raw > 1700 and status.flightmode == "MANUAL"):
@@ -944,8 +949,9 @@ def master_callback(m, master, recipients):
     elif mtype in [ 'HEARTBEAT', 'GLOBAL_POSITION', 'RC_CHANNELS_SCALED',
                     'ATTITUDE', 'RC_CHANNELS_RAW', 'GPS_STATUS', 'WAYPOINT_CURRENT',
                     'SERVO_OUTPUT_RAW', 'VFR_HUD',
-                    'GLOBAL_POSITION_INT', 'RAW_PRESSURE', 'RAW_IMU', 'WAYPOINT_ACK',
-                    'NAV_CONTROLLER_OUTPUT', 'GPS_RAW', 'WAYPOINT',
+                    'GLOBAL_POSITION_INT', 'RAW_PRESSURE', 'RAW_IMU',
+                    'WAYPOINT_ACK', 'MISSION_ACK',
+                    'NAV_CONTROLLER_OUTPUT', 'GPS_RAW', 'GPS_RAW_INT', 'WAYPOINT',
                     'SCALED_PRESSURE', 'SENSOR_OFFSETS', 'MEMINFO', 'AP_ADC' ]:
         pass
     else:
@@ -1161,9 +1167,13 @@ def periodic_tasks(mav_master):
 
     if heartbeat_period.trigger() and settings.heartbeat != 0:
         status.counters['MasterOut'] += 1
-        MAV_GROUND = 5
-        MAV_AUTOPILOT_NONE = 4
-        mav_master.mav.heartbeat_send(MAV_GROUND, MAV_AUTOPILOT_NONE)
+        if mavlink.WIRE_PROTOCOL_VERSION == '1.0':
+            mav_master.mav.heartbeat_send(mavlink.MAV_TYPE_GCS, mavlink.MAV_AUTOPILOT_INVALID,
+                                          0, 0, 0)
+        else:
+            MAV_GROUND = 5
+            MAV_AUTOPILOT_NONE = 4
+            mav_master.mav.heartbeat_send(MAV_GROUND, MAV_AUTOPILOT_NONE)
 
     if heartbeat_check_period.trigger() and (
         status.last_heartbeat != 0 and time.time() > status.last_heartbeat + 5):
