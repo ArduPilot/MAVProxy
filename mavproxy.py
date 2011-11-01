@@ -1084,6 +1084,11 @@ def process_flightgear(m, master):
         master.mav.vfr_hud_send(kt2mps(airspeed), groundspeed, int(heading),
                                 int(status.rc_throttle*100), ft2m(altitude), 0)
 
+    gps_heading = math.degrees(math.atan2(speedE, speedN))
+    if gps_heading < 0:
+        gps_heading += 360
+#    print("speedE=%.2f speedN=%.2f gps_heading=%.2f" % (speedE, speedN, gps_heading))
+
     # remember GPS fix, we send this at opts.gpsrate
     status.gps = mavlink.MAVLink_gps_raw_message(get_usec(),
                                                  3, # we have a 3D fix
@@ -1093,7 +1098,7 @@ def process_flightgear(m, master):
                                                  0, # no uncertainty
                                                  ft2m(math.sqrt((speedN * speedN) +
                                                                 (speedE * speedE))),
-                                                 heading);
+                                                 gps_heading)
 
 def mkdir_p(dir):
     '''like mkdir -p'''
