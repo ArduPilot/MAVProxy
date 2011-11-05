@@ -9,7 +9,7 @@ Released under the GNU GPL version 3 or later
 
 import sys, os, struct, math, time, socket
 import fnmatch, errno, threading
-import serial
+import serial, Queue
 
 # find the mavlink.py module
 for d in [ 'pymavlink',
@@ -969,17 +969,15 @@ def master_callback(m, master, recipients):
             r.write(m.get_msgbuf().tostring())
 
     # and log them
-    if master.logfile and mtype != "BAD_DATA":
-        master.logfile.write(str(struct.pack('>Q', get_usec()) + m.get_msgbuf().tostring()))
-        master.logfile.flush()
+    if master.logqueue and mtype != "BAD_DATA":
+        master.logqueue.put(str(struct.pack('>Q', get_usec()) + m.get_msgbuf().tostring()))
 
 
 def process_master(m):
     '''process packets from the MAVLink master'''
     s = m.recv()
-    if m.logfile_raw:
-        m.logfile_raw.write(str(s))
-        m.logfile_raw.flush()
+    if m.logqueue_raw:
+        m.logqueue_raw.put(str(s))
 
     if status.setup_mode:
         sys.stdout.write(str(s))
@@ -1111,7 +1109,21 @@ def mkdir_p(dir):
         return
     mkdir_p(os.path.dirname(dir))
     os.mkdir(dir)
-                             
+
+def log_writer():
+    '''log writing thread'''
+    global mav_master
+    m = mav_master
+    while True:
+        m.logfile_raw.write(m.logqueue_raw.get())
+        while not m.logqueue_raw.empty():
+            m.logfile_raw.write(m.logqueue_raw.get())
+        while not m.logqueue.empty():
+            m.logfile.write(m.logqueue.get())
+        m.logfile.flush()
+        m.logfile_raw.flush()
+        if status_period.trigger():
+            status.write()
 
 def open_logs(mav_master):
     '''open log files'''
@@ -1137,6 +1149,17 @@ def open_logs(mav_master):
     print("Logging to %s" % logfile)
     mav_master.logfile = open(logfile, mode=mode)
     mav_master.logfile_raw = open(logfile+'.raw', mode=mode)
+
+    # queues for logging
+    mav_master.logqueue = Queue.Queue()
+    mav_master.logqueue_raw = Queue.Queue()
+
+    # use a separate thread for writing to the logfile to prevent
+    # delays during disk writes (important as delays can be long if camera
+    # app is running)
+    t = threading.Thread(target=log_writer)
+    t.daemon = True
+    t.start()
 
 
 # master mavlink device
@@ -1166,9 +1189,6 @@ def periodic_tasks(mav_master):
     if status.gps and gps_period.trigger():
         status.counters['MasterOut'] += 1
         mav_master.mav.send(status.gps)
-
-    if status_period.trigger():
-        status.write()
 
     if heartbeat_period.trigger() and settings.heartbeat != 0:
         status.counters['MasterOut'] += 1
