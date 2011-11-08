@@ -1082,8 +1082,11 @@ def process_flightgear(m, master):
         master.mav.vfr_hud_send(kt2mps(airspeed), groundspeed, int(heading),
                                 int(status.rc_throttle*100), ft2m(altitude), 0)
 
-    lon_scale = math.cos(math.radians(latitude))
-    gps_heading = math.degrees(math.atan2(lon_scale*speedE, speedN))
+    try:
+        lon_scale = math.cos(math.radians(latitude))
+        gps_heading = math.degrees(math.atan2(lon_scale*speedE, speedN))
+    except Exception:
+        gps_heading = 0
     if gps_heading < 0:
         gps_heading += 360
 #    print("speedE=%.2f speedN=%.2f gps_heading=%.2f" % (speedE, speedN, gps_heading))
