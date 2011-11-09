@@ -415,6 +415,9 @@ def load_waypoints(filename):
     for line in f:
         if line.startswith('#'):
             continue
+        line = line.strip()
+        if not line:
+            continue
         w = readfn(line)
         if w is not None:
             w.seq = len(status.wpoints)
