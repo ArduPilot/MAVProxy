@@ -27,7 +27,7 @@ if os.getenv('MAVLINK10'):
     import mavlinkv10 as mavlink
 else:
     import mavlink
-import mavutil
+import mavutil, mavwp
 import select
 
 def kt2mps(x):
@@ -135,7 +135,7 @@ class status(object):
         self.setup_mode = opts.setup
         self.wp_op = None
         self.wp_save_filename = None
-        self.wpoints = []
+        self.wploader = mavwp.MAVWPLoader()
         self.loading_waypoints = False
         self.loading_waypoint_lasttime = time.time()
         self.mav_error = 0
@@ -323,131 +323,47 @@ def process_waypoint_request(m, mav_master):
     '''process a waypoint request from the master'''
     if (not status.loading_waypoints or
         time.time() > status.loading_waypoint_lasttime + 10.0):
-        return
-    if m.seq >= len(status.wpoints):
-        print("Request for bad waypoint %u (max %u)" % (m.seq, len(status.wpoints)))
-        return
-    mav_master.mav.send(status.wpoints[m.seq])
-    status.loading_waypoint_lasttime = time.time()
-    if m.seq == len(status.wpoints) - 1:
         status.loading_waypoints = False
-        print("Sent all %u waypoints" % len(status.wpoints))
+        print("not loading waypoints")
+        return
+    if m.seq >= status.wploader.count():
+        print("Request for bad waypoint %u (max %u)" % (m.seq, status.wploader.count()))
+        return
+    mav_master.mav.send(status.wploader.wp(m.seq))
+    status.loading_waypoint_lasttime = time.time()
+    if m.seq == status.wploader.count() - 1:
+        status.loading_waypoints = False
+        print("Sent all %u waypoints" % status.wploader.count())
     else:
-        print("Sent waypoint %u : %s" % (m.seq, status.wpoints[m.seq]))
-
-
-def read_waypoint_v100(line):
-    '''read a version 100 waypoint'''
-    cmdmap = {
-        2 : mavlink.MAV_CMD_NAV_TAKEOFF,
-        3 : mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH,
-        4 : mavlink.MAV_CMD_NAV_LAND,
-        24: mavlink.MAV_CMD_NAV_TAKEOFF,
-        26: mavlink.MAV_CMD_NAV_LAND,
-        25: mavlink.MAV_CMD_NAV_WAYPOINT ,
-        27: mavlink.MAV_CMD_NAV_LOITER_UNLIM
-        }
-    a = line.split()
-    if len(a) != 13:
-        raise RuntimeError("invalid waypoint line with %u values" % len(a))
-    w = mavlink.MAVLink_waypoint_message(status.target_system, status.target_component,
-                                         int(a[0]),    # seq
-                                         int(a[1]),    # frame
-                                         int(a[2]),    # action
-                                         int(a[7]),    # current
-                                         int(a[12]),   # autocontinue
-                                         float(a[5]),  # param1,
-                                         float(a[6]),  # param2,
-                                         float(a[3]),  # param3
-                                         float(a[4]),  # param4
-                                         float(a[9]),  # x, latitude
-                                         float(a[8]),  # y, longitude
-                                         float(a[10])  # z
-                                         )
-    if not w.command in cmdmap:
-        print("Unknown v100 waypoint action %u" % w.command)
-        return None
-    
-    w.command = cmdmap[w.command]
-    return w
-
-def read_waypoint_v110(line):
-    '''read a version 110 waypoint'''
-    a = line.split()
-    if len(a) != 12:
-        raise RuntimeError("invalid waypoint line with %u values" % len(a))
-    w = mavlink.MAVLink_waypoint_message(status.target_system, status.target_component,
-                                         int(a[0]),    # seq
-                                         int(a[2]),    # frame
-                                         int(a[3]),    # command
-                                         int(a[1]),    # current
-                                         int(a[11]),   # autocontinue
-                                         float(a[4]),  # param1,
-                                         float(a[5]),  # param2,
-                                         float(a[6]),  # param3
-                                         float(a[7]),  # param4
-                                         float(a[8]),  # x (latitude)
-                                         float(a[9]),  # y (longitude)
-                                         float(a[10])  # z (altitude)
-                                         )
-    return w
-
+        print("Sent waypoint %u : %s" % (m.seq, status.wploader.wp(m.seq)))
 
 def load_waypoints(filename):
     '''load waypoints from a file'''
+    status.wploader.target_system = status.target_system
+    status.wploader.target_component = status.target_component
     try:
-        f = open(filename, mode='r')
-    except Exception:
-        print("Failed to open %s" % filename)
+        status.wploader.load(filename)
+    except Exception, msg:
+        print("Unable to load %s - %s" % (filename, msg))
         return
-    version_line = f.readline().strip()
-    if version_line == "QGC WPL 100":
-        readfn = read_waypoint_v100
-    elif version_line == "QGC WPL 110":
-        readfn = read_waypoint_v110
-    else:
-        print("Unsupported waypoint format '%s'" % version_line)
-        f.close()
-        return
-
-    status.wpoints = []
-
-    for line in f:
-        if line.startswith('#'):
-            continue
-        line = line.strip()
-        if not line:
-            continue
-        w = readfn(line)
-        if w is not None:
-            w.seq = len(status.wpoints)
-            status.wpoints.append(w)
-    f.close()
-    print("Loaded %u waypoints from %s" % (len(status.wpoints), filename))
+    print("Loaded %u waypoints from %s" % (status.wploader.count(), filename))
 
     mav_master.waypoint_clear_all_send()
-    if len(status.wpoints) == 0:
+    if status.wploader.count() == 0:
         return
 
     status.loading_waypoints = True
     status.loading_waypoint_lasttime = time.time()
-    mav_master.waypoint_count_send(len(status.wpoints))
+    mav_master.waypoint_count_send(status.wploader.count())
 
 def save_waypoints(filename):
     '''save waypoints to a file'''
     try:
-        f = open(filename, mode='w')
-    except Exception:
-        print("Failed to open %s" % filename)
+        status.wploader.save(filename)
+    except Exception, msg:
+        print("Failed to save %s - %s" % (filename, msg))
         return
-    f.write("QGC WPL 110\n")
-    for w in status.wpoints:
-        f.write("%u\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%u\n" % (
-            w.seq, w.current, w.frame, w.command,
-            w.param1, w.param2, w.param3, w.param4,
-            w.x, w.y, w.z, w.autocontinue))
-    f.close()
-    print("Saved %u waypoints to %s" % (len(status.wpoints), filename))
+    print("Saved %u waypoints to %s" % (status.wploader.count(), filename))
              
 
 def cmd_wp(args, rl, mav_master):
@@ -874,23 +790,35 @@ def master_callback(m, master, recipients):
             if status.rc_throttle < 0.1:
                 status.rc_throttle = 0
 
-    elif mtype in ['WAYPOINT_COUNT','MISSION_COUNT'] and status.wp_op != None:
-        status.wpoints = [None]*m.count
-        print("Requesting %u waypoints" % m.count)
-        mav_master.waypoint_request_send(0)
+    elif mtype in ['WAYPOINT_COUNT','MISSION_COUNT']:
+        if status.wp_op is None:
+            print("No waypoint load started")
+        else:
+            status.wploader.clear()
+            status.wploader.expected_count = m.count
+            print("Requesting %u waypoints t=%s now=%s" % (m.count,
+                                                           time.asctime(time.localtime(m._timestamp)),
+                                                           time.asctime()))
+            mav_master.waypoint_request_send(0)
 
     elif mtype in ['WAYPOINT', 'MISSION_ITEM'] and status.wp_op != None:
-        status.wpoints[m.seq] = m
-        if m.seq+1 < len(status.wpoints):
+        if m.seq > status.wploader.count():
+            print("Unexpected waypoint number %u - expected %u" % (m.seq, status.wploader.count()))
+        elif m.seq < status.wploader.count():
+            # a duplicate
+            pass
+        else:
+            status.wploader.add(m)
+        if m.seq+1 < status.wploader.expected_count:
             mav_master.waypoint_request_send(m.seq+1)
         else:
             if status.wp_op == 'list':
-                for w in status.wpoints:
-                    if w is not None:
-                        print("%u %u %.10f %.10f %f p1=%.1f p2=%.1f p3=%.1f p4=%.1f cur=%u auto=%u" % (
-                            w.command, w.frame, w.x, w.y, w.z,
-                            w.param1, w.param2, w.param3, w.param4,
-                            w.current, w.autocontinue))
+                for i in range(status.wploader.count()):
+                    w = status.wploader.wp(i)
+                    print("%u %u %.10f %.10f %f p1=%.1f p2=%.1f p3=%.1f p4=%.1f cur=%u auto=%u" % (
+                        w.command, w.frame, w.x, w.y, w.z,
+                        w.param1, w.param2, w.param3, w.param4,
+                        w.current, w.autocontinue))
             elif status.wp_op == "save":
                 save_waypoints(status.wp_save_filename)
             status.wp_op = None
