@@ -1181,7 +1181,7 @@ mav_outputs = []
 fg_input = None
 
 # flightgear output
-fg_output = None
+fg_output = []
 
 settings = settings()
 
@@ -1192,8 +1192,9 @@ def periodic_tasks(mav_master):
         status.target_component == -1):
         return
 
-    if fg_output and fg_period.trigger():
-        send_flightgear_controls(fg_output)
+    if len(fg_output) != 0 and fg_period.trigger():
+        for f in fg_output:
+            send_flightgear_controls(f)
 
     if status.gps and gps_period.trigger():
         status.counters['MasterOut'] += 1
@@ -1398,7 +1399,9 @@ Auto-detected serial ports are:
     if opts.fgin:
         fg_input = mavutil.mavudp(opts.fgin, input=True)
     if opts.fgout:
-        fg_output = mavutil.mavudp(opts.fgout, input=False)
+        fgout = opts.fgout.split(',')
+        for f in fgout:
+            fg_output.append(mavutil.mavudp(f, input=False))
 
     settings.numcells = opts.num_cells
     settings.speech = opts.speech
