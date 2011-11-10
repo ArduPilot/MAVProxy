@@ -752,6 +752,8 @@ def battery_report():
 def master_callback(m, master, recipients):
     '''process mavlink message m on master, sending any messages to recipients'''
 
+    if getattr(m, '_timestamp', None) is None:
+        master.post_message(m)
     status.counters['MasterIn'] += 1
 
 #    print("Got MAVLink msg: %s" % m)
@@ -917,13 +919,14 @@ def process_master(m):
         sys.stdout.flush()
         return
 
-    msg = m.mav.parse_char(s)
-    if msg:
-        m.post_message(msg)
-        if msg.get_type() == "BAD_DATA":
-            if opts.show_errors:
-                print("MAV error: %s" % msg)
-            status.mav_error += 1
+    msgs = m.mav.parse_buffer(s)
+    if msgs:
+        for msg in msgs:
+            m.post_message(msg)
+            if msg.get_type() == "BAD_DATA":
+                if opts.show_errors:
+                    print("MAV error: %s" % msg)
+                status.mav_error += 1
 
     
 
