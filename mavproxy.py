@@ -1251,7 +1251,8 @@ if __name__ == '__main__':
     parser.add_option("--out",   dest="output", help="MAVLink output port",
                       action='append', default=[])
     parser.add_option("--fgin",  dest="fgin",   help="flightgear input")
-    parser.add_option("--fgout", dest="fgout",  help="flightgear output")
+    parser.add_option("--fgout", dest="fgout",  action='append', default=[],
+                      help="flightgear output")
     parser.add_option("--fgrate",dest="fgrate", default=50.0, type='float',
                       help="flightgear update rate")
     parser.add_option("--gpsrate",dest="gpsrate", default=4.0, type='float',
@@ -1329,10 +1330,8 @@ Auto-detected serial ports are:
     # open any flightgear UDP ports
     if opts.fgin:
         fg_input = mavutil.mavudp(opts.fgin, input=True)
-    if opts.fgout:
-        fgout = opts.fgout.split(',')
-        for f in fgout:
-            fg_output.append(mavutil.mavudp(f, input=False))
+    for f in opts.fgout:
+        fg_output.append(mavutil.mavudp(f, input=False))
 
     settings.numcells = opts.num_cells
     settings.speech = opts.speech
