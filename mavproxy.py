@@ -985,8 +985,8 @@ def process_flightgear(m, master):
     if magic != 0x4c56414d:
         print("Bad flightgear magic 0x%08x should be 0x4c56414d" % magic)
         return
-    if altitude < 0:
-        # the first packet from flightgear is sometimes rubbish
+    if altitude <= 0 or latitude == 0 or longitude == 0:
+        # the first packets from flightgear are often rubbish
         return
 
     status.counters['FGearIn'] += 1
@@ -1340,7 +1340,7 @@ Auto-detected serial ports are:
     fg_period = mavutil.periodic_event(opts.fgrate)
     gps_period = mavutil.periodic_event(opts.gpsrate)
     status_period = mavutil.periodic_event(1.0)
-    msg_period = mavutil.periodic_event(0.01)
+    msg_period = mavutil.periodic_event(1.0/30)
     heartbeat_period = mavutil.periodic_event(1)
     battery_period = mavutil.periodic_event(0.1)
     override_period = mavutil.periodic_event(1)
