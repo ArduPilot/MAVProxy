@@ -86,7 +86,10 @@ class settings(object):
                       ('speech', int),
                       ('streamrate', int),
                       ('heartbeatreport', int),
-                      ('radiosetup', int)]
+                      ('radiosetup', int),
+                      ('rc1mul', int),
+                      ('rc2mul', int),
+                      ('rc4mul', int)]
         self.altreadout = 10
         self.battreadout = 1
         self.basealtitude = -1
@@ -96,6 +99,9 @@ class settings(object):
         self.streamrate = 4
         self.radiosetup = 0
         self.heartbeatreport = 1
+        self.rc1mul = 1
+        self.rc2mul = 1
+        self.rc4mul = 1
 
     def set(self, vname, value):
         '''set a setting'''
@@ -785,10 +791,10 @@ def master_callback(m, master, recipients):
             status.rc_throttle[2] = scale_rc(m.servo3_raw, 0.0, 1.0, param='RC3')
             status.rc_throttle[3] = scale_rc(m.servo4_raw, 0.0, 1.0, param='RC3')
         else:
-            status.rc_aileron  = scale_rc(m.servo1_raw, -1.0, 1.0, param='RC1')
-            status.rc_elevator = scale_rc(m.servo2_raw, -1.0, 1.0, param='RC2')
+            status.rc_aileron  = scale_rc(m.servo1_raw, -1.0, 1.0, param='RC1') * settings.rc1mul
+            status.rc_elevator = scale_rc(m.servo2_raw, -1.0, 1.0, param='RC2') * settings.rc2mul
             status.rc_throttle = scale_rc(m.servo3_raw, 0.0, 1.0, param='RC3')
-            status.rc_rudder   = scale_rc(m.servo4_raw, -1.0, 1.0, param='RC4')
+            status.rc_rudder   = scale_rc(m.servo4_raw, -1.0, 1.0, param='RC4') * settings.rc4mul
             if status.rc_throttle < 0.1:
                 status.rc_throttle = 0
 
