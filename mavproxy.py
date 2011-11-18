@@ -831,7 +831,7 @@ def master_callback(m, master, recipients):
             have_gps_fix = True
         if 'GPS_RAW_INT' in status.msgs and status.msgs['GPS_RAW_INT'].fix_type == 2:
             have_gps_fix = True
-        if have_gps_fix:
+        if have_gps_fix and m.alt != 0.0:
             if settings.basealtitude == -1:
                 settings.basealtitude = m.alt
                 status.last_altitude_announce = 0.0
