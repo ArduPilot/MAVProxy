@@ -84,6 +84,7 @@ class settings(object):
                       ('heartbeat', int),
                       ('numcells', int),
                       ('speech', int),
+                      ('mavfwd', int),
                       ('streamrate', int),
                       ('heartbeatreport', int),
                       ('radiosetup', int),
@@ -95,6 +96,7 @@ class settings(object):
         self.basealtitude = -1
         self.heartbeat = 1
         self.numcells = 0
+        self.mavfwd = 1
         self.speech = 0
         self.streamrate = 4
         self.radiosetup = 0
@@ -524,7 +526,7 @@ def cmd_set(args, rl, mav_master):
 def cmd_status(args, rl, mav_master):
     '''show status'''
     if len(args) == 0:
-        status.show(sys.stdout, pattern=pattern)
+        status.show(sys.stdout, pattern=None)
     else:
         for pattern in args:
             status.show(sys.stdout, pattern=pattern)
@@ -926,7 +928,7 @@ def process_mavlink(slave, master):
     except mavlink.MAVError as e:
         print("Bad MAVLink slave message from %s: %s" % (slave.address, e.message))
         return
-    if not status.setup_mode:
+    if settings.mavfwd and not status.setup_mode:
         master.write(m.get_msgbuf())
     status.counters['Slave'] += 1
 
