@@ -190,7 +190,18 @@ def get_mav_param(param, default=None):
     if not param in mav_param:
         return default
     return mav_param[param]
-    
+
+
+def send_rc_override(mav_master):
+    '''send RC override packet'''
+    if sitl_output:
+        buf = struct.pack('<HHHHHHHH',
+                          *status.override)
+        sitl_output.write(buf)
+    else:
+        mav_master.mav.rc_channels_override_send(status.target_system,
+                                                 status.target_component,
+                                                 *status.override)
 
 def control_set(mav_master, name, channel, args):
     '''set a fixed RC control PWM value'''
@@ -198,9 +209,8 @@ def control_set(mav_master, name, channel, args):
         print("Usage: %s <pwmvalue>" % name)
         return
     status.override[channel-1] = int(args[0])
-    mav_master.mav.rc_channels_override_send(status.target_system,
-                                             status.target_component,
-                                             *status.override)
+    send_rc_override(mav_master)
+    
     
 def cmd_roll(args, rl, mav_master):
     control_set(mav_master, 'roll', 1, args)
@@ -231,8 +241,7 @@ def cmd_switch(args, rl, mav_master):
         default_channel = 8
     flite_mode_ch_parm = int(get_mav_param("FLTMODE_CH", default_channel))
     status.override[flite_mode_ch_parm-1] = mapping[value]
-    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component,
-                                             *status.override)
+    send_rc_override(mav_master)
     if value == 0:
         print("Disabled RC switch override")
     else:
@@ -265,34 +274,7 @@ def cmd_rc(args, rl, mav_master):
         print("Channel must be between 1 and 8")
         return
     status.override[channel-1] = value
-    mav_master.mav.rc_channels_override_send(status.target_system,
-                                             status.target_component,
-                                             *status.override)
-
-def cmd_disarm(args, rl, mav_master):
-    '''disarm the motors'''
-    values = [ 65535 ] * 8
-    values[3] = 1000
-    values[2] = 1000
-    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
-    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
-    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
-
-def cmd_arm(args, rl, mav_master):
-    '''arm the motors'''
-    values = [ 65535 ] * 8
-    values[3] = 2000
-    values[2] = 1000
-    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
-    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
-    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
-    time.sleep(2)
-    values[3] = 1500
-    values[2] = 1000
-    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
-    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
-    mav_master.mav.rc_channels_override_send(status.target_system, status.target_component, *values)
-
+    send_rc_override(mav_master)
 
 def cmd_loiter(args, rl, mav_master):
     '''set LOITER mode'''
@@ -541,11 +523,11 @@ def cmd_set(args, rl, mav_master):
 
 def cmd_status(args, rl, mav_master):
     '''show status'''
-    if len(args) > 0:
-        pattern = args[0]
+    if len(args) == 0:
+        status.show(sys.stdout, pattern=pattern)
     else:
-        pattern = None
-    status.show(sys.stdout, pattern=pattern)
+        for pattern in args:
+            status.show(sys.stdout, pattern=pattern)
 
 def cmd_bat(args, rl, mav_master):
     '''show battery levels'''
@@ -572,9 +554,6 @@ command_map = {
     'param'   : (cmd_param,    'manage APM parameters'),
     'setup'   : (cmd_setup,    'go into setup mode'),
     'reset'   : (cmd_reset,    'reopen the connection to the MAVLink master'),
-    'd'       : (cmd_disarm,   'disarm the motors'),
-    'disarm'  : (cmd_disarm,   'disarm the motors'),
-    'arm'     : (cmd_arm,      'arm the motors'),
     'status'  : (cmd_status,   'show status'),
     'trim'    : (cmd_trim,     'trim aileron, elevator and rudder to current values'),
     'auto'    : (cmd_auto,     'set AUTO mode'),
@@ -1004,16 +983,24 @@ def process_flightgear(m, master):
     if status.setup_mode:
         return
 
-    # send IMU data to the master
-    status.counters['MasterOut'] += 1
-    master.mav.attitude_send(get_usec(),
-                             deg2rad(rollDeg), deg2rad(pitchDeg), deg2rad(yawDeg),
-                             deg2rad(rollRate),deg2rad(pitchRate),deg2rad(yawRate))
+    try:
+        lon_scale = math.cos(math.radians(latitude))
+        gps_heading = math.degrees(math.atan2(lon_scale*speedE, speedN))
+    except Exception:
+        gps_heading = 0
+    if gps_heading < 0:
+        gps_heading += 360
 
     groundspeed = ft2m(math.sqrt((speedN * speedN) + (speedE * speedE)))
 
     if math.isnan(heading):
         heading = 0.0
+
+    # send IMU data to the master
+    status.counters['MasterOut'] += 1
+    master.mav.attitude_send(get_usec(),
+                             deg2rad(rollDeg), deg2rad(pitchDeg), deg2rad(yawDeg),
+                             deg2rad(rollRate),deg2rad(pitchRate),deg2rad(yawRate))
 
     # and airspeed
     status.counters['MasterOut'] += 1
@@ -1024,15 +1011,6 @@ def process_flightgear(m, master):
         master.mav.vfr_hud_send(kt2mps(airspeed), groundspeed, int(heading),
                                 int(status.rc_throttle*100), ft2m(altitude), 0)
 
-    try:
-        lon_scale = math.cos(math.radians(latitude))
-        gps_heading = math.degrees(math.atan2(lon_scale*speedE, speedN))
-    except Exception:
-        gps_heading = 0
-    if gps_heading < 0:
-        gps_heading += 360
-#    print("speedE=%.2f speedN=%.2f gps_heading=%.2f" % (speedE, speedN, gps_heading))
-
     # remember GPS fix, we send this at opts.gpsrate
     status.gps = mavlink.MAVLink_gps_raw_message(get_usec(),
                                                  3, # we have a 3D fix
@@ -1040,8 +1018,7 @@ def process_flightgear(m, master):
                                                  ft2m(altitude),
                                                  0, # no uncertainty
                                                  0, # no uncertainty
-                                                 ft2m(math.sqrt((speedN * speedN) +
-                                                                (speedE * speedE))),
+                                                 groundspeed,
                                                  gps_heading)
 
 def mkdir_p(dir):
@@ -1120,6 +1097,9 @@ fg_input = None
 # flightgear output
 fg_output = []
 
+# SITL output
+sitl_output = None
+
 settings = settings()
 
 def periodic_tasks(mav_master):
@@ -1164,10 +1144,7 @@ def periodic_tasks(mav_master):
 
     if override_period.trigger():
         if status.override != [ 0 ] * 8:
-            mav_master.mav.rc_channels_override_send(status.target_system,
-                                                     status.target_component,
-                                                     *status.override)
-            
+            send_rc_override(mav_master)
 
 
 def main_loop():
@@ -1259,6 +1236,7 @@ if __name__ == '__main__':
     parser.add_option("--fgin",  dest="fgin",   help="flightgear input")
     parser.add_option("--fgout", dest="fgout",  action='append', default=[],
                       help="flightgear output")
+    parser.add_option("--sitl", dest="sitl",  default=None, help="SITL output port")
     parser.add_option("--fgrate",dest="fgrate", default=50.0, type='float',
                       help="flightgear update rate")
     parser.add_option("--gpsrate",dest="gpsrate", default=4.0, type='float',
@@ -1338,6 +1316,8 @@ Auto-detected serial ports are:
         fg_input = mavutil.mavudp(opts.fgin, input=True)
     for f in opts.fgout:
         fg_output.append(mavutil.mavudp(f, input=False))
+    if opts.sitl:
+        sitl_output = mavutil.mavudp(opts.sitl, input=False)
 
     settings.numcells = opts.num_cells
     settings.speech = opts.speech
@@ -1349,7 +1329,10 @@ Auto-detected serial ports are:
     msg_period = mavutil.periodic_event(1.0/30)
     heartbeat_period = mavutil.periodic_event(1)
     battery_period = mavutil.periodic_event(0.1)
-    override_period = mavutil.periodic_event(1)
+    if sitl_output:
+        override_period = mavutil.periodic_event(50)
+    else:
+        override_period = mavutil.periodic_event(1)
     heartbeat_check_period = mavutil.periodic_event(0.2)
 
     rl = rline("MAV> ")
