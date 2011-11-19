@@ -79,6 +79,7 @@ def say(text, priority='important'):
 class settings(object):
     def __init__(self):
         self.vars = [ ('altreadout', int),
+                      ('distreadout', int),
                       ('battreadout', int),
                       ('basealtitude', int),
                       ('heartbeat', int),
@@ -92,6 +93,7 @@ class settings(object):
                       ('rc2mul', int),
                       ('rc4mul', int)]
         self.altreadout = 10
+        self.distreadout = 200
         self.battreadout = 1
         self.basealtitude = -1
         self.heartbeat = 1
@@ -151,6 +153,7 @@ class status(object):
         self.target_component = -1
         self.speech = None
         self.last_altitude_announce = 0.0
+        self.last_distance_announce = 0.0
         self.last_battery_announce = 0
         self.last_avionics_battery_announce = 0
         self.battery_level = -1
@@ -846,7 +849,7 @@ def master_callback(m, master, recipients):
                     math.fabs(m.alt - status.last_altitude_announce) >= int(settings.altreadout)):
                     status.last_altitude_announce = m.alt
                     rounded_alt = int(settings.altreadout) * ((5+int(m.alt - settings.basealtitude)) / int(settings.altreadout))
-                    say("%u meters" % rounded_alt, priority='notification')
+                    say("height %u" % rounded_alt, priority='notification')
 
     elif mtype == "RC_CHANNELS_RAW":
         if (m.chan7_raw > 1700 and status.flightmode == "MANUAL"):
@@ -862,7 +865,13 @@ def master_callback(m, master, recipients):
                 if rcmax < v:
                     if param_set(mav_master, 'RC%u_MAX' % i, v):
                         print("Set RC%u_MAX=%u" % (i, v))
-                    
+
+    elif mtype == "NAV_CONTROLLER_OUTPUT" and status.flightmode == "AUTO" and settings.distreadout:
+        rounded_dist = int(m.wp_dist/settings.distreadout)*settings.distreadout
+        if math.fabs(rounded_dist - status.last_distance_announce) >= settings.distreadout:
+            if rounded_dist != 0:
+                say("%u" % rounded_dist, priority="notification")
+            status.last_distance_announce = rounded_dist
 
     elif mtype == "BAD_DATA":
         if mavutil.all_printable(m.data):
