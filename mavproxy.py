@@ -1282,7 +1282,7 @@ if __name__ == '__main__':
     (opts, args) = parser.parse_args()
 
     if not opts.master:
-        serial_list = mavutil.auto_detect_serial(preferred='*FTDI*')
+        serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*"])
         if len(serial_list) == 1:
             opts.master = serial_list[0].device
         else:
