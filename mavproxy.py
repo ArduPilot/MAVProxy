@@ -9,7 +9,7 @@ Released under the GNU GPL version 3 or later
 
 import sys, os, struct, math, time, socket
 import fnmatch, errno, threading
-import serial, Queue
+import serial, Queue, select
 
 # find the mavlink.py module
 for d in [ 'pymavlink',
@@ -23,11 +23,6 @@ for d in [ 'pymavlink',
             except:
                 pass
 
-if os.getenv('MAVLINK10'):
-    import mavlinkv10 as mavlink
-else:
-    import mavlink
-import mavutil, mavwp
 import select
 
 def kt2mps(x):
@@ -324,11 +319,10 @@ def process_waypoint_request(m, mav_master):
         return
     mav_master.mav.send(status.wploader.wp(m.seq))
     status.loading_waypoint_lasttime = time.time()
+    print("Sent waypoint %u : %s" % (m.seq, status.wploader.wp(m.seq)))
     if m.seq == status.wploader.count() - 1:
         status.loading_waypoints = False
         print("Sent all %u waypoints" % status.wploader.count())
-    else:
-        print("Sent waypoint %u : %s" % (m.seq, status.wploader.wp(m.seq)))
 
 def load_waypoints(filename):
     '''load waypoints from a file'''
@@ -631,7 +625,7 @@ def system_check():
     '''check that the system is ready to fly'''
     ok = True
 
-    if mavlink.wire_protocol_version == '1.0':
+    if mavlink.WIRE_PROTOCOL_VERSION == '1.0':
         if not 'GPS_RAW_INT' in status.msgs:
             say("WARNING no GPS status")
             return
@@ -1277,9 +1271,16 @@ if __name__ == '__main__':
     parser.add_option("--num-cells", dest="num_cells", help="number of LiPo battery cells",
                       type='int', default=0)
     parser.add_option("--aircraft", dest="aircraft", help="aircraft name", default=None)
-    
+    parser.add_option("--mav10", action='store_true', default=False, help="Use MAVLink protocol 1.0")
     
     (opts, args) = parser.parse_args()
+
+    if opts.mav10:
+        import mavlinkv10 as mavlink
+        os.environ['MAVLINK10'] = '1'
+    else:
+        import mavlink as mavlink
+    import mavutil, mavwp
 
     if not opts.master:
         serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*"])
