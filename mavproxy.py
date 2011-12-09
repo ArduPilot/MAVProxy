@@ -415,7 +415,7 @@ def param_load_file(filename, wildcard, mav_master):
         if len(a) != 2:
             print("Invalid line: %s" % line)
             continue
-        if a[0] in ['SYSID_SW_MREV', 'SYS_NUM_RESETS']:
+        if a[0] in ['SYSID_SW_MREV', 'SYS_NUM_RESETS', 'ARSPD_OFFSET', 'GND_ABS_PRESS', 'GND_TEMP' ]:
             continue
         if not fnmatch.fnmatch(a[0].upper(), wildcard.upper()):
             continue
