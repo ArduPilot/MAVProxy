@@ -203,28 +203,6 @@ def send_rc_override(mav_master):
                                                  status.target_component,
                                                  *status.override)
 
-def control_set(mav_master, name, channel, args):
-    '''set a fixed RC control PWM value'''
-    if len(args) != 1:
-        print("Usage: %s <pwmvalue>" % name)
-        return
-    status.override[channel-1] = int(args[0])
-    send_rc_override(mav_master)
-    
-    
-def cmd_roll(args, rl, mav_master):
-    control_set(mav_master, 'roll', 1, args)
-
-def cmd_pitch(args, rl, mav_master):
-    control_set(mav_master, 'pitch', 2, args)
-
-def cmd_rudder(args, rl, mav_master):
-    control_set(mav_master, 'rudder', 4, args)
-
-def cmd_throttle(args, rl, mav_master):
-    control_set(mav_master, 'throttle', 3, args)
-
-
 def cmd_switch(args, rl, mav_master):
     '''handle RC switch changes'''
     mapping = [ 0, 1165, 1295, 1425, 1555, 1685, 1815 ]
@@ -533,6 +511,25 @@ def cmd_bat(args, rl, mav_master):
     print("Flight battery:   %u%%" % status.battery_level)
     print("Avionics battery: %u%%" % status.avionics_battery_level)
 
+
+def cmd_up(args, rl, mav_master):
+    '''adjust TRIM_PITCH_CD up by 5 degrees'''
+    if len(args) == 0:
+        adjust = 5.0
+    else:
+        adjust = float(args[0])
+    old_trim = get_mav_param('TRIM_PITCH_CD', None)
+    if old_trim is None:
+        print("Existing trim value unknown!")
+        return
+    new_trim = int(old_trim + (adjust*100))
+    if math.fabs(new_trim - old_trim) > 1000:
+        print("Adjustment by %d too large (from %d to %d)" % (adjust*100, old_trim, new_trim))
+        return
+    print("Adjusting TRIM_PITCH_CD from %d to %d" % (old_trim, new_trim))
+    param_set(mav_master, 'TRIM_PITCH_CD', new_trim)
+
+
 def cmd_setup(args, rl, mav_master):
     status.setup_mode = True
     rl.set_prompt("")
@@ -543,10 +540,6 @@ def cmd_reset(args, rl, mav_master):
     mav_master.reset()
 
 command_map = {
-    'roll'    : (cmd_roll,     'set fixed roll PWM'),
-    'pitch'   : (cmd_pitch,    'set fixed pitch PWM'),
-    'rudder'  : (cmd_rudder,   'set fixed rudder PWM'),
-    'throttle': (cmd_throttle, 'set fixed throttle PWM'),
     'switch'  : (cmd_switch,   'set RC switch (1-5), 0 disables'),
     'rc'      : (cmd_rc,       'override a RC channel value'),
     'wp'      : (cmd_wp,       'waypoint management'),
@@ -563,6 +556,7 @@ command_map = {
     'magreset': (cmd_magreset, 'reset magnetometer offsets'),
     'set'     : (cmd_set,      'mavproxy settings'),
     'bat'     : (cmd_bat,      'show battery levels'),
+    'up'      : (cmd_up,       'adjust TRIM_PITCH_CD up by 5 degrees'),
     };
 
 def process_stdin(rl, line, mav_master):
