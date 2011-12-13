@@ -119,6 +119,7 @@ class MPStatus(object):
         self.logdir = None
         self.last_heartbeat = 0
         self.heartbeat_error = False
+        self.last_apm_msg = None
 
     def show(self, f, pattern=None):
         '''write status to status.txt'''
@@ -753,7 +754,9 @@ def master_callback(m, master):
             say("heartbeat OK")
         mpstate.status.last_heartbeat = time.time()
     elif mtype == 'STATUSTEXT':
-        print("APM: %s" % m.text)
+        if m.text != mpstate.status.last_apm_msg:
+            print("APM: %s" % m.text)
+            mpstate.status.last_apm_msg = m.text
     elif mtype == 'PARAM_VALUE':
         mpstate.mav_param[str(m.param_id)] = m.param_value
         if m.param_index+1 == m.param_count:
