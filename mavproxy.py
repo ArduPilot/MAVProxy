@@ -153,12 +153,6 @@ class MPState(object):
         # mavlink outputs
         self.mav_outputs = []
 
-        # flightgear input
-        self.fg_input = None
-
-        # flightgear output
-        self.fg_output = []
-
         # SITL output
         self.sitl_output = None
 
@@ -170,18 +164,6 @@ class MPState(object):
             self.settings.link = 0
         return self.mav_master[self.settings.link]
 
-
-def kt2mps(x):
-    '''knots to meters per second'''
-    return float(x)*0.514444444
-
-def deg2rad(x):
-    '''degrees to radians'''
-    return (float(x) / 360.0) * 2.0 * math.pi
-
-def ft2m(x):
-    '''feet to meters'''
-    return float(x) * 0.3048
 
 def get_usec():
     '''time since 1970 in microseconds'''
@@ -959,96 +941,6 @@ def process_mavlink(slave):
         mpstate.master().write(m.get_msgbuf())
     mpstate.status.counters['Slave'] += 1
 
-def send_flightgear_controls(fg):
-    '''send control values to flightgear'''
-    mpstate.status.counters['FGearOut'] += 1
-    if opts.quadcopter:
-        r = [0, 0, 0, 0, 0, 0, 0, 0]
-        if 'RC_CHANNELS_RAW' in mpstate.status.msgs:
-            for i in range(0, 8):
-                r[i] = getattr(mpstate.status.msgs['RC_CHANNELS_RAW'], 'chan%u_raw' % (i+1))
-        buf = struct.pack('>ffffHHHHHHHH',
-                          mpstate.status.rc_throttle[0], # right
-                          mpstate.status.rc_throttle[1], # left
-                          mpstate.status.rc_throttle[2], # front
-                          mpstate.status.rc_throttle[3], # back
-                          r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7])
-    else:
-        buf = struct.pack('>dddd', mpstate.status.rc_aileron, mpstate.status.rc_elevator,
-                          mpstate.status.rc_rudder, mpstate.status.rc_throttle)
-    fg.write(buf)
-    
-
-
-def process_flightgear(m):
-    '''process flightgear protocol input'''
-    buf = m.recv()
-    if len(buf) == 0:
-        return
-    # see MAVLink.xml for the protocol format
-    try:
-        (latitude, longitude, altitude, heading,
-         speedN, speedE,
-         xAccel, yAccel, zAccel,
-         rollRate, pitchRate, yawRate,
-         rollDeg, pitchDeg, yawDeg,
-         airspeed, magic) = struct.unpack('>ddddddddddddddddI', buf)
-    except struct.error as e:
-        print("Bad flightgear input of length %u: %s" % (len(buf), e.message))
-        return
-    if magic != 0x4c56414d:
-        print("Bad flightgear magic 0x%08x should be 0x4c56414d" % magic)
-        return
-    if altitude <= 0 or latitude == 0 or longitude == 0:
-        # the first packets from flightgear are often rubbish
-        return
-
-    mpstate.status.counters['FGearIn'] += 1
-
-    if yawDeg == 0.0:
-        # not all planes give a yaw value
-        yawDeg = heading
-
-    if mpstate.status.setup_mode:
-        return
-
-    try:
-        lon_scale = math.cos(math.radians(latitude))
-        gps_heading = math.degrees(math.atan2(lon_scale*speedE, speedN))
-    except Exception:
-        gps_heading = 0
-    if gps_heading < 0:
-        gps_heading += 360
-
-    groundspeed = ft2m(math.sqrt((speedN * speedN) + (speedE * speedE)))
-
-    if math.isnan(heading):
-        heading = 0.0
-
-    # send IMU data to the master
-    mpstate.status.counters['MasterOut'] += 1
-    master.mav.attitude_send(get_usec(),
-                             deg2rad(rollDeg), deg2rad(pitchDeg), deg2rad(yawDeg),
-                             deg2rad(rollRate),deg2rad(pitchRate),deg2rad(yawRate))
-
-    # and airspeed
-    mpstate.status.counters['MasterOut'] += 1
-    if opts.quadcopter:
-        master.mav.vfr_hud_send(kt2mps(airspeed), groundspeed, int(heading),
-                                int(mpstate.status.rc_throttle[0]*100), ft2m(altitude), 0)
-    else:
-        master.mav.vfr_hud_send(kt2mps(airspeed), groundspeed, int(heading),
-                                int(mpstate.status.rc_throttle*100), ft2m(altitude), 0)
-
-    # remember GPS fix, we send this at opts.gpsrate
-    mpstate.status.gps = mavlink.MAVLink_gps_raw_message(get_usec(),
-                                                 3, # we have a 3D fix
-                                                 latitude, longitude,
-                                                 ft2m(altitude),
-                                                 0, # no uncertainty
-                                                 0, # no uncertainty
-                                                 groundspeed,
-                                                 gps_heading)
 
 def mkdir_p(dir):
     '''like mkdir -p'''
@@ -1129,14 +1021,6 @@ def periodic_tasks():
         mpstate.status.target_component == -1):
         return
 
-    if len(mpstate.fg_output) != 0 and fg_period.trigger():
-        for f in mpstate.fg_output:
-            send_flightgear_controls(f)
-
-    if mpstate.status.gps and gps_period.trigger():
-        mpstate.status.counters['MasterOut'] += 1
-        mpstate.master().mav.send(mpstate.status.gps)
-
     if heartbeat_period.trigger() and mpstate.settings.heartbeat != 0:
         mpstate.status.counters['MasterOut'] += 1
         for master in mpstate.mav_master:
@@ -1196,8 +1080,6 @@ def main_loop():
                 rin.append(master.fd)
         for m in mpstate.mav_outputs:
             rin.append(m.fd)
-        if mpstate.fg_input:
-            rin.append(mpstate.fg_input.fd)
         if rin == []:
             time.sleep(0.001)
             continue
@@ -1213,8 +1095,6 @@ def main_loop():
             for m in mpstate.mav_outputs:
                 if fd == m.fd:
                     process_mavlink(m)
-            if mpstate.fg_input and fd == mpstate.fg_input.fd:
-                process_flightgear(mpstate.fg_input)
 
 
 def input_loop():
@@ -1256,14 +1136,7 @@ if __name__ == '__main__':
                       help="master port baud rate", default=115200)
     parser.add_option("--out",   dest="output", help="MAVLink output port",
                       action='append', default=[])
-    parser.add_option("--fgin",  dest="fgin",   help="flightgear input")
-    parser.add_option("--fgout", dest="fgout",  action='append', default=[],
-                      help="flightgear output")
     parser.add_option("--sitl", dest="sitl",  default=None, help="SITL output port")
-    parser.add_option("--fgrate",dest="fgrate", default=50.0, type='float',
-                      help="flightgear update rate")
-    parser.add_option("--gpsrate",dest="gpsrate", default=4.0, type='float',
-                      help="GPS update rate")
     parser.add_option("--streamrate",dest="streamrate", default=4, type='int',
                       help="MAVLink stream rate")
     parser.add_option("--source-system", dest='SOURCE_SYSTEM', type='int',
@@ -1349,11 +1222,6 @@ Auto-detected serial ports are:
     for p in opts.output:
         mpstate.mav_outputs.append(mavutil.mavudp(p, input=False))
 
-    # open any flightgear UDP ports
-    if opts.fgin:
-        mpstate.fg_input = mavutil.mavudp(opts.fgin, input=True)
-    for f in opts.fgout:
-        mpstate.fg_output.append(mavutil.mavudp(f, input=False))
     if opts.sitl:
         mpstate.sitl_output = mavutil.mavudp(opts.sitl, input=False)
 
@@ -1362,8 +1230,6 @@ Auto-detected serial ports are:
     mpstate.settings.streamrate = opts.streamrate
     mpstate.settings.streamrate2 = opts.streamrate
 
-    fg_period = mavutil.periodic_event(opts.fgrate)
-    gps_period = mavutil.periodic_event(opts.gpsrate)
     status_period = mavutil.periodic_event(1.0)
     msg_period = mavutil.periodic_event(1.0/30)
     heartbeat_period = mavutil.periodic_event(1)
