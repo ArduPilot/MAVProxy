@@ -28,7 +28,8 @@ import select
 
 class MPSettings(object):
     def __init__(self):
-        self.vars = [ ('altreadout', int),
+        self.vars = [ ('link', int),
+                      ('altreadout', int),
                       ('distreadout', int),
                       ('battreadout', int),
                       ('basealtitude', int),
@@ -37,11 +38,13 @@ class MPSettings(object):
                       ('speech', int),
                       ('mavfwd', int),
                       ('streamrate', int),
+                      ('streamrate2', int),
                       ('heartbeatreport', int),
                       ('radiosetup', int),
                       ('rc1mul', int),
                       ('rc2mul', int),
                       ('rc4mul', int)]
+        self.link = 0
         self.altreadout = 10
         self.distreadout = 200
         self.battreadout = 1
@@ -51,6 +54,7 @@ class MPSettings(object):
         self.mavfwd = 1
         self.speech = 0
         self.streamrate = 4
+        self.streamrate2 = 4
         self.radiosetup = 0
         self.heartbeatreport = 1
         self.rc1mul = 1
@@ -91,7 +95,7 @@ class MPStatus(object):
         self.gps	 = None
         self.msgs = {}
         self.msg_count = {}
-        self.counters = {'MasterIn' : 0, 'MasterOut' : 0, 'FGearIn' : 0, 'FGearOut' : 0, 'Slave' : 0}
+        self.counters = {'MasterIn' : [], 'MasterOut' : 0, 'FGearIn' : 0, 'FGearOut' : 0, 'Slave' : 0}
         self.setup_mode = opts.setup
         self.wp_op = None
         self.wp_save_filename = None
@@ -121,7 +125,7 @@ class MPStatus(object):
         if pattern is None:
             f.write('Counters: ')
             for c in self.counters:
-                f.write('%s:%u ' % (c, self.counters[c]))
+                f.write('%s:%s ' % (c, self.counters[c]))
             f.write('\n')
             f.write('MAV Errors: %u\n' % self.mav_error)
             f.write(str(self.gps)+'\n')
@@ -160,6 +164,11 @@ class MPState(object):
 
         self.mav_param = {}
 
+    def master(self):
+        '''return the currently chosen mavlink master object'''
+        if self.settings.link >= len(self.mav_master):
+            self.settings.link = 0
+        return self.mav_master[self.settings.link]
 
 
 def kt2mps(x):
@@ -222,7 +231,7 @@ def send_rc_override():
                           *mpstate.status.override)
         mpstate.sitl_output.write(buf)
     else:
-        mpstate.mav_master.mav.rc_channels_override_send(mpstate.status.target_system,
+        mpstate.master().mav.rc_channels_override_send(mpstate.status.target_system,
                                                          mpstate.status.target_component,
                                                          *mpstate.status.override)
 
@@ -255,9 +264,9 @@ def cmd_trim(args, rl):
         return
     m = mpstate.status.msgs['RC_CHANNELS_RAW']
 
-    mpstate.mav_master.param_set_send('ROLL_TRIM',  m.chan1_raw)
-    mpstate.mav_master.param_set_send('PITCH_TRIM', m.chan2_raw)
-    mpstate.mav_master.param_set_send('YAW_TRIM',   m.chan4_raw)
+    mpstate.master().param_set_send('ROLL_TRIM',  m.chan1_raw)
+    mpstate.master().param_set_send('PITCH_TRIM', m.chan2_raw)
+    mpstate.master().param_set_send('YAW_TRIM',   m.chan4_raw)
     print("Trimmed to aileron=%u elevator=%u rudder=%u" % (
         m.chan1_raw, m.chan2_raw, m.chan4_raw))
     
@@ -280,27 +289,27 @@ def cmd_rc(args, rl):
 def cmd_loiter(args, rl):
     '''set LOITER mode'''
     MAV_ACTION_LOITER = 27
-    mpstate.mav_master.mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_LOITER)
+    mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_LOITER)
 
 def cmd_auto(args, rl):
     '''set AUTO mode'''
     MAV_ACTION_SET_AUTO = 13
-    mpstate.mav_master.mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_SET_AUTO)
+    mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_SET_AUTO)
 
 def cmd_ground(args, rl):
     '''do a ground start mode'''
     MAV_ACTION_CALIBRATE_GYRO = 17
-    mpstate.mav_master.mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_CALIBRATE_GYRO)
+    mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_CALIBRATE_GYRO)
 
 def cmd_rtl(args, rl):
     '''set RTL mode'''
     MAV_ACTION_RETURN = 3
-    mpstate.mav_master.mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_RETURN)
+    mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_RETURN)
 
 def cmd_manual(args, rl):
     '''set MANUAL mode'''
     MAV_ACTION_SET_MANUAL = 12
-    mpstate.mav_master.mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_SET_MANUAL)
+    mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_SET_MANUAL)
 
 def process_waypoint_request(m, master):
     '''process a waypoint request from the master'''
@@ -330,13 +339,13 @@ def load_waypoints(filename):
         return
     print("Loaded %u waypoints from %s" % (mpstate.status.wploader.count(), filename))
 
-    mpstate.mav_master.waypoint_clear_all_send()
+    mpstate.master().waypoint_clear_all_send()
     if mpstate.status.wploader.count() == 0:
         return
 
     mpstate.status.loading_waypoints = True
     mpstate.status.loading_waypoint_lasttime = time.time()
-    mpstate.mav_master.waypoint_count_send(mpstate.status.wploader.count())
+    mpstate.master().waypoint_count_send(mpstate.status.wploader.count())
 
 def save_waypoints(filename):
     '''save waypoints to a file'''
@@ -361,21 +370,21 @@ def cmd_wp(args, rl):
         load_waypoints(args[1])
     elif args[0] == "list":
         mpstate.status.wp_op = "list"
-        mpstate.mav_master.waypoint_request_list_send()
+        mpstate.master().waypoint_request_list_send()
     elif args[0] == "save":
         if len(args) != 2:
             print("usage: wp save <filename>")
             return
         mpstate.status.wp_save_filename = args[1]
         mpstate.status.wp_op = "save"
-        mpstate.mav_master.waypoint_request_list_send()
+        mpstate.master().waypoint_request_list_send()
     elif args[0] == "set":
         if len(args) != 2:
             print("usage: wp set <wpindex>")
             return
-        mpstate.mav_master.waypoint_set_current_send(int(args[1]))
+        mpstate.master().waypoint_set_current_send(int(args[1]))
     elif args[0] == "clear":
-        mpstate.mav_master.waypoint_clear_all_send()
+        mpstate.master().waypoint_clear_all_send()
     else:
         print("Usage: wp <list|load|save|set|clear>")
 
@@ -385,10 +394,10 @@ def param_set(name, value, retries=3):
     got_ack = False
     while retries > 0 and not got_ack:
         retries -= 1
-        mpstate.mav_master.param_set_send(name, float(value))
+        mpstate.master().param_set_send(name, float(value))
         tstart = time.time()
         while time.time() - tstart < 1:
-            ack = mpstate.mav_master.recv_match(type='PARAM_VALUE', blocking=False)
+            ack = mpstate.master().recv_match(type='PARAM_VALUE', blocking=False)
             if ack == None:
                 time.sleep(0.1)
                 continue
@@ -457,7 +466,7 @@ def cmd_param(args, rl):
         print("usage: param <fetch|edit|set|show|store>")
         return
     if args[0] == "fetch":
-        mpstate.mav_master.param_fetch_all()
+        mpstate.master().param_fetch_all()
         print("Requested parameter list")
     elif args[0] == "save":
         if len(args) < 2:
@@ -497,7 +506,7 @@ def cmd_param(args, rl):
                 print("%-15.15s %f" % (str(p), mpstate.mav_param[p]))
     elif args[0] == "store":
         MAV_ACTION_STORAGE_WRITE = 15
-        mpstate.mav_master.mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_STORAGE_WRITE)
+        mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_STORAGE_WRITE)
     else:
         print("Unknown subcommand '%s' (try 'fetch', 'save', 'set', 'show', 'load' or 'store')" % args[0]);
 
@@ -554,7 +563,7 @@ def cmd_setup(args, rl):
 
 def cmd_reset(args, rl):
     print("Resetting master")
-    mpstate.mav_master.reset()
+    mpstate.master().reset()
 
 command_map = {
     'switch'  : (cmd_switch,   'set RC switch (1-5), 0 disables'),
@@ -587,7 +596,7 @@ def process_stdin(rl, line):
             mpstate.status.setup_mode = False
             rl.set_prompt("MAV> ")
             return
-        mpstate.mav_master.write(line + '\r')
+        mpstate.master().write(line + '\r')
         return
 
     if not line:
@@ -743,14 +752,12 @@ def battery_report():
 
     
 
-def master_callback(m, master, recipients):
+def master_callback(m, master):
     '''process mavlink message m on master, sending any messages to recipients'''
 
     if getattr(m, '_timestamp', None) is None:
         master.post_message(m)
-    mpstate.status.counters['MasterIn'] += 1
-
-#    print("Got MAVLink msg: %s" % m)
+    mpstate.status.counters['MasterIn'][master.linknum] += 1
 
     mtype = m.get_type()
     if mtype == 'HEARTBEAT':
@@ -795,7 +802,7 @@ def master_callback(m, master, recipients):
             print("Requesting %u waypoints t=%s now=%s" % (m.count,
                                                            time.asctime(time.localtime(m._timestamp)),
                                                            time.asctime()))
-            mpstate.mav_master.waypoint_request_send(0)
+            master.waypoint_request_send(0)
 
     elif mtype in ['WAYPOINT', 'MISSION_ITEM'] and mpstate.status.wp_op != None:
         if m.seq > mpstate.status.wploader.count():
@@ -806,7 +813,7 @@ def master_callback(m, master, recipients):
         else:
             mpstate.status.wploader.add(m)
         if m.seq+1 < mpstate.status.wploader.expected_count:
-            mpstate.mav_master.waypoint_request_send(m.seq+1)
+            master.waypoint_request_send(m.seq+1)
         else:
             if mpstate.status.wp_op == 'list':
                 for i in range(mpstate.status.wploader.count()):
@@ -829,8 +836,8 @@ def master_callback(m, master, recipients):
 
     elif mtype == "SYS_STATUS":
         battery_update(m)
-        if mpstate.mav_master.flightmode != mpstate.status.flightmode:
-            mpstate.status.flightmode = mpstate.mav_master.flightmode
+        if master.flightmode != mpstate.status.flightmode:
+            mpstate.status.flightmode = master.flightmode
             rl.set_prompt(mpstate.status.flightmode + "> ")
             say("Mode " + mpstate.status.flightmode)
 
@@ -898,21 +905,28 @@ def master_callback(m, master, recipients):
         mpstate.status.msg_count[m.get_type()] = 0
     mpstate.status.msg_count[m.get_type()] += 1
 
-    # also send the message on to all the slaves
-    if mtype != "BAD_DATA":
-        for r in recipients:
-            r.write(m.get_msgbuf().tostring())
+    # don't pass along bad data
+    if mtype == "BAD_DATA":
+        return
+
+    # pass messages along to listeners
+    recipients = mpstate.mav_outputs
+    for r in recipients:
+        r.write(m.get_msgbuf().tostring())
 
     # and log them
-    if master.logqueue and mtype != "BAD_DATA":
-        master.logqueue.put(str(struct.pack('>Q', get_usec()) + m.get_msgbuf().tostring()))
+    if mpstate.logqueue:
+        mpstate.logqueue.put(str(struct.pack('>Q', get_usec()) + m.get_msgbuf().tostring()))
 
 
 def process_master(m):
     '''process packets from the MAVLink master'''
-    s = m.recv()
-    if m.logqueue_raw:
-        m.logqueue_raw.put(str(s))
+    try:
+        s = m.recv()
+    except Exception:
+        return
+    if mpstate.logqueue_raw:
+        mpstate.logqueue_raw.put(str(s))
 
     if mpstate.status.setup_mode:
         sys.stdout.write(str(s))
@@ -942,7 +956,7 @@ def process_mavlink(slave):
         print("Bad MAVLink slave message from %s: %s" % (slave.address, e.message))
         return
     if mpstate.settings.mavfwd and not mpstate.status.setup_mode:
-        mpstate.mav_master.write(m.get_msgbuf())
+        mpstate.master().write(m.get_msgbuf())
     mpstate.status.counters['Slave'] += 1
 
 def send_flightgear_controls(fg):
@@ -1050,15 +1064,14 @@ def mkdir_p(dir):
 
 def log_writer():
     '''log writing thread'''
-    m = mpstate.mav_master
     while True:
-        m.logfile_raw.write(m.logqueue_raw.get())
-        while not m.logqueue_raw.empty():
-            m.logfile_raw.write(m.logqueue_raw.get())
-        while not m.logqueue.empty():
-            m.logfile.write(m.logqueue.get())
-        m.logfile.flush()
-        m.logfile_raw.flush()
+        mpstate.logfile_raw.write(mpstate.logqueue_raw.get())
+        while not mpstate.logqueue_raw.empty():
+            mpstate.logfile_raw.write(mpstate.logqueue_raw.get())
+        while not mpstate.logqueue.empty():
+            mpstate.logfile.write(mpstate.logqueue.get())
+        mpstate.logfile.flush()
+        mpstate.logfile_raw.flush()
         if status_period.trigger():
             mpstate.status.write()
 
@@ -1084,12 +1097,12 @@ def open_logs():
         logfile = os.path.join(fdir, logfile)
         mpstate.status.logdir = fdir
     print("Logging to %s" % logfile)
-    mpstate.mav_master.logfile = open(logfile, mode=mode)
-    mpstate.mav_master.logfile_raw = open(logfile+'.raw', mode=mode)
+    mpstate.logfile = open(logfile, mode=mode)
+    mpstate.logfile_raw = open(logfile+'.raw', mode=mode)
 
     # queues for logging
-    mpstate.mav_master.logqueue = Queue.Queue()
-    mpstate.mav_master.logqueue_raw = Queue.Queue()
+    mpstate.logqueue = Queue.Queue()
+    mpstate.logqueue_raw = Queue.Queue()
 
     # use a separate thread for writing to the logfile to prevent
     # delays during disk writes (important as delays can be long if camera
@@ -1098,6 +1111,16 @@ def open_logs():
     t.daemon = True
     t.start()
 
+def set_stream_rates():
+    '''set mavlink stream rates'''
+    for master in mpstate.mav_master:
+        if master.linknum == 0:
+            rate = mpstate.settings.streamrate
+        else:
+            rate = mpstate.settings.streamrate2
+        master.mav.request_data_stream_send(mpstate.status.target_system, mpstate.status.target_component,
+                                            mavlink.MAV_DATA_STREAM_ALL,
+                                            rate, 1)
 
 def periodic_tasks():
     '''run periodic checks'''
@@ -1112,17 +1135,18 @@ def periodic_tasks():
 
     if mpstate.status.gps and gps_period.trigger():
         mpstate.status.counters['MasterOut'] += 1
-        mpstate.mav_master.mav.send(mpstate.status.gps)
+        mpstate.master().mav.send(mpstate.status.gps)
 
     if heartbeat_period.trigger() and mpstate.settings.heartbeat != 0:
         mpstate.status.counters['MasterOut'] += 1
-        if mavlink.WIRE_PROTOCOL_VERSION == '1.0':
-            mpstate.mav_master.mav.heartbeat_send(mavlink.MAV_TYPE_GCS, mavlink.MAV_AUTOPILOT_INVALID,
+        for master in mpstate.mav_master:
+            if mavlink.WIRE_PROTOCOL_VERSION == '1.0':
+                master.mav.heartbeat_send(mavlink.MAV_TYPE_GCS, mavlink.MAV_AUTOPILOT_INVALID,
                                           0, 0, 0)
-        else:
-            MAV_GROUND = 5
-            MAV_AUTOPILOT_NONE = 4
-            mpstate.mav_master.mav.heartbeat_send(MAV_GROUND, MAV_AUTOPILOT_NONE)
+            else:
+                MAV_GROUND = 5
+                MAV_AUTOPILOT_NONE = 4
+                master.mav.heartbeat_send(MAV_GROUND, MAV_AUTOPILOT_NONE)
 
     if heartbeat_check_period.trigger() and (
         mpstate.status.last_heartbeat != 0 and time.time() > mpstate.status.last_heartbeat + 5):
@@ -1130,11 +1154,11 @@ def periodic_tasks():
         mpstate.status.heartbeat_error = True
 
     if msg_period.trigger():
-        mpstate.mav_master.mav.request_data_stream_send(mpstate.status.target_system, mpstate.status.target_component,
-                                                mavlink.MAV_DATA_STREAM_ALL,
-                                                mpstate.settings.streamrate, 1)
-    if not mpstate.mav_master.param_fetch_complete and mpstate.mav_master.time_since('PARAM_VALUE') > 2:
-        mpstate.mav_master.param_fetch_all()
+        set_stream_rates()
+
+    for master in mpstate.mav_master:
+        if not master.param_fetch_complete and master.time_since('PARAM_VALUE') > 2:
+            master.param_fetch_all()
  
     if battery_period.trigger():
         battery_report()
@@ -1147,11 +1171,10 @@ def periodic_tasks():
 def main_loop():
     '''main processing loop'''
     if not mpstate.status.setup_mode:
-        mpstate.mav_master.wait_heartbeat()
-        mpstate.mav_master.mav.request_data_stream_send(mpstate.mav_master.target_system, mpstate.mav_master.target_component,
-                                                mavlink.MAV_DATA_STREAM_ALL,
-                                                mpstate.settings.streamrate, 1)
-        mpstate.mav_master.param_fetch_all()
+        for master in mpstate.mav_master:
+            master.wait_heartbeat()
+            master.param_fetch_all()
+        set_stream_rates()
 
     while True:
         if mpstate.status.exit:
@@ -1160,15 +1183,17 @@ def main_loop():
             process_stdin(rl, rl.line)
             rl.line = None
 
-        if mpstate.mav_master.fd is None:
-            if mpstate.mav_master.port.inWaiting() > 0:
-                process_master(mpstate.mav_master)
+        for master in mpstate.mav_master:
+            if master.fd is None:
+                if master.port.inWaiting() > 0:
+                    process_master(master)
 
         periodic_tasks()
     
         rin = []
-        if mpstate.mav_master.fd is not None:
-            rin.append(mpstate.mav_master.fd)
+        for master in mpstate.mav_master:
+            if master.fd is not None:
+                rin.append(master.fd)
         for m in mpstate.mav_outputs:
             rin.append(m.fd)
         if mpstate.fg_input:
@@ -1182,8 +1207,9 @@ def main_loop():
             continue
 
         for fd in rin:
-            if fd == mpstate.mav_master.fd:
-                process_master(mpstate.mav_master)
+            for master in mpstate.mav_master:
+                if fd == master.fd:
+                    process_master(master)
             for m in mpstate.mav_outputs:
                 if fd == m.fd:
                     process_mavlink(m)
@@ -1225,7 +1251,7 @@ if __name__ == '__main__':
     from optparse import OptionParser
     parser = OptionParser("mavproxy.py [options]")
 
-    parser.add_option("--master",dest="master", help="MAVLink master port")
+    parser.add_option("--master",dest="master", action='append', help="MAVLink master port", default=[])
     parser.add_option("--baudrate", dest="baudrate", type='int',
                       help="master port baud rate", default=115200)
     parser.add_option("--out",   dest="output", help="MAVLink output port",
@@ -1280,7 +1306,7 @@ if __name__ == '__main__':
     if not opts.master:
         serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*"])
         if len(serial_list) == 1:
-            opts.master = serial_list[0].device
+            opts.master = [serial_list[0].device]
         else:
             print('''
 Please choose a MAVLink master with --master
@@ -1299,16 +1325,22 @@ Auto-detected serial ports are:
     mpstate.status.target_system = opts.TARGET_SYSTEM
     mpstate.status.target_component = opts.TARGET_COMPONENT
 
+    mpstate.mav_master = []
+    
     # open master link
-    if opts.master.startswith('tcp:'):
-        mpstate.mav_master = mavutil.mavtcp(opts.master[4:])
-    elif opts.master.find(':') != -1:
-        mpstate.mav_master = mavutil.mavudp(opts.master, input=True)
-    elif opts.master.endswith(".elf"):
-        mpstate.mav_master = mavutil.mavchildexec(opts.master)  
-    else:
-        mpstate.mav_master = mavutil.mavserial(opts.master, baud=opts.baudrate)
-    mpstate.mav_master.mav.set_callback(master_callback, mpstate.mav_master, mpstate.mav_outputs)
+    for mdev in opts.master:
+        if mdev.startswith('tcp:'):
+            m = mavutil.mavtcp(mdev[4:])
+        elif mdev.find(':') != -1:
+            m = mavutil.mavudp(mdev, input=True)
+        elif mdev.endswith(".elf"):
+            m = mavutil.mavchildexec(mdev)  
+        else:
+            m = mavutil.mavserial(mdev, baud=opts.baudrate)
+        m.mav.set_callback(master_callback, m)
+        m.linknum = len(mpstate.mav_master)
+        mpstate.mav_master.append(m)
+        mpstate.status.counters['MasterIn'].append(0)
 
     # log all packets from the master, for later replay
     open_logs()
@@ -1328,6 +1360,7 @@ Auto-detected serial ports are:
     mpstate.settings.numcells = opts.num_cells
     mpstate.settings.speech = opts.speech
     mpstate.settings.streamrate = opts.streamrate
+    mpstate.settings.streamrate2 = opts.streamrate
 
     fg_period = mavutil.periodic_event(opts.fgrate)
     gps_period = mavutil.periodic_event(opts.gpsrate)
