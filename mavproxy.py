@@ -44,7 +44,7 @@ class MPSettings(object):
                       ('rc1mul', int),
                       ('rc2mul', int),
                       ('rc4mul', int)]
-        self.link = 0
+        self.link = 1
         self.altreadout = 10
         self.distreadout = 200
         self.battreadout = 1
@@ -161,9 +161,16 @@ class MPState(object):
 
     def master(self):
         '''return the currently chosen mavlink master object'''
-        if self.settings.link >= len(self.mav_master):
-            self.settings.link = 0
-        return self.mav_master[self.settings.link]
+        if self.settings.link > len(self.mav_master):
+            self.settings.link = 1
+
+        # try to use one with no link error
+        if not self.mav_master[self.settings.link-1].linkerror:
+            return self.mav_master[self.settings.link-1]
+        for m in self.mav_master:
+            if not m.linkerror:
+                return m
+        return self.mav_master[self.settings.link-1]
 
 
 def get_usec():
@@ -752,7 +759,12 @@ def master_callback(m, master):
         if mpstate.status.heartbeat_error:
             mpstate.status.heartbeat_error = False
             say("heartbeat OK")
+        if master.linkerror:
+            master.linkerror = False
+            say("link %u OK" % (master.linknum+1))
+            
         mpstate.status.last_heartbeat = time.time()
+        master.last_heartbeat = mpstate.status.last_heartbeat
     elif mtype == 'STATUSTEXT':
         if m.text != mpstate.status.last_apm_msg:
             print("APM: %s" % m.text)
@@ -1017,6 +1029,17 @@ def set_stream_rates():
                                             mavlink.MAV_DATA_STREAM_ALL,
                                             rate, 1)
 
+def check_link_status():
+    '''check status of master links'''
+    tnow = time.time()
+    if mpstate.status.last_heartbeat != 0 and tnow > mpstate.status.last_heartbeat + 5:
+        say("no heartbeat")
+        mpstate.status.heartbeat_error = True
+    for master in mpstate.mav_master:
+        if not master.linkerror and tnow > master.last_heartbeat + 5:
+            say("link %u down" % (master.linknum+1))
+            master.linkerror = True
+
 def periodic_tasks():
     '''run periodic checks'''
     if (mpstate.status.setup_mode or
@@ -1035,10 +1058,8 @@ def periodic_tasks():
                 MAV_AUTOPILOT_NONE = 4
                 master.mav.heartbeat_send(MAV_GROUND, MAV_AUTOPILOT_NONE)
 
-    if heartbeat_check_period.trigger() and (
-        mpstate.status.last_heartbeat != 0 and time.time() > mpstate.status.last_heartbeat + 5):
-        say("no heartbeat")
-        mpstate.status.heartbeat_error = True
+    if heartbeat_check_period.trigger():
+        check_link_status()
 
     if msg_period.trigger():
         set_stream_rates()
@@ -1215,6 +1236,7 @@ Auto-detected serial ports are:
             m = mavutil.mavserial(mdev, baud=opts.baudrate)
         m.mav.set_callback(master_callback, m)
         m.linknum = len(mpstate.mav_master)
+        m.linkerror = False
         mpstate.mav_master.append(m)
         mpstate.status.counters['MasterIn'].append(0)
 
@@ -1241,7 +1263,7 @@ Auto-detected serial ports are:
         override_period = mavutil.periodic_event(50)
     else:
         override_period = mavutil.periodic_event(1)
-    heartbeat_check_period = mavutil.periodic_event(0.2)
+    heartbeat_check_period = mavutil.periodic_event(0.33)
 
     rl = rline("MAV> ")
     if opts.setup:
