@@ -555,6 +555,14 @@ def cmd_reset(args, rl):
     print("Resetting master")
     mpstate.master().reset()
 
+def cmd_link(args, rl):
+    for master in mpstate.mav_master:
+        if master.linkerror:
+            print("link %u down" % (master.linknum+1))
+        else:
+            print("link %u OK (%u packets)" % (master.linknum+1, mpstate.status.counters['MasterIn'][master.linknum]))
+
+
 command_map = {
     'switch'  : (cmd_switch,   'set RC switch (1-5), 0 disables'),
     'rc'      : (cmd_rc,       'override a RC channel value'),
@@ -571,6 +579,7 @@ command_map = {
     'manual'  : (cmd_manual,   'set MANUAL mode'),
     'set'     : (cmd_set,      'mavproxy settings'),
     'bat'     : (cmd_bat,      'show battery levels'),
+    'link'    : (cmd_link,     'show link status'),
     'up'      : (cmd_up,       'adjust TRIM_PITCH_CD up by 5 degrees'),
     };
 
