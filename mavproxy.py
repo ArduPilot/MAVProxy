@@ -805,7 +805,6 @@ def master_callback(m, master):
 
     if master.link_delayed:
         # don't process delayed packets 
-        print("skip delayed: %s" % m)
         return
     
     if mtype == 'HEARTBEAT':
