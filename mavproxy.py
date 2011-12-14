@@ -120,6 +120,7 @@ class MPStatus(object):
         self.last_heartbeat = 0
         self.heartbeat_error = False
         self.last_apm_msg = None
+        self.highest_usec = 0
 
     def show(self, f, pattern=None):
         '''write status to status.txt'''
@@ -557,10 +558,15 @@ def cmd_reset(args, rl):
 
 def cmd_link(args, rl):
     for master in mpstate.mav_master:
+        linkdelay = (mpstate.status.highest_usec - master.highest_usec)*1e-6
         if master.linkerror:
             print("link %u down" % (master.linknum+1))
+        elif master.link_delayed:
+            print("link %u delayed by %.2f seconds" % (master.linknum+1, linkdelay))
         else:
-            print("link %u OK (%u packets)" % (master.linknum+1, mpstate.status.counters['MasterIn'][master.linknum]))
+            print("link %u OK (%u packets, %.2fs delay)" % (master.linknum+1,
+                                                            mpstate.status.counters['MasterIn'][master.linknum],
+                                                            linkdelay))
 
 
 command_map = {
@@ -749,6 +755,31 @@ def battery_report():
     if avionics_rbattery_level <= 20:
         say("Avionics battery warning")
 
+
+def handle_usec_timestamp(m, master):
+    '''special handling for MAVLink packets with a usec field'''
+    usec = m.usec
+    if usec + 6.0e7 < master.highest_usec:
+        say('Time has wrapped')
+        print("usec %u highest_usec %u" % (usec, master.highest_usec))
+        mpstate.status.highest_usec = usec
+        for mm in mpstate.mav_master:
+            mm.link_delayed = False
+            mm.highest_usec = usec
+        return
+
+    # we want to detect when a link has significant buffering, causing us to receive
+    # old packets. If we get packets that are more than 1 second old, then mark the link
+    # as being delayed. We will not act on packets from this link until it has caught up
+    master.highest_usec = usec
+    if usec > mpstate.status.highest_usec:
+        mpstate.status.highest_usec = usec
+    if usec + 1e6 < mpstate.status.highest_usec and not master.link_delayed:
+        master.link_delayed = True
+        say("link %u delayed" % (master.linknum+1))
+    elif usec + 0.5e6 > mpstate.status.highest_usec and master.link_delayed:
+        master.link_delayed = False
+        say("link %u OK" % (master.linknum+1))
     
 
 def master_callback(m, master):
@@ -758,7 +789,25 @@ def master_callback(m, master):
         master.post_message(m)
     mpstate.status.counters['MasterIn'][master.linknum] += 1
 
+    if getattr(m, 'usec', None) is not None:
+        # update link_delayed attribute
+        handle_usec_timestamp(m, master)
+
     mtype = m.get_type()
+
+    # and log them
+    if mtype != 'BAD_DATA' and mpstate.logqueue:
+        # put link number in bottom 2 bits, so we can analyse packet
+        # delay in saved logs
+        usec = get_usec()
+        usec = (usec & ~3) | master.linknum
+        mpstate.logqueue.put(str(struct.pack('>Q', usec) + m.get_msgbuf().tostring()))
+
+    if master.link_delayed:
+        # don't process delayed packets 
+        print("skip delayed: %s" % m)
+        return
+    
     if mtype == 'HEARTBEAT':
         if (mpstate.status.target_system != m.get_srcSystem() or
             mpstate.status.target_component != m.get_srcComponent()):
@@ -912,17 +961,10 @@ def master_callback(m, master):
     mpstate.status.msg_count[m.get_type()] += 1
 
     # don't pass along bad data
-    if mtype == "BAD_DATA":
-        return
-
-    # pass messages along to listeners
-    recipients = mpstate.mav_outputs
-    for r in recipients:
-        r.write(m.get_msgbuf().tostring())
-
-    # and log them
-    if mpstate.logqueue:
-        mpstate.logqueue.put(str(struct.pack('>Q', get_usec()) + m.get_msgbuf().tostring()))
+    if mtype != "BAD_DATA":
+        # pass messages along to listeners
+        for r in mpstate.mav_outputs:
+            r.write(m.get_msgbuf().tostring())
 
 
 def process_master(m):
@@ -1246,6 +1288,9 @@ Auto-detected serial ports are:
         m.mav.set_callback(master_callback, m)
         m.linknum = len(mpstate.mav_master)
         m.linkerror = False
+        m.link_delayed = False
+        m.last_heartbeat = 0
+        m.highest_usec = 0
         mpstate.mav_master.append(m)
         mpstate.status.counters['MasterIn'].append(0)
 
