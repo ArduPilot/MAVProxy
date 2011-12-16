@@ -100,6 +100,7 @@ class MPStatus(object):
         self.wp_op = None
         self.wp_save_filename = None
         self.wploader = mavwp.MAVWPLoader()
+        self.fenceloader = mavwp.MAVFenceLoader()
         self.loading_waypoints = False
         self.loading_waypoint_lasttime = time.time()
         self.mav_error = 0
@@ -121,6 +122,8 @@ class MPStatus(object):
         self.heartbeat_error = False
         self.last_apm_msg = None
         self.highest_usec = 0
+        self.last_fence_breach = 0
+        self.last_fence_status = 0
 
     def show(self, f, pattern=None):
         '''write status to status.txt'''
@@ -380,6 +383,107 @@ def cmd_wp(args, rl):
         print("Usage: wp <list|load|save|set|clear>")
 
 
+def fetch_fence_point(i):
+    '''fetch one fence point'''
+    mpstate.master().mav.fence_fetch_point_send(mpstate.status.target_system,
+                                                mpstate.status.target_component, i)
+    tstart = time.time()
+    p = None
+    while time.time() - tstart < 1:
+        p = mpstate.master().recv_match(type='FENCE_POINT', blocking=False)
+        if p is not None:
+            break
+        time.sleep(0.1)
+        continue
+    if p is None:
+        print("Failed to fetch point %u" % i)
+        return None
+    return p
+
+
+
+def load_fence(filename):
+    '''load fence points from a file'''
+    try:
+        mpstate.status.fenceloader.target_system = mpstate.status.target_system
+        mpstate.status.fenceloader.target_component = mpstate.status.target_component
+        mpstate.status.fenceloader.load(filename)
+    except Exception, msg:
+        print("Unable to load %s - %s" % (filename, msg))
+        return
+    print("Loaded %u geo-fence points from %s" % (mpstate.status.fenceloader.count(), filename))
+
+    # must disable geo-fencing when loading
+    action = get_mav_param('FENCE_ACTION', mavlink.FENCE_ACTION_NONE)
+    param_set('FENCE_ACTION', mavlink.FENCE_ACTION_NONE)
+    param_set('FENCE_TOTAL', mpstate.status.fenceloader.count())
+    for i in range(mpstate.status.fenceloader.count()):
+        p = mpstate.status.fenceloader.point(i)
+        mpstate.master().mav.send(p)
+        p2 = fetch_fence_point(i)
+        if p2 is None:
+            param_set('FENCE_ACTION', action)
+            return
+        if (p.idx != p2.idx or
+            abs(p.lat - p2.lat) >= 0.00001 or
+            abs(p.lng - p2.lng) >= 0.00001):
+            print("Failed to send fence point %u" % i)
+            param_set('FENCE_ACTION', action)
+            return
+    param_set('FENCE_ACTION', action)
+
+
+def list_fence(filename):
+    '''list fence points, optionally saving to a file'''
+
+    mpstate.status.fenceloader.clear()
+    count = get_mav_param('FENCE_TOTAL', 0)
+    if count == 0:
+        print("No geo-fence points")
+        return
+    for i in range(int(count)):
+        p = fetch_fence_point(i)
+        if p is None:
+            return
+        mpstate.status.fenceloader.add(p)
+
+    if filename is not None:
+        try:
+            mpstate.status.fenceloader.save(filename)
+        except Exception, msg:
+            print("Unable to save %s - %s" % (filename, msg))
+            return
+        print("Saved %u geo-fence points to %s" % (mpstate.status.fenceloader.count(), filename))
+    else:
+        for i in range(mpstate.status.fenceloader.count()):
+            p = mpstate.status.fenceloader.point(i)
+            print("lat=%f lng=%f" % (p.lat, p.lng))
+
+
+def cmd_fence(args, rl):
+    '''geo-fence commands'''
+    if len(args) < 1:
+        print("usage: fence <list|load|save|clear>")
+        return
+
+    if args[0] == "load":
+        if len(args) != 2:
+            print("usage: fence load <filename>")
+            return
+        load_fence(args[1])
+    elif args[0] == "list":
+        list_fence(None)
+    elif args[0] == "save":
+        if len(args) != 2:
+            print("usage: fence save <filename>")
+            return
+        list_fence(args[1])
+    elif args[0] == "clear":
+        param_set('FENCE_TOTAL', 0)
+    else:
+        print("Usage: fence <list|load|save|clear>")
+
+
 def param_set(name, value, retries=3):
     '''set a parameter'''
     got_ack = False
@@ -573,6 +677,7 @@ command_map = {
     'switch'  : (cmd_switch,   'set RC switch (1-5), 0 disables'),
     'rc'      : (cmd_rc,       'override a RC channel value'),
     'wp'      : (cmd_wp,       'waypoint management'),
+    'fence'   : (cmd_fence,    'geo-fence management'),
     'param'   : (cmd_param,    'manage APM parameters'),
     'setup'   : (cmd_setup,    'go into setup mode'),
     'reset'   : (cmd_reset,    'reopen the connection to the MAVLink master'),
@@ -917,8 +1022,8 @@ def master_callback(m, master):
                     say("height %u" % rounded_alt, priority='notification')
 
     elif mtype == "RC_CHANNELS_RAW":
-        if (m.chan7_raw > 1700 and mpstate.status.flightmode == "MANUAL"):
-            system_check()
+#        if (m.chan7_raw > 1700 and mpstate.status.flightmode == "MANUAL"):
+#            system_check()
         if mpstate.settings.radiosetup:
             for i in range(1,9):
                 v = getattr(m, 'chan%u_raw' % i)
@@ -938,6 +1043,15 @@ def master_callback(m, master):
                 say("%u" % rounded_dist, priority="progress")
             mpstate.status.last_distance_announce = rounded_dist
 
+    elif mtype == "FENCE_STATUS":
+        if mpstate.status.last_fence_breach != m.breach_time:
+            say("fence breach")
+        if mpstate.status.last_fence_status != m.breach_status:
+            if m.breach_status == mavlink.FENCE_BREACH_NONE:
+                say("fence OK")
+        mpstate.status.last_fence_breach = m.breach_time
+        mpstate.status.last_fence_status = m.breach_status
+
     elif mtype == "BAD_DATA":
         if mavutil.all_printable(m.data):
             sys.stdout.write(m.data)
@@ -948,7 +1062,8 @@ def master_callback(m, master):
                     'GLOBAL_POSITION_INT', 'RAW_PRESSURE', 'RAW_IMU',
                     'WAYPOINT_ACK', 'MISSION_ACK',
                     'NAV_CONTROLLER_OUTPUT', 'GPS_RAW', 'GPS_RAW_INT', 'WAYPOINT',
-                    'SCALED_PRESSURE', 'SENSOR_OFFSETS', 'MEMINFO', 'AP_ADC' ]:
+                    'SCALED_PRESSURE', 'SENSOR_OFFSETS', 'MEMINFO', 'AP_ADC',
+                    'FENCE_POINT', 'FENCE_STATUS' ]:
         pass
     else:
         print("Got MAVLink msg: %s" % m)
@@ -1249,6 +1364,7 @@ if __name__ == '__main__':
 
     # global mavproxy state
     mpstate = MPState()
+    mpstate.status.exit = False
 
     if not opts.master:
         serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*"])
