@@ -47,7 +47,7 @@ class MPSettings(object):
         self.link = 1
         self.altreadout = 10
         self.distreadout = 200
-        self.battreadout = 1
+        self.battreadout = 0
         self.basealtitude = -1
         self.heartbeat = 1
         self.numcells = 0
