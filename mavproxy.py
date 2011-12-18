@@ -32,7 +32,6 @@ class MPSettings(object):
                       ('altreadout', int),
                       ('distreadout', int),
                       ('battreadout', int),
-                      ('basealtitude', int),
                       ('heartbeat', int),
                       ('numcells', int),
                       ('speech', int),
@@ -107,6 +106,7 @@ class MPStatus(object):
         self.target_system = -1
         self.target_component = -1
         self.speech = None
+        self.altitude = 0
         self.last_altitude_announce = 0.0
         self.last_distance_announce = 0.0
         self.last_battery_announce = 0
@@ -124,6 +124,7 @@ class MPStatus(object):
         self.highest_usec = 0
         self.last_fence_breach = 0
         self.last_fence_status = 0
+        self.have_gps_lock = False
 
     def show(self, f, pattern=None):
         '''write status to status.txt'''
@@ -536,7 +537,9 @@ def param_load_file(filename, wildcard):
         if len(a) != 2:
             print("Invalid line: %s" % line)
             continue
-        if a[0] in ['SYSID_SW_MREV', 'SYS_NUM_RESETS', 'ARSPD_OFFSET', 'GND_ABS_PRESS', 'GND_TEMP', 'CMD_TOTAL' ]:
+        # some parameters should not be loaded from file
+        if a[0] in ['SYSID_SW_MREV', 'SYS_NUM_RESETS', 'ARSPD_OFFSET', 'GND_ABS_PRESS',
+                    'GND_TEMP', 'CMD_TOTAL', 'CMD_INDEX', 'LOG_LASTFILE' ]:
             continue
         if not fnmatch.fnmatch(a[0].upper(), wildcard.upper()):
             continue
@@ -632,6 +635,10 @@ def cmd_bat(args, rl):
     print("Flight battery:   %u%%" % mpstate.status.battery_level)
     print("Avionics battery: %u%%" % mpstate.status.avionics_battery_level)
 
+def cmd_alt(args, rl):
+    '''show altitude'''
+    print("Altitude:  %.1f" % mpstate.status.altitude)
+
 
 def cmd_up(args, rl):
     '''adjust TRIM_PITCH_CD up by 5 degrees'''
@@ -690,6 +697,7 @@ command_map = {
     'manual'  : (cmd_manual,   'set MANUAL mode'),
     'set'     : (cmd_set,      'mavproxy settings'),
     'bat'     : (cmd_bat,      'show battery levels'),
+    'alt'     : (cmd_alt,      'show relative altitude'),
     'link'    : (cmd_link,     'show link status'),
     'up'      : (cmd_up,       'adjust TRIM_PITCH_CD up by 5 degrees'),
     };
@@ -1006,20 +1014,12 @@ def master_callback(m, master):
             have_gps_fix = True
         if 'GPS_RAW_INT' in mpstate.status.msgs and mpstate.status.msgs['GPS_RAW_INT'].fix_type == 2:
             have_gps_fix = True
-        if have_gps_fix and m.alt != 0.0:
-            if mpstate.settings.basealtitude == -1:
-                mpstate.settings.basealtitude = m.alt
+        if have_gps_fix and not mpstate.status.have_gps_lock:
                 mpstate.status.last_altitude_announce = 0.0
                 say("GPS lock at %u meters" % m.alt, priority='notification')
-            else:
-                if m.alt < mpstate.settings.basealtitude:
-                    mpstate.settings.basealtitude = m.alt
-                    mpstate.status.last_altitude_announce = m.alt
-                if (int(mpstate.settings.altreadout) > 0 and
-                    math.fabs(m.alt - mpstate.status.last_altitude_announce) >= int(mpstate.settings.altreadout)):
-                    mpstate.status.last_altitude_announce = m.alt
-                    rounded_alt = int(mpstate.settings.altreadout) * ((5+int(m.alt - mpstate.settings.basealtitude)) / int(mpstate.settings.altreadout))
-                    say("height %u" % rounded_alt, priority='notification')
+                # re-fetch to get the home pressure and temperature
+                mpstate.master().param_fetch_all()
+                mpstate.status.have_gps_lock = True
 
     elif mtype == "RC_CHANNELS_RAW":
 #        if (m.chan7_raw > 1700 and mpstate.status.flightmode == "MANUAL"):
@@ -1051,6 +1051,17 @@ def master_callback(m, master):
                 say("fence OK")
         mpstate.status.last_fence_breach = m.breach_time
         mpstate.status.last_fence_status = m.breach_status
+
+    elif mtype == "SCALED_PRESSURE":
+        scaling = get_mav_param('GND_ABS_PRESS', 95443) / (m.press_abs*100)
+	temp = get_mav_param('GND_TEMP', 30) + 273.15
+        altitude = math.log(scaling) * temp * 29271.267 * 0.001
+        mpstate.status.altitude = altitude
+        if (int(mpstate.settings.altreadout) > 0 and
+            math.fabs(altitude - mpstate.status.last_altitude_announce) >= int(mpstate.settings.altreadout)):
+            mpstate.status.last_altitude_announce = altitude
+            rounded_alt = int(mpstate.settings.altreadout) * ((5+int(altitude - mpstate.settings.basealtitude)) / int(mpstate.settings.altreadout))
+            say("height %u" % rounded_alt, priority='notification')
 
     elif mtype == "BAD_DATA":
         if mavutil.all_printable(m.data):
@@ -1253,7 +1264,9 @@ def main_loop():
         if mpstate.status.exit:
             return
         if rl.line is not None:
-            process_stdin(rl, rl.line)
+            cmds = rl.line.split(';')
+            for c in cmds:
+                process_stdin(rl, c)
             rl.line = None
 
         for master in mpstate.mav_master:
