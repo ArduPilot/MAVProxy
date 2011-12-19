@@ -1055,12 +1055,15 @@ def master_callback(m, master):
     elif mtype == "SCALED_PRESSURE":
         scaling = get_mav_param('GND_ABS_PRESS', 95443) / (m.press_abs*100)
 	temp = get_mav_param('GND_TEMP', 30) + 273.15
-        altitude = math.log(scaling) * temp * 29271.267 * 0.001
-        mpstate.status.altitude = altitude
+        try:
+            altitude = math.log(scaling) * temp * 29271.267 * 0.001
+            mpstate.status.altitude = altitude
+        except ValueError:
+            pass
         if (int(mpstate.settings.altreadout) > 0 and
-            math.fabs(altitude - mpstate.status.last_altitude_announce) >= int(mpstate.settings.altreadout)):
-            mpstate.status.last_altitude_announce = altitude
-            rounded_alt = int(mpstate.settings.altreadout) * ((5+int(altitude - mpstate.settings.basealtitude)) / int(mpstate.settings.altreadout))
+            math.fabs(mpstate.status.altitude - mpstate.status.last_altitude_announce) >= int(mpstate.settings.altreadout)):
+            mpstate.status.last_altitude_announce = mpstate.status.altitude
+            rounded_alt = int(mpstate.settings.altreadout) * ((5+int(mpstate.status.altitude - mpstate.settings.basealtitude)) / int(mpstate.settings.altreadout))
             say("height %u" % rounded_alt, priority='notification')
 
     elif mtype == "BAD_DATA":
