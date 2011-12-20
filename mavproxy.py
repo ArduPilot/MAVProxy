@@ -893,6 +893,15 @@ def handle_usec_timestamp(m, master):
     elif usec + 0.5e6 > mpstate.status.highest_usec and master.link_delayed:
         master.link_delayed = False
         say("link %u OK" % (master.linknum+1))
+
+def report_altitude(altitude):
+    '''possibly report a new altitude'''
+    mpstate.status.altitude = altitude
+    if (int(mpstate.settings.altreadout) > 0 and
+        math.fabs(mpstate.status.altitude - mpstate.status.last_altitude_announce) >= int(mpstate.settings.altreadout)):
+        mpstate.status.last_altitude_announce = mpstate.status.altitude
+        rounded_alt = int(mpstate.settings.altreadout) * ((5+int(mpstate.status.altitude - mpstate.settings.basealtitude)) / int(mpstate.settings.altreadout))
+        say("height %u" % rounded_alt, priority='notification')
     
 
 def master_callback(m, master):
@@ -1020,6 +1029,10 @@ def master_callback(m, master):
                 # re-fetch to get the home pressure and temperature
                 mpstate.master().param_fetch_all()
                 mpstate.status.have_gps_lock = True
+        ground_press = get_mav_param('GND_ABS_PRESS', None)
+        if opts.quadcopter or ground_press is None:
+            # we're on a ArduCopter which uses relative altitude in VFR_HUD
+            report_altitude(m.alt)
 
     elif mtype == "RC_CHANNELS_RAW":
 #        if (m.chan7_raw > 1700 and mpstate.status.flightmode == "MANUAL"):
@@ -1053,18 +1066,18 @@ def master_callback(m, master):
         mpstate.status.last_fence_status = m.breach_status
 
     elif mtype == "SCALED_PRESSURE":
-        scaling = get_mav_param('GND_ABS_PRESS', 95443) / (m.press_abs*100)
-	temp = get_mav_param('GND_TEMP', 30) + 273.15
-        try:
-            altitude = math.log(scaling) * temp * 29271.267 * 0.001
-            mpstate.status.altitude = altitude
-        except ValueError:
-            pass
-        if (int(mpstate.settings.altreadout) > 0 and
-            math.fabs(mpstate.status.altitude - mpstate.status.last_altitude_announce) >= int(mpstate.settings.altreadout)):
-            mpstate.status.last_altitude_announce = mpstate.status.altitude
-            rounded_alt = int(mpstate.settings.altreadout) * ((5+int(mpstate.status.altitude - mpstate.settings.basealtitude)) / int(mpstate.settings.altreadout))
-            say("height %u" % rounded_alt, priority='notification')
+        ground_press = get_mav_param('GND_ABS_PRESS', None)
+        ground_temperature = get_mav_param('GND_TEMP', None)
+        if ground_press is not None and ground_temperature is not None:
+            altitude = None
+            try:
+                scaling = ground_press / (m.press_abs*100)
+                temp = ground_temperature + 273.15
+                altitude = math.log(scaling) * temp * 29271.267 * 0.001
+            except ValueError:
+                pass
+            if altitude is not None:
+                report_altitude(altitude)
 
     elif mtype == "BAD_DATA":
         if mavutil.all_printable(m.data):
