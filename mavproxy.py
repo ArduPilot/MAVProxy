@@ -1277,7 +1277,7 @@ def main_loop():
         set_stream_rates()
 
     while True:
-        if mpstate.status.exit:
+        if mpstate is None or mpstate.status.exit:
             return
         if rl.line is not None:
             cmds = rl.line.split(';')
