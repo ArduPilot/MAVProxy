@@ -125,6 +125,7 @@ class MPStatus(object):
         self.last_fence_breach = 0
         self.last_fence_status = 0
         self.have_gps_lock = False
+        self.watch = None
 
     def show(self, f, pattern=None):
         '''write status to status.txt'''
@@ -490,14 +491,14 @@ def param_set(name, value, retries=3):
     got_ack = False
     while retries > 0 and not got_ack:
         retries -= 1
-        mpstate.master().param_set_send(name, float(value))
+        mpstate.master().param_set_send(name.upper(), float(value))
         tstart = time.time()
         while time.time() - tstart < 1:
             ack = mpstate.master().recv_match(type='PARAM_VALUE', blocking=False)
             if ack == None:
                 time.sleep(0.1)
                 continue
-            if str(name) == str(ack.param_id):
+            if str(name).upper() == str(ack.param_id).upper():
                 got_ack = True
                 break
     if not got_ack:
@@ -581,7 +582,7 @@ def cmd_param(args, rl):
             return
         param = args[1]
         value = args[2]
-        if not param in mpstate.mav_param:
+        if not param.upper() in mpstate.mav_param:
             print("Warning: Unable to find parameter '%s'" % param)
         param_set(param, value)
     elif args[0] == "load":
@@ -679,6 +680,14 @@ def cmd_link(args, rl):
                                                             mpstate.status.counters['MasterIn'][master.linknum],
                                                             linkdelay))
 
+def cmd_watch(args, rl):
+    '''watch a mavlink packet pattern'''
+    if len(args) == 0:
+        mpstate.status.watch = None
+        return
+    mpstate.status.watch = args[0]
+    print("Watching %s" % mpstate.status.watch)
+
 
 command_map = {
     'switch'  : (cmd_switch,   'set RC switch (1-5), 0 disables'),
@@ -700,6 +709,7 @@ command_map = {
     'alt'     : (cmd_alt,      'show relative altitude'),
     'link'    : (cmd_link,     'show link status'),
     'up'      : (cmd_up,       'adjust TRIM_PITCH_CD up by 5 degrees'),
+    'watch'   : (cmd_watch,    'watch a MAVLink pattern'),
     };
 
 def process_stdin(rl, line):
@@ -1094,6 +1104,10 @@ def master_callback(m, master):
         pass
     else:
         print("Got MAVLink msg: %s" % m)
+
+    if mpstate.status.watch is not None:
+        if fnmatch.fnmatch(m.get_type().upper(), mpstate.status.watch.upper()):
+            print(m)
 
     # keep the last message of each type around
     mpstate.status.msgs[m.get_type()] = m
