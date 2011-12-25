@@ -122,6 +122,7 @@ class MPStatus(object):
         self.heartbeat_error = False
         self.last_apm_msg = None
         self.highest_usec = 0
+        self.fence_enabled = False
         self.last_fence_breach = 0
         self.last_fence_status = 0
         self.have_gps_lock = False
@@ -1067,6 +1068,9 @@ def master_callback(m, master):
             mpstate.status.last_distance_announce = rounded_dist
 
     elif mtype == "FENCE_STATUS":
+        if not mpstate.status.fence_enabled:
+            mpstate.status.fence_enabled = True
+            say("fence enabled")
         if mpstate.status.last_fence_breach != m.breach_time:
             say("fence breach")
         if mpstate.status.last_fence_status != m.breach_status:
