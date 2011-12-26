@@ -541,7 +541,7 @@ def param_load_file(filename, wildcard):
             continue
         # some parameters should not be loaded from file
         if a[0] in ['SYSID_SW_MREV', 'SYS_NUM_RESETS', 'ARSPD_OFFSET', 'GND_ABS_PRESS',
-                    'GND_TEMP', 'CMD_TOTAL', 'CMD_INDEX', 'LOG_LASTFILE' ]:
+                    'GND_TEMP', 'CMD_TOTAL', 'CMD_INDEX', 'LOG_LASTFILE', 'FENCE_TOTAL' ]:
             continue
         if not fnmatch.fnmatch(a[0].upper(), wildcard.upper()):
             continue
@@ -1323,6 +1323,9 @@ def main_loop():
             (rin, win, xin) = select.select(rin, [], [], 0.001)
         except select.error:
             continue
+
+        if mpstate is None:
+            return
 
         for fd in rin:
             for master in mpstate.mav_master:
