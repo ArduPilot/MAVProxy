@@ -298,6 +298,11 @@ def cmd_ground(args, rl):
     MAV_ACTION_CALIBRATE_GYRO = 17
     mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_CALIBRATE_GYRO)
 
+def cmd_level(args, rl):
+    '''do a ground start mode'''
+    MAV_ACTION_CALIBRATE_ACC = 19
+    mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_CALIBRATE_ACC)
+
 def cmd_rtl(args, rl):
     '''set RTL mode'''
     MAV_ACTION_RETURN = 3
@@ -702,6 +707,7 @@ command_map = {
     'trim'    : (cmd_trim,     'trim aileron, elevator and rudder to current values'),
     'auto'    : (cmd_auto,     'set AUTO mode'),
     'ground'  : (cmd_ground,   'do a ground start'),
+    'level'   : (cmd_level,    'set level on a multicopter'),
     'loiter'  : (cmd_loiter,   'set LOITER mode'),
     'rtl'     : (cmd_rtl,      'set RTL mode'),
     'manual'  : (cmd_manual,   'set MANUAL mode'),
