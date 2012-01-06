@@ -1217,7 +1217,7 @@ def open_logs():
             sys.exit(1)
         mkdir_p(fdir)
         print(fdir)
-        logfile = os.path.join(fdir, logfile)
+        logfile = os.path.join(fdir, 'flight.log')
         mpstate.status.logdir = fdir
     print("Logging to %s" % logfile)
     mpstate.logfile = open(logfile, mode=mode)
