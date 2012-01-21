@@ -126,6 +126,7 @@ class MPStatus(object):
         self.last_fence_breach = 0
         self.last_fence_status = 0
         self.have_gps_lock = False
+        self.lost_gps_lock = False
         self.watch = None
 
     def show(self, f, pattern=None):
@@ -1050,6 +1051,15 @@ def master_callback(m, master):
         if opts.quadcopter or ground_press is None:
             # we're on a ArduCopter which uses relative altitude in VFR_HUD
             report_altitude(m.alt)
+
+    elif mtype == "GPS_RAW":
+        if mpstate.status.have_gps_lock:
+            if m.fix_type != 2 and not mpstate.status.lost_gps_lock:
+                say("GPS fix lost")
+                mpstate.status.lost_gps_lock = True
+            if m.fix_type == 2 and mpstate.status.lost_gps_lock:
+                say("GPS OK")
+                mpstate.status.lost_gps_lock = False
 
     elif mtype == "RC_CHANNELS_RAW":
 #        if (m.chan7_raw > 1700 and mpstate.status.flightmode == "MANUAL"):
