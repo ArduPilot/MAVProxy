@@ -40,6 +40,7 @@ class MPSettings(object):
                       ('streamrate2', int),
                       ('heartbeatreport', int),
                       ('radiosetup', int),
+                      ('paramretry', int),
                       ('rc1mul', int),
                       ('rc2mul', int),
                       ('rc4mul', int)]
@@ -56,6 +57,7 @@ class MPSettings(object):
         self.streamrate2 = 4
         self.radiosetup = 0
         self.heartbeatreport = 1
+        self.paramretry = 2
         self.rc1mul = 1
         self.rc2mul = 1
         self.rc4mul = 1
@@ -1111,7 +1113,7 @@ def master_callback(m, master):
 
     elif mtype == "BAD_DATA":
         if mavutil.all_printable(m.data):
-            sys.stdout.write(m.data)
+            sys.stdout.write(str(m.data))
             sys.stdout.flush()
     elif mtype in [ 'HEARTBEAT', 'GLOBAL_POSITION', 'RC_CHANNELS_SCALED',
                     'ATTITUDE', 'RC_CHANNELS_RAW', 'GPS_STATUS', 'WAYPOINT_CURRENT',
@@ -1291,7 +1293,9 @@ def periodic_tasks():
         set_stream_rates()
 
     for master in mpstate.mav_master:
-        if not master.param_fetch_complete and master.time_since('PARAM_VALUE') > 2:
+        if (not master.param_fetch_complete and
+            mpstate.settings.paramretry != 0 and
+            master.time_since('PARAM_VALUE') > mpstate.settings.paramretry):
             master.param_fetch_all()
  
     if battery_period.trigger():
