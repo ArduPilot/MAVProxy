@@ -57,7 +57,7 @@ class MPSettings(object):
         self.streamrate2 = 4
         self.radiosetup = 0
         self.heartbeatreport = 1
-        self.paramretry = 2
+        self.paramretry = 10
         self.rc1mul = 1
         self.rc2mul = 1
         self.rc4mul = 1
