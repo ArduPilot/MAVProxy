@@ -732,9 +732,13 @@ def process_stdin(rl, line):
         # in setup mode we send strings straight to the master
         if line == '.':
             mpstate.status.setup_mode = False
+            mpstate.status.flightmode = "MAV"
             rl.set_prompt("MAV> ")
             return
-        mpstate.master().write(line + '\r')
+        if line == '+++':
+            mpstate.master().write(line)
+        else:
+            mpstate.master().write(line + '\r')
         return
 
     if not line:
