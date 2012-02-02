@@ -130,6 +130,8 @@ class MPStatus(object):
         self.have_gps_lock = False
         self.lost_gps_lock = False
         self.watch = None
+        self.last_streamrate1 = -1
+        self.last_streamrate2 = -1
 
     def show(self, f, pattern=None):
         '''write status to status.txt'''
@@ -1252,6 +1254,12 @@ def open_logs():
 
 def set_stream_rates():
     '''set mavlink stream rates'''
+    if (not msg_period.trigger() and
+        mpstate.status.last_streamrate1 == mpstate.settings.streamrate and
+        mpstate.status.last_streamrate2 == mpstate.settings.streamrate2):
+        return
+    mpstate.status.last_streamrate1 = mpstate.settings.streamrate
+    mpstate.status.last_streamrate2 = mpstate.settings.streamrate2
     for master in mpstate.mav_master:
         if master.linknum == 0:
             rate = mpstate.settings.streamrate
@@ -1293,8 +1301,7 @@ def periodic_tasks():
     if heartbeat_check_period.trigger():
         check_link_status()
 
-    if msg_period.trigger():
-        set_stream_rates()
+    set_stream_rates()
 
     for master in mpstate.mav_master:
         if (not master.param_fetch_complete and
