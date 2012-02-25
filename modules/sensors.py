@@ -47,11 +47,10 @@ def cmd_sensors(args):
 
 def cmd_speed(args):
     '''enable/disable speed report'''
-    if len(args) == 0 or args[0] == "on":
-        mpstate.sensors_state.speed_report = True
+    mpstate.sensors_state.speed_report = not mpstate.sensors_state.speed_report
+    if mpstate.sensors_state.speed_report:
         print("Speed reporting enabled")
     else:
-        mpstate.sensors_state.speed_report = False
         print("Speed reporting disabled")
 
 def init(_mpstate):
