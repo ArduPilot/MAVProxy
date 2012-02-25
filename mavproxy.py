@@ -158,6 +158,8 @@ class MPStatus(object):
         self.show(f)
         f.close()
 
+class MAVFunctions(object):
+    pass
 
 class MPState(object):
     '''holds state of mavproxy'''
@@ -176,6 +178,8 @@ class MPState(object):
 
         self.mav_param = {}
         self.modules = []
+        self.functions = MAVFunctions()
+        self.functions.say = say
 
     def master(self):
         '''return the currently chosen mavlink master object'''
