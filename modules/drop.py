@@ -51,3 +51,6 @@ def mavlink_packet(m):
     '''handle an incoming mavlink packet'''
     if m.get_type() == 'RC_CHANNELS_RAW':
         check_drop(m)
+    if m.get_type() == 'PARAM_VALUE':
+        if str(m.param_id) == 'RC5_FUNCTION' and m.param_value != 1.0:
+            print("DROP WARNING: RC5_FUNCTION=%u" % m.param_value)
