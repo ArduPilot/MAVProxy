@@ -23,6 +23,9 @@ for d in [ 'pymavlink',
             except:
                 pass
 
+# add modules path
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'modules'))
+
 import select
 
 
@@ -41,6 +44,7 @@ class MPSettings(object):
                       ('heartbeatreport', int),
                       ('radiosetup', int),
                       ('paramretry', int),
+                      ('moddebug', int),
                       ('rc1mul', int),
                       ('rc2mul', int),
                       ('rc4mul', int)]
@@ -61,6 +65,7 @@ class MPSettings(object):
         self.rc1mul = 1
         self.rc2mul = 1
         self.rc4mul = 1
+        self.moddebug = 0
 
     def set(self, vname, value):
         '''set a setting'''
@@ -170,6 +175,7 @@ class MPState(object):
         self.sitl_output = None
 
         self.mav_param = {}
+        self.modules = []
 
     def master(self):
         '''return the currently chosen mavlink master object'''
@@ -237,7 +243,7 @@ def send_rc_override():
                                                          mpstate.status.target_component,
                                                          *mpstate.status.override)
 
-def cmd_switch(args, rl):
+def cmd_switch(args):
     '''handle RC switch changes'''
     mapping = [ 0, 1165, 1295, 1425, 1555, 1685, 1815 ]
     if len(args) != 1:
@@ -259,7 +265,7 @@ def cmd_switch(args, rl):
     else:
         print("Set RC switch override to %u (PWM=%u)" % (value, mapping[value]))
 
-def cmd_trim(args, rl):
+def cmd_trim(args):
     '''trim aileron, elevator and rudder to current values'''
     if not 'RC_CHANNELS_RAW' in mpstate.status.msgs:
         print("No RC_CHANNELS_RAW to trim with")
@@ -273,7 +279,7 @@ def cmd_trim(args, rl):
         m.chan1_raw, m.chan2_raw, m.chan4_raw))
     
 
-def cmd_rc(args, rl):
+def cmd_rc(args):
     '''handle RC value override'''
     if len(args) != 2:
         print("Usage: rc <channel> <pwmvalue>")
@@ -288,32 +294,32 @@ def cmd_rc(args, rl):
     mpstate.status.override[channel-1] = value
     send_rc_override()
 
-def cmd_loiter(args, rl):
+def cmd_loiter(args):
     '''set LOITER mode'''
     MAV_ACTION_LOITER = 27
     mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_LOITER)
 
-def cmd_auto(args, rl):
+def cmd_auto(args):
     '''set AUTO mode'''
     MAV_ACTION_SET_AUTO = 13
     mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_SET_AUTO)
 
-def cmd_ground(args, rl):
+def cmd_ground(args):
     '''do a ground start mode'''
     MAV_ACTION_CALIBRATE_GYRO = 17
     mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_CALIBRATE_GYRO)
 
-def cmd_level(args, rl):
+def cmd_level(args):
     '''do a ground start mode'''
     MAV_ACTION_CALIBRATE_ACC = 19
     mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_CALIBRATE_ACC)
 
-def cmd_rtl(args, rl):
+def cmd_rtl(args):
     '''set RTL mode'''
     MAV_ACTION_RETURN = 3
     mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_RETURN)
 
-def cmd_manual(args, rl):
+def cmd_manual(args):
     '''set MANUAL mode'''
     MAV_ACTION_SET_MANUAL = 12
     mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_SET_MANUAL)
@@ -364,7 +370,7 @@ def save_waypoints(filename):
     print("Saved %u waypoints to %s" % (mpstate.status.wploader.count(), filename))
              
 
-def cmd_wp(args, rl):
+def cmd_wp(args):
     '''waypoint commands'''
     if len(args) < 1:
         print("usage: wp <list|load|save|set|clear>")
@@ -473,7 +479,7 @@ def list_fence(filename):
             print("lat=%f lng=%f" % (p.lat, p.lng))
 
 
-def cmd_fence(args, rl):
+def cmd_fence(args):
     '''geo-fence commands'''
     if len(args) < 1:
         print("usage: fence <list|load|save|clear>")
@@ -570,7 +576,7 @@ def param_load_file(filename, wildcard):
 
 param_wildcard = "*"
 
-def cmd_param(args, rl):
+def cmd_param(args):
     '''control parameters'''
     if len(args) < 1:
         print("usage: param <fetch|edit|set|show|store>")
@@ -620,7 +626,7 @@ def cmd_param(args, rl):
     else:
         print("Unknown subcommand '%s' (try 'fetch', 'save', 'set', 'show', 'load' or 'store')" % args[0]);
 
-def cmd_set(args, rl):
+def cmd_set(args):
     '''control mavproxy options'''
     if len(args) == 0:
         mpstate.settings.show_all()
@@ -634,7 +640,7 @@ def cmd_set(args, rl):
     else:
         mpstate.settings.set(args[0], args[1])
 
-def cmd_status(args, rl):
+def cmd_status(args):
     '''show status'''
     if len(args) == 0:
         mpstate.status.show(sys.stdout, pattern=None)
@@ -642,17 +648,17 @@ def cmd_status(args, rl):
         for pattern in args:
             mpstate.status.show(sys.stdout, pattern=pattern)
 
-def cmd_bat(args, rl):
+def cmd_bat(args):
     '''show battery levels'''
     print("Flight battery:   %u%%" % mpstate.status.battery_level)
     print("Avionics battery: %u%%" % mpstate.status.avionics_battery_level)
 
-def cmd_alt(args, rl):
+def cmd_alt(args):
     '''show altitude'''
     print("Altitude:  %.1f" % mpstate.status.altitude)
 
 
-def cmd_up(args, rl):
+def cmd_up(args):
     '''adjust TRIM_PITCH_CD up by 5 degrees'''
     if len(args) == 0:
         adjust = 5.0
@@ -670,16 +676,16 @@ def cmd_up(args, rl):
     param_set('TRIM_PITCH_CD', new_trim)
 
 
-def cmd_setup(args, rl):
+def cmd_setup(args):
     mpstate.status.setup_mode = True
-    rl.set_prompt("")
+    mpstate.rl.set_prompt("")
 
 
-def cmd_reset(args, rl):
+def cmd_reset(args):
     print("Resetting master")
     mpstate.master().reset()
 
-def cmd_link(args, rl):
+def cmd_link(args):
     for master in mpstate.mav_master:
         linkdelay = (mpstate.status.highest_usec - master.highest_usec)*1e-6
         if master.linkerror:
@@ -691,13 +697,46 @@ def cmd_link(args, rl):
                                                             mpstate.status.counters['MasterIn'][master.linknum],
                                                             linkdelay))
 
-def cmd_watch(args, rl):
+def cmd_watch(args):
     '''watch a mavlink packet pattern'''
     if len(args) == 0:
         mpstate.status.watch = None
         return
     mpstate.status.watch = args[0]
     print("Watching %s" % mpstate.status.watch)
+
+def cmd_module(args):
+    '''module commands'''
+    if len(args) < 1:
+        print("usage: module <list|load|reload>")
+        return
+    if args[0] == "list":
+        for m in mpstate.modules:
+            print("%s: %s" % (m.name(), m.description()))
+    elif args[0] == "load":
+        if len(args) < 2:
+            print("usage: module load <name>")
+            return
+        try:
+            m = __import__(args[1])
+            if m in mpstate.modules:
+                raise RuntimeError("module already loaded")
+            m.init(mpstate)
+            mpstate.modules.append(m)
+            print("Loaded module %s" % args[1])
+        except Exception, msg:
+            print("Unable to load module %s: %s" % (args[1], msg))
+    elif args[0] == "reload":
+        if len(args) < 2:
+            print("usage: module reload <name>")
+            return
+        for m in mpstate.modules:
+            if m.name() == args[1]:
+                reload(m)
+                m.init(mpstate)
+                print("Reloaded module %s" % args[1])
+                return
+        print("Unable to find module %s" % args[1])
 
 
 command_map = {
@@ -722,6 +761,7 @@ command_map = {
     'link'    : (cmd_link,     'show link status'),
     'up'      : (cmd_up,       'adjust TRIM_PITCH_CD up by 5 degrees'),
     'watch'   : (cmd_watch,    'watch a MAVLink pattern'),
+    'module'  : (cmd_module,   'module commands'),
     };
 
 def process_stdin(rl, line):
@@ -735,7 +775,7 @@ def process_stdin(rl, line):
         if line == '.':
             mpstate.status.setup_mode = False
             mpstate.status.flightmode = "MAV"
-            rl.set_prompt("MAV> ")
+            mpstate.rl.set_prompt("MAV> ")
             return
         if line == '+++':
             mpstate.master().write(line)
@@ -760,7 +800,7 @@ def process_stdin(rl, line):
         return
     (fn, help) = command_map[cmd]
     try:
-        fn(args[1:], rl)
+        fn(args[1:])
     except Exception as e:
         print("ERROR in command: %s" % str(e))
 
@@ -1040,7 +1080,7 @@ def master_callback(m, master):
         battery_update(m)
         if master.flightmode != mpstate.status.flightmode:
             mpstate.status.flightmode = master.flightmode
-            rl.set_prompt(mpstate.status.flightmode + "> ")
+            mpstate.rl.set_prompt(mpstate.status.flightmode + "> ")
             say("Mode " + mpstate.status.flightmode)
 
     elif mtype == "VFR_HUD":
@@ -1114,6 +1154,8 @@ def master_callback(m, master):
                 altitude = math.log(scaling) * temp * 29271.267 * 0.001
             except ValueError:
                 pass
+            except ZeroDivisionError:
+                pass
             if altitude is not None:
                 report_altitude(altitude)
 
@@ -1148,6 +1190,15 @@ def master_callback(m, master):
         # pass messages along to listeners
         for r in mpstate.mav_outputs:
             r.write(m.get_msgbuf().tostring())
+
+        # pass to modules
+        for mod in mpstate.modules:
+            try:
+                mod.mavlink_packet(m)
+            except Exception, msg:
+                if mpstate.settings.moddebug == 1:
+                    print(msg)
+                pass
 
 
 def process_master(m):
@@ -1312,7 +1363,7 @@ def periodic_tasks():
     if battery_period.trigger():
         battery_report()
 
-    if override_period.trigger():
+    if mpstate.override_period.trigger():
         if mpstate.status.override != [ 0 ] * 8:
             send_rc_override()
 
@@ -1328,11 +1379,11 @@ def main_loop():
     while True:
         if mpstate is None or mpstate.status.exit:
             return
-        if rl.line is not None:
-            cmds = rl.line.split(';')
+        if mpstate.rl.line is not None:
+            cmds = mpstate.rl.line.split(';')
             for c in cmds:
-                process_stdin(rl, c)
-            rl.line = None
+                process_stdin(mpstate.rl, c)
+            mpstate.rl.line = None
 
         for master in mpstate.mav_master:
             if master.fd is None:
@@ -1370,14 +1421,14 @@ def main_loop():
 def input_loop():
     '''wait for user input'''
     while True:
-        while rl.line is not None:
+        while mpstate.rl.line is not None:
             time.sleep(0.01)
         try:
-            line = raw_input(rl.prompt)
+            line = raw_input(mpstate.rl.prompt)
         except EOFError:
             mpstate.status.exit = True
             sys.exit(1)
-        rl.line = line
+        mpstate.rl.line = line
             
 
 def run_script(scriptfile):
@@ -1392,7 +1443,7 @@ def run_script(scriptfile):
         if line == "":
             continue
         print("-> %s" % line)
-        process_stdin(rl, line)
+        process_stdin(mpstate.rl, line)
     f.close()
         
 
@@ -1446,6 +1497,7 @@ if __name__ == '__main__':
     # global mavproxy state
     mpstate = MPState()
     mpstate.status.exit = False
+    mpstate.command_map = command_map
 
     if not opts.master:
         serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*"])
@@ -1510,14 +1562,14 @@ Auto-detected serial ports are:
     heartbeat_period = mavutil.periodic_event(1)
     battery_period = mavutil.periodic_event(0.1)
     if mpstate.sitl_output:
-        override_period = mavutil.periodic_event(50)
+        mpstate.override_period = mavutil.periodic_event(50)
     else:
-        override_period = mavutil.periodic_event(1)
+        mpstate.override_period = mavutil.periodic_event(1)
     heartbeat_check_period = mavutil.periodic_event(0.33)
 
-    rl = rline("MAV> ")
+    mpstate.rl = rline("MAV> ")
     if opts.setup:
-        rl.set_prompt("")
+        mpstate.rl.set_prompt("")
 
     if opts.aircraft is not None:
         start_script = os.path.join(opts.aircraft, "mavinit.scr")
