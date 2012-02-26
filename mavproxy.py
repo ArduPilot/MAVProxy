@@ -123,6 +123,7 @@ class MPStatus(object):
         self.last_waypoint = 0
         self.exit = False
         self.override = [ 0 ] * 8
+        self.last_override = [ 0 ] * 8
         self.flightmode = 'MAV'
         self.logdir = None
         self.last_heartbeat = 0
@@ -1368,7 +1369,8 @@ def periodic_tasks():
         battery_report()
 
     if mpstate.override_period.trigger():
-        if mpstate.status.override != [ 0 ] * 8:
+        if mpstate.status.override != mpstate.status.last_override:
+            mpstate.status.last_override = mpstate.status.override[:]
             send_rc_override()
 
 
