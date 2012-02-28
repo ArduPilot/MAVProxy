@@ -181,6 +181,7 @@ class MPState(object):
         self.modules = []
         self.functions = MAVFunctions()
         self.functions.say = say
+        self.functions.process_stdin = process_stdin
 
     def master(self):
         '''return the currently chosen mavlink master object'''
@@ -769,7 +770,7 @@ command_map = {
     'module'  : (cmd_module,   'module commands'),
     };
 
-def process_stdin(rl, line):
+def process_stdin(line):
     '''handle commands from user'''
     if line is None:
         sys.exit(0)
@@ -1388,7 +1389,7 @@ def main_loop():
         if mpstate.rl.line is not None:
             cmds = mpstate.rl.line.split(';')
             for c in cmds:
-                process_stdin(mpstate.rl, c)
+                process_stdin(c)
             mpstate.rl.line = None
 
         for master in mpstate.mav_master:
@@ -1449,7 +1450,7 @@ def run_script(scriptfile):
         if line == "":
             continue
         print("-> %s" % line)
-        process_stdin(mpstate.rl, line)
+        process_stdin(line)
     f.close()
         
 
