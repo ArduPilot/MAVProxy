@@ -125,6 +125,7 @@ class MPStatus(object):
         self.exit = False
         self.override = [ 0 ] * 8
         self.last_override = [ 0 ] * 8
+        self.override_counter = 0
         self.flightmode = 'MAV'
         self.logdir = None
         self.last_heartbeat = 0
@@ -299,6 +300,7 @@ def cmd_rc(args):
         print("Channel must be between 1 and 8")
         return
     mpstate.status.override[channel-1] = value
+    mpstate.status.override_counter = 10
     send_rc_override()
 
 def cmd_loiter(args):
@@ -1374,7 +1376,9 @@ def periodic_tasks():
         if mpstate.status.override != mpstate.status.last_override:
             mpstate.status.last_override = mpstate.status.override[:]
             send_rc_override()
-
+        elif mpstate.status.override_counter > 0:
+            send_rc_override()
+            mpstate.status.override_counter -= 1
 
 def main_loop():
     '''main processing loop'''
