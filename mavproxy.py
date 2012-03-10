@@ -62,7 +62,7 @@ class MPSettings(object):
         self.streamrate2 = 4
         self.radiosetup = 0
         self.heartbeatreport = 1
-        self.paramretry = 10
+        self.paramretry = 20
         self.rc1mul = 1
         self.rc2mul = 1
         self.rc4mul = 1
@@ -140,6 +140,7 @@ class MPStatus(object):
         self.watch = None
         self.last_streamrate1 = -1
         self.last_streamrate2 = -1
+        self.last_paramretry = 0
 
     def show(self, f, pattern=None):
         '''write status to status.txt'''
@@ -1366,7 +1367,9 @@ def periodic_tasks():
     for master in mpstate.mav_master:
         if (not master.param_fetch_complete and
             mpstate.settings.paramretry != 0 and
-            master.time_since('PARAM_VALUE') > mpstate.settings.paramretry):
+            time.time() - mpstate.status.last_paramretry > mpstate.settings.paramretry):
+            mpstate.status.last_paramretry = time.time()
+            print("fetching parameters")
             master.param_fetch_all()
  
     if battery_period.trigger():
