@@ -141,6 +141,7 @@ class MPStatus(object):
         self.last_streamrate1 = -1
         self.last_streamrate2 = -1
         self.last_paramretry = 0
+        self.last_seq = 0
 
     def show(self, f, pattern=None):
         '''write status to status.txt'''
@@ -286,7 +287,6 @@ def cmd_trim(args):
     mpstate.master().param_set_send('YAW_TRIM',   m.chan4_raw)
     print("Trimmed to aileron=%u elevator=%u rudder=%u" % (
         m.chan1_raw, m.chan2_raw, m.chan4_raw))
-    
 
 def cmd_rc(args):
     '''handle RC value override'''
@@ -695,9 +695,11 @@ def cmd_link(args):
         elif master.link_delayed:
             print("link %u delayed by %.2f seconds" % (master.linknum+1, linkdelay))
         else:
-            print("link %u OK (%u packets, %.2fs delay)" % (master.linknum+1,
-                                                            mpstate.status.counters['MasterIn'][master.linknum],
-                                                            linkdelay))
+            print("link %u OK (%u packets, %.2fs delay, %u lost, %.1f%% loss)" % (master.linknum+1,
+                                                                                  mpstate.status.counters['MasterIn'][master.linknum],
+                                                                                  linkdelay,
+                                                                                  master.mav_loss,
+                                                                                  master.packet_loss()))
 
 def cmd_watch(args):
     '''watch a mavlink packet pattern'''
@@ -734,6 +736,10 @@ def cmd_module(args):
             return
         for m in mpstate.modules:
             if m.name() == args[1]:
+                try:
+                    m.unload()
+                except Exception:
+                    pass
                 reload(m)
                 m.init(mpstate)
                 print("Reloaded module %s" % args[1])
@@ -1229,7 +1235,8 @@ def process_master(m):
     msgs = m.mav.parse_buffer(s)
     if msgs:
         for msg in msgs:
-            m.post_message(msg)
+            if getattr(m, '_timestamp', None) is None:
+                m.post_message(msg)
             if msg.get_type() == "BAD_DATA":
                 if opts.show_errors:
                     print("MAV error: %s" % msg)
