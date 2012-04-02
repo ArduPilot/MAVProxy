@@ -620,7 +620,7 @@ def cmd_param(args):
             param_wildcard = args[2]
         else:
             param_wildcard = "*"
-        param_load_file(args[1], param_wildcard);
+        param_load_file(args[1], param_wildcard)
     elif args[0] == "show":
         if len(args) > 1:
             pattern = args[1]
@@ -634,7 +634,7 @@ def cmd_param(args):
         MAV_ACTION_STORAGE_WRITE = 15
         mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_STORAGE_WRITE)
     else:
-        print("Unknown subcommand '%s' (try 'fetch', 'save', 'set', 'show', 'load' or 'store')" % args[0]);
+        print("Unknown subcommand '%s' (try 'fetch', 'save', 'set', 'show', 'load' or 'store')" % args[0])
 
 def cmd_set(args):
     '''control mavproxy options'''
@@ -772,7 +772,7 @@ command_map = {
     'up'      : (cmd_up,       'adjust TRIM_PITCH_CD up by 5 degrees'),
     'watch'   : (cmd_watch,    'watch a MAVLink pattern'),
     'module'  : (cmd_module,   'module commands'),
-    };
+    }
 
 def process_stdin(line):
     '''handle commands from user'''
@@ -926,7 +926,7 @@ def battery_report():
     if int(mpstate.settings.battreadout) == 0:
         return
 
-    rbattery_level = int((mpstate.status.battery_level+5)/10)*10;
+    rbattery_level = int((mpstate.status.battery_level+5)/10)*10
 
     if rbattery_level != mpstate.status.last_battery_announce:
         say("Flight battery %u percent" % rbattery_level,priority='notification')
@@ -936,7 +936,7 @@ def battery_report():
 
     # avionics battery reporting disabled for now
     return
-    avionics_rbattery_level = int((mpstate.status.avionics_battery_level+5)/10)*10;
+    avionics_rbattery_level = int((mpstate.status.avionics_battery_level+5)/10)*10
 
     if avionics_rbattery_level != mpstate.status.last_avionics_battery_announce:
         say("Avionics Battery %u percent" % avionics_rbattery_level,priority='notification')
@@ -1180,7 +1180,7 @@ def master_callback(m, master):
                     'WAYPOINT_ACK', 'MISSION_ACK',
                     'NAV_CONTROLLER_OUTPUT', 'GPS_RAW', 'GPS_RAW_INT', 'WAYPOINT',
                     'SCALED_PRESSURE', 'SENSOR_OFFSETS', 'MEMINFO', 'AP_ADC',
-                    'FENCE_POINT', 'FENCE_STATUS', 'DCM', 'HWSTATUS', 'SIMSTATE' ]:
+                    'FENCE_POINT', 'FENCE_STATUS', 'DCM', 'RADIO', 'AHRS', 'HWSTATUS', 'SIMSTATE' ]:
         pass
     else:
         print("Got MAVLink msg: %s" % m)
@@ -1343,9 +1343,7 @@ def check_link_status():
 
 def periodic_tasks():
     '''run periodic checks'''
-    if (mpstate.status.setup_mode or
-        mpstate.status.target_system == -1 or
-        mpstate.status.target_component == -1):
+    if mpstate.status.setup_mode:
         return
 
     if heartbeat_period.trigger() and mpstate.settings.heartbeat != 0:
@@ -1464,6 +1462,8 @@ def run_script(scriptfile):
 
 if __name__ == '__main__':
 
+    print('start1')
+
     from optparse import OptionParser
     parser = OptionParser("mavproxy.py [options]")
 
@@ -1498,13 +1498,14 @@ if __name__ == '__main__':
     parser.add_option("--num-cells", dest="num_cells", help="number of LiPo battery cells",
                       type='int', default=0)
     parser.add_option("--aircraft", dest="aircraft", help="aircraft name", default=None)
+    parser.add_option("--cmd", dest="cmd", help="initial commands", default=None)
     parser.add_option("--mav10", action='store_true', default=False, help="Use MAVLink protocol 1.0")
     
     (opts, args) = parser.parse_args()
 
     if opts.mav10:
-        import mavlinkv10 as mavlink
         os.environ['MAVLINK10'] = '1'
+        import mavlinkv10 as mavlink
     else:
         import mavlink as mavlink
     import mavutil, mavwp
@@ -1590,6 +1591,11 @@ Auto-detected serial ports are:
         start_script = os.path.join(opts.aircraft, "mavinit.scr")
         if os.path.exists(start_script):
             run_script(start_script)
+
+    if opts.cmd is not None:
+        cmds = opts.cmd.split(';')
+        for c in cmds:
+            process_stdin(c)
 
     # run main loop as a thread
     mpstate.status.thread = threading.Thread(target=main_loop)
