@@ -62,7 +62,7 @@ class MPSettings(object):
         self.streamrate2 = 4
         self.radiosetup = 0
         self.heartbeatreport = 1
-        self.paramretry = 20
+        self.paramretry = 10
         self.rc1mul = 1
         self.rc2mul = 1
         self.rc4mul = 1
@@ -1365,7 +1365,8 @@ def periodic_tasks():
     for master in mpstate.mav_master:
         if (not master.param_fetch_complete and
             mpstate.settings.paramretry != 0 and
-            time.time() - mpstate.status.last_paramretry > mpstate.settings.paramretry):
+            time.time() - mpstate.status.last_paramretry > mpstate.settings.paramretry and
+            master.time_since('PARAM_VALUE') > 10):
             mpstate.status.last_paramretry = time.time()
             print("fetching parameters")
             master.param_fetch_all()
