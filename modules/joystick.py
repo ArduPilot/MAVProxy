@@ -21,7 +21,7 @@ def get_joystick():
         print 'joystick not found.'
         return
 
-    while True:        
+    while not mpstate.status.exit:        
         sleep(0.005)
         for e in pygame.event.get(): # iterate over event stack
             #the following is somewhat custom for the specific joystick model:
