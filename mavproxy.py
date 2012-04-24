@@ -306,28 +306,23 @@ def cmd_rc(args):
 
 def cmd_loiter(args):
     '''set LOITER mode'''
-    MAV_ACTION_LOITER = 27
-    mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_LOITER)
+    mpstate.master().set_mode_loiter()
 
 def cmd_auto(args):
     '''set AUTO mode'''
-    MAV_ACTION_SET_AUTO = 13
-    mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_SET_AUTO)
+    mpstate.master().set_mode_auto()
 
 def cmd_ground(args):
     '''do a ground start mode'''
-    MAV_ACTION_CALIBRATE_GYRO = 17
-    mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_CALIBRATE_GYRO)
+    mpstate.master().calibrate_imu()
 
 def cmd_level(args):
     '''do a ground start mode'''
-    MAV_ACTION_CALIBRATE_ACC = 19
-    mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_CALIBRATE_ACC)
+    mpstate.master().calibrate_level()
 
 def cmd_rtl(args):
     '''set RTL mode'''
-    MAV_ACTION_RETURN = 3
-    mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_RETURN)
+    mpstate.master().set_mode_rtl()
 
 def cmd_manual(args):
     '''set MANUAL mode'''
@@ -589,7 +584,7 @@ param_wildcard = "*"
 def cmd_param(args):
     '''control parameters'''
     if len(args) < 1:
-        print("usage: param <fetch|edit|set|show|store>")
+        print("usage: param <fetch|edit|set|show>")
         return
     if args[0] == "fetch":
         mpstate.master().param_fetch_all()
@@ -630,11 +625,8 @@ def cmd_param(args):
         for p in k:
             if fnmatch.fnmatch(str(p).upper(), pattern.upper()):
                 print("%-15.15s %f" % (str(p), mpstate.mav_param[p]))
-    elif args[0] == "store":
-        MAV_ACTION_STORAGE_WRITE = 15
-        mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_STORAGE_WRITE)
     else:
-        print("Unknown subcommand '%s' (try 'fetch', 'save', 'set', 'show', 'load' or 'store')" % args[0])
+        print("Unknown subcommand '%s' (try 'fetch', 'save', 'set', 'show', 'load')" % args[0])
 
 def cmd_set(args):
     '''control mavproxy options'''
