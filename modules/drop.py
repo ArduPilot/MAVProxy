@@ -4,8 +4,8 @@
 import time
 
 mpstate = None
-release_pwm = 983
-hold_pwm = 1776
+hold_pwm = 983
+release_pwm = 1776
 drop_channel = 5
 drop_time = 2.0
 
