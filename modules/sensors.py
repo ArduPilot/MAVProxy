@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 '''monitor sensor consistancy'''
 
-import time, math
+import time, math, mavutil
 
 mpstate = None
 
@@ -33,9 +33,14 @@ def description():
 
 def cmd_sensors(args):
     '''show key sensors'''
+    if mpstate.master().WIRE_PROTOCOL_VERSION == '1.0':
+        gps_heading = mpstate.status.msgs['GPS_RAW_INT'].cog * 0.01
+    else:
+        gps_heading = mpstate.status.msgs['GPS_RAW'].hdg
+        
     print("heading: %u/%u   alt: %u/%u  r/p: %u/%u speed: %u/%u  thr: %u" % (
         mpstate.status.msgs['VFR_HUD'].heading,
-        mpstate.status.msgs['GPS_RAW'].hdg,
+        gps_heading,
         mpstate.status.altitude,
         mpstate.sensors_state.gps_alt,
         math.degrees(mpstate.status.msgs['ATTITUDE'].roll),

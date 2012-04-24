@@ -1111,6 +1111,15 @@ def master_callback(m, master):
                 say("GPS OK")
                 mpstate.status.lost_gps_lock = False
 
+    elif mtype == "GPS_RAW_INT":
+        if mpstate.status.have_gps_lock:
+            if m.fix_type != 3 and not mpstate.status.lost_gps_lock:
+                say("GPS fix lost")
+                mpstate.status.lost_gps_lock = True
+            if m.fix_type == 3 and mpstate.status.lost_gps_lock:
+                say("GPS OK")
+                mpstate.status.lost_gps_lock = False
+
     elif mtype == "RC_CHANNELS_RAW":
 #        if (m.chan7_raw > 1700 and mpstate.status.flightmode == "MANUAL"):
 #            system_check()
