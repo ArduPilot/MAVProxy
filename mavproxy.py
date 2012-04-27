@@ -1505,7 +1505,7 @@ if __name__ == '__main__':
     
     (opts, args) = parser.parse_args()
 
-    if opts.mav10:
+    if opts.mav10 or os.getenv('MAVLINK10'):
         os.environ['MAVLINK10'] = '1'
         import mavlinkv10 as mavlink
     else:
