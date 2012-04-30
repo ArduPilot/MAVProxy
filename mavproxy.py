@@ -991,7 +991,7 @@ def master_callback(m, master):
         # delay in saved logs
         usec = get_usec()
         usec = (usec & ~3) | master.linknum
-        mpstate.logqueue.put(str(struct.pack('>Q', usec) + m.get_msgbuf().tostring()))
+        mpstate.logqueue.put(str(struct.pack('>Q', usec) + m.get_msgbuf()))
 
     if master.link_delayed:
         # don't process delayed packets 
@@ -1200,7 +1200,7 @@ def master_callback(m, master):
     if mtype != "BAD_DATA":
         # pass messages along to listeners
         for r in mpstate.mav_outputs:
-            r.write(m.get_msgbuf().tostring())
+            r.write(m.get_msgbuf())
 
         # pass to modules
         for mod in mpstate.modules:
