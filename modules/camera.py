@@ -71,19 +71,12 @@ def cmd_camera(args):
             state.capture_count, state.error_count, state.region_count, state.fps))
     elif args[0] == "view":
         if not state.viewing:
-            cv.NamedWindow('Viewer')
-            key = cv.WaitKey(1)
             print("Starting image viewer")
         state.viewing = True
     elif args[0] == "noview":
         if state.viewing:
             print("Stopping image viewer")
-            state.viewing = False
-            cv.DestroyWindow('Viewer')
-            for i in range(5):
-                # OpenCV bug - need to wait multiple times on destroy for all
-                # events to be processed
-                key = cv.WaitKey(1)
+        state.viewing = False
 
 
 
@@ -133,6 +126,8 @@ def scan_thread():
 
     im_640 = numpy.zeros((480,640,3),dtype='uint8')
     im_marked = numpy.zeros((480,640,3),dtype='uint8')
+
+    view_window = False
     
     while not state.unload.wait(0.01):
         if state.scan_queue.empty():
@@ -142,8 +137,21 @@ def scan_thread():
         regions = scanner.scan(im_640, im_marked)
         state.region_count += len(regions)
         if state.viewing:
+            if not view_window:
+                view_window = True
+                cv.NamedWindow('Viewer')
+                key = cv.WaitKey(1)
             cv.ShowImage('Viewer', im_marked)
             key = cv.WaitKey(1)
+        else:
+            if view_window:
+                view_window = False
+                cv.DestroyWindow('Viewer')
+                for i in range(5):
+                    # OpenCV bug - need to wait multiple times on destroy for all
+                    # events to be processed
+                    key = cv.WaitKey(1)
+
 
 
 def init(_mpstate):
