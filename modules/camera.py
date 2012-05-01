@@ -141,7 +141,9 @@ def scan_thread():
                 view_window = True
                 cv.NamedWindow('Viewer')
                 key = cv.WaitKey(1)
-            cv.ShowImage('Viewer', im_marked)
+            mat = cv.fromarray(im_marked)
+            img = cv.GetImage(mat)
+            cv.ShowImage('Viewer', img)
             key = cv.WaitKey(1)
         else:
             if view_window:
