@@ -26,7 +26,8 @@ class camera_state(object):
         self.cam = None
         self.save_queue = Queue.Queue()
         self.scan_queue = Queue.Queue()
-
+        self.viewing = False
+        
 
 def name():
     '''return module name'''
@@ -68,6 +69,22 @@ def cmd_camera(args):
     elif args[0] == "status":
         print("Captured %u images %u errors %u regions %.1f fps" % (
             state.capture_count, state.error_count, state.region_count, state.fps))
+    elif args[0] == "view":
+        if not state.viewing:
+            cv.NamedWindow('Viewer')
+            key = cv.WaitKey(1)
+            print("Starting image viewer")
+        state.viewing = True
+    elif args[0] == "noview":
+        if state.viewing:
+            print("Stopping image viewer")
+            state.viewing = False
+            cv.DestroyWindow('Viewer')
+            for i in range(5):
+                # OpenCV bug - need to wait multiple times on destroy for all
+                # events to be processed
+                key = cv.WaitKey(1)
+
 
 
 def capture_thread():
@@ -124,6 +141,9 @@ def scan_thread():
         scanner.debayer(im, im_640)
         regions = scanner.scan(im_640, im_marked)
         state.region_count += len(regions)
+        if state.viewing:
+            cv.ShowImage('Viewer', im_marked)
+            key = cv.WaitKey(1)
 
 
 def init(_mpstate):
