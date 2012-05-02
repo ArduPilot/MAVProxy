@@ -201,7 +201,7 @@ def transmit_thread():
             connected = True
         try:
             cPickle.dump((regions, jpeg), pfile, cPickle.HIGHEST_PROTOCOL)
-        except socket.error:
+        except Exception:
             port.close()
             pfile = None
             connected = False
