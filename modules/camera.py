@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 '''camera control for ptgrey chameleon camera'''
 
-import time, threading, sys, os, numpy, Queue, cv
+import time, threading, sys, os, numpy, Queue, cv, socket, errno, cPickle
 
 # use the camera code from the cuav repo (see githib.com/tridge)
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'camera'))
@@ -16,8 +16,13 @@ class camera_state(object):
         self.running = False
         self.unload = threading.Event()
         self.unload.clear()
+
         self.capture_thread = None
         self.save_thread = None
+        self.scan_thread = None
+        self.transmit_thread = None
+        self.view_thread = None
+
         self.capture_count = 0
         self.error_count = 0
         self.error_msg = None
@@ -26,7 +31,11 @@ class camera_state(object):
         self.cam = None
         self.save_queue = Queue.Queue()
         self.scan_queue = Queue.Queue()
+        self.transmit_queue = Queue.Queue()
         self.viewing = False
+        self.depth = 8
+        self.gcs_address = None
+        self.gcs_view_port = 7543
         
 
 def name():
@@ -42,7 +51,6 @@ def cmd_camera(args):
     state = mpstate.camera_state
     if args[0] == "start":
         state.colour = 0
-        state.depth = 8
         try:
             # try colour first
             print("trying colour")
@@ -57,6 +65,11 @@ def cmd_camera(args):
         state.error_count = 0
         state.error_msg = None
         state.running = True
+        if state.capture_thread is None:
+            state.capture_thread = start_thread(capture_thread)
+            state.save_thread = start_thread(save_thread)
+            state.scan_thread = start_thread(scan_thread)
+            state.transmit_thread = start_thread(transmit_thread)
         print("started camera running")
     elif args[0] == "stop":
         if state.cam is not None:
@@ -72,11 +85,20 @@ def cmd_camera(args):
     elif args[0] == "view":
         if not state.viewing:
             print("Starting image viewer")
+        if state.view_thread is None:
+            state.view_thread = start_thread(view_thread)
         state.viewing = True
     elif args[0] == "noview":
         if state.viewing:
             print("Stopping image viewer")
         state.viewing = False
+    elif args[0] == "gcs":
+        if len(args) != 2:
+            print("usage: camera gcs <IPADDRESS>")
+            return
+        state.gcs_address = args[1]
+    else:
+        print("usage: camera <start|stop|status|view|noview|gcs>")
 
 
 
@@ -90,7 +112,10 @@ def capture_thread():
             continue
         try:
             status = chameleon.trigger(state.cam)
-            im = numpy.zeros((960,1280),dtype='uint8')
+            if state.depth == 16:
+                im = numpy.zeros((960,1280),dtype='uint16')
+            else:
+                im = numpy.zeros((960,1280),dtype='uint8')
             (shutter, ftime) = chameleon.capture(state.cam, im)
             state.save_queue.put(im)
             state.scan_queue.put(im)
@@ -126,23 +151,109 @@ def scan_thread():
 
     im_640 = numpy.zeros((480,640,3),dtype='uint8')
     im_marked = numpy.zeros((480,640,3),dtype='uint8')
+    counter = 0
 
-    view_window = False
-    
     while not state.unload.wait(0.01):
         if state.scan_queue.empty():
             continue
         im = state.scan_queue.get()
-        scanner.debayer(im, im_640)
+        if state.depth == 16:
+            scanner.debayer_16_8(im, im_640)
+        else:
+            scanner.debayer(im, im_640)
+
         regions = scanner.scan(im_640, im_marked)
+
         state.region_count += len(regions)
+        if len(regions) > 0:
+            cv.SaveImage('tmp/marked%u.pnm' % counter, im_marked)
+            counter += 1
+        jpeg = scanner.jpeg_compress(im_marked)
+        state.transmit_queue.put((regions, jpeg))
+
+
+def transmit_thread():
+    '''thread for image transmit to GCS'''
+    state = mpstate.camera_state
+
+    connected = False
+    port = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    port.setblocking(1)
+    pfile = None
+
+    i = 0
+    while not state.unload.wait(0.01):
+        if state.transmit_queue.empty():
+            continue
+        (regions, jpeg) = state.transmit_queue.get()
+
+        if not connected:
+            # try to connect if the GCS viewer is ready
+            if state.gcs_address is None:
+                continue
+            try:
+                port.connect((state.gcs_address, state.gcs_view_port))
+                pfile = port.makefile()
+            except socket.error as e:
+                if e.errno in [ errno.EHOSTUNREACH, errno.ECONNREFUSED ]:
+                    continue
+                raise
+            connected = True
+        try:
+            cPickle.dump((regions, jpeg), pfile, cPickle.HIGHEST_PROTOCOL)
+        except socket.error:
+            port.close()
+            pfile = None
+            connected = False
+            raise
+
+        # local save
+        jfile = open('tmp/j%u.jpg' % i, "w")
+        jfile.write(jpeg)
+        jfile.close()
+        i += 1
+
+def view_thread():
+    '''image viewing thread - this runs on the ground station'''
+    state = mpstate.camera_state
+    view_window = False
+
+    connected = False
+    port = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    port.bind(("", state.gcs_view_port))
+    port.listen(1)
+    port.setblocking(1)
+    sock = None
+    pfile = None
+    counter = 0
+    view_window = False
+
+    while not state.unload.wait(0.01):
         if state.viewing:
             if not view_window:
                 view_window = True
                 cv.NamedWindow('Viewer')
                 key = cv.WaitKey(1)
-            mat = cv.fromarray(im_marked)
-            img = cv.GetImage(mat)
+            if not connected:
+                try:
+                    (sock, remote) = port.accept()
+                    pfile = sock.makefile()
+                except socket.error as e:
+                    continue
+                connected = True
+            try:
+                (regions, jpeg) = cPickle.load(pfile)
+            except Exception:
+                sock.close()
+                pfile = None
+                connected = False
+                raise
+            filename = 'tmp/v%u.jpg' % counter
+            counter += 1
+            jfile = open(filename, "w")
+            jfile.write(jpeg)
+            jfile.close()
+            img = cv.LoadImage(filename)
             cv.ShowImage('Viewer', img)
             key = cv.WaitKey(1)
         else:
@@ -155,6 +266,12 @@ def scan_thread():
                     key = cv.WaitKey(1)
 
 
+def start_thread(fn):
+    '''start a thread running'''
+    t = threading.Thread(target=fn)
+    t.daemon = True
+    t.start()
+    return t
 
 def init(_mpstate):
     '''initialise module'''
@@ -162,31 +279,20 @@ def init(_mpstate):
     mpstate = _mpstate
     mpstate.camera_state = camera_state()
     mpstate.command_map['camera'] = (cmd_camera, "camera control")
-
-    # start capture thread
-    mpstate.camera_state.capture_thread = threading.Thread(target=capture_thread)
-    mpstate.camera_state.capture_thread.daemon = True
-    mpstate.camera_state.capture_thread.start()
-
-    # start save thread
-    mpstate.camera_state.save_thread = threading.Thread(target=save_thread)
-    mpstate.camera_state.save_thread.daemon = True
-    mpstate.camera_state.save_thread.start()
-
-    # start scan thread
-    mpstate.camera_state.scan_thread = threading.Thread(target=scan_thread)
-    mpstate.camera_state.scan_thread.daemon = True
-    mpstate.camera_state.scan_thread.start()
-
+    state = mpstate.camera_state
     print("camera initialised")
 
 
 def unload():
     '''unload module'''
     mpstate.camera_state.unload.set()
-    mpstate.camera_state.capture_thread.join(2.0)
-    mpstate.camera_state.save_thread.join(2.0)
-    mpstate.camera_state.scan_thread.join(2.0)
+    if mpstate.camera_state.capture_thread is not None:
+        mpstate.camera_state.capture_thread.join(1.0)
+        mpstate.camera_state.save_thread.join(1.0)
+        mpstate.camera_state.scan_thread.join(1.0)
+        mpstate.camera_state.transmit_thread.join(1.0)
+    if mpstate.camera_state.view_thread is not None:
+        mpstate.camera_state.view_thread.join(1.0)
     if state.cam is not None:
         print("closing camera")
         chameleon.close(state.cam)
