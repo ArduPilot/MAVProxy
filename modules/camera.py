@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 '''camera control for ptgrey chameleon camera'''
 
-import time, threading, sys, os, numpy, Queue, cv, socket, errno, cPickle
+import time, threading, sys, os, numpy, Queue, cv, socket, errno, cPickle, signal
 
 # use the camera code from the cuav repo (see githib.com/tridge)
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'camera'))
@@ -177,9 +177,6 @@ def transmit_thread():
     state = mpstate.camera_state
 
     connected = False
-    port = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    port.setblocking(1)
-    pfile = None
 
     i = 0
     while not state.unload.wait(0.01):
@@ -192,20 +189,19 @@ def transmit_thread():
             if state.gcs_address is None:
                 continue
             try:
+                port = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 port.connect((state.gcs_address, state.gcs_view_port))
-                pfile = port.makefile()
             except socket.error as e:
                 if e.errno in [ errno.EHOSTUNREACH, errno.ECONNREFUSED ]:
                     continue
                 raise
             connected = True
         try:
-            cPickle.dump((regions, jpeg), pfile, cPickle.HIGHEST_PROTOCOL)
-        except Exception:
+            port.send(cPickle.dumps((regions, jpeg), protocol=cPickle.HIGHEST_PROTOCOL))
+        except socket.error:
             port.close()
-            pfile = None
+            port = None
             connected = False
-            raise
 
         # local save
         jfile = open('tmp/j%u.jpg' % i, "w")
@@ -247,7 +243,7 @@ def view_thread():
                 sock.close()
                 pfile = None
                 connected = False
-                raise
+
             filename = 'tmp/v%u.jpg' % counter
             counter += 1
             jfile = open(filename, "w")
@@ -280,6 +276,7 @@ def init(_mpstate):
     mpstate.camera_state = camera_state()
     mpstate.command_map['camera'] = (cmd_camera, "camera control")
     state = mpstate.camera_state
+    signal.signal(signal.SIGPIPE, signal.SIG_IGN)
     print("camera initialised")
 
 
