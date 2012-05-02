@@ -3,9 +3,9 @@
 
 import time, threading, sys, os, numpy, Queue, cv
 
-# use the camera code from the misc repo
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'misc', 'camera'))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'misc', 'image'))
+# use the camera code from the cuav repo (see githib.com/tridge)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'camera'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'image'))
 import chameleon, scanner
 
 mpstate = None
