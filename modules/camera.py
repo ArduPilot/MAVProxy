@@ -36,6 +36,7 @@ class camera_state(object):
         self.depth = 8
         self.gcs_address = None
         self.gcs_view_port = 7543
+        self.brightness = 1.0
         
 
 def name():
@@ -97,8 +98,13 @@ def cmd_camera(args):
             print("usage: camera gcs <IPADDRESS>")
             return
         state.gcs_address = args[1]
+    elif args[0] == "brightness":
+        if len(args) != 2:
+            print("usage: camera brightness <BRIGHTNESS>")
+            return
+        state.brightness = float(args[1])
     else:
-        print("usage: camera <start|stop|status|view|noview|gcs>")
+        print("usage: camera <start|stop|status|view|noview|gcs|brightness>")
 
 
 
@@ -250,6 +256,7 @@ def view_thread():
             jfile.write(jpeg)
             jfile.close()
             img = cv.LoadImage(filename)
+            cv.ConvertScale(img, img, scale=state.brightness)
             cv.ShowImage('Viewer', img)
             key = cv.WaitKey(1)
         else:
@@ -276,7 +283,6 @@ def init(_mpstate):
     mpstate.camera_state = camera_state()
     mpstate.command_map['camera'] = (cmd_camera, "camera control")
     state = mpstate.camera_state
-    signal.signal(signal.SIGPIPE, signal.SIG_IGN)
     print("camera initialised")
 
 
