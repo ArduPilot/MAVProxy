@@ -1,18 +1,17 @@
 #!/usr/bin/env python
 '''camera control for ptgrey chameleon camera'''
 
-import time, threading, sys, os, numpy, Queue, cv, socket, errno, cPickle, signal
+import time, threading, sys, os, numpy, Queue, cv, socket, errno, cPickle, signal, struct
 
 # use the camera code from the cuav repo (see githib.com/tridge)
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'camera'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'image'))
-import chameleon, scanner
+import chameleon, scanner, mavutil
 
 mpstate = None
 
 class camera_state(object):
     def __init__(self):
-        self.save_dir = "/data/tmp"
         self.running = False
         self.unload = threading.Event()
         self.unload.clear()
@@ -37,7 +36,15 @@ class camera_state(object):
         self.gcs_address = None
         self.gcs_view_port = 7543
         self.brightness = 1.0
-        
+
+        # setup directory for images
+        self.camera_dir = os.path.join(os.path.dirname(mpstate.logfile_name),
+                                      "camera")
+        try:
+            os.mkdir(self.camera_dir)
+        except OSError as e:
+            if not e.errno in [ errno.EEXIST ]:
+                raise
 
 def name():
     '''return module name'''
@@ -133,7 +140,17 @@ def capture_thread():
             state.error_count += 1
             state.error_msg = msg
 
-
+def save_aircraft_data(filename):
+    '''save critical data needed for geo-referencing'''
+    output = mavutil.mavlogfile(filename, write=True)
+    for mtype in [ 'ATTITUDE', 'GPS_RAW', 'VFR_HUD' ]:
+        master = mpstate.master()
+        if mtype in master.messages:
+            m = master.messages[mtype]
+            timestamp = getattr(m, '_timestamp', 0)
+            output.write(struct.pack('>Q', timestamp*1.0e6))
+            output.write(m.get_msgbuf())
+    output.close()
 
 def save_thread():
     '''image save thread'''
@@ -143,7 +160,10 @@ def save_thread():
         if state.save_queue.empty():
             continue
         im = state.save_queue.get()
-        chameleon.save_pgm(state.cam, 'tmp/i%u.pgm' % count, im)
+        chameleon.save_pgm(state.cam, 
+                           '%s/raw%u.pgm' % (state.camera_dir, count), 
+                           im)
+        save_aircraft_data('%s/raw%u.log' % (state.camera_dir, count))
         count += 1
         # don't allow the queue to get too large, drop half the images
         # when larger than 50
@@ -172,7 +192,8 @@ def scan_thread():
 
         state.region_count += len(regions)
         if len(regions) > 0:
-            cv.SaveImage('tmp/marked%u.pnm' % counter, im_marked)
+            cv.SaveImage('%s/marked%u.pnm' % (state.camera_dir, counter), 
+                         im_marked)
             counter += 1
         jpeg = scanner.jpeg_compress(im_marked)
         state.transmit_queue.put((regions, jpeg))
@@ -210,7 +231,7 @@ def transmit_thread():
             connected = False
 
         # local save
-        jfile = open('tmp/j%u.jpg' % i, "w")
+        jfile = open('%s/j%u.jpg' % (state.camera_dir, i), "w")
         jfile.write(jpeg)
         jfile.close()
         i += 1
@@ -250,7 +271,7 @@ def view_thread():
                 pfile = None
                 connected = False
 
-            filename = 'tmp/v%u.jpg' % counter
+            filename = '%s/v%u.jpg' % (state.camera_dir, counter)
             counter += 1
             jfile = open(filename, "w")
             jfile.write(jpeg)
