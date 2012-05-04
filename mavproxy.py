@@ -1307,6 +1307,7 @@ def open_logs():
         logfile = os.path.join(fdir, 'flight.log')
         mpstate.status.logdir = fdir
     print("Logging to %s" % logfile)
+    mpstate.logfile_name = logfile
     mpstate.logfile = open(logfile, mode=mode)
     mpstate.logfile_raw = open(logfile+'.raw', mode=mode)
 
