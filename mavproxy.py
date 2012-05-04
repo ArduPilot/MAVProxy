@@ -111,8 +111,8 @@ class MPStatus(object):
         self.loading_waypoints = False
         self.loading_waypoint_lasttime = time.time()
         self.mav_error = 0
-        self.target_system = -1
-        self.target_component = -1
+        self.target_system = 1
+        self.target_component = 1
         self.speech = None
         self.altitude = 0
         self.last_altitude_announce = 0.0
@@ -1393,7 +1393,7 @@ def periodic_tasks():
 
 def main_loop():
     '''main processing loop'''
-    if not mpstate.status.setup_mode:
+    if not mpstate.status.setup_mode and not opts.nowait:
         for master in mpstate.mav_master:
             master.wait_heartbeat()
             master.param_fetch_all()
@@ -1488,9 +1488,9 @@ if __name__ == '__main__':
     parser.add_option("--source-system", dest='SOURCE_SYSTEM', type='int',
                       default=255, help='MAVLink source system for this GCS')
     parser.add_option("--target-system", dest='TARGET_SYSTEM', type='int',
-                      default=-1, help='MAVLink target master system')
+                      default=1, help='MAVLink target master system')
     parser.add_option("--target-component", dest='TARGET_COMPONENT', type='int',
-                      default=-1, help='MAVLink target master component')
+                      default=1, help='MAVLink target master component')
     parser.add_option("--logfile", dest="logfile", help="MAVLink master logfile",
                       default='mav.log')
     parser.add_option("-a", "--append-log", dest="append_log", help="Append to log files",
@@ -1510,6 +1510,7 @@ if __name__ == '__main__':
     parser.add_option("--aircraft", dest="aircraft", help="aircraft name", default=None)
     parser.add_option("--cmd", dest="cmd", help="initial commands", default=None)
     parser.add_option("--mav10", action='store_true', default=False, help="Use MAVLink protocol 1.0")
+    parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
     
     (opts, args) = parser.parse_args()
 
@@ -1584,7 +1585,7 @@ Auto-detected serial ports are:
     mpstate.settings.streamrate2 = opts.streamrate
 
     status_period = mavutil.periodic_event(1.0)
-    msg_period = mavutil.periodic_event(1.0/30)
+    msg_period = mavutil.periodic_event(1.0/15)
     heartbeat_period = mavutil.periodic_event(1)
     battery_period = mavutil.periodic_event(0.1)
     if mpstate.sitl_output:
