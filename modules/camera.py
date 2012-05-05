@@ -48,6 +48,9 @@ class camera_state(object):
         self.gcs_address = None
         self.gcs_view_port = 7543
         self.brightness = 1.0
+        self.full_resolution = 0
+
+        self.last_watch = 0
 
         # setup directory for images
         self.camera_dir = os.path.join(os.path.dirname(mpstate.logfile_name),
@@ -125,6 +128,11 @@ def cmd_camera(args):
             print("usage: camera brightness <BRIGHTNESS>")
             return
         state.brightness = float(args[1])
+    elif args[0] == "fullres":
+        if len(args) != 2 or args[1] not in ['0','1']:
+            print("usage: camera fullres <0/1>")
+            return
+        state.full_resolution = int(args[1])
     else:
         print("usage: camera <start|stop|status|view|noview|gcs|brightness>")
 
@@ -140,13 +148,14 @@ def capture_thread():
             continue
         try:
             status = chameleon.trigger(state.cam)
+            frame_time = time.time()
             if state.depth == 16:
                 im = numpy.zeros((960,1280),dtype='uint16')
             else:
                 im = numpy.zeros((960,1280),dtype='uint8')
-            (shutter, ftime) = chameleon.capture(state.cam, im)
-            state.save_queue.put(im)
-            state.scan_queue.put(im)
+            shutter = chameleon.capture(state.cam, im)
+            state.save_queue.put((frame_time,im))
+            state.scan_queue.put((frame_time,im))
             state.capture_count += 1
             t2 = time.time()
             state.fps = 1.0 / (t2-t1)
@@ -167,51 +176,51 @@ def save_aircraft_data(filename):
             output.write(m.get_msgbuf())
     output.close()
 
+def timestamp(frame_time):
+    '''return a localtime timestamp with 0.01 second resolution'''
+    hundredths = int(frame_time * 100.0) % 100
+    return "%s%02u" % (time.strftime("%Y%m%d%H%M%S", time.localtime(frame_time)), hundredths)
+
 def save_thread():
     '''image save thread'''
     state = mpstate.camera_state
-    count = 0
-    while not state.unload.wait(0.01):
+    while not state.unload.wait(0.05):
         if state.save_queue.empty():
             continue
-        im = state.save_queue.get()
+        (frame_time,im) = state.save_queue.get()
+        hundredths = int(frame_time * 100.0) % 100
+        rawname = "raw%s" % timestamp(frame_time)
         chameleon.save_pgm(state.cam, 
-                           '%s/raw%u.pgm' % (state.raw_dir, count), 
+                           '%s/%s.pgm' % (state.raw_dir, rawname), 
                            im)
-        save_aircraft_data('%s/raw%u.log' % (state.raw_dir, count))
-        count += 1
+        save_aircraft_data('%s/%s.log' % (state.raw_dir, rawname))
         # don't allow the queue to get too large, drop half the images
         # when larger than 50
         if state.save_queue.qsize() > 50:
             state.save_queue.get()
-            count += 1
 
 def scan_thread():
     '''image scanning thread'''
     state = mpstate.camera_state
 
-    im_640 = numpy.zeros((480,640,3),dtype='uint8')
-    im_marked = numpy.zeros((480,640,3),dtype='uint8')
-    counter = 0
-
-    while not state.unload.wait(0.01):
+    while not state.unload.wait(0.05):
         if state.scan_queue.empty():
             continue
-        im = state.scan_queue.get()
+        (frame_time,im) = state.scan_queue.get()
+
+        im_640 = numpy.zeros((480,640,3),dtype='uint8')
         if state.depth == 16:
             scanner.debayer_16_8(im, im_640)
         else:
             scanner.debayer(im, im_640)
-
-        regions = scanner.scan(im_640, im_marked)
-
+        regions = scanner.scan(im_640)
         state.region_count += len(regions)
-        if len(regions) > 0:
-            cv.SaveImage('%s/marked%u.pnm' % (state.marked_dir, counter), 
-                         im_marked)
-            counter += 1
-        jpeg = scanner.jpeg_compress(im_marked)
-        state.transmit_queue.put((regions, jpeg))
+
+        if state.full_resolution:
+            tx_image = numpy.ascontiguousarray(im)
+        else:
+            tx_image = im_640
+        state.transmit_queue.put((frame_time, regions, tx_image))
 
 
 def transmit_thread():
@@ -221,10 +230,20 @@ def transmit_thread():
     connected = False
 
     i = 0
-    while not state.unload.wait(0.01):
+    while not state.unload.wait(0.05):
         if state.transmit_queue.empty():
             continue
-        (regions, jpeg) = state.transmit_queue.get()
+        (frame_time, regions, image) = state.transmit_queue.get()
+        if image.shape == (960,1280):
+            # we're transmitting a full size image, but we need to compress 
+            # it first
+            img_full = cv.GetImage(cv.fromarray(image))
+            full_colour = cv.CreateMat(960, 1280, cv.CV_8UC3)
+            cv.CvtColor(img_full, full_colour, cv.CV_BayerGR2BGR)
+            jpeg = scanner.jpeg_compress(numpy.ascontiguousarray(full_colour))
+        else:
+            # send a 640x480 image
+            jpeg = scanner.jpeg_compress(image)
 
         if not connected:
             # try to connect if the GCS viewer is ready
@@ -239,7 +258,7 @@ def transmit_thread():
                 raise
             connected = True
         try:
-            port.send(cPickle.dumps((regions, jpeg), protocol=cPickle.HIGHEST_PROTOCOL))
+            port.send(cPickle.dumps((regions, jpeg), protocol=1))
         except socket.error:
             port.close()
             port = None
@@ -263,10 +282,9 @@ def view_thread():
     port.setblocking(1)
     sock = None
     pfile = None
-    counter = 0
     view_window = False
 
-    while not state.unload.wait(0.01):
+    while not state.unload.wait(0.05):
         if state.viewing:
             if not view_window:
                 view_window = True
@@ -286,8 +304,7 @@ def view_thread():
                 pfile = None
                 connected = False
 
-            filename = '%s/v%u.jpg' % (state.view_dir, counter)
-            counter += 1
+            filename = '%s/v%s.jpg' % (state.view_dir, timestamp(frame_time))
             jfile = open(filename, "w")
             jfile.write(jpeg)
             jfile.close()
@@ -341,4 +358,7 @@ def unload():
 
 def mavlink_packet(m):
     '''handle an incoming mavlink packet'''
-    pass
+    state = mpstate.camera_state
+    if mpstate.status.watch == "camera" and time.time() > state.last_watch+1:
+        state.last_watch = time.time()
+        cmd_camera(['status'])
