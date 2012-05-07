@@ -31,6 +31,15 @@ def unload():
         
 def mavlink_packet(msg):
     '''handle an incoming mavlink packet'''
+    if not isinstance(mpstate.console, wxconsole.MessageConsole):
+        return
     if not mpstate.console.is_alive():
         mpstate.console = textconsole.SimpleConsole()
+        return
+    type = msg.get_type()
+    if type == 'GPS_RAW':
+        if msg.fix_type == 2:
+            mpstate.console.set_status('GPS', 'GPS: OK', fg='green')
+        else:
+            mpstate.console.set_status('GPS', 'GPS: %u' % msg.fix_type, fg='red')
 
