@@ -1375,7 +1375,8 @@ def periodic_tasks():
         if (not master.param_fetch_complete and
             mpstate.settings.paramretry != 0 and
             time.time() - mpstate.status.last_paramretry > mpstate.settings.paramretry and
-            master.time_since('PARAM_VALUE') > 10):
+            master.time_since('PARAM_VALUE') > 10 and
+            'HEARTBEAT' in master.messages):
             mpstate.status.last_paramretry = time.time()
             print("fetching parameters")
             master.param_fetch_all()
