@@ -12,7 +12,7 @@ class LiveGraph():
     All of the GUI work is done in a child process to provide some insulation
     from the parent mavproxy instance and prevent instability in the GCS
 
-    New data is sent to the LiveGraph instance via a queue
+    New data is sent to the LiveGraph instance via a pipe
     '''
     def __init__(self,
                  fields,
@@ -26,7 +26,7 @@ class LiveGraph():
         self.num_points = num_points
         self.values = [None]*len(self.fields)
 
-        self.queue = multiprocessing.Queue()
+        self.parent_pipe,self.child_pipe = multiprocessing.Pipe()
         self.close_graph = multiprocessing.Event()
         self.close_graph.clear()
         self.child = multiprocessing.Process(target=self.child_task)
@@ -43,13 +43,14 @@ class LiveGraph():
 
     def add_values(self, values):
         '''add some data to the graph'''
-        print self, 'foo'
-        self.queue.put(values)
+        if self.child.is_alive():
+            self.parent_pipe.send(values)
 
     def close(self):
         '''close the graph'''
         self.close_graph.set()
-        self.child.join(2)
+        if self.child.is_alive():
+            self.child.join(2)
 
 import wx
 
@@ -161,14 +162,17 @@ class GraphFrame(wx.Frame):
             self.redraw_timer.Stop()
             self.Destroy()
             return
-        while not state.queue.empty():
-            state.value = state.queue.get()
+        while state.child_pipe.poll():
+            state.value = state.child_pipe.recv()
         if not self.paused:
             for i in range(len(self.plot_data)):
                 if state.value[i] is not None:
                     self.data[i].append(state.value[i])
                     if len(self.data[i]) > state.num_points:
                         self.data[i] = self.data[i][len(self.data)-state.num_points:]
-        
+
+        for i in range(len(self.plot_data)):
+            if state.value[i] is None or len(self.data[i]) < 2:
+                return
         self.draw_plot()
     

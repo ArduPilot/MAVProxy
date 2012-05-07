@@ -82,4 +82,4 @@ def mavlink_packet(msg):
         f = state.fields[i]
         state.values[i] = mavutil.evaluate_expression(f, mpstate.master().messages)
     if state.livegraph is not None:
-        state.livegraph.queue.put(state.values)
+        state.livegraph.add_values(state.values)
