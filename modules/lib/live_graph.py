@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 
   MAVProxy realtime graphing module, partly based on the wx graphing
@@ -189,4 +191,14 @@ class GraphFrame(wx.Frame):
                 return
         self.axes.legend(state.fields, loc='upper left', bbox_to_anchor=(0, 1.1))
         self.draw_plot()
+    
+if __name__ == "__main__":
+    # test the graph
+    import time, math
+    livegraph = LiveGraph(['sin(t)', 'cos(t)'],
+                          title='Graph Test')
+    while livegraph.is_alive():
+        t = time.time()
+        livegraph.add_values([math.sin(t), math.cos(t)])
+        time.sleep(0.1)
     
