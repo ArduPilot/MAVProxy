@@ -10,6 +10,18 @@ import chameleon, scanner, mavutil
 
 mpstate = None
 
+def mkdir_p(dir):
+    '''like mkdir -p'''
+    if not dir:
+        return
+    if dir.endswith("/"):
+        mkdir_p(dir[:-1])
+        return
+    if os.path.isdir(dir):
+        return
+    mkdir_p(os.path.dirname(dir))
+    os.mkdir(dir)
+
 class camera_state(object):
     def __init__(self):
         self.running = False
@@ -40,11 +52,14 @@ class camera_state(object):
         # setup directory for images
         self.camera_dir = os.path.join(os.path.dirname(mpstate.logfile_name),
                                       "camera")
-        try:
-            os.mkdir(self.camera_dir)
-        except OSError as e:
-            if not e.errno in [ errno.EEXIST ]:
-                raise
+        self.raw_dir = os.path.join(self.camera_dir, "raw")
+        self.jpeg_dir = os.path.join(self.camera_dir, "jpeg")
+        self.marked_dir = os.path.join(self.camera_dir, "marked")
+        self.view_dir = os.path.join(self.camera_dir, "view")
+        mkdir_p(self.raw_dir)
+        mkdir_p(self.jpeg_dir)
+        mkdir_p(self.marked_dir)
+        mkdir_p(self.view_dir)
 
 def name():
     '''return module name'''
@@ -161,9 +176,9 @@ def save_thread():
             continue
         im = state.save_queue.get()
         chameleon.save_pgm(state.cam, 
-                           '%s/raw%u.pgm' % (state.camera_dir, count), 
+                           '%s/raw%u.pgm' % (state.raw_dir, count), 
                            im)
-        save_aircraft_data('%s/raw%u.log' % (state.camera_dir, count))
+        save_aircraft_data('%s/raw%u.log' % (state.raw_dir, count))
         count += 1
         # don't allow the queue to get too large, drop half the images
         # when larger than 50
@@ -192,7 +207,7 @@ def scan_thread():
 
         state.region_count += len(regions)
         if len(regions) > 0:
-            cv.SaveImage('%s/marked%u.pnm' % (state.camera_dir, counter), 
+            cv.SaveImage('%s/marked%u.pnm' % (state.marked_dir, counter), 
                          im_marked)
             counter += 1
         jpeg = scanner.jpeg_compress(im_marked)
@@ -231,7 +246,7 @@ def transmit_thread():
             connected = False
 
         # local save
-        jfile = open('%s/j%u.jpg' % (state.camera_dir, i), "w")
+        jfile = open('%s/j%u.jpg' % (state.jpeg_dir, i), "w")
         jfile.write(jpeg)
         jfile.close()
         i += 1
@@ -271,7 +286,7 @@ def view_thread():
                 pfile = None
                 connected = False
 
-            filename = '%s/v%u.jpg' % (state.camera_dir, counter)
+            filename = '%s/v%u.jpg' % (state.view_dir, counter)
             counter += 1
             jfile = open(filename, "w")
             jfile.write(jpeg)
