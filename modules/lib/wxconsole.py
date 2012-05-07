@@ -5,6 +5,21 @@
 """
 import textconsole, wx
 
+class Text():
+    '''text to write to console'''
+    def __init__(self, text, fg='black', bg='white'):
+        self.text = text
+        self.fg = fg
+        self.bg = bg
+
+class Value():
+    '''a value for the status bar'''
+    def __init__(self, name, text, fg='black', bg='white'):
+        self.name = name
+        self.text = text
+        self.fg = fg
+        self.bg = bg
+
 class MessageConsole(textconsole.SimpleConsole):
     '''
     a message console for MAVProxy
@@ -31,7 +46,13 @@ class MessageConsole(textconsole.SimpleConsole):
     def write(self, text, fg='black', bg='white'):
         '''write to the console'''
         if self.child.is_alive():
-            self.parent_pipe.send((text,fg,bg))
+            self.parent_pipe.send(Text(text, fg, bg))
+
+    def set_status(self, name, text='', fg='black', bg='white'):
+        '''set a status value'''
+        if self.child.is_alive():
+            self.parent_pipe.send(Value(name, text, fg, bg))
+        
 
     def close(self):
         '''close the console'''
@@ -49,11 +70,29 @@ class ConsoleFrame(wx.Frame):
     def __init__(self, state, title):
         self.state = state
         wx.Frame.__init__(self, None, title=title, size=(600,300))
-        self.control = wx.TextCtrl(self, style=wx.TE_MULTILINE)
+        self.panel = wx.Panel(self)
+        
+        # values for the status bar
+        self.values = {}
+
+        self.control = wx.TextCtrl(self.panel, style=wx.TE_MULTILINE | wx.TE_READONLY)
+
+        self.status = wx.BoxSizer(wx.HORIZONTAL)
+        self.status.Add(wx.StaticText(self.panel, -1, "Status:"), border=5, flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL)
+
+        self.vbox = wx.BoxSizer(wx.VERTICAL)
+        self.vbox.Add(self.status, 0, flag=wx.ALIGN_LEFT | wx.TOP)
+        self.vbox.Add(self.control, 1, flag=wx.LEFT | wx.BOTTOM | wx.GROW)        
+
+        self.panel.SetSizer(self.vbox)
+
         self.timer = wx.Timer(self)
+
         self.Bind(wx.EVT_TIMER, self.on_timer, self.timer)        
         self.timer.Start(100)
+
         self.Bind(wx.EVT_IDLE, self.on_idle)
+
         self.Show(True)
         self.pending = []
 
@@ -68,20 +107,36 @@ class ConsoleFrame(wx.Frame):
             self.Destroy()
             return
         while state.child_pipe.poll():
-            self.pending.append(state.child_pipe.recv())
-            if self.control.GetInsertionPoint() == self.control.GetLastPosition():
-                # we're scrolled at the bottom
-                for (text, fg, bg) in self.pending:
-                    oldstyle = self.control.GetDefaultStyle()
-                    style = wx.TextAttr()
-                    if fg is not None:
-                        style.SetTextColour(fg)
-                    if bg is not None:
-                        style.SetBackgroundColour(bg)
-                    self.control.SetDefaultStyle(style)
-                    self.control.AppendText(text)
-                    self.control.SetDefaultStyle(oldstyle)
-                self.pending = []
+            obj = state.child_pipe.recv()
+            if isinstance(obj, Value):
+                if not obj.name in self.values:
+                    value = wx.TextCtrl(self.panel, style=wx.TE_READONLY)
+                    self.status.Add(value, border=5, flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL)
+                    self.values[obj.name] = value                    
+                value = self.values[obj.name]
+                value.SetForegroundColour(obj.fg)
+                value.SetBackgroundColour(obj.bg)
+                value.SetValue(obj.text)
+                size = value.GetSize()
+                dc = wx.ClientDC(value)
+                sx, sy, dummy = dc.GetMultiLineTextExtent(value.GetValue() + "M")
+                value.SetSize((sx, -1))
+                self.status.Layout()
+                self.panel.Layout()
+            elif isinstance(obj, Text):
+                '''request to add text to the console'''
+                if self.control.GetInsertionPoint() == self.control.GetLastPosition():
+                    self.pending.append(obj)
+                    for p in self.pending:
+                        # we're scrolled at the bottom
+                        oldstyle = self.control.GetDefaultStyle()
+                        style = wx.TextAttr()
+                        style.SetTextColour(p.fg)
+                        style.SetBackgroundColour(p.bg)
+                        self.control.SetDefaultStyle(style)
+                        self.control.AppendText(p.text)
+                        self.control.SetDefaultStyle(oldstyle)
+                    self.pending = []
     
 if __name__ == "__main__":
     # test the console
@@ -91,4 +146,6 @@ if __name__ == "__main__":
         console.write('Tick', fg='red')
         console.write(" %s " % time.asctime())
         console.writeln('tock', bg='yellow')
+        console.set_status('GPS', 'GPS: OK', fg='blue', bg='green')
+        console.set_status('Link1', 'Link1: OK', fg='green', bg='write')
         time.sleep(0.5)
