@@ -1,9 +1,7 @@
 """
-MAVProxy realtime graphing module, partly based on the wx graphing
-demo by Eli Bendersky (eliben@gmail.com)
+  MAVProxy realtime graphing module
 
-  http://eli.thegreenplace.net/files/prog_code/wx_mpl_dynamic_graph.py.txt
-
+  uses lib/live_graph.py for display
 """
 
 import mavutil, re, os, sys
@@ -60,7 +58,7 @@ def mavlink_packet(msg):
     state = mpstate.graph_state
 
     # check for any closed graphs
-    for i in range(len(state.graphs)-1, 0, -1):
+    for i in range(len(state.graphs)-1, -1, -1):
         if not state.graphs[i].is_alive():
             state.graphs[i].close()
             state.graphs.pop(i)
@@ -91,11 +89,13 @@ class Graph():
                                               title='MAVProxy: graph')
 
     def is_alive(self):
+        '''check if this graph is still alive'''
         if self.livegraph:
             return self.livegraph.is_alive()
         return False        
 
     def close(self):
+        '''close this graph'''
         if self.livegraph:
             self.livegraph.close()
         self.livegraph = None

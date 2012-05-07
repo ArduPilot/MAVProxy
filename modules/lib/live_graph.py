@@ -187,6 +187,6 @@ class GraphFrame(wx.Frame):
         for i in range(len(self.plot_data)):
             if state.values[i] is None or len(self.data[i]) < 2:
                 return
-        self.axes.legend(state.fields, loc='upper left')
+        self.axes.legend(state.fields, loc='upper left', bbox_to_anchor=(0, 1.1))
         self.draw_plot()
     
