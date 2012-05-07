@@ -49,8 +49,12 @@ class LiveGraph():
     def close(self):
         '''close the graph'''
         self.close_graph.set()
-        if self.child.is_alive():
+        if self.is_alive():
             self.child.join(2)
+
+    def is_alive(self):
+        '''check if graph is still going'''
+        return self.child.is_alive()
 
 import wx
 
@@ -80,13 +84,17 @@ class GraphFrame(wx.Frame):
         self.init_plot()
         self.canvas = FigCanvas(self.panel, -1, self.fig)
 
+        self.close_button = wx.Button(self.panel, -1, "Close")
+        self.Bind(wx.EVT_BUTTON, self.on_close_button, self.close_button)
+
         self.pause_button = wx.Button(self.panel, -1, "Pause")
         self.Bind(wx.EVT_BUTTON, self.on_pause_button, self.pause_button)
         self.Bind(wx.EVT_UPDATE_UI, self.on_update_pause_button, self.pause_button)
         
         self.hbox1 = wx.BoxSizer(wx.HORIZONTAL)
+        self.hbox1.Add(self.close_button, border=5, flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL)
+        self.hbox1.AddSpacer(1)
         self.hbox1.Add(self.pause_button, border=5, flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL)
-        self.hbox1.AddSpacer(20)
         
         self.vbox = wx.BoxSizer(wx.VERTICAL)
         self.vbox.Add(self.canvas, 1, flag=wx.LEFT | wx.TOP | wx.GROW)        
@@ -102,8 +110,7 @@ class GraphFrame(wx.Frame):
         self.fig = Figure((6.0, 3.0), dpi=self.dpi)
 
         self.axes = self.fig.add_subplot(111)
-        self.axes.set_axis_bgcolor('black')
-        self.axes.set_title(' '.join(self.state.fields), size=12)
+        self.axes.set_axis_bgcolor('white')
         
         pylab.setp(self.axes.get_xticklabels(), fontsize=8)
         pylab.setp(self.axes.get_yticklabels(), fontsize=8)
@@ -117,6 +124,7 @@ class GraphFrame(wx.Frame):
                 self.data[i], 
                 linewidth=1,
                 color=self.state.colors[i],
+                label=self.state.fields[i],
                 )[0]
             self.plot_data.append(p)
 
@@ -139,6 +147,7 @@ class GraphFrame(wx.Frame):
         self.axes.set_ybound(lower=ymin, upper=ymax)
         self.axes.grid(True, color='gray')
         pylab.setp(self.axes.get_xticklabels(), visible=True)
+        pylab.setp(self.axes.get_legend().get_texts(), fontsize='small')
             
         for i in range(len(self.plot_data)):
             self.plot_data[i].set_xdata(numpy.arange(-len(self.data[0]),0))
@@ -152,6 +161,10 @@ class GraphFrame(wx.Frame):
     def on_update_pause_button(self, event):
         label = "Resume" if self.paused else "Pause"
         self.pause_button.SetLabel(label)
+
+    def on_close_button(self, event):
+        self.redraw_timer.Stop()
+        self.Destroy()
     
     def on_redraw_timer(self, event):
         # if paused do not add data, but still redraw the plot
@@ -163,16 +176,17 @@ class GraphFrame(wx.Frame):
             self.Destroy()
             return
         while state.child_pipe.poll():
-            state.value = state.child_pipe.recv()
+            state.values = state.child_pipe.recv()
         if not self.paused:
             for i in range(len(self.plot_data)):
-                if state.value[i] is not None:
-                    self.data[i].append(state.value[i])
+                if state.values[i] is not None:
+                    self.data[i].append(state.values[i])
                     if len(self.data[i]) > state.num_points:
                         self.data[i] = self.data[i][len(self.data)-state.num_points:]
 
         for i in range(len(self.plot_data)):
-            if state.value[i] is None or len(self.data[i]) < 2:
+            if state.values[i] is None or len(self.data[i]) < 2:
                 return
+        self.axes.legend(state.fields, loc='upper left')
         self.draw_plot()
     
