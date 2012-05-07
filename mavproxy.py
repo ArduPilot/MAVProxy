@@ -26,9 +26,9 @@ for d in [ 'pymavlink',
 
 # add modules path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'modules'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'modules', 'lib'))
 
-import select
-
+import select, textconsole
 
 class MPSettings(object):
     def __init__(self):
@@ -169,6 +169,7 @@ class MAVFunctions(object):
 class MPState(object):
     '''holds state of mavproxy'''
     def __init__(self):
+        self.console = textconsole.SimpleConsole()
         self.settings = MPSettings()
         self.status = MPStatus()
 
@@ -224,7 +225,7 @@ class rline(object):
 def say(text, priority='important'):
     '''speak some text'''
     ''' http://cvs.freebsoft.org/doc/speechd/ssip.html see 4.3.1 for priorities'''
-    print(text)
+    mpstate.console.writeln(text)
     if mpstate.settings.speech:
         import speechd
         mpstate.status.speech = speechd.SSIPClient('MAVProxy%u' % os.getpid())
@@ -334,17 +335,17 @@ def process_waypoint_request(m, master):
     if (not mpstate.status.loading_waypoints or
         time.time() > mpstate.status.loading_waypoint_lasttime + 10.0):
         mpstate.status.loading_waypoints = False
-        print("not loading waypoints")
+        mpstate.console.error("not loading waypoints")
         return
     if m.seq >= mpstate.status.wploader.count():
-        print("Request for bad waypoint %u (max %u)" % (m.seq, mpstate.status.wploader.count()))
+        mpstate.console.error("Request for bad waypoint %u (max %u)" % (m.seq, mpstate.status.wploader.count()))
         return
     master.mav.send(mpstate.status.wploader.wp(m.seq))
     mpstate.status.loading_waypoint_lasttime = time.time()
-    print("Sent waypoint %u : %s" % (m.seq, mpstate.status.wploader.wp(m.seq)))
+    mpstate.console.writeln("Sent waypoint %u : %s" % (m.seq, mpstate.status.wploader.wp(m.seq)))
     if m.seq == mpstate.status.wploader.count() - 1:
         mpstate.status.loading_waypoints = False
-        print("Sent all %u waypoints" % mpstate.status.wploader.count())
+        mpstate.console.writeln("Sent all %u waypoints" % mpstate.status.wploader.count())
 
 def load_waypoints(filename):
     '''load waypoints from a file'''
@@ -420,7 +421,7 @@ def fetch_fence_point(i):
         time.sleep(0.1)
         continue
     if p is None:
-        print("Failed to fetch point %u" % i)
+        mpstate.console.error("Failed to fetch point %u" % i)
         return None
     return p
 
@@ -481,7 +482,7 @@ def list_fence(filename):
     else:
         for i in range(mpstate.status.fenceloader.count()):
             p = mpstate.status.fenceloader.point(i)
-            print("lat=%f lng=%f" % (p.lat, p.lng))
+            mpstate.console.writeln("lat=%f lng=%f" % (p.lat, p.lng))
 
 
 def cmd_fence(args):
@@ -948,7 +949,7 @@ def handle_usec_timestamp(m, master):
     usec = m.usec
     if usec + 6.0e7 < master.highest_usec:
         say('Time has wrapped')
-        print("usec %u highest_usec %u" % (usec, master.highest_usec))
+        mpstate.console.writeln("usec %u highest_usec %u" % (usec, master.highest_usec))
         mpstate.status.highest_usec = usec
         for mm in mpstate.mav_master:
             mm.link_delayed = False
@@ -1020,12 +1021,12 @@ def master_callback(m, master):
         master.last_heartbeat = mpstate.status.last_heartbeat
     elif mtype == 'STATUSTEXT':
         if m.text != mpstate.status.last_apm_msg:
-            print("APM: %s" % m.text)
+            mpstate.console.writeln("APM: %s" % m.text, bg='red')
             mpstate.status.last_apm_msg = m.text
     elif mtype == 'PARAM_VALUE':
         mpstate.mav_param[str(m.param_id)] = m.param_value
         if m.param_index+1 == m.param_count:
-            print("Received %u parameters" % m.param_count)
+            mpstate.console.writeln("Received %u parameters" % m.param_count)
             if mpstate.status.logdir != None:
                 param_save(os.path.join(mpstate.status.logdir, 'mav.parm'), '*')
 
@@ -1045,18 +1046,18 @@ def master_callback(m, master):
 
     elif mtype in ['WAYPOINT_COUNT','MISSION_COUNT']:
         if mpstate.status.wp_op is None:
-            print("No waypoint load started")
+            mpstate.console.error("No waypoint load started")
         else:
             mpstate.status.wploader.clear()
             mpstate.status.wploader.expected_count = m.count
-            print("Requesting %u waypoints t=%s now=%s" % (m.count,
-                                                           time.asctime(time.localtime(m._timestamp)),
-                                                           time.asctime()))
+            mpstate.console.writeln("Requesting %u waypoints t=%s now=%s" % (m.count,
+                                                                             time.asctime(time.localtime(m._timestamp)),
+                                                                             time.asctime()))
             master.waypoint_request_send(0)
 
     elif mtype in ['WAYPOINT', 'MISSION_ITEM'] and mpstate.status.wp_op != None:
         if m.seq > mpstate.status.wploader.count():
-            print("Unexpected waypoint number %u - expected %u" % (m.seq, mpstate.status.wploader.count()))
+            mpstate.console.writeln("Unexpected waypoint number %u - expected %u" % (m.seq, mpstate.status.wploader.count()))
         elif m.seq < mpstate.status.wploader.count():
             # a duplicate
             pass
@@ -1135,11 +1136,11 @@ def master_callback(m, master):
                 rcmin = get_mav_param('RC%u_MIN' % i, 0)
                 if rcmin > v:
                     if param_set('RC%u_MIN' % i, v):
-                        print("Set RC%u_MIN=%u" % (i, v))
+                        mpstate.console.writeln("Set RC%u_MIN=%u" % (i, v))
                 rcmax = get_mav_param('RC%u_MAX' % i, 0)
                 if rcmax < v:
                     if param_set('RC%u_MAX' % i, v):
-                        print("Set RC%u_MAX=%u" % (i, v))
+                        mpstate.console.writeln("Set RC%u_MAX=%u" % (i, v))
 
     elif mtype == "NAV_CONTROLLER_OUTPUT" and mpstate.status.flightmode == "AUTO" and mpstate.settings.distreadout:
         rounded_dist = int(m.wp_dist/mpstate.settings.distreadout)*mpstate.settings.distreadout
@@ -1178,8 +1179,7 @@ def master_callback(m, master):
 
     elif mtype == "BAD_DATA":
         if mavutil.all_printable(m.data):
-            sys.stdout.write(str(m.data))
-            sys.stdout.flush()
+            mpstate.console.write(str(m.data), bg='red')
     elif mtype in [ 'HEARTBEAT', 'GLOBAL_POSITION', 'RC_CHANNELS_SCALED',
                     'ATTITUDE', 'RC_CHANNELS_RAW', 'GPS_STATUS', 'WAYPOINT_CURRENT',
                     'SERVO_OUTPUT_RAW', 'VFR_HUD',
@@ -1190,11 +1190,11 @@ def master_callback(m, master):
                     'FENCE_POINT', 'FENCE_STATUS', 'DCM', 'RADIO', 'AHRS', 'HWSTATUS', 'SIMSTATE' ]:
         pass
     else:
-        print("Got MAVLink msg: %s" % m)
+        mpstate.console.writeln("Got MAVLink msg: %s" % m)
 
     if mpstate.status.watch is not None:
         if fnmatch.fnmatch(m.get_type().upper(), mpstate.status.watch.upper()):
-            print(m)
+            mpstate.console.writeln(m)
 
     # keep the last message of each type around
     mpstate.status.msgs[m.get_type()] = m
@@ -1239,7 +1239,7 @@ def process_master(m):
                 m.post_message(msg)
             if msg.get_type() == "BAD_DATA":
                 if opts.show_errors:
-                    print("MAV error: %s" % msg)
+                    mpstate.console.writeln("MAV error: %s" % msg)
                 mpstate.status.mav_error += 1
 
     
@@ -1253,7 +1253,7 @@ def process_mavlink(slave):
     try:
         m = slave.mav.decode(buf)
     except mavlink.MAVError as e:
-        print("Bad MAVLink slave message from %s: %s" % (slave.address, e.message))
+        mpstate.status.error("Bad MAVLink slave message from %s: %s" % (slave.address, e.message))
         return
     if mpstate.settings.mavfwd and not mpstate.status.setup_mode:
         mpstate.master().write(m.get_msgbuf())
@@ -1378,7 +1378,7 @@ def periodic_tasks():
             master.time_since('PARAM_VALUE') > 10 and
             'HEARTBEAT' in master.messages):
             mpstate.status.last_paramretry = time.time()
-            print("fetching parameters")
+            mpstate.status.writeln("fetching parameters")
             master.param_fetch_all()
  
     if battery_period.trigger():
@@ -1461,19 +1461,17 @@ def run_script(scriptfile):
         f = open(scriptfile, mode='r')
     except Exception:
         return
-    print("Running script %s" % scriptfile)
+    mpstate.console.writeln("Running script %s" % scriptfile)
     for line in f:
         line = line.strip()
         if line == "":
             continue
-        print("-> %s" % line)
+        mpstatue.console.writeln("-> %s" % line)
         process_stdin(line)
     f.close()
         
 
 if __name__ == '__main__':
-
-    print('start1')
 
     from optparse import OptionParser
     parser = OptionParser("mavproxy.py [options]")

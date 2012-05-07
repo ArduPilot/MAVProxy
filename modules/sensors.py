@@ -38,7 +38,7 @@ def cmd_sensors(args):
     else:
         gps_heading = mpstate.status.msgs['GPS_RAW'].hdg
         
-    print("heading: %u/%u   alt: %u/%u  r/p: %u/%u speed: %u/%u  thr: %u" % (
+    mpstate.console.writeln("heading: %u/%u   alt: %u/%u  r/p: %u/%u speed: %u/%u  thr: %u" % (
         mpstate.status.msgs['VFR_HUD'].heading,
         gps_heading,
         mpstate.status.altitude,
@@ -54,9 +54,9 @@ def cmd_speed(args):
     '''enable/disable speed report'''
     mpstate.sensors_state.speed_report = not mpstate.sensors_state.speed_report
     if mpstate.sensors_state.speed_report:
-        print("Speed reporting enabled")
+        mpstate.console.writeln("Speed reporting enabled", bg='yellow')
     else:
-        print("Speed reporting disabled")
+        mpstate.console.writeln("Speed reporting disabled", bg='yellow')
 
 def init(_mpstate):
     '''initialise module'''
