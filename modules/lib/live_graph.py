@@ -19,13 +19,15 @@ class LiveGraph():
     def __init__(self,
                  fields,
                  title='MAVProxy: LiveGraph',
-                 num_points=100,
+                 timespan=20.0,
+                 tickresolution=0.2,
                  colors=[ 'red', 'green', 'blue', 'orange', 'olive']):
         import multiprocessing
         self.fields = fields
         self.colors = colors
         self.title  = title
-        self.num_points = num_points
+        self.timespan = timespan
+        self.tickresolution = tickresolution
         self.values = [None]*len(self.fields)
 
         self.parent_pipe,self.child_pipe = multiprocessing.Pipe()
@@ -73,10 +75,12 @@ class GraphFrame(wx.Frame):
         self.paused = False
         
         self.create_main_panel()
-        
+
+        self.Bind(wx.EVT_IDLE, self.on_idle)
+
         self.redraw_timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.on_redraw_timer, self.redraw_timer)        
-        self.redraw_timer.Start(200)
+        self.redraw_timer.Start(1000*self.state.tickresolution)
 
     def create_main_panel(self):
         from matplotlib.backends.backend_wxagg import \
@@ -85,6 +89,7 @@ class GraphFrame(wx.Frame):
 
         self.init_plot()
         self.canvas = FigCanvas(self.panel, -1, self.fig)
+
 
         self.close_button = wx.Button(self.panel, -1, "Close")
         self.Bind(wx.EVT_BUTTON, self.on_close_button, self.close_button)
@@ -107,7 +112,7 @@ class GraphFrame(wx.Frame):
     
     def init_plot(self):
         self.dpi = 100
-        import pylab
+        import pylab, numpy
         from matplotlib.figure import Figure
         self.fig = Figure((6.0, 3.0), dpi=self.dpi)
 
@@ -130,6 +135,11 @@ class GraphFrame(wx.Frame):
                 )[0]
             self.plot_data.append(p)
 
+        # create X data
+        self.xdata = numpy.arange(-self.state.timespan, 0, self.state.tickresolution)
+        self.axes.set_xbound(lower=self.xdata[0], upper=0)
+
+
     def draw_plot(self):
         """ Redraws the plot
         """
@@ -139,21 +149,24 @@ class GraphFrame(wx.Frame):
         vhigh = max(self.data[0])
         vlow  = min(self.data[0])
 
-        for i in range(len(self.plot_data)):
+        for i in range(1,len(self.plot_data)):
             vhigh = max(vhigh, max(self.data[i]))
             vlow  = min(vlow,  min(self.data[i]))
         ymin = vlow  - 0.05*(vhigh-vlow)
         ymax = vhigh + 0.05*(vhigh-vlow)
 
-        self.axes.set_xbound(lower=-state.num_points, upper=0)
         self.axes.set_ybound(lower=ymin, upper=ymax)
         self.axes.grid(True, color='gray')
         pylab.setp(self.axes.get_xticklabels(), visible=True)
         pylab.setp(self.axes.get_legend().get_texts(), fontsize='small')
             
         for i in range(len(self.plot_data)):
-            self.plot_data[i].set_xdata(numpy.arange(-len(self.data[0]),0))
-            self.plot_data[i].set_ydata(numpy.array(self.data[i]))
+            ydata = numpy.array(self.data[i])
+            xdata = self.xdata
+            if len(ydata) < len(self.xdata):
+                xdata = xdata[-len(ydata):]
+            self.plot_data[i].set_xdata(xdata)
+            self.plot_data[i].set_ydata(ydata)
         
         self.canvas.draw()
     
@@ -167,6 +180,10 @@ class GraphFrame(wx.Frame):
     def on_close_button(self, event):
         self.redraw_timer.Stop()
         self.Destroy()
+
+    def on_idle(self, event):
+        import time
+        time.sleep(self.state.tickresolution*0.5)
     
     def on_redraw_timer(self, event):
         # if paused do not add data, but still redraw the plot
@@ -179,12 +196,13 @@ class GraphFrame(wx.Frame):
             return
         while state.child_pipe.poll():
             state.values = state.child_pipe.recv()
-        if not self.paused:
-            for i in range(len(self.plot_data)):
-                if state.values[i] is not None:
-                    self.data[i].append(state.values[i])
-                    if len(self.data[i]) > state.num_points:
-                        self.data[i] = self.data[i][len(self.data)-state.num_points:]
+        if self.paused:
+            return
+        for i in range(len(self.plot_data)):
+            if state.values[i] is not None:
+                self.data[i].append(state.values[i])
+                while len(self.data[i]) > len(self.xdata):
+                    self.data[i].pop(0)
 
         for i in range(len(self.plot_data)):
             if state.values[i] is None or len(self.data[i]) < 2:
@@ -200,5 +218,4 @@ if __name__ == "__main__":
     while livegraph.is_alive():
         t = time.time()
         livegraph.add_values([math.sin(t), math.cos(t)])
-        time.sleep(0.1)
-    
+        time.sleep(0.05)

@@ -13,7 +13,7 @@ import live_graph
 
 class graph_state(object):
     def __init__(self):
-        self.num_points = 100
+        self.timespan = 20
         self.graphs = []
         
 def name():
@@ -85,7 +85,7 @@ class Graph():
 
         self.values = [None]*len(self.fields)
         self.livegraph = live_graph.LiveGraph(self.fields,
-                                              num_points=state.num_points,
+                                              timespan=state.timespan,
                                               title='MAVProxy: graph')
 
     def is_alive(self):
