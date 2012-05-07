@@ -1378,7 +1378,7 @@ def periodic_tasks():
             master.time_since('PARAM_VALUE') > 10 and
             'HEARTBEAT' in master.messages):
             mpstate.status.last_paramretry = time.time()
-            mpstate.status.writeln("fetching parameters")
+            mpstate.console.writeln("fetching parameters")
             master.param_fetch_all()
  
     if battery_period.trigger():
@@ -1508,6 +1508,7 @@ if __name__ == '__main__':
                       type='int', default=0)
     parser.add_option("--aircraft", dest="aircraft", help="aircraft name", default=None)
     parser.add_option("--cmd", dest="cmd", help="initial commands", default=None)
+    parser.add_option("--console", action='store_true', help="use GUI console")
     parser.add_option("--mav10", action='store_true', default=False, help="Use MAVLink protocol 1.0")
     parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
     
@@ -1601,6 +1602,9 @@ Auto-detected serial ports are:
         start_script = os.path.join(opts.aircraft, "mavinit.scr")
         if os.path.exists(start_script):
             run_script(start_script)
+
+    if opts.console:
+        process_stdin('module load console')
 
     if opts.cmd is not None:
         cmds = opts.cmd.split(';')
