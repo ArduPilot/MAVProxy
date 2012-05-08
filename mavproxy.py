@@ -1217,11 +1217,6 @@ def master_callback(m, master):
             except Exception, msg:
                 if mpstate.settings.moddebug == 1:
                     print(msg)
-                elif mpstate.settings.moddebug > 1:
-                    import traceback
-                    exc_type, exc_value, exc_traceback = sys.exc_info()
-                    traceback.print_exception(exc_type, exc_value, exc_traceback,
-                                              limit=2, file=sys.stdout)
                 pass
 
 
