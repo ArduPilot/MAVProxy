@@ -795,7 +795,7 @@ def process_stdin(line):
     if not line:
         return
 
-    args = line.split(" ")
+    args = line.split()
     cmd = args[0]
     if cmd == 'help':
         k = command_map.keys()
