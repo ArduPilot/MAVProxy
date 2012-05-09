@@ -21,6 +21,10 @@ class SimpleConsole():
         '''write to the console with linefeed'''
         self.write(text + '\n', fg=fg, bg=bg)
 
+    def set_status(self, name, text='', fg='black', bg='white'):
+        '''set a status value'''
+        pass
+
     def error(self, text, fg='red', bg='white'):
         self.writeln(text, fg=fg, bg=bg)
 
