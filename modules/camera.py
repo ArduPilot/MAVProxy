@@ -258,14 +258,14 @@ def transmit_thread():
                 raise
             connected = True
         try:
-            port.send(cPickle.dumps((regions, jpeg), protocol=1))
+            port.send(cPickle.dumps((frame_time, regions, jpeg), protocol=1))
         except socket.error:
             port.close()
             port = None
             connected = False
 
         # local save
-        jfile = open('%s/j%u.jpg' % (state.jpeg_dir, i), "w")
+        jfile = open('%s/j%s.jpg' % (state.jpeg_dir, timestamp(frame_time)), "w")
         jfile.write(jpeg)
         jfile.close()
         i += 1
@@ -298,17 +298,25 @@ def view_thread():
                     continue
                 connected = True
             try:
-                (regions, jpeg) = cPickle.load(pfile)
+                (frame_time, regions, jpeg) = cPickle.load(pfile)
             except Exception:
                 sock.close()
                 pfile = None
                 connected = False
+                continue
 
             filename = '%s/v%s.jpg' % (state.view_dir, timestamp(frame_time))
             jfile = open(filename, "w")
             jfile.write(jpeg)
             jfile.close()
             img = cv.LoadImage(filename)
+            if img.width == 640:
+                region_scale = 1
+            else:
+                region_scale = 2
+            for r in regions:
+                (x1,y1,x2,y2) = [x * region_scale for x in r]
+                cv.Rectangle(img, (x1,y1), (x2,y2), (255,0,0), 2)
             cv.ConvertScale(img, img, scale=state.brightness)
             cv.ShowImage('Viewer', img)
             key = cv.WaitKey(1)
