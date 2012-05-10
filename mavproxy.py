@@ -270,11 +270,13 @@ def cmd_switch(args):
         default_channel = 8
     flite_mode_ch_parm = int(get_mav_param("FLTMODE_CH", default_channel))
     mpstate.status.override[flite_mode_ch_parm-1] = mapping[value]
+    mpstate.status.override_counter = 10
     send_rc_override()
     if value == 0:
         print("Disabled RC switch override")
     else:
-        print("Set RC switch override to %u (PWM=%u)" % (value, mapping[value]))
+        print("Set RC switch override to %u (PWM=%u channel=%u)" % (
+            value, mapping[value], flite_mode_ch_parm))
 
 def cmd_trim(args):
     '''trim aileron, elevator and rudder to current values'''
@@ -1385,12 +1387,13 @@ def periodic_tasks():
         battery_report()
 
     if mpstate.override_period.trigger():
-        if mpstate.status.override != mpstate.status.last_override:
+        if (mpstate.status.override != [ 0 ] * 8 or 
+            mpstate.status.override != mpstate.status.last_override or
+            mpstate.status.override_counter > 0):
             mpstate.status.last_override = mpstate.status.override[:]
             send_rc_override()
-        elif mpstate.status.override_counter > 0:
-            send_rc_override()
-            mpstate.status.override_counter -= 1
+            if mpstate.status.override_counter > 0:
+                mpstate.status.override_counter -= 1
 
 def main_loop():
     '''main processing loop'''
@@ -1589,7 +1592,7 @@ Auto-detected serial ports are:
     heartbeat_period = mavutil.periodic_event(1)
     battery_period = mavutil.periodic_event(0.1)
     if mpstate.sitl_output:
-        mpstate.override_period = mavutil.periodic_event(50)
+        mpstate.override_period = mavutil.periodic_event(20)
     else:
         mpstate.override_period = mavutil.periodic_event(1)
     heartbeat_check_period = mavutil.periodic_event(0.33)
