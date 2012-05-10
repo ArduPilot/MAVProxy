@@ -14,9 +14,10 @@ class Text():
 
 class Value():
     '''a value for the status bar'''
-    def __init__(self, name, text, fg='black', bg='white'):
+    def __init__(self, name, text, row=0, fg='black', bg='white'):
         self.name = name
         self.text = text
+        self.row = row
         self.fg = fg
         self.bg = bg
 
@@ -25,10 +26,12 @@ class MessageConsole(textconsole.SimpleConsole):
     a message console for MAVProxy
     '''
     def __init__(self,
-                 title='MAVProxy: console'):
+                 title='MAVProxy: console',
+                 statusrows=2):
         textconsole.SimpleConsole.__init__(self)
         import multiprocessing
         self.title  = title
+        self.statusrows = statusrows
         self.parent_pipe,self.child_pipe = multiprocessing.Pipe()
         self.close_event = multiprocessing.Event()
         self.close_event.clear()
@@ -48,10 +51,10 @@ class MessageConsole(textconsole.SimpleConsole):
         if self.child.is_alive():
             self.parent_pipe.send(Text(text, fg, bg))
 
-    def set_status(self, name, text='', fg='black', bg='white'):
+    def set_status(self, name, text='', row=0, fg='black', bg='white'):
         '''set a status value'''
         if self.child.is_alive():
-            self.parent_pipe.send(Value(name, text, fg, bg))
+            self.parent_pipe.send(Value(name, text, row, fg, bg))
         
 
     def close(self):
@@ -77,11 +80,12 @@ class ConsoleFrame(wx.Frame):
 
         self.control = wx.TextCtrl(self.panel, style=wx.TE_MULTILINE | wx.TE_READONLY)
 
-        self.status = wx.BoxSizer(wx.HORIZONTAL)
-        self.status.Add(wx.StaticText(self.panel, -1, "Status:"), border=5, flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL)
-
+        
         self.vbox = wx.BoxSizer(wx.VERTICAL)
-        self.vbox.Add(self.status, 0, flag=wx.ALIGN_LEFT | wx.TOP)
+        self.status = []
+        for i in range(state.statusrows):
+            self.status.append(wx.BoxSizer(wx.HORIZONTAL))
+            self.vbox.Add(self.status[i], 0, flag=wx.ALIGN_LEFT | wx.TOP)
         self.vbox.Add(self.control, 1, flag=wx.LEFT | wx.BOTTOM | wx.GROW)        
 
         self.panel.SetSizer(self.vbox)
@@ -109,19 +113,17 @@ class ConsoleFrame(wx.Frame):
         while state.child_pipe.poll():
             obj = state.child_pipe.recv()
             if isinstance(obj, Value):
+                # request to set a status field
                 if not obj.name in self.values:
-                    value = wx.TextCtrl(self.panel, style=wx.TE_READONLY)
-                    self.status.Add(value, border=5, flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL)
+                    # create a new status field
+                    value = wx.StaticText(self.panel, -1, obj.text)
+                    self.status[obj.row].Add(value, border=5)
+                    self.status[obj.row].AddSpacer(20)
                     self.values[obj.name] = value                    
                 value = self.values[obj.name]
                 value.SetForegroundColour(obj.fg)
                 value.SetBackgroundColour(obj.bg)
-                value.SetValue(obj.text)
-                size = value.GetSize()
-                dc = wx.ClientDC(value)
-                sx, sy, dummy = dc.GetMultiLineTextExtent(value.GetValue() + "M")
-                value.SetSize((sx, -1))
-                self.status.Layout()
+                value.SetLabel(obj.text)
                 self.panel.Layout()
             elif isinstance(obj, Text):
                 '''request to add text to the console'''
