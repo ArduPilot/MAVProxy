@@ -55,14 +55,6 @@ class camera_state(object):
         # setup directory for images
         self.camera_dir = os.path.join(os.path.dirname(mpstate.logfile_name),
                                       "camera")
-        self.raw_dir = os.path.join(self.camera_dir, "raw")
-        self.jpeg_dir = os.path.join(self.camera_dir, "jpeg")
-        self.marked_dir = os.path.join(self.camera_dir, "marked")
-        self.view_dir = os.path.join(self.camera_dir, "view")
-        mkdir_p(self.raw_dir)
-        mkdir_p(self.jpeg_dir)
-        mkdir_p(self.marked_dir)
-        mkdir_p(self.view_dir)
 
 def name():
     '''return module name'''
@@ -184,6 +176,8 @@ def timestamp(frame_time):
 def save_thread():
     '''image save thread'''
     state = mpstate.camera_state
+    raw_dir = os.path.join(self.camera_dir, "raw")
+    mkdir_p(raw_dir)
     while not state.unload.wait(0.05):
         if state.save_queue.empty():
             continue
@@ -191,9 +185,9 @@ def save_thread():
         hundredths = int(frame_time * 100.0) % 100
         rawname = "raw%s" % timestamp(frame_time)
         chameleon.save_pgm(state.cam, 
-                           '%s/%s.pgm' % (state.raw_dir, rawname), 
+                           '%s/%s.pgm' % (raw_dir, rawname), 
                            im)
-        save_aircraft_data('%s/%s.log' % (state.raw_dir, rawname))
+        save_aircraft_data('%s/%s.log' % (raw_dir, rawname))
         # don't allow the queue to get too large, drop half the images
         # when larger than 50
         if state.save_queue.qsize() > 50:
@@ -228,6 +222,9 @@ def transmit_thread():
     state = mpstate.camera_state
 
     connected = False
+
+    jpeg_dir = os.path.join(self.camera_dir, "jpeg")
+    mkdir_p(jpeg_dir)
 
     i = 0
     while not state.unload.wait(0.05):
@@ -265,7 +262,7 @@ def transmit_thread():
             connected = False
 
         # local save
-        jfile = open('%s/j%s.jpg' % (state.jpeg_dir, timestamp(frame_time)), "w")
+        jfile = open('%s/j%s.jpg' % (jpeg_dir, timestamp(frame_time)), "w")
         jfile.write(jpeg)
         jfile.close()
         i += 1
@@ -283,6 +280,9 @@ def view_thread():
     sock = None
     pfile = None
     view_window = False
+
+    view_dir = os.path.join(self.camera_dir, "view")
+    mkdir_p(view_dir)
 
     while not state.unload.wait(0.05):
         if state.viewing:
@@ -305,7 +305,7 @@ def view_thread():
                 connected = False
                 continue
 
-            filename = '%s/v%s.jpg' % (state.view_dir, timestamp(frame_time))
+            filename = '%s/v%s.jpg' % (view_dir, timestamp(frame_time))
             jfile = open(filename, "w")
             jfile.write(jpeg)
             jfile.close()
