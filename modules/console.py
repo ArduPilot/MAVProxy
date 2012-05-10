@@ -97,4 +97,4 @@ def mavlink_packet(msg):
         mpstate.console.set_status('WPDist', 'Distance %u' % msg.wp_dist)
         mpstate.console.set_status('WPBearing', 'Bearing %u' % msg.target_bearing)
         mpstate.console.set_status('AltError', 'AltError %d' % msg.alt_error)
-        mpstate.console.set_status('AspdError', 'AspdError %d' % msg.aspd_error)
+        mpstate.console.set_status('AspdError', 'AspdError %.1f' % (msg.aspd_error*0.01))
