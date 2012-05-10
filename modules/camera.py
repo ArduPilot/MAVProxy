@@ -301,8 +301,8 @@ def view_thread():
     view_dir = os.path.join(state.camera_dir, "view")
     mkdir_p(view_dir)
 
-    mpstate.console.set_status('Images', 'Images %u' % image_count, row=3)
-    mpstate.console.set_status('Regions', 'Regions %u' % region_count, row=3)
+    mpstate.console.set_status('Images', 'Images %u' % image_count, row=6)
+    mpstate.console.set_status('Regions', 'Regions %u' % region_count, row=6)
 
     while not state.unload.wait(0.05):
         if state.viewing:
