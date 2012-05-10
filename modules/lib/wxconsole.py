@@ -117,7 +117,7 @@ class ConsoleFrame(wx.Frame):
                     # possibly add more status rows
                     for i in range(len(self.status), obj.row+1):
                         self.status.append(wx.BoxSizer(wx.HORIZONTAL))
-                        self.vbox.Insert(1, self.status[i], 0, flag=wx.ALIGN_LEFT | wx.TOP)
+                        self.vbox.Insert(len(self.status)-1, self.status[i], 0, flag=wx.ALIGN_LEFT | wx.TOP)
                         self.vbox.Layout()
                     self.status[obj.row].Add(value, border=5)
                     self.status[obj.row].AddSpacer(20)
@@ -152,4 +152,5 @@ if __name__ == "__main__":
         console.writeln('tock', bg='yellow')
         console.set_status('GPS', 'GPS: OK', fg='blue', bg='green')
         console.set_status('Link1', 'Link1: OK', fg='green', bg='write')
+        console.set_status('Date', 'Date: %s' % time.asctime(), fg='red', bg='write', row=2)
         time.sleep(0.5)
