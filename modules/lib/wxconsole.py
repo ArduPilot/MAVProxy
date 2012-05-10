@@ -26,12 +26,10 @@ class MessageConsole(textconsole.SimpleConsole):
     a message console for MAVProxy
     '''
     def __init__(self,
-                 title='MAVProxy: console',
-                 statusrows=2):
+                 title='MAVProxy: console'):
         textconsole.SimpleConsole.__init__(self)
         import multiprocessing
         self.title  = title
-        self.statusrows = statusrows
         self.parent_pipe,self.child_pipe = multiprocessing.Pipe()
         self.close_event = multiprocessing.Event()
         self.close_event.clear()
@@ -82,10 +80,9 @@ class ConsoleFrame(wx.Frame):
 
         
         self.vbox = wx.BoxSizer(wx.VERTICAL)
-        self.status = []
-        for i in range(state.statusrows):
-            self.status.append(wx.BoxSizer(wx.HORIZONTAL))
-            self.vbox.Add(self.status[i], 0, flag=wx.ALIGN_LEFT | wx.TOP)
+        # start with one status row
+        self.status = [wx.BoxSizer(wx.HORIZONTAL)]
+        self.vbox.Add(self.status[0], 0, flag=wx.ALIGN_LEFT | wx.TOP)
         self.vbox.Add(self.control, 1, flag=wx.LEFT | wx.BOTTOM | wx.GROW)        
 
         self.panel.SetSizer(self.vbox)
@@ -117,6 +114,11 @@ class ConsoleFrame(wx.Frame):
                 if not obj.name in self.values:
                     # create a new status field
                     value = wx.StaticText(self.panel, -1, obj.text)
+                    # possibly add more status rows
+                    for i in range(len(self.status), obj.row+1):
+                        self.status.append(wx.BoxSizer(wx.HORIZONTAL))
+                        self.vbox.Insert(1, self.status[i], 0, flag=wx.ALIGN_LEFT | wx.TOP)
+                        self.vbox.Layout()
                     self.status[obj.row].Add(value, border=5)
                     self.status[obj.row].AddSpacer(20)
                     self.values[obj.name] = value                    
