@@ -176,7 +176,7 @@ def timestamp(frame_time):
 def save_thread():
     '''image save thread'''
     state = mpstate.camera_state
-    raw_dir = os.path.join(self.camera_dir, "raw")
+    raw_dir = os.path.join(state.camera_dir, "raw")
     mkdir_p(raw_dir)
     while not state.unload.wait(0.05):
         if state.save_queue.empty():
@@ -223,7 +223,7 @@ def transmit_thread():
 
     connected = False
 
-    jpeg_dir = os.path.join(self.camera_dir, "jpeg")
+    jpeg_dir = os.path.join(state.camera_dir, "jpeg")
     mkdir_p(jpeg_dir)
 
     i = 0
@@ -280,8 +280,10 @@ def view_thread():
     sock = None
     pfile = None
     view_window = False
+    image_count = 0
+    region_count = 0
 
-    view_dir = os.path.join(self.camera_dir, "view")
+    view_dir = os.path.join(state.camera_dir, "view")
     mkdir_p(view_dir)
 
     while not state.unload.wait(0.05):
@@ -320,6 +322,10 @@ def view_thread():
             cv.ConvertScale(img, img, scale=state.brightness)
             cv.ShowImage('Viewer', img)
             key = cv.WaitKey(1)
+
+            image_count += 1
+            region_count += len(regions)
+            mpstate.console.set_status('Camera', 'Images %u' % image_count, row=2)
         else:
             if view_window:
                 view_window = False
