@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 
 """
-  MAVProxy checklist, implemented in a child process  
+  MAVProxy checklist, implemented in a child process
+  Created by Stephen Dade (stephen_dade@hotmail.com)
 """
 
 class CheckItem():
-    '''Checklist item'''
+    '''Checklist item used for information transfer
+    between threads/processes/pipes'''
     def __init__(self, name, state):
         self.name = name
         self.state = state
@@ -26,60 +28,196 @@ class UI():
 
     def child_task(self):
         '''child process - this holds all the GUI elements'''
-        from Tkinter import *
+        import Tkinter as tk
 
-        self.root = Tk()
+        self.root = tk.Tk()
 
         self.root.grid()
+        self.createLists()
         self.createWidgets(self.root)
         self.on_timer()
         self.root.mainloop()     
 
+    def createLists(self):
+        '''Generate the checklists. Note that:
+        0,1 = off/on for auto-ticked items
+        2,3 = off/on for manually ticked items'''
+
+        self.bootList = {
+        'Trim set from controller':2,
+        'Avionics Battery':2,
+        'Compass Offsets':2,
+        'Accelerometers Calibrated':2,
+        'Gyros Calibrated':2,
+        'Aircraft Params Loaded':2,
+        'Radio Links > 6db margin':2,
+        'Waypoints Loaded':2
+        }
+
+        self.beforeCruiseList = {
+        'Airspeed > 20 m/s':0,
+        'Altitude > 30 m':0,
+        '< 100 degrees to 1st Waypoint':0
+        }
+
+        self.bottleDropList = {
+        'Joe found':0,
+        'Joe waypoint laid in':0,
+        '< 100m to Joe waypoint':0,
+        'Bottle drop mechanism activated':0
+        }
+
+        self.beforeLanding = {
+        '< 100m from airfield home':0
+        }
+
     def createWidgets(self, frame):
-        from Tkinter import *
+        '''Create the controls on the UI'''
+        import Tkinter as tk
+
 	'''Group Labels'''
-	BootLabel = Label(frame, text="Boot / Before Takeoff")
-	FlightLabel = Label(frame, text="Before Cruise/AUTO")
-	CruiseLabel = Label(frame, text="During Flight - General")
-	LandLabel = Label(frame, text="Before Landing")
+	BootLabel = tk.Label(frame, text="Boot / Before Takeoff")
+	FlightLabel = tk.Label(frame, text="Before Cruise/AUTO")
+	BottleLabel = tk.Label(frame, text="Bottle Drop")
+	LandLabel = tk.Label(frame, text="Before Landing")
 	BootLabel.grid(row=0, column=0)
 	FlightLabel.grid(row=0, column=1)
-	CruiseLabel.grid(row=0, column=2)
+	BottleLabel.grid(row=0, column=2)
 	LandLabel.grid(row=0, column=3)
+        i = 1
 
-	'''Before Takeoff'''
-	BootTrim = Checkbutton(frame, text='Trim set from controller', state="disabled")      
-	BootTrim.grid(row=1, column=0, sticky=W)
-	BootAvbattery = Checkbutton(text='Avionics Battery', state="disabled")      
-	BootAvbattery.grid(row=2, column=0, sticky=W)
-	BootCompOffsets = Checkbutton(text='Compass Offsets', state="disabled")      
-	BootCompOffsets.grid(row=3, column=0, sticky=W)
-	BootAccel = Checkbutton(text='Accelerometers Calibrated', state="disabled")      
-	BootAccel.grid(row=4, column=0, sticky=W)
-	BootGyro = Checkbutton(text='Gyros Calibrated', state="disabled")      
-	BootGyro.grid(row=5, column=0, sticky=W)
-	BootAirParams = Checkbutton(text='Aircraft Params Loaded', state="disabled")      
-	BootAirParams.grid(row=6, column=0, sticky=W)
-	BootRadios = Checkbutton(text='Radio Links > 6db margin', state="disabled")      
-	BootRadios.grid(row=7, column=0, sticky=W)
-	BootWaypoints = Checkbutton(text='Waypoints Loaded', state="disabled")      
-	BootWaypoints.grid(row=8, column=0, sticky=W)
+        '''Boot checklist'''
+        for key in self.bootList:     
+            if self.bootList[key] == 0:
+                self.bootList[key] = tk.IntVar()
+                aCheckButton = tk.Checkbutton(text=key, variable=self.bootList[key], state="disabled", onvalue=1, offvalue=0)
+                aCheckButton.grid(row = i, column=0, sticky='w')
+            if self.bootList[key] == 2:
+                self.bootList[key] = tk.IntVar()
+                aCheckButton = tk.Checkbutton(text=key, variable=self.bootList[key], onvalue=3, offvalue=2)
+                aCheckButton.grid(row = i, column=0, sticky='w')
+            i = i+1
+
+	self.BootDone = tk.Button(text='Confirm Checklist Complete', state="active", command=self.bootCheck)      
+	self.BootDone.grid(row = i, column=0, sticky='w')
+        i=i+1
 
 	'''After takeoff'''
-	TakeoffSpeed = Checkbutton(text='Airspeed > 20 m/s', state="disabled")      
-	TakeoffSpeed.grid(row=1, column=1, sticky=W)
-	TakeoffAlt = Checkbutton(text='Altitude > 30 m', state="disabled")      
-	TakeoffAlt.grid(row=2, column=1, sticky=W)
-	TakeoffWaypoint = Checkbutton(text='< 100 degrees to 1st Waypoint', state="disabled")      
-	TakeoffWaypoint.grid(row=3, column=1, sticky=W)
+        i=1
+        for key in self.beforeCruiseList:     
+            if self.beforeCruiseList[key] == 0:
+                self.beforeCruiseList[key] = tk.IntVar()
+                aCheckButton = tk.Checkbutton(text=key, variable=self.beforeCruiseList[key], state="disabled", onvalue=1, offvalue=0)
+                aCheckButton.grid(row = i, column=1, sticky='w')
+            if self.beforeCruiseList[key] == 2:
+                self.beforeCruiseList[key] = tk.IntVar()
+                aCheckButton = tk.Checkbutton(text=key, variable=self.beforeCruiseList[key], onvalue=3, offvalue=2)
+                aCheckButton.grid(row = i, column=1, sticky='w')
+            i = i+1
 
-	'''General - During Flight'''
-	GeneralAirspeedDiv = Checkbutton(text='No Airspeed Sensor Divergence', state="disabled")      
-	GeneralAirspeedDiv.grid(row=1, column=2, sticky=W)
-	GeneralHeadingDiv = Checkbutton(text='No Heading Sensor Divergence', state="disabled")      
-	GeneralHeadingDiv.grid(row=2, column=2, sticky=W)
-	GeneralAltDiv = Checkbutton(text='No Altitude Sensor Divergence', state="disabled")      
-	GeneralAltDiv.grid(row=3, column=2, sticky=W)
+	self.TakeoffDone = tk.Button(text='Confirm Checklist Complete', state="disabled", command=self.takeoffCheck)      
+	self.TakeoffDone.grid(row = i, column=1, sticky='w')
+        i = i+1
+
+	'''Before bottle drop'''
+        i=1
+        for key in self.bottleDropList:     
+            if self.bottleDropList[key] == 0:
+                self.bottleDropList[key] = tk.IntVar()
+                aCheckButton = tk.Checkbutton(text=key, variable=self.bottleDropList[key],state="disabled", onvalue=1, offvalue=0)
+                aCheckButton.grid(row = i, column=2, sticky='w')
+            if self.bottleDropList[key] == 2:
+                self.bottleDropList[key] = tk.IntVar()
+                aCheckButton = tk.Checkbutton(text=key, variable=self.bottleDropList[key], onvalue=3, offvalue=2)
+                aCheckButton.grid(row = i, column=2, sticky='w')
+            i = i+1
+
+	self.BottleDone = tk.Button(text='Confirm Checklist Complete', state="disabled", command=self.BottleCheck)      
+	self.BottleDone.grid(row = i, column=2, sticky='w')
+        i = i+1
+
+        '''Before landing'''
+        i=1
+        for key in self.beforeLanding:     
+            if self.beforeLanding[key] == 0:
+                self.beforeLanding[key] = tk.IntVar()
+                aCheckButton = tk.Checkbutton(text=key, variable=self.beforeLanding[key],state="disabled", onvalue=1, offvalue=0)
+                aCheckButton.grid(row = i, column=3, sticky='w')
+            if self.beforeLanding[key] == 2:
+                self.beforeLanding[key] = tk.IntVar()
+                aCheckButton = tk.Checkbutton(text=key, variable=self.beforeLanding[key], onvalue=3, offvalue=2)
+                aCheckButton.grid(row = i, column=3, sticky='w')
+            i = i+1
+
+	self.LandingButton = tk.Button(text='Confirm Checklist Complete', state="disabled", command=self.landCheck)      
+	self.LandingButton.grid(row = i, column=3, sticky='w')
+        i = i+1
+
+
+    def bootCheck(self):
+        '''Event for the "Checklist Complete" button for the Before Takeoff section'''
+        import Tkinter as tk
+        import tkMessageBox
+
+        '''Check all of the checklist for ticks'''
+        for key, value in self.bootList.items():
+            state = value.get()
+            if state == 0 or state == 2:
+                tkMessageBox.showinfo("Error", "Item not ticked: " + key)
+                return
+
+        '''if we made it here, the checklist is OK'''
+        self.TakeoffDone.config(state="normal")
+	self.BootDone.config(text='Checklist Completed', state="disabled")   
+
+
+    def takeoffCheck(self):
+        '''Event for the "Checklist Complete" button for the Before Cruise/AUTO section'''
+        import Tkinter as tk
+        import tkMessageBox
+
+        '''Check all of the checklist for ticks'''
+        for key, value in self.beforeCruiseList.items():
+            state = value.get()
+            if state == 0 or state == 2:
+                tkMessageBox.showinfo("Error", "Item not ticked: " + key)
+                return
+
+        '''if we made it here, the checklist is OK'''
+        self.BottleDone.config(state="normal")
+	self.TakeoffDone.config(text='Checklist Completed', state="disabled")  
+
+    def BottleCheck(self):
+        '''Event for the "Checklist Complete" button for the Before Bottle Drop section'''
+        import Tkinter as tk
+        import tkMessageBox
+
+        '''Check all of the checklist for ticks'''
+        for key, value in self.bottleDropList.items():
+            state = value.get()
+            if state == 0 or state == 2:
+                tkMessageBox.showinfo("Error", "Item not ticked: " + key)
+                return
+
+        '''if we made it here, the checklist is OK'''
+        self.LandingButton.config(state="normal")
+	self.BottleDone.config(text='Checklist Completed', state="disabled") 
+
+    def landCheck(self):
+        '''Event for the "Checklist Complete" button for the Before Landing section'''
+        import Tkinter as tk
+        import tkMessageBox
+
+        '''Check all of the checklist for ticks'''
+        for key, value in self.beforeLanding.items():
+            state = value.get()
+            if state == 0 or state == 2:
+                tkMessageBox.showinfo("Error", "Item not ticked: " + key)
+                return
+
+        '''if we made it here, the checklist is OK'''
+	self.LandingButton.config(text='Checklist Completed', state="disabled")
+        tkMessageBox.showinfo("Information", "Checklist Completed!")
 
     def close(self):
         '''close the console'''
@@ -92,8 +230,9 @@ class UI():
         return self.child.is_alive()
 
     def on_timer(self):
-        from Tkinter import *
-        '''state = self.state'''
+        '''this timer periodically checks the inter-process pipe
+        for any updated checklist items'''
+        import Tkinter as tk
         if self.close_event.wait(0.001):
             self.timer.Stop()
             self.Destroy()
@@ -106,7 +245,7 @@ class UI():
                 for child in self.root.winfo_children():
 
                     '''If the control is a checkbutton and it's name matches, update it'''
-                    if isinstance(child, Checkbutton) and obj.name == child.cget('text'):
+                    if isinstance(child, tk.Checkbutton) and obj.name == child.cget('text'):
                         if obj.state == 1:
                             child.select()
                         else:
