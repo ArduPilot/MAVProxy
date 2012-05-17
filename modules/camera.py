@@ -30,28 +30,35 @@ class camera_state(object):
 
         self.capture_thread = None
         self.save_thread = None
-        self.scan_thread = None
+        self.scan_thread1 = None
+        self.scan_thread2 = None
         self.transmit_thread = None
         self.view_thread = None
 
         self.capture_count = 0
+        self.scan_count = 0
         self.error_count = 0
         self.error_msg = None
         self.region_count = 0
         self.fps = 0
+        self.scan_fps = 0
         self.cam = None
         self.save_queue = Queue.Queue()
         self.scan_queue = Queue.Queue()
         self.transmit_queue = Queue.Queue()
         self.viewing = False
-        self.depth = 16
+        self.depth = 8
         self.gcs_address = None
         self.gcs_view_port = 7543
+        self.capture_brightness = 1000
+        self.gamma = 950
         self.brightness = 1.0
         self.full_resolution = 0
+        self.quality = 95
 
         self.last_watch = 0
         self.frame_loss = 0
+        self.colour = 1
 
         # setup directory for images
         self.camera_dir = os.path.join(os.path.dirname(mpstate.logfile_name),
@@ -69,17 +76,6 @@ def cmd_camera(args):
     '''camera commands'''
     state = mpstate.camera_state
     if args[0] == "start":
-        state.colour = 0
-        try:
-            # try colour first
-            print("trying colour")
-            state.cam = chameleon.open(1, state.depth)
-            state.colour = 1
-        except chameleon.error:
-            # fallback to mono
-            print("trying mono")
-            state.cam = chameleon.open(0, state.depth)
-            state.colour = 0
         state.capture_count = 0
         state.error_count = 0
         state.error_msg = None
@@ -87,21 +83,17 @@ def cmd_camera(args):
         if state.capture_thread is None:
             state.capture_thread = start_thread(capture_thread)
             state.save_thread = start_thread(save_thread)
-            state.scan_thread = start_thread(scan_thread)
+            state.scan_thread1 = start_thread(scan_thread)
+            state.scan_thread2 = start_thread(scan_thread)
             state.transmit_thread = start_thread(transmit_thread)
         print("started camera running")
     elif args[0] == "stop":
-        if state.cam is not None:
-            state.running = False
-            time.sleep(0.3)
-            if state.cam is not None:
-                chameleon.close(state.cam)
-                state.cam = None
-            print("stopped camera running")
+        state.running = False
+        print("stopped camera capture")
     elif args[0] == "status":
-        print("Captured %u images %u errors %u regions %.1f fps %u lost" % (
-            state.capture_count, state.error_count, state.region_count, 
-            state.fps, state.frame_loss))
+        print("Captured %u images  %u errors  %u scanned  %u regions %.1f fps  %.1f scan_fps  %u lost" % (
+            state.capture_count, state.error_count, state.scan_count, state.region_count, 
+            state.fps, state.scan_fps, state.frame_loss))
     elif args[0] == "queue":
         print("scan %u  save %u  transmit %u" % (
                 state.scan_queue.qsize(),
@@ -124,49 +116,110 @@ def cmd_camera(args):
         state.gcs_address = args[1]
     elif args[0] == "brightness":
         if len(args) != 2:
-            print("usage: camera brightness <BRIGHTNESS>")
-            return
-        state.brightness = float(args[1])
+            print("brightness=%f" % state.brightness)
+        else:
+            state.brightness = float(args[1])
+    elif args[0] == "capbrightness":
+        if len(args) != 2:
+            print("capbrightness=%u" % state.capture_brightness)
+        else:
+            state.capture_brightness = int(args[1])
+    elif args[0] == "gamma":
+        if len(args) != 2:
+            print("gamma=%u" % state.gamma)
+        else:
+            state.gamma = int(args[1])
     elif args[0] == "fullres":
         if len(args) != 2 or args[1] not in ['0','1']:
             print("usage: camera fullres <0/1>")
             return
         state.full_resolution = int(args[1])
     else:
-        print("usage: camera <start|stop|status|view|noview|gcs|brightness>")
+        print("usage: camera <start|stop|status|view|noview|gcs|brightness|capbrightness>")
 
 
+def get_base_time():
+  '''we need to get a baseline time from the camera. To do that we trigger
+  in single shot mode until we get a good image, and use the time we 
+  triggered as the base time'''
+  state = mpstate.camera_state
+  frame_time = None
+  error_count = 0
+
+  print('Opening camera')
+  h = chameleon.open(state.colour, state.depth, state.capture_brightness)
+
+  print('Getting camare base_time')
+  while frame_time is None:
+    try:
+      base_time = time.time()
+      im = numpy.zeros((960,1280),dtype='uint8' if state.depth==8 else 'uint16')
+      chameleon.trigger(h, False)
+      frame_time, frame_counter, shutter = chameleon.capture(h, 1000, im)
+      base_time -= frame_time
+    except chameleon.error:
+      print('failed to capture')
+      error_count += 1
+      if error_count > 3:
+        error_count = 0
+        print('re-opening camera')
+        chameleon.close(h)
+        h = chameleon.open(state.colour, state.depth, state.capture_brightness)
+  print('base_time=%f' % base_time)
+  return h, base_time, frame_time
 
 def capture_thread():
     '''camera capture thread'''
     state = mpstate.camera_state
     t1 = time.time()
     last_frame_counter = 0
+    h = None
+    last_gamma = 0
 
-    while not mpstate.camera_state.unload.wait(0.01):
-        if not state.running:
+    raw_dir = os.path.join(state.camera_dir, "raw")
+    mkdir_p(raw_dir)
+
+    while not mpstate.camera_state.unload.wait(0.02):
+        if not state.running:            
             t1 = time.time()
+            if h is not None:
+                chameleon.close(h)
+                h = None
             continue
         try:
-            status = chameleon.trigger(state.cam, False)
+            if h is None:
+                h, base_time, last_frame_time = get_base_time()
+                # put into continuous mode
+                chameleon.trigger(h, True)
+
             frame_time = time.time()
             if state.depth == 16:
                 im = numpy.zeros((960,1280),dtype='uint16')
             else:
                 im = numpy.zeros((960,1280),dtype='uint8')
-            frame_time, frame_counter, shutter = chameleon.capture(state.cam, 1000, im)
+            if last_gamma != state.gamma:
+                chameleon.set_gamma(h, state.gamma)
+                last_gamma = state.gamma
+            frame_time, frame_counter, shutter = chameleon.capture(h, 1000, im)
+            if frame_time < last_frame_time:
+                base_time += 128
             if last_frame_counter != 0:
                 state.frame_loss += frame_counter - (last_frame_counter+1)
-            last_frame_counter = frame_counter
-            state.save_queue.put((frame_time,im))
-            state.scan_queue.put((frame_time,im))
+                
+            state.save_queue.put((base_time+frame_time,im))
+            state.scan_queue.put((base_time+frame_time,im))
             state.capture_count += 1
             t2 = time.time()
             state.fps = 1.0 / (t2-t1)
             t1 = t2
+
+            last_frame_time = frame_time
+            last_frame_counter = frame_counter
         except chameleon.error, msg:
             state.error_count += 1
             state.error_msg = msg
+    if h is not None:
+        chameleon.close(h)
 
 def save_aircraft_data(filename):
     '''save critical data needed for geo-referencing'''
@@ -190,47 +243,34 @@ def save_thread():
     state = mpstate.camera_state
     raw_dir = os.path.join(state.camera_dir, "raw")
     mkdir_p(raw_dir)
-    while not state.unload.wait(0.05):
+    while not state.unload.wait(0.02):
         if state.save_queue.empty():
             continue
         (frame_time,im) = state.save_queue.get()
-        hundredths = int(frame_time * 100.0) % 100
         rawname = "raw%s" % timestamp(frame_time)
-        chameleon.save_pgm('%s/%s.pgm' % (raw_dir, rawname), 
-                           im)
+        chameleon.save_pgm('%s/%s.pgm' % (raw_dir, rawname), im)
         save_aircraft_data('%s/%s.log' % (raw_dir, rawname))
-        # don't allow the queue to get too large, drop half the images
-        # when larger than 50
-        if state.save_queue.qsize() > 50:
-            state.save_queue.get()
 
 def scan_thread():
     '''image scanning thread'''
     state = mpstate.camera_state
 
-    while not state.unload.wait(0.05):
-        if state.scan_queue.empty():
+    while not state.unload.wait(0.02):
+        try:
+            (frame_time,im) = state.scan_queue.get(timeout=0.2)
+        except Queue.Empty:
             continue
-        (frame_time,im) = state.scan_queue.get()
 
+        t1 = time.time()
         im_640 = numpy.zeros((480,640,3),dtype='uint8')
-        if state.depth == 16:
-            scanner.debayer_16_8(im, im_640)
-        else:
-            scanner.debayer(im, im_640)
+        scanner.debayer(im, im_640)
         regions = scanner.scan(im_640)
+        t2 = time.time()
+        state.scan_fps = 1.0 / (t2-t1)
+        state.scan_count += 1
+
         state.region_count += len(regions)
-
-        if state.full_resolution:
-            tx_image = numpy.ascontiguousarray(im)
-        else:
-            tx_image = im_640
-        state.transmit_queue.put((frame_time, regions, tx_image))
-
-        # throw some away if queue is too full
-        while state.scan_queue.qsize() > 50:
-            (frame_time,im) = state.scan_queue.get()
-
+        state.transmit_queue.put((frame_time, regions, im, im_640))
 
 def transmit_thread():
     '''thread for image transmit to GCS'''
@@ -238,24 +278,20 @@ def transmit_thread():
 
     connected = False
 
-    jpeg_dir = os.path.join(state.camera_dir, "jpeg")
-    mkdir_p(jpeg_dir)
-
-    i = 0
-    while not state.unload.wait(0.05):
+    while not state.unload.wait(0.02):
         if state.transmit_queue.empty():
             continue
-        (frame_time, regions, image) = state.transmit_queue.get()
-        if image.shape == (960,1280):
-            # we're transmitting a full size image, but we need to compress 
-            # it first
-            img_full = cv.GetImage(cv.fromarray(image))
-            full_colour = cv.CreateMat(960, 1280, cv.CV_8UC3)
-            cv.CvtColor(img_full, full_colour, cv.CV_BayerGR2BGR)
-            jpeg = scanner.jpeg_compress(numpy.ascontiguousarray(full_colour))
+        # only send the latest image to the ground station
+        while state.transmit_queue.qsize() > 0:
+            (frame_time, regions, im, im_640) = state.transmit_queue.get()
+        if state.full_resolution:
+            # we're transmitting a full size image
+            im_colour = numpy.zeros((960,1280,3),dtype='uint8')
+            scanner.debayer_full(im, im_colour)
+            jpeg = scanner.jpeg_compress(im_colour, state.quality)
         else:
-            # send a 640x480 image
-            jpeg = scanner.jpeg_compress(image)
+            # compress a 640x480 image
+            jpeg = scanner.jpeg_compress(im_640, state.quality)
 
         if not connected:
             # try to connect if the GCS viewer is ready
@@ -270,17 +306,11 @@ def transmit_thread():
                 raise
             connected = True
         try:
-            port.send(cPickle.dumps((frame_time, regions, jpeg), protocol=1))
+            port.send(cPickle.dumps((frame_time, regions, jpeg), protocol=cPickle.HIGHEST_PROTOCOL))
         except socket.error:
             port.close()
             port = None
             connected = False
-
-        # local save
-        jfile = open('%s/j%s.jpg' % (jpeg_dir, timestamp(frame_time)), "w")
-        jfile.write(jpeg)
-        jfile.close()
-        i += 1
 
 def view_thread():
     '''image viewing thread - this runs on the ground station'''
@@ -304,7 +334,7 @@ def view_thread():
     mpstate.console.set_status('Images', 'Images %u' % image_count, row=6)
     mpstate.console.set_status('Regions', 'Regions %u' % region_count, row=6)
 
-    while not state.unload.wait(0.05):
+    while not state.unload.wait(0.02):
         if state.viewing:
             if not view_window:
                 view_window = True
@@ -326,9 +356,7 @@ def view_thread():
                 continue
 
             filename = '%s/v%s.jpg' % (view_dir, timestamp(frame_time))
-            jfile = open(filename, "w")
-            jfile.write(jpeg)
-            jfile.close()
+            chameleon.save_file(filename, jpeg)
             img = cv.LoadImage(filename)
             if img.width == 640:
                 region_scale = 1
@@ -374,18 +402,16 @@ def init(_mpstate):
 
 def unload():
     '''unload module'''
+    state.running = False
     mpstate.camera_state.unload.set()
     if mpstate.camera_state.capture_thread is not None:
         mpstate.camera_state.capture_thread.join(1.0)
         mpstate.camera_state.save_thread.join(1.0)
-        mpstate.camera_state.scan_thread.join(1.0)
+        mpstate.camera_state.scan_thread1.join(1.0)
+        mpstate.camera_state.scan_thread2.join(1.0)
         mpstate.camera_state.transmit_thread.join(1.0)
     if mpstate.camera_state.view_thread is not None:
         mpstate.camera_state.view_thread.join(1.0)
-    if state.cam is not None:
-        print("closing camera")
-        chameleon.close(state.cam)
-        state.cam = None
     print('camera unload OK')
 
 
