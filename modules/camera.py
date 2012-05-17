@@ -11,21 +11,6 @@ import chameleon, scanner, mavutil, cuav_mosaic
 
 mpstate = None
 
-def mkdir_p(dir):
-    '''like mkdir -p'''
-    if not dir:
-        return
-    if dir.endswith("/"):
-        mkdir_p(dir[:-1])
-        return
-    if os.path.isdir(dir):
-        return
-    mkdir_p(os.path.dirname(dir))
-    try:
-        os.mkdir(dir)
-    except Exception:
-        pass
-
 class camera_state(object):
     def __init__(self):
         self.running = False
@@ -183,7 +168,7 @@ def capture_thread():
     last_gamma = 0
 
     raw_dir = os.path.join(state.camera_dir, "raw")
-    mkdir_p(raw_dir)
+    cuav_util.mkdir_p(raw_dir)
 
     while not mpstate.camera_state.unload.wait(0.02):
         if not state.running:            
@@ -245,7 +230,7 @@ def save_thread():
     '''image save thread'''
     state = mpstate.camera_state
     raw_dir = os.path.join(state.camera_dir, "raw")
-    mkdir_p(raw_dir)
+    cuav_util.mkdir_p(raw_dir)
     while not state.unload.wait(0.02):
         if state.save_queue.empty():
             continue
@@ -335,7 +320,7 @@ def view_thread():
     region_count = 0
     mosaic = None
     view_dir = os.path.join(state.camera_dir, "view")
-    mkdir_p(view_dir)
+    cuav_util.mkdir_p(view_dir)
 
     mpstate.console.set_status('Images', 'Images %u' % image_count, row=6)
     mpstate.console.set_status('Regions', 'Regions %u' % region_count, row=6)
