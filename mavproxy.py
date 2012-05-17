@@ -966,10 +966,10 @@ def handle_usec_timestamp(m, master):
         mpstate.status.highest_usec = usec
     if usec + 1e6 < mpstate.status.highest_usec and not master.link_delayed and len(mpstate.mav_master) > 1:
         master.link_delayed = True
-        say("link %u delayed" % (master.linknum+1))
+        mpstate.console.writeln("link %u delayed" % (master.linknum+1))
     elif usec + 0.5e6 > mpstate.status.highest_usec and master.link_delayed:
         master.link_delayed = False
-        say("link %u OK" % (master.linknum+1))
+        mpstate.console.writeln("link %u OK" % (master.linknum+1))
 
 def report_altitude(altitude):
     '''possibly report a new altitude'''
