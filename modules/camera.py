@@ -56,7 +56,8 @@ class camera_state(object):
         self.capture_brightness = 1000
         self.gamma = 950
         self.brightness = 1.0
-        self.full_resolution = 0
+        # send every 4th image full resolution
+        self.full_resolution = 4
         self.quality = 95
 
         self.last_watch = 0
@@ -133,12 +134,13 @@ def cmd_camera(args):
         else:
             state.gamma = int(args[1])
     elif args[0] == "fullres":
-        if len(args) != 2 or args[1] not in ['0','1']:
-            print("usage: camera fullres <0/1>")
-            return
-        state.full_resolution = int(args[1])
+        if len(args) != 2 or int(args[1]) <= 0:
+            print("full_resolution: %u" % state.full_resolution)
+        else:
+            state.full_resolution = int(args[1])
+            
     else:
-        print("usage: camera <start|stop|status|view|noview|gcs|brightness|capbrightness>")
+        print("usage: camera <start|stop|status|view|noview|gcs|brightness|fullres|capbrightness>")
 
 
 def get_base_time():
@@ -277,14 +279,16 @@ def transmit_thread():
     state = mpstate.camera_state
 
     connected = False
+    tx_count = 0
 
     while not state.unload.wait(0.02):
         if state.transmit_queue.empty():
             continue
-        # only send the latest image to the ground station
-        while state.transmit_queue.qsize() > 0:
+        # only send the latest images to the ground station
+        while state.transmit_queue.qsize() > 5:
             (frame_time, regions, im, im_640) = state.transmit_queue.get()
-        if state.full_resolution:
+        (frame_time, regions, im, im_640) = state.transmit_queue.get()
+        if tx_count % state.full_resolution == 0:
             # we're transmitting a full size image
             im_colour = numpy.zeros((960,1280,3),dtype='uint8')
             scanner.debayer_full(im, im_colour)
@@ -292,6 +296,7 @@ def transmit_thread():
         else:
             # compress a 640x480 image
             jpeg = scanner.jpeg_compress(im_640, state.quality)
+        tx_count += 1
 
         if not connected:
             # try to connect if the GCS viewer is ready
