@@ -6,7 +6,8 @@ import time, threading, sys, os, numpy, Queue, cv, socket, errno, cPickle, signa
 # use the camera code from the cuav repo (see githib.com/tridge)
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'camera'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'image'))
-import chameleon, scanner, mavutil
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'lib'))
+import chameleon, scanner, mavutil, cuav_mosaic
 
 mpstate = None
 
@@ -332,7 +333,7 @@ def view_thread():
     view_window = False
     image_count = 0
     region_count = 0
-
+    mosaic = None
     view_dir = os.path.join(state.camera_dir, "view")
     mkdir_p(view_dir)
 
@@ -345,6 +346,7 @@ def view_thread():
                 view_window = True
                 cv.NamedWindow('Viewer')
                 key = cv.WaitKey(1)
+                mosaic = cuav_mosaic.Mosaic()
             if not connected:
                 try:
                     (sock, remote) = port.accept()
@@ -363,15 +365,17 @@ def view_thread():
             filename = '%s/v%s.jpg' % (view_dir, timestamp(frame_time))
             chameleon.save_file(filename, jpeg)
             img = cv.LoadImage(filename)
-            if img.width == 640:
-                region_scale = 1
+            if img.width == 1280:
+                display_img = cv.CreateImage((640, 480), 8, 3)
+                cv.Resize(img, display_img)
             else:
-                region_scale = 2
+                display_img = img
+            mosaic.add_regions(regions, display_img, filename)
             for r in regions:
-                (x1,y1,x2,y2) = [x * region_scale for x in r]
-                cv.Rectangle(img, (x1,y1), (x2,y2), (255,0,0), 2)
-            cv.ConvertScale(img, img, scale=state.brightness)
-            cv.ShowImage('Viewer', img)
+                (x1,y1,x2,y2) = r
+                cv.Rectangle(display_img, (x1,y1), (x2,y2), (255,0,0), 2)
+            cv.ConvertScale(display_img, display_img, scale=state.brightness)
+            cv.ShowImage('Viewer', display_img)
             key = cv.WaitKey(1)
 
             image_count += 1
