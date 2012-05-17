@@ -1255,7 +1255,7 @@ def process_mavlink(slave):
     try:
         m = slave.mav.decode(buf)
     except mavlink.MAVError as e:
-        mpstate.status.error("Bad MAVLink slave message from %s: %s" % (slave.address, e.message))
+        mpstate.console.error("Bad MAVLink slave message from %s: %s" % (slave.address, e.message))
         return
     if mpstate.settings.mavfwd and not mpstate.status.setup_mode:
         mpstate.master().write(m.get_msgbuf())
