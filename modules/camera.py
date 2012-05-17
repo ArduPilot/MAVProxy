@@ -7,7 +7,7 @@ import time, threading, sys, os, numpy, Queue, cv, socket, errno, cPickle, signa
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'camera'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'image'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'lib'))
-import chameleon, scanner, mavutil, cuav_mosaic
+import chameleon, scanner, mavutil, cuav_mosaic, mav_position, cuav_util
 
 mpstate = None
 
@@ -49,6 +49,8 @@ class camera_state(object):
         self.last_watch = 0
         self.frame_loss = 0
         self.colour = 1
+
+        self.mpos = mav_position.MavInterpolator()
 
         # setup directory for images
         self.camera_dir = os.path.join(os.path.dirname(mpstate.logfile_name),
@@ -209,18 +211,6 @@ def capture_thread():
     if h is not None:
         chameleon.close(h)
 
-def save_aircraft_data(filename):
-    '''save critical data needed for geo-referencing'''
-    output = mavutil.mavlogfile(filename, write=True)
-    for mtype in [ 'ATTITUDE', 'GPS_RAW', 'VFR_HUD' ]:
-        master = mpstate.master()
-        if mtype in master.messages:
-            m = master.messages[mtype]
-            timestamp = getattr(m, '_timestamp', 0)
-            output.write(struct.pack('>Q', timestamp*1.0e6))
-            output.write(m.get_msgbuf())
-    output.close()
-
 def timestamp(frame_time):
     '''return a localtime timestamp with 0.01 second resolution'''
     hundredths = int(frame_time * 100.0) % 100
@@ -237,7 +227,6 @@ def save_thread():
         (frame_time,im) = state.save_queue.get()
         rawname = "raw%s" % timestamp(frame_time)
         chameleon.save_pgm('%s/%s.pgm' % (raw_dir, rawname), im)
-        save_aircraft_data('%s/%s.log' % (raw_dir, rawname))
 
 def scan_thread():
     '''image scanning thread'''
@@ -305,6 +294,7 @@ def transmit_thread():
 
 def view_thread():
     '''image viewing thread - this runs on the ground station'''
+    import cuav_mosaic
     state = mpstate.camera_state
     view_window = False
 
@@ -355,7 +345,15 @@ def view_thread():
                 cv.Resize(img, display_img)
             else:
                 display_img = img
-            mosaic.add_regions(regions, display_img, filename)
+
+            # interpolate our current position, and add it to the
+            # mosaic
+            try:
+                pos = state.mpos.position(frame_time, 0)
+            except mav_position.MavInterpolatorException:
+                pos = None
+            mosaic.add_regions(regions, display_img, filename, pos=pos)
+
             for r in regions:
                 (x1,y1,x2,y2) = r
                 cv.Rectangle(display_img, (x1,y1), (x2,y2), (255,0,0), 2)
@@ -415,3 +413,5 @@ def mavlink_packet(m):
     if mpstate.status.watch in ["camera","queue"] and time.time() > state.last_watch+1:
         state.last_watch = time.time()
         cmd_camera(["status" if mpstate.status.watch == "camera" else "queue"])
+    # update position interpolator
+    state.mpos.add_msg(m)
