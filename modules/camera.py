@@ -181,7 +181,6 @@ def capture_thread():
 
     while not mpstate.camera_state.unload.wait(0.02):
         if not state.running:            
-            t1 = time.time()
             if h is not None:
                 chameleon.close(h)
                 h = None
@@ -209,9 +208,7 @@ def capture_thread():
             state.save_queue.put((base_time+frame_time,im))
             state.scan_queue.put((base_time+frame_time,im))
             state.capture_count += 1
-            t2 = time.time()
-            state.fps = 1.0 / (t2-t1)
-            t1 = t2
+            state.fps = 1.0/(frame_time - last_frame_time)
 
             last_frame_time = frame_time
             last_frame_counter = frame_counter
