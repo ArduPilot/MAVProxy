@@ -20,7 +20,10 @@ def mkdir_p(dir):
     if os.path.isdir(dir):
         return
     mkdir_p(os.path.dirname(dir))
-    os.mkdir(dir)
+    try:
+        os.mkdir(dir)
+    except Exception:
+        pass
 
 class camera_state(object):
     def __init__(self):
