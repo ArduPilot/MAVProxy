@@ -84,7 +84,6 @@ def mavlink_packet(msg):
         else:
             fg = 'red'
         mpstate.console.set_status('Vcc', 'Vcc %.2f' % (msg.Vcc * 0.001), fg=fg)
-        mpstate.console.set_status('Pitch', 'Pitch %u' % math.degrees(msg.pitch))
     elif type == 'HEARTBEAT':
         for m in mpstate.mav_master:
             linkdelay = (mpstate.status.highest_usec - m.highest_usec)*1e-6            
