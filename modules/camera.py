@@ -7,7 +7,7 @@ import time, threading, sys, os, numpy, Queue, cv, socket, errno, cPickle, signa
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'camera'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'image'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'lib'))
-import chameleon, scanner, mavutil, cuav_mosaic, mav_position, cuav_util
+import chameleon, scanner, mavutil, cuav_mosaic, mav_position, cuav_util, cuav_joe
 
 mpstate = None
 
@@ -50,11 +50,14 @@ class camera_state(object):
         self.frame_loss = 0
         self.colour = 1
 
-        self.mpos = mav_position.MavInterpolator()
-
         # setup directory for images
         self.camera_dir = os.path.join(os.path.dirname(mpstate.logfile_name),
                                       "camera")
+        cuav_util.mkdir_p(self.camera_dir)
+
+        self.mpos = mav_position.MavInterpolator()
+        self.joelog = cuav_joe.JoeLog(os.path.join(self.camera_dir, 'joe.log'))
+
 
 def name():
     '''return module name'''
@@ -249,6 +252,16 @@ def scan_thread():
         state.region_count += len(regions)
         state.transmit_queue.put((frame_time, regions, im, im_640))
 
+def log_joe_position(frame_time, regions, filename=None):
+    '''add to joe.log if possible'''
+    state = mpstate.camera_state
+    try:
+        pos = state.mpos.position(frame_time, 0)
+        state.joelog.add_regions(frame_time, regions, pos, filename)
+        return pos
+    except mav_position.MavInterpolatorException:
+        return None
+
 def transmit_thread():
     '''thread for image transmit to GCS'''
     state = mpstate.camera_state
@@ -262,7 +275,9 @@ def transmit_thread():
         # only send the latest images to the ground station
         while state.transmit_queue.qsize() > 5:
             (frame_time, regions, im, im_640) = state.transmit_queue.get()
+            log_joe_position(frame_time, regions)
         (frame_time, regions, im, im_640) = state.transmit_queue.get()
+        log_joe_position(frame_time, regions)
         if tx_count % state.full_resolution == 0:
             # we're transmitting a full size image
             im_colour = numpy.zeros((960,1280,3),dtype='uint8')
@@ -348,10 +363,7 @@ def view_thread():
 
             # interpolate our current position, and add it to the
             # mosaic
-            try:
-                pos = state.mpos.position(frame_time, 0)
-            except mav_position.MavInterpolatorException:
-                pos = None
+            pos = log_joe_position(frame_time, regions, filename)
             mosaic.add_regions(regions, display_img, filename, pos=pos)
 
             for r in regions:
