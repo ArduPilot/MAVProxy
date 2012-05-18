@@ -87,9 +87,9 @@ def cmd_camera(args):
         state.running = False
         print("stopped camera capture")
     elif args[0] == "status":
-        print("Captured %u images  %u errors  %u scanned  %u regions %.1f fps  %.0f jpeg_size  %u lost" % (
+        print("Captured %u images  %u errors  %u scanned  %u regions %.1f fps  %.0f jpeg_size  %u lost  %u scanq" % (
             state.capture_count, state.error_count, state.scan_count, state.region_count, 
-            state.fps, state.jpeg_size, state.frame_loss))
+            state.fps, state.jpeg_size, state.frame_loss, state.scan_queue.qsize()))
     elif args[0] == "queue":
         print("scan %u  save %u  transmit %u" % (
                 state.scan_queue.qsize(),
@@ -243,6 +243,9 @@ def scan_thread():
 
     while not state.unload.wait(0.02):
         try:
+            # keep the queue size below 30, so we don't run out of memory
+            if state.scan_queue.qsize() > 30:
+                (frame_time,im) = state.scan_queue.get(timeout=0.2)
             (frame_time,im) = state.scan_queue.get(timeout=0.2)
         except Queue.Empty:
             continue
