@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 '''camera control for ptgrey chameleon camera'''
 
-import time, threading, sys, os, numpy, Queue, cv, socket, errno, cPickle, signal, struct
+import time, threading, sys, os, numpy, Queue, cv, socket, errno, cPickle, signal, struct, fcntl
 
 # use the camera code from the cuav repo (see githib.com/tridge)
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'camera'))
@@ -328,6 +328,10 @@ def view_thread():
 
     connected = False
     port = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    port.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    flags = fcntl.fcntl(port.fileno(), fcntl.F_GETFD)
+    flags |= fcntl.FD_CLOEXEC
+    fcntl.fcntl(port.fileno(), fcntl.F_SETFD, flags)
     port.bind(("", state.gcs_view_port))
     port.listen(1)
     port.setblocking(1)
