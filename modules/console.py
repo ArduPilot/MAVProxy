@@ -29,6 +29,7 @@ def init(_mpstate):
     mpstate.console.set_status('Mode', 'UNKNOWN', row=0, fg='blue')
     mpstate.console.set_status('GPS', 'GPS: --', fg='red', row=0)
     mpstate.console.set_status('Vcc', 'Vcc: --', fg='red', row=0)
+    mpstate.console.set_status('Radio', 'Radio: --', row=0)
     mpstate.console.set_status('Heading', 'Hdg ---/---', row=2)
     mpstate.console.set_status('Alt', 'Alt ---/---', row=2)
     mpstate.console.set_status('AirSpeed', 'AirSpeed --', row=2)
@@ -84,6 +85,12 @@ def mavlink_packet(msg):
         else:
             fg = 'red'
         mpstate.console.set_status('Vcc', 'Vcc %.2f' % (msg.Vcc * 0.001), fg=fg)
+    elif type == 'RADIO':
+        if msg.rssi < msg.noise+10 or msg.remrssi < msg.remnoise+10:
+            fg = 'red'
+        else:
+            fg = 'black'
+        mpstate.console.set_status('Radio', 'Radio %u/%u %u/%u' % (msg.rssi, msg.noise, msg.remrssi, msg.remnoise), fg=fg)
     elif type == 'HEARTBEAT':
         for m in mpstate.mav_master:
             linkdelay = (mpstate.status.highest_usec - m.highest_usec)*1e-6            
