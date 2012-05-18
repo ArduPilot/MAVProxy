@@ -65,13 +65,13 @@ def mavlink_packet(msg):
         else:
             mpstate.console.set_status('GPS', 'GPS: %u' % msg.fix_type, fg='red')
         if master.mavlink10():
-            gps_heading = mpstate.status.msgs['GPS_RAW_INT'].cog * 0.01
+            gps_heading = int(mpstate.status.msgs['GPS_RAW_INT'].cog * 0.01)
         else:
             gps_heading = mpstate.status.msgs['GPS_RAW'].hdg
         mpstate.console.set_status('Heading', 'Hdg %s/%u' % (master.field('VFR_HUD', 'heading', '-'), gps_heading))
     elif type == 'VFR_HUD':
         mpstate.console.set_status('Mode', '%s' % master.flightmode, fg='blue')
-        mpstate.console.set_status('Alt', 'Alt %u/%u' % (mpstate.status.altitude, master.field('GPS_RAW', 'alt', '-')))
+        mpstate.console.set_status('Alt', 'Alt %u/%s' % (mpstate.status.altitude, master.field('GPS_RAW', 'alt', '-')))
         mpstate.console.set_status('AirSpeed', 'AirSpeed %u' % msg.airspeed)
         mpstate.console.set_status('GPSSpeed', 'GPSSpeed %u' % msg.groundspeed)
         mpstate.console.set_status('Thr', 'Thr %u' % msg.throttle)
