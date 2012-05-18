@@ -124,6 +124,11 @@ def cmd_camera(args):
             print("gamma=%u" % state.gamma)
         else:
             state.gamma = int(args[1])
+    elif args[0] == "quality":
+        if len(args) != 2:
+            print("quality=%u" % state.quality)
+        else:
+            state.quality = int(args[1])
     elif args[0] == "fullres":
         if len(args) != 2 or int(args[1]) <= 0:
             print("full_resolution: %u" % state.full_resolution)
