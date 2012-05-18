@@ -44,7 +44,7 @@ class camera_state(object):
         self.brightness = 1.0
         # send every 4th image full resolution
         self.full_resolution = 4
-        self.quality = 95
+        self.quality = 75
         self.jpeg_size = 0
 
         self.last_watch = 0
@@ -339,6 +339,7 @@ def view_thread():
 
     mpstate.console.set_status('Images', 'Images %u' % image_count, row=6)
     mpstate.console.set_status('Regions', 'Regions %u' % region_count, row=6)
+    mpstate.console.set_status('JPGSize', 'JPG Size %.0f' % 0.0, row=6)
 
     while not state.unload.wait(0.02):
         if state.viewing:
@@ -390,6 +391,7 @@ def view_thread():
             region_count += len(regions)
             mpstate.console.set_status('Images', 'Images %u' % image_count)
             mpstate.console.set_status('Regions', 'Regions %u' % region_count)
+            mpstate.console.set_status('JPGSize', 'JPG Size %.0f' % state.jpeg_size)
         else:
             if view_window:
                 view_window = False
