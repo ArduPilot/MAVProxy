@@ -28,6 +28,7 @@ def init(_mpstate):
     # setup some default status information
     mpstate.console.set_status('Mode', 'UNKNOWN', row=0, fg='blue')
     mpstate.console.set_status('GPS', 'GPS: --', fg='red', row=0)
+    mpstate.console.set_status('Vcc', 'Vcc: --', fg='red', row=0)
     mpstate.console.set_status('Heading', 'Hdg ---/---', row=2)
     mpstate.console.set_status('Alt', 'Alt ---/---', row=2)
     mpstate.console.set_status('AirSpeed', 'AirSpeed --', row=2)
@@ -76,6 +77,13 @@ def mavlink_packet(msg):
         mpstate.console.set_status('Thr', 'Thr %u' % msg.throttle)
     elif type == 'ATTITUDE':
         mpstate.console.set_status('Roll', 'Roll %u' % math.degrees(msg.roll))
+        mpstate.console.set_status('Pitch', 'Pitch %u' % math.degrees(msg.pitch))
+    elif type == 'HWSTATUS':
+        if msg.Vcc >= 4600 and msg.Vcc <= 5100:
+            fg = 'green'
+        else:
+            fg = 'red'
+        mpstate.console.set_status('Vcc', 'Vcc %.2f' % (msg.Vcc * 0.001), fg=fg)
         mpstate.console.set_status('Pitch', 'Pitch %u' % math.degrees(msg.pitch))
     elif type == 'HEARTBEAT':
         for m in mpstate.mav_master:
