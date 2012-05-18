@@ -181,6 +181,8 @@ def capture_thread():
     raw_dir = os.path.join(state.camera_dir, "raw")
     cuav_util.mkdir_p(raw_dir)
 
+    gammalog = open(os.path.join(state.camera_dir, "gamma.log"), "w")
+
     while not mpstate.camera_state.unload.wait(0.02):
         if not state.running:            
             if h is not None:
@@ -207,6 +209,12 @@ def capture_thread():
             if last_frame_counter != 0:
                 state.frame_loss += frame_counter - (last_frame_counter+1)
                 
+            gammalog.write('%f %s %u %u\n' % (frame_time+base_time,
+                                              cuav_util.frame_time(frame_time+base_time),
+                                              frame_counter,
+                                              state.gamma))
+            gammalog.flush()
+
             state.save_queue.put((base_time+frame_time,im))
             state.scan_queue.put((base_time+frame_time,im))
             state.capture_count += 1
@@ -220,11 +228,6 @@ def capture_thread():
     if h is not None:
         chameleon.close(h)
 
-def timestamp(frame_time):
-    '''return a localtime timestamp with 0.01 second resolution'''
-    hundredths = int(frame_time * 100.0) % 100
-    return "%s%02u" % (time.strftime("%Y%m%d%H%M%S", time.localtime(frame_time)), hundredths)
-
 def save_thread():
     '''image save thread'''
     state = mpstate.camera_state
@@ -234,7 +237,7 @@ def save_thread():
         if state.save_queue.empty():
             continue
         (frame_time,im) = state.save_queue.get()
-        rawname = "raw%s" % timestamp(frame_time)
+        rawname = "raw%s" % cuav_util.frame_time(frame_time)
         chameleon.save_pgm('%s/%s.pgm' % (raw_dir, rawname), im)
 
 def scan_thread():
@@ -373,7 +376,7 @@ def view_thread():
             # keep filtered image size
             state.jpeg_size = 0.95 * state.jpeg_size + 0.05 * len(jpeg)
 
-            filename = '%s/v%s.jpg' % (view_dir, timestamp(frame_time))
+            filename = '%s/v%s.jpg' % (view_dir, cuav_util.frame_time(frame_time))
             chameleon.save_file(filename, jpeg)
             img = cv.LoadImage(filename)
             if img.width == 1280:
