@@ -1467,7 +1467,7 @@ def run_script(scriptfile):
     mpstate.console.writeln("Running script %s" % scriptfile)
     for line in f:
         line = line.strip()
-        if line == "":
+        if line == "" or line.startswith('#'):
             continue
         mpstate.console.writeln("-> %s" % line)
         process_stdin(line)
@@ -1528,6 +1528,11 @@ if __name__ == '__main__':
     mpstate = MPState()
     mpstate.status.exit = False
     mpstate.command_map = command_map
+
+    if opts.speech:
+        # start the speech-dispatcher early, so it doesn't inherit any ports from
+        # modules/mavutil
+        say('Startup')
 
     if not opts.master:
         serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*"])
