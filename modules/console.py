@@ -82,7 +82,7 @@ def mavlink_packet(msg):
             linkdelay = (mpstate.status.highest_usec - m.highest_usec)*1e-6            
             linkline = "Link %u " % (m.linknum+1)
             if m.linkerror:
-                linkline += "down" % (m.linknum+1)
+                linkline += "down"
                 fg = 'red'
             elif master.link_delayed:
                 linkline += "delayed %.2fs" % linkdelay
@@ -90,7 +90,7 @@ def mavlink_packet(msg):
             else:
                 linkline += "OK (%u pkts, %.2fs delay, %u lost)" % (m.mav_count, linkdelay, m.mav_loss)
                 fg = 'darkgreen'
-            mpstate.console.set_status('Link%u'%m.linknum, linkline, row=m.linknum+1, fg=fg)
+            mpstate.console.set_status('Link%u'%m.linknum, linkline, row=1, fg=fg)
     elif type in ['WAYPOINT_CURRENT', 'MISSION_CURRENT']:
         mpstate.console.set_status('WP', 'WP %u' % msg.seq)
     elif type == 'NAV_CONTROLLER_OUTPUT':
