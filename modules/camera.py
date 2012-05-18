@@ -45,6 +45,7 @@ class camera_state(object):
         # send every 4th image full resolution
         self.full_resolution = 4
         self.quality = 95
+        self.jpeg_size = 0
 
         self.last_watch = 0
         self.frame_loss = 0
@@ -86,9 +87,9 @@ def cmd_camera(args):
         state.running = False
         print("stopped camera capture")
     elif args[0] == "status":
-        print("Captured %u images  %u errors  %u scanned  %u regions %.1f fps  %.1f scan_fps  %u lost" % (
+        print("Captured %u images  %u errors  %u scanned  %u regions %.1f fps  %.0f jpeg_size  %u lost" % (
             state.capture_count, state.error_count, state.scan_count, state.region_count, 
-            state.fps, state.scan_fps, state.frame_loss))
+            state.fps, state.jpeg_size, state.frame_loss))
     elif args[0] == "queue":
         print("scan %u  save %u  transmit %u" % (
                 state.scan_queue.qsize(),
@@ -291,6 +292,10 @@ def transmit_thread():
         else:
             # compress a 640x480 image
             jpeg = scanner.jpeg_compress(im_640, state.quality)
+
+        # keep filtered image size
+        state.jpeg_size = 0.95 * state.jpeg_size + 0.05 * len(jpeg)
+        
         tx_count += 1
 
         if not connected:
@@ -356,6 +361,9 @@ def view_thread():
                 pfile = None
                 connected = False
                 continue
+
+            # keep filtered image size
+            state.jpeg_size = 0.95 * state.jpeg_size + 0.05 * len(jpeg)
 
             filename = '%s/v%s.jpg' % (view_dir, timestamp(frame_time))
             chameleon.save_file(filename, jpeg)
