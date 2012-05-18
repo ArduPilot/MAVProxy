@@ -1469,7 +1469,7 @@ def run_script(scriptfile):
         line = line.strip()
         if line == "":
             continue
-        mpstatue.console.writeln("-> %s" % line)
+        mpstate.console.writeln("-> %s" % line)
         process_stdin(line)
     f.close()
         
