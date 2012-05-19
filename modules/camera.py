@@ -262,7 +262,8 @@ def scan_thread():
         state.scan_count += 1
 
         state.region_count += len(regions)
-        state.transmit_queue.put((frame_time, regions, im, im_640))
+        if state.transmit_queue.qsize() < 20:
+            state.transmit_queue.put((frame_time, regions, im, im_640))
 
 def log_joe_position(frame_time, regions, filename=None):
     '''add to joe.log if possible'''
