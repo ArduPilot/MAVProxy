@@ -39,8 +39,9 @@ class camera_state(object):
         self.depth = 8
         self.gcs_address = None
         self.gcs_view_port = 7543
-        self.capture_brightness = 1000
+        self.capture_brightness = 150
         self.gamma = 950
+        self.lens = 5.0
         self.brightness = 1.0
         # send every 4th image full resolution
         self.full_resolution = 4
@@ -358,7 +359,7 @@ def view_thread():
                 view_window = True
                 cv.NamedWindow('Viewer')
                 key = cv.WaitKey(1)
-                mosaic = cuav_mosaic.Mosaic()
+                mosaic = cuav_mosaic.Mosaic(lens=state.lens)
             if not connected:
                 try:
                     (sock, remote) = port.accept()
@@ -390,6 +391,8 @@ def view_thread():
             # mosaic
             pos = log_joe_position(frame_time, regions, filename)
             mosaic.add_regions(regions, display_img, filename, pos=pos)
+            if pos:
+                mosaic.add_image(filename, img, pos)
 
             for r in regions:
                 (x1,y1,x2,y2) = r
