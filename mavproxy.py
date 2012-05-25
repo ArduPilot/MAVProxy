@@ -1564,10 +1564,8 @@ Auto-detected serial ports are:
             m = mavutil.mavtcp(mdev[4:])
         elif mdev.find(':') != -1:
             m = mavutil.mavudp(mdev, input=True)
-        elif mdev.endswith(".elf"):
-            m = mavutil.mavchildexec(mdev)  
         else:
-            m = mavutil.mavserial(mdev, baud=opts.baudrate)
+            m = mavutil.mavserial(mdev, baud=opts.baudrate, autoreconnect=True)
         m.mav.set_callback(master_callback, m)
         m.linknum = len(mpstate.mav_master)
         m.linkerror = False
