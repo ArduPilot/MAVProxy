@@ -129,18 +129,17 @@ class ConsoleFrame(wx.Frame):
                 self.panel.Layout()
             elif isinstance(obj, Text):
                 '''request to add text to the console'''
-                if self.control.GetInsertionPoint() == self.control.GetLastPosition():
-                    self.pending.append(obj)
-                    for p in self.pending:
-                        # we're scrolled at the bottom
-                        oldstyle = self.control.GetDefaultStyle()
-                        style = wx.TextAttr()
-                        style.SetTextColour(p.fg)
-                        style.SetBackgroundColour(p.bg)
-                        self.control.SetDefaultStyle(style)
-                        self.control.AppendText(p.text)
-                        self.control.SetDefaultStyle(oldstyle)
-                    self.pending = []
+                self.pending.append(obj)
+                for p in self.pending:
+                    # we're scrolled at the bottom
+                    oldstyle = self.control.GetDefaultStyle()
+                    style = wx.TextAttr()
+                    style.SetTextColour(p.fg)
+                    style.SetBackgroundColour(p.bg)
+                    self.control.SetDefaultStyle(style)
+                    self.control.AppendText(p.text)
+                    self.control.SetDefaultStyle(oldstyle)
+                self.pending = []
     
 if __name__ == "__main__":
     # test the console
