@@ -43,14 +43,13 @@ class camera_state(object):
         self.gamma = 950
         self.lens = 5.0
         self.brightness = 1.0
-        # send every 4th image full resolution
-        self.full_resolution = 4
         self.quality = 75
         self.jpeg_size = 0
 
         self.last_watch = 0
         self.frame_loss = 0
         self.colour = 1
+        self.boundary = None
 
         # setup directory for images
         self.camera_dir = os.path.join(os.path.dirname(mpstate.logfile_name),
@@ -131,14 +130,13 @@ def cmd_camera(args):
             print("quality=%u" % state.quality)
         else:
             state.quality = int(args[1])
-    elif args[0] == "fullres":
-        if len(args) != 2 or int(args[1]) <= 0:
-            print("full_resolution: %u" % state.full_resolution)
+    elif args[0] == "boundary":
+        if len(args) != 2:
+            print("boundary=%s" % state.boundary)
         else:
-            state.full_resolution = int(args[1])
-            
+            state.boundary = args[1]
     else:
-        print("usage: camera <start|stop|status|view|noview|gcs|brightness|fullres|capbrightness>")
+        print("usage: camera <start|stop|status|view|noview|gcs|brightness|capbrightness|boundary>")
 
 
 def get_base_time():
@@ -286,20 +284,39 @@ def transmit_thread():
     while not state.unload.wait(0.02):
         if state.transmit_queue.empty():
             continue
-        # only send the latest images to the ground station
-        while state.transmit_queue.qsize() > 5:
-            (frame_time, regions, im, im_640) = state.transmit_queue.get()
-            log_joe_position(frame_time, regions)
+
         (frame_time, regions, im, im_640) = state.transmit_queue.get()
         log_joe_position(frame_time, regions)
-        if tx_count % state.full_resolution == 0:
-            # we're transmitting a full size image
-            im_colour = numpy.zeros((960,1280,3),dtype='uint8')
-            scanner.debayer_full(im, im_colour)
-            jpeg = scanner.jpeg_compress(im_colour, state.quality)
+
+        if connected:
+            tcp_queue = cuav_util.socket_send_queue_size(port)
         else:
-            # compress a 640x480 image
-            jpeg = scanner.jpeg_compress(im_640, state.quality)
+            tcp_queue = 0
+
+        jpeg = None
+        
+        if len(regions) > 0:
+            # this image had a Joe in it. Unless the sendq is very large, send the image in
+            # full resolution with high quality
+            if tcp_queue > 200000:
+                # very large queue, send in half quality
+                jpeg = scanner.jpeg_compress(im_640, state.quality*0.5)
+            elif tcp_queue > 100000:
+                # moderate queue, send in normal quality
+                jpeg = scanner.jpeg_compress(im_640, state.quality)
+            else:
+                # small queue, send in full res
+                im_full = numpy.zeros((960,1280,3),dtype='uint8')
+                scanner.debayer_full(im, im_full)
+                jpeg = scanner.jpeg_compress(im_full, max(state.quality, min(state.quality*2,80)))
+        else:
+            # this image didn't have a Joe. Don't send at all unless the TCP send queue is quite small.
+            # if we do send, then send at low res
+            if tcp_queue < 50000:
+                jpeg = scanner.jpeg_compress(im_640, state.quality)
+
+        if jpeg is None:
+            continue
 
         # keep filtered image size
         state.jpeg_size = 0.95 * state.jpeg_size + 0.05 * len(jpeg)
@@ -360,6 +377,9 @@ def view_thread():
                 cv.NamedWindow('Viewer')
                 key = cv.WaitKey(1)
                 mosaic = cuav_mosaic.Mosaic(lens=state.lens)
+                if state.boundary is not None:
+                    boundary = cuav_util.polygon_load(state.boundary)
+                    mosaic.set_boundary(boundary)
             if not connected:
                 try:
                     (sock, remote) = port.accept()
