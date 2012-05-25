@@ -988,7 +988,7 @@ def master_callback(m, master):
         master.post_message(m)
     mpstate.status.counters['MasterIn'][master.linknum] += 1
 
-    if getattr(m, 'usec', None) is not None:
+    if not m.get_type().startswith('GPS_RAW') and getattr(m, 'usec', None) is not None:
         # update link_delayed attribute
         handle_usec_timestamp(m, master)
 
