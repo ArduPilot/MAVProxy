@@ -187,6 +187,7 @@ class MPState(object):
         self.functions = MAVFunctions()
         self.functions.say = say
         self.functions.process_stdin = process_stdin
+        self.select_extra = {}
 
     def master(self):
         '''return the currently chosen mavlink master object'''
@@ -714,8 +715,9 @@ def cmd_watch(args):
 
 def cmd_module(args):
     '''module commands'''
+    usage = "usage: module <list|load|reload>"
     if len(args) < 1:
-        print("usage: module <list|load|reload>")
+        print(usage)
         return
     if args[0] == "list":
         for m in mpstate.modules:
@@ -748,6 +750,8 @@ def cmd_module(args):
                 print("Reloaded module %s" % args[1])
                 return
         print("Unable to find module %s" % args[1])
+    else:
+        print(usage)
 
 
 command_map = {
@@ -1189,7 +1193,7 @@ def master_callback(m, master):
                     'WAYPOINT_ACK', 'MISSION_ACK',
                     'NAV_CONTROLLER_OUTPUT', 'GPS_RAW', 'GPS_RAW_INT', 'WAYPOINT',
                     'SCALED_PRESSURE', 'SENSOR_OFFSETS', 'MEMINFO', 'AP_ADC',
-                    'FENCE_POINT', 'FENCE_STATUS', 'DCM', 'RADIO', 'AHRS', 'HWSTATUS', 'SIMSTATE' ]:
+                    'FENCE_POINT', 'FENCE_STATUS', 'DCM', 'RADIO', 'AHRS', 'HWSTATUS', 'SIMSTATE', 'PPP' ]:
         pass
     else:
         mpstate.console.writeln("Got MAVLink msg: %s" % m)
@@ -1217,8 +1221,11 @@ def master_callback(m, master):
             except Exception, msg:
                 if mpstate.settings.moddebug == 1:
                     print(msg)
-                pass
-
+                elif mpstate.settings.moddebug > 1:
+                    import traceback
+                    exc_type, exc_value, exc_traceback = sys.exc_info()
+                    traceback.print_exception(exc_type, exc_value, exc_traceback,
+                                              limit=2, file=sys.stdout)
 
 def process_master(m):
     '''process packets from the MAVLink master'''
@@ -1428,6 +1435,9 @@ def main_loop():
         if rin == []:
             time.sleep(0.001)
             continue
+
+        for fd in mpstate.select_extra:
+            rin.append(fd)
         try:
             (rin, win, xin) = select.select(rin, [], [], 0.001)
         except select.error:
@@ -1440,9 +1450,25 @@ def main_loop():
             for master in mpstate.mav_master:
                 if fd == master.fd:
                     process_master(master)
+                    continue
             for m in mpstate.mav_outputs:
                 if fd == m.fd:
                     process_mavlink(m)
+                    continue
+
+            # this allow modules to register their own file descriptors
+            # for the main select loop
+            if fd in mpstate.select_extra:
+                try:
+                    # call the registered read function
+                    (fn, args) = mpstate.select_extra[fd]
+                    fn(args)
+                except Exception, msg:
+                    if mpstate.settings.moddebug == 1:
+                        print(msg)
+                    # on an exception, remove it from the select list
+                    mpstate.select_extra.pop(fd)
+                    
 
 
 def input_loop():
