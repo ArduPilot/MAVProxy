@@ -300,7 +300,7 @@ def transmit_thread():
             # full resolution with high quality
             if tcp_queue > 200000:
                 # very large queue, send in half quality
-                jpeg = scanner.jpeg_compress(im_640, state.quality*0.5)
+                jpeg = scanner.jpeg_compress(im_640, int(state.quality*0.5))
             elif tcp_queue > 100000:
                 # moderate queue, send in normal quality
                 jpeg = scanner.jpeg_compress(im_640, state.quality)
@@ -308,7 +308,7 @@ def transmit_thread():
                 # small queue, send in full res
                 im_full = numpy.zeros((960,1280,3),dtype='uint8')
                 scanner.debayer_full(im, im_full)
-                jpeg = scanner.jpeg_compress(im_full, max(state.quality, min(state.quality*2,80)))
+                jpeg = scanner.jpeg_compress(im_full, max(state.quality, min(state.quality*2, 80)))
         else:
             # this image didn't have a Joe. Don't send at all unless the TCP send queue is quite small.
             # if we do send, then send at low res
