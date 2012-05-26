@@ -70,7 +70,7 @@ class ConsoleFrame(wx.Frame):
     
     def __init__(self, state, title):
         self.state = state
-        wx.Frame.__init__(self, None, title=title, size=(600,300))
+        wx.Frame.__init__(self, None, title=title, size=(800,300))
         self.panel = wx.Panel(self)
         
         # values for the status bar
