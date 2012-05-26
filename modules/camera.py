@@ -45,6 +45,7 @@ class camera_state(object):
         self.brightness = 1.0
         self.quality = 75
         self.jpeg_size = 0
+        self.tcp_queue = 0
 
         self.last_watch = 0
         self.frame_loss = 0
@@ -87,9 +88,9 @@ def cmd_camera(args):
         state.running = False
         print("stopped camera capture")
     elif args[0] == "status":
-        print("Captured %u images  %u errors  %u scanned  %u regions %.1f fps  %.0f jpeg_size  %u lost  %u scanq" % (
+        print("Cap %u imgs  %u err %u scan  %u regions %.0f jsize %.0f tcpq %u lst %u sq" % (
             state.capture_count, state.error_count, state.scan_count, state.region_count, 
-            state.fps, state.jpeg_size, state.frame_loss, state.scan_queue.qsize()))
+            state.jpeg_size, state.tcp_queue, state.frame_loss, state.scan_queue.qsize()))
     elif args[0] == "queue":
         print("scan %u  save %u  transmit %u" % (
                 state.scan_queue.qsize(),
@@ -153,8 +154,8 @@ def get_base_time():
   print('Getting camare base_time')
   while frame_time is None:
     try:
-      base_time = time.time()
       im = numpy.zeros((960,1280),dtype='uint8' if state.depth==8 else 'uint16')
+      base_time = time.time()
       chameleon.trigger(h, False)
       frame_time, frame_counter, shutter = chameleon.capture(h, 1000, im)
       base_time -= frame_time
@@ -245,24 +246,26 @@ def scan_thread():
 
     while not state.unload.wait(0.02):
         try:
-            # keep the queue size below 30, so we don't run out of memory
-            if state.scan_queue.qsize() > 30:
+            # keep the queue size below 100, so we don't run out of memory
+            if state.scan_queue.qsize() > 100:
                 (frame_time,im) = state.scan_queue.get(timeout=0.2)
             (frame_time,im) = state.scan_queue.get(timeout=0.2)
         except Queue.Empty:
             continue
 
         t1 = time.time()
+        im_full = numpy.zeros((960,1280,3),dtype='uint8')
         im_640 = numpy.zeros((480,640,3),dtype='uint8')
-        scanner.debayer(im, im_640)
+        scanner.debayer_full(im, im_full)
+        scanner.downsample(im_full, im_640)
         regions = scanner.scan(im_640)
         t2 = time.time()
         state.scan_fps = 1.0 / (t2-t1)
         state.scan_count += 1
 
         state.region_count += len(regions)
-        if state.transmit_queue.qsize() < 20:
-            state.transmit_queue.put((frame_time, regions, im, im_640))
+        if state.transmit_queue.qsize() < 100:
+            state.transmit_queue.put((frame_time, regions, im_full, im_640))
 
 def log_joe_position(frame_time, regions, filename=None):
     '''add to joe.log if possible'''
@@ -285,7 +288,7 @@ def transmit_thread():
         if state.transmit_queue.empty():
             continue
 
-        (frame_time, regions, im, im_640) = state.transmit_queue.get()
+        (frame_time, regions, im_full, im_640) = state.transmit_queue.get()
         log_joe_position(frame_time, regions)
 
         if connected:
@@ -293,21 +296,27 @@ def transmit_thread():
         else:
             tcp_queue = 0
 
+        state.tcp_queue = 0.95*state.tcp_queue + 0.05 * tcp_queue
+
         jpeg = None
-        
+
         if len(regions) > 0:
             # this image had a Joe in it. Unless the sendq is very large, send the image in
             # full resolution with high quality
-            if tcp_queue > 200000:
+            if tcp_queue > 400000:
+                # very large queue, send in half quality
+                jpeg = scanner.jpeg_compress(im_640, int(state.quality*0.1))
+            elif tcp_queue > 200000:
+                # very large queue, send in half quality
+                jpeg = scanner.jpeg_compress(im_640, int(state.quality*0.3))
+            elif tcp_queue > 150000:
                 # very large queue, send in half quality
                 jpeg = scanner.jpeg_compress(im_640, int(state.quality*0.5))
-            elif tcp_queue > 100000:
+            elif tcp_queue > 80000:
                 # moderate queue, send in normal quality
                 jpeg = scanner.jpeg_compress(im_640, state.quality)
             else:
                 # small queue, send in full res
-                im_full = numpy.zeros((960,1280,3),dtype='uint8')
-                scanner.debayer_full(im, im_full)
                 jpeg = scanner.jpeg_compress(im_full, max(state.quality, min(state.quality*2, 80)))
         else:
             # this image didn't have a Joe. Don't send at all unless the TCP send queue is quite small.
@@ -336,7 +345,7 @@ def transmit_thread():
                 raise
             connected = True
         try:
-            port.send(cPickle.dumps((frame_time, regions, jpeg), protocol=cPickle.HIGHEST_PROTOCOL))
+            port.send(cPickle.dumps((frame_time, regions, jpeg, state.frame_loss, state.tcp_queue), protocol=cPickle.HIGHEST_PROTOCOL))
         except socket.error:
             port.close()
             port = None
@@ -367,8 +376,10 @@ def view_thread():
     cuav_util.mkdir_p(view_dir)
 
     mpstate.console.set_status('Images', 'Images %u' % image_count, row=6)
+    mpstate.console.set_status('Lost', 'Lost %u' % 0, row=6)
     mpstate.console.set_status('Regions', 'Regions %u' % region_count, row=6)
     mpstate.console.set_status('JPGSize', 'JPG Size %.0f' % 0.0, row=6)
+    mpstate.console.set_status('TCPQ', 'TCPQ %.0f' % 0.0, row=6)
 
     while not state.unload.wait(0.02):
         if state.viewing:
@@ -388,7 +399,7 @@ def view_thread():
                     continue
                 connected = True
             try:
-                (frame_time, regions, jpeg) = cPickle.load(pfile)
+                (frame_time, regions, jpeg, state.frame_loss, state.tcp_queue) = cPickle.load(pfile)
             except Exception:
                 sock.close()
                 pfile = None
@@ -424,8 +435,10 @@ def view_thread():
             image_count += 1
             region_count += len(regions)
             mpstate.console.set_status('Images', 'Images %u' % image_count)
+            mpstate.console.set_status('Lost', 'Lost %u' % state.frame_loss)
             mpstate.console.set_status('Regions', 'Regions %u' % region_count)
             mpstate.console.set_status('JPGSize', 'JPG Size %.0f' % state.jpeg_size)
+            mpstate.console.set_status('TCPQ', 'TCPQ %.0f' % state.tcp_queue)
         else:
             if view_window:
                 view_window = False
