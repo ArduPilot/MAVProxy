@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 '''camera control for ptgrey chameleon camera'''
 
-import time, threading, sys, os, numpy, Queue, cv, socket, errno, cPickle, signal, struct, fcntl
+import time, threading, sys, os, numpy, Queue, cv, socket, errno, cPickle, signal, struct, fcntl, select, cStringIO
 
 # use the camera code from the cuav repo (see githib.com/tridge)
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'camera'))
@@ -283,6 +283,8 @@ def transmit_thread():
 
     connected = False
     tx_count = 0
+    skip_count = 0
+    pfile = None
 
     while not state.unload.wait(0.02):
         if state.transmit_queue.empty():
@@ -321,10 +323,11 @@ def transmit_thread():
         else:
             # this image didn't have a Joe. Don't send at all unless the TCP send queue is quite small.
             # if we do send, then send at low res
-            if tcp_queue < 50000:
+            if tcp_queue < 50000 or (tx_count+skip_count) % 15 == 0:
                 jpeg = scanner.jpeg_compress(im_640, state.quality)
 
         if jpeg is None:
+            skip_count += 1
             continue
 
         # keep filtered image size
@@ -339,16 +342,20 @@ def transmit_thread():
             try:
                 port = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 port.connect((state.gcs_address, state.gcs_view_port))
+                pfile = cuav_util.PickleStreamOut(port)
+                print("Connected to GCS")
             except socket.error as e:
                 if e.errno in [ errno.EHOSTUNREACH, errno.ECONNREFUSED ]:
+                    print("failed to connect")
                     continue
                 raise
             connected = True
         try:
-            port.send(cPickle.dumps((frame_time, regions, jpeg, state.frame_loss, state.tcp_queue), protocol=cPickle.HIGHEST_PROTOCOL))
+            pfile.send((frame_time, regions, jpeg, state.frame_loss, state.tcp_queue))
         except socket.error:
             port.close()
             port = None
+            pfile = None
             connected = False
 
 def view_thread():
@@ -364,7 +371,7 @@ def view_thread():
     flags |= fcntl.FD_CLOEXEC
     fcntl.fcntl(port.fileno(), fcntl.F_SETFD, flags)
     port.bind(("", state.gcs_view_port))
-    port.listen(1)
+    port.listen(5)
     port.setblocking(1)
     sock = None
     pfile = None
@@ -391,19 +398,57 @@ def view_thread():
                 if state.boundary is not None:
                     boundary = cuav_util.polygon_load(state.boundary)
                     mosaic.set_boundary(boundary)
-            if not connected:
+
+            # wait for a new connection or an existing connection
+            rin = [port.fileno()]
+            if connected:
+                rin.append(sock.fileno())
+            try:
+                (rin, win, xin) = select.select(rin, [], [], 0.02)
+            except select.error:
+                cv.WaitKey(1)
+                continue
+            if port.fileno() in rin:
+                # a new TCP connection is coming in
+                if connected:
+                    # close any existing connection
+                    sock.close()
+                    connected = False
                 try:
+                    # get the new connection
                     (sock, remote) = port.accept()
-                    pfile = sock.makefile()
+                    connected = True
+                    pfile = cuav_util.PickleStreamIn()
+                    sock.setblocking(0)
                 except socket.error as e:
                     continue
-                connected = True
+                continue
+            if not connected:
+                continue
+            if not sock.fileno() in rin:
+                continue
+
             try:
-                (frame_time, regions, jpeg, state.frame_loss, state.tcp_queue) = cPickle.load(pfile)
+                # read some data from the socket
+                buf = sock.recv(10000)
             except Exception:
                 sock.close()
-                pfile = None
                 connected = False
+                continue
+            if len(buf) == 0:
+                # we reached EOF
+                sock.close()
+                connected = False
+                continue
+
+            pfile.write(buf)
+
+            try:
+                obj = pfile.get()
+                if obj == None:
+                    continue
+                (frame_time, regions, jpeg, state.frame_loss, state.tcp_queue) = obj
+            except Exception as e:
                 continue
 
             # keep filtered image size
