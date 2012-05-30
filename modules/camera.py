@@ -1,13 +1,20 @@
 #!/usr/bin/env python
 '''camera control for ptgrey chameleon camera'''
 
-import time, threading, sys, os, numpy, Queue, cv, socket, errno, cPickle, signal, struct, fcntl, select, cStringIO
+import time, threading, sys, os, numpy, Queue, cv, errno, cPickle, signal, struct, fcntl, select, cStringIO
 
 # use the camera code from the cuav repo (see githib.com/tridge)
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'camera'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'image'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'lib'))
-import chameleon, scanner, mavutil, cuav_mosaic, mav_position, cuav_util, cuav_joe
+import scanner, mavutil, cuav_mosaic, mav_position, cuav_util, cuav_joe, block_xmit
+
+# allow for replaying of previous flights
+if os.getenv('FAKE_CHAMELEON'):
+    print("Loaded fake chameleon backend")
+    import fake_chameleon as chameleon
+else:
+    import chameleon
 
 mpstate = None
 
@@ -39,13 +46,14 @@ class camera_state(object):
         self.depth = 8
         self.gcs_address = None
         self.gcs_view_port = 7543
+        self.bandwidth = 120000
         self.capture_brightness = 150
         self.gamma = 950
         self.lens = 5.0
         self.brightness = 1.0
         self.quality = 75
         self.jpeg_size = 0
-        self.tcp_queue = 0
+        self.xmit_queue = 0
 
         self.last_watch = 0
         self.frame_loss = 0
@@ -57,7 +65,7 @@ class camera_state(object):
                                       "camera")
         cuav_util.mkdir_p(self.camera_dir)
 
-        self.mpos = mav_position.MavInterpolator()
+        self.mpos = mav_position.MavInterpolator(backlog=500)
         self.joelog = cuav_joe.JoeLog(os.path.join(self.camera_dir, 'joe.log'))
 
 
@@ -88,9 +96,9 @@ def cmd_camera(args):
         state.running = False
         print("stopped camera capture")
     elif args[0] == "status":
-        print("Cap %u imgs  %u err %u scan  %u regions %.0f jsize %.0f tcpq %u lst %u sq" % (
+        print("Cap %u imgs  %u err %u scan  %u regions %.0f jsize %.0f xmitq %u lst %u sq" % (
             state.capture_count, state.error_count, state.scan_count, state.region_count, 
-            state.jpeg_size, state.tcp_queue, state.frame_loss, state.scan_queue.qsize()))
+            state.jpeg_size, state.xmit_queue, state.frame_loss, state.scan_queue.qsize()))
     elif args[0] == "queue":
         print("scan %u  save %u  transmit %u" % (
                 state.scan_queue.qsize(),
@@ -131,13 +139,18 @@ def cmd_camera(args):
             print("quality=%u" % state.quality)
         else:
             state.quality = int(args[1])
+    elif args[0] == "bandwidth":
+        if len(args) != 2:
+            print("bandwidth=%u" % state.bandwidth)
+        else:
+            state.bandwidth = int(args[1])
     elif args[0] == "boundary":
         if len(args) != 2:
             print("boundary=%s" % state.boundary)
         else:
             state.boundary = args[1]
     else:
-        print("usage: camera <start|stop|status|view|noview|gcs|brightness|capbrightness|boundary>")
+        print("usage: camera <start|stop|status|view|noview|gcs|brightness|capbrightness|boundary|bandwidth>")
 
 
 def get_base_time():
@@ -277,53 +290,80 @@ def log_joe_position(frame_time, regions, filename=None):
     except mav_position.MavInterpolatorException:
         return None
 
+
+class ImagePacket:
+    '''a jpeg image sent to the ground station'''
+    def __init__(self, frame_time, jpeg):
+        self.frame_time = frame_time
+        self.jpeg = jpeg
+
+class ThumbPacket:
+    '''a thumbnail region sent to the ground station'''
+    def __init__(self, frame_time, regions, thumb, frame_loss, xmit_queue):
+        self.frame_time = frame_time
+        self.regions = regions
+        self.thumb = thumb
+        self.frame_loss = frame_loss
+        self.xmit_queue = xmit_queue
+        
+
 def transmit_thread():
     '''thread for image transmit to GCS'''
     state = mpstate.camera_state
 
-    connected = False
     tx_count = 0
     skip_count = 0
-    pfile = None
+    bsend = block_xmit.BlockSender(0, state.bandwidth)
 
     while not state.unload.wait(0.02):
+        bsend.tick()
         if state.transmit_queue.empty():
             continue
 
         (frame_time, regions, im_full, im_640) = state.transmit_queue.get()
         log_joe_position(frame_time, regions)
 
-        if connected:
-            tcp_queue = cuav_util.socket_send_queue_size(port)
-        else:
-            tcp_queue = 0
-
-        state.tcp_queue = 0.95*state.tcp_queue + 0.05 * tcp_queue
+        state.xmit_queue = bsend.sendq_size()
 
         jpeg = None
 
+        if len(regions) > 0 and bsend.sendq_size() < 2000:
+            # send a region message with thumbnails to the ground station
+            thumb = cuav_mosaic.CompositeThumbnail(im_640, regions, quality=state.quality)
+            bsend.set_bandwidth(state.bandwidth)
+            pkt = ThumbPacket(frame_time, regions, thumb, state.frame_loss, state.xmit_queue)
+
+            # send matches with a higher priority
+            bsend.send(cPickle.dumps(pkt, cPickle.HIGHEST_PROTOCOL),
+                       dest=(state.gcs_address, state.gcs_view_port),
+                       priority=1)
+
+        # send the image itself, compressing according to the queue size
         if len(regions) > 0:
             # this image had a Joe in it. Unless the sendq is very large, send the image in
             # full resolution with high quality
-            if tcp_queue > 400000:
+            if state.xmit_queue > 300:
+                # nobody is listening
+                jpeg = None
+            elif state.xmit_queue > 50:
                 # very large queue, send in half quality
                 jpeg = scanner.jpeg_compress(im_640, int(state.quality*0.1))
-            elif tcp_queue > 200000:
+            elif state.xmit_queue > 20:
                 # very large queue, send in half quality
                 jpeg = scanner.jpeg_compress(im_640, int(state.quality*0.3))
-            elif tcp_queue > 150000:
+            elif state.xmit_queue > 10 or state.transmit_queue.qsize() > 50:
                 # very large queue, send in half quality
                 jpeg = scanner.jpeg_compress(im_640, int(state.quality*0.5))
-            elif tcp_queue > 80000:
+            elif state.xmit_queue > 5:
                 # moderate queue, send in normal quality
                 jpeg = scanner.jpeg_compress(im_640, state.quality)
             else:
                 # small queue, send in full res
                 jpeg = scanner.jpeg_compress(im_full, max(state.quality, min(state.quality*2, 80)))
         else:
-            # this image didn't have a Joe. Don't send at all unless the TCP send queue is quite small.
+            # this image didn't have a Joe. Don't send at all unless the send queue is quite small.
             # if we do send, then send at low res
-            if tcp_queue < 50000 or (tx_count+skip_count) % 15 == 0:
+            if state.xmit_queue < 5 or (tx_count+skip_count) % 15 == 0:
                 jpeg = scanner.jpeg_compress(im_640, state.quality)
 
         if jpeg is None:
@@ -335,28 +375,12 @@ def transmit_thread():
         
         tx_count += 1
 
-        if not connected:
-            # try to connect if the GCS viewer is ready
-            if state.gcs_address is None:
-                continue
-            try:
-                port = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                port.connect((state.gcs_address, state.gcs_view_port))
-                pfile = cuav_util.PickleStreamOut(port)
-                print("Connected to GCS")
-            except socket.error as e:
-                if e.errno in [ errno.EHOSTUNREACH, errno.ECONNREFUSED ]:
-                    print("failed to connect")
-                    continue
-                raise
-            connected = True
-        try:
-            pfile.send((frame_time, regions, jpeg, state.frame_loss, state.tcp_queue))
-        except socket.error:
-            port.close()
-            port = None
-            pfile = None
-            connected = False
+        if state.gcs_address is None:
+            continue
+        bsend.set_bandwidth(state.bandwidth)
+        pkt = ImagePacket(frame_time, jpeg)
+        bsend.send(cPickle.dumps(pkt, cPickle.HIGHEST_PROTOCOL),
+                   dest=(state.gcs_address, state.gcs_view_port))
 
 def view_thread():
     '''image viewing thread - this runs on the ground station'''
@@ -364,32 +388,27 @@ def view_thread():
     state = mpstate.camera_state
     view_window = False
 
-    connected = False
-    port = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    port.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    flags = fcntl.fcntl(port.fileno(), fcntl.F_GETFD)
-    flags |= fcntl.FD_CLOEXEC
-    fcntl.fcntl(port.fileno(), fcntl.F_SETFD, flags)
-    port.bind(("", state.gcs_view_port))
-    port.listen(5)
-    port.setblocking(1)
-    sock = None
-    pfile = None
+    bsend = block_xmit.BlockSender(state.gcs_view_port, state.bandwidth)
+
     view_window = False
     image_count = 0
     region_count = 0
     mosaic = None
     view_dir = os.path.join(state.camera_dir, "view")
+    thumb_dir = os.path.join(state.camera_dir, "thumb")
     cuav_util.mkdir_p(view_dir)
+    cuav_util.mkdir_p(thumb_dir)
 
     mpstate.console.set_status('Images', 'Images %u' % image_count, row=6)
     mpstate.console.set_status('Lost', 'Lost %u' % 0, row=6)
     mpstate.console.set_status('Regions', 'Regions %u' % region_count, row=6)
     mpstate.console.set_status('JPGSize', 'JPG Size %.0f' % 0.0, row=6)
-    mpstate.console.set_status('TCPQ', 'TCPQ %.0f' % 0.0, row=6)
+    mpstate.console.set_status('XMITQ', 'XMITQ %.0f' % 0.0, row=6)
 
     while not state.unload.wait(0.02):
         if state.viewing:
+            bsend.tick()
+            cv.WaitKey(1)
             if not view_window:
                 view_window = True
                 cv.NamedWindow('Viewer')
@@ -398,92 +417,73 @@ def view_thread():
                 if state.boundary is not None:
                     boundary = cuav_util.polygon_load(state.boundary)
                     mosaic.set_boundary(boundary)
-
-            # wait for a new connection or an existing connection
-            rin = [port.fileno()]
-            if connected:
-                rin.append(sock.fileno())
+            buf = bsend.recv(0)
+            if buf is None:
+                continue
             try:
-                (rin, win, xin) = select.select(rin, [], [], 0.02)
-            except select.error:
-                cv.WaitKey(1)
-                continue
-            if port.fileno() in rin:
-                # a new TCP connection is coming in
-                if connected:
-                    # close any existing connection
-                    sock.close()
-                    connected = False
-                try:
-                    # get the new connection
-                    (sock, remote) = port.accept()
-                    connected = True
-                    pfile = cuav_util.PickleStreamIn()
-                    sock.setblocking(0)
-                except socket.error as e:
-                    continue
-                continue
-            if not connected:
-                continue
-            if not sock.fileno() in rin:
-                continue
-
-            try:
-                # read some data from the socket
-                buf = sock.recv(10000)
-            except Exception:
-                sock.close()
-                connected = False
-                continue
-            if len(buf) == 0:
-                # we reached EOF
-                sock.close()
-                connected = False
-                continue
-
-            pfile.write(buf)
-
-            try:
-                obj = pfile.get()
+                obj = cPickle.loads(str(buf))
                 if obj == None:
                     continue
-                (frame_time, regions, jpeg, state.frame_loss, state.tcp_queue) = obj
             except Exception as e:
                 continue
 
-            # keep filtered image size
-            state.jpeg_size = 0.95 * state.jpeg_size + 0.05 * len(jpeg)
+            if isinstance(obj, ThumbPacket):
+                # we've received a set of thumbnails from the plane for a positive hit
 
-            filename = '%s/v%s.jpg' % (view_dir, cuav_util.frame_time(frame_time))
-            chameleon.save_file(filename, jpeg)
-            img = cv.LoadImage(filename)
-            if img.width == 1280:
-                display_img = cv.CreateImage((640, 480), 8, 3)
-                cv.Resize(img, display_img)
-            else:
-                display_img = img
+                # save the thumbnails
+                filename = '%s/v%s.jpg' % (thumb_dir, cuav_util.frame_time(obj.frame_time))
+                chameleon.save_file(filename, obj.thumb)
+                composite = cv.LoadImage(filename)
+                thumbs = cuav_mosaic.ExtractThumbs(composite, len(obj.regions))
 
-            # interpolate our current position, and add it to the
-            # mosaic
-            pos = log_joe_position(frame_time, regions, filename)
-            mosaic.add_regions(regions, display_img, filename, pos=pos)
-            if pos:
-                mosaic.add_image(filename, img, pos)
+                # log the joe positions
+                filename = '%s/v%s.jpg' % (view_dir, cuav_util.frame_time(obj.frame_time))
+                pos = log_joe_position(obj.frame_time, obj.regions, filename)
 
-            for r in regions:
-                (x1,y1,x2,y2) = r
-                cv.Rectangle(display_img, (x1,y1), (x2,y2), (255,0,0), 2)
-            cv.ConvertScale(display_img, display_img, scale=state.brightness)
-            cv.ShowImage('Viewer', display_img)
-            key = cv.WaitKey(1)
+                # update the mosaic and map
+                mosaic.add_regions(obj.regions, thumbs, filename, pos=pos)
 
-            image_count += 1
-            region_count += len(regions)
-            mpstate.console.set_status('Images', 'Images %u' % image_count)
-            mpstate.console.set_status('Lost', 'Lost %u' % state.frame_loss)
-            mpstate.console.set_status('Regions', 'Regions %u' % region_count)
-            mpstate.console.set_status('JPGSize', 'JPG Size %.0f' % state.jpeg_size)
-            mpstate.console.set_status('TCPQ', 'TCPQ %.0f' % state.tcp_queue)
+                # update console display
+                region_count += len(obj.regions)
+                state.frame_loss = obj.frame_loss
+                state.xmit_queue = obj.xmit_queue
+
+                mpstate.console.set_status('Lost', 'Lost %u' % state.frame_loss)
+                mpstate.console.set_status('Regions', 'Regions %u' % region_count)
+                mpstate.console.set_status('XMITQ', 'XMITQ %.0f' % state.xmit_queue)
+
+            if isinstance(obj, ImagePacket):
+                # we have an image from the plane
+
+                # save it to disk
+                filename = '%s/v%s.jpg' % (view_dir, cuav_util.frame_time(obj.frame_time))
+                chameleon.save_file(filename, obj.jpeg)
+                img = cv.LoadImage(filename)
+                    
+                # work out where we were at the time
+                try:
+                    pos = state.mpos.position(obj.frame_time, 0)
+                except mav_position.MavInterpolatorException:
+                    pos = None
+                if pos:
+                    mosaic.add_image(filename, img, pos)
+
+                img = cv.LoadImage(filename)
+                if img.width == 1280:
+                    display_img = cv.CreateImage((640, 480), 8, 3)
+                    cv.Resize(img, display_img)
+                else:
+                    display_img = img
+
+                cv.ConvertScale(display_img, display_img, scale=state.brightness)
+                cv.ShowImage('Viewer', display_img)
+
+                # update console
+                image_count += 1
+                state.jpeg_size = 0.95 * state.jpeg_size + 0.05 * len(obj.jpeg)
+                mpstate.console.set_status('Images', 'Images %u' % image_count)
+                mpstate.console.set_status('JPGSize', 'JPG Size %.0f' % state.jpeg_size)
+                
         else:
             if view_window:
                 view_window = False
