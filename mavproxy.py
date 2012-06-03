@@ -40,6 +40,7 @@ class MPSettings(object):
                       ('numcells', int),
                       ('speech', int),
                       ('mavfwd', int),
+                      ('mavfwd_rate', int),
                       ('streamrate', int),
                       ('streamrate2', int),
                       ('heartbeatreport', int),
@@ -57,6 +58,7 @@ class MPSettings(object):
         self.heartbeat = 1
         self.numcells = 0
         self.mavfwd = 1
+        self.mavfwd_rate = 0
         self.speech = 0
         self.streamrate = 4
         self.streamrate2 = 4
@@ -1210,9 +1212,12 @@ def master_callback(m, master):
 
     # don't pass along bad data
     if mtype != "BAD_DATA":
-        # pass messages along to listeners
-        for r in mpstate.mav_outputs:
-            r.write(m.get_msgbuf())
+        # pass messages along to listeners, except for REQUEST_DATA_STREAM, which
+        # would lead a conflict in stream rate setting between mavproxy and the other
+        # GCS
+        if mpstate.settings.mavfwd_rate or mtype != 'REQUEST_DATA_STREAM':
+            for r in mpstate.mav_outputs:
+                r.write(m.get_msgbuf())
 
         # pass to modules
         for mod in mpstate.modules:
@@ -1315,10 +1320,10 @@ def open_logs():
         print(fdir)
         logfile = os.path.join(fdir, 'flight.log')
         mpstate.status.logdir = fdir
-    print("Logging to %s" % logfile)
     mpstate.logfile_name = logfile
     mpstate.logfile = open(logfile, mode=mode)
     mpstate.logfile_raw = open(logfile+'.raw', mode=mode)
+    print("Logging to %s" % logfile)
 
     # queues for logging
     mpstate.logqueue = Queue.Queue()
