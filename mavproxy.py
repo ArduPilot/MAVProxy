@@ -444,8 +444,8 @@ def load_fence(filename):
     print("Loaded %u geo-fence points from %s" % (mpstate.status.fenceloader.count(), filename))
 
     # must disable geo-fencing when loading
-    action = get_mav_param('FENCE_ACTION', mavlink.FENCE_ACTION_NONE)
-    param_set('FENCE_ACTION', mavlink.FENCE_ACTION_NONE)
+    action = get_mav_param('FENCE_ACTION', mavutil.mavlink.FENCE_ACTION_NONE)
+    param_set('FENCE_ACTION', mavutil.mavlink.FENCE_ACTION_NONE)
     param_set('FENCE_TOTAL', mpstate.status.fenceloader.count())
     for i in range(mpstate.status.fenceloader.count()):
         p = mpstate.status.fenceloader.point(i)
@@ -845,7 +845,7 @@ def system_check():
     '''check that the system is ready to fly'''
     ok = True
 
-    if mavlink.WIRE_PROTOCOL_VERSION == '1.0':
+    if mavutil.mavlink.WIRE_PROTOCOL_VERSION == '1.0':
         if not 'GPS_RAW_INT' in mpstate.status.msgs:
             say("WARNING no GPS status")
             return
@@ -1164,7 +1164,7 @@ def master_callback(m, master):
         if mpstate.status.last_fence_breach != m.breach_time:
             say("fence breach")
         if mpstate.status.last_fence_status != m.breach_status:
-            if m.breach_status == mavlink.FENCE_BREACH_NONE:
+            if m.breach_status == mavutil.mavlink.FENCE_BREACH_NONE:
                 say("fence OK")
         mpstate.status.last_fence_breach = m.breach_time
         mpstate.status.last_fence_status = m.breach_status
@@ -1246,6 +1246,8 @@ def process_master(m):
         sys.stdout.flush()
         return
 
+    if m.first_byte:
+        m.auto_mavlink_version(s)
     msgs = m.mav.parse_buffer(s)
     if msgs:
         for msg in msgs:
@@ -1266,7 +1268,7 @@ def process_mavlink(slave):
         return
     try:
         m = slave.mav.decode(buf)
-    except mavlink.MAVError as e:
+    except mavutil.mavlink.MAVError as e:
         mpstate.console.error("Bad MAVLink slave message from %s: %s" % (slave.address, e.message))
         return
     if mpstate.settings.mavfwd and not mpstate.status.setup_mode:
@@ -1350,7 +1352,7 @@ def set_stream_rates():
         else:
             rate = mpstate.settings.streamrate2
         master.mav.request_data_stream_send(mpstate.status.target_system, mpstate.status.target_component,
-                                            mavlink.MAV_DATA_STREAM_ALL,
+                                            mavutil.mavlink.MAV_DATA_STREAM_ALL,
                                             rate, 1)
 
 def check_link_status():
@@ -1372,8 +1374,8 @@ def periodic_tasks():
     if heartbeat_period.trigger() and mpstate.settings.heartbeat != 0:
         mpstate.status.counters['MasterOut'] += 1
         for master in mpstate.mav_master:
-            if mavlink.WIRE_PROTOCOL_VERSION == '1.0':
-                master.mav.heartbeat_send(mavlink.MAV_TYPE_GCS, mavlink.MAV_AUTOPILOT_INVALID,
+            if master.mavlink10():
+                master.mav.heartbeat_send(mavutil.mavlink.MAV_TYPE_GCS, mavutil.mavlink.MAV_AUTOPILOT_INVALID,
                                           0, 0, 0)
             else:
                 MAV_GROUND = 5
