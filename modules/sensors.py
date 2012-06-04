@@ -71,6 +71,11 @@ def init(_mpstate):
         gps = mpstate.status.msgs['GPS_RAW']
         mpstate.sensors_state.ground_alt = gps.alt - mpstate.status.altitude
 
+    if 'GPS_RAW_INT' in mpstate.status.msgs:
+        # cope with reload
+        gps = mpstate.status.msgs['GPS_RAW_INT']
+        mpstate.sensors_state.ground_alt = (gps.alt/1.0e3) - mpstate.status.altitude
+
 def angle_diff(angle1, angle2):
     ret = angle1 - angle2
     if ret > 180:
@@ -105,29 +110,49 @@ def report_change(name, value, maxdiff=1, deltat=10):
 
 def check_heading(m):
     '''check heading discrepancy'''
-    gps = mpstate.status.msgs['GPS_RAW']
-    if gps.v < 3:
+    if 'GPS_RAW' in mpstate.status.msgs:
+        gps = mpstate.status.msgs['GPS_RAW']
+        if gps.v < 3:
+            return
+        diff = math.fabs(angle_diff(m.heading, gps.hdg))
+    elif 'GPS_RAW_INT' in mpstate.status.msgs:
+        gps = mpstate.status.msgs['GPS_RAW_INT']
+        if gps.vel < 300:
+            return
+        diff = math.fabs(angle_diff(m.heading, gps.cog/100.0))
+    else:
         return
-    diff = math.fabs(angle_diff(m.heading, gps.hdg))
     report('heading', diff<20, 'heading error %u' % diff)
 
 def check_altitude(m):
     '''check altitude discrepancy'''
-    gps = mpstate.status.msgs['GPS_RAW']
-    if gps.fix_type != 2:
+    if 'GPS_RAW' in mpstate.status.msgs:
+        gps = mpstate.status.msgs['GPS_RAW']
+        if gps.fix_type != 2:
+            return
+        v = gps.v
+        alt = gps.alt
+    elif 'GPS_RAW_INT' in mpstate.status.msgs:
+        gps = mpstate.status.msgs['GPS_RAW_INT']
+        if gps.fix_type != 3:
+            return
+        v = gps.vel/100
+        alt = gps.alt/1000
+    else:
         return
-    if gps.v > mpstate.sensors_state.max_speed:
-        mpstate.sensors_state.max_speed = gps.v
+
+    if v > mpstate.sensors_state.max_speed:
+        mpstate.sensors_state.max_speed = v
     if mpstate.sensors_state.max_speed < 5:
-        mpstate.sensors_state.ground_alt = gps.alt
+        mpstate.sensors_state.ground_alt = alt
         return
-    mpstate.sensors_state.gps_alt = gps.alt - mpstate.sensors_state.ground_alt
+    mpstate.sensors_state.gps_alt = alt - mpstate.sensors_state.ground_alt
     diff = math.fabs(mpstate.sensors_state.gps_alt - mpstate.status.altitude)
     report('altitude', diff<30, 'altitude error %u' % diff)
 
 def mavlink_packet(m):
     '''handle an incoming mavlink packet'''
-    if m.get_type() == 'VFR_HUD' and 'GPS_RAW' in mpstate.status.msgs:
+    if m.get_type() == 'VFR_HUD' and ( 'GPS_RAW' in mpstate.status.msgs or 'GPS_RAW_INT' in mpstate.status.msgs ):
         check_heading(m)
         check_altitude(m)
         if mpstate.sensors_state.speed_report:

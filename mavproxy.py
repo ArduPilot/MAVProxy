@@ -849,7 +849,7 @@ def system_check():
         if not 'GPS_RAW_INT' in mpstate.status.msgs:
             say("WARNING no GPS status")
             return
-        if mpstate.status.msgs['GPS_RAW_INT'].fix_type != 2:
+        if mpstate.status.msgs['GPS_RAW_INT'].fix_type != 3:
             say("WARNING no GPS lock")
             ok = False
     else:
@@ -1104,7 +1104,7 @@ def master_callback(m, master):
         have_gps_fix = False
         if 'GPS_RAW' in mpstate.status.msgs and mpstate.status.msgs['GPS_RAW'].fix_type == 2:
             have_gps_fix = True
-        if 'GPS_RAW_INT' in mpstate.status.msgs and mpstate.status.msgs['GPS_RAW_INT'].fix_type == 2:
+        if 'GPS_RAW_INT' in mpstate.status.msgs and mpstate.status.msgs['GPS_RAW_INT'].fix_type == 3:
             have_gps_fix = True
         if have_gps_fix and not mpstate.status.have_gps_lock:
                 mpstate.status.last_altitude_announce = 0.0
