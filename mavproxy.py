@@ -1267,6 +1267,8 @@ def process_mavlink(slave):
     except socket.error:
         return
     try:
+        if slave.first_byte:
+            slave.auto_mavlink_version(buf)
         m = slave.mav.decode(buf)
     except mavutil.mavlink.MAVError as e:
         mpstate.console.error("Bad MAVLink slave message from %s: %s" % (slave.address, e.message))
