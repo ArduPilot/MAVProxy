@@ -68,10 +68,10 @@ class UI():
         'Flight mode MANUAL':0,
         'Trim set from controller':0,
         'Avionics Battery':0,
-        'Compass Offsets':0,
-        'Accelerometers Calibrated':0,
-        'Gyros Calibrated':0,
-        'Aircraft Params Loaded':0,
+        'Compass Calibrated':0,
+        'Accelerometers and Gyros Calibrated':0,
+        'UAV Level':0,
+        'Aircraft Params Loaded':2,
         'Radio Links > 6db margin':0,
         'Waypoints Loaded':0
         }
