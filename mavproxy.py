@@ -1545,16 +1545,13 @@ if __name__ == '__main__':
     parser.add_option("--aircraft", dest="aircraft", help="aircraft name", default=None)
     parser.add_option("--cmd", dest="cmd", help="initial commands", default=None)
     parser.add_option("--console", action='store_true', help="use GUI console")
-    parser.add_option("--mav10", action='store_true', default=False, help="Use MAVLink protocol 1.0")
+    parser.add_option("--mav09", action='store_true', default=False, help="Use MAVLink protocol 0.9")
     parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
     
     (opts, args) = parser.parse_args()
 
-    if opts.mav10 or os.getenv('MAVLINK10'):
-        os.environ['MAVLINK10'] = '1'
-        import mavlinkv10 as mavlink
-    else:
-        import mavlink as mavlink
+    if opts.mav09:
+        os.environ['MAVLINK09'] = '1'
     import mavutil, mavwp
 
     # global mavproxy state
