@@ -80,14 +80,14 @@ class UI():
         'Flight control surfaces responsive':2,
         'Engine throttle responsive':2,
         'Runway clear':2,
-        'Compass active':2,
+        'Compass active':0,
         'IMU OK':2,
         'Set flight timer and alarm':2
         }
 
         self.beforeCruiseList = {
-        'Airspeed > 20 m/s':2,
-        'Altitude > 30 m':2,
+        'Airspeed > 10 m/s':0,
+        'Altitude > 30 m':0,
         '< 100 degrees to 1st Waypoint':2
         }
 
@@ -117,16 +117,16 @@ class UI():
         EngineLabel = tk.Label(frame, text="Before Engine Start")
         BootLabel = tk.Label(frame, text="Before Takeoff")
         FlightLabel = tk.Label(frame, text="Before Cruise/AUTO")
-        BottleLabel = tk.Label(frame, text="Bottle Drop")
-        LandLabel = tk.Label(frame, text="Before Landing")
-        ShutdownLabel = tk.Label(frame, text="Before Shutdown")
+        '''BottleLabel = tk.Label(frame, text="Bottle Drop")'''
+        '''LandLabel = tk.Label(frame, text="Before Landing")'''
+        '''ShutdownLabel = tk.Label(frame, text="Before Shutdown")'''
         AssemblyLabel.grid(row=0, column=0)
         EngineLabel.grid(row=0, column=1)
         BootLabel.grid(row=0, column=2)
         FlightLabel.grid(row=0, column=3)
-        BottleLabel.grid(row=0, column=4)
-        LandLabel.grid(row=0, column=5)
-        ShutdownLabel.grid(row=0, column=6)
+        '''BottleLabel.grid(row=0, column=4)'''
+        '''LandLabel.grid(row=0, column=5)'''
+        '''ShutdownLabel.grid(row=0, column=6)'''
 
         '''before assembly checklist'''
         i = 1
@@ -193,7 +193,7 @@ class UI():
         self.beforeCruiseButton.grid(row = i, column=3, sticky='w')
 
         '''Before bottle drop'''
-        i=1
+        '''i=1
         for key in self.bottleDropList:     
             if self.bottleDropList[key] == 0:
                 self.bottleDropList[key] = tk.IntVar()
@@ -206,10 +206,10 @@ class UI():
             i = i+1
 
         self.bottleDropButton = tk.Button(text='Bottle drop completed', state="disabled", command=self.bottleDropCheck)      
-        self.bottleDropButton.grid(row = i, column=4, sticky='w')
+        self.bottleDropButton.grid(row = i, column=4, sticky='w')'''
 
         '''Before landing'''
-        i=1
+        '''i=1
         for key in self.beforeLandingList:     
             if self.beforeLandingList[key] == 0:
                 self.beforeLandingList[key] = tk.IntVar()
@@ -222,10 +222,10 @@ class UI():
             i = i+1
 
         self.beforeLandingButton = tk.Button(text='Ready for landing', state="disabled", command=self.beforeLandingCheck)      
-        self.beforeLandingButton.grid(row = i, column=5, sticky='w')
+        self.beforeLandingButton.grid(row = i, column=5, sticky='w')'''
 
         '''before shutdown checklist'''
-        i = 1
+        '''i = 1
         for key in self.beforeShutdownList:     
             if self.beforeShutdownList[key] == 0:
                 self.beforeShutdownList[key] = tk.IntVar()
@@ -238,7 +238,7 @@ class UI():
             i = i+1
 
         self.beforeShutdownButton = tk.Button(text='Shutdown', state="disabled", command=self.beforeShutdownCheck)      
-        self.beforeShutdownButton.grid(row = i, column=6, sticky='w')
+        self.beforeShutdownButton.grid(row = i, column=6, sticky='w')'''
 
 
     def beforeAssemblyListCheck(self):
@@ -326,7 +326,8 @@ class UI():
                 child.config(state="disabled")
 
         '''if we made it here, the checklist is OK'''
-        self.bottleDropButton.config(state="normal")
+        '''self.bottleDropButton.config(state="normal")'''
+        tkMessageBox.showinfo("Information", "Checklist Completed!")
         self.beforeCruiseButton.config(text='Checklist Completed', state="disabled")
         self.curStep = 4
 
@@ -429,7 +430,7 @@ class UI():
 
 
         '''print("in here")'''
-        self.root.after(1000, self.on_timer)
+        self.root.after(500, self.on_timer)
 
     def set_status(self, name, status):
         '''set a status value'''
@@ -444,14 +445,6 @@ if __name__ == "__main__":
     checklist = UI()
     
     while checklist.is_alive():
-        '''console.write('Tick', fg='red')
-        console.write(" %s " % time.asctime())
-        console.writeln('tock', bg='yellow')
-        console.set_status('GPS', 'GPS: OK', fg='blue', bg='green')
-        console.set_status('Link1', 'Link1: OK', fg='green', bg='write')
-        console.set_status('Date', 'Date: %s' % time.asctime(), fg='red', bg='write', row=2)'''
-        '''print("main loop")'''
-        '''print "curStep = " + str(checklist.curStep)'''
         checklist.set_status("Compass Offsets", 1)
         time.sleep(0.5)
 

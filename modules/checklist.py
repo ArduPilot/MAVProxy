@@ -40,6 +40,8 @@ def mavlink_packet(msg):
 
     type = msg.get_type() 
 
+    master = mpstate.master()
+
     if type == 'HEARTBEAT':
         '''beforeEngineList - APM booted'''
         if mpstate.status.heartbeat_error == True:
@@ -74,10 +76,10 @@ def mavlink_packet(msg):
 
     if type == 'ATTITUDE':
         '''beforeEngineList - UAV Level'''
-        if (math.fabs(math.degrees(msg.pitch)) < 5 or math.fabs(math.degrees(msg.roll)) < 5):
-            mpstate.checklist.set_status("UAV Level", 0)
-        else:
+        if (math.fabs(math.degrees(msg.pitch)) < 3 and math.fabs(math.degrees(msg.roll)) < 3):
             mpstate.checklist.set_status("UAV Level", 1)
+        else:
+            mpstate.checklist.set_status("UAV Level", 0)
 
     if type == 'GPS_RAW':
         '''beforeEngineList - GPS lock'''
@@ -87,10 +89,11 @@ def mavlink_packet(msg):
             mpstate.checklist.set_status("GPS lock", 1)
 
     '''beforeEngineList - Radio Links > 6db margin TODO: figure out how to read db levels'''
-    for master in mpstate.mav_master:
-        mpstate.checklist.set_status("Radio Links > 6db margin", 1)
-        if master.linkerror or master.link_delayed:
-            mpstate.checklist.set_status("Radio Links > 6db margin", 0)
+    if type == 'HEARTBEAT':
+        for master in mpstate.mav_master:
+            mpstate.checklist.set_status("Radio Links > 6db margin", 1)
+            if master.linkerror or master.link_delayed:
+                mpstate.checklist.set_status("Radio Links > 6db margin", 0)
 
     if type == 'SYS_STATUS':
         '''beforeEngineList - Avionics Battery'''
@@ -119,10 +122,23 @@ def mavlink_packet(msg):
         else:
             mpstate.checklist.set_status("Trim set from controller", 1)
 
+    '''beforeTakeoffList - Compass active'''
+    if type == 'GPS_RAW':
+        if math.fabs(msg.hdg - master.field('VFR_HUD', 'heading', '-')) < 10 or math.fabs(msg.hdg - master.field('VFR_HUD', 'heading', '-')) > 355:
+            mpstate.checklist.set_status("Compass active", 1)
+        else:
+            mpstate.checklist.set_status("Compass active", 0)
 
-
-
-
+    '''beforeCruiseList - Airspeed > 10 m/s , Altitude > 30 m'''
+    if type == 'VFR_HUD':
+         if mpstate.status.altitude > 30:
+             mpstate.checklist.set_status("Altitude > 30 m", 1)
+         else:
+             mpstate.checklist.set_status("Altitude > 30 m", 0)
+         if msg.airspeed > 10 or msg.groundspeed > 10:
+             mpstate.checklist.set_status("Airspeed > 10 m/s", 1)
+         else:
+             mpstate.checklist.set_status("Airspeed > 10 m/s", 0)
 
 
 
