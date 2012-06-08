@@ -172,6 +172,7 @@ class MPState(object):
     '''holds state of mavproxy'''
     def __init__(self):
         self.console = textconsole.SimpleConsole()
+        self.map = None
         self.settings = MPSettings()
         self.status = MPStatus()
 
@@ -1547,6 +1548,7 @@ if __name__ == '__main__':
     parser.add_option("--aircraft", dest="aircraft", help="aircraft name", default=None)
     parser.add_option("--cmd", dest="cmd", help="initial commands", default=None)
     parser.add_option("--console", action='store_true', help="use GUI console")
+    parser.add_option("--map", action='store_true', help="load map module")
     parser.add_option("--mav09", action='store_true', default=False, help="Use MAVLink protocol 0.9")
     parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
     
@@ -1643,6 +1645,9 @@ Auto-detected serial ports are:
 
     if opts.console:
         process_stdin('module load console')
+
+    if opts.map:
+        process_stdin('module load map')
 
     if opts.cmd is not None:
         cmds = opts.cmd.split(';')
