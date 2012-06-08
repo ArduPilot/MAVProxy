@@ -9,25 +9,28 @@ import mp_util, mp_tile, math, cv, time
 
 class SlipObject:
     '''an object to display on the map'''
-    def __init__(self, key, layer, bounds):
+    def __init__(self, key, layer):
         self.key = key
         self.layer = layer
-        self.bounds = bounds
-
 
 class SlipPolygon(SlipObject):
     '''a polygon to display on the map'''
     def __init__(self, key, points, layer, colour, linewidth):
-        SlipObject.__init__(self, key, layer, mp_util.polygon_bounds(points))
+        SlipObject.__init__(self, key, layer, )
         self.points = points
         self.colour = colour
         self.linewidth = linewidth
+        self._bounds = mp_util.polygon_bounds(self.points)
+
+    def bounds(self):
+        '''return bounding box'''
+        return self._bounds
 
 
 class SlipThumbnail(SlipObject):
     '''a thumbnail to display on the map'''
-    def __init__(self, key, latlon, layer, img, border_colour, border_width):
-        SlipObject.__init__(self, key, layer, (latlon[0], latlon[1], 0, 0))
+    def __init__(self, key, latlon, layer, img, border_colour=None, border_width=0):
+        SlipObject.__init__(self, key, layer)
         self.latlon = latlon
         self._img = None
         self.imgstr = img.tostring()
@@ -35,6 +38,10 @@ class SlipThumbnail(SlipObject):
         self.height = img.height
         self.border_width = border_width
         self.border_colour = border_colour
+
+    def bounds(self):
+        '''return bounding box'''
+        return (self.latlon[0], self.latlon[1], 0, 0)
 
     def img(self):
         '''return a cv image for the thumbnail'''
@@ -46,7 +53,39 @@ class SlipThumbnail(SlipObject):
         if self.border_width and self.border_colour is not None:
             cv.Rectangle(self._img, (0,0), (self.width-1,self.height-1), self.border_colour, self.border_width)
         return self._img
+
+
+class SlipIcon(SlipThumbnail):
+    '''a icon to display on the map'''
+    def __init__(self, key, latlon, layer, img, rotation=0, follow=False):
+        SlipThumbnail.__init__(self, key, latlon, layer, img)
+        self.rotation = rotation
+        self.follow = follow
         
+    def img(self):
+        '''return a cv image for the icon'''
+        SlipThumbnail.img(self)
+
+        if self.rotation:
+            # rotate the image
+            mat = cv.CreateMat(2, 3, cv.CV_32FC1)
+            cv.GetRotationMatrix2D((self.width/2,self.height/2),
+                                   -self.rotation, 1.0, mat)
+            self._rotated = cv.CloneImage(self._img)
+            cv.WarpAffine(self._img, self._rotated, mat)
+        else:
+            self._rotated = self._img
+        return self._rotated
+
+
+class SlipPosition:
+    '''an position object to move an existing object on the map'''
+    def __init__(self, key, latlon, layer=None, rotation=0):
+        self.key = key
+        self.layer = layer
+        self.latlon = latlon
+        self.rotation = rotation
+
 
 class MPSlipMap():
     '''
@@ -124,6 +163,14 @@ class MPSlipMap():
     def add_thumbnail(self, key, latlon, img, layer=1, border_width=0, border_colour=None):
         '''add a thumbnail on the map'''
         self.pipe.send(SlipThumbnail(key, latlon, layer, img, border_colour, border_width))
+
+    def add_icon(self, key, latlon, img, layer=1, rotation=0):
+        '''add a icon on the map'''
+        self.pipe.send(SlipIcon(key, latlon, layer, img, rotation))
+
+    def set_icon_position(self, key, latlon, layer=None, rotation=0):
+        '''move an icon on the map'''
+        self.pipe.send(SlipPosition(key, latlon, layer, rotation))
         
 
 import wx
@@ -139,6 +186,17 @@ class MPSlipMapFrame(wx.Frame):
         state.panel = MPSlipMapPanel(self, state)
         self.Bind(wx.EVT_IDLE, self.on_idle)
         self.Bind(wx.EVT_SIZE, state.panel.on_size)
+
+    def find_object(self, key, layers):
+        '''find an object to be modified'''
+        state = self.state
+
+        if layers is None:
+            layers = state.layers.keys()
+        for layer in layers:
+            if key in state.layers[layer]:
+                return state.layers[layer][key]
+        return None
         
     def on_idle(self, event):
         '''prevent the main loop spinning too fast'''
@@ -147,13 +205,24 @@ class MPSlipMapFrame(wx.Frame):
         # receive any display objects from the parent
         while state.pipe.poll():
             obj = state.pipe.recv()
+
             if isinstance(obj, SlipObject):
                 if not obj.layer in state.layers:
                     # its a new layer
                     state.layers[obj.layer] = {}
                 state.layers[obj.layer][obj.key] = obj
                 state.need_redraw = True
+
+            if isinstance(obj, SlipPosition):
+                # move an object
+                object = self.find_object(obj.key, obj.layer)
+                if object is not None:
+                    object.latlon = obj.latlon
+                    if hasattr(object, 'rotation'):
+                        object.rotation = obj.rotation
+                    state.need_redraw = True
         time.sleep(0.1)
+
 
 class ImagePanel(wx.Panel):
     '''a resizable panel containing an image'''
@@ -289,16 +358,8 @@ class MPSlipMapPanel(wx.Panel):
         pix1,pix2 = clipped
         cv.Line(img, pix1, pix2, colour, linewidth)
 
-    def draw_thumbnail(self, obj, img):
-        '''draw a thumbnail on the image'''
-        thumb = obj.img()
-        (px,py) = self.pixel_coords(obj.latlon)
-
-        # find top left
-        px -= thumb.width/2
-        py -= thumb.height/2
-        w = thumb.width
-        h = thumb.height
+    def clip_rect(self, px, py, w, h, img):
+        '''clip an image for display on the map'''
         sx = 0
         sy = 0
         
@@ -310,19 +371,49 @@ class MPSlipMapPanel(wx.Panel):
             sy = -py
             h += py
             py = 0
-        if px >= img.width or py >= img.height:
-            print('clip failed')
-            return
         if px+w > img.width:
             w = img.width - px
         if py+h > img.height:
-            h = img.height - py            
+            h = img.height - py
+        return (px, py, sx, sy, w, h)
+
+    def draw_thumbnail(self, obj, img):
+        '''draw a thumbnail on the image'''
+        thumb = obj.img()
+        (px,py) = self.pixel_coords(obj.latlon)
+
+        # find top left
+        px -= thumb.width/2
+        py -= thumb.height/2
+        w = thumb.width
+        h = thumb.height
+
+        (px, py, sx, sy, w, h) = self.clip_rect(px, py, w, h, img)
 
         cv.SetImageROI(thumb, (sx, sy, w, h))
         cv.SetImageROI(img, (px, py, w, h))
         cv.Copy(thumb, img)
         cv.ResetImageROI(img)
         cv.ResetImageROI(thumb)
+
+    def draw_icon(self, obj, img):
+        '''draw a icon on the image'''
+        icon = obj.img()
+        (px,py) = self.pixel_coords(obj.latlon)
+
+        # find top left
+        px -= icon.width/2
+        py -= icon.height/2
+        w = icon.width
+        h = icon.height
+
+        (px, py, sx, sy, w, h) = self.clip_rect(px, py, w, h, img)
+
+        cv.SetImageROI(icon, (sx, sy, w, h))
+        cv.SetImageROI(img, (px, py, w, h))
+        cv.Add(icon, img, img)
+        cv.ResetImageROI(img)
+        cv.ResetImageROI(icon)
 
     def draw_polygon(self, obj, img):
         '''draw a polygon on the image'''
@@ -333,6 +424,8 @@ class MPSlipMapPanel(wx.Panel):
         '''draw an object on the image'''
         if isinstance(obj, SlipPolygon):
             self.draw_polygon(obj, img)
+        elif isinstance(obj, SlipIcon):
+            self.draw_icon(obj, img)
         elif isinstance(obj, SlipThumbnail):
             self.draw_thumbnail(obj, img)
 
@@ -342,7 +435,7 @@ class MPSlipMapPanel(wx.Panel):
         keys.sort()
         for k in keys:
             obj = objects[k]
-            if mp_util.bounds_overlap(bounds, obj.bounds):
+            if mp_util.bounds_overlap(bounds, obj.bounds()):
                 self.draw_object(obj, img)
 
     def redraw_map(self):
@@ -436,7 +529,8 @@ class MPSlipMapPanel(wx.Panel):
         for l in state.layers:
             keys = state.layers[l].keys()[:]
             for key in keys:
-                if isinstance(state.layers[l][key], SlipThumbnail):
+                if (isinstance(state.layers[l][key], SlipThumbnail)
+                    and not isinstance(state.layers[l][key], SlipIcon)):
                     state.layers[l].pop(key)
 
     def on_key_down(self, event):
@@ -472,6 +566,7 @@ if __name__ == "__main__":
     parser.add_option("--debug", action='store_true', default=False, help="show debug info")
     parser.add_option("--boundary", default=None, help="show boundary")
     parser.add_option("--thumbnail", default=None, help="show thumbnail")
+    parser.add_option("--icon", default=None, help="show icon")
     (opts, args) = parser.parse_args()
     
     sm = MPSlipMap(lat=opts.lat,
@@ -489,6 +584,11 @@ if __name__ == "__main__":
     if opts.thumbnail:
         thumb = cv.LoadImage(opts.thumbnail)
         sm.add_thumbnail('thumb', (opts.lat,opts.lon), thumb, layer=2, border_width=2, border_colour=(255,0,0))
+
+    if opts.icon:
+        icon = cv.LoadImage(opts.icon)
+        sm.add_icon('icon', (opts.lat,opts.lon), icon, layer=3, rotation=90)
+        sm.set_icon_position('icon', mp_util.gps_newpos(opts.lat,opts.lon, 180, 100), rotation=45)
             
     while sm.is_alive():
         time.sleep(0.1)

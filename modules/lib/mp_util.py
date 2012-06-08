@@ -122,3 +122,41 @@ def bounds_overlap(bound1, bound2):
 	if y2+h2 < y1:
 		return False
 	return True
+
+
+
+# see http://pybox2d.blogspot.com.au/2009/01/swig-and-pickle.html
+# for information on pickling swig objects
+
+def swig_setstate(self, dict):
+	'''a replacement __setstate__ method for swig objects'''
+	self.__init__()
+	for key, value in dict.iteritems():
+		try:
+			setattr(self, key, value)
+		except Exception:
+			pass
+
+def swig_getstate(self):
+	'''a replacement __getstate__ method for swig objects'''
+	ret = {}
+	for v in dir(self):
+		if not v.startswith('__') and v != 'this':
+			try:
+				a = getattr(self, v)
+				# nasty hack ....
+				if hasattr(a, '__call__') or hasattr(a, '__swig_destroy__'):
+					continue
+				if str(a).find('Swig Object') != -1:
+					continue
+				ret[v] = a
+			except Exception:
+				pass
+	return ret
+
+def pickle_enable(type):
+	'''make a swig type picklable'''
+	if getattr(type, '__setstate__', None) is None:
+		type.__setstate__ = swig_setstate
+	if getattr(type, '__getstate__', None) is None:
+		type.__getstate__ = swig_getstate
