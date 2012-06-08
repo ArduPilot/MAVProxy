@@ -7,7 +7,8 @@ import time, threading, sys, os, numpy, Queue, cv, errno, cPickle, signal, struc
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'camera'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'image'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'lib'))
-import scanner, mavutil, cuav_mosaic, mav_position, cuav_util, cuav_joe, block_xmit
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib'))
+import scanner, mavutil, cuav_mosaic, mav_position, cuav_util, cuav_joe, block_xmit, mp_image
 
 # allow for replaying of previous flights
 if os.getenv('FAKE_CHAMELEON'):
@@ -114,6 +115,9 @@ def cmd_camera(args):
                 state.bandwidth_used,
                 state.rtt_estimate))
     elif args[0] == "view":
+        if mpstate.map is None:
+            print("Please load map module first")
+            return
         if not state.viewing:
             print("Starting image viewer")
         if state.view_thread is None:
@@ -412,6 +416,8 @@ def view_thread():
     cuav_util.mkdir_p(view_dir)
     cuav_util.mkdir_p(thumb_dir)
 
+    img_window = mp_image.MPImage(title='Camera')
+
     mpstate.console.set_status('Images', 'Images %u' % image_count, row=6)
     mpstate.console.set_status('Lost', 'Lost %u' % 0, row=6)
     mpstate.console.set_status('Regions', 'Regions %u' % region_count, row=6)
@@ -428,9 +434,8 @@ def view_thread():
             cv.WaitKey(1)
             if not view_window:
                 view_window = True
-                cv.NamedWindow('Viewer')
                 key = cv.WaitKey(1)
-                mosaic = cuav_mosaic.Mosaic(lens=state.lens)
+                mosaic = cuav_mosaic.Mosaic(slipmap=mpstate.map, lens=state.lens)
                 if state.boundary is not None:
                     boundary = cuav_util.polygon_load(state.boundary)
                     mosaic.set_boundary(boundary)
@@ -500,7 +505,7 @@ def view_thread():
                     display_img = img
 
                 cv.ConvertScale(display_img, display_img, scale=state.brightness)
-                cv.ShowImage('Viewer', display_img)
+                img_window.set_image(display_img, bgr=True)
 
                 # update console
                 image_count += 1
@@ -513,11 +518,6 @@ def view_thread():
         else:
             if view_window:
                 view_window = False
-                cv.DestroyWindow('Viewer')
-                for i in range(5):
-                    # OpenCV bug - need to wait multiple times on destroy for all
-                    # events to be processed
-                    key = cv.WaitKey(1)
 
 
 def start_thread(fn):

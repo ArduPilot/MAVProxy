@@ -44,7 +44,7 @@ def init(_mpstate):
 
 def unload():
     '''unload module'''
-    stop_antenna_link()
+    pass
 
 def mavlink_packet(m):
     '''handle an incoming mavlink packet'''
