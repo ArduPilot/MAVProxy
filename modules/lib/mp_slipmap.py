@@ -5,11 +5,52 @@ Andrew Tridgell
 June 2012
 '''
 
-import mp_util, mp_tile, math, cv
+import mp_util, mp_tile, math, cv, time
+
+class SlipObject:
+    '''an object to display on the map'''
+    def __init__(self, key, layer, bounds):
+        self.key = key
+        self.layer = layer
+        self.bounds = bounds
+
+
+class SlipPolygon(SlipObject):
+    '''a polygon to display on the map'''
+    def __init__(self, key, points, layer, colour, linewidth):
+        SlipObject.__init__(self, key, layer, mp_util.polygon_bounds(points))
+        self.points = points
+        self.colour = colour
+        self.linewidth = linewidth
+
+
+class SlipThumbnail(SlipObject):
+    '''a thumbnail to display on the map'''
+    def __init__(self, key, latlon, layer, img, border_colour, border_width):
+        SlipObject.__init__(self, key, layer, (latlon[0], latlon[1], 0, 0))
+        self.latlon = latlon
+        self._img = None
+        self.imgstr = img.tostring()
+        self.width = img.width
+        self.height = img.height
+        self.border_width = border_width
+        self.border_colour = border_colour
+
+    def img(self):
+        '''return a cv image for the thumbnail'''
+        if self._img is not None:
+            return self._img
+        self._img = cv.CreateImage((self.width, self.height), 8, 3)
+        cv.SetData(self._img, self.imgstr)
+        cv.CvtColor(self._img, self._img, cv.CV_BGR2RGB)
+        if self.border_width and self.border_colour is not None:
+            cv.Rectangle(self._img, (0,0), (self.width-1,self.height-1), self.border_colour, self.border_width)
+        return self._img
+        
 
 class MPSlipMap():
     '''
-    a generic image viewer widget for use in MP tools
+    a generic map viewer widget for use in mavproxy
     '''
     def __init__(self,
                  title='SlipMap',
@@ -18,21 +59,23 @@ class MPSlipMap():
                  width=800,
                  height=600,
                  ground_width=1000,
-                 tile_delay=1.0,
+                 tile_delay=0.3,
                  service="MicrosoftSat",
                  max_zoom=19,
                  debug=False,
                  download=True):
         import multiprocessing
 
-        self.mt = mp_tile.MPTile(download=download, service=service,
-                                 tile_delay=tile_delay, debug=debug,
-                                 max_zoom=max_zoom)
         self.lat = lat
         self.lon = lon
         self.width = width
         self.height = height
         self.ground_width = ground_width
+        self.download = download
+        self.service = service
+        self.tile_delay = tile_delay
+        self.debug = debug
+        self.max_zoom = max_zoom
 
         self.drag_step = 10
 
@@ -42,12 +85,23 @@ class MPSlipMap():
         self.close_window.clear()
         self.child = multiprocessing.Process(target=self.child_task)
         self.child.start()
+        self.pipe = self.parent_pipe
 
 
     def child_task(self):
         '''child process - this holds all the GUI elements'''
-        import wx, matplotlib
-        matplotlib.use('WXAgg')
+        import wx
+        state = self
+        
+        self.mt = mp_tile.MPTile(download=self.download,
+                                 service=self.service,
+                                 tile_delay=self.tile_delay,
+                                 debug=self.debug,
+                                 max_zoom=self.max_zoom)
+        state.layers = {}
+        state.need_redraw = True
+        
+        self.pipe = self.child_pipe
         self.app = wx.PySimpleApp()
         self.app.frame = MPSlipMapFrame(state=self)
         self.app.frame.Show()
@@ -62,6 +116,15 @@ class MPSlipMap():
     def is_alive(self):
         '''check if graph is still going'''
         return self.child.is_alive()
+
+    def add_polygon(self, key, polygon, layer=1, colour=(0,255,0), linewidth=1):
+        '''add a polygon on the map'''
+        self.pipe.send(SlipPolygon(key, polygon, layer, colour, linewidth))
+
+    def add_thumbnail(self, key, latlon, img, layer=1, border_width=0, border_colour=None):
+        '''add a thumbnail on the map'''
+        self.pipe.send(SlipThumbnail(key, latlon, layer, img, border_colour, border_width))
+        
 
 import wx
 from PIL import Image
@@ -79,7 +142,17 @@ class MPSlipMapFrame(wx.Frame):
         
     def on_idle(self, event):
         '''prevent the main loop spinning too fast'''
-        import time
+        state = self.state
+
+        # receive any display objects from the parent
+        while state.pipe.poll():
+            obj = state.pipe.recv()
+            if isinstance(obj, SlipObject):
+                if not obj.layer in state.layers:
+                    # its a new layer
+                    state.layers[obj.layer] = {}
+                state.layers[obj.layer][obj.key] = obj
+                state.need_redraw = True
         time.sleep(0.1)
 
 class ImagePanel(wx.Panel):
@@ -110,7 +183,7 @@ class MPSlipMapPanel(wx.Panel):
         self.redraw_timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.on_redraw_timer, self.redraw_timer)        
         self.Bind(wx.EVT_SET_FOCUS, self.on_focus)
-        self.redraw_timer.Start(1000)
+        self.redraw_timer.Start(200)
         self.mouse_pos = None
         self.mouse_down = None
         self.click_pos = None
@@ -180,12 +253,18 @@ class MPSlipMapPanel(wx.Panel):
             self.re_center(state.width/2,state.height/2, state.lat, state.lon)
             self.redraw_map()
 
-    def update_position(self, pos):
+    def update_position(self):
         '''update position text'''
         state = self.state
-        (lat,lon) = state.mt.coord_from_area(pos.x, pos.y, state.lat, state.lon, state.width, state.ground_width)
+        pos = self.mouse_pos
         self.position.Clear()
-        self.position.WriteText('Cursor: %f %f %u %u TopLeft: %f %f\n' % (lat, lon, pos.x, pos.y, state.lat, state.lon))
+        if pos is not None:
+            (lat,lon) = state.mt.coord_from_area(pos.x, pos.y, state.lat, state.lon, state.width, state.ground_width)
+            self.position.WriteText('Cursor: %f %f  ' % (lat, lon))
+        pending = state.mt.tiles_pending()
+        if pending:
+            self.position.WriteText('Downloading %u ' % pending)
+        self.position.WriteText('\n')
         if self.click_pos is not None:
             self.position.WriteText('Click: %f %f' % (self.click_pos[0], self.click_pos[1]))
         if self.last_click_pos is not None:
@@ -193,24 +272,115 @@ class MPSlipMapPanel(wx.Panel):
                                             self.click_pos[0], self.click_pos[1])
             self.position.WriteText('  Distance: %.1fm' % distance)
 
+    def pixel_coords(self, latlon):
+        '''return pixel coordinates in the map image for a (lat,lon)'''
+        state = self.state
+        (lat,lon) = latlon
+        return state.mt.coord_to_pixel(state.lat, state.lon, state.width, state.ground_width, lat, lon)        
+
+    def draw_line(self, img, pt1, pt2, colour, linewidth):
+        '''draw a line on the image'''
+        state = self.state
+        pix1 = self.pixel_coords(pt1)
+        pix2 = self.pixel_coords(pt2)
+        clipped = cv.ClipLine((state.width,state.height), pix1, pix2)
+        if clipped is None:
+            return
+        pix1,pix2 = clipped
+        cv.Line(img, pix1, pix2, colour, linewidth)
+
+    def draw_thumbnail(self, obj, img):
+        '''draw a thumbnail on the image'''
+        thumb = obj.img()
+        (px,py) = self.pixel_coords(obj.latlon)
+
+        # find top left
+        px -= thumb.width/2
+        py -= thumb.height/2
+        w = thumb.width
+        h = thumb.height
+        sx = 0
+        sy = 0
+        
+        if px < 0:
+            sx = -px
+            w += px
+            px = 0
+        if py < 0:
+            sy = -py
+            h += py
+            py = 0
+        if px >= img.width or py >= img.height:
+            print('clip failed')
+            return
+        if px+w > img.width:
+            w = img.width - px
+        if py+h > img.height:
+            h = img.height - py            
+
+        cv.SetImageROI(thumb, (sx, sy, w, h))
+        cv.SetImageROI(img, (px, py, w, h))
+        cv.Copy(thumb, img)
+        cv.ResetImageROI(img)
+        cv.ResetImageROI(thumb)
+
+    def draw_polygon(self, obj, img):
+        '''draw a polygon on the image'''
+        for i in range(len(obj.points)-1):
+            self.draw_line(img, obj.points[i], obj.points[i+1], obj.colour, obj.linewidth)
+
+    def draw_object(self, obj, img):
+        '''draw an object on the image'''
+        if isinstance(obj, SlipPolygon):
+            self.draw_polygon(obj, img)
+        elif isinstance(obj, SlipThumbnail):
+            self.draw_thumbnail(obj, img)
+
+    def draw_objects(self, objects, bounds, img):
+        '''draw objects on the image'''
+        keys = objects.keys()
+        keys.sort()
+        for k in keys:
+            obj = objects[k]
+            if mp_util.bounds_overlap(bounds, obj.bounds):
+                self.draw_object(obj, img)
+
     def redraw_map(self):
         '''redraw the map with current settings'''
         state = self.state
-        if self.last_view and self.last_view == self.current_view():
+        if self.last_view and self.last_view == self.current_view() and not state.need_redraw:
             return
 
         # get the new map
         img = state.mt.area_to_image(state.lat, state.lon, state.width, state.height, state.ground_width)
+
+        # find display bounding box
+        (lat2, lon2) = state.mt.coord_from_area(state.width-1, state.height-1, state.lat, state.lon,
+                                                state.width, state.ground_width)
+        bounds = (lat2, state.lon, state.lat-lat2, lon2-state.lon)
+
+        # draw layer objects
+        keys = state.layers.keys()
+        keys.sort()
+        for k in keys:
+            self.draw_objects(state.layers[k], bounds, img)
+
+        # display the image
         self.img = wx.EmptyImage(state.width,state.height)
         self.img.SetData(img.tostring())
         self.imagePanel.set_image(self.img)
+
+        self.update_position()
 
         self.mainSizer.Fit(self)
         self.Refresh()
         self.last_view = self.current_view()
         self.SetFocus()
+        state.need_redraw = False
         
     def on_redraw_timer(self, event):
+        '''the redraw timer ensures we show new map tiles as they
+        are downloaded'''
         state = self.state
         self.redraw_map()
 
@@ -237,11 +407,11 @@ class MPSlipMapPanel(wx.Panel):
         '''handle mouse events'''
         state = self.state
         pos = event.GetPosition()
-        self.update_position(pos)
         if event.Leaving():
             self.mouse_pos = None
         else:
             self.mouse_pos = pos
+        self.update_position()
         if event.LeftDown():
             self.mouse_down = pos
             self.last_click_pos = self.click_pos
@@ -261,6 +431,14 @@ class MPSlipMapPanel(wx.Panel):
                 self.mouse_down = newpos
                 self.redraw_map()
 
+    def clear_thumbnails(self):
+        state = self.state
+        for l in state.layers:
+            keys = state.layers[l].keys()[:]
+            for key in keys:
+                if isinstance(state.layers[l][key], SlipThumbnail):
+                    state.layers[l].pop(key)
+
     def on_key_down(self, event):
         '''handle keyboard input'''
         state = self.state
@@ -274,6 +452,9 @@ class MPSlipMapPanel(wx.Panel):
         elif c == ord('G'):
             self.enter_position()
             event.Skip()
+        elif c == ord('C'):
+            self.clear_thumbnails()
+            event.Skip()
 
 
             
@@ -284,11 +465,13 @@ if __name__ == "__main__":
     parser = OptionParser("mp_slipmap.py [options]")
     parser.add_option("--lat", type='float', default=-35.362938, help="start latitude")
     parser.add_option("--lon", type='float', default=149.165085, help="start longitude")
-    parser.add_option("--service", default="YahooSat", help="tile service")
+    parser.add_option("--service", default="MicrosoftSat", help="tile service")
     parser.add_option("--offline", action='store_true', default=False, help="no download")
-    parser.add_option("--delay", type='float', default=1.0, help="tile download delay")
+    parser.add_option("--delay", type='float', default=0.3, help="tile download delay")
     parser.add_option("--max-zoom", type='int', default=19, help="maximum tile zoom")
     parser.add_option("--debug", action='store_true', default=False, help="show debug info")
+    parser.add_option("--boundary", default=None, help="show boundary")
+    parser.add_option("--thumbnail", default=None, help="show thumbnail")
     (opts, args) = parser.parse_args()
     
     sm = MPSlipMap(lat=opts.lat,
@@ -298,5 +481,14 @@ if __name__ == "__main__":
                    debug=opts.debug,
                    max_zoom=opts.max_zoom,
                    tile_delay=opts.delay)
+
+    if opts.boundary:
+        boundary = mp_util.polygon_load(opts.boundary)
+        sm.add_polygon('boundary', boundary, layer=1, linewidth=2, colour=(0,255,0))
+
+    if opts.thumbnail:
+        thumb = cv.LoadImage(opts.thumbnail)
+        sm.add_thumbnail('thumb', (opts.lat,opts.lon), thumb, layer=2, border_width=2, border_colour=(255,0,0))
+            
     while sm.is_alive():
         time.sleep(0.1)

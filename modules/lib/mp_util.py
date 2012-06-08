@@ -16,7 +16,7 @@ def gps_distance(lat1, lon1, lat2, lon2):
 	lon2 = radians(lon2)
 	dLat = lat2 - lat1
 	dLon = lon2 - lon1
-	
+
 	a = sin(0.5*dLat)**2 + sin(0.5*dLon)**2 * cos(lat1) * cos(lat2)
 	c = 2.0 * atan2(sqrt(a), sqrt(1.0-a))
 	return radius_of_earth * c
@@ -66,16 +66,59 @@ def gps_offset(lat, lon, east, north):
 
 
 def mkdir_p(dir):
-    '''like mkdir -p'''
-    if not dir:
-        return
-    if dir.endswith("/"):
-        mkdir_p(dir[:-1])
-        return
-    if os.path.isdir(dir):
-        return
-    mkdir_p(os.path.dirname(dir))
-    try:
-        os.mkdir(dir)
-    except Exception:
-        pass
+	'''like mkdir -p'''
+	if not dir:
+		return
+	if dir.endswith("/"):
+		mkdir_p(dir[:-1])
+		return
+	if os.path.isdir(dir):
+		return
+	mkdir_p(os.path.dirname(dir))
+	try:
+		os.mkdir(dir)
+	except Exception:
+		pass
+
+def polygon_load(filename):
+	'''load a polygon from a file'''
+	ret = []
+        f = open(filename)
+        for line in f:
+		if line.startswith('#'):
+			continue
+		line = line.strip()
+		if not line:
+			continue
+		a = line.split()
+		if len(a) != 2:
+			raise RuntimeError("invalid polygon line: %s" % line)
+		ret.append((float(a[0]), float(a[1])))
+        f.close()
+	return ret
+
+
+def polygon_bounds(points):
+	'''return bounding box of a polygon in (x,y,width,height) form'''
+        (minx, miny) = points[0]
+        (maxx, maxy) = points[0]
+        for p in points:
+            minx = min(minx, p[0])
+            maxx = max(maxx, p[0])
+            miny = min(miny, p[1])
+            maxy = max(maxy, p[1])
+	return (minx, miny, maxx-minx, maxy-miny)
+
+def bounds_overlap(bound1, bound2):
+	'''return true if two bounding boxes overlap'''
+	(x1,y1,w1,h1) = bound1
+	(x2,y2,w2,h2) = bound2
+	if x1+w1 < x2:
+		return False
+	if x2+w2 < x1:
+		return False
+	if y1+h1 < y2:
+		return False
+	if y2+h2 < y1:
+		return False
+	return True
