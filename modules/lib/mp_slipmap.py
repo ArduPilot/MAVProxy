@@ -5,7 +5,7 @@ Andrew Tridgell
 June 2012
 '''
 
-import mp_util, mp_tile, math, cv, time, functools
+import mp_util, mp_tile, math, cv, time, functools, mp_elevation
 
 class SlipObject:
     '''an object to display on the map'''
@@ -402,6 +402,7 @@ class MPSlipMapPanel(wx.Panel):
         self.mouse_down = None
         self.click_pos = None
         self.last_click_pos = None
+        self.ElevationMap = mp_elevation.ElevationModel()
 
         self.mainSizer = wx.BoxSizer(wx.VERTICAL)
         self.SetSizer(self.mainSizer)
@@ -487,7 +488,8 @@ class MPSlipMapPanel(wx.Panel):
         self.position.Clear()
         if pos is not None:
             (lat,lon) = state.mt.coord_from_area(pos.x, pos.y, state.lat, state.lon, state.width, state.ground_width)
-            self.position.WriteText('Cursor: %f %f  ' % (lat, lon))
+            alt = self.ElevationMap.GetElevation(lat, lon)
+            self.position.WriteText('Cursor: %f %f %.1f m' % (lat, lon, alt))
         pending = state.mt.tiles_pending()
         if pending:
             self.position.WriteText('Downloading %u ' % pending)
