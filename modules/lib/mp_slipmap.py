@@ -283,9 +283,9 @@ class MPSlipMap():
         '''add a thumbnail on the map'''
         self.pipe.send(SlipThumbnail(key, latlon, layer, img, border_colour, border_width))
 
-    def add_icon(self, key, latlon, img, layer=1, rotation=0):
+    def add_icon(self, key, latlon, img, layer=1, rotation=0, follow=False):
         '''add a icon on the map'''
-        self.pipe.send(SlipIcon(key, latlon, img, layer, rotation))
+        self.pipe.send(SlipIcon(key, latlon, img, layer, rotation, follow=follow))
 
     def set_icon_position(self, key, latlon, layer=None, rotation=0):
         '''move an icon on the map'''
@@ -321,9 +321,24 @@ class MPSlipMapFrame(wx.Frame):
         '''follow an object on the map'''
         state = self.state
         (px,py) = state.panel.pixmapper(object.latlon)
-        if px > state.width/4 and px < 3*state.width/4 and py > state.height/4 and py < 3*state.height/4:
-            # we're in the mid part already
+        ratio = 0.25
+        if (px > ratio*state.width and
+            px < (1.0-ratio)*state.width and
+            py > ratio*state.height and
+            py < (1.0-ratio)*state.height):
+            # we're in the mid part of the map already, don't move
             return
+
+        if state.panel.follow_checkbox is None:
+            # display a 'Follow' checkbox
+            state.panel.follow_checkbox = wx.CheckBox(state.panel, -1, 'Follow')
+            state.panel.follow_checkbox.SetValue(True)
+            state.panel.controls.Add(state.panel.follow_checkbox, flag=wx.LEFT, border=0)
+
+        if not state.panel.follow_checkbox.GetValue():
+            # the use has disabled following
+            return
+
         (lat, lon) = object.latlon
         state.panel.re_center(state.width/2, state.height/2, lat, lon)
         
@@ -391,17 +406,25 @@ class MPSlipMapPanel(wx.Panel):
         self.mainSizer = wx.BoxSizer(wx.VERTICAL)
         self.SetSizer(self.mainSizer)
 
+        # start off with no follow checkbox
+        self.follow_checkbox = None
+
         # display for lat/lon/elevation
         self.position = wx.TextCtrl(self, style=wx.TE_MULTILINE|wx.TE_READONLY)
         textsize = tuple(self.position.GetFullTextExtent('line 1\nline 2\n')[0:2])
         self.position.SetMinSize(textsize)
-        self.mainSizer.AddSpacer(20)
+        self.mainSizer.AddSpacer(5)
         self.mainSizer.Add(self.position, flag=wx.LEFT | wx.BOTTOM | wx.GROW, border=0)
         self.position.Bind(wx.EVT_SET_FOCUS, self.on_focus)
 
+        # a place to put control flags
+        self.controls = wx.BoxSizer(wx.HORIZONTAL)
+        self.mainSizer.Add(self.controls, 0, flag=wx.ALIGN_LEFT | wx.TOP | wx.GROW)
+        self.mainSizer.AddSpacer(5)
+
         # panel for the main map image
         self.imagePanel = ImagePanel(self, wx.EmptyImage(state.width,state.height))
-        self.mainSizer.Add(self.imagePanel, flag=wx.TOP|wx.LEFT|wx.GROW, border=5)
+        self.mainSizer.Add(self.imagePanel, flag=wx.GROW, border=5)
         self.imagePanel.Bind(wx.EVT_MOUSE_EVENTS, self.on_mouse)
         self.imagePanel.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
         self.imagePanel.Bind(wx.EVT_MOUSEWHEEL, self.on_mouse_wheel)
@@ -646,7 +669,7 @@ if __name__ == "__main__":
 
     if opts.icon:
         icon = cv.LoadImage(opts.icon)
-        sm.add_icon('icon', (opts.lat,opts.lon), icon, layer=3, rotation=90)
+        sm.add_icon('icon', (opts.lat,opts.lon), icon, layer=3, rotation=90, follow=True)
         sm.set_icon_position('icon', mp_util.gps_newpos(opts.lat,opts.lon, 180, 100), rotation=45)
             
     while sm.is_alive():
