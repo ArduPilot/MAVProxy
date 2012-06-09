@@ -38,7 +38,9 @@ def init(_mpstate):
     plane = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..',
                          'data', 'planetracker.png')
     icon = cv.LoadImage(plane)
-    mpstate.map.add_icon('plane', (0,0), icon, layer=3, rotation=0)
+    mpstate.map.add_object(mp_slipmap.SlipIcon('plane', (0,0), icon, layer=3, rotation=0,
+                                               follow=True,
+                                               trail=mp_slipmap.SlipTrail()))
 
 def unload():
     '''unload module'''
@@ -55,6 +57,7 @@ def mavlink_packet(m):
         state.heading = m.cog*0.01
     else:
         return
+
     mpstate.map.set_icon_position('plane', (state.lat, state.lon), rotation=state.heading)
 
     # if the waypoints have changed, redisplay
