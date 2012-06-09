@@ -4,12 +4,19 @@
   uses lib/console.py for display
 """
 
-import os, sys, math
+import os, sys, math, time
 
 mpstate = None
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib'))
 import wxconsole, textconsole
+
+class module_state(object):
+    def __init__(self):
+        '''Flight time vars'''
+        self.in_air = False
+        self.start_time = 0.0
+        self.total_time = 0.0
 
 def name():
     '''return module name'''
@@ -23,6 +30,7 @@ def init(_mpstate):
     '''initialise module'''
     global mpstate
     mpstate = _mpstate
+    mpstate.console_state = module_state()
     mpstate.console = wxconsole.MessageConsole()
 
     # setup some default status information
@@ -42,7 +50,8 @@ def init(_mpstate):
     mpstate.console.set_status('WPBearing', 'Bearing ---', row=3)
     mpstate.console.set_status('AltError', 'AltError --', row=3)
     mpstate.console.set_status('AspdError', 'AspdError --', row=3)
-        
+    mpstate.console.set_status('FlightTime', 'FlightTime --', row=3)
+       
 
 def unload():
     '''unload module'''
@@ -58,6 +67,7 @@ def mavlink_packet(msg):
     type = msg.get_type()
 
     master = mpstate.master()
+    state = mpstate.console_state
     # add some status fields
     if type in [ 'GPS_RAW', 'GPS_RAW_INT' ]:
         if ((msg.fix_type == 3 and master.mavlink10()) or
@@ -80,6 +90,17 @@ def mavlink_packet(msg):
         mpstate.console.set_status('AirSpeed', 'AirSpeed %u' % msg.airspeed)
         mpstate.console.set_status('GPSSpeed', 'GPSSpeed %u' % msg.groundspeed)
         mpstate.console.set_status('Thr', 'Thr %u' % msg.throttle)
+        t = time.localtime(msg._timestamp)
+        if msg.groundspeed > 3 and not state.in_air:
+            state.in_air = True
+            state.start_time = time.mktime(t)
+        elif msg.groundspeed > 3 and state.in_air:
+            state.total_time = time.mktime(t) - state.start_time
+            mpstate.console.set_status('FlightTime', 'FlightTime %u:%02u' % (int(state.total_time)/60, int(state.total_time)%60))
+        elif msg.groundspeed < 3 and state.in_air:
+            state.in_air = False
+            state.total_time = time.mktime(t) - state.start_time
+            mpstate.console.set_status('FlightTime', 'FlightTime %u:%02u' % (int(state.total_time)/60, int(state.total_time)%60))
     elif type == 'ATTITUDE':
         mpstate.console.set_status('Roll', 'Roll %u' % math.degrees(msg.roll))
         mpstate.console.set_status('Pitch', 'Pitch %u' % math.degrees(msg.pitch))
