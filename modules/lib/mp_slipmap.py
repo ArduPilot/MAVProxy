@@ -393,6 +393,8 @@ class MPSlipMapPanel(wx.Panel):
 
         # display for lat/lon/elevation
         self.position = wx.TextCtrl(self, style=wx.TE_MULTILINE|wx.TE_READONLY)
+        textsize = tuple(self.position.GetFullTextExtent('line 1\nline 2\n')[0:2])
+        self.position.SetMinSize(textsize)
         self.mainSizer.AddSpacer(20)
         self.mainSizer.Add(self.position, flag=wx.LEFT | wx.BOTTOM | wx.GROW, border=0)
         self.position.Bind(wx.EVT_SET_FOCUS, self.on_focus)
