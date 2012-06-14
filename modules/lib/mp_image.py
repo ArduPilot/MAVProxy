@@ -5,10 +5,7 @@ Andrew Tridgell
 June 2012
 '''
 
-import mp_util, time, wx, cv
-
-mp_util.pickle_enable(wx.MouseEvent)
-mp_util.pickle_enable(wx.KeyEvent)
+import mp_util, time, wx, cv, mp_widgets
 
 class MPImage():
     '''
@@ -84,24 +81,6 @@ class MPImageFrame(wx.Frame):
         state = self.state
         time.sleep(0.1)
 
-class ImagePanel(wx.Panel):
-    '''a resizable panel containing an image'''
-    def __init__(self, parent, img):
-        wx.Panel.__init__(self, parent, -1, size=(1, 1))
-        self.set_image(img)
-        self.Bind(wx.EVT_PAINT, self.on_paint)
-        
-    def on_paint(self, event):
-        '''repaint the image'''
-        dc = wx.AutoBufferedPaintDC(self)
-        dc.DrawBitmap(self._bmp, 0, 0)
-
-    def set_image(self, img):
-        '''set the image to be displayed'''
-        self._bmp = wx.BitmapFromImage(img)
-        self.SetMinSize((self._bmp.GetWidth(), self._bmp.GetHeight()))
-
-
 class MPImagePanel(wx.PyScrolledWindow):
     """ The image panel
     """    
@@ -118,7 +97,7 @@ class MPImagePanel(wx.PyScrolledWindow):
         self.SetSizer(self.mainSizer)
 
         # panel for the main image
-        self.imagePanel = ImagePanel(self, wx.EmptyImage(state.width,state.height))
+        self.imagePanel = mp_widgets.ImagePanel(self, wx.EmptyImage(state.width,state.height))
         self.mainSizer.Add(self.imagePanel, flag=wx.TOP|wx.LEFT|wx.GROW, border=5)
         for ev in state._events:
             self.imagePanel.Bind(ev, self.on_event)
@@ -159,7 +138,7 @@ class MPImagePanel(wx.PyScrolledWindow):
             event.GetWheelRotation() == 0):
             # don't flood the pipe with mouse movement
             return
-        state.pipe.send(event)
+        state.pipe.send(mp_util.object_container(event))
             
 if __name__ == "__main__":
     import time, cv
@@ -175,8 +154,9 @@ if __name__ == "__main__":
 
     while im.is_alive():
         for event in im.events():
-            if isinstance(event, wx.MouseEvent):
+            print event.ClassName
+            if event.ClassName == 'wxMouseEvent':
                 print 'mouse', event.X, event.Y
-            if isinstance(event, wx.KeyEvent):
-                print 'key %u' % event.GetUniChar()
+            if event.ClassName == 'wxKeyEvent':
+                print 'key %u' % event.KeyCode
         time.sleep(0.1)
