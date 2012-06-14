@@ -5,13 +5,14 @@ Andrew Tridgell
 June 2012
 '''
 
-import mp_util, mp_tile, math, cv, time, functools, mp_elevation
+import mp_util, mp_tile, math, cv, time, functools, mp_elevation, mp_widgets
 
 class SlipObject:
     '''an object to display on the map'''
     def __init__(self, key, layer):
         self.key = key
         self.layer = layer
+        self.latlon = None
 
     def clip(self, px, py, w, h, img):
         '''clip an area for display on the map'''
@@ -44,6 +45,14 @@ class SlipObject:
         if hasattr(self, 'rotation'):
             self.rotation = newpos.rotation
 
+    def clicked(self, px, py):
+        '''check if a click on px,py should be considered a click
+        on the object. Return None if definately not a click,
+        otherwise return the distance of the click, smaller being nearer
+        '''
+        return None
+        
+
 class SlipPolygon(SlipObject):
     '''a polygon to display on the map'''
     def __init__(self, key, points, layer, colour, linewidth):
@@ -61,22 +70,24 @@ class SlipPolygon(SlipObject):
         '''draw a line on the image'''
         pix1 = pixmapper(pt1)
         pix2 = pixmapper(pt2)
-        clipped = cv.ClipLine((img.width,img.height), pix1, pix2)
+        clipped = cv.ClipLine((img.width, img.height), pix1, pix2)
         if clipped is None:
             return
-        pix1,pix2 = clipped
+        (pix1, pix2) = clipped
         cv.Line(img, pix1, pix2, colour, linewidth)
 
     def draw(self, img, pixmapper):
         '''draw a polygon on the image'''
         for i in range(len(self.points)-1):
-            self.draw_line(img, pixmapper, self.points[i], self.points[i+1], self.colour, self.linewidth)
+            self.draw_line(img, pixmapper, self.points[i], self.points[i+1],
+                           self.colour, self.linewidth)
 
 
 
 class SlipThumbnail(SlipObject):
     '''a thumbnail to display on the map'''
-    def __init__(self, key, latlon, layer, img, border_colour=None, border_width=0):
+    def __init__(self, key, latlon, layer, img,
+                 border_colour=None, border_width=0):
         SlipObject.__init__(self, key, layer)
         self.latlon = latlon
         self._img = None
@@ -85,6 +96,8 @@ class SlipThumbnail(SlipObject):
         self.height = img.height
         self.border_width = border_width
         self.border_colour = border_colour
+        self.posx = -1
+        self.posy = -1
 
     def bounds(self):
         '''return bounding box'''
@@ -98,7 +111,8 @@ class SlipThumbnail(SlipObject):
         cv.SetData(self._img, self.imgstr)
         cv.CvtColor(self._img, self._img, cv.CV_BGR2RGB)
         if self.border_width and self.border_colour is not None:
-            cv.Rectangle(self._img, (0,0), (self.width-1,self.height-1), self.border_colour, self.border_width)
+            cv.Rectangle(self._img, (0, 0), (self.width-1, self.height-1),
+                         self.border_colour, self.border_width)
         return self._img
 
     def draw(self, img, pixmapper):
@@ -119,6 +133,17 @@ class SlipThumbnail(SlipObject):
         cv.Copy(thumb, img)
         cv.ResetImageROI(img)
         cv.ResetImageROI(thumb)
+
+        # remember where we placed it for clicked()
+        self.posx = px+w/2
+        self.posy = py+h/2
+
+    def clicked(self, px, py):
+        '''see if the image has been clicked on'''
+        if (abs(px - self.posx) > self.width/2 or
+            abs(py - self.posy) > self.height/2):
+            return None
+        return math.sqrt((px-self.posx)**2 + (py-self.posy)**2)
 
 
 class SlipTrail:
@@ -149,7 +174,8 @@ class SlipTrail:
 
 class SlipIcon(SlipThumbnail):
     '''a icon to display on the map'''
-    def __init__(self, key, latlon, img, layer=1, rotation=0, follow=False, trail=None):
+    def __init__(self, key, latlon, img, layer=1, rotation=0,
+                 follow=False, trail=None):
         SlipThumbnail.__init__(self, key, latlon, layer, img)
         self.rotation = rotation
         self.follow = follow
@@ -193,6 +219,11 @@ class SlipIcon(SlipThumbnail):
         cv.ResetImageROI(img)
         cv.ResetImageROI(icon)
 
+        # remember where we placed it for clicked()
+        self.posx = px+w/2
+        self.posy = py+h/2
+
+
 class SlipPosition:
     '''an position object to move an existing object on the map'''
     def __init__(self, key, latlon, layer=None, rotation=0):
@@ -201,6 +232,80 @@ class SlipPosition:
         self.latlon = latlon
         self.rotation = rotation
 
+
+class SlipInformation:
+    '''an object to display in the information box'''
+    def __init__(self, key):
+        self.key = key
+
+    def draw(self, parent, box):
+        '''default draw method'''
+        pass
+
+    def update(self, newinfo):
+        '''update the information'''
+        pass
+
+
+class SlipInfoImage(SlipInformation):
+    '''an image to display in the info box'''
+    def __init__(self, key, img):
+        SlipInformation.__init__(self, key)
+        self.imgstr = img.tostring()
+        self.width = img.width
+        self.height = img.height
+        self.imgpanel = None
+
+    def img(self):
+        '''return a wx image'''
+        img = wx.EmptyImage(self.width, self.height)
+        img.SetData(self.imgstr)
+        return img
+
+    def draw(self, parent, box):
+        '''redraw the image'''
+        if self.imgpanel is None:
+            self.imgpanel = mp_widgets.ImagePanel(parent, self.img())
+            box.Add(self.imgpanel, flag=wx.LEFT, border=0)
+            box.Layout()
+
+    def update(self, newinfo):
+        '''update the image'''
+        self.imgstr = newinfo.imgstr
+        self.width = newinfo.width
+        self.height = newinfo.height
+        if self.imgpanel is not None:
+            self.imgpanel.set_image(self.img())
+
+
+class SlipObjectSelection:
+    '''description of a object under the cursor during an event'''
+    def __init__(self, objkey, distance):
+        self.distance = distance
+        self.objkey = objkey
+
+class SlipEvent:
+    '''an event sent to the parent.
+
+    latlon  = (lat,lon) of mouse on map
+    event   = wx event
+    objkeys = list of SlipObjectSelection selections 
+    '''
+    def __init__(self, latlon, event, selected):
+        self.latlon = latlon
+        self.event = mp_util.object_container(event)
+        self.selected = selected
+
+class SlipMouseEvent(SlipEvent):
+    '''a mouse event sent to the parent'''
+    def __init__(self, latlon, event, selected):
+        SlipEvent.__init__(self, latlon, event, selected)
+
+class SlipKeyEvent(SlipEvent):
+    '''a key event sent to the parent'''
+    def __init__(self, latlon, event, selected):
+        SlipEvent.__init__(self, latlon, event, selected)
+        
 
 class MPSlipMap():
     '''
@@ -217,6 +322,7 @@ class MPSlipMap():
                  service="MicrosoftSat",
                  max_zoom=19,
                  debug=False,
+                 elevation=False,
                  download=True):
         import multiprocessing
 
@@ -230,11 +336,13 @@ class MPSlipMap():
         self.tile_delay = tile_delay
         self.debug = debug
         self.max_zoom = max_zoom
+        self.elevation = elevation
 
         self.drag_step = 10
 
         self.title = title
-        self.parent_pipe,self.child_pipe = multiprocessing.Pipe()
+        self.child_pipe,self.parent_pipe = multiprocessing.Pipe(duplex=False)
+        self.event_queue = multiprocessing.Queue()
         self.close_window = multiprocessing.Event()
         self.close_window.clear()
         self.child = multiprocessing.Process(target=self.child_task)
@@ -253,6 +361,7 @@ class MPSlipMap():
                                  debug=self.debug,
                                  max_zoom=self.max_zoom)
         state.layers = {}
+        state.info = {}
         state.need_redraw = True
         
         self.pipe = self.child_pipe
@@ -272,25 +381,23 @@ class MPSlipMap():
         return self.child.is_alive()
 
     def add_object(self, obj):
-        '''add a object on the map'''
+        '''add or update an object on the map'''
         self.pipe.send(obj)
 
-    def add_polygon(self, key, polygon, layer=1, colour=(0,255,0), linewidth=1):
-        '''add a polygon on the map'''
-        self.pipe.send(SlipPolygon(key, polygon, layer, colour, linewidth))
-
-    def add_thumbnail(self, key, latlon, img, layer=1, border_width=0, border_colour=None):
-        '''add a thumbnail on the map'''
-        self.pipe.send(SlipThumbnail(key, latlon, layer, img, border_colour, border_width))
-
-    def add_icon(self, key, latlon, img, layer=1, rotation=0, follow=False):
-        '''add a icon on the map'''
-        self.pipe.send(SlipIcon(key, latlon, img, layer, rotation, follow=follow))
-
-    def set_icon_position(self, key, latlon, layer=None, rotation=0):
-        '''move an icon on the map'''
+    def set_position(self, key, latlon, layer=None, rotation=0):
+        '''move an object on the map'''
         self.pipe.send(SlipPosition(key, latlon, layer, rotation))
-        
+
+    def event_count(self):
+        '''return number of events waiting to be processed'''
+        return self.event_queue.qsize()
+
+    def get_event(self):
+        '''return next event or None'''
+        if self.event_queue.qsize() == 0:
+            return None
+        return sm.event_queue.get()
+    
 
 import wx
 from PIL import Image
@@ -333,7 +440,8 @@ class MPSlipMapFrame(wx.Frame):
             # display a 'Follow' checkbox
             state.panel.follow_checkbox = wx.CheckBox(state.panel, -1, 'Follow')
             state.panel.follow_checkbox.SetValue(True)
-            state.panel.controls.Add(state.panel.follow_checkbox, flag=wx.LEFT, border=0)
+            state.panel.controls.Add(state.panel.follow_checkbox,
+                                     flag=wx.LEFT, border=0)
 
         if not state.panel.follow_checkbox.GetValue():
             # the use has disabled following
@@ -347,6 +455,8 @@ class MPSlipMapFrame(wx.Frame):
         state = self.state
 
         # receive any display objects from the parent
+        obj = None
+
         while state.pipe.poll():
             obj = state.pipe.recv()
 
@@ -365,25 +475,16 @@ class MPSlipMapFrame(wx.Frame):
                     if getattr(object, 'follow', False):
                         self.follow(object)
                     state.need_redraw = True
-        time.sleep(0.1)
 
+            if isinstance(obj, SlipInformation):
+                # see if its a existing one or a new one
+                if obj.key in state.info:
+                    state.info[obj.key].update(obj)
+                else:
+                    state.info[obj.key] = obj
 
-class ImagePanel(wx.Panel):
-    '''a resizable panel containing an image'''
-    def __init__(self, parent, img):
-        wx.Panel.__init__(self, parent, -1, size=(1, 1))
-        self.set_image(img)
-        self.Bind(wx.EVT_PAINT, self.on_paint)
-        
-    def on_paint(self, event):
-        '''repaint the image'''
-        dc = wx.AutoBufferedPaintDC(self)
-        dc.DrawBitmap(self._bmp, 0, 0)
-
-    def set_image(self, img):
-        '''set the image to be displayed'''
-        self._bmp = wx.BitmapFromImage(img)
-        self.SetMinSize((self._bmp.GetWidth(), self._bmp.GetHeight()))
+        if obj is None:
+            time.sleep(0.05)
 
 
 class MPSlipMapPanel(wx.Panel):
@@ -402,7 +503,8 @@ class MPSlipMapPanel(wx.Panel):
         self.mouse_down = None
         self.click_pos = None
         self.last_click_pos = None
-        self.ElevationMap = mp_elevation.ElevationModel()
+        if state.elevation:
+            self.ElevationMap = mp_elevation.ElevationModel()
 
         self.mainSizer = wx.BoxSizer(wx.VERTICAL)
         self.SetSizer(self.mainSizer)
@@ -414,17 +516,22 @@ class MPSlipMapPanel(wx.Panel):
         self.position = wx.TextCtrl(self, style=wx.TE_MULTILINE|wx.TE_READONLY)
         textsize = tuple(self.position.GetFullTextExtent('line 1\nline 2\n')[0:2])
         self.position.SetMinSize(textsize)
-        self.mainSizer.AddSpacer(5)
+        self.mainSizer.AddSpacer(2)
         self.mainSizer.Add(self.position, flag=wx.LEFT | wx.BOTTOM | wx.GROW, border=0)
         self.position.Bind(wx.EVT_SET_FOCUS, self.on_focus)
 
         # a place to put control flags
         self.controls = wx.BoxSizer(wx.HORIZONTAL)
         self.mainSizer.Add(self.controls, 0, flag=wx.ALIGN_LEFT | wx.TOP | wx.GROW)
-        self.mainSizer.AddSpacer(5)
+        self.mainSizer.AddSpacer(2)
+
+        # a place to put information like image details
+        self.information = wx.BoxSizer(wx.HORIZONTAL)
+        self.mainSizer.Add(self.information, 0, flag=wx.ALIGN_LEFT | wx.TOP | wx.GROW)
+        self.mainSizer.AddSpacer(2)
 
         # panel for the main map image
-        self.imagePanel = ImagePanel(self, wx.EmptyImage(state.width,state.height))
+        self.imagePanel = mp_widgets.ImagePanel(self, wx.EmptyImage(state.width,state.height))
         self.mainSizer.Add(self.imagePanel, flag=wx.GROW, border=5)
         self.imagePanel.Bind(wx.EVT_MOUSE_EVENTS, self.on_mouse)
         self.imagePanel.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
@@ -438,6 +545,7 @@ class MPSlipMapPanel(wx.Panel):
         state.frame.Fit()
 
     def on_focus(self, event):
+        '''called when the panel gets focus'''
         self.imagePanel.SetFocus()
 
     def current_view(self):
@@ -446,10 +554,15 @@ class MPSlipMapPanel(wx.Panel):
         return (state.lat, state.lon, state.width, state.height,
                 state.ground_width, state.mt.tiles_pending())
 
+    def coordinates(self, x, y):
+        '''return coordinates of a pixel in the map'''
+        state = self.state
+        return state.mt.coord_from_area(x, y, state.lat, state.lon, state.width, state.ground_width)
+
     def re_center(self, x, y, lat, lon):
         '''re-center view for pixel x,y'''
         state = self.state
-        (lat2,lon2) = state.mt.coord_from_area(x, y, state.lat, state.lon, state.width, state.ground_width)
+        (lat2,lon2) = self.coordinates(x, y)
         distance = mp_util.gps_distance(lat2, lon2, lat, lon)
         bearing  = mp_util.gps_bearing(lat2, lon2, lat, lon)
         (state.lat, state.lon) = mp_util.gps_newpos(state.lat, state.lon, bearing, distance)
@@ -461,7 +574,7 @@ class MPSlipMapPanel(wx.Panel):
             (x,y) = (self.mouse_pos.x, self.mouse_pos.y)
         else:
             (x,y) = (state.width/2, state.height/2)
-        (lat,lon) = state.mt.coord_from_area(x, y, state.lat, state.lon, state.width, state.ground_width)
+        (lat,lon) = self.coordinates(x, y)
         state.ground_width *= zoom
         # limit ground_width to sane values
         state.ground_width = max(state.ground_width, 20)
@@ -487,9 +600,11 @@ class MPSlipMapPanel(wx.Panel):
         pos = self.mouse_pos
         self.position.Clear()
         if pos is not None:
-            (lat,lon) = state.mt.coord_from_area(pos.x, pos.y, state.lat, state.lon, state.width, state.ground_width)
-            alt = self.ElevationMap.GetElevation(lat, lon)
-            self.position.WriteText('Cursor: %f %f %.1f m' % (lat, lon, alt))
+            (lat,lon) = self.coordinates(pos.x, pos.y)
+            self.position.WriteText('Cursor: %f %f' % (lat, lon))
+            if state.elevation:
+                alt = self.ElevationMap.GetElevation(lat, lon)
+                self.position.WriteText(' %.1fm' % alt)
         pending = state.mt.tiles_pending()
         if pending:
             self.position.WriteText('Downloading %u ' % pending)
@@ -531,8 +646,7 @@ class MPSlipMapPanel(wx.Panel):
                                                   state.width, state.height, state.ground_width)
 
         # find display bounding box
-        (lat2, lon2) = state.mt.coord_from_area(state.width-1, state.height-1, state.lat, state.lon,
-                                                state.width, state.ground_width)
+        (lat2,lon2) = self.coordinates(state.width-1, state.height-1)
         bounds = (lat2, state.lon, state.lat-lat2, lon2-state.lon)
 
         # draw layer objects
@@ -541,6 +655,10 @@ class MPSlipMapPanel(wx.Panel):
         keys.sort()
         for k in keys:
             self.draw_objects(state.layers[k], bounds, img)
+
+        # draw information objects
+        for key in state.info:
+            state.info[key].draw(state.panel, state.panel.information)
 
         # display the image
         self.img = wx.EmptyImage(state.width,state.height)
@@ -580,6 +698,20 @@ class MPSlipMapPanel(wx.Panel):
         self.change_zoom(zoom)
         self.redraw_map()
 
+    def selected_objects(self, pos):
+        '''return a list of matching objects for a position'''
+        state = self.state
+        selected = []
+        (px, py) = pos
+        for layer in state.layers:
+            for key in state.layers[layer]:
+                distance = state.layers[layer][key].clicked(px, py)
+                if distance is not None:
+                    selected.append(SlipObjectSelection(key, distance))
+        selected.sort(key=lambda c: c.distance)
+        return selected
+        
+
     def on_mouse(self, event):
         '''handle mouse events'''
         state = self.state
@@ -589,10 +721,18 @@ class MPSlipMapPanel(wx.Panel):
         else:
             self.mouse_pos = pos
         self.update_position()
+
+        if event.ButtonIsDown(wx.MOUSE_BTN_ANY) or event.ButtonUp():
+            # send any event with a mouse button to the parent
+            latlon = self.coordinates(pos.x, pos.y)
+            selected = self.selected_objects(pos)
+            state.event_queue.put(SlipMouseEvent(latlon, event, selected))
+            print(latlon, selected)
+
         if event.LeftDown():
             self.mouse_down = pos
             self.last_click_pos = self.click_pos
-            self.click_pos = state.mt.coord_from_area(pos.x, pos.y, state.lat, state.lon, state.width, state.ground_width)
+            self.click_pos = self.coordinates(pos.x, pos.y)
 
         if event.Dragging() and self.mouse_down is not None:
             # drag map to new position
@@ -620,6 +760,13 @@ class MPSlipMapPanel(wx.Panel):
     def on_key_down(self, event):
         '''handle keyboard input'''
         state = self.state
+
+        # send all key events to the parent
+        if self.mouse_pos:
+            latlon = self.coordinates(self.mouse_pos.x, self.mouse_pos.y)
+            selected = self.selected_objects(self.mouse_pos)
+            state.event_queue.put(SlipKeyEvent(latlon, event, selected))
+        
         c = event.GetUniChar()
         if c == ord('+') or (c == ord('=') and event.ShiftDown()):
             self.change_zoom(1.0/1.2)
@@ -651,6 +798,7 @@ if __name__ == "__main__":
     parser.add_option("--boundary", default=None, help="show boundary")
     parser.add_option("--thumbnail", default=None, help="show thumbnail")
     parser.add_option("--icon", default=None, help="show icon")
+    parser.add_option("--elevation", action='store_true', default=False, help="show elevation information")
     (opts, args) = parser.parse_args()
     
     sm = MPSlipMap(lat=opts.lat,
@@ -659,20 +807,30 @@ if __name__ == "__main__":
                    service=opts.service,
                    debug=opts.debug,
                    max_zoom=opts.max_zoom,
+                   elevation=opts.elevation,
                    tile_delay=opts.delay)
 
     if opts.boundary:
         boundary = mp_util.polygon_load(opts.boundary)
-        sm.add_polygon('boundary', boundary, layer=1, linewidth=2, colour=(0,255,0))
+        sm.add_object(SlipPolygon('boundary', boundary, layer=1, linewidth=2, colour=(0,255,0)))
 
     if opts.thumbnail:
         thumb = cv.LoadImage(opts.thumbnail)
-        sm.add_thumbnail('thumb', (opts.lat,opts.lon), thumb, layer=2, border_width=2, border_colour=(255,0,0))
+        sm.add_object(SlipThumbnail('thumb', (opts.lat,opts.lon), layer=1, img=thumb, border_width=2, border_colour=(255,0,0)))
 
     if opts.icon:
         icon = cv.LoadImage(opts.icon)
-        sm.add_icon('icon', (opts.lat,opts.lon), icon, layer=3, rotation=90, follow=True)
-        sm.set_icon_position('icon', mp_util.gps_newpos(opts.lat,opts.lon, 180, 100), rotation=45)
+        sm.add_object(SlipIcon('icon', (opts.lat,opts.lon), icon, layer=3, rotation=90, follow=True))
+        sm.set_position('icon', mp_util.gps_newpos(opts.lat,opts.lon, 180, 100), rotation=45)
+        sm.add_object(SlipInfoImage('detail', icon))
             
     while sm.is_alive():
+        while sm.event_count() > 0:
+            obj = sm.get_event()
+            if isinstance(obj, SlipMouseEvent):
+                print("Mouse event at %s (X/Y=%u/%u) for %u objects" % (obj.latlon,
+                                                                        obj.event.X, obj.event.Y,
+                                                                        len(obj.selected)))
+            if isinstance(obj, SlipKeyEvent):
+                print("Key event at %s for %u objects" % (obj.latlon, len(obj.selected)))
         time.sleep(0.1)
