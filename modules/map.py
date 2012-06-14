@@ -32,7 +32,7 @@ def init(_mpstate):
     global mpstate
     mpstate = _mpstate
     mpstate.map_state = module_state()
-    mpstate.map = mp_slipmap.MPSlipMap(service='GoogleSat')
+    mpstate.map = mp_slipmap.MPSlipMap(service='GoogleSat', elevation=True)
 
     # setup a plane icon
     plane = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..',
@@ -58,18 +58,18 @@ def mavlink_packet(m):
     else:
         return
 
-    mpstate.map.set_icon_position('plane', (state.lat, state.lon), rotation=state.heading)
+    mpstate.map.set_position('plane', (state.lat, state.lon), rotation=state.heading)
 
     # if the waypoints have changed, redisplay
     if state.wp_change_time != mpstate.status.wploader.last_change:
         state.wp_change_time = mpstate.status.wploader.last_change
         points = mpstate.status.wploader.polygon()
         if len(points) > 1:
-            mpstate.map.add_polygon('mission', points, layer=1, linewidth=2, colour=(255,255,255))
+            mpstate.map.add_object(mp_slipmap.SlipPolygon('mission', points, layer=1, linewidth=2, colour=(255,255,255)))
 
     # if the fence has changed, redisplay
     if state.fence_change_time != mpstate.status.fenceloader.last_change:
         state.fence_change_time = mpstate.status.fenceloader.last_change
         points = mpstate.status.fenceloader.polygon()
         if len(points) > 1:
-            mpstate.map.add_polygon('fence', points, layer=1, linewidth=2, colour=(0,255,0))
+            mpstate.map.add_object(mp_slipmap.SlipPolygon('fence', points, layer=1, linewidth=2, colour=(0,255,0)))
