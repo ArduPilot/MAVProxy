@@ -73,3 +73,7 @@ def mavlink_packet(m):
         points = mpstate.status.fenceloader.polygon()
         if len(points) > 1:
             mpstate.map.add_object(mp_slipmap.SlipPolygon('fence', points, layer=1, linewidth=2, colour=(0,255,0)))
+
+    # check for any events from the map
+    mpstate.map.check_events()
+    
