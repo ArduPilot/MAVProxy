@@ -278,6 +278,44 @@ class SlipInfoImage(SlipInformation):
             self.imgpanel.set_image(self.img())
 
 
+class SlipInfoText(SlipInformation):
+    '''text to display in the info box'''
+    def __init__(self, key, text):
+        SlipInformation.__init__(self, key)
+        self.text = text
+        self.textctrl = None
+
+    def _resize(self):
+        '''calculate and set text size, handling multi-line'''
+        lines = self.text.split('\n')
+        xsize, ysize = 0, 0
+        for line in lines:
+            size = self.textctrl.GetTextExtent(line)
+            xsize = max(xsize, size[0])
+            ysize = ysize + size[1]
+        xsize = int(xsize*1.2)
+        self.textctrl.SetSize((xsize, ysize))
+        self.textctrl.SetMinSize((xsize, ysize))
+        
+
+    def draw(self, parent, box):
+        '''redraw the text'''
+        if self.textctrl is None:
+            self.textctrl = wx.TextCtrl(parent, style=wx.TE_MULTILINE|wx.TE_READONLY)
+            self.textctrl.WriteText(self.text)
+            self._resize()
+            box.Add(self.textctrl, flag=wx.LEFT, border=0)
+        box.Layout()
+
+    def update(self, newinfo):
+        '''update the image'''
+        self.text = newinfo.text
+        if self.textctrl is not None:
+            self.textctrl.Clear()
+            self.textctrl.WriteText(self.text)
+            self._resize()
+
+
 class SlipObjectSelection:
     '''description of a object under the cursor during an event'''
     def __init__(self, objkey, distance):
@@ -348,6 +386,7 @@ class MPSlipMap():
         self.child = multiprocessing.Process(target=self.child_task)
         self.child.start()
         self.pipe = self.parent_pipe
+        self._callbacks = set()
 
 
     def child_task(self):
@@ -396,7 +435,18 @@ class MPSlipMap():
         '''return next event or None'''
         if self.event_queue.qsize() == 0:
             return None
-        return sm.event_queue.get()
+        return self.event_queue.get()
+
+    def add_callback(self, callback):
+        '''add a callback for events from the map'''
+        self._callbacks.add(callback)
+
+    def check_events(self):
+        '''check for events, calling registered callbacks as needed'''
+        while self.event_count() > 0:
+            event = self.get_event()
+            for callback in self._callbacks:
+                callback(event)
     
 
 import wx
@@ -479,8 +529,10 @@ class MPSlipMapFrame(wx.Frame):
             if isinstance(obj, SlipInformation):
                 # see if its a existing one or a new one
                 if obj.key in state.info:
+#                    print('update %s' % str(obj.key))
                     state.info[obj.key].update(obj)
                 else:
+#                    print('add %s' % str(obj.key))
                     state.info[obj.key] = obj
 
         if obj is None:
@@ -727,7 +779,6 @@ class MPSlipMapPanel(wx.Panel):
             latlon = self.coordinates(pos.x, pos.y)
             selected = self.selected_objects(pos)
             state.event_queue.put(SlipMouseEvent(latlon, event, selected))
-            print(latlon, selected)
 
         if event.LeftDown():
             self.mouse_down = pos
@@ -823,6 +874,7 @@ if __name__ == "__main__":
         sm.add_object(SlipIcon('icon', (opts.lat,opts.lon), icon, layer=3, rotation=90, follow=True))
         sm.set_position('icon', mp_util.gps_newpos(opts.lat,opts.lon, 180, 100), rotation=45)
         sm.add_object(SlipInfoImage('detail', icon))
+        sm.add_object(SlipInfoText('detail text', 'test text'))
             
     while sm.is_alive():
         while sm.event_count() > 0:
