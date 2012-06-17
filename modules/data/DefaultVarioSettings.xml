@@ -1,0 +1,21 @@
+<varioSettings>
+    <COMPort>localhost:25999</COMPort>
+    <ComponentID>1</ComponentID>
+    <SystemID>55</SystemID>
+    <Baud>115200</Baud>
+    <Timeout>2.000000</Timeout>
+    <MasterID>253</MasterID>
+    <Volume>50.000000</Volume>
+    <Deadband>0.500000</Deadband>
+    <Offset>0.000000</Offset>
+    <maxFallRate>4.000000</maxFallRate>
+    <maxRiseRate>4.000000</maxRiseRate>
+    <minFallingKey>55</minFallingKey>
+    <maxFallingKey>25</maxFallingKey>
+    <minRisingKey>60</minRisingKey>
+    <maxRisingKey>80</maxRisingKey>
+    <risingSoundfont>example.sf2</risingSoundfont>
+    <fallingSoundfont>example.sf2</fallingSoundfont>
+    <pulseRate>2.000000</pulseRate>
+    <pulseDuty>25</pulseDuty>
+</varioSettings>
