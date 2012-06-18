@@ -753,6 +753,21 @@ def cmd_module(args):
                 print("Reloaded module %s" % args[1])
                 return
         print("Unable to find module %s" % args[1])
+    elif args[0] == "unload":
+        if len(args) < 2:
+            print("usage: module unload <name>")
+            return
+        for m in mpstate.modules:
+            if m.name() == args[1]:
+                try:
+                    m.unload()
+                    print("Unloaded module %s" % args[1])
+                except Exception:
+                    print("unload() not implemented in module %s" % args[1])
+                    pass
+                return
+        print("Unable to find module %s" % args[1])
+        
     else:
         print(usage)
 
