@@ -21,61 +21,43 @@ def description():
     '''return module description'''
     return "variometer"
 
-#===============================================================================
-# def cmd_vario(args):
-#    '''vario command'''
-#    return
-#===============================================================================
-
-#===============================================================================
-#    state = mpstate.graph_state
-# 
-#    if len(args) == 0:
-#        # list current graphs
-#        for i in range(len(state.graphs)):
-#            print("Graph %u: %s" % (i, state.graphs[i].fields))
-#        return
-# 
-#    # start a new graph
-#    state.graphs.append(Graph(args[:]))
-#===============================================================================
+def cmd_vario(args):
+    '''vario command'''
 
 
 def init(_mpstate):
-    '''initialise module'''
     global mpstate
-    mpstate = _mpstate
+    mstate = _mpstate
+    '''initialise module'''
+    
+    self
 
+        try:
+            self.settings_path = os.path.join(self.application_path, 'modules', 'data', "DefaultVarioSettings.xml")
+#            self.settings_path = os.path.join(self.application_path, "DefaultVarioSettings.xml")
+            self.Settings = varioSettings.parse(self.settings_path)
+        except:
+            print("Could not load vario settings at: " + self.settings_path)
+        else:
+          
+    self.vario = pymavario.vario()
 
-#===============================================================================
-#    try:
-#        self.settings_path = os.path.join(self.application_path, 'modules', 'data', "DefaultVarioSettings.xml")
-# #        self.settings_path = os.path.join(self.application_path, "DefaultVarioSettings.xml")
-#        self.Settings = varioSettings.parse(self.settings_path)
-#    except:
-#        print("Could not load vario settings at: " + self.settings_path)
-#        print("vario not initialised")
-#    else:
-#          
-#        self.vario = pymavario.vario()
-#    
-#                
-#        self.vario.deadband = float(self.Settings.get_Deadband()) * 100.0
-#        self.vario.minRate = float(self.Settings.get_maxFallRate()) * -100.0
-#        self.vario.maxRate = float(self.Settings.get_maxRiseRate()) * 100.0
-#        self.vario.maxRate = float(self.m_textCtrlMaxRisingRate.GetValue()) * 100.0
-#        self.vario.minFallingKey = int(self.Settings.get_minFallingKey())
-#        value = int(str(self.Settings.get_maxFallingKey()))
-#        self.vario.maxFallingKey = value
-#        self.vario.minRisingKey = int(self.Settings.get_minRisingKey())
-#        value = int(self.Settings.get_maxRisingKey())
-#        self.vario.maxRisingKey = value
-#            
-#        self.vario.setRisingSoundfont(str(self.Settings.get_risingSoundfont()))
-#        self.vario.setFallingSoundfont(str(self.Settings.get_fallingSoundfont()))
-#    
-#        print("vario initialised")
-#===============================================================================
+            
+    self.vario.deadband = float(self.Settings.get_Deadband()) * 100.0
+    self.vario.minRate = float(self.Settings.get_maxFallRate()) * -100.0
+    self.vario.maxRate = float(self.Settings.get_maxRiseRate()) * 100.0
+    self.vario.maxRate = float(self.m_textCtrlMaxRisingRate.GetValue()) * 100.0
+    self.vario.minFallingKey = int(self.Settings.get_minFallingKey())
+    value = int(str(self.Settings.get_maxFallingKey())
+    self.vario.maxFallingKey = value
+    self.vario.minRisingKey = int(self.Settings.get_minRisingKey())
+    value = int(self.Settings.get_maxRisingKey())
+    self.vario.maxRisingKey = value
+        
+    self.vario.setRisingSoundfont(str(self.Settings.get_risingSoundfont()))
+    self.vario.setFallingSoundfont(str(self.Settings.get_fallingSoundfont()))
+
+    print("vario initialised")
 
 def unload():
     '''unload module'''
@@ -94,19 +76,16 @@ def mavlink_packet(msg):
                 #        self.heartbeat_timer = time.time()
                 #===============================================================
 
-    #===========================================================================
-    # if msg and msg.get_type() == "GLOBAL_POSITION_INT":
-    #    try:
-    #        vz = msg.vz   # vertical velocity in cm/s
-    #        vz = int(-vz)
-    #    except:
-    #        print("decode global vz message fail")
-    #    try:
-    #        self.vario.vario_callback(vz)
-    #    except:
-    #        print("vario callback fail")
-    #===========================================================================
-    return
+    if msg and msg.get_type() == "GLOBAL_POSITION_INT":
+        try:
+            vz = msg.vz   # vertical velocity in cm/s
+            vz = int(-vz)
+        except:
+            print("decode global vz message fail")
+        try:
+            self.vario.vario_callback(vz)
+        except:
+            print("vario callback fail")
             
 
 class healthcheck(threading.Thread):
