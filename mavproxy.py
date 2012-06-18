@@ -1196,7 +1196,8 @@ def master_callback(m, master):
                     'WAYPOINT_ACK', 'MISSION_ACK',
                     'NAV_CONTROLLER_OUTPUT', 'GPS_RAW', 'GPS_RAW_INT', 'WAYPOINT',
                     'SCALED_PRESSURE', 'SENSOR_OFFSETS', 'MEMINFO', 'AP_ADC',
-                    'FENCE_POINT', 'FENCE_STATUS', 'DCM', 'RADIO', 'AHRS', 'HWSTATUS', 'SIMSTATE', 'PPP' ]:
+                    'FENCE_POINT', 'FENCE_STATUS', 'DCM', 'RADIO', 'AHRS', 'HWSTATUS', 'SIMSTATE', 'PPP',
+                    'SERIAL_UDB_EXTRA_F2_A', 'SERIAL_UDB_EXTRA_F2_B' ]:
         pass
     else:
         mpstate.console.writeln("Got MAVLink msg: %s" % m)
@@ -1549,6 +1550,7 @@ if __name__ == '__main__':
     parser.add_option("--cmd", dest="cmd", help="initial commands", default=None)
     parser.add_option("--console", action='store_true', help="use GUI console")
     parser.add_option("--map", action='store_true', help="load map module")
+    parser.add_option("--vario", action='store_true', help="load vario module")
     parser.add_option("--mav09", action='store_true', default=False, help="Use MAVLink protocol 0.9")
     parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
     
@@ -1648,6 +1650,9 @@ Auto-detected serial ports are:
 
     if opts.map:
         process_stdin('module load map')
+
+    if opts.vario:
+        process_stdin('module load vario')
 
     if opts.cmd is not None:
         cmds = opts.cmd.split(';')

@@ -9,7 +9,7 @@ import mavutil, re, os, sys, threading, time
 mpstate = None
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib'))
-import pymavario
+import mp_vario
 import varioSettings
 
         
@@ -23,45 +23,77 @@ def description():
 
 def cmd_vario(args):
     '''vario command'''
+    return
+
+#===============================================================================
+#    state = mpstate.graph_state
+# 
+#    if len(args) == 0:
+#        # list current graphs
+#        for i in range(len(state.graphs)):
+#            print("Graph %u: %s" % (i, state.graphs[i].fields))
+#        return
+# 
+#    # start a new graph
+#    state.graphs.append(Graph(args[:]))
+#===============================================================================
 
 
 def init(_mpstate):
-    global mpstate
-    mstate = _mpstate
     '''initialise module'''
-    
-    self
+    global mpstate
+    mpstate = _mpstate
 
-        try:
-            self.settings_path = os.path.join(self.application_path, 'modules', 'data', "DefaultVarioSettings.xml")
-#            self.settings_path = os.path.join(self.application_path, "DefaultVarioSettings.xml")
-            self.Settings = varioSettings.parse(self.settings_path)
-        except:
-            print("Could not load vario settings at: " + self.settings_path)
-        else:
-          
-    self.vario = pymavario.vario()
+    mpstate.vario_initialised = False
 
-            
-    self.vario.deadband = float(self.Settings.get_Deadband()) * 100.0
-    self.vario.minRate = float(self.Settings.get_maxFallRate()) * -100.0
-    self.vario.maxRate = float(self.Settings.get_maxRiseRate()) * 100.0
-    self.vario.maxRate = float(self.m_textCtrlMaxRisingRate.GetValue()) * 100.0
-    self.vario.minFallingKey = int(self.Settings.get_minFallingKey())
-    value = int(str(self.Settings.get_maxFallingKey())
-    self.vario.maxFallingKey = value
-    self.vario.minRisingKey = int(self.Settings.get_minRisingKey())
-    value = int(self.Settings.get_maxRisingKey())
-    self.vario.maxRisingKey = value
+    try:
+        settings_path = "unassigned"
+        settings_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', "DefaultVarioSettings.xml")
+ #        self.settings_path = os.path.join(self.application_path, "DefaultVarioSettings.xml")
+        mpstate.varioSettings = varioSettings.parse(settings_path)
+    except:
+        print("Could not load vario settings at: " + settings_path)
+        print("vario not initialised")
+    else:
+
+ #       rise_font_path = mpstate.varioSettings.get_risingSoundfont()
+ #       fall_font_path = mpstate.varioSettings.get_fallingSoundfont()   
         
-    self.vario.setRisingSoundfont(str(self.Settings.get_risingSoundfont()))
-    self.vario.setFallingSoundfont(str(self.Settings.get_fallingSoundfont()))
-
-    print("vario initialised")
+        rise_font_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', str(mpstate.varioSettings.get_risingSoundfont()) )
+        fall_font_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', str(mpstate.varioSettings.get_fallingSoundfont()) )         
+        
+        if(not os.path.isfile(rise_font_path)):
+            print("did not find soundfont path for rising at " + rise_font_path)
+            return        
+        if(not os.path.isfile(fall_font_path)):
+            print("did not find soundfont path for falling at " + fall_font_path)
+            return
+          
+        mpstate.vario = mp_vario.vario(rise_font_path, fall_font_path)
+    
+                
+        mpstate.vario.deadband = float(mpstate.varioSettings.get_Deadband()) * 100.0
+        mpstate.vario.minRate = float(mpstate.varioSettings.get_maxFallRate()) * -100.0
+        mpstate.vario.maxRate = float(mpstate.varioSettings.get_maxRiseRate()) * 100.0
+#        mpstate.vario.maxRate = float(mpstate.varioSettings.m_textCtrlMaxRisingRate.GetValue()) * 100.0
+        mpstate.vario.minFallingKey = int(mpstate.varioSettings.get_minFallingKey())
+        value = int(str(mpstate.varioSettings.get_maxFallingKey()))
+        mpstate.vario.maxFallingKey = value
+        mpstate.vario.minRisingKey = int(mpstate.varioSettings.get_minRisingKey())
+        value = int(mpstate.varioSettings.get_maxRisingKey())
+        mpstate.vario.maxRisingKey = value
+            
+ #       mpstate.vario.setRisingSoundfont(str(mpstate.varioSettings.get_risingSoundfont()))
+ #       mpstate.vario.setFallingSoundfont(str(mpstate.varioSettings.get_fallingSoundfont()))
+    
+        mpstate.vario_initialised = True
+        print("vario initialised")
 
 def unload():
     '''unload module'''
-    self.vario.stop()
+    mpstate.vario_initialised = False
+    mpstate.vario.stop()
+
         
 def mavlink_packet(msg):
     '''handle an incoming mavlink packet'''
@@ -71,9 +103,9 @@ def mavlink_packet(msg):
                 #    system = msg.get_srcSystem()
                 #    component = msg.get_srcComponent()
                 #    print("Heartbeat from UDB (system %u component %u)" % (system, component))
-                #    if((system == self.system) and (component == self.component)):
-                #        self.heartbeat_ok = True
-                #        self.heartbeat_timer = time.time()
+                #    if((system == mpstate.system) and (component == mpstate.component)):
+                #        mpstate.heartbeat_ok = True
+                #        mpstate.heartbeat_timer = time.time()
                 #===============================================================
 
     if msg and msg.get_type() == "GLOBAL_POSITION_INT":
@@ -83,18 +115,24 @@ def mavlink_packet(msg):
         except:
             print("decode global vz message fail")
         try:
-            self.vario.vario_callback(vz)
+            if(mpstate.vario_initialised == True):
+                mpstate.vario.setRate(vz)
         except:
             print("vario callback fail")
+    return
             
-
-class healthcheck(threading.Thread):
-    def __init__(self):
-        threading.Thread.__init__(self)
-        self._stop = threading.Event()
-
-        
-    def run(self):
-        while ( (not mpstate.status.exit) and (not self._stop.isSet()) ):
-            time.sleep(0.5)
+#===============================================================================
+# 
+# class healthcheck(threading.Thread):
+#    def __init__(self, _mpstate):
+#        threading.Thread.__init__(self)
+#        self._stop = threading.Event()
+#        global mpstate
+#        mpstate = _mpstate
+# 
+#        
+#    def run(mpstate):
+#        while ( (not mpstate.status.exit) and (not self._stop.isSet()) ):
+#            time.sleep(0.5)
+#===============================================================================
         
