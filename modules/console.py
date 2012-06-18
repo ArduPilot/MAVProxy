@@ -9,7 +9,8 @@ import os, sys, math, time
 mpstate = None
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib'))
-import wxconsole, textconsole
+import wxconsole
+import textconsole
 
 class module_state(object):
     def __init__(self):
@@ -59,7 +60,7 @@ def unload():
         
 def mavlink_packet(msg):
     '''handle an incoming mavlink packet'''
-    if not isinstance(mpstate.console, wxconsole.MessageConsole):
+    if not isinstance(mpstate.console, textconsole.SimpleConsole):
         return
     if not mpstate.console.is_alive():
         mpstate.console = textconsole.SimpleConsole()

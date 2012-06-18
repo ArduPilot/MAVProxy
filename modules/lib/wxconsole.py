@@ -26,42 +26,49 @@ class MessageConsole(textconsole.SimpleConsole):
     a message console for MAVProxy
     '''
     def __init__(self,
-                 title='MAVProxy: console'):
+                title='MAVProxy: console'):
+        print "MessageConsole init"
         textconsole.SimpleConsole.__init__(self)
         import multiprocessing
         self.title  = title
-        self.parent_pipe,self.child_pipe = multiprocessing.Pipe()
-        self.close_event = multiprocessing.Event()
-        self.close_event.clear()
-        self.child = multiprocessing.Process(target=self.child_task)
-        self.child.start()
+     #   self.parent_pipe,self.child_pipe = multiprocessing.Pipe()
+     #   self.close_event = multiprocessing.Event()
+     #   self.close_event.clear()
+     #   self.child = multiprocessing.Process(target=self.child_task)
+     #   self.child.start()
+        self.child = self.child_task()
 
     def child_task(self):
         '''child process - this holds all the GUI elements'''
+        print "MessageConsole child"
         import wx
-        app = wx.PySimpleApp()
+        app = wx.App(False)
         app.frame = ConsoleFrame(state=self, title=self.title)
         app.frame.Show()
         app.MainLoop()
 
     def write(self, text, fg='black', bg='white'):
+        print "MessageConsole write"
         '''write to the console'''
         if self.child.is_alive():
             self.parent_pipe.send(Text(text, fg, bg))
 
     def set_status(self, name, text='', row=0, fg='black', bg='white'):
+        print "MessageConsole status"
         '''set a status value'''
         if self.child.is_alive():
             self.parent_pipe.send(Value(name, text, row, fg, bg))
         
 
     def close(self):
+        print "MessageConsole close"
         '''close the console'''
         self.close_event.set()
         if self.is_alive():
             self.child.join(2)
 
     def is_alive(self):
+        print "MessageConsole alive"
         '''check if child is still going'''
         return self.child.is_alive()
 
@@ -69,6 +76,7 @@ class ConsoleFrame(wx.Frame):
     """ The main frame of the console"""
     
     def __init__(self, state, title):
+        print "ConsoleFrame init"
         self.state = state
         wx.Frame.__init__(self, None, title=title, size=(800,300))
         self.panel = wx.Panel(self)
@@ -98,17 +106,19 @@ class ConsoleFrame(wx.Frame):
         self.pending = []
 
     def on_idle(self, event):
-        import time
-        time.sleep(0.05)
+       print "ConsoleFrame idle"
+       import time
+       time.sleep(0.05)
     
     def on_timer(self, event):
+        print "ConsoleFrame timer"
         state = self.state
-        if state.close_event.wait(0.001):
-            self.timer.Stop()
-            self.Destroy()
-            return
+   #     if state.close_event.wait(0.001):
+   #         self.timer.Stop()
+   #         self.Destroy()
+   #         return
         while state.child_pipe.poll():
-            obj = state.child_pipe.recv()
+   #         obj = state.child_pipe.recv()
             if isinstance(obj, Value):
                 # request to set a status field
                 if not obj.name in self.values:
@@ -143,13 +153,24 @@ class ConsoleFrame(wx.Frame):
     
 if __name__ == "__main__":
     # test the console
+    import wx
     import time
-    console = MessageConsole()
-    while console.is_alive():
-        console.write('Tick', fg='red')
-        console.write(" %s " % time.asctime())
-        console.writeln('tock', bg='yellow')
-        console.set_status('GPS', 'GPS: OK', fg='blue', bg='green')
-        console.set_status('Link1', 'Link1: OK', fg='green', bg='write')
-        console.set_status('Date', 'Date: %s' % time.asctime(), fg='red', bg='write', row=2)
-        time.sleep(0.5)
+    print "before MessageConsole"
+  #  console = MessageConsole()
+    print "after MessageConsole"
+    
+    state = {}
+    app = wx.App(False)
+    app.frame = ConsoleFrame(state, title="blah")
+    app.frame.Show()
+    app.MainLoop()
+#
+#    while console.is_alive():
+#        print "while console.is_alive"
+#        console.write('Tick', fg='red')
+#        console.write(" %s " % time.asctime())
+#        console.writeln('tock', bg='yellow')
+#        console.set_status('GPS', 'GPS: OK', fg='blue', bg='green')
+#        console.set_status('Link1', 'Link1: OK', fg='green', bg='write')
+#        console.set_status('Date', 'Date: %s' % time.asctime(), fg='red', bg='write', row=2)
+#        time.sleep(0.5)
