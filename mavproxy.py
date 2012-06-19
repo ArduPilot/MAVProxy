@@ -189,6 +189,7 @@ class MPState(object):
         self.modules = []
         self.functions = MAVFunctions()
         self.functions.say = say
+        self.functions.report_altitude = report_altitude
         self.functions.process_stdin = process_stdin
         self.select_extra = {}
 
@@ -1551,6 +1552,7 @@ if __name__ == '__main__':
     parser.add_option("--console", action='store_true', help="use GUI console")
     parser.add_option("--map", action='store_true', help="load map module")
     parser.add_option("--vario", action='store_true', help="load vario module")
+    parser.add_option("--joystick", action='store_true', help="load joystick module")
     parser.add_option("--mav09", action='store_true', default=False, help="Use MAVLink protocol 0.9")
     parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
     
@@ -1643,7 +1645,7 @@ Auto-detected serial ports are:
     if opts.aircraft is not None:
         start_script = os.path.join(opts.aircraft, "mavinit.scr")
         if os.path.exists(start_script):
-            run_script(start_script)
+            run_script(start_script),
 
     if opts.console:
         process_stdin('module load console')
@@ -1653,6 +1655,9 @@ Auto-detected serial ports are:
 
     if opts.vario:
         process_stdin('module load vario')
+
+    if opts.joystick:
+        process_stdin('module load joystick')
 
     if opts.cmd is not None:
         cmds = opts.cmd.split(';')
