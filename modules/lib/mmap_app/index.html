@@ -125,21 +125,22 @@ function MarkerClip(map) {
 
     var createdMarkerCount = 0;
 
-    this.createDefaultMarker = function() {
+    this.createDefaultMarker = function(size) {
         var marker = document.createElement('div');
         marker.id = map.parent.id+'-marker-'+createdMarkerCount;
         createdMarkerCount++;
-        marker.style.width = '20px';
-        marker.style.height = '20px';
+        px_size = size + 'px';
+        marker.style.width = px_size;
+        marker.style.height = px_size;
         marker.style.margin = '0';
         marker.style.padding = '0';
         marker.style.backgroundColor = '#ffffff';
         marker.style.borderWidth = '2px';
         marker.style.borderColor = 'black';
         marker.style.borderStyle = 'solid';
-        marker.style.MozBorderRadius = '20px';
-        marker.style.borderRadius = '20px';
-        marker.style.WebkitBorderRadius = '20px';
+        marker.style.MozBorderRadius = px_size;
+        marker.style.borderRadius = px_size;
+        marker.style.WebkitBorderRadius = px_size;
         return marker;
     };
 }
@@ -184,7 +185,7 @@ function initMap() {
   map = new MM.Map(parent, map_layer);
 
   marker_clip = new MarkerClip(map);
-  var marker = marker_clip.createDefaultMarker();
+  var marker = marker_clip.createDefaultMarker(20);
   var location = new MM.Location(0, 0);
   marker.title = "lovedrone";
   marker_clip.addMarker(marker, location);
@@ -232,6 +233,8 @@ function updateTelemetryDisplay() {
   now = new Date().getTime();
   $("#t_fps").html((1000.0 / (now - last_state_update_time)).toPrecision(3));
 
+  var trail_marker = marker_clip.createDefaultMarker(2);
+  marker_clip.addMarker(trail_marker, new MM.Location(state.lat, state.lon));
   marker_clip.setMarkerLocation(0, new MM.Location(state.lat, state.lon));
 }
 
