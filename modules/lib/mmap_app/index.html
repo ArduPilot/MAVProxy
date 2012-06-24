@@ -116,17 +116,17 @@ function updateLayer() {
   var bing_key = "Anmc0b2q6140lnPvAj5xANM1rvF1A4CvVtr6H2VJvQcdnDvc8NL-I2C49owIe9xC";
   if (layerNum == '1') {
     var style = 'AerialWithLabels';
-    provider = new MM.BingProvider(bing_key, style);
+    provider = new MM.BingProvider(bing_key, style, function(provider) { map_layer.setProvider(provider); });
   } else if (layerNum == '2') {
     var style = 'BirdseyeWithLabels';
-    provider = new MM.BingProvider(bing_key, style);
+    provider = new MM.BingProvider(bing_key, style, function(provider) { map_layer.setProvider(provider); });
   } else if (layerNum == '3') {
     var style = 'Road';
-    provider = new MM.BingProvider(bing_key, style);
+    provider = new MM.BingProvider(bing_key, style, function(provider) { map_layer.setProvider(provider); });
   } else if (layerNum == '4') {
     provider = new MM.BlueMarbleProvider();
+    map_layer.setProvider(provider);
   }
-  map_layer.setProvider(provider);
 }
 </script>
 
