@@ -1,6 +1,6 @@
 <html>
 <head>
-<script type="text/javascript" src="../../../../modestmaps-js/modestmaps.js"></script>
+<script type="text/javascript" src="modestmaps.js"></script>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
 <script type="text/javascript">
 
@@ -40,17 +40,20 @@ function initMap() {
 }
 
 function updateState() {
-  $.getJSON("http://192.168.0.147:9999/",
+  $.getJSON("data",
     function(data){
-      state.lat = data.lat;
-      state.lon = data.lon;
-      state.heading = data.heading;
+      state = data;
     });
 }
 
 function updateMap() {
   var location = new MM.Location(state.lat, state.lon);
   map.setCenter(location);
+  var html = "(" + state.lat + ", " + state.lon + ")";
+  html = html + " hdg:" + state.heading;
+  html = html + " alt:" + state.alt;
+  html = html + " aspd:" + state.airspeed;
+  $("#readout").html(html);
 }
 
 setInterval(updateState, 500);
@@ -60,9 +63,8 @@ setInterval(updateMap, 1000);
 <title>modest mavmap</title>
 </head>
 <body onload="initMap()">
-<p>
-Hello
-</p>
+<div id="readout">
+</div>
 <div id="map"></div>
 </body>
 </html>
