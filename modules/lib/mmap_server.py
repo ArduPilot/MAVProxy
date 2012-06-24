@@ -30,10 +30,21 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
       self.wfile.write(json.dumps(data))
     else:
       path = path[1:]
-      self.send_response(200)
-      self.end_headers()
-      with open(os.path.join(DOC_DIR, path), 'rb') as f:
-        self.wfile.write(f.read())
+      content = None
+      error = None
+      try:
+        with open(os.path.join(DOC_DIR, path), 'rb') as f:
+          content = f.read()
+      except IOError, e:
+        error = str(e)
+      if content:
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(content)
+      else:
+        self.send_response(404)
+        self.end_headers()
+        self.wfile.write('Error: %s' % (error,))
 
 
 def start_server(address, port, module_state):
