@@ -12,6 +12,8 @@ class module_state(object):
   def __init__(self):
     self.lat = None
     self.lon = None
+    self.alt = None
+    self.speed = None
     self.heading = 0
     self.wp_change_time = 0
     self.fence_change_time = 0
@@ -34,7 +36,7 @@ def init(module_context):
   g_module_context = module_context
   state = module_state()
   g_module_context.mmap_state = state
-  state.server = mmap_server.start_server('', port=9999, module_state=state)
+  state.server = mmap_server.start_server('0.0.0.0', port=9999, module_state=state)
 
 
 def unload():
@@ -53,3 +55,6 @@ def mavlink_packet(m):
     (state.lat, state.lon) = (m.lat / 1.0e7, m.lon / 1.0e7)
   elif m.get_type() == "VFR_HUD":
     state.heading = m.heading
+    state.alt = m.alt
+    state.airspeed = m.airspeed
+    state.groundspeed = m.groundspeed
