@@ -1,27 +1,52 @@
 <html>
 <head>
+<style type="text/css">
+body {
+  width: 100%;
+}
+
+html {
+  width: 100%;
+}
+
+#map {
+  height: 100%;
+  width: 100%;
+}
+
+.telemetry_header {
+  background-color: black;
+  color: white;
+  padding-left: 10px;
+  padding-right: 10px;
+  padding-top: 1px;
+  padding-bottom: 1px;
+  font-face: Courier, Courier News, monospace;
+  font-size: 24px;
+}
+
+.layerpicker {
+  display: inline;
+  float: right; 
+}
+
+</style>
+
 <script type="text/javascript" src="modestmaps.js"></script>
+<script type="text/javascript" src="bluemarble.js"></script>
+<script type="text/javascript" src="bing.js"></script>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
 <script type="text/javascript">
 
 var map;
+var map_layer;
+var last_state_update_time;
 
 var state = {};
 state.lat = 20.0;
 state.lon = 0.0;
 state.heading = 0.0;
 
-
-MM.BlueMarbleProvider = function() {
-    MM.MapProvider.call(this, function(coordinate) {
-        coordinate = this.sourceCoordinate(coordinate);
-        if (!coordinate) return null;
-        var img = coordinate.zoom.toFixed(0) +'-r'+ coordinate.row.toFixed(0) +'-c'+ coordinate.column.toFixed(0) + '.jpg';
-        return 'http://s3.amazonaws.com/com.modestmaps.bluemarble/' + img;
-    });
-};
-
-com.modestmaps.extend(MM.BlueMarbleProvider, MM.MapProvider);
 
 function initMap() {
 
@@ -32,38 +57,99 @@ function initMap() {
   // out of the box with OpenStreetMap and friends:
   // var template = 'http://tile.openstreetmap.org/{Z}/{X}/{Y}.png';
   // var provider = new MM.TemplatedMapProvider(template);
-  var provider = new MM.Layer(new MM.BlueMarbleProvider());
+
+  // --------------------
+  // Blue Marble
+  var provider = new MM.BlueMarbleProvider();
+
+  // --------------------
+  // Microsoft Bing
+  // please use your own API key!  This is jjwiseman's!
+  // var key = "Anmc0b2q6140lnPvAj5xANM1rvF1A4CvVtr6H2VJvQcdnDvc8NL-I2C49owIe9xC";
+  // var style = 'AerialWithLabels';
+  // var provider = new MM.BingProvider(key, style);
+
+  map_layer = new MM.Layer(provider);
 
   // without a size, it will expand to fit the parent:
-  map = new MM.Map(parent, provider, new MM.Point(1024,512));
+  map = new MM.Map(parent, map_layer);
   map.setCenterZoom(new MM.Location(20.0, 0), 6);
+
+  setInterval(updateState, 500);
+  $('#layerpicker').change(updateLayer);
 }
 
 function updateState() {
   $.getJSON("data",
     function(data){
       state = data;
+      updateMap();
+      updateTelemetryDisplay();
+      last_state_update_time = new Date().getTime();
+      updateMap();
     });
 }
+
 
 function updateMap() {
   var location = new MM.Location(state.lat, state.lon);
   map.setCenter(location);
-  var html = "(" + state.lat + ", " + state.lon + ")";
-  html = html + " hdg:" + state.heading;
-  html = html + " alt:" + state.alt;
-  html = html + " aspd:" + state.airspeed;
-  $("#readout").html(html);
 }
 
-setInterval(updateState, 500);
-setInterval(updateMap, 1000);
+
+function updateTelemetryDisplay() {
+  $("#t_lat").html(state.lat);
+  $("#t_lon").html(state.lon);
+  $("#t_alt").html(state.alt);
+  $("#t_gspd").html(state.groundspeed);
+  $("#t_aspd").html(state.airspeed);
+  $("#t_hdg").html(state.heading);
+  now = new Date().getTime();
+  $("#t_fps").html(1000.0 / (now - last_state_update_time));
+}
+
+
+function updateLayer() {
+  var provider;
+  var layerNum = $(this).attr('value');
+  console.log("Switching to layer " + layerNum);
+  var bing_key = "Anmc0b2q6140lnPvAj5xANM1rvF1A4CvVtr6H2VJvQcdnDvc8NL-I2C49owIe9xC";
+  if (layerNum == '1') {
+    var style = 'AerialWithLabels';
+    provider = new MM.BingProvider(bing_key, style);
+  } else if (layerNum == '2') {
+    var style = 'BirdseyeWithLabels';
+    provider = new MM.BingProvider(bing_key, style);
+  } else if (layerNum == '3') {
+    var style = 'Road';
+    provider = new MM.BingProvider(bing_key, style);
+  } else if (layerNum == '4') {
+    provider = new MM.BlueMarbleProvider();
+  }
+  map_layer.setProvider(provider);
+}
 </script>
 
 <title>modest mavmap</title>
 </head>
 <body onload="initMap()">
-<div id="readout">
+<div class="telemetry_header">
+<span class="t_value" id="t_lat"></span>, <span class="t_value" id="t_lon"></span>) |
+ALT <span class="t_value" id="t_alt"></span> m |
+HDG <span class="t_value" id="t_hdg"></span> |
+GNDSPD <span class="t_value" id="t_gspd"></span> m/s |
+AIRSPD <span class="t_value" id="t_aspd"></span> m/s |
+FPS <span class="t_value" id="t_fps"></span>
+
+<div class="layerpicker">
+<select id="layerpicker">
+  <option value="1">Microsoft Bing (aerial)</option>
+  <option value="2">Microsoft Bing (birdseye)</option>
+  <option value="3">Microsoft Bing (road)</option>
+  <option value="4">Blue Marble</option>
+<select>
+</div>
+
 </div>
 <div id="map"></div>
 </body>
