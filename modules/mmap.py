@@ -32,10 +32,9 @@ def init(module_context):
   """initialise module"""
   global g_module_context
   g_module_context = module_context
-  mstate = module_state()
-  g_module_context.mmap_state = mstate
-  mstate.server = mmap_server.Server(mmap_server.Handler, 9999)
-  mstate.server.start()
+  state = module_state()
+  g_module_context.mmap_state = state
+  state.server = mmap_server.start_server('', port=9999, module_state=state)
 
 
 def unload():
