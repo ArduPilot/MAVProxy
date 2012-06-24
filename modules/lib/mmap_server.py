@@ -1,7 +1,10 @@
 import BaseHTTPServer
 import json
-import logging
+import os.path
 import thread
+import urlparse
+
+DOC_DIR = os.path.join(os.path.dirname(__file__), 'mmap_app')
 
 
 class Server(BaseHTTPServer.HTTPServer):
@@ -13,16 +16,24 @@ class Server(BaseHTTPServer.HTTPServer):
 
 class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
   def do_GET(self):
-    #scheme, host, path, params, query, frag = urlparse.urlparse(self.path)
-    #params = cgi.parse_qs(query)
-    print('HOOOAH')
-    state = self.server.module_state
-    data = {'lat': state.lat,
-            'lon': state.lon,
-            'heading': state.heading}
-    self.send_response(200)
-    self.end_headers()
-    self.wfile.write(json.dumps(data))
+    scheme, host, path, params, query, frag = urlparse.urlparse(self.path)
+    if path == '/data':
+      state = self.server.module_state
+      data = {'lat': state.lat,
+              'lon': state.lon,
+              'heading': state.heading,
+              'alt': state.alt,
+              'airspeed': state.airspeed,
+              'groundspeed': state.groundspeed}
+      self.send_response(200)
+      self.end_headers()
+      self.wfile.write(json.dumps(data))
+    else:
+      path = path[1:]
+      self.send_response(200)
+      self.end_headers()
+      with open(os.path.join(DOC_DIR, path), 'rb') as f:
+        self.wfile.write(f.read())
 
 
 def start_server(address, port, module_state):
