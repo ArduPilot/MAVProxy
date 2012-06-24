@@ -1,0 +1,68 @@
+<html>
+<head>
+<script type="text/javascript" src="../../../../modestmaps-js/modestmaps.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
+<script type="text/javascript">
+
+var map;
+
+var state = {};
+state.lat = 20.0;
+state.lon = 0.0;
+state.heading = 0.0;
+
+
+MM.BlueMarbleProvider = function() {
+    MM.MapProvider.call(this, function(coordinate) {
+        coordinate = this.sourceCoordinate(coordinate);
+        if (!coordinate) return null;
+        var img = coordinate.zoom.toFixed(0) +'-r'+ coordinate.row.toFixed(0) +'-c'+ coordinate.column.toFixed(0) + '.jpg';
+        return 'http://s3.amazonaws.com/com.modestmaps.bluemarble/' + img;
+    });
+};
+
+com.modestmaps.extend(MM.BlueMarbleProvider, MM.MapProvider);
+
+function initMap() {
+
+  // name of a div element:
+  var parent = 'map';
+
+  // defaults to Google-style Mercator projection, so works
+  // out of the box with OpenStreetMap and friends:
+  // var template = 'http://tile.openstreetmap.org/{Z}/{X}/{Y}.png';
+  // var provider = new MM.TemplatedMapProvider(template);
+  var provider = new MM.Layer(new MM.BlueMarbleProvider());
+
+  // without a size, it will expand to fit the parent:
+  map = new MM.Map(parent, provider, new MM.Point(1024,512));
+  map.setCenterZoom(new MM.Location(20.0, 0), 6);
+}
+
+function updateState() {
+  $.getJSON("http://192.168.0.147:9999/",
+    function(data){
+      state.lat = data.lat;
+      state.lon = data.lon;
+      state.heading = data.heading;
+    });
+}
+
+function updateMap() {
+  var location = new MM.Location(state.lat, state.lon);
+  map.setCenter(location);
+}
+
+setInterval(updateState, 500);
+setInterval(updateMap, 1000);
+</script>
+
+<title>modest mavmap</title>
+</head>
+<body onload="initMap()">
+<p>
+Hello
+</p>
+<div id="map"></div>
+</body>
+</html>
