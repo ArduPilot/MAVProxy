@@ -16,6 +16,14 @@ html {
   width: 100%;
 }
 
+#adi {
+  position: absolute;
+  top: 100px;
+  height: 100px;
+  width: 100px;
+  border: 1px solid #9C9898;
+}
+
 #drone {
   background-image: url('drone-sm.png');
   background-repeat: none;
@@ -76,6 +84,7 @@ html {
 <script type="text/javascript" src="modestmaps.js"></script>
 <script type="text/javascript" src="bluemarble.js"></script>
 <script type="text/javascript" src="bing.js"></script>
+<script src="http://www.html5canvastutorials.com/libraries/kinetic-v3.10.0.js"></script>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
 <script type="text/javascript">
 
@@ -92,6 +101,57 @@ function TrailPlotter(marker_clip) {
         last_trail_time = now;
     }
   }
+}
+
+
+function ADI(container) {
+    this.stage = new Kinetic.Stage({
+        container: container,
+    });
+    this.stage.setScale($(container).width / 100.0, $(container).height / 100.0)
+
+
+    this.layer = new Kinetic.Layer();
+
+    this.plane = new Kinetic.Path({
+        x: 50,
+        y: 50,
+        data: "m -26,0 15,0 3,3 M -1,0 l 2,0 M 26,0 l -15,0 -3,3",
+	stroke: "black",
+	lineJoin: "round",
+	strokeWidth: 2.5,
+	shadow: {
+	    color: 'black',
+	    blur: 5,
+	    offset: [1, 1],
+	    alpha: 0.5
+	},
+        scale: 1.2
+    });
+
+    // add the shape to the layer
+    this.layer.add(this.plane);
+
+    this.horizon = new Kinetic.Path({
+	x: 50,
+	y: 50,
+	data: "m -50,0 100,0",
+	stroke: "black",
+	lineJoin: "round",
+	strokeWidth: 1.7,
+	scale: 1
+    });
+    this.layer.add(this.horizon);
+
+    // add the layer to the stage
+    this.stage.add(this.layer);
+
+    this.setAttitude = function(pitch, roll) {
+	horizon_y = 50 - 50 * Math.sin(pitch);
+	this.horizon.setY(horizon_y);
+	this.horizon.setRotation(roll);
+	this.layer.draw();
+    }
 }
 
 
@@ -188,10 +248,13 @@ var map_layer;
 var marker_clip;
 var trail_plotter;
 var last_state_update_time;
+var adi;
 
 var state = {};
 state.lat = 20.0;
 state.lon = 0.0;
+state.pitch = 0.0;
+state.roll = 0.0
 state.heading = 0.0;
 
 
@@ -234,6 +297,8 @@ function initMap() {
   $('#layerpicker').change(updateLayer);
 
   trail_plotter = new TrailPlotter(marker_clip);
+
+    adi = new ADI("adi")
 }
 
 
@@ -273,6 +338,7 @@ function updateTelemetryDisplay() {
   now = new Date().getTime();
   $("#t_fps").html((1000.0 / (now - last_state_update_time)).toPrecision(3));
 
+  adi.setAttitude(state.pitch, state.roll);
   
   rotate_drone(state.heading)
   trail_plotter.update();
@@ -336,6 +402,7 @@ LINK <span class="t_value" id="t_link"></span> |
 <br>
 (<span class="t_value" id="t_lat"></span>, <span class="t_value" id="t_lon"></span>)
 </div>
+<div id="adi"></div>
 <div id="map"></div>
 <div id="drone"></div>
 </body>

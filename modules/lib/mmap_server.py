@@ -22,6 +22,9 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
       data = {'lat': state.lat,
               'lon': state.lon,
               'heading': state.heading,
+              'pitch': state.pitch,
+              'roll': state.roll,
+              'yaw': state.yaw,
               'alt': state.alt,
               'airspeed': state.airspeed,
               'groundspeed': state.groundspeed}
