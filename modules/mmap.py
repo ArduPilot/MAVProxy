@@ -1,5 +1,6 @@
 import os
 import sys
+import webbrowser
 
 sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.realpath(__file__)), 'lib'))
@@ -36,7 +37,9 @@ def init(module_context):
   g_module_context = module_context
   state = module_state()
   g_module_context.mmap_state = state
-  state.server = mmap_server.start_server('0.0.0.0', port=9999, module_state=state)
+  state.server = mmap_server.start_server(
+    '0.0.0.0', port=9999, module_state=state)
+  webbrowser.open('http://127.0.0.1:9999/', autoraise=True)
 
 
 def unload():

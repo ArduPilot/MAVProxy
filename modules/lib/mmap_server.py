@@ -29,7 +29,14 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
       self.end_headers()
       self.wfile.write(json.dumps(data))
     else:
+      # Remove leading '/'.
       path = path[1:]
+      # Ignore all directories.  E.g.  for ../../bar/a.txt serve
+      # DOC_DIR/a.txt.
+      unused_head, path = os.path.split(path)
+      # for / serve index.html.
+      if path == '':
+        path = 'index.html'
       content = None
       error = None
       try:
