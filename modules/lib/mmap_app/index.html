@@ -17,18 +17,18 @@ html {
 }
 
 #drone {
-	background-image:url('drone-sm.png');
-	background-repeat:none;
-	position:absolute;
-	top: 45%;
-	left: 45%;
-	height:100px;
-	width:150px;
-	-moz-transition: all 2s ease;
-	-webkit-transition: all 2s ease;
-	-o-transition: all 2s ease;
-	-ms-transition: all 2s ease;
-	transition: all 2s ease;
+  background-image: url('drone-sm.png');
+  background-repeat: none;
+  position: absolute;
+  top: 45%;
+  left: 45%;
+  height: 100px;
+  width: 150px;
+  -moz-transition: all 2s ease;
+  -webkit-transition: all 2s ease;
+  -o-transition: all 2s ease;
+  -ms-transition: all 2s ease;
+  transition: all 2s ease;
 }
 
 
@@ -87,8 +87,8 @@ function TrailPlotter(marker_clip) {
   this.update = function() {
     var now = new Date().getTime();
       if (last_trail_time == 0 || now - last_trail_time > 10000) {
-	var trail_marker = this.marker_clip.createDefaultMarker(2);
-	this.marker_clip.addMarker(trail_marker, new MM.Location(state.lat, state.lon));
+        var trail_marker = this.marker_clip.createDefaultMarker(2);
+        this.marker_clip.addMarker(trail_marker, new MM.Location(state.lat, state.lon));
         last_trail_time = now;
     }
   }
@@ -335,8 +335,6 @@ LINK <span class="t_value" id="t_link"></span> |
 </div>
 <br>
 (<span class="t_value" id="t_lat"></span>, <span class="t_value" id="t_lon"></span>)
-
-
 </div>
 <div id="map"></div>
 <div id="drone"></div>
