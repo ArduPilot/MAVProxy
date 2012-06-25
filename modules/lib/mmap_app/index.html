@@ -155,10 +155,16 @@ function ADI(container) {
     this.roll = 90.0 * Math.PI / 180.0;
     this.targetPitch = 0.0;
     this.targetRoll = 0.0;
+
+    var containerElement = document.getElementById(container);
+    console.log('CONTAINER ' + containerElement.offsetWidth + 'x' + containerElement.offsetHeight);
     this.stage = new Kinetic.Stage({
         container: container,
+	height: containerElement.offsetHeight,
+	width: containerElement.offsetWidth
     });
-    this.stage.setScale($(container).width / 100.0, $(container).height / 100.0)
+    this.stage.setScale(containerElement.offsetWidth / 100.0,
+			containerElement.offsetHeight / 100.0)
     this.layer = new Kinetic.Layer();
     this.plane = new Kinetic.Path({
         x: 50,
@@ -180,7 +186,7 @@ function ADI(container) {
     this.horizon = new Kinetic.Path({
 	x: 50,
 	y: 50,
-	data: "m -50,0 100,0",
+	data: "m -100,0 200,0",
 	stroke: "black",
 	lineJoin: "round",
 	strokeWidth: 1.7,
@@ -190,6 +196,11 @@ function ADI(container) {
     // add the layer to the stage
     this.stage.add(this.layer);
 
+    var horizon_y = 50 - 50 * Math.sin(this.pitch);
+    this.horizon.setY(horizon_y);
+    this.horizon.setRotation(this.roll * 1.0);
+    this.layer.draw();
+	
     this.animateToAttitude = function() {
 	var need_more_animation = false;
 	
