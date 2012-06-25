@@ -5,6 +5,13 @@
 body {
   width: 100%;
   margin: 0px 0px 0px 0px;
+  font-family: 'Droid Sans Mono', Courier, Courier News, monospace;
+  font-size: 24px;
+}
+
+select {
+  font-family: 'Droid Sans Mono', Courier, Courier News, monospace !important;
+  font-size: 20px !important;
 }
 
 html {
@@ -12,17 +19,18 @@ html {
 }
 
 #map {
+  position: absolute;
+  top: 0px;
+  bottom: 0px;
   height: 100%;
   width: 100%;
+  z-index: -1;
 }
 
 #adi {
-  position: absolute;
-  top: 100px;
   height: 100px;
   width: 100px;
   border: 1px solid #9C9898;
-  z-index: 1;
 }
 
 #drone {
@@ -40,11 +48,11 @@ html {
   transition: all 2s ease;
 }
 
+.controls {
+    float: right;
+}
+
 .telemetry_header {
-  position: absolute;
-  top: 0px;
-  left: 0px;
-  z-index: 1;
   width: 100%;
   background-color: rgba(0, 0, 0, 0.5);
   color: white;
@@ -52,12 +60,14 @@ html {
   padding-right: 10px;
   padding-top: 1px;
   padding-bottom: 1px;
-  font-family: 'Droid Sans Mono', Courier, Courier News, monospace;
-  font-size: 24px;
 }
 
 .layerpicker {
   display: inline;
+}
+
+.zoomslider {
+    display: inline;
 }
 
 .link {
@@ -88,6 +98,40 @@ html {
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
 <script type="text/javascript">
 
+function MapPanner(map) {
+    var theMapPanner = this;
+    this.map = map;
+    this.targetLocation = null;
+    
+    this.animateToCenter = function() {
+	var need_more_animation = false;
+	var curLocation = theMapPanner.map.getCenter();
+	var nextLat = curLocation.lat + (theMapPanner.targetLocation.lat - curLocation.lat) * 0.2;
+	var nextLon = curLocation.lon + (theMapPanner.targetLocation.lon - curLocation.lon) * 0.2;
+	if (Math.abs(nextLat - curLocation.lat) < 0.00001) {
+	    nextLat = theMapPanner.targetLocation.lat;
+	} else {
+	    need_more_animation = true;
+	}
+	if (Math.abs(nextLon - curLocation.lon) < 0.00001) {
+	    nextLon = theMapPanner.targetLocation.lon;
+	} else {
+	    need_more_animation = true;
+	}
+
+	theMapPanner.map.setCenter(new MM.Location(nextLat, nextLon));
+	if (need_more_animation) {
+	    MM.getFrame(this.animateToCenter);
+	}
+    }
+
+    this.setCenter = function(location) {
+	this.targetLocation = location;
+	MM.getFrame(this.animateToCenter);
+    }
+
+}
+
 function TrailPlotter(marker_clip) {
   this.marker_clip = marker_clip
 
@@ -105,14 +149,17 @@ function TrailPlotter(marker_clip) {
 
 
 function ADI(container) {
+    var theADI = this;
+
+    this.pitch = 90.0 * Math.PI / 180.0;
+    this.roll = 90.0 * Math.PI / 180.0;
+    this.targetPitch = 0.0;
+    this.targetRoll = 0.0;
     this.stage = new Kinetic.Stage({
         container: container,
     });
     this.stage.setScale($(container).width / 100.0, $(container).height / 100.0)
-
-
     this.layer = new Kinetic.Layer();
-
     this.plane = new Kinetic.Path({
         x: 50,
         y: 50,
@@ -128,10 +175,8 @@ function ADI(container) {
 	},
         scale: 1.2
     });
-
     // add the shape to the layer
     this.layer.add(this.plane);
-
     this.horizon = new Kinetic.Path({
 	x: 50,
 	y: 50,
@@ -142,15 +187,44 @@ function ADI(container) {
 	scale: 1
     });
     this.layer.add(this.horizon);
-
     // add the layer to the stage
     this.stage.add(this.layer);
 
+    this.animateToAttitude = function() {
+	var need_more_animation = false;
+	
+	var curPitch = theADI.pitch;
+	var nextPitch = curPitch + (theADI.targetPitch - curPitch) * 0.05;
+	if (Math.abs(nextPitch - curPitch) < 0.001) {
+	    nextPitch = theADI.targetPitch;
+	} else {
+	    need_more_animation = true;
+	}
+	
+	var curRoll = theADI.roll;
+	var nextRoll = curRoll + (theADI.targetRoll - curRoll) * 0.05;
+	if (Math.abs(nextRoll - curRoll) < 0.001) {
+	    nextRoll = theADI.targetRoll;
+	} else {
+	    need_more_animation = true;
+	}
+	
+	horizon_y = 50 - 50 * Math.sin(nextPitch * 1.0);
+	theADI.horizon.setY(horizon_y);
+	theADI.horizon.setRotation(nextRoll * 1.0);
+	theADI.layer.draw();
+	
+	theADI.pitch = nextPitch;
+	theADI.roll = nextRoll;
+	if (need_more_animation) {
+	    MM.getFrame(theADI.animateToAttitude);
+	}
+    }
+    
     this.setAttitude = function(pitch, roll) {
-	horizon_y = 50 - 50 * Math.sin(pitch * 1.0);
-	this.horizon.setY(horizon_y);
-	this.horizon.setRotation(roll * 1.0);
-	this.layer.draw();
+	this.targetPitch = pitch;
+	this.targetRoll = roll;
+	MM.getFrame(this.animateToAttitude);
     }
 }
 
@@ -247,13 +321,14 @@ function MarkerClip(map) {
 var map;
 var map_layer;
 var marker_clip;
-var trail_plotter;
+var trailPlotter;
+var mapPanner;
 var last_state_update_time;
 var adi;
 
 var state = {};
-state.lat = 20.0;
-state.lon = 0.0;
+state.lat = null;
+state.lon = null;
 state.pitch = 0.0;
 state.roll = 0.0
 state.heading = 0.0;
@@ -284,7 +359,7 @@ function initMap() {
   map_layer = new MM.Layer(provider);
 
   // without a size, it will expand to fit the parent:
-  map = new MM.Map(parent, map_layer);
+    map = new MM.Map(parent, map_layer, null, null);
 
   marker_clip = new MarkerClip(map);
   //var marker = marker_clip.createDefaultMarker(20);
@@ -292,39 +367,57 @@ function initMap() {
   //marker.title = "lovedrone";
   //marker_clip.addMarker(marker, location);
 
-  map.setCenterZoom(new MM.Location(20.0, 0), 20);
+  map.setCenterZoom(new MM.Location(20.0, 0), 18);
 
-  setInterval(updateState, 500);
+  setInterval(updateState, 250);
   $('#layerpicker').change(updateLayer);
 
-  trail_plotter = new TrailPlotter(marker_clip);
+  trailPlotter = new TrailPlotter(marker_clip);
+  mapPanner = new MapPanner(map);
+    
+  adi = new ADI("adi");
 
-    adi = new ADI("adi")
+  var zoomSlider = document.getElementById('zoom');
+  zoomSlider.onchange = function() {
+      var sliderProp = (zoomSlider.value - zoomSlider.min) / (zoomSlider.max - zoomSlider.min);
+      var targetZoom = sliderProp * 18.0; 
+      map.setZoom(targetZoom);
+  };
 }
 
 
+function updateLinkStatus() {
+    var now = (new Date()).getTime();
+    if (!last_state_update_time) {
+	$("#t_link").html('<span class="link error">NO</span>');
+    } else if (now - last_state_update_time > 5000) {
+	$("#t_link").html('<span class="link error">TIMEOUT</span>');
+    } else if (now - last_state_update_time > 1000) {
+	$("#t_link").html('<span class="link slow">SLOW</span>');
+    } else {
+	$("#t_link").html('<span class="link ok">OK</span>');
+    }
+}
+
 function updateState() {
-  $.getJSON("data",
-    function(data){
-      state = data;
-      updateTelemetryDisplay();
-      last_state_update_time = new Date().getTime();
-      updateMap();
-    });
-  var now = (new Date()).getTime();
-  if (now - last_state_update_time > 5000) {
-    $("#t_link").html('<span class="link error">ERROR</span>');
-  } else if (now - last_state_update_time > 1000) {
-    $("#t_link").html('<span class="link slow">SLOW</span>');
-  } else {
-    $("#t_link").html('<span class="link ok">OK</span>');
-  }
+    $.getJSON("data",
+	      function(data){
+		  state = data;
+		  updateTelemetryDisplay();
+		  updateMap();
+		  last_state_update_time = new Date().getTime();
+	      });
+    updateLinkStatus();
 }
 
 
 function updateMap() {
   var location = new MM.Location(state.lat, state.lon);
-  map.setCenter(location);
+    if (!last_state_update_time) {
+	map.setCenter(location);
+    } else {
+	mapPanner.setCenter(location);
+    }
 }
 
 
@@ -341,7 +434,7 @@ function updateTelemetryDisplay() {
   adi.setAttitude(state.pitch, state.roll);
   
   rotate_drone(state.heading)
-  trail_plotter.update();
+  trailPlotter.update();
   marker_clip.setMarkerLocation(0, new MM.Location(state.lat, state.lon));
 }
 
@@ -390,17 +483,22 @@ ALT <span class="t_value" id="t_alt"></span> m |
 HDG <span class="t_value" id="t_hdg"></span> |
 GNDSPD <span class="t_value" id="t_gspd"></span> m/s |
 AIRSPD <span class="t_value" id="t_aspd"></span> m/s |
-LINK <span class="t_value" id="t_link"></span> |
+LINK <span class="t_value" id="t_link"></span><br>
+(<span class="t_value" id="t_lat"></span>, <span class="t_value" id="t_lon"></span>)
+</div>
+<div id="controls">
 <div class="layerpicker">
-<select id="layerpicker">
+Map <select id="layerpicker">
   <option value="1">Microsoft Bing (aerial)</option>
   <option value="2">Microsoft Bing (birdseye)</option>
   <option value="3">Microsoft Bing (road)</option>
   <option value="4">Blue Marble</option>
 <select>
-</div>
 <br>
-(<span class="t_value" id="t_lat"></span>, <span class="t_value" id="t_lon"></span>)
+<div class="zoomslider">
+Zoom <input id="zoom" type="range" value="18000" min="0" max="18000"></input>
+</div>
+</div>
 </div>
 <div id="adi"></div>
 <div id="map"></div>
