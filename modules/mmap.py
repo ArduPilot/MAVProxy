@@ -61,3 +61,7 @@ def mavlink_packet(m):
     state.alt = m.alt
     state.airspeed = m.airspeed
     state.groundspeed = m.groundspeed
+  elif m.get_type() == "ATTITUDE":
+    state.pitch = m.pitch
+    state.roll = m.roll
+    state.yaw = m.yaw
