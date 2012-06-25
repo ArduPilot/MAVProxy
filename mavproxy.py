@@ -733,11 +733,13 @@ def cmd_module(args):
             m = __import__(args[1])
             if m in mpstate.modules:
                 raise RuntimeError("module already loaded")
+            print m
             m.init(mpstate)
             mpstate.modules.append(m)
             print("Loaded module %s" % args[1])
         except Exception, msg:
             print("Unable to load module %s: %s" % (args[1], msg))
+            raise
     elif args[0] == "reload":
         if len(args) < 2:
             print("usage: module reload <name>")
@@ -821,6 +823,7 @@ def process_stdin(line):
         fn(args[1:])
     except Exception as e:
         print("ERROR in command: %s" % str(e))
+        raise
 
 
 def scale_rc(servo, min, max, param):
