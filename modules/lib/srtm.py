@@ -21,7 +21,7 @@ import math
 class NoSuchTileError(Exception):
     """Raised when there is no tile for a region."""
     def __init__(self, lat, lon):
-        Exception.__init__()
+        Exception.__init__(self)
         self.lat = lat
         self.lon = lon
 
@@ -32,7 +32,7 @@ class NoSuchTileError(Exception):
 class WrongTileError(Exception):
     """Raised when the value of a pixel outside the tile area is requested."""
     def __init__(self, tile_lat, tile_lon, req_lat, req_lon):
-        Exception.__init__()
+        Exception.__init__(self)
         self.tile_lat = tile_lat
         self.tile_lon = tile_lon
         self.req_lat = req_lat
@@ -45,7 +45,7 @@ class WrongTileError(Exception):
 class InvalidTileError(Exception):
     """Raised when the SRTM tile file contains invalid data."""
     def __init__(self, lat, lon):
-        Exception.__init__()
+        Exception.__init__(self)
         self.lat = lat
         self.lon = lon
 
