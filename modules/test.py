@@ -39,6 +39,7 @@ def mavlink_packet(m):
             mpstate.functions.process_stdin("rc 3 2000")
             mpstate.functions.process_stdin("module load sensors")
             mpstate.functions.process_stdin("watch sensors")
+            mpstate.functions.process_stdin("wp list")
             mpstate.test_state.state = TestState.FBWA
     if mpstate.test_state.state == TestState.FBWA:
         if mpstate.status.altitude > 60:
