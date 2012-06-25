@@ -38,7 +38,7 @@ def init(module_context):
   state = module_state()
   g_module_context.mmap_state = state
   state.server = mmap_server.start_server(
-    '0.0.0.0', port=9999, module_state=state)
+    '127.0.0.1', port=9999, module_state=state)
   webbrowser.open('http://127.0.0.1:9999/', autoraise=True)
 
 
