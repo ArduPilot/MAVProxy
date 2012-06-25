@@ -8,7 +8,7 @@ import mavutil, re, os, sys, threading, time
 
 mpstate = None
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib', 'vario'))
 import mp_vario
 import varioSettings
 
