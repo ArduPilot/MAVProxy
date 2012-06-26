@@ -14,9 +14,14 @@ class module_state(object):
     self.lat = None
     self.lon = None
     self.alt = None
-    self.speed = None
-    self.heading = 0
+    self.airspeed = None
+    self.groundspeed = None
+    self.heading = None
+    self.pitch = None
+    self.roll = None
+    self.yaw = None
     self.wp_change_time = 0
+    self.waypoints = []
     self.fence_change_time = 0
     self.server = None
 
@@ -38,7 +43,7 @@ def init(module_context):
   state = module_state()
   g_module_context.mmap_state = state
   state.server = mmap_server.start_server(
-    '127.0.0.1', port=9999, module_state=state)
+    '0.0.0.0', port=9999, module_state=state)
   webbrowser.open('http://127.0.0.1:9999/', autoraise=True)
 
 
@@ -65,3 +70,8 @@ def mavlink_packet(m):
     state.pitch = m.pitch
     state.roll = m.roll
     state.yaw = m.yaw
+  # if the waypoints have changed, redisplay
+  if state.wp_change_time != g_module_context.status.wploader.last_change:
+    state.wp_change_time = g_module_context.status.wploader.last_change
+    points = g_module_context.status.wploader.polygon()
+    state.waypoints = points
