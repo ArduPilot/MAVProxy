@@ -1,7 +1,7 @@
 import BaseHTTPServer
 import json
 import os.path
-import thread
+import threading
 import urlparse
 
 DOC_DIR = os.path.join(os.path.dirname(__file__), 'mmap_app')
@@ -27,7 +27,9 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
               'yaw': state.yaw,
               'alt': state.alt,
               'airspeed': state.airspeed,
-              'groundspeed': state.groundspeed}
+              'groundspeed': state.groundspeed,
+              'wp_change_time': state.wp_change_time,
+              'waypoints': state.waypoints}
       self.send_response(200)
       self.end_headers()
       self.wfile.write(json.dumps(data))
@@ -60,5 +62,7 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
 def start_server(address, port, module_state):
   server = Server(
     Handler, address=address, port=port, module_state=module_state)
-  thread.start_new_thread(server.serve_forever, ())
+  server_thread = threading.Thread(target=server.serve_forever)
+  server_thread.daemon = True
+  server_thread.start()
   return server
