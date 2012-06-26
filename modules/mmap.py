@@ -20,6 +20,7 @@ class module_state(object):
     self.pitch = None
     self.roll = None
     self.yaw = None
+    self.gps_fix_type = None
     self.wp_change_time = 0
     self.waypoints = []
     self.fence_change_time = 0
@@ -61,6 +62,7 @@ def mavlink_packet(m):
     (state.lat, state.lon) = (m.lat, m.lon)
   elif m.get_type() == 'GPS_RAW_INT':
     (state.lat, state.lon) = (m.lat / 1.0e7, m.lon / 1.0e7)
+    state.gps_fix_type = m.fix_type
   elif m.get_type() == "VFR_HUD":
     state.heading = m.heading
     state.alt = m.alt

@@ -28,6 +28,7 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
               'alt': state.alt,
               'airspeed': state.airspeed,
               'groundspeed': state.groundspeed,
+              'gps_fix_type': state.gps_fix_type,
               'wp_change_time': state.wp_change_time,
               'waypoints': state.waypoints}
       self.send_response(200)

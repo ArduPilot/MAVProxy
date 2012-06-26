@@ -27,11 +27,18 @@ html {
   z-index: -1;
 }
 
+#header {
+    background-color: rgba(0, 0, 0, 0.5);
+    width: 100%;
+    height: 200px;
+    color: white;
+}
+
 #adi {
-  height: 400px;
-  width: 400px;
-  border: 1px solid #9C9898;
+    height: 200px;
+    width: 200px;
     background-color: rgba(255, 255, 255, 0.5);
+    float: left;
 }
 
 #drone {
@@ -53,10 +60,7 @@ html {
     float: right;
 }
 
-.telemetry_header {
-  width: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  color: white;
+#telemetry {
   padding-left: 10px;
   padding-right: 10px;
   padding-top: 1px;
@@ -435,15 +439,22 @@ function updateMap() {
 
 
 function updateTelemetryDisplay() {
-  $("#t_lat").html(state.lat);
-  $("#t_lon").html(state.lon);
-  $("#t_alt").html(state.alt.toPrecision(4));
-  $("#t_gspd").html(state.groundspeed.toPrecision(3));
-  $("#t_aspd").html(state.airspeed.toPrecision(3));
-  $("#t_hdg").html(state.heading)
-  now = new Date().getTime();
-  $("#t_fps").html((1000.0 / (now - last_state_update_time)).toPrecision(3));
-
+    $("#t_lat").html(state.lat.toPrecision(11));
+    $("#t_lon").html(state.lon.toPrecision(11));
+    $("#t_alt").html(state.alt.toPrecision(4));
+    $("#t_gspd").html(state.groundspeed.toPrecision(2));
+    $("#t_aspd").html(state.airspeed.toPrecision(2));
+    $("#t_hdg").html(state.heading)
+    now = new Date().getTime();
+    $("#t_fps").html((1000.0 / (now - last_state_update_time)).toPrecision(3));
+    if (state.gps_fix_type >= 3) {
+	$("#t_gps").html('<span class="ok">OK</span>');
+    } else if (state.gps_fix_type == 2) {
+	$("#t_gps").html('<span class="slow">02</span>');
+    } else if (state.gps_fix_type <= 1) {
+	$("#t_gps").html('<span class="error">' + state.gps_fix_type + '</span>');
+    }
+					     
   adi.setAttitude(state.pitch, state.roll);
   
   rotate_drone(state.heading)
@@ -491,30 +502,33 @@ function updateLayer() {
 <title>modest mavmap</title>
 </head>
 <body onload="initMap()">
-<div class="telemetry_header">
-ALT <span class="t_value" id="t_alt"></span> m |
-HDG <span class="t_value" id="t_hdg"></span> |
-GNDSPD <span class="t_value" id="t_gspd"></span> m/s |
-AIRSPD <span class="t_value" id="t_aspd"></span> m/s |
-LINK <span class="t_value" id="t_link"></span><br>
-(<span class="t_value" id="t_lat"></span>, <span class="t_value" id="t_lon"></span>)
-</div>
-<div id="controls">
-<div class="layerpicker">
-Map <select id="layerpicker">
-  <option value="1">Microsoft Bing (aerial)</option>
-  <option value="2">Microsoft Bing (birdseye)</option>
-  <option value="3">Microsoft Bing (road)</option>
-  <option value="4">Blue Marble</option>
-<select>
-<br>
-<div class="zoomslider">
-Zoom <input id="zoom" type="range" value="18000" min="0" max="18000"></input>
-</div>
-</div>
-</div>
-<div id="adi"></div>
-<div id="map"></div>
-<div id="drone"></div>
+  <div id="header">
+    <div id="adi"></div>
+    <div id="telemetry">
+      ALT <span class="t_value" id="t_alt"></span> m |
+      HDG <span class="t_value" id="t_hdg"></span> |
+      GNDSPD <span class="t_value" id="t_gspd"></span> m/s |
+      AIRSPD <span class="t_value" id="t_aspd"></span> m/s |
+      LINK <span class="t_value" id="t_link"></span> |
+      GPS <span class="t_value" id="t_gps"></span> |
+      (<span class="t_value" id="t_lat"></span>, <span class="t_value" id="t_lon"></span>)
+    </div>
+    <div id="controls">
+      <div class="layerpicker">
+	Map:
+	<select id="layerpicker">
+	  <option value="1">Microsoft Bing (aerial)</option>
+	  <option value="2">Microsoft Bing (birdseye)</option>
+	  <option value="3">Microsoft Bing (road)</option>
+	  <option value="4">Blue Marble</option>
+	</select>
+      </div>
+      <div class="zoomslider">
+	Zoom: <input id="zoom" type="range" value="18000" min="0" max="18000"></input>
+      </div>
+    </div>
+  </div>
+  <div id="map"></div>
+  <div id="drone"></div>
 </body>
 </html>
