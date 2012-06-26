@@ -28,9 +28,10 @@ html {
 }
 
 #adi {
-  height: 100px;
-  width: 100px;
+  height: 400px;
+  width: 400px;
   border: 1px solid #9C9898;
+    background-color: rgba(255, 255, 255, 0.5);
 }
 
 #drone {
@@ -151,7 +152,7 @@ function TrailPlotter(marker_clip) {
 function ADI(container) {
     var theADI = this;
 
-    this.pitch = 90.0 * Math.PI / 180.0;
+    this.pitch = -90.0 * Math.PI / 180.0;
     this.roll = 90.0 * Math.PI / 180.0;
     this.targetPitch = 0.0;
     this.targetRoll = 0.0;
@@ -196,10 +197,14 @@ function ADI(container) {
     // add the layer to the stage
     this.stage.add(this.layer);
 
-    var horizon_y = 50 - 50 * Math.sin(this.pitch);
-    this.horizon.setY(horizon_y);
-    this.horizon.setRotation(this.roll * 1.0);
-    this.layer.draw();
+    this.drawFromAttitude = function(pitch, roll) {
+	var horizon_y = 50.0 + 50.0 * Math.sin(pitch);
+	theADI.horizon.setY(horizon_y);
+	theADI.horizon.setRotation(-roll);
+	theADI.layer.draw();
+    }
+
+    this.drawFromAttitude(this.pitch, this.roll);
 	
     this.animateToAttitude = function() {
 	var need_more_animation = false;
@@ -220,10 +225,7 @@ function ADI(container) {
 	    need_more_animation = true;
 	}
 	
-	horizon_y = 50 - 50 * Math.sin(nextPitch * 1.0);
-	theADI.horizon.setY(horizon_y);
-	theADI.horizon.setRotation(nextRoll * 1.0);
-	theADI.layer.draw();
+	theADI.drawFromAttitude(nextPitch, nextRoll);
 	
 	theADI.pitch = nextPitch;
 	theADI.roll = nextRoll;
