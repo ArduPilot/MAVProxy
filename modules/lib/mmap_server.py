@@ -44,6 +44,7 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
               'airspeed': state.airspeed,
               'groundspeed': state.groundspeed,
               'gps_fix_type': state.gps_fix_type,
+              'flight_mode': state.flight_mode,
               'wp_change_time': state.wp_change_time,
               'waypoints': state.waypoints}
       self.send_response(200)

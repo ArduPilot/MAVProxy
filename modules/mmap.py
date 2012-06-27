@@ -2,6 +2,8 @@ import os
 import sys
 import webbrowser
 
+import mavutil
+
 sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.realpath(__file__)), 'lib'))
 import mmap_server
@@ -21,6 +23,7 @@ class module_state(object):
     self.roll = None
     self.yaw = None
     self.gps_fix_type = None
+    self.flight_mode = None
     self.wp_change_time = 0
     self.waypoints = []
     self.fence_change_time = 0
@@ -58,6 +61,8 @@ def mavlink_packet(m):
   """handle an incoming mavlink packet"""
   global g_module_context
   state = g_module_context.mmap_state
+  if m.get_type() == 'HEARTBEAT':
+    state.flight_mode = mavutil.mode_string_v10(m)
   if m.get_type() == 'GPS_RAW':
     (state.lat, state.lon) = (m.lat, m.lon)
   elif m.get_type() == 'GPS_RAW_INT':

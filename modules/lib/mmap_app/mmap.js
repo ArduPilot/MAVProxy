@@ -326,7 +326,8 @@ function updateTelemetryDisplay() {
     $("#t_alt").html(state.alt.toPrecision(4));
     $("#t_gspd").html(state.groundspeed.toPrecision(2));
     $("#t_aspd").html(state.airspeed.toPrecision(2));
-    $("#t_hdg").html(state.heading)
+    $("#t_hdg").html(state.heading);
+    $("#t_flt_mode").html(state.flight_mode);
     now = new Date().getTime();
     $("#t_fps").html((1000.0 / (now - last_state_update_time)).toPrecision(3));
     if (state.gps_fix_type >= 3) {
