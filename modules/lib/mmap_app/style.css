@@ -1,0 +1,92 @@
+body {
+    width: 100%;
+    margin: 0px 0px 0px 0px;
+    font-family: 'Droid Sans Mono', Courier, Courier News, monospace;
+    font-size: 24px;
+}
+
+select {
+    font-family: 'Droid Sans Mono', Courier, Courier News, monospace !important;
+    font-size: 20px !important;
+}
+
+html {
+    width: 100%;
+}
+
+#map {
+    position: absolute;
+    top: 0px;
+    bottom: 0px;
+    height: 100%;
+    width: 100%;
+    z-index: -1;
+}
+
+#header {
+    background-color: rgba(0, 0, 0, 0.5);
+    width: 100%;
+    height: 200px;
+    color: white;
+}
+
+#adi {
+    height: 200px;
+    width: 200px;
+    background-color: rgba(255, 255, 255, 0.5);
+    float: left;
+}
+
+#drone {
+    background-image: url('drone-sm.png');
+    background-repeat: no-repeat;
+    position: absolute;
+    top: 45%;
+    left: 45%;
+    height: 100px;
+    width: 150px;
+    -moz-transition: all 2s ease;
+    -webkit-transition: all 2s ease;
+    -o-transition: all 2s ease;
+    -ms-transition: all 2s ease;
+    transition: all 2s ease;
+}
+
+.controls {
+    float: right;
+}
+
+#telemetry {
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 1px;
+    padding-bottom: 1px;
+}
+
+.layerpicker {
+    display: inline;
+}
+
+.zoomslider {
+    display: inline;
+}
+
+.link {
+    padding-left: 3px;
+    padding-right: 3px;
+}
+
+.ok {
+    background-color: green;
+    color: white;
+}
+
+.slow {
+    background-color: yellow;
+    color: black;
+}
+
+.error {
+    background-color: red;
+    color: black;
+}

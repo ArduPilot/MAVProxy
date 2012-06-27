@@ -75,5 +75,4 @@ def mavlink_packet(m):
   # if the waypoints have changed, redisplay
   if state.wp_change_time != g_module_context.status.wploader.last_change:
     state.wp_change_time = g_module_context.status.wploader.last_change
-    points = g_module_context.status.wploader.polygon()
-    state.waypoints = points
+    state.waypoints = g_module_context.status.wploader.wpoints[:]
