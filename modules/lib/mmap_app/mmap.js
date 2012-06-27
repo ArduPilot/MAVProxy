@@ -249,20 +249,8 @@ state.waypoints = null;
 
 
 function initMap() {
-
-    // name of a div element:
-    var parent = 'map';
-
-    // defaults to Google-style Mercator projection, so works
-    // out of the box with OpenStreetMap and friends:
-    // var template = 'http://tile.openstreetmap.org/{Z}/{X}/{Y}.png';
-    // var provider = new MM.TemplatedMapProvider(template);
-
-    // --------------------
-    // Blue Marble
     // var provider = new MM.BlueMarbleProvider();
 
-    // --------------------
     // Microsoft Bing
     // please use your own API key!  This is jjwiseman's!
     var key = "Anmc0b2q6140lnPvAj5xANM1rvF1A4CvVtr6H2VJvQcdnDvc8NL-I2C49owIe9xC";
@@ -270,9 +258,7 @@ function initMap() {
     var provider = new MM.BingProvider(key, style);
 
     map_layer = new MM.Layer(provider);
-
-    // without a size, it will expand to fit the parent:
-    map = new MM.Map(parent, map_layer, null, null);
+    map = new MM.Map('map', map_layer);
 
     marker_clip = new MarkerClip(map);
     //var marker = marker_clip.createDefaultMarker(20);
