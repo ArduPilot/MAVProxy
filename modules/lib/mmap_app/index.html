@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html>
 <head>
 <link href='http://fonts.googleapis.com/css?family=Droid+Sans+Mono' rel='stylesheet' type='text/css'>
@@ -43,7 +44,7 @@ html {
 
 #drone {
   background-image: url('drone-sm.png');
-  background-repeat: none;
+  background-repeat: no-repeat;
   position: absolute;
   top: 45%;
   left: 45%;
@@ -349,6 +350,7 @@ state.lon = null;
 state.pitch = 0.0;
 state.roll = 0.0
 state.heading = 0.0;
+state.waypoints = null;
 
 
 
@@ -454,7 +456,6 @@ function updateTelemetryDisplay() {
     } else if (state.gps_fix_type <= 1) {
 	$("#t_gps").html('<span class="error">' + state.gps_fix_type + '</span>');
     }
-					     
   adi.setAttitude(state.pitch, state.roll);
   
   rotate_drone(state.heading)
@@ -524,7 +525,7 @@ function updateLayer() {
 	</select>
       </div>
       <div class="zoomslider">
-	Zoom: <input id="zoom" type="range" value="18000" min="0" max="18000"></input>
+	Zoom: <input id="zoom" type="range" value="18000" min="0" max="18000">
       </div>
     </div>
   </div>
