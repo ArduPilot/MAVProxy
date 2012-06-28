@@ -40,9 +40,9 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
       if msgs.has_message(mtype):
         (t, n, m) = msgs.get_message(mtype)
         mdict = m.to_dict()
-        resp = { 'time_usec' : t,
-                 'index' : n,
-                 'msg' : mdict }
+        resp = {'time_usec': t,
+                'index': n,
+                'msg': mdict}
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
         self.end_headers()
