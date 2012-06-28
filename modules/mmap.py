@@ -9,6 +9,35 @@ import mmap_server
 g_module_context = None
 
 
+class message_memo(object):
+  def __init__(self):
+    self._d = dict({})
+    self.time = 0
+
+  def insert_message(self, m):
+    mtype = m.get_type().upper()
+    if mtype == "GPS_RAW_INT":
+      self.time = m.time_usec
+    if mtype in self._d:
+      (oldtime, n, oldm) = self._d[mtype]
+      self._d[mtype] = (self.time, n+1, m)
+    else:
+      self._d[mtype] = (self.time, 0, m)
+
+  def get_message(self,mt):
+    mtype = mt.upper() # arg is case insensitive
+    if mtype in self._d:
+      return self._d[mtype]
+    else:
+      return None
+
+  def has_message(self,mt):
+    mtype = mt.upper()
+    if mtype in self._d:
+      return True
+    else:
+      return False
+
 class module_state(object):
   def __init__(self):
     self.lat = None
@@ -25,6 +54,7 @@ class module_state(object):
     self.waypoints = []
     self.fence_change_time = 0
     self.server = None
+    self.messages = message_memo()
 
 
 def name():
@@ -58,6 +88,7 @@ def mavlink_packet(m):
   """handle an incoming mavlink packet"""
   global g_module_context
   state = g_module_context.mmap_state
+  state.messages.insert_message(m)
   if m.get_type() == 'GPS_RAW':
     (state.lat, state.lon) = (m.lat, m.lon)
   elif m.get_type() == 'GPS_RAW_INT':
