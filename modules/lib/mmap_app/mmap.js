@@ -306,6 +306,14 @@ function updateState() {
                   updateMap();
                   last_state_update_time = new Date().getTime();
               });
+    /* Just to demonstrate the mavlink message api: */
+    $.getJSON("mavlink/heartbeat", function(hb){
+      console.log("num heartbeats: " + hb.index.toString() + " time_usec: " + hb.time_usec.toString());
+    });
+    /* case insensitive. mavlink/gps_raw_int works too. */
+    $.getJSON("mavlink/GPS_RAW_INT", function(gps){
+      console.log("altitude: " +  gps.msg.alt.toString()); 
+    });
     updateLinkStatus();
 }
 
