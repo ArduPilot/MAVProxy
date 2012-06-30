@@ -258,7 +258,12 @@ function initMap() {
     var provider = new MM.BingProvider(key, style);
 
     map_layer = new MM.Layer(provider);
-    map = new MM.Map('map', map_layer);
+    
+    eventHandlers = [
+	new MouseWheelHandler(),
+	new TouchHandler()
+    ];
+    map = new MM.Map('map', map_layer, undefined, eventHandlers);
 
     marker_clip = new MarkerClip(map);
     //var marker = marker_clip.createDefaultMarker(20);
