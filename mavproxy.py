@@ -10,6 +10,7 @@ Released under the GNU GPL version 3 or later
 import sys, os, struct, math, time, socket
 import fnmatch, errno, threading
 import serial, Queue, select
+import logging
 
 # find the mavlink.py module
 for d in [ 'pymavlink',
@@ -191,6 +192,11 @@ class MPState(object):
         self.functions.say = say
         self.functions.process_stdin = process_stdin
         self.select_extra = {}
+        self.msg_queue = Queue.Queue()
+
+    def queue_message(self, message):
+        logging.warn('Queueing message %s', message)
+        self.msg_queue.put(message)
 
     def master(self):
         '''return the currently chosen mavlink master object'''
@@ -1374,6 +1380,12 @@ def check_link_status():
 
 def periodic_tasks():
     '''run periodic checks'''
+    while not mpstate.msg_queue.empty():
+        # Shouldn't block here if the queue isn't empty, but be defensive.
+        message = mpstate.msg_queue.get(block=False)
+        logging.warn('Sending queued message %s', message)
+        mpstate.master().mav.send(message)
+
     if mpstate.status.setup_mode:
         return
 
