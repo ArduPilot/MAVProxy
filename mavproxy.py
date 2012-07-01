@@ -195,7 +195,7 @@ class MPState(object):
         self.msg_queue = Queue.Queue()
 
     def queue_message(self, message):
-        logging.warn('Queueing message %s', message)
+        logging.info('Queueing message %s', message)
         self.msg_queue.put(message)
 
     def master(self):
@@ -1383,7 +1383,7 @@ def periodic_tasks():
     while not mpstate.msg_queue.empty():
         # Shouldn't block here if the queue isn't empty, but be defensive.
         message = mpstate.msg_queue.get(block=False)
-        logging.warn('Sending queued message %s', message)
+        logging.info('Sending queued message %s', message)
         mpstate.master().mav.send(message)
 
     if mpstate.status.setup_mode:
@@ -1525,11 +1525,27 @@ def run_script(scriptfile):
     f.close()
         
 
+LOGGING_LEVELS = {
+  'DEBUG': logging.DEBUG,
+  'INFO': logging.INFO,
+  'WARNING': logging.WARNING,
+  'ERROR': logging.ERROR,
+  'CRITICAL': logging.CRITICAL
+  }
+
+
+def get_logging_level_by_name(name):
+  return LOGGING_LEVELS[name]
+
+
 if __name__ == '__main__':
 
     from optparse import OptionParser
     parser = OptionParser("mavproxy.py [options]")
 
+    parser.add_option('--logging-level', dest='logging_level', default='INFO',
+                      choices=LOGGING_LEVELS.keys(),
+                      help='The logging level to use.')
     parser.add_option("--master",dest="master", action='append', help="MAVLink master port", default=[])
     parser.add_option("--baudrate", dest="baudrate", type='int',
                       help="master port baud rate", default=115200)
@@ -1568,6 +1584,10 @@ if __name__ == '__main__':
     parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
     
     (opts, args) = parser.parse_args()
+
+    logging.basicConfig(
+        level=get_logging_level_by_name(opts.logging_level),
+        format='%(asctime)s:%(levelname)s:%(module)s:%(lineno)d: %(message)s')
 
     if opts.mav09:
         os.environ['MAVLINK09'] = '1'
