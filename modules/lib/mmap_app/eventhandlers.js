@@ -170,15 +170,16 @@ TouchHandler.prototype = {
         this.taps = [tap];
     },
 
-    // Handle a double tap by zooming in a single zoom level to a
-    // round zoom.
+    // Handle a double tap by telling the drone to fly to the tapped
+    // location.
     onDoubleTap: function(tap) {
-
-        var z = this.map.getZoom(), // current zoom
-        tz = Math.round(z) + 1, // target zoom
-        dz = tz - z;            // desired delate
-        // zoom in to a round number
-        this.map.zoomBy(dz);
+	var target = this.map.pointLocation(new MM.Point(tap.x, tap.y));
+	var url = '/command';
+        $.ajax({
+            type: 'POST',
+            url: url,
+            data: JSON.stringify({command: 'FLYTO',
+                                  location: {lat: target.lat, lon: target.lon}})});
     },
 
     // Re-transform the actual map parent's CSS transformation
@@ -208,8 +209,6 @@ TouchHandler.prototype = {
         // pan from the previous center of these touches
         var prevCenter = MM.Point.interpolate(l0, l1, 0.5);
 
-        this.map.panBy(center.x - prevCenter.x,
-                       center.y - prevCenter.y);
         this.wasPinching = true;
         this.lastPinchCenter = center;
     },
