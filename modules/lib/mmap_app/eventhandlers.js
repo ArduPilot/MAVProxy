@@ -285,3 +285,41 @@ MouseWheelHandler.prototype = {
         return MM.cancelEvent(e);
     }
 };
+
+
+
+// Handle double clicks by telling the drone to fly to that location.
+DoubleClickHandler = function(map) {
+    if (map !== undefined) {
+        this.init(map);
+    }
+};
+
+DoubleClickHandler.prototype = {
+
+    init: function(map) {
+        this.map = map;
+        this._doubleClick = MM.bind(this.doubleClick, this);
+        MM.addEvent(map.parent, 'dblclick', this._doubleClick);
+    },
+
+    remove: function() {
+        MM.removeEvent(this.map.parent, 'dblclick', this._doubleClick);
+    },
+
+    doubleClick: function(e) {
+        // Ensure that this handler is attached once.
+        // Get the point on the map that was double-clicked
+
+	var clickPoint = MM.getMousePoint(e, this.map);
+	var target = this.map.pointLocation(clickPoint);
+	var url = '/command';
+        $.ajax({
+            type: 'POST',
+            url: url,
+            data: JSON.stringify({command: 'FLYTO',
+                                  location: {lat: target.lat, lon: target.lon}})});
+	
+        return MM.cancelEvent(e);
+    }
+};

@@ -261,7 +261,8 @@ function initMap() {
     
     eventHandlers = [
 	new MouseWheelHandler(),
-	new TouchHandler()
+	new TouchHandler(),
+	new DoubleClickHandler()
     ];
     map = new MM.Map('map', map_layer, undefined, eventHandlers);
 
@@ -311,7 +312,7 @@ function updateState() {
                   updateMap();
                   last_state_update_time = new Date().getTime();
               });
-    /* Just to demonstrate the mavlink message api: */
+    // /* Just to demonstrate the mavlink message api: */
     $.getJSON("mavlink/heartbeat", function(hb){
       console.log("num heartbeats: " + hb.index.toString() + " time_usec: " + hb.time_usec.toString());
     });
