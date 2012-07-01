@@ -2,6 +2,7 @@ import os
 import sys
 import webbrowser
 
+import mavlinkv10
 import mavutil
 
 sys.path.insert(0, os.path.join(
@@ -40,6 +41,7 @@ class message_memo(object):
     else:
       return False
 
+
 class module_state(object):
   def __init__(self):
     self.lat = None
@@ -58,6 +60,30 @@ class module_state(object):
     self.fence_change_time = 0
     self.server = None
     self.messages = message_memo()
+
+  def command(self, command):
+    # First draft, assumes the command has a location and we want to
+    # fly to the location right now.
+    seq = 0
+    frame = mavlinkv10.MAV_FRAME_GLOBAL_RELATIVE_ALT
+    cmd = mavlinkv10.MAV_CMD_NAV_WAYPOINT
+    param1 = 0  # Hold time in seconds.
+    param2 = 5  # Acceptance radius in meters.
+    param3 = 0  # Pass through the WP.
+    param4 = 0  # Desired yaw angle at WP.
+    x = command['location']['lat']
+    y = command['location']['lon']
+    z = 10
+    # APM specific current value, 2 means this is a "guided mode"
+    # waypoint and not for the mission.
+    current = 2
+    autocontinue = 0
+    msg = mavlinkv10.MAVLink_mission_item_message(
+      g_module_context.status.target_system,
+      g_module_context.status.target_component,
+      seq, frame, cmd, current, autocontinue, param1, param2, param3, param4,
+      x, y, z)
+    g_module_context.queue_message(msg)
 
 
 def name():

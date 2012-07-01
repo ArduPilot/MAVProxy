@@ -30,6 +30,13 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
   def log_request(code, size=None):
     pass
 
+  def do_POST(self):
+    # Expects a JSON string in the body.
+    content_len = int(self.headers.getheader('content-length'))
+    post_body = self.rfile.read(content_len)
+    command = json.loads(post_body)
+    self.server.module_state.command(command)
+
   def do_GET(self):
     scheme, host, path, params, query, frag = urlparse.urlparse(self.path)
     ps = path.split('/')
