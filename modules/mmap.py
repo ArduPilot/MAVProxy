@@ -23,18 +23,18 @@ class message_memo(object):
       self.time = m.time_usec
     if mtype in self._d:
       (oldtime, n, oldm) = self._d[mtype]
-      self._d[mtype] = (self.time, n+1, m)
+      self._d[mtype] = (self.time, n + 1, m)
     else:
       self._d[mtype] = (self.time, 0, m)
 
-  def get_message(self,mt):
-    mtype = mt.upper() # arg is case insensitive
+  def get_message(self, mt):
+    mtype = mt.upper()  # arg is case insensitive
     if mtype in self._d:
       return self._d[mtype]
     else:
       return None
 
-  def has_message(self,mt):
+  def has_message(self, mt):
     mtype = mt.upper()
     if mtype in self._d:
       return True
