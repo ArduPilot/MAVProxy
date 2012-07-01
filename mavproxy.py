@@ -1551,8 +1551,6 @@ if __name__ == '__main__':
     parser.add_option("--cmd", dest="cmd", help="initial commands", default=None)
     parser.add_option("--console", action='store_true', help="use GUI console")
     parser.add_option("--map", action='store_true', help="load map module")
-    parser.add_option("--vario", action='store_true', help="load vario module")
-    parser.add_option("--joystick", action='store_true', help="load joystick module")
     parser.add_option("--mav09", action='store_true', default=False, help="Use MAVLink protocol 0.9")
     parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
     
@@ -1652,12 +1650,6 @@ Auto-detected serial ports are:
 
     if opts.map:
         process_stdin('module load map')
-
-    if opts.vario:
-        process_stdin('module load vario')
-
-    if opts.joystick:
-        process_stdin('module load joystick')
 
     if opts.cmd is not None:
         cmds = opts.cmd.split(';')
