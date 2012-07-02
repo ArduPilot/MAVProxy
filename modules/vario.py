@@ -1,7 +1,6 @@
 """
-  MAVProxy realtime graphing module
-
-  uses lib/live_graph.py for display
+  MAVProxy vario module
+  Uses fluidsynth and soundfonts driving alsa
 """
 
 import mavutil, re, os, sys, threading, time
@@ -69,7 +68,7 @@ def init(_mpstate):
             print("did not find soundfont path for falling at " + fall_font_path)
             return
           
-        mpstate.vario = mp_vario.vario(rise_font_path, fall_font_path)
+        mpstate.vario = mp_vario.vario(mpstate, rise_font_path, fall_font_path)
     
                 
         mpstate.vario.deadband = float(mpstate.varioSettings.get_Deadband()) * 100.0
@@ -136,3 +135,4 @@ def mavlink_packet(msg):
 #            time.sleep(0.5)
 #===============================================================================
         
+

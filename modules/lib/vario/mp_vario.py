@@ -18,9 +18,10 @@ def enum(*sequential, **named):
 
 
 class varioSoundGen(threading.Thread):
-    def __init__(self, rising_soundfont, falling_soundfont):
+    def __init__(self, mpstate, rising_soundfont, falling_soundfont):
         threading.Thread.__init__(self)
-                
+        
+        self.mpstate = mpstate
         self._stop = threading.Event()
 
         self.key = 60.00
@@ -64,7 +65,8 @@ class varioSoundGen(threading.Thread):
         pulseOnTime = 0.1
         pulseOffTime = 0.2
         
-        while(not self._stop.isSet() ):
+        
+        while( (not self._stop.isSet()) and (self.mpstate.status.exit == False) ):
       
             if(self.new_risingSoundfont != ""):
 #                if getattr(self, 'sfid_rising', None) is not None:
@@ -99,8 +101,8 @@ class varioSoundGen(threading.Thread):
 
 
 class vario():
-    def __init__(self, rising_soundfont, falling_soundfont):
-        self.soundGen = varioSoundGen(rising_soundfont, falling_soundfont)
+    def __init__(self, mpstate, rising_soundfont, falling_soundfont):
+        self.soundGen = varioSoundGen(mpstate, rising_soundfont, falling_soundfont)
         self.soundGen.start()
         
         self.deadband   = 50.0
