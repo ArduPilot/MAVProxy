@@ -69,6 +69,12 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
               'flight_mode': state.flight_mode,
               'wp_change_time': state.wp_change_time,
               'waypoints': state.waypoints}
+      msgs = self.server.module_state.messages
+      if msgs.has_message('STATUSTEXT'):
+        (unused_t, seq, m) = msgs.get_message('STATUSTEXT')
+        data['status_text'] = {'severity': m.severity,
+                               'text': m.text,
+                               'seq': seq}
       self.send_response(200)
       # http://www.ietf.org/rfc/rfc4627.txt says application/json.
       self.send_header('Content-type', 'application/json')

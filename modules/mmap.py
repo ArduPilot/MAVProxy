@@ -73,7 +73,7 @@ class module_state(object):
     param4 = 0  # Desired yaw angle at WP.
     x = command['location']['lat']
     y = command['location']['lon']
-    z = 10
+    z = 400
     # APM specific current value, 2 means this is a "guided mode"
     # waypoint and not for the mission.
     current = 2

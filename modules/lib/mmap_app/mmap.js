@@ -312,7 +312,8 @@ function updateState() {
                   updateMap();
                   last_state_update_time = new Date().getTime();
               });
-    // /* Just to demonstrate the mavlink message api: */
+    updateLinkStatus();
+    /* Just to demonstrate the mavlink message api: */
     $.getJSON("mavlink/heartbeat", function(hb){
       console.log("num heartbeats: " + hb.index.toString() + " time_usec: " + hb.time_usec.toString());
     });
@@ -320,7 +321,6 @@ function updateState() {
     $.getJSON("mavlink/GPS_RAW_INT", function(gps){
       console.log("altitude: " +  gps.msg.alt.toString()); 
     });
-    updateLinkStatus();
 }
 
 
@@ -333,6 +333,8 @@ function updateMap() {
     }
 }
 
+
+var status_text_seq;
 
 function updateTelemetryDisplay() {
     $("#t_lat").html(state.lat.toPrecision(11));
@@ -350,6 +352,22 @@ function updateTelemetryDisplay() {
         $("#t_gps").html('<span class="slow">02</span>');
     } else if (state.gps_fix_type <= 1) {
         $("#t_gps").html('<span class="error">' + state.gps_fix_type + '</span>');
+    }
+    if (state.status_text) {
+        if ((!status_text_seq) || state.status_text.seq > status_text_seq) {
+            $("#t_sta_txt").html(state.status_text.text)
+		.stop(true, true)
+		.css('color', 'yellow')
+		.css('background-color', 'rgb(0, 0, 0, 1.0)')
+		.animate({
+                    color: $.Color("white"),
+                    backgroundColor: $.Color("rgb(0, 0, 0, 0.0)")
+		}, {
+                    duration: 5000,
+                    queue: false
+		});
+            status_text_seq = state.status_text.seq;
+	}
     }
     adi.setAttitude(state.pitch, state.roll);
     
