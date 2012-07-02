@@ -232,7 +232,9 @@ function MarkerClip(map) {
 
 var map;
 var map_layer;
+var marker_layer;
 var marker_clip;
+var waypointMarkerElement;
 var trailPlotter;
 var mapPanner;
 var last_state_update_time;
@@ -249,7 +251,6 @@ state.waypoints = null;
 
 
 function initMap() {
-    // var provider = new MM.BlueMarbleProvider();
 
     // Microsoft Bing
     // please use your own API key!  This is jjwiseman's!
@@ -258,13 +259,14 @@ function initMap() {
     var provider = new MM.BingProvider(key, style);
 
     map_layer = new MM.Layer(provider);
-    
+    marker_layer = new MM.MarkerLayer();
     eventHandlers = [
 	new MouseWheelHandler(),
 	new TouchHandler(),
 	new DoubleClickHandler()
     ];
     map = new MM.Map('map', map_layer, undefined, eventHandlers);
+    map.addLayer(marker_layer);
 
     marker_clip = new MarkerClip(map);
     //var marker = marker_clip.createDefaultMarker(20);
@@ -313,11 +315,12 @@ function updateState() {
                   last_state_update_time = new Date().getTime();
               });
     updateLinkStatus();
-    /* Just to demonstrate the mavlink message api: */
+    // Just to demonstrate the mavlink message api:
     $.getJSON("mavlink/heartbeat", function(hb){
-      console.log("num heartbeats: " + hb.index.toString() + " time_usec: " + hb.time_usec.toString());
+      console.log("num heartbeats: " + hb.index.toString() +
+                  " time_usec: " + hb.time_usec.toString());
     });
-    /* case insensitive. mavlink/gps_raw_int works too. */
+    // case insensitive. mavlink/gps_raw_int works too.
     $.getJSON("mavlink/GPS_RAW_INT", function(gps){
       console.log("altitude: " +  gps.msg.alt.toString()); 
     });
@@ -335,6 +338,7 @@ function updateMap() {
 
 
 var status_text_seq;
+var clientWaypointSeq;
 
 function updateTelemetryDisplay() {
     $("#t_lat").html(state.lat.toPrecision(11));
@@ -370,11 +374,28 @@ function updateTelemetryDisplay() {
 	}
     }
     adi.setAttitude(state.pitch, state.roll);
-    
     rotate_drone(state.heading);
-    trailPlotter.update();
-    marker_clip.setMarkerLocation(0, new MM.Location(state.lat, state.lon));
+
+    if (state.client_waypoint &&
+	(!clientWaypointSeq || clientWaypointSeq < state.client_waypoint_seq)) {
+	newWaypoint(state.client_waypoint);
+    }
 }
+
+function newWaypoint(location) {
+    if (!waypointMarkerElement) {
+	waypointMarkerElement = document.createElement('div');
+	waypointMarkerElement.innerHTML = '<img src="mapmarker.png" width="50" height="50">';
+	waypointMarkerElement.pixelOffset = {x: -25, y: -50};
+	marker_layer.addMarker(waypointMarkerElement, location);
+    } else {
+	waypointMarkerElement.location = location;
+	waypointMarkerElement.coord = map.locationCoordinate(location);
+	marker_layer.repositionMarker(waypointMarkerElement);
+    }
+}
+
+
 
 
 function rotate_drone(deg){

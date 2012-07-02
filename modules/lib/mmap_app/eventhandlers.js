@@ -58,16 +58,16 @@ TouchHandler.prototype = {
             var t = e.touches[i];
             if (t.identifier in this.locations) {
                 var l = this.locations[t.identifier];
-                l.x = t.screenX;
-                l.y = t.screenY;
+                l.x = t.clientX;
+                l.y = t.clientY;
                 l.scale = e.scale;
             }
             else {
                 this.locations[t.identifier] = {
                     scale: e.scale,
-                    startPos: { x: t.screenX, y: t.screenY },
-                    x: t.screenX,
-                    y: t.screenY,
+                    startPos: { x: t.clientX, y: t.clientY },
+                    x: t.clientX,
+                    y: t.clientY,
                     time: new Date().getTime()
                 };
             }
@@ -121,7 +121,7 @@ TouchHandler.prototype = {
             // matching touch that's just ended. Let's see
             // what kind of event it is based on how long it
             // lasted and how far it moved.
-            var pos = { x: t.screenX, y: t.screenY },
+            var pos = { x: t.clientX, y: t.clientY },
             time = now - loc.time,
             travel = MM.Point.distance(pos, loc.startPos);
             if (travel > this.maxTapDistance) {
@@ -174,12 +174,7 @@ TouchHandler.prototype = {
     // location.
     onDoubleTap: function(tap) {
 	var target = this.map.pointLocation(new MM.Point(tap.x, tap.y));
-	var url = '/command';
-        $.ajax({
-            type: 'POST',
-            url: url,
-            data: JSON.stringify({command: 'FLYTO',
-                                  location: {lat: target.lat, lon: target.lon}})});
+	flyTo(target);
     },
 
     // Re-transform the actual map parent's CSS transformation
@@ -190,8 +185,8 @@ TouchHandler.prototype = {
         // use the first two touches and their previous positions
         var t0 = e.touches[0],
         t1 = e.touches[1],
-        p0 = new MM.Point(t0.screenX, t0.screenY),
-        p1 = new MM.Point(t1.screenX, t1.screenY),
+        p0 = new MM.Point(t0.clientX, t0.clientY),
+        p1 = new MM.Point(t1.clientX, t1.clientY),
         l0 = this.locations[t0.identifier],
         l1 = this.locations[t1.identifier];
 
@@ -289,18 +284,20 @@ MouseWheelHandler.prototype = {
 
 
 // Handle double clicks by telling the drone to fly to that location.
-DoubleClickHandler = function(map) {
+DoubleClickHandler = function(map, options) {
     if (map !== undefined) {
-        this.init(map);
+        this.init(map, options);
     }
 };
 
 DoubleClickHandler.prototype = {
 
-    init: function(map) {
+    init: function(map, options) {
         this.map = map;
         this._doubleClick = MM.bind(this.doubleClick, this);
         MM.addEvent(map.parent, 'dblclick', this._doubleClick);
+
+	this.options = {};
     },
 
     remove: function() {
@@ -313,13 +310,16 @@ DoubleClickHandler.prototype = {
 
 	var clickPoint = MM.getMousePoint(e, this.map);
 	var target = this.map.pointLocation(clickPoint);
-	var url = '/command';
-        $.ajax({
-            type: 'POST',
-            url: url,
-            data: JSON.stringify({command: 'FLYTO',
-                                  location: {lat: target.lat, lon: target.lon}})});
-	
+	flyTo(target);
         return MM.cancelEvent(e);
     }
+};
+
+
+flyTo = function(location) {
+    $.ajax({
+        type: 'POST',
+        url: '/command',
+        data: JSON.stringify({command: 'FLYTO',
+                              location: {lat: location.lat, lon: location.lon}})});
 };

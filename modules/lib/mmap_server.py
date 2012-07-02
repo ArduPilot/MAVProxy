@@ -67,8 +67,9 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
               'groundspeed': state.groundspeed,
               'gps_fix_type': state.gps_fix_type,
               'flight_mode': state.flight_mode,
-              'wp_change_time': state.wp_change_time,
-              'waypoints': state.waypoints}
+              'wp_change_time': state.wp_change_time}
+      if state.client_waypoint:
+        data['client_waypoint'] = state.client_waypoint
       msgs = self.server.module_state.messages
       if msgs.has_message('STATUSTEXT'):
         (unused_t, seq, m) = msgs.get_message('STATUSTEXT')

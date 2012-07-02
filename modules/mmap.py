@@ -55,6 +55,8 @@ class module_state(object):
     self.yaw = None
     self.gps_fix_type = None
     self.flight_mode = None
+    self.client_waypoint = None
+    self.client_waypoint_seq = 0
     self.wp_change_time = 0
     self.waypoints = []
     self.fence_change_time = 0
@@ -73,6 +75,8 @@ class module_state(object):
     param4 = 0  # Desired yaw angle at WP.
     x = command['location']['lat']
     y = command['location']['lon']
+    self.client_waypoint = command['location']
+    self.client_waypoint_seq += 1
     z = 400
     # APM specific current value, 2 means this is a "guided mode"
     # waypoint and not for the mission.
