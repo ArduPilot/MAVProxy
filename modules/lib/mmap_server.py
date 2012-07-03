@@ -50,23 +50,26 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
   def do_GET(self):
     scheme, host, path, params, query, frag = urlparse.urlparse(self.path)
     ps = path.split('/')
-    # API: /mavlink/mtype
+    # API: /mavlink/mtype1+mtype2+...
     if len(ps) == 3 and ps[1] == 'mavlink':
-      mtype = ps[2]
+      mtypes = ps[2].split('+')
       msgs = self.server.module_state.messages
-      if msgs.has_message(mtype):
-        (t, n, m) = msgs.get_message(mtype)
-        mdict = m.to_dict()
-        for key, value in mdict.items():
-          if isinstance(value, types.StringTypes):
-            mdict[key] = nul_terminate(value)
-        resp = {'time_usec': t,
-                'index': n,
-                'msg': mdict}
-        self.send_response(200)
-        self.send_header('Content-type', 'application/json')
-        self.end_headers()
-        self.wfile.write(json.dumps(resp))
+      results = []
+      for mtype in mtypes:
+        if msgs.has_message(mtype):
+          (t, n, m) = msgs.get_message(mtype)
+          mdict = m.to_dict()
+          for key, value in mdict.items():
+            if isinstance(value, types.StringTypes):
+              mdict[key] = nul_terminate(value)
+          resp = {'time_usec': t,
+                  'index': n,
+                  'msg': mdict}
+          results.append(resp)
+      self.send_response(200)
+      self.send_header('Content-type', 'application/json')
+      self.end_headers()
+      self.wfile.write(json.dumps(results))
     elif path == '/data':
       state = self.server.module_state
       data = {'lat': state.lat,
