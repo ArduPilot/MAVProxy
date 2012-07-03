@@ -2,6 +2,7 @@ import BaseHTTPServer
 import json
 import os.path
 import threading
+import types
 import urlparse
 
 DOC_DIR = os.path.join(os.path.dirname(__file__), 'mmap_app')
@@ -18,12 +19,21 @@ def content_type_for_file(path):
   content_types = {
     '.js': 'text/javascript; charset=utf-8',
     '.css': 'text/css; charset=utf-8',
-    '.html': 'text/html; charset=utf-8'}
+    '.html': 'text/html; charset=utf-8',
+    '.mp3': 'audio/mpeg3'}
   root, ext = os.path.splitext(path)
   if ext in content_types:
     return content_types[ext]
   else:
     return 'text/plain; charset=utf-8'
+
+
+def nul_terminate(s):
+  nul_pos = s.find('\0')
+  if nul_pos >= 0:
+    return s[:nul_pos]
+  else:
+    return s
 
 
 class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
@@ -47,6 +57,9 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
       if msgs.has_message(mtype):
         (t, n, m) = msgs.get_message(mtype)
         mdict = m.to_dict()
+        for key, value in mdict.items():
+          if isinstance(value, types.StringTypes):
+            mdict[key] = nul_terminate(value)
         resp = {'time_usec': t,
                 'index': n,
                 'msg': mdict}
@@ -74,7 +87,7 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
       if msgs.has_message('STATUSTEXT'):
         (unused_t, seq, m) = msgs.get_message('STATUSTEXT')
         data['status_text'] = {'severity': m.severity,
-                               'text': m.text,
+                               'text': nul_terminate(m.text),
                                'seq': seq}
       self.send_response(200)
       # http://www.ietf.org/rfc/rfc4627.txt says application/json.
