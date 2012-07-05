@@ -70,33 +70,6 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
       self.send_header('Content-type', 'application/json')
       self.end_headers()
       self.wfile.write(json.dumps(results))
-    elif path == '/data':
-      state = self.server.module_state
-      data = {'lat': state.lat,
-              'lon': state.lon,
-              'heading': state.heading,
-              'pitch': state.pitch,
-              'roll': state.roll,
-              'yaw': state.yaw,
-              'alt': state.alt,
-              'airspeed': state.airspeed,
-              'groundspeed': state.groundspeed,
-              'gps_fix_type': state.gps_fix_type,
-              'flight_mode': state.flight_mode,
-              'wp_change_time': state.wp_change_time}
-      if state.client_waypoint:
-        data['client_waypoint'] = state.client_waypoint
-      msgs = self.server.module_state.messages
-      if msgs.has_message('STATUSTEXT'):
-        (unused_t, seq, m) = msgs.get_message('STATUSTEXT')
-        data['status_text'] = {'severity': m.severity,
-                               'text': nul_terminate(m.text),
-                               'seq': seq}
-      self.send_response(200)
-      # http://www.ietf.org/rfc/rfc4627.txt says application/json.
-      self.send_header('Content-type', 'application/json')
-      self.end_headers()
-      self.wfile.write(json.dumps(data))
     else:
       # Remove leading '/'.
       path = path[1:]
