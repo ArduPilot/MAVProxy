@@ -4,3 +4,6 @@ mavproxy
 *.pyc
 *.log
 camera/
+*.raw
+*.parm
+*.scr
