@@ -1,5 +1,6 @@
 mmap = {};
 
+
 function MapPanner(map) {
     var theMapPanner = this;
     this.map = map;
@@ -32,21 +33,6 @@ function MapPanner(map) {
         MM.getFrame(this.animateToCenter);
     };
 
-}
-
-function TrailPlotter(marker_clip) {
-    this.marker_clip = marker_clip;
-
-    var last_trail_time = 0;
-
-    this.update = function() {
-        var now = new Date().getTime();
-        if (last_trail_time === 0 || now - last_trail_time > 10000) {
-            var trail_marker = this.marker_clip.createDefaultMarker(2);
-            this.marker_clip.addMarker(trail_marker, new MM.Location(state.lat, state.lon));
-            last_trail_time = now;
-        }
-    };
 }
 
 
@@ -138,95 +124,6 @@ function ADI(container) {
         this.targetPitch = pitch;
         this.targetRoll = roll;
         MM.getFrame(this.animateToAttitude);
-    };
-}
-
-
-function MarkerClip(map) {
-
-    this.map = map;
-
-    var theClip = this;
-
-    var markerDiv = document.createElement('div');
-    markerDiv.id = map.parent.id + '-markerClip-' + new Date().getTime();
-    markerDiv.style.margin = '0';
-    markerDiv.style.padding = '0';
-    markerDiv.style.position = 'absolute';
-    markerDiv.style.top = '0px';
-    markerDiv.style.left = '0px';
-    markerDiv.style.width = map.dimensions.x+'px';
-    markerDiv.style.height = map.dimensions.y+'px';        
-    map.parent.appendChild(markerDiv);    
-    
-    function onMapChange() {
-        theClip.updateMarkers();    
-    }
-
-    map.addCallback('drawn', onMapChange);
-
-    map.addCallback('resized', function() {
-        markerDiv.style.width = map.dimensions.x+'px';
-        markerDiv.style.height = map.dimensions.y+'px';        
-        theClip.updateMarkers();
-    });
-
-    this.updateMarkers = function() {
-        for (var i = 0; i < this.markers.length; i++) {
-            this.updateMarkerAt(i);
-        }
-    };
-    
-    this.markers = [];
-    this.markerLocations = [];
-    this.markerOffsets = [];
-    
-    this.addMarker = function(element, location, offset) {
-        element.style.position = 'absolute';
-        if (!offset) {
-            offset = new MM.Point(element.offsetWidth/2, element.offsetHeight/2);
-        }
-        markerDiv.appendChild(element);
-        this.markers.push(element);
-        this.markerLocations.push(location);
-        this.markerOffsets.push(offset);
-        this.updateMarkerAt(this.markers.length-1);
-    };
-
-    this.setMarkerLocation = function(index, location) {
-        this.markerLocations[index] = location;
-    };
-    
-    this.updateMarkerAt = function(index) {
-        var point = map.locationPoint(this.markerLocations[index]),
-        offset = this.markerOffsets[index],
-        element = this.markers[index];
-        MM.moveElement(element, { 
-            x: point.x - offset.x, 
-            y: point.y - offset.y,
-            scale: 1, width: element.pxsize, height: element.pxsize });
-    };
-
-    var createdMarkerCount = 0;
-
-    this.createDefaultMarker = function(size) {
-        var marker = document.createElement('div');
-        marker.id = map.parent.id+'-marker-'+createdMarkerCount;
-        createdMarkerCount++;
-        var px_size = size + 'px';
-        marker.pxsize = px_size;
-        marker.style.width = px_size;
-        marker.style.height = px_size;
-        marker.style.margin = '0';
-        marker.style.padding = '0';
-        marker.style.backgroundColor = '#ffffff';
-        marker.style.borderWidth = '2px';
-        marker.style.borderColor = 'black';
-        marker.style.borderStyle = 'solid';
-        marker.style.MozBorderRadius = px_size;
-        marker.style.borderRadius = px_size;
-        marker.style.WebkitBorderRadius = px_size;
-        return marker;
     };
 }
 
