@@ -40,6 +40,12 @@ def gps_bearing(lat1, lon1, lat2, lon2):
 	return bearing
 
 
+def wrap_valid_longitude(lon):
+  ''' wrap a longitude value around to always have a value in the range
+      [-180, +180) i.e 0 => 0, 1 => 1, -1 => -1, 181 => -179, -181 => 179
+  '''
+  return (((lon + 180.0) % 360.0) - 180.0)
+
 def gps_newpos(lat, lon, bearing, distance):
 	'''extrapolate latitude/longitude given a heading and distance 
 	thanks to http://www.movable-type.co.uk/scripts/latlong.html
@@ -55,7 +61,7 @@ def gps_newpos(lat, lon, bearing, distance):
 		    cos(lat1)*sin(dr)*cos(brng))
 	lon2 = lon1 + atan2(sin(brng)*sin(dr)*cos(lat1), 
 			    cos(dr)-sin(lat1)*sin(lat2))
-	return (degrees(lat2), degrees(lon2))
+	return (degrees(lat2), wrap_valid_longitude(degrees(lon2)))
 
 def gps_offset(lat, lon, east, north):
 	'''return new lat/lon after moving east/north

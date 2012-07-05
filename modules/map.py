@@ -51,10 +51,10 @@ def mavlink_packet(m):
     state = mpstate.map_state
     if m.get_type() == 'GPS_RAW':
         (state.lat, state.lon) = (m.lat, m.lon)
-        state.heading = m.hdg
     elif m.get_type() == 'GPS_RAW_INT':
         (state.lat, state.lon) = (m.lat/1.0e7, m.lon/1.0e7)
-        state.heading = m.cog*0.01
+    elif m.get_type() == "VFR_HUD":
+        state.heading = m.heading
     else:
         return
 
