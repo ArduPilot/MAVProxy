@@ -131,9 +131,7 @@ function ADI(container) {
 var map;
 var map_layer;
 var marker_layer;
-var marker_clip;
 var waypointMarkerElement;
-var trailPlotter;
 var mapPanner;
 var last_state_update_time;
 var adi;
@@ -166,18 +164,11 @@ function initMap() {
     map = new MM.Map('map', map_layer, undefined, eventHandlers);
     map.addLayer(marker_layer);
 
-    marker_clip = new MarkerClip(map);
-    //var marker = marker_clip.createDefaultMarker(20);
-    //var location = new MM.Location(0, 0);
-    //marker.title = "lovedrone";
-    //marker_clip.addMarker(marker, location);
-
     map.setCenterZoom(new MM.Location(20.0, 0), 18);
 
     setInterval(updateState, 250);
     $('#layerpicker').change(updateLayer);
 
-    trailPlotter = new TrailPlotter(marker_clip);
     mapPanner = new MapPanner(map);
     
     adi = new ADI("adi");
