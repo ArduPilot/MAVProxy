@@ -63,9 +63,9 @@ def ip_listen(sock):
 
     # takeover stdin/stdout while we are connected
     state.stdout_saved = sys.stdout
-    state.stdin_saved = sys.stdin
+    #state.stdin_saved = sys.stdin
     sys.stdout = state.connection.makefile(mode='w', bufsize=0)
-    sys.stdin = null_in() #state.connection.makefile(mode='r', bufsize=0)
+    #sys.stdin = null_in() #state.connection.makefile(mode='r', bufsize=0)
 
 # server socket callback for accept()  - when an existing client sends data
 def ip_data(sock):
@@ -79,7 +79,7 @@ def ip_data(sock):
         # we have reached EOF on the socket
         sock.close()
         sys.stdout = state.stdout_saved
-        sys.stdin = state.stdin_saved
+        #sys.stdin = state.stdin_saved
         state.stdout_saved = None
         state.stdin_saved = None
         state.connection = None
