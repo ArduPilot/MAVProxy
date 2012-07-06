@@ -34,6 +34,7 @@ class MPSettings(object):
     def __init__(self):
         self.vars = [ ('link', int),
                       ('altreadout', int),
+                      ('altreadstr', str),
                       ('distreadout', int),
                       ('battreadout', int),
                       ('heartbeat', int),
@@ -52,6 +53,7 @@ class MPSettings(object):
                       ('rc4mul', int)]
         self.link = 1
         self.altreadout = 10
+        self.altreadstr = ""
         self.distreadout = 200
         self.battreadout = 0
         self.basealtitude = -1
@@ -986,7 +988,10 @@ def report_altitude(altitude):
         math.fabs(mpstate.status.altitude - mpstate.status.last_altitude_announce) >= int(mpstate.settings.altreadout)):
         mpstate.status.last_altitude_announce = mpstate.status.altitude
         rounded_alt = int(mpstate.settings.altreadout) * ((5+int(mpstate.status.altitude - mpstate.settings.basealtitude)) / int(mpstate.settings.altreadout))
-        say("height %u" % rounded_alt, priority='notification')
+        if(self.altreadstring == ""):
+            say("height %u" % rounded_alt, priority='notification')
+        else:
+            say(self.altreadstring % rounded_alt, priority='notification')
     
 
 def master_callback(m, master):
