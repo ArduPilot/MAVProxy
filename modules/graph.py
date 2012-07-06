@@ -93,7 +93,7 @@ class Graph():
         self.values = [None]*len(self.fields)
         self.livegraph = live_graph.LiveGraph(self.fields,
                                               timespan=state.timespan,
-                                              title='MAVProxy: graph')
+                                              title=self.fields[0])
 
     def is_alive(self):
         '''check if this graph is still alive'''
