@@ -17,6 +17,8 @@ class ElevationModel():
 
     def GetElevation(self, latitude, longitude):
         '''Returns the altitude (m ASL) of a given lat/long pair'''
+        if latitude == 0 or longitude == 0:
+            return 0
         TileID = (numpy.floor(latitude), numpy.floor(longitude))
         if TileID in self.tileDict:
             alt = self.tileDict[TileID].getAltitudeFromLatLon(latitude, longitude)
