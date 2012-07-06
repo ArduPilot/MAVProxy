@@ -988,10 +988,10 @@ def report_altitude(altitude):
         math.fabs(mpstate.status.altitude - mpstate.status.last_altitude_announce) >= int(mpstate.settings.altreadout)):
         mpstate.status.last_altitude_announce = mpstate.status.altitude
         rounded_alt = int(mpstate.settings.altreadout) * ((5+int(mpstate.status.altitude - mpstate.settings.basealtitude)) / int(mpstate.settings.altreadout))
-        if(self.altreadstring == ""):
+        if(mpstate.settings.altreadstr == ""):
             say("height %u" % rounded_alt, priority='notification')
         else:
-            say(self.altreadstring % rounded_alt, priority='notification')
+            say(mpstate.settings.altreadstr % rounded_alt, priority='notification')
     
 
 def master_callback(m, master):
