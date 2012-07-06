@@ -316,7 +316,7 @@ DoubleClickHandler.prototype = {
 };
 
 
-flyTo = function(location) {
+var flyTo = function(location) {
     $.ajax({
         type: 'POST',
         url: '/command',

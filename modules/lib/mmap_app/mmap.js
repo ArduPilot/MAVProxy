@@ -1,5 +1,17 @@
 mmap = {};
 
+mmap.location = null;
+mmap.map = null;
+mmap.mapLayer = null;
+mmap.markerLayer = null;
+mmap.waypointMarkerElement = null;
+mmap.mapPanner = null;
+mmap.lastMessageHandledTime = null;
+mmap.adi = null;
+mmap.statusTextSeq = null;
+mmap.chimeAudio = new Audio('drone_chime.mp3');
+mmap.clientWaypointSeq = null;
+
 
 function MapPanner(map) {
     var theMapPanner = this;
@@ -21,7 +33,6 @@ function MapPanner(map) {
         } else {
             need_more_animation = true;
         }
-
         theMapPanner.map.setCenter(new MM.Location(nextLat, nextLon));
         if (need_more_animation) {
             MM.getFrame(this.animateToCenter);
@@ -32,7 +43,6 @@ function MapPanner(map) {
         this.targetLocation = location;
         MM.getFrame(this.animateToCenter);
     };
-
 }
 
 
@@ -56,9 +66,9 @@ function ADI(container) {
     this.plane = new Kinetic.Path({
         x: 50,
         y: 50,
-        data: "m -26,0 15,0 3,3 M -1,0 l 2,0 M 26,0 l -15,0 -3,3",
-        stroke: "black",
-        lineJoin: "round",
+        data: 'm -26,0 15,0 3,3 M -1,0 l 2,0 M 26,0 l -15,0 -3,3',
+        stroke: 'black',
+        lineJoin: 'round',
         strokeWidth: 2.5,
         shadow: {
             color: 'black',
@@ -73,9 +83,9 @@ function ADI(container) {
     this.horizon = new Kinetic.Path({
         x: 50,
         y: 50,
-        data: "m -100,0 200,0",
-        stroke: "black",
-        lineJoin: "round",
+        data: 'm -100,0 200,0',
+        stroke: 'black',
+        lineJoin: 'round',
         strokeWidth: 1.7,
         scale: 1
     });
@@ -128,78 +138,54 @@ function ADI(container) {
 }
 
 
-var map;
-var map_layer;
-var marker_layer;
-var waypointMarkerElement;
-var mapPanner;
-var last_state_update_time;
-var adi;
-
-var state = {};
-state.lat = null;
-state.lon = null;
-state.pitch = 0.0;
-state.roll = 0.0;
-state.heading = 0.0;
-state.waypoints = null;
-
-
-
-function initMap() {
-
+mmap.initMap = function() {
     // Microsoft Bing
     // please use your own API key!  This is jjwiseman's!
-    var key = "Anmc0b2q6140lnPvAj5xANM1rvF1A4CvVtr6H2VJvQcdnDvc8NL-I2C49owIe9xC";
+    var key = 'Anmc0b2q6140lnPvAj5xANM1rvF1A4CvVtr6H2VJvQcdnDvc8NL-I2C49owIe9xC';
     var style = 'AerialWithLabels';
     var provider = new MM.BingProvider(key, style);
 
-    map_layer = new MM.Layer(provider);
-    marker_layer = new MM.MarkerLayer();
-    eventHandlers = [
+    mmap.mapLayer = new MM.Layer(provider);
+    mmap.markerLayer = new MM.MarkerLayer();
+    var eventHandlers = [
 	new MouseWheelHandler(),
 	new TouchHandler(),
 	new DoubleClickHandler()
     ];
-    map = new MM.Map('map', map_layer, undefined, eventHandlers);
-    map.addLayer(marker_layer);
+    mmap.map = new MM.Map('map', mmap.mapLayer, undefined, eventHandlers);
+    mmap.map.addLayer(mmap.markerLayer);
 
-    map.setCenterZoom(new MM.Location(20.0, 0), 18);
+    mmap.map.setCenterZoom(new MM.Location(20.0, 0), 18);
 
-    setInterval(updateState, 250);
-    $('#layerpicker').change(updateLayer);
+    setInterval(mmap.updateState, 250);
+    $('#layerpicker').change(mmap.updateLayer);
 
-    mapPanner = new MapPanner(map);
+    mmap.mapPanner = new MapPanner(mmap.map);
     
-    adi = new ADI("adi");
+    mmap.adi = new ADI('adi');
 
     var zoomSlider = document.getElementById('zoom');
     zoomSlider.onchange = function() {
         var sliderProp = (zoomSlider.value - zoomSlider.min) / (zoomSlider.max - zoomSlider.min);
         var targetZoom = sliderProp * 18.0; 
-        map.setZoom(targetZoom);
+        mmap.map.setZoom(targetZoom);
     };
-}
+};
 
 
-function updateLinkStatus() {
+mmap.updateLinkStatus = function() {
     var now = (new Date()).getTime();
-    if (!last_state_update_time) {
-        $("#t_link").html('<span class="link error">NO</span>');
-    } else if (now - last_state_update_time > 5000) {
-        $("#t_link").html('<span class="link error">TIMEOUT</span>');
-    } else if (now - last_state_update_time > 1000) {
-        $("#t_link").html('<span class="link slow">SLOW</span>');
+    if (!mmap.lastMessageHandledTime) {
+        $('#t_link').html('<span class="link error">NO</span>');
+    } else if (now - mmap.lastMessageHandledTime > 5000) {
+        $('#t_link').html('<span class="link error">TIMEOUT</span>');
+    } else if (now - mmap.lastMessageHandledTime > 1000) {
+        $('#t_link').html('<span class="link slow">SLOW</span>');
     } else {
-        $("#t_link").html('<span class="link ok">OK</span>');
+        $('#t_link').html('<span class="link ok">OK</span>');
     }
-}
+};
 
-function handleMessages(msgs) {
-    for (var i = 0; i < msgs.length; i++) {
-        handleMessage(msgs[i]);
-    }
-}
 
 mmap.arduPlaneFlightModes = {
     0: 'MANUAL',
@@ -236,6 +222,7 @@ mmap.MAV_TYPE_QUADROTOR = 2;
 mmap.MAV_TYPE_FIXED_WING = 1;
 mmap.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED = 1;
 
+
 mmap.flightModeString = function(msg) {
     var mode;
     if (!msg.base_mode & mmap.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED) {
@@ -252,224 +239,186 @@ mmap.flightModeString = function(msg) {
     return mode;
 };
 
-function handleHeartbeat(time, index, msg) {
+
+mmap.handleHeartbeat = function(time, index, msg) {
     $('#t_flt_mode').html(mmap.flightModeString(msg));
-}
+};
 
-function handleGpsRaw(time, index, msg) {
-    $("#t_lat").html(msg.lat.toPrecision(11));
-    $("#t_lon").html(msg.lon.toPrecision(11));
-}
 
-function handleGpsRawInt(time, index, msg) {
+mmap.handleGpsRaw = function(time, index, msg) {
+    $('#t_lat').html(msg.lat.toPrecision(11));
+    $('#t_lon').html(msg.lon.toPrecision(11));
+    mmap.location = {lat: msg.lat, lon: msg.lon};
+};
+
+
+mmap.handleGpsRawInt = function(time, index, msg) {
     if (msg.fix_type >= 3) {
-        $("#t_gps").html('<span class="ok">OK</span>');
+        $('#t_gps').html('<span class="ok">OK</span>');
     } else if (msg.fix_type == 2) {
-        $("#t_gps").html('<span class="slow">02</span>');
+        $('#t_gps').html('<span class="slow">02</span>');
     } else {
-        $("#t_gps").html('<span class="error">' + msg.fix_type + '</span>');
+        $('#t_gps').html('<span class="error">' + msg.fix_type + '</span>');
     }
-    $("#t_lat").html((msg.lat / 1.0e7).toPrecision(11));
-    $("#t_lon").html((msg.lon / 1.0e7).toPrecision(11));
-}
+    var lat = msg.lat / 1.0e7;
+    var lon = msg.lon / 1.0e7;
+    $('#t_lat').html(lat.toPrecision(11));
+    $('#t_lon').html(lon.toPrecision(11));
+    mmap.location = {lat: lat, lon: lon};
+};
 
-function handleVfrHud(time, index, msg) {
-    $("#t_alt").html(msg.alt.toPrecision(4));
-    $("#t_gspd").html(msg.groundspeed.toPrecision(2));
-    $("#t_aspd").html(msg.airspeed.toPrecision(2));
-    $("#t_hdg").html(msg.heading);
-    rotate_drone(msg.heading);
-}
 
-function handleAttitude(time, index, msg) {
-    adi.setAttitude(msg.pitch, msg.roll);
-}
+mmap.updateMap = function() {
+    var location = new MM.Location(mmap.location.lat, mmap.location.lon);
+    if (!mmap.lastMessageHandledTime) {
+        mmap.map.setCenter(location);
+    } else {
+        mmap.mapPanner.setCenter(location);
+    }
+};
 
-function handleStatusText(time, index, msg) {
-    if ((!status_text_seq) || index > status_text_seq) {
+
+mmap.handleVfrHud = function(time, index, msg) {
+    $('#t_alt').html(msg.alt.toPrecision(4));
+    $('#t_gspd').html(msg.groundspeed.toPrecision(2));
+    $('#t_aspd').html(msg.airspeed.toPrecision(2));
+    $('#t_hdg').html(msg.heading);
+    mmap.rotateDrone(msg.heading);
+};
+
+
+mmap.handleAttitude = function(time, index, msg) {
+    mmap.adi.setAttitude(msg.pitch, msg.roll);
+};
+
+
+mmap.handleMetaWaypoint = function(time, index, msg) {
+    if (!mmap.clientWaypointSeq || mmap.clientWaypointSeq < index) {
+	mmap.newWaypoint(msg.waypoint);
+    }
+};
+
+mmap.handleStatusText = function(time, index, msg) {
+    if ((!mmap.statusTextSeq) || index > mmap.statusTextSeq) {
         var audioElement = new Audio('drone_chime.mp3');
         audioElement.play();
-        $("#t_sta_txt").html(msg.text)
+        $('#t_sta_txt').html(msg.text)
             .stop(true, true)
             .css('color', 'yellow')
             .css('background-color', 'rgb(0, 0, 0, 1.0)')
             .animate({
-                color: $.Color("yellow"),
-                backgroundColor: $.Color("rgb(0, 0, 0, 1.0)")
+                color: $.Color('yellow'),
+                backgroundColor: $.Color('rgb(0, 0, 0, 1.0)')
             }, {
                 duration: 200,
                 queue: true
             })
             .animate({
-                color: $.Color("white"),
-                backgroundColor: $.Color("rgb(0, 0, 0, 0.0)")
+                color: $.Color('white'),
+                backgroundColor: $.Color('rgb(0, 0, 0, 0.0)')
             }, {
                 duration: 5000,
                 queue: true
             });
-        status_text_seq = index;
+        mmap.statusTextSeq = index;
     }
-}
-
-
-var messageHandlerMap = {
-    'HEARTBEAT': handleHeartbeat,
-    'GPS_RAW': handleGpsRaw,
-    'GPS_RAW_INT': handleGpsRawInt,
-    'VFR_HUD': handleVfrHud,
-    'ATTITUDE': handleAttitude,
-    'STATUSTEXT': handleStatusText
 };
 
-function handleMessage(msg) {
-    handler = messageHandlerMap[msg.msg.mavpackettype];
-    handler(msg.time_usec, msg.index, msg.msg);
-}
+
+mmap.messageHandlerMap = {
+    'HEARTBEAT': mmap.handleHeartbeat,
+    'GPS_RAW': mmap.handleGpsRaw,
+    'GPS_RAW_INT': mmap.handleGpsRawInt,
+    'VFR_HUD': mmap.handleVfrHud,
+    'ATTITUDE': mmap.handleAttitude,
+    'STATUSTEXT': mmap.handleStatusText,
+    'META_WAYPOINT': mmap.handleMetaWaypoint
+};
 
 
-function updateState() {
-    msgTypes = Object.keys(messageHandlerMap);
+mmap.handleMessages = function(msgs) {
+    for (var i = 0; i < msgs.length; i++) {
+        mmap.handleMessage(msgs[i]);
+    }
+};
+
+
+mmap.handleMessage = function(msg) {
+    var handler = mmap.messageHandlerMap[msg.msg.mavpackettype];
+    if (handler) {
+        handler(msg.time_usec, msg.index, msg.msg);
+    } else {
+        console.warn(
+            'No handler defined for message type ' + msg.msg.mavpackettype);
+    }
+};
+
+
+mmap.updateState = function() {
+    var msgTypes = Object.keys(mmap.messageHandlerMap);
     $.getJSON('mavlink/' + msgTypes.join('+'),
               function(msgs) {
-                  handleMessages(msgs);
-                  updateMap();
-                  last_state_update_time = new Date().getTime();
+                  mmap.handleMessages(msgs);
+                  mmap.updateMap();
+                  mmap.lastMessageHandledTime = new Date().getTime();
               });
-    updateLinkStatus();
-                 
-    // $.getJSON("mavlink+heartbeat+",
-    //           function(data){
-    //               state = data;
-    //               updateTelemetryDisplay();
-    //               updateMap();
-    //               last_state_update_time = new Date().getTime();
-    //           });
-    // updateLinkStatus();
-    // Just to demonstrate the mavlink message api:
-    // $.getJSON("mavlink/heartbeat", function(hb){
-    //   console.log("num heartbeats: " + hb.index.toString() +
-    //               " time_usec: " + hb.time_usec.toString());
-    // });
-    // // case insensitive. mavlink/gps_raw_int works too.
-    // $.getJSON("mavlink/GPS_RAW_INT", function(gps){
-    //   console.log("altitude: " +  gps.msg.alt.toString()); 
-    // });
-}
+    mmap.updateLinkStatus();
+};
 
 
-function updateMap() {
-    var location = new MM.Location(state.lat, state.lon);
-    if (!last_state_update_time) {
-        map.setCenter(location);
+mmap.newWaypoint = function(location) {
+    if (!mmap.waypointMarkerElement) {
+	mmap.waypointMarkerElement = document.createElement('div');
+	mmap.waypointMarkerElement.innerHTML = '<img src="mapmarker.png" width="50" height="50">';
+	mmap.waypointMarkerElement.pixelOffset = {x: -25, y: -50};
+	mmap.markerLayer.addMarker(mmap.waypointMarkerElement, location);
     } else {
-        mapPanner.setCenter(location);
+	mmap.waypointMarkerElement.location = location;
+	mmap.waypointMarkerElement.coord = mmap.map.locationCoordinate(location);
+	mmap.markerLayer.repositionMarker(mmap.waypointMarkerElement);
     }
-}
+};
 
 
-var status_text_seq;
-var chimeAudio = new Audio('drone_chime.mp3');
-var clientWaypointSeq;
-
-function updateTelemetryDisplay() {
-    $("#t_lat").html(state.lat.toPrecision(11));
-    $("#t_lon").html(state.lon.toPrecision(11));
-    $("#t_alt").html(state.alt.toPrecision(4));
-    $("#t_gspd").html(state.groundspeed.toPrecision(2));
-    $("#t_aspd").html(state.airspeed.toPrecision(2));
-    $("#t_hdg").html(state.heading);
-    $("#t_flt_mode").html(state.flight_mode);
-    now = new Date().getTime();
-    $("#t_fps").html((1000.0 / (now - last_state_update_time)).toPrecision(3));
-    if (state.gps_fix_type >= 3) {
-        $("#t_gps").html('<span class="ok">OK</span>');
-    } else if (state.gps_fix_type == 2) {
-        $("#t_gps").html('<span class="slow">02</span>');
-    } else if (state.gps_fix_type <= 1) {
-        $("#t_gps").html('<span class="error">' + state.gps_fix_type + '</span>');
-    }
-    if (state.status_text) {
-        if ((!status_text_seq) || state.status_text.seq > status_text_seq) {
-            var audioElement = new Audio('drone_chime.mp3');
-            audioElement.play();
-            $("#t_sta_txt").html(state.status_text.text)
-		.stop(true, true)
-		.css('color', 'yellow')
-		.css('background-color', 'rgb(0, 0, 0, 1.0)')
-                .animate({
-                    color: $.Color("yellow"),
-                    backgroundColor: $.Color("rgb(0, 0, 0, 1.0)")
-                }, {
-                    duration: 200,
-                    queue: true
-		})
-		.animate({
-                    color: $.Color("white"),
-                    backgroundColor: $.Color("rgb(0, 0, 0, 0.0)")
-		}, {
-                    duration: 5000,
-                    queue: true
-		});
-            status_text_seq = state.status_text.seq;
-	}
-    }
-    adi.setAttitude(state.pitch, state.roll);
-    rotate_drone(state.heading);
-
-    if (state.client_waypoint &&
-	(!clientWaypointSeq || clientWaypointSeq < state.client_waypoint_seq)) {
-	newWaypoint(state.client_waypoint);
-    }
-}
-
-function newWaypoint(location) {
-    if (!waypointMarkerElement) {
-	waypointMarkerElement = document.createElement('div');
-	waypointMarkerElement.innerHTML = '<img src="mapmarker.png" width="50" height="50">';
-	waypointMarkerElement.pixelOffset = {x: -25, y: -50};
-	marker_layer.addMarker(waypointMarkerElement, location);
-    } else {
-	waypointMarkerElement.location = location;
-	waypointMarkerElement.coord = map.locationCoordinate(location);
-	marker_layer.repositionMarker(waypointMarkerElement);
-    }
-}
-
-
-
-
-function rotate_drone(deg){
-    var rotate = "rotate(" + (deg) + "deg);";
+mmap.rotateDrone = function(deg){
+    var rotate = 'rotate(' + (deg) + 'deg);';
     var tr = new Array(
-        "transform:" + rotate,
-        "-moz-transform:" + rotate,
-        "-webkit-transform:" + rotate,
-        "-ms-transform:" + rotate,
-        "-o-transform:" + rotate
+        'transform:' + rotate,
+        '-moz-transform:' + rotate,
+        '-webkit-transform:' + rotate,
+        '-ms-transform:' + rotate,
+        '-o-transform:' + rotate
     );
+    var drone = document.getElementById('drone');
+    drone.setAttribute('style', tr.join(';'));
+};
 
-    var drone = document.getElementById("drone");
-    drone.setAttribute("style", tr.join(";"));
-}
 
-
-function updateLayer() {
+mmap.updateMapLayer = function() {
     var provider;
     var layerNum = $(this).attr('value');
-    console.log("Switching to layer " + layerNum);
-    var bing_key = "Anmc0b2q6140lnPvAj5xANM1rvF1A4CvVtr6H2VJvQcdnDvc8NL-I2C49owIe9xC";
+    var bing_key = 'Anmc0b2q6140lnPvAj5xANM1rvF1A4CvVtr6H2VJvQcdnDvc8NL-I2C49owIe9xC';
     var style;
     if (layerNum == '1') {
         style = 'AerialWithLabels';
-        provider = new MM.BingProvider(bing_key, style, function(provider) { map_layer.setProvider(provider); });
+        provider = new MM.BingProvider(bing_key, style,
+                                       function(provider) {
+                                           mmap.mapLayer.setProvider(provider);
+                                       });
     } else if (layerNum == '2') {
         style = 'BirdseyeWithLabels';
-        provider = new MM.BingProvider(bing_key, style, function(provider) { map_layer.setProvider(provider); });
+        provider = new MM.BingProvider(bing_key, style,
+                                       function(provider) {
+                                           mmap.mapLayer.setProvider(provider);
+                                       });
     } else if (layerNum == '3') {
         style = 'Road';
-        provider = new MM.BingProvider(bing_key, style, function(provider) { map_layer.setProvider(provider); });
+        provider = new MM.BingProvider(bing_key, style,
+                                       function(provider) {
+                                           mmap.mapLayer.setProvider(provider);
+                                       });
     } else if (layerNum == '4') {
         provider = new MM.BlueMarbleProvider();
-        map_layer.setProvider(provider);
+        mmap.mapLayer.setProvider(provider);
     }
-}
+};

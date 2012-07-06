@@ -4,11 +4,26 @@ import webbrowser
 
 import mavlinkv10
 
+# FIXME: Please.
 sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.realpath(__file__)), 'lib'))
 import mmap_server
 
 g_module_context = None
+
+
+class MetaMessage(object):
+  def __init__(self, msg_type=None, data=None):
+    self.msg_type = msg_type
+    self.data = data or {}
+
+  def get_type(self):
+    return self.msg_type
+
+  def to_dict(self):
+    d = dict(self.data.items())
+    d['mavpackettype'] = self.msg_type
+    return d
 
 
 class message_memo(object):
@@ -76,6 +91,9 @@ class module_state(object):
       seq, frame, cmd, current, autocontinue, param1, param2, param3, param4,
       x, y, z)
     g_module_context.queue_message(msg)
+    msg = MetaMessage(msg_type='META_WAYPOINT',
+                      data={'waypoint': {'lat': x, 'lon': y}})
+    self.messages.insert_message(msg)
 
 
 def name():
