@@ -57,7 +57,7 @@ class varioSoundGen(threading.Thread):
         print("sound generator thread starting")
         self._stop.clear()
 
-        fs = fluidsynth.Synth()
+        fs = fluidsynth.Synth(samplerate=11025)
         fs.start(driver='alsa')
 
         self.outAmplitude = 0
