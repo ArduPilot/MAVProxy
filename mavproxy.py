@@ -963,7 +963,7 @@ def battery_report():
 
 def handle_usec_timestamp(m, master):
     '''special handling for MAVLink packets with a usec field'''
-    usec = m.usec
+    usec = m.time_usec
     if usec + 6.0e7 < master.highest_usec:
         say('Time has wrapped')
         mpstate.console.writeln("usec %u highest_usec %u" % (usec, master.highest_usec))
@@ -1003,7 +1003,7 @@ def master_callback(m, master):
         master.post_message(m)
     mpstate.status.counters['MasterIn'][master.linknum] += 1
 
-    if not m.get_type().startswith('GPS_RAW') and getattr(m, 'usec', None) is not None:
+    if not m.get_type().startswith('RAW_IMU') and getattr(m, 'time_usec', None) is not None:
         # update link_delayed attribute
         handle_usec_timestamp(m, master)
 
