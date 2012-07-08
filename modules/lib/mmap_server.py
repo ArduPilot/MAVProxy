@@ -46,6 +46,8 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
     post_body = self.rfile.read(content_len)
     command = json.loads(post_body)
     self.server.module_state.command(command)
+    self.send_response(200)
+    self.end_headers()
 
   def do_GET(self):
     scheme, host, path, params, query, frag = urlparse.urlparse(self.path)
