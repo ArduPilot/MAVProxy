@@ -52,12 +52,14 @@ class InvalidTileError(Exception):
     def __str__(self):
         return "SRTM tile for %d, %d is invalid!" % (self.lat, self.lon)
 
-class SRTMDownloader:
+class SRTMDownloader():
     """Automatically download SRTM tiles."""
     def __init__(self, server="dds.cr.usgs.gov",
                  directory="/srtm/version2_1/SRTM3/",
-                 cachedir=os.path.join(os.environ['HOME'], '.tilecache/SRTM')):
+                 cachedir=os.path.join(os.environ['HOME'], '.tilecache/SRTM'),
+                 offline=0):
 
+        self.offline = offline
         self.server = server
         self.directory = directory
         self.cachedir = cachedir
@@ -79,13 +81,15 @@ class SRTMDownloader:
             data = open(self.filelist_file, 'rb')
         except IOError:
             '''print "No SRTM cached file list. Creating new one!"'''
-            self.createFileList()
+            if self.offline == 0:
+                self.createFileList()
             return
         try:
             self.filelist = pickle.load(data)
         except:
             '''print "Unknown error loading cached SRTM file list. Creating new one!"'''
-            self.createFileList()
+            if self.offline == 0:
+                self.createFileList()
 
     def createFileList(self):
         """SRTM data is split into different directories, get a list of all of
@@ -188,6 +192,8 @@ class SRTMDownloader:
 
     def downloadTile(self, continent, filename):
         #Use HTTP
+        if self.offline == 1:
+            return
         conn = httplib.HTTPConnection(self.server)
         conn.set_debuglevel(0)
         filepath = "%s%s%s" % \
