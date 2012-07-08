@@ -24,6 +24,8 @@ class ElevationModel():
             alt = self.tileDict[TileID].getAltitudeFromLatLon(latitude, longitude)
         else:
             tile = self.downloader.getTile(numpy.floor(latitude), numpy.floor(longitude))
+            if tile == 0:
+                 return -1
             self.tileDict[TileID] = tile
             alt = tile.getAltitudeFromLatLon(latitude, longitude)
 
