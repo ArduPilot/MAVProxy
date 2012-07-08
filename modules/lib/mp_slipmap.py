@@ -662,9 +662,9 @@ class MPSlipMapPanel(wx.Panel):
                 self.position.WriteText(' %.1fm' % alt)
         pending = state.mt.tiles_pending()
         if pending:
-            self.position.WriteText('Map Downloading %u ' % pending)
+            self.position.WriteText(' Map Downloading %u ' % pending)
         if alt == -1:
-            self.position.WriteText('SRTM Downloading ')
+            self.position.WriteText(' SRTM Downloading ')
         self.position.WriteText('\n')
         if self.click_pos is not None:
             self.position.WriteText('Click: %f %f' % (self.click_pos[0], self.click_pos[1]))
