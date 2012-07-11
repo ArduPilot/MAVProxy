@@ -11,7 +11,7 @@ mmap.adi = null;
 mmap.statusTextSeq = null;
 mmap.chimeAudio = new Audio('drone_chime.mp3');
 mmap.clientWaypointSeq = null;
-
+mmap._alt = null;
 
 function MapPanner(map) {
     var theMapPanner = this;
@@ -170,6 +170,12 @@ mmap.initMap = function() {
         var targetZoom = sliderProp * 18.0; 
         mmap.map.setZoom(targetZoom);
     };
+
+    var altSlider = document.getElementById('altinput');
+    mmap.setAlt(altSlider.value);
+    altSlider.onchange = function () {
+      mmap.setAlt(altSlider.value);
+    };
 };
 
 
@@ -324,6 +330,16 @@ mmap.handleStatusText = function(time, index, msg) {
     }
 };
 
+
+mmap.setAlt = function(newalt) {
+  mmap._alt = newalt;
+  $('#v_altwaypt').html(newalt.toString())
+}
+
+mmap.getAlt = function() { 
+   
+  return mmap._alt;
+}
 
 mmap.messageHandlerMap = {
     'HEARTBEAT': mmap.handleHeartbeat,
