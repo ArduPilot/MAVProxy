@@ -751,12 +751,9 @@ def cmd_module(args):
             mpstate.modules.append(m)
             print("Loaded module %s" % modname)
         except Exception, msg:
-<<<<<<< HEAD
+
             print("Unable to load module %s: %s" % (modname, msg))
-=======
-            print("Unable to load module %s: %s" % (args[1], msg))
-            raise
->>>>>>> refs/remotes/wiseman_mavproxy_browser/modestmap
+
     elif args[0] == "reload":
         if len(args) < 2:
             print("usage: module reload <name>")
@@ -772,7 +769,7 @@ def cmd_module(args):
                 m.init(mpstate)
                 print("Reloaded module %s" % modname)
                 return
-<<<<<<< HEAD
+
         print("Unable to find module %s" % args[1])
     elif args[0] == "unload":
         if len(args) < 2:
@@ -789,9 +786,6 @@ def cmd_module(args):
                 return
         print("Unable to find module %s" % args[1])
         
-=======
-        print("Unable to find module %s" % modname)
->>>>>>> 14e44d00053d6afa9559b015e29353ccd817ae77
     else:
         print(usage)
 
