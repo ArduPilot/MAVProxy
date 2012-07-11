@@ -10,21 +10,18 @@
     <script type="text/javascript"
       src="http://maps.googleapis.com/maps/api/js?key=AIzaSyDenqzM4LCjTbN8VJsYV5lebWjwWSZRiFY&sensor=false">
     </script>
-
     <script type="text/javascript">
       function initialize() {
         var myOptions = {
           center: new google.maps.LatLng(-26.588527,151.843972),
           zoom: 15,
-          mapTypeId: google.maps.MapTypeId.ROADMAP
+          mapTypeId: google.maps.MapTypeId.SATELLITE
         };
         var map = new google.maps.Map(document.getElementById("map_canvas"),
             myOptions);
       }
     </script>
-<!-- https://developers.google.com/maps/documentation/javascript/controls 
-    // HINT OVERLAYS  move with the map, CONTROLS do not. 
-    -->
+<!-- https://developers.google.com/maps/documentation/javascript/controls -->
   </head>
   <body onload="initialize()">
     <div id="map_canvas" style="width:100%; height:100%"></div>

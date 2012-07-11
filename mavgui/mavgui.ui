@@ -417,15 +417,15 @@
    <widget class="QWebView" name="webView">
     <property name="geometry">
      <rect>
-      <x>260</x>
-      <y>-20</y>
+      <x>290</x>
+      <y>20</y>
       <width>951</width>
       <height>761</height>
      </rect>
     </property>
     <property name="url">
      <url>
-      <string>file:///Users/buzz/Documents/Arduino/MAVProxy/mymap.html</string>
+      <string>file:///Users/buzz/Documents/Arduino/MAVProxy/mavgui/mymap.html</string>
      </url>
     </property>
    </widget>
