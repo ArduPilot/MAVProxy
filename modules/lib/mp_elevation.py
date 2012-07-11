@@ -5,26 +5,41 @@ It will grab the altitude of a long,lat pair from the SRTM database
 Created by Stephen Dade (stephen_dade@hotmail.com)
 '''
 
-import numpy, os, time, sys, srtm
+import numpy, os, time, sys, srtm, GAreader
 
 class ElevationModel():
     '''Elevation Model. Only SRTM for now'''
 
-    def __init__(self):
-        self.downloader = srtm.SRTMDownloader()
-        self.downloader.loadFileList()
-        self.tileDict = dict()
+    def __init__(self, database='srtm'):
+        '''Use offline=1 to disable any downloading of tiles, regardless of whether the
+        tile exists'''
+        self.database = database
+        if self.database == 'srtm':
+            self.downloader = srtm.SRTMDownloader(offline=0)
+            self.downloader.loadFileList()
+            self.tileDict = dict()
+
+        '''Use the Geoscience Australia database instead - watch for the correct database path'''
+        if self.database == 'geoscience':
+            self.mappy = GAreader.ERMap()
+            self.mappy.read_ermapper(os.path.join(os.environ['HOME'], './Documents/Elevation/Canberra/GSNSW_P756demg'))
 
     def GetElevation(self, latitude, longitude):
         '''Returns the altitude (m ASL) of a given lat/long pair'''
-        TileID = (numpy.floor(latitude), numpy.floor(longitude))
-        if TileID in self.tileDict:
-            alt = self.tileDict[TileID].getAltitudeFromLatLon(latitude, longitude)
-        else:
-            tile = self.downloader.getTile(numpy.floor(latitude), numpy.floor(longitude))
-            self.tileDict[TileID] = tile
-            alt = tile.getAltitudeFromLatLon(latitude, longitude)
-
+        if latitude == 0 or longitude == 0:
+            return 0
+        if self.database == 'srtm':
+            TileID = (numpy.floor(latitude), numpy.floor(longitude))
+            if TileID in self.tileDict:
+                alt = self.tileDict[TileID].getAltitudeFromLatLon(latitude, longitude)
+            else:
+                tile = self.downloader.getTile(numpy.floor(latitude), numpy.floor(longitude))
+                if tile == 0:
+                    return -1
+                self.tileDict[TileID] = tile
+                alt = tile.getAltitudeFromLatLon(latitude, longitude)
+        if self.database == 'geoscience':
+             alt = self.mappy.getAltitudeAtPoint(latitude, longitude)
         return alt
 
 
@@ -32,12 +47,13 @@ if __name__ == "__main__":
 
     from optparse import OptionParser
     parser = OptionParser("mp_elevation.py [options]")
-    parser.add_option("--lat", type='float', default=-35.362938, help="start latitude")
-    parser.add_option("--lon", type='float', default=149.165085, help="start longitude")
+    parser.add_option("--lat", type='float', default=-35.052544, help="start latitude")
+    parser.add_option("--lon", type='float', default=149.509165, help="start longitude")
+    parser.add_option("--database", type='string', default='srtm', help="elevation database")
 
     (opts, args) = parser.parse_args()
 
-    EleModel = ElevationModel()
+    EleModel = ElevationModel(opts.database)
 
     lat = opts.lat
     lon = opts.lon

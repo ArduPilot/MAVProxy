@@ -614,6 +614,8 @@ class MPSlipMapPanel(wx.Panel):
     def re_center(self, x, y, lat, lon):
         '''re-center view for pixel x,y'''
         state = self.state
+        if lat is None or lon is None:
+            return
         (lat2,lon2) = self.coordinates(x, y)
         distance = mp_util.gps_distance(lat2, lon2, lat, lon)
         bearing  = mp_util.gps_bearing(lat2, lon2, lat, lon)
@@ -651,6 +653,7 @@ class MPSlipMapPanel(wx.Panel):
         state = self.state
         pos = self.mouse_pos
         self.position.Clear()
+        alt = 0
         if pos is not None:
             (lat,lon) = self.coordinates(pos.x, pos.y)
             self.position.WriteText('Cursor: %f %f' % (lat, lon))
@@ -659,7 +662,9 @@ class MPSlipMapPanel(wx.Panel):
                 self.position.WriteText(' %.1fm' % alt)
         pending = state.mt.tiles_pending()
         if pending:
-            self.position.WriteText('Downloading %u ' % pending)
+            self.position.WriteText(' Map Downloading %u ' % pending)
+        if alt == -1:
+            self.position.WriteText(' SRTM Downloading ')
         self.position.WriteText('\n')
         if self.click_pos is not None:
             self.position.WriteText('Click: %f %f' % (self.click_pos[0], self.click_pos[1]))

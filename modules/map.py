@@ -32,7 +32,7 @@ def init(_mpstate):
     global mpstate
     mpstate = _mpstate
     mpstate.map_state = module_state()
-    mpstate.map = mp_slipmap.MPSlipMap(service='GoogleSat', elevation=True)
+    mpstate.map = mp_slipmap.MPSlipMap(service='GoogleSat', elevation=True, title='Map')
 
     # setup a plane icon
     plane = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..',

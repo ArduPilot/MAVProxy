@@ -32,7 +32,7 @@ def init(_mpstate):
     global mpstate
     mpstate = _mpstate
     mpstate.console_state = module_state()
-    mpstate.console = wxconsole.MessageConsole()
+    mpstate.console = wxconsole.MessageConsole(title='Console')
 
     # setup some default status information
     mpstate.console.set_status('Mode', 'UNKNOWN', row=0, fg='blue')

@@ -34,6 +34,13 @@ def cmd_graph(args):
             print("Graph %u: %s" % (i, state.graphs[i].fields))
         return
 
+    if args[0] == "timespan":
+        if len(args) == 1:
+            print("timespan: %.1f" % state.timespan)
+            return
+        state.timespan = float(args[1])
+        return
+
     # start a new graph
     state.graphs.append(Graph(args[:]))
 
@@ -86,7 +93,7 @@ class Graph():
         self.values = [None]*len(self.fields)
         self.livegraph = live_graph.LiveGraph(self.fields,
                                               timespan=state.timespan,
-                                              title='MAVProxy: graph')
+                                              title=self.fields[0])
 
     def is_alive(self):
         '''check if this graph is still alive'''

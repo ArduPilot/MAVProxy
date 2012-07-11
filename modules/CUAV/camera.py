@@ -4,10 +4,10 @@
 import time, threading, sys, os, numpy, Queue, cv, errno, cPickle, signal, struct, fcntl, select, cStringIO
 
 # use the camera code from the cuav repo (see githib.com/tridge)
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'camera'))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'image'))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'lib'))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'cuav', 'camera'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'cuav', 'image'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'cuav', 'lib'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'lib'))
 import scanner, mavutil, cuav_mosaic, mav_position, cuav_util, cuav_joe, block_xmit, mp_image
 
 # allow for replaying of previous flights
@@ -66,6 +66,7 @@ class camera_state(object):
 
         self.bandwidth_used = 0
         self.rtt_estimate = 0
+        self.transmit = True
 
         # setup directory for images
         self.camera_dir = os.path.join(os.path.dirname(mpstate.logfile_name),
@@ -167,13 +168,18 @@ def cmd_camera(args):
             print("save_pgm=%s" % str(state.save_pgm))
         else:
             state.save_pgm = bool(int(args[1]))
+    elif args[0] == "transmit":
+        if len(args) != 2:
+            print("transmit=%s" % str(state.transmit))
+        else:
+            state.transmit = bool(int(args[1]))
     elif args[0] == "boundary":
         if len(args) != 2:
             print("boundary=%s" % state.boundary)
         else:
             state.boundary = args[1]
     else:
-        print("usage: camera <start|stop|status|view|noview|gcs|brightness|capbrightness|boundary|bandwidth|loss|save>")
+        print("usage: camera <start|stop|status|view|noview|gcs|brightness|capbrightness|boundary|bandwidth|transmit|loss|save>")
 
 
 def get_base_time():
@@ -369,9 +375,10 @@ def transmit_thread():
             pkt = ThumbPacket(frame_time, regions, thumb, latlon_list, state.frame_loss, state.xmit_queue)
 
             # send matches with a higher priority
-            bsend.send(cPickle.dumps(pkt, cPickle.HIGHEST_PROTOCOL),
-                       dest=(state.gcs_address, state.gcs_view_port),
-                       priority=1)
+            if state.transmit:
+                bsend.send(cPickle.dumps(pkt, cPickle.HIGHEST_PROTOCOL),
+                           dest=(state.gcs_address, state.gcs_view_port),
+                           priority=1)
 
         # Base how many images we send on the send queue size
         send_frequency = state.xmit_queue // 3

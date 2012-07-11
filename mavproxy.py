@@ -569,7 +569,8 @@ def param_load_file(filename, wildcard):
             continue
         # some parameters should not be loaded from file
         if a[0] in ['SYSID_SW_MREV', 'SYS_NUM_RESETS', 'ARSPD_OFFSET', 'GND_ABS_PRESS',
-                    'GND_TEMP', 'CMD_TOTAL', 'CMD_INDEX', 'LOG_LASTFILE', 'FENCE_TOTAL' ]:
+                    'GND_TEMP', 'CMD_TOTAL', 'CMD_INDEX', 'LOG_LASTFILE', 'FENCE_TOTAL',
+                    'FORMAT_VERSION' ]:
             continue
         if not fnmatch.fnmatch(a[0].upper(), wildcard.upper()):
             continue
@@ -612,7 +613,8 @@ def cmd_param(args):
         param = args[1]
         value = args[2]
         if not param.upper() in mpstate.mav_param:
-            print("Warning: Unable to find parameter '%s'" % param)
+            print("Unable to find parameter '%s'" % param)
+            return
         param_set(param, value)
     elif args[0] == "load":
         if len(args) < 2:
@@ -730,28 +732,35 @@ def cmd_module(args):
             print("usage: module load <name>")
             return
         try:
-            m = __import__(args[1])
+            directory = os.path.dirname(args[1])
+            modname   = os.path.basename(args[1])
+            if directory:
+                sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                                'modules', directory))
+            m = __import__(modname)
             if m in mpstate.modules:
                 raise RuntimeError("module already loaded")
             m.init(mpstate)
             mpstate.modules.append(m)
-            print("Loaded module %s" % args[1])
+            print("Loaded module %s" % modname)
         except Exception, msg:
-            print("Unable to load module %s: %s" % (args[1], msg))
+            print("Unable to load module %s: %s" % (modname, msg))
     elif args[0] == "reload":
         if len(args) < 2:
             print("usage: module reload <name>")
             return
+        modname = os.path.basename(args[1])
         for m in mpstate.modules:
-            if m.name() == args[1]:
+            if m.name() == modname:
                 try:
                     m.unload()
                 except Exception:
                     pass
                 reload(m)
                 m.init(mpstate)
-                print("Reloaded module %s" % args[1])
+                print("Reloaded module %s" % modname)
                 return
+<<<<<<< HEAD
         print("Unable to find module %s" % args[1])
     elif args[0] == "unload":
         if len(args) < 2:
@@ -768,6 +777,9 @@ def cmd_module(args):
                 return
         print("Unable to find module %s" % args[1])
         
+=======
+        print("Unable to find module %s" % modname)
+>>>>>>> 14e44d00053d6afa9559b015e29353ccd817ae77
     else:
         print(usage)
 
@@ -970,7 +982,7 @@ def battery_report():
 
 def handle_usec_timestamp(m, master):
     '''special handling for MAVLink packets with a usec field'''
-    usec = m.usec
+    usec = m.time_usec
     if usec + 6.0e7 < master.highest_usec:
         say('Time has wrapped')
         mpstate.console.writeln("usec %u highest_usec %u" % (usec, master.highest_usec))
@@ -1010,7 +1022,7 @@ def master_callback(m, master):
         master.post_message(m)
     mpstate.status.counters['MasterIn'][master.linknum] += 1
 
-    if not m.get_type().startswith('GPS_RAW') and getattr(m, 'usec', None) is not None:
+    if not m.get_type().startswith('GPS_RAW') and getattr(m, 'time_usec', None) is not None:
         # update link_delayed attribute
         handle_usec_timestamp(m, master)
 
@@ -1584,7 +1596,7 @@ if __name__ == '__main__':
         say('Startup')
 
     if not opts.master:
-        serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*"])
+        serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*", "*USB_to_UART*"])
         if len(serial_list) == 1:
             opts.master = [serial_list[0].device]
         else:
