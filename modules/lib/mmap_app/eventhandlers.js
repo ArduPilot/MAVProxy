@@ -174,7 +174,7 @@ TouchHandler.prototype = {
     // location.
     onDoubleTap: function(tap) {
 	var target = this.map.pointLocation(new MM.Point(tap.x, tap.y));
-	flyTo(target);
+	mmap.flyTo(target);
     },
 
     // Re-transform the actual map parent's CSS transformation
@@ -310,16 +310,8 @@ DoubleClickHandler.prototype = {
 
 	var clickPoint = MM.getMousePoint(e, this.map);
 	var target = this.map.pointLocation(clickPoint);
-	flyTo(target);
+	mmap.flyTo(target);
         return MM.cancelEvent(e);
     }
 };
 
-
-var flyTo = function(location) {
-    $.ajax({
-        type: 'POST',
-        url: '/command',
-        data: JSON.stringify({command: 'FLYTO',
-                              location: {lat: location.lat, lon: location.lon}})});
-};

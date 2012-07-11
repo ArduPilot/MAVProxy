@@ -171,11 +171,17 @@ mmap.initMap = function() {
         mmap.map.setZoom(targetZoom);
     };
 
-    var altSlider = document.getElementById('altinput');
-    mmap.setAlt(altSlider.value);
-    altSlider.onchange = function () {
-      mmap.setAlt(altSlider.value);
+    mmap.altSlider = document.getElementById('altinput');
+    mmap.setAlt(mmap.altSlider.value, false);
+    mmap.altSlider.onchange = function () {
+      mmap.setAlt(mmap.altSlider.value, false);
     };
+
+    document.getElementById('altinput_submit').onclick = function () {
+      if (mmap.lastFlyTo){
+        mmap.flyTo(mmap.lastFlyTo);
+      }
+    }
 };
 
 
@@ -300,6 +306,7 @@ mmap.handleAttitude = function(time, index, msg) {
 
 mmap.handleMetaWaypoint = function(time, index, msg) {
     if (!mmap.clientWaypointSeq || mmap.clientWaypointSeq < index) {
+	mmap.clientWaypointSeq = index;
 	mmap.newWaypoint(msg.waypoint);
     }
 };
@@ -331,13 +338,15 @@ mmap.handleStatusText = function(time, index, msg) {
 };
 
 
-mmap.setAlt = function(newalt) {
+mmap.setAlt = function(newalt, updateslider) {
+  if (updateslider) {
+    mmap.altSlider.value = newalt;
+  }
   mmap._alt = newalt;
   $('#v_altwaypt').html(newalt.toString())
 }
 
 mmap.getAlt = function() { 
-   
   return mmap._alt;
 }
 
@@ -393,6 +402,8 @@ mmap.newWaypoint = function(location) {
 	mmap.waypointMarkerElement.coord = mmap.map.locationCoordinate(location);
 	mmap.markerLayer.repositionMarker(mmap.waypointMarkerElement);
     }
+  mmap.setAlt(location.alt, true);
+  mmap.lastFlyTo = location; 
 };
 
 
@@ -437,4 +448,19 @@ mmap.updateMapLayer = function() {
         provider = new MM.BlueMarbleProvider();
         mmap.mapLayer.setProvider(provider);
     }
+};
+
+
+mmap.lastFlyTo = null;
+mmap.flyTo = function(location) {
+  var loc = {lat: location.lat
+            , lon: location.lon
+            , alt: mmap.getAlt() };
+  mmap.lastFlyTo = loc;
+    $.ajax({
+        type: 'POST',
+        url: '/command',
+        data: JSON.stringify({command: 'FLYTO',
+                              location: loc })
+    });
 };
