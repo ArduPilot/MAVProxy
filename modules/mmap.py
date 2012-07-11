@@ -76,11 +76,12 @@ class module_state(object):
     param2 = 5  # Acceptance radius in meters.
     param3 = 0  # Pass through the WP.
     param4 = 0  # Desired yaw angle at WP.
-    x = command['location']['lat']
-    y = command['location']['lon']
+    # Expects float, but json sometimes decodes to int:
+    x = float(command['location']['lat'])
+    y = float(command['location']['lon'])
+    z = float(command['location']['alt']) 
     self.client_waypoint = command['location']
     self.client_waypoint_seq += 1
-    z = 400
     # APM specific current value, 2 means this is a "guided mode"
     # waypoint and not for the mission.
     current = 2
@@ -92,7 +93,7 @@ class module_state(object):
       x, y, z)
     g_module_context.queue_message(msg)
     msg = MetaMessage(msg_type='META_WAYPOINT',
-                      data={'waypoint': {'lat': x, 'lon': y}})
+        data={'waypoint': {'lat': x, 'lon': y, 'alt': z }})
     self.messages.insert_message(msg)
 
 
