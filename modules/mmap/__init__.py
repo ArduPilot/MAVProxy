@@ -2,8 +2,6 @@ import os
 import sys
 import webbrowser
 
-sys.path.insert(0, os.path.join(
-    os.path.dirname(os.path.realpath(__file__)), 'lib'))
 import mmap_server
 
 g_module_context = None

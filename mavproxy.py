@@ -18,11 +18,69 @@ for d in [ 'pymavlink',
     if os.path.exists(d):
         sys.path.insert(0, d)
 
-# add modules path
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'modules'))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'modules', 'lib'))
+import select
+from modules.lib import textconsole
 
-import select, textconsole, mp_settings
+class MPSettings(object):
+    def __init__(self):
+        self.vars = [ ('link', int),
+                      ('altreadout', int),
+                      ('distreadout', int),
+                      ('battreadout', int),
+                      ('heartbeat', int),
+                      ('numcells', int),
+                      ('speech', int),
+                      ('mavfwd', int),
+                      ('mavfwd_rate', int),
+                      ('streamrate', int),
+                      ('streamrate2', int),
+                      ('heartbeatreport', int),
+                      ('radiosetup', int),
+                      ('paramretry', int),
+                      ('moddebug', int),
+                      ('rc1mul', int),
+                      ('rc2mul', int),
+                      ('rc4mul', int)]
+        self.link = 1
+        self.altreadout = 10
+        self.distreadout = 200
+        self.battreadout = 0
+        self.basealtitude = -1
+        self.heartbeat = 1
+        self.numcells = 0
+        self.mavfwd = 1
+        self.mavfwd_rate = 0
+        self.speech = 0
+        self.streamrate = 4
+        self.streamrate2 = 4
+        self.radiosetup = 0
+        self.heartbeatreport = 1
+        self.paramretry = 10
+        self.rc1mul = 1
+        self.rc2mul = 1
+        self.rc4mul = 1
+        self.moddebug = 0
+
+    def set(self, vname, value):
+        '''set a setting'''
+        for (v,t) in sorted(self.vars):
+            if v == vname:
+                try:
+                    value = t(value)
+                except:
+                    print("Unable to convert %s to type %s" % (value, t))
+                    return
+                setattr(self, vname, value)
+                return
+
+    def show(self, v):
+        '''show settings'''
+        print("%20s %s" % (v, getattr(self, v)))
+
+    def show_all(self):
+        '''show all settings'''
+        for (v,t) in sorted(self.vars):
+            self.show(v)
 
 class MPStatus(object):
     '''hold status information about the mavproxy'''
@@ -700,32 +758,29 @@ def cmd_module(args):
         if len(args) < 2:
             print("usage: module load <name>")
             return
+        modname = args[1]
+        modpath = 'modules.%s' % (modname,)
         try:
-            directory = os.path.dirname(args[1])
-            modname   = os.path.basename(args[1])
-            if directory:
-                sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                                'modules', directory))
-            m = __import__(modname)
+            m = import_package(modpath)
             if m in mpstate.modules:
-                raise RuntimeError("module already loaded")
+                raise RuntimeError("module %s already loaded" % (modname,))
             m.init(mpstate)
             mpstate.modules.append(m)
-            print("Loaded module %s" % modname)
+            print("Loaded module %s" % (modname,))
         except Exception, msg:
             print("Unable to load module %s: %s" % (modname, msg))
     elif args[0] == "reload":
         if len(args) < 2:
             print("usage: module reload <name>")
             return
-        modname = os.path.basename(args[1])
+        modname = args[1]
         for m in mpstate.modules:
             if m.name() == modname:
                 try:
                     m.unload()
                 except Exception:
                     pass
-                reload(m)
+                reload('modules.%s' % (m,))
                 m.init(mpstate)
                 print("Reloaded module %s" % modname)
                 return
@@ -776,6 +831,17 @@ def cmd_alias(args):
         print(usage)
         return
         
+# http://stackoverflow.com/questions/211100/pythons-import-doesnt-work-as-expected
+# has info on why this is necessary.
+
+def import_package(name):
+    """Given a package name like 'foo.bar.quux', imports the package
+    and returns the desired module."""
+    mod = __import__(name)
+    components = name.split('.')
+    for comp in components[1:]:
+        mod = getattr(mod, comp)
+    return mod
 
 
 command_map = {
