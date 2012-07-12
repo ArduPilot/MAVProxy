@@ -163,8 +163,10 @@ class MPTile:
 		# _download_pending is a dictionary of TileInfo objects
 		self._download_pending = {}
 		self._download_thread = None
-		self._loading = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'data', 'loading.jpg')
-		self._unavailable = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'data', 'unavailable.jpg')
+		self._loading = os.path.join(os.path.dirname(__file__),
+                                             'data', 'loading.jpg')
+		self._unavailable = os.path.join(os.path.dirname(__file__),
+                                                 'data', 'unavailable.jpg')
 		self._tile_cache = collections.OrderedDict()
 
 	def coord_to_tile(self, lat, lon, zoom):

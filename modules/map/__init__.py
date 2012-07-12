@@ -6,7 +6,6 @@ June 2012
 '''
 
 import sys, os, cv
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib'))
 import mp_slipmap
 
 mpstate = None
@@ -35,7 +34,7 @@ def init(_mpstate):
     mpstate.map = mp_slipmap.MPSlipMap(service='GoogleSat', elevation=True, title='Map')
 
     # setup a plane icon
-    plane = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..',
+    plane = os.path.join(os.path.dirname(__file__),
                          'data', 'planetracker.png')
     icon = cv.LoadImage(plane)
     mpstate.map.add_object(mp_slipmap.SlipIcon('plane', (0,0), icon, layer=3, rotation=0,

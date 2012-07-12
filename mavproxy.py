@@ -24,11 +24,8 @@ for d in [ 'pymavlink',
             except:
                 pass
 
-# add modules path
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'modules'))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'modules', 'lib'))
-
-import select, textconsole
+import select
+from modules.lib import textconsole
 
 class MPSettings(object):
     def __init__(self):
@@ -731,38 +728,48 @@ def cmd_module(args):
         if len(args) < 2:
             print("usage: module load <name>")
             return
+        modname = args[1]
+        modpath = 'modules.%s' % (modname,)
         try:
-            directory = os.path.dirname(args[1])
-            modname   = os.path.basename(args[1])
-            if directory:
-                sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                                'modules', directory))
-            m = __import__(modname)
+            m = import_package(modpath)
             if m in mpstate.modules:
-                raise RuntimeError("module already loaded")
+                raise RuntimeError("module %s already loaded" % (modname,))
             m.init(mpstate)
             mpstate.modules.append(m)
-            print("Loaded module %s" % modname)
+            print("Loaded module %s" % (modname,))
         except Exception, msg:
             print("Unable to load module %s: %s" % (modname, msg))
     elif args[0] == "reload":
         if len(args) < 2:
             print("usage: module reload <name>")
             return
-        modname = os.path.basename(args[1])
+        modname = args[1]
         for m in mpstate.modules:
             if m.name() == modname:
                 try:
                     m.unload()
                 except Exception:
                     pass
-                reload(m)
+                reload('modules.%s' % (m,))
                 m.init(mpstate)
                 print("Reloaded module %s" % modname)
                 return
         print("Unable to find module %s" % modname)
     else:
         print(usage)
+
+
+# http://stackoverflow.com/questions/211100/pythons-import-doesnt-work-as-expected
+# has info on why this is necessary.
+
+def import_package(name):
+    """Given a package name like 'foo.bar.quux', imports the package
+    and returns the desired module."""
+    mod = __import__(name)
+    components = name.split('.')
+    for comp in components[1:]:
+        mod = getattr(mod, comp)
+    return mod
 
 
 command_map = {

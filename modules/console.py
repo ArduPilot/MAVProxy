@@ -8,8 +8,8 @@ import os, sys, math, time
 
 mpstate = None
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib'))
-import wxconsole, textconsole
+from modules.lib import wxconsole
+from modules.lib import textconsole
 
 class module_state(object):
     def __init__(self):
