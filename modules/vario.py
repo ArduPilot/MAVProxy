@@ -92,7 +92,7 @@ def unload():
     '''unload module'''
     mpstate.vario_initialised = False
     mpstate.vario.stop()
-
+    mpstate.vario = None
         
 def mavlink_packet(msg):
     '''handle an incoming mavlink packet'''
