@@ -8,7 +8,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'cuav', 'image'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'cuav', 'lib'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'lib'))
+
 import scanner, mavutil, cuav_mosaic, mav_position, cuav_util, cuav_joe, block_xmit, mp_image, cuav_region
+from cam_params import CameraParams
 
 # allow for replaying of previous flights
 if os.getenv('FAKE_CHAMELEON'):
@@ -50,7 +52,7 @@ class camera_state(object):
         self.bandwidth = 40000
         self.capture_brightness = 150
         self.gamma = 950
-        self.lens = 5.0
+        self.c_params = CameraParams(lens=5.0)
         self.brightness = 1.0
         self.quality = 75
         self.jpeg_size = 0
@@ -459,7 +461,7 @@ def view_thread():
             bsend.tick(packet_count=1000)
             if not view_window:
                 view_window = True
-                mosaic = cuav_mosaic.Mosaic(slipmap=mpstate.map, lens=state.lens)
+                mosaic = cuav_mosaic.Mosaic(slipmap=mpstate.map, C=state.c_params)
                 if state.boundary_polygon is not None:
                     mosaic.set_boundary(state.boundary_polygon)
             buf = bsend.recv(0)
