@@ -47,7 +47,7 @@ class camera_state(object):
         self.depth = 8
         self.gcs_address = None
         self.gcs_view_port = 7543
-        self.bandwidth = 120000
+        self.bandwidth = 40000
         self.capture_brightness = 150
         self.gamma = 950
         self.lens = 5.0
@@ -61,6 +61,7 @@ class camera_state(object):
         self.frame_loss = 0
         self.colour = 1
         self.boundary = None
+        self.boundary_polygon = None
         self.packet_loss = 0
         self.save_pgm = True
 
@@ -68,12 +69,14 @@ class camera_state(object):
         self.rtt_estimate = 0
         self.transmit = True
 
+        self.roll_stabilised = True
+        
         # setup directory for images
         self.camera_dir = os.path.join(os.path.dirname(mpstate.logfile_name),
                                       "camera")
         cuav_util.mkdir_p(self.camera_dir)
 
-        self.mpos = mav_position.MavInterpolator(backlog=5000)
+        self.mpos = mav_position.MavInterpolator(backlog=5000, gps_lag=-0.5)
         self.joelog = cuav_joe.JoeLog(os.path.join(self.camera_dir, 'joe.log'))
 
 
@@ -178,6 +181,7 @@ def cmd_camera(args):
             print("boundary=%s" % state.boundary)
         else:
             state.boundary = args[1]
+            state.boundary_polygon = cuav_util.polygon_load(state.boundary)
     else:
         print("usage: camera <start|stop|status|view|noview|gcs|brightness|capbrightness|boundary|bandwidth|transmit|loss|save>")
 
@@ -306,15 +310,17 @@ def scan_thread():
         state.scan_fps = 1.0 / (t2-t1)
         state.scan_count += 1
 
+        regions = cuav_util.filter_regions(im_640, regions)
+
         state.region_count += len(regions)
         if state.transmit_queue.qsize() < 100:
             state.transmit_queue.put((frame_time, regions, im_full, im_640))
 
-def get_plane_position(frame_time):
+def get_plane_position(frame_time,roll=None):
     '''get a MavPosition object for the planes position if possible'''
     state = mpstate.camera_state
     try:
-        pos = state.mpos.position(frame_time, 0)
+        pos = state.mpos.position(frame_time, 0,roll=roll)
         return pos
     except mav_position.MavInterpolatorException:
         return None
@@ -328,9 +334,10 @@ def log_joe_position(pos, frame_time, regions, filename=None):
 
 class ImagePacket:
     '''a jpeg image sent to the ground station'''
-    def __init__(self, frame_time, jpeg):
+    def __init__(self, frame_time, jpeg, xmit_queue):
         self.frame_time = frame_time
         self.jpeg = jpeg
+        self.xmit_queue = xmit_queue
 
 class ThumbPacket:
     '''a thumbnail region sent to the ground station'''
@@ -357,8 +364,25 @@ def transmit_thread():
             continue
 
         (frame_time, regions, im_full, im_640) = state.transmit_queue.get()
-        pos = get_plane_position(frame_time)
+        if state.roll_stabilised:
+            roll=0
+        else:
+            roll=None
+        pos = get_plane_position(frame_time, roll=roll)
         latlon_list = log_joe_position(pos, frame_time, regions)
+
+        # filter out any regions outside the boundary
+        regions2 = []
+        latlon_list2 = []
+        for i in range(len(regions)):
+            if latlon_list[i] is None:
+                continue
+            if state.boundary_polygon and cuav_util.polygon_outside(latlon_list[i], state.boundary_polygon):
+                continue
+            regions2.append(regions[i])
+            latlon_list2.append(latlon_list[i])
+        regions = regions2
+        latlon_list = latlon_list2            
 
         state.xmit_queue = bsend.sendq_size()
         state.efficiency = bsend.get_efficiency()
@@ -369,7 +393,8 @@ def transmit_thread():
 
         if len(regions) > 0 and bsend.sendq_size() < 2000:
             # send a region message with thumbnails to the ground station
-            thumb = cuav_mosaic.CompositeThumbnail(im_full, regions, quality=state.quality, thumb_size=100)
+            thumb = cuav_mosaic.CompositeThumbnail(cv.GetImage(cv.fromarray(im_full)),
+                                                   regions, quality=state.quality, thumb_size=50)
             bsend.set_bandwidth(state.bandwidth)
             bsend.set_packet_loss(state.packet_loss)
             pkt = ThumbPacket(frame_time, regions, thumb, latlon_list, state.frame_loss, state.xmit_queue)
@@ -379,6 +404,7 @@ def transmit_thread():
                 bsend.send(cPickle.dumps(pkt, cPickle.HIGHEST_PROTOCOL),
                            dest=(state.gcs_address, state.gcs_view_port),
                            priority=1)
+                bsend.tick()
 
         # Base how many images we send on the send queue size
         send_frequency = state.xmit_queue // 3
@@ -398,8 +424,9 @@ def transmit_thread():
             continue
         bsend.set_packet_loss(state.packet_loss)
         bsend.set_bandwidth(state.bandwidth)
-        pkt = ImagePacket(frame_time, jpeg)
-        bsend.send(cPickle.dumps(pkt, cPickle.HIGHEST_PROTOCOL),
+        pkt = ImagePacket(frame_time, jpeg, state.xmit_queue)
+        str = cPickle.dumps(pkt, cPickle.HIGHEST_PROTOCOL)
+        bsend.send(str,
                    dest=(state.gcs_address, state.gcs_view_port))
 
 
@@ -438,14 +465,11 @@ def view_thread():
     while not state.unload.wait(0.02):
         if state.viewing:
             bsend.tick(packet_count=1000)
-            cv.WaitKey(1)
             if not view_window:
                 view_window = True
-                key = cv.WaitKey(1)
                 mosaic = cuav_mosaic.Mosaic(slipmap=mpstate.map, lens=state.lens)
-                if state.boundary is not None:
-                    boundary = cuav_util.polygon_load(state.boundary)
-                    mosaic.set_boundary(boundary)
+                if state.boundary_polygon is not None:
+                    mosaic.set_boundary(state.boundary_polygon)
             buf = bsend.recv(0)
             if buf is None:
                 continue
@@ -490,20 +514,12 @@ def view_thread():
                 # we have an image from the plane
                 image_total_bytes += len(buf)
 
+                state.xmit_queue = obj.xmit_queue
+                mpstate.console.set_status('XMITQ', 'XMITQ %.0f' % state.xmit_queue)
+
                 # save it to disk
                 filename = '%s/v%s.jpg' % (view_dir, cuav_util.frame_time(obj.frame_time))
                 chameleon.save_file(filename, obj.jpeg)
-                img = cv.LoadImage(filename)
-                    
-                # work out where we were at the time
-                try:
-                    pos = state.mpos.position(obj.frame_time, 0)
-                except mav_position.MavInterpolatorException, msg:
-                    print msg
-                    pos = None
-                if pos:
-                    mosaic.add_image(filename, img, pos)
-
                 img = cv.LoadImage(filename)
                 if img.width == 1280:
                     display_img = cv.CreateImage((640, 480), 8, 3)
