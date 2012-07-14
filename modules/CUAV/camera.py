@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'cuav', 'image'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'cuav', 'lib'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'lib'))
-import scanner, mavutil, cuav_mosaic, mav_position, cuav_util, cuav_joe, block_xmit, mp_image
+import scanner, mavutil, cuav_mosaic, mav_position, cuav_util, cuav_joe, block_xmit, mp_image, cuav_region
 
 # allow for replaying of previous flights
 if os.getenv('FAKE_CHAMELEON'):
@@ -305,12 +305,12 @@ def scan_thread():
         im_640 = numpy.zeros((480,640,3),dtype='uint8')
         scanner.debayer_full(im, im_full)
         scanner.downsample(im_full, im_640)
-        regions = scanner.scan(im_640)
+        regions = cuav_region.RegionsConvert(scanner.scan(im_640))
         t2 = time.time()
         state.scan_fps = 1.0 / (t2-t1)
         state.scan_count += 1
 
-        regions = cuav_util.filter_regions(im_640, regions)
+        regions = cuav_region.filter_regions(im_640, regions)
 
         state.region_count += len(regions)
         if state.transmit_queue.qsize() < 100:
@@ -341,13 +341,12 @@ class ImagePacket:
 
 class ThumbPacket:
     '''a thumbnail region sent to the ground station'''
-    def __init__(self, frame_time, regions, thumb, latlon_list, frame_loss, xmit_queue):
+    def __init__(self, frame_time, regions, thumb, frame_loss, xmit_queue):
         self.frame_time = frame_time
         self.regions = regions
         self.thumb = thumb
         self.frame_loss = frame_loss
         self.xmit_queue = xmit_queue
-        self.latlon_list = latlon_list
         
 
 def transmit_thread():
@@ -369,20 +368,13 @@ def transmit_thread():
         else:
             roll=None
         pos = get_plane_position(frame_time, roll=roll)
-        latlon_list = log_joe_position(pos, frame_time, regions)
+
+        # this adds the latlon field to the regions
+        log_joe_position(pos, frame_time, regions)
 
         # filter out any regions outside the boundary
-        regions2 = []
-        latlon_list2 = []
-        for i in range(len(regions)):
-            if latlon_list[i] is None:
-                continue
-            if state.boundary_polygon and cuav_util.polygon_outside(latlon_list[i], state.boundary_polygon):
-                continue
-            regions2.append(regions[i])
-            latlon_list2.append(latlon_list[i])
-        regions = regions2
-        latlon_list = latlon_list2            
+        if state.boundary_polygon:
+            regions = cuav_region.filter_boundary(regions, state.boundary_polygon)
 
         state.xmit_queue = bsend.sendq_size()
         state.efficiency = bsend.get_efficiency()
@@ -397,7 +389,7 @@ def transmit_thread():
                                                    regions, quality=state.quality, thumb_size=50)
             bsend.set_bandwidth(state.bandwidth)
             bsend.set_packet_loss(state.packet_loss)
-            pkt = ThumbPacket(frame_time, regions, thumb, latlon_list, state.frame_loss, state.xmit_queue)
+            pkt = ThumbPacket(frame_time, regions, thumb, state.frame_loss, state.xmit_queue)
 
             # send matches with a higher priority
             if state.transmit:
@@ -496,7 +488,7 @@ def view_thread():
                 log_joe_position(pos, obj.frame_time, obj.regions, filename)
 
                 # update the mosaic and map
-                mosaic.add_regions(obj.regions, thumbs, obj.latlon_list, filename, pos=pos)
+                mosaic.add_regions(obj.regions, thumbs, filename, pos=pos)
 
                 # update console display
                 region_count += len(obj.regions)
