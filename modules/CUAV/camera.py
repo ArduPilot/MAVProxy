@@ -80,6 +80,8 @@ class camera_state(object):
 
         self.mpos = mav_position.MavInterpolator(backlog=5000, gps_lag=-0.5)
         self.joelog = cuav_joe.JoeLog(os.path.join(self.camera_dir, 'joe.log'))
+        # load camera params
+        self.c_params.load('cuav/data/chameleon1_arecont0.json')
 
 
 def name():
