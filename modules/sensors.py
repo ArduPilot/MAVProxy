@@ -156,7 +156,11 @@ def mavlink_packet(m):
         check_heading(m)
         check_altitude(m)
         if mpstate.sensors_state.speed_report:
-            report_change('speed', m.groundspeed, maxdiff=2, deltat=2)
+            if m.airspeed != 0:
+                speed = m.airspeed
+            else:
+                speed = m.groundspeed
+            report_change('speed', speed, maxdiff=2, deltat=2)
     if mpstate.status.watch == "sensors" and time.time() > mpstate.sensors_state.last_watch+1:
         mpstate.sensors_state.last_watch = time.time()
         cmd_sensors([])
