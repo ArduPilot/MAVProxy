@@ -52,7 +52,7 @@ class camera_state(object):
         self.bandwidth = 40000
         self.capture_brightness = 150
         self.gamma = 950
-        self.c_params = CameraParams(lens=5.0)
+        self.c_params = CameraParams(lens=4.0)
         self.brightness = 1.0
         self.quality = 75
         self.jpeg_size = 0
