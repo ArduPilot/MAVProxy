@@ -118,7 +118,7 @@ def mavlink_packet(msg):
         mpstate.console.set_status('Radio', 'Radio %u/%u %u/%u' % (msg.rssi, msg.noise, msg.remrssi, msg.remnoise), fg=fg)
     elif type == 'HEARTBEAT':
         for m in mpstate.mav_master:
-            linkdelay = (mpstate.status.highest_usec - m.highest_usec)*1e-6            
+            linkdelay = (mpstate.status.highest_msec - m.highest_msec)*1.0e-3
             linkline = "Link %u " % (m.linknum+1)
             if m.linkerror:
                 linkline += "down"
