@@ -1016,7 +1016,8 @@ def master_callback(m, master):
 
     if master.link_delayed:
         # don't process delayed packets that cause double reporting
-        if mtype in [ 'HEARTBEAT', 'MISSION_CURRENT', 'SYS_STATUS', 'VFR_HUD', 'GPS_RAW_INT', 'SCALED_PRESSURE' ]:
+        if mtype in [ 'MISSION_CURRENT', 'SYS_STATUS', 'VFR_HUD',
+                      'GPS_RAW_INT', 'SCALED_PRESSURE', 'NAV_CONTROLLER_OUTPUT' ]:
             return
     
     if mtype == 'HEARTBEAT':
