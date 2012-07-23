@@ -34,9 +34,7 @@ def init(_mpstate):
     mpstate.map = mp_slipmap.MPSlipMap(service='GoogleSat', elevation=True, title='Map')
 
     # setup a plane icon
-    plane = os.path.join(os.path.dirname(__file__),
-                         'data', 'planetracker.png')
-    icon = cv.LoadImage(plane)
+    icon = mpstate.map.icon('planetracker.png')
     mpstate.map.add_object(mp_slipmap.SlipIcon('plane', (0,0), icon, layer=3, rotation=0,
                                                follow=True,
                                                trail=mp_slipmap.SlipTrail()))
