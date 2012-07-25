@@ -383,13 +383,12 @@ class MPSlipMap():
         self.drag_step = 10
 
         self.title = title
-        self.child_pipe,self.parent_pipe = multiprocessing.Pipe(duplex=False)
         self.event_queue = multiprocessing.Queue()
+        self.object_queue = multiprocessing.Queue()
         self.close_window = multiprocessing.Event()
         self.close_window.clear()
         self.child = multiprocessing.Process(target=self.child_task)
         self.child.start()
-        self.pipe = self.parent_pipe
         self._callbacks = set()
 
 
@@ -407,7 +406,6 @@ class MPSlipMap():
         state.info = {}
         state.need_redraw = True
         
-        self.pipe = self.child_pipe
         self.app = wx.PySimpleApp()
         self.app.frame = MPSlipMapFrame(state=self)
         self.app.frame.Show()
@@ -425,11 +423,11 @@ class MPSlipMap():
 
     def add_object(self, obj):
         '''add or update an object on the map'''
-        self.pipe.send(obj)
+        self.object_queue.put(obj)
 
     def set_position(self, key, latlon, layer=None, rotation=0):
         '''move an object on the map'''
-        self.pipe.send(SlipPosition(key, latlon, layer, rotation))
+        self.object_queue.put(SlipPosition(key, latlon, layer, rotation))
 
     def event_count(self):
         '''return number of events waiting to be processed'''
@@ -517,8 +515,8 @@ class MPSlipMapFrame(wx.Frame):
         # receive any display objects from the parent
         obj = None
 
-        while state.pipe.poll():
-            obj = state.pipe.recv()
+        while state.object_queue.qsize():
+            obj = state.object_queue.get()
 
             if isinstance(obj, SlipObject):
                 if not obj.layer in state.layers:
