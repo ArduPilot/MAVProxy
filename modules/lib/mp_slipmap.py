@@ -231,6 +231,11 @@ class SlipPosition:
         self.latlon = latlon
         self.rotation = rotation
 
+class SlipCenter:
+    '''an object to move the view center'''
+    def __init__(self, latlon):
+        self.latlon = latlon
+
 
 class SlipInformation:
     '''an object to display in the information box'''
@@ -539,6 +544,13 @@ class MPSlipMapFrame(wx.Frame):
                 else:
 #                    print('add %s' % str(obj.key))
                     state.info[obj.key] = obj
+                state.need_redraw = True
+
+            if isinstance(obj, SlipCenter):
+                # move center
+                (lat,lon) = obj.latlon
+                state.panel.re_center(state.width/2, state.height/2, lat, lon)
+                state.need_redraw = True
 
         if obj is None:
             time.sleep(0.05)

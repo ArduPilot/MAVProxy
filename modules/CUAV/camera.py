@@ -392,7 +392,7 @@ def transmit_thread():
         if len(regions) > 0 and bsend.sendq_size() < 2000:
             # send a region message with thumbnails to the ground station
             thumb = cuav_mosaic.CompositeThumbnail(cv.GetImage(cv.fromarray(im_full)),
-                                                   regions, quality=state.quality, thumb_size=50)
+                                                   regions, quality=state.quality, thumb_size=80)
             bsend.set_bandwidth(state.bandwidth)
             bsend.set_packet_loss(state.packet_loss)
             pkt = ThumbPacket(frame_time, regions, thumb, state.frame_loss, state.xmit_queue)
@@ -468,6 +468,10 @@ def view_thread():
                 mosaic = cuav_mosaic.Mosaic(slipmap=mpstate.map, C=state.c_params)
                 if state.boundary_polygon is not None:
                     mosaic.set_boundary(state.boundary_polygon)
+
+            # check for keyboard events
+            mosaic.check_events()
+
             buf = bsend.recv(0)
             if buf is None:
                 continue
@@ -477,6 +481,7 @@ def view_thread():
                     continue
             except Exception as e:
                 continue
+
 
             if isinstance(obj, ThumbPacket):
                 # we've received a set of thumbnails from the plane for a positive hit
