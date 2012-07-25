@@ -328,7 +328,8 @@ def get_plane_position(frame_time,roll=None):
     try:
         pos = state.mpos.position(frame_time, 0,roll=roll)
         return pos
-    except mav_position.MavInterpolatorException:
+    except mav_position.MavInterpolatorException as e:
+        print str(e)
         return None
 
 def log_joe_position(pos, frame_time, regions, filename=None):
@@ -340,10 +341,11 @@ def log_joe_position(pos, frame_time, regions, filename=None):
 
 class ImagePacket:
     '''a jpeg image sent to the ground station'''
-    def __init__(self, frame_time, jpeg, xmit_queue):
+    def __init__(self, frame_time, jpeg, xmit_queue, pos):
         self.frame_time = frame_time
         self.jpeg = jpeg
         self.xmit_queue = xmit_queue
+        self.pos = pos
 
 class ThumbPacket:
     '''a thumbnail region sent to the ground station'''
@@ -422,7 +424,7 @@ def transmit_thread():
             continue
         bsend.set_packet_loss(state.packet_loss)
         bsend.set_bandwidth(state.bandwidth)
-        pkt = ImagePacket(frame_time, jpeg, state.xmit_queue)
+        pkt = ImagePacket(frame_time, jpeg, state.xmit_queue, pos)
         str = cPickle.dumps(pkt, cPickle.HIGHEST_PROTOCOL)
         bsend.send(str,
                    dest=(state.gcs_address, state.gcs_view_port))
@@ -529,6 +531,8 @@ def view_thread():
                     cv.Resize(img, display_img)
                 else:
                     display_img = img
+
+                mosaic.add_image(obj.frame_time, filename, obj.pos)
 
                 cv.ConvertScale(display_img, display_img, scale=state.brightness)
                 img_window.set_image(display_img, bgr=True)
