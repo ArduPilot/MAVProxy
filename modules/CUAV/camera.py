@@ -382,7 +382,7 @@ def transmit_thread():
 
         # filter out any regions outside the boundary
         if state.boundary_polygon:
-            regions = cuav_region.filter_boundary(regions, state.boundary_polygon)
+            regions = cuav_region.filter_boundary(regions, state.boundary_polygon, pos)
 
         state.xmit_queue = bsend.sendq_size()
         state.efficiency = bsend.get_efficiency()
