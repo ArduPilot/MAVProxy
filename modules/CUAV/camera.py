@@ -247,7 +247,7 @@ def capture_thread():
                 # put into continuous mode
                 chameleon.trigger(h, True)
 
-            frame_time = time.time()
+            capture_time = time.time()
             if state.depth == 16:
                 im = numpy.zeros((960,1280),dtype='uint16')
             else:
@@ -261,10 +261,12 @@ def capture_thread():
             if last_frame_counter != 0:
                 state.frame_loss += frame_counter - (last_frame_counter+1)
                 
-            gammalog.write('%f %s %u %u\n' % (frame_time+base_time,
-                                              cuav_util.frame_time(frame_time+base_time),
-                                              frame_counter,
-                                              state.gamma))
+            gammalog.write('%f %f %f %s %u %u\n' % (frame_time,
+                                                    frame_time+base_time,
+                                                    capture_time,
+                                                    cuav_util.frame_time(frame_time+base_time),
+                                                    frame_counter,
+                                                    state.gamma))
             gammalog.flush()
 
             state.save_queue.put((base_time+frame_time,im))
