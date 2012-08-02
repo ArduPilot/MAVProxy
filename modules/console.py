@@ -123,12 +123,12 @@ def mavlink_packet(msg):
             if m.linkerror:
                 linkline += "down"
                 fg = 'red'
-            elif master.link_delayed:
-                linkline += "delayed %.2fs" % linkdelay
-                fg = 'yellow'
             else:
                 linkline += "OK (%u pkts, %.2fs delay, %u lost)" % (m.mav_count, linkdelay, m.mav_loss)
-                fg = 'darkgreen'
+                if linkdelay > 1:
+                    fg = 'yellow'
+                else:
+                    fg = 'darkgreen'
             mpstate.console.set_status('Link%u'%m.linknum, linkline, row=1, fg=fg)
     elif type in ['WAYPOINT_CURRENT', 'MISSION_CURRENT']:
         mpstate.console.set_status('WP', 'WP %u' % msg.seq)
