@@ -5,7 +5,15 @@ It will grab the altitude of a long,lat pair from the SRTM database
 Created by Stephen Dade (stephen_dade@hotmail.com)
 '''
 
-import numpy, os, time, sys, srtm, GAreader
+import os
+import sys
+import time
+
+import numpy
+
+from mavproxy_map import GAreader
+from mavproxy_map import srtm
+
 
 class ElevationModel():
     '''Elevation Model. Only SRTM for now'''

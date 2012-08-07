@@ -5,8 +5,7 @@ Andrew Tridgell
 June 2012
 '''
 
-import sys, os, cv
-import mp_slipmap
+from mavproxy_map import mp_slipmap
 
 mpstate = None
 

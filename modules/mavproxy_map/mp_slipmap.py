@@ -5,7 +5,17 @@ Andrew Tridgell
 June 2012
 '''
 
-import mp_util, mp_tile, math, cv, time, functools, mp_elevation, mp_widgets, os
+import cv
+import functools
+import math
+import os
+import time
+
+from mavproxy_map import mp_elevation
+from mavproxy_map import mp_tile
+from mavproxy_map import mp_util
+from mavproxy_map import mp_widgets
+
 
 class SlipObject:
     '''an object to display on the map'''
@@ -452,7 +462,7 @@ class MPSlipMap():
     
     def icon(self, filename):
         '''load an icon from the data directory'''
-        path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..',
+        path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                             'data', filename)
         return cv.LoadImage(path)        
 

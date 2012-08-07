@@ -6,7 +6,6 @@
 """Load and process SRTM data. Originally written by OpenStreetMap
 Edited by CanberraUAV"""
 
-#import xml.dom.minidom
 from HTMLParser import HTMLParser
 import httplib
 import re
