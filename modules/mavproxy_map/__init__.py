@@ -6,9 +6,9 @@ June 2012
 '''
 
 import sys, os, cv, math
-import mp_slipmap
 import functools
 import time
+from mavproxy_map import mp_slipmap
 
 mpstate = None
 

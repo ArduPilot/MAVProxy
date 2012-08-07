@@ -9,7 +9,19 @@ May 2012
 released under GNU GPL v3 or later
 '''
 
-import math, cv, sys, os, mp_util, httplib2, threading, time, collections, string, hashlib, errno, tempfile
+import collections
+import errno
+import hashlib
+import httplib2
+import math
+import threading
+import os
+import string
+import time
+
+import cv
+
+from mavproxy_map import mp_util
 
 class TileException(Exception):
 	'''tile error class'''

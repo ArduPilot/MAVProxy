@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 '''common mavproxy utility functions'''
 
-import math, os
+import math
+import os
 
 radius_of_earth = 6378100.0 # in meters
 
@@ -10,32 +11,30 @@ def gps_distance(lat1, lon1, lat2, lon2):
 	'''return distance between two points in meters,
 	coordinates are in degrees
 	thanks to http://www.movable-type.co.uk/scripts/latlong.html'''
-	from math import radians, cos, sin, sqrt, atan2
-	lat1 = radians(lat1)
-	lat2 = radians(lat2)
-	lon1 = radians(lon1)
-	lon2 = radians(lon2)
+	lat1 = math.radians(lat1)
+	lat2 = math.radians(lat2)
+	lon1 = math.radians(lon1)
+	lon2 = math.radians(lon2)
 	dLat = lat2 - lat1
 	dLon = lon2 - lon1
 
-	a = sin(0.5*dLat)**2 + sin(0.5*dLon)**2 * cos(lat1) * cos(lat2)
-	c = 2.0 * atan2(sqrt(a), sqrt(1.0-a))
+	a = math.sin(0.5*dLat)**2 + math.sin(0.5*dLon)**2 * math.cos(lat1) * math.cos(lat2)
+	c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0-a))
 	return radius_of_earth * c
 
 
 def gps_bearing(lat1, lon1, lat2, lon2):
 	'''return bearing between two points in degrees, in range 0-360
 	thanks to http://www.movable-type.co.uk/scripts/latlong.html'''
-	from math import sin, cos, atan2, radians, degrees
-	lat1 = radians(lat1)
-	lat2 = radians(lat2)
-	lon1 = radians(lon1)
-	lon2 = radians(lon2)
+	lat1 = math.radians(lat1)
+	lat2 = math.radians(lat2)
+	lon1 = math.radians(lon1)
+	lon2 = math.radians(lon2)
 	dLat = lat2 - lat1
 	dLon = lon2 - lon1
-	y = sin(dLon) * cos(lat2)
-	x = cos(lat1)*sin(lat2) - sin(lat1)*cos(lat2)*cos(dLon)
-	bearing = degrees(atan2(y, x))
+	y = math.sin(dLon) * math.cos(lat2)
+	x = math.cos(lat1)*math.sin(lat2) - math.sin(lat1)*math.cos(lat2)*math.cos(dLon)
+	bearing = math.degrees(math.atan2(y, x))
 	if bearing < 0:
 		bearing += 360.0
 	return bearing
@@ -51,18 +50,16 @@ def gps_newpos(lat, lon, bearing, distance):
 	'''extrapolate latitude/longitude given a heading and distance
 	thanks to http://www.movable-type.co.uk/scripts/latlong.html
 	'''
-	from math import sin, asin, cos, atan2, radians, degrees
-
-	lat1 = radians(lat)
-	lon1 = radians(lon)
-	brng = radians(bearing)
+	lat1 = math.radians(lat)
+	lon1 = math.radians(lon)
+	brng = math.radians(bearing)
 	dr = distance/radius_of_earth
 
-	lat2 = asin(sin(lat1)*cos(dr) +
-		    cos(lat1)*sin(dr)*cos(brng))
-	lon2 = lon1 + atan2(sin(brng)*sin(dr)*cos(lat1),
-			    cos(dr)-sin(lat1)*sin(lat2))
-	return (degrees(lat2), wrap_valid_longitude(degrees(lon2)))
+	lat2 = math.asin(math.sin(lat1)*math.cos(dr) +
+                         math.cos(lat1)*math.sin(dr)*math.cos(brng))
+	lon2 = lon1 + math.atan2(math.sin(brng)*math.sin(dr)*math.cos(lat1), 
+                                 math.cos(dr)-math.sin(lat1)*math.sin(lat2))
+	return (math.degrees(lat2), wrap_valid_longitude(math.degrees(lon2)))
 
 def gps_offset(lat, lon, east, north):
 	'''return new lat/lon after moving east/north

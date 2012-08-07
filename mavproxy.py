@@ -11,6 +11,10 @@ import sys, os, struct, math, time, socket
 import fnmatch, errno, threading
 import serial, Queue, select
 
+# The modules subdirectory contains the modules that come with
+# mavproxy.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'modules'))
+
 # find the mavlink.py module
 for d in [ 'pymavlink',
            os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'pymavlink'),
@@ -759,7 +763,7 @@ def cmd_module(args):
             print("usage: module load <name>")
             return
         modname = args[1]
-        modpath = 'modules.%s' % (modname,)
+        modpath = 'mavproxy_%s' % (modname,)
         try:
             m = import_package(modpath)
             if m in mpstate.modules:
