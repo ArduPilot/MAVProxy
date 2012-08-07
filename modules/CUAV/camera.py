@@ -328,7 +328,8 @@ def get_plane_position(frame_time,roll=None):
     try:
         pos = state.mpos.position(frame_time, 0,roll=roll)
         return pos
-    except mav_position.MavInterpolatorException:
+    except mav_position.MavInterpolatorException as e:
+        print str(e)
         return None
 
 def log_joe_position(pos, frame_time, regions, filename=None):
@@ -340,10 +341,11 @@ def log_joe_position(pos, frame_time, regions, filename=None):
 
 class ImagePacket:
     '''a jpeg image sent to the ground station'''
-    def __init__(self, frame_time, jpeg, xmit_queue):
+    def __init__(self, frame_time, jpeg, xmit_queue, pos):
         self.frame_time = frame_time
         self.jpeg = jpeg
         self.xmit_queue = xmit_queue
+        self.pos = pos
 
 class ThumbPacket:
     '''a thumbnail region sent to the ground station'''
@@ -380,7 +382,7 @@ def transmit_thread():
 
         # filter out any regions outside the boundary
         if state.boundary_polygon:
-            regions = cuav_region.filter_boundary(regions, state.boundary_polygon)
+            regions = cuav_region.filter_boundary(regions, state.boundary_polygon, pos)
 
         state.xmit_queue = bsend.sendq_size()
         state.efficiency = bsend.get_efficiency()
@@ -392,7 +394,7 @@ def transmit_thread():
         if len(regions) > 0 and bsend.sendq_size() < 2000:
             # send a region message with thumbnails to the ground station
             thumb = cuav_mosaic.CompositeThumbnail(cv.GetImage(cv.fromarray(im_full)),
-                                                   regions, quality=state.quality, thumb_size=50)
+                                                   regions, quality=state.quality, thumb_size=80)
             bsend.set_bandwidth(state.bandwidth)
             bsend.set_packet_loss(state.packet_loss)
             pkt = ThumbPacket(frame_time, regions, thumb, state.frame_loss, state.xmit_queue)
@@ -422,7 +424,7 @@ def transmit_thread():
             continue
         bsend.set_packet_loss(state.packet_loss)
         bsend.set_bandwidth(state.bandwidth)
-        pkt = ImagePacket(frame_time, jpeg, state.xmit_queue)
+        pkt = ImagePacket(frame_time, jpeg, state.xmit_queue, pos)
         str = cPickle.dumps(pkt, cPickle.HIGHEST_PROTOCOL)
         bsend.send(str,
                    dest=(state.gcs_address, state.gcs_view_port))
@@ -468,6 +470,10 @@ def view_thread():
                 mosaic = cuav_mosaic.Mosaic(slipmap=mpstate.map, C=state.c_params)
                 if state.boundary_polygon is not None:
                     mosaic.set_boundary(state.boundary_polygon)
+
+            # check for keyboard events
+            mosaic.check_events()
+
             buf = bsend.recv(0)
             if buf is None:
                 continue
@@ -477,6 +483,7 @@ def view_thread():
                     continue
             except Exception as e:
                 continue
+
 
             if isinstance(obj, ThumbPacket):
                 # we've received a set of thumbnails from the plane for a positive hit
@@ -524,6 +531,8 @@ def view_thread():
                     cv.Resize(img, display_img)
                 else:
                     display_img = img
+
+                mosaic.add_image(obj.frame_time, filename, obj.pos)
 
                 cv.ConvertScale(display_img, display_img, scale=state.brightness)
                 img_window.set_image(display_img, bgr=True)

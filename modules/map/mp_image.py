@@ -22,17 +22,16 @@ class MPImage():
         self.width = width
         self.height = height
         self._events = events
-        self.parent_pipe,self.child_pipe = multiprocessing.Pipe()
+        self.in_queue = multiprocessing.Queue()
+        self.out_queue = multiprocessing.Queue()
         self.child = multiprocessing.Process(target=self.child_task)
         self.child.start()
-        self.pipe = self.parent_pipe
 
     def child_task(self):
         '''child process - this holds all the GUI elements'''
         import wx
         state = self
         
-        self.pipe = self.child_pipe
         self.app = wx.PySimpleApp()
         self.app.frame = MPImageFrame(state=self)
         self.app.frame.Show()
@@ -46,19 +45,19 @@ class MPImage():
         if bgr:
             img = cv.CloneImage(img)
             cv.CvtColor(img, img, cv.CV_BGR2RGB)
-        self.pipe.send(((img.width, img.height), img.tostring()))
+        self.in_queue.put(((img.width, img.height), img.tostring()))
 
     def poll(self):
         '''check for events, returning one event'''
-        if self.pipe.poll():
-            return self.pipe.recv()
+        if self.out_queue.qsize():
+            return self.out_queue.get()
         return None            
 
     def events(self):
         '''check for events a list of events'''
         ret = []
-        while self.pipe.poll():
-            ret.append(self.pipe.recv())
+        while self.out_queue.qsize():
+            ret.append(self.out_queue.get())
         return ret
 
 from PIL import Image
@@ -122,8 +121,8 @@ class MPImagePanel(wx.PyScrolledWindow):
         '''the redraw timer ensures we show new map tiles as they
         are downloaded'''
         state = self.state
-        while state.pipe.poll():
-            obj = state.pipe.recv()
+        while state.in_queue.qsize():
+            obj = state.in_queue.get()
             (size, imgstr) = obj
             img = wx.EmptyImage(size[0], size[1])
             img.SetData(imgstr)
@@ -136,9 +135,9 @@ class MPImagePanel(wx.PyScrolledWindow):
         if (isinstance(event, wx.MouseEvent) and
             not event.ButtonIsDown(wx.MOUSE_BTN_ANY) and
             event.GetWheelRotation() == 0):
-            # don't flood the pipe with mouse movement
+            # don't flood the queue with mouse movement
             return
-        state.pipe.send(mp_util.object_container(event))
+        state.out_queue.put(mp_util.object_container(event))
             
 if __name__ == "__main__":
     import time, cv
