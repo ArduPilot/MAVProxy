@@ -372,6 +372,38 @@ def load_waypoints(filename):
     mpstate.status.loading_waypoint_lasttime = time.time()
     mpstate.master().waypoint_count_send(mpstate.status.wploader.count())
 
+def update_waypoints(filename, wpnum):
+    '''update waypoints from a file'''
+    mpstate.status.wploader.target_system = mpstate.status.target_system
+    mpstate.status.wploader.target_component = mpstate.status.target_component
+    try:
+        mpstate.status.wploader.load(filename)
+    except Exception, msg:
+        print("Unable to load %s - %s" % (filename, msg))
+        return
+    if mpstate.status.wploader.count() == 0:
+        print("No waypoints found in %s" % filename)
+        return
+    if wpnum == -1:
+        print("Loaded %u updated waypoints from %s" % (mpstate.status.wploader.count(), filename))
+    elif wpnum >= mpstate.status.wploader.count():
+        print("Invalid waypoint number %u" % wpnum)
+        return
+    else:
+        print("Loaded updated waypoint %u from %s" % (wpnum, filename))
+
+    mpstate.status.loading_waypoints = True
+    mpstate.status.loading_waypoint_lasttime = time.time()
+    if wpnum == -1:
+        start = 0
+        end = mpstate.status.wploader.count()-1
+    else:
+        start = wpnum
+        end = wpnum
+    mpstate.master().mav.mission_write_partial_list_send(mpstate.status.target_system,
+                                                         mpstate.status.target_component,
+                                                         start, end)
+
 def save_waypoints(filename):
     '''save waypoints to a file'''
     try:
@@ -393,6 +425,15 @@ def cmd_wp(args):
             print("usage: wp load <filename>")
             return
         load_waypoints(args[1])
+    elif args[0] == "update":
+        if len(args) < 2:
+            print("usage: wp update <filename> <wpnum>")
+            return
+        if len(args) == 3:
+            wpnum = int(args[2])
+        else:
+            wpnum = -1
+        update_waypoints(args[1], wpnum)
     elif args[0] == "list":
         mpstate.status.wp_op = "list"
         mpstate.master().waypoint_request_list_send()
