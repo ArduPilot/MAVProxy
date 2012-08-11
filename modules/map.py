@@ -59,7 +59,7 @@ def mavlink_packet(m):
     '''handle an incoming mavlink packet'''
     state = mpstate.map_state
 
-    if m.get_type() == "SIMSTATEX":
+    if m.get_type() == "SIMSTATE":
         if not mpstate.map_state.have_simstate:
             mpstate.map_state.have_simstate  = True
             create_blueplane()
