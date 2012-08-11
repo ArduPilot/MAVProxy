@@ -5,7 +5,7 @@ Andrew Tridgell
 June 2012
 '''
 
-import sys, os, cv
+import sys, os, cv, math
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib'))
 import mp_slipmap
 
@@ -18,6 +18,7 @@ class module_state(object):
         self.heading = 0
         self.wp_change_time = 0
         self.fence_change_time = 0
+        self.have_simstate = False
 
 def name():
     '''return module name'''
@@ -47,12 +48,19 @@ def unload():
 def mavlink_packet(m):
     '''handle an incoming mavlink packet'''
     state = mpstate.map_state
-    if m.get_type() == 'GPS_RAW':
-        (state.lat, state.lon) = (m.lat, m.lon)
-    elif m.get_type() == 'GPS_RAW_INT':
-        (state.lat, state.lon) = (m.lat/1.0e7, m.lon/1.0e7)
-    elif m.get_type() == "VFR_HUD":
-        state.heading = m.heading
+
+    if m.get_type() == "SIMSTATE":
+        if not mpstate.map_state.have_simstate:
+            print("loading blue plane")
+            mpstate.map_state.have_simstate = True
+            icon = mpstate.map.icon('blueplane.png')
+            mpstate.map.add_object(mp_slipmap.SlipIcon('simplane', (0,0), icon, layer=3, rotation=0,
+                                                       trail=mp_slipmap.SlipTrail()))
+        mpstate.map.set_position('simplane', (m.lat, m.lng), rotation=math.degrees(m.yaw))
+        
+
+    if m.get_type() == 'GLOBAL_POSITION_INT':
+        (state.lat, state.lon, state.heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
     else:
         return
 
