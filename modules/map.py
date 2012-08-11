@@ -7,7 +7,7 @@ June 2012
 
 import sys, os, cv, math
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib'))
-import mp_slipmap
+import mp_slipmap, mp_util
 
 mpstate = None
 
@@ -19,6 +19,7 @@ class module_state(object):
         self.wp_change_time = 0
         self.fence_change_time = 0
         self.have_simstate = False
+        self.have_blueplane = False
 
 def name():
     '''return module name'''
@@ -45,19 +46,31 @@ def unload():
     '''unload module'''
     mpstate.map = None
 
+def create_blueplane():
+    '''add the blue plane to the map'''
+    if mpstate.map_state.have_blueplane:
+        return
+    mpstate.map_state.have_blueplane = True
+    icon = mpstate.map.icon('blueplane.png')
+    mpstate.map.add_object(mp_slipmap.SlipIcon('blueplane', (0,0), icon, layer=3, rotation=0,
+                                               trail=mp_slipmap.SlipTrail()))
+
 def mavlink_packet(m):
     '''handle an incoming mavlink packet'''
     state = mpstate.map_state
 
-    if m.get_type() == "SIMSTATE":
+    if m.get_type() == "SIMSTATEX":
         if not mpstate.map_state.have_simstate:
-            print("loading blue plane")
-            mpstate.map_state.have_simstate = True
-            icon = mpstate.map.icon('blueplane.png')
-            mpstate.map.add_object(mp_slipmap.SlipIcon('simplane', (0,0), icon, layer=3, rotation=0,
-                                                       trail=mp_slipmap.SlipTrail()))
-        mpstate.map.set_position('simplane', (m.lat, m.lng), rotation=math.degrees(m.yaw))
-        
+            mpstate.map_state.have_simstate  = True
+            create_blueplane()
+        mpstate.map.set_position('blueplane', (m.lat, m.lng), rotation=math.degrees(m.yaw))
+
+    if m.get_type() == "GPS_RAW_INT" and not mpstate.map_state.have_simstate:
+        (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
+        if state.lat is not None and (mpstate.map_state.have_blueplane or
+                                      mp_util.gps_distance(lat, lon, state.lat, state.lon) > 10):
+            create_blueplane()
+            mpstate.map.set_position('blueplane', (lat, lon), rotation=m.cog*0.01)
 
     if m.get_type() == 'GLOBAL_POSITION_INT':
         (state.lat, state.lon, state.heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
