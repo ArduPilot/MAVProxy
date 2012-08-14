@@ -9,7 +9,7 @@ import os, sys, math, time
 mpstate = None
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib'))
-import wxconsole, textconsole
+import wxconsole, textconsole, mp_elevation
 
 class module_state(object):
     def __init__(self):
@@ -39,7 +39,8 @@ def init(_mpstate):
     mpstate.console.set_status('Vcc', 'Vcc: --', fg='red', row=0)
     mpstate.console.set_status('Radio', 'Radio: --', row=0)
     mpstate.console.set_status('Heading', 'Hdg ---/---', row=2)
-    mpstate.console.set_status('Alt', 'Alt ---/---', row=2)
+    mpstate.console.set_status('Alt', 'Alt ---', row=2)
+    mpstate.console.set_status('AGL', 'AGL ---', row=2)
     mpstate.console.set_status('AirSpeed', 'AirSpeed --', row=2)
     mpstate.console.set_status('GPSSpeed', 'GPSSpeed --', row=2)
     mpstate.console.set_status('Thr', 'Thr ---', row=2)
@@ -51,6 +52,8 @@ def init(_mpstate):
     mpstate.console.set_status('AltError', 'AltError --', row=3)
     mpstate.console.set_status('AspdError', 'AspdError --', row=3)
     mpstate.console.set_status('FlightTime', 'FlightTime --', row=3)
+
+    mpstate.console.ElevationMap = mp_elevation.ElevationModel()
        
 
 def unload():
@@ -86,7 +89,20 @@ def mavlink_packet(msg):
             alt = master.field('GPS_RAW_INT', 'alt', 0) / 1.0e3
         else:
             alt = master.field('GPS_RAW', 'alt', 0)
-        mpstate.console.set_status('Alt', 'Alt %u/%.0f' % (mpstate.status.altitude, alt))
+        if mpstate.status.wploader.count() > 0:
+            wp = mpstate.status.wploader.wp(0)
+            home_lat = wp.x
+            home_lng = wp.y
+        else:
+            home_lat = master.field('HOME', 'lat') * 1.0e-7
+            home_lng = master.field('HOME', 'lon') * 1.0e-7
+        lat = master.field('GLOBAL_POSITION_INT', 'lat') * 1.0e-7
+        lng = master.field('GLOBAL_POSITION_INT', 'lon') * 1.0e-7
+        rel_alt = master.field('GLOBAL_POSITION_INT', 'relative_alt') * 1.0e-3
+        agl_alt = mpstate.console.ElevationMap.GetElevation(home_lat, home_lng) - mpstate.console.ElevationMap.GetElevation(lat, lng)
+        agl_alt += rel_alt
+        mpstate.console.set_status('Alt', 'Alt %u' % rel_alt)
+        mpstate.console.set_status('AGL', 'AGL %u' % agl_alt)
         mpstate.console.set_status('AirSpeed', 'AirSpeed %u' % msg.airspeed)
         mpstate.console.set_status('GPSSpeed', 'GPSSpeed %u' % msg.groundspeed)
         mpstate.console.set_status('Thr', 'Thr %u' % msg.throttle)
