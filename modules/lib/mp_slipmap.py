@@ -667,26 +667,30 @@ class MPSlipMapPanel(wx.Panel):
         '''update position text'''
         state = self.state
         pos = self.mouse_pos
-        self.position.Clear()
+        oldtext = self.position.GetValue()
+        newtext = ''
         alt = 0
         if pos is not None:
             (lat,lon) = self.coordinates(pos.x, pos.y)
-            self.position.WriteText('Cursor: %f %f' % (lat, lon))
+            newtext += 'Cursor: %f %f' % (lat, lon)
             if state.elevation:
                 alt = self.ElevationMap.GetElevation(lat, lon)
-                self.position.WriteText(' %.1fm' % alt)
+                newtext += ' %.1fm' % alt
         pending = state.mt.tiles_pending()
         if pending:
-            self.position.WriteText(' Map Downloading %u ' % pending)
+            newtext += ' Map Downloading %u ' % pending
         if alt == -1:
-            self.position.WriteText(' SRTM Downloading ')
-        self.position.WriteText('\n')
+            newtext += ' SRTM Downloading '
+        newtext += '\n'
         if self.click_pos is not None:
-            self.position.WriteText('Click: %f %f' % (self.click_pos[0], self.click_pos[1]))
+            newtext += 'Click: %f %f' % (self.click_pos[0], self.click_pos[1])
         if self.last_click_pos is not None:
             distance = mp_util.gps_distance(self.last_click_pos[0], self.last_click_pos[1],
                                             self.click_pos[0], self.click_pos[1])
-            self.position.WriteText('  Distance: %.1fm' % distance)
+            newtext += '  Distance: %.1fm' % distance
+        if newtext != oldtext:
+            self.position.Clear()
+            self.position.WriteText(newtext)
 
     def pixel_coords(self, latlon):
         '''return pixel coordinates in the map image for a (lat,lon)'''
