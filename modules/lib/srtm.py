@@ -17,6 +17,7 @@ import zipfile
 import array
 import math
 import multiprocessing
+import mp_util
 
 class NoSuchTileError(Exception):
     """Raised when there is no tile for a region."""
@@ -66,7 +67,7 @@ class SRTMDownloader():
 	'''print "SRTMDownloader - server= %s, directory=%s." % \
               (self.server, self.directory)'''
         if not os.path.exists(cachedir):
-            os.mkdir(cachedir)
+            mp_util.mkdir_p(cachedir)
         self.filelist = {}
         self.filename_regex = re.compile(
                 r"([NS])(\d{2})([EW])(\d{3})\.hgt\.zip")
