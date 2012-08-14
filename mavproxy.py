@@ -497,8 +497,8 @@ def load_fence(filename):
             param_set('FENCE_ACTION', action)
             return
         if (p.idx != p2.idx or
-            abs(p.lat - p2.lat) >= 0.00001 or
-            abs(p.lng - p2.lng) >= 0.00001):
+            abs(p.lat - p2.lat) >= 0.00003 or
+            abs(p.lng - p2.lng) >= 0.00003):
             print("Failed to send fence point %u" % i)
             param_set('FENCE_ACTION', action)
             return
