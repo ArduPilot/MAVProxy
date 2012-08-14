@@ -809,7 +809,7 @@ class MPSlipMapPanel(wx.Panel):
             self.last_click_pos = self.click_pos
             self.click_pos = self.coordinates(pos.x, pos.y)
 
-        if event.Dragging() and self.mouse_down is not None:
+        if event.Dragging() and event.ButtonIsDown(wx.MOUSE_BTN_LEFT):
             # drag map to new position
             newpos = pos
             dx = (self.mouse_down.x - newpos.x)
