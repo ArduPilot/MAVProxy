@@ -327,6 +327,10 @@ def cmd_level(args):
     '''do a ground start mode'''
     mpstate.master().calibrate_level()
 
+def cmd_calpressure(args):
+    '''calibrate pressure sensors'''
+    mpstate.master().calibrate_pressure()
+
 def cmd_rtl(args):
     '''set RTL mode'''
     mpstate.master().set_mode_rtl()
@@ -817,6 +821,7 @@ command_map = {
     'auto'    : (cmd_auto,     'set AUTO mode'),
     'ground'  : (cmd_ground,   'do a ground start'),
     'level'   : (cmd_level,    'set level on a multicopter'),
+    'calpress': (cmd_calpressure,'calibrate pressure sensors'),
     'loiter'  : (cmd_loiter,   'set LOITER mode'),
     'rtl'     : (cmd_rtl,      'set RTL mode'),
     'manual'  : (cmd_manual,   'set MANUAL mode'),
