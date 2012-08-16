@@ -22,6 +22,7 @@ class sensors_state(object):
         self.reports['heading'] = sensors_report()
         self.reports['altitude'] = sensors_report()
         self.reports['speed'] = sensors_report()
+        
 
 def name():
     '''return module name'''
@@ -75,6 +76,12 @@ def init(_mpstate):
         # cope with reload
         gps = mpstate.status.msgs['GPS_RAW_INT']
         mpstate.sensors_state.ground_alt = (gps.alt/1.0e3) - mpstate.status.altitude
+
+def unload():
+    global mpstate
+    mpstate.sensors_state = False
+    mpstate.command_map['sensors'] = False
+    mpstate.command_map['speed'] = False
 
 def angle_diff(angle1, angle2):
     ret = angle1 - angle2

@@ -10,6 +10,7 @@ Released under the GNU GPL version 3 or later
 import sys, os, struct, math, time, socket
 import fnmatch, errno, threading
 import serial, Queue, select
+import logging
 
 # find the mavlink.py module
 for d in [ 'pymavlink',
@@ -191,6 +192,11 @@ class MPState(object):
         self.functions.say = say
         self.functions.process_stdin = process_stdin
         self.select_extra = {}
+        self.msg_queue = Queue.Queue()
+
+    def queue_message(self, message):
+        logging.info('Queueing message %s', message)
+        self.msg_queue.put(message)
 
     def master(self):
         '''return the currently chosen mavlink master object'''
@@ -783,11 +789,14 @@ def cmd_module(args):
             m = __import__(modname)
             if m in mpstate.modules:
                 raise RuntimeError("module already loaded")
+            print m
             m.init(mpstate)
             mpstate.modules.append(m)
             print("Loaded module %s" % modname)
         except Exception, msg:
+
             print("Unable to load module %s: %s" % (modname, msg))
+
     elif args[0] == "reload":
         if len(args) < 2:
             print("usage: module reload <name>")
@@ -803,7 +812,23 @@ def cmd_module(args):
                 m.init(mpstate)
                 print("Reloaded module %s" % modname)
                 return
-        print("Unable to find module %s" % modname)
+
+        print("Unable to find module %s" % args[1])
+    elif args[0] == "unload":
+        if len(args) < 2:
+            print("usage: module unload <name>")
+            return
+        for m in mpstate.modules:
+            if m.name() == args[1]:
+                try:
+                    m.unload()
+                    print("Unloaded module %s" % args[1])
+                except Exception:
+                    print("unload() not implemented in module %s" % args[1])
+                    pass
+                return
+        print("Unable to find module %s" % args[1])
+        
     else:
         print(usage)
 
@@ -873,6 +898,7 @@ def process_stdin(line):
         fn(args[1:])
     except Exception as e:
         print("ERROR in command: %s" % str(e))
+        raise
 
 
 def scale_rc(servo, min, max, param):
@@ -1425,6 +1451,12 @@ def check_link_status():
 
 def periodic_tasks():
     '''run periodic checks'''
+    while not mpstate.msg_queue.empty():
+        # Shouldn't block here if the queue isn't empty, but be defensive.
+        message = mpstate.msg_queue.get(block=False)
+        logging.info('Sending queued message %s', message)
+        mpstate.master().mav.send(message)
+
     if mpstate.status.setup_mode:
         return
 
@@ -1564,11 +1596,27 @@ def run_script(scriptfile):
     f.close()
         
 
+LOGGING_LEVELS = {
+  'DEBUG': logging.DEBUG,
+  'INFO': logging.INFO,
+  'WARNING': logging.WARNING,
+  'ERROR': logging.ERROR,
+  'CRITICAL': logging.CRITICAL
+  }
+
+
+def get_logging_level_by_name(name):
+  return LOGGING_LEVELS[name]
+
+
 if __name__ == '__main__':
 
     from optparse import OptionParser
     parser = OptionParser("mavproxy.py [options]")
 
+    parser.add_option('--logging-level', dest='logging_level', default='INFO',
+                      choices=LOGGING_LEVELS.keys(),
+                      help='The logging level to use.')
     parser.add_option("--master",dest="master", action='append', help="MAVLink master port", default=[])
     parser.add_option("--baudrate", dest="baudrate", type='int',
                       help="master port baud rate", default=115200)
@@ -1607,6 +1655,10 @@ if __name__ == '__main__':
     parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
     
     (opts, args) = parser.parse_args()
+
+    logging.basicConfig(
+        level=get_logging_level_by_name(opts.logging_level),
+        format='%(asctime)s:%(levelname)s:%(module)s:%(lineno)d: %(message)s')
 
     if opts.mav09:
         os.environ['MAVLINK09'] = '1'

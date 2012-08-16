@@ -29,6 +29,11 @@ def init(_mpstate):
     mpstate = _mpstate
     mpstate.test_state = test_state()
     print("Module test loaded")
+    
+def unload():
+    global mpstate
+    mpstate.test_state = False
+    
 
 def mavlink_packet(m):
     '''handle an incoming mavlink packet'''

@@ -54,7 +54,9 @@ MM.BingProvider = function(key, style, onready) {
 
         // TODO: display data.brandLogoUri
         // TODO: display data.copyright
-        onready(provider);
+	if (onready) {
+            onready(provider);
+	}
     };
 };
 
