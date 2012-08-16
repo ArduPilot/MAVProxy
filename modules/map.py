@@ -5,9 +5,9 @@ Andrew Tridgell
 June 2012
 '''
 
-import sys, os, cv
+import sys, os, cv, math
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib'))
-import mp_slipmap
+import mp_slipmap, mp_util, functools, time
 
 mpstate = None
 
@@ -18,6 +18,10 @@ class module_state(object):
         self.heading = 0
         self.wp_change_time = 0
         self.fence_change_time = 0
+        self.have_simstate = False
+        self.have_blueplane = False
+        self.move_wp = -1
+        self.moving_wp = False
 
 def name():
     '''return module name'''
@@ -35,26 +39,101 @@ def init(_mpstate):
     mpstate.map = mp_slipmap.MPSlipMap(service='GoogleSat', elevation=True, title='Map')
 
     # setup a plane icon
-    plane = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..',
-                         'data', 'planetracker.png')
-    icon = cv.LoadImage(plane)
+    icon = mpstate.map.icon('planetracker.png')
     mpstate.map.add_object(mp_slipmap.SlipIcon('plane', (0,0), icon, layer=3, rotation=0,
                                                follow=True,
                                                trail=mp_slipmap.SlipTrail()))
+
+    mpstate.map.add_callback(functools.partial(map_callback))
+
+def display_waypoints():
+    '''display the waypoints'''
+    points = mpstate.status.wploader.polygon()
+    if len(points) > 1:
+        mpstate.map.add_object(mp_slipmap.SlipPolygon('mission', points, layer=1, linewidth=2, colour=(255,255,255)))
+
+def closest_waypoint(latlon):
+    '''find closest waypoint to a position'''
+    (lat, lon) = latlon
+    best_distance = -1
+    closest = -1
+    for i in range(mpstate.status.wploader.count()):
+        w = mpstate.status.wploader.wp(i)
+        distance = mp_util.gps_distance(lat, lon, w.x, w.y)
+        if best_distance == -1 or distance < best_distance:
+            best_distance = distance
+            closest = i
+    if best_distance < 20:
+        return closest
+    else:
+        return -1
+        
+
+def map_callback(obj):
+    '''called when an event happens on the slipmap'''
+    import mp_slipmap
+    state = mpstate.map_state
+    if not isinstance(obj, mp_slipmap.SlipMouseEvent):
+        return
+    if obj.event.m_leftDown and state.moving_wp:
+        state.moving_wp = False        
+        print("cancelled WP move")
+    if obj.event.m_rightDown:
+        if not state.moving_wp:
+            wpnum = closest_waypoint(obj.latlon)
+            if wpnum != -1:
+                state.moving_wp = True
+                state.move_wp = wpnum
+                wp = mpstate.status.wploader.wp(state.move_wp)
+                print("Selected WP %u" % wpnum)
+        else:
+            wp = mpstate.status.wploader.wp(state.move_wp)
+            (lat, lon) = obj.latlon
+            wp.x = lat
+            wp.y = lon
+            state.moving_wp = False
+            mpstate.status.loading_waypoints = True
+            mpstate.status.loading_waypoint_lasttime = time.time()
+            mpstate.master().mav.mission_write_partial_list_send(mpstate.status.target_system,
+                                                                 mpstate.status.target_component,
+                                                                 state.move_wp, state.move_wp)
+            print("Moved WP %u to %f, %f" % (state.move_wp, lat, lon))
+            display_waypoints()
+            
+        
 
 def unload():
     '''unload module'''
     mpstate.map = None
 
+def create_blueplane():
+    '''add the blue plane to the map'''
+    if mpstate.map_state.have_blueplane:
+        return
+    mpstate.map_state.have_blueplane = True
+    icon = mpstate.map.icon('blueplane.png')
+    mpstate.map.add_object(mp_slipmap.SlipIcon('blueplane', (0,0), icon, layer=3, rotation=0,
+                                               trail=mp_slipmap.SlipTrail()))
+
 def mavlink_packet(m):
     '''handle an incoming mavlink packet'''
     state = mpstate.map_state
-    if m.get_type() == 'GPS_RAW':
-        (state.lat, state.lon) = (m.lat, m.lon)
-    elif m.get_type() == 'GPS_RAW_INT':
-        (state.lat, state.lon) = (m.lat/1.0e7, m.lon/1.0e7)
-    elif m.get_type() == "VFR_HUD":
-        state.heading = m.heading
+
+    if m.get_type() == "SIMSTATE":
+        if not mpstate.map_state.have_simstate:
+            mpstate.map_state.have_simstate  = True
+            create_blueplane()
+        mpstate.map.set_position('blueplane', (m.lat, m.lng), rotation=math.degrees(m.yaw))
+
+    if m.get_type() == "GPS_RAW_INT" and not mpstate.map_state.have_simstate:
+        (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
+        if state.lat is not None and (mpstate.map_state.have_blueplane or
+                                      mp_util.gps_distance(lat, lon, state.lat, state.lon) > 10):
+            create_blueplane()
+            mpstate.map.set_position('blueplane', (lat, lon), rotation=m.cog*0.01)
+
+    if m.get_type() == 'GLOBAL_POSITION_INT':
+        (state.lat, state.lon, state.heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
     else:
         return
 
@@ -63,9 +142,7 @@ def mavlink_packet(m):
     # if the waypoints have changed, redisplay
     if state.wp_change_time != mpstate.status.wploader.last_change:
         state.wp_change_time = mpstate.status.wploader.last_change
-        points = mpstate.status.wploader.polygon()
-        if len(points) > 1:
-            mpstate.map.add_object(mp_slipmap.SlipPolygon('mission', points, layer=1, linewidth=2, colour=(255,255,255)))
+        display_waypoints()
 
     # if the fence has changed, redisplay
     if state.fence_change_time != mpstate.status.fenceloader.last_change:

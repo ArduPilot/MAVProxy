@@ -134,7 +134,7 @@ class MPStatus(object):
         self.last_heartbeat = 0
         self.heartbeat_error = False
         self.last_apm_msg = None
-        self.highest_usec = 0
+        self.highest_msec = 0
         self.fence_enabled = False
         self.last_fence_breach = 0
         self.last_fence_status = 0
@@ -333,6 +333,10 @@ def cmd_level(args):
     '''do a ground start mode'''
     mpstate.master().calibrate_level()
 
+def cmd_calpressure(args):
+    '''calibrate pressure sensors'''
+    mpstate.master().calibrate_pressure()
+
 def cmd_rtl(args):
     '''set RTL mode'''
     mpstate.master().set_mode_rtl()
@@ -378,6 +382,38 @@ def load_waypoints(filename):
     mpstate.status.loading_waypoint_lasttime = time.time()
     mpstate.master().waypoint_count_send(mpstate.status.wploader.count())
 
+def update_waypoints(filename, wpnum):
+    '''update waypoints from a file'''
+    mpstate.status.wploader.target_system = mpstate.status.target_system
+    mpstate.status.wploader.target_component = mpstate.status.target_component
+    try:
+        mpstate.status.wploader.load(filename)
+    except Exception, msg:
+        print("Unable to load %s - %s" % (filename, msg))
+        return
+    if mpstate.status.wploader.count() == 0:
+        print("No waypoints found in %s" % filename)
+        return
+    if wpnum == -1:
+        print("Loaded %u updated waypoints from %s" % (mpstate.status.wploader.count(), filename))
+    elif wpnum >= mpstate.status.wploader.count():
+        print("Invalid waypoint number %u" % wpnum)
+        return
+    else:
+        print("Loaded updated waypoint %u from %s" % (wpnum, filename))
+
+    mpstate.status.loading_waypoints = True
+    mpstate.status.loading_waypoint_lasttime = time.time()
+    if wpnum == -1:
+        start = 0
+        end = mpstate.status.wploader.count()-1
+    else:
+        start = wpnum
+        end = wpnum
+    mpstate.master().mav.mission_write_partial_list_send(mpstate.status.target_system,
+                                                         mpstate.status.target_component,
+                                                         start, end)
+
 def save_waypoints(filename):
     '''save waypoints to a file'''
     try:
@@ -399,6 +435,15 @@ def cmd_wp(args):
             print("usage: wp load <filename>")
             return
         load_waypoints(args[1])
+    elif args[0] == "update":
+        if len(args) < 2:
+            print("usage: wp update <filename> <wpnum>")
+            return
+        if len(args) == 3:
+            wpnum = int(args[2])
+        else:
+            wpnum = -1
+        update_waypoints(args[1], wpnum)
     elif args[0] == "list":
         mpstate.status.wp_op = "list"
         mpstate.master().waypoint_request_list_send()
@@ -462,8 +507,8 @@ def load_fence(filename):
             param_set('FENCE_ACTION', action)
             return
         if (p.idx != p2.idx or
-            abs(p.lat - p2.lat) >= 0.00001 or
-            abs(p.lng - p2.lng) >= 0.00001):
+            abs(p.lat - p2.lat) >= 0.00003 or
+            abs(p.lng - p2.lng) >= 0.00003):
             print("Failed to send fence point %u" % i)
             param_set('FENCE_ACTION', action)
             return
@@ -704,11 +749,9 @@ def cmd_reset(args):
 
 def cmd_link(args):
     for master in mpstate.mav_master:
-        linkdelay = (mpstate.status.highest_usec - master.highest_usec)*1e-6
+        linkdelay = (mpstate.status.highest_msec - master.highest_msec)*1.0e-3
         if master.linkerror:
             print("link %u down" % (master.linknum+1))
-        elif master.link_delayed:
-            print("link %u delayed by %.2f seconds" % (master.linknum+1, linkdelay))
         else:
             print("link %u OK (%u packets, %.2fs delay, %u lost, %.1f%% loss)" % (master.linknum+1,
                                                                                   mpstate.status.counters['MasterIn'][master.linknum],
@@ -803,6 +846,7 @@ command_map = {
     'auto'    : (cmd_auto,     'set AUTO mode'),
     'ground'  : (cmd_ground,   'do a ground start'),
     'level'   : (cmd_level,    'set level on a multicopter'),
+    'calpress': (cmd_calpressure,'calibrate pressure sensors'),
     'loiter'  : (cmd_loiter,   'set LOITER mode'),
     'rtl'     : (cmd_rtl,      'set RTL mode'),
     'manual'  : (cmd_manual,   'set MANUAL mode'),
@@ -987,30 +1031,29 @@ def battery_report():
         say("Avionics battery warning")
 
 
-def handle_usec_timestamp(m, master):
-    '''special handling for MAVLink packets with a usec field'''
-    usec = m.time_usec
-    if usec + 6.0e7 < master.highest_usec:
+def handle_msec_timestamp(m, master):
+    '''special handling for MAVLink packets with a time_boot_ms field'''
+    msec = m.time_boot_ms
+    if msec > 1e7 and msec > master.highest_msec+1e5:
+        # its been sent as microseconds
+        msec /= 1000
+    if msec + 30000 < master.highest_msec:
         say('Time has wrapped')
-        mpstate.console.writeln("usec %u highest_usec %u" % (usec, master.highest_usec))
-        mpstate.status.highest_usec = usec
+        print('Time has wrapped', msec, master.highest_msec)
+        mpstate.status.highest_msec = msec
         for mm in mpstate.mav_master:
             mm.link_delayed = False
-            mm.highest_usec = usec
+            mm.highest_msec = msec
         return
 
-    # we want to detect when a link has significant buffering, causing us to receive
-    # old packets. If we get packets that are more than 1 second old, then mark the link
-    # as being delayed. We will not act on packets from this link until it has caught up
-    master.highest_usec = usec
-    if usec > mpstate.status.highest_usec:
-        mpstate.status.highest_usec = usec
-    if usec + 1e6 < mpstate.status.highest_usec and not master.link_delayed and len(mpstate.mav_master) > 1:
+    # we want to detect when a link is delayed
+    master.highest_msec = msec
+    if msec > mpstate.status.highest_msec:
+        mpstate.status.highest_msec = msec
+    if msec < mpstate.status.highest_msec and len(mpstate.mav_master) > 1:
         master.link_delayed = True
-        mpstate.console.writeln("link %u delayed" % (master.linknum+1))
-    elif usec + 0.5e6 > mpstate.status.highest_usec and master.link_delayed:
-        master.link_delayed = False
-        mpstate.console.writeln("link %u OK" % (master.linknum+1))
+    else:
+        master.link_delayed = False       
 
 def report_altitude(altitude):
     '''possibly report a new altitude'''
@@ -1029,9 +1072,9 @@ def master_callback(m, master):
         master.post_message(m)
     mpstate.status.counters['MasterIn'][master.linknum] += 1
 
-    if not m.get_type().startswith('GPS_RAW') and getattr(m, 'time_usec', None) is not None:
+    if getattr(m, 'time_boot_ms', None) is not None:
         # update link_delayed attribute
-        handle_usec_timestamp(m, master)
+        handle_msec_timestamp(m, master)
 
     mtype = m.get_type()
 
@@ -1044,8 +1087,10 @@ def master_callback(m, master):
         mpstate.logqueue.put(str(struct.pack('>Q', usec) + m.get_msgbuf()))
 
     if master.link_delayed:
-        # don't process delayed packets 
-        return
+        # don't process delayed packets that cause double reporting
+        if mtype in [ 'MISSION_CURRENT', 'SYS_STATUS', 'VFR_HUD',
+                      'GPS_RAW_INT', 'SCALED_PRESSURE', 'NAV_CONTROLLER_OUTPUT' ]:
+            return
     
     if mtype == 'HEARTBEAT':
         if (mpstate.status.target_system != m.get_srcSystem() or
@@ -1230,7 +1275,8 @@ def master_callback(m, master):
                     'WAYPOINT_ACK', 'MISSION_ACK',
                     'NAV_CONTROLLER_OUTPUT', 'GPS_RAW', 'GPS_RAW_INT', 'WAYPOINT',
                     'SCALED_PRESSURE', 'SENSOR_OFFSETS', 'MEMINFO', 'AP_ADC',
-                    'FENCE_POINT', 'FENCE_STATUS', 'DCM', 'RADIO', 'AHRS', 'HWSTATUS', 'SIMSTATE', 'PPP' ]:
+                    'FENCE_POINT', 'FENCE_STATUS', 'DCM', 'RADIO', 'AHRS', 'HWSTATUS',
+                    'SIMSTATE', 'PPP', 'WIND' ]:
         pass
     else:
         mpstate.console.writeln("Got MAVLink msg: %s" % m)
@@ -1665,7 +1711,7 @@ Auto-detected serial ports are:
         m.linkerror = False
         m.link_delayed = False
         m.last_heartbeat = 0
-        m.highest_usec = 0
+        m.highest_msec = 0
         mpstate.mav_master.append(m)
         mpstate.status.counters['MasterIn'].append(0)
 
