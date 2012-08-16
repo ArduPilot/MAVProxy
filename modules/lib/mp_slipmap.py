@@ -5,7 +5,7 @@ Andrew Tridgell
 June 2012
 '''
 
-import mp_util, mp_tile, math, cv, time, functools, mp_elevation, mp_widgets
+import mp_util, mp_tile, math, cv, time, functools, mp_elevation, mp_widgets, os
 
 class SlipObject:
     '''an object to display on the map'''
@@ -51,7 +51,6 @@ class SlipObject:
         otherwise return the distance of the click, smaller being nearer
         '''
         return None
-        
 
 class SlipPolygon(SlipObject):
     '''a polygon to display on the map'''
@@ -232,6 +231,11 @@ class SlipPosition:
         self.latlon = latlon
         self.rotation = rotation
 
+class SlipCenter:
+    '''an object to move the view center'''
+    def __init__(self, latlon):
+        self.latlon = latlon
+
 
 class SlipInformation:
     '''an object to display in the information box'''
@@ -379,13 +383,12 @@ class MPSlipMap():
         self.drag_step = 10
 
         self.title = title
-        self.child_pipe,self.parent_pipe = multiprocessing.Pipe(duplex=False)
         self.event_queue = multiprocessing.Queue()
+        self.object_queue = multiprocessing.Queue()
         self.close_window = multiprocessing.Event()
         self.close_window.clear()
         self.child = multiprocessing.Process(target=self.child_task)
         self.child.start()
-        self.pipe = self.parent_pipe
         self._callbacks = set()
 
 
@@ -403,7 +406,6 @@ class MPSlipMap():
         state.info = {}
         state.need_redraw = True
         
-        self.pipe = self.child_pipe
         self.app = wx.PySimpleApp()
         self.app.frame = MPSlipMapFrame(state=self)
         self.app.frame.Show()
@@ -421,11 +423,11 @@ class MPSlipMap():
 
     def add_object(self, obj):
         '''add or update an object on the map'''
-        self.pipe.send(obj)
+        self.object_queue.put(obj)
 
     def set_position(self, key, latlon, layer=None, rotation=0):
         '''move an object on the map'''
-        self.pipe.send(SlipPosition(key, latlon, layer, rotation))
+        self.object_queue.put(SlipPosition(key, latlon, layer, rotation))
 
     def event_count(self):
         '''return number of events waiting to be processed'''
@@ -448,6 +450,12 @@ class MPSlipMap():
             for callback in self._callbacks:
                 callback(event)
     
+    def icon(self, filename):
+        '''load an icon from the data directory'''
+        path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..',
+                            'data', filename)
+        return cv.LoadImage(path)        
+
 
 import wx
 from PIL import Image
@@ -507,8 +515,8 @@ class MPSlipMapFrame(wx.Frame):
         # receive any display objects from the parent
         obj = None
 
-        while state.pipe.poll():
-            obj = state.pipe.recv()
+        while state.object_queue.qsize():
+            obj = state.object_queue.get()
 
             if isinstance(obj, SlipObject):
                 if not obj.layer in state.layers:
@@ -534,6 +542,13 @@ class MPSlipMapFrame(wx.Frame):
                 else:
 #                    print('add %s' % str(obj.key))
                     state.info[obj.key] = obj
+                state.need_redraw = True
+
+            if isinstance(obj, SlipCenter):
+                # move center
+                (lat,lon) = obj.latlon
+                state.panel.re_center(state.width/2, state.height/2, lat, lon)
+                state.need_redraw = True
 
         if obj is None:
             time.sleep(0.05)
@@ -652,26 +667,30 @@ class MPSlipMapPanel(wx.Panel):
         '''update position text'''
         state = self.state
         pos = self.mouse_pos
-        self.position.Clear()
+        oldtext = self.position.GetValue()
+        newtext = ''
         alt = 0
         if pos is not None:
             (lat,lon) = self.coordinates(pos.x, pos.y)
-            self.position.WriteText('Cursor: %f %f' % (lat, lon))
+            newtext += 'Cursor: %f %f' % (lat, lon)
             if state.elevation:
                 alt = self.ElevationMap.GetElevation(lat, lon)
-                self.position.WriteText(' %.1fm' % alt)
+                newtext += ' %.1fm' % alt
         pending = state.mt.tiles_pending()
         if pending:
-            self.position.WriteText(' Map Downloading %u ' % pending)
+            newtext += ' Map Downloading %u ' % pending
         if alt == -1:
-            self.position.WriteText(' SRTM Downloading ')
-        self.position.WriteText('\n')
+            newtext += ' SRTM Downloading '
+        newtext += '\n'
         if self.click_pos is not None:
-            self.position.WriteText('Click: %f %f' % (self.click_pos[0], self.click_pos[1]))
+            newtext += 'Click: %f %f' % (self.click_pos[0], self.click_pos[1])
         if self.last_click_pos is not None:
             distance = mp_util.gps_distance(self.last_click_pos[0], self.last_click_pos[1],
                                             self.click_pos[0], self.click_pos[1])
-            self.position.WriteText('  Distance: %.1fm' % distance)
+            newtext += '  Distance: %.1fm' % distance
+        if newtext != oldtext:
+            self.position.Clear()
+            self.position.WriteText(newtext)
 
     def pixel_coords(self, latlon):
         '''return pixel coordinates in the map image for a (lat,lon)'''
@@ -790,7 +809,7 @@ class MPSlipMapPanel(wx.Panel):
             self.last_click_pos = self.click_pos
             self.click_pos = self.coordinates(pos.x, pos.y)
 
-        if event.Dragging() and self.mouse_down is not None:
+        if event.Dragging() and event.ButtonIsDown(wx.MOUSE_BTN_LEFT):
             # drag map to new position
             newpos = pos
             dx = (self.mouse_down.x - newpos.x)
