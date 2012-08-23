@@ -72,6 +72,8 @@ class camera_state(object):
         self.transmit = True
 
         self.roll_stabilised = True
+
+        self.minscore = 4
         
         # setup directory for images
         self.camera_dir = os.path.join(os.path.dirname(mpstate.logfile_name),
@@ -182,6 +184,11 @@ def cmd_camera(args):
             print("transmit=%s" % str(state.transmit))
         else:
             state.transmit = bool(int(args[1]))
+    elif args[0] == "minscore":
+        if len(args) != 2:
+            print("minscore=%u" % state.minscore)
+        else:
+            state.minscore = int(args[1])
     elif args[0] == "boundary":
         if len(args) != 2:
             print("boundary=%s" % state.boundary)
@@ -189,7 +196,7 @@ def cmd_camera(args):
             state.boundary = args[1]
             state.boundary_polygon = cuav_util.polygon_load(state.boundary)
     else:
-        print("usage: camera <start|stop|status|view|noview|gcs|brightness|capbrightness|boundary|bandwidth|transmit|loss|save>")
+        print("usage: camera <start|stop|status|view|noview|gcs|brightness|capbrightness|boundary|bandwidth|transmit|loss|save|minscore>")
 
 
 def get_base_time():
@@ -318,7 +325,7 @@ def scan_thread():
         state.scan_fps = 1.0 / (t2-t1)
         state.scan_count += 1
 
-        regions = cuav_region.filter_regions(im_640, regions)
+        regions = cuav_region.filter_regions(im_full, regions, min_score=state.minscore)
 
         state.region_count += len(regions)
         if state.transmit_queue.qsize() < 100:
