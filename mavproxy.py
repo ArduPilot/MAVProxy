@@ -144,6 +144,7 @@ class MPStatus(object):
         self.last_streamrate2 = -1
         self.last_paramretry = 0
         self.last_seq = 0
+        self.fetch_one = False
 
     def show(self, f, pattern=None):
         '''write status to status.txt'''
@@ -640,8 +641,13 @@ def cmd_param(args):
         print("usage: param <fetch|edit|set|show>")
         return
     if args[0] == "fetch":
-        mpstate.master().param_fetch_all()
-        print("Requested parameter list")
+        if len(args) == 1:
+            mpstate.master().param_fetch_all()
+            print("Requested parameter list")
+        else:
+            mpstate.master().param_fetch_one(args[1])
+            mpstate.status.fetch_one = True
+            print("Requested parameter %s" % args[1])
     elif args[0] == "save":
         if len(args) < 2:
             print("usage: param save <filename> [wildcard]")
@@ -1063,7 +1069,8 @@ def master_callback(m, master):
     if master.link_delayed:
         # don't process delayed packets that cause double reporting
         if mtype in [ 'MISSION_CURRENT', 'SYS_STATUS', 'VFR_HUD',
-                      'GPS_RAW_INT', 'SCALED_PRESSURE', 'NAV_CONTROLLER_OUTPUT' ]:
+                      'GPS_RAW_INT', 'SCALED_PRESSURE', 'GLOBAL_POSITION_INT',
+                      'NAV_CONTROLLER_OUTPUT' ]:
             return
     
     if mtype == 'HEARTBEAT':
@@ -1087,6 +1094,9 @@ def master_callback(m, master):
             mpstate.status.last_apm_msg = m.text
     elif mtype == 'PARAM_VALUE':
         mpstate.mav_param[str(m.param_id)] = m.param_value
+        if mpstate.status.fetch_one:
+            mpstate.status.fetch_one = False
+            mpstate.console.writeln("%s = %f" % (m.param_id, m.param_value))
         if m.param_index+1 == m.param_count:
             mpstate.console.writeln("Received %u parameters" % m.param_count)
             if mpstate.status.logdir != None:
@@ -1161,15 +1171,8 @@ def master_callback(m, master):
         if 'GPS_RAW_INT' in mpstate.status.msgs and mpstate.status.msgs['GPS_RAW_INT'].fix_type == 3:
             have_gps_fix = True
         if have_gps_fix and not mpstate.status.have_gps_lock:
-                mpstate.status.last_altitude_announce = 0.0
                 say("GPS lock at %u meters" % m.alt, priority='notification')
-                # re-fetch to get the home pressure and temperature
-                mpstate.master().param_fetch_all()
                 mpstate.status.have_gps_lock = True
-        ground_press = get_mav_param('GND_ABS_PRESS', None)
-        if opts.quadcopter or ground_press is None:
-            # we're on a ArduCopter which uses relative altitude in VFR_HUD
-            report_altitude(m.alt)
 
     elif mtype == "GPS_RAW":
         if mpstate.status.have_gps_lock:
@@ -1223,21 +1226,8 @@ def master_callback(m, master):
         mpstate.status.last_fence_breach = m.breach_time
         mpstate.status.last_fence_status = m.breach_status
 
-    elif mtype == "SCALED_PRESSURE":
-        ground_press = get_mav_param('GND_ABS_PRESS', None)
-        ground_temperature = get_mav_param('GND_TEMP', None)
-        if ground_press is not None and ground_temperature is not None:
-            altitude = None
-            try:
-                scaling = ground_press / (m.press_abs*100)
-                temp = ground_temperature + 273.15
-                altitude = math.log(scaling) * temp * 29271.267 * 0.001
-            except ValueError:
-                pass
-            except ZeroDivisionError:
-                pass
-            if altitude is not None:
-                report_altitude(altitude)
+    elif mtype == "GLOBAL_POSITION_INT":
+        report_altitude(m.relative_alt*0.001)
 
     elif mtype == "BAD_DATA":
         if mavutil.all_printable(m.data):
