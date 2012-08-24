@@ -192,6 +192,7 @@ class MPState(object):
         self.functions.say = say
         self.functions.process_stdin = process_stdin
         self.select_extra = {}
+        self.continue_mode = False
 
     def master(self):
         '''return the currently chosen mavlink master object'''
@@ -1145,6 +1146,10 @@ def master_callback(m, master):
                         w.command, w.frame, w.x, w.y, w.z,
                         w.param1, w.param2, w.param3, w.param4,
                         w.current, w.autocontinue))
+                if mpstate.status.logdir != None:
+                    waytxt = os.path.join(mpstate.status.logdir, 'way.txt')
+                    save_waypoints(waytxt)
+                    print("Saved waypoints to %s" % waytxt)                    
             elif mpstate.status.wp_op == "save":
                 save_waypoints(mpstate.status.wp_save_filename)
             mpstate.status.wp_op = None
@@ -1345,12 +1350,10 @@ def log_writer():
             mpstate.logfile.write(mpstate.logqueue.get())
         mpstate.logfile.flush()
         mpstate.logfile_raw.flush()
-        if status_period.trigger():
-            mpstate.status.write()
 
 def open_logs():
     '''open log files'''
-    if opts.append_log:
+    if opts.append_log or opts.continue_mode:
         mode = 'a'
     else:
         mode = 'w'
@@ -1358,11 +1361,15 @@ def open_logs():
     if opts.aircraft is not None:
         dirname = "%s/logs/%s" % (opts.aircraft, time.strftime("%Y-%m-%d"))
         mkdir_p(dirname)
+        highest = None
         for i in range(1, 10000):
             fdir = os.path.join(dirname, 'flight%u' % i)
             if not os.path.exists(fdir):
                 break
-        if os.path.exists(fdir):
+            highest = fdir
+        if mpstate.continue_mode and highest is not None:
+            fdir = highest
+        elif os.path.exists(fdir):
             print("Flight logs full")
             sys.exit(1)
         mkdir_p(fdir)
@@ -1595,6 +1602,7 @@ if __name__ == '__main__':
     parser.add_option("--map", action='store_true', help="load map module")
     parser.add_option("--mav09", action='store_true', default=False, help="Use MAVLink protocol 0.9")
     parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
+    parser.add_option("--continue", dest='continue_mode', action='store_true', default=False, help="continue logs")
     
     (opts, args) = parser.parse_args()
 
@@ -1606,6 +1614,7 @@ if __name__ == '__main__':
     mpstate = MPState()
     mpstate.status.exit = False
     mpstate.command_map = command_map
+    mpstate.continue_mode = opts.continue_mode
 
     if opts.speech:
         # start the speech-dispatcher early, so it doesn't inherit any ports from
@@ -1656,6 +1665,11 @@ Auto-detected serial ports are:
     # log all packets from the master, for later replay
     open_logs()
 
+    if mpstate.continue_mode and mpstate.status.logdir != None:
+        waytxt = os.path.join(mpstate.status.logdir, 'way.txt')
+        if os.path.exists(waytxt):
+            mpstate.status.wploader.load(waytxt)
+
     # open any mavlink UDP ports
     for p in opts.output:
         mpstate.mav_outputs.append(mavutil.mavudp(p, input=False))
@@ -1668,7 +1682,6 @@ Auto-detected serial ports are:
     mpstate.settings.streamrate = opts.streamrate
     mpstate.settings.streamrate2 = opts.streamrate
 
-    status_period = mavutil.periodic_event(1.0)
     msg_period = mavutil.periodic_event(1.0/15)
     heartbeat_period = mavutil.periodic_event(1)
     battery_period = mavutil.periodic_event(0.1)

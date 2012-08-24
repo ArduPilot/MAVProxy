@@ -73,15 +73,15 @@ class camera_state(object):
 
         self.roll_stabilised = True
 
-        self.minscore = 4
+        self.minscore = 3
         
         # setup directory for images
         self.camera_dir = os.path.join(os.path.dirname(mpstate.logfile_name),
                                       "camera")
         cuav_util.mkdir_p(self.camera_dir)
 
-        self.mpos = mav_position.MavInterpolator(backlog=5000, gps_lag=-0.5)
-        self.joelog = cuav_joe.JoeLog(os.path.join(self.camera_dir, 'joe.log'))
+        self.mpos = mav_position.MavInterpolator(backlog=5000, gps_lag=0.3)
+        self.joelog = cuav_joe.JoeLog(os.path.join(self.camera_dir, 'joe.log'), append=mpstate.continue_mode)
         # load camera params
         path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..',
                             'cuav', 'data', 'chameleon1_arecont0.json')
@@ -240,7 +240,11 @@ def capture_thread():
     raw_dir = os.path.join(state.camera_dir, "raw")
     cuav_util.mkdir_p(raw_dir)
 
-    gammalog = open(os.path.join(state.camera_dir, "gamma.log"), "w")
+    if mpstate.continue_mode:
+        mode = 'a'
+    else:
+        mode = 'w'
+    gammalog = open(os.path.join(state.camera_dir, "gamma.log"), mode=mode)
 
     while not mpstate.camera_state.unload.wait(0.02):
         if not state.running:            
@@ -341,11 +345,11 @@ def get_plane_position(frame_time,roll=None):
         print str(e)
         return None
 
-def log_joe_position(pos, frame_time, regions, filename=None):
+def log_joe_position(pos, frame_time, regions, filename=None, thumb_filename=None):
     '''add to joe.log if possible, returning a list of (lat,lon) tuples
     for the positions of the identified image regions'''
     state = mpstate.camera_state
-    return state.joelog.add_regions(frame_time, regions, pos, filename)
+    return state.joelog.add_regions(frame_time, regions, pos, filename, thumb_filename)
 
 
 class ImagePacket:
@@ -358,12 +362,13 @@ class ImagePacket:
 
 class ThumbPacket:
     '''a thumbnail region sent to the ground station'''
-    def __init__(self, frame_time, regions, thumb, frame_loss, xmit_queue):
+    def __init__(self, frame_time, regions, thumb, frame_loss, xmit_queue, pos):
         self.frame_time = frame_time
         self.regions = regions
         self.thumb = thumb
         self.frame_loss = frame_loss
         self.xmit_queue = xmit_queue
+        self.pos = pos
         
 
 def transmit_thread():
@@ -406,7 +411,7 @@ def transmit_thread():
                                                    regions, quality=state.quality, thumb_size=80)
             bsend.set_bandwidth(state.bandwidth)
             bsend.set_packet_loss(state.packet_loss)
-            pkt = ThumbPacket(frame_time, regions, thumb, state.frame_loss, state.xmit_queue)
+            pkt = ThumbPacket(frame_time, regions, thumb, state.frame_loss, state.xmit_queue, pos)
 
             # send matches with a higher priority
             if state.transmit:
@@ -437,6 +442,38 @@ def transmit_thread():
         str = cPickle.dumps(pkt, cPickle.HIGHEST_PROTOCOL)
         bsend.send(str,
                    dest=(state.gcs_address, state.gcs_view_port))
+
+def reload_mosaic(mosaic):
+    '''reload state into mosaic'''
+    state = mpstate.camera_state
+    regions = []
+    last_thumbfile = None
+    last_joe = None
+    joes = cuav_joe.JoeIterator(state.joelog.filename)
+    for joe in joes:
+        print joe
+        if joe.thumb_filename == last_thumbfile or last_thumbfile is None:
+            regions.append(joe.r)
+            last_joe = joe
+            last_thumbfile = joe.thumb_filename
+        else:
+            try:
+                composite = cv.LoadImage(last_joe.thumb_filename)
+                thumbs = cuav_mosaic.ExtractThumbs(composite, len(regions))
+                mosaic.add_regions(regions, thumbs, last_joe.image_filename, last_joe.pos)
+            except Exception:
+                pass                
+            regions = []
+            last_joe = None
+            last_thumbfile = None
+    if last_joe:
+        try:
+            composite = cv.LoadImage(last_joe.thumb_filename)
+            thumbs = cuav_mosaic.ExtractThumbs(composite, len(regions))
+            mosaic.add_regions(regions, thumbs, last_joe.image_filename, last_joe.pos)
+        except Exception:
+            pass
+        
 
 
 def view_thread():
@@ -479,6 +516,11 @@ def view_thread():
                 mosaic = cuav_mosaic.Mosaic(slipmap=mpstate.map, C=state.c_params)
                 if state.boundary_polygon is not None:
                     mosaic.set_boundary(state.boundary_polygon)
+                if mpstate.continue_mode:
+                    print("MOSAIC RELOAD")
+                    reload_mosaic(mosaic)
+                else:
+                    print("NO MOSAIC RELOAD")
 
             # check for keyboard events
             mosaic.check_events()
@@ -499,15 +541,15 @@ def view_thread():
                 thumb_total_bytes += len(buf)
 
                 # save the thumbnails
-                filename = '%s/v%s.jpg' % (thumb_dir, cuav_util.frame_time(obj.frame_time))
-                chameleon.save_file(filename, obj.thumb)
-                composite = cv.LoadImage(filename)
+                thumb_filename = '%s/v%s.jpg' % (thumb_dir, cuav_util.frame_time(obj.frame_time))
+                chameleon.save_file(thumb_filename, obj.thumb)
+                composite = cv.LoadImage(thumb_filename)
                 thumbs = cuav_mosaic.ExtractThumbs(composite, len(obj.regions))
 
                 # log the joe positions
                 filename = '%s/v%s.jpg' % (view_dir, cuav_util.frame_time(obj.frame_time))
-                pos = get_plane_position(obj.frame_time)
-                log_joe_position(pos, obj.frame_time, obj.regions, filename)
+                pos = obj.pos
+                log_joe_position(pos, obj.frame_time, obj.regions, filename, thumb_filename)
 
                 # update the mosaic and map
                 mosaic.add_regions(obj.regions, thumbs, filename, pos=pos)
