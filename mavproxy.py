@@ -339,8 +339,11 @@ def cmd_rtl(args):
 
 def cmd_manual(args):
     '''set MANUAL mode'''
-    MAV_ACTION_SET_MANUAL = 12
-    mpstate.master().mav.action_send(mpstate.status.target_system, mpstate.status.target_component, MAV_ACTION_SET_MANUAL)
+    mpstate.master().set_mode_manual()
+
+def cmd_fbwa(args):
+    '''set FBWA mode'''
+    mpstate.master().set_mode_fbwa()
 
 def process_waypoint_request(m, master):
     '''process a waypoint request from the master'''
@@ -832,6 +835,7 @@ command_map = {
     'loiter'  : (cmd_loiter,   'set LOITER mode'),
     'rtl'     : (cmd_rtl,      'set RTL mode'),
     'manual'  : (cmd_manual,   'set MANUAL mode'),
+    'fbwa'    : (cmd_fbwa,     'set FBWA mode'),
     'set'     : (cmd_set,      'mavproxy settings'),
     'bat'     : (cmd_bat,      'show battery levels'),
     'alt'     : (cmd_alt,      'show relative altitude'),
