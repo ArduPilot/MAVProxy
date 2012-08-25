@@ -355,6 +355,9 @@ def process_waypoint_request(m, master):
     if m.seq >= mpstate.status.wploader.count():
         mpstate.console.error("Request for bad waypoint %u (max %u)" % (m.seq, mpstate.status.wploader.count()))
         return
+    wp = mpstate.status.wploader.wp(m.seq)
+    wp.target_system = mpstate.status.target_system
+    wp.target_component = mpstate.status.target_component
     master.mav.send(mpstate.status.wploader.wp(m.seq))
     mpstate.status.loading_waypoint_lasttime = time.time()
     mpstate.console.writeln("Sent waypoint %u : %s" % (m.seq, mpstate.status.wploader.wp(m.seq)))

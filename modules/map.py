@@ -91,6 +91,8 @@ def map_callback(obj):
             (lat, lon) = obj.latlon
             wp.x = lat
             wp.y = lon
+            wp.target_system    = mpstate.status.target_system
+            wp.target_component = mpstate.status.target_component
             state.moving_wp = False
             mpstate.status.loading_waypoints = True
             mpstate.status.loading_waypoint_lasttime = time.time()
