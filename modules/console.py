@@ -96,9 +96,9 @@ def mavlink_packet(msg):
         else:
             home_lat = master.field('HOME', 'lat') * 1.0e-7
             home_lng = master.field('HOME', 'lon') * 1.0e-7
-        lat = master.field('GLOBAL_POSITION_INT', 'lat') * 1.0e-7
-        lng = master.field('GLOBAL_POSITION_INT', 'lon') * 1.0e-7
-        rel_alt = master.field('GLOBAL_POSITION_INT', 'relative_alt') * 1.0e-3
+        lat = master.field('GLOBAL_POSITION_INT', 'lat', 0) * 1.0e-7
+        lng = master.field('GLOBAL_POSITION_INT', 'lon', 0) * 1.0e-7
+        rel_alt = master.field('GLOBAL_POSITION_INT', 'relative_alt', 0) * 1.0e-3
         agl_alt = mpstate.console.ElevationMap.GetElevation(home_lat, home_lng) - mpstate.console.ElevationMap.GetElevation(lat, lng)
         agl_alt += rel_alt
         mpstate.console.set_status('Alt', 'Alt %u' % rel_alt)
