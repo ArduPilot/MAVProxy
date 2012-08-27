@@ -139,7 +139,8 @@ def mavlink_packet(m):
     else:
         return
 
-    mpstate.map.set_position('plane', (state.lat, state.lon), rotation=state.heading)
+    if state.lat != 0 or state.lon != 0:
+        mpstate.map.set_position('plane', (state.lat, state.lon), rotation=state.heading)
 
     # if the waypoints have changed, redisplay
     if state.wp_change_time != mpstate.status.wploader.last_change:
