@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'cuav', 'lib'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'lib'))
 
-import scanner, mavutil, cuav_mosaic, mav_position, cuav_util, cuav_joe, block_xmit, mp_image, cuav_region
+import scanner, mavutil, cuav_mosaic, mav_position, cuav_util, cuav_joe, block_xmit, mp_image, cuav_region, mp_slipmap
 from cam_params import CameraParams
 
 # allow for replaying of previous flights
@@ -201,6 +201,9 @@ def cmd_camera(args):
         else:
             state.boundary = args[1]
             state.boundary_polygon = cuav_util.polygon_load(state.boundary)
+            if mpstate.map is not None:
+                mpstate.map.add_object(mp_slipmap.SlipPolygon('boundary', state.boundary_polygon, layer=1, linewidth=2, colour=(0,0,255)))
+                
     else:
         print("usage: camera <start|stop|status|view|noview|gcs|brightness|capbrightness|boundary|bandwidth|transmit|loss|save|minscore|altitude>")
 
@@ -523,10 +526,7 @@ def view_thread():
                 if state.boundary_polygon is not None:
                     mosaic.set_boundary(state.boundary_polygon)
                 if mpstate.continue_mode:
-                    print("MOSAIC RELOAD")
                     reload_mosaic(mosaic)
-                else:
-                    print("NO MOSAIC RELOAD")
 
             # check for keyboard events
             mosaic.check_events()
