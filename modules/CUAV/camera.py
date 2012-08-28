@@ -74,6 +74,7 @@ class camera_state(object):
         self.roll_stabilised = True
 
         self.minscore = 3
+        self.altitude = None
         
         # setup directory for images
         self.camera_dir = os.path.join(os.path.dirname(mpstate.logfile_name),
@@ -189,6 +190,11 @@ def cmd_camera(args):
             print("minscore=%u" % state.minscore)
         else:
             state.minscore = int(args[1])
+    elif args[0] == "altitude":
+        if len(args) != 2:
+            print("altitude=%u" % state.altitude)
+        else:
+            state.altitude = int(args[1])
     elif args[0] == "boundary":
         if len(args) != 2:
             print("boundary=%s" % state.boundary)
@@ -196,7 +202,7 @@ def cmd_camera(args):
             state.boundary = args[1]
             state.boundary_polygon = cuav_util.polygon_load(state.boundary)
     else:
-        print("usage: camera <start|stop|status|view|noview|gcs|brightness|capbrightness|boundary|bandwidth|transmit|loss|save|minscore>")
+        print("usage: camera <start|stop|status|view|noview|gcs|brightness|capbrightness|boundary|bandwidth|transmit|loss|save|minscore|altitude>")
 
 
 def get_base_time():
@@ -349,7 +355,7 @@ def log_joe_position(pos, frame_time, regions, filename=None, thumb_filename=Non
     '''add to joe.log if possible, returning a list of (lat,lon) tuples
     for the positions of the identified image regions'''
     state = mpstate.camera_state
-    return state.joelog.add_regions(frame_time, regions, pos, filename, thumb_filename)
+    return state.joelog.add_regions(frame_time, regions, pos, filename, thumb_filename, altitude=state.altitude)
 
 
 class ImagePacket:
