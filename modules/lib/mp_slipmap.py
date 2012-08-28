@@ -74,6 +74,7 @@ class SlipPolygon(SlipObject):
             return
         (pix1, pix2) = clipped
         cv.Line(img, pix1, pix2, colour, linewidth)
+        cv.Circle(img, pix2, linewidth*2, colour)
 
     def draw(self, img, pixmapper):
         '''draw a polygon on the image'''
