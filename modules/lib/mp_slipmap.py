@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*- 
 '''
 slipmap based on mp_tile
 Andrew Tridgell
@@ -380,6 +381,7 @@ class MPSlipMap():
         self.debug = debug
         self.max_zoom = max_zoom
         self.elevation = elevation
+        self.oldtext = None
 
         self.drag_step = 10
 
@@ -668,7 +670,6 @@ class MPSlipMapPanel(wx.Panel):
         '''update position text'''
         state = self.state
         pos = self.mouse_pos
-        oldtext = self.position.GetValue()
         newtext = ''
         alt = 0
         if pos is not None:
@@ -684,14 +685,18 @@ class MPSlipMapPanel(wx.Panel):
             newtext += ' SRTM Downloading '
         newtext += '\n'
         if self.click_pos is not None:
-            newtext += 'Click: %f %f' % (self.click_pos[0], self.click_pos[1])
+            newtext += 'Click: %f %f (%s %s)' % (self.click_pos[0], self.click_pos[1],
+                                                 mp_util.degrees_to_dms(self.click_pos[0]),
+                                                 mp_util.degrees_to_dms(self.click_pos[1]))
         if self.last_click_pos is not None:
             distance = mp_util.gps_distance(self.last_click_pos[0], self.last_click_pos[1],
                                             self.click_pos[0], self.click_pos[1])
             newtext += '  Distance: %.1fm' % distance
-        if newtext != oldtext:
+        t1 = unicode(newtext, encoding='ascii', errors="replace")
+        if t1 != state.oldtext:
             self.position.Clear()
             self.position.WriteText(newtext)
+            state.oldtext = t1
 
     def pixel_coords(self, latlon):
         '''return pixel coordinates in the map image for a (lat,lon)'''
