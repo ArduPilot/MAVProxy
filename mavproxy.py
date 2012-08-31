@@ -133,6 +133,7 @@ class MPStatus(object):
         self.last_heartbeat = 0
         self.heartbeat_error = False
         self.last_apm_msg = None
+        self.last_apm_msg_time = 0
         self.highest_msec = 0
         self.fence_enabled = False
         self.last_fence_breach = 0
@@ -1097,9 +1098,10 @@ def master_callback(m, master):
         mpstate.status.last_heartbeat = time.time()
         master.last_heartbeat = mpstate.status.last_heartbeat
     elif mtype == 'STATUSTEXT':
-        if m.text != mpstate.status.last_apm_msg:
+        if m.text != mpstate.status.last_apm_msg or time.time() > mpstate.status.last_apm_msg_time+2:
             mpstate.console.writeln("APM: %s" % m.text, bg='red')
             mpstate.status.last_apm_msg = m.text
+            mpstate.status.last_apm_msg_time = time.time()
     elif mtype == 'PARAM_VALUE':
         mpstate.mav_param[str(m.param_id)] = m.param_value
         if mpstate.status.fetch_one:
