@@ -653,6 +653,29 @@ def param_load_file(filename, wildcard):
         count += 1
     f.close()
     print("Loaded %u parameters from %s (changed %u)" % (count, filename, changed))
+
+def param_reload_file(filename):
+    '''reload parameters from a file'''
+    try:
+        f = open(filename, mode='r')
+    except:
+        print("Failed to open file '%s'" % filename)
+        return
+    count = 0
+    for line in f:
+        line = line.strip()
+        if not line or line[0] == "#":
+            continue
+        a = line.split()
+        if len(a) != 2:
+            print("Invalid line: %s" % line)
+            continue
+        mpstate.mav_param[a[0]] = float(a[1])
+        count += 1
+    f.close()
+    for master in mpstate.mav_master:
+        master.param_fetch_complete = True
+    print("Reloaded %u parameters from %s" % (count, filename))
     
 
 param_wildcard = "*"
@@ -1495,7 +1518,8 @@ def main_loop():
     if not mpstate.status.setup_mode and not opts.nowait:
         for master in mpstate.mav_master:
             master.wait_heartbeat()
-            master.param_fetch_all()
+            if len(mpstate.mav_param) < 10 or not mpstate.continue_mode:
+                master.param_fetch_all()
         set_stream_rates()
 
     while True:
@@ -1693,12 +1717,17 @@ Auto-detected serial ports are:
     open_logs()
 
     if mpstate.continue_mode and mpstate.status.logdir != None:
+        parmfile = os.path.join(mpstate.status.logdir, 'mav.parm')
+        if os.path.exists(parmfile):
+            param_reload_file(parmfile)
         waytxt = os.path.join(mpstate.status.logdir, 'way.txt')
         if os.path.exists(waytxt):
             mpstate.status.wploader.load(waytxt)
+            print("Loaded waypoints from %s" % waytxt)
         fencetxt = os.path.join(mpstate.status.logdir, 'fence.txt')
         if os.path.exists(fencetxt):
             mpstate.status.fenceloader.load(fencetxt) 
+            print("Loaded fence from %s" % fencetxt)
 
     # open any mavlink UDP ports
     for p in opts.output:
