@@ -548,6 +548,10 @@ def list_fence(filename):
         for i in range(mpstate.status.fenceloader.count()):
             p = mpstate.status.fenceloader.point(i)
             mpstate.console.writeln("lat=%f lng=%f" % (p.lat, p.lng))
+    if mpstate.status.logdir != None:
+        fencetxt = os.path.join(mpstate.status.logdir, 'fence.txt')
+        mpstate.status.fenceloader.save(fencetxt)
+        print("Saved fence to %s" % fencetxt)                    
 
 
 def cmd_fence(args):
