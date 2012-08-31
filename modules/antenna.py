@@ -26,12 +26,12 @@ def description():
 def cmd_antenna(args):
     '''set gcs location'''
     state = mpstate.antenna_state
-    usage = "antenna lat,lon"
+    usage = "antenna lat lon"
     if len(args) != 2:
         if state.gcs_location is None:
             print("GCS location not set")
         else:
-            print("GCS location %s" % str(self.gcs_location))
+            print("GCS location %s" % str(state.gcs_location))
         return
     state.gcs_location = (float(args[0]), float(args[1]))
         
