@@ -667,7 +667,7 @@ def cmd_param(args):
             mpstate.master().param_fetch_all()
             print("Requested parameter list")
         else:
-            mpstate.master().param_fetch_one(args[1])
+            mpstate.master().param_fetch_one(args[1].upper())
             mpstate.status.fetch_one = True
             print("Requested parameter %s" % args[1])
     elif args[0] == "save":
@@ -1268,7 +1268,8 @@ def master_callback(m, master):
                     'NAV_CONTROLLER_OUTPUT', 'GPS_RAW', 'GPS_RAW_INT', 'WAYPOINT',
                     'SCALED_PRESSURE', 'SENSOR_OFFSETS', 'MEMINFO', 'AP_ADC',
                     'FENCE_POINT', 'FENCE_STATUS', 'DCM', 'RADIO', 'AHRS', 'HWSTATUS',
-                    'SIMSTATE', 'PPP', 'WIND' ]:
+                    'SIMSTATE', 'PPP', 'WIND', 'MISSION_ITEM',
+                    'DATA16', 'DATA32', 'DATA64' ]:
         pass
     else:
         mpstate.console.writeln("Got MAVLink msg: %s" % m)
@@ -1342,12 +1343,15 @@ def process_mavlink(slave):
     try:
         if slave.first_byte:
             slave.auto_mavlink_version(buf)
-        m = slave.mav.decode(buf)
+        msgs = slave.mav.parse_buffer(buf)
     except mavutil.mavlink.MAVError as e:
         mpstate.console.error("Bad MAVLink slave message from %s: %s" % (slave.address, e.message))
         return
+    if msgs is None:
+        return
     if mpstate.settings.mavfwd and not mpstate.status.setup_mode:
-        mpstate.master().write(m.get_msgbuf())
+        for m in msgs:
+            mpstate.master().write(m.get_msgbuf())
     mpstate.status.counters['Slave'] += 1
 
 
@@ -1692,10 +1696,13 @@ Auto-detected serial ports are:
         waytxt = os.path.join(mpstate.status.logdir, 'way.txt')
         if os.path.exists(waytxt):
             mpstate.status.wploader.load(waytxt)
+        fencetxt = os.path.join(mpstate.status.logdir, 'fence.txt')
+        if os.path.exists(fencetxt):
+            mpstate.status.fenceloader.load(fencetxt) 
 
     # open any mavlink UDP ports
     for p in opts.output:
-        mpstate.mav_outputs.append(mavutil.mavudp(p, input=False))
+        mpstate.mav_outputs.append(mavutil.mavlink_connection(p, baud=opts.baudrate, input=False))
 
     if opts.sitl:
         mpstate.sitl_output = mavutil.mavudp(opts.sitl, input=False)
