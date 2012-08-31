@@ -457,6 +457,11 @@ def cmd_wp(args):
         mpstate.status.wp_save_filename = args[1]
         mpstate.status.wp_op = "save"
         mpstate.master().waypoint_request_list_send()
+    elif args[0] == "show":
+        if len(args) != 2:
+            print("usage: wp show <filename>")
+            return
+        mpstate.status.wploader.load(args[1])
     elif args[0] == "set":
         if len(args) != 2:
             print("usage: wp set <wpindex>")
@@ -465,7 +470,7 @@ def cmd_wp(args):
     elif args[0] == "clear":
         mpstate.master().waypoint_clear_all_send()
     else:
-        print("Usage: wp <list|load|save|set|clear>")
+        print("Usage: wp <list|load|save|set|show|clear>")
 
 
 def fetch_fence_point(i):
@@ -563,10 +568,15 @@ def cmd_fence(args):
             print("usage: fence save <filename>")
             return
         list_fence(args[1])
+    elif args[0] == "show":
+        if len(args) != 2:
+            print("usage: fence show <filename>")
+            return
+        mpstate.status.fenceloader.load(args[1]) 
     elif args[0] == "clear":
         param_set('FENCE_TOTAL', 0)
     else:
-        print("Usage: fence <list|load|save|clear>")
+        print("Usage: fence <list|load|save|show|clear>")
 
 
 def param_set(name, value, retries=3):
