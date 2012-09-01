@@ -79,6 +79,7 @@ class camera_state(object):
         self.altitude = None
         self.bsocket = None
         self.bsend2 = None
+        self.send1 = True
         self.send2 = False
         self.thumbsize = 60
         
@@ -233,6 +234,11 @@ def cmd_camera(args):
             print("send2=%s" % str(state.send2))
         else:
             state.send2 = bool(int(args[1]))
+    elif args[0] == "send1":
+        if len(args) != 2:
+            print("send1=%s" % str(state.send1))
+        else:
+            state.send1 = bool(int(args[1]))
     elif args[0] == "minscore":
         if len(args) != 2:
             print("minscore=%u" % state.minscore)
@@ -253,7 +259,7 @@ def cmd_camera(args):
                 mpstate.map.add_object(mp_slipmap.SlipPolygon('boundary', state.boundary_polygon, layer=1, linewidth=2, colour=(0,0,255)))
                 
     else:
-        print("usage: camera <start|stop|status|view|noview|gcs|brightness|capbrightness|boundary|bandwidth|bandwidth2|thumbsize|transmit|loss|save|minscore|altitude|send2>")
+        print("usage: camera <start|stop|status|view|noview|gcs|brightness|capbrightness|boundary|bandwidth|bandwidth2|thumbsize|transmit|loss|save|minscore|altitude|send1|send2>")
 
 
 def cmd_remote(args):
@@ -500,9 +506,10 @@ def transmit_thread():
             # send matches with a higher priority
             if state.transmit:
                 buf = cPickle.dumps(pkt, cPickle.HIGHEST_PROTOCOL)
-                bsend.send(buf,
-                           dest=(state.gcs_address, state.gcs_view_port),
-                           priority=1)
+                if state.send1:
+                    bsend.send(buf,
+                               dest=(state.gcs_address, state.gcs_view_port),
+                               priority=1)
                 # also send thumbnails via 900MHz telemetry
                 if state.send2:
                     state.bsend2.set_bandwidth(state.bandwidth2)
