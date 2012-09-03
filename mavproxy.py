@@ -342,6 +342,15 @@ def cmd_manual(args):
     '''set MANUAL mode'''
     mpstate.master().set_mode_manual()
 
+def cmd_servo(args):
+    '''set a servo'''
+    if len(args) != 2:
+        print("Usage: servo <channel> <pwmvalue>")
+        return
+    channel = int(args[0])
+    value   = int(args[1])
+    mpstate.master().set_servo(channel, value)
+
 def cmd_fbwa(args):
     '''set FBWA mode'''
     mpstate.master().set_mode_fbwa()
@@ -881,6 +890,7 @@ command_map = {
     'bat'     : (cmd_bat,      'show battery levels'),
     'alt'     : (cmd_alt,      'show relative altitude'),
     'link'    : (cmd_link,     'show link status'),
+    'servo'   : (cmd_servo,    'set a servo value'),
     'up'      : (cmd_up,       'adjust TRIM_PITCH_CD up by 5 degrees'),
     'watch'   : (cmd_watch,    'watch a MAVLink pattern'),
     'module'  : (cmd_module,   'module commands'),
