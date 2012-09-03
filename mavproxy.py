@@ -1293,19 +1293,9 @@ def master_callback(m, master):
     elif mtype == "BAD_DATA":
         if mavutil.all_printable(m.data):
             mpstate.console.write(str(m.data), bg='red')
-    elif mtype in [ 'HEARTBEAT', 'GLOBAL_POSITION', 'RC_CHANNELS_SCALED',
-                    'ATTITUDE', 'RC_CHANNELS_RAW', 'GPS_STATUS', 'WAYPOINT_CURRENT',
-                    'SERVO_OUTPUT_RAW', 'VFR_HUD',
-                    'GLOBAL_POSITION_INT', 'RAW_PRESSURE', 'RAW_IMU',
-                    'WAYPOINT_ACK', 'MISSION_ACK',
-                    'NAV_CONTROLLER_OUTPUT', 'GPS_RAW', 'GPS_RAW_INT', 'WAYPOINT',
-                    'SCALED_PRESSURE', 'SENSOR_OFFSETS', 'MEMINFO', 'AP_ADC',
-                    'FENCE_POINT', 'FENCE_STATUS', 'DCM', 'RADIO', 'AHRS', 'HWSTATUS',
-                    'SIMSTATE', 'PPP', 'WIND', 'MISSION_ITEM',
-                    'DATA16', 'DATA32', 'DATA64' ]:
-        pass
     else:
-        mpstate.console.writeln("Got MAVLink msg: %s" % m)
+        #mpstate.console.writeln("Got MAVLink msg: %s" % m)
+        pass
 
     if mpstate.status.watch is not None:
         if fnmatch.fnmatch(m.get_type().upper(), mpstate.status.watch.upper()):
