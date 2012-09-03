@@ -13,7 +13,7 @@ It is highly desirable that teams provide:
 
 '''
 
-import sys, os
+import sys, os, serial
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'cuav', 'lib'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'lib'))
 import cuav_util
@@ -27,6 +27,8 @@ class module_state(object):
         self.data = 8
         self.parity = 'N'
         self.stop = 1
+        self.serial = serial.Serial()
+        self.output_time = 0.0
 
 def name():
     '''return module name'''
@@ -39,15 +41,16 @@ def description():
 def cmd_nmea(args):
     '''set nmea'''
     state = mpstate.nmea_state
-    usage = "nmea port,baudrate,data,parity,stop"
+    usage = "nmea port [baudrate data parity stop]"
     if len(args) == 0:
       if state.port is None:
         print("NMEA output port not set")
+        print usage
       else:
         print("NMEA output port %s, %d, %d, %s, %d" % (str(state.port), state.baudrate, state.data, str(state.parity), state.stop))
       return
     if len(args) > 0:
-      state.port = int(args[0])
+      state.port = str(args[0])
     if len(args) > 1:
       state.baudrate = int(args[1])
     if len(args) > 2:
@@ -56,7 +59,16 @@ def cmd_nmea(args):
       state.parity = str(args[3])
     if len(args) > 4:
       state.stop = int(args[4])
-        
+
+    if (len(args) > 0):
+      try:
+        state.serial = serial.Serial(state.port, state.baudrate, state.data, state.parity, state.stop)
+      except serial.SerialException as se:
+        print("Failed to open output port %s:%s" % (state.port, se.message))
+        state.port = None
+        state.serial = serial.Serial()
+
+
 def init(_mpstate):
     '''initialise module'''
     global mpstate
@@ -111,7 +123,12 @@ def format_rmc(utc_sec, fix, lat, lon, speed, course):
 
 def mavlink_packet(m):
     '''handle an incoming mavlink packet'''
+    import time
     state = mpstate.nmea_state
+
+    now_time = time.time()
+    if abs(state.output_time - now_time) < 1.0:
+      return
 
     if m.get_type() == 'GPS_RAW_INT':
       #for GPRMC and GPGGA
@@ -119,21 +136,26 @@ def mavlink_packet(m):
       fix_status = 'A' if (m.fix_type > 1) else 'V'
       lat = m.lat/1.0e7
       lon = m.lon/1.0e7
-  
+
       #for GPRMC
       knots = ((m.vel/100.0)/1852.0)*3600
       course = m.cog/100.0
-  
+
       #for GPGGA
       fix_quality = 1 if (m.fix_type > 1) else 0 # 0/1 for (in)valid or 2 DGPS
       num_sat = m.satellites_visible
       hdop = m.eph/100.0
       altitude = m.alt/1000.0
-      #mpstate.console.set_status('Antenna', 'Antenna %.0f' % bearing, row=0)
 
-      print format_gga(utc_sec, lat, lon, fix_quality, num_sat, hdop, altitude)
-      print format_rmc(utc_sec, fix_status, lat, lon, knots, course)
+      #print format_gga(utc_sec, lat, lon, fix_quality, num_sat, hdop, altitude)
+      #print format_rmc(utc_sec, fix_status, lat, lon, knots, course)
+      gga = format_gga(utc_sec, lat, lon, fix_quality, num_sat, hdop, altitude)
+      rmc = format_rmc(utc_sec, fix_status, lat, lon, knots, course)
 
-    if (state.port is not None):
-      print 'todo output to port instead of printing'
+      state.output_time = now_time
+      print gga+'\r'
+      print rmc+'\r'
+      if state.serial.isOpen():
+        state.serial.write(gga + '\r\n')
+        state.serial.write(rmc + '\r\n')
 
