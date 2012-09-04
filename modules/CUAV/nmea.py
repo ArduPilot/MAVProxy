@@ -153,8 +153,8 @@ def mavlink_packet(m):
       rmc = format_rmc(utc_sec, fix_status, lat, lon, knots, course)
 
       state.output_time = now_time
-      print gga+'\r'
-      print rmc+'\r'
+      #print gga+'\r'
+      #print rmc+'\r'
       if state.serial.isOpen():
         state.serial.write(gga + '\r\n')
         state.serial.write(rmc + '\r\n')
