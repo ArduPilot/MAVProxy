@@ -238,6 +238,11 @@ class SlipCenter:
     def __init__(self, latlon):
         self.latlon = latlon
 
+class SlipBrightness:
+    '''an object to change map brightness'''
+    def __init__(self, brightness):
+        self.brightness = brightness
+
 
 class SlipInformation:
     '''an object to display in the information box'''
@@ -366,7 +371,7 @@ class MPSlipMap():
                  service="MicrosoftSat",
                  max_zoom=19,
                  debug=False,
-                 brightness=1,
+                 brightness=1.0,
                  elevation=False,
                  download=True):
         import multiprocessing
@@ -555,6 +560,11 @@ class MPSlipMapFrame(wx.Frame):
                 state.panel.re_center(state.width/2, state.height/2, lat, lon)
                 state.need_redraw = True
 
+            if isinstance(obj, SlipBrightness):
+                # set map brightness
+                state.brightness = obj.brightness
+                state.need_redraw = True
+
         if obj is None:
             time.sleep(0.05)
 
@@ -730,7 +740,7 @@ class MPSlipMapPanel(wx.Panel):
             # get the new map
             self.map_img = state.mt.area_to_image(state.lat, state.lon,
                                                   state.width, state.height, state.ground_width)
-            if state.brightness != 1:
+            if state.brightness != 1.0:
                 cv.ConvertScale(self.map_img, self.map_img, scale=state.brightness)
 
 

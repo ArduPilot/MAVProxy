@@ -22,6 +22,7 @@ class module_state(object):
         self.have_blueplane = False
         self.move_wp = -1
         self.moving_wp = False
+        self.brightness = 1
 
 def name():
     '''return module name'''
@@ -31,12 +32,24 @@ def description():
     '''return module description'''
     return "map display"
 
+def cmd_map(args):
+    '''map commands'''
+    state = mpstate.map_state
+    if args[0] == "brightness":
+        if len(args) < 2:
+            print("Brightness %.1f" % state.brightness)
+        else:
+            state.brightness = float(args[1])
+            mpstate.map.add_object(mp_slipmap.SlipBrightness(state.brightness))
+    else:
+        print("usage: map <brightness>")
+
 def init(_mpstate):
     '''initialise module'''
     global mpstate
     mpstate = _mpstate
     mpstate.map_state = module_state()
-    mpstate.map = mp_slipmap.MPSlipMap(service='GoogleSat', elevation=True, title='Map', brightness=2)
+    mpstate.map = mp_slipmap.MPSlipMap(service='GoogleSat', elevation=True, title='Map')
 
     # setup a plane icon
     icon = mpstate.map.icon('planetracker.png')
@@ -45,6 +58,8 @@ def init(_mpstate):
                                                trail=mp_slipmap.SlipTrail()))
 
     mpstate.map.add_callback(functools.partial(map_callback))
+    mpstate.command_map['map'] = (cmd_map, "map control")
+
 
 def display_waypoints():
     '''display the waypoints'''
