@@ -36,7 +36,7 @@ def init(_mpstate):
     global mpstate
     mpstate = _mpstate
     mpstate.map_state = module_state()
-    mpstate.map = mp_slipmap.MPSlipMap(service='GoogleSat', elevation=True, title='Map')
+    mpstate.map = mp_slipmap.MPSlipMap(service='GoogleSat', elevation=True, title='Map', brightness=2)
 
     # setup a plane icon
     icon = mpstate.map.icon('planetracker.png')

@@ -366,6 +366,7 @@ class MPSlipMap():
                  service="MicrosoftSat",
                  max_zoom=19,
                  debug=False,
+                 brightness=1,
                  elevation=False,
                  download=True):
         import multiprocessing
@@ -382,6 +383,7 @@ class MPSlipMap():
         self.max_zoom = max_zoom
         self.elevation = elevation
         self.oldtext = None
+        self.brightness = brightness
 
         self.drag_step = 10
 
@@ -691,7 +693,9 @@ class MPSlipMapPanel(wx.Panel):
         if self.last_click_pos is not None:
             distance = mp_util.gps_distance(self.last_click_pos[0], self.last_click_pos[1],
                                             self.click_pos[0], self.click_pos[1])
-            newtext += '  Distance: %.1fm' % distance
+            bearing = mp_util.gps_bearing(self.last_click_pos[0], self.last_click_pos[1],
+                                            self.click_pos[0], self.click_pos[1])
+            newtext += '  Distance: %.1fm Bearing %.1f' % (distance, bearing)
         t1 = unicode(newtext, encoding='ascii', errors="replace")
         if t1 != state.oldtext:
             self.position.Clear()
@@ -726,6 +730,9 @@ class MPSlipMapPanel(wx.Panel):
             # get the new map
             self.map_img = state.mt.area_to_image(state.lat, state.lon,
                                                   state.width, state.height, state.ground_width)
+            if state.brightness != 1:
+                cv.ConvertScale(self.map_img, self.map_img, scale=state.brightness)
+
 
         # find display bounding box
         (lat2,lon2) = self.coordinates(state.width-1, state.height-1)
