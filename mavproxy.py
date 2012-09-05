@@ -132,7 +132,8 @@ class MPState(object):
               ('moddebug', int, 0),
               ('rc1mul', int, 1),
               ('rc2mul', int, 1),
-              ('rc4mul', int, 1)]
+              ('rc4mul', int, 1),
+              ('shownoise', int, 1)]
             )
         self.status = MPStatus()
 
@@ -1249,7 +1250,7 @@ def master_callback(m, master):
         report_altitude(m.relative_alt*0.001)
 
     elif mtype == "BAD_DATA":
-        if mavutil.all_printable(m.data):
+        if mpstate.settings.shownoise and mavutil.all_printable(m.data):
             mpstate.console.write(str(m.data), bg='red')
     else:
         #mpstate.console.writeln("Got MAVLink msg: %s" % m)
