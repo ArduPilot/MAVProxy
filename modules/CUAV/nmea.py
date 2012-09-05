@@ -27,7 +27,7 @@ class module_state(object):
         self.data = 8
         self.parity = 'N'
         self.stop = 1
-        self.serial = serial.Serial()
+        self.serial = None
         self.output_time = 0.0
 
 def name():
@@ -60,13 +60,18 @@ def cmd_nmea(args):
     if len(args) > 4:
       state.stop = int(args[4])
 
+    if state.serial is not None:
+        state.serial.close()
+    state.serial = None
     if (len(args) > 0):
-      try:
-        state.serial = serial.Serial(state.port, state.baudrate, state.data, state.parity, state.stop)
-      except serial.SerialException as se:
-        print("Failed to open output port %s:%s" % (state.port, se.message))
-        state.port = None
-        state.serial = serial.Serial()
+        if state.port.startswith("/dev/"):
+            try:
+                state.serial = serial.Serial(state.port, state.baudrate, state.data, state.parity, state.stop)
+            except serial.SerialException as se:
+                print("Failed to open output port %s:%s" % (state.port, se.message))
+        else:
+            state.serial = open(state.port, mode='w')
+            
 
 
 def init(_mpstate):
@@ -89,7 +94,7 @@ def format_time(utc_sec):
     import time
     tm_t = time.gmtime(utc_sec)
     subsecs = utc_sec - int(utc_sec);
-    return "%02d%02d%05.2f" % (tm_t.tm_hour, tm_t.tm_min, tm_t.tm_sec + subsecs)
+    return "%02d%02d%05.3f" % (tm_t.tm_hour, tm_t.tm_min, tm_t.tm_sec + subsecs)
 
 def format_lat(lat):
     deg = abs(lat)
@@ -105,7 +110,7 @@ def format_lon(lon):
 #print ("*%02X" % nmea_checksum(tst))
 
 def nmea_checksum(msg):
-    d = msg[msg.find('$')+1:msg.find('*')]
+    d = msg[1:]
     cs = 0
     for i in d:
       cs ^= ord(i)
@@ -117,7 +122,7 @@ def format_gga(utc_sec, lat, lon, fix, nsat, hdop, alt):
     return msg + "*%02X" % nmea_checksum(msg)
 
 def format_rmc(utc_sec, fix, lat, lon, speed, course):
-    fmt = "$GPRMC,%s,%s,%s,%s,%05.1f,%05.1f,%s,,"
+    fmt = "$GPRMC,%s,%s,%s,%s,%.2f,%.2f,%s,,"
     msg = fmt % (format_time(utc_sec), fix, format_lat(lat), format_lon(lon), speed, course, format_date(utc_sec))
     return msg + "*%02X" % nmea_checksum(msg)
 
@@ -132,7 +137,7 @@ def mavlink_packet(m):
 
     if m.get_type() == 'GPS_RAW_INT':
       #for GPRMC and GPGGA
-      utc_sec = m.time_usec/1.0e6 + 16.0
+      utc_sec = now_time
       fix_status = 'A' if (m.fix_type > 1) else 'V'
       lat = m.lat/1.0e7
       lon = m.lon/1.0e7
@@ -155,7 +160,8 @@ def mavlink_packet(m):
       state.output_time = now_time
       #print gga+'\r'
       #print rmc+'\r'
-      if state.serial.isOpen():
+      if state.serial is not None:
         state.serial.write(gga + '\r\n')
         state.serial.write(rmc + '\r\n')
-
+        state.serial.flush()
+        
