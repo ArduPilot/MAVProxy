@@ -22,6 +22,7 @@ class MPSettings(object):
                     return
                 setattr(self, vname, value)
                 return
+        print("Invalid setting %s" % vname)
 
     def show(self, v):
         '''show settings'''
