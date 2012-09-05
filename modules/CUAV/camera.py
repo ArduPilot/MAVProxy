@@ -52,6 +52,8 @@ class camera_state(object):
               ('altitude', int, None),
               ('send1', int, 1),
               ('send2', int, 1),
+              ('maxqueue1', int, None),
+              ('maxqueue2', int, 30),
               ('thumbsize', int, 60),
               ('packet_loss', int, 0)              
               ]
@@ -403,8 +405,8 @@ def transmit_thread():
     state.bsend2.set_bandwidth(state.settings.bandwidth2)
 
     while not state.unload.wait(0.02):
-        bsend.tick(packet_count=1000)
-        state.bsend2.tick(packet_count=1000)
+        bsend.tick(packet_count=1000, max_queue=state.settings.maxqueue1)
+        state.bsend2.tick(packet_count=1000, max_queue=state.settings.maxqueue2)
         check_commands()
         if state.transmit_queue.empty():
             continue
@@ -432,28 +434,38 @@ def transmit_thread():
         jpeg = None
 
         if len(regions) > 0:
-            score = 0
+            lowscore = 0
+            highscore = 0
             for r in regions:
-                score = max(score, r.score)
+                lowscore = min(lowscore, r.score)
+                highscore = max(highscore, r.score)
                 
-            # send a region message with thumbnails to the ground station
-            thumb = cuav_mosaic.CompositeThumbnail(cv.GetImage(cv.fromarray(im_full)),
-                                                   regions, quality=state.settings.quality, thumb_size=state.settings.thumbsize)
-            bsend.set_bandwidth(state.settings.bandwidth)
-            bsend.set_packet_loss(state.settings.packet_loss)
-            pkt = ThumbPacket(frame_time, regions, thumb, state.frame_loss, state.xmit_queue, pos)
-
-            # send matches with a higher priority
             if state.settings.transmit:
-                buf = cPickle.dumps(pkt, cPickle.HIGHEST_PROTOCOL)
-                if state.settings.send1 and score > state.settings.minscore:
+                # send a region message with thumbnails to the ground station
+                thumb = None
+                if state.settings.send1:
+                    thumb = cuav_mosaic.CompositeThumbnail(cv.GetImage(cv.fromarray(im_full)),
+                                                           regions, quality=state.settings.quality, thumb_size=state.settings.thumbsize)
+                    pkt = ThumbPacket(frame_time, regions, thumb, state.frame_loss, state.xmit_queue, pos)
+
+                    buf = cPickle.dumps(pkt, cPickle.HIGHEST_PROTOCOL)
+                    bsend.set_bandwidth(state.settings.bandwidth)
+                    bsend.set_packet_loss(state.settings.packet_loss)
                     bsend.send(buf,
                                dest=(state.settings.gcs_address, state.settings.gcs_view_port),
                                priority=1)
                 # also send thumbnails via 900MHz telemetry
-                if state.settings.send2 and score > state.settings.minscore2:
+                if state.settings.send2 and highscore >= state.settings.minscore2:
+                    if thumb is None or lowscore < state.settings.minscore2:
+                        # remove some of the regions
+                        regions = cuav_region.filter_regions(im_full, regions, min_score=state.settings.minscore2)
+                        thumb = cuav_mosaic.CompositeThumbnail(cv.GetImage(cv.fromarray(im_full)),
+                                                               regions, quality=state.settings.quality, thumb_size=state.settings.thumbsize)
+                        pkt = ThumbPacket(frame_time, regions, thumb, state.frame_loss, state.xmit_queue, pos)
+
+                        buf = cPickle.dumps(pkt, cPickle.HIGHEST_PROTOCOL)
                     state.bsend2.set_bandwidth(state.settings.bandwidth2)
-                    state.bsend2.send(buf, priority=score)
+                    state.bsend2.send(buf, priority=highscore)
 
         # Base how many images we send on the send queue size
         send_frequency = state.xmit_queue // 3
@@ -553,8 +565,8 @@ def view_thread():
         if state.viewing:
             tnow = time.time()
             if tnow - ack_time > 0.1:
-                bsend.tick(packet_count=1000)
-                state.bsend2.tick(packet_count=1000)
+                bsend.tick(packet_count=1000, max_queue=state.settings.maxqueue1)
+                state.bsend2.tick(packet_count=1000, max_queue=state.settings.maxqueue2)
                 ack_time = tnow
             if not view_window:
                 view_window = True
