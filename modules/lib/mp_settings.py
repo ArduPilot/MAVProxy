@@ -10,8 +10,8 @@ class MPSettings(object):
 
     def set(self, vname, value):
         '''set a setting'''
-        if value is None:
-            setattr(self, vname, value)
+        if value is None or value == 'None':
+            setattr(self, vname, None)
             return
         for (v,t,d) in sorted(self.vars):
             if v == vname:
