@@ -61,6 +61,7 @@ class SRTMDownloader():
                  offline=0):
 
         self.offline = offline
+        self.first_failure = False
         self.server = server
         self.directory = directory
         self.cachedir = cachedir
@@ -200,18 +201,24 @@ class SRTMDownloader():
         filepath = "%s%s%s" % \
                      (self.directory,continent,filename)
         '''print "filepath=%s" % filepath'''
-        conn.request("GET", filepath)
-        r1 = conn.getresponse()
-        if r1.status==200:
-            '''print "status200 received ok"'''
-            data = r1.read()
-            self.ftpfile = open(self.cachedir + "/" + filename, 'wb')
-            self.ftpfile.write(data)
-            self.ftpfile.close()
-            self.ftpfile = None
-        else:
-            '''print "oh no = status=%d %s" \
-                  % (r1.status,r1.reason)'''
+        try:
+            conn.request("GET", filepath)
+            r1 = conn.getresponse()
+            if r1.status==200:
+                '''print "status200 received ok"'''
+                data = r1.read()
+                self.ftpfile = open(self.cachedir + "/" + filename, 'wb')
+                self.ftpfile.write(data)
+                self.ftpfile.close()
+                self.ftpfile = None
+            else:
+                '''print "oh no = status=%d %s" \
+                % (r1.status,r1.reason)'''
+        except Exception as e:
+            if not self.first_failure:
+                print("SRTM Download failed: %s" % str(e))
+                self.first_failure = True
+            pass
 
 
 class SRTMTile:
