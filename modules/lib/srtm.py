@@ -216,7 +216,7 @@ class SRTMDownloader():
                 % (r1.status,r1.reason)'''
         except Exception as e:
             if not self.first_failure:
-                print("SRTM Download failed: %s" % str(e))
+                #print("SRTM Download failed: %s" % str(e))
                 self.first_failure = True
             pass
 
