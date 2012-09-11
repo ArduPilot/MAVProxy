@@ -63,9 +63,13 @@ def init(_mpstate):
 
 def display_waypoints():
     '''display the waypoints'''
-    points = mpstate.status.wploader.polygon()
-    if len(points) > 1:
-        mpstate.map.add_object(mp_slipmap.SlipPolygon('mission', points, layer=1, linewidth=2, colour=(255,255,255)))
+    polygons = mpstate.status.wploader.polygon_list()
+    mpstate.map.add_object(mp_slipmap.SlipClearLayer('Mission'))
+    for i in range(len(polygons)):
+        p = polygons[i]
+        if len(p) > 1:
+            mpstate.map.add_object(mp_slipmap.SlipPolygon('mission%u' % i, p,
+                                                          layer='Mission', linewidth=2, colour=(255,255,255)))
 
 def closest_waypoint(latlon):
     '''find closest waypoint to a position'''
@@ -100,7 +104,7 @@ def map_callback(obj):
                 state.moving_wp = True
                 state.move_wp = wpnum
                 wp = mpstate.status.wploader.wp(state.move_wp)
-                print("Selected WP %u" % wpnum)
+                print("Selected WP %u : %s" % (wpnum, getattr(wp,'comment','')))
         else:
             wp = mpstate.status.wploader.wp(state.move_wp)
             (lat, lon) = obj.latlon

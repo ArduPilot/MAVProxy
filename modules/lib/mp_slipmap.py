@@ -243,6 +243,11 @@ class SlipBrightness:
     def __init__(self, brightness):
         self.brightness = brightness
 
+class SlipClearLayer:
+    '''remove all objects in a layer'''
+    def __init__(self, layer):
+        self.layer = layer
+
 
 class SlipInformation:
     '''an object to display in the information box'''
@@ -563,6 +568,12 @@ class MPSlipMapFrame(wx.Frame):
             if isinstance(obj, SlipBrightness):
                 # set map brightness
                 state.brightness = obj.brightness
+                state.need_redraw = True
+
+            if isinstance(obj, SlipClearLayer):
+                # remove all objects from a layer
+                if obj.layer in state.layers:
+                    state.layers.pop(obj.layer)
                 state.need_redraw = True
 
         if obj is None:
