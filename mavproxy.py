@@ -289,6 +289,10 @@ def cmd_level(args):
     '''do a ground start mode'''
     mpstate.master().calibrate_level()
 
+def cmd_reboot(args):
+    '''reboot autopilot'''
+    mpstate.master().reboot_autopilot()
+
 def cmd_calpressure(args):
     '''calibrate pressure sensors'''
     mpstate.master().calibrate_pressure()
@@ -850,6 +854,7 @@ command_map = {
     'alt'     : (cmd_alt,      'show relative altitude'),
     'link'    : (cmd_link,     'show link status'),
     'servo'   : (cmd_servo,    'set a servo value'),
+    'reboot'  : (cmd_reboot,   'reboot the autopilot'),
     'up'      : (cmd_up,       'adjust TRIM_PITCH_CD up by 5 degrees'),
     'watch'   : (cmd_watch,    'watch a MAVLink pattern'),
     'module'  : (cmd_module,   'module commands'),
