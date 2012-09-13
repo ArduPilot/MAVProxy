@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*- 
 '''
 slipmap based on mp_tile
 Andrew Tridgell
@@ -84,6 +85,7 @@ class SlipPolygon(SlipObject):
             return
         (pix1, pix2) = clipped
         cv.Line(img, pix1, pix2, colour, linewidth)
+        cv.Circle(img, pix2, linewidth*2, colour)
 
     def draw(self, img, pixmapper):
         '''draw a polygon on the image'''
@@ -246,6 +248,16 @@ class SlipCenter:
     def __init__(self, latlon):
         self.latlon = latlon
 
+class SlipBrightness:
+    '''an object to change map brightness'''
+    def __init__(self, brightness):
+        self.brightness = brightness
+
+class SlipClearLayer:
+    '''remove all objects in a layer'''
+    def __init__(self, layer):
+        self.layer = layer
+
 
 class SlipInformation:
     '''an object to display in the information box'''
@@ -374,6 +386,7 @@ class MPSlipMap():
                  service="MicrosoftSat",
                  max_zoom=19,
                  debug=False,
+                 brightness=1.0,
                  elevation=False,
                  download=True):
         import multiprocessing
@@ -389,6 +402,8 @@ class MPSlipMap():
         self.debug = debug
         self.max_zoom = max_zoom
         self.elevation = elevation
+        self.oldtext = None
+        self.brightness = brightness
 
         self.drag_step = 10
 
@@ -560,6 +575,17 @@ class MPSlipMapFrame(wx.Frame):
                 state.panel.re_center(state.width/2, state.height/2, lat, lon)
                 state.need_redraw = True
 
+            if isinstance(obj, SlipBrightness):
+                # set map brightness
+                state.brightness = obj.brightness
+                state.need_redraw = True
+
+            if isinstance(obj, SlipClearLayer):
+                # remove all objects from a layer
+                if obj.layer in state.layers:
+                    state.layers.pop(obj.layer)
+                state.need_redraw = True
+
         if obj is None:
             time.sleep(0.05)
 
@@ -677,26 +703,35 @@ class MPSlipMapPanel(wx.Panel):
         '''update position text'''
         state = self.state
         pos = self.mouse_pos
-        self.position.Clear()
+        newtext = ''
         alt = 0
         if pos is not None:
             (lat,lon) = self.coordinates(pos.x, pos.y)
-            self.position.WriteText('Cursor: %f %f' % (lat, lon))
+            newtext += 'Cursor: %f %f' % (lat, lon)
             if state.elevation:
                 alt = self.ElevationMap.GetElevation(lat, lon)
-                self.position.WriteText(' %.1fm' % alt)
+                newtext += ' %.1fm' % alt
         pending = state.mt.tiles_pending()
         if pending:
-            self.position.WriteText(' Map Downloading %u ' % pending)
+            newtext += ' Map Downloading %u ' % pending
         if alt == -1:
-            self.position.WriteText(' SRTM Downloading ')
-        self.position.WriteText('\n')
+            newtext += ' SRTM Downloading '
+        newtext += '\n'
         if self.click_pos is not None:
-            self.position.WriteText('Click: %f %f' % (self.click_pos[0], self.click_pos[1]))
+            newtext += 'Click: %f %f (%s %s)' % (self.click_pos[0], self.click_pos[1],
+                                                 mp_util.degrees_to_dms(self.click_pos[0]),
+                                                 mp_util.degrees_to_dms(self.click_pos[1]))
         if self.last_click_pos is not None:
             distance = mp_util.gps_distance(self.last_click_pos[0], self.last_click_pos[1],
                                             self.click_pos[0], self.click_pos[1])
-            self.position.WriteText('  Distance: %.1fm' % distance)
+            bearing = mp_util.gps_bearing(self.last_click_pos[0], self.last_click_pos[1],
+                                            self.click_pos[0], self.click_pos[1])
+            newtext += '  Distance: %.1fm Bearing %.1f' % (distance, bearing)
+        t1 = unicode(newtext, encoding='ascii', errors="replace")
+        if t1 != state.oldtext:
+            self.position.Clear()
+            self.position.WriteText(newtext)
+            state.oldtext = t1
 
     def pixel_coords(self, latlon):
         '''return pixel coordinates in the map image for a (lat,lon)'''
@@ -726,6 +761,9 @@ class MPSlipMapPanel(wx.Panel):
             # get the new map
             self.map_img = state.mt.area_to_image(state.lat, state.lon,
                                                   state.width, state.height, state.ground_width)
+            if state.brightness != 1.0:
+                cv.ConvertScale(self.map_img, self.map_img, scale=state.brightness)
+
 
         # find display bounding box
         (lat2,lon2) = self.coordinates(state.width-1, state.height-1)
@@ -815,7 +853,7 @@ class MPSlipMapPanel(wx.Panel):
             self.last_click_pos = self.click_pos
             self.click_pos = self.coordinates(pos.x, pos.y)
 
-        if event.Dragging() and self.mouse_down is not None:
+        if event.Dragging() and event.ButtonIsDown(wx.MOUSE_BTN_LEFT):
             # drag map to new position
             newpos = pos
             dx = (self.mouse_down.x - newpos.x)

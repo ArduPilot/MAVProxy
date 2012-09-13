@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*- 
 '''common mavproxy utility functions'''
 
 import math
@@ -142,3 +143,11 @@ class object_container:
 					setattr(self, v, a)
 				except Exception:
 					pass
+
+def degrees_to_dms(degrees):
+	'''return a degrees:minutes:seconds string'''
+	deg = int(degrees)
+	min = int((degrees - deg)*60)
+	sec = ((degrees - deg) - (min/60.0))*60*60
+	return '%u°%02u\'%04.1f"' % (deg, abs(min), abs(sec))
+

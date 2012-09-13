@@ -18,12 +18,12 @@ from mavproxy_map import srtm
 class ElevationModel():
     '''Elevation Model. Only SRTM for now'''
 
-    def __init__(self, database='srtm'):
+    def __init__(self, database='srtm', offline=0):
         '''Use offline=1 to disable any downloading of tiles, regardless of whether the
         tile exists'''
         self.database = database
         if self.database == 'srtm':
-            self.downloader = srtm.SRTMDownloader(offline=0)
+            self.downloader = srtm.SRTMDownloader(offline=offline)
             self.downloader.loadFileList()
             self.tileDict = dict()
 
