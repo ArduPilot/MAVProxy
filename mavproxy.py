@@ -562,7 +562,7 @@ def cmd_param(args):
     '''control parameters'''
     param_wildcard = "*"
     if len(args) < 1:
-        print("usage: param <fetch|edit|set|show>")
+        print("usage: param <fetch|edit|set|show|diff>")
         return
     if args[0] == "fetch":
         if len(args) == 1:
@@ -581,6 +581,15 @@ def cmd_param(args):
         else:
             param_wildcard = "*"
         mpstate.mav_param.save(args[1], param_wildcard, verbose=True)
+    elif args[0] == "diff":
+        if len(args) < 2:
+            if opts.aircraft is not None:
+                filename = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(mpstate.status.logdir))), 'mavdefault.txt')
+            else:
+                print("Usage: param diff <filename>")
+        else:
+            filename = args[1]
+        mpstate.mav_param.diff(filename)
     elif args[0] == "set":
         if len(args) != 3:
             print("Usage: param set PARMNAME VALUE")
