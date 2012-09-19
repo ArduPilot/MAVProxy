@@ -146,7 +146,7 @@ class MPState(object):
         # SITL output
         self.sitl_output = None
 
-        self.mav_param = {}
+        self.mav_param = mavparm.MAVParmDict()
         self.modules = []
         self.functions = MAVFunctions()
         self.functions.say = say
@@ -204,9 +204,7 @@ def say(text, priority='important'):
 
 def get_mav_param(param, default=None):
     '''return a EEPROM parameter value'''
-    if not param in mpstate.mav_param:
-        return default
-    return mpstate.mav_param[param]
+    return mpstate.mav_param.get(param, default)
 
 
 def send_rc_override():
@@ -557,103 +555,12 @@ def cmd_fence(args):
 
 def param_set(name, value, retries=3):
     '''set a parameter'''
-    got_ack = False
-    while retries > 0 and not got_ack:
-        retries -= 1
-        mpstate.master().param_set_send(name.upper(), float(value))
-        tstart = time.time()
-        while time.time() - tstart < 1:
-            ack = mpstate.master().recv_match(type='PARAM_VALUE', blocking=False)
-            if ack == None:
-                time.sleep(0.1)
-                continue
-            if str(name).upper() == str(ack.param_id).upper():
-                got_ack = True
-                break
-    if not got_ack:
-        print("timeout setting %s to %f" % (name, float(value)))
-        return False
-    return True
+    return mpstate.mav_param.mavset(mpstate.master(), name, value, retries=retries)
 
-
-def param_save(filename, wildcard):
-    '''save parameters to a file'''
-    f = open(filename, mode='w')
-    k = mpstate.mav_param.keys()
-    k.sort()
-    count = 0
-    for p in k:
-        if p and fnmatch.fnmatch(str(p).upper(), wildcard.upper()):
-            f.write("%-15.15s %f\n" % (p, mpstate.mav_param[p]))
-            count += 1
-    f.close()
-    print("Saved %u parameters to %s" % (count, filename))
-
-
-def param_load_file(filename, wildcard):
-    '''load parameters from a file'''
-    try:
-        f = open(filename, mode='r')
-    except:
-        print("Failed to open file '%s'" % filename)
-        return
-    count = 0
-    changed = 0
-    for line in f:
-        line = line.strip()
-        if not line or line[0] == "#":
-            continue
-        a = line.split()
-        if len(a) != 2:
-            print("Invalid line: %s" % line)
-            continue
-        # some parameters should not be loaded from file
-        if a[0] in ['SYSID_SW_MREV', 'SYS_NUM_RESETS', 'ARSPD_OFFSET', 'GND_ABS_PRESS',
-                    'GND_TEMP', 'CMD_TOTAL', 'CMD_INDEX', 'LOG_LASTFILE', 'FENCE_TOTAL',
-                    'FORMAT_VERSION' ]:
-            continue
-        if not fnmatch.fnmatch(a[0].upper(), wildcard.upper()):
-            continue
-        if a[0] not in mpstate.mav_param:
-            print("Unknown parameter %s" % a[0])
-            continue
-        old_value = mpstate.mav_param[a[0]]
-        if math.fabs(old_value - float(a[1])) > 0.000001:
-            if param_set(a[0], a[1]):
-                print("changed %s from %f to %f" % (a[0], old_value, float(a[1])))
-            changed += 1
-        count += 1
-    f.close()
-    print("Loaded %u parameters from %s (changed %u)" % (count, filename, changed))
-
-def param_reload_file(filename):
-    '''reload parameters from a file'''
-    try:
-        f = open(filename, mode='r')
-    except:
-        print("Failed to open file '%s'" % filename)
-        return
-    count = 0
-    for line in f:
-        line = line.strip()
-        if not line or line[0] == "#":
-            continue
-        a = line.split()
-        if len(a) != 2:
-            print("Invalid line: %s" % line)
-            continue
-        mpstate.mav_param[a[0]] = float(a[1])
-        count += 1
-    f.close()
-    for master in mpstate.mav_master:
-        master.param_fetch_complete = True
-    print("Reloaded %u parameters from %s" % (count, filename))
-    
-
-param_wildcard = "*"
 
 def cmd_param(args):
     '''control parameters'''
+    param_wildcard = "*"
     if len(args) < 1:
         print("usage: param <fetch|edit|set|show>")
         return
@@ -673,7 +580,7 @@ def cmd_param(args):
             param_wildcard = args[2]
         else:
             param_wildcard = "*"
-        param_save(args[1], param_wildcard)
+        mpstate.mav_param.save(args[1], param_wildcard, verbose=True)
     elif args[0] == "set":
         if len(args) != 3:
             print("Usage: param set PARMNAME VALUE")
@@ -692,16 +599,13 @@ def cmd_param(args):
             param_wildcard = args[2]
         else:
             param_wildcard = "*"
-        param_load_file(args[1], param_wildcard)
+        mpstate.mav_param.load(args[1], param_wildcard, mpstate.master())
     elif args[0] == "show":
         if len(args) > 1:
             pattern = args[1]
         else:
             pattern = "*"
-        k = sorted(mpstate.mav_param.keys())
-        for p in k:
-            if fnmatch.fnmatch(str(p).upper(), pattern.upper()):
-                print("%-15.15s %f" % (str(p), mpstate.mav_param[p]))
+        mpstate.mav_param.show(pattern)
     else:
         print("Unknown subcommand '%s' (try 'fetch', 'save', 'set', 'show', 'load')" % args[0])
 
@@ -1121,7 +1025,7 @@ def master_callback(m, master):
         if m.param_index+1 == m.param_count:
             mpstate.console.writeln("Received %u parameters" % m.param_count)
             if mpstate.status.logdir != None:
-                param_save(os.path.join(mpstate.status.logdir, 'mav.parm'), '*')
+                mpstate.mav_param.save(os.path.join(mpstate.status.logdir, 'mav.parm'), '*', verbose=True)
 
     elif mtype == 'SERVO_OUTPUT_RAW':
         if opts.quadcopter:
@@ -1625,7 +1529,7 @@ if __name__ == '__main__':
 
     if opts.mav09:
         os.environ['MAVLINK09'] = '1'
-    import mavutil, mavwp
+    import mavutil, mavwp, mavparm
 
     # global mavproxy state
     mpstate = MPState()
@@ -1685,7 +1589,9 @@ Auto-detected serial ports are:
     if mpstate.continue_mode and mpstate.status.logdir != None:
         parmfile = os.path.join(mpstate.status.logdir, 'mav.parm')
         if os.path.exists(parmfile):
-            param_reload_file(parmfile)
+            mpstate.mav_param.load(parmfile)
+            for m in mpstate.mav_master:
+                m.param_fetch_complete = True
         waytxt = os.path.join(mpstate.status.logdir, 'way.txt')
         if os.path.exists(waytxt):
             mpstate.status.wploader.load(waytxt)
