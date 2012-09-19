@@ -735,9 +735,9 @@ def mavlink_packet(m):
             state.bsocket.incoming.append(m)
     if m.get_type() == "SERVO_OUTPUT_RAW":
         bottle = m.servo7_raw
-        if bottle == 1290:
+        if bottle == 1000:
             mpstate.console.set_status('Bottle', 'Bottle: HELD', row=0, fg='green')
-        elif bottle == 1776:
+        elif bottle == 1380:
             mpstate.console.set_status('Bottle', 'Bottle: DROP', row=0, fg='red')
         else:
             mpstate.console.set_status('Bottle', 'Bottle: %u' % bottle, row=0, fg='red')
