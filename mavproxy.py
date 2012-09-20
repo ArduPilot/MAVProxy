@@ -70,6 +70,7 @@ class MPStatus(object):
         self.flightmode = 'MAV'
         self.logdir = None
         self.last_heartbeat = 0
+        self.last_message = 0
         self.heartbeat_error = False
         self.last_apm_msg = None
         self.last_apm_msg_time = 0
@@ -999,6 +1000,13 @@ def master_callback(m, master):
         usec = (usec & ~3) | master.linknum
         mpstate.logqueue.put(str(struct.pack('>Q', usec) + m.get_msgbuf()))
 
+    if mtype in [ 'HEARTBEAT', 'GPS_RAW_INT', 'GPS_RAW', 'GLOBAL_POSITION_INT', 'SYS_STATUS' ]:
+        if master.linkerror:
+            master.linkerror = False
+            say("link %u OK" % (master.linknum+1))
+        mpstate.status.last_message = time.time()
+        master.last_message = mpstate.status.last_message        
+
     if master.link_delayed:
         # don't process delayed packets that cause double reporting
         if mtype in [ 'MISSION_CURRENT', 'SYS_STATUS', 'VFR_HUD',
@@ -1341,11 +1349,11 @@ def set_stream_rates():
 def check_link_status():
     '''check status of master links'''
     tnow = time.time()
-    if mpstate.status.last_heartbeat != 0 and tnow > mpstate.status.last_heartbeat + 5:
-        say("no heartbeat")
+    if mpstate.status.last_message != 0 and tnow > mpstate.status.last_message + 5:
+        say("no link")
         mpstate.status.heartbeat_error = True
     for master in mpstate.mav_master:
-        if not master.linkerror and tnow > master.last_heartbeat + 5:
+        if not master.linkerror and tnow > master.last_message + 5:
             say("link %u down" % (master.linknum+1))
             master.linkerror = True
 
@@ -1353,6 +1361,9 @@ def periodic_tasks():
     '''run periodic checks'''
     if mpstate.status.setup_mode:
         return
+
+    if mpstate.settings.heartbeat != 0:
+        heartbeat_period.frequency = mpstate.settings.heartbeat
 
     if heartbeat_period.trigger() and mpstate.settings.heartbeat != 0:
         mpstate.status.counters['MasterOut'] += 1
@@ -1588,6 +1599,7 @@ Auto-detected serial ports are:
         m.linkerror = False
         m.link_delayed = False
         m.last_heartbeat = 0
+        m.last_message = 0
         m.highest_msec = 0
         mpstate.mav_master.append(m)
         mpstate.status.counters['MasterIn'].append(0)
