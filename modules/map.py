@@ -153,6 +153,16 @@ def mavlink_packet(m):
             create_blueplane()
             mpstate.map.set_position('blueplane', (lat, lon), rotation=m.cog*0.01)
 
+    if m.get_type() == "NAV_CONTROLLER_OUTPUT":
+        if mpstate.master().flightmode == "AUTO":
+            trajectory = [ (state.lat, state.lon),
+                           mp_util.gps_newpos(state.lat, state.lon, m.target_bearing, m.wp_dist) ]
+            mpstate.map.add_object(mp_slipmap.SlipPolygon('trajectory', trajectory, layer='Trajectory',
+                                                          linewidth=2, colour=(255,0,180)))
+        else:
+            mpstate.map.add_object(mp_slipmap.SlipClearLayer('Trajectory'))
+
+        
     if m.get_type() == 'GLOBAL_POSITION_INT':
         (state.lat, state.lon, state.heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
     else:
