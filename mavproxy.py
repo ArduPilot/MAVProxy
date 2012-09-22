@@ -83,7 +83,6 @@ class MPStatus(object):
         self.watch = None
         self.last_streamrate1 = -1
         self.last_streamrate2 = -1
-        self.last_paramretry = 0
         self.last_seq = 0
         self.fetch_one = False
 
@@ -129,7 +128,6 @@ class MPState(object):
               ('streamrate2', int, 4),
               ('heartbeatreport', int, 1),
               ('radiosetup', int, 0),
-              ('paramretry', int, 10),
               ('moddebug', int, 0),
               ('rc1mul', int, 1),
               ('rc2mul', int, 1),
@@ -148,6 +146,8 @@ class MPState(object):
         self.sitl_output = None
 
         self.mav_param = mavparm.MAVParmDict()
+        self.mav_param_set = set()
+        self.mav_param_count = 0
         self.modules = []
         self.functions = MAVFunctions()
         self.functions.say = say
@@ -568,6 +568,7 @@ def cmd_param(args):
     if args[0] == "fetch":
         if len(args) == 1:
             mpstate.master().param_fetch_all()
+            mpstate.mav_param_set = set()
             print("Requested parameter list")
         else:
             mpstate.master().param_fetch_one(args[1].upper())
@@ -1020,6 +1021,9 @@ def master_callback(m, master):
             mpstate.status.target_system = m.get_srcSystem()
             mpstate.status.target_component = m.get_srcComponent()
             say("online system %u component %u" % (mpstate.status.target_system, mpstate.status.target_component),'message')
+            if len(mpstate.mav_param_set) == 0 or len(mpstate.mav_param_set) != mpstate.mav_param_count:
+                master.param_fetch_all()
+
         if mpstate.status.heartbeat_error:
             mpstate.status.heartbeat_error = False
             say("heartbeat OK")
@@ -1035,11 +1039,15 @@ def master_callback(m, master):
             mpstate.status.last_apm_msg = m.text
             mpstate.status.last_apm_msg_time = time.time()
     elif mtype == 'PARAM_VALUE':
+        if m.param_index != -1:
+            mpstate.mav_param_set.add(m.param_index)
+        if m.param_count != -1:
+            mpstate.mav_param_count = m.param_count
         mpstate.mav_param[str(m.param_id)] = m.param_value
         if mpstate.status.fetch_one:
             mpstate.status.fetch_one = False
             mpstate.console.writeln("%s = %f" % (m.param_id, m.param_value))
-        if m.param_index+1 == m.param_count:
+        if len(mpstate.mav_param_set) == m.param_count:
             mpstate.console.writeln("Received %u parameters" % m.param_count)
             if mpstate.status.logdir != None:
                 mpstate.mav_param.save(os.path.join(mpstate.status.logdir, 'mav.parm'), '*', verbose=True)
@@ -1382,16 +1390,15 @@ def periodic_tasks():
 
     set_stream_rates()
 
-    for master in mpstate.mav_master:
-        if (not master.param_fetch_complete and
-            mpstate.settings.paramretry != 0 and
-            time.time() - mpstate.status.last_paramretry > mpstate.settings.paramretry and
-            master.time_since('PARAM_VALUE') > 10 and
-            'HEARTBEAT' in master.messages):
-            mpstate.status.last_paramretry = time.time()
-            mpstate.console.writeln("fetching parameters")
-            master.param_fetch_all()
- 
+    if param_period.trigger():
+        if len(mpstate.mav_param_set) == 0:
+            mpstate.master().param_fetch_all()
+        elif mpstate.mav_param_count != 0 and len(mpstate.mav_param_set) != mpstate.mav_param_count:
+            if mpstate.master().time_since('PARAM_VALUE') >= 1:
+                diff = set(range(mpstate.mav_param_count)).difference(mpstate.mav_param_set)
+                idx = diff.pop()
+                mpstate.master().param_fetch_one(idx)
+            
     if battery_period.trigger():
         battery_report()
 
@@ -1410,6 +1417,7 @@ def main_loop():
         for master in mpstate.mav_master:
             master.wait_heartbeat()
             if len(mpstate.mav_param) < 10 or not mpstate.continue_mode:
+                mpstate.mav_param_set = set()
                 master.param_fetch_all()
         set_stream_rates()
 
@@ -1636,6 +1644,7 @@ Auto-detected serial ports are:
     mpstate.settings.streamrate2 = opts.streamrate
 
     msg_period = mavutil.periodic_event(1.0/15)
+    param_period = mavutil.periodic_event(1)
     heartbeat_period = mavutil.periodic_event(1)
     battery_period = mavutil.periodic_event(0.1)
     if mpstate.sitl_output:
