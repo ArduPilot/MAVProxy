@@ -1039,15 +1039,19 @@ def master_callback(m, master):
             mpstate.status.last_apm_msg = m.text
             mpstate.status.last_apm_msg_time = time.time()
     elif mtype == 'PARAM_VALUE':
-        if m.param_index != -1:
+        param_id = "%.15s" % m.param_id 
+        if m.param_index != -1 and m.param_index not in mpstate.mav_param_set:
+            added_new_parameter = True
             mpstate.mav_param_set.add(m.param_index)
+        else:
+            added_new_parameter = False
         if m.param_count != -1:
             mpstate.mav_param_count = m.param_count
-        mpstate.mav_param[str(m.param_id)] = m.param_value
+        mpstate.mav_param[str(param_id)] = m.param_value
         if mpstate.status.fetch_one:
             mpstate.status.fetch_one = False
-            mpstate.console.writeln("%s = %f" % (m.param_id, m.param_value))
-        if len(mpstate.mav_param_set) == m.param_count:
+            mpstate.console.writeln("%s = %f" % (param_id, m.param_value))
+        if added_new_parameter and len(mpstate.mav_param_set) == m.param_count:
             mpstate.console.writeln("Received %u parameters" % m.param_count)
             if mpstate.status.logdir != None:
                 mpstate.mav_param.save(os.path.join(mpstate.status.logdir, 'mav.parm'), '*', verbose=True)
@@ -1398,6 +1402,12 @@ def periodic_tasks():
                 diff = set(range(mpstate.mav_param_count)).difference(mpstate.mav_param_set)
                 idx = diff.pop()
                 mpstate.master().param_fetch_one(idx)
+
+        # cope with packet loss fetching mission
+        if mpstate.master().time_since('MISSION_ITEM') >= 2 and mpstate.status.wploader.count() < getattr(mpstate.status.wploader,'expected_count',0):
+            seq = mpstate.status.wploader.count()
+            print("re-requesting WP %u" % seq)
+            mpstate.master().waypoint_request_send(seq)
             
     if battery_period.trigger():
         battery_report()
