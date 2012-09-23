@@ -741,3 +741,11 @@ def mavlink_packet(m):
             mpstate.console.set_status('Bottle', 'Bottle: DROP', row=0, fg='red')
         else:
             mpstate.console.set_status('Bottle', 'Bottle: %u' % bottle, row=0, fg='red')
+    if m.get_type() == "SYS_STATUS":
+        voltage = m.voltage_battery * 0.001
+        if voltage > 4.2 and voltage < 4.7:
+            mpstate.console.set_status('BottleComfirm', 'Con: DROP', row=0, fg='red')
+        elif voltage < 0.6:
+            mpstate.console.set_status('BottleComfirm', 'Con: HELD', row=0, fg='green')
+        else:
+            mpstate.console.set_status('BottleComfirm', 'Con: %.1f' % voltage, row=0, fg='blue')
