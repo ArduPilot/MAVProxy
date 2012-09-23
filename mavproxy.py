@@ -1400,8 +1400,9 @@ def periodic_tasks():
         elif mpstate.mav_param_count != 0 and len(mpstate.mav_param_set) != mpstate.mav_param_count:
             if mpstate.master().time_since('PARAM_VALUE') >= 1:
                 diff = set(range(mpstate.mav_param_count)).difference(mpstate.mav_param_set)
-                idx = diff.pop()
-                mpstate.master().param_fetch_one(idx)
+                if len(diff) > 0:
+                    idx = diff.pop()
+                    mpstate.master().param_fetch_one(idx)
 
         # cope with packet loss fetching mission
         if mpstate.master().time_since('MISSION_ITEM') >= 2 and mpstate.status.wploader.count() < getattr(mpstate.status.wploader,'expected_count',0):
