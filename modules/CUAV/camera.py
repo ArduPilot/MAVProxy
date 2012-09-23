@@ -312,13 +312,16 @@ def save_thread():
     state = mpstate.camera_state
     raw_dir = os.path.join(state.camera_dir, "raw")
     cuav_util.mkdir_p(raw_dir)
+    frame_count = 0
     while not state.unload.wait(0.02):
         if state.save_queue.empty():
             continue
         (frame_time,im) = state.save_queue.get()
         rawname = "raw%s" % cuav_util.frame_time(frame_time)
-        if state.settings.save_pgm:
-            chameleon.save_pgm('%s/%s.pgm' % (raw_dir, rawname), im)
+        frame_count += 1
+        if state.settings.save_pgm != 0:
+            if frame_count % state.settings.save_pgm == 0:
+                chameleon.save_pgm('%s/%s.pgm' % (raw_dir, rawname), im)
 
 def scan_thread():
     '''image scanning thread'''
