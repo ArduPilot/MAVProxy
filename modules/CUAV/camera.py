@@ -55,7 +55,8 @@ class camera_state(object):
               ('maxqueue1', int, None),
               ('maxqueue2', int, 30),
               ('thumbsize', int, 60),
-              ('packet_loss', int, 0)              
+              ('packet_loss', int, 0),             
+              ('gcs_slave', str, None)  
               ]
             )
 
@@ -87,6 +88,7 @@ class camera_state(object):
         self.rtt_estimate = 0
         self.bsocket = None
         self.bsend2 = None
+        self.bsend_slave = None
         
         # setup directory for images
         self.camera_dir = os.path.join(os.path.dirname(mpstate.logfile_name),
@@ -567,6 +569,8 @@ def view_thread():
             if tnow - ack_time > 0.1:
                 bsend.tick(packet_count=1000, max_queue=state.settings.maxqueue1)
                 state.bsend2.tick(packet_count=1000, max_queue=state.settings.maxqueue2)
+                if state.bsend_slave is not None:
+                    state.bsend_slave.tick(packet_count=1000)
                 ack_time = tnow
             if not view_window:
                 view_window = True
@@ -590,6 +594,13 @@ def view_thread():
                     continue
             except Exception as e:
                 continue
+
+            if state.settings.gcs_slave is not None:
+                if state.bsend_slave is None:
+                    state.bsend_slave = block_xmit.BlockSender(0, state.settings.bandwidth*10, debug=False)
+                state.bsend_slave.send(buf,
+                                       dest=(state.settings.gcs_slave, state.settings.gcs_view_port),
+                                       priority=1)
 
             if isinstance(obj, ThumbPacket):
                 # we've received a set of thumbnails from the plane for a positive hit
