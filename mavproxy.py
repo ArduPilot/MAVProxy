@@ -556,6 +556,7 @@ def cmd_fence(args):
 
 def param_set(name, value, retries=3):
     '''set a parameter'''
+    name = name.upper()
     return mpstate.mav_param.mavset(mpstate.master(), name, value, retries=retries)
 
 
