@@ -21,7 +21,7 @@ class module_state(object):
         self.have_simstate = False
         self.have_blueplane = False
         self.move_wp = -1
-        self.moving_wp = False
+        self.moving_wp = 0
         self.brightness = 1
 
 def name():
@@ -94,31 +94,36 @@ def map_callback(obj):
     state = mpstate.map_state
     if not isinstance(obj, mp_slipmap.SlipMouseEvent):
         return
-    if obj.event.m_leftDown and state.moving_wp:
-        state.moving_wp = False        
+    if obj.event.m_leftDown and state.moving_wp != 0:
+        state.moving_wp = 0
         print("cancelled WP move")
     if obj.event.m_rightDown:
-        if not state.moving_wp:
+        if state.moving_wp == 0:
             wpnum = closest_waypoint(obj.latlon)
             if wpnum != -1:
-                state.moving_wp = True
+                state.moving_wp = time.time()
                 state.move_wp = wpnum
                 wp = mpstate.status.wploader.wp(state.move_wp)
                 print("Selected WP %u : %s" % (wpnum, getattr(wp,'comment','')))
-        else:
+        elif time.time() - state.moving_wp >= 1.5:
             wp = mpstate.status.wploader.wp(state.move_wp)
             (lat, lon) = obj.latlon
+            if getattr(mpstate.console, 'ElevationMap', None) is not None:
+                alt1 = mpstate.console.ElevationMap.GetElevation(lat, lon) 
+                alt2 = mpstate.console.ElevationMap.GetElevation(wp.x, wp.y)
+                wp.z += alt1 - alt2
             wp.x = lat
             wp.y = lon
+            
             wp.target_system    = mpstate.status.target_system
             wp.target_component = mpstate.status.target_component
-            state.moving_wp = False
+            state.moving_wp = 0
             mpstate.status.loading_waypoints = True
             mpstate.status.loading_waypoint_lasttime = time.time()
             mpstate.master().mav.mission_write_partial_list_send(mpstate.status.target_system,
                                                                  mpstate.status.target_component,
                                                                  state.move_wp, state.move_wp)
-            print("Moved WP %u to %f, %f" % (state.move_wp, lat, lon))
+            print("Moved WP %u to %f, %f at %.1fm" % (state.move_wp, lat, lon, wp.z))
             display_waypoints()
             
         
