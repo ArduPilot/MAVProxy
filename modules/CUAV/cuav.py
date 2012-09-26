@@ -139,6 +139,10 @@ def mavlink_packet(m):
         if mpstate.status.flightmode == "AUTO":
             height = master.field('GLOBAL_POSITION_INT', 'relative_alt', 0)*0.001
             groundspeed = master.field('VFR_HUD', 'groundspeed', 0)
+            fix_type = master.field('GPS_RAW_INT', 'fix_type', 0)
+            if fix_type != 3:
+                check_parms({ "COMPASS_USE":1}, set=True)
+                
             # we're in auto flight, see what target we have
             wpnum = master.field('MISSION_CURRENT', 'seq', 0)
             if wpnum > 0 and mpstate.status.wploader.count() > wpnum + 3:
