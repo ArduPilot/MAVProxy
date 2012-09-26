@@ -152,7 +152,7 @@ def mavlink_packet(msg):
         mpstate.console.set_status('Roll', 'Roll %u' % math.degrees(msg.roll))
         mpstate.console.set_status('Pitch', 'Pitch %u' % math.degrees(msg.pitch))
     elif type == 'HWSTATUS':
-        if msg.Vcc >= 4600 and msg.Vcc <= 5100:
+        if msg.Vcc >= 4600 and msg.Vcc <= 5300:
             fg = 'green'
         else:
             fg = 'red'
