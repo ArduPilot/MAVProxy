@@ -43,9 +43,6 @@ def init(_mpstate):
     mpstate = _mpstate
     mpstate.antenna_state = module_state()
     mpstate.command_map['antenna'] = (cmd_antenna, "antenna link control")
-    if mpstate.status.wploader.count() > 0:
-        home = mpstate.status.wploader.wp(0)
-        mpstate.antenna_state.gcs_location = (home.x, home.y)
 
 def unload():
     '''unload module'''
@@ -54,6 +51,12 @@ def unload():
 def mavlink_packet(m):
     '''handle an incoming mavlink packet'''
     state = mpstate.antenna_state
+    if state.gcs_location is None and mpstate.status.wploader.count() > 0:
+        home = mpstate.status.wploader.wp(0)
+        mpstate.antenna_state.gcs_location = (home.x, home.y)
+        print("Antenna home set")
+    if state.gcs_location is None:
+        return
     if m.get_type() == 'GPS_RAW' and state.gcs_location is not None:
         (gcs_lat, gcs_lon) = state.gcs_location
         bearing = cuav_util.gps_bearing(gcs_lat, gcs_lon, m.lat, m.lon)
