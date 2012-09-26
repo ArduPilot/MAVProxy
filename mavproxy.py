@@ -80,6 +80,7 @@ class MPStatus(object):
         self.last_fence_status = 0
         self.have_gps_lock = False
         self.lost_gps_lock = False
+        self.last_gps_lock = 0
         self.watch = None
         self.last_streamrate1 = -1
         self.last_streamrate2 = -1
@@ -1135,21 +1136,25 @@ def master_callback(m, master):
 
     elif mtype == "GPS_RAW":
         if mpstate.status.have_gps_lock:
-            if m.fix_type != 2 and not mpstate.status.lost_gps_lock:
+            if m.fix_type != 2 and not mpstate.status.lost_gps_lock and (time.time() - mpstate.status.last_gps_lock) > 3:
                 say("GPS fix lost")
                 mpstate.status.lost_gps_lock = True
             if m.fix_type == 2 and mpstate.status.lost_gps_lock:
                 say("GPS OK")
                 mpstate.status.lost_gps_lock = False
+            if m.fix_type == 2:
+                mpstate.status.last_gps_lock = time.time()
 
     elif mtype == "GPS_RAW_INT":
         if mpstate.status.have_gps_lock:
-            if m.fix_type != 3 and not mpstate.status.lost_gps_lock:
+            if m.fix_type != 3 and not mpstate.status.lost_gps_lock and (time.time() - mpstate.status.last_gps_lock) > 3:
                 say("GPS fix lost")
                 mpstate.status.lost_gps_lock = True
             if m.fix_type == 3 and mpstate.status.lost_gps_lock:
                 say("GPS OK")
                 mpstate.status.lost_gps_lock = False
+            if m.fix_type == 3:
+                mpstate.status.last_gps_lock = time.time()
 
     elif mtype == "RC_CHANNELS_RAW":
 #        if (m.chan7_raw > 1700 and mpstate.status.flightmode == "MANUAL"):
