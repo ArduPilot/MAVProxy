@@ -87,6 +87,8 @@ def estimated_time_remaining(lat, lon, wpnum, speed):
             distance += mp_util.gps_distance(lat, lon, w.x, w.y)
             lat = w.x
             lon = w.y
+            if w.command == mavutil.mavlink.MAV_CMD_NAV_LAND:
+                break
     return distance / speed
         
         
