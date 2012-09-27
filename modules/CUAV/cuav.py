@@ -129,6 +129,8 @@ def mavlink_packet(m):
             mpstate.console.set_status('BottleConfirm', 'Con: HELD', row=8, fg='green')
         else:
             mpstate.console.set_status('BottleConfirm', 'Con: %.1f' % voltage, row=8, fg='blue')
+    if m.get_type() == "WIND":
+        mpstate.console.set_status('Wind', 'Wind: %.1f/%u' % (m.speed,int(m.direction+0.5)), row=8)
     if time.time() - state.check_time > 2:
         state.check_time = time.time()
         master = mpstate.master()
