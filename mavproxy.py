@@ -133,7 +133,8 @@ class MPState(object):
               ('rc1mul', int, 1),
               ('rc2mul', int, 1),
               ('rc4mul', int, 1),
-              ('shownoise', int, 1)]
+              ('shownoise', int, 1),
+              ('basealt', int, 0)]
             )
         self.status = MPStatus()
 
@@ -974,6 +975,13 @@ def handle_msec_timestamp(m, master):
 
 def report_altitude(altitude):
     '''possibly report a new altitude'''
+    master = mpstate.master()
+    if getattr(mpstate.console, 'ElevationMap', None) is not None and mpstate.settings.basealt != 0:
+        lat = master.field('GLOBAL_POSITION_INT', 'lat', 0)*1.0e-7
+        lon = master.field('GLOBAL_POSITION_INT', 'lon', 0)*1.0e-7
+        alt1 = mpstate.console.ElevationMap.GetElevation(lat, lon) 
+        alt2 = mpstate.settings.basealt
+        altitude += alt2 - alt1
     mpstate.status.altitude = altitude
     if (int(mpstate.settings.altreadout) > 0 and
         math.fabs(mpstate.status.altitude - mpstate.status.last_altitude_announce) >= int(mpstate.settings.altreadout)):

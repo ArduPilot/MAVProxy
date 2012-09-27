@@ -132,10 +132,13 @@ def mavlink_packet(msg):
         lat = master.field('GLOBAL_POSITION_INT', 'lat', 0) * 1.0e-7
         lng = master.field('GLOBAL_POSITION_INT', 'lon', 0) * 1.0e-7
         rel_alt = master.field('GLOBAL_POSITION_INT', 'relative_alt', 0) * 1.0e-3
-        agl_alt = mpstate.console.ElevationMap.GetElevation(home_lat, home_lng) - mpstate.console.ElevationMap.GetElevation(lat, lng)
+        if mpstate.settings.basealt != 0:
+            agl_alt = mpstate.settings.basealt - mpstate.console.ElevationMap.GetElevation(lat, lng)
+        else:
+            agl_alt = mpstate.console.ElevationMap.GetElevation(home_lat, home_lng) - mpstate.console.ElevationMap.GetElevation(lat, lng)
         agl_alt += rel_alt
-        mpstate.console.set_status('Alt', 'Alt %u' % rel_alt)
         mpstate.console.set_status('AGL', 'AGL %u' % agl_alt)
+        mpstate.console.set_status('Alt', 'Alt %u' % rel_alt)
         mpstate.console.set_status('AirSpeed', 'AirSpeed %u' % msg.airspeed)
         mpstate.console.set_status('GPSSpeed', 'GPSSpeed %u' % msg.groundspeed)
         mpstate.console.set_status('Thr', 'Thr %u' % msg.throttle)
