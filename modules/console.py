@@ -106,11 +106,15 @@ def mavlink_packet(msg):
     state = mpstate.console_state
     # add some status fields
     if type in [ 'GPS_RAW', 'GPS_RAW_INT' ]:
+        if type == "GPS_RAW":
+            num_sats = master.field('GPS_STATUS', 'satellites_visible', 0)
+        else:
+            num_sats = msg.satellites_visible
         if ((msg.fix_type == 3 and master.mavlink10()) or
             (msg.fix_type == 2 and not master.mavlink10())):
-            mpstate.console.set_status('GPS', 'GPS: OK', fg='green')
+            mpstate.console.set_status('GPS', 'GPS: OK (%u)' % num_sats, fg='green')
         else:
-            mpstate.console.set_status('GPS', 'GPS: %u' % msg.fix_type, fg='red')
+            mpstate.console.set_status('GPS', 'GPS: %u (%u)' % (msg.fix_type, num_sats), fg='red')
         if master.mavlink10():
             gps_heading = int(mpstate.status.msgs['GPS_RAW_INT'].cog * 0.01)
         else:
