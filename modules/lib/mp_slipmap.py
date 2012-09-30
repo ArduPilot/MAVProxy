@@ -897,8 +897,8 @@ if __name__ == "__main__":
 
     from optparse import OptionParser
     parser = OptionParser("mp_slipmap.py [options]")
-    parser.add_option("--lat", type='float', default=-35.362938, help="start latitude")
-    parser.add_option("--lon", type='float', default=149.165085, help="start longitude")
+    parser.add_option("--lat", type='float', default=-26.582218, help="start latitude")
+    parser.add_option("--lon", type='float', default=151.840113, help="start longitude")
     parser.add_option("--service", default="MicrosoftSat", help="tile service")
     parser.add_option("--offline", action='store_true', default=False, help="no download")
     parser.add_option("--delay", type='float', default=0.3, help="tile download delay")
