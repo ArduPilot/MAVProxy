@@ -47,8 +47,11 @@ def check_parms(parms, set=False):
         v = mpstate.mav_param.get(p, None)
         if v is None:
             continue
-        if v != parms[p]:
-            mpstate.console.writeln('%s should be %.1f (currently %.1f)' % (p, parms[p], v), fg='blue')
+        if abs(v - parms[p]) > 0.0001:
+            if set:
+                mpstate.console.writeln('Setting %s to %.1f (currently %.1f)' % (p, parms[p], v), fg='blue')
+            else:
+                mpstate.console.writeln('%s should be %.1f (currently %.1f)' % (p, parms[p], v), fg='blue')
             if set:
                 master.param_set_send(p, parms[p])
 
@@ -61,16 +64,40 @@ def check_preflight():
         mpstate.console.writeln('Baro cal needed', fg='blue')
     if master.field('MISSION_CURRENT', 'seq', 0) != 0:
         mpstate.console.writeln('Mission should be reset', fg='blue')
-    parms = { 'COMPASS_USE'   : 1.0,
-              'KFF_RDDRMIX'   : 0.0,
+    if mpstate.status.fenceloader.count() < 5:
+        mpstate.console.writeln('fence needs to be loaded', fg='blue')        
+    parms = { 
               'TRIM_THROTTLE' : 40,
-              'WP_RADIUS'     : 70,
-              'ALT_OFFSET'    : 0.0,
-              'THR_MIN'       : 5.0,
-              'RC3_MIN'       : 1080.0,
-              'RC7_FUNCTION'  : 0.0,
-              'STICK_MIXING'  : 1.0 }
+              'RC3_MIN'       : 1080.0  }
     check_parms(parms)
+    parms = {
+        'STICK_MIXING'  : 1.0,
+        'THR_MIN'       : 5.0,
+        'COMPASS_USE'   : 1.0,
+        'KFF_RDDRMIX'   : 0.0,
+        'RC7_FUNCTION'  : 0.0,
+        'WP_RADIUS'     : 70,
+        'ALT_OFFSET'    : 0.0,
+        "SR0_EXTRA1"    : 5.0,
+        "SR0_EXTRA2"    : 3.0,
+        "SR0_EXTRA3"    : 2.0,
+        "SR0_EXT_STAT"  : 4.0,
+        "SR0_PARAMS"    : 10.0,
+        "SR0_POSITION"  : 4.0,
+        "SR0_RAW_CTRL"  : 2.0,
+        "SR0_RAW_SENS"  : 2.0,
+        "SR0_RC_CHAN"   : 2.0,
+        "SR3_EXTRA1"    : 1.0,
+        "SR3_EXTRA2"    : 1.0,
+        "SR3_EXTRA3"    : 1.0,
+        "SR3_EXT_STAT"  : 3.0,
+        "SR3_PARAMS"    : 10.0,
+        "SR3_POSITION"  : 3.0,
+        "SR3_RAW_CTRL"  : 1.0,
+        "SR3_RAW_SENS"  : 1.0,
+        "SR3_RC_CHAN"   : 1.0 }
+    check_parms(parms, set=True)
+              
 
 def check_joe_approach():
     '''check joe approach'''
@@ -104,11 +131,14 @@ def check_search():
               'STICK_MIXING'  : 0,
               'KFF_RDDRMIX'   : 0.1,
               'THR_MIN'       : 5.0 }
-    check_parms(parms)
+    check_parms(parms, set=True)
 
 def check_takeoff():
     '''check takeoff'''
     state = mpstate.cuav_state
+    if mpstate.settings.mavfwd != 0:
+        mpstate.console.writeln('mavfwd should be zero', fg='blue')
+        
 
 def mavlink_packet(m):
     '''handle an incoming mavlink packet'''
@@ -123,9 +153,9 @@ def mavlink_packet(m):
             mpstate.console.set_status('Bottle', 'Bottle: %u' % bottle, row=8, fg='red')
     if m.get_type() == "SYS_STATUS":
         voltage = m.voltage_battery * 0.001
-        if voltage > 4.2 and voltage < 4.7:
+        if voltage < 1.0:
             mpstate.console.set_status('BottleConfirm', 'Con: DROP', row=8, fg='red')
-        elif voltage < 0.6:
+        elif voltage > 3.0 and voltage < 5.5:
             mpstate.console.set_status('BottleConfirm', 'Con: HELD', row=8, fg='green')
         else:
             mpstate.console.set_status('BottleConfirm', 'Con: %.1f' % voltage, row=8, fg='blue')
