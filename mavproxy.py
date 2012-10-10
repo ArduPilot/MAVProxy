@@ -155,6 +155,10 @@ class MPState(object):
         self.select_extra = {}
         self.continue_mode = False
 
+    def output_all(self, msg):
+      for o in self.mav_outputs:
+        o.write(msg)
+
     def master(self):
         '''return the currently chosen mavlink master object'''
         if self.settings.link > len(self.mav_master):
@@ -831,6 +835,12 @@ def cmd_module(args):
     else:
         print(usage)
 
+def cmd_arm(args):
+  mpstate.master().arducopter_arm()
+
+def cmd_disarm(args):
+  mpstate.master().arducopter_disarm()
+
 def cmd_mavconsole(args):
     '''mav console control'''
     if len(args) >= 2:
@@ -874,7 +884,9 @@ command_map = {
     'watch'   : (cmd_watch,    'watch a MAVLink pattern'),
     'module'  : (cmd_module,   'module commands'),
     'mavconsole' : (cmd_mavconsole,  'mav console commands'),
-    'mc'      : (cmd_mavconsole,  'mav console commands')
+    'mc'      : (cmd_mavconsole, 'mav console commands'),
+    'arm'     : (cmd_arm,       'ArduCopter arm motors'),
+    'disarm'  : (cmd_disarm,    'ArduCopter disarm motors')
     }
 
 def process_stdin(line):
