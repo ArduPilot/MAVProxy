@@ -835,7 +835,17 @@ def cmd_alias(args):
     else:
         print(usage)
         return
-        
+
+
+def cmd_arm(args):
+  '''arm motors'''
+  mpstate.master().arducopter_arm()
+
+
+def cmd_disarm(args):
+  '''disarm motors'''
+  mpstate.master().arducopter_disarm()
+
 # http://stackoverflow.com/questions/211100/pythons-import-doesnt-work-as-expected
 # has info on why this is necessary.
 
@@ -876,6 +886,8 @@ command_map = {
     'watch'   : (cmd_watch,    'watch a MAVLink pattern'),
     'module'  : (cmd_module,   'module commands'),
     'alias'   : (cmd_alias,    'command aliases'),
+    'arm'     : (cmd_arm,      'ArduCopter arm motors'),
+    'disarm'  : (cmd_disarm,   'ArduCopter disarm motors')
     }
 
 def process_stdin(line):
