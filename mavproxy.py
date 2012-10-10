@@ -28,7 +28,7 @@ for d in [ 'pymavlink',
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'modules'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'modules', 'lib'))
 
-import select, textconsole, mp_settings
+import select, textconsole, mavconsole, mp_settings
 
 class MPStatus(object):
     '''hold status information about the mavproxy'''
@@ -114,6 +114,7 @@ class MPState(object):
     '''holds state of mavproxy'''
     def __init__(self):
         self.console = textconsole.SimpleConsole()
+        self.mavconsole = mavconsole.DelegateMavConsole(self.console)
         self.map = None
         self.settings = mp_settings.MPSettings(
             [ ('link', int, 1),
@@ -156,6 +157,10 @@ class MPState(object):
         self.functions.process_stdin = process_stdin
         self.select_extra = {}
         self.continue_mode = False
+
+    def output_all(self, msg):
+      for o in self.mav_outputs:
+        o.write(msg)
 
     def master(self):
         '''return the currently chosen mavlink master object'''
@@ -748,6 +753,26 @@ def cmd_module(args):
     else:
         print(usage)
 
+def cmd_arm(args):
+  mpstate.master().arducopter_arm()
+
+def cmd_disarm(args):
+  mpstate.master().arducopter_disarm()
+
+def cmd_mavconsole(args):
+    '''mav console control'''
+    if len(args) >= 2:
+        if args[0] == 'write' or args[0] == 'w':
+            mpstate.mavconsole.write(mpstate.master(), ' '.join(args[1:]))
+    elif len(args) == 1:
+        if args[0] == 'quiet' or  args[0] == 'q':
+            mpstate.mavconsole.quiet()
+        elif args[0] == 'active' or  args[0] == 'a':
+            mpstate.mavconsole.active()
+        else:
+            print 'Unknown command to mavconsole'
+    else:
+        print 'Unknown command to mavconsole'
 
 command_map = {
     'switch'  : (cmd_switch,   'set RC switch (1-5), 0 disables'),
@@ -776,6 +801,10 @@ command_map = {
     'up'      : (cmd_up,       'adjust TRIM_PITCH_CD up by 5 degrees'),
     'watch'   : (cmd_watch,    'watch a MAVLink pattern'),
     'module'  : (cmd_module,   'module commands'),
+    'mavconsole' : (cmd_mavconsole,  'mav console commands'),
+    'mc'      : (cmd_mavconsole, 'mav console commands'),
+    'arm'     : (cmd_arm,       'ArduCopter arm motors'),
+    'disarm'  : (cmd_disarm,    'ArduCopter disarm motors')
     }
 
 def process_stdin(line):
@@ -1206,6 +1235,8 @@ def master_callback(m, master):
             mpstate.console.write(str(m.data), bg='red')
     elif mtype in [ "COMMAND_ACK" ]:
         mpstate.console.writeln("Got MAVLink msg: %s" % m)
+    elif mtype in ["DATA16", "DATA32"] :
+        mpstate.mavconsole.onMessage(m)
     else:
         #mpstate.console.writeln("Got MAVLink msg: %s" % m)
         pass
