@@ -907,6 +907,7 @@ if __name__ == "__main__":
     parser.add_option("--boundary", default=None, help="show boundary")
     parser.add_option("--thumbnail", default=None, help="show thumbnail")
     parser.add_option("--icon", default=None, help="show icon")
+    parser.add_option("--flag", default=[], type='str', action='append', help="flag positions")
     parser.add_option("--elevation", action='store_true', default=False, help="show elevation information")
     (opts, args) = parser.parse_args()
     
@@ -933,6 +934,11 @@ if __name__ == "__main__":
         sm.set_position('icon', mp_util.gps_newpos(opts.lat,opts.lon, 180, 100), rotation=45)
         sm.add_object(SlipInfoImage('detail', icon))
         sm.add_object(SlipInfoText('detail text', 'test text'))
+
+    for flag in opts.flag:
+        (lat,lon) = flag.split(',')
+        icon = sm.icon('flag.png')
+        sm.add_object(SlipIcon('icon - %s' % str(flag), (float(lat),float(lon)), icon, layer=3, rotation=0, follow=False))
             
     while sm.is_alive():
         while sm.event_count() > 0:
