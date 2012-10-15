@@ -128,7 +128,6 @@ class MPState(object):
               ('streamrate', int, 4),
               ('streamrate2', int, 4),
               ('heartbeatreport', int, 1),
-              ('radiosetup', int, 0),
               ('moddebug', int, 0),
               ('rc1mul', int, 1),
               ('rc2mul', int, 1),
@@ -244,19 +243,6 @@ def cmd_switch(args):
     else:
         print("Set RC switch override to %u (PWM=%u channel=%u)" % (
             value, mapping[value], flite_mode_ch_parm))
-
-def cmd_trim(args):
-    '''trim aileron, elevator and rudder to current values'''
-    if not 'RC_CHANNELS_RAW' in mpstate.status.msgs:
-        print("No RC_CHANNELS_RAW to trim with")
-        return
-    m = mpstate.status.msgs['RC_CHANNELS_RAW']
-
-    mpstate.master().param_set_send('ROLL_TRIM',  m.chan1_raw)
-    mpstate.master().param_set_send('PITCH_TRIM', m.chan2_raw)
-    mpstate.master().param_set_send('YAW_TRIM',   m.chan4_raw)
-    print("Trimmed to aileron=%u elevator=%u rudder=%u" % (
-        m.chan1_raw, m.chan2_raw, m.chan4_raw))
 
 def cmd_rc(args):
     '''handle RC value override'''
@@ -704,7 +690,7 @@ def cmd_watch(args):
 
 def cmd_module(args):
     '''module commands'''
-    usage = "usage: module <list|load|reload>"
+    usage = "usage: module <list|load|reload|unload>"
     if len(args) < 1:
         print(usage)
         return
@@ -745,6 +731,18 @@ def cmd_module(args):
                 print("Reloaded module %s" % modname)
                 return
         print("Unable to find module %s" % modname)
+    elif args[0] == "unload":
+        if len(args) < 2:
+            print("usage: module unload <name>")
+            return
+        modname = os.path.basename(args[1])
+        for m in mpstate.modules:
+            if m.name() == modname:
+                m.unload()
+                mpstate.modules.remove(m)
+                print("Unloaded module %s" % modname)
+                return
+        print("Unable to find module %s" % modname)
     else:
         print(usage)
 
@@ -758,7 +756,6 @@ command_map = {
     'setup'   : (cmd_setup,    'go into setup mode'),
     'reset'   : (cmd_reset,    'reopen the connection to the MAVLink master'),
     'status'  : (cmd_status,   'show status'),
-    'trim'    : (cmd_trim,     'trim aileron, elevator and rudder to current values'),
     'auto'    : (cmd_auto,     'set AUTO mode'),
     'ground'  : (cmd_ground,   'do a ground start'),
     'level'   : (cmd_level,    'set level on a multicopter'),
@@ -1163,21 +1160,6 @@ def master_callback(m, master):
                 mpstate.status.lost_gps_lock = False
             if m.fix_type == 3:
                 mpstate.status.last_gps_lock = time.time()
-
-    elif mtype == "RC_CHANNELS_RAW":
-#        if (m.chan7_raw > 1700 and mpstate.status.flightmode == "MANUAL"):
-#            system_check()
-        if mpstate.settings.radiosetup:
-            for i in range(1,9):
-                v = getattr(m, 'chan%u_raw' % i)
-                rcmin = get_mav_param('RC%u_MIN' % i, 0)
-                if rcmin > v:
-                    if param_set('RC%u_MIN' % i, v):
-                        mpstate.console.writeln("Set RC%u_MIN=%u" % (i, v))
-                rcmax = get_mav_param('RC%u_MAX' % i, 0)
-                if rcmax < v:
-                    if param_set('RC%u_MAX' % i, v):
-                        mpstate.console.writeln("Set RC%u_MAX=%u" % (i, v))
 
     elif mtype == "NAV_CONTROLLER_OUTPUT" and mpstate.status.flightmode == "AUTO" and mpstate.settings.distreadout:
         rounded_dist = int(m.wp_dist/mpstate.settings.distreadout)*mpstate.settings.distreadout
