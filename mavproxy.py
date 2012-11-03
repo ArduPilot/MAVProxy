@@ -17,12 +17,6 @@ for d in [ 'pymavlink',
            os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'mavlink', 'pymavlink') ]:
     if os.path.exists(d):
         sys.path.insert(0, d)
-        if os.name == 'nt':
-            try:
-                # broken python compilation of mavlink.py on windows!
-                os.unlink(os.path.join(d, 'mavlink.pyc'))
-            except:
-                pass
 
 # add modules path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'modules'))
@@ -189,7 +183,7 @@ class rline(object):
         if prompt != self.prompt:
             self.prompt = prompt
             sys.stdout.write(prompt)
-            
+
 def say(text, priority='important'):
     '''speak some text'''
     ''' http://cvs.freebsoft.org/doc/speechd/ssip.html see 4.3.1 for priorities'''
@@ -384,7 +378,7 @@ def save_waypoints(filename):
         print("Failed to save %s - %s" % (filename, msg))
         return
     print("Saved %u waypoints to %s" % (mpstate.status.wploader.count(), filename))
-             
+
 
 def cmd_wp(args):
     '''waypoint commands'''
@@ -510,7 +504,7 @@ def list_fence(filename):
     if mpstate.status.logdir != None:
         fencetxt = os.path.join(mpstate.status.logdir, 'fence.txt')
         mpstate.status.fenceloader.save(fencetxt)
-        print("Saved fence to %s" % fencetxt)                    
+        print("Saved fence to %s" % fencetxt)
 
 
 def cmd_fence(args):
@@ -535,7 +529,7 @@ def cmd_fence(args):
         if len(args) != 2:
             print("usage: fence show <filename>")
             return
-        mpstate.status.fenceloader.load(args[1]) 
+        mpstate.status.fenceloader.load(args[1])
     elif args[0] == "clear":
         param_set('FENCE_TOTAL', 0)
     else:
@@ -857,7 +851,7 @@ def system_check():
     if not 'PITCH_MIN' in mpstate.mav_param:
         say("WARNING no pitch parameter available")
         return
-        
+
     if int(mpstate.mav_param['PITCH_MIN']) > 1300:
         say("WARNING PITCH MINIMUM not set")
         ok = False
@@ -968,7 +962,7 @@ def handle_msec_timestamp(m, master):
     if msec < mpstate.status.highest_msec and len(mpstate.mav_master) > 1:
         master.link_delayed = True
     else:
-        master.link_delayed = False       
+        master.link_delayed = False
 
 def report_altitude(altitude):
     '''possibly report a new altitude'''
@@ -976,7 +970,7 @@ def report_altitude(altitude):
     if getattr(mpstate.console, 'ElevationMap', None) is not None and mpstate.settings.basealt != 0:
         lat = master.field('GLOBAL_POSITION_INT', 'lat', 0)*1.0e-7
         lon = master.field('GLOBAL_POSITION_INT', 'lon', 0)*1.0e-7
-        alt1 = mpstate.console.ElevationMap.GetElevation(lat, lon) 
+        alt1 = mpstate.console.ElevationMap.GetElevation(lat, lon)
         alt2 = mpstate.settings.basealt
         altitude += alt2 - alt1
     mpstate.status.altitude = altitude
@@ -985,7 +979,7 @@ def report_altitude(altitude):
         mpstate.status.last_altitude_announce = mpstate.status.altitude
         rounded_alt = int(mpstate.settings.altreadout) * ((5+int(mpstate.status.altitude)) / int(mpstate.settings.altreadout))
         say("height %u" % rounded_alt, priority='notification')
-    
+
 
 def master_callback(m, master):
     '''process mavlink message m on master, sending any messages to recipients'''
@@ -1013,7 +1007,7 @@ def master_callback(m, master):
             master.linkerror = False
             say("link %u OK" % (master.linknum+1))
         mpstate.status.last_message = time.time()
-        master.last_message = mpstate.status.last_message        
+        master.last_message = mpstate.status.last_message
 
     if master.link_delayed:
         # don't process delayed packets that cause double reporting
@@ -1021,7 +1015,7 @@ def master_callback(m, master):
                       'GPS_RAW_INT', 'SCALED_PRESSURE', 'GLOBAL_POSITION_INT',
                       'NAV_CONTROLLER_OUTPUT' ]:
             return
-    
+
     if mtype == 'HEARTBEAT':
         if (mpstate.status.target_system != m.get_srcSystem() or
             mpstate.status.target_component != m.get_srcComponent()):
@@ -1037,7 +1031,7 @@ def master_callback(m, master):
         if master.linkerror:
             master.linkerror = False
             say("link %u OK" % (master.linknum+1))
-            
+
         mpstate.status.last_heartbeat = time.time()
         master.last_heartbeat = mpstate.status.last_heartbeat
     elif mtype == 'STATUSTEXT':
@@ -1046,7 +1040,7 @@ def master_callback(m, master):
             mpstate.status.last_apm_msg = m.text
             mpstate.status.last_apm_msg_time = time.time()
     elif mtype == 'PARAM_VALUE':
-        param_id = "%.15s" % m.param_id 
+        param_id = "%.15s" % m.param_id
         if m.param_index != -1 and m.param_index not in mpstate.mav_param_set:
             added_new_parameter = True
             mpstate.mav_param_set.add(m.param_index)
@@ -1109,7 +1103,7 @@ def master_callback(m, master):
                 if mpstate.status.logdir != None:
                     waytxt = os.path.join(mpstate.status.logdir, 'way.txt')
                     save_waypoints(waytxt)
-                    print("Saved waypoints to %s" % waytxt)                    
+                    print("Saved waypoints to %s" % waytxt)
             elif mpstate.status.wp_op == "save":
                 save_waypoints(mpstate.status.wp_save_filename)
             mpstate.status.wp_op = None
@@ -1250,7 +1244,7 @@ def process_master(m):
                     mpstate.console.writeln("MAV error: %s" % msg)
                 mpstate.status.mav_error += 1
 
-    
+
 
 def process_mavlink(slave):
     '''process packets from MAVLink slaves, forwarding to the master'''
@@ -1405,12 +1399,12 @@ def periodic_tasks():
             seq = mpstate.status.wploader.count()
             print("re-requesting WP %u" % seq)
             mpstate.master().waypoint_request_send(seq)
-            
+
     if battery_period.trigger():
         battery_report()
 
     if mpstate.override_period.trigger():
-        if (mpstate.status.override != [ 0 ] * 8 or 
+        if (mpstate.status.override != [ 0 ] * 8 or
             mpstate.status.override != mpstate.status.last_override or
             mpstate.status.override_counter > 0):
             mpstate.status.last_override = mpstate.status.override[:]
@@ -1443,7 +1437,7 @@ def main_loop():
                     process_master(master)
 
         periodic_tasks()
-    
+
         rin = []
         for master in mpstate.mav_master:
             if master.fd is not None:
@@ -1486,7 +1480,7 @@ def main_loop():
                         print(msg)
                     # on an exception, remove it from the select list
                     mpstate.select_extra.pop(fd)
-                    
+
 
 
 def input_loop():
@@ -1500,7 +1494,7 @@ def input_loop():
             mpstate.status.exit = True
             sys.exit(1)
         mpstate.rl.line = line
-            
+
 
 def run_script(scriptfile):
     '''run a script file'''
@@ -1516,7 +1510,7 @@ def run_script(scriptfile):
         mpstate.console.writeln("-> %s" % line)
         process_stdin(line)
     f.close()
-        
+
 
 if __name__ == '__main__':
 
@@ -1560,7 +1554,7 @@ if __name__ == '__main__':
     parser.add_option("--mav09", action='store_true', default=False, help="Use MAVLink protocol 0.9")
     parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
     parser.add_option("--continue", dest='continue_mode', action='store_true', default=False, help="continue logs")
-    
+
     (opts, args) = parser.parse_args()
 
     if opts.mav09:
@@ -1601,7 +1595,7 @@ Auto-detected serial ports are:
     mpstate.status.target_component = opts.TARGET_COMPONENT
 
     mpstate.mav_master = []
-    
+
     # open master link
     for mdev in opts.master:
         if mdev.startswith('tcp:'):
@@ -1635,7 +1629,7 @@ Auto-detected serial ports are:
             print("Loaded waypoints from %s" % waytxt)
         fencetxt = os.path.join(mpstate.status.logdir, 'fence.txt')
         if os.path.exists(fencetxt):
-            mpstate.status.fenceloader.load(fencetxt) 
+            mpstate.status.fenceloader.load(fencetxt)
             print("Loaded fence from %s" % fencetxt)
 
     # open any mavlink UDP ports
