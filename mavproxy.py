@@ -902,7 +902,7 @@ def battery_update(SYS_STATUS):
     '''update battery level'''
 
     # main flight battery
-    mpstate.status.battery_level = SYS_STATUS.battery_remaining/10.0
+    mpstate.status.battery_level = SYS_STATUS.battery_remaining
 
     # avionics battery
     if not 'AP_ADC' in mpstate.status.msgs:
