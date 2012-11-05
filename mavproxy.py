@@ -1668,6 +1668,8 @@ Auto-detected serial ports are:
         start_script = os.path.join(opts.aircraft, "mavinit.scr")
         if os.path.exists(start_script):
             run_script(start_script)
+        else:
+            print("no script %s" % start_script)
 
     if opts.console:
         process_stdin('module load console')
