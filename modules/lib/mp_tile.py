@@ -9,7 +9,7 @@ May 2012
 released under GNU GPL v3 or later
 '''
 
-import math, cv, sys, os, mp_util, httplib2, threading, time, collections, string, hashlib, errno
+import math, cv, sys, os, mp_util, httplib2, threading, time, collections, string, hashlib, errno, tempfile
 
 class TileException(Exception):
 	'''tile error class'''
@@ -129,7 +129,7 @@ class TileInfo:
 		(x,y) = self.tile
 		tile_info = TileServiceInfo(x, y, self.zoom)
 		return url.substitute(tile_info)
-		
+
 
 class TileInfoScaled(TileInfo):
 	'''information on a tile with scale information and placement'''
@@ -139,7 +139,7 @@ class TileInfoScaled(TileInfo):
 		(self.srcx, self.srcy) = src
 		(self.dstx, self.dsty) = dst
 
-		
+
 
 class MPTile:
 	'''map tile object'''
@@ -147,7 +147,11 @@ class MPTile:
 		     service="MicrosoftSat", tile_delay=0.3, debug=False,
 		     max_zoom=19):
 		if cache_path is None:
-			cache_path = os.path.join(os.environ['HOME'], '.tilecache')
+			cache_path = os.path.join(tempfile.gettempdir(), 'MAVtilecache')
+
+		if not os.path.exists(cache_path):
+			mp_util.mkdir_p(cache_path)
+
 		self.cache_path = cache_path
 		self.max_zoom = max_zoom
 		self.min_zoom = 1
@@ -206,11 +210,11 @@ class MPTile:
 			for key in keys:
 				if self._download_pending[key].request_time > tile_info.request_time:
 					tile_info = self._download_pending[key]
-			
+
 			url = tile_info.url(self.service)
 			path = self.tile_to_path(tile_info)
 			key = tile_info.key()
-			
+
 			try:
 				if self.debug:
 					print("Downloading %s [%u left]" % (url, len(keys)))
@@ -228,7 +232,7 @@ class MPTile:
 				if self.debug:
 					print("non-image response %s" % url)
 				continue
-				
+
 
 			# see if its a blank/unavailable tile
 			md5 = hashlib.md5(img).hexdigest()
@@ -240,7 +244,7 @@ class MPTile:
 				continue
 
 			mp_util.mkdir_p(os.path.dirname(path))
-			h = open(path+'.tmp','w')
+			h = open(path+'.tmp','wb')
 			h.write(img)
 			h.close()
 			os.rename(path+'.tmp', path)
@@ -318,8 +322,8 @@ class MPTile:
 				img = self.load_tile_lowres(tile)
 				if img is None:
 					img = cv.LoadImage(self._unavailable)
-				return img			
-				
+				return img
+
 
 		path = self.tile_to_path(tile)
 		try:
@@ -337,7 +341,7 @@ class MPTile:
 			img = self.load_tile_lowres(tile)
 			if img is None:
 				img = cv.LoadImage(self._unavailable)
-			return img			
+			return img
 
 		try:
 			self._download_pending[key].refresh_time()
@@ -349,7 +353,7 @@ class MPTile:
 		if img is None:
 			img = cv.LoadImage(self._loading)
 		return img
-	
+
 
 	def scaled_tile(self, tile):
 		'''return a scaled tile'''
@@ -379,7 +383,7 @@ class MPTile:
 
 		if lat is None or lon is None or lat2 is None or lon2 is None:
 			return (0,0)
-			
+
 		dx = mp_util.gps_distance(lat, lon, lat, lon2)
 		if lon2 < lon:
 			dx = -dx
@@ -390,7 +394,7 @@ class MPTile:
 		dx /= pixel_width
 		dy /= pixel_width
 		return (int(dx), int(dy))
-		
+
 
 	def area_to_tile_list(self, lat, lon, width, height, ground_width, zoom=None):
 		'''return a list of TileInfoScaled objects needed for
@@ -448,7 +452,7 @@ class MPTile:
 		return ret
 
 	def area_to_image(self, lat, lon, width, height, ground_width, zoom=None, ordered=True):
-		'''return an RGB image for an area of land, with ground_width 
+		'''return an RGB image for an area of land, with ground_width
 		in meters, and width/height in pixels.
 
 		lat/lon is the top left corner. The zoom is automatically
@@ -463,7 +467,7 @@ class MPTile:
 		if ordered:
 			(midlat, midlon) = self.coord_from_area(width/2, height/2, lat, lon, width, ground_width)
 			tlist.sort(key=lambda d: d.distance(midlat, midlon), reverse=True)
-		
+
 		for t in tlist:
 			scaled_tile = self.scaled_tile(t)
 
@@ -499,7 +503,7 @@ if __name__ == "__main__":
 	lat = opts.lat
 	lon = opts.lon
 	ground_width = opts.width
-	
+
 	if opts.boundary:
 		boundary = mp_util.polygon_load(opts.boundary)
 		bounds = mp_util.polygon_bounds(boundary)

@@ -18,6 +18,7 @@ import array
 import math
 import multiprocessing
 import mp_util
+import tempfile
 
 class NoSuchTileError(Exception):
     """Raised when there is no tile for a region."""
@@ -57,7 +58,7 @@ class SRTMDownloader():
     """Automatically download SRTM tiles."""
     def __init__(self, server="dds.cr.usgs.gov",
                  directory="/srtm/version2_1/SRTM3/",
-                 cachedir=os.path.join(os.environ['HOME'], '.tilecache/SRTM'),
+                 cachedir=os.path.join(tempfile.gettempdir(), 'MAVProxySRTM'),
                  offline=0):
 
         self.offline = offline
@@ -72,7 +73,7 @@ class SRTMDownloader():
         self.filelist = {}
         self.filename_regex = re.compile(
                 r"([NS])(\d{2})([EW])(\d{3})\.hgt\.zip")
-        self.filelist_file = self.cachedir + "/filelist_python"
+        self.filelist_file = self.cachedir + "\\filelist_python"
         self.childFileListDownload = None
         self.childTileDownload = None
 
@@ -290,7 +291,7 @@ class SRTMTile:
         if value == -32768:
             return -1 # -32768 is a special value for areas with no data
         return value
-        
+
 
     def getAltitudeFromLatLon(self, lat, lon):
         """Get the altitude of a lat lon pair, using the four neighbouring
@@ -346,7 +347,7 @@ class parseHTMLDirectoryListing(HTMLParser):
             for attr in attrs:
                 if attr[0]=='href':
                     self.currHref = attr[1]
-            
+
 
     def handle_endtag(self, tag):
         #print "Encountered the end of a %s tag" % tag
