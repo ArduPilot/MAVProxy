@@ -17,6 +17,8 @@ import zipfile
 import array
 import math
 import multiprocessing
+import mp_util
+import tempfile
 
 class NoSuchTileError(Exception):
     """Raised when there is no tile for a region."""
@@ -56,21 +58,28 @@ class SRTMDownloader():
     """Automatically download SRTM tiles."""
     def __init__(self, server="dds.cr.usgs.gov",
                  directory="/srtm/version2_1/SRTM3/",
-                 cachedir=os.path.join(os.environ['HOME'], '.tilecache/SRTM'),
+                 cachedir=None,
                  offline=0):
 
+        if cachedir is None:
+            try:
+                cachedir = os.path.join(os.environ['HOME'], '.tilecache/SRTM')
+            except Exception:
+                cachedir = os.path.join(tempfile.gettempdir(), 'MAVProxySRTM')
+
         self.offline = offline
+        self.first_failure = False
         self.server = server
         self.directory = directory
         self.cachedir = cachedir
 	'''print "SRTMDownloader - server= %s, directory=%s." % \
               (self.server, self.directory)'''
         if not os.path.exists(cachedir):
-            os.mkdir(cachedir)
+            mp_util.mkdir_p(cachedir)
         self.filelist = {}
         self.filename_regex = re.compile(
                 r"([NS])(\d{2})([EW])(\d{3})\.hgt\.zip")
-        self.filelist_file = self.cachedir + "/filelist_python"
+        self.filelist_file = os.path.join(self.cachedir, "filelist_python")
         self.childFileListDownload = None
         self.childTileDownload = None
 
@@ -199,18 +208,24 @@ class SRTMDownloader():
         filepath = "%s%s%s" % \
                      (self.directory,continent,filename)
         '''print "filepath=%s" % filepath'''
-        conn.request("GET", filepath)
-        r1 = conn.getresponse()
-        if r1.status==200:
-            '''print "status200 received ok"'''
-            data = r1.read()
-            self.ftpfile = open(self.cachedir + "/" + filename, 'wb')
-            self.ftpfile.write(data)
-            self.ftpfile.close()
-            self.ftpfile = None
-        else:
-            '''print "oh no = status=%d %s" \
-                  % (r1.status,r1.reason)'''
+        try:
+            conn.request("GET", filepath)
+            r1 = conn.getresponse()
+            if r1.status==200:
+                '''print "status200 received ok"'''
+                data = r1.read()
+                self.ftpfile = open(self.cachedir + "/" + filename, 'wb')
+                self.ftpfile.write(data)
+                self.ftpfile.close()
+                self.ftpfile = None
+            else:
+                '''print "oh no = status=%d %s" \
+                % (r1.status,r1.reason)'''
+        except Exception as e:
+            if not self.first_failure:
+                #print("SRTM Download failed: %s" % str(e))
+                self.first_failure = True
+            pass
 
 
 class SRTMTile:
@@ -282,7 +297,7 @@ class SRTMTile:
         if value == -32768:
             return -1 # -32768 is a special value for areas with no data
         return value
-        
+
 
     def getAltitudeFromLatLon(self, lat, lon):
         """Get the altitude of a lat lon pair, using the four neighbouring
@@ -338,7 +353,7 @@ class parseHTMLDirectoryListing(HTMLParser):
             for attr in attrs:
                 if attr[0]=='href':
                     self.currHref = attr[1]
-            
+
 
     def handle_endtag(self, tag):
         #print "Encountered the end of a %s tag" % tag

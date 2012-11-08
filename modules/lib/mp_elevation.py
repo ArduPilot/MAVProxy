@@ -10,12 +10,12 @@ import numpy, os, time, sys, srtm, GAreader
 class ElevationModel():
     '''Elevation Model. Only SRTM for now'''
 
-    def __init__(self, database='srtm'):
+    def __init__(self, database='srtm', offline=0):
         '''Use offline=1 to disable any downloading of tiles, regardless of whether the
         tile exists'''
         self.database = database
         if self.database == 'srtm':
-            self.downloader = srtm.SRTMDownloader(offline=0)
+            self.downloader = srtm.SRTMDownloader(offline=offline)
             self.downloader.loadFileList()
             self.tileDict = dict()
 
@@ -58,24 +58,26 @@ if __name__ == "__main__":
     lat = opts.lat
     lon = opts.lon
 
-    '''Do a few lat/long pairs to demonstrate the caching'''
+    '''Do a few lat/long pairs to demonstrate the caching
+    Note the +0.000001 to the time. On faster PC's, the two time periods
+    may in fact be equal, so we add a little extra time on the end to account for this'''
     t0 = time.time()
     alt = EleModel.GetElevation(lat, lon)
-    t1 = time.time()
+    t1 = time.time()+.000001
     print("Altitude at (%.6f, %.6f) is %u m. Pulled at %.1f FPS" % (lat, lon, alt, 1/(t1-t0)))
 
     lat = opts.lat+0.001
     lon = opts.lon+0.001
     t0 = time.time()
     alt = EleModel.GetElevation(lat, lon)
-    t1 = time.time()
+    t1 = time.time()+.000001
     print("Altitude at (%.6f, %.6f) is %u m. Pulled at %.1f FPS" % (lat, lon, alt, 1/(t1-t0)))
 
     lat = opts.lat-0.001
     lon = opts.lon-0.001
     t0 = time.time()
     alt = EleModel.GetElevation(lat, lon)
-    t1 = time.time()
+    t1 = time.time()+.000001
     print("Altitude at (%.6f, %.6f) is %u m. Pulled at %.1f FPS" % (lat, lon, alt, 1/(t1-t0)))
 
 

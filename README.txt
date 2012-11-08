@@ -1,10 +1,10 @@
 MAVProxy
 --------
 
-This is a MAVLink proxy in python. 
+This is a MAVLink ground station written in python. 
 
-Please see http://www.qgroundcontrol.org/mavlink/pymavlink for
-more information 
+Please see http://www.qgroundcontrol.org/mavlink/mavproxy_startpage
+for more information
 
-This ground station developed as part of the CanberraUAV team entry
-
+This ground station was developed as part of the CanberraUAV OBC team
+entry
