@@ -1313,7 +1313,7 @@ def open_logs():
             sys.exit(1)
         mkdir_p(fdir)
         print(fdir)
-        logfile = os.path.join(fdir, 'flight.log')
+        logfile = os.path.join(fdir, 'flight.tlog')
         mpstate.status.logdir = fdir
     mpstate.logfile_name = logfile
     mpstate.logfile = open(logfile, mode=mode)
@@ -1532,7 +1532,7 @@ if __name__ == '__main__':
     parser.add_option("--target-component", dest='TARGET_COMPONENT', type='int',
                       default=1, help='MAVLink target master component')
     parser.add_option("--logfile", dest="logfile", help="MAVLink master logfile",
-                      default='mav.log')
+                      default='mav.tlog')
     parser.add_option("-a", "--append-log", dest="append_log", help="Append to log files",
                       action='store_true', default=False)
     parser.add_option("--quadcopter", dest="quadcopter", help="use quadcopter controls",
