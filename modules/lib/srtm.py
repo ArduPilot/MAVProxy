@@ -63,9 +63,9 @@ class SRTMDownloader():
 
         if cachedir is None:
             try:
-                cachedir = os.path.join(os.environ['HOME'], '.tilecache/SRTM'),
+                cachedir = os.path.join(os.environ['HOME'], '.tilecache/SRTM')
             except Exception:
-                cachedir = os.path.join(tempfile.gettempdir(), 'MAVProxySRTM'),
+                cachedir = os.path.join(tempfile.gettempdir(), 'MAVProxySRTM')
 
         self.offline = offline
         self.first_failure = False
