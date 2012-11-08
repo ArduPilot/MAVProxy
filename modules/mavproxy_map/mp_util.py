@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*- 
+# -*- coding: utf-8 -*-
 '''common mavproxy utility functions'''
 
 import math
@@ -33,7 +33,7 @@ def gps_bearing(lat1, lon1, lat2, lon2):
 	dLat = lat2 - lat1
 	dLon = lon2 - lon1
 	y = math.sin(dLon) * math.cos(lat2)
-	x = math.cos(lat1)*math.sin(lat2) - math.sin(lat1)*math.cos(lat2)*math.cos(dLon)
+	x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1)*math.cos(lat2)*math.cos(dLon)
 	bearing = math.degrees(math.atan2(y, x))
 	if bearing < 0:
 		bearing += 360.0
@@ -47,7 +47,7 @@ def wrap_valid_longitude(lon):
   return (((lon + 180.0) % 360.0) - 180.0)
 
 def gps_newpos(lat, lon, bearing, distance):
-	'''extrapolate latitude/longitude given a heading and distance 
+	'''extrapolate latitude/longitude given a heading and distance
 	thanks to http://www.movable-type.co.uk/scripts/latlong.html
 	'''
 	lat1 = math.radians(lat)
@@ -149,5 +149,5 @@ def degrees_to_dms(degrees):
 	deg = int(degrees)
 	min = int((degrees - deg)*60)
 	sec = ((degrees - deg) - (min/60.0))*60*60
-	return '%u°%02u\'%04.1f"' % (deg, abs(min), abs(sec))
+	return u'%u\u00b0%02u\'%04.1f"' % (deg, abs(min), abs(sec))
 

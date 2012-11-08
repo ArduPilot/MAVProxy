@@ -66,24 +66,26 @@ if __name__ == "__main__":
     lat = opts.lat
     lon = opts.lon
 
-    '''Do a few lat/long pairs to demonstrate the caching'''
+    '''Do a few lat/long pairs to demonstrate the caching
+    Note the +0.000001 to the time. On faster PC's, the two time periods
+    may in fact be equal, so we add a little extra time on the end to account for this'''
     t0 = time.time()
     alt = EleModel.GetElevation(lat, lon)
-    t1 = time.time()
+    t1 = time.time()+.000001
     print("Altitude at (%.6f, %.6f) is %u m. Pulled at %.1f FPS" % (lat, lon, alt, 1/(t1-t0)))
 
     lat = opts.lat+0.001
     lon = opts.lon+0.001
     t0 = time.time()
     alt = EleModel.GetElevation(lat, lon)
-    t1 = time.time()
+    t1 = time.time()+.000001
     print("Altitude at (%.6f, %.6f) is %u m. Pulled at %.1f FPS" % (lat, lon, alt, 1/(t1-t0)))
 
     lat = opts.lat-0.001
     lon = opts.lon-0.001
     t0 = time.time()
     alt = EleModel.GetElevation(lat, lon)
-    t1 = time.time()
+    t1 = time.time()+.000001
     print("Altitude at (%.6f, %.6f) is %u m. Pulled at %.1f FPS" % (lat, lon, alt, 1/(t1-t0)))
 
 

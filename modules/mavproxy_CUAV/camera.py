@@ -55,7 +55,8 @@ class camera_state(object):
               ('maxqueue1', int, None),
               ('maxqueue2', int, 30),
               ('thumbsize', int, 60),
-              ('packet_loss', int, 0)              
+              ('packet_loss', int, 0),             
+              ('gcs_slave', str, None)  
               ]
             )
 
@@ -87,6 +88,7 @@ class camera_state(object):
         self.rtt_estimate = 0
         self.bsocket = None
         self.bsend2 = None
+        self.bsend_slave = None
         
         # setup directory for images
         self.camera_dir = os.path.join(os.path.dirname(mpstate.logfile_name),
@@ -310,13 +312,16 @@ def save_thread():
     state = mpstate.camera_state
     raw_dir = os.path.join(state.camera_dir, "raw")
     cuav_util.mkdir_p(raw_dir)
+    frame_count = 0
     while not state.unload.wait(0.02):
         if state.save_queue.empty():
             continue
         (frame_time,im) = state.save_queue.get()
         rawname = "raw%s" % cuav_util.frame_time(frame_time)
-        if state.settings.save_pgm:
-            chameleon.save_pgm('%s/%s.pgm' % (raw_dir, rawname), im)
+        frame_count += 1
+        if state.settings.save_pgm != 0:
+            if frame_count % state.settings.save_pgm == 0:
+                chameleon.save_pgm('%s/%s.pgm' % (raw_dir, rawname), im)
 
 def scan_thread():
     '''image scanning thread'''
@@ -424,6 +429,7 @@ def transmit_thread():
         # filter out any regions outside the boundary
         if state.boundary_polygon:
             regions = cuav_region.filter_boundary(regions, state.boundary_polygon, pos)
+            regions = cuav_region.filter_regions(im_full, regions, min_score=state.settings.minscore)
 
         state.xmit_queue = bsend.sendq_size()
         state.xmit_queue2 = state.bsend2.sendq_size()
@@ -507,6 +513,7 @@ def reload_mosaic(mosaic):
             try:
                 composite = cv.LoadImage(last_joe.thumb_filename)
                 thumbs = cuav_mosaic.ExtractThumbs(composite, len(regions))
+                mosaic.set_brightness(state.settings.brightness)
                 mosaic.add_regions(regions, thumbs, last_joe.image_filename, last_joe.pos)
             except Exception:
                 pass                
@@ -517,6 +524,7 @@ def reload_mosaic(mosaic):
         try:
             composite = cv.LoadImage(last_joe.thumb_filename)
             thumbs = cuav_mosaic.ExtractThumbs(composite, len(regions))
+            mosaic.set_brightness(state.settings.brightness)
             mosaic.add_regions(regions, thumbs, last_joe.image_filename, last_joe.pos)
         except Exception:
             pass
@@ -567,6 +575,8 @@ def view_thread():
             if tnow - ack_time > 0.1:
                 bsend.tick(packet_count=1000, max_queue=state.settings.maxqueue1)
                 state.bsend2.tick(packet_count=1000, max_queue=state.settings.maxqueue2)
+                if state.bsend_slave is not None:
+                    state.bsend_slave.tick(packet_count=1000)
                 ack_time = tnow
             if not view_window:
                 view_window = True
@@ -591,6 +601,13 @@ def view_thread():
             except Exception as e:
                 continue
 
+            if state.settings.gcs_slave is not None:
+                if state.bsend_slave is None:
+                    state.bsend_slave = block_xmit.BlockSender(0, state.settings.bandwidth*10, debug=False)
+                state.bsend_slave.send(buf,
+                                       dest=(state.settings.gcs_slave, state.settings.gcs_view_port),
+                                       priority=1)
+
             if isinstance(obj, ThumbPacket):
                 # we've received a set of thumbnails from the plane for a positive hit
                 if obj.frame_time in thumbs_received:
@@ -611,6 +628,7 @@ def view_thread():
                 log_joe_position(pos, obj.frame_time, obj.regions, filename, thumb_filename)
 
                 # update the mosaic and map
+                mosaic.set_brightness(state.settings.brightness)
                 mosaic.add_regions(obj.regions, thumbs, filename, pos=pos)
 
                 # update console display
@@ -733,11 +751,3 @@ def mavlink_packet(m):
     if m.get_type() in [ 'DATA16', 'DATA32', 'DATA64', 'DATA96' ]:
         if state.bsocket is not None:
             state.bsocket.incoming.append(m)
-    if m.get_type() == "SERVO_OUTPUT_RAW":
-        bottle = m.servo7_raw
-        if bottle == 1290:
-            mpstate.console.set_status('Bottle', 'Bottle: HELD', row=0, fg='green')
-        elif bottle == 1776:
-            mpstate.console.set_status('Bottle', 'Bottle: DROP', row=0, fg='red')
-        else:
-            mpstate.console.set_status('Bottle', 'Bottle: %u' % bottle, row=0, fg='red')

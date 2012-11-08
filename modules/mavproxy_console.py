@@ -90,6 +90,8 @@ def estimated_time_remaining(lat, lon, wpnum, speed):
             distance += mp_util.gps_distance(lat, lon, w.x, w.y)
             lat = w.x
             lon = w.y
+            if w.command == mavutil.mavlink.MAV_CMD_NAV_LAND:
+                break
     return distance / speed
         
         
@@ -107,11 +109,15 @@ def mavlink_packet(msg):
     state = mpstate.console_state
     # add some status fields
     if type in [ 'GPS_RAW', 'GPS_RAW_INT' ]:
+        if type == "GPS_RAW":
+            num_sats = master.field('GPS_STATUS', 'satellites_visible', 0)
+        else:
+            num_sats = msg.satellites_visible
         if ((msg.fix_type == 3 and master.mavlink10()) or
             (msg.fix_type == 2 and not master.mavlink10())):
-            mpstate.console.set_status('GPS', 'GPS: OK', fg='green')
+            mpstate.console.set_status('GPS', 'GPS: OK (%u)' % num_sats, fg='green')
         else:
-            mpstate.console.set_status('GPS', 'GPS: %u' % msg.fix_type, fg='red')
+            mpstate.console.set_status('GPS', 'GPS: %u (%u)' % (msg.fix_type, num_sats), fg='red')
         if master.mavlink10():
             gps_heading = int(mpstate.status.msgs['GPS_RAW_INT'].cog * 0.01)
         else:
@@ -133,10 +139,13 @@ def mavlink_packet(msg):
         lat = master.field('GLOBAL_POSITION_INT', 'lat', 0) * 1.0e-7
         lng = master.field('GLOBAL_POSITION_INT', 'lon', 0) * 1.0e-7
         rel_alt = master.field('GLOBAL_POSITION_INT', 'relative_alt', 0) * 1.0e-3
-        agl_alt = mpstate.console.ElevationMap.GetElevation(home_lat, home_lng) - mpstate.console.ElevationMap.GetElevation(lat, lng)
+        if mpstate.settings.basealt != 0:
+            agl_alt = mpstate.settings.basealt - mpstate.console.ElevationMap.GetElevation(lat, lng)
+        else:
+            agl_alt = mpstate.console.ElevationMap.GetElevation(home_lat, home_lng) - mpstate.console.ElevationMap.GetElevation(lat, lng)
         agl_alt += rel_alt
-        mpstate.console.set_status('Alt', 'Alt %u' % rel_alt)
         mpstate.console.set_status('AGL', 'AGL %u' % agl_alt)
+        mpstate.console.set_status('Alt', 'Alt %u' % rel_alt)
         mpstate.console.set_status('AirSpeed', 'AirSpeed %u' % msg.airspeed)
         mpstate.console.set_status('GPSSpeed', 'GPSSpeed %u' % msg.groundspeed)
         mpstate.console.set_status('Thr', 'Thr %u' % msg.throttle)
@@ -155,7 +164,7 @@ def mavlink_packet(msg):
         mpstate.console.set_status('Roll', 'Roll %u' % math.degrees(msg.roll))
         mpstate.console.set_status('Pitch', 'Pitch %u' % math.degrees(msg.pitch))
     elif type == 'HWSTATUS':
-        if msg.Vcc >= 4600 and msg.Vcc <= 5100:
+        if msg.Vcc >= 4600 and msg.Vcc <= 5300:
             fg = 'green'
         else:
             fg = 'red'
