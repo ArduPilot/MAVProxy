@@ -924,7 +924,7 @@ def battery_report():
     rbattery_level = int((mpstate.status.battery_level+5)/10)*10
 
     if rbattery_level != mpstate.status.last_battery_announce:
-        say("Flight battery %u percent" % rbattery_level,priority='notification')
+        say("Flight battery %u percent" % rbattery_level, priority='notification')
         mpstate.status.last_battery_announce = rbattery_level
     if rbattery_level <= 20:
         say("Flight battery warning")
@@ -934,7 +934,7 @@ def battery_report():
     avionics_rbattery_level = int((mpstate.status.avionics_battery_level+5)/10)*10
 
     if avionics_rbattery_level != mpstate.status.last_avionics_battery_announce:
-        say("Avionics Battery %u percent" % avionics_rbattery_level,priority='notification')
+        say("Avionics Battery %u percent" % avionics_rbattery_level, priority='notification')
         mpstate.status.last_avionics_battery_announce = avionics_rbattery_level
     if avionics_rbattery_level <= 20:
         say("Avionics battery warning")
