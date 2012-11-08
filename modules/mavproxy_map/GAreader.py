@@ -4,7 +4,11 @@ Module to read DTM files published by Geoscience Australia
 Written by Stephen Dade (stephen_dade@hotmail.com
 '''
 
-import sys, numpy, os
+import os
+import sys
+
+import numpy
+
 
 class ERMap:
     '''Class to read GA files'''

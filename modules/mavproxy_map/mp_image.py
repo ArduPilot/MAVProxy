@@ -5,7 +5,13 @@ Andrew Tridgell
 June 2012
 '''
 
-import mp_util, time, wx, cv, mp_widgets
+import cv
+import time
+import wx
+
+from mavproxy_map import mp_util
+from mavproxy_map import mp_widgets
+
 
 class MPImage():
     '''
@@ -140,8 +146,6 @@ class MPImagePanel(wx.PyScrolledWindow):
         state.out_queue.put(mp_util.object_container(event))
             
 if __name__ == "__main__":
-    import time, cv
-
     from optparse import OptionParser
     parser = OptionParser("mp_image.py <file>")
     (opts, args) = parser.parse_args()

@@ -9,7 +9,21 @@ May 2012
 released under GNU GPL v3 or later
 '''
 
-import math, cv, sys, os, mp_util, httplib2, threading, time, collections, string, hashlib, errno, tempfile
+import collections
+import errno
+import hashlib
+import httplib2
+import math
+import threading
+import os
+import string
+import tempfile
+import time
+
+import cv
+
+from mavproxy_map import mp_util
+
 
 class TileException(Exception):
 	'''tile error class'''
@@ -171,8 +185,10 @@ class MPTile:
 		# _download_pending is a dictionary of TileInfo objects
 		self._download_pending = {}
 		self._download_thread = None
-		self._loading = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'data', 'loading.jpg')
-		self._unavailable = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'data', 'unavailable.jpg')
+		self._loading = os.path.join(os.path.dirname(__file__),
+                                             'data', 'loading.jpg')
+		self._unavailable = os.path.join(os.path.dirname(__file__),
+                                                 'data', 'unavailable.jpg')
 		self._tile_cache = collections.OrderedDict()
 
 	def coord_to_tile(self, lat, lon, zoom):

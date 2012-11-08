@@ -5,9 +5,11 @@ Andrew Tridgell
 June 2012
 '''
 
-import sys, os, cv, math
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib'))
-import mp_slipmap, mp_util, functools, time
+import functools
+import time
+
+from mavproxy_map import mp_slipmap
+from mavproxy_map import mp_util
 
 mpstate = None
 
