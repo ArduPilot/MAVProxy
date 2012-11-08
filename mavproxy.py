@@ -1180,7 +1180,7 @@ def master_callback(m, master):
     elif mtype == "BAD_DATA":
         if mpstate.settings.shownoise and mavutil.all_printable(m.data):
             mpstate.console.write(str(m.data), bg='red')
-    elif mtype in [ "COMMAND_ACK" ]:
+    elif mtype in [ "COMMAND_ACK", "MISSION_ACK" ]:
         mpstate.console.writeln("Got MAVLink msg: %s" % m)
     else:
         #mpstate.console.writeln("Got MAVLink msg: %s" % m)
