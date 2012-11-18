@@ -149,6 +149,7 @@ class MPState(object):
         self.functions.process_stdin = process_stdin
         self.select_extra = {}
         self.continue_mode = False
+        self.aliases = {}
 
     def master(self):
         '''return the currently chosen mavlink master object'''
@@ -741,6 +742,38 @@ def cmd_module(args):
         print(usage)
 
 
+def cmd_alias(args):
+    '''alias commands'''
+    usage = "usage: alias <add|remove|list>"
+    if len(args) < 1 or args[0] == "list":
+        if len(args) >= 2:
+            wildcard = args[1].upper()
+        else:
+            wildcard = '*'
+        for a in sorted(mpstate.aliases.keys()):
+            if fnmatch.fnmatch(a.upper(), wildcard):
+                print("%20s : %s" % (a, mpstate.aliases[a]))
+    elif args[0] == "add":
+        if len(args) < 3:
+            print(usage)
+            return
+        a = args[1]
+        mpstate.aliases[a] = ' '.join(args[2:])
+    elif args[0] == "remove":
+        if len(args) != 2:
+            print(usage)
+            return
+        a = args[1]
+        if a in mpstate.aliases:
+            mpstate.aliases.pop(a)
+        else:
+            print("no alias %s" % a)
+    else:
+        print(usage)
+        return
+        
+
+
 command_map = {
     'switch'  : (cmd_switch,   'set RC switch (1-5), 0 disables'),
     'rc'      : (cmd_rc,       'override a RC channel value'),
@@ -767,6 +800,7 @@ command_map = {
     'up'      : (cmd_up,       'adjust TRIM_PITCH_CD up by 5 degrees'),
     'watch'   : (cmd_watch,    'watch a MAVLink pattern'),
     'module'  : (cmd_module,   'module commands'),
+    'alias'   : (cmd_alias,    'command aliases'),
     }
 
 def process_stdin(line):
@@ -793,6 +827,11 @@ def process_stdin(line):
 
     args = line.split()
     cmd = args[0]
+    while cmd in mpstate.aliases:
+        line = mpstate.aliases[cmd]
+        args = line.split() + args[1:]
+        cmd = args[0]
+        
     if cmd == 'help':
         k = command_map.keys()
         k.sort()
