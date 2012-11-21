@@ -1546,7 +1546,10 @@ def run_script(scriptfile):
         line = line.strip()
         if line == "" or line.startswith('#'):
             continue
-        mpstate.console.writeln("-> %s" % line)
+        if line.startswith('@'):
+            line = line[1:]
+        else:
+            mpstate.console.writeln("-> %s" % line)
         process_stdin(line)
     f.close()
 
@@ -1696,6 +1699,11 @@ Auto-detected serial ports are:
     mpstate.rl = rline("MAV> ")
     if opts.setup:
         mpstate.rl.set_prompt("")
+
+    if 'HOME' in os.environ and not opts.setup:
+        start_script = os.path.join(os.environ['HOME'], ".mavinit.scr")
+        if os.path.exists(start_script):
+            run_script(start_script)
 
     if opts.aircraft is not None:
         start_script = os.path.join(opts.aircraft, "mavinit.scr")
