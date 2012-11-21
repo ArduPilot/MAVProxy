@@ -752,7 +752,7 @@ def cmd_alias(args):
             wildcard = '*'
         for a in sorted(mpstate.aliases.keys()):
             if fnmatch.fnmatch(a.upper(), wildcard):
-                print("%20s : %s" % (a, mpstate.aliases[a]))
+                print("%-15s : %s" % (a, mpstate.aliases[a]))
     elif args[0] == "add":
         if len(args) < 3:
             print(usage)
@@ -1079,7 +1079,7 @@ def master_callback(m, master):
             mpstate.status.last_apm_msg = m.text
             mpstate.status.last_apm_msg_time = time.time()
     elif mtype == 'PARAM_VALUE':
-        param_id = "%.15s" % m.param_id
+        param_id = "%.16s" % m.param_id
         if m.param_index != -1 and m.param_index not in mpstate.mav_param_set:
             added_new_parameter = True
             mpstate.mav_param_set.add(m.param_index)
