@@ -964,6 +964,8 @@ def battery_report():
     if int(mpstate.settings.battreadout) == 0:
         return
 
+    mpstate.console.set_status('Battery', 'Battery: %u' % mpstate.status.battery_level, row=0)
+
     rbattery_level = int((mpstate.status.battery_level+5)/10)*10
 
     if rbattery_level != mpstate.status.last_battery_announce:
