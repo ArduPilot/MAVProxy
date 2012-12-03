@@ -575,7 +575,11 @@ def cmd_param(args):
                 print("Usage: param diff <filename>")
         else:
             filename = args[1]
-        mpstate.mav_param.diff(filename)
+        if len(args) == 3:
+            wildcard = args[2]
+        else:
+            wildcard = '*'
+        mpstate.mav_param.diff(filename, wildcard=wildcard)
     elif args[0] == "set":
         if len(args) != 3:
             print("Usage: param set PARMNAME VALUE")
