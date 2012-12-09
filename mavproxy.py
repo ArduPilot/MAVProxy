@@ -149,6 +149,7 @@ class MPState(object):
         self.functions.process_stdin = process_stdin
         self.select_extra = {}
         self.continue_mode = False
+        self.aliases = {}
 
     def master(self):
         '''return the currently chosen mavlink master object'''
@@ -574,7 +575,11 @@ def cmd_param(args):
                 print("Usage: param diff <filename>")
         else:
             filename = args[1]
-        mpstate.mav_param.diff(filename)
+        if len(args) == 3:
+            wildcard = args[2]
+        else:
+            wildcard = '*'
+        mpstate.mav_param.diff(filename, wildcard=wildcard)
     elif args[0] == "set":
         if len(args) != 3:
             print("Usage: param set PARMNAME VALUE")
@@ -741,6 +746,38 @@ def cmd_module(args):
         print(usage)
 
 
+def cmd_alias(args):
+    '''alias commands'''
+    usage = "usage: alias <add|remove|list>"
+    if len(args) < 1 or args[0] == "list":
+        if len(args) >= 2:
+            wildcard = args[1].upper()
+        else:
+            wildcard = '*'
+        for a in sorted(mpstate.aliases.keys()):
+            if fnmatch.fnmatch(a.upper(), wildcard):
+                print("%-15s : %s" % (a, mpstate.aliases[a]))
+    elif args[0] == "add":
+        if len(args) < 3:
+            print(usage)
+            return
+        a = args[1]
+        mpstate.aliases[a] = ' '.join(args[2:])
+    elif args[0] == "remove":
+        if len(args) != 2:
+            print(usage)
+            return
+        a = args[1]
+        if a in mpstate.aliases:
+            mpstate.aliases.pop(a)
+        else:
+            print("no alias %s" % a)
+    else:
+        print(usage)
+        return
+        
+
+
 command_map = {
     'switch'  : (cmd_switch,   'set RC switch (1-5), 0 disables'),
     'rc'      : (cmd_rc,       'override a RC channel value'),
@@ -767,6 +804,7 @@ command_map = {
     'up'      : (cmd_up,       'adjust TRIM_PITCH_CD up by 5 degrees'),
     'watch'   : (cmd_watch,    'watch a MAVLink pattern'),
     'module'  : (cmd_module,   'module commands'),
+    'alias'   : (cmd_alias,    'command aliases'),
     }
 
 def process_stdin(line):
@@ -793,6 +831,11 @@ def process_stdin(line):
 
     args = line.split()
     cmd = args[0]
+    while cmd in mpstate.aliases:
+        line = mpstate.aliases[cmd]
+        args = line.split() + args[1:]
+        cmd = args[0]
+        
     if cmd == 'help':
         k = command_map.keys()
         k.sort()
@@ -1040,7 +1083,7 @@ def master_callback(m, master):
             mpstate.status.last_apm_msg = m.text
             mpstate.status.last_apm_msg_time = time.time()
     elif mtype == 'PARAM_VALUE':
-        param_id = "%.15s" % m.param_id
+        param_id = "%.16s" % m.param_id
         if m.param_index != -1 and m.param_index not in mpstate.mav_param_set:
             added_new_parameter = True
             mpstate.mav_param_set.add(m.param_index)
@@ -1412,6 +1455,22 @@ def periodic_tasks():
             if mpstate.status.override_counter > 0:
                 mpstate.status.override_counter -= 1
 
+
+    # call optional module idle tasks. These are called at several hundred Hz
+    for m in mpstate.modules:
+        if hasattr(m, 'idle_task'):
+            try:
+                m.idle_task()
+            except Exception, msg:
+                if mpstate.settings.moddebug == 1:
+                    print(msg)
+                elif mpstate.settings.moddebug > 1:
+                    import traceback
+                    exc_type, exc_value, exc_traceback = sys.exc_info()
+                    traceback.print_exception(exc_type, exc_value, exc_traceback,
+                                              limit=2, file=sys.stdout)
+
+
 def main_loop():
     '''main processing loop'''
     if not mpstate.status.setup_mode and not opts.nowait:
@@ -1507,7 +1566,10 @@ def run_script(scriptfile):
         line = line.strip()
         if line == "" or line.startswith('#'):
             continue
-        mpstate.console.writeln("-> %s" % line)
+        if line.startswith('@'):
+            line = line[1:]
+        else:
+            mpstate.console.writeln("-> %s" % line)
         process_stdin(line)
     f.close()
 
@@ -1660,6 +1722,11 @@ Auto-detected serial ports are:
     mpstate.rl = rline("MAV> ")
     if opts.setup:
         mpstate.rl.set_prompt("")
+
+    if 'HOME' in os.environ and not opts.setup:
+        start_script = os.path.join(os.environ['HOME'], ".mavinit.scr")
+        if os.path.exists(start_script):
+            run_script(start_script)
 
     if opts.aircraft is not None:
         start_script = os.path.join(opts.aircraft, "mavinit.scr")

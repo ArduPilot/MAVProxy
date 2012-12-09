@@ -404,7 +404,7 @@ def transmit_thread():
 
     tx_count = 0
     skip_count = 0
-    bsend = block_xmit.BlockSender(0, state.settings.bandwidth, debug=False)
+    bsend = block_xmit.BlockSender(0, bandwidth=state.settings.bandwidth, debug=False)
     state.bsocket = MavSocket(mpstate.mav_master[0])
     state.bsend2 = block_xmit.BlockSender(mss=96, sock=state.bsocket, dest_ip='mavlink', dest_port=0, backlog=5, debug=False)
     state.bsend2.set_bandwidth(state.settings.bandwidth2)
@@ -536,7 +536,7 @@ def view_thread():
     import cuav_mosaic
     state = mpstate.camera_state
 
-    bsend = block_xmit.BlockSender(state.settings.gcs_view_port, state.settings.bandwidth)
+    bsend = block_xmit.BlockSender(state.settings.gcs_view_port, bandwidth=state.settings.bandwidth)
     state.bsocket = MavSocket(mpstate.mav_master[0])
     state.bsend2 = block_xmit.BlockSender(mss=96, sock=state.bsocket, dest_ip='mavlink', dest_port=0, backlog=5, debug=False)
     state.bsend2.set_bandwidth(state.settings.bandwidth2)
@@ -603,7 +603,7 @@ def view_thread():
 
             if state.settings.gcs_slave is not None:
                 if state.bsend_slave is None:
-                    state.bsend_slave = block_xmit.BlockSender(0, state.settings.bandwidth*10, debug=False)
+                    state.bsend_slave = block_xmit.BlockSender(0, bandwidth=state.settings.bandwidth*10, debug=False)
                 state.bsend_slave.send(buf,
                                        dest=(state.settings.gcs_slave, state.settings.gcs_view_port),
                                        priority=1)
