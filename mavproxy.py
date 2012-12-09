@@ -1614,7 +1614,9 @@ if __name__ == '__main__':
     parser.add_option("--console", action='store_true', help="use GUI console")
     parser.add_option("--map", action='store_true', help="load map module")
     parser.add_option(
-        '--module', action='append',
+        '--load-module',
+        action='append',
+        default=[],
         help='Load the specified module. Can be used multiple times.')
     parser.add_option("--mav09", action='store_true', default=False, help="Use MAVLink protocol 0.9")
     parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
@@ -1738,9 +1740,8 @@ Auto-detected serial ports are:
     if opts.console:
         process_stdin('module load console')
 
-    if opts.module:
-        for module in opts.module:
-            process_stdin('module load %s' % (module,))
+    for module in opts.load_module:
+        process_stdin('module load %s' % (module,))
 
     if opts.cmd is not None:
         cmds = opts.cmd.split(';')
