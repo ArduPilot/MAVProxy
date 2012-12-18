@@ -117,6 +117,10 @@ def scale_channel(ch, value):
     cmin  = master.param('RC%u_MIN'%ch, 1000)
     cmax  = master.param('RC%u_MAX'%ch, 2000)
     ctrim = master.param('RC%u_TRIM'%ch, 1500)
+    if cmax == cmin:
+        cmax = 2000
+        cmin = 1000
+        ctrim = 1500
     if ctrim < cmin:
         ctrim = cmin
     # scale to -1/1 range
