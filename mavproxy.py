@@ -1277,7 +1277,7 @@ def process_master(m):
         sys.stdout.flush()
         return
 
-    if m.first_byte:
+    if m.first_byte and opts.auto_protocol:
         m.auto_mavlink_version(s)
     msgs = m.mav.parse_buffer(s)
     if msgs:
@@ -1298,7 +1298,7 @@ def process_mavlink(slave):
     except socket.error:
         return
     try:
-        if slave.first_byte:
+        if slave.first_byte and opts.auto_protocol:
             slave.auto_mavlink_version(buf)
         msgs = slave.mav.parse_buffer(buf)
     except mavutil.mavlink.MAVError as e:
@@ -1616,6 +1616,7 @@ if __name__ == '__main__':
     parser.add_option("--console", action='store_true', help="use GUI console")
     parser.add_option("--map", action='store_true', help="load map module")
     parser.add_option("--mav09", action='store_true', default=False, help="Use MAVLink protocol 0.9")
+    parser.add_option("--auto-protocol", action='store_true', default=False, help="Auto detect MAVLink protocol version")
     parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
     parser.add_option("--continue", dest='continue_mode', action='store_true', default=False, help="continue logs")
 
