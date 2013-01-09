@@ -1743,6 +1743,9 @@ Auto-detected serial ports are:
     if opts.console:
         process_stdin('module load console')
 
+    if opts.map:
+        process_stdin('module load map')
+
     for module in opts.load_module:
         process_stdin('module load %s' % (module,))
 
