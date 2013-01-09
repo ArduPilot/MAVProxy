@@ -121,8 +121,10 @@ def scale_channel(ch, value):
         cmax = 2000
         cmin = 1000
         ctrim = 1500
-    if ctrim < cmin:
-        ctrim = cmin
+    if ctrim <= cmin:
+        ctrim = cmin+1
+    if ctrim >= cmax:
+        ctrim = cmax-1
     # scale to -1/1 range
     if ch == 3:
         v = (value-cmin) / float(cmax-cmin)
