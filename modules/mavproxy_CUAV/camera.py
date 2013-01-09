@@ -9,8 +9,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'cuav', 'lib'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'lib'))
 
-import scanner, mavutil, cuav_mosaic, mav_position, cuav_util, cuav_joe, block_xmit, mp_image, cuav_region, mp_slipmap, mp_settings
+import scanner, mavutil, cuav_mosaic, mav_position, cuav_util, cuav_joe, block_xmit, mp_image, cuav_region, mp_settings
 from cam_params import CameraParams
+from modules.mavproxy_map import mp_slipmap
 
 # allow for replaying of previous flights
 if os.getenv('FAKE_CHAMELEON'):

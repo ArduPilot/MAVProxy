@@ -21,7 +21,7 @@ import time
 
 import cv
 
-from mavproxy_map import mp_util
+from modules.lib import mp_util
 
 class TileException(Exception):
 	'''tile error class'''

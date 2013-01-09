@@ -11,7 +11,7 @@ mpstate = None
 from modules.lib import wxconsole
 from modules.lib import textconsole
 from modules.lib import mp_elevation
-from modules.lib import mavutil
+import mavutil
 from modules.lib import mp_util
 
 class module_state(object):

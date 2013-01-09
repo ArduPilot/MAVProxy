@@ -13,7 +13,7 @@ import serial, Queue, select
 
 # The modules subdirectory contains the modules that come with
 # mavproxy.
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'modules'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'modules'))
 
 # find the mavlink.py module
 for d in [ 'pymavlink',
@@ -24,6 +24,7 @@ for d in [ 'pymavlink',
 
 import select
 from modules.lib import textconsole
+from modules.lib import mp_settings
 
 class MPSettings(object):
     def __init__(self):

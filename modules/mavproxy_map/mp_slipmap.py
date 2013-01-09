@@ -14,7 +14,7 @@ import time
 
 from mavproxy_map import mp_elevation
 from mavproxy_map import mp_tile
-from mavproxy_map import mp_util
+from modules.lib import mp_util
 from mavproxy_map import mp_widgets
 
 

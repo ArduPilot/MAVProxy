@@ -16,7 +16,7 @@ import zipfile
 import array
 import math
 import multiprocessing
-import mp_util
+from modules.lib import mp_util
 import tempfile
 
 class NoSuchTileError(Exception):

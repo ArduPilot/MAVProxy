@@ -9,7 +9,7 @@ import cv
 import time
 import wx
 
-from mavproxy_map import mp_util
+from modules.lib import mp_util
 from mavproxy_map import mp_widgets
 
 
