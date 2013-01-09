@@ -1619,7 +1619,7 @@ if __name__ == '__main__':
         '--load-module',
         action='append',
         default=[],
-        help='Load the specified module. Can be used multiple times.')
+        help='Load the specified module. Can be used multiple times, or with a comma separated list')
     parser.add_option("--mav09", action='store_true', default=False, help="Use MAVLink protocol 0.9")
     parser.add_option("--auto-protocol", action='store_true', default=False, help="Auto detect MAVLink protocol version")
     parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
@@ -1747,7 +1747,9 @@ Auto-detected serial ports are:
         process_stdin('module load map')
 
     for module in opts.load_module:
-        process_stdin('module load %s' % (module,))
+        modlist = module.split(',')
+        for mod in modlist:
+            process_stdin('module load %s' % mod)
 
     if opts.cmd is not None:
         cmds = opts.cmd.split(';')
