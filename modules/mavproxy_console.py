@@ -10,7 +10,7 @@ mpstate = None
 
 from modules.lib import wxconsole
 from modules.lib import textconsole
-from modules.lib import mp_elevation
+from modules.mavproxy_map import mp_elevation
 import mavutil
 from modules.lib import mp_util
 
