@@ -13,6 +13,7 @@ from lib import live_graph
 class graph_state(object):
     def __init__(self):
         self.timespan = 20
+        self.tickresolution = 0.2
         self.graphs = []
         
 def name():
@@ -33,15 +34,21 @@ def cmd_graph(args):
             print("Graph %u: %s" % (i, state.graphs[i].fields))
         return
 
-    if args[0] == "timespan":
+    elif args[0] == "help":
+        print("graph <timespan|tickresolution|expression>")
+    elif args[0] == "timespan":
         if len(args) == 1:
             print("timespan: %.1f" % state.timespan)
             return
         state.timespan = float(args[1])
-        return
-
-    # start a new graph
-    state.graphs.append(Graph(args[:]))
+    elif args[0] == "tickresolution":
+        if len(args) == 1:
+            print("tickresolution: %.1f" % state.tickresolution)
+            return
+        state.tickresolution = float(args[1])
+    else:
+        # start a new graph
+        state.graphs.append(Graph(args[:]))
 
 
 def init(_mpstate):
@@ -92,6 +99,7 @@ class Graph():
         self.values = [None]*len(self.fields)
         self.livegraph = live_graph.LiveGraph(self.fields,
                                               timespan=state.timespan,
+                                              tickresolution=state.tickresolution,
                                               title=self.fields[0])
 
     def is_alive(self):
