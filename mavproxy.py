@@ -785,7 +785,7 @@ def cmd_module(args):
                     m.unload()
                 except Exception:
                     pass
-                reload('modules.%s' % (m,))
+                reload(m)
                 m.init(mpstate)
                 print("Reloaded module %s" % modname)
                 return
@@ -1335,6 +1335,8 @@ def master_callback(m, master):
 
         # pass to modules
         for mod in mpstate.modules:
+            if not hasattr(mod, 'mavlink_packet'):
+                continue
             try:
                 mod.mavlink_packet(m)
             except Exception, msg:
