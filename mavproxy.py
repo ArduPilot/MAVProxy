@@ -305,16 +305,20 @@ def cmd_switch(args):
 def cmd_rc(args):
     '''handle RC value override'''
     if len(args) != 2:
-        print("Usage: rc <channel> <pwmvalue>")
+        print("Usage: rc <channel|all> <pwmvalue>")
         return
-    channel = int(args[0])
     value   = int(args[1])
     if value == -1:
         value = 65535
-    if channel < 1 or channel > 8:
-        print("Channel must be between 1 and 8")
-        return
-    mpstate.status.override[channel-1] = value
+    if args[0] == 'all':
+        for i in range(8):
+            mpstate.status.override[i] = value
+    else:
+        channel = int(args[0])
+        mpstate.status.override[channel-1] = value
+        if channel < 1 or channel > 8:
+            print("Channel must be between 1 and 8 or 'all'")
+            return
     mpstate.status.override_counter = 10
     send_rc_override()
 
