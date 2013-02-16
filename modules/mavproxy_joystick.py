@@ -24,11 +24,11 @@ joymap = {
     'CarolBox USB*':
     # http://www.hobbyking.com/hobbyking/store/__13597__USB_Simulator_Cable_XTR_AeroFly_FMS.html
     # has 6 usable axes. This assumes mode 1
-    [(3, -500, 1500),
-     (0, -500, 1500),
-     (1, 500, 1500),
+    [(3, 500, 1500),
+     (0, 500, 1500),
+     (1, 700, 1500),
      (4, 500, 1500),
-     None,
+     (5, 500, 1500),
      None,
      (2, 500, 1500),
      (5, 500, 1500)],
