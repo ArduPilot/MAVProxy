@@ -1075,9 +1075,6 @@ def battery_report():
 def handle_msec_timestamp(m, master):
     '''special handling for MAVLink packets with a time_boot_ms field'''
     msec = m.time_boot_ms
-    if msec > 1e7 and msec > master.highest_msec+1e5:
-        # its been sent as microseconds
-        msec /= 1000
     if msec + 30000 < master.highest_msec:
         say('Time has wrapped')
         print('Time has wrapped', msec, master.highest_msec)
