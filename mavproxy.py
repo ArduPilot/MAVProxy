@@ -1732,7 +1732,7 @@ if __name__ == '__main__':
         say('Startup')
 
     if not opts.master:
-        serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*", "*USB_to_UART*"])
+        serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*", "*3D_Robotics*", "*USB_to_UART*"])
         if len(serial_list) == 1:
             opts.master = [serial_list[0].device]
         else:
