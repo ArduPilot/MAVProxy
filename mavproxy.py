@@ -143,6 +143,7 @@ class MPStatus(object):
         self.last_streamrate2 = -1
         self.last_seq = 0
         self.fetch_one = False
+        self.armed = False
 
     def show(self, f, pattern=None):
         '''write status to status.txt'''
@@ -1163,6 +1164,15 @@ def master_callback(m, master):
 
         mpstate.status.last_heartbeat = time.time()
         master.last_heartbeat = mpstate.status.last_heartbeat
+
+        armed = (m.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED) != 0
+        if armed != mpstate.status.armed:
+            mpstate.status.armed = armed
+            if armed:
+                say("ARMED")
+            else:
+                say("DISARMED")
+        
     elif mtype == 'STATUSTEXT':
         if m.text != mpstate.status.last_apm_msg or time.time() > mpstate.status.last_apm_msg_time+2:
             mpstate.console.writeln("APM: %s" % m.text, bg='red')
