@@ -9,8 +9,13 @@ June 2012
 import cv
 import functools
 import math
-import os
+import os, sys
 import time
+
+if __name__ == "__main__":
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..'))
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
+
 
 from mavproxy_map import mp_elevation
 from mavproxy_map import mp_tile
