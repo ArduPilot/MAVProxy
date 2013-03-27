@@ -5,7 +5,7 @@ Andrew Tridgell
 June 2012
 '''
 
-import sys, os, cv, math
+import sys, os, math
 import functools
 import time
 from mavproxy_map import mp_slipmap
