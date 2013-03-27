@@ -5,7 +5,7 @@ Andrew Tridgell
 June 2012
 '''
 
-import cv
+import cv2.cv as cv
 import time
 import wx
 

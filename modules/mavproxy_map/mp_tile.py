@@ -20,7 +20,7 @@ import sys
 import string
 import time
 
-import cv
+import cv2.cv as cv
 
 if __name__ == "__main__":
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..'))

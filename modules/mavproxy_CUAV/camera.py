@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 '''camera control for ptgrey chameleon camera'''
 
-import time, threading, sys, os, numpy, Queue, cv, errno, cPickle, signal, struct, fcntl, select, cStringIO
+import time, threading, sys, os, numpy, Queue, errno, cPickle, signal, struct, fcntl, select, cStringIO
+import cv2.cv as cv
 
 # use the camera code from the cuav repo (see githib.com/tridge)
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'cuav', 'camera'))
