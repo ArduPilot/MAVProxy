@@ -16,10 +16,15 @@ import httplib2
 import math
 import threading
 import os
+import sys
 import string
 import time
 
 import cv
+
+if __name__ == "__main__":
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..'))
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
 
 from modules.lib import mp_util
 
@@ -133,7 +138,9 @@ class TileInfo:
 	def path(self):
 		'''return relative path of tile image'''
 		(x, y) = self.tile
-		return "%u/%u/%u.img" % (self.zoom, y, x)
+		return os.path.join('%u' % self.zoom,
+				    '%u' % y,
+				    '%u.img' % x)
 
 	def url(self, service):
 		'''return URL for a tile'''
@@ -158,11 +165,12 @@ class MPTile:
 	def __init__(self, cache_path=None, download=True, cache_size=500,
 		     service="MicrosoftSat", tile_delay=0.3, debug=False,
 		     max_zoom=19):
-
+		
 		if cache_path is None:
 			try:
 				cache_path = os.path.join(os.environ['HOME'], '.tilecache')
 			except Exception:
+				import tempfile
 				cache_path = os.path.join(tempfile.gettempdir(), 'MAVtilecache')
 
 		if not os.path.exists(cache_path):
@@ -352,7 +360,9 @@ class MPTile:
 				self._tile_cache.popitem(0)
 			return ret
 		except IOError as e:
-			if not e.errno in [errno.ENOENT]:
+			# windows gives errno 0 for some versions of python, treat that as ENOENT
+			# and try a download
+			if not e.errno in [errno.ENOENT,0]:
 				raise
 			pass
 		if not self.download:
