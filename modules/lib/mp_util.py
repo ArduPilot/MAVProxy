@@ -73,7 +73,7 @@ def mkdir_p(dir):
 	'''like mkdir -p'''
 	if not dir:
 		return
-	if dir.endswith("/"):
+	if dir.endswith("/") or dir.endswith("\\"):
 		mkdir_p(dir[:-1])
 		return
 	if os.path.isdir(dir):
