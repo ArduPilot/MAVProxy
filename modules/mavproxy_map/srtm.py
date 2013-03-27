@@ -185,7 +185,7 @@ class SRTMDownloader():
             '''print "here??"'''
             return 0
 
-        if not os.path.exists(self.cachedir + "/" + filename):
+        if not os.path.exists(os.path.join(self.cachedir, filename)):
             if self.childTileDownload is None or not self.childTileDownload.is_alive():
                 self.childTileDownload = multiprocessing.Process(target=self.downloadTile, args=(continent, filename))
                 self.childTileDownload.start()
@@ -196,7 +196,10 @@ class SRTMDownloader():
             return 0
         # TODO: Currently we create a new tile object each time.
         # Caching is required for improved performance.
-        return SRTMTile(self.cachedir + "/" + filename, int(lat), int(lon))
+        try:
+            return SRTMTile(os.path.join(self.cachedir, filename), int(lat), int(lon))
+        except InvalidTileError:
+            return 0
 
     def downloadTile(self, continent, filename):
         #Use HTTP
@@ -213,7 +216,7 @@ class SRTMDownloader():
             if r1.status==200:
                 '''print "status200 received ok"'''
                 data = r1.read()
-                self.ftpfile = open(self.cachedir + "/" + filename, 'wb')
+                self.ftpfile = open(os.path.join(self.cachedir, filename), 'wb')
                 self.ftpfile.write(data)
                 self.ftpfile.close()
                 self.ftpfile = None
@@ -236,7 +239,10 @@ class SRTMTile:
         only have to look at a single tile.
         """
     def __init__(self, f, lat, lon):
-        zipf = zipfile.ZipFile(f, 'r')
+        try:
+            zipf = zipfile.ZipFile(f, 'r')
+        except Exception:
+            raise InvalidTileError(lat, lon)            
         names = zipf.namelist()
         if len(names) != 1:
             raise InvalidTileError(lat, lon)
