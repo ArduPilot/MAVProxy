@@ -51,7 +51,12 @@ def init(_mpstate):
     global mpstate
     mpstate = _mpstate
     mpstate.map_state = module_state()
-    mpstate.map = mp_slipmap.MPSlipMap(service='GoogleSat', elevation=True, title='Map')
+    service = 'GoogleSat'
+    import platform
+    if platform.system() == 'Windows':
+        # windows has trouble with Google tile URLs
+        service = 'MicrosoftSat'
+    mpstate.map = mp_slipmap.MPSlipMap(service=service, elevation=True, title='Map')
 
     # setup a plane icon
     icon = mpstate.map.icon('planetracker.png')
