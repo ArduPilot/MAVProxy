@@ -1165,7 +1165,7 @@ def master_callback(m, master):
         mpstate.status.last_heartbeat = time.time()
         master.last_heartbeat = mpstate.status.last_heartbeat
 
-        armed = (m.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED) != 0
+        armed = mpstate.master().motors_armed()
         if armed != mpstate.status.armed:
             mpstate.status.armed = armed
             if armed:
