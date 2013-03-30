@@ -74,20 +74,20 @@ def check_sim_in():
     '''check for FDM packets from runsim'''
     state = mpstate.hil_state
     try:
-        pkt = state.sim_in.recv(16*8 + 4)
+        pkt = state.sim_in.recv(17*8 + 4)
     except socket.error as e:
         if not e.errno in [ errno.EAGAIN, errno.EWOULDBLOCK ]:
             raise
         return        
-    if len(pkt) != 16*8 + 4:
+    if len(pkt) != 17*8 + 4:
         # wrong size, discard it
         print("wrong size %u" % len(pkt))
         return
-    (latitude, longitude, altitude, heading, v_north, v_east,
+    (latitude, longitude, altitude, heading, v_north, v_east, v_down,
      ax, ay, az,
      phidot, thetadot, psidot,
      roll, pitch, yaw,
-     vcas, check) = struct.unpack('<16dI', pkt)
+     vcas, check) = struct.unpack('<17dI', pkt)
     (p, q, r) = convert_body_frame(radians(roll), radians(pitch), radians(phidot), radians(thetadot), radians(psidot))
 
     try:
