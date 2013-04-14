@@ -166,7 +166,7 @@ def mavlink_packet(m):
             mpstate.map.set_position('blueplane', (lat, lon), rotation=m.cog*0.01)
 
     if m.get_type() == "NAV_CONTROLLER_OUTPUT":
-        if mpstate.master().flightmode == "AUTO":
+        if mpstate.master().flightmode in [ "AUTO", "GUIDED", "LOITER", "RTL" ]:
             trajectory = [ (state.lat, state.lon),
                            mp_util.gps_newpos(state.lat, state.lon, m.target_bearing, m.wp_dist) ]
             mpstate.map.add_object(mp_slipmap.SlipPolygon('trajectory', trajectory, layer='Trajectory',
