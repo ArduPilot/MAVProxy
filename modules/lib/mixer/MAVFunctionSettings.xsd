@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<xs:schema elementFormDefault="qualified" targetNamespace="MAVFunctions" xmlns="MAVFunctions" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+	
+	<xs:simpleType name="dataType">
+    		<xs:restriction base="xs:string">
+      			<xs:enumeration value="Register"/>
+      			<xs:enumeration value="Percent"/>
+      			<xs:enumeration value="Fraction"/>
+      			<xs:enumeration value="int14"/>
+      			<xs:enumeration value="int16"/>
+    		</xs:restriction>
+	</xs:simpleType>
+		
+	
+	<xs:element name="ComponentFunctionSettings">
+		<xs:complexType>
+			<xs:sequence>
+			<xs:element name="registers" type="registers"/>
+			<xs:element name="functions" type="functions"/><xs:element
+				type="inputs" name="inputRegs" maxOccurs="1" minOccurs="0">
+</xs:element>
+				<xs:element name="outputRegs" type="outputs"
+					maxOccurs="1" minOccurs="0">
+				</xs:element>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+
+	<xs:complexType name="registers">
+		<xs:sequence>
+			<xs:element maxOccurs="255" minOccurs="0" name="register" type="register"/>
+		</xs:sequence>
+	</xs:complexType>
+
+	<xs:complexType name="register">
+		<xs:sequence>
+			<xs:element name="identifier" type="xs:string"/>
+			<xs:element name="description" type="xs:string"/>
+		</xs:sequence>
+	</xs:complexType>
+
+	<xs:complexType name="functions">
+		<xs:sequence>
+			<xs:element maxOccurs="255" minOccurs="0" name="function" type="function"/>
+		</xs:sequence>
+	</xs:complexType>
+
+	
+	<xs:complexType name="functionBlockData">
+		<xs:sequence>
+			<xs:element name="name" type="xs:string"/>
+			<xs:element name="value" type="xs:string"/>
+		</xs:sequence>
+	</xs:complexType>
+
+	<xs:complexType name="functionBlockHeader">
+		<xs:sequence>
+			<xs:element name="functionType" type="xs:string"/>
+			<xs:element name="destReg" type="xs:string"/>
+			<xs:element name="action" type="xs:string"/>
+			<xs:element name="description" type="xs:string"/>
+		</xs:sequence>
+	</xs:complexType>
+	
+	<xs:complexType name="function">
+		<xs:sequence>
+			<xs:element name="header" type="functionBlockHeader"/>
+			<xs:element maxOccurs="255" minOccurs="0" name="setting" type="functionBlockData"/>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="input">
+		<xs:sequence>
+			<xs:element type="xs:string" name="register"></xs:element>
+		</xs:sequence>
+		
+		
+	</xs:complexType>
+	<xs:complexType name="output">
+		<xs:sequence>
+			<xs:element type="xs:string" name="register">
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="outputs">
+		<xs:sequence>
+			<xs:element name="output" type="output" maxOccurs="unbounded"
+				minOccurs="0">
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="inputs">
+		<xs:sequence>
+			<xs:element name="input" type="input" maxOccurs="unbounded"
+				minOccurs="0">
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+
+</xs:schema>

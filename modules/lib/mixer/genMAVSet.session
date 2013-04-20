@@ -1,0 +1,26 @@
+<?xml version="1.0" ?>
+<session>
+    <input_schema>MAVFunctionSettings.xsd</input_schema>
+    <output_superclass>MAVFunctionSettings.py</output_superclass>
+    <output_subclass>subMAVFunctionSettings.py</output_subclass>
+    <force>true</force>
+    <prefix></prefix>
+    <namespace_prefix></namespace_prefix>
+    <empty_namespace_prefix>false</empty_namespace_prefix>
+    <behavior_filename></behavior_filename>
+    <properties>false</properties>
+    <subclass_suffix></subclass_suffix>
+    <root_element>ComponentFunctionSettings</root_element>
+    <superclass_module>MAVFunctionSettings</superclass_module>
+    <auto_super>false</auto_super>
+    <old_getters_setters>false</old_getters_setters>
+    <validator_bodies></validator_bodies>
+    <user_methods></user_methods>
+    <no_dates>false</no_dates>
+    <no_versions>false</no_versions>
+    <no_process_includes>false</no_process_includes>
+    <silence>true</silence>
+    <namespace_defs></namespace_defs>
+    <external_encoding></external_encoding>
+    <member_specs>none</member_specs>
+</session>
