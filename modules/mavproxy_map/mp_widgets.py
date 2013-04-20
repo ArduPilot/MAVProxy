@@ -12,9 +12,10 @@ class ImagePanel(wx.Panel):
     '''a resizable panel containing an image'''
     def __init__(self, parent, img):
         wx.Panel.__init__(self, parent, -1, size=(1, 1))
+        self.SetBackgroundStyle(wx.BG_STYLE_CUSTOM)
         self.set_image(img)
         self.Bind(wx.EVT_PAINT, self.on_paint)
-        
+
     def on_paint(self, event):
         '''repaint the image'''
         dc = wx.AutoBufferedPaintDC(self)

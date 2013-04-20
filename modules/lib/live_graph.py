@@ -21,7 +21,7 @@ class LiveGraph():
                  title='MAVProxy: LiveGraph',
                  timespan=20.0,
                  tickresolution=0.2,
-                 colors=[ 'red', 'green', 'blue', 'orange', 'olive']):
+                 colors=[ 'red', 'green', 'blue', 'orange', 'olive', 'yellow', 'grey', 'black']):
         import multiprocessing
         self.fields = fields
         self.colors = colors
@@ -126,6 +126,10 @@ class GraphFrame(wx.Frame):
         # to the plotted line series
         #
         self.plot_data = []
+        if len(self.data[0]) == 0:
+            max_y = min_y = 0
+        else:
+            max_y = min_y = self.data[0][0]
         for i in range(len(self.data)):
             p = self.axes.plot(
                 self.data[i], 
@@ -134,10 +138,16 @@ class GraphFrame(wx.Frame):
                 label=self.state.fields[i],
                 )[0]
             self.plot_data.append(p)
+            if len(self.data[i]) != 0:
+                min_y = min(min_y, min(self.data[i]))
+                max_y = max(max_y, max(self.data[i]))
 
         # create X data
         self.xdata = numpy.arange(-self.state.timespan, 0, self.state.tickresolution)
         self.axes.set_xbound(lower=self.xdata[0], upper=0)
+        if min_y == max_y:
+            self.axes.set_ybound(min_y, max_y+0.1)
+            
 
 
     def draw_plot(self):
@@ -146,6 +156,9 @@ class GraphFrame(wx.Frame):
         import numpy, pylab
         state = self.state
 
+        if len(self.data[0]) == 0:
+            print("no data to plot")
+            return
         vhigh = max(self.data[0])
         vlow  = min(self.data[0])
 
@@ -155,6 +168,9 @@ class GraphFrame(wx.Frame):
         ymin = vlow  - 0.05*(vhigh-vlow)
         ymax = vhigh + 0.05*(vhigh-vlow)
 
+        if ymin == ymax:
+            ymax = ymin + 0.1
+            ymin = ymin - 0.1
         self.axes.set_ybound(lower=ymin, upper=ymax)
         self.axes.grid(True, color='gray')
         pylab.setp(self.axes.get_xticklabels(), visible=True)
