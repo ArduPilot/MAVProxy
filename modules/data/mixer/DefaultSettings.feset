@@ -1,0 +1,178 @@
+<ComponentFunctionSettings>
+    <registers>
+        <register>
+            <identifier>NULL</identifier>
+            <description>NULL register for doing nothing or storing nothing</description>
+        </register>
+        <register>
+            <identifier>PWIN_AILERON</identifier>
+            <description>Manual aileron input</description>
+        </register>
+        <register>
+            <identifier>PWIN_ELEVATOR</identifier>
+            <description>Manual elevator input</description>
+        </register>
+        <register>
+            <identifier>PWIN_THROTTLE</identifier>
+            <description>Manual throttle input</description>
+        </register>
+        <register>
+            <identifier>PWIN_RUDDER</identifier>
+            <description>Manual rudder input</description>
+        </register>
+        <register>
+            <identifier>AP_CON_ROLL</identifier>
+            <description>Manual rudder input</description>
+        </register>
+        <register>
+            <identifier>AP_CON_PITCH</identifier>
+            <description>Manual rudder input</description>
+        </register>
+        <register>
+            <identifier>AP_CON_THROTTLE</identifier>
+            <description>Manual rudder input</description>
+        </register>
+        <register>
+            <identifier>AP_CON_YAW</identifier>
+            <description>Manual rudder input</description>
+        </register>
+        <register>
+            <identifier>PWOUT_AILERON</identifier>
+            <description>Manual aileron input</description>
+        </register>
+        <register>
+            <identifier>PWOUT_ELEVATOR</identifier>
+            <description>Manual elevator input</description>
+        </register>
+        <register>
+            <identifier>PWOUT_THROTTLE</identifier>
+            <description>Manual throttle input</description>
+        </register>
+        <register>
+            <identifier>PWOUT_RUDDER</identifier>
+            <description>Manual rudder input</description>
+        </register>
+    </registers>
+    <functions>
+        <function>
+            <header>
+                <functionType>GAIN_OFFSET</functionType>
+                <destReg>PWIN_AILERON</destReg>
+                <action>SET</action>
+                <description>Does nothing</description>
+            </header>
+            <setting>
+                <name>src</name>
+                <value>NULL</value>
+            </setting>
+            <setting>
+                <name>PosGain</name>
+                <value>100.0</value>
+            </setting>
+            <setting>
+                <name>NegGain</name>
+                <value>100.0</value>
+            </setting>
+            <setting>
+                <name>Offset</name>
+                <value>0.0</value>
+            </setting>
+            <setting>
+                <name>Constant</name>
+                <value>0.0</value>
+            </setting>
+        </function>
+        <function>
+            <header>
+                <functionType>GAIN_OFFSET</functionType>
+                <destReg>PWIN_RUDDER</destReg>
+                <action>SET</action>
+                <description>Does nothing</description>
+            </header>
+            <setting>
+                <name>src</name>
+                <value>NULL</value>
+            </setting>
+            <setting>
+                <name>PosGain</name>
+                <value>100.0</value>
+            </setting>
+            <setting>
+                <name>NegGain</name>
+                <value>100.0</value>
+            </setting>
+            <setting>
+                <name>Offset</name>
+                <value>0.0</value>
+            </setting>
+            <setting>
+                <name>Constant</name>
+                <value>0.0</value>
+            </setting>
+        </function>
+        <function>
+            <header>
+                <functionType>GAIN_OFFSET</functionType>
+                <destReg>PWIN_ELEVATOR</destReg>
+                <action>SET</action>
+                <description>Does nothing</description>
+            </header>
+            <setting>
+                <name>src</name>
+                <value>NULL</value>
+            </setting>
+            <setting>
+                <name>PosGain</name>
+                <value>100.0</value>
+            </setting>
+            <setting>
+                <name>NegGain</name>
+                <value>100.0</value>
+            </setting>
+            <setting>
+                <name>Offset</name>
+                <value>0.0</value>
+            </setting>
+            <setting>
+                <name>Constant</name>
+                <value>0.0</value>
+            </setting>
+        </function>
+        <function>
+            <header>
+                <functionType>MULTIPLY</functionType>
+                <destReg>PWIN_THROTTLE</destReg>
+                <action>ADD</action>
+                <description>Does nothing</description>
+            </header>
+            <setting>
+                <name>src1</name>
+                <value>NULL</value>
+            </setting>
+            <setting>
+                <name>src2</name>
+                <value>NULL</value>
+            </setting>
+        </function>
+        <function>
+            <header>
+                <functionType>LINEAR_MUX</functionType>
+                <destReg>PWIN_RUDDER</destReg>
+                <action>ADD</action>
+                <description>Does nothing</description>
+            </header>
+            <setting>
+                <name>src1</name>
+                <value>NULL</value>
+            </setting>
+            <setting>
+                <name>src2</name>
+                <value>NULL</value>
+            </setting>
+            <setting>
+                <name>Control</name>
+                <value>NULL</value>
+            </setting>
+        </function>
+    </functions>
+</ComponentFunctionSettings>

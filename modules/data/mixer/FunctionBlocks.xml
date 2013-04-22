@@ -1,0 +1,663 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- New document created with EditiX at Tue Aug 09 20:53:50 CEST 2011 -->
+
+
+<FunctionBlocks
+xmlns="FunctionBlock"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="FunctionBlock FunctionBlocks.xsd">
+<functionBlock>
+	<header>
+		<name>NULL</name>
+		<description>Do nothing.  Used as end of a list of functions</description>
+		<MAVFunction>function_NULL</MAVFunction>
+	</header>
+</functionBlock>
+<functionBlock>
+	<header>
+		<name>GAIN_OFFSET</name>
+		<description>Standard differential mixer for summing with input and output offset</description>
+		<MAVFunction>function_sum</MAVFunction>
+	</header>
+	<setting>
+		<name>src</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>Source for sum</description>
+	</setting>
+	<setting>
+		<name>PosGain</name>
+		<type>Percent</type>
+		<default>100.0</default>
+		<description>Gain when input is positive after offset removed</description>
+	</setting>
+	<setting>
+		<name>NegGain</name>
+		<type>Percent</type>
+		<default>100.0</default>
+		<description>Gain when input is negative after offset removed</description>
+	</setting>
+	<setting>
+		<name>Offset</name>
+		<type>Percent</type>
+		<default>0.0</default>
+		<description>Offset removed from input before applying gains</description>
+	</setting>
+	<setting>
+		<name>Constant</name>
+		<type>Percent</type>
+		<default>0.0</default>
+		<description>Constant added to output after gain</description>
+	</setting>
+</functionBlock>
+<functionBlock>
+	<header>
+		<name>MULTIPLY</name>
+		<description>Multiply two sources together</description>
+		<MAVFunction>function_multiply</MAVFunction>
+	</header>
+	<setting>
+		<name>src1</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>Reference to first source</description>
+	</setting>
+	<setting>
+		<name>src2</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>Reference to second source</description>
+	</setting>
+</functionBlock>
+<functionBlock>
+	<header>
+		<name>LINEAR_MUX</name>
+		<description>Multiply two sources together</description>
+		<MAVFunction>function_linear_mux</MAVFunction>
+	</header>
+	<setting>
+		<name>src1</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>Reference to first source</description>
+	</setting>
+	<setting>
+		<name>src2</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>Reference to second source</description>
+	</setting>
+	<setting>
+		<name>Control</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>Reference to linear mux control</description>
+	</setting>
+</functionBlock>
+<functionBlock>
+	<header>
+		<name>CONDITIONAL_SET_REF</name>
+		<description>Set output to the reference value when the referenced source meets the set condition values</description>
+		<MAVFunction>function_conditional_set</MAVFunction>
+	</header>
+	<setting>
+		<name>src</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>The reference which the output will be set to</description>
+	</setting>
+	<setting>
+		<name>srcCond</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>The reference register with the condition setting value</description>
+	</setting>
+	<setting>
+		<name>condMax</name>
+		<type>int16</type>
+		<default>NULL</default>
+		<description>Maximum value for which the condition is valid</description>
+	</setting>
+	<setting>
+		<name>condMin</name>
+		<type>int16</type>
+		<default>NULL</default>
+		<description>Minimum value for which the condition is valid</description>
+	</setting>
+	<setting>
+		<name>condInvalidOffset</name>
+		<type>Percent</type>
+		<default>NULL</default>
+		<description>Offset value when condition is not met</description>
+	</setting>
+	<setting>
+		<name>condValidOffset</name>
+		<type>Percent</type>
+		<default>NULL</default>
+		<description>Offset value when condition is met</description>
+	</setting>
+</functionBlock>
+<functionBlock>
+	<header>
+		<name>CONDITIONAL_SET</name>
+		<description>Set output to the set value when the referenced source meets the set condition values, otherwise set to reference value</description>
+		<MAVFunction>function_conditional_set</MAVFunction>
+	</header>
+	<setting>
+		<name>src</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>The reference which the output will be set to</description>
+	</setting>
+	<setting>
+		<name>srcCond</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>The reference register with the condition setting value</description>
+	</setting>
+	<setting>
+		<name>condMax</name>
+		<type>int16</type>
+		<default>0</default>
+		<description>Maximum value for which the condition is valid</description>
+	</setting>
+	<setting>
+		<name>condMin</name>
+		<type>int16</type>
+		<default>0</default>
+		<description>Minimum value for which the condition is valid</description>
+	</setting>
+	<setting>
+		<name>setValue</name>
+		<type>Percent</type>
+		<default>0.0</default>
+		<description>Offset value when condition is met</description>
+	</setting>
+</functionBlock>
+<functionBlock>
+	<header>
+		<name>CONDITIONAL_GAIN</name>
+		<description>Multiply the refernced source value by different gains dependant on the contition of another reference value</description>
+		<MAVFunction>function_conditional_gain</MAVFunction>
+	</header>
+	<setting>
+		<name>src</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>The reference which the output will be set to</description>
+	</setting>
+	<setting>
+		<name>srcCond</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>The reference register with the condition setting value</description>
+	</setting>
+	<setting>
+		<name>condMax</name>
+		<type>int16</type>
+		<default>NULL</default>
+		<description>Maximum value for which the condition is valid</description>
+	</setting>
+	<setting>
+		<name>condMin</name>
+		<type>int16</type>
+		<default>NULL</default>
+		<description>Minimum value for which the condition is valid</description>
+	</setting>
+	<setting>
+		<name>condInvalidGain</name>
+		<type>Percent</type>
+		<default>0.0</default>
+		<description>Gain value when condition is not met</description>
+	</setting>
+	<setting>
+		<name>condValidGain</name>
+		<type>Percent</type>
+		<default>0.0</default>
+		<description>Gain value when condition is met</description>
+	</setting>
+</functionBlock>
+<functionBlock>
+	<header>
+		<name>SCALE_TRIM_LIMIT</name>
+		<description>Scale reference input to output units adding offset and subTrim.  Apply pos and neg limits.</description>
+		<MAVFunction>function_scaleTrimLimit</MAVFunction>
+	</header>
+	<setting>
+		<name>src</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>The reference which the output will be set to</description>
+	</setting>
+	<setting>
+		<name>subTrim</name>
+		<type>int16</type>
+		<default>0</default>
+		<description>Output trim before limiting but after scaling</description>
+	</setting>
+	<setting>
+		<name>offset</name>
+		<type>int16</type>
+		<default>0</default>
+		<description>Offset before scaling</description>
+	</setting>
+	<setting>
+		<name>scalePos</name>
+		<type>int16</type>
+		<default>1000</default>
+		<description>Scale in positive direction</description>
+	</setting>
+	<setting>
+		<name>scaleNeg</name>
+		<type>int16</type>
+		<default>1000</default>
+		<description>Scale in negative direction</description>
+	</setting>
+	<setting>
+		<name>limitMin</name>
+		<type>int16</type>
+		<default>2000</default>
+		<description>Minimum value for which the condition is valid</description>
+	</setting>
+	<setting>
+		<name>limitMax</name>
+		<type>int16</type>
+		<default>4000</default>
+		<description>Minimum value for which the condition is valid</description>
+	</setting>
+</functionBlock>
+<functionBlock>
+	<header>
+		<name>SCALE_REFTRIM_LIMIT</name>
+		<description>Scale reference input to output units adding offset and subTrim.  Apply pos and neg limits.</description>
+		<MAVFunction>function_scaleTrimLimit</MAVFunction>
+	</header>
+	<setting>
+		<name>src</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>The reference which the output will be set to</description>
+	</setting>
+	<setting>
+		<name>subTrim</name>
+		<type>int16</type>
+		<default>0</default>
+		<description>Output trim before limiting but after scaling</description>
+	</setting>
+	<setting>
+		<name>refOffset</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>Referenced Register offset before scaling</description>
+	</setting>
+	<setting>
+		<name>scalePos</name>
+		<type>int16</type>
+		<default>1000</default>
+		<description>Scale in positive direction</description>
+	</setting>
+	<setting>
+		<name>scaleNeg</name>
+		<type>int16</type>
+		<default>1000</default>
+		<description>Scale in negative direction</description>
+	</setting>
+	<setting>
+		<name>limitMin</name>
+		<type>int16</type>
+		<default>2000</default>
+		<description>Minimum value for which the condition is valid</description>
+	</setting>
+	<setting>
+		<name>limitMax</name>
+		<type>int16</type>
+		<default>4000</default>
+		<description>Minimum value for which the condition is valid</description>
+	</setting>
+</functionBlock>
+<functionBlock>
+	<header>
+		<name>GAIN_LIMIT</name>
+		<description>Apply gain with limits</description>
+		<MAVFunction>function_gainLimit</MAVFunction>
+	</header>
+	<setting>
+		<name>src</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>The reference which the output will be set to</description>
+	</setting>
+	<setting>
+		<name>posGain</name>
+		<type>Percent</type>
+		<default>100.0</default>
+		<description>Gain for positive values</description>
+	</setting>
+	<setting>
+		<name>negGain</name>
+		<type>Percent</type>
+		<default>100.0</default>
+		<description>Gain for negative values</description>
+	</setting>
+	<setting>
+		<name>limitNeg</name>
+		<type>Percent</type>
+		<default>-100.0</default>
+		<description>Minimum limit value</description>
+	</setting>
+	<setting>
+		<name>limitPos</name>
+		<type>Percent</type>
+		<default>100.0</default>
+		<description>Maximum limit value</description>
+	</setting>
+</functionBlock>
+<functionBlock>
+	<header>
+		<name>THREE_POINT</name>
+		<description>Three point mixer</description>
+		<MAVFunction>function_threePoint</MAVFunction>
+	</header>
+	<setting>
+		<name>src</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>The reference which the output will be set to</description>
+	</setting>
+	<setting>
+		<name>inputLow</name>
+		<type>Percent</type>
+		<default>-100.0</default>
+		<description>low input point</description>
+	</setting>
+	<setting>
+		<name>outputLow</name>
+		<type>Percent</type>
+		<default>-100.0</default>
+		<description>Low output point</description>
+	</setting>
+
+	<setting>
+		<name>inputMid</name>
+		<type>Percent</type>
+		<default>0.0</default>
+		<description>Mid input point</description>
+	</setting>
+	<setting>
+		<name>outputMid</name>
+		<type>Percent</type>
+		<default>0.0</default>
+		<description>Mid output point</description>
+	</setting>
+	
+	<setting>
+		<name>inputHigh</name>
+		<type>Percent</type>
+		<default>100.0</default>
+		<description>High input point</description>
+	</setting>
+	<setting>
+		<name>outputHigh</name>
+		<type>Percent</type>
+		<default>100.0</default>
+		<description>High output point</description>
+	</setting>
+</functionBlock>
+
+<functionBlock>
+	<header>
+		<name>FOUR_POINT</name>
+		<description>Four point mixer</description>
+		<MAVFunction>function_fourpoint</MAVFunction>
+	</header>
+	<setting>
+		<name>src</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>The reference which the output will be set to</description>
+	</setting>
+	<setting>
+		<name>input1</name>
+		<type>Percent</type>
+		<default>-100.0</default>
+		<description>Input point 1</description>
+	</setting>
+	<setting>
+		<name>output1</name>
+		<type>Percent</type>
+		<default>-100.0</default>
+		<description>Output point 1</description>
+	</setting>
+
+	<setting>
+		<name>input2</name>
+		<type>Percent</type>
+		<default>-25.0</default>
+		<description>Input point 2</description>
+	</setting>
+	<setting>
+		<name>output2</name>
+		<type>Percent</type>
+		<default>-25.0</default>
+		<description>Output point 2</description>
+	</setting>
+	<setting>
+		<name>input3</name>
+		<type>Percent</type>
+		<default>25.0</default>
+		<description>Input point 3</description>
+	</setting>
+	<setting>
+		<name>output3</name>
+		<type>Percent</type>
+		<default>25.0</default>
+		<description>Output point 3</description>
+	</setting>
+	<setting>
+		<name>input4</name>
+		<type>Percent</type>
+		<default>100.0</default>
+		<description>Input point 4</description>
+	</setting>
+	<setting>
+		<name>output4</name>
+		<type>Percent</type>
+		<default>100.0</default>
+		<description>Output point 4</description>
+	</setting>
+</functionBlock>
+
+<functionBlock>
+	<header>
+		<name>FIVE_POINT</name>
+		<description>Five point mixer</description>
+		<MAVFunction>function_fivepoint</MAVFunction>
+	</header>
+	<setting>
+		<name>src</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>The reference which the output will be set to</description>
+	</setting>
+	<setting>
+		<name>input1</name>
+		<type>Percent</type>
+		<default>-100.0</default>
+		<description>Input point 1</description>
+	</setting>
+	<setting>
+		<name>output1</name>
+		<type>Percent</type>
+		<default>-100.0</default>
+		<description>Output point 1</description>
+	</setting>
+
+	<setting>
+		<name>input2</name>
+		<type>Percent</type>
+		<default>-50.0</default>
+		<description>Input point 2</description>
+	</setting>
+	<setting>
+		<name>output2</name>
+		<type>Percent</type>
+		<default>-50.0</default>
+		<description>Output point 2</description>
+	</setting>
+	<setting>
+		<name>input3</name>
+		<type>Percent</type>
+		<default>0.0</default>
+		<description>Input point 3</description>
+	</setting>
+	<setting>
+		<name>output3</name>
+		<type>Percent</type>
+		<default>0.0</default>
+		<description>Output point 3</description>
+	</setting>
+	<setting>
+		<name>input4</name>
+		<type>Percent</type>
+		<default>50.0</default>
+		<description>Input point 4</description>
+	</setting>
+	<setting>
+		<name>output4</name>
+		<type>Percent</type>
+		<default>50.0</default>
+		<description>Output point 4</description>
+	</setting>
+	<setting>
+		<name>input5</name>
+		<type>Percent</type>
+		<default>100.0</default>
+		<description>Input point 5</description>
+	</setting>
+	<setting>
+		<name>output5</name>
+		<type>Percent</type>
+		<default>100.0</default>
+		<description>Output point 5</description>
+	</setting>
+</functionBlock>
+
+
+<functionBlock>
+	<header>
+		<name>GAIN</name>
+		<description>Apply gain</description>
+		<MAVFunction>function_gain</MAVFunction>
+	</header>
+	<setting>
+		<name>src</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>The reference which the output will be set to</description>
+	</setting>
+	<setting>
+		<name>posGain</name>
+		<type>Percent</type>
+		<default>100.0</default>
+		<description>Gain for positive values</description>
+	</setting>
+	<setting>
+		<name>negGain</name>
+		<type>Percent</type>
+		<default>100.0</default>
+		<description>Gain for negative values</description>
+	</setting>
+</functionBlock>
+
+
+<functionBlock>
+	<header>
+		<name>RATE</name>
+		<description>Simple positive/negative gain</description>
+		<MAVFunction>function_rate</MAVFunction>
+	</header>
+	<setting>
+		<name>src</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>The reference which the output will be set to</description>
+	</setting>
+	<setting>
+		<name>posRate</name>
+		<type>Percent</type>
+		<default>100.0</default>
+		<description>positive rate in % per servo cycle. Output register stores last output</description>
+	</setting>
+	<setting>
+		<name>negRate</name>
+		<type>Percent</type>
+		<default>100.0</default>
+		<description>negative rate in % per servo cycle. Output register stores last output</description>
+	</setting>
+</functionBlock>
+
+<functionBlock>
+	<header>
+		<name>PCT_COND_GAINS</name>
+		<description>Percent conditional pos/neg gains</description>
+		<MAVFunction>function_pct_cond_gains</MAVFunction>
+	</header>
+	<setting>
+		<name>src</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>The reference to which gain is applied</description>
+	</setting>
+	<setting>
+		<name>srcCond</name>
+		<type>Register</type>
+		<default>NULL</default>
+		<description>reference register determining the condition</description>
+	</setting>
+	<setting>
+		<name>negRate</name>
+		<type>Percent</type>
+		<default>100.0</default>
+		<description>negative rate in % per servo cycle. Output register stores last output</description>
+	</setting>
+	<setting>
+		<name>condMax</name>
+		<type>Percent</type>
+		<default>0.0</default>
+		<description>Maximum percent for which the condition is valid</description>
+	</setting>
+	<setting>
+		<name>condMin</name>
+		<type>Percent</type>
+		<default>0.0</default>
+		<description>Minimum percent for which the condition is valid</description>
+	</setting>
+
+	<setting>
+		<name>posGainInvalid</name>
+		<type>Percent</type>
+		<default>100.0</default>
+		<description>Gain for positive values when condition invalid</description>
+	</setting>
+	<setting>
+		<name>negGainInvalid</name>
+		<type>Percent</type>
+		<default>100.0</default>
+		<description>Gain for negative values when condition invalid</description>
+	</setting>
+	<setting>
+		<name>posGainValid</name>
+		<type>Percent</type>
+		<default>100.0</default>
+		<description>Gain for positive values when condition valid</description>
+	</setting>
+	<setting>
+		<name>negGainValid</name>
+		<type>Percent</type>
+		<default>100.0</default>
+		<description>Gain for negative values when condition valid</description>
+	</setting>
+</functionBlock>
+</FunctionBlocks>
+
