@@ -88,7 +88,13 @@ class MainFrame( gui.MainFrameBase ):
             self.m_scrolledWindowFuncParams.Enable(True)
         if(update_type == callback_type.SYNC_FAIL):
             self.m_gridFBs.Enable(True)
-            self.m_scrolledWindowFuncParams.Enable(True)            
+            self.m_scrolledWindowFuncParams.Enable(True)    
+        if(update_type == callback_type.REGISTERS_CHANGED):
+            self.m_refreshSettingsGrid()
+        if(update_type == callback_type.FUNCTIONS_CHANGED):
+            self.m_updateFunctionBlocks()
+        if(update_type == callback_type.SETTINGS_MODIFIED):
+            self.m_refreshSettingsGridFunction( self.selectedFunctionIndex )
            
             
 
@@ -141,6 +147,9 @@ class MainFrame( gui.MainFrameBase ):
             self.m_mavlinkUpdate()
 
         self.m_gridFBs.AutoSizeColumns()
+
+        if( (self.selectedFunctionIndex != -1) and (self.selectedRegisterIndex != -1) ):
+            self.m_gridFBs.MakeCellVisible( self.selectedFunctionIndex, self.selectedRegisterIndex )
 
         self.refreshingSettingsGrid = False
 
@@ -254,56 +263,34 @@ class MainFrame( gui.MainFrameBase ):
         selections = self.m_listBoxFuncType.GetSelections()
         if len(selections) > 0:
             print("function type change")
-            self.m_changeSelectedFunctionType( selections[0] )
-        self.m_gridFBs.MakeCellVisible( self.selectedFunctionIndex, self.selectedRegisterIndex )
+            selection = self.m_changeSelectedFunctionType( selections[0] )
+            self.doc.m_changeFunctionType( self.selectedFunctionIndex, selection)
         event.Skip()
 
     def m_menuAddRegister ( self, event ):
-        regstring = self.m_menuGetUniqueRegisterName()          #'NULL_{:d}'.format(len(self.registers) + 1)
-        newreg = MAVFSettingsAPI.registerSub(regstring, "Does nothing")
-        self.registers.append(newreg)
-        self.m_refreshSettingsGrid()
-        self.m_gridFBs.MakeCellVisible( self.selectedFunctionIndex, self.selectedRegisterIndex )
+        self.selectedRegisterIndex = len(self.registers)
+        self.doc.addRegister()
         event.Skip()
 
     def m_menuInsertRegister ( self, event ):
-        regstring =  self.m_menuGetUniqueRegisterName()         #'NULL_{:d}'.format(len(self.registers) + 1)
-        newreg = MAVFSettingsAPI.registerSub(regstring, "Does nothing")
-        self.registers.insert( self.selectedRegisterIndex, newreg)
-        self.m_refreshSettingsGrid()
-        self.m_gridFBs.MakeCellVisible( self.selectedFunctionIndex, self.selectedRegisterIndex )
+        self.doc.insertRegister(self.selectedRegisterIndex)
         event.Skip()
 
     def m_menuDeleteRegister ( self, event ):
-        self.registers.pop(self.selectedRegisterIndex)
-        self.selectedRegisterIndex = 0
-        self.m_refreshSettingsGrid()        
-        self.m_gridFBs.MakeCellVisible( self.selectedFunctionIndex, self.selectedRegisterIndex )
+        self.doc.deleteRegister(self.selectedRegisterIndex)
         event.Skip()
 
     def m_menuAddFunction ( self, event ):
-        newFHeader = MAVFSettingsAPI.functionBlockHeaderSub("NULL", "NULL", "CLEAR", "Do nothing")
-        newFSettings = []
-        newfunc = MAVFSettingsAPI.functionSub(newFHeader, newFSettings)
-        self.MAVFSettings.functions.function.append(newfunc)
-        self.m_refreshSettingsGrid()
-        self.m_gridFBs.MakeCellVisible( self.selectedFunctionIndex, self.selectedRegisterIndex )
-        event.Skip()        
+        self.selectedFunctionIndex = len(self.functions)
+        self.doc.addFunction()
+        event.Skip()
 
     def m_menuInsertFunction ( self, event ):
-        newFHeader = MAVFSettingsAPI.functionBlockHeaderSub("NULL", "NULL", "CLEAR", "Do nothing")
-        newFSettings = []
-        newfunc = MAVFSettingsAPI.functionSub(newFHeader, newFSettings)
-        self.MAVFSettings.functions.function.insert(self.selectedFunctionIndex, newfunc)
-        self.m_refreshSettingsGrid()
-        self.m_gridFBs.MakeCellVisible( self.selectedFunctionIndex, self.selectedRegisterIndex )
+        self.doc.insertFunction(self.selectedFunctionIndex)
         event.Skip()
 
     def m_menuDeleteFunction ( self, event ):
-        self.MAVFSettings.functions.function.pop(self.selectedFunctionIndex)
-        self.selectedFunctionIndex = 0
-        self.m_refreshSettingsGrid()        
-        self.m_gridFBs.MakeCellVisible( self.selectedFunctionIndex, self.selectedRegisterIndex )
+        self.doc.deleteFunction( self.selectedFunctionIndex )
         event.Skip()
 
             
@@ -317,11 +304,7 @@ class MainFrame( gui.MainFrameBase ):
     def m_FBs_cell_dclick ( self, event ):
         self.selectedFunctionIndex = event.GetRow()
         self.selectedRegisterIndex = event.GetCol()
-        identifier = self.MAVFSettings.registers.register[event.GetCol()].identifier
-        print("double cell click")
-        self.MAVFSettings.functions.function[event.GetRow()].header.destReg = identifier
-        self.m_refreshSettingsGrid()
-        self.m_gridFBs.MakeCellVisible( event.GetRow(), event.GetCol() )
+        self.doc.setFunctionOutputRegister(self.selectedFunctionIndex, self.selectedRegisterIndex)
         event.Skip()
 
     def m_FBs_label_click ( self, event ):
@@ -340,12 +323,9 @@ class MainFrame( gui.MainFrameBase ):
                 return
             print("params edit set to label value")
             editCntrl = self.m_gridParameters.GetCellEditor(self.m_paramsEditIndex, 1)
-            regName = self.MAVFSettings.registers.register[event.GetCol()].identifier
-
-            self.m_gridParameters.SetCellValue(self.m_paramsEditIndex, 1, regName)
-            self.MAVFSettings.functions.function[self.selectedFunctionIndex].setting[self.m_paramsEditIndex].value = regName
-            print('Changing function ', self.selectedFunctionIndex, ' parameter ', self.m_paramsEditIndex, ' to ', regName)
-            self.m_refreshSettingsGridFunction( self.selectedFunctionIndex )
+            
+            registerIndex = event.GetCol()
+            self.doc.setFunctionParameterAsRegister(registerIndex, self.selectedFunctionIndex, self.m_paramsEditIndex)
             self.m_paramsEditIndex == -1
         event.Skip()
 
@@ -354,6 +334,7 @@ class MainFrame( gui.MainFrameBase ):
         event.Skip()
 
     def   m_FBs_regEdit ( self, event ):
+        self.selectedRegisterIndex = event.GetCol()
         regNameEditor = ValueEditor.ValueEditDialog( self )
         regNameEditor.m_textCtrlRegNameEdit.SetValue(self.m_gridFBs.GetColLabelValue( event.GetCol() ))
         regNameEditor.ShowModal()
@@ -370,9 +351,9 @@ class MainFrame( gui.MainFrameBase ):
             print("Must be at least one character long")
             event.Skip()
             return
-        self.MAVFSettings.registers.register[ event.GetCol() ].identifier = newRegName
-        self.m_refreshSettingsGrid()
-        self.m_gridFBs.MakeCellVisible( event.GetRow(), event.GetCol() )
+        self.doc.m_renameRegister(event.GetCol(), newRegName)
+#        self.m_refreshSettingsGrid()
+#        self.m_gridFBs.MakeCellVisible( event.GetRow(), event.GetCol() )
         event.Skip()
 
     def   m_panelFBsize ( self, event ):
@@ -387,8 +368,7 @@ class MainFrame( gui.MainFrameBase ):
 
     def   m_comboSetAction ( self, event ):
         selString = self.m_comboAction.GetValue()
-        self.MAVFSettings.functions.function[self.selectedFunctionIndex].header.action = selString
-        self.m_refreshSettingsGridFunction( self.selectedFunctionIndex )
+        self.doc.setFunctionAction(self.selectedFunctionIndex, selString )
         event.Skip()
 
     def   m_ParamsCellSelect ( self, event ):

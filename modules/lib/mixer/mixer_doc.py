@@ -27,6 +27,7 @@ class callback_type(object):
     FUNCTIONS_CHANGED = 115
     REGISTERS_CHANGED = 130
     REGISTER_MODIFIED = 132
+    SETTINGS_MODIFIED = 140
     NOT_SYNCHRONISED  = 150
 
 # actions    
@@ -263,19 +264,19 @@ class mixer_document( ):
         del self.MAVFSettings.functions.function[self.selectedFunctionIndex].setting[:]
         print("clear parameters from function")
 
-    def m_changeSelectedFunctionType ( self, functionTypeIndex ):
+    def m_changeFunctionType ( self, functionIndex, functionTypeIndex ):
         self.m_clearSelectedFunctionParamList()
         prntstr = 'Change selected function type, function{:d}, type index{:d}'.format(self.selectedFunctionIndex, functionTypeIndex)
         print(prntstr)
         sourceFBlock = self.FBlocks[functionTypeIndex]
         self.MAVFSettings.functions.function[self.selectedFunctionIndex].header.functionType = sourceFBlock.header.name
-        print("Setting function to name ", self.MAVFSettings.functions.function[self.selectedFunctionIndex].header.functionType)
+        print("Setting function to name ", self.MAVFSettings.functions.function[functionIndex].header.functionType)
         for item in self.FBlocks[functionTypeIndex].setting:
             newParameter = MAVFSettingsAPI.functionBlockDataSub(item.name, item.default)
-            self.MAVFSettings.functions.function[self.selectedFunctionIndex].setting.append(newParameter)
+            self.MAVFSettings.functions.function[functionIndex].setting.append(newParameter)
             print("insert new parameter into function")
         
-        self.m_call_callbacks(callback_type.FUNCTION_CHANGED, self.selectedFunctionIndex)
+        self.m_call_callbacks(callback_type.FUNCTION_CHANGED, functionIndex)
 
 
     def m_menuGetUniqueRegisterName ( self ):
@@ -299,44 +300,67 @@ class mixer_document( ):
     def m_selectRegister( self, registerIndex):
         self.selectedRegisterIndex = registerIndex
         
-    def m_addRegister ( self ):
+    def addRegister ( self ):
         regstring = self.m_menuGetUniqueRegisterName()          #'NULL_{:d}'.format(len(self.registers) + 1)
         newreg = MAVFSettingsAPI.registerSub(regstring, "Does nothing")
         self.registers.append(newreg)
         self.m_call_callbacks(callback_type.REGISTERS_CHANGED)
 
-    def m_insertRegister ( self ):
+    def insertRegister ( self, registerIndex ):
         regstring =  self.m_menuGetUniqueRegisterName()         #'NULL_{:d}'.format(len(self.registers) + 1)
         newreg = MAVFSettingsAPI.registerSub(regstring, "Does nothing")
-        self.registers.insert( self.selectedRegisterIndex, newreg)
+        self.registers.insert( registerIndex, newreg)
         self.m_call_callbacks(callback_type.REGISTERS_CHANGED)
 
-    def m_menuDeleteRegister ( self ):
+    def deleteRegister ( self, registerIndex ):
         if(len(self.registers) > 1):
-            self.registers.pop(self.selectedRegisterIndex)
+            self.registers.pop(registerIndex)
             self.selectedRegisterIndex = 0
             self.m_call_callbacks(callback_type.REGISTERS_CHANGED)
+            
+    def   m_renameRegister( self, registerIndex, newRegName ):
+        if newRegName.find(" ") != wx.NOT_FOUND:
+            print("No spaces allowed in register names")
+            event.Skip()
+            return False
+        if len(newRegName) > 15:
+            print("Name too long, reduce to less than 15 characters, no spaces")
+            event.Skip()
+            return False
+        if len(newRegName) == 0:
+            print("Must be at least one character long")
+            event.Skip()
+            return False
+        self.MAVFSettings.registers.register[ registerIndex ].identifier = newRegName
+        self.m_call_callbacks(callback_type.REGISTERS_CHANGED)
 
-    def m_addFunction ( self ):
+
+    def addFunction ( self ):
         newFHeader = MAVFSettingsAPI.functionBlockHeaderSub("NULL", "NULL", "CLEAR", "Do nothing")
         newFSettings = []
         newfunc = MAVFSettingsAPI.functionSub(newFHeader, newFSettings)
         self.MAVFSettings.functions.function.append(newfunc)
-        self.m_call_callbacks(callback_type.FUNCTIONS_CHANGED, 0)
+        self.m_call_callbacks(callback_type.REGISTERS_CHANGED, 0)
 
-    def m_menuInsertFunction ( self ):
+    def insertFunction ( self, insertIndex ):
         newFHeader = MAVFSettingsAPI.functionBlockHeaderSub("NULL", "NULL", "CLEAR", "Do nothing")
         newFSettings = []
         newfunc = MAVFSettingsAPI.functionSub(newFHeader, newFSettings)
-        self.MAVFSettings.functions.function.insert(self.selectedFunctionIndex, newfunc)
-        self.m_call_callbacks(callback_type.FUNCTIONS_CHANGED, self.selectedFunctionIndex)
+        self.MAVFSettings.functions.function.insert(insertIndex, newfunc)
+        self.m_call_callbacks(callback_type.REGISTERS_CHANGED, insertIndex)
 
-    def m_menuDeleteFunction ( self ):
+    def deleteFunction ( self, deleteIndex ):
         if(len(self.MAVFSettings.functions.function) > 1):
-            self.MAVFSettings.functions.function.pop(self.selectedFunctionIndex)
+            self.MAVFSettings.functions.function.pop(deleteIndex)
             self.selectedFunctionIndex = 0
-            self.m_call_callbacks(callback_type.FUNCTIONS_CHANGED, self.selectedFunctionIndex)
+            self.m_call_callbacks(callback_type.REGISTERS_CHANGED, deleteIndex)
 
+
+    def setFunctionOutputRegister(self, functionIndex, registerIndex):
+        identifier = self.MAVFSettings.registers.register[registerIndex].identifier
+        print("double cell click")
+        self.MAVFSettings.functions.function[functionIndex].header.destReg = identifier
+        self.m_call_callbacks(callback_type.REGISTERS_CHANGED, functionIndex)
 
     def   m_change_regName ( self, col, newRegName ):
         if newRegName.find(" ") != wx.NOT_FOUND:
@@ -354,9 +378,9 @@ class mixer_document( ):
         return True
 
 
-    def   m_setAction ( self, actionStr ):
-        self.MAVFSettings.functions.function[self.selectedFunctionIndex].header.action = actionStr
-        self.m_call_callbacks(callback_type.FUNCTION_MODIFIED, self.selectedFunctionIndex)
+    def   setFunctionAction ( self, functionIndex, actionStr ):
+        self.MAVFSettings.functions.function[functionIndex].header.action = actionStr
+        self.m_call_callbacks(callback_type.SETTINGS_MODIFIED, functionIndex)
 
     def   m_paramSelect ( self, index ):
         self.m_paramsSelectIndex = index
@@ -409,6 +433,12 @@ class mixer_document( ):
         self.MAVFSettings.functions.function[functionIndex].setting[paramIndex].value = paramEditStr
         self.m_call_callbacks(callback_type.UPDATE_FUNCTION, functionIndex)
         #        print('Changing function ', self.selectedFunctionIndex, ' parameter ', event.GetRow(), ' to ', editStr)
+
+    def setFunctionParameterAsRegister(self, registerIndex, functionIndex, paramIndex):
+        regName = self.MAVFSettings.registers.register[registerIndex].identifier
+        self.MAVFSettings.functions.function[functionIndex].setting[paramIndex].value = regName
+        print('Changing function ', functionIndex, ' parameter ', paramIndex, ' to ', regName)
+        self.m_call_callbacks(callback_type.SETTINGS_MODIFIED, functionIndex)
 
 
     def m_update ( self ):
