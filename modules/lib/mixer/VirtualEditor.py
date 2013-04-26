@@ -41,7 +41,7 @@ class VirtualEditDialog ( gui.VirtualDialogBase ):
 			
 		CellText = self.m_gridVirtual.GetCellValue(event.GetRow(), event.GetCol())
 			
-		if(self.mainframe.m_findRegisterIndexWithName(CellText) == -1):
+		if(self.doc.m_findRegisterIndexWithName(CellText) == -1):
 			self.m_gridVirtual.SetCellTextColour(event.GetRow(), event.GetCol(), wx.TheColourDatabase.Find("red") )
 		else:
 			self.m_gridVirtual.SetCellTextColour(event.GetRow(), event.GetCol(), wx.TheColourDatabase.Find("black") )

@@ -98,6 +98,11 @@ class mavlink_processes:
             self.send_all()
         if(callback_type == mixer_doc.callback_type.NOT_SYNCHRONISED):
             self.MAVServices.synchronised = False
+        if(callback_type == mixer_doc.callback_type.NV_MEM_WRITE):
+            self.commit_buffer_to_nvmem()
+            
+                
+
 
             
     def send_all(self):

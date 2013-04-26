@@ -95,6 +95,15 @@ class MainFrame( gui.MainFrameBase ):
             self.m_updateFunctionBlocks()
         if(update_type == callback_type.SETTINGS_MODIFIED):
             self.m_refreshSettingsGridFunction( self.selectedFunctionIndex )
+        if(update_type == callback_type.NV_MEM_WRITE_OK):
+            dlg = wx.MessageDialog(self, "Write to NV memory OK", "", wx.OK)
+            dlg.ShowModal()
+        if(update_type == callback_type.NV_MEM_WRITE_FAIL):
+            dlg = wx.MessageDialog(self, "FAILED NV MEMORY WRITE", "WARNING", wx.OK)
+            dlg.ShowModal()
+#        if(update_type == callback_type.UPDATE_ALL):
+#            self.m_refreshSettingsGrid()
+#            self.m_updateFunctionBlocks()
            
             
 
@@ -263,8 +272,7 @@ class MainFrame( gui.MainFrameBase ):
         selections = self.m_listBoxFuncType.GetSelections()
         if len(selections) > 0:
             print("function type change")
-            selection = self.m_changeSelectedFunctionType( selections[0] )
-            self.doc.m_changeFunctionType( self.selectedFunctionIndex, selection)
+            self.doc.m_changeFunctionType( self.selectedFunctionIndex, selections[0])
         event.Skip()
 
     def m_menuAddRegister ( self, event ):
@@ -477,7 +485,7 @@ class MainFrame( gui.MainFrameBase ):
         self.doc.m_saveSettingsFile("")
 
     def m_mniSaveSettingsAsClick( self, event ):
-        fdlg = wx.FileDialog(self, "Save the settings file as a backup", wx.EmptyString, wx.EmptyString, "*.feset", wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT);
+        fdlg = wx.FileDialog(self, "Save the settings file as a backup", self.doc.settings_path, wx.EmptyString, "*.feset", wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT);
         if fdlg.ShowModal() != wx.ID_OK:
             return;
         self.doc.m_saveSettingsFile(fdlg.GetPath())
@@ -497,7 +505,7 @@ class MainFrame( gui.MainFrameBase ):
     def m_mnExportCHeaders( self, event ):
         fdlg = wx.DirDialog(self);
         folder = self.doc.get_libff_directory()
-        fdlg.SetPath(self.exportPath)
+        fdlg.SetPath(folder)
         if fdlg.ShowModal() != wx.ID_OK:
             return;
 
@@ -521,24 +529,13 @@ class MainFrame( gui.MainFrameBase ):
         event.Skip()
                 
     def m_mnCommitToNV(self, event ):
-        try:
-            self.MAVProcesses
-        except:
-            dlg = wx.MessageDialog(self, "MAVlink processes not running, connect to MAV first", "WARNING", wx.OK)
-            dlg.ShowModal()
-            return
-
-        if(self.MAVProcesses.services_running() == False):
-            dlg = wx.MessageDialog(self, "MAVlink processes not running, connect to MAV first", "WARNING", wx.OK)
-            dlg.ShowModal()       
-            return        
-        
         dlg = wx.MessageDialog(self, "CONFIRM WRITE TO NON VOLATILE MEMORY", "NV memory write")
         if(dlg.ShowModal() != wx.ID_OK):
             return
-        
-        self.MAVProcesses.commit_buffer_to_nvmem();
 
+        if(self.doc.commitToNV() == False):
+            print("MAV services not running")
+        
     def m_btnClick_ClearNVMem(self, event):
         event.Skip()
             

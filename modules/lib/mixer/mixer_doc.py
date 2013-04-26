@@ -33,6 +33,7 @@ class callback_type(object):
 # actions    
     UPDATE_ALL      = 225
     UPDATE_FUNCTION = 265
+    NV_MEM_WRITE    = 270
     
 
 def PercentToQ14(percent):
@@ -125,7 +126,14 @@ class mixer_document( ):
     # Document handling
     
     def get_libff_directory(self):
-        return os.path.join(self.application_path, "..", "..", "..", "..", "..", "..");
+        libffdir = os.path.dirname(self.application_path)
+        libffdir = os.path.dirname(libffdir)
+        libffdir = os.path.dirname(libffdir)
+        libffdir = os.path.dirname(libffdir)
+        libffdir = os.path.dirname(libffdir)
+#        libffdir = os.path.join(libffdir, "libFlexiFunctions");
+        return libffdir
+
 
     def m_openSettingsFile( self, filepath ):
         self.MAVFSettings = MAVFSettingsAPI.parse(filepath)
@@ -265,6 +273,7 @@ class mixer_document( ):
         print("clear parameters from function")
 
     def m_changeFunctionType ( self, functionIndex, functionTypeIndex ):
+        self.selectedFunctionIndex = functionIndex
         self.m_clearSelectedFunctionParamList()
         prntstr = 'Change selected function type, function{:d}, type index{:d}'.format(self.selectedFunctionIndex, functionTypeIndex)
         print(prntstr)
@@ -277,6 +286,7 @@ class mixer_document( ):
             print("insert new parameter into function")
         
         self.m_call_callbacks(callback_type.FUNCTION_CHANGED, functionIndex)
+        self.m_call_callbacks(callback_type.REGISTERS_CHANGED, functionIndex)
 
 
     def m_menuGetUniqueRegisterName ( self ):
@@ -460,13 +470,8 @@ class mixer_document( ):
         Files = CFileGen.CFiles()
         Files.writeFiles(self.exportPath, "FlexiFunciton", self.MAVFSettings, self.FBlocks)
             
-    def m_mnCommitToNV(self, event ):
-        try:
-            self.MAVProcesses
-        except:
-            return False
-   
-        self.MAVProcesses.commit_buffer_to_nvmem();
+    def commitToNV(self):
+        self.m_call_callbacks(callback_type.NV_MEM_WRITE)
         return True
             
     def m_close( self ):
