@@ -20,7 +20,7 @@ import functools
 
 from optparse import OptionParser
 parser = OptionParser("mavflightview.py [options]")
-parser.add_option("--service", default="GoogleSat", help="tile service")
+parser.add_option("--service", default="MicrosoftSat", help="tile service")
 parser.add_option("--mode", default=None, help="flight mode")
 parser.add_option("--condition", default=None, help="conditional check on log")
 parser.add_option("--mission", default=None, help="mission file (defaults to logged mission)")
@@ -37,6 +37,11 @@ def create_imagefile(filename, latlon, ground_width, path_obj, mission_obj, widt
     '''create path and mission as an image file'''
     mt = mp_tile.MPTile(service=opts.service)
 
+    map_img = mt.area_to_image(latlon[0], latlon[1],
+                               width, height, ground_width)
+    while mt.tiles_pending() > 0:
+        print("Waiting on %u tiles" % mt.tiles_pending())
+        time.sleep(1)
     map_img = mt.area_to_image(latlon[0], latlon[1],
                                width, height, ground_width)
     # a function to convert from (lat,lon) to (px,py) on the map
