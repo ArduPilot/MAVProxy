@@ -104,8 +104,8 @@ def polygon_load(filename):
 
 def polygon_bounds(points):
 	'''return bounding box of a polygon in (x,y,width,height) form'''
-        (minx, miny) = points[0]
-        (maxx, maxy) = points[0]
+        (minx, miny) = (points[0][0], points[0][1])
+        (maxx, maxy) = (minx, miny)
         for p in points:
             minx = min(minx, p[0])
             maxx = max(maxx, p[0])

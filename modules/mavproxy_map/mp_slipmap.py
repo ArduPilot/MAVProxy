@@ -95,8 +95,12 @@ class SlipPolygon(SlipObject):
     def draw(self, img, pixmapper):
         '''draw a polygon on the image'''
         for i in range(len(self.points)-1):
+            if len(self.points[i]) > 2:
+                colour = self.points[i][2]
+            else:
+                colour = self.colour
             self.draw_line(img, pixmapper, self.points[i], self.points[i+1],
-                           self.colour, self.linewidth)
+                           colour, self.linewidth)
 
 
 
@@ -747,7 +751,7 @@ class MPSlipMapPanel(wx.Panel):
     def pixel_coords(self, latlon):
         '''return pixel coordinates in the map image for a (lat,lon)'''
         state = self.state
-        (lat,lon) = latlon
+        (lat,lon) = (latlon[0], latlon[1])
         return state.mt.coord_to_pixel(state.lat, state.lon, state.width, state.ground_width, lat, lon)
 
     def draw_objects(self, objects, bounds, img):
