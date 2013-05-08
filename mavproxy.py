@@ -336,8 +336,32 @@ def cmd_ground(args):
     mpstate.master().calibrate_imu()
 
 def cmd_level(args):
-    '''do a ground start mode'''
+    '''run a accel level'''
     mpstate.master().calibrate_level()
+
+def cmd_accelcal(args):
+    '''do a full 3D accel calibration'''
+    mav = mpstate.master()
+    # ack the APM to begin 3D calibration of accelerometers
+    mav.mav.command_long_send(mav.target_system, mav.target_component,
+                              mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, 0,
+                              0, 0, 0, 0, 1, 0, 0)
+    count = 0
+    # we expect 6 messages and acks
+    while count < 6:
+        m = mav.recv_match(type='STATUSTEXT', blocking=True)
+        text = str(m.text)
+        if not text.startswith('Place APM'):
+            continue
+        # wait for user to hit enter
+        mpstate.rl.line = None
+        while mpstate.rl.line is None:
+            time.sleep(0.1)
+        mpstate.rl.line = None
+        count += 1
+        # tell the APM that we've done as requested
+        mav.mav.command_ack_send(count, 1)
+
 
 def cmd_reboot(args):
     '''reboot autopilot'''
@@ -876,6 +900,7 @@ command_map = {
     'auto'    : (cmd_auto,     'set AUTO mode'),
     'ground'  : (cmd_ground,   'do a ground start'),
     'level'   : (cmd_level,    'set level on a multicopter'),
+    'accelcal': (cmd_accelcal, 'do 3D accelerometer calibration'),
     'calpress': (cmd_calpressure,'calibrate pressure sensors'),
     'loiter'  : (cmd_loiter,   'set LOITER mode'),
     'rtl'     : (cmd_rtl,      'set RTL mode'),
