@@ -36,7 +36,7 @@ class TileException(Exception):
 TILE_SERVICES = {
 	# thanks to http://go2log.com/2011/09/26/fetching-tiles-for-offline-map/
 	# for the URL mapping info
-	"GoogleSat"      : "http://khm${GOOG_DIGIT}.google.com/kh/v=113&src=app&x=${X}&y=${Y}&z=${ZOOM}&s=${GALILEO}",
+	"GoogleSat"      : "http://khm${GOOG_DIGIT}.google.com/kh/v=129&src=app&x=${X}&y=${Y}&z=${ZOOM}&s=${GALILEO}",
 	"GoogleMap"      : "http://mt${GOOG_DIGIT}.google.com/vt/lyrs=m@121&hl=en&x=${X}&y=${Y}&z=${ZOOM}&s=${GALILEO}",
 	"GoogleHyb"      : "http://mt${GOOG_DIGIT}.google.com/vt/lyrs=h@121&hl=en&x=${X}&y=${Y}&z=${ZOOM}&s=${GALILEO}",
 	"GoogleTer"      : "http://mt${GOOG_DIGIT}.google.com/vt/lyrs=t@108,r@121&hl=en&x=${X}&y=${Y}&z=${ZOOM}&s=${GALILEO}",
