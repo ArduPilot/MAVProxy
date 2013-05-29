@@ -25,6 +25,7 @@ class module_state(object):
         self.move_wp = -1
         self.moving_wp = 0
         self.brightness = 1
+        self.icon_counter = 0
 
 def name():
     '''return module name'''
@@ -43,8 +44,23 @@ def cmd_map(args):
         else:
             state.brightness = float(args[1])
             mpstate.map.add_object(mp_slipmap.SlipBrightness(state.brightness))
+    elif args[0] == "icon":
+        if len(args) < 3:
+            print("Usage: map icon <lat> <lon> <icon>")
+        else:
+            lat = args[1]
+            lon = args[2]
+            flag = 'flag.png'
+            if len(args) > 3:
+                flag = args[3] + '.png'
+            icon = mpstate.map.icon(flag)
+            mpstate.map.add_object(mp_slipmap.SlipIcon('icon - %s [%u]' % (str(flag),state.icon_counter),
+                                                       (float(lat),float(lon)),
+                                               icon, layer=3, rotation=0, follow=False))
+            state.icon_counter += 1
+            
     else:
-        print("usage: map <brightness>")
+        print("usage: map <brightness|icon>")
 
 def init(_mpstate):
     '''initialise module'''
