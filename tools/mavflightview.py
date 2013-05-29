@@ -25,6 +25,7 @@ parser.add_option("--mode", default=None, help="flight mode")
 parser.add_option("--condition", default=None, help="conditional check on log")
 parser.add_option("--mission", default=None, help="mission file (defaults to logged mission)")
 parser.add_option("--imagefile", default=None, help="output to image file")
+parser.add_option("--flag", default=[], type='str', action='append', help="flag positions")
 
 (opts, args) = parser.parse_args()
 
@@ -126,6 +127,16 @@ def mavflightview(filename):
         map.add_object(path_obj)
         if mission_obj is not None:
             map.add_object(mission_obj)
+
+        for flag in opts.flag:
+            a = flag.split(',')
+            lat = a[0]
+            lon = a[1]
+            icon = 'flag.png'
+            if len(a) > 2:
+                icon = a[2] + '.png'
+            icon = map.icon(icon)
+            map.add_object(mp_slipmap.SlipIcon('icon - %s' % str(flag), (float(lat),float(lon)), icon, layer=3, rotation=0, follow=False))
 
 if len(args) < 1:
     print("Usage: mavflightview.py [options] <LOGFILE...>")
