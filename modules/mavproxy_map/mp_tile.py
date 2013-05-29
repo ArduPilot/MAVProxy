@@ -327,7 +327,10 @@ class MPTile:
 			# copy out the quadrant we want
 			cv.SetImageROI(img, (tile_info.offsetx, tile_info.offsety, width2, height2))
 			img2 = cv.CreateImage((width2,height2), 8, 3)
-			cv.Copy(img, img2)
+                        try:
+                            cv.Copy(img, img2)
+                        except Exception:
+                            continue
 			cv.ResetImageROI(img)
 
 			# and scale it
