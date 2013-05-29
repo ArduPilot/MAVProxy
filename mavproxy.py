@@ -1151,6 +1151,15 @@ def report_altitude(altitude):
         rounded_alt = int(mpstate.settings.altreadout) * ((5+int(mpstate.status.altitude)) / int(mpstate.settings.altreadout))
         say("height %u" % rounded_alt, priority='notification')
 
+def master_send_callback(m, master):
+    '''called on sending a message'''
+    mtype = m.get_type()
+
+    if mtype != 'BAD_DATA' and mpstate.logqueue:
+        usec = get_usec()
+        usec = (usec & ~3) | 3 # linknum 3
+        mpstate.logqueue.put(str(struct.pack('>Q', usec) + m.get_msgbuf()))
+
 
 def master_callback(m, master):
     '''process mavlink message m on master, sending any messages to recipients'''
@@ -1812,6 +1821,8 @@ Auto-detected serial ports are:
         else:
             m = mavutil.mavserial(mdev, baud=opts.baudrate, autoreconnect=True)
         m.mav.set_callback(master_callback, m)
+        if hasattr(m.mav, 'set_send_callback'):
+            m.mav.set_send_callback(master_send_callback, m)
         m.linknum = len(mpstate.mav_master)
         m.linkerror = False
         m.link_delayed = False
