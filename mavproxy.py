@@ -142,7 +142,7 @@ class MPStatus(object):
         self.last_streamrate1 = -1
         self.last_streamrate2 = -1
         self.last_seq = 0
-        self.fetch_one = False
+        self.fetch_one = 0
         self.armed = False
 
     def show(self, f, pattern=None):
@@ -662,9 +662,11 @@ def cmd_param(args):
             mpstate.mav_param_set = set()
             print("Requested parameter list")
         else:
-            mpstate.master().param_fetch_one(args[1].upper())
-            mpstate.status.fetch_one = True
-            print("Requested parameter %s" % args[1])
+            for p in mpstate.mav_param.keys():
+                if fnmatch.fnmatch(p, args[1].upper()):
+                    mpstate.master().param_fetch_one(p)
+                    mpstate.status.fetch_one += 1
+                    print("Requested parameter %s" % p)
     elif args[0] == "save":
         if len(args) < 2:
             print("usage: param save <filename> [wildcard]")
@@ -1238,8 +1240,8 @@ def master_callback(m, master):
         if m.param_count != -1:
             mpstate.mav_param_count = m.param_count
         mpstate.mav_param[str(param_id)] = m.param_value
-        if mpstate.status.fetch_one:
-            mpstate.status.fetch_one = False
+        if mpstate.status.fetch_one > 0:
+            mpstate.status.fetch_one -= 1
             mpstate.console.writeln("%s = %f" % (param_id, m.param_value))
         if added_new_parameter and len(mpstate.mav_param_set) == m.param_count:
             mpstate.console.writeln("Received %u parameters" % m.param_count)
