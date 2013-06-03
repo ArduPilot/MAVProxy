@@ -206,5 +206,13 @@ def mavlink_packet(msg):
     elif type == 'NAV_CONTROLLER_OUTPUT':
         mpstate.console.set_status('WPDist', 'Distance %u' % msg.wp_dist)
         mpstate.console.set_status('WPBearing', 'Bearing %u' % msg.target_bearing)
-        mpstate.console.set_status('AltError', 'AltError %d' % msg.alt_error)
-        mpstate.console.set_status('AspdError', 'AspdError %.1f' % (msg.aspd_error*0.01))
+        if msg.alt_error > 0:
+            alt_error_sign = "L"
+        else:
+            alt_error_sign = "H"
+        if msg.aspd_error > 0:
+            aspd_error_sign = "L"
+        else:
+            aspd_error_sign = "H"
+        mpstate.console.set_status('AltError', 'AltError %d%s' % (msg.alt_error, alt_error_sign))
+        mpstate.console.set_status('AspdError', 'AspdError %.1f%s' % (msg.aspd_error*0.01, aspd_error_sign))
