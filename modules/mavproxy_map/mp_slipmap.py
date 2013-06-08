@@ -12,6 +12,8 @@ import math
 import os, sys
 import time
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__))))
+
 if __name__ == "__main__":
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..'))
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
@@ -22,6 +24,12 @@ from mavproxy_map import mp_tile
 from modules.lib import mp_util
 from mavproxy_map import mp_widgets
 
+
+def grid_convert(lat, lon):
+    '''convert to grid reference'''
+    import redfearn
+    (zone, easting, northing) = redfearn.redfearn(lat, lon)
+    return "%sH %.0f %.0f" % (zone, easting, northing)
 
 class SlipObject:
     '''an object to display on the map'''
@@ -723,7 +731,7 @@ class MPSlipMapPanel(wx.Panel):
         alt = 0
         if pos is not None:
             (lat,lon) = self.coordinates(pos.x, pos.y)
-            newtext += 'Cursor: %f %f' % (lat, lon)
+            newtext += 'Cursor: %f %f (%s)' % (lat, lon, grid_convert(lat, lon))
             if state.elevation:
                 alt = self.ElevationMap.GetElevation(lat, lon)
                 newtext += ' %.1fm' % alt
@@ -734,9 +742,10 @@ class MPSlipMapPanel(wx.Panel):
             newtext += ' SRTM Downloading '
         newtext += '\n'
         if self.click_pos is not None:
-            newtext += 'Click: %f %f (%s %s)' % (self.click_pos[0], self.click_pos[1],
-                                                 mp_util.degrees_to_dms(self.click_pos[0]),
-                                                 mp_util.degrees_to_dms(self.click_pos[1]))
+            newtext += 'Click: %f %f (%s %s) (%s)' % (self.click_pos[0], self.click_pos[1],
+                                                      mp_util.degrees_to_dms(self.click_pos[0]),
+                                                      mp_util.degrees_to_dms(self.click_pos[1]),
+                                                      grid_convert(self.click_pos[0], self.click_pos[1]))
         if self.last_click_pos is not None:
             distance = mp_util.gps_distance(self.last_click_pos[0], self.last_click_pos[1],
                                             self.click_pos[0], self.click_pos[1])
