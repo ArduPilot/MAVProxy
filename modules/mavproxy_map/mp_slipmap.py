@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__))))
 if __name__ == "__main__":
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..'))
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'mavlink', 'pymavlink'))
 
 
 from mavproxy_map import mp_elevation
@@ -109,6 +110,47 @@ class SlipPolygon(SlipObject):
                 colour = self.colour
             self.draw_line(img, pixmapper, self.points[i], self.points[i+1],
                            colour, self.linewidth)
+
+
+class SlipGrid(SlipObject):
+    '''a map grid'''
+    def __init__(self, key, spacing, start, count, layer, colour, linewidth):
+        SlipObject.__init__(self, key, layer, )
+        self.colour = colour
+        self.linewidth = linewidth
+        self.spacing = spacing
+        self.start = start
+        self.count = count
+
+    def bounds(self):
+        '''return bounding box'''
+        return None
+
+    def draw_line(self, img, pixmapper, pt1, pt2, colour, linewidth):
+        '''draw a line on the image'''
+        pix1 = pixmapper(pt1)
+        pix2 = pixmapper(pt2)
+        clipped = cv.ClipLine((img.width, img.height), pix1, pix2)
+        if clipped is None:
+            return
+        (pix1, pix2) = clipped
+        cv.Line(img, pix1, pix2, colour, linewidth)
+        cv.Circle(img, pix2, linewidth*2, colour)
+
+    def draw(self, img, pixmapper):
+        '''draw a polygon on the image'''
+        start = self.start
+        for i in range(-self.count, self.count, 1):
+            pos1 = mp_util.gps_newpos(start[0], start[1], 90, i*self.spacing)
+            pos2 = mp_util.gps_newpos(pos1[0], pos1[1], 0, self.count*self.spacing)
+            pos3 = mp_util.gps_newpos(pos2[0], pos2[1], 180, 2*self.count*self.spacing)
+            self.draw_line(img, pixmapper, pos2, pos3, self.colour, self.linewidth)
+        for i in range(-self.count, self.count, 1):
+            pos1 = mp_util.gps_newpos(start[0], start[1], 0, i*self.spacing)
+            pos2 = mp_util.gps_newpos(pos1[0], pos1[1], 90, self.count*self.spacing)
+            pos3 = mp_util.gps_newpos(pos2[0], pos2[1], 270, 2*self.count*self.spacing)
+            self.draw_line(img, pixmapper, pos2, pos3, self.colour, self.linewidth)
+            
 
 
 
@@ -769,7 +811,8 @@ class MPSlipMapPanel(wx.Panel):
         keys.sort()
         for k in keys:
             obj = objects[k]
-            if mp_util.bounds_overlap(bounds, obj.bounds()):
+            bounds2 = obj.bounds()
+            if bounds2 is None or mp_util.bounds_overlap(bounds, bounds2):
                 obj.draw(img, self.pixmapper)
 
     def redraw_map(self):
@@ -939,10 +982,13 @@ if __name__ == "__main__":
     parser.add_option("--max-zoom", type='int', default=19, help="maximum tile zoom")
     parser.add_option("--debug", action='store_true', default=False, help="show debug info")
     parser.add_option("--boundary", default=None, help="show boundary")
+    parser.add_option("--mission", default=[], action='append', help="show mission")
     parser.add_option("--thumbnail", default=None, help="show thumbnail")
     parser.add_option("--icon", default=None, help="show icon")
     parser.add_option("--flag", default=[], type='str', action='append', help="flag positions")
+    parser.add_option("--grid", default=None, help="grid spacing,lat,lon,count")
     parser.add_option("--elevation", action='store_true', default=False, help="show elevation information")
+    parser.add_option("--verbose", action='store_true', default=False, help="show mount actions")
     (opts, args) = parser.parse_args()
 
     sm = MPSlipMap(lat=opts.lat,
@@ -957,6 +1003,22 @@ if __name__ == "__main__":
     if opts.boundary:
         boundary = mp_util.polygon_load(opts.boundary)
         sm.add_object(SlipPolygon('boundary', boundary, layer=1, linewidth=2, colour=(0,255,0)))
+
+    if opts.mission:
+        import mavwp
+        for file in opts.mission:
+            wp = mavwp.MAVWPLoader()
+            wp.load(file)
+            boundary = wp.polygon()
+            sm.add_object(SlipPolygon('mission-%s' % file, boundary, layer=1, linewidth=1, colour=(255,255,255)))
+
+    if opts.grid:
+        a = opts.grid.split(",")
+        spacing = float(a[0])
+        lat = float(a[1])
+        lon = float(a[2])
+        count = int(a[3])
+        sm.add_object(SlipGrid('grid', spacing, (lat,lon), count=count, layer=1, linewidth=1, colour=(255,255,0)))
 
     if opts.thumbnail:
         thumb = cv.LoadImage(opts.thumbnail)
@@ -977,6 +1039,8 @@ if __name__ == "__main__":
     while sm.is_alive():
         while sm.event_count() > 0:
             obj = sm.get_event()
+            if not opts.verbose:
+                continue
             if isinstance(obj, SlipMouseEvent):
                 print("Mouse event at %s (X/Y=%u/%u) for %u objects" % (obj.latlon,
                                                                         obj.event.X, obj.event.Y,
