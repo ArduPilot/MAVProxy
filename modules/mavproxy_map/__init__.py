@@ -58,7 +58,18 @@ def cmd_map(args):
                                                        (float(lat),float(lon)),
                                                icon, layer=3, rotation=0, follow=False))
             state.icon_counter += 1
-            
+    elif args[0] == "grid":
+        if len(args) < 4:
+            print("Usage: map grid <spacing> <lat> <lon> <count>")
+        else:
+            spacing = float(args[1])
+            lat = float(args[2])
+            lon = float(args[3])
+            count = int(args[4])
+            flag = 'flag.png'
+            icon = mpstate.map.icon(flag)
+            mpstate.map.add_object(mp_slipmap.SlipGrid('grid', spacing, (lat,lon), count, 
+                                                       layer=3, linewidth=1, colour=(255,255,0)))
     else:
         print("usage: map <brightness|icon>")
 
