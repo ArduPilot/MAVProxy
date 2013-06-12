@@ -151,3 +151,35 @@ def degrees_to_dms(degrees):
 	sec = ((degrees - deg) - (min/60.0))*60*60
 	return u'%u\u00b0%02u\'%04.1f"' % (deg, abs(min), abs(sec))
 
+
+class UTMGrid:
+        '''class to hold UTM grid position'''
+        def __init__(self, zone, easting, northing):
+                self.zone = zone
+                self.easting = easting
+                self.northing = northing
+
+        def __str__(self):
+                return "%u %u %u" % (self.zone, self.easting, self.northing)
+
+        def latlon(self):
+                '''return (lat,lon) for the grid coordinates'''
+                from ANUGA import lat_long_UTM_conversion
+                (lat, lon) = lat_long_UTM_conversion.UTMtoLL(self.northing, self.easting, self.zone)
+                return (lat, lon)
+                
+
+def latlon_to_grid(latlon):
+    '''convert to grid reference'''
+    import ANUGA.redfearn as redfearn
+    (zone, easting, northing) = redfearn.redfearn(latlon[0], latlon[1])
+    return UTMGrid(zone, easting, northing)
+
+def latlon_round(latlon, spacing=1000):
+        '''round to nearest grid corner'''
+        g = latlon_to_grid(latlon)
+        g.easting = (g.easting // spacing) * spacing
+        g.northing = (g.northing // spacing) * spacing
+        return g.latlon()
+
+        
