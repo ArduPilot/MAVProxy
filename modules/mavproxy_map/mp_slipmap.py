@@ -26,12 +26,6 @@ from modules.lib import mp_util
 from mavproxy_map import mp_widgets
 
 
-def grid_convert(lat, lon):
-    '''convert to grid reference'''
-    import redfearn
-    (zone, easting, northing) = redfearn.redfearn(lat, lon)
-    return "%sH %.0f %.0f" % (zone, easting, northing)
-
 class SlipObject:
     '''an object to display on the map'''
     def __init__(self, key, layer):
@@ -58,7 +52,7 @@ class SlipObject:
             h = img.height - py
         return (px, py, sx, sy, w, h)
 
-    def draw(self, img, pixmapper):
+    def draw(self, img, pixmapper, bounds):
         '''default draw method'''
         pass
 
@@ -101,7 +95,7 @@ class SlipPolygon(SlipObject):
         cv.Line(img, pix1, pix2, colour, linewidth)
         cv.Circle(img, pix2, linewidth*2, colour)
 
-    def draw(self, img, pixmapper):
+    def draw(self, img, pixmapper, bounds):
         '''draw a polygon on the image'''
         for i in range(len(self.points)-1):
             if len(self.points[i]) > 2:
@@ -114,13 +108,10 @@ class SlipPolygon(SlipObject):
 
 class SlipGrid(SlipObject):
     '''a map grid'''
-    def __init__(self, key, spacing, start, count, layer, colour, linewidth):
+    def __init__(self, key, layer, colour, linewidth):
         SlipObject.__init__(self, key, layer, )
         self.colour = colour
         self.linewidth = linewidth
-        self.spacing = spacing
-        self.start = start
-        self.count = count
 
     def bounds(self):
         '''return bounding box'''
@@ -137,20 +128,30 @@ class SlipGrid(SlipObject):
         cv.Line(img, pix1, pix2, colour, linewidth)
         cv.Circle(img, pix2, linewidth*2, colour)
 
-    def draw(self, img, pixmapper):
+    def draw(self, img, pixmapper, bounds):
         '''draw a polygon on the image'''
-        start = self.start
-        for i in range(-self.count, self.count, 1):
-            pos1 = mp_util.gps_newpos(start[0], start[1], 90, i*self.spacing)
-            pos2 = mp_util.gps_newpos(pos1[0], pos1[1], 0, self.count*self.spacing)
-            pos3 = mp_util.gps_newpos(pos2[0], pos2[1], 180, 2*self.count*self.spacing)
-            self.draw_line(img, pixmapper, pos2, pos3, self.colour, self.linewidth)
-        for i in range(-self.count, self.count, 1):
-            pos1 = mp_util.gps_newpos(start[0], start[1], 0, i*self.spacing)
-            pos2 = mp_util.gps_newpos(pos1[0], pos1[1], 90, self.count*self.spacing)
-            pos3 = mp_util.gps_newpos(pos2[0], pos2[1], 270, 2*self.count*self.spacing)
-            self.draw_line(img, pixmapper, pos2, pos3, self.colour, self.linewidth)
-            
+	(x,y,w,h) = bounds
+        spacing = 1000
+        while True:
+            start = mp_util.latlon_round((x,y), spacing)
+            dist = mp_util.gps_distance(x,y,x+w,y+h)
+            count = int(dist / spacing)
+            if count < 2:
+                spacing /= 10
+            elif count > 50:
+                spacing *= 10
+            else:
+                break
+        print spacing, count
+        
+        for i in range(count*2+2):
+            pos1 = mp_util.gps_newpos(start[0], start[1], 90, i*spacing)
+            pos3 = mp_util.gps_newpos(pos1[0], pos1[1], 0, 3*count*spacing)
+            self.draw_line(img, pixmapper, pos1, pos3, self.colour, self.linewidth)
+
+            pos1 = mp_util.gps_newpos(start[0], start[1], 0, i*spacing)
+            pos3 = mp_util.gps_newpos(pos1[0], pos1[1], 90, 3*count*spacing)
+            self.draw_line(img, pixmapper, pos1, pos3, self.colour, self.linewidth)
 
 
 
@@ -185,7 +186,7 @@ class SlipThumbnail(SlipObject):
                          self.border_colour, self.border_width)
         return self._img
 
-    def draw(self, img, pixmapper):
+    def draw(self, img, pixmapper, bounds):
         '''draw the thumbnail on the image'''
         thumb = self.img()
         (px,py) = pixmapper(self.latlon)
@@ -234,7 +235,7 @@ class SlipTrail:
             while len(self.points) > self.count:
                 self.points.pop(0)
 
-    def draw(self, img, pixmapper):
+    def draw(self, img, pixmapper, bounds):
         '''draw the trail'''
         for p in self.points:
             (px,py) = pixmapper(p)
@@ -266,11 +267,11 @@ class SlipIcon(SlipThumbnail):
             self._rotated = self._img
         return self._rotated
 
-    def draw(self, img, pixmapper):
+    def draw(self, img, pixmapper, bounds):
         '''draw the icon on the image'''
 
         if self.trail is not None:
-            self.trail.draw(img, pixmapper)
+            self.trail.draw(img, pixmapper, bounds)
 
         icon = self.img()
         (px,py) = pixmapper(self.latlon)
@@ -773,7 +774,7 @@ class MPSlipMapPanel(wx.Panel):
         alt = 0
         if pos is not None:
             (lat,lon) = self.coordinates(pos.x, pos.y)
-            newtext += 'Cursor: %f %f (%s)' % (lat, lon, grid_convert(lat, lon))
+            newtext += 'Cursor: %f %f (%s)' % (lat, lon, mp_util.latlon_to_grid((lat, lon)))
             if state.elevation:
                 alt = self.ElevationMap.GetElevation(lat, lon)
                 newtext += ' %.1fm' % alt
@@ -787,7 +788,7 @@ class MPSlipMapPanel(wx.Panel):
             newtext += 'Click: %f %f (%s %s) (%s)' % (self.click_pos[0], self.click_pos[1],
                                                       mp_util.degrees_to_dms(self.click_pos[0]),
                                                       mp_util.degrees_to_dms(self.click_pos[1]),
-                                                      grid_convert(self.click_pos[0], self.click_pos[1]))
+                                                      mp_util.latlon_to_grid(self.click_pos))
         if self.last_click_pos is not None:
             distance = mp_util.gps_distance(self.last_click_pos[0], self.last_click_pos[1],
                                             self.click_pos[0], self.click_pos[1])
@@ -799,9 +800,14 @@ class MPSlipMapPanel(wx.Panel):
             self.position.WriteText(newtext)
             state.oldtext = newtext
 
-    def pixel_coords(self, latlon):
-        '''return pixel coordinates in the map image for a (lat,lon)'''
+    def pixel_coords(self, latlon, reverse=False):
+        '''return pixel coordinates in the map image for a (lat,lon)
+        if reverse is set, then return lat/lon for a pixel coordinate
+        '''
         state = self.state
+        if reverse:
+            (x,y) = latlon
+            return self.coordinates(x,y)
         (lat,lon) = (latlon[0], latlon[1])
         return state.mt.coord_to_pixel(state.lat, state.lon, state.width, state.ground_width, lat, lon)
 
@@ -813,7 +819,7 @@ class MPSlipMapPanel(wx.Panel):
             obj = objects[k]
             bounds2 = obj.bounds()
             if bounds2 is None or mp_util.bounds_overlap(bounds, bounds2):
-                obj.draw(img, self.pixmapper)
+                obj.draw(img, self.pixmapper, bounds)
 
     def redraw_map(self):
         '''redraw the map with current settings'''
@@ -986,7 +992,7 @@ if __name__ == "__main__":
     parser.add_option("--thumbnail", default=None, help="show thumbnail")
     parser.add_option("--icon", default=None, help="show icon")
     parser.add_option("--flag", default=[], type='str', action='append', help="flag positions")
-    parser.add_option("--grid", default=None, help="grid spacing,lat,lon,count")
+    parser.add_option("--grid", default=None, help="add a UTM grid")
     parser.add_option("--elevation", action='store_true', default=False, help="show elevation information")
     parser.add_option("--verbose", action='store_true', default=False, help="show mount actions")
     (opts, args) = parser.parse_args()
@@ -1013,12 +1019,7 @@ if __name__ == "__main__":
             sm.add_object(SlipPolygon('mission-%s' % file, boundary, layer=1, linewidth=1, colour=(255,255,255)))
 
     if opts.grid:
-        a = opts.grid.split(",")
-        spacing = float(a[0])
-        lat = float(a[1])
-        lon = float(a[2])
-        count = int(a[3])
-        sm.add_object(SlipGrid('grid', spacing, (lat,lon), count=count, layer=1, linewidth=1, colour=(255,255,0)))
+        sm.add_object(SlipGrid('grid', layer=1, linewidth=1, colour=(255,255,0)))
 
     if opts.thumbnail:
         thumb = cv.LoadImage(opts.thumbnail)
