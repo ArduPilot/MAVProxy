@@ -4,3 +4,7 @@ mavproxy
 *.pyc
 *.log
 camera/
+build/
+gtest/
+*.tlog
+*.raw
