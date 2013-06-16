@@ -47,9 +47,9 @@ def create_imagefile(filename, latlon, ground_width, path_obj, mission_obj, widt
                                width, height, ground_width)
     # a function to convert from (lat,lon) to (px,py) on the map
     pixmapper = functools.partial(pixel_coords, ground_width=ground_width, mt=mt, topleft=latlon, width=width)
-    path_obj.draw(map_img, pixmapper)
+    path_obj.draw(map_img, pixmapper, None)
     if mission_obj is not None:
-        mission_obj.draw(map_img, pixmapper)
+        mission_obj.draw(map_img, pixmapper, None)
     cv.CvtColor(map_img, map_img, cv.CV_BGR2RGB)
     cv.SaveImage(filename, map_img)
 
