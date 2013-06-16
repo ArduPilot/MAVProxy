@@ -4,23 +4,19 @@
 import time, threading, sys, os, numpy, Queue, errno, cPickle, signal, struct, fcntl, select, cStringIO
 import cv2.cv as cv
 
-# use the camera code from the cuav repo (see githib.com/tridge)
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'cuav', 'camera'))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'cuav', 'image'))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'cuav', 'lib'))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'lib'))
-
-import scanner, mavutil, cuav_mosaic, mav_position, cuav_util, cuav_joe, block_xmit, cuav_region, mp_settings
-from mavproxy_map import mp_image
-from cam_params import CameraParams
-from modules.mavproxy_map import mp_slipmap
+from cuav.image import scanner
+from pymavlink import mavutil
+from cuav.lib import cuav_mosaic, mav_position, cuav_util, cuav_joe, block_xmit, cuav_region, mp_settings
+from MAVProxy.modules.mavproxy_map import mp_image
+from cuav.camera.cam_params import CameraParams
+from MAVProxy.modules.mavproxy_map import mp_slipmap
 
 # allow for replaying of previous flights
 if os.getenv('FAKE_CHAMELEON'):
     print("Loaded fake chameleon backend")
-    import fake_chameleon as chameleon
+    import cuav.camera.fake_chameleon as chameleon
 else:
-    import chameleon
+    import cuav.camera.chameleon as chameleon
 
 mpstate = None
 
@@ -536,7 +532,7 @@ def reload_mosaic(mosaic):
 
 def view_thread():
     '''image viewing thread - this runs on the ground station'''
-    import cuav_mosaic
+    from cuav.lib import cuav_mosaic
     state = mpstate.camera_state
 
     bsend = block_xmit.BlockSender(state.settings.gcs_view_port, bandwidth=state.settings.bandwidth)

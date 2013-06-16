@@ -6,15 +6,9 @@ view a mission log on a map
 
 import sys, time, os
 
-# allow import from the parent directory, where mavlink.py is
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'modules'))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'mavlink', 'pymavlink'))
-
-import mavutil, mavwp
-import mavproxy_map.mp_slipmap as mp_slipmap
-import mavproxy_map.mp_tile as mp_tile
-import lib.mp_util as mp_util
+from pymavlink import mavutil, mavwp
+from MAVProxy.modules.mavproxy_map import mp_slipmap, mp_tile
+from MAVProxy.modules.lib import mp_util
 import cv2.cv as cv
 import functools
 

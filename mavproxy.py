@@ -11,20 +11,9 @@ import sys, os, struct, math, time, socket
 import fnmatch, errno, threading
 import serial, Queue, select
 
-# The modules subdirectory contains the modules that come with
-# mavproxy.
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'modules'))
-
-# find the mavlink.py module
-for d in [ 'pymavlink',
-           os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'pymavlink'),
-           os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'mavlink', 'pymavlink') ]:
-    if os.path.exists(d):
-        sys.path.insert(0, d)
-
 import select
-from modules.lib import textconsole
-from modules.lib import mp_settings
+from MAVProxy.modules.lib import textconsole
+from MAVProxy.modules.lib import mp_settings
 
 class MPSettings(object):
     def __init__(self):
@@ -810,7 +799,7 @@ def cmd_module(args):
             print("usage: module load <name>")
             return
         modname = args[1]
-        modpath = 'mavproxy_%s' % (modname,)
+        modpath = 'MAVProxy.modules.mavproxy_%s' % (modname,)
         try:
             m = import_package(modpath)
             if m in mpstate.modules:
@@ -1777,7 +1766,7 @@ if __name__ == '__main__':
 
     if opts.mav09:
         os.environ['MAVLINK09'] = '1'
-    import mavutil, mavwp, mavparm
+    from pymavlink import mavutil, mavwp, mavparm
 
     # global mavproxy state
     mpstate = MPState()

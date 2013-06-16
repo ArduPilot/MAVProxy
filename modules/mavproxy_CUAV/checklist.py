@@ -9,7 +9,7 @@ import os, sys, math
 mpstate = None
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib'))
-import libchecklist
+from MAVProxy.modules.lib import libchecklist
 
 def name():
     '''return module name'''

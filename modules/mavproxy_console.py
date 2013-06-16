@@ -8,11 +8,11 @@ import os, sys, math, time
 
 mpstate = None
 
-from modules.lib import wxconsole
-from modules.lib import textconsole
-from modules.mavproxy_map import mp_elevation
-import mavutil
-from modules.lib import mp_util
+from MAVProxy.modules.lib import wxconsole
+from MAVProxy.modules.lib import textconsole
+from MAVProxy.modules.mavproxy_map import mp_elevation
+from pymavlink import mavutil
+from MAVProxy.modules.lib import mp_util
 
 class module_state(object):
     def __init__(self):

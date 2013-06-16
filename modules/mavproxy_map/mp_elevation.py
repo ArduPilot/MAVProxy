@@ -11,8 +11,8 @@ import time
 
 import numpy
 
-from mavproxy_map import GAreader
-from mavproxy_map import srtm
+from MAVProxy.modules.mavproxy_map import GAreader
+from MAVProxy.modules.mavproxy_map import srtm
 
 
 class ElevationModel():

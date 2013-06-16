@@ -6,8 +6,7 @@ June 2012
 '''
 
 import sys, os, time
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'lib'))
-import cuav_util
+from cuav.lib import cuav_util
 
 mpstate = None
 

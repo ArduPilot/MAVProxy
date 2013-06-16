@@ -16,7 +16,7 @@ import zipfile
 import array
 import math
 import multiprocessing
-from modules.lib import mp_util
+from MAVProxy.modules.lib import mp_util
 import tempfile
 
 class NoSuchTileError(Exception):

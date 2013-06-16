@@ -14,9 +14,7 @@ It is highly desirable that teams provide:
 '''
 
 import sys, os, serial
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'cuav', 'lib'))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'lib'))
-import cuav_util
+from cuav.lib import cuav_util
 
 mpstate = None
 

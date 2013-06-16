@@ -5,10 +5,9 @@ Andrew Tridgell
 '''
 
 import sys, os, time
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'cuav', 'lib'))
-import cuav_util
-import mp_util, mavutil, mavlinkv10
-from mavlinkv10 import *
+from cuav import cuav_util
+from pymavlink import mp_util, mavutil, mavlinkv10
+from pymavlink.mavlinkv10 import *
 
 mpstate = None
 

@@ -8,8 +8,8 @@ June 2012
 import sys, os, math
 import functools
 import time
-from mavproxy_map import mp_slipmap
-from modules.lib import mp_util
+from MAVProxy.modules.mavproxy_map import mp_slipmap
+from MAVProxy.modules.lib import mp_util
 
 mpstate = None
 
@@ -117,7 +117,7 @@ def closest_waypoint(latlon):
 
 def map_callback(obj):
     '''called when an event happens on the slipmap'''
-    from mavproxy_map import mp_slipmap
+    from MAVProxy.modules.mavproxy_map import mp_slipmap
     state = mpstate.map_state
     if not isinstance(obj, mp_slipmap.SlipMouseEvent):
         return

@@ -12,18 +12,10 @@ import math
 import os, sys
 import time
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__))))
-
-if __name__ == "__main__":
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..'))
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'mavlink', 'pymavlink'))
-
-
-from mavproxy_map import mp_elevation
-from mavproxy_map import mp_tile
-from modules.lib import mp_util
-from mavproxy_map import mp_widgets
+from MAVProxy.modules.mavproxy_map import mp_elevation
+from MAVProxy.modules.mavproxy_map import mp_tile
+from MAVProxy.modules.lib import mp_util
+from MAVProxy.modules.mavproxy_map import mp_widgets
 
 
 class SlipObject:
@@ -1010,7 +1002,7 @@ if __name__ == "__main__":
         sm.add_object(SlipPolygon('boundary', boundary, layer=1, linewidth=2, colour=(0,255,0)))
 
     if opts.mission:
-        import mavwp
+        from pymavlink import mavwp
         for file in opts.mission:
             wp = mavwp.MAVWPLoader()
             wp.load(file)

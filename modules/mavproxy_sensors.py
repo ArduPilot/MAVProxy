@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 '''monitor sensor consistancy'''
 
-import time, math, mavutil
+import time, math
+from pymavlink import mavutil
 
 mpstate = None
 

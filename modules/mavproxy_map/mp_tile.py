@@ -22,11 +22,7 @@ import time
 
 import cv2.cv as cv
 
-if __name__ == "__main__":
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..'))
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
-
-from modules.lib import mp_util
+from MAVProxy.modules.lib import mp_util
 
 class TileException(Exception):
 	'''tile error class'''

@@ -4,11 +4,12 @@
   uses lib/live_graph.py for display
 """
 
-import mavutil, re, os, sys
+from pymavlink import mavutil
+import re, os, sys
 
 mpstate = None
 
-from lib import live_graph
+from MAVProxy.modules.lib import live_graph
 
 class graph_state(object):
     def __init__(self):

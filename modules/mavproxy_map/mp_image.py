@@ -9,8 +9,8 @@ import cv2.cv as cv
 import time
 import wx
 
-from modules.lib import mp_util
-from mavproxy_map import mp_widgets
+from MAVProxy.modules.lib import mp_util
+from MAVProxy.modules.mavproxy_map import mp_widgets
 
 
 class MPImage():

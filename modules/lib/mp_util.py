@@ -164,14 +164,14 @@ class UTMGrid:
 
         def latlon(self):
                 '''return (lat,lon) for the grid coordinates'''
-                from ANUGA import lat_long_UTM_conversion
+                from MAVProxy.modules.lib.ANUGA import lat_long_UTM_conversion
                 (lat, lon) = lat_long_UTM_conversion.UTMtoLL(self.northing, self.easting, self.zone)
                 return (lat, lon)
                 
 
 def latlon_to_grid(latlon):
     '''convert to grid reference'''
-    import ANUGA.redfearn as redfearn
+    from MAVProxy.modules.lib.ANUGA import redfearn
     (zone, easting, northing) = redfearn.redfearn(latlon[0], latlon[1])
     return UTMGrid(zone, easting, northing)
 
