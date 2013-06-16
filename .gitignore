@@ -5,6 +5,7 @@ mavproxy
 *.log
 camera/
 build/
+dist/
 gtest/
 *.tlog
 *.raw
