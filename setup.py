@@ -1,7 +1,7 @@
 from distutils.core import setup, Extension
 
 setup (name = 'MAVProxy',
-       version = '1.0.3',
+       version = '1.0.4',
        description = 'MAVProxy MAVLink ground station',
        url = 'https://github.com/tridge/MAVProxy',
        author = 'Andrew Tridgell',
