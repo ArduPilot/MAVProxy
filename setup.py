@@ -13,7 +13,7 @@ setup (name = 'MAVProxy',
                    'MAVProxy.modules.lib',
                    'MAVProxy.modules.lib.ANUGA',
                    'MAVProxy.modules.mavproxy_CUAV' ],
-       requires = [ 'pymavlink>=1.1.2' ],
+       requires = [ 'pymavlink (>=1.1.2)' ],
        scripts = [ 'mavproxy.py', 'tools/mavflightview.py' ],
        package_data = { 'MAVProxy.modules.mavproxy_map' :
                         [ 'data/*.jpg', 'data/*.png' ]}
