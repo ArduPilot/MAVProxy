@@ -1,7 +1,7 @@
 from distutils.core import setup, Extension
 
 setup (name = 'MAVProxy',
-       version = '1.0.4',
+       version = '1.0.5',
        description = 'MAVProxy MAVLink ground station',
        url = 'https://github.com/tridge/MAVProxy',
        author = 'Andrew Tridgell',
@@ -12,6 +12,7 @@ setup (name = 'MAVProxy',
                    'MAVProxy.modules.mavproxy_map',
                    'MAVProxy.modules.lib',
                    'MAVProxy.modules.lib.ANUGA',
+                   'MAVProxy.modules.lib.optparse_gui',
                    'MAVProxy.modules.mavproxy_CUAV' ],
        requires = [ 'pymavlink (>=1.1.2)' ],
        scripts = [ 'mavproxy.py', 'tools/mavflightview.py' ],
