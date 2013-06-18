@@ -1766,12 +1766,14 @@ if __name__ == '__main__':
     parser.add_option("--auto-protocol", action='store_true', default=False, help="Auto detect MAVLink protocol version")
     parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
     parser.add_option("--continue", dest='continue_mode', action='store_true', default=False, help="continue logs")
+    parser.add_option("--dialect",  default="ardupilotmega", help="MAVLink dialect")
 
     (opts, args) = parser.parse_args()
 
     if opts.mav09:
         os.environ['MAVLINK09'] = '1'
     from pymavlink import mavutil, mavwp, mavparm
+    mavutil.set_dialect(opts.dialect)
 
     # global mavproxy state
     mpstate = MPState()
