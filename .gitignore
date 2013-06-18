@@ -9,3 +9,4 @@ dist/
 gtest/
 *.tlog
 *.raw
+MANIFEST
