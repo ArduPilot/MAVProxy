@@ -983,7 +983,7 @@ if __name__ == "__main__":
     parser.add_option("--thumbnail", default=None, help="show thumbnail")
     parser.add_option("--icon", default=None, help="show icon")
     parser.add_option("--flag", default=[], type='str', action='append', help="flag positions")
-    parser.add_option("--grid", default=None, help="add a UTM grid")
+    parser.add_option("--grid", default=False, action='store_true', help="add a UTM grid")
     parser.add_option("--elevation", action='store_true', default=False, help="show elevation information")
     parser.add_option("--verbose", action='store_true', default=False, help="show mount actions")
     (opts, args) = parser.parse_args()
