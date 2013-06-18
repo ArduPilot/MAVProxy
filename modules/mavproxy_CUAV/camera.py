@@ -449,8 +449,11 @@ def transmit_thread():
                 # send a region message with thumbnails to the ground station
                 thumb = None
                 if state.settings.send1:
-                    thumb = cuav_mosaic.CompositeThumbnail(cv.GetImage(cv.fromarray(im_full)),
-                                                           regions, quality=state.settings.quality, thumb_size=state.settings.thumbsize)
+                    thumb_img = cuav_mosaic.CompositeThumbnail(cv.GetImage(cv.fromarray(im_full)),
+                                                               regions,
+                                                               thumb_size=state.settings.thumbsize)
+                    thumb = scanner.jpeg_compress(numpy.ascontiguousarray(cv.GetMat(thumb_img)), state.settings.quality)
+
                     pkt = ThumbPacket(frame_time, regions, thumb, state.frame_loss, state.xmit_queue, pos)
 
                     buf = cPickle.dumps(pkt, cPickle.HIGHEST_PROTOCOL)
@@ -464,8 +467,10 @@ def transmit_thread():
                     if thumb is None or lowscore < state.settings.minscore2:
                         # remove some of the regions
                         regions = cuav_region.filter_regions(im_full, regions, min_score=state.settings.minscore2)
-                        thumb = cuav_mosaic.CompositeThumbnail(cv.GetImage(cv.fromarray(im_full)),
-                                                               regions, quality=state.settings.quality, thumb_size=state.settings.thumbsize)
+                        thumb_img = cuav_mosaic.CompositeThumbnail(cv.GetImage(cv.fromarray(im_full)),
+                                                                   regions,
+                                                                   thumb_size=state.settings.thumbsize)
+                        thumb = scanner.jpeg_compress(numpy.ascontiguousarray(cv.GetMat(thumb_img)), state.settings.quality)
                         pkt = ThumbPacket(frame_time, regions, thumb, state.frame_loss, state.xmit_queue, pos)
 
                         buf = cPickle.dumps(pkt, cPickle.HIGHEST_PROTOCOL)
