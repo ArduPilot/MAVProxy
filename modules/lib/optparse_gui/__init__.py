@@ -11,6 +11,10 @@ import re
 import optparse
 
 import wx
+<<<<<<< HEAD
+import wx.lib.agw.persist as PM
+=======
+>>>>>>> 6878f374dee9d130bd7797b14cdc7fa8f5006797
 
 __version__ = 0.1
 __revision__ = '$Id$'
@@ -51,6 +55,14 @@ class OptparseDialog( wx.Dialog ):
 
         self.browse_option_map = {}
 
+<<<<<<< HEAD
+        #persistence manager setup
+        self._persistMgr = PM.PersistenceManager.Get()
+        _configFile = os.path.join(os.getcwd(), top_label_text + '.cfg')
+        self._persistMgr.SetPersistenceFile(_configFile)
+        
+=======
+>>>>>>> 6878f374dee9d130bd7797b14cdc7fa8f5006797
         # Add controls for all the options
         for option in option_parser.option_list:
             if option.dest is None:
@@ -99,6 +111,11 @@ class OptparseDialog( wx.Dialog ):
                 raise NotImplementedError ( 'Unknown option action: %s' % repr( option.action ) )
 
             ctrl.SetHelpText( option.help )
+<<<<<<< HEAD
+            ctrl.SetName(option.dest) 
+            self._persistMgr.RegisterAndRestore(ctrl)
+=======
+>>>>>>> 6878f374dee9d130bd7797b14cdc7fa8f5006797
             sizer.Add(box, 0, wx.GROW|wx.ALIGN_CENTER_VERTICAL|wx.ALL, 5)
 
             self.option_controls[ option ] = ctrl
@@ -237,6 +254,15 @@ class OptionParser( optparse.OptionParser ):
             dlg.args_ctrl.Value = ' '.join(args)
 
         dlg_result = dlg.ShowModal()
+<<<<<<< HEAD
+        
+        # Save the current settings to file
+        for ele in dlg.GetChildren():
+            if ele.GetName() != "":
+                dlg._persistMgr.SaveAndUnregister(ele)
+                    
+=======
+>>>>>>> 6878f374dee9d130bd7797b14cdc7fa8f5006797
         if wx.ID_OK != dlg_result:
             raise UserCancelledError( 'User has canceled' )
 
