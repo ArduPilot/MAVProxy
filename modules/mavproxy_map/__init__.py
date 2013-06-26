@@ -59,10 +59,7 @@ def cmd_map(args):
                                                icon, layer=3, rotation=0, follow=False))
             state.icon_counter += 1
     elif args[0] == "grid":
-        if len(args) < 4:
-            print("Usage: map grid")
-        else:
-            mpstate.map.add_object(mp_slipmap.SlipGrid('grid', layer=3, linewidth=1, colour=(255,255,0)))
+        mpstate.map.add_object(mp_slipmap.SlipGrid('grid', layer=3, linewidth=1, colour=(255,255,0)))
     else:
         print("usage: map <brightness|icon|grid>")
 
