@@ -1,6 +1,6 @@
 from distutils.core import setup, Extension
 
-version = "1.0.6"
+version = "1.0.7"
 
 setup (name = 'MAVProxy',
        version = version,
