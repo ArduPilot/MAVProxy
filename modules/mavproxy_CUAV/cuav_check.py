@@ -5,9 +5,8 @@ Andrew Tridgell
 '''
 
 import sys, os, time
-from cuav import cuav_util
-from pymavlink import mp_util, mavutil, mavlinkv10
-from pymavlink.mavlinkv10 import *
+from cuav.lib import cuav_util
+from pymavlink import mavutil
 
 mpstate = None
 

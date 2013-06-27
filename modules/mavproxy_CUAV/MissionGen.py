@@ -4,8 +4,6 @@
 import time, threading, sys, os, numpy, Queue
 
 # use the mission generator code from the cuav repo (see githib.com/stephendade)
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'cuav', 'lib'))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib'))
 from pymavlink import mavutil
 from cuav.lib import cuav_missiongenerator
 

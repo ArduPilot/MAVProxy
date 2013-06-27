@@ -6,12 +6,7 @@ search a set of log files for a condition
 
 import sys, time, os
 
-# allow import from the parent directory, where mavlink.py is
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'modules'))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'mavlink', 'pymavlink'))
-
-import mavutil
+from pymavlink import mavutil
 
 from optparse import OptionParser
 parser = OptionParser("mavsearch.py [options]")
