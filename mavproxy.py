@@ -1112,6 +1112,11 @@ def battery_report():
 
 def handle_msec_timestamp(m, master):
     '''special handling for MAVLink packets with a time_boot_ms field'''
+
+    if m.get_type() == 'GLOBAL_POSITION_INT':
+        # this is fix time, not boot time
+        return
+
     msec = m.time_boot_ms
     if msec + 30000 < master.highest_msec:
         say('Time has wrapped')
