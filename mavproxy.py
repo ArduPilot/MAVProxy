@@ -1192,7 +1192,7 @@ def master_callback(m, master):
                       'NAV_CONTROLLER_OUTPUT' ]:
             return
 
-    if mtype == 'HEARTBEAT':
+    if mtype == 'HEARTBEAT' and m.get_srcSystem() != 255:
         if (mpstate.status.target_system != m.get_srcSystem() or
             mpstate.status.target_component != m.get_srcComponent()):
             mpstate.status.target_system = m.get_srcSystem()
