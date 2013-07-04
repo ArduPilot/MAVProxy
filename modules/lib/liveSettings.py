@@ -69,7 +69,11 @@ class LiveSettings(Thread):
                 cc.SetValue(value)
                 cc.Bind(wx.EVT_TEXT, self.OnTextUpdate)
                 cc.SetName(key) 
-
+            elif type(value) is list:
+                cc = wx.ComboBox(CtrlPanel, style=wx.CB_READONLY, choices=value)
+                cc.SetStringSelection(value[0])
+                cc.Bind(wx.EVT_COMBOBOX, self.OnListUpdate)
+                cc.SetName(key) 
             CtrlSizer.Add(cc, 0, wx.ALL)
             CtrlSizer.AddSpacer(10)
 			
@@ -86,6 +90,11 @@ class LiveSettings(Thread):
         self.app.MainLoop()
 
     #Event bindings, shared by the controls, ordered by type
+    def OnListUpdate(self,event):
+        cc = event.GetEventObject()
+        #print cc.GetName() + " was changed to " + cc.GetValue()
+        self.MsgQ.put({cc.GetName(): cc.GetValue()})
+
     def OnTextUpdate(self,event):
         cc = event.GetEventObject()
         #print cc.GetName() + " was changed to " + cc.GetValue()
@@ -156,7 +165,9 @@ if __name__ == '__main__':
     numInt = 1
     numFloat = 2.5
     numString = "Test"
-    dict = {'numString': numString, 'numFloat': numFloat, 'numInt': numInt}
+    #note the first item in the list is the selected option
+    numSelect = ['up', 'down', 'left', 'right']
+    dict = {'numString': numString, 'numFloat': numFloat, 'numInt': numInt, 'numSelect': numSelect}
     
     mainThread = LiveSettings(dict, "LiveSettings Test")
     print "Subproccess passed"
