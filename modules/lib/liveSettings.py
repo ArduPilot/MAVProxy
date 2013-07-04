@@ -22,18 +22,18 @@ import time
 #need the mainthread to be a global var, so
 #it can be closed from it's own child (the UI)
 mainThread = None
-myQueue = Queue.Queue()
+#myQueue = Queue.Queue()
  
 # Simply an extension on the Thread class
 # Holds the UI and pipes the setting values in and out
 class LiveSettings(Thread):
     """Worker Thread Class."""
-    def __init__(self, dict, title, q):
+    def __init__(self, dict, title):
         """Init Worker Thread Class."""
         Thread.__init__(self)
         self._dict = dict
         self._title = title
-        self.q = q
+        self.MsgQ = Queue.Queue()
         # This starts the thread running on creation
         self.start()
 
@@ -89,22 +89,22 @@ class LiveSettings(Thread):
     def OnTextUpdate(self,event):
         cc = event.GetEventObject()
         #print cc.GetName() + " was changed to " + cc.GetValue()
-        self.q.put({cc.GetName(): cc.GetValue()})
+        self.MsgQ.put({cc.GetName(): cc.GetValue()})
 
     def OnFloatSpin(self,event):
         cc = event.GetEventObject()
         #print cc.GetName() + " was changed to " + str(cc.GetValue())
-        self.q.put({cc.GetName(): cc.GetValue()})
+        self.MsgQ.put({cc.GetName(): cc.GetValue()})
 
     def OnSpin(self,event):
         cc = event.GetEventObject()
         #print cc.GetName() + " was changed to " + str(cc.GetValue())
-        self.q.put({cc.GetName(): cc.GetValue()})
+        self.MsgQ.put({cc.GetName(): cc.GetValue()})
 
     def abort(self):
         """abort worker thread."""
         # Method for use by main thread to signal an abort
-        self.q.put(0)
+        self.MsgQ.put(0)
         self.app.Exit()
         print "Subthread exit\n"
 
@@ -158,12 +158,12 @@ if __name__ == '__main__':
     numString = "Test"
     dict = {'numString': numString, 'numFloat': numFloat, 'numInt': numInt}
     
-    mainThread = LiveSettings(dict, "LiveSettings Test", myQueue)
+    mainThread = LiveSettings(dict, "LiveSettings Test")
     print "Subproccess passed"
 	
     # wait for the thread to finish
     while True:
-        e = myQueue.get()
+        e = mainThread.MsgQ.get()
         #if the queue sends a 0, it's a signal to exit
         if e == 0:
             break
