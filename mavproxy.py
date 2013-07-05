@@ -485,7 +485,7 @@ def save_waypoints(filename):
 def cmd_wp(args):
     '''waypoint commands'''
     if len(args) < 1:
-        print("usage: wp <list|load|save|set|clear>")
+        print("usage: wp <list|load|update|save|set|clear>")
         return
 
     if args[0] == "load":
