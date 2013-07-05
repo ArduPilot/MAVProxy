@@ -56,7 +56,8 @@ class camera_state(object):
               ('maxqueue2', int, 30),
               ('thumbsize', int, 60),
               ('packet_loss', int, 0),             
-              ('gcs_slave', str, None)  
+              ('gcs_slave', str, None),
+              ('filter_type', str, 'simple')  
               ]
             )
 
@@ -346,7 +347,8 @@ def scan_thread():
         state.scan_fps = 1.0 / (t2-t1)
         state.scan_count += 1
 
-        regions = cuav_region.filter_regions(im_full, regions, min_score=min(state.settings.minscore,state.settings.minscore2))
+        regions = cuav_region.filter_regions(im_full, regions, min_score=min(state.settings.minscore,state.settings.minscore2),
+                                             filter_type=state.settings.filter_type)
 
         state.region_count += len(regions)
         if state.transmit_queue.qsize() < 100:
@@ -429,7 +431,8 @@ def transmit_thread():
         # filter out any regions outside the boundary
         if state.boundary_polygon:
             regions = cuav_region.filter_boundary(regions, state.boundary_polygon, pos)
-            regions = cuav_region.filter_regions(im_full, regions, min_score=state.settings.minscore)
+            regions = cuav_region.filter_regions(im_full, regions, min_score=state.settings.minscore,
+                                                 filter_type=state.settings.filter_type)
 
         state.xmit_queue = bsend.sendq_size()
         state.xmit_queue2 = state.bsend2.sendq_size()
@@ -467,7 +470,8 @@ def transmit_thread():
                 if state.settings.send2 and highscore >= state.settings.minscore2:
                     if thumb is None or lowscore < state.settings.minscore2:
                         # remove some of the regions
-                        regions = cuav_region.filter_regions(im_full, regions, min_score=state.settings.minscore2)
+                        regions = cuav_region.filter_regions(im_full, regions, min_score=state.settings.minscore2,
+                                                             filter_type=state.settings.filter_type)
                         thumb_img = cuav_mosaic.CompositeThumbnail(cv.GetImage(cv.fromarray(im_full)),
                                                                    regions,
                                                                    thumb_size=state.settings.thumbsize)
