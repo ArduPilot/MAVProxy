@@ -136,4 +136,6 @@ if len(args) < 1:
     print("Usage: mavflightview.py [options] <LOGFILE...>")
     sys.exit(1)
 
-mavflightview(args[0])
+if __name__ == "__main__":
+    # add dialogs
+    mavflightview(args[0])
