@@ -37,8 +37,19 @@ joymap = {
     # only 4 axes usable. This assumes mode 1
     [(2, 500,  1500),
      (1, -500,  1500),
-     (3, -1000, 1000),
-     (0, -500,  1500)]
+     (3, -500, 1000),
+     (0, -500,  1500)],
+
+    'GREAT PLANES InterLink Elite':
+    # 4 axes usable
+    [(0, 500,  1500),
+     (1, -500,  1500),
+     (2, -1000, 1500),
+     (4, -500,  1500),
+     None,
+     None,
+     None,
+     (3, 500,  1500)]
 }
 
 def idle_task():
@@ -102,3 +113,11 @@ def init(_mpstate):
                     break
         except pygame.error:
             continue    
+
+if __name__ == "__main__":
+    class dummy(object):
+        def __init__(self):
+            pass
+    d = dummy()
+    init(d)
+    
