@@ -26,6 +26,7 @@ class module_state(object):
         self.moving_wp = 0
         self.brightness = 1
         self.icon_counter = 0
+        self.click_position = None
 
 def name():
     '''return module name'''
@@ -121,6 +122,8 @@ def map_callback(obj):
     if obj.event.m_leftDown and state.moving_wp != 0:
         state.moving_wp = 0
         print("cancelled WP move")
+    else:
+        state.click_position = obj.latlon
     if obj.event.m_rightDown:
         if state.moving_wp == 0:
             wpnum = closest_waypoint(obj.latlon)
@@ -129,7 +132,7 @@ def map_callback(obj):
                 state.move_wp = wpnum
                 wp = mpstate.status.wploader.wp(state.move_wp)
                 print("Selected WP %u : %s" % (wpnum, getattr(wp,'comment','')))
-        elif time.time() - state.moving_wp >= 1.5:
+        elif time.time() - state.moving_wp >= 1:
             wp = mpstate.status.wploader.wp(state.move_wp)
             (lat, lon) = obj.latlon
             if getattr(mpstate.console, 'ElevationMap', None) is not None:
