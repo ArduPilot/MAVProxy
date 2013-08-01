@@ -27,6 +27,9 @@ class module_state(object):
         self.brightness = 1
         self.icon_counter = 0
         self.click_position = None
+        self.draw_line = None
+        self.draw_callback = None
+        
 
 def name():
     '''return module name'''
@@ -75,6 +78,7 @@ def init(_mpstate):
         # windows has trouble with Google tile URLs
         service = 'MicrosoftSat'
     mpstate.map = mp_slipmap.MPSlipMap(service=service, elevation=True, title='Map')
+    mpstate.map_functions = { 'draw_lines' : draw_lines }
 
     # setup a plane icon
     icon = mpstate.map.icon('planetracker.png')
@@ -122,9 +126,11 @@ def map_callback(obj):
     if obj.event.m_leftDown and state.moving_wp != 0:
         state.moving_wp = 0
         print("cancelled WP move")
-    else:
+    elif obj.event.m_leftDown:
         state.click_position = obj.latlon
+        drawing_update()
     if obj.event.m_rightDown:
+        drawing_end()
         if state.moving_wp == 0:
             wpnum = closest_waypoint(obj.latlon)
             if wpnum != -1:
@@ -158,6 +164,7 @@ def map_callback(obj):
 def unload():
     '''unload module'''
     mpstate.map = None
+    mpstate.map_functions = {}
 
 def create_blueplane():
     '''add the blue plane to the map'''
@@ -168,6 +175,31 @@ def create_blueplane():
     mpstate.map.add_object(mp_slipmap.SlipIcon('blueplane', (0,0), icon, layer=3, rotation=0,
                                                trail=mp_slipmap.SlipTrail()))
 
+def drawing_update():
+    '''update line drawing'''
+    state = mpstate.map_state
+    if state.draw_callback is None:
+        return
+    state.draw_line.append(state.click_position)
+    if len(state.draw_line) > 1:
+        mpstate.map.add_object(mp_slipmap.SlipPolygon('drawing', state.draw_line,
+                                                      layer='Drawing', linewidth=2, colour=(128,128,255)))
+
+def drawing_end():
+    '''end line drawing'''
+    state = mpstate.map_state
+    if state.draw_callback is None:
+        return
+    state.draw_callback(state.draw_line)
+    state.draw_callback = None
+    mpstate.map.add_object(mp_slipmap.SlipClearLayer('Drawing'))
+
+def draw_lines(callback):
+    '''draw a series of connected lines on the map, calling callback when done'''
+    state = mpstate.map_state
+    state.draw_callback = callback
+    state.draw_line = []
+    
 def mavlink_packet(m):
     '''handle an incoming mavlink packet'''
     state = mpstate.map_state

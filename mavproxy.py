@@ -167,6 +167,7 @@ class MPState(object):
     def __init__(self):
         self.console = textconsole.SimpleConsole()
         self.map = None
+        self.map_functions = {}
         self.settings = mp_settings.MPSettings(
             [ ('link', int, 1),
               ('altreadout', int, 10),
@@ -570,17 +571,8 @@ def fetch_fence_point(i):
 
 
 
-def load_fence(filename):
-    '''load fence points from a file'''
-    try:
-        mpstate.status.fenceloader.target_system = mpstate.status.target_system
-        mpstate.status.fenceloader.target_component = mpstate.status.target_component
-        mpstate.status.fenceloader.load(filename)
-    except Exception, msg:
-        print("Unable to load %s - %s" % (filename, msg))
-        return
-    print("Loaded %u geo-fence points from %s" % (mpstate.status.fenceloader.count(), filename))
-
+def send_fence():
+    '''send fence points from fenceloader'''
     # must disable geo-fencing when loading
     action = get_mav_param('FENCE_ACTION', mavutil.mavlink.FENCE_ACTION_NONE)
     param_set('FENCE_ACTION', mavutil.mavlink.FENCE_ACTION_NONE)
@@ -599,6 +591,18 @@ def load_fence(filename):
             param_set('FENCE_ACTION', action)
             return
     param_set('FENCE_ACTION', action)
+
+def load_fence(filename):
+    '''load fence points from a file'''
+    try:
+        mpstate.status.fenceloader.target_system = mpstate.status.target_system
+        mpstate.status.fenceloader.target_component = mpstate.status.target_component
+        mpstate.status.fenceloader.load(filename)
+    except Exception, msg:
+        print("Unable to load %s - %s" % (filename, msg))
+        return
+    print("Loaded %u geo-fence points from %s" % (mpstate.status.fenceloader.count(), filename))
+    send_fence()
 
 
 def list_fence(filename):
@@ -632,10 +636,28 @@ def list_fence(filename):
         print("Saved fence to %s" % fencetxt)
 
 
+def fence_draw_callback(points):
+    '''callback from drawing a fence'''
+    if len(points) < 3:
+        return
+    from MAVProxy.modules.lib import mp_util
+    mpstate.status.fenceloader.clear()
+    mpstate.status.fenceloader.target_system = mpstate.status.target_system
+    mpstate.status.fenceloader.target_component = mpstate.status.target_component
+    bounds = mp_util.polygon_bounds(points)
+    (lat, lon, width, height) = bounds
+    center = (lat+width/2, lon+height/2)
+    mpstate.status.fenceloader.add_latlon(center[0], center[1])
+    for p in points:
+        mpstate.status.fenceloader.add_latlon(p[0], p[1])
+    # close it
+    mpstate.status.fenceloader.add_latlon(points[0][0], points[0][1])
+    send_fence()
+
 def cmd_fence(args):
     '''geo-fence commands'''
     if len(args) < 1:
-        print("usage: fence <list|load|save|clear>")
+        print("usage: fence <list|load|save|clear|edit>")
         return
 
     if args[0] == "load":
@@ -655,6 +677,12 @@ def cmd_fence(args):
             print("usage: fence show <filename>")
             return
         mpstate.status.fenceloader.load(args[1])
+    elif args[0] == "edit":
+        if not 'draw_lines' in mpstate.map_functions:
+            print("No map drawing available")
+            return        
+        mpstate.map_functions['draw_lines'](fence_draw_callback)
+        print("Drawing fence on map")
     elif args[0] == "clear":
         param_set('FENCE_TOTAL', 0)
     else:
