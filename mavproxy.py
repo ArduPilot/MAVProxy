@@ -119,6 +119,7 @@ class MPStatus(object):
         self.last_override = [ 0 ] * 8
         self.override_counter = 0
         self.flightmode = 'MAV'
+        self.last_mode_announce = 0
         self.logdir = None
         self.last_heartbeat = 0
         self.last_message = 0
@@ -1412,8 +1413,9 @@ def master_callback(m, master):
 
     elif mtype == "SYS_STATUS":
         battery_update(m)
-        if master.flightmode != mpstate.status.flightmode:
+        if master.flightmode != mpstate.status.flightmode and time.time() > mpstate.status.last_mode_announce + 2:
             mpstate.status.flightmode = master.flightmode
+            mpstate.status.last_mode_announce = time.time()
             mpstate.rl.set_prompt(mpstate.status.flightmode + "> ")
             say("Mode " + mpstate.status.flightmode)
 
