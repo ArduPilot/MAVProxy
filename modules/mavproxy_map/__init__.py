@@ -130,7 +130,9 @@ def map_callback(obj):
         state.click_position = obj.latlon
         drawing_update()
     if obj.event.m_rightDown:
-        drawing_end()
+        if state.draw_callback is not None:
+            drawing_end()
+            return
         if state.moving_wp == 0:
             wpnum = closest_waypoint(obj.latlon)
             if wpnum != -1:

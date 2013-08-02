@@ -186,7 +186,8 @@ class MPState(object):
               ('rc2mul', int, 1),
               ('rc4mul', int, 1),
               ('shownoise', int, 1),
-              ('basealt', int, 0)]
+              ('basealt', int, 0),
+              ('wpalt', int, 100)]
             )
         self.status = MPStatus()
 
@@ -505,6 +506,46 @@ def save_waypoints(filename):
         return
     print("Saved %u waypoints to %s" % (mpstate.status.wploader.count(), filename))
 
+def wp_draw_callback(points):
+    '''callback from drawing waypoints'''
+    if len(points) < 3:
+        return
+    from MAVProxy.modules.lib import mp_util
+    home = mpstate.status.wploader.wp(0)
+    mpstate.status.wploader.clear()
+    mpstate.status.wploader.target_system = mpstate.status.target_system
+    mpstate.status.wploader.target_component = mpstate.status.target_component
+    mpstate.status.wploader.add(home)
+    for p in points:
+        mpstate.status.wploader.add_latlonalt(p[0], p[1], mpstate.settings.wpalt)
+    mpstate.master().waypoint_clear_all_send()
+    if mpstate.status.wploader.count() == 0:
+        return
+    mpstate.status.loading_waypoints = True
+    mpstate.status.loading_waypoint_lasttime = time.time()
+    mpstate.master().waypoint_count_send(mpstate.status.wploader.count())
+
+def set_home_location():
+    '''set home location from last map click'''
+    try:
+        latlon = mpstate.map_state.click_position
+    except Exception:
+        print("No map available")
+        return
+    lat = float(latlon[0])
+    lon = float(latlon[1])
+    if mpstate.status.wploader.count() == 0:
+        mpstate.status.wploader.add_latlonalt(lat, lon, 0)
+    w = mpstate.status.wploader.wp(0)
+    w.x = lat
+    w.y = lon
+    mpstate.status.wploader.set(w, 0)
+    mpstate.status.loading_waypoints = True
+    mpstate.status.loading_waypoint_lasttime = time.time()
+    mpstate.master().mav.mission_write_partial_list_send(mpstate.status.target_system,
+                                                         mpstate.status.target_component,
+                                                         0, 0)
+    
 
 def cmd_wp(args):
     '''waypoint commands'''
@@ -548,6 +589,17 @@ def cmd_wp(args):
         mpstate.master().waypoint_set_current_send(int(args[1]))
     elif args[0] == "clear":
         mpstate.master().waypoint_clear_all_send()
+    elif args[0] == "draw":
+        if not 'draw_lines' in mpstate.map_functions:
+            print("No map drawing available")
+            return        
+        if mpstate.status.wploader.count() == 0:
+            print("Need home location - refresh waypoints")
+            return
+        mpstate.map_functions['draw_lines'](wp_draw_callback)
+        print("Drawing waypoints on map")
+    elif args[0] == "sethome":
+        set_home_location()        
     else:
         print("Usage: wp <list|load|save|set|show|clear>")
 
@@ -657,7 +709,7 @@ def fence_draw_callback(points):
 def cmd_fence(args):
     '''geo-fence commands'''
     if len(args) < 1:
-        print("usage: fence <list|load|save|clear|edit>")
+        print("usage: fence <list|load|save|clear|draw>")
         return
 
     if args[0] == "load":
@@ -677,7 +729,7 @@ def cmd_fence(args):
             print("usage: fence show <filename>")
             return
         mpstate.status.fenceloader.load(args[1])
-    elif args[0] == "edit":
+    elif args[0] == "draw":
         if not 'draw_lines' in mpstate.map_functions:
             print("No map drawing available")
             return        
@@ -686,7 +738,7 @@ def cmd_fence(args):
     elif args[0] == "clear":
         param_set('FENCE_TOTAL', 0)
     else:
-        print("Usage: fence <list|load|save|show|clear>")
+        print("Usage: fence <list|load|save|show|clear|draw>")
 
 
 def param_set(name, value, retries=3):
