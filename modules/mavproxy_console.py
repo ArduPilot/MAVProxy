@@ -185,7 +185,7 @@ def mavlink_packet(msg):
             else:
                 linkline += "OK (%u pkts, %.2fs delay, %u lost)" % (m.mav_count, linkdelay, m.mav_loss)
                 if linkdelay > 1:
-                    fg = 'yellow'
+                    fg = 'orange'
                 else:
                     fg = 'darkgreen'
             mpstate.console.set_status('Link%u'%m.linknum, linkline, row=1, fg=fg)
