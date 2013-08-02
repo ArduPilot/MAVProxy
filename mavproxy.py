@@ -1923,12 +1923,7 @@ Auto-detected serial ports are:
 
     # open master link
     for mdev in opts.master:
-        if mdev.startswith('tcp:'):
-            m = mavutil.mavtcp(mdev[4:])
-        elif mdev.find(':') != -1:
-            m = mavutil.mavudp(mdev, input=True)
-        else:
-            m = mavutil.mavserial(mdev, baud=opts.baudrate, autoreconnect=True)
+        m = mavutil.mavlink_connection(mdev, autoreconnect=True, baud=opts.baudrate)
         m.mav.set_callback(master_callback, m)
         if hasattr(m.mav, 'set_send_callback'):
             m.mav.set_send_callback(master_send_callback, m)
