@@ -3,7 +3,7 @@ try:
 except ImportError:
     from distutils.core import setup
 
-version = "1.0.8"
+version = "1.0.9"
 
 setup(name='MAVProxy',
       version=version,
