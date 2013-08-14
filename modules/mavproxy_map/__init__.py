@@ -210,7 +210,7 @@ def mavlink_packet(m):
         if not mpstate.map_state.have_simstate:
             mpstate.map_state.have_simstate  = True
             create_blueplane()
-        mpstate.map.set_position('blueplane', (m.lat, m.lng), rotation=math.degrees(m.yaw))
+        mpstate.map.set_position('blueplane', (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
 
     if m.get_type() == "GPS_RAW_INT" and not mpstate.map_state.have_simstate:
         (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
