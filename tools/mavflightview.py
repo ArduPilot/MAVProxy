@@ -20,6 +20,7 @@ parser.add_option("--condition", default=None, help="conditional check on log")
 parser.add_option("--mission", default=None, help="mission file (defaults to logged mission)")
 parser.add_option("--imagefile", default=None, help="output to image file")
 parser.add_option("--flag", default=[], type='str', action='append', help="flag positions")
+parser.add_option("--rawgps", action='store_true', default=False, help="use GPS_RAW_INT")
 
 (opts, args) = parser.parse_args()
 
@@ -73,22 +74,28 @@ def mavflightview(filename):
         wp.load(opts.mission)
     path = []
     while True:
-        m = mlog.recv_match(type=['MISSION_ITEM', 'GLOBAL_POSITION_INT'])
+        m = mlog.recv_match(type=['MISSION_ITEM', 'GLOBAL_POSITION_INT', 'GPS_RAW_INT'])
         if m is None:
             break
-        if m.get_type() == 'GLOBAL_POSITION_INT' and mlog.check_condition(opts.condition):
-            if opts.mode is not None and mlog.flightmode.lower() != opts.mode.lower():
-                continue
-            lat = m.lat * 1.0e-7
-            lng = m.lon * 1.0e-7
-            if lat != 0 or lng != 0:
-                if mlog.flightmode in colourmap:
-                    point = (lat, lng, colourmap[mlog.flightmode])
-                else:
-                    point = (lat, lng)
-                path.append(point)
         if m.get_type() == 'MISSION_ITEM':
             wp.set(m, m.seq)            
+            continue
+        if m.get_type() == 'GLOBAL_POSITION_INT' and opts.rawgps:
+            continue
+        if m.get_type() == 'GPS_RAW_INT' and not opts.rawgps:
+            continue
+        if not mlog.check_condition(opts.condition):
+            continue
+        if opts.mode is not None and mlog.flightmode.lower() != opts.mode.lower():
+            continue
+        lat = m.lat * 1.0e-7
+        lng = m.lon * 1.0e-7
+        if lat != 0 or lng != 0:
+            if mlog.flightmode in colourmap:
+                point = (lat, lng, colourmap[mlog.flightmode])
+            else:
+                point = (lat, lng)
+            path.append(point)
     if len(path) == 0:
         print("No points to plot")
         return
