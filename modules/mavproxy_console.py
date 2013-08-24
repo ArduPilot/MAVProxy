@@ -169,7 +169,7 @@ def mavlink_packet(msg):
         else:
             fg = 'red'
         mpstate.console.set_status('Vcc', 'Vcc %.2f' % (msg.Vcc * 0.001), fg=fg)
-    elif type == 'RADIO':
+    elif type in ['RADIO', 'RADIO_STATUS']:
         if msg.rssi < msg.noise+10 or msg.remrssi < msg.remnoise+10:
             fg = 'red'
         else:
