@@ -57,7 +57,8 @@ class camera_state(object):
               ('thumbsize', int, 60),
               ('packet_loss', int, 0),             
               ('gcs_slave', str, None),
-              ('filter_type', str, 'simple')  
+              ('filter_type', str, 'simple'),
+              ('fullres', int, 0)  
               ]
             )
 
@@ -342,7 +343,10 @@ def scan_thread():
         im_640 = numpy.zeros((480,640,3),dtype='uint8')
         scanner.debayer_full(im, im_full)
         scanner.downsample(im_full, im_640)
-        regions = cuav_region.RegionsConvert(scanner.scan(im_640))
+        if state.settings.fullres:
+            regions = cuav_region.RegionsConvert(scanner.scan(im_full), 1280, 960)
+        else:
+            regions = cuav_region.RegionsConvert(scanner.scan(im_640))
         t2 = time.time()
         state.scan_fps = 1.0 / (t2-t1)
         state.scan_count += 1
