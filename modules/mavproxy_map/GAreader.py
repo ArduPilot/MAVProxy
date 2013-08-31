@@ -2,9 +2,9 @@
 '''
 Module to read DTM files published by Geoscience Australia
 Written by Stephen Dade (stephen_dade@hotmail.com
-Chunks are downloaded in 240x240 pixel tiffs, 5x5min (9.3x9.3km) geo area
-Thus each pixel is ~39x39m
-File format will be 115124N145123W.tiff, where the top left corner is 115.123N, 145.123W
+Chunks are downloaded in 400x400 pixel tiffs, 0.05deg (9.3x9.3km) geo area
+Thus each pixel is ~23x23m
+File format will be 115124N145123W.tiff, where the bottom left corner is 115.123N, 145.123W
 '''
 
 import os
@@ -12,7 +12,8 @@ import threading
 import time
 import urllib2
 import Image
-
+from MAVProxy.modules.lib import mp_util
+import tempfile
 import numpy
 
 class downloadThread (threading.Thread):
@@ -39,15 +40,18 @@ class ERMap:
             try:
                 cachedir = os.path.join(os.environ['HOME'], '.tilecache/GeoAus')
             except Exception:
-                #cachedir = os.path.join(tempfile.gettempdir(), 'GeoAus')
-                cachedir = "C:\GAtmp"
+                cachedir = os.path.join(tempfile.gettempdir(), 'GeoAus')
+                #cachedir = "C:\GAtmp"
 
         self.offline = offline
         self.first_failure = False
         self.server = "http://www.ga.gov.au/gisimg/services/topography/dem_1s/ImageServer/WMSServer?"
         self.cachedir = cachedir
-        self.imgpixelsize = 240
+        
+        #user configureable resolution options - pixel and geo size per tile
+        self.imgpixelsize = 400
         self.imggeosize = 0.05
+        
         self.downloadThreads = []
         '''print "SRTMDownloader - server= %s, directory=%s." % \
         (self.server, self.directory)'''
@@ -58,7 +62,7 @@ class ERMap:
         '''Return the altitude at a particular long/lat'''
         #Check we're actually in Australia:
         if not (latty < -10 and latty > -40 and longy > 113 and longy < 154):
-            print "Outside GeoAustralia DTED range"
+            print "Outside GeoScience Australia DTED range"
             return 0
         
         #find out which chunk of data has this point 115124N145123W.tiff
@@ -80,12 +84,13 @@ class ERMap:
         #open up the file
         #print "Opening " + str(os.path.join(self.cachedir, data_chunk))
         im = Image.open(os.path.join(self.cachedir, data_chunk))
+        width, height = im.size
         #print im.format, im.size, im.mode
         pixelMap = im.load() #create the pixel map
         
         #figure out pixel indexes        
-        x = ((latty - self.positionToTile(latty, 0))/self.imggeosize) * self.imgpixelsize
-        y = ((longy - self.positionToTile(longy, 0))/self.imggeosize) * self.imgpixelsize
+        y = height - ((latty - self.positionToTile(latty, 0))/self.imggeosize) * self.imgpixelsize
+        x = ((longy - self.positionToTile(longy, 0))/self.imggeosize) * self.imgpixelsize
         #print "long, lat" , latty, longy
         #print "x,y ", x, y
         x_int = int(x)
@@ -94,10 +99,21 @@ class ERMap:
         y_frac = y - int(y)
         
         #print "frac", x_int, x_frac, y_int, y_frac
+        #need to check to ensure the +1 pixels are still in the image
         value00 = (pixelMap[x_int, y_int])
-        value10 = (pixelMap[x_int+1, y_int])
-        value01 = (pixelMap[x_int, y_int+1])
-        value11 = (pixelMap[x_int+1, y_int+1])
+        if x_int < (width-1) and y_int < (height-1):
+            value11 = (pixelMap[x_int+1, y_int+1])
+        if x_int < (width-1):
+            value10 = (pixelMap[x_int+1, y_int])
+        else:
+            value10 = value00
+            value11 = value00
+        if y_int < (height-1):
+            value01 = (pixelMap[x_int, y_int+1])
+        else:
+            value01 = value00   
+            value11 = value00            
+
         #print "values ", value00, value10, value01, value11
 
         value1 = self._avg(value00, value10, x_frac)
@@ -130,8 +146,8 @@ class ERMap:
         filename = os.path.join(self.cachedir, "" + str(x_int) + "N" + str(y_int) + "W.tiff")
         thread1 = downloadThread(str(x_int) + ", " + str(y_int), webaddress, filename)
         self.downloadThreads.append(thread1)
-        print "Site is " + webaddress
-        print "Downloading " + filename
+        #print "Site is " + webaddress
+        #print "Downloading " + filename
         thread1.start()
         
     def positionToTile(self, posn, tilecoords):
@@ -152,21 +168,21 @@ if __name__ == '__main__':
 
     #test the altitude (around Canberra):
     alt = mappy.getAltitudeAtPoint(-35.274411, 149.097504)
-    print "Alt at (-35.274411, 149.097504) is 807m (Google) or " + str(alt)
+    print "Alt at (-35.274411, 149.097504) is 807m (Google) or " + str(alt) + "m (GA)"
     alt = mappy.getAltitudeAtPoint(-35.239648, 149.126118)
-    print "Alt at (-35.239648, 149.126118) is 577m (Google) or " + str(alt)
+    print "Alt at (-35.239648, 149.126118) is 577m (Google) or " + str(alt) + "m (GA)"
     alt = mappy.getAltitudeAtPoint(-35.362751, 149.165361)
-    print "Alt at (-35.362751, 149.165361) is 584m (Google) or " + str(alt)
+    print "Alt at (-35.362751, 149.165361) is 584m (Google) or " + str(alt) + "m (GA)"
     alt = mappy.getAltitudeAtPoint(-35.306992, 149.194274)
-    print "Alt at (-35.306992, 149.194274) is 570m (Google) or " + str(alt)
+    print "Alt at (-35.306992, 149.194274) is 570m (Google) or " + str(alt) + "m (GA)"
     alt = mappy.getAltitudeAtPoint(-35.261612, 149.542091)
-    print "Alt at (-35.261612, 149.542091) is 766m (Google) or " + str(alt)
+    print "Alt at (-35.261612, 149.542091) is 766m (Google) or " + str(alt) + "m (GA)"
     alt = mappy.getAltitudeAtPoint(-35.052544, 149.509165)
-    print "Alt at (-35.052544, 149.509165) is 700m (Google) or " + str(alt)
+    print "Alt at (-35.052544, 149.509165) is 700m (Google) or " + str(alt) + "m (GA)"
     alt = mappy.getAltitudeAtPoint(-35.045126, 149.257482)
-    print "Alt at (-35.045126, 149.257482) is 577m (Google) or " + str(alt)
+    print "Alt at (-35.045126, 149.257482) is 577m (Google) or " + str(alt) + "m (GA)"
     alt = mappy.getAltitudeAtPoint(-35.564044, 149.177657)
-    print "Alt at (-35.564044, 149.177657) is 1113m (Google) or " + str(alt)
+    print "Alt at (-35.564044, 149.177657) is 1113m (Google) or " + str(alt) + "m (GA)"
 
 
 
