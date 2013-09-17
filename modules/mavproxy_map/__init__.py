@@ -10,6 +10,7 @@ import functools
 import time
 from MAVProxy.modules.mavproxy_map import mp_slipmap
 from MAVProxy.modules.lib import mp_util
+from MAVProxy.modules.lib import mp_settings
 
 mpstate = None
 
@@ -21,15 +22,18 @@ class module_state(object):
         self.wp_change_time = 0
         self.fence_change_time = 0
         self.have_simstate = False
-        self.have_blueplane = False
+        self.have_vehicle = {}
         self.move_wp = -1
         self.moving_wp = 0
-        self.brightness = 1
         self.icon_counter = 0
         self.click_position = None
         self.draw_line = None
         self.draw_callback = None
-        
+        self.vehicle_type = 'plane'
+        self.settings = mp_settings.MPSettings(
+            [ ('showgpspos', int, 0),
+              ('showsimpos', int, 0),
+              ('brightness', float, 1)])
 
 def name():
     '''return module name'''
@@ -42,13 +46,7 @@ def description():
 def cmd_map(args):
     '''map commands'''
     state = mpstate.map_state
-    if args[0] == "brightness":
-        if len(args) < 2:
-            print("Brightness %.1f" % state.brightness)
-        else:
-            state.brightness = float(args[1])
-            mpstate.map.add_object(mp_slipmap.SlipBrightness(state.brightness))
-    elif args[0] == "icon":
+    if args[0] == "icon":
         if len(args) < 3:
             print("Usage: map icon <lat> <lon> <icon>")
         else:
@@ -64,8 +62,14 @@ def cmd_map(args):
             state.icon_counter += 1
     elif args[0] == "grid":
         mpstate.map.add_object(mp_slipmap.SlipGrid('grid', layer=3, linewidth=1, colour=(255,255,0)))
+    elif args[0] == "set":
+        if len(args) < 3:
+            state.settings.show_all()
+        else:
+            state.settings.set(args[1], args[2])
+            mpstate.map.add_object(mp_slipmap.SlipBrightness(state.settings.brightness))
     else:
-        print("usage: map <brightness|icon|grid>")
+        print("usage: map <brightness|icon|grid|set>")
 
 def init(_mpstate):
     '''initialise module'''
@@ -79,12 +83,6 @@ def init(_mpstate):
         service = 'MicrosoftSat'
     mpstate.map = mp_slipmap.MPSlipMap(service=service, elevation=True, title='Map')
     mpstate.map_functions = { 'draw_lines' : draw_lines }
-
-    # setup a plane icon
-    icon = mpstate.map.icon('planetracker.png')
-    mpstate.map.add_object(mp_slipmap.SlipIcon('plane', (0,0), icon, layer=3, rotation=0,
-                                               follow=True,
-                                               trail=mp_slipmap.SlipTrail()))
 
     mpstate.map.add_callback(functools.partial(map_callback))
     mpstate.command_map['map'] = (cmd_map, "map control")
@@ -168,13 +166,14 @@ def unload():
     mpstate.map = None
     mpstate.map_functions = {}
 
-def create_blueplane():
-    '''add the blue plane to the map'''
-    if mpstate.map_state.have_blueplane:
+def create_vehicle_icon(name, colour, follow=False):
+    '''add a vehicle to the map'''
+    state = mpstate.map_state
+    if name in mpstate.map_state.have_vehicle and mpstate.map_state.have_vehicle[name] == state.vehicle_type:
         return
-    mpstate.map_state.have_blueplane = True
-    icon = mpstate.map.icon('blueplane.png')
-    mpstate.map.add_object(mp_slipmap.SlipIcon('blueplane', (0,0), icon, layer=3, rotation=0,
+    mpstate.map_state.have_vehicle[name] = state.vehicle_type
+    icon = mpstate.map.icon(colour + state.vehicle_type + '.png')
+    mpstate.map.add_object(mp_slipmap.SlipIcon(name, (0,0), icon, layer=3, rotation=0, follow=follow,
                                                trail=mp_slipmap.SlipTrail()))
 
 def drawing_update():
@@ -206,18 +205,37 @@ def mavlink_packet(m):
     '''handle an incoming mavlink packet'''
     state = mpstate.map_state
 
-    if m.get_type() == "SIMSTATE":
-        if not mpstate.map_state.have_simstate:
-            mpstate.map_state.have_simstate  = True
-            create_blueplane()
-        mpstate.map.set_position('blueplane', (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
+    if m.get_type() == "HEARTBEAT":
+        from pymavlink import mavutil
+        if m.type in [mavutil.mavlink.MAV_TYPE_FIXED_WING]:
+            state.vehicle_type = 'plane'
+        elif m.type in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER,
+                        mavutil.mavlink.MAV_TYPE_SURFACE_BOAT,
+                        mavutil.mavlink.MAV_TYPE_SUBMARINE]:
+            state.vehicle_type = 'rover'
+        elif m.type in [mavutil.mavlink.MAV_TYPE_QUADROTOR,
+                        mavutil.mavlink.MAV_TYPE_COAXIAL,
+                        mavutil.mavlink.MAV_TYPE_HEXAROTOR,
+                        mavutil.mavlink.MAV_TYPE_OCTOROTOR,
+                        mavutil.mavlink.MAV_TYPE_TRICOPTER,
+                        mavutil.mavlink.MAV_TYPE_HELICOPTER]:
+            state.vehicle_type = 'copter'
 
-    if m.get_type() == "GPS_RAW_INT" and not mpstate.map_state.have_simstate:
+    if m.get_type() == "SIMSTATE" and state.settings.showsimpos:
+        create_vehicle_icon('SimVehicle', 'green')
+        mpstate.map.set_position('SimVehicle', (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
+
+    if m.get_type() == "GPS_RAW_INT" and state.settings.showgpspos:
         (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
-        if state.lat is not None and (mpstate.map_state.have_blueplane or
-                                      mp_util.gps_distance(lat, lon, state.lat, state.lon) > 10):
-            create_blueplane()
-            mpstate.map.set_position('blueplane', (lat, lon), rotation=m.cog*0.01)
+        if lat != 0 or lon != 0:
+            create_vehicle_icon('GPSVehicle', 'blue')
+            mpstate.map.set_position('GPSVehicle', (lat, lon), rotation=m.cog*0.01)
+
+    if m.get_type() == 'GLOBAL_POSITION_INT':
+        (state.lat, state.lon, state.heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
+        if state.lat != 0 or state.lon != 0:
+            create_vehicle_icon('PosVehicle', 'red', follow=True)
+            mpstate.map.set_position('PosVehicle', (state.lat, state.lon), rotation=state.heading)
 
     if m.get_type() == "NAV_CONTROLLER_OUTPUT":
         if mpstate.master().flightmode in [ "AUTO", "GUIDED", "LOITER", "RTL" ]:
@@ -229,14 +247,6 @@ def mavlink_packet(m):
             mpstate.map.add_object(mp_slipmap.SlipClearLayer('Trajectory'))
 
         
-    if m.get_type() == 'GLOBAL_POSITION_INT':
-        (state.lat, state.lon, state.heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
-    else:
-        return
-
-    if state.lat != 0 or state.lon != 0:
-        mpstate.map.set_position('plane', (state.lat, state.lon), rotation=state.heading)
-
     # if the waypoints have changed, redisplay
     if state.wp_change_time != mpstate.status.wploader.last_change:
         state.wp_change_time = mpstate.status.wploader.last_change
