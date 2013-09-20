@@ -49,6 +49,17 @@ joymap = {
      None,
      None,
      None,
+     (3, 500,  1500)],
+
+    'Great Planes GP Controller':
+    # 4 axes usable
+    [(0, 500,  1500),
+     (1, -500,  1500),
+     (2, -1000, 1500),
+     (4, -500,  1500),
+     None,
+     None,
+     None,
      (3, 500,  1500)]
 }
 
@@ -83,6 +94,10 @@ def description():
     return "joystick aircraft control"
 
 def mavlink_packet(pkt):
+    pass
+
+def unload():
+    '''unload module'''
     pass
 
 def init(_mpstate):
