@@ -160,7 +160,7 @@ class MPTile:
 	'''map tile object'''
 	def __init__(self, cache_path=None, download=True, cache_size=500,
 		     service="MicrosoftSat", tile_delay=0.3, debug=False,
-		     max_zoom=19):
+		     max_zoom=19, refresh_age=30*24*60*60):
 		
 		if cache_path is None:
 			try:
@@ -180,6 +180,7 @@ class MPTile:
 		self.tile_delay = tile_delay
 		self.service = service
 		self.debug = debug
+                self.refresh_age = refresh_age
 
 		if service not in TILE_SERVICES:
 			raise TileException('unknown tile service %s' % service)
@@ -353,6 +354,14 @@ class MPTile:
 		path = self.tile_to_path(tile)
 		try:
 			ret = cv.LoadImage(path)
+
+                        # if it is an old tile, then try to refresh
+                        if os.path.getmtime(path) + self.refresh_age < time.time():
+                                try:
+                                        self._download_pending[key].refresh_time()
+                                except Exception:
+                                        self._download_pending[key] = tile
+                                self.start_download_thread()
 			# add it to the tile cache
 			self._tile_cache[key] = ret
 			while len(self._tile_cache) > self.cache_size:
