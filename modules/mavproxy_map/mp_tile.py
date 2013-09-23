@@ -12,7 +12,7 @@ released under GNU GPL v3 or later
 import collections
 import errno
 import hashlib
-import httplib2
+import urllib2
 import math
 import threading
 import os
@@ -222,7 +222,6 @@ class MPTile:
 
 	def downloader(self):
 		'''the download thread'''
-		http = httplib2.Http()
 		while self.tiles_pending() > 0:
 			time.sleep(self.tile_delay)
 
@@ -241,21 +240,23 @@ class MPTile:
 			try:
 				if self.debug:
 					print("Downloading %s [%u left]" % (url, len(keys)))
-				resp,img = http.request(url)
-			except httplib2.HttpLib2Error as e:
+				resp = urllib2.urlopen(url)
+				headers = resp.info()
+			except urllib2.URLError as e:
 				#print('Error loading %s' % url)
 				self._tile_cache[key] = self._unavailable
 				self._download_pending.pop(key)
 				if self.debug:
 					print("Failed %s: %s" % (url, str(e)))
 				continue
-			if 'content-type' not in resp or resp['content-type'].find('image') == -1:
+			if 'content-type' not in headers or headers['content-type'].find('image') == -1:
 				self._tile_cache[key] = self._unavailable
 				self._download_pending.pop(key)
 				if self.debug:
 					print("non-image response %s" % url)
 				continue
-
+			else:
+				img = resp.read()
 
 			# see if its a blank/unavailable tile
 			md5 = hashlib.md5(img).hexdigest()
