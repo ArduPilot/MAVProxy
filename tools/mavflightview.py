@@ -21,6 +21,7 @@ parser.add_option("--mission", default=None, help="mission file (defaults to log
 parser.add_option("--imagefile", default=None, help="output to image file")
 parser.add_option("--flag", default=[], type='str', action='append', help="flag positions")
 parser.add_option("--rawgps", action='store_true', default=False, help="use GPS_RAW_INT")
+parser.add_option("--debug", action='store_true', default=False, help="show debug info")
 
 (opts, args) = parser.parse_args()
 
@@ -125,7 +126,8 @@ def mavflightview(filename):
                                    width=600,
                                    height=600,
                                    ground_width=ground_width,
-                                   lat=lat, lon=lon)
+                                   lat=lat, lon=lon,
+                                   debug=opts.debug)
         map.add_object(path_obj)
         if mission_obj is not None:
             map.add_object(mission_obj)
