@@ -467,6 +467,25 @@ def wp_draw_callback(points):
     mpstate.status.loading_waypoint_lasttime = time.time()
     mpstate.master().waypoint_count_send(mpstate.status.wploader.count())
 
+def wp_loop():
+    '''close the loop on a mission'''
+    loader = mpstate.status.wploader
+    if loader.count() < 2:
+        print("Not enough waypoints (%u)" % loader.count())
+        return
+    wp = loader.wp(loader.count()-2)
+    if wp.command == mavutil.mavlink.MAV_CMD_DO_JUMP:
+        print("Mission is already looped")
+        return
+    wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0, 0, mavutil.mavlink.MAV_CMD_DO_JUMP,
+                                                      0, 1, 1, -1, 0, 0, 0, 0, 0)
+    loader.add(wp)
+    loader.add(loader.wp(1))
+    mpstate.status.loading_waypoints = True
+    mpstate.status.loading_waypoint_lasttime = time.time()
+    mpstate.master().waypoint_count_send(mpstate.status.wploader.count())
+    print("Closed loop on mission")
+
 def set_home_location():
     '''set home location from last map click'''
     try:
@@ -492,7 +511,7 @@ def set_home_location():
 def cmd_wp(args):
     '''waypoint commands'''
     if len(args) < 1:
-        print("usage: wp <list|load|update|save|set|clear>")
+        print("usage: wp <list|load|update|save|set|clear|loop>")
         return
 
     if args[0] == "load":
@@ -542,6 +561,8 @@ def cmd_wp(args):
         print("Drawing waypoints on map")
     elif args[0] == "sethome":
         set_home_location()        
+    elif args[0] == "loop":
+        wp_loop()        
     else:
         print("Usage: wp <list|load|save|set|show|clear>")
 
