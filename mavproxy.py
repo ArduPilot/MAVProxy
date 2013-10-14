@@ -757,7 +757,7 @@ def list_rally_points():
 
     for i in range(mpstate.status.rallyloader.rally_count()):
         p = mpstate.status.rallyloader.rally_point(i)
-        mpstate.console.writeln("lat=%f lng=%f alt=%f break_alt=%f land_dir=%f" % (p.lat * 1e-7, p.lng * 1e-7, p.alt / 100.0, p.break_alt / 100.0, p.land_dir / 100.0))
+        mpstate.console.writeln("lat=%f lng=%f alt=%f break_alt=%f land_dir=%f" % (p.lat * 1e-7, p.lng * 1e-7, p.alt, p.break_alt, p.land_dir))
 
     #TODO: rally_land points
 
@@ -786,19 +786,19 @@ def cmd_rally(args):
             print("No map click position available")
             return
 
-        alt = float(args[1]) * 100.0;
+        alt = float(args[1]);
         break_alt = 0.0
         land_hdg = 0.0;
         if (len(args) > 2):
-            break_alt = float(args[2]) * 100.0;
+            break_alt = float(args[2]);
         if (len(args) > 3):
-            land_hdg = float(args[3]) * 100.0;
+            land_hdg = float(args[3]);
 
         mpstate.status.rallyloader.create_and_append_rally_point(latlon[0] * 1e7, latlon[1] * 1e7, alt, break_alt, land_hdg, 0)
 
         send_rally_points();
 
-        print("Added Rally point at %s %f" % (str(latlon), alt / 100.0))
+        print("Added Rally point at %s %f" % (str(latlon), alt))
     
     elif args[0] == "clear":
         mpstate.status.rallyloader.clear()
