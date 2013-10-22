@@ -10,7 +10,7 @@
     <!--[if lt IE 9]>
     <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
     <![endif]-->
-    <title>MAVProxy by stephendade</title>
+    <title>MAVProxy</title>
   </head>
 
   <body>
@@ -22,12 +22,6 @@
           <h2>A UAV ground station software package for MAVLink based systems</h2>
         </header>
 
-        <section id="downloads" class="clearfix">
-          <a href="https://github.com/stephendade/MAVProxy/zipball/master" id="download-zip" class="button"><span>Download .zip</span></a>
-          <a href="https://github.com/stephendade/MAVProxy/tarball/master" id="download-tar-gz" class="button"><span>Download .tar.gz</span></a>
-          <a href="https://github.com/stephendade/MAVProxy" id="view-on-github" class="button"><span>View on GitHub</span></a>
-        </section>
-
         <hr>
 
         <section id="main_content">
@@ -36,6 +30,100 @@
 
 <p>MAVProxy is a fully-functioning GCS for UAV's. The intent is for a minimalist, portable and extendable GCS for any UAV supporting the MAVLink protocol (such as the APM).</p>
 
+<h2>
+<a name="features" class="anchor" href="#features"><span class="octicon octicon-link"></span></a>Features</h2>
+<ul>
+<li>It is a command-line, console based app. There are plugins included in MAVProxy to provide a basic GUI.</li>
+<li>Can be networked and run over any number of computers.</li>
+<li>It's portable; it should run on any POSIX OS with python, pyserial, and select() function calls, which means Linux, OS X, Windows, and others.</li>
+<li>The light-weight design means it can run on small netbooks with ease.</li>
+<li>It supports loadable modules, and has modules to support console/s, moving maps, joysticks, antenna trackers, etc</li>
+</ul>
+
+<p>
+Running under Ubuntu:
+</p>
+<p>
+<a href="images/mavproxy_linux.jpg" class="media" title="mavproxy_linux.jpg"><img src="images/mavproxy_linux.jpg" class="media" alt="" width="300" /></a>
+</p>
+
+<p>
+Running under Windows 7:
+</p>
+<p>
+<a href="images/mavproxy_windows.jpg" class="media" title="mavproxy_windows.jpg"><img src="images/mavproxy_windows.jpg" class="media" alt="" width="300" /></a>
+</p>
+<h2>
+<a name="install" class="anchor" href="#install"><span class="octicon octicon-link"></span></a>Download and Installation</h2>
+<p>
+You will need to have <a href="http://www.python.org/download/releases/2.7/">Python 2.7</a> installed first.
+</p>
+<h4><a name="installWin" class="anchor" href="#installWin"><span class="octicon octicon-link"></span></a>Windows</h4>
+<p>MAVProxy is hosted on PyPi and the installation packages can be found there:<br>
+<a href="https://pypi.python.org/pypi/MAVProxy">MAVProxy</a><br>
+<a href="https://pypi.python.org/pypi/pymavlink">MAVLink</a><br>
+</p>
+
+<p>The following Python packages will be required (if not already installed):</p>
+<ul>
+<li><a href="http://www.lfd.uci.edu/~gohlke/pythonlibs/#pyserial">Pyserial</a></li>
+<li><a href="http://sourceforge.net/projects/matplotlib/files/matplotlib/matplotlib-1.1.1/">Matplotlib</a></li>
+<li><a href="http://www.wxpython.org/download.php">wxPython</a></li>
+<li><a href="http://www.lfd.uci.edu/~gohlke/pythonlibs/#opencv">openCV for Python</a></li>
+<li><a href="http://www.pythonware.com/products/pil/">Python Imaging Library</a></li>
+<li><a href="http://www.lfd.uci.edu/~gohlke/pythonlibs">Python Base Distribution</a></li>
+</ul>
+
+<h4><a name="installLinux" class="anchor" href="#installLinux"><span class="octicon octicon-link"></span></a>Linux</h4>
+<p>Linux users can use the PyPi program to get the needed packages:<br>
+<code>
+sudo apt-get install python-pip
+</code></p>
+
+<p>Then download and install MAVProxy. Prerequisites will be automatically downloaded too. Note a sudo may be required in some circumstances if the install generates errors.<br>
+<code>
+pip install MAVProxy
+</code></p>
+
+<p>The following other packages may also be required (via apt-get or similar):</p>
+<ul>
+<li>python-matplotlib</li>
+<li>python-opencv</li>
+<li>python-serial</li>
+<li>python-wxgtk</li>
+</ul>
+
+
+<h2>
+<a name="guide" class="anchor" href="#guide"><span class="octicon octicon-link"></span></a>User Guide</h2>
+
+<h4><a name="guideStart" class="anchor" href="#guideStart"><span class="octicon octicon-link"></span></a>Quickstart</h4>
+
+<h4><a name="guideStart" class="anchor" href="#guideStart"><span class="octicon octicon-link"></span></a>Starting MAVProxy</h4>
+
+<h4><a name="guideParam" class="anchor" href="#guideParam"><span class="octicon octicon-link"></span></a>Parameters</h4>
+
+<h4><a name="guideWP" class="anchor" href="#guideWP"><span class="octicon octicon-link"></span></a>Waypoints</h4>
+
+<h4><a name="guideGF" class="anchor" href="#guideGF"><span class="octicon octicon-link"></span></a>GeoFence</h4>
+
+<h4><a name="guideGF" class="anchor" href="#guideGF"><span class="octicon octicon-link"></span></a>Rally Points</h4>
+
+<h4><a name="guideModes" class="anchor" href="#guideModes"><span class="octicon octicon-link"></span></a>Flight Modes</h4>
+
+<h4><a name="guideMisc" class="anchor" href="#guideMisc"><span class="octicon octicon-link"></span></a>Calibration</h4>
+
+<h4><a name="guideMisc" class="anchor" href="#guideMisc"><span class="octicon octicon-link"></span></a>System Commands</h4>
+
+<h4><a name="guideMod" class="anchor" href="#guideMod"><span class="octicon octicon-link"></span></a>Modules</h4>
+
+<h4><a name="guideMod" class="anchor" href="#guideMod"><span class="octicon octicon-link"></span></a>Playback from Log</h4>
+
+<h4><a name="guideMod" class="anchor" href="#guideMod"><span class="octicon octicon-link"></span></a>MAVLink Tools</h4>
+
+<h2>
+<a name="devel" class="anchor" href="#devel"><span class="octicon octicon-link"></span></a>Development</h2>
+<p>Something about how to make your own modules. Possilty a template or example too.</p>
 <h2>
 <a name="license" class="anchor" href="#license"><span class="octicon octicon-link"></span></a>License</h2>
 
