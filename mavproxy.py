@@ -1076,6 +1076,14 @@ def cmd_arm(args):
   '''arm motors'''
   mpstate.master().arducopter_arm()
 
+def cmd_time(args):
+  '''show autopilot time'''
+  tusec = mpstate.master().field('SYSTEM_TIME', 'time_unix_usec', 0)
+  if tusec == 0:
+      print("No SYSTEM_TIME time available")
+      return
+  print("%s (%s)\n" % (time.ctime(tusec * 1.0e-6), time.ctime()))
+
 
 def cmd_disarm(args):
   '''disarm motors'''
@@ -1126,6 +1134,7 @@ command_map = {
     'module'  : (cmd_module,   'module commands'),
     'alias'   : (cmd_alias,    'command aliases'),
     'arm'     : (cmd_arm,      'ArduCopter arm motors'),
+    'time'    : (cmd_time,     'Show autopilot time'),
     'disarm'  : (cmd_disarm,   'ArduCopter disarm motors')
     }
 
