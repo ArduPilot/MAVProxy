@@ -1759,6 +1759,15 @@ def check_link_status():
             say("link %u down" % (master.linknum+1))
             master.linkerror = True
 
+def send_heartbeat(master):
+    if master.mavlink10():
+        master.mav.heartbeat_send(mavutil.mavlink.MAV_TYPE_GCS, mavutil.mavlink.MAV_AUTOPILOT_INVALID,
+                                  0, 0, 0)
+    else:
+        MAV_GROUND = 5
+        MAV_AUTOPILOT_NONE = 4
+        master.mav.heartbeat_send(MAV_GROUND, MAV_AUTOPILOT_NONE)
+
 def periodic_tasks():
     '''run periodic checks'''
     if mpstate.status.setup_mode:
@@ -1770,13 +1779,7 @@ def periodic_tasks():
     if heartbeat_period.trigger() and mpstate.settings.heartbeat != 0:
         mpstate.status.counters['MasterOut'] += 1
         for master in mpstate.mav_master:
-            if master.mavlink10():
-                master.mav.heartbeat_send(mavutil.mavlink.MAV_TYPE_GCS, mavutil.mavlink.MAV_AUTOPILOT_INVALID,
-                                          0, 0, 0)
-            else:
-                MAV_GROUND = 5
-                MAV_AUTOPILOT_NONE = 4
-                master.mav.heartbeat_send(MAV_GROUND, MAV_AUTOPILOT_NONE)
+            send_heartbeat(master)
 
     if heartbeat_check_period.trigger():
         check_link_status()
@@ -1833,6 +1836,7 @@ def main_loop():
     '''main processing loop'''
     if not mpstate.status.setup_mode and not opts.nowait:
         for master in mpstate.mav_master:
+            send_heartbeat(master)
             master.wait_heartbeat()
             if len(mpstate.mav_param) < 10 or not mpstate.continue_mode:
                 mpstate.mav_param_set = set()
