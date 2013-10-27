@@ -77,11 +77,11 @@ def init(_mpstate):
     global mpstate
     mpstate = _mpstate
     mpstate.map_state = module_state()
-    service = 'GoogleSat'
+    if 'MAP_SERVICE' in os.environ:
+        service = os.environ['MAP_SERVICE']
+    else:
+        service = 'YahooSat'
     import platform
-    if platform.system() == 'Windows':
-        # windows has trouble with Google tile URLs
-        service = 'MicrosoftSat'
     mpstate.map = mp_slipmap.MPSlipMap(service=service, elevation=True, title='Map')
     mpstate.map_functions = { 'draw_lines' : draw_lines }
 
