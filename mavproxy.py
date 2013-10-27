@@ -564,7 +564,7 @@ def cmd_wp(args):
     elif args[0] == "loop":
         wp_loop()        
     else:
-        print("Usage: wp <list|load|save|set|show|clear>")
+        print("Usage: wp <list|load|save|set|show|clear|draw|loop>")
 
 
 def fetch_fence_point(i):
