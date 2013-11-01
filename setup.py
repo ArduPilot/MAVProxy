@@ -3,7 +3,7 @@ try:
 except ImportError:
     from distutils.core import setup
 
-version = "1.0.12"
+version = "1.0.13"
 
 setup(name='MAVProxy',
       version=version,
@@ -41,7 +41,9 @@ on how to use MAVProxy.''',
                 'MAVProxy.modules.mavproxy_CUAV'],
       install_requires=['pymavlink>=1.1.2',
                         'pyserial>=2.6'],
-      scripts=['mavproxy.py', 'tools/mavflightview.py'],
+      scripts=['mavproxy.py', 'tools/mavflightview.py',
+               'modules/mavproxy_map/mp_slipmap.py',
+               'modules/mavproxy_map/mp_tile.py'],
       package_data={'MAVProxy.modules.mavproxy_map':
                     ['data/*.jpg', 'data/*.png']}
     )
