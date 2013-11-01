@@ -42,6 +42,9 @@ def init(_mpstate):
     mpstate.console.set_status('GPS', 'GPS: --', fg='red', row=0)
     mpstate.console.set_status('Vcc', 'Vcc: --', fg='red', row=0)
     mpstate.console.set_status('Radio', 'Radio: --', row=0)
+    mpstate.console.set_status('INS', 'INS', fg='grey', row=0)
+    mpstate.console.set_status('MAG', 'MAG', fg='grey', row=0)
+    mpstate.console.set_status('AS', 'AS', fg='grey', row=0)
     mpstate.console.set_status('Heading', 'Hdg ---/---', row=2)
     mpstate.console.set_status('Alt', 'Alt ---', row=2)
     mpstate.console.set_status('AGL', 'AGL ---', row=2)
@@ -163,6 +166,21 @@ def mavlink_packet(msg):
     elif type == 'ATTITUDE':
         mpstate.console.set_status('Roll', 'Roll %u' % math.degrees(msg.roll))
         mpstate.console.set_status('Pitch', 'Pitch %u' % math.degrees(msg.pitch))
+    elif type in ['SYS_STATUS']:
+        sensors = { 'AS'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_DIFFERENTIAL_PRESSURE,
+                    'MAG' : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_MAG,
+                    'INS' : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_ACCEL | mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_GYRO }
+        for s in sensors.keys():
+            bits = sensors[s]
+            present = ((msg.onboard_control_sensors_enabled & bits) == bits)
+            healthy = ((msg.onboard_control_sensors_health & bits) == bits)
+            if not present:
+                fg = 'grey'
+            elif not healthy:
+                fg = 'red'
+            else:
+                fg = 'green'
+            mpstate.console.set_status(s, s, fg=fg)            
     elif type == 'HWSTATUS':
         if msg.Vcc >= 4600 and msg.Vcc <= 5300:
             fg = 'green'
