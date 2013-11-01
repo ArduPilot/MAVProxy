@@ -31,10 +31,12 @@ class module_state(object):
         self.draw_line = None
         self.draw_callback = None
         self.vehicle_type = 'plane'
+        self.last_service = ''
         self.settings = mp_settings.MPSettings(
             [ ('showgpspos', int, 0),
               ('showsimpos', int, 0),
-              ('brightness', float, 1)])
+              ('brightness', float, 1),
+              ('service', str, 'YahooSat')])
 
 def name():
     '''return module name'''
@@ -78,11 +80,9 @@ def init(_mpstate):
     mpstate = _mpstate
     mpstate.map_state = module_state()
     if 'MAP_SERVICE' in os.environ:
-        service = os.environ['MAP_SERVICE']
-    else:
-        service = 'YahooSat'
+        mpstate.map_state.set('service', os.environ['MAP_SERVICE'])
     import platform
-    mpstate.map = mp_slipmap.MPSlipMap(service=service, elevation=True, title='Map')
+    mpstate.map = mp_slipmap.MPSlipMap(service=mpstate.map_state.settings.service, elevation=True, title='Map')
     mpstate.map_functions = { 'draw_lines' : draw_lines }
 
     mpstate.map.add_callback(functools.partial(map_callback))
@@ -205,6 +205,10 @@ def draw_lines(callback):
 def mavlink_packet(m):
     '''handle an incoming mavlink packet'''
     state = mpstate.map_state
+
+    if state.last_service != state.settings.service:
+        state.last_service = state.settings.service
+        mpstate.map.add_object(mp_slipmap.SlipService(state.settings.service))
 
     if m.get_type() == "HEARTBEAT":
         from pymavlink import mavutil

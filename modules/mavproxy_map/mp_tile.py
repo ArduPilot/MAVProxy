@@ -140,6 +140,8 @@ class TileInfo:
 
 	def url(self, service):
 		'''return URL for a tile'''
+		if service not in TILE_SERVICES:
+			raise TileException('unknown tile service %s' % service)
 		url = string.Template(TILE_SERVICES[service])
 		(x,y) = self.tile
 		tile_info = TileServiceInfo(x, y, self.zoom)
@@ -193,6 +195,10 @@ class MPTile:
 		self._unavailable = os.path.join(os.path.dirname(__file__),
                                                  'data', 'unavailable.jpg')
 		self._tile_cache = collections.OrderedDict()
+
+        def set_service(self, service):
+                '''set tile service'''
+                self.service = service
 
 	def coord_to_tile(self, lat, lon, zoom):
 		'''convert lat/lon/zoom to a TileInfo'''

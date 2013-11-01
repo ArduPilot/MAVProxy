@@ -392,6 +392,11 @@ class SlipInfoText(SlipInformation):
             self.textctrl.WriteText(self.text)
             self._resize()
 
+class SlipService:
+    '''an object to change the map service'''
+    def __init__(self, service):
+        self.service = service
+
 
 class SlipObjectSelection:
     '''description of a object under the cursor during an event'''
@@ -618,6 +623,11 @@ class MPSlipMapFrame(wx.Frame):
                 else:
 #                    print('add %s' % str(obj.key))
                     state.info[obj.key] = obj
+                state.need_redraw = True
+
+            if isinstance(obj, SlipService):
+                # change map service
+                state.mt.set_service(obj.service)
                 state.need_redraw = True
 
             if isinstance(obj, SlipCenter):
