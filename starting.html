@@ -28,7 +28,7 @@
           <h2>
 <a name="ContentTmp" class="anchor" href="#ContentTmp"><span class="octicon octicon-link"></span></a>Startup Options</h2>
           <p>There are no mandatory command line options for MAVProxy. An exception to this is the <code>--master</code> option if there is more than 1 APM connected to the system.</p>
-          <h4><a name="Subheading" class="anchor" href="#Subheading"><span class="octicon octicon-link"></span></a>--master</h4>
+          <h4>--master</h4>
           <p>Specifies which port (serial, USB or network address/port) the UAV is communicating on.</p>
           <p>Multiple <code>--master</code> can be used. MAVProxy will sort the packets into a single stream automatically. This is useful if independent redundant links are being used.</p>
           <p>If an IP address is specified, it must be the local computer's IP address.</p>
@@ -39,8 +39,86 @@
             mavproxy.py --master=192.168.1.1:14550 --master=/dev/ttyUSB0
           </code></p>
           
-          <h4><a name="Subheading" class="anchor" href="#Subheading"><span class="octicon octicon-link"></span></a>--quadcopter</h4>
+          <h4>--quadcopter</h4>
           <p>Use quadcopter controls.</p>
+          
+          <h4>--baudrate</h4>
+          <p>Baudrate of <code>--master</code> port. Only applicable for serial links.</p>
+          
+          <h4>--out</h4>
+          <p>Forward the MAVLink packets to a remote IP address. Useful if using multiple ground station computers. MAVlink usually uses port 14550 for packet forwarding, though other ports can be used if needed.</p>
+          <p><code>
+            mavproxy.py --master=/dev/ttyUSB0 --out:192.168.1.1:14550
+          </code></p>       
+
+          <h4>--sitl</h4>
+          <p>Input from APM Software in the loop (SITL) simulator. Usually <code>--sitl=127.0.0.1:5501</code>.</p> 
+
+          <h4>--streamrate</h4>
+          <p>MAVLink stream rate.</p>
+
+          <h4>--source-system</h4>
+          <p>MAVLink source system for this GCS.</p>   
+
+          <h4>--target-system</h4>
+          <p>MAVLink target master system.</p>
+
+          <h4>--target-component</h4>
+          <p>MAVLink target master component.</p>
+
+          <h4>--logfile</h4>
+          <p>Name of MAVLink master logfile. Defualt is mav.tlog.</p>
+
+          <h4>--append-log</h4>
+          <p>Append to latest log file, rather than creating a new one. Useful if re-connecting mid-flight.</p>   
+
+          <h4>--setup</h4>
+          <p>Startup in the APM's command line interface (CLI) mode.</p>
+
+          <h4>--nodtr</h4>
+          <p>Disable DTR drop on close.</p>
+
+          <h4>--show-errors</h4>
+          <p>Show MAVLink error packets.</p>
+
+          <h4>--speech</h4>
+          <p>Use text-to-speech. Requires the speechd software on Linux.</p>
+
+          <h4>--num-cells</h4>
+          <p>Number of Lipo battery cells in main battery. Used for detecting low battery voltage.</p>
+
+          <h4>--aircraft</h4>
+          <p>Name of the aircraft being flown. If used, logfiles will be stored in /Logs/AircraftName/Date/flightNumber/flight.tlog. Useful for keeping flight logs organised.</p>      
+
+          <h4>--cmd</h4>
+          <p>Initial commands to run in MAVProxy. Delimited by <code>;</code></p>
+          <p><code>
+            mavproxy.py --master=/dev/ttyUSB0 --cmd="param load init.parm; module load map;"
+          </code></p>    
+
+          <h4>--console</h4>
+          <p>Load the GUI console module.</p>
+
+          <h4>--map</h4>
+          <p>Load the moving map module.</p>        
+
+          <h4>--load-module</h4>
+          <p>Load the specified module on startup. Can be used multiple times, or with a comma separated list.</p>    
+
+          <h4>--mav09</h4>
+          <p>Use MAVLink protocol 0.9. Recent versions of the APM software use version 1.0 of MAVLink.</p>    
+
+          <h4>--auto-protocol</h4>
+          <p>Auto detect MAVLink protocol version.</p>    
+
+          <h4>--continue</h4>
+          <p>Continue logs.</p>   
+
+          <h4>--nowait</h4>
+          <p>Don't wait for HEARTBEAT packets on startup.</p>   
+
+          <h4>--dialect</h4>
+          <p>MAVLink dialect. Uses the APM dialect by default.</p>             
         </section>
 
         <footer>
