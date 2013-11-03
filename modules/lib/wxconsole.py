@@ -3,7 +3,12 @@
 """
   MAVProxy message console, implemented in a child process  
 """
-import textconsole, wx
+import textconsole, wx, sys, os
+
+# allow running without installing
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '.\lib'))
+
+from liveSettings import LiveSettings
 
 class Text():
     '''text to write to console'''
@@ -145,11 +150,27 @@ if __name__ == "__main__":
     # test the console
     import time
     console = MessageConsole()
+	
+    #livesettings test. Note the currently selected setting has to go first
+    SettingsDict = {'GPS colour': ['blue', 'yellow', 'red', 'green'], 'Link1 colour': ['green', 'yellow', 'red', 'blue']}
+    SettingsThread = LiveSettings(SettingsDict, "WXConsole Options")
+    GPScolour = 'blue'
+    Linkcolour = 'green'
+	
     while console.is_alive():
+        #Read any changed settings from liveSettingsUI
+        if not SettingsThread.MsgQ.empty():
+            e = SettingsThread.MsgQ.get()
+            for key, value in e.iteritems():
+                if key == 'GPS colour':
+                    GPScolour = value
+                if key == 'Link1 colour':
+                    Linkcolour = value
+
         console.write('Tick', fg='red')
         console.write(" %s " % time.asctime())
         console.writeln('tock', bg='yellow')
-        console.set_status('GPS', 'GPS: OK', fg='blue', bg='green')
-        console.set_status('Link1', 'Link1: OK', fg='green', bg='write')
+        console.set_status('GPS', 'GPS: OK', fg=GPScolour, bg='green')
+        console.set_status('Link1', 'Link1: OK', fg=Linkcolour, bg='write')
         console.set_status('Date', 'Date: %s' % time.asctime(), fg='red', bg='write', row=2)
         time.sleep(0.5)
