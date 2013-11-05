@@ -608,6 +608,9 @@ class MPSlipMapFrame(wx.Frame):
             # its a new layer
             state.layers[obj.layer] = {}
         state.layers[obj.layer][obj.key] = obj
+        if isinstance(obj, SlipGrid):
+            state.panel.grid_checkbox.SetValue(True)
+            state.panel.Refresh()
         state.need_redraw = True
 
     def remove_object(self, key):
@@ -639,11 +642,7 @@ class MPSlipMapFrame(wx.Frame):
             obj = state.object_queue.get()
 
             if isinstance(obj, SlipObject):
-                if not obj.layer in state.layers:
-                    # its a new layer
-                    state.layers[obj.layer] = {}
-                state.layers[obj.layer][obj.key] = obj
-                state.need_redraw = True
+                self.add_object(obj)
 
             if isinstance(obj, SlipPosition):
                 # move an object
