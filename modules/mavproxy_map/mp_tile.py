@@ -200,6 +200,10 @@ class MPTile:
                 '''set tile service'''
                 self.service = service
 
+        def get_service_list(self):
+                '''return list of available services'''
+                return TILE_SERVICES.keys()
+
 	def coord_to_tile(self, lat, lon, zoom):
 		'''convert lat/lon/zoom to a TileInfo'''
 		world_tiles = 1<<zoom
