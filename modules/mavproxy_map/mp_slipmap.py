@@ -309,6 +309,11 @@ class SlipClearLayer:
     def __init__(self, layer):
         self.layer = layer
 
+class SlipRemoveObject:
+    '''remove an object by key'''
+    def __init__(self, key):
+        self.key = key
+
 
 class SlipInformation:
     '''an object to display in the information box'''
@@ -552,6 +557,13 @@ class MPSlipMapFrame(wx.Frame):
         self.Bind(wx.EVT_IDLE, self.on_idle)
         self.Bind(wx.EVT_SIZE, state.panel.on_size)
 
+        state.panel.grid_checkbox = wx.CheckBox(state.panel, -1, 'Grid')
+        state.panel.grid_checkbox.SetValue(False)
+        state.panel.controls.Add(state.panel.grid_checkbox,
+                                 flag=wx.LEFT, border=0)
+        state.have_grid = state.panel.grid_checkbox.GetValue()
+
+
     def find_object(self, key, layers):
         '''find an object to be modified'''
         state = self.state
@@ -588,6 +600,33 @@ class MPSlipMapFrame(wx.Frame):
 
         (lat, lon) = object.latlon
         state.panel.re_center(state.width/2, state.height/2, lat, lon)
+
+    def add_object(self, obj):
+        '''add an object to a later'''
+        state = self.state
+        if not obj.layer in state.layers:
+            # its a new layer
+            state.layers[obj.layer] = {}
+        state.layers[obj.layer][obj.key] = obj
+        state.need_redraw = True
+
+    def remove_object(self, key):
+        '''remove an object by key from all layers'''
+        state = self.state
+        for layer in state.layers:
+            state.layers[layer].pop(key, None)
+        state.need_redraw = True
+
+    def check_grid(self):
+        '''check if grid checkbox has changed'''
+        state = self.state
+        if state.have_grid == state.panel.grid_checkbox.GetValue():
+            return
+        state.have_grid = state.panel.grid_checkbox.GetValue()
+        if not state.have_grid:
+            self.remove_object('grid')
+        else:
+            self.add_object(SlipGrid('grid', layer=3, linewidth=1, colour=(255,255,0)))
 
     def on_idle(self, event):
         '''prevent the main loop spinning too fast'''
@@ -651,7 +690,14 @@ class MPSlipMapFrame(wx.Frame):
                     state.layers.pop(obj.layer)
                 state.need_redraw = True
 
+            if isinstance(obj, SlipRemoveObject):
+                # remove an object by key
+                if obj.layer in state.layers:
+                    state.layers.pop(obj.layer)
+                state.need_redraw = True
+        
         if obj is None:
+            self.check_grid()
             time.sleep(0.05)
 
 
@@ -1024,7 +1070,7 @@ if __name__ == "__main__":
             sm.add_object(SlipPolygon('mission-%s' % file, boundary, layer=1, linewidth=1, colour=(255,255,255)))
 
     if opts.grid:
-        sm.add_object(SlipGrid('grid', layer=1, linewidth=1, colour=(255,255,0)))
+        sm.add_object(SlipGrid('grid', layer=3, linewidth=1, colour=(255,255,0)))
 
     if opts.thumbnail:
         thumb = cv.LoadImage(opts.thumbnail)
