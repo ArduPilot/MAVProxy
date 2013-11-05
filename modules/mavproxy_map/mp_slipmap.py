@@ -627,8 +627,12 @@ class MPSlipMapFrame(wx.Frame):
 
             if isinstance(obj, SlipService):
                 # change map service
-                state.mt.set_service(obj.service)
-                state.need_redraw = True
+                services = state.mt.get_service_list()
+                if obj.service not in services:
+                    print("Unknown map service '%s'" % obj.service)
+                else:
+                    state.mt.set_service(obj.service)
+                    state.need_redraw = True
 
             if isinstance(obj, SlipCenter):
                 # move center
