@@ -75,7 +75,7 @@ def mavflightview(filename):
         wp.load(opts.mission)
     path = []
     while True:
-        m = mlog.recv_match(type=['MISSION_ITEM', 'GLOBAL_POSITION_INT', 'GPS_RAW_INT'])
+        m = mlog.recv_match(type=['MISSION_ITEM', 'GLOBAL_POSITION_INT', 'GPS_RAW_INT', 'GPS'])
         if m is None:
             break
         if m.get_type() == 'MISSION_ITEM':
@@ -89,10 +89,17 @@ def mavflightview(filename):
             continue
         if opts.mode is not None and mlog.flightmode.lower() != opts.mode.lower():
             continue
-        lat = m.lat * 1.0e-7
-        lng = m.lon * 1.0e-7
+        if m.get_type() == 'GPS':
+            if m.Status < 2:
+                continue
+            # flash log
+            lat = m.Lat
+            lng = m.Lng
+        else:
+            lat = m.lat * 1.0e-7
+            lng = m.lon * 1.0e-7
         if lat != 0 or lng != 0:
-            if mlog.flightmode in colourmap:
+            if getattr(mlog, 'flightmode','') in colourmap:
                 point = (lat, lng, colourmap[mlog.flightmode])
             else:
                 point = (lat, lng)
