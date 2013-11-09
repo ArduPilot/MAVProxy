@@ -80,7 +80,7 @@ def init(_mpstate):
     mpstate = _mpstate
     mpstate.map_state = module_state()
     if 'MAP_SERVICE' in os.environ:
-        mpstate.map_state.set('service', os.environ['MAP_SERVICE'])
+        mpstate.map_state.settings.set('service', os.environ['MAP_SERVICE'])
     import platform
     mpstate.map = mp_slipmap.MPSlipMap(service=mpstate.map_state.settings.service, elevation=True, title='Map')
     mpstate.map_functions = { 'draw_lines' : draw_lines }
