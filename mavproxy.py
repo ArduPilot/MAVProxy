@@ -669,8 +669,97 @@ def fence_draw_callback(points):
     mpstate.status.fenceloader.add_latlon(points[0][0], points[0][1])
     send_fence()
 
+def quadcopter_fence(args):
+    '''geo-fence for quadcopter'''
+    usage = "usage: fence enable|disable|type|action|alt|radius|margin|rtlalt|show|draw"
+    fence_types = {
+        "none":         0,
+        "alt":          1,
+        "circle":       2,
+        "altcircle":    3
+    }
+    if len(args) < 1:
+        print(usage)
+        return
+    if args[0] == "enable":
+        param_set('FENCE_ENABLE', 1)
+    elif args[0] == "disable":
+        param_set('FENCE_ENABLE', 0)
+    elif args[0] == "type":
+        if len(args) != 2 or args[1].lower() not in fence_types.keys():
+            print("Usage: fence type none|alt|circle|altcircle")
+            return
+        param_set('FENCE_TYPE', fence_types[args[1].lower()])
+    elif args[0] == "action":
+        if len(args) != 2 or args[1].lower() not in ("report", "rtl_or_land"):
+            print("Usage: fence action report|rtl_or_land")
+            return
+        if args[1].lower == "report":
+            param_set('FENCE_ACTION', 0)
+        elif args[1].lower == "rtl_or_land":
+            param_set('FENCE_ACTION', 1)
+    elif args[0] == "alt":
+        if len(args) != 2 or not args[1].isdigit() or int(args[1]) < 10 or int(args[1]) > 1000:
+            print("Usage: fence alt <altitude 10-1000 meters>")
+            return
+        param_set('FENCE_ALT_MAX', args[1])
+    elif args[0] == "radius":
+        if len(args) != 2 or not args[1].isdigit() or int(args[1]) < 30 or int(args[1]) > 1000:
+            print("Usage: fence radius <radius 30-1000 meters>")
+            return
+        param_set('FENCE_RADIUS', args[1])
+    elif args[0] == "margin":
+        if len(args) != 2 or not args[1].isdigit() or int(args[1]) < 10 or int(args[1]) > 10:
+            print("Usage: fence margin <radius 1-10 meters>")
+            return
+        param_set('FENCE_MARGIN', args[1])
+    elif args[0] == "rtlalt":
+        if len(args) != 2 or not args[1].isdigit() or int(args[1]) < 0 or int(args[1]) > 80:
+            print("Usage: fence rtlalt <Altitude for RTL 0-80 meters>")
+            return
+        param_set('RTL_ALT', 100.0 * float(args[1]))
+    elif args[0] == "show":
+        enabled = get_mav_param('FENCE_ENABLE')
+        if enabled:
+            print("  fence enabled")
+        else:
+            print("  fence disabled")
+        if len(args) == 1 or args[1].lower() == "type":
+            val = int(get_mav_param('FENCE_TYPE'))
+            for t in fence_types.keys():
+                if fence_types[t] == val:
+                    print("  Fence Type: %s" % t)
+                    break
+            else:
+                print("  Fence Type unknown (%d)" % val)
+        if len(args) == 1 or args[1].lower() == "action":
+            val = get_mav_param('FENCE_ACTION')
+            if val:
+                print("  Fence Action: RTL or LAND")
+            else:
+                print("  Fence Action: Report only")
+        if len(args) == 1 or args[1].lower() == "alt":
+            val = get_mav_param('FENCE_ALT_MAX')
+            print("  Fence Altitude: %dm" % int(val))
+        if len(args) == 1 or args[1].lower() == "radius":
+            val = get_mav_param('FENCE_RADIUS')
+            print("  Fence Radius: %dm" % int(val))
+        if len(args) == 1 or args[1].lower() == "margin":
+            val = get_mav_param('FENCE_MARGIN')
+            print("  Fence Margin: %dm" % int(val))
+        if len(args) == 1 or args[1].lower() == "rtlalt":
+            val = get_mav_param('RTL_ALT')
+            print("  RTL Altitude: %fm" % (0.01 * float(val),))
+    elif args[0] == "draw":
+        print("Not (yet) implemented")
+    else:
+        print(usage)
+
 def cmd_fence(args):
     '''geo-fence commands'''
+    if opts.quadcopter:
+        quadcopter_fence(args)
+        return
     if len(args) < 1:
         print("usage: fence <list|load|save|clear|draw>")
         return
