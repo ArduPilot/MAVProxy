@@ -38,13 +38,15 @@
           module reload modulename</br>
           module list</code></p>
           
-          <h4>Default Modules</h4>
+          <h3>Default Modules</h3>
           <p>MAVProxy comes with several modules by default.</p>
           
-          <h5>console</h5>
+          <h4>console</h4>
           <p>A GUI console that displays important information to the UAV's current state.</p>
           
-          <h5>map</h5>
+          <a href="images/console.png" class="media" title="console.png"><img src="images/console.png" class="media" alt="" /></a>
+          
+          <h4>map</h4>
           <p>A moving map display that shows the UAV's current position, waypoints and geofence.</p>
           <p>Maps are automaticually downloaded and cached to the user's hard drive. The module will use these files if an internet connection is not found.</p>
           <p>To display the waypoints and geofence, the <code>wp list</code> and <code>fence list</code> commands can be used.</p>
@@ -52,7 +54,9 @@
           <p>To draw a set of waypoints, use the <code>wp draw</code> command. Right click on the map for the desired waypoints. When finished, use the <code>wp loop</code> to connect the last waypoint to the first one, creating a loop.</p>
           <p>Use the "g" key to specify a position to move the map to.</p>
           
-          <h5>graph</h5>
+          <a href="images/map.png" class="media" title="map.png"><img src="images/map.png" class="media" alt="" /></a>
+          
+          <h4>graph</h4>
           <p>A module to plot (graph) data in realtime from the UAV. It is useful for looking for time-varying patterns in the data</p>
           <p>After loading, new plots can be created by:</p>
           <p><code>graph add dataname</code></p>
@@ -61,7 +65,7 @@
           <p>Aribary mathematical functions can alse be used.</p>
           <p><code>graph add "(VFR_HUD.alt/1000.0)+5"</code></p>
           
-          <h5>joystick</h5>
+          <h4>joystick</h4>
           <p>Allows a joystick connected to the ground station computer to be used a an RC controller. The commands are sent via MAVLink.</p>
           <p>This module is only compatible with the CarolBox USB, PS3, Great Planes Interlink and Great Planes GP controllers.</p>
         </section>

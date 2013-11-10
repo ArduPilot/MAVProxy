@@ -10,7 +10,7 @@
     <!--[if lt IE 9]>
     <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
     <![endif]-->
-    <title>MAVProxy - System Commands</title>
+    <title>MAVProxy - Scripts</title>
   </head>
 
   <body>
@@ -26,30 +26,17 @@
 
         <section id="main_content">
           <h2>
-<a name="ContentSystem" class="anchor" href="#ContentSystem"><span class="octicon octicon-link"></span></a>System Commands</h2>
-          <p>There are a number of overall system and miscellaneous commands:</p>
-          <h4>reboot</h4>
-          <p>Reboots the APM.</p>
+<a name="ContentSCR" class="anchor" href="#ContentSCR"><span class="octicon octicon-link"></span></a>Startup Scripts</h2>
+          <p>MAVProxy is capable of executing a script (of MAVProxy commands) on startup. This can save the effort of (re)setting up the MAVProxy environment for each flight.</p>
           
-          <h4>setup</h4>
-          <p>Goes into the setup (CLI) mode of the APM.</p>
+          <p>A script (mavinit.scr) should be placed in an aircraft directory (ie. MAVProxy/Aircraftname/mavinit.scr) containing the commands. Any normal MAVProxy commands can be placed in here. Note that the --aircraft option must be used, in order for MAVProxy to find the script in the appropriate aircraft directory.</p>
           
-          <h4>rc</h4>
-          <p>Override a RC (input) channel. This value remains in effect until a value of -1 is set. Uses the form of <code>rc chan value</code>. Use <code>all</code> to set a global value for all RC channels.</p>
+          <p>An example script can be found <a href="files/mavinit.scr">here</a>.</p>
           
-          <p><code>rc 1 1000</br>
-          rc all -1</code></p>
+          <p>In this particular script, aliases are used as shortcuts to common commands.</p>
           
-          <h4>servo</h4>
-          <p>Override a servo (output) channel. Useful for manually triggering the auxillary channels. Uses the form of <code>servo chan value</code>.</p> 
-          
-          <p><code>servo 8 1500</code></p>   
+          <p>For example</br><code>@alias add g graph</code> </br> <code>@alias add gbatt g SYS_STATUS.current_battery</code></br> in the mavinit.scr will allow the user to graph the current battery level by typing </br> <code>gbatt</code></br> instead of </br><code>graph SYS_STATUS.current_battery</code></p>.
 
-          <h4>time</h4>
-          <p>Displays the current on the autopilot, if supported. The time in the brackets is the ground station time.</p>
-
-          <h4>status</h4>
-          <p>Shows the latest packets recieved from the autopilot. Useful for reading the state of the UAV.</p>          
         </section>
 
         <footer>
