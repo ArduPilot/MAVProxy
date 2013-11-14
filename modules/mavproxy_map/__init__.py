@@ -83,7 +83,7 @@ class circle_fence(object):
                 colour = (0,255,0)
             if self.type == 2 or  self.type == 3:
                 # only display if it's in Circle or Altitude_and_Circle mode
-                fence_drawing = mp_slipmap.SlipCircle('fence', (self.home.x, self.home.y), self.radius, layer=1, linewidth=2, colour=colour)
+                fence_drawing = mp_slipmap.SlipCircle('fence', (self.home.x, self.home.y), self.radius, layer=1, thickness=3, colour=colour)
                 # print("bounding box: %f %f %f %f" % fence_drawing.bounds())
                 self.mpstate.map.add_object(fence_drawing)
 

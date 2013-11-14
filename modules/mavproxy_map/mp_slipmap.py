@@ -65,12 +65,12 @@ class SlipObject:
 
 class SlipCircle(SlipObject):
     '''a circle to display on the map'''
-    def __init__(self, key, center_latlon, radius, layer, colour, linewidth):
+    def __init__(self, key, center_latlon, radius, layer, colour, thickness=1):
         SlipObject.__init__(self, key, layer, )
         self.center = center_latlon
         self.radius = radius
         self.colour = colour
-        self.linewidth = linewidth
+        self.thickness = thickness
         self._bounds = self.circle_bounds(center_latlon, radius)
 
     def circle_bounds(self, center, radius):
@@ -85,7 +85,7 @@ class SlipCircle(SlipObject):
         p1 = mp_util.gps_newpos(self.center[0], self.center[1], 90, self.radius)
         p1_px = pixmapper(p1)
         radius_px = p1_px[0] - center_px[0]
-        cv.Circle(img, center_px, radius_px, self.colour)
+        cv.Circle(img, center_px, radius_px, self.colour, thickness=self.thickness)
 
 class SlipPolygon(SlipObject):
     '''a polygon to display on the map'''
