@@ -1688,6 +1688,13 @@ def master_callback(m, master):
             mpstate.status.armed = armed
             if armed:
                 say("ARMED")
+                if opts.quadcopter:
+                    # For a copter, HOME is where it's armed. Refresh waypoints
+                    # to get the new home. Note that "fetch_home" is (currently)
+                    # a dummy op to avoid saving waypoints to a file
+                    # uneccessarily
+                    mpstate.status.wp_op = "fetch_home"
+                    mpstate.master().waypoint_request_list_send()
             else:
                 say("DISARMED")
         
