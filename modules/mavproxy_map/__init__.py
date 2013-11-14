@@ -31,12 +31,61 @@ class module_state(object):
         self.draw_line = None
         self.draw_callback = None
         self.vehicle_type = 'plane'
+        self.circle_fence = None
         self.last_service = ''
         self.settings = mp_settings.MPSettings(
             [ ('showgpspos', int, 0),
               ('showsimpos', int, 0),
               ('brightness', float, 1),
               ('service', str, 'YahooSat')])
+
+class circle_fence(object):
+    def __init__(self, mpstate):
+        self.mpstate = mpstate
+        self.home = None
+        self.enabled = None
+        self.type = None
+        self.action = None
+        self.radius = None
+        self.alt = None
+        self.margin = None
+
+    def refresh_params(self):
+        if mpstate.status.wploader.count() > 0:
+            self.home = mpstate.status.wploader.wp(0)
+        self.enabled = self.getparam('FENCE_ENABLE')
+        self.type = self.getparam('FENCE_TYPE')
+        self.action = self.getparam('FENCE_ACTION')
+        self.radius = self.getparam('FENCE_RADIUS')
+        self.alt = self.getparam('FENCE_ALT_MAX')
+        self.margin = self.getparam('FENCE_MARGIN')
+
+    def getparam(self, param, default=None):
+        return self.mpstate.mav_param.get(param, default)
+
+    def refresh_display(self, force=False):
+        '''Refresh display if neccessary'''
+        if self.home is None and mpstate.status.wploader.count() == 0:
+            # Home is not set, so neither the fence
+            return
+        if mpstate.status.wploader.count() > 0:
+            wp_home = mpstate.status.wploader.wp(0)
+        else:
+            wp_home = None
+        if (force or self.home != wp_home or
+                self.enabled != self.getparam('FENCE_ENABLE') or
+                self.radius != self.getparam('FENCE_RADIUS')):
+            self.refresh_params()
+            #TODO: change color to suit enabled/disabled status
+            if self.enabled:
+                colour = (255,0,0)
+            else:
+                colour = (0,255,0)
+            if self.type == 2 or  self.type == 3:
+                # only display if it's in Circle or Altitude_and_Circle mode
+                fence_drawing = mp_slipmap.SlipCircle('fence', (self.home.x, self.home.y), self.radius, layer=1, thickness=3, colour=colour)
+                # print("bounding box: %f %f %f %f" % fence_drawing.bounds())
+                self.mpstate.map.add_object(fence_drawing)
 
 def name():
     '''return module name'''
@@ -258,7 +307,16 @@ def mavlink_packet(m):
         display_waypoints()
 
     # if the fence has changed, redisplay
-    if state.fence_change_time != mpstate.status.fenceloader.last_change:
+    if state.vehicle_type == 'copter':
+        if state.circle_fence is None:
+            # Refresh waypoints to get home location
+            mpstate.status.wp_op = "fetch_home"
+            mpstate.master().waypoint_request_list_send()
+            state.circle_fence = circle_fence(mpstate)
+            state.circle_fence.refresh_display(force=True)
+        else:
+            state.circle_fence.refresh_display()
+    elif state.fence_change_time != mpstate.status.fenceloader.last_change:
         state.fence_change_time = mpstate.status.fenceloader.last_change
         points = mpstate.status.fenceloader.polygon()
         if len(points) > 1:
