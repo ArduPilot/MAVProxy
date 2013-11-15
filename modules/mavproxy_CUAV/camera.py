@@ -102,7 +102,10 @@ class camera_state(object):
         # load camera params
         path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..',
                             'cuav', 'data', 'chameleon1_arecont0.json')
-        self.c_params.load(path)
+        if os.path.exists(path):
+            self.c_params.load(path)
+        else:
+            print("Warning: %s not found" % path)
 
 
 class MavSocket:
