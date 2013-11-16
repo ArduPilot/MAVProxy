@@ -121,7 +121,7 @@ class MPImagePanel(wx.Panel):
         for ev in state._events:
             self.imagePanel.Bind(ev, self.on_event)
         if not wx.EVT_KEY_DOWN in state._events:
-            self.imagePanel.Bind(ev, self.on_key_event)
+            self.imagePanel.Bind(wx.EVT_KEY_DOWN, self.on_key_event)
         self.imagePanel.Bind(wx.EVT_MOUSEWHEEL, self.on_mouse_wheel)
 
         self.redraw()
