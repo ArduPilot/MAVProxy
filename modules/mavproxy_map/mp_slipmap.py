@@ -538,17 +538,7 @@ class MPSlipMap():
 
     def icon(self, filename):
         '''load an icon from the data directory'''
-        # we have to jump through a lot of hoops to get an OpenCV image
-        # when we may be in a package zip file
-        import pkg_resources
-        try:
-            raw = pkg_resources.resource_stream(__name__, "data/%s" % filename).read()
-        except Exception:
-            raw = open(os.path.join(__file__, 'data', filename)).read()
-        imagefiledata = cv.CreateMatHeader(1, len(raw), cv.CV_8UC1)
-        cv.SetData(imagefiledata, raw, len(raw))
-        img = cv.DecodeImage(imagefiledata, cv.CV_LOAD_IMAGE_COLOR)
-        return img
+        return mp_tile.mp_icon(filename)
 
 
 import wx
@@ -1034,6 +1024,8 @@ class MPSlipMapPanel(wx.Panel):
 
 
 if __name__ == "__main__":
+    import multiprocessing
+    multiprocessing.freeze_support()
     import time
 
     from optparse import OptionParser

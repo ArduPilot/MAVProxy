@@ -31,7 +31,7 @@ on how to use MAVProxy.''',
         'Programming Language :: Python :: 2.7',
         'Topic :: Scientific/Engineering'],
       license='GPLv3',
-      package_dir={'MAVProxy': '.'},
+      package_dir={'MAVProxy': '../MAVProxy'},
       packages=['MAVProxy',
                 'MAVProxy.modules',
                 'MAVProxy.modules.mavproxy_map',
@@ -41,9 +41,9 @@ on how to use MAVProxy.''',
                 'MAVProxy.modules.mavproxy_CUAV'],
       install_requires=['pymavlink>=1.1.2',
                         'pyserial>=2.6'],
-      scripts=['mavproxy.py', 'tools/mavflightview.py',
-               'modules/mavproxy_map/mp_slipmap.py',
-               'modules/mavproxy_map/mp_tile.py'],
-      package_data={'MAVProxy.modules.mavproxy_map':
+      scripts=['MAVProxy/mavproxy.py', 'MAVProxy/tools/mavflightview.py',
+               'MAVProxy/modules/mavproxy_map/mp_slipmap.py',
+               'MAVProxy/modules/mavproxy_map/mp_tile.py'],
+      package_data={'MAVProxy.modules.mp_tile':
                     ['data/*.jpg', 'data/*.png']}
     )

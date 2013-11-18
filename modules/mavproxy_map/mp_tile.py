@@ -190,10 +190,8 @@ class MPTile:
 		# _download_pending is a dictionary of TileInfo objects
 		self._download_pending = {}
 		self._download_thread = None
-		self._loading = os.path.join(os.path.dirname(__file__),
-                                             'data', 'loading.jpg')
-		self._unavailable = os.path.join(os.path.dirname(__file__),
-                                                 'data', 'unavailable.jpg')
+                self._loading = mp_icon('loading.jpg')
+		self._unavailable = mp_icon('unavailable.jpg')
 		self._tile_cache = collections.OrderedDict()
 
         def set_service(self, service):
@@ -358,7 +356,7 @@ class MPTile:
 			if img == self._unavailable:
 				img = self.load_tile_lowres(tile)
 				if img is None:
-					img = cv.LoadImage(self._unavailable)
+					img = self._unavailable
 				return img
 
 
@@ -387,7 +385,7 @@ class MPTile:
 		if not self.download:
 			img = self.load_tile_lowres(tile)
 			if img is None:
-				img = cv.LoadImage(self._unavailable)
+				img = self._unavailable
 			return img
 
 		try:
@@ -398,7 +396,7 @@ class MPTile:
 
 		img = self.load_tile_lowres(tile)
 		if img is None:
-			img = cv.LoadImage(self._loading)
+			img = self._loading
 		return img
 
 
@@ -530,6 +528,20 @@ class MPTile:
 		# return as an RGB image
 		cv.CvtColor(img, img, cv.CV_BGR2RGB)
 		return img
+
+def mp_icon(filename):
+        '''load an icon from the data directory'''
+        # we have to jump through a lot of hoops to get an OpenCV image
+        # when we may be in a package zip file
+        try:
+                import pkg_resources
+                raw = pkg_resources.resource_stream(__name__, "data/%s" % filename).read()
+        except Exception:
+                raw = open(os.path.join(__file__, 'data', filename)).read()
+        imagefiledata = cv.CreateMatHeader(1, len(raw), cv.CV_8UC1)
+        cv.SetData(imagefiledata, raw, len(raw))
+        img = cv.DecodeImage(imagefiledata, cv.CV_LOAD_IMAGE_COLOR)
+        return img
 
 
 if __name__ == "__main__":
