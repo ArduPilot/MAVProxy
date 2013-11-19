@@ -13,6 +13,18 @@ from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.mavproxy_map import mp_widgets
 
 
+class MPImageData:
+    '''image data to display'''
+    def __init__(self, img):
+        self.width = img.width
+        self.height = img.height
+        self.data = img.tostring()
+
+class MPImageTitle:
+    '''window title to use'''
+    def __init__(self, title):
+        self.title = title
+
 class MPImage():
     '''
     a generic image viewer widget for use in MP tools
@@ -57,7 +69,10 @@ class MPImage():
         if bgr:
             img = cv.CloneImage(img)
             cv.CvtColor(img, img, cv.CV_BGR2RGB)
-        self.in_queue.put(((img.width, img.height), img.tostring()))
+        self.in_queue.put(MPImageData(img))
+
+    def set_title(self, title):
+        self.in_queue.put(MPImageTitle(title))
 
     def poll(self):
         '''check for events, returning one event'''
@@ -196,11 +211,13 @@ class MPImagePanel(wx.Panel):
         state = self.state
         while state.in_queue.qsize():
             obj = state.in_queue.get()
-            (size, imgstr) = obj
-            img = wx.EmptyImage(size[0], size[1])
-            img.SetData(imgstr)
-            self.img = img
-            self.need_redraw = True
+            if isinstance(obj, MPImageData):
+                img = wx.EmptyImage(obj.width, obj.height)
+                img.SetData(obj.data)
+                self.img = img
+                self.need_redraw = True
+            if isinstance(obj, MPImageTitle):
+                state.frame.SetTitle(obj.title)
         if self.need_redraw:
             self.redraw()
 
