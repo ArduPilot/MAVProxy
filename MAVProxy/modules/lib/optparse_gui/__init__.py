@@ -231,7 +231,7 @@ class OptionParser( optparse.OptionParser ):
                 if default is not None:
                     option.default = default
 
-        dlg = OptparseDialog( option_parser = self )
+        dlg = OptparseDialog( option_parser = self, title=self.get_description() )
 
         if args:
             dlg.args_ctrl.Value = ' '.join(args)
