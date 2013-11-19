@@ -21,9 +21,10 @@ class MPImage():
                  title='MPImage',
                  width=512,
                  height=512,
-                 events=[],
                  can_zoom = False,
-                 can_drag = False):
+                 can_drag = False,
+                 mouse_events = False,
+                 key_events = False):
         import multiprocessing
 
         self.title = title
@@ -31,7 +32,8 @@ class MPImage():
         self.height = height
         self.can_zoom = can_zoom
         self.can_drag = can_drag
-        self._events = events
+        self.mouse_events = mouse_events
+        self.key_events = key_events
         self.in_queue = multiprocessing.Queue()
         self.out_queue = multiprocessing.Queue()
         self.child = multiprocessing.Process(target=self.child_task)
@@ -118,9 +120,11 @@ class MPImagePanel(wx.Panel):
         # panel for the main image
         self.imagePanel = mp_widgets.ImagePanel(self, wx.EmptyImage(state.width,state.height))
         self.mainSizer.Add(self.imagePanel, flag=wx.TOP|wx.LEFT|wx.GROW, border=0)
-        for ev in state._events:
-            self.imagePanel.Bind(ev, self.on_event)
-        if not wx.EVT_KEY_DOWN in state._events:
+        if state.mouse_events:
+            self.imagePanel.Bind(wx.EVT_MOUSE_EVENTS, self.on_event)
+        if state.key_events:
+            self.imagePanel.Bind(wx.EVT_KEY_DOWN, self.on_event)
+        else:
             self.imagePanel.Bind(wx.EVT_KEY_DOWN, self.on_key_event)
         self.imagePanel.Bind(wx.EVT_MOUSEWHEEL, self.on_mouse_wheel)
 
@@ -297,7 +301,8 @@ if __name__ == "__main__":
     parser.add_option("--drag", action='store_true', default=False, help="allow drag")
     (opts, args) = parser.parse_args()
     
-    im = MPImage(events=[wx.EVT_MOUSE_EVENTS, wx.EVT_KEY_DOWN],
+    im = MPImage(mouse_events=True,
+                 key_events=True,
                  can_drag = opts.drag,
                  can_zoom = opts.zoom)
     img = cv.LoadImage(args[0])
