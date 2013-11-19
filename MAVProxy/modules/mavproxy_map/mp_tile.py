@@ -281,9 +281,9 @@ class MPTile:
 			h.close()
                         try:
                                 os.unlink(path)
-                                os.rename(path+'.tmp', path)
                         except Exception:
                                 pass
+                        os.rename(path+'.tmp', path)
 			self._download_pending.pop(key)
 		self._download_thread = None
 
