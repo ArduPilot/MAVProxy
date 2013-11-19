@@ -7,6 +7,7 @@ version = "1.1.0"
 
 setup(name='MAVProxy',
       version=version,
+      zip_safe=True,
       description='MAVProxy MAVLink ground station',
       long_description='''A MAVLink protocol proxy and ground station. MAVProxy
 is oriented towards command line operation, and is suitable for embedding in
@@ -31,7 +32,6 @@ on how to use MAVProxy.''',
         'Programming Language :: Python :: 2.7',
         'Topic :: Scientific/Engineering'],
       license='GPLv3',
-      package_dir={'MAVProxy': 'MAVProxy'},
       packages=['MAVProxy',
                 'MAVProxy.modules',
                 'MAVProxy.modules.mavproxy_map',
@@ -44,6 +44,7 @@ on how to use MAVProxy.''',
       scripts=['MAVProxy/mavproxy.py', 'MAVProxy/tools/mavflightview.py',
                'MAVProxy/modules/mavproxy_map/mp_slipmap.py',
                'MAVProxy/modules/mavproxy_map/mp_tile.py'],
-      package_data={'MAVProxy.modules.mavproxy_map':
-                    ['data/*.jpg', 'data/*.png']}
+      package_data={'MAVProxy':
+                    ['modules/mavproxy_map/data/*.jpg', 
+                     'modules/mavproxy_map/data/*.png']}
     )

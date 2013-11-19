@@ -279,7 +279,11 @@ class MPTile:
 			h = open(path+'.tmp','wb')
 			h.write(img)
 			h.close()
-			os.rename(path+'.tmp', path)
+                        try:
+                                os.unlink(path)
+                                os.rename(path+'.tmp', path)
+                        except Exception:
+                                pass
 			self._download_pending.pop(key)
 		self._download_thread = None
 
