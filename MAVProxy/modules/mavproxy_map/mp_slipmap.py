@@ -561,6 +561,25 @@ class MPSlipMapFrame(wx.Frame):
                                  flag=wx.LEFT, border=0)
         state.have_grid = state.panel.grid_checkbox.GetValue()
 
+        state.panel.service_choice = wx.Choice(
+            state.panel, -1, (85, 18),
+            choices=self.state.mt.get_service_list())
+        try:
+            # cope with invalid state.service, e.g. bad CLI option
+            select_pos = state.panel.service_choice.FindString(
+                self.state.service)
+        except:
+            select_pos = 0
+        state.panel.service_choice.SetSelection(select_pos)
+        state.panel.controls.Add(state.panel.service_choice,
+                                 flag=wx.LEFT, border=0)
+        state.panel.service_choice.Bind(wx.EVT_CHOICE,
+                                        self.handle_service_select)
+
+    def handle_service_select(self, event):
+        ''' handle events from the service_choice widget '''
+        selected = event.GetString()
+        self.state.add_object(SlipService(selected))
 
     def find_object(self, key, layers):
         '''find an object to be modified'''
