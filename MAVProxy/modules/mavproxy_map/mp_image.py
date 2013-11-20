@@ -40,7 +40,8 @@ class MPImage():
                  can_zoom = False,
                  can_drag = False,
                  mouse_events = False,
-                 key_events = False):
+                 key_events = False,
+                 auto_size = False):
         import multiprocessing
 
         self.title = title
@@ -50,6 +51,8 @@ class MPImage():
         self.can_drag = can_drag
         self.mouse_events = mouse_events
         self.key_events = key_events
+        self.auto_size = auto_size
+        
         self.in_queue = multiprocessing.Queue()
         self.out_queue = multiprocessing.Queue()
         self.child = multiprocessing.Process(target=self.child_task)
@@ -220,6 +223,8 @@ class MPImagePanel(wx.Panel):
                 img.SetData(obj.data)
                 self.img = img
                 self.need_redraw = True
+                if state.auto_size:
+                    state.frame.SetSize(wx.Size(obj.width, obj.height))
             if isinstance(obj, MPImageTitle):
                 state.frame.SetTitle(obj.title)
         if self.need_redraw:
@@ -320,12 +325,14 @@ if __name__ == "__main__":
     parser = OptionParser("mp_image.py <file>")
     parser.add_option("--zoom", action='store_true', default=False, help="allow zoom")
     parser.add_option("--drag", action='store_true', default=False, help="allow drag")
+    parser.add_option("--autosize", action='store_true', default=False, help="auto size window")
     (opts, args) = parser.parse_args()
     
     im = MPImage(mouse_events=True,
                  key_events=True,
                  can_drag = opts.drag,
-                 can_zoom = opts.zoom)
+                 can_zoom = opts.zoom,
+                 auto_size = opts.autosize)
     img = cv.LoadImage(args[0])
     im.set_image(img, bgr=True)
 
