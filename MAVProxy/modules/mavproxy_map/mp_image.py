@@ -5,9 +5,13 @@ Andrew Tridgell
 June 2012
 '''
 
-import cv2.cv as cv
 import time
 import wx
+
+try:
+    import cv2.cv as cv
+except ImportError:
+    import cv
 
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.mavproxy_map import mp_widgets
