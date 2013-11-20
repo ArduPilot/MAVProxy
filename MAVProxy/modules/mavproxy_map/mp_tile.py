@@ -20,7 +20,10 @@ import sys
 import string
 import time
 
-import cv2.cv as cv
+try:
+	import cv2.cv as cv
+except ImportError:
+	import cv
 
 from MAVProxy.modules.lib import mp_util
 

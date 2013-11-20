@@ -6,11 +6,15 @@ Andrew Tridgell
 June 2012
 '''
 
-import cv2.cv as cv
 import functools
 import math
 import os, sys
 import time
+
+try:
+    import cv2.cv as cv
+except ImportError:
+    import cv
 
 from MAVProxy.modules.mavproxy_map import mp_elevation
 from MAVProxy.modules.mavproxy_map import mp_tile

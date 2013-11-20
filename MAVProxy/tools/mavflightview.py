@@ -9,8 +9,12 @@ import sys, time, os
 from pymavlink import mavutil, mavwp
 from MAVProxy.modules.mavproxy_map import mp_slipmap, mp_tile
 from MAVProxy.modules.lib import mp_util
-import cv2.cv as cv
 import functools
+
+try:
+    import cv2.cv as cv
+except ImportError:
+    import cv
 
 from optparse import OptionParser
 parser = OptionParser("mavflightview.py [options]")

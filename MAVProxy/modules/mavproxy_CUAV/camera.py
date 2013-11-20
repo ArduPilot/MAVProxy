@@ -2,7 +2,10 @@
 '''camera control for ptgrey chameleon camera'''
 
 import time, threading, sys, os, numpy, Queue, errno, cPickle, signal, struct, fcntl, select, cStringIO
-import cv2.cv as cv
+try:
+    import cv2.cv as cv
+except ImportError:
+    import cv
 
 from cuav.image import scanner
 from pymavlink import mavutil
