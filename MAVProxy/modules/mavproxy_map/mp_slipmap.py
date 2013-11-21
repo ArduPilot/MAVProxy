@@ -559,31 +559,28 @@ class MPSlipMapFrame(wx.Frame):
         self.Bind(wx.EVT_IDLE, self.on_idle)
         self.Bind(wx.EVT_SIZE, state.panel.on_size)
 
+        # display a 'Grid' checkbox
         state.panel.grid_checkbox = wx.CheckBox(state.panel, -1, 'Grid')
         state.panel.grid_checkbox.SetValue(False)
         state.panel.controls.Add(state.panel.grid_checkbox,
                                  flag=wx.LEFT, border=0)
         state.have_grid = state.panel.grid_checkbox.GetValue()
 
+        # display a 'Follow' checkbox
+        state.panel.follow_checkbox = wx.CheckBox(state.panel, -1, 'Follow')
+        state.panel.follow_checkbox.SetValue(True)
+        state.panel.controls.Add(state.panel.follow_checkbox,
+                                 flag=wx.LEFT, border=0)
+
+        # display a list of available map services
         state.panel.service_choice = wx.Choice(
             state.panel, -1, (85, 18),
             choices=self.state.mt.get_service_list())
-        try:
-            # cope with invalid state.service, e.g. bad CLI option
-            select_pos = state.panel.service_choice.FindString(
-                self.state.service)
-        except:
-            select_pos = 0
-        state.panel.service_choice.SetSelection(select_pos)
         state.panel.controls.Add(state.panel.service_choice,
                                  flag=wx.LEFT, border=0)
         state.panel.service_choice.Bind(wx.EVT_CHOICE,
-                                        self.handle_service_select)
-
-    def handle_service_select(self, event):
-        ''' handle events from the service_choice widget '''
-        selected = event.GetString()
-        self.state.add_object(SlipService(selected))
+                                        state.panel.handle_service_select)
+        state.panel.set_service_selection()
 
     def find_object(self, key, layers):
         '''find an object to be modified'''
@@ -607,13 +604,6 @@ class MPSlipMapFrame(wx.Frame):
             py < (1.0-ratio)*state.height):
             # we're in the mid part of the map already, don't move
             return
-
-        if state.panel.follow_checkbox is None:
-            # display a 'Follow' checkbox
-            state.panel.follow_checkbox = wx.CheckBox(state.panel, -1, 'Follow')
-            state.panel.follow_checkbox.SetValue(True)
-            state.panel.controls.Add(state.panel.follow_checkbox,
-                                     flag=wx.LEFT, border=0)
 
         if not state.panel.follow_checkbox.GetValue():
             # the use has disabled following
@@ -690,8 +680,10 @@ class MPSlipMapFrame(wx.Frame):
                 if obj.service not in services:
                     print("Unknown map service '%s'" % obj.service)
                 else:
+                    state.service = obj.service
                     state.mt.set_service(obj.service)
                     state.need_redraw = True
+                    state.panel.set_service_selection()
 
             if isinstance(obj, SlipCenter):
                 # move center
@@ -784,6 +776,25 @@ class MPSlipMapPanel(wx.Panel):
         self.last_view = None
         self.redraw_map()
         state.frame.Fit()
+
+    def set_service_selection(self):
+        '''set the selection position in the service dropdown'''
+        state = self.state
+        try:
+            # cope with invalid state.service, e.g. bad CLI option
+            select_pos = state.panel.service_choice.FindString(state.service)
+        except:
+            select_pos = 0
+        state.panel.service_choice.SetSelection(select_pos)
+        state.panel.Refresh()
+
+    def handle_service_select(self, event):
+        ''' handle events from the service_choice widget '''
+        state = self.state
+        state.service = event.GetString()
+        state.mt.set_service(state.service)
+        self.set_service_selection()
+        state.need_redraw = True
 
     def on_focus(self, event):
         '''called when the panel gets focus'''
