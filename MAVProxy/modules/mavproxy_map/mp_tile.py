@@ -92,16 +92,17 @@ class TileServiceInfo:
 
 class TileInfo:
 	'''description of a tile'''
-	def __init__(self, tile, zoom, offset=(0,0)):
+	def __init__(self, tile, zoom, service, offset=(0,0)):
 		self.tile = tile
 		(self.x, self.y) = tile
 		self.zoom = zoom
+                self.service = service
 		(self.offsetx, self.offsety) = offset
 		self.refresh_time()
 
 	def key(self):
 		'''tile cache key'''
-		return (self.tile, self.zoom)
+		return (self.tile, self.zoom, self.service)
 
 	def refresh_time(self):
 		'''reset the request time'''
@@ -153,8 +154,8 @@ class TileInfo:
 
 class TileInfoScaled(TileInfo):
 	'''information on a tile with scale information and placement'''
-	def __init__(self, tile, zoom, scale, src, dst):
-		TileInfo.__init__(self, tile, zoom)
+	def __init__(self, tile, zoom, scale, src, dst, service):
+		TileInfo.__init__(self, tile, zoom, service)
 		self.scale = scale
 		(self.srcx, self.srcy) = src
 		(self.dstx, self.dsty) = dst
@@ -203,7 +204,9 @@ class MPTile:
 
         def get_service_list(self):
                 '''return list of available services'''
-                return TILE_SERVICES.keys()
+                service_list = TILE_SERVICES.keys()
+                service_list.sort()
+                return service_list
 
 	def coord_to_tile(self, lat, lon, zoom):
 		'''convert lat/lon/zoom to a TileInfo'''
@@ -214,7 +217,7 @@ class MPTile:
 		y = world_tiles/2 + 0.5*math.log((1+e)/(1-e)) * (-tiles_pre_radian)
 		offsetx = int((x - int(x)) * TILES_WIDTH)
 		offsety = int((y - int(y)) * TILES_HEIGHT)
-		return TileInfo((int(x) % world_tiles, int(y) % world_tiles), zoom, offset=(offsetx, offsety))
+		return TileInfo((int(x) % world_tiles, int(y) % world_tiles), zoom, self.service, offset=(offsetx, offsety))
 
 	def tile_to_path(self, tile):
 		'''return full path to a tile'''
@@ -496,7 +499,8 @@ class MPTile:
 			dstx = 0
 			for x in range(tile_min.x, tile_max.x+1):
 				if dstx < width and dsty < height:
-					ret.append(TileInfoScaled((x,y), zoom, scale, (srcx,srcy), (dstx,dsty)))
+					ret.append(TileInfoScaled((x,y), zoom, scale,
+                                                                  (srcx,srcy), (dstx,dsty), self.service))
 				dstx += scaled_tile_width-srcx
 				srcx = 0
 			dsty += scaled_tile_height-srcy
