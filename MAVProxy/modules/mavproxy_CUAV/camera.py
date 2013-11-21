@@ -347,12 +347,14 @@ def scan_thread():
         t1 = time.time()
         im_full = numpy.zeros((960,1280,3),dtype='uint8')
         im_640 = numpy.zeros((480,640,3),dtype='uint8')
-        scanner.debayer_full(im, im_full)
+        scanner.debayer(im, im_full)
         scanner.downsample(im_full, im_640)
         if state.settings.fullres:
-            regions = cuav_region.RegionsConvert(scanner.scan(im_full), 1280, 960)
+            img_scan = im_full
         else:
-            regions = cuav_region.RegionsConvert(scanner.scan(im_640))
+            img_scan = im_640
+        regions = scanner.scan(img_scan)
+        regions = cuav_region.RegionsConvert(regions, cuav_util.image_shape(img_scan), cuav_util.image_shape(im_full))
         t2 = time.time()
         state.scan_fps = 1.0 / (t2-t1)
         state.scan_count += 1
