@@ -1169,16 +1169,19 @@ def cmd_module(args):
             print("usage: module load <name>")
             return
         modname = args[1]
-        modpath = 'MAVProxy.modules.mavproxy_%s' % (modname,)
-        try:
-            m = import_package(modpath)
-            if m in mpstate.modules:
-                raise RuntimeError("module %s already loaded" % (modname,))
-            m.init(mpstate)
-            mpstate.modules.append(m)
-            print("Loaded module %s" % (modname,))
-        except Exception, msg:
-            print("Unable to load module %s: %s" % (modname, msg))
+        modpaths = ['MAVProxy.modules.mavproxy_%s' % modname, modname]
+        for modpath in modpaths:
+            try:
+                m = import_package(modpath)
+                if m in mpstate.modules:
+                    raise RuntimeError("module %s already loaded" % (modname,))
+                m.init(mpstate)
+                mpstate.modules.append(m)
+                print("Loaded module %s" % (modname,))
+                return
+            except Exception, msg:
+                ex = msg
+        print("Failed to load module: %s" % ex)
     elif args[0] == "reload":
         if len(args) < 2:
             print("usage: module reload <name>")
