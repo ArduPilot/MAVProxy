@@ -1179,7 +1179,7 @@ def cmd_module(args):
                 mpstate.modules.append(m)
                 print("Loaded module %s" % (modname,))
                 return
-            except Exception, msg:
+            except ImportError, msg:
                 ex = msg
         print("Failed to load module: %s" % ex)
     elif args[0] == "reload":
