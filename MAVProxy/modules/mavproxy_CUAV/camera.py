@@ -120,12 +120,10 @@ class MavSocket:
     def sendto(self, buf, dest):
         if len(buf) <= 16:
             self.master.mav.data16_send(0, len(buf), buf)
-        if len(buf) <= 32:
+        elif len(buf) <= 32:
             self.master.mav.data32_send(0, len(buf), buf)
         elif len(buf) <= 64:
             self.master.mav.data64_send(0, len(buf), buf)
-        elif len(buf) <= 96:
-            self.master.mav.data96_send(0, len(buf), buf)
         else:
             print("PACKET TOO LARGE %u" % len(buf))
             raise RuntimeError('packet too large %u' % len(buf))
@@ -169,7 +167,8 @@ def cmd_camera(args):
             state.capture_count, state.error_count, state.scan_count, state.region_count, 
             state.jpeg_size,
             state.xmit_queue, state.xmit_queue2, state.frame_loss, state.scan_queue.qsize(), state.efficiency))
-        if state.bsend2:
+        #print("state.bsend2 is ", state.bsend2)
+        if state.bsend2 is not None:
             state.bsend2.report(detailed=False)
     elif args[0] == "queue":
         print("scan %u  save %u  transmit %u  eff %.1f  bw %.1f  rtt %.1f" % (
@@ -219,6 +218,7 @@ def cmd_remote(args):
         return
     pkt = CommandPacket(cmd)
     buf = cPickle.dumps(pkt, cPickle.HIGHEST_PROTOCOL)
+    #print("sending buf len=%u from cmd_remote" % len(buf))
     state.bsend2.send(buf, priority=10000)
 
 def get_base_time():
@@ -420,7 +420,7 @@ def transmit_thread():
     skip_count = 0
     bsend = block_xmit.BlockSender(0, bandwidth=state.settings.bandwidth, debug=False)
     state.bsocket = MavSocket(mpstate.mav_master[0])
-    state.bsend2 = block_xmit.BlockSender(mss=96, sock=state.bsocket, dest_ip='mavlink', dest_port=0, backlog=5, debug=False)
+    state.bsend2 = block_xmit.BlockSender(mss=64, sock=state.bsocket, dest_ip='mavlink', dest_port=0, backlog=5, debug=False)
     state.bsend2.set_bandwidth(state.settings.bandwidth2)
 
     while not state.unload.wait(0.02):
@@ -475,6 +475,7 @@ def transmit_thread():
                     buf = cPickle.dumps(pkt, cPickle.HIGHEST_PROTOCOL)
                     bsend.set_bandwidth(state.settings.bandwidth)
                     bsend.set_packet_loss(state.settings.packet_loss)
+                    #print("sending thumb len=%u" % len(buf))
                     bsend.send(buf,
                                dest=(state.settings.gcs_address, state.settings.gcs_view_port),
                                priority=1)
@@ -492,6 +493,7 @@ def transmit_thread():
 
                         buf = cPickle.dumps(pkt, cPickle.HIGHEST_PROTOCOL)
                     state.bsend2.set_bandwidth(state.settings.bandwidth2)
+                    #print("sending thumb2 len=%u" % len(buf))
                     state.bsend2.send(buf, priority=highscore)
 
         # Base how many images we send on the send queue size
@@ -514,6 +516,7 @@ def transmit_thread():
         bsend.set_bandwidth(state.settings.bandwidth)
         pkt = ImagePacket(frame_time, jpeg, state.xmit_queue, pos)
         str = cPickle.dumps(pkt, cPickle.HIGHEST_PROTOCOL)
+        #print("sending image len=%u" % len(str))
         bsend.send(str,
                    dest=(state.settings.gcs_address, state.settings.gcs_view_port))
 
@@ -559,7 +562,7 @@ def view_thread():
 
     bsend = block_xmit.BlockSender(state.settings.gcs_view_port, bandwidth=state.settings.bandwidth)
     state.bsocket = MavSocket(mpstate.mav_master[0])
-    state.bsend2 = block_xmit.BlockSender(mss=96, sock=state.bsocket, dest_ip='mavlink', dest_port=0, backlog=5, debug=False)
+    state.bsend2 = block_xmit.BlockSender(mss=64, sock=state.bsocket, dest_ip='mavlink', dest_port=0, backlog=5, debug=False)
     state.bsend2.set_bandwidth(state.settings.bandwidth2)
 
     view_window = False
@@ -625,6 +628,7 @@ def view_thread():
             if state.settings.gcs_slave is not None:
                 if state.bsend_slave is None:
                     state.bsend_slave = block_xmit.BlockSender(0, bandwidth=state.settings.bandwidth*10, debug=False)
+                #print("send bsend_slave")
                 state.bsend_slave.send(buf,
                                        dest=(state.settings.gcs_slave, state.settings.gcs_view_port),
                                        priority=1)
@@ -757,6 +761,7 @@ def check_commands():
         sys.stdout = stdout_saved
         pkt = CommandResponse(str(buf.getvalue()))
         buf = cPickle.dumps(pkt, cPickle.HIGHEST_PROTOCOL)
+        #print("send in check_commands")
         state.bsend2.send(buf, priority=10000)
         state.bsend2.set_bandwidth(state.settings.bandwidth2)
 
