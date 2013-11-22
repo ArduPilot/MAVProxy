@@ -124,6 +124,8 @@ class MavSocket:
             self.master.mav.data32_send(0, len(buf), buf)
         elif len(buf) <= 64:
             self.master.mav.data64_send(0, len(buf), buf)
+        elif len(buf) <= 96:
+            self.master.mav.data96_send(0, len(buf), buf)
         else:
             print("PACKET TOO LARGE %u" % len(buf))
             raise RuntimeError('packet too large %u' % len(buf))
@@ -420,7 +422,7 @@ def transmit_thread():
     skip_count = 0
     bsend = block_xmit.BlockSender(0, bandwidth=state.settings.bandwidth, debug=False)
     state.bsocket = MavSocket(mpstate.mav_master[0])
-    state.bsend2 = block_xmit.BlockSender(mss=64, sock=state.bsocket, dest_ip='mavlink', dest_port=0, backlog=5, debug=False)
+    state.bsend2 = block_xmit.BlockSender(mss=96, sock=state.bsocket, dest_ip='mavlink', dest_port=0, backlog=5, debug=False)
     state.bsend2.set_bandwidth(state.settings.bandwidth2)
 
     while not state.unload.wait(0.02):
@@ -562,7 +564,7 @@ def view_thread():
 
     bsend = block_xmit.BlockSender(state.settings.gcs_view_port, bandwidth=state.settings.bandwidth)
     state.bsocket = MavSocket(mpstate.mav_master[0])
-    state.bsend2 = block_xmit.BlockSender(mss=64, sock=state.bsocket, dest_ip='mavlink', dest_port=0, backlog=5, debug=False)
+    state.bsend2 = block_xmit.BlockSender(mss=96, sock=state.bsocket, dest_ip='mavlink', dest_port=0, backlog=5, debug=False)
     state.bsend2.set_bandwidth(state.settings.bandwidth2)
 
     view_window = False
