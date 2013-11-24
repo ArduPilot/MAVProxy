@@ -758,6 +758,7 @@ def cmd_watch(args):
 def cmd_module(args):
     '''module commands'''
     usage = "usage: module <list|load|reload|unload>"
+    
     if len(args) < 1:
         print(usage)
         return
