@@ -1308,9 +1308,9 @@ command_map = {
     'watch'   : (cmd_watch,    'watch a MAVLink pattern'),
     'module'  : (cmd_module,   'module commands'),
     'alias'   : (cmd_alias,    'command aliases'),
-    'arm'     : (cmd_arm,      'ArduCopter arm motors'),
+    'arm'     : (cmd_arm,      'Copter/Plane arm motors'),
     'time'    : (cmd_time,     'Show autopilot time'),
-    'disarm'  : (cmd_disarm,   'ArduCopter disarm motors')
+    'disarm'  : (cmd_disarm,   'Copter/Plane disarm motors')
     }
 
 def process_stdin(line):
