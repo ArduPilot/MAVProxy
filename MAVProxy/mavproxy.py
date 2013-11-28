@@ -1435,7 +1435,7 @@ def vcell_to_battery_percent(vcell):
     elif vcell > 3.81:
         # 3.81 is 17% remaining, from flight logs
         return 17.0 + 83.0 * (vcell - 3.81) / (4.1 - 3.81)
-    elif vcell > 3.81:
+    elif vcell > 3.2:
         # below 3.2 it degrades fast. It's dead at 3.2
         return 0.0 + 17.0 * (vcell - 3.20) / (3.81 - 3.20)
     # it's dead or disconnected
