@@ -1326,10 +1326,11 @@ def process_stdin(line):
             mpstate.status.flightmode = "MAV"
             mpstate.rl.set_prompt("MAV> ")
             return
-        if line == '+++':
-            mpstate.master().write(line)
-        else:
-            mpstate.master().write(line + '\r')
+        if line != '+++':
+            line += '\r'
+        for c in line:
+            time.sleep(0.01)
+            mpstate.master().write(c)
         return
 
     if not line:
