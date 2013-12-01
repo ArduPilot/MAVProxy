@@ -94,11 +94,24 @@ def mavflightview(filename):
         if opts.mode is not None and mlog.flightmode.lower() != opts.mode.lower():
             continue
         if m.get_type() == 'GPS':
-            if m.Status < 2:
+            status = getattr(m, 'Status', None)
+            if status is None:
+                status = getattr(m, 'FixType', None)
+                if status is None:
+                    print("Can't find status on GPS message")
+                    print(m)
+                    break
+            if status < 2:
                 continue
             # flash log
             lat = m.Lat
-            lng = m.Lng
+            lng = getattr(m, 'Lng', None)
+            if lng is None:
+                lng = getattr(m, 'Lon', None)
+                if lng is None:
+                    print("Can't find longitude on GPS message")
+                    print(m)
+                    break                    
         else:
             lat = m.lat * 1.0e-7
             lng = m.lon * 1.0e-7
