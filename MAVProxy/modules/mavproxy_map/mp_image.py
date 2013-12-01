@@ -29,6 +29,11 @@ class MPImageTitle:
     def __init__(self, title):
         self.title = title
 
+class MPImageMenu:
+    '''window menu to add'''
+    def __init__(self, menu):
+        self.menu = menu
+
 class MPImage():
     '''
     a generic image viewer widget for use in MP tools
@@ -81,6 +86,9 @@ class MPImage():
     def set_title(self, title):
         self.in_queue.put(MPImageTitle(title))
 
+    def set_menu(self, menu):
+        self.in_queue.put(MPImageMenu(menu))
+
     def poll(self):
         '''check for events, returning one event'''
         if self.out_queue.qsize():
@@ -131,6 +139,7 @@ class MPImagePanel(wx.Panel):
         self.mouse_down = None
         self.drag_step = 10
         self.zoom = 1.0
+        self.menu = None
 
         # dragpos is the top left position in image coordinates
         self.dragpos = wx.Point(0,0)
@@ -227,6 +236,8 @@ class MPImagePanel(wx.Panel):
                     state.frame.SetSize(wx.Size(obj.width, obj.height))
             if isinstance(obj, MPImageTitle):
                 state.frame.SetTitle(obj.title)
+            if isinstance(obj, MPImageMenu):
+                self.set_menu(obj.menu)
         if self.need_redraw:
             self.redraw()
 
@@ -319,6 +330,23 @@ class MPImagePanel(wx.Panel):
             # don't flood the queue with mouse movement
             return
         state.out_queue.put(mp_util.object_container(event))
+
+    def on_menu(self, event):
+        '''called on menu event'''
+        state = self.state
+        if self.menu is None:
+            return
+        m = event.GetEventObject()
+        ret = self.menu.find_selected(event)
+        if ret is not None:
+            state.out_queue.put(ret)
+
+    def set_menu(self, menu):
+        '''add a menu from the parent'''
+        self.menu = menu
+        wx_menu = menu.wx_menu()
+        self.frame.SetMenuBar(wx_menu)
+        self.frame.Bind(wx.EVT_MENU, self.on_menu)
             
 if __name__ == "__main__":
     from optparse import OptionParser
@@ -338,6 +366,9 @@ if __name__ == "__main__":
 
     while im.is_alive():
         for event in im.events():
+            if isinstance(event, MPMenuItem):
+                print(event)
+                continue
             print event.ClassName
             if event.ClassName == 'wxMouseEvent':
                 print 'mouse', event.X, event.Y
