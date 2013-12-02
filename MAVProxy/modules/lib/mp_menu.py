@@ -89,10 +89,11 @@ class MPMenuCheckbox(MPMenuItem):
 
 class MPMenuRadio(MPMenuItem):
     '''a MP menu item as a radio item'''
-    def __init__(self, name, description='', returnkey=None, items=[]):
+    def __init__(self, name, description='', returnkey=None, selected=None, items=[]):
         MPMenuItem.__init__(self, name, description=description, returnkey=returnkey)
         self.items = items
         self.choice = 0
+        self.initial = selected
 
     def set_choices(self, items):
         '''set radio item choices'''
@@ -101,7 +102,7 @@ class MPMenuRadio(MPMenuItem):
     def get_choice(self):
         '''return the chosen item'''
         return self.items[self.choice]
-        
+
     def find_selected(self, event):
         '''find the selected menu item'''
         first = self.id()
@@ -117,6 +118,8 @@ class MPMenuRadio(MPMenuItem):
         submenu = wx.Menu()
         for i in range(len(self.items)):
             submenu.AppendRadioItem(self.id()+i, self.items[i], self.description)
+            if self.items[i] == self.initial:
+                submenu.Check(self.id()+i, True)
         menu.AppendMenu(-1, self.name, submenu)
         
     def __str__(self):
