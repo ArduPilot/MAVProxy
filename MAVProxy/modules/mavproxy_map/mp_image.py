@@ -34,6 +34,16 @@ class MPImageBrightness:
     def __init__(self, brightness):
         self.brightness = brightness
 
+class MPImageFitToWindow:
+    '''fit image to window'''
+    def __init__(self):
+        pass
+
+class MPImageFullSize:
+    '''show full image resolution'''
+    def __init__(self):
+        pass
+
 class MPImageMenu:
     '''window menu to add'''
     def __init__(self, menu):
@@ -105,6 +115,14 @@ class MPImage():
     def set_brightness(self, brightness):
         '''set the image brightness'''
         self.in_queue.put(MPImageBrightness(brightness))
+
+    def fit_to_window(self):
+        '''fit the image to the window'''
+        self.in_queue.put(MPImageFitToWindow())
+
+    def full_size(self):
+        '''show the full image resolution'''
+        self.in_queue.put(MPImageFullSize())
 
     def set_menu(self, menu):
         '''set a MPTopMenu on the frame'''
@@ -290,6 +308,10 @@ class MPImagePanel(wx.Panel):
             if isinstance(obj, MPImageBrightness):
                 state.brightness = obj.brightness
                 self.need_redraw = True
+            if isinstance(obj, MPImageFullSize):
+                self.full_size()
+            if isinstance(obj, MPImageFitToWindow):
+                self.fit_to_window()
         if self.need_redraw:
             self.redraw()
 
@@ -418,6 +440,21 @@ class MPImagePanel(wx.Panel):
             self.wx_popup_menu = None
         else:
             self.wx_popup_menu = menu.wx_menu()
+
+    def fit_to_window(self):
+        '''fit image to window'''
+        state = self.state
+        self.dragpos = wx.Point(0, 0)
+        client_area = state.frame.GetClientSize()
+        self.zoom = min(float(client_area.x) / self.img.GetWidth(),
+                        float(client_area.y) / self.img.GetHeight())
+        self.need_redraw = True
+
+    def full_size(self):
+        '''show image at full size'''
+        self.dragpos = wx.Point(0, 0)
+        self.zoom = 1.0
+        self.need_redraw = True
             
 if __name__ == "__main__":
     from optparse import OptionParser
