@@ -18,7 +18,7 @@ control modules. MAVProxy is extensible via a modules system - see the modules
 subdirectory for some example modules. MAVProxy was developed by CanberraUAV
 for use in the 2012 Outback Challenge, and includes a module for the
 CanberraUAV search and rescue system. See
-http://www.qgroundcontrol.org/mavlink/mavproxy_startpage for more information
+http://tridge.github.io/MAVProxy/ for more information
 on how to use MAVProxy.''',
       url='https://github.com/tridge/MAVProxy',
       author='Andrew Tridgell',
@@ -39,6 +39,9 @@ on how to use MAVProxy.''',
                 'MAVProxy.modules.lib.ANUGA',
                 'MAVProxy.modules.lib.optparse_gui'],
       install_requires=['pymavlink>=1.1.2',
+                        'matplotlib>=1.3.1',
+                        'wxPython>=2.9.1.1',
+                        'PIL>=1.1.6',
                         'pyserial>=2.6'],
       scripts=['MAVProxy/mavproxy.py', 'MAVProxy/tools/mavflightview.py',
                'MAVProxy/modules/mavproxy_map/mp_slipmap.py',
