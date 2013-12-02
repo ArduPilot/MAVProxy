@@ -154,18 +154,19 @@ def degrees_to_dms(degrees):
 
 class UTMGrid:
         '''class to hold UTM grid position'''
-        def __init__(self, zone, easting, northing):
+        def __init__(self, zone, easting, northing, hemisphere='S'):
                 self.zone = zone
                 self.easting = easting
                 self.northing = northing
+                self.hemisphere = hemisphere
 
         def __str__(self):
-                return "%u %u %u" % (self.zone, self.easting, self.northing)
+                return "%s %u %u %u" % (self.hemisphere, self.zone, self.easting, self.northing)
 
         def latlon(self):
                 '''return (lat,lon) for the grid coordinates'''
                 from MAVProxy.modules.lib.ANUGA import lat_long_UTM_conversion
-                (lat, lon) = lat_long_UTM_conversion.UTMtoLL(self.northing, self.easting, self.zone)
+                (lat, lon) = lat_long_UTM_conversion.UTMtoLL(self.northing, self.easting, self.zone, isSouthernHemisphere=(self.hemisphere=='S'))
                 return (lat, lon)
                 
 
@@ -173,7 +174,11 @@ def latlon_to_grid(latlon):
     '''convert to grid reference'''
     from MAVProxy.modules.lib.ANUGA import redfearn
     (zone, easting, northing) = redfearn.redfearn(latlon[0], latlon[1])
-    return UTMGrid(zone, easting, northing)
+    if latlon[0] < 0:
+            hemisphere = 'S'
+    else:
+            hemisphere = 'N'
+    return UTMGrid(zone, easting, northing, hemisphere=hemisphere)
 
 def latlon_round(latlon, spacing=1000):
         '''round to nearest grid corner'''
