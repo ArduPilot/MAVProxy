@@ -57,6 +57,7 @@ class MPImage():
         self.mouse_events = mouse_events
         self.key_events = key_events
         self.auto_size = auto_size
+        self.menu = None
         
         self.in_queue = multiprocessing.Queue()
         self.out_queue = multiprocessing.Queue()
@@ -78,16 +79,24 @@ class MPImage():
         return self.child.is_alive()
 
     def set_image(self, img, bgr=False):
+        '''set the currently displayed image'''
         if bgr:
             img = cv.CloneImage(img)
             cv.CvtColor(img, img, cv.CV_BGR2RGB)
         self.in_queue.put(MPImageData(img))
 
     def set_title(self, title):
+        '''set the frame title'''
         self.in_queue.put(MPImageTitle(title))
 
     def set_menu(self, menu):
+        '''set a MPTopMenu on the frame'''
+        self.menu = menu
         self.in_queue.put(MPImageMenu(menu))
+
+    def get_menu(self):
+        '''get the current frame menu'''
+        return self.menu
 
     def poll(self):
         '''check for events, returning one event'''
