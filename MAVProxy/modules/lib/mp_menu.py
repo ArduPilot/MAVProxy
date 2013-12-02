@@ -87,6 +87,41 @@ class MPMenuCheckbox(MPMenuItem):
     def __str__(self):
         return "MPMenuCheckbox(%s,%s,%s,%s)" % (self.name, self.description, self.returnkey, str(self.checked))
 
+class MPMenuRadio(MPMenuItem):
+    '''a MP menu item as a radio item'''
+    def __init__(self, name, description='', returnkey=None, items=[]):
+        MPMenuItem.__init__(self, name, description=description, returnkey=returnkey)
+        self.items = items
+        self.choice = 0
+
+    def set_choices(self, items):
+        '''set radio item choices'''
+        self.items = items
+
+    def get_choice(self):
+        '''return the chosen item'''
+        return self.items[self.choice]
+        
+    def find_selected(self, event):
+        '''find the selected menu item'''
+        first = self.id()
+        last = first + len(self.items) - 1
+        evid = event.GetId()
+        if evid >= first and evid <= last:
+            self.choice = evid - first
+            return self
+        return None
+
+    def _append(self, menu):
+        '''append this menu item to a menu'''
+        submenu = wx.Menu()
+        for i in range(len(self.items)):
+            submenu.AppendRadioItem(self.id()+i, self.items[i], self.description)
+        menu.AppendMenu(-1, self.name, submenu)
+        
+    def __str__(self):
+        return "MPMenuRadio(%s,%s,%s,%s)" % (self.name, self.description, self.returnkey, self.get_choice())
+
 
 class MPMenuSubMenu(MPMenuGeneric):
     '''a MP menu item'''
@@ -175,7 +210,11 @@ if __name__ == '__main__':
                                                                 MPMenuItem('Bar'),
                                                                 MPMenuSeparator(),
                                                                 MPMenuCheckbox('&Grid\tCtrl+G')]),
-                                           MPMenuItem('Image', 'EditImage')])])
+                                           MPMenuItem('Image', 'EditImage'),
+                                           MPMenuRadio('Colours',
+                                                       items=['Red','Green','Blue']),
+                                           MPMenuRadio('Shapes',
+                                                       items=['Circle','Square','Triangle'])])])
     
     im.set_menu(menu)
     while im.is_alive():
