@@ -550,7 +550,7 @@ class MPSlipMapFrame(wx.Frame):
         wx.Frame.__init__(self, None, wx.ID_ANY, state.title)
         self.state = state
         state.frame = self
-        state.grid = False
+        state.grid = True
         state.follow = True
         state.panel = MPSlipMapPanel(self, state)
         self.Bind(wx.EVT_IDLE, self.on_idle)
@@ -559,7 +559,8 @@ class MPSlipMapFrame(wx.Frame):
         # create the View menu
         self.menu = MPMenuTop([MPMenuSubMenu('View',
                                              items=[MPMenuCheckbox('Follow\tCtrl+F', 'Follow Aircraft', 'toggleFollow'),
-                                                    MPMenuCheckbox('Grid\tCtrl+G', 'Enable Grid', 'toggleGrid'),
+                                                    MPMenuCheckbox('Grid\tCtrl+G', 'Enable Grid', 'toggleGrid',
+                                                                   checked=state.grid),
                                                     MPMenuItem('Goto\tCtrl+P', 'Goto Position', 'gotoPosition'),
                                                     MPMenuItem('Brightness +\tCtrl+B', 'Increase Brightness', 'increaseBrightness'),
                                                     MPMenuItem('Brightness -\tCtrl+Shift+B', 'Decrease Brightness', 'decreaseBrightness'),
