@@ -188,3 +188,18 @@ def latlon_round(latlon, spacing=1000):
         return g.latlon()
 
         
+def wxToPIL(wimg):
+        '''convert a wxImage to a PIL Image'''
+        from PIL import Image
+        (w,h) = wimg.GetSize()
+        d     = wimg.GetData()
+        pimg  = Image.new("RGB", (w,h), color=1)
+        pimg.fromstring(d)
+        return pimg
+
+def PILTowx(pimg):
+        '''convert a PIL Image to a wx image'''
+        import wx
+        wimg = wx.EmptyImage(pimg.size[0], pimg.size[1])
+        wimg.SetData(pimg.convert('RGB').tostring())
+        return wimg
