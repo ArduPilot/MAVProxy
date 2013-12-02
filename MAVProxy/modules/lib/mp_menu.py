@@ -21,7 +21,10 @@ class MPMenuGeneric(object):
         pass
     
     def __str__(self):
-        return "MPMenuSeparator()"
+        return "MPMenuGeneric()"
+
+    def __repr__(self):
+        return str(self.__str__())
 
 class MPMenuSeparator(MPMenuGeneric):
     '''a MP menu separator'''
@@ -52,8 +55,9 @@ class MPMenuItem(MPMenuGeneric):
 
     def id(self):
         '''id used to identify the returned menu items
-        uses a 31 bit signed integer'''
-        return int(hash((self.name, self.returnkey)) & 0x7FFFFFFF)
+        uses a 16 bit unsigned integer'''
+        # 0xFFFF is used as windows only allows for 16 bit IDs
+        return int(hash((self.name, self.returnkey)) & 0xFFFF)
 
     def _append(self, menu):
         '''append this menu item to a menu'''
