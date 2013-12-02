@@ -61,8 +61,6 @@ def cmd_map(args):
                                                        (float(lat),float(lon)),
                                                icon, layer=3, rotation=0, follow=False))
             state.icon_counter += 1
-    elif args[0] == "grid":
-        mpstate.map.add_object(mp_slipmap.SlipGrid('grid', layer=3, linewidth=1, colour=(255,255,0)))
     elif args[0] == "set":
         if len(args) < 3:
             state.settings.show_all()
@@ -70,7 +68,7 @@ def cmd_map(args):
             state.settings.set(args[1], args[2])
             mpstate.map.add_object(mp_slipmap.SlipBrightness(state.settings.brightness))
     else:
-        print("usage: map <brightness|icon|grid|set>")
+        print("usage: map <brightness|icon|set>")
 
 def init(_mpstate):
     '''initialise module'''
