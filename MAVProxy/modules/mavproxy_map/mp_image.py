@@ -29,6 +29,11 @@ class MPImageTitle:
     def __init__(self, title):
         self.title = title
 
+class MPImageBrightness:
+    '''image brightness to use'''
+    def __init__(self, brightness):
+        self.brightness = brightness
+
 class MPImageMenu:
     '''window menu to add'''
     def __init__(self, menu):
@@ -96,6 +101,10 @@ class MPImage():
     def set_title(self, title):
         '''set the frame title'''
         self.in_queue.put(MPImageTitle(title))
+
+    def set_brightness(self, brightness):
+        '''set the image brightness'''
+        self.in_queue.put(MPImageBrightness(brightness))
 
     def set_menu(self, menu):
         '''set a MPTopMenu on the frame'''
@@ -169,6 +178,7 @@ class MPImagePanel(wx.Panel):
         self.popup_menu = None
         self.wx_popup_menu = None
         self.popup_pos = None
+        state.brightness = 1.0
 
         # dragpos is the top left position in image coordinates
         self.dragpos = wx.Point(0,0)
@@ -236,6 +246,10 @@ class MPImagePanel(wx.Panel):
         scaled_image = self.img.Copy()
         scaled_image = scaled_image.GetSubImage(rect);
         scaled_image = scaled_image.Rescale(int(rect.width*self.zoom), int(rect.height*self.zoom))
+        if state.brightness != 1.0:
+            pimg = mp_util.wxToPIL(scaled_image)
+            pimg = Image.eval(pimg, lambda x: int(x * state.brightness))
+            scaled_image = mp_util.PILTowx(pimg)
         self.imagePanel.set_image(scaled_image)
         self.need_redraw = False
 
@@ -273,6 +287,9 @@ class MPImagePanel(wx.Panel):
                 self.set_menu(obj.menu)
             if isinstance(obj, MPImagePopupMenu):
                 self.set_popup_menu(obj.menu)
+            if isinstance(obj, MPImageBrightness):
+                state.brightness = obj.brightness
+                self.need_redraw = True
         if self.need_redraw:
             self.redraw()
 
