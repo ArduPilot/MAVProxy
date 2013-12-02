@@ -416,15 +416,17 @@ class MPImagePanel(wx.Panel):
     def on_menu(self, event):
         '''called on menu event'''
         state = self.state
-        if self.menu is not None:
-            ret = self.menu.find_selected(event)
-            if ret is not None:
-                state.out_queue.put(ret)
         if self.popup_menu is not None:
             ret = self.popup_menu.find_selected(event)
             if ret is not None:
                 ret.popup_pos = self.popup_pos
                 state.out_queue.put(ret)
+                return
+        if self.menu is not None:
+            ret = self.menu.find_selected(event)
+            if ret is not None:
+                state.out_queue.put(ret)
+                return
 
     def set_menu(self, menu):
         '''add a menu from the parent'''
