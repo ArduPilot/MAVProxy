@@ -884,6 +884,10 @@ class MPSlipMapPanel(wx.Panel):
         (lat2,lon2) = self.coordinates(state.width-1, state.height-1)
         bounds = (lat2, state.lon, state.lat-lat2, lon2-state.lon)
 
+        # possibly draw a grid
+        if state.grid:
+            SlipGrid('grid', layer=3, linewidth=1, colour=(255,255,0)).draw(img, self.pixmapper, bounds)
+
         # draw layer objects
         img = cv.CloneImage(self.map_img)
         keys = state.layers.keys()
@@ -894,10 +898,6 @@ class MPSlipMapPanel(wx.Panel):
         # draw information objects
         for key in state.info:
             state.info[key].draw(state.panel, state.panel.information)
-
-        # possibly draw a grid
-        if state.grid:
-            SlipGrid('grid', layer=3, linewidth=1, colour=(255,255,0)).draw(img, self.pixmapper, bounds)
 
         # display the image
         self.img = wx.EmptyImage(state.width,state.height)
