@@ -80,6 +80,8 @@ class MPImage():
 
     def set_image(self, img, bgr=False):
         '''set the currently displayed image'''
+        if not self.is_alive():
+            return
         if bgr:
             img = cv.CloneImage(img)
             cv.CvtColor(img, img, cv.CV_BGR2RGB)
