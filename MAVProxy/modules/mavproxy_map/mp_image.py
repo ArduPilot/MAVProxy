@@ -266,7 +266,6 @@ class MPImagePanel(wx.Panel):
                     total_area = state.frame.GetSize()
                     bx = max(total_area.x - client_area.x,0)
                     by = max(total_area.y - client_area.y,0)
-                    print('BORDER: ', bx, by)
                     state.frame.SetSize(wx.Size(obj.width+bx, obj.height+by))
             if isinstance(obj, MPImageTitle):
                 state.frame.SetTitle(obj.title)
