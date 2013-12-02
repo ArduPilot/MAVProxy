@@ -34,6 +34,11 @@ class MPImageMenu:
     def __init__(self, menu):
         self.menu = menu
 
+class MPImagePopupMenu:
+    '''popup menu to add'''
+    def __init__(self, menu):
+        self.menu = menu
+
 class MPImage():
     '''
     a generic image viewer widget for use in MP tools
@@ -58,6 +63,7 @@ class MPImage():
         self.key_events = key_events
         self.auto_size = auto_size
         self.menu = None
+        self.popup_menu = None
         
         self.in_queue = multiprocessing.Queue()
         self.out_queue = multiprocessing.Queue()
@@ -96,9 +102,18 @@ class MPImage():
         self.menu = menu
         self.in_queue.put(MPImageMenu(menu))
 
+    def set_popup_menu(self, menu):
+        '''set a popup menu on the frame'''
+        self.popup_menu = menu
+        self.in_queue.put(MPImagePopupMenu(menu))
+
     def get_menu(self):
         '''get the current frame menu'''
         return self.menu
+
+    def get_popup_menu(self):
+        '''get the current popup menu'''
+        return self.popup_menu
 
     def poll(self):
         '''check for events, returning one event'''
@@ -151,6 +166,9 @@ class MPImagePanel(wx.Panel):
         self.drag_step = 10
         self.zoom = 1.0
         self.menu = None
+        self.popup_menu = None
+        self.wx_popup_menu = None
+        self.popup_pos = None
 
         # dragpos is the top left position in image coordinates
         self.dragpos = wx.Point(0,0)
@@ -244,11 +262,18 @@ class MPImagePanel(wx.Panel):
                 self.img = img
                 self.need_redraw = True
                 if state.auto_size:
-                    state.frame.SetSize(wx.Size(obj.width, obj.height))
+                    client_area = state.frame.GetClientSize()
+                    total_area = state.frame.GetSize()
+                    bx = max(total_area.x - client_area.x,0)
+                    by = max(total_area.y - client_area.y,0)
+                    print('BORDER: ', bx, by)
+                    state.frame.SetSize(wx.Size(obj.width+bx, obj.height+by))
             if isinstance(obj, MPImageTitle):
                 state.frame.SetTitle(obj.title)
             if isinstance(obj, MPImageMenu):
                 self.set_menu(obj.menu)
+            if isinstance(obj, MPImagePopupMenu):
+                self.set_popup_menu(obj.menu)
         if self.need_redraw:
             self.redraw()
 
@@ -307,9 +332,17 @@ class MPImagePanel(wx.Panel):
         self.need_redraw = True
         self.redraw()
 
+    def show_popup_menu(self, pos):
+        '''show a popup menu'''
+        self.popup_pos = self.image_coordinates(pos)
+        self.frame.PopupMenu(self.wx_popup_menu, pos)
+
     def on_mouse_event(self, event):
         '''handle mouse events'''
         pos = event.GetPosition()
+        if event.RightDown() and self.popup_menu is not None:
+            self.show_popup_menu(pos)
+            return
         if event.Leaving():
             self.mouse_pos = None
         else:
@@ -345,11 +378,15 @@ class MPImagePanel(wx.Panel):
     def on_menu(self, event):
         '''called on menu event'''
         state = self.state
-        if self.menu is None:
-            return
-        ret = self.menu.find_selected(event)
-        if ret is not None:
-            state.out_queue.put(ret)
+        if self.menu is not None:
+            ret = self.menu.find_selected(event)
+            if ret is not None:
+                state.out_queue.put(ret)
+        if self.popup_menu is not None:
+            ret = self.popup_menu.find_selected(event)
+            if ret is not None:
+                ret.popup_pos = self.popup_pos
+                state.out_queue.put(ret)
 
     def set_menu(self, menu):
         '''add a menu from the parent'''
@@ -357,6 +394,14 @@ class MPImagePanel(wx.Panel):
         wx_menu = menu.wx_menu()
         self.frame.SetMenuBar(wx_menu)
         self.frame.Bind(wx.EVT_MENU, self.on_menu)
+
+    def set_popup_menu(self, menu):
+        '''add a popup menu from the parent'''
+        self.popup_menu = menu
+        if menu is None:
+            self.wx_popup_menu = None
+        else:
+            self.wx_popup_menu = menu.wx_menu()
             
 if __name__ == "__main__":
     from optparse import OptionParser
