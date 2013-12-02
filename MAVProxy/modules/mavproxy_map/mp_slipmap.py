@@ -558,7 +558,8 @@ class MPSlipMapFrame(wx.Frame):
 
         # create the View menu
         self.menu = MPMenuTop([MPMenuSubMenu('View',
-                                             items=[MPMenuCheckbox('Follow\tCtrl+F', 'Follow Aircraft', 'toggleFollow'),
+                                             items=[MPMenuCheckbox('Follow\tCtrl+F', 'Follow Aircraft', 'toggleFollow',
+                                                                   checked=state.follow),
                                                     MPMenuCheckbox('Grid\tCtrl+G', 'Enable Grid', 'toggleGrid',
                                                                    checked=state.grid),
                                                     MPMenuItem('Goto\tCtrl+P', 'Goto Position', 'gotoPosition'),
