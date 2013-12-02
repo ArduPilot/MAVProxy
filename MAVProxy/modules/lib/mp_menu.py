@@ -65,9 +65,9 @@ class MPMenuItem(MPMenuGeneric):
 
 class MPMenuCheckbox(MPMenuItem):
     '''a MP menu item as a checkbox'''
-    def __init__(self, name, description='', returnkey=None):
+    def __init__(self, name, description='', returnkey=None, checked=False):
         MPMenuItem.__init__(self, name, description=description, returnkey=returnkey)
-        self.checked = False
+        self.checked = checked
         
     def find_selected(self, event):
         '''find the selected menu item'''
@@ -83,6 +83,7 @@ class MPMenuCheckbox(MPMenuItem):
     def _append(self, menu):
         '''append this menu item to a menu'''
         menu.AppendCheckItem(self.id(), self.name, self.description)
+        menu.Check(self.id(), self.checked)
 
     def __str__(self):
         return "MPMenuCheckbox(%s,%s,%s,%s)" % (self.name, self.description, self.returnkey, str(self.checked))
