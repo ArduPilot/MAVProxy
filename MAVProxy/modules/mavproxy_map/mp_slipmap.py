@@ -556,9 +556,8 @@ class MPSlipMapFrame(wx.Frame):
         self.Bind(wx.EVT_IDLE, self.on_idle)
         self.Bind(wx.EVT_SIZE, state.panel.on_size)
 
-        self.menu = MPMenuTop([MPMenuSubMenu('&File',
-                                             items=[MPMenuItem('&Quit\tCtrl+Q', 'Quit')]),
-                               MPMenuSubMenu('View',
+        # create the View menu
+        self.menu = MPMenuTop([MPMenuSubMenu('View',
                                              items=[MPMenuCheckbox('Follow\tCtrl+F', 'Follow Aircraft', 'toggleFollow'),
                                                     MPMenuCheckbox('Grid\tCtrl+G', 'Enable Grid', 'toggleGrid'),
                                                     MPMenuItem('Goto\tCtrl+P', 'Goto Position', 'gotoPosition'),
