@@ -220,10 +220,18 @@ if __name__ == '__main__':
                                                        items=['Circle','Square','Triangle'])])])
     
     im.set_menu(menu)
+
+    popup = MPMenuSubMenu('A Popup',
+                          items=[MPMenuItem('Sub1'),
+                                 MPMenuItem('Sub2'),
+                                 MPMenuItem('Sub3')])
+
+    im.set_popup_menu(popup)
+    
     while im.is_alive():
         for event in im.events():
             if isinstance(event, MPMenuItem):
-                print(event)
+                print(event, getattr(event, 'popup_pos', None))
                 continue
             else:
                 print(event)
