@@ -19,6 +19,7 @@ except ImportError:
 from MAVProxy.modules.mavproxy_map import mp_elevation
 from MAVProxy.modules.mavproxy_map import mp_tile
 from MAVProxy.modules.lib import mp_util
+from MAVProxy.modules.lib.mp_menu import *
 from MAVProxy.modules.mavproxy_map import mp_widgets
 
 
@@ -401,12 +402,6 @@ class SlipInfoText(SlipInformation):
             self.textctrl.WriteText(self.text)
             self._resize()
 
-class SlipService:
-    '''an object to change the map service'''
-    def __init__(self, service):
-        self.service = service
-
-
 class SlipObjectSelection:
     '''description of a object under the cursor during an event'''
     def __init__(self, objkey, distance):
@@ -555,32 +550,46 @@ class MPSlipMapFrame(wx.Frame):
         wx.Frame.__init__(self, None, wx.ID_ANY, state.title)
         self.state = state
         state.frame = self
+        state.grid = False
+        state.follow = True
         state.panel = MPSlipMapPanel(self, state)
         self.Bind(wx.EVT_IDLE, self.on_idle)
         self.Bind(wx.EVT_SIZE, state.panel.on_size)
 
-        # display a 'Grid' checkbox
-        state.panel.grid_checkbox = wx.CheckBox(state.panel, -1, 'Grid')
-        state.panel.grid_checkbox.SetValue(False)
-        state.panel.controls.Add(state.panel.grid_checkbox,
-                                 flag=wx.LEFT, border=0)
-        state.have_grid = state.panel.grid_checkbox.GetValue()
+        self.menu = MPMenuTop([MPMenuSubMenu('&File',
+                                             items=[MPMenuItem('&Quit\tCtrl+Q', 'Quit')]),
+                               MPMenuSubMenu('View',
+                                             items=[MPMenuCheckbox('Follow\tCtrl+F', 'Follow Aircraft', 'toggleFollow'),
+                                                    MPMenuCheckbox('Grid\tCtrl+G', 'Enable Grid', 'toggleGrid'),
+                                                    MPMenuItem('Goto\tCtrl+P', 'Goto Position', 'gotoPosition'),
+                                                    MPMenuItem('Brightness +\tCtrl+B', 'Increase Brightness', 'increaseBrightness'),
+                                                    MPMenuItem('Brightness -\tCtrl+Shift+B', 'Decrease Brightness', 'decreaseBrightness'),
+                                                    MPMenuRadio('Service', 'Select map service',
+                                                                returnkey='setService',
+                                                                selected=state.mt.get_service(),
+                                                                items=state.mt.get_service_list())])])
+        self.SetMenuBar(self.menu.wx_menu())
+        self.Bind(wx.EVT_MENU, self.on_menu)
 
-        # display a 'Follow' checkbox
-        state.panel.follow_checkbox = wx.CheckBox(state.panel, -1, 'Follow')
-        state.panel.follow_checkbox.SetValue(True)
-        state.panel.controls.Add(state.panel.follow_checkbox,
-                                 flag=wx.LEFT, border=0)
-
-        # display a list of available map services
-        state.panel.service_choice = wx.Choice(
-            state.panel, -1, (85, 18),
-            choices=self.state.mt.get_service_list())
-        state.panel.controls.Add(state.panel.service_choice,
-                                 flag=wx.LEFT, border=0)
-        state.panel.service_choice.Bind(wx.EVT_CHOICE,
-                                        state.panel.handle_service_select)
-        state.panel.set_service_selection()
+    def on_menu(self, event):
+        '''handle menu selection'''
+        state = self.state
+        ret = self.menu.find_selected(event)
+        if ret is None:
+            return
+        if ret.returnkey == 'toggleGrid':
+            state.grid = ret.IsChecked()
+        elif ret.returnkey == 'toggleFollow':
+            state.follow = ret.IsChecked()
+        elif ret.returnkey == 'setService':
+            state.mt.set_service(ret.get_choice())
+        elif ret.returnkey == 'gotoPosition':
+            state.panel.enter_position()
+        elif ret.returnkey == 'increaseBrightness':
+            state.brightness *= 1.25
+        elif ret.returnkey == 'decreaseBrightness':
+            state.brightness /= 1.25
+        state.need_redraw = True
 
     def find_object(self, key, layers):
         '''find an object to be modified'''
@@ -605,8 +614,8 @@ class MPSlipMapFrame(wx.Frame):
             # we're in the mid part of the map already, don't move
             return
 
-        if not state.panel.follow_checkbox.GetValue():
-            # the use has disabled following
+        if not state.follow:
+            # the user has disabled following
             return
 
         (lat, lon) = object.latlon
@@ -619,9 +628,6 @@ class MPSlipMapFrame(wx.Frame):
             # its a new layer
             state.layers[obj.layer] = {}
         state.layers[obj.layer][obj.key] = obj
-        if isinstance(obj, SlipGrid):
-            state.panel.grid_checkbox.SetValue(True)
-            state.panel.Refresh()
         state.need_redraw = True
 
     def remove_object(self, key):
@@ -630,17 +636,6 @@ class MPSlipMapFrame(wx.Frame):
         for layer in state.layers:
             state.layers[layer].pop(key, None)
         state.need_redraw = True
-
-    def check_grid(self):
-        '''check if grid checkbox has changed'''
-        state = self.state
-        if state.have_grid == state.panel.grid_checkbox.GetValue():
-            return
-        state.have_grid = state.panel.grid_checkbox.GetValue()
-        if not state.have_grid:
-            self.remove_object('grid')
-        else:
-            self.add_object(SlipGrid('grid', layer=3, linewidth=1, colour=(255,255,0)))
 
     def on_idle(self, event):
         '''prevent the main loop spinning too fast'''
@@ -674,17 +669,6 @@ class MPSlipMapFrame(wx.Frame):
                     state.info[obj.key] = obj
                 state.need_redraw = True
 
-            if isinstance(obj, SlipService):
-                # change map service
-                services = state.mt.get_service_list()
-                if obj.service not in services:
-                    print("Unknown map service '%s'" % obj.service)
-                else:
-                    state.service = obj.service
-                    state.mt.set_service(obj.service)
-                    state.need_redraw = True
-                    state.panel.set_service_selection()
-
             if isinstance(obj, SlipCenter):
                 # move center
                 (lat,lon) = obj.latlon
@@ -709,7 +693,6 @@ class MPSlipMapFrame(wx.Frame):
                 state.need_redraw = True
         
         if obj is None:
-            self.check_grid()
             time.sleep(0.05)
 
 
@@ -734,9 +717,6 @@ class MPSlipMapPanel(wx.Panel):
 
         self.mainSizer = wx.BoxSizer(wx.VERTICAL)
         self.SetSizer(self.mainSizer)
-
-        # start off with no follow checkbox
-        self.follow_checkbox = None
 
         # display for lat/lon/elevation
         self.position = wx.TextCtrl(self, style=wx.TE_MULTILINE|wx.TE_READONLY)
@@ -776,25 +756,6 @@ class MPSlipMapPanel(wx.Panel):
         self.last_view = None
         self.redraw_map()
         state.frame.Fit()
-
-    def set_service_selection(self):
-        '''set the selection position in the service dropdown'''
-        state = self.state
-        try:
-            # cope with invalid state.service, e.g. bad CLI option
-            select_pos = state.panel.service_choice.FindString(state.service)
-        except:
-            select_pos = 0
-        state.panel.service_choice.SetSelection(select_pos)
-        state.panel.Refresh()
-
-    def handle_service_select(self, event):
-        ''' handle events from the service_choice widget '''
-        state = self.state
-        state.service = event.GetString()
-        state.mt.set_service(state.service)
-        self.set_service_selection()
-        state.need_redraw = True
 
     def on_focus(self, event):
         '''called when the panel gets focus'''
@@ -912,12 +873,11 @@ class MPSlipMapPanel(wx.Panel):
         if view_same and not state.need_redraw:
             return
 
-        if not view_same:
-            # get the new map
-            self.map_img = state.mt.area_to_image(state.lat, state.lon,
-                                                  state.width, state.height, state.ground_width)
-            if state.brightness != 1.0:
-                cv.ConvertScale(self.map_img, self.map_img, scale=state.brightness)
+        # get the new map
+        self.map_img = state.mt.area_to_image(state.lat, state.lon,
+                                              state.width, state.height, state.ground_width)
+        if state.brightness != 1.0:
+            cv.ConvertScale(self.map_img, self.map_img, scale=state.brightness)
 
 
         # find display bounding box
@@ -934,6 +894,10 @@ class MPSlipMapPanel(wx.Panel):
         # draw information objects
         for key in state.info:
             state.info[key].draw(state.panel, state.panel.information)
+
+        # possibly draw a grid
+        if state.grid:
+            SlipGrid('grid', layer=3, linewidth=1, colour=(255,255,0)).draw(img, self.pixmapper, bounds)
 
         # display the image
         self.img = wx.EmptyImage(state.width,state.height)

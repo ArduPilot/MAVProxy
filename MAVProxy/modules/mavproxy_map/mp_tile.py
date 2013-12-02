@@ -202,6 +202,10 @@ class MPTile:
                 '''set tile service'''
                 self.service = service
 
+        def get_service(self):
+                '''get tile service'''
+                return self.service
+
         def get_service_list(self):
                 '''return list of available services'''
                 service_list = TILE_SERVICES.keys()

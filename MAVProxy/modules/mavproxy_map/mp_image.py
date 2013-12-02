@@ -345,7 +345,6 @@ class MPImagePanel(wx.Panel):
         state = self.state
         if self.menu is None:
             return
-        m = event.GetEventObject()
         ret = self.menu.find_selected(event)
         if ret is not None:
             state.out_queue.put(ret)
