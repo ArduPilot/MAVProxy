@@ -411,7 +411,11 @@ class MPImagePanel(wx.Panel):
             event.GetWheelRotation() == 0):
             # don't flood the queue with mouse movement
             return
-        state.out_queue.put(mp_util.object_container(event))
+        evt = mp_util.object_container(event)
+        pt = self.image_coordinates(wx.Point(evt.X,evt.Y))
+        evt.X = pt.x
+        evt.Y = pt.y
+        state.out_queue.put(evt)
 
     def on_menu(self, event):
         '''called on menu event'''
