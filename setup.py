@@ -1,6 +1,6 @@
 from setuptools import setup
 
-version = "1.2.1"
+version = "1.2.2"
 
 setup(name='MAVProxy',
       version=version,
@@ -36,8 +36,6 @@ on how to use MAVProxy.''',
                 'MAVProxy.modules.lib.ANUGA',
                 'MAVProxy.modules.lib.optparse_gui'],
       install_requires=['pymavlink>=1.1.2',
-                        'matplotlib',
-                        'PIL',
                         'pyserial'],
       scripts=['MAVProxy/mavproxy.py', 'MAVProxy/tools/mavflightview.py',
                'MAVProxy/modules/mavproxy_map/mp_slipmap.py',
