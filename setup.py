@@ -1,9 +1,6 @@
-try:
-    from setuptools import setup
-except ImportError:
-    from distutils.core import setup
+from setuptools import setup
 
-version = "1.2.0"
+version = "1.2.1"
 
 setup(name='MAVProxy',
       version=version,
@@ -40,7 +37,6 @@ on how to use MAVProxy.''',
                 'MAVProxy.modules.lib.optparse_gui'],
       install_requires=['pymavlink>=1.1.2',
                         'matplotlib',
-                        'wxPython',
                         'PIL',
                         'pyserial'],
       scripts=['MAVProxy/mavproxy.py', 'MAVProxy/tools/mavflightview.py',
