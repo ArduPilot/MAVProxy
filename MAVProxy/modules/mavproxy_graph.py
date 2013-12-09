@@ -90,7 +90,7 @@ class Graph():
         self.field_types = []
         self.msg_types = set()
 
-        re_caps = re.compile('[A-Z_]+')
+        re_caps = re.compile('[A-Z_][A-Z0-9_]+')
         for f in self.fields:
             caps = set(re.findall(re_caps, f))
             self.msg_types = self.msg_types.union(caps)
