@@ -32,23 +32,28 @@
           <p>Specifies which port (serial, USB or network address/port) the UAV is communicating on.</p>
           <p>Multiple <code>--master</code> can be used. MAVProxy will sort the packets into a single stream automatically. This is useful if independent redundant links are being used.</p>
           <p>If an IP address is specified, it must be the local computer's IP address.</p>
+          <p>If a serial port is specified, an optional comma-separated baud rate may also be specified.  If present, this overrides the global default speed given by <code>--baudrate</code>.</p>
           <p><code>
             mavproxy.py --master=/dev/ttyUSB0</br>
             mavproxy.py --master="com14"</br>
             mavproxy.py --master=192.168.1.1:14550</br>
-            mavproxy.py --master=192.168.1.1:14550 --master=/dev/ttyUSB0
+            mavproxy.py --master=192.168.1.1:14550 --master=/dev/ttyUSB0</br>
+            mavproxy.py --master=/dev/ttyUSB0,57600
           </code></p>
           
           <h4>--quadcopter</h4>
           <p>Use quadcopter controls.</p>
           
           <h4>--baudrate</h4>
-          <p>Baudrate of <code>--master</code> port. Only applicable for serial links.</p>
+          <p>Default baudrate of <code>--master</code> and <code>--out</code> ports. Only applicable for serial links.</p>
           
           <h4>--out</h4>
-          <p>Forward the MAVLink packets to a remote IP address. Useful if using multiple ground station computers. MAVlink usually uses port 14550 for packet forwarding, though other ports can be used if needed.</p>
+          <p>Forward the MAVLink packets to a remote device (serial, USB or network address/port). Useful if using multiple ground station computers or relaying the stream through an intermediate node.</p>
+          <p>MAVlink usually uses port 14550 for IP-based packet forwarding, though other ports can be used if needed.</p>
+          <p>If a serial port is given (for example a radio device connecting an airbourne MAVProxy instance with the GCS), a link-specific baud rate can be given after the device, delimited by a comma.  This overrides the global default baudrate specified by <code>--baudrate</code>.</p>
           <p><code>
-            mavproxy.py --master=/dev/ttyUSB0 --out:192.168.1.1:14550
+            mavproxy.py --master=/dev/ttyUSB0 --out=192.168.1.1:14550</br>
+            mavproxy.py --master=/dev/ttyACM0,115200 --out=/dev/ttyUSB0,57600
           </code></p>       
 
           <h4>--sitl</h4>
