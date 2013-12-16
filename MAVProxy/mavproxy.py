@@ -152,6 +152,11 @@ class MPState(object):
         self.select_extra = {}
         self.continue_mode = False
         self.aliases = {}
+        self.log_download_set = set()
+        self.log_download_file = None
+        self.log_download_lognum = None
+        self.log_download_filename = None
+        self.log_download_last_timestamp = None
 
     def master(self):
         '''return the currently chosen mavlink master object'''
@@ -565,6 +570,40 @@ def cmd_wp(args):
         wp_loop()        
     else:
         print("Usage: wp <list|load|save|set|show|clear|draw|loop>")
+
+
+
+def cmd_log(args):
+    '''log commands'''
+    if len(args) < 1:
+        print("usage: log <list|download|erase|resume>")
+        return
+
+    if args[0] == "list":
+        print("Requesting log list")
+        mpstate.log_download_set = set()
+        mpstate.master().mav.log_request_list_send(mpstate.status.target_system,
+                                                   mpstate.status.target_component,
+                                                   0, 0xffff)
+
+    elif args[0] == "erase":
+        mpstate.master().mav.log_erase_send(mpstate.status.target_system,
+                                            mpstate.status.target_component)
+    elif args[0] == "download":
+        if len(args) != 2:
+            print("usage: log download <lognumber>")
+            return
+        log_num = int(args[1])
+        filename = "log%u.bin" % log_num
+        print("Downloading log %u as %s" % (log_num, filename))
+        mpstate.log_download_lognum = log_num
+        mpstate.log_download_file = open(filename, "wb")
+        mpstate.master().mav.log_request_data_send(mpstate.status.target_system,
+                                                   mpstate.status.target_component,
+                                                   log_num, 0, 0xFFFFFFFF)
+        mpstate.log_download_filename = filename
+        mpstate.log_download_set = set()
+        mpstate.log_download_last_timestamp = time.time()
 
 
 def fetch_fence_point(i):
@@ -1279,6 +1318,7 @@ command_map = {
     'switch'  : (cmd_switch,   'set RC switch (1-5), 0 disables'),
     'rc'      : (cmd_rc,       'override a RC channel value'),
     'wp'      : (cmd_wp,       'waypoint management'),
+    'log'     : (cmd_log,      'on-board log management'),
     'fence'   : (cmd_fence,    'geo-fence management'),
     'rally'   : (cmd_rally,    'rally point management'),
     'param'   : (cmd_param,    'manage APM parameters'),
@@ -1534,6 +1574,62 @@ def report_altitude(altitude):
         rounded_alt = int(mpstate.settings.altreadout) * ((mpstate.settings.altreadout/2 + int(mpstate.status.altitude)) / int(mpstate.settings.altreadout))
         say("height %u" % rounded_alt, priority='notification')
 
+
+def handle_log_entry(m):
+    '''handling incoming log entry'''
+    if m.time_utc == 0:
+        tstring = ''
+    else:
+        tstring = time.ctime(m.time_utc)
+    print("Log %u  numLogs %u lastLog %u size %u %s" % (m.id, m.num_logs, m.last_log_num, m.size, tstring))
+
+def handle_log_data(m):
+    '''handling incoming log data'''
+    if mpstate.log_download_file is None:
+        return
+    # lose some data
+    #import random
+    #if random.uniform(0,1) < 0.05:
+    #    print('dropping ', str(m))
+    #    return
+    mpstate.log_download_file.seek(m.ofs)
+    if m.count != 0:
+        mpstate.log_download_file.write(m.data[:m.count])
+        mpstate.log_download_set.add(m.ofs // 90)
+    mpstate.log_download_last_timestamp = time.time()
+    if m.count == 0 or (m.count < 90 and len(mpstate.log_download_set) == 1 + (m.ofs // 90)):
+        print("Finished downloading %s" % mpstate.log_download_filename)
+        mpstate.log_download_file.close()
+        mpstate.log_download_file = None
+        mpstate.log_download_set = set()
+
+def handle_log_data_missing():
+    '''handling missing incoming log data'''
+    if len(mpstate.log_download_set) == 0:
+        return
+    highest = max(mpstate.log_download_set)
+    diff = set(range(highest)).difference(mpstate.log_download_set)
+    if len(diff) == 0:
+        mpstate.master().mav.log_request_data_send(mpstate.status.target_system,
+                                                   mpstate.status.target_component,
+                                                   mpstate.log_download_lognum, (1+highest)*90, 0xffffffff)
+    else:
+        num_requests = 0
+        while num_requests < 10:
+            start = min(diff)
+            diff.remove(start)
+            end = start
+            while end+1 in diff:
+                end += 1
+                diff.remove(end)
+            mpstate.master().mav.log_request_data_send(mpstate.status.target_system,
+                                                       mpstate.status.target_component,
+                                                       mpstate.log_download_lognum, start*90, (end+1-start)*90)
+            num_requests += 1
+            if end != start or len(diff) == 0:
+                break
+    
+
 def master_send_callback(m, master):
     '''called on sending a message'''
     mtype = m.get_type()
@@ -1755,6 +1851,10 @@ def master_callback(m, master):
             mpstate.console.write(str(m.data), bg='red')
     elif mtype in [ "COMMAND_ACK", "MISSION_ACK" ]:
         mpstate.console.writeln("Got MAVLink msg: %s" % m)
+    elif mtype == 'LOG_ENTRY':
+        handle_log_entry(m)
+    elif mtype == 'LOG_DATA':
+        handle_log_data(m)
     else:
         #mpstate.console.writeln("Got MAVLink msg: %s" % m)
         pass
@@ -1979,6 +2079,10 @@ def periodic_tasks():
             seq = mpstate.status.wploader.count()
             print("re-requesting WP %u" % seq)
             mpstate.master().waypoint_request_send(seq)
+
+    if log_period.trigger():
+        if mpstate.log_download_last_timestamp is not None and time.time() - mpstate.log_download_last_timestamp > 0.5:
+            handle_log_data_missing()
 
     if battery_period.trigger():
         battery_report()
@@ -2251,6 +2355,7 @@ Auto-detected serial ports are:
 
     msg_period = mavutil.periodic_event(1.0/15)
     param_period = mavutil.periodic_event(1)
+    log_period = mavutil.periodic_event(2)
     heartbeat_period = mavutil.periodic_event(1)
     battery_period = mavutil.periodic_event(0.1)
     if mpstate.sitl_output:
