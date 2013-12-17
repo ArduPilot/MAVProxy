@@ -136,4 +136,6 @@ def idle_task():
     '''handle missing log data'''
     state = mpstate.log_state
     if state.download_last_timestamp is not None and time.time() - state.download_last_timestamp > 0.5:
+        state.download_last_timestamp = time.time()
         handle_log_data_missing()
+
