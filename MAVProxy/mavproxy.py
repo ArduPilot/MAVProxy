@@ -2278,10 +2278,11 @@ Auto-detected serial ports are:
         else:
             print("no script %s" % start_script)
 
-    # some core functionality is in modules
-    standard_modules = ['log']
-    for m in standard_modules:
-        process_stdin('module load %s' % m)
+    if not opts.setup:
+        # some core functionality is in modules
+        standard_modules = ['log']
+        for m in standard_modules:
+            process_stdin('module load %s' % m)
 
     if opts.console:
         process_stdin('module load console')
