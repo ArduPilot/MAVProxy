@@ -296,7 +296,7 @@ def sample_parse_args_issue1():
     usage = "usage: %prog [options] args"
     option_parser_class = OptionParser
 
-    parser = option_parser_class( usage = usage, version='0.1' )
+    parser = option_parser_class( usage = usage, version='0.1', description='Demo' )
     parser.add_option("-f", "--file", dest="filename", default = r'c:\1.txt',
                       type = 'file',
                       help="read data from FILENAME")
