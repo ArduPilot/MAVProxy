@@ -172,4 +172,5 @@ if len(args) < 1:
 
 if __name__ == "__main__":
     # add dialogs
-    mavflightview(args[0])
+    for f in args:
+        mavflightview(f)
