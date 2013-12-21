@@ -12,6 +12,14 @@ class log_state(object):
         self.download_start = None
         self.download_last_timestamp = None
 
+def name():
+    '''return module name'''
+    return "log"
+
+def description():
+    '''return module description'''
+    return "logg transfer"
+
 def init(_mpstate):
     '''initialise module'''
     global mpstate
