@@ -25,9 +25,14 @@ parser.add_option("--mission", default=None, help="mission file (defaults to log
 parser.add_option("--imagefile", default=None, help="output to image file")
 parser.add_option("--flag", default=[], type='str', action='append', help="flag positions")
 parser.add_option("--rawgps", action='store_true', default=False, help="use GPS_RAW_INT")
+parser.add_option("--rawgps2", action='store_true', default=False, help="use GPS2_RAW")
 parser.add_option("--debug", action='store_true', default=False, help="show debug info")
+parser.add_option("--multi", action='store_true', default=False, help="show multiple flights on one map")
 
 (opts, args) = parser.parse_args()
+
+def create_map(title):
+    '''create map object'''
 
 def pixel_coords(latlon, ground_width=0, mt=None, topleft=None, width=None):
     '''return pixel coordinates in the map image for a (lat,lon)'''
@@ -79,21 +84,24 @@ def mavflightview(filename):
         wp.load(opts.mission)
     path = []
     while True:
-        m = mlog.recv_match(type=['MISSION_ITEM', 'GLOBAL_POSITION_INT', 'GPS_RAW_INT', 'GPS'])
+        types = ['MISSION_ITEM']
+        if opts.rawgps:
+            types.append('GPS_RAW_INT')
+        elif opts.rawgps2:
+            types.extend(['GPS_RAW2','GPS2'])
+        else:
+            types.extend(['GPS','GLOBAL_POSITION_INT'])
+        m = mlog.recv_match(type=types)
         if m is None:
             break
         if m.get_type() == 'MISSION_ITEM':
             wp.set(m, m.seq)            
             continue
-        if m.get_type() == 'GLOBAL_POSITION_INT' and opts.rawgps:
-            continue
-        if m.get_type() == 'GPS_RAW_INT' and not opts.rawgps:
-            continue
         if not mlog.check_condition(opts.condition):
             continue
         if opts.mode is not None and mlog.flightmode.lower() != opts.mode.lower():
             continue
-        if m.get_type() == 'GPS':
+        if m.get_type() in ['GPS','GPS2']:
             status = getattr(m, 'Status', None)
             if status is None:
                 status = getattr(m, 'FixType', None)
@@ -132,11 +140,11 @@ def mavflightview(filename):
            mp_util.gps_distance(lat, lon, lat, bounds[1]+bounds[3]) >= ground_width-20):
         ground_width += 10
 
-    path_obj = mp_slipmap.SlipPolygon('FlightPath', path, layer='FlightPath',
+    path_obj = mp_slipmap.SlipPolygon('FlightPath-%s' % filename, path, layer='FlightPath',
                                       linewidth=2, colour=(255,0,180))
     mission = wp.polygon()
     if len(mission) > 1:
-        mission_obj = mp_slipmap.SlipPolygon('Mission', wp.polygon(), layer='Mission',
+        mission_obj = mp_slipmap.SlipPolygon('Mission-%s' % filename, wp.polygon(), layer='Mission',
                                              linewidth=2, colour=(255,255,255))
     else:
         mission_obj = None
@@ -144,14 +152,20 @@ def mavflightview(filename):
     if opts.imagefile:
         create_imagefile(opts.imagefile, (lat,lon), ground_width, path_obj, mission_obj)
     else:
-        map = mp_slipmap.MPSlipMap(title=filename,
-                                   service=opts.service,
-                                   elevation=True,
-                                   width=600,
-                                   height=600,
-                                   ground_width=ground_width,
-                                   lat=lat, lon=lon,
-                                   debug=opts.debug)
+        global multi_map
+        if opts.multi and multi_map is not None:
+            map = multi_map
+        else:
+            map = mp_slipmap.MPSlipMap(title=filename,
+                                       service=opts.service,
+                                       elevation=True,
+                                       width=600,
+                                       height=600,
+                                       ground_width=ground_width,
+                                       lat=lat, lon=lon,
+                                       debug=opts.debug)
+        if opts.multi:
+            multi_map = map
         map.add_object(path_obj)
         if mission_obj is not None:
             map.add_object(mission_obj)
@@ -171,6 +185,8 @@ if len(args) < 1:
     sys.exit(1)
 
 if __name__ == "__main__":
-    # add dialogs
+    if opts.multi:
+        multi_map = None
+
     for f in args:
         mavflightview(f)
