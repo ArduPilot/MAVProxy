@@ -33,6 +33,7 @@ class module_state(object):
         self.vehicle_type = 'plane'
         self.settings = mp_settings.MPSettings(
             [ ('showgpspos', int, 0),
+              ('showgps2pos', int, 1),
               ('showsimpos', int, 0),
               ('brightness', float, 1)])
 
@@ -228,6 +229,12 @@ def mavlink_packet(m):
         if lat != 0 or lon != 0:
             create_vehicle_icon('GPSVehicle', 'blue')
             mpstate.map.set_position('GPSVehicle', (lat, lon), rotation=m.cog*0.01)
+
+    if m.get_type() == "GPS2_RAW" and state.settings.showgps2pos:
+        (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
+        if lat != 0 or lon != 0:
+            create_vehicle_icon('GPS2Vehicle', 'green')
+            mpstate.map.set_position('GPS2Vehicle', (lat, lon), rotation=m.cog*0.01)
 
     if m.get_type() == 'GLOBAL_POSITION_INT':
         (state.lat, state.lon, state.heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
