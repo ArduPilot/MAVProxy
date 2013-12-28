@@ -43,7 +43,7 @@ def handle_log_entry(m):
         tstring = ''
     else:
         tstring = time.ctime(m.time_utc)
-    state.entries[m.id] = m.size
+    state.entries[m.id] = m
     print("Log %u  numLogs %u lastLog %u size %u %s" % (m.id, m.num_logs, m.last_log_num, m.size, tstring))
 
 
@@ -111,11 +111,30 @@ def log_status():
         return
     dt = time.time() - state.download_start
     speed = os.path.getsize(state.download_filename) / (1000.0 * dt)
-    size = state.entries.get(state.download_lognum, 0)
+    m = state.entries.get(state.download_lognum, None)
+    if m is None:
+        size = 0
+    else:
+        size = m.size
     print("Downloading %s - %u/%u bytes %.1f kbyte/s" % (state.download_filename,
                                                          os.path.getsize(state.download_filename),
                                                          size,
                                                          speed))
+
+def log_download(log_num, filename):
+    '''download a log file'''
+    state = mpstate.log_state
+    print("Downloading log %u as %s" % (log_num, filename))
+    state.download_lognum = log_num
+    state.download_file = open(filename, "wb")
+    mpstate.master().mav.log_request_data_send(mpstate.status.target_system,
+                                               mpstate.status.target_component,
+                                               log_num, 0, 0xFFFFFFFF)
+    state.download_filename = filename
+    state.download_set = set()
+    state.download_start = time.time()
+    state.download_last_timestamp = time.time()
+    state.download_ofs = 0
 
 def cmd_log(args):
     '''log commands'''
@@ -137,27 +156,26 @@ def cmd_log(args):
         mpstate.master().mav.log_erase_send(mpstate.status.target_system,
                                             mpstate.status.target_component)
     elif args[0] == "download":
-        if len(args) != 2:
-            print("usage: log download <lognumber>")
+        if len(args) < 2:
+            print("usage: log download <lognumber> <filename>")
             return
-        log_num = int(args[1])
-        filename = "log%u.bin" % log_num
-        print("Downloading log %u as %s" % (log_num, filename))
-        state.download_lognum = log_num
-        state.download_file = open(filename, "wb")
-        mpstate.master().mav.log_request_data_send(mpstate.status.target_system,
-                                                   mpstate.status.target_component,
-                                                   log_num, 0, 0xFFFFFFFF)
-        state.download_filename = filename
-        state.download_set = set()
-        state.download_start = time.time()
-        state.download_last_timestamp = time.time()
-        state.download_ofs = 0
+        if args[1] == 'latest':
+            if len(state.entries.keys()) == 0:
+                print("Please use log list first")
+                return
+            log_num = sorted(state.entries, key=lambda id: state.entries[id].time_utc)[-1]
+        else:
+            log_num = int(args[1])
+        if len(args) > 2:
+            filename = args[2]
+        else:
+            filename = "log%u.bin" % log_num
+        log_download(log_num, filename)
 
 def idle_task():
     '''handle missing log data'''
     state = mpstate.log_state
-    if state.download_last_timestamp is not None and time.time() - state.download_last_timestamp > 0.5:
+    if state.download_last_timestamp is not None and time.time() - state.download_last_timestamp > 0.7:
         state.download_last_timestamp = time.time()
         handle_log_data_missing()
 
