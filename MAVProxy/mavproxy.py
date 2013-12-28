@@ -1560,7 +1560,7 @@ def master_callback(m, master):
     mtype = m.get_type()
 
     # and log them
-    if mtype != 'BAD_DATA' and mpstate.logqueue:
+    if mtype not in ['BAD_DATA','LOG_DATA'] and mpstate.logqueue:
         # put link number in bottom 2 bits, so we can analyse packet
         # delay in saved logs
         usec = get_usec()
@@ -2044,13 +2044,13 @@ def main_loop():
         for m in mpstate.mav_outputs:
             rin.append(m.fd)
         if rin == []:
-            time.sleep(0.001)
+            time.sleep(0.0001)
             continue
 
         for fd in mpstate.select_extra:
             rin.append(fd)
         try:
-            (rin, win, xin) = select.select(rin, [], [], 0.001)
+            (rin, win, xin) = select.select(rin, [], [], 0.0001)
         except select.error:
             continue
 

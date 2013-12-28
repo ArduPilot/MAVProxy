@@ -11,6 +11,8 @@ class log_state(object):
         self.download_filename = None
         self.download_start = None
         self.download_last_timestamp = None
+        self.download_ofs = 0
+        self.entries = {}
 
 def name():
     '''return module name'''
@@ -36,10 +38,12 @@ def mavlink_packet(m):
 
 def handle_log_entry(m):
     '''handling incoming log entry'''
+    state = mpstate.log_state
     if m.time_utc == 0:
         tstring = ''
     else:
         tstring = time.ctime(m.time_utc)
+    state.entries[m.id] = m.size
     print("Log %u  numLogs %u lastLog %u size %u %s" % (m.id, m.num_logs, m.last_log_num, m.size, tstring))
 
 
@@ -53,10 +57,13 @@ def handle_log_data(m):
     #if random.uniform(0,1) < 0.05:
     #    print('dropping ', str(m))
     #    return
-    state.download_file.seek(m.ofs)
+    if m.ofs != state.download_ofs:
+        state.download_file.seek(m.ofs)
+        state.download_ofs = m.ofs
     if m.count != 0:
         state.download_file.write(m.data[:m.count])
         state.download_set.add(m.ofs // 90)
+        state.download_ofs += m.count
     state.download_last_timestamp = time.time()
     if m.count == 0 or (m.count < 90 and len(state.download_set) == 1 + (m.ofs // 90)):
         dt = time.time() - state.download_start
@@ -81,7 +88,7 @@ def handle_log_data_missing():
                                                    state.download_lognum, (1+highest)*90, 0xffffffff)
     else:
         num_requests = 0
-        while num_requests < 10:
+        while num_requests < 20:
             start = min(diff)
             diff.remove(start)
             end = start
@@ -92,9 +99,23 @@ def handle_log_data_missing():
                                                        mpstate.status.target_component,
                                                        state.download_lognum, start*90, (end+1-start)*90)
             num_requests += 1
-            if end != start or len(diff) == 0:
+            if len(diff) == 0:
                 break
     
+
+def log_status():
+    '''show download status'''
+    state = mpstate.log_state
+    if state.download_filename is None:
+        print("No download")
+        return
+    dt = time.time() - state.download_start
+    speed = os.path.getsize(state.download_filename) / (1000.0 * dt)
+    size = state.entries.get(state.download_lognum, 0)
+    print("Downloading %s - %u/%u bytes %.1f kbyte/s" % (state.download_filename,
+                                                         os.path.getsize(state.download_filename),
+                                                         size,
+                                                         speed))
 
 def cmd_log(args):
     '''log commands'''
@@ -104,15 +125,7 @@ def cmd_log(args):
         return
 
     if args[0] == "status":
-        if state.download_filename is None:
-            print("No download")
-        else:
-            dt = time.time() - state.download_start
-            speed = os.path.getsize(state.download_filename) / (1000.0 * dt)
-            print("Downloading %s - %u bytes %.1f kbyte/s" % (state.download_filename,
-                                                              os.path.getsize(state.download_filename),
-                                                              speed))
-
+        log_status()
     if args[0] == "list":
         print("Requesting log list")
         state.download_set = set()
@@ -139,6 +152,7 @@ def cmd_log(args):
         state.download_set = set()
         state.download_start = time.time()
         state.download_last_timestamp = time.time()
+        state.download_ofs = 0
 
 def idle_task():
     '''handle missing log data'''
