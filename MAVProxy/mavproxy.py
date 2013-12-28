@@ -1798,7 +1798,7 @@ def master_callback(m, master):
 def process_master(m):
     '''process packets from the MAVLink master'''
     try:
-        s = m.recv()
+        s = m.recv(8192)
     except Exception:
         return
     if mpstate.logqueue_raw:
