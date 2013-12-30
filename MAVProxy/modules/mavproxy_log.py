@@ -5,6 +5,9 @@ import time, os
 
 class log_state(object):
     def __init__(self):
+        self.reset()
+
+    def reset(self):
         self.download_set = set()
         self.download_file = None
         self.download_lognum = None
@@ -140,7 +143,7 @@ def cmd_log(args):
     '''log commands'''
     state = mpstate.log_state
     if len(args) < 1:
-        print("usage: log <list|download|erase|resume|status>")
+        print("usage: log <list|download|erase|resume|status|cancel>")
         return
 
     if args[0] == "status":
@@ -155,6 +158,11 @@ def cmd_log(args):
     elif args[0] == "erase":
         mpstate.master().mav.log_erase_send(mpstate.status.target_system,
                                             mpstate.status.target_component)
+    elif args[0] == "cancel":
+        if state.download_file is not None:
+            state.download_file.close()
+        state.reset()
+
     elif args[0] == "download":
         if len(args) < 2:
             print("usage: log download <lognumber> <filename>")
