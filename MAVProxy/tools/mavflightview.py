@@ -87,9 +87,9 @@ def mavflightview(filename):
         types = ['MISSION_ITEM']
         if opts.rawgps:
             types.append('GPS_RAW_INT')
-        elif opts.rawgps2:
-            types.extend(['GPS_RAW2','GPS2'])
-        else:
+        if opts.rawgps2:
+            types.extend(['GPS2_RAW','GPS2'])
+        if len(types) == 1:
             types.extend(['GPS','GLOBAL_POSITION_INT'])
         m = mlog.recv_match(type=types)
         if m is None:
