@@ -35,7 +35,7 @@ class module_state(object):
             [ ('showgpspos', int, 0),
               ('showgps2pos', int, 1),
               ('showsimpos', int, 0),
-              ('showekfpos', int, 0),
+              ('showahrs2pos', int, 0),
               ('brightness', float, 1)])
 
 def name():
@@ -225,9 +225,9 @@ def mavlink_packet(m):
         create_vehicle_icon('SimVehicle', 'green')
         mpstate.map.set_position('SimVehicle', (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
 
-    if m.get_type() == "EKF" and state.settings.showekfpos:
-        create_vehicle_icon('EKFVehicle', 'blue')
-        mpstate.map.set_position('EKFVehicle', (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
+    if m.get_type() == "AHRS2" and state.settings.showahrs2pos:
+        create_vehicle_icon('AHRS2Vehicle', 'blue')
+        mpstate.map.set_position('AHRS2Vehicle', (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
 
     if m.get_type() == "GPS_RAW_INT" and state.settings.showgpspos:
         (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
