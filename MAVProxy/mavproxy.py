@@ -538,6 +538,11 @@ def cmd_wp(args):
         mpstate.status.wp_save_filename = args[1]
         mpstate.status.wp_op = "save"
         mpstate.master().waypoint_request_list_send()
+    elif args[0] == "savelocal":
+        if len(args) != 2:
+            print("usage: wp savelocal <filename>")
+            return
+        mpstate.status.wploader.save(args[1])
     elif args[0] == "show":
         if len(args) != 2:
             print("usage: wp show <filename>")
@@ -566,6 +571,14 @@ def cmd_wp(args):
     else:
         print("Usage: wp <list|load|save|set|show|clear|draw|loop>")
 
+
+def cmd_script(args):
+    '''run a script'''
+    if len(args) < 1:
+        print("usage: script <filename>")
+        return
+
+    run_script(args[0])
 
 
 def fetch_fence_point(i):
@@ -1373,6 +1386,7 @@ command_map = {
     'switch'  : (cmd_switch,   'set RC switch (1-5), 0 disables'),
     'rc'      : (cmd_rc,       'override a RC channel value'),
     'wp'      : (cmd_wp,       'waypoint management'),
+    'script'  : (cmd_script,   'run a script of MAVProxy commands'),
     'fence'   : (cmd_fence,    'geo-fence management'),
     'rally'   : (cmd_rally,    'rally point management'),
     'param'   : (cmd_param,    'manage APM parameters'),
