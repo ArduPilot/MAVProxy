@@ -158,6 +158,11 @@ def cmd_log(args):
     elif args[0] == "erase":
         mpstate.master().mav.log_erase_send(mpstate.status.target_system,
                                             mpstate.status.target_component)
+
+    elif args[0] == "resume":
+        mpstate.master().mav.log_request_end_send(mpstate.status.target_system,
+                                                  mpstate.status.target_component)
+
     elif args[0] == "cancel":
         if state.download_file is not None:
             state.download_file.close()
