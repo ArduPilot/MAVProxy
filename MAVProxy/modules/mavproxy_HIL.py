@@ -15,7 +15,7 @@ class module_state(object):
     def __init__(self):
         self.last_sim_send_time = time.time()
         self.last_apm_send_time = time.time()
-        self.servo_output = None
+        self.rc_channels_scaled = None
         self.hil_state_msg = None
         sim_in_address  = ('127.0.0.1', 5501)
         sim_out_address  = ('127.0.0.1', 5502)
@@ -52,8 +52,8 @@ def unload():
 def mavlink_packet(m):
     '''handle an incoming mavlink packet'''
     state = mpstate.hil_state
-    if m.get_type() == 'SERVO_OUTPUT_RAW':
-        state.servo_output = m
+    if m.get_type() == 'RC_CHANNELS_SCALED':
+        state.rc_channels_scaled = m
 
 def idle_task():
     '''called from main loop'''
@@ -114,29 +114,16 @@ def check_sim_in():
 def scale_channel(ch, value):
     '''scale a channel to 1000/1500/2000'''
     master = mpstate.master()
-    cmin  = master.param('RC%u_MIN'%ch, 1000)
-    cmax  = master.param('RC%u_MAX'%ch, 2000)
-    ctrim = master.param('RC%u_TRIM'%ch, 1500)
-    if cmax == cmin:
-        cmax = 2000
-        cmin = 1000
-        ctrim = 1500
-    if ctrim <= cmin:
-        ctrim = cmin+1
-    if ctrim >= cmax:
-        ctrim = cmax-1
-    # scale to -1/1 range
+    v = value/10000.0
+    if v < -1:
+        v = -1
+    elif v > 1:
+        v = 1
+    if ch in [2,4]:
+        v = -v
     if ch == 3:
-        v = (value-cmin) / float(cmax-cmin)
-        v = min(max(v, 0.0), 1.0)
-    elif value >= ctrim:
-        v = (value-ctrim) / float(cmax-ctrim)
-        v = min(max(v, -1.0), 1.0)
-    else:
-        v = (value-ctrim) / float(ctrim-cmin)
-        v = min(max(v, -1.0), 1.0)
-    # scale to runsim servo range
-    if ch == 3:
+        if v < 0:
+            v = 0
         return int(1000 + v*1000)
     return int(1500 + v*500)
 
@@ -145,13 +132,13 @@ def check_sim_out():
     '''check if we should send new servos to flightgear'''
     state = mpstate.hil_state
     now = time.time()
-    if now - state.last_sim_send_time < 0.02 or state.servo_output is None:
+    if now - state.last_sim_send_time < 0.02 or state.rc_channels_scaled is None:
         return
     state.last_sim_send_time = now
 
     servos = []
     for ch in range(1,9):
-        servos.append(scale_channel(ch, getattr(state.servo_output, 'servo%u_raw' % ch)))
+        servos.append(scale_channel(ch, getattr(state.rc_channels_scaled, 'chan%u_scaled' % ch)))
     servos.extend([0,0,0, 0,0,0])
     buf = struct.pack('<14H', *servos)
     try:
