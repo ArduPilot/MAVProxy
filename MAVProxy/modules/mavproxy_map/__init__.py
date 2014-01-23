@@ -270,12 +270,12 @@ def mavlink_packet(m):
             mpstate.map.add_object(mp_slipmap.SlipPolygon('fence', points, layer=1, linewidth=2, colour=(0,255,0)))
 
     # if the rallypoints have changed, redisplay
-    if state.rally_change_time != mpstate.status.rallyloader.last_change:
-        state.rally_change_time = mpstate.status.rallyloader.last_change
+    if state.rally_change_time != mpstate.rally_state.rallyloader.last_change:
+        state.rally_change_time = mpstate.rally_state.rallyloader.last_change
         icon = mpstate.map.icon('rallypoint.png')
         mpstate.map.add_object(mp_slipmap.SlipClearLayer('RallyPoints'))
-        for i in range(mpstate.status.rallyloader.rally_count()):
-            rp = mpstate.status.rallyloader.rally_point(i)
+        for i in range(mpstate.rally_state.rallyloader.rally_count()):
+            rp = mpstate.rally_state.rallyloader.rally_point(i)
             mpstate.map.add_object(mp_slipmap.SlipIcon('Rally-%u' % i, (rp.lat*1.0e-7, rp.lng*1.0e-7), icon,
                                                        layer='RallyPoints', rotation=0, follow=False))
 

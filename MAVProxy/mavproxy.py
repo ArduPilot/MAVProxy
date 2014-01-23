@@ -44,7 +44,6 @@ class MPStatus(object):
         self.mav_error = 0
         self.target_system = 1
         self.target_component = 1
-        self.rallyloader = mavwp.MAVRallyLoader(self.target_system, self.target_component)
         self.speech = None
         self.altitude = 0
         self.last_altitude_announce = 0.0
@@ -717,136 +716,6 @@ def cmd_fence(args):
     else:
         print("Usage: fence <list|load|save|show|clear|draw>")
 
-
-def fetch_rally_point(i):
-    '''fetch one rally point'''
-    mpstate.master().mav.rally_fetch_point_send(mpstate.status.target_system,
-                                                mpstate.status.target_component, i)
-    tstart = time.time()
-    p = None
-    while time.time() - tstart < 1:
-        p = mpstate.master().recv_match(type='RALLY_POINT', blocking=False)
-        if p is not None:
-            break
-        time.sleep(0.1)
-        continue
-    if p is None:
-        mpstate.console.error("Failed to fetch rally point %u" % i)
-        return None
-    return p
-
-def send_rally_points():
-    '''send rally points from fenceloader'''
-    param_set('RALLY_TOTAL', mpstate.status.rallyloader.rally_count())
-    for i in range(mpstate.status.rallyloader.rally_count()):
-        p = mpstate.status.rallyloader.rally_point(i)
-        mpstate.master().mav.send(p)
-        
-        #Don't know why this check was being done, but not discounting yet...
-        #Will remove before committing if I don't discover why.
-        #p2 = fetch_rally_point(i)
-        #
-        #if (p.idx != p2.idx or
-        #    abs(p.lat - p2.lat) >= 0.00003 or
-        #    abs(p.lng - p2.lng) >= 0.00003):
-        #    print("Failed to send fence point %u" % i)
-        #    param_set('FENCE_ACTION', action)
-        #    return
-
-    #TODO rally land points
-
-def list_rally_points():
-    mpstate.status.rallyloader.clear()
-    rally_count = get_mav_param('RALLY_TOTAL', 0)
-    if rally_count == 0:
-        print("No rally points")
-        return
-    for i in range(int(rally_count)):
-        p = fetch_rally_point(i)
-        if p is None:
-            return
-        mpstate.status.rallyloader.append_rally_point(p)
-
-    #TODO: rally_land points
-
-    for i in range(mpstate.status.rallyloader.rally_count()):
-        p = mpstate.status.rallyloader.rally_point(i)
-        mpstate.console.writeln("lat=%f lng=%f alt=%f break_alt=%f land_dir=%f" % (p.lat * 1e-7, p.lng * 1e-7, p.alt, p.break_alt, p.land_dir))
-
-    #TODO: rally_land points
-
-def cmd_rally(args):
-    '''rally point commands'''
-    #TODO: add_land arg
-    if(len(args) < 1):
-        print("Usage: rally <list|load|save|add|clear>")
-        return
-
-    elif(args[0] == "add"):
-        if (len(args) < 2):
-            print("Usage: rally add ALT <BREAK_ALT> <LAND_HDG>")
-            return
-
-        if (mpstate.status.rallyloader.rally_count() > 4):
-            print ("Only 5 rally points possible per flight plan.")
-            return
-
-        try:
-            latlon = mpstate.map_state.click_position
-        except Exception:
-            print("No map available")
-            return
-        if latlon is None:
-            print("No map click position available")
-            return
-
-        alt = float(args[1]);
-        break_alt = 0.0
-        land_hdg = 0.0;
-        if (len(args) > 2):
-            break_alt = float(args[2]);
-        if (len(args) > 3):
-            land_hdg = float(args[3]);
-
-        mpstate.status.rallyloader.create_and_append_rally_point(latlon[0] * 1e7, latlon[1] * 1e7, alt, break_alt, land_hdg, 0)
-
-        send_rally_points();
-
-        print("Added Rally point at %s %f" % (str(latlon), alt))
-    
-    elif args[0] == "clear":
-        mpstate.status.rallyloader.clear()
-        param_set('RALLY_TOTAL', 0)
-
-    elif(args[0] == "list"):
-        list_rally_points()
-
-    elif(args[0] == "load"):
-        if (len(args) < 2):
-            print("Usage: rally load filename")
-
-        try:
-            mpstate.status.rallyloader.load(args[1])
-        except Exception, msg:
-            print("Unable to load %s - %s" % (args[1], msg))
-            return
-    
-        send_rally_points()
-
-        print("Loaded %u rally points from %s" % (mpstate.status.rallyloader.rally_count(), args[1]))
-
-    elif(args[0] == "save"):
-        if (len(args) < 2):
-            print("Usage: rally save filename");
-
-        mpstate.status.rallyloader.save(args[1]);
-
-        print "Saved rally file ", args[1];
-
-    else:
-        #TODO: add_land arg
-        print("Usage: rally <list|load|save|add|clear>")
-
 def param_set(name, value, retries=3):
     '''set a parameter'''
     name = name.upper()
@@ -1388,7 +1257,6 @@ command_map = {
     'wp'      : (cmd_wp,       'waypoint management'),
     'script'  : (cmd_script,   'run a script of MAVProxy commands'),
     'fence'   : (cmd_fence,    'geo-fence management'),
-    'rally'   : (cmd_rally,    'rally point management'),
     'param'   : (cmd_param,    'manage APM parameters'),
     'tuneopt' : (cmd_tuneopt,  'Select option for Tune Pot on Channel 6 (quadcopter only)'),
     'setup'   : (cmd_setup,    'go into setup mode'),
@@ -2387,7 +2255,7 @@ Auto-detected serial ports are:
 
     if not opts.setup:
         # some core functionality is in modules
-        standard_modules = ['log']
+        standard_modules = ['log','rally']
         for m in standard_modules:
             process_stdin('module load %s' % m)
 
