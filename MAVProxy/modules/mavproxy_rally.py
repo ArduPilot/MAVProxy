@@ -11,15 +11,15 @@ class rally_state(object):
         return 
 
 def name():
-    #return module name
+    '''return module name'''
     return "rally"
 
 def description():
-    #return module description
+    '''return module description'''
     return "rally point control"
 
 def init(_mpstate):
-    #initialize module
+    '''initialize module'''
     global mpstate
     mpstate = _mpstate
     mpstate.rally_state = rally_state()
@@ -97,8 +97,8 @@ def cmd_rally(args):
         print_usage()
 
 def mavlink_packet(m):
-    #handle incoming mavlink packet
-    return #TODO
+    '''handle incoming mavlink packet'''
+    return #TODO when applicable
 
 def send_rally_points():
     '''send rally points from fenceloader'''
