@@ -1775,7 +1775,14 @@ def process_master(m):
     try:
         s = m.recv(16*1024)
     except Exception:
+        time.sleep(0.1)
         return
+    # prevent a dead serial port from causing the CPU to spin. The user hitting enter will
+    # cause it to try and reconnect
+    if len(s) == 0:
+        time.sleep(0.1)
+        return
+    
     if mpstate.logqueue_raw:
         mpstate.logqueue_raw.put(str(s))
 
