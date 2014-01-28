@@ -63,6 +63,8 @@ def cmd_rccal(args):
     elif (args[0] == "done"):
         mpstate.rc_state.calibrating = False
         mpstate.rc_state.apply_rc_cal()
+    else:
+        print_cal_usage()
 
 def cmd_rctrim(args):
     '''set RCx_TRIM'''
