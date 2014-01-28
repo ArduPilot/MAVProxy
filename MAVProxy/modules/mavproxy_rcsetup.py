@@ -54,6 +54,10 @@ def cmd_rccal(args):
         return
 
     if (args[0] == "start"):
+        print "WARNING: remove propellers from electric planes!!"
+        print "Push return when ready to calibrate."
+        raw_input()
+
         mpstate.rc_state.clear_rc_cal()
         mpstate.rc_state.calibrating = True
     elif (args[0] == "done"):
