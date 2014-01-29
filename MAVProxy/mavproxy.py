@@ -2032,7 +2032,7 @@ def main_loop():
         for fd in mpstate.select_extra:
             rin.append(fd)
         try:
-            (rin, win, xin) = select.select(rin, [], [], 0.0001)
+            (rin, win, xin) = select.select(rin, [], [], 0.01)
         except select.error:
             continue
 
