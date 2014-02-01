@@ -10,6 +10,7 @@ Released under the GNU GPL version 3 or later
 import sys, os, struct, math, time, socket
 import fnmatch, errno, threading
 import serial, Queue, select
+import readline, glob
 
 import select
 
@@ -2095,8 +2096,13 @@ def run_script(scriptfile):
         process_stdin(line)
     f.close()
 
+def complete(text, state):
+    return (glob.glob(text+'*')+[None])[state]
 
 if __name__ == '__main__':
+    readline.set_completer_delims(' \t\n;')
+    readline.parse_and_bind("tab: complete")
+    readline.set_completer(complete)
 
     from optparse import OptionParser
     parser = OptionParser("mavproxy.py [options]")
