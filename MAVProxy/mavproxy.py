@@ -10,7 +10,6 @@ Released under the GNU GPL version 3 or later
 import sys, os, struct, math, time, socket
 import fnmatch, errno, threading
 import serial, Queue, select
-import readline, glob
 
 import select
 
@@ -20,6 +19,7 @@ import select
 
 from MAVProxy.modules.lib import textconsole
 from MAVProxy.modules.lib import mp_settings
+from MAVProxy.modules.lib import rline
 
 class MPStatus(object):
     '''hold status information about the mavproxy'''
@@ -170,22 +170,6 @@ class MPState(object):
 def get_usec():
     '''time since 1970 in microseconds'''
     return int(time.time() * 1.0e6)
-
-class rline(object):
-    '''async readline abstraction'''
-    def __init__(self, prompt):
-        import threading
-        self.prompt = prompt
-        self.line = None
-        try:
-            import readline
-        except Exception:
-            pass
-
-    def set_prompt(self, prompt):
-        if prompt != self.prompt:
-            self.prompt = prompt
-            sys.stdout.write(prompt)
 
 def say(text, priority='important'):
     '''speak some text'''
@@ -2096,14 +2080,7 @@ def run_script(scriptfile):
         process_stdin(line)
     f.close()
 
-def complete(text, state):
-    return (glob.glob(text+'*')+[None])[state]
-
 if __name__ == '__main__':
-    readline.set_completer_delims(' \t\n;')
-    readline.parse_and_bind("tab: complete")
-    readline.set_completer(complete)
-
     from optparse import OptionParser
     parser = OptionParser("mavproxy.py [options]")
 
@@ -2250,7 +2227,7 @@ Auto-detected serial ports are:
         mpstate.override_period = mavutil.periodic_event(1)
     heartbeat_check_period = mavutil.periodic_event(0.33)
 
-    mpstate.rl = rline("MAV> ")
+    mpstate.rl = rline.rline("MAV> ")
     if opts.setup:
         mpstate.rl.set_prompt("")
 
