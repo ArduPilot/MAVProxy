@@ -1049,6 +1049,9 @@ def cmd_module(args):
                 return
             except ImportError, msg:
                 ex = msg
+                if mpstate.settings.moddebug > 1:
+                    import traceback
+                    print traceback.format_exc()
         print("Failed to load module: %s" % ex)
     elif args[0] == "reload":
         if len(args) < 2:
