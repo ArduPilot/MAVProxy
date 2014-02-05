@@ -27,7 +27,5 @@ try:
     readline.set_completer_delims(' \t\n;')
     readline.parse_and_bind("tab: complete")
     readline.set_completer(complete)
-    print("setup readline")
 except Exception:
-    print("failed to setup readline")
     pass
