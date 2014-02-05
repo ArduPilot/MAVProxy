@@ -2101,11 +2101,14 @@ if __name__ == '__main__':
     from optparse import OptionParser
     parser = OptionParser("mavproxy.py [options]")
 
-    parser.add_option("--master",dest="master", action='append', help="MAVLink master port", default=[])
+    parser.add_option("--master", dest="master", action='append',
+                      metavar="DEVICE[,BAUD]", help="MAVLink master port and optional baud rate",
+                      default=[])
+    parser.add_option("--out", dest="output", action='append',
+                      metavar="DEVICE[,BAUD]", help="MAVLink output port and optional baud rate",
+                      default=[])
     parser.add_option("--baudrate", dest="baudrate", type='int',
-                      help="master port baud rate", default=115200)
-    parser.add_option("--out",   dest="output", help="MAVLink output port",
-                      action='append', default=[])
+                      help="default serial baud rate", default=115200)
     parser.add_option("--sitl", dest="sitl",  default=None, help="SITL output port")
     parser.add_option("--streamrate",dest="streamrate", default=4, type='int',
                       help="MAVLink stream rate")
@@ -2190,7 +2193,12 @@ Auto-detected serial ports are:
 
     # open master link
     for mdev in opts.master:
-        m = mavutil.mavlink_connection(mdev, autoreconnect=True, baud=opts.baudrate)
+        if ',' in mdev:
+            port, baud = mdev.split(',')
+        else:
+            port, baud = mdev, opts.baudrate
+
+        m = mavutil.mavlink_connection(port, autoreconnect=True, baud=int(baud))
         m.mav.set_callback(master_callback, m)
         if hasattr(m.mav, 'set_send_callback'):
             m.mav.set_send_callback(master_send_callback, m)
@@ -2221,9 +2229,15 @@ Auto-detected serial ports are:
             mpstate.status.fenceloader.load(fencetxt)
             print("Loaded fence from %s" % fencetxt)
 
-    # open any mavlink UDP ports
+    # open any mavlink output connections (UDP/Serial)
     for p in opts.output:
-        mpstate.mav_outputs.append(mavutil.mavlink_connection(p, baud=opts.baudrate, input=False))
+        if ',' in p:
+            port, baud = p.split(',')
+            
+        else:
+            port, baud = p, opts.baudrate
+
+        mpstate.mav_outputs.append(mavutil.mavlink_connection(port, baud=int(baud), input=False))
 
     if opts.sitl:
         mpstate.sitl_output = mavutil.mavudp(opts.sitl, input=False)
