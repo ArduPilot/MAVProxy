@@ -300,6 +300,29 @@ def cmd_accelcal(args):
         mav.mav.command_ack_send(count, 1)
 
 
+def cmd_compassmot(args):
+    '''do a compass/motor interference calibration'''
+    mav = mpstate.master()
+    print("compassmot starting")
+    mav.mav.command_long_send(mav.target_system, mav.target_component,
+                              mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, 0,
+                              0, 0, 0, 0, 0, 1, 0)
+    mpstate.rl.line = None
+    while True:
+        m = mav.recv_match(type=['COMMAND_ACK','COMPASSMOT_STATUS'], blocking=False)
+        if m is not None:
+            print(m)
+            if m.get_type() == 'COMMAND_ACK':
+                break
+        if mpstate.rl.line is not None:
+            # user has hit enter, stop the process
+            mav.mav.command_ack_send(0, 1)
+            break
+        time.sleep(0.01)
+    print("compassmot done")
+
+
+
 def cmd_reboot(args):
     '''reboot autopilot'''
     mpstate.master().reboot_autopilot()
@@ -1255,6 +1278,7 @@ command_map = {
     'ground'  : (cmd_ground,   'do a ground start'),
     'level'   : (cmd_level,    'set level on a multicopter'),
     'accelcal': (cmd_accelcal, 'do 3D accelerometer calibration'),
+    'compassmot': (cmd_compassmot, 'do compass/motor interference calibration'),
     'calpress': (cmd_calpressure,'calibrate pressure sensors'),
     'loiter'  : (cmd_loiter,   'set LOITER mode'),
     'rtl'     : (cmd_rtl,      'set RTL mode'),
@@ -1714,6 +1738,9 @@ def master_callback(m, master):
 
     elif mtype == "GLOBAL_POSITION_INT":
         report_altitude(m.relative_alt*0.001)
+
+    elif mtype == "COMPASSMOT_STATUS":
+        print(m)
 
     elif mtype == "BAD_DATA":
         if mpstate.settings.shownoise and mavutil.all_printable(m.data):
