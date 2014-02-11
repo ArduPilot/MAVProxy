@@ -2158,6 +2158,7 @@ if __name__ == '__main__':
     parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
     parser.add_option("--continue", dest='continue_mode', action='store_true', default=False, help="continue logs")
     parser.add_option("--dialect",  default="ardupilotmega", help="MAVLink dialect")
+    parser.add_option("--rtscts",  action='store_true', help="enable hardware RTS/CTS flow control")
 
     (opts, args) = parser.parse_args()
 
@@ -2207,6 +2208,8 @@ Auto-detected serial ports are:
         m.mav.set_callback(master_callback, m)
         if hasattr(m.mav, 'set_send_callback'):
             m.mav.set_send_callback(master_send_callback, m)
+        if opts.rtscts:
+            m.set_rtscts(True)
         m.linknum = len(mpstate.mav_master)
         m.linkerror = False
         m.link_delayed = False
