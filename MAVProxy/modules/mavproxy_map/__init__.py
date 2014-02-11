@@ -263,9 +263,9 @@ def mavlink_packet(m):
         display_waypoints()
 
     # if the fence has changed, redisplay
-    if state.fence_change_time != mpstate.status.fenceloader.last_change:
-        state.fence_change_time = mpstate.status.fenceloader.last_change
-        points = mpstate.status.fenceloader.polygon()
+    if state.fence_change_time != mpstate.fence.fenceloader.last_change:
+        state.fence_change_time = mpstate.fence.fenceloader.last_change
+        points = mpstate.fence.fenceloader.polygon()
         if len(points) > 1:
             mpstate.map.add_object(mp_slipmap.SlipPolygon('fence', points, layer=1, linewidth=2, colour=(0,255,0)))
 

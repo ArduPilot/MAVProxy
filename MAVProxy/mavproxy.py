@@ -39,7 +39,6 @@ class MPStatus(object):
         self.wp_op = None
         self.wp_save_filename = None
         self.wploader = mavwp.MAVWPLoader()
-        self.fenceloader = mavwp.MAVFenceLoader()
         self.loading_waypoints = False
         self.loading_waypoint_lasttime = time.time()
         self.mav_error = 0
@@ -67,9 +66,6 @@ class MPStatus(object):
         self.last_apm_msg = None
         self.last_apm_msg_time = 0
         self.highest_msec = 0
-        self.fence_enabled = False
-        self.last_fence_breach = 0
-        self.last_fence_status = 0
         self.have_gps_lock = False
         self.lost_gps_lock = False
         self.last_gps_lock = 0
@@ -586,143 +582,6 @@ def cmd_script(args):
         return
 
     run_script(args[0])
-
-
-def fetch_fence_point(i):
-    '''fetch one fence point'''
-    mpstate.master().mav.fence_fetch_point_send(mpstate.status.target_system,
-                                                mpstate.status.target_component, i)
-    tstart = time.time()
-    p = None
-    while time.time() - tstart < 1:
-        p = mpstate.master().recv_match(type='FENCE_POINT', blocking=False)
-        if p is not None:
-            break
-        time.sleep(0.1)
-        continue
-    if p is None:
-        mpstate.console.error("Failed to fetch point %u" % i)
-        return None
-    return p
-
-
-
-def send_fence():
-    '''send fence points from fenceloader'''
-    # must disable geo-fencing when loading
-    action = get_mav_param('FENCE_ACTION', mavutil.mavlink.FENCE_ACTION_NONE)
-    param_set('FENCE_ACTION', mavutil.mavlink.FENCE_ACTION_NONE)
-    param_set('FENCE_TOTAL', mpstate.status.fenceloader.count())
-    for i in range(mpstate.status.fenceloader.count()):
-        p = mpstate.status.fenceloader.point(i)
-        mpstate.master().mav.send(p)
-        p2 = fetch_fence_point(i)
-        if p2 is None:
-            param_set('FENCE_ACTION', action)
-            return
-        if (p.idx != p2.idx or
-            abs(p.lat - p2.lat) >= 0.00003 or
-            abs(p.lng - p2.lng) >= 0.00003):
-            print("Failed to send fence point %u" % i)
-            param_set('FENCE_ACTION', action)
-            return
-    param_set('FENCE_ACTION', action)
-
-def load_fence(filename):
-    '''load fence points from a file'''
-    try:
-        mpstate.status.fenceloader.target_system = mpstate.status.target_system
-        mpstate.status.fenceloader.target_component = mpstate.status.target_component
-        mpstate.status.fenceloader.load(filename)
-    except Exception, msg:
-        print("Unable to load %s - %s" % (filename, msg))
-        return
-    print("Loaded %u geo-fence points from %s" % (mpstate.status.fenceloader.count(), filename))
-    send_fence()
-
-
-def list_fence(filename):
-    '''list fence points, optionally saving to a file'''
-
-    mpstate.status.fenceloader.clear()
-    count = get_mav_param('FENCE_TOTAL', 0)
-    if count == 0:
-        print("No geo-fence points")
-        return
-    for i in range(int(count)):
-        p = fetch_fence_point(i)
-        if p is None:
-            return
-        mpstate.status.fenceloader.add(p)
-
-    if filename is not None:
-        try:
-            mpstate.status.fenceloader.save(filename)
-        except Exception, msg:
-            print("Unable to save %s - %s" % (filename, msg))
-            return
-        print("Saved %u geo-fence points to %s" % (mpstate.status.fenceloader.count(), filename))
-    else:
-        for i in range(mpstate.status.fenceloader.count()):
-            p = mpstate.status.fenceloader.point(i)
-            mpstate.console.writeln("lat=%f lng=%f" % (p.lat, p.lng))
-    if mpstate.status.logdir != None:
-        fencetxt = os.path.join(mpstate.status.logdir, 'fence.txt')
-        mpstate.status.fenceloader.save(fencetxt)
-        print("Saved fence to %s" % fencetxt)
-
-
-def fence_draw_callback(points):
-    '''callback from drawing a fence'''
-    if len(points) < 3:
-        return
-    from MAVProxy.modules.lib import mp_util
-    mpstate.status.fenceloader.clear()
-    mpstate.status.fenceloader.target_system = mpstate.status.target_system
-    mpstate.status.fenceloader.target_component = mpstate.status.target_component
-    bounds = mp_util.polygon_bounds(points)
-    (lat, lon, width, height) = bounds
-    center = (lat+width/2, lon+height/2)
-    mpstate.status.fenceloader.add_latlon(center[0], center[1])
-    for p in points:
-        mpstate.status.fenceloader.add_latlon(p[0], p[1])
-    # close it
-    mpstate.status.fenceloader.add_latlon(points[0][0], points[0][1])
-    send_fence()
-
-def cmd_fence(args):
-    '''geo-fence commands'''
-    if len(args) < 1:
-        print("usage: fence <list|load|save|clear|draw>")
-        return
-
-    if args[0] == "load":
-        if len(args) != 2:
-            print("usage: fence load <filename>")
-            return
-        load_fence(args[1])
-    elif args[0] == "list":
-        list_fence(None)
-    elif args[0] == "save":
-        if len(args) != 2:
-            print("usage: fence save <filename>")
-            return
-        list_fence(args[1])
-    elif args[0] == "show":
-        if len(args) != 2:
-            print("usage: fence show <filename>")
-            return
-        mpstate.status.fenceloader.load(args[1])
-    elif args[0] == "draw":
-        if not 'draw_lines' in mpstate.map_functions:
-            print("No map drawing available")
-            return        
-        mpstate.map_functions['draw_lines'](fence_draw_callback)
-        print("Drawing fence on map")
-    elif args[0] == "clear":
-        param_set('FENCE_TOTAL', 0)
-    else:
-        print("Usage: fence <list|load|save|show|clear|draw>")
 
 def param_set(name, value, retries=3):
     '''set a parameter'''
@@ -1267,7 +1126,6 @@ command_map = {
     'rc'      : (cmd_rc,       'override a RC channel value'),
     'wp'      : (cmd_wp,       'waypoint management'),
     'script'  : (cmd_script,   'run a script of MAVProxy commands'),
-    'fence'   : (cmd_fence,    'geo-fence management'),
     'param'   : (cmd_param,    'manage APM parameters'),
     'tuneopt' : (cmd_tuneopt,  'Select option for Tune Pot on Channel 6 (quadcopter only)'),
     'setup'   : (cmd_setup,    'go into setup mode'),
@@ -1723,19 +1581,7 @@ def master_callback(m, master):
             if rounded_dist != 0:
                 say("%u" % rounded_dist, priority="progress")
             mpstate.status.last_distance_announce = rounded_dist
-
-    elif mtype == "FENCE_STATUS":
-        if not mpstate.status.fence_enabled:
-            mpstate.status.fence_enabled = True
-            say("fence enabled")
-        if mpstate.status.last_fence_breach != m.breach_time:
-            say("fence breach")
-        if mpstate.status.last_fence_status != m.breach_status:
-            if m.breach_status == mavutil.mavlink.FENCE_BREACH_NONE:
-                say("fence OK")
-        mpstate.status.last_fence_breach = m.breach_time
-        mpstate.status.last_fence_status = m.breach_status
-
+    
     elif mtype == "GLOBAL_POSITION_INT":
         report_altitude(m.relative_alt*0.001)
 
@@ -2232,10 +2078,6 @@ Auto-detected serial ports are:
         if os.path.exists(waytxt):
             mpstate.status.wploader.load(waytxt)
             print("Loaded waypoints from %s" % waytxt)
-        fencetxt = os.path.join(mpstate.status.logdir, 'fence.txt')
-        if os.path.exists(fencetxt):
-            mpstate.status.fenceloader.load(fencetxt)
-            print("Loaded fence from %s" % fencetxt)
 
     # open any mavlink UDP ports
     for p in opts.output:
@@ -2278,7 +2120,7 @@ Auto-detected serial ports are:
 
     if not opts.setup:
         # some core functionality is in modules
-        standard_modules = ['log','rally']
+        standard_modules = ['log','rally','fence']
         for m in standard_modules:
             process_stdin('module load %s' % m)
 
