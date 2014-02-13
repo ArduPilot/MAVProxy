@@ -187,6 +187,24 @@ def mavlink_packet(msg):
         else:
             fg = 'red'
         mpstate.console.set_status('Vcc', 'Vcc %.2f' % (msg.Vcc * 0.001), fg=fg)
+    elif type == 'POWER_STATUS':
+        if msg.flags & mavutil.mavlink.MAV_POWER_STATUS_CHANGED:
+            fg = 'red'
+        else:
+            fg = 'green'
+        status = 'PWR:'
+        if msg.flags & mavutil.mavlink.MAV_POWER_STATUS_USB_CONNECTED:
+            status += 'U'
+        if msg.flags & mavutil.mavlink.MAV_POWER_STATUS_BRICK_VALID:
+            status += 'B'
+        if msg.flags & mavutil.mavlink.MAV_POWER_STATUS_SERVO_VALID:
+            status += 'S'
+        if msg.flags & mavutil.mavlink.MAV_POWER_STATUS_PERIPH_OVERCURRENT:
+            status += 'O1'
+        if msg.flags & mavutil.mavlink.MAV_POWER_STATUS_PERIPH_HIPOWER_OVERCURRENT:
+            status += 'O2'
+        mpstate.console.set_status('PWR', status, fg=fg)
+        mpstate.console.set_status('Srv', 'Srv %.1f' % msg.Vservo, fg='green')
     elif type in ['RADIO', 'RADIO_STATUS']:
         if msg.rssi < msg.noise+10 or msg.remrssi < msg.remnoise+10:
             fg = 'red'
