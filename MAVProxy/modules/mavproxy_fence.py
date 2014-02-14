@@ -57,6 +57,7 @@ def mavlink_packet(m):
             mpstate.functions.say("fence enabled")
         elif(mpstate.fence.enabled == True and enabled == False):
             mpstate.functions.say("fence disabled")
+            
         mpstate.fence.enabled = enabled
         
         healthy = ((m.onboard_control_sensors_health & bits) == bits)
@@ -65,6 +66,14 @@ def mavlink_packet(m):
         elif (mpstate.fence.healthy == True and healthy == False):
             mpstate.functions.say("fence breach")
         mpstate.fence.healthy = healthy 
+
+        #console output for fence:
+        if (mpstate.fence.enabled == False):
+                mpstate.console.set_status('Fence', 'FEN', row=0, fg='grey')
+        elif (mpstate.fence.enabled == True and mpstate.fence.healthy == True):
+                mpstate.console.set_status('Fence', 'FEN', row=0, fg='green')
+        elif (mpstate.fence.enabled == True and mpstate.fence.healthy == False):
+                mpstate.console.set_status('Fence', 'FEN', row=0, fg='red')
 
 def set_fence_enabled(do_enable):
     '''Enable or disable fence'''
