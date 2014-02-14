@@ -70,10 +70,13 @@ def handle_log_data(m):
     state.download_last_timestamp = time.time()
     if m.count == 0 or (m.count < 90 and len(state.download_set) == 1 + (m.ofs // 90)):
         dt = time.time() - state.download_start
-        speed = os.path.getsize(state.download_filename) / (1000.0 * dt)
-        print("Finished downloading %s (%u seconds, %.1f kbyte/sec)" % (state.download_filename,
-                                                                        dt, speed))
         state.download_file.close()
+        size = os.path.getsize(state.download_filename)
+        speed = size / (1000.0 * dt)
+        print("Finished downloading %s (%u bytes %u seconds, %.1f kbyte/sec)" % (
+            state.download_filename,
+            size,
+            dt, speed))
         state.download_file = None
         state.download_filename = None
         state.download_set = set()
