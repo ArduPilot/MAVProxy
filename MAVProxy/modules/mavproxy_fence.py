@@ -66,13 +66,25 @@ def mavlink_packet(m):
             mpstate.functions.say("fence breach")
         mpstate.fence.healthy = healthy 
 
+def set_fence_enabled(do_enable):
+    '''Enable or disable fence'''
+    mpstate.master().mav.command_long_send(
+            mpstate.master().target_system,
+            mpstate.master().target_component,
+            mavutil.mavlink.MAV_CMD_DO_FENCE_ENABLE, 0,
+            do_enable, 0, 0, 0, 0, 0, 0)
+
 def cmd_fence(args):
     '''fence commands'''
     if len(args) < 1:
         print_usage()
         return
 
-    if args[0] == "load":
+    if args[0] == "enable":
+        set_fence_enabled(1)
+    elif args[0] == "disable":
+        set_fence_enabled(0)
+    elif args[0] == "load":
         if len(args) != 2:
             print("usage: fence load <filename>")
             return
@@ -98,7 +110,7 @@ def cmd_fence(args):
     elif args[0] == "clear":
         mpstate.mav_param.mavset(mpstate.master(),'FENCE_TOTAL', 0, 3)
     else:
-        print("Usage: fence <list|load|save|show|clear|draw>")
+        print_usage()
 
 def load_fence(filename):
     '''load fence points from a file'''
@@ -197,6 +209,6 @@ def list_fence(filename):
         print("Saved fence to %s" % fencetxt)
 
 def print_usage():
-    print("usage: fence <list|load|save|clear|draw>")
+    print("usage: fence <enable|disable|list|load|save|clear|draw>")
 
 
