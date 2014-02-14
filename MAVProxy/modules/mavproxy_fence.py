@@ -8,9 +8,11 @@ from MAVProxy.modules.lib import mp_util
 class fence_state(object):
     def __init__(self):
         self.fenceloader = mavwp.MAVFenceLoader()
-        self.fence_enabled = False
         self.last_fence_breach = 0
         self.last_fence_status = 0
+        self.present = False
+        self.enabled = False
+        self.healthy = True
         return
 
 def name():
@@ -38,16 +40,31 @@ def init(_mpstate):
 def mavlink_packet(m):
     '''handle and incoming mavlink packet'''
     if m.get_type() == "FENCE_STATUS":
-        if not mpstate.fence.fence_enabled:
-            mpstate.fence.fence_enabled = True
-            mpstate.functions.say("fence enabled")
-        if mpstate.fence.last_fence_breach != m.breach_time:
-            mpstate.functions.say("fence breach")
-        if mpstate.fence.last_fence_status != m.breach_status:
-            if m.breach_status == mavutil.mavlink.FENCE_BREACH_NONE:
-                mpstate.functions.say("fence OK")
         mpstate.fence.last_fence_breach = m.breach_time
         mpstate.fence.last_fence_status = m.breach_status
+    elif m.get_type() in ['SYS_STATUS']:
+        bits = mavutil.mavlink.MAV_SYS_STATUS_GEOFENCE
+
+        present = ((m.onboard_control_sensors_present & bits) == bits)
+        if (mpstate.fence.present == False and present == True):
+            mpstate.functions.say("fence present")
+        elif (mpstate.fence.present == True and present == False):
+            mpstate.functions.say("fence removed")
+        mpstate.fence.present = present
+        
+        enabled = ((m.onboard_control_sensors_enabled & bits) == bits)
+        if (mpstate.fence.enabled == False and enabled == True):
+            mpstate.functions.say("fence enabled")
+        elif(mpstate.fence.enabled == True and enabled == False):
+            mpstate.functions.say("fence disabled")
+        mpstate.fence.enabled = enabled
+        
+        healthy = ((m.onboard_control_sensors_health & bits) == bits)
+        if (mpstate.fence.healthy == False and healthy == True):
+            mpstate.functions.say("fence OK")
+        elif (mpstate.fence.healthy == True and healthy == False):
+            mpstate.functions.say("fence breach")
+        mpstate.fence.healthy = healthy 
 
 def cmd_fence(args):
     '''fence commands'''
