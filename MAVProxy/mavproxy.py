@@ -344,6 +344,15 @@ def cmd_servo(args):
     value   = int(args[1])
     mpstate.master().set_servo(channel, value)
 
+def cmd_relay(args):
+    '''Set relay to value'''
+    if len(args) != 2:
+        print("Usage: relay <relay number|0-3> <0,1>")
+        return
+    relay = int(args[0])
+    state   = int(args[1])
+    mpstate.master().set_relay(relay, state)
+
 def cmd_fbwa(args):
     '''set FBWA mode'''
     mpstate.master().set_mode_fbwa()
@@ -702,7 +711,7 @@ tune_options = {
     'INAV_TC':          '32',
     'Declination':      '38',
     'CircleRate':       '39',
-    'SonarGain':       '41',
+    'SonarGain':        '41',
 }
 
 def tune_show():
@@ -1156,7 +1165,8 @@ command_map = {
     'alias'   : (cmd_alias,    'command aliases'),
     'arm'     : (cmd_arm,      'Copter/Plane arm motors'),
     'time'    : (cmd_time,     'Show autopilot time'),
-    'disarm'  : (cmd_disarm,   'Copter/Plane disarm motors')
+    'disarm'  : (cmd_disarm,   'Copter/Plane disarm motors'),
+    'relay'   : (cmd_relay,   'Set relay number to state'),
     }
 
 def process_stdin(line):
