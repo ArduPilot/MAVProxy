@@ -110,8 +110,6 @@ class MPState(object):
             [ ('link', int, 1),
               ('altreadout', int, 10),
               ('distreadout', int, 200),
-              ('battreadout', int, 0),
-              ('voltreadout', int, 0),
               ('heartbeat', int, 1),
               ('numcells', int, 1),
               ('speech', int, 0),
@@ -1313,19 +1311,15 @@ def battery_update(SYS_STATUS):
     else:
         mpstate.status.avionics_battery_level = (95*mpstate.status.avionics_battery_level + 5*avionics_battery_level)/100
 
-def voltage_report():
-    '''report voltage level'''
-    if int(mpstate.settings.voltreadout) == 0:
-        return
-
-    mpstate.console.set_status('Voltage', 'Voltage: %.2f' % (float(mpstate.status.voltage_level) / 1000.0), row=0)    
-
 def battery_report():
-    '''report battery level'''
-    if int(mpstate.settings.battreadout) == 0:
-        return
-
-    mpstate.console.set_status('Battery', 'Battery: %u' % mpstate.status.battery_level, row=0)
+    #report voltage level only 
+    if mpstate.mav_param['BATT_MONITOR'] == 3:
+        mpstate.console.set_status('Battery', 'Batt: --%%/%.2fV' % (float(mpstate.status.voltage_level) / 1000.0), row=0)
+    elif mpstate.mav_param['BATT_MONITOR'] == 4:
+        mpstate.console.set_status('Battery', 'Batt: %u%%/%.2fV' % (mpstate.status.battery_level, (float(mpstate.status.voltage_level) / 1000.0)), row=0)
+    else:
+        #clear battery status
+        mpstate.console.set_status('Battery')
 
     rbattery_level = int((mpstate.status.battery_level+5)/10)*10
 
@@ -1835,7 +1829,6 @@ def periodic_tasks():
 
     if battery_period.trigger():
         battery_report()
-        voltage_report()
 
     if mpstate.override_period.trigger():
         if (mpstate.status.override != [ 0 ] * 8 or
