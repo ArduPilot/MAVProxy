@@ -204,7 +204,7 @@ def mavlink_packet(msg):
         if msg.flags & mavutil.mavlink.MAV_POWER_STATUS_PERIPH_HIPOWER_OVERCURRENT:
             status += 'O2'
         mpstate.console.set_status('PWR', status, fg=fg)
-        mpstate.console.set_status('Srv', 'Srv %.1f' % msg.Vservo, fg='green')
+        mpstate.console.set_status('Srv', 'Srv %.2f' % (msg.Vservo*0.001), fg='green')
     elif type in ['RADIO', 'RADIO_STATUS']:
         if msg.rssi < msg.noise+10 or msg.remrssi < msg.remnoise+10:
             fg = 'red'
