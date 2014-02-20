@@ -1312,22 +1312,25 @@ def battery_update(SYS_STATUS):
         mpstate.status.avionics_battery_level = (95*mpstate.status.avionics_battery_level + 5*avionics_battery_level)/100
 
 def battery_report():
+    batt_mon = mpstate.mav_param.get('BATT_MONITOR',0)
+
     #report voltage level only 
-    if mpstate.mav_param['BATT_MONITOR'] == 3:
-        mpstate.console.set_status('Battery', 'Batt: --%%/%.2fV' % (float(mpstate.status.voltage_level) / 1000.0), row=0)
-    elif mpstate.mav_param['BATT_MONITOR'] == 4:
+    if batt_mon == 3:
+        mpstate.console.set_status('Battery', 'Batt: %.2fV' % (float(mpstate.status.voltage_level) / 1000.0), row=0)
+    elif batt_mon == 4:
         mpstate.console.set_status('Battery', 'Batt: %u%%/%.2fV' % (mpstate.status.battery_level, (float(mpstate.status.voltage_level) / 1000.0)), row=0)
+
+        rbattery_level = int((mpstate.status.battery_level+5)/10)*10
+
+        if rbattery_level != mpstate.status.last_battery_announce:
+            say("Flight battery %u percent" % rbattery_level, priority='notification')
+            mpstate.status.last_battery_announce = rbattery_level
+        if rbattery_level <= 20:
+            say("Flight battery warning")
+
     else:
         #clear battery status
         mpstate.console.set_status('Battery')
-
-    rbattery_level = int((mpstate.status.battery_level+5)/10)*10
-
-    if rbattery_level != mpstate.status.last_battery_announce:
-        say("Flight battery %u percent" % rbattery_level, priority='notification')
-        mpstate.status.last_battery_announce = rbattery_level
-    if rbattery_level <= 20:
-        say("Flight battery warning")
 
     # avionics battery reporting disabled for now
     return
