@@ -51,6 +51,7 @@ class MPStatus(object):
         self.last_battery_announce = 0
         self.last_avionics_battery_announce = 0
         self.battery_level = -1
+        self.voltage_level = -1
         self.avionics_battery_level = -1
         self.last_waypoint = 0
         self.exit = False
@@ -110,6 +111,7 @@ class MPState(object):
               ('altreadout', int, 10),
               ('distreadout', int, 200),
               ('battreadout', int, 0),
+              ('voltreadout', int, 0),
               ('heartbeat', int, 1),
               ('numcells', int, 1),
               ('speech', int, 0),
@@ -1293,6 +1295,7 @@ def battery_update(SYS_STATUS):
 
     # main flight battery
     mpstate.status.battery_level = SYS_STATUS.battery_remaining
+    mpstate.status.voltage_level = SYS_STATUS.voltage_battery
 
     # avionics battery
     if not 'AP_ADC' in mpstate.status.msgs:
@@ -1310,7 +1313,12 @@ def battery_update(SYS_STATUS):
     else:
         mpstate.status.avionics_battery_level = (95*mpstate.status.avionics_battery_level + 5*avionics_battery_level)/100
 
+def voltage_report():
+    '''report voltage level'''
+    if int(mpstate.settings.voltreadout) == 0:
+        return
 
+    mpstate.console.set_status('Voltage', 'Voltage: %.2f' % (float(mpstate.status.voltage_level) / 1000.0), row=0)    
 
 def battery_report():
     '''report battery level'''
@@ -1827,6 +1835,7 @@ def periodic_tasks():
 
     if battery_period.trigger():
         battery_report()
+        voltage_report()
 
     if mpstate.override_period.trigger():
         if (mpstate.status.override != [ 0 ] * 8 or
