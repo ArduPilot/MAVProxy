@@ -15,6 +15,7 @@ class log_state(object):
         self.download_start = None
         self.download_last_timestamp = None
         self.download_ofs = 0
+        self.retries = 0
         self.entries = {}
 
 def name():
@@ -73,10 +74,11 @@ def handle_log_data(m):
         state.download_file.close()
         size = os.path.getsize(state.download_filename)
         speed = size / (1000.0 * dt)
-        print("Finished downloading %s (%u bytes %u seconds, %.1f kbyte/sec)" % (
+        print("Finished downloading %s (%u bytes %u seconds, %.1f kbyte/sec %u retries)" % (
             state.download_filename,
             size,
-            dt, speed))
+            dt, speed,
+            state.retries))
         state.download_file = None
         state.download_filename = None
         state.download_set = set()
@@ -92,6 +94,7 @@ def handle_log_data_missing():
         mpstate.master().mav.log_request_data_send(mpstate.status.target_system,
                                                    mpstate.status.target_component,
                                                    state.download_lognum, (1+highest)*90, 0xffffffff)
+        state.retries += 1
     else:
         num_requests = 0
         while num_requests < 20:
@@ -105,6 +108,7 @@ def handle_log_data_missing():
                                                        mpstate.status.target_component,
                                                        state.download_lognum, start*90, (end+1-start)*90)
             num_requests += 1
+            state.retries += 1
             if len(diff) == 0:
                 break
     
@@ -122,10 +126,11 @@ def log_status():
         size = 0
     else:
         size = m.size
-    print("Downloading %s - %u/%u bytes %.1f kbyte/s" % (state.download_filename,
-                                                         os.path.getsize(state.download_filename),
-                                                         size,
-                                                         speed))
+    print("Downloading %s - %u/%u bytes %.1f kbyte/s (%u retries)" % (state.download_filename,
+                                                                      os.path.getsize(state.download_filename),
+                                                                      size,
+                                                                      speed,
+                                                                      state.retries))
 
 def log_download(log_num, filename):
     '''download a log file'''
@@ -141,6 +146,7 @@ def log_download(log_num, filename):
     state.download_start = time.time()
     state.download_last_timestamp = time.time()
     state.download_ofs = 0
+    state.retries = 0
 
 def cmd_log(args):
     '''log commands'''
