@@ -284,7 +284,7 @@ def cmd_accelcal(args):
     while count < 6:
         m = mav.recv_match(type='STATUSTEXT', blocking=True)
         text = str(m.text)
-        if not text.startswith('Place APM'):
+        if not text.startswith('Place '):
             continue
         # wait for user to hit enter
         mpstate.rl.line = None
