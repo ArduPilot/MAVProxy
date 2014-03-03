@@ -220,6 +220,8 @@ def mavlink_packet(m):
                         mavutil.mavlink.MAV_TYPE_TRICOPTER,
                         mavutil.mavlink.MAV_TYPE_HELICOPTER]:
             state.vehicle_type = 'copter'
+        elif m.type in [mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER]:
+            state.vehicle_type = 'antenna'     
 
     if m.get_type() == "SIMSTATE" and state.settings.showsimpos:
         create_vehicle_icon('SimVehicle', 'green')
