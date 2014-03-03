@@ -1316,9 +1316,9 @@ def battery_report():
 
     #report voltage level only 
     if batt_mon == 3:
-        mpstate.console.set_status('Battery', 'Batt: %.2fV' % (float(mpstate.status.voltage_level) / 1000.0), row=0)
+        mpstate.console.set_status('Battery', 'Batt: %.2fV' % (float(mpstate.status.voltage_level) / 1000.0), row=1)
     elif batt_mon == 4:
-        mpstate.console.set_status('Battery', 'Batt: %u%%/%.2fV' % (mpstate.status.battery_level, (float(mpstate.status.voltage_level) / 1000.0)), row=0)
+        mpstate.console.set_status('Battery', 'Batt: %u%%/%.2fV' % (mpstate.status.battery_level, (float(mpstate.status.voltage_level) / 1000.0)), row=1)
 
         rbattery_level = int((mpstate.status.battery_level+5)/10)*10
 
