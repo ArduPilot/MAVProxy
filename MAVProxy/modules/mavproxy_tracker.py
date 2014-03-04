@@ -41,6 +41,14 @@ def cmd_tracker(args):
             state.settings.show_all()
         else:
             state.settings.set(args[1], args[2])
+    elif args[0] == 'arm':
+        cmd_tracker_arm()
+    elif args[0] == 'disarm':
+        cmd_tracker_disarm()
+    elif args[0] == 'level':
+        cmd_tracker_level()
+    else:
+        print("usage: tracker <start|set|arm|disarm|level>")
 
 def init(_mpstate):
     '''initialise module'''
@@ -53,8 +61,15 @@ def unload():
     '''unload module'''
     pass
 
+def tracker_callback(m, connection):
+    '''process mavlink message m from tracker'''
+    connection.post_message(m)
+
+def tracker_send_callback(m, master):
+    '''called on sending a message to the tracker'''
+
 def mavlink_packet(m):
-    '''handle an incoming mavlink packet. Rlay it to the tracker if it is a GLOBAL_POSITION_INT'''
+    '''handle an incoming mavlink packet from the master vehicle. Relay it to the tracker if it is a GLOBAL_POSITION_INT'''
     if m.get_type() == 'GLOBAL_POSITION_INT':
         if (mpstate.tracker_state.connection == None):
             return
@@ -65,6 +80,33 @@ def cmd_tracker_start():
         print("tracker port not set")
         return
     print("connecting to tracker %s at %d" % (mpstate.tracker_state.settings.port, mpstate.tracker_state.settings.baudrate))
-    mpstate.tracker_state.connection = mavutil.mavlink_connection(mpstate.tracker_state.settings.port, 
-                                                                  autoreconnect=True, 
-                                                                  baud=mpstate.tracker_state.settings.baudrate)
+    m = mavutil.mavlink_connection(mpstate.tracker_state.settings.port, 
+                                   autoreconnect=True, 
+                                   baud=mpstate.tracker_state.settings.baudrate)
+    m.mav.set_callback(tracker_callback, m)
+    if hasattr(m.mav, 'set_send_callback'):
+        m.mav.set_send_callback(tracker_send_callback, m)
+    m.linknum = len(mpstate.mav_master)
+    m.linkerror = False
+    m.link_delayed = False
+    m.last_heartbeat = 0
+    m.last_message = 0
+    m.highest_msec = 0
+    mpstate.mav_master.append(m)
+    mpstate.tracker_state.connection = m
+
+def cmd_tracker_arm():
+    '''Enable the servos in the tracker so the antenna will move'''
+    if (mpstate.tracker_state.connection):
+        mpstate.tracker_state.connection.arducopter_arm()
+
+def cmd_tracker_disarm():
+    '''Disable the servos in the tracker so the antenna will not move'''
+    if (mpstate.tracker_state.connection):
+        mpstate.tracker_state.connection.arducopter_disarm()
+
+def cmd_tracker_level():
+    '''Calibrate the accelerometers. Disarm and move the antenna level first'''
+    if (mpstate.tracker_state.connection):
+        mpstate.tracker_state.connection.calibrate_level()
+
