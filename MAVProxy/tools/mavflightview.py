@@ -26,6 +26,7 @@ parser.add_option("--imagefile", default=None, help="output to image file")
 parser.add_option("--flag", default=[], type='str', action='append', help="flag positions")
 parser.add_option("--rawgps", action='store_true', default=False, help="use GPS_RAW_INT")
 parser.add_option("--rawgps2", action='store_true', default=False, help="use GPS2_RAW")
+parser.add_option("--dualgps", action='store_true', default=False, help="use GPS_RAW_INT and GPS2_RAW")
 parser.add_option("--debug", action='store_true', default=False, help="show debug info")
 parser.add_option("--multi", action='store_true', default=False, help="show multiple flights on one map")
 
@@ -39,7 +40,7 @@ def pixel_coords(latlon, ground_width=0, mt=None, topleft=None, width=None):
     (lat,lon) = (latlon[0], latlon[1])
     return mt.coord_to_pixel(topleft[0], topleft[1], width, ground_width, lat, lon)
 
-def create_imagefile(filename, latlon, ground_width, path_obj, mission_obj, width=600, height=600):
+def create_imagefile(filename, latlon, ground_width, path_obj, mission_obj, width=600, height=600, path2_obj=None):
     '''create path and mission as an image file'''
     mt = mp_tile.MPTile(service=opts.service)
 
@@ -53,6 +54,8 @@ def create_imagefile(filename, latlon, ground_width, path_obj, mission_obj, widt
     # a function to convert from (lat,lon) to (px,py) on the map
     pixmapper = functools.partial(pixel_coords, ground_width=ground_width, mt=mt, topleft=latlon, width=width)
     path_obj.draw(map_img, pixmapper, None)
+    if path2_obj is not None:
+        path2_obj.draw(map_img, pixmapper, None)
     if mission_obj is not None:
         mission_obj.draw(map_img, pixmapper, None)
     cv.CvtColor(map_img, map_img, cv.CV_BGR2RGB)
@@ -83,14 +86,17 @@ def mavflightview(filename):
     if opts.mission is not None:
         wp.load(opts.mission)
     path = []
+    path2 = []
+    types = ['MISSION_ITEM']
+    if opts.rawgps:
+        types.append('GPS_RAW_INT')
+    if opts.rawgps2:
+        types.extend(['GPS2_RAW','GPS2'])
+    if opts.dualgps:
+        types.extend(['GPS2_RAW','GPS2', 'GPS_RAW_INT', 'GPS'])
+    if len(types) == 1:
+        types.extend(['GPS','GLOBAL_POSITION_INT'])
     while True:
-        types = ['MISSION_ITEM']
-        if opts.rawgps:
-            types.append('GPS_RAW_INT')
-        if opts.rawgps2:
-            types.extend(['GPS2_RAW','GPS2'])
-        if len(types) == 1:
-            types.extend(['GPS','GLOBAL_POSITION_INT'])
         m = mlog.recv_match(type=types)
         if m is None:
             break
@@ -128,7 +134,10 @@ def mavflightview(filename):
                 point = (lat, lng, colourmap[mlog.flightmode])
             else:
                 point = (lat, lng)
-            path.append(point)
+            if opts.dualgps and m.get_type() in ['GPS2_RAW', 'GPS2']:
+                path2.append(point)
+            else:
+                path.append(point)
     if len(path) == 0:
         print("No points to plot")
         return
@@ -142,6 +151,11 @@ def mavflightview(filename):
 
     path_obj = mp_slipmap.SlipPolygon('FlightPath-%s' % filename, path, layer='FlightPath',
                                       linewidth=2, colour=(255,0,180))
+    if len(path2) != 0:
+        path2_obj = mp_slipmap.SlipPolygon('FlightPath2-%s' % filename, path2, layer='FlightPath',
+                                           linewidth=2, colour=(255,0,180))
+    else:
+        path2_obj = None
     mission = wp.polygon()
     if len(mission) > 1:
         mission_obj = mp_slipmap.SlipPolygon('Mission-%s' % filename, wp.polygon(), layer='Mission',
@@ -150,7 +164,7 @@ def mavflightview(filename):
         mission_obj = None
 
     if opts.imagefile:
-        create_imagefile(opts.imagefile, (lat,lon), ground_width, path_obj, mission_obj)
+        create_imagefile(opts.imagefile, (lat,lon), ground_width, path_obj, mission_obj, path2_obj=path2_obj)
     else:
         global multi_map
         if opts.multi and multi_map is not None:
@@ -167,6 +181,8 @@ def mavflightview(filename):
         if opts.multi:
             multi_map = map
         map.add_object(path_obj)
+        if path2_obj is not None:
+            map.add_object(path2_obj)            
         if mission_obj is not None:
             map.add_object(mission_obj)
 
