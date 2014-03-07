@@ -127,6 +127,19 @@ class MPState(object):
               ('wpalt', int, 100),
               ('parambatch', int, 10)]
             )
+
+        self.completions = {
+            "wp" : ["<list|clear>",
+                    "<load|update|save> (FILENAME)"],
+            "fence" : ["<draw|list|clear>",
+                       "<load|save> (FILENAME)"],
+            "param" : ["fetch",
+                       "<set|show> (PARAMETER)",
+                       "<load|save> (FILENAME)"],
+            "script" : ["(FILENAME)"],
+            "set"    : ["(SETTING)"]
+            }
+
         self.status = MPStatus()
 
         # master mavlink device
@@ -2107,7 +2120,7 @@ Auto-detected serial ports are:
         mpstate.override_period = mavutil.periodic_event(1)
     heartbeat_check_period = mavutil.periodic_event(0.33)
 
-    mpstate.rl = rline.rline("MAV> ")
+    mpstate.rl = rline.rline("MAV> ", mpstate)
     if opts.setup:
         mpstate.rl.set_prompt("")
 

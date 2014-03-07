@@ -32,3 +32,10 @@ class MPSettings(object):
         '''show all settings'''
         for (v,t,d) in sorted(self.vars):
             self.show(v)
+
+    def list(self):
+        '''list all settings'''
+        ret = []
+        for (v,t,d) in self.vars:
+            ret.append(v)
+        return ret

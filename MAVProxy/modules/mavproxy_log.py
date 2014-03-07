@@ -32,6 +32,7 @@ def init(_mpstate):
     mpstate = _mpstate
     mpstate.log_state = log_state()
     mpstate.command_map['log'] = (cmd_log, "log file handling")
+    mpstate.completions['log'] = ['<download|status|erase|resume|cancel|list>']
 
 def mavlink_packet(m):
     '''handle an incoming mavlink packet'''
