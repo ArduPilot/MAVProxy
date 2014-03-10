@@ -502,6 +502,8 @@ class MPSlipMap():
         if self.is_alive():
             self.child.join(2)
 
+        self.child.terminate()
+
     def is_alive(self):
         '''check if graph is still going'''
         return self.child.is_alive()

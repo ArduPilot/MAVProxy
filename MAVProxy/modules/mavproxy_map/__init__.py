@@ -165,6 +165,7 @@ def map_callback(obj):
 
 def unload():
     '''unload module'''
+    mpstate.map.close()
     mpstate.map = None
     mpstate.map_functions = {}
 
