@@ -427,6 +427,12 @@ def process_stdin(line):
             (fn, help) = command_map[cmd]
             print("%-15s : %s" % (cmd, help))
         return
+    if cmd == 'exit':
+        reply = raw_input("Are you sure you want to exit? (y/N)")
+        if reply.lower() == 'y':
+            mpstate.status.exit = True
+        return
+
     if not cmd in command_map:
         for m in mpstate.modules:
             if hasattr(m, 'unknown_command'):
@@ -1011,11 +1017,12 @@ def main_loop():
 
 def input_loop():
     '''wait for user input'''
-    while True:
+    while mpstate.status.exit != True:
         while mpstate.rl.line is not None:
             time.sleep(0.01)
         try:
-            line = raw_input(mpstate.rl.prompt)
+            if mpstate.status.exit != True:
+                line = raw_input(mpstate.rl.prompt)
         except EOFError:
             mpstate.status.exit = True
             sys.exit(1)
@@ -1214,9 +1221,14 @@ Auto-detected serial ports are:
 
     # use main program for input. This ensures the terminal cleans
     # up on exit
-    try:
-        input_loop()
-    except KeyboardInterrupt:
-        print("exiting")
-        mpstate.status.exit = True
-        sys.exit(1)
+    while (mpstate.status.exit != True):
+        try:
+            input_loop()
+        except KeyboardInterrupt:
+            print("Interrupt caught.  Use 'exit' to quit MAVProxy.")
+
+    for m in mpstate.modules:
+        print "Unloading module:", m.name()
+        m.unload()
+        
+    sys.exit(0)
