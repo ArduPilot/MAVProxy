@@ -6,8 +6,6 @@
 
 import os, sys, math, time
 
-mpstate = None
-
 from MAVProxy.modules.lib import wxconsole
 from MAVProxy.modules.lib import textconsole
 from MAVProxy.modules.mavproxy_map import mp_elevation
@@ -66,6 +64,7 @@ def init(_mpstate):
 
 def unload():
     '''unload module'''
+    mpstate.console.close()
     mpstate.console = textconsole.SimpleConsole()
 
 def estimated_time_remaining(lat, lon, wpnum, speed):
