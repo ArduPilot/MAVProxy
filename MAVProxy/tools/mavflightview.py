@@ -89,7 +89,7 @@ def mavflightview(filename):
     path2 = []
     types = ['MISSION_ITEM']
     if opts.rawgps:
-        types.append('GPS_RAW_INT')
+        types.extend(['GPS', 'GPS_RAW_INT'])
     if opts.rawgps2:
         types.extend(['GPS2_RAW','GPS2'])
     if opts.dualgps:
@@ -129,12 +129,24 @@ def mavflightview(filename):
         else:
             lat = m.lat * 1.0e-7
             lng = m.lon * 1.0e-7
+        secondary = opts.dualgps and m.get_type() in ['GPS2_RAW', 'GPS2']
         if lat != 0 or lng != 0:
             if getattr(mlog, 'flightmode','') in colourmap:
-                point = (lat, lng, colourmap[mlog.flightmode])
+                colour = colourmap[mlog.flightmode]
+                if secondary:
+                    (r,g,b) = colour
+                    (r,g,b) = (r+50,g+50,b+50)
+                    if r > 255:
+                        r = 205
+                    if g > 255:
+                        g = 205
+                    if b > 255:
+                        b = 205
+                    colour = (r,g,b)
+                point = (lat, lng, colour)
             else:
                 point = (lat, lng)
-            if opts.dualgps and m.get_type() in ['GPS2_RAW', 'GPS2']:
+            if secondary:
                 path2.append(point)
             else:
                 path.append(point)
