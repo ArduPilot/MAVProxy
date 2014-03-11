@@ -226,31 +226,35 @@ def mavlink_packet(m):
         elif m.type in [mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER]:
             state.vehicle_type = 'antenna'     
 
+    # this is the beginnings of allowing support for multiple vehicles
+    # in the air at the same time
+    vehicle = 'Vehicle%u' % m.get_srcSystem()
+
     if m.get_type() == "SIMSTATE" and state.settings.showsimpos:
-        create_vehicle_icon('SimVehicle', 'green')
-        mpstate.map.set_position('SimVehicle', (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
+        create_vehicle_icon('Sim' + vehicle, 'green')
+        mpstate.map.set_position('Sim' + vehicle, (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
 
     if m.get_type() == "AHRS2" and state.settings.showahrs2pos:
-        create_vehicle_icon('AHRS2Vehicle', 'blue')
-        mpstate.map.set_position('AHRS2Vehicle', (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
+        create_vehicle_icon('AHRS2' + vehicle, 'blue')
+        mpstate.map.set_position('AHRS2' + vehicle, (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
 
     if m.get_type() == "GPS_RAW_INT" and state.settings.showgpspos:
         (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
         if lat != 0 or lon != 0:
-            create_vehicle_icon('GPSVehicle', 'blue')
-            mpstate.map.set_position('GPSVehicle', (lat, lon), rotation=m.cog*0.01)
+            create_vehicle_icon('GPS' + vehicle, 'blue')
+            mpstate.map.set_position('GPS' + vehicle, (lat, lon), rotation=m.cog*0.01)
 
     if m.get_type() == "GPS2_RAW" and state.settings.showgps2pos:
         (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
         if lat != 0 or lon != 0:
-            create_vehicle_icon('GPS2Vehicle', 'green')
-            mpstate.map.set_position('GPS2Vehicle', (lat, lon), rotation=m.cog*0.01)
+            create_vehicle_icon('GPS2' + vehicle, 'green')
+            mpstate.map.set_position('GPS2' + vehicle, (lat, lon), rotation=m.cog*0.01)
 
     if m.get_type() == 'GLOBAL_POSITION_INT':
         (state.lat, state.lon, state.heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
         if state.lat != 0 or state.lon != 0:
-            create_vehicle_icon('PosVehicle', 'red', follow=True)
-            mpstate.map.set_position('PosVehicle', (state.lat, state.lon), rotation=state.heading)
+            create_vehicle_icon('Pos' + vehicle, 'red', follow=True)
+            mpstate.map.set_position('Pos' + vehicle, (state.lat, state.lon), rotation=state.heading)
 
     if m.get_type() == "NAV_CONTROLLER_OUTPUT":
         if mpstate.master().flightmode in [ "AUTO", "GUIDED", "LOITER", "RTL" ]:
