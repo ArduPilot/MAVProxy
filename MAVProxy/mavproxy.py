@@ -120,7 +120,8 @@ class MPState(object):
               ('shownoise', int, 1),
               ('basealt', int, 0),
               ('wpalt', int, 100),
-              ('parambatch', int, 10)]
+              ('parambatch', int, 10),
+              ('requireexit', int, 0)]
             )
 
         self.completions = {
@@ -427,7 +428,7 @@ def process_stdin(line):
             (fn, help) = command_map[cmd]
             print("%-15s : %s" % (cmd, help))
         return
-    if cmd == 'exit':
+    if cmd == 'exit' and mpstate.settings.requireexit:
         reply = raw_input("Are you sure you want to exit? (y/N)")
         if reply.lower() == 'y':
             mpstate.status.exit = True
@@ -1225,10 +1226,15 @@ Auto-detected serial ports are:
         try:
             input_loop()
         except KeyboardInterrupt:
-            print("Interrupt caught.  Use 'exit' to quit MAVProxy.")
+            if mpstate.settings.requireexit:
+                print("Interrupt caught.  Use 'exit' to quit MAVProxy.")
+            else:
+                mpstate.status.exit = True
+                sys.exit(1)
 
+    #this loop executes after leaving the above loop and is for cleanup on exit
     for m in mpstate.modules:
         print "Unloading module:", m.name()
         m.unload()
         
-    sys.exit(0)
+    sys.exit(1)
