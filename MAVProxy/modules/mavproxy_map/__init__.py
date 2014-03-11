@@ -28,6 +28,7 @@ class module_state(object):
         self.moving_wp = 0
         self.icon_counter = 0
         self.click_position = None
+        self.click_time = 0
         self.draw_line = None
         self.draw_callback = None
         self.vehicle_type = 'plane'
@@ -125,8 +126,10 @@ def map_callback(obj):
         state.moving_wp = 0
         print("cancelled WP move")
     elif obj.event.m_leftDown:
-        state.click_position = obj.latlon
-        drawing_update()
+        if time.time() - state.click_time > 0.1:
+            state.click_position = obj.latlon
+            state.click_time = time.time()
+            drawing_update()
     if obj.event.m_rightDown:
         if state.draw_callback is not None:
             drawing_end()
