@@ -578,8 +578,10 @@ def cmd_wp(args):
         if mpstate.status.wploader.count() == 0:
             print("Need home location - refresh waypoints")
             return
+        if len(args) > 1:
+            mpstate.settings.wpalt = int(args[1])
         mpstate.map_functions['draw_lines'](wp_draw_callback)
-        print("Drawing waypoints on map")
+        print("Drawing waypoints on map at altitude %d" % mpstate.settings.wpalt)
     elif args[0] == "sethome":
         set_home_location()        
     elif args[0] == "loop":
