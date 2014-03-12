@@ -169,13 +169,15 @@ def unload():
     mpstate.map = None
     mpstate.map_functions = {}
 
-def create_vehicle_icon(name, colour, follow=False):
+def create_vehicle_icon(name, colour, follow=False, vehicle_type=None):
     '''add a vehicle to the map'''
     state = mpstate.map_state
-    if name in mpstate.map_state.have_vehicle and mpstate.map_state.have_vehicle[name] == state.vehicle_type:
+    if vehicle_type is None:
+        vehicle_type = state.vehicle_type
+    if name in mpstate.map_state.have_vehicle and mpstate.map_state.have_vehicle[name] == vehicle_type:
         return
-    mpstate.map_state.have_vehicle[name] = state.vehicle_type
-    icon = mpstate.map.icon(colour + state.vehicle_type + '.png')
+    mpstate.map_state.have_vehicle[name] = vehicle_type
+    icon = mpstate.map.icon(colour + vehicle_type + '.png')
     mpstate.map.add_object(mp_slipmap.SlipIcon(name, (0,0), icon, layer=3, rotation=0, follow=follow,
                                                trail=mp_slipmap.SlipTrail()))
 
