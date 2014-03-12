@@ -1555,7 +1555,7 @@ def master_callback(m, master):
             mpstate.status.last_waypoint = m.seq
             say("waypoint %u" % m.seq,priority='message')
 
-    elif mtype == "SYS_STATUS":
+    elif mtype == "HEARTBEAT":
         battery_update(m)
         if master.flightmode != mpstate.status.flightmode and time.time() > mpstate.status.last_mode_announce + 2:
             mpstate.status.flightmode = master.flightmode
