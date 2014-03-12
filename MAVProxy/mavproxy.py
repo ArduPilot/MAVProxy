@@ -251,88 +251,6 @@ def cmd_up(args):
     print("Adjusting TRIM_PITCH_CD from %d to %d" % (old_trim, new_trim))
     param_set('TRIM_PITCH_CD', new_trim)
 
-aux_options = {
-    "Nothing":"0",
-    "Flip":"2",
-    "SimpleMode":"3",
-    "RTL":"4",
-    "SaveTrim":"5",
-    "SaveWP":"7",
-    "MultiMode":"8",
-    "CameraTrigger":"9",
-    "Sonar":"10",
-    "Fence":"11",
-    "ResetYaw":"12",
-    "SuperSimpleMode":"13",
-    "AcroTrainer":"14",
-    "Auto":"16",
-    "AutoTune":"17",
-    "Land":"18"
-}
-
-def aux_show(channel):
-    param = "CH%s_OPT" % channel
-    opt_num = str(int(get_mav_param(param)))
-    option = None
-    for k in aux_options.keys():
-        if opt_num == aux_options[k]:
-            option = k
-            break
-    else:
-        print("AUX Channel is currently set to unknown value " + opt_num)
-        return
-    print("AUX Channel is currently set to " + option)
-
-def aux_option_validate(option):
-    for k in aux_options:
-        if option.upper() == k.upper():
-            return k
-    return None
-
-def cmd_auxopt(args):
-    '''handle AUX switches (CH7, CH8) settings'''
-    if not opts.quadcopter or 'CH7_OPT' not in mpstate.mav_param:
-        print("This command is only available for quadcopter")
-        return
-    if len(args) == 0 or args[0] not in ('set', 'show', 'reset', 'list'):
-        print("Usage: auxopt set|show|reset|list")
-        return
-    if args[0] == 'list':
-        print("Options available:")
-        for s in sorted(aux_options.keys()):
-            print('  ' + s)
-    elif args[0] == 'show':
-        if len(args) > 2 and args[1] not in ['7', '8', 'all']:
-            print("Usage: auxopt show [7|8|all]")
-            return
-        if len(args) < 2 or args[1] == 'all':
-            aux_show('7')
-            aux_show('8')
-            return
-        aux_show(args[1])
-    elif args[0] == 'reset':
-        if len(args) < 2 or args[1] not in ['7', '8', 'all']:
-            print("Usage: auxopt reset 7|8|all")
-            return
-        if args[1] == 'all':
-            param_set('CH7_OPT', '0')
-            param_set('CH8_OPT', '0')
-            return
-        param = "CH%s_OPT" % args[1]
-        param_set(param, '0')
-    elif args[0] == 'set':
-        if len(args) < 3 or args[1] not in ['7', '8']:
-            print("Usage: auxopt set 7|8 OPTION")
-            return
-        option = aux_option_validate(args[2])
-        if not option:
-            print("Invalid option " + args[2])
-            return
-        param = "CH%s_OPT" % args[1]
-        param_set(param, aux_options[option])
-    else:
-        print("Usage: auxopt set|show|list")
-
 def cmd_setup(args):
     mpstate.status.setup_mode = True
     mpstate.rl.set_prompt("")
@@ -493,7 +411,6 @@ command_map = {
     'servo'   : (cmd_servo,    'set a servo value'),
     'reboot'  : (cmd_reboot,   'reboot the autopilot'),
     'up'      : (cmd_up,       'adjust TRIM_PITCH_CD up by 5 degrees'),
-    'auxopt'  : (cmd_auxopt,   'select option for aux switches on CH7 and CH8 (ArduCopter only)'),
     'watch'   : (cmd_watch,    'watch a MAVLink pattern'),
     'module'  : (cmd_module,   'module commands'),
     'alias'   : (cmd_alias,    'command aliases'),
@@ -1297,7 +1214,8 @@ Auto-detected serial ports are:
 
     if not opts.setup:
         # some core functionality is in modules
-        standard_modules = ['log','rally','fence','param','tuneopt','arm','mode','calibration','rc','wp']
+        standard_modules = ['log','rally','fence','param',
+                            'tuneopt','arm','mode','calibration','rc','wp','auxopt']
         for m in standard_modules:
             load_module(m, quiet=True)
 
