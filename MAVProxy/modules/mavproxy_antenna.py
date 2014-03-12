@@ -50,8 +50,8 @@ def unload():
 def mavlink_packet(m):
     '''handle an incoming mavlink packet'''
     state = mpstate.antenna_state
-    if state.gcs_location is None and mpstate.status.wploader.count() > 0:
-        home = mpstate.status.wploader.wp(0)
+    if state.gcs_location is None and mpstate.wp_state.wploader.count() > 0:
+        home = mpstate.wp_state.wploader.wp(0)
         mpstate.antenna_state.gcs_location = (home.x, home.y)
         print("Antenna home set")
     if state.gcs_location is None:

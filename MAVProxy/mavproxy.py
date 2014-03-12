@@ -29,11 +29,6 @@ class MPStatus(object):
         self.msg_count = {}
         self.counters = {'MasterIn' : [], 'MasterOut' : 0, 'FGearIn' : 0, 'FGearOut' : 0, 'Slave' : 0}
         self.setup_mode = opts.setup
-        self.wp_op = None
-        self.wp_save_filename = None
-        self.wploader = mavwp.MAVWPLoader()
-        self.loading_waypoints = False
-        self.loading_waypoint_lasttime = time.time()
         self.mav_error = 0
         self.target_system = 1
         self.target_component = 1
@@ -46,7 +41,6 @@ class MPStatus(object):
         self.battery_level = -1
         self.voltage_level = -1
         self.avionics_battery_level = -1
-        self.last_waypoint = 0
         self.exit = False
         self.flightmode = 'MAV'
         self.last_mode_announce = 0
@@ -119,8 +113,6 @@ class MPState(object):
             )
 
         self.completions = {
-            "wp" : ["<list|clear>",
-                    "<load|update|save> (FILENAME)"],
             "script" : ["(FILENAME)"],
             "set"    : ["(SETTING)"]
             }
@@ -201,212 +193,6 @@ def cmd_servo(args):
     channel = int(args[0])
     value   = int(args[1])
     mpstate.master().set_servo(channel, value)
-
-def process_waypoint_request(m, master):
-    '''process a waypoint request from the master'''
-    if (not mpstate.status.loading_waypoints or
-        time.time() > mpstate.status.loading_waypoint_lasttime + 10.0):
-        mpstate.status.loading_waypoints = False
-        mpstate.console.error("not loading waypoints")
-        return
-    if m.seq >= mpstate.status.wploader.count():
-        mpstate.console.error("Request for bad waypoint %u (max %u)" % (m.seq, mpstate.status.wploader.count()))
-        return
-    wp = mpstate.status.wploader.wp(m.seq)
-    wp.target_system = mpstate.status.target_system
-    wp.target_component = mpstate.status.target_component
-    master.mav.send(mpstate.status.wploader.wp(m.seq))
-    mpstate.status.loading_waypoint_lasttime = time.time()
-    mpstate.console.writeln("Sent waypoint %u : %s" % (m.seq, mpstate.status.wploader.wp(m.seq)))
-    if m.seq == mpstate.status.wploader.count() - 1:
-        mpstate.status.loading_waypoints = False
-        mpstate.console.writeln("Sent all %u waypoints" % mpstate.status.wploader.count())
-
-def load_waypoints(filename):
-    '''load waypoints from a file'''
-    mpstate.status.wploader.target_system = mpstate.status.target_system
-    mpstate.status.wploader.target_component = mpstate.status.target_component
-    try:
-        mpstate.status.wploader.load(filename)
-    except Exception, msg:
-        print("Unable to load %s - %s" % (filename, msg))
-        return
-    print("Loaded %u waypoints from %s" % (mpstate.status.wploader.count(), filename))
-
-    mpstate.master().waypoint_clear_all_send()
-    if mpstate.status.wploader.count() == 0:
-        return
-
-    mpstate.status.loading_waypoints = True
-    mpstate.status.loading_waypoint_lasttime = time.time()
-    mpstate.master().waypoint_count_send(mpstate.status.wploader.count())
-
-def update_waypoints(filename, wpnum):
-    '''update waypoints from a file'''
-    mpstate.status.wploader.target_system = mpstate.status.target_system
-    mpstate.status.wploader.target_component = mpstate.status.target_component
-    try:
-        mpstate.status.wploader.load(filename)
-    except Exception, msg:
-        print("Unable to load %s - %s" % (filename, msg))
-        return
-    if mpstate.status.wploader.count() == 0:
-        print("No waypoints found in %s" % filename)
-        return
-    if wpnum == -1:
-        print("Loaded %u updated waypoints from %s" % (mpstate.status.wploader.count(), filename))
-    elif wpnum >= mpstate.status.wploader.count():
-        print("Invalid waypoint number %u" % wpnum)
-        return
-    else:
-        print("Loaded updated waypoint %u from %s" % (wpnum, filename))
-
-    mpstate.status.loading_waypoints = True
-    mpstate.status.loading_waypoint_lasttime = time.time()
-    if wpnum == -1:
-        start = 0
-        end = mpstate.status.wploader.count()-1
-    else:
-        start = wpnum
-        end = wpnum
-    mpstate.master().mav.mission_write_partial_list_send(mpstate.status.target_system,
-                                                         mpstate.status.target_component,
-                                                         start, end)
-
-def save_waypoints(filename):
-    '''save waypoints to a file'''
-    try:
-        mpstate.status.wploader.save(filename)
-    except Exception, msg:
-        print("Failed to save %s - %s" % (filename, msg))
-        return
-    print("Saved %u waypoints to %s" % (mpstate.status.wploader.count(), filename))
-
-def wp_draw_callback(points):
-    '''callback from drawing waypoints'''
-    if len(points) < 3:
-        return
-    from MAVProxy.modules.lib import mp_util
-    home = mpstate.status.wploader.wp(0)
-    mpstate.status.wploader.clear()
-    mpstate.status.wploader.target_system = mpstate.status.target_system
-    mpstate.status.wploader.target_component = mpstate.status.target_component
-    mpstate.status.wploader.add(home)
-    for p in points:
-        mpstate.status.wploader.add_latlonalt(p[0], p[1], mpstate.settings.wpalt)
-    mpstate.master().waypoint_clear_all_send()
-    if mpstate.status.wploader.count() == 0:
-        return
-    mpstate.status.loading_waypoints = True
-    mpstate.status.loading_waypoint_lasttime = time.time()
-    mpstate.master().waypoint_count_send(mpstate.status.wploader.count())
-
-def wp_loop():
-    '''close the loop on a mission'''
-    loader = mpstate.status.wploader
-    if loader.count() < 2:
-        print("Not enough waypoints (%u)" % loader.count())
-        return
-    wp = loader.wp(loader.count()-2)
-    if wp.command == mavutil.mavlink.MAV_CMD_DO_JUMP:
-        print("Mission is already looped")
-        return
-    wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0, 0, mavutil.mavlink.MAV_CMD_DO_JUMP,
-                                                      0, 1, 1, -1, 0, 0, 0, 0, 0)
-    loader.add(wp)
-    loader.add(loader.wp(1))
-    mpstate.status.loading_waypoints = True
-    mpstate.status.loading_waypoint_lasttime = time.time()
-    mpstate.master().waypoint_count_send(mpstate.status.wploader.count())
-    print("Closed loop on mission")
-
-def set_home_location():
-    '''set home location from last map click'''
-    try:
-        latlon = mpstate.map_state.click_position
-    except Exception:
-        print("No map available")
-        return
-    lat = float(latlon[0])
-    lon = float(latlon[1])
-    if mpstate.status.wploader.count() == 0:
-        mpstate.status.wploader.add_latlonalt(lat, lon, 0)
-    w = mpstate.status.wploader.wp(0)
-    w.x = lat
-    w.y = lon
-    mpstate.status.wploader.set(w, 0)
-    mpstate.status.loading_waypoints = True
-    mpstate.status.loading_waypoint_lasttime = time.time()
-    mpstate.master().mav.mission_write_partial_list_send(mpstate.status.target_system,
-                                                         mpstate.status.target_component,
-                                                         0, 0)
-    
-
-def cmd_wp(args):
-    '''waypoint commands'''
-    if len(args) < 1:
-        print("usage: wp <list|load|update|save|set|clear|loop>")
-        return
-
-    if args[0] == "load":
-        if len(args) != 2:
-            print("usage: wp load <filename>")
-            return
-        load_waypoints(args[1])
-    elif args[0] == "update":
-        if len(args) < 2:
-            print("usage: wp update <filename> <wpnum>")
-            return
-        if len(args) == 3:
-            wpnum = int(args[2])
-        else:
-            wpnum = -1
-        update_waypoints(args[1], wpnum)
-    elif args[0] == "list":
-        mpstate.status.wp_op = "list"
-        mpstate.master().waypoint_request_list_send()
-    elif args[0] == "save":
-        if len(args) != 2:
-            print("usage: wp save <filename>")
-            return
-        mpstate.status.wp_save_filename = args[1]
-        mpstate.status.wp_op = "save"
-        mpstate.master().waypoint_request_list_send()
-    elif args[0] == "savelocal":
-        if len(args) != 2:
-            print("usage: wp savelocal <filename>")
-            return
-        mpstate.status.wploader.save(args[1])
-    elif args[0] == "show":
-        if len(args) != 2:
-            print("usage: wp show <filename>")
-            return
-        mpstate.status.wploader.load(args[1])
-    elif args[0] == "set":
-        if len(args) != 2:
-            print("usage: wp set <wpindex>")
-            return
-        mpstate.master().waypoint_set_current_send(int(args[1]))
-    elif args[0] == "clear":
-        mpstate.master().waypoint_clear_all_send()
-    elif args[0] == "draw":
-        if not 'draw_lines' in mpstate.map_functions:
-            print("No map drawing available")
-            return        
-        if mpstate.status.wploader.count() == 0:
-            print("Need home location - refresh waypoints")
-            return
-        if len(args) > 1:
-            mpstate.settings.wpalt = int(args[1])
-        mpstate.map_functions['draw_lines'](wp_draw_callback)
-        print("Drawing waypoints on map at altitude %d" % mpstate.settings.wpalt)
-    elif args[0] == "sethome":
-        set_home_location()        
-    elif args[0] == "loop":
-        wp_loop()        
-    else:
-        print("Usage: wp <list|load|save|set|show|clear|draw|loop>")
-
 
 def cmd_script(args):
     '''run a script'''
@@ -696,7 +482,6 @@ def import_package(name):
 
 
 command_map = {
-    'wp'      : (cmd_wp,       'waypoint management'),
     'script'  : (cmd_script,   'run a script of MAVProxy commands'),
     'setup'   : (cmd_setup,    'go into setup mode'),
     'reset'   : (cmd_reset,    'reopen the connection to the MAVLink master'),
@@ -980,51 +765,6 @@ def master_callback(m, master):
             mpstate.status.last_apm_msg = m.text
             mpstate.status.last_apm_msg_time = time.time()
 
-    elif mtype in ['WAYPOINT_COUNT','MISSION_COUNT']:
-        if mpstate.status.wp_op is None:
-            mpstate.console.error("No waypoint load started")
-        else:
-            mpstate.status.wploader.clear()
-            mpstate.status.wploader.expected_count = m.count
-            mpstate.console.writeln("Requesting %u waypoints t=%s now=%s" % (m.count,
-                                                                             time.asctime(time.localtime(m._timestamp)),
-                                                                             time.asctime()))
-            master.waypoint_request_send(0)
-
-    elif mtype in ['WAYPOINT', 'MISSION_ITEM'] and mpstate.status.wp_op != None:
-        if m.seq > mpstate.status.wploader.count():
-            mpstate.console.writeln("Unexpected waypoint number %u - expected %u" % (m.seq, mpstate.status.wploader.count()))
-        elif m.seq < mpstate.status.wploader.count():
-            # a duplicate
-            pass
-        else:
-            mpstate.status.wploader.add(m)
-        if m.seq+1 < mpstate.status.wploader.expected_count:
-            master.waypoint_request_send(m.seq+1)
-        else:
-            if mpstate.status.wp_op == 'list':
-                for i in range(mpstate.status.wploader.count()):
-                    w = mpstate.status.wploader.wp(i)
-                    print("%u %u %.10f %.10f %f p1=%.1f p2=%.1f p3=%.1f p4=%.1f cur=%u auto=%u" % (
-                        w.command, w.frame, w.x, w.y, w.z,
-                        w.param1, w.param2, w.param3, w.param4,
-                        w.current, w.autocontinue))
-                if mpstate.status.logdir != None:
-                    waytxt = os.path.join(mpstate.status.logdir, 'way.txt')
-                    save_waypoints(waytxt)
-                    print("Saved waypoints to %s" % waytxt)
-            elif mpstate.status.wp_op == "save":
-                save_waypoints(mpstate.status.wp_save_filename)
-            mpstate.status.wp_op = None
-
-    elif mtype in ["WAYPOINT_REQUEST", "MISSION_REQUEST"]:
-        process_waypoint_request(m, master)
-
-    elif mtype in ["WAYPOINT_CURRENT", "MISSION_CURRENT"]:
-        if m.seq != mpstate.status.last_waypoint:
-            mpstate.status.last_waypoint = m.seq
-            say("waypoint %u" % m.seq,priority='message')
-
     elif mtype == "SYS_STATUS":
         battery_update(m)
 
@@ -1287,13 +1027,6 @@ def periodic_tasks():
         for master in mpstate.mav_master:
             send_heartbeat(master)
 
-        # cope with packet loss fetching mission
-        if mpstate.master().time_since('MISSION_ITEM') >= 2 and mpstate.status.wploader.count() < getattr(mpstate.status.wploader,'expected_count',0):
-            seq = mpstate.status.wploader.count()
-            print("re-requesting WP %u" % seq)
-            mpstate.master().waypoint_request_send(seq)
-
-
     if heartbeat_check_period.trigger():
         check_link_status()
 
@@ -1471,7 +1204,7 @@ if __name__ == '__main__':
 
     if opts.mav09:
         os.environ['MAVLINK09'] = '1'
-    from pymavlink import mavutil, mavwp, mavparm
+    from pymavlink import mavutil, mavparm
     mavutil.set_dialect(opts.dialect)
 
     # global mavproxy state
@@ -1529,12 +1262,6 @@ Auto-detected serial ports are:
     # log all packets from the master, for later replay
     open_logs()
 
-    if mpstate.continue_mode and mpstate.status.logdir != None:
-        waytxt = os.path.join(mpstate.status.logdir, 'way.txt')
-        if os.path.exists(waytxt):
-            mpstate.status.wploader.load(waytxt)
-            print("Loaded waypoints from %s" % waytxt)
-
     # open any mavlink UDP ports
     for p in opts.output:
         mpstate.mav_outputs.append(mavutil.mavlink_connection(p, baud=opts.baudrate, input=False))
@@ -1570,7 +1297,7 @@ Auto-detected serial ports are:
 
     if not opts.setup:
         # some core functionality is in modules
-        standard_modules = ['log','rally','fence','param','tuneopt','arm','mode','calibration','rc']
+        standard_modules = ['log','rally','fence','param','tuneopt','arm','mode','calibration','rc','wp']
         for m in standard_modules:
             load_module(m, quiet=True)
 

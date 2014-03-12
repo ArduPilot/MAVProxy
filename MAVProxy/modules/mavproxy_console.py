@@ -71,15 +71,15 @@ def unload():
 def estimated_time_remaining(lat, lon, wpnum, speed):
     '''estimate time remaining in mission in seconds'''
     idx = wpnum
-    if wpnum >= mpstate.status.wploader.count():
+    if wpnum >= mpstate.wp_state.wploader.count():
         return 0
     distance = 0
     done = set()
-    while idx < mpstate.status.wploader.count():
+    while idx < mpstate.wp_state.wploader.count():
         if idx in done:
             break
         done.add(idx)
-        w = mpstate.status.wploader.wp(idx)
+        w = mpstate.wp_state.wploader.wp(idx)
         if w.command == mavutil.mavlink.MAV_CMD_DO_JUMP:
             idx = int(w.param1)
             continue
@@ -133,8 +133,8 @@ def mavlink_packet(msg):
             alt = master.field('GPS_RAW_INT', 'alt', 0) / 1.0e3
         else:
             alt = master.field('GPS_RAW', 'alt', 0)
-        if mpstate.status.wploader.count() > 0:
-            wp = mpstate.status.wploader.wp(0)
+        if mpstate.wp_state.wploader.count() > 0:
+            wp = mpstate.wp_state.wploader.wp(0)
             home_lat = wp.x
             home_lng = wp.y
         else:

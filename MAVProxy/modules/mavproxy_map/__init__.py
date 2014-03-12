@@ -91,7 +91,7 @@ def init(_mpstate):
 
 def display_waypoints():
     '''display the waypoints'''
-    polygons = mpstate.status.wploader.polygon_list()
+    polygons = mpstate.wp_state.wploader.polygon_list()
     mpstate.map.add_object(mp_slipmap.SlipClearLayer('Mission'))
     for i in range(len(polygons)):
         p = polygons[i]
@@ -104,8 +104,8 @@ def closest_waypoint(latlon):
     (lat, lon) = latlon
     best_distance = -1
     closest = -1
-    for i in range(mpstate.status.wploader.count()):
-        w = mpstate.status.wploader.wp(i)
+    for i in range(mpstate.wp_state.wploader.count()):
+        w = mpstate.wp_state.wploader.wp(i)
         distance = mp_util.gps_distance(lat, lon, w.x, w.y)
         if best_distance == -1 or distance < best_distance:
             best_distance = distance
@@ -139,10 +139,10 @@ def map_callback(obj):
             if wpnum != -1:
                 state.moving_wp = time.time()
                 state.move_wp = wpnum
-                wp = mpstate.status.wploader.wp(state.move_wp)
+                wp = mpstate.wp_state.wploader.wp(state.move_wp)
                 print("Selected WP %u : %s" % (wpnum, getattr(wp,'comment','')))
         elif time.time() - state.moving_wp >= 1:
-            wp = mpstate.status.wploader.wp(state.move_wp)
+            wp = mpstate.wp_state.wploader.wp(state.move_wp)
             (lat, lon) = obj.latlon
             if getattr(mpstate.console, 'ElevationMap', None) is not None:
                 alt1 = mpstate.console.ElevationMap.GetElevation(lat, lon) 
@@ -154,8 +154,8 @@ def map_callback(obj):
             wp.target_system    = mpstate.status.target_system
             wp.target_component = mpstate.status.target_component
             state.moving_wp = 0
-            mpstate.status.loading_waypoints = True
-            mpstate.status.loading_waypoint_lasttime = time.time()
+            mpstate.wp_state.loading_waypoints = True
+            mpstate.wp_state.loading_waypoint_lasttime = time.time()
             mpstate.master().mav.mission_write_partial_list_send(mpstate.status.target_system,
                                                                  mpstate.status.target_component,
                                                                  state.move_wp, state.move_wp)
@@ -269,8 +269,8 @@ def mavlink_packet(m):
 
         
     # if the waypoints have changed, redisplay
-    if state.wp_change_time != mpstate.status.wploader.last_change:
-        state.wp_change_time = mpstate.status.wploader.last_change
+    if state.wp_change_time != mpstate.wp_state.wploader.last_change:
+        state.wp_change_time = mpstate.wp_state.wploader.last_change
         display_waypoints()
 
     # if the fence has changed, redisplay
