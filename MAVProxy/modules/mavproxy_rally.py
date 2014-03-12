@@ -24,6 +24,8 @@ def init(_mpstate):
     mpstate = _mpstate
     mpstate.rally_state = rally_state()
     mpstate.command_map['rally'] = (cmd_rally, "rally point control")
+    mpstate.completions["rally"] = ["<add|clear|list>",
+                                    "<load|save> (FILENAME)"]
 
 def cmd_rally(args):
     '''rally point commands'''

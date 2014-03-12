@@ -17,6 +17,10 @@ def init(_mpstate):
     mpstate = _mpstate
     mpstate.command_map['arm'] =    (cmd_arm,      'arm motors')
     mpstate.command_map['disarm'] = (cmd_disarm,   'disarm motors')
+    mpstate.completions['arm'] = ['check <all|baro|compass|gps|ins|params|rc|voltage|battery>',
+                                  'uncheck <all|baro|compass|gps|ins|params|rc|voltage|battery>',
+                                  'list',
+                                  'throttle']
 
 arming_masks = {
     "all"     : 0x0001,
@@ -47,7 +51,10 @@ def cmd_arm(args):
         
         arming_mask = int(mpstate.functions.get_mav_param("ARMING_CHECK",0))
         name = args[1].lower()
-        if name in arming_masks:
+        if name == 'all':
+            for name in arming_masks.keys():
+                arming_mask |= arming_masks[name]
+        elif name in arming_masks:
             arming_mask |= arming_masks[name]
         else:
             print("unrecognized arm check:", name)
@@ -62,7 +69,9 @@ def cmd_arm(args):
 
         arming_mask = int(mpstate.functions.get_mav_param("ARMING_CHECK",0))
         name = args[1].lower()
-        if name in arming_masks:
+        if name == 'all':
+            arming_mask = 0
+        elif name in arming_masks:
             arming_mask &= ~arming_masks[name]
         else:
             print "unrecognized arm check:", args[1]

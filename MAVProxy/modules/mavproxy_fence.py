@@ -27,7 +27,8 @@ def init(_mpstate):
     mpstate = _mpstate
     mpstate.fence = fence_state()
     mpstate.command_map['fence'] = (cmd_fence, "geo-fence management")
-
+    mpstate.completions["fence"] = ["<draw|list|clear>",
+                                    "<load|save> (FILENAME)"]
     if mpstate.continue_mode and mpstate.status.logdir != None:
         fencetxt = os.path.join(mpstate.status.logdir, 'fence.txt')
         if os.path.exists(fencetxt):

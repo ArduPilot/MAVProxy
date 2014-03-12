@@ -124,8 +124,6 @@ class MPState(object):
         self.completions = {
             "wp" : ["<list|clear>",
                     "<load|update|save> (FILENAME)"],
-            "fence" : ["<draw|list|clear>",
-                       "<load|save> (FILENAME)"],
             "script" : ["(FILENAME)"],
             "set"    : ["(SETTING)"]
             }
