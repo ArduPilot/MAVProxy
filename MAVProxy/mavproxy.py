@@ -753,6 +753,27 @@ def cmd_watch(args):
     mpstate.status.watch = args[0]
     print("Watching %s" % mpstate.status.watch)
 
+def load_module(modname, quiet=False):
+    '''load a module'''
+    modpaths = ['MAVProxy.modules.mavproxy_%s' % modname, modname]
+    for modpath in modpaths:
+        try:
+            m = import_package(modpath)
+            if m in mpstate.modules:
+                raise RuntimeError("module %s already loaded" % (modname,))
+            m.init(mpstate)
+            mpstate.modules.append(m)
+            if not quiet:
+                print("Loaded module %s" % (modname,))
+            return True
+        except ImportError, msg:
+            ex = msg
+            if mpstate.settings.moddebug > 1:
+                import traceback
+                print traceback.format_exc()
+    print("Failed to load module: %s" % ex)
+    return False
+
 def cmd_module(args):
     '''module commands'''
     usage = "usage: module <list|load|reload|unload>"
@@ -766,23 +787,7 @@ def cmd_module(args):
         if len(args) < 2:
             print("usage: module load <name>")
             return
-        modname = args[1]
-        modpaths = ['MAVProxy.modules.mavproxy_%s' % modname, modname]
-        for modpath in modpaths:
-            try:
-                m = import_package(modpath)
-                if m in mpstate.modules:
-                    raise RuntimeError("module %s already loaded" % (modname,))
-                m.init(mpstate)
-                mpstate.modules.append(m)
-                print("Loaded module %s" % (modname,))
-                return
-            except ImportError, msg:
-                ex = msg
-                if mpstate.settings.moddebug > 1:
-                    import traceback
-                    print traceback.format_exc()
-        print("Failed to load module: %s" % ex)
+        load_module(args[1])
     elif args[0] == "reload":
         if len(args) < 2:
             print("usage: module reload <name>")
@@ -1917,7 +1922,7 @@ Auto-detected serial ports are:
         # some core functionality is in modules
         standard_modules = ['log','rally','fence','param','tuneopt']
         for m in standard_modules:
-            process_stdin('module load %s' % m)
+            load_module(m, quiet=True)
 
     if opts.console:
         process_stdin('module load console')
