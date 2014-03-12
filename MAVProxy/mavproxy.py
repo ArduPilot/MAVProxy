@@ -1057,54 +1057,6 @@ def process_stdin(line):
         print("ERROR in command: %s" % str(e))
 
 
-def system_check():
-    '''check that the system is ready to fly'''
-    ok = True
-
-    if mavutil.mavlink.WIRE_PROTOCOL_VERSION == '1.0':
-        if not 'GPS_RAW_INT' in mpstate.status.msgs:
-            say("WARNING no GPS status")
-            return
-        if mpstate.status.msgs['GPS_RAW_INT'].fix_type != 3:
-            say("WARNING no GPS lock")
-            ok = False
-    else:
-        if not 'GPS_RAW' in mpstate.status.msgs and not 'GPS_RAW_INT' in mpstate.status.msgs:
-            say("WARNING no GPS status")
-            return
-        if mpstate.status.msgs['GPS_RAW'].fix_type != 2:
-            say("WARNING no GPS lock")
-            ok = False
-
-    if not 'PITCH_MIN' in mpstate.mav_param:
-        say("WARNING no pitch parameter available")
-        return
-
-    if int(mpstate.mav_param['PITCH_MIN']) > 1300:
-        say("WARNING PITCH MINIMUM not set")
-        ok = False
-
-    if not 'ATTITUDE' in mpstate.status.msgs:
-        say("WARNING no attitude recorded")
-        return
-
-    if math.fabs(mpstate.status.msgs['ATTITUDE'].pitch) > math.radians(5):
-        say("WARNING pitch is %u degrees" % math.degrees(mpstate.status.msgs['ATTITUDE'].pitch))
-        ok = False
-
-    if math.fabs(mpstate.status.msgs['ATTITUDE'].roll) > math.radians(5):
-        say("WARNING roll is %u degrees" % math.degrees(mpstate.status.msgs['ATTITUDE'].roll))
-        ok = False
-
-    if ok:
-        say("All OK SYSTEM READY TO FLY")
-
-
-def beep():
-    f = open("/dev/tty", mode="w")
-    f.write(chr(7))
-    f.close()
-
 def vcell_to_battery_percent(vcell):
     '''convert a cell voltage to a percentage battery level'''
     if vcell > 4.1:
