@@ -70,7 +70,7 @@ def idle_task():
         return
     for e in pygame.event.get(): # iterate over event stack
         #the following is somewhat custom for the specific joystick model:
-        override = mpstate.status.override[:]
+        override = mpstate.rc_state.override[:]
         for i in range(len(state.map)):
             m = state.map[i]
             if m is None:
@@ -81,9 +81,9 @@ def idle_task():
             v = int(state.js.get_axis(axis)*mul + add)
             v = max(min(v, 2000), 1000)
             override[i] = v
-        if override != mpstate.status.override:
-            mpstate.status.override = override
-            mpstate.override_period.force()
+        if override != mpstate.rc_state.override:
+            mpstate.rc_state.override = override
+            mpstate.rc_state.override_period.force()
 
 def name():
     '''return module name'''
