@@ -10,16 +10,18 @@ June 2012
 
 import sys, os, time
 from MAVProxy.modules.lib import mp_settings
+from MAVProxy.modules import mavproxy_map
 from pymavlink import mavutil
 
 mpstate = None
 
-class module_state(object):
+class tracker_state(object):
     def __init__(self):
         self.connection = None
         self.settings = mp_settings.MPSettings(
             [ ('port', str, "/dev/ttyUSB0"),
-              ('baudrate', int, 57600)
+              ('baudrate', int, 57600),
+              ('debug', int, 0)
               ]
             )
 
@@ -54,59 +56,74 @@ def init(_mpstate):
     '''initialise module'''
     global mpstate
     mpstate = _mpstate
-    mpstate.tracker_state = module_state()
+    mpstate.tracker_state = tracker_state()
     mpstate.command_map['tracker'] = (cmd_tracker, "antenna tracker control module")
 
 def unload():
     '''unload module'''
     pass
 
-def tracker_callback(m, connection):
-    '''process mavlink message m from tracker'''
-    connection.post_message(m)
-
-def tracker_send_callback(m, master):
-    '''called on sending a message to the tracker'''
-
 def mavlink_packet(m):
-    '''handle an incoming mavlink packet from the master vehicle. Relay it to the tracker if it is a GLOBAL_POSITION_INT'''
+    '''handle an incoming mavlink packet from the master vehicle. Relay it to the tracker
+    if it is a GLOBAL_POSITION_INT'''
+    state = mpstate.tracker_state
+    if not state.connection:
+        return
+    if m.get_type() in ['GLOBAL_POSITION_INT', 'SCALED_PRESSURE']:
+        state.connection.mav.send(m)
+
+def idle_task():
+    '''called in idle time'''
+    state = mpstate.tracker_state
+    if not state.connection:
+        return
+
+    # check for a mavlink message from the tracker
+    m = state.connection.recv_msg()
+    if m is None:
+        return
+
+    if state.settings.debug:
+        print m
+
     if m.get_type() == 'GLOBAL_POSITION_INT':
-        if (mpstate.tracker_state.connection == None):
-            return
-        mpstate.tracker_state.connection.mav.global_position_int_send(m.time_boot_ms, m.lat, m.lon, m.alt, m.relative_alt, m.vx, m.vy, m.vz, m.hdg)
+        (state.lat, state.lon, state.heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
+        if state.lat != 0 or state.lon != 0:
+            mavproxy_map.create_vehicle_icon('AntennaTracker', 'red', follow=False, vehicle_type='antenna')
+            mpstate.map.set_position('AntennaTracker', (state.lat, state.lon), rotation=state.heading)
+    
 
 def cmd_tracker_start():
-    if mpstate.tracker_state.settings.port == None:
+    state = mpstate.tracker_state
+    if state.settings.port == None:
         print("tracker port not set")
         return
-    print("connecting to tracker %s at %d" % (mpstate.tracker_state.settings.port, mpstate.tracker_state.settings.baudrate))
-    m = mavutil.mavlink_connection(mpstate.tracker_state.settings.port, 
+    print("connecting to tracker %s at %d" % (state.settings.port, state.settings.baudrate))
+    m = mavutil.mavlink_connection(state.settings.port, 
                                    autoreconnect=True, 
-                                   baud=mpstate.tracker_state.settings.baudrate)
-    m.mav.set_callback(tracker_callback, m)
-    if hasattr(m.mav, 'set_send_callback'):
-        m.mav.set_send_callback(tracker_send_callback, m)
-    m.linknum = len(mpstate.mav_master)
-    m.linkerror = False
-    m.link_delayed = False
-    m.last_heartbeat = 0
-    m.last_message = 0
-    m.highest_msec = 0
-    mpstate.mav_master.append(m)
-    mpstate.tracker_state.connection = m
+                                   baud=state.settings.baudrate)
+    state.connection = m
 
 def cmd_tracker_arm():
     '''Enable the servos in the tracker so the antenna will move'''
-    if (mpstate.tracker_state.connection):
-        mpstate.tracker_state.connection.arducopter_arm()
+    state = mpstate.tracker_state
+    if not state.connection:
+        print("tracker not connected")
+        return
+    state.connection.arducopter_arm()
 
 def cmd_tracker_disarm():
     '''Disable the servos in the tracker so the antenna will not move'''
-    if (mpstate.tracker_state.connection):
-        mpstate.tracker_state.connection.arducopter_disarm()
+    state = mpstate.tracker_state
+    if not state.connection:
+        print("tracker not connected")
+        return
+    state.connection.arducopter_disarm()
 
 def cmd_tracker_level():
     '''Calibrate the accelerometers. Disarm and move the antenna level first'''
-    if (mpstate.tracker_state.connection):
-        mpstate.tracker_state.connection.calibrate_level()
-
+    state = mpstate.tracker_state
+    if not state.connection:
+        print("tracker not connected")
+        return
+    state.connection.calibrate_level()
