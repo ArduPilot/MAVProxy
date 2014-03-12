@@ -24,7 +24,7 @@ def name():
 
 def description():
     '''return module description'''
-    return "logg transfer"
+    return "log transfer"
 
 def init(_mpstate):
     '''initialise module'''
