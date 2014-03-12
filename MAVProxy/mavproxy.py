@@ -850,104 +850,6 @@ def cmd_alias(args):
         print(usage)
         return
 
-def cmd_arm(args):
-    '''arm commands'''
-    usage = "usage: arm <check|uncheck|list|throttle>"
-    checkables = "<all|baro|compass|gps|ins|params|rc|voltage|battery>"
-
-    if len(args) > 0:
-        if args[0] == "check":
-            if (len(args) < 2):
-                print "usage: arm check", checkables
-                return
-            
-            arming_mask = int(mpstate.mav_param["ARMING_CHECK"])
-
-            if (args[1] == "all"):
-                arming_mask |= 0x0001
-            elif (args[1] == "baro"):
-                arming_mask |= 0x0002
-            elif (args[1] == "compass"):
-                arming_mask |= 0x0004
-            elif (args[1] == "gps"):
-                arming_mask |= 0x0008
-            elif (args[1] == "ins"):
-                arming_mask |= 0x0010
-            elif (args[1] == "params"):
-                arming_mask |= 0x0020
-            elif (args[1] == "rc"):
-                arming_mask |= 0x0030
-            elif (args[1] == "voltage"):
-                arming_mask |= 0x0040
-            elif (args[1] == "battery"):
-                arming_mask |= 0x0100
-            else:
-                print "unrecognized arm check:", args[1]
-                return
-
-            param_set("ARMING_CHECK", arming_mask)
-        elif args[0] == "uncheck":
-            if (len(args) < 2):
-                print "usage: arm uncheck", checkables
-                return
-
-            arming_mask = int(mpstate.mav_param["ARMING_CHECK"])
-
-            if (args[1] == "all"):
-                arming_mask ^= 0x0001
-            elif (args[1] == "baro"):
-                arming_mask ^= 0x0002
-            elif (args[1] == "compass"):
-                arming_mask ^= 0x0004
-            elif (args[1] == "gps"):
-                arming_mask ^= 0x0008
-            elif (args[1] == "ins"):
-                arming_mask ^= 0x0010
-            elif (args[1] == "params"):
-                arming_mask ^= 0x0020
-            elif (args[1] == "rc"):
-                arming_mask ^= 0x0040
-            elif (args[1] == "voltage"):
-                arming_mask ^= 0x0080
-            elif (args[1] == "battery"):
-                arming_mask ^= 0x0100
-            else:
-                print "unrecognized arm check:", args[1]
-                return
-
-            param_set("ARMING_CHECK", arming_mask)
-
-        elif args[0] == "list":
-            arming_mask = int(mpstate.mav_param["ARMING_CHECK"])
-            if (arming_mask & 0x0001 != 0):
-                print "ALL"
-            if (arming_mask & 0x0002 != 0):
-                print "BARO"
-            if (arming_mask & 0x0004 != 0):
-                print "COMPASS"
-            if (arming_mask & 0x0008 != 0):
-                print "GPS"
-            if (arming_mask & 0x0010 != 0):
-                print "INS"
-            if (arming_mask & 0x0020 != 0):
-                print "PARAMETERS"
-            if (arming_mask & 0x0040 != 0):
-                print "RC"
-            if (arming_mask & 0x0080 != 0):
-                print "VOLTAGE"
-            if (arming_mask & 0x0100 != 0):
-                print "BATTERY"
-
-        elif args[0] == "throttle":
-            mpstate.master().arducopter_arm()
-        else:
-            print(usage)
-            return
-    else:
-        print(usage)
-        return
-
-
 def cmd_time(args):
   '''show autopilot time'''
   tusec = mpstate.master().field('SYSTEM_TIME', 'time_unix_usec', 0)
@@ -956,10 +858,6 @@ def cmd_time(args):
       return
   print("%s (%s)\n" % (time.ctime(tusec * 1.0e-6), time.ctime()))
 
-
-def cmd_disarm(args):
-  '''disarm motors'''
-  mpstate.master().arducopter_disarm()
 
 # http://stackoverflow.com/questions/211100/pythons-import-doesnt-work-as-expected
 # has info on why this is necessary.
@@ -1005,9 +903,7 @@ command_map = {
     'watch'   : (cmd_watch,    'watch a MAVLink pattern'),
     'module'  : (cmd_module,   'module commands'),
     'alias'   : (cmd_alias,    'command aliases'),
-    'arm'     : (cmd_arm,      'Copter/Plane arm motors'),
     'time'    : (cmd_time,     'Show autopilot time'),
-    'disarm'  : (cmd_disarm,   'Copter/Plane disarm motors')
     }
 
 def process_stdin(line):
@@ -1872,7 +1768,7 @@ Auto-detected serial ports are:
 
     if not opts.setup:
         # some core functionality is in modules
-        standard_modules = ['log','rally','fence','param','tuneopt']
+        standard_modules = ['log','rally','fence','param','tuneopt','arm']
         for m in standard_modules:
             load_module(m, quiet=True)
 
