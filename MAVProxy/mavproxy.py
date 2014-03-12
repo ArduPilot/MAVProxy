@@ -265,21 +265,6 @@ def cmd_level(args):
     '''run a accel level'''
     mpstate.master().calibrate_level()
 
-def cmd_mode(args):
-    '''set arbitrary mode'''
-    mode_mapping = mpstate.master().mode_mapping()
-    if mode_mapping is None:
-        print('No mode mapping available')
-        return
-    if len(args) != 1:
-        print('Available modes: ', mode_mapping.keys())
-        return
-    mode = args[0].upper()
-    if mode not in mode_mapping:
-        print('Unknown mode %s: ' % mode)
-        return
-    mpstate.master().set_mode(mode_mapping[mode])
-
 def cmd_accelcal(args):
     '''do a full 3D accel calibration'''
     mav = mpstate.master()
@@ -881,7 +866,6 @@ command_map = {
     'reset'   : (cmd_reset,    'reopen the connection to the MAVLink master'),
     'status'  : (cmd_status,   'show status'),
     'auto'    : (cmd_auto,     'set AUTO mode'),
-    'mode'    : (cmd_mode,     'set a mode'),
     'ground'  : (cmd_ground,   'do a ground start'),
     'level'   : (cmd_level,    'set level on a multicopter'),
     'accelcal': (cmd_accelcal, 'do 3D accelerometer calibration'),
@@ -1768,7 +1752,7 @@ Auto-detected serial ports are:
 
     if not opts.setup:
         # some core functionality is in modules
-        standard_modules = ['log','rally','fence','param','tuneopt','arm']
+        standard_modules = ['log','rally','fence','param','tuneopt','arm','mode']
         for m in standard_modules:
             load_module(m, quiet=True)
 
