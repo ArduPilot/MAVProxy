@@ -32,3 +32,11 @@ def cmd_mode(args):
         return
     mpstate.master().set_mode(mode_mapping[mode])
 
+def unknown_command(args):
+    '''handle mode switch by mode name as command'''
+    mode_mapping = mpstate.master().mode_mapping()
+    mode = args[0].upper()
+    if mode in mode_mapping:
+        mpstate.master().set_mode(mode_mapping[mode])
+        return True
+    return False

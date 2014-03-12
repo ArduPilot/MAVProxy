@@ -249,14 +249,6 @@ def cmd_rc(args):
     mpstate.status.override_counter = 10
     send_rc_override()
 
-def cmd_loiter(args):
-    '''set LOITER mode'''
-    mpstate.master().set_mode_loiter()
-
-def cmd_auto(args):
-    '''set AUTO mode'''
-    mpstate.master().set_mode_auto()
-
 def cmd_ground(args):
     '''do a ground start mode'''
     mpstate.master().calibrate_imu()
@@ -320,14 +312,6 @@ def cmd_calpressure(args):
     '''calibrate pressure sensors'''
     mpstate.master().calibrate_pressure()
 
-def cmd_rtl(args):
-    '''set RTL mode'''
-    mpstate.master().set_mode_rtl()
-
-def cmd_manual(args):
-    '''set MANUAL mode'''
-    mpstate.master().set_mode_manual()
-
 def cmd_servo(args):
     '''set a servo'''
     if len(args) != 2:
@@ -336,10 +320,6 @@ def cmd_servo(args):
     channel = int(args[0])
     value   = int(args[1])
     mpstate.master().set_servo(channel, value)
-
-def cmd_fbwa(args):
-    '''set FBWA mode'''
-    mpstate.master().set_mode_fbwa()
 
 def cmd_guided(args):
     '''set GUIDED target'''
@@ -865,16 +845,11 @@ command_map = {
     'setup'   : (cmd_setup,    'go into setup mode'),
     'reset'   : (cmd_reset,    'reopen the connection to the MAVLink master'),
     'status'  : (cmd_status,   'show status'),
-    'auto'    : (cmd_auto,     'set AUTO mode'),
     'ground'  : (cmd_ground,   'do a ground start'),
     'level'   : (cmd_level,    'set level on a multicopter'),
     'accelcal': (cmd_accelcal, 'do 3D accelerometer calibration'),
     'compassmot': (cmd_compassmot, 'do compass/motor interference calibration'),
     'calpress': (cmd_calpressure,'calibrate pressure sensors'),
-    'loiter'  : (cmd_loiter,   'set LOITER mode'),
-    'rtl'     : (cmd_rtl,      'set RTL mode'),
-    'manual'  : (cmd_manual,   'set MANUAL mode'),
-    'fbwa'    : (cmd_fbwa,     'set FBWA mode'),
     'guided'  : (cmd_guided,   'set GUIDED target'),
     'set'     : (cmd_set,      'mavproxy settings'),
     'bat'     : (cmd_bat,      'show battery levels'),
@@ -928,6 +903,13 @@ def process_stdin(line):
             print("%-15s : %s" % (cmd, help))
         return
     if not cmd in command_map:
+        for m in mpstate.modules:
+            if hasattr(m, 'unknown_command'):
+                try:
+                    if m.unknown_command(args):
+                        return
+                except Exception as e:
+                    print("ERROR in command: %s" % str(e))
         print("Unknown command '%s'" % line)
         return
     (fn, help) = command_map[cmd]
