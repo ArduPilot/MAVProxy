@@ -98,6 +98,7 @@ class MPState(object):
         self.console = textconsole.SimpleConsole()
         self.map = None
         self.map_functions = {}
+        self.vehicle_type = None
         self.settings = mp_settings.MPSettings(
             [ ('link', int, 1),
               ('altreadout', int, 10),
@@ -606,95 +607,6 @@ def cmd_set(args):
     else:
         mpstate.settings.set(args[0], args[1])
 
-tune_options = {
-    'None':             '0',
-    'StabRollPitchkP':  '1',
-    'RateRollPitchkP':  '4',
-    'RateRollPitchkI':  '6',
-    'RateRollPitchkD':  '21',
-    'StabYawkP':        '3',
-    'RateYawkP':        '6',
-    'RateYawkD':        '26',
-    'AltitudeHoldkP':   '14',
-    'ThrottleRatekP':   '7',
-    'ThrottleRatekD':   '37',
-    'ThrottleAccelkP':  '34',
-    'ThrottleAccelkI':  '35',
-    'ThrottleAccelkD':  '36',
-    'LoiterPoskP':      '12',
-    'LoiterRatekP':     '22',
-    'LoiterRatekI':     '28',
-    'LoiterRatekD':     '29',
-    'WPSpeed':          '10',
-    'AcroRollPitch kP': '25',
-    'AcroYawkP':        '40',
-    'RelayOnOff':       '9',
-    'HeliExtGyro':      '13',
-    'OFLoiterkP':       '17',
-    'OFLoiterkI':       '18',
-    'OFLoiterkD':       '19',
-    'AHRSYawkP':        '30',
-    'AHRSkP':           '31',
-    'INAV_TC':          '32',
-    'Declination':      '38',
-    'CircleRate':       '39',
-    'SonarGain':       '41',
-}
-
-def tune_show():
-    opt_num = str(int(get_mav_param('TUNE')))
-    option = None
-    for k in tune_options.keys():
-        if opt_num == tune_options[k]:
-            option = k
-            break
-    else:
-        print("TUNE is currently set to unknown value " + opt_num)
-        return
-    low = get_mav_param('TUNE_LOW')
-    high = get_mav_param('TUNE_HIGH')
-    print("TUNE is currently set to %s LOW=%f HIGH=%f" % (option, low/1000, high/1000))
-
-def tune_option_validate(option):
-    for k in tune_options:
-        if option.upper() == k.upper():
-            return k
-    return None
-
-# TODO: Check/show the limits of LOW and HIGH
-def cmd_tuneopt(args):
-    '''Select option for Tune Pot on Channel 6 (quadcopter only)'''
-    usage = "usage: tuneopt <set|show|reset|list>"
-    if not opts.quadcopter or 'TUNE' not in mpstate.mav_param:
-        print("This command is only available for quadcopter")
-        return
-    if len(args) < 1:
-        print(usage)
-        return
-    if args[0].lower() == 'reset':
-        param_set('TUNE', '0')
-    elif args[0].lower() == 'set':
-        if len(args) < 4:
-            print('Usage: tuneopt set OPTION LOW HIGH')
-            return
-        option = tune_option_validate(args[1])
-        if not option:
-            print('Invalid Tune option: ' + args[1])
-            return
-        low = args[2]
-        high = args[3]
-        param_set('TUNE', tune_options[option])
-        param_set('TUNE_LOW', float(low) * 1000)
-        param_set('TUNE_HIGH', float(high) * 1000)
-    elif args[0].lower() == 'show':
-        tune_show()
-    elif args[0].lower() == 'list':
-        print("Options available:")
-        for s in sorted(tune_options.keys()):
-            print('  ' + s)
-    else:
-        print(usage)
-
 def cmd_status(args):
     '''show status'''
     if len(args) == 0:
@@ -1062,7 +974,6 @@ command_map = {
     'rc'      : (cmd_rc,       'override a RC channel value'),
     'wp'      : (cmd_wp,       'waypoint management'),
     'script'  : (cmd_script,   'run a script of MAVProxy commands'),
-    'tuneopt' : (cmd_tuneopt,  'Select option for Tune Pot on Channel 6 (quadcopter only)'),
     'setup'   : (cmd_setup,    'go into setup mode'),
     'reset'   : (cmd_reset,    'reopen the connection to the MAVLink master'),
     'status'  : (cmd_status,   'show status'),
@@ -1377,6 +1288,22 @@ def master_callback(m, master):
             mpstate.status.last_mode_announce = time.time()
             mpstate.rl.set_prompt(mpstate.status.flightmode + "> ")
             say("Mode " + mpstate.status.flightmode)
+
+        if m.type in [mavutil.mavlink.MAV_TYPE_FIXED_WING]:
+            mpstate.vehicle_type = 'plane'
+        elif m.type in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER,
+                        mavutil.mavlink.MAV_TYPE_SURFACE_BOAT,
+                        mavutil.mavlink.MAV_TYPE_SUBMARINE]:
+            mpstate.vehicle_type = 'rover'
+        elif m.type in [mavutil.mavlink.MAV_TYPE_QUADROTOR,
+                        mavutil.mavlink.MAV_TYPE_COAXIAL,
+                        mavutil.mavlink.MAV_TYPE_HEXAROTOR,
+                        mavutil.mavlink.MAV_TYPE_OCTOROTOR,
+                        mavutil.mavlink.MAV_TYPE_TRICOPTER,
+                        mavutil.mavlink.MAV_TYPE_HELICOPTER]:
+            mpstate.vehicle_type = 'copter'
+        elif m.type in [mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER]:
+            mpstate.vehicle_type = 'antenna'
         
     elif mtype == 'STATUSTEXT':
         if m.text != mpstate.status.last_apm_msg or time.time() > mpstate.status.last_apm_msg_time+2:
@@ -1988,7 +1915,7 @@ Auto-detected serial ports are:
 
     if not opts.setup:
         # some core functionality is in modules
-        standard_modules = ['log','rally','fence','param']
+        standard_modules = ['log','rally','fence','param','tuneopt']
         for m in standard_modules:
             process_stdin('module load %s' % m)
 
