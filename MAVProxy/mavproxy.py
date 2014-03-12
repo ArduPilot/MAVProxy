@@ -321,29 +321,6 @@ def cmd_servo(args):
     value   = int(args[1])
     mpstate.master().set_servo(channel, value)
 
-def cmd_guided(args):
-    '''set GUIDED target'''
-    if len(args) != 1:
-        print("Usage: guided ALTITUDE")
-        return
-    try:
-        latlon = mpstate.map_state.click_position
-    except Exception:
-        print("No map available")
-        return
-    if latlon is None:
-        print("No map click position available")
-        return        
-    altitude = int(args[0])
-    print("Guided %s %d" % (str(latlon), altitude))
-    mpstate.master().mav.mission_item_send(mpstate.status.target_system,
-                                           mpstate.status.target_component,
-                                           0,
-                                           mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                           mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
-                                           2, 0, 0, 0, 0, 0,
-                                           latlon[0], latlon[1], altitude)
-
 def process_waypoint_request(m, master):
     '''process a waypoint request from the master'''
     if (not mpstate.status.loading_waypoints or
@@ -850,7 +827,6 @@ command_map = {
     'accelcal': (cmd_accelcal, 'do 3D accelerometer calibration'),
     'compassmot': (cmd_compassmot, 'do compass/motor interference calibration'),
     'calpress': (cmd_calpressure,'calibrate pressure sensors'),
-    'guided'  : (cmd_guided,   'set GUIDED target'),
     'set'     : (cmd_set,      'mavproxy settings'),
     'bat'     : (cmd_bat,      'show battery levels'),
     'alt'     : (cmd_alt,      'show relative altitude'),

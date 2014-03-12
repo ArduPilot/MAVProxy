@@ -2,6 +2,7 @@
 '''mode command handling'''
 
 import time, os
+from pymavlink import mavutil
 
 def name():
     '''return module name'''
@@ -16,6 +17,7 @@ def init(_mpstate):
     global mpstate
     mpstate = _mpstate
     mpstate.command_map['mode'] = (cmd_mode, "mode change")
+    mpstate.command_map['guided'] = (cmd_guided, "fly to a clicked location on map")
 
 def cmd_mode(args):
     '''set arbitrary mode'''
@@ -40,3 +42,27 @@ def unknown_command(args):
         mpstate.master().set_mode(mode_mapping[mode])
         return True
     return False
+
+def cmd_guided(args):
+    '''set GUIDED target'''
+    if len(args) != 1:
+        print("Usage: guided ALTITUDE")
+        return
+    try:
+        latlon = mpstate.map_state.click_position
+    except Exception:
+        print("No map available")
+        return
+    if latlon is None:
+        print("No map click position available")
+        return        
+    altitude = int(args[0])
+    print("Guided %s %d" % (str(latlon), altitude))
+    mpstate.master().mav.mission_item_send(mpstate.status.target_system,
+                                           mpstate.status.target_component,
+                                           0,
+                                           mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                           mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
+                                           2, 0, 0, 0, 0, 0,
+                                           latlon[0], latlon[1], altitude)
+    
