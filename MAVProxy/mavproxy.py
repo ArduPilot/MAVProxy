@@ -249,68 +249,9 @@ def cmd_rc(args):
     mpstate.status.override_counter = 10
     send_rc_override()
 
-def cmd_ground(args):
-    '''do a ground start mode'''
-    mpstate.master().calibrate_imu()
-
-def cmd_level(args):
-    '''run a accel level'''
-    mpstate.master().calibrate_level()
-
-def cmd_accelcal(args):
-    '''do a full 3D accel calibration'''
-    mav = mpstate.master()
-    # ack the APM to begin 3D calibration of accelerometers
-    mav.mav.command_long_send(mav.target_system, mav.target_component,
-                              mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, 0,
-                              0, 0, 0, 0, 1, 0, 0)
-    count = 0
-    # we expect 6 messages and acks
-    while count < 6:
-        m = mav.recv_match(type='STATUSTEXT', blocking=True)
-        text = str(m.text)
-        if not text.startswith('Place '):
-            continue
-        # wait for user to hit enter
-        mpstate.rl.line = None
-        while mpstate.rl.line is None:
-            time.sleep(0.1)
-        mpstate.rl.line = None
-        count += 1
-        # tell the APM that we've done as requested
-        mav.mav.command_ack_send(count, 1)
-
-
-def cmd_compassmot(args):
-    '''do a compass/motor interference calibration'''
-    mav = mpstate.master()
-    print("compassmot starting")
-    mav.mav.command_long_send(mav.target_system, mav.target_component,
-                              mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, 0,
-                              0, 0, 0, 0, 0, 1, 0)
-    mpstate.rl.line = None
-    while True:
-        m = mav.recv_match(type=['COMMAND_ACK','COMPASSMOT_STATUS'], blocking=False)
-        if m is not None:
-            print(m)
-            if m.get_type() == 'COMMAND_ACK':
-                break
-        if mpstate.rl.line is not None:
-            # user has hit enter, stop the process
-            mav.mav.command_ack_send(0, 1)
-            break
-        time.sleep(0.01)
-    print("compassmot done")
-
-
-
 def cmd_reboot(args):
     '''reboot autopilot'''
     mpstate.master().reboot_autopilot()
-
-def cmd_calpressure(args):
-    '''calibrate pressure sensors'''
-    mpstate.master().calibrate_pressure()
 
 def cmd_servo(args):
     '''set a servo'''
@@ -822,11 +763,6 @@ command_map = {
     'setup'   : (cmd_setup,    'go into setup mode'),
     'reset'   : (cmd_reset,    'reopen the connection to the MAVLink master'),
     'status'  : (cmd_status,   'show status'),
-    'ground'  : (cmd_ground,   'do a ground start'),
-    'level'   : (cmd_level,    'set level on a multicopter'),
-    'accelcal': (cmd_accelcal, 'do 3D accelerometer calibration'),
-    'compassmot': (cmd_compassmot, 'do compass/motor interference calibration'),
-    'calpress': (cmd_calpressure,'calibrate pressure sensors'),
     'set'     : (cmd_set,      'mavproxy settings'),
     'bat'     : (cmd_bat,      'show battery levels'),
     'alt'     : (cmd_alt,      'show relative altitude'),
@@ -1710,7 +1646,7 @@ Auto-detected serial ports are:
 
     if not opts.setup:
         # some core functionality is in modules
-        standard_modules = ['log','rally','fence','param','tuneopt','arm','mode']
+        standard_modules = ['log','rally','fence','param','tuneopt','arm','mode','calibration']
         for m in standard_modules:
             load_module(m, quiet=True)
 
