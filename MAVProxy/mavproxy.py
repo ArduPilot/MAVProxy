@@ -1472,6 +1472,12 @@ def master_callback(m, master):
                 say("ARMED")
             else:
                 say("DISARMED")
+
+        if master.flightmode != mpstate.status.flightmode and time.time() > mpstate.status.last_mode_announce + 2:
+            mpstate.status.flightmode = master.flightmode
+            mpstate.status.last_mode_announce = time.time()
+            mpstate.rl.set_prompt(mpstate.status.flightmode + "> ")
+            say("Mode " + mpstate.status.flightmode)
         
     elif mtype == 'STATUSTEXT':
         if m.text != mpstate.status.last_apm_msg or time.time() > mpstate.status.last_apm_msg_time+2:
@@ -1555,13 +1561,8 @@ def master_callback(m, master):
             mpstate.status.last_waypoint = m.seq
             say("waypoint %u" % m.seq,priority='message')
 
-    elif mtype == "HEARTBEAT":
+    elif mtype == "SYS_STATUS":
         battery_update(m)
-        if master.flightmode != mpstate.status.flightmode and time.time() > mpstate.status.last_mode_announce + 2:
-            mpstate.status.flightmode = master.flightmode
-            mpstate.status.last_mode_announce = time.time()
-            mpstate.rl.set_prompt(mpstate.status.flightmode + "> ")
-            say("Mode " + mpstate.status.flightmode)
 
     elif mtype == "VFR_HUD":
         have_gps_fix = False
