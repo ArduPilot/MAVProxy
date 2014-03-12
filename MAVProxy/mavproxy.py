@@ -48,9 +48,6 @@ class MPStatus(object):
         self.avionics_battery_level = -1
         self.last_waypoint = 0
         self.exit = False
-        self.override = [ 0 ] * 8
-        self.last_override = [ 0 ] * 8
-        self.override_counter = 0
         self.flightmode = 'MAV'
         self.last_mode_announce = 0
         self.logdir = None
@@ -191,61 +188,6 @@ def param_set(name, value, retries=3):
     state = mpstate.param_state
     name = name.upper()
     return mpstate.mav_param.mavset(mpstate.master(), name, value, retries=retries)
-
-def send_rc_override():
-    '''send RC override packet'''
-    if mpstate.sitl_output:
-        buf = struct.pack('<HHHHHHHH',
-                          *mpstate.status.override)
-        mpstate.sitl_output.write(buf)
-    else:
-        mpstate.master().mav.rc_channels_override_send(mpstate.status.target_system,
-                                                         mpstate.status.target_component,
-                                                         *mpstate.status.override)
-
-def cmd_switch(args):
-    '''handle RC switch changes'''
-    mapping = [ 0, 1165, 1295, 1425, 1555, 1685, 1815 ]
-    if len(args) != 1:
-        print("Usage: switch <pwmvalue>")
-        return
-    value = int(args[0])
-    if value < 0 or value > 6:
-        print("Invalid switch value. Use 1-6 for flight modes, '0' to disable")
-        return
-    if opts.quadcopter:
-        default_channel = 5
-    else:
-        default_channel = 8
-    flite_mode_ch_parm = int(get_mav_param("FLTMODE_CH", default_channel))
-    mpstate.status.override[flite_mode_ch_parm-1] = mapping[value]
-    mpstate.status.override_counter = 10
-    send_rc_override()
-    if value == 0:
-        print("Disabled RC switch override")
-    else:
-        print("Set RC switch override to %u (PWM=%u channel=%u)" % (
-            value, mapping[value], flite_mode_ch_parm))
-
-def cmd_rc(args):
-    '''handle RC value override'''
-    if len(args) != 2:
-        print("Usage: rc <channel|all> <pwmvalue>")
-        return
-    value   = int(args[1])
-    if value == -1:
-        value = 65535
-    if args[0] == 'all':
-        for i in range(8):
-            mpstate.status.override[i] = value
-    else:
-        channel = int(args[0])
-        mpstate.status.override[channel-1] = value
-        if channel < 1 or channel > 8:
-            print("Channel must be between 1 and 8 or 'all'")
-            return
-    mpstate.status.override_counter = 10
-    send_rc_override()
 
 def cmd_reboot(args):
     '''reboot autopilot'''
@@ -754,8 +696,6 @@ def import_package(name):
 
 
 command_map = {
-    'switch'  : (cmd_switch,   'set RC switch (1-5), 0 disables'),
-    'rc'      : (cmd_rc,       'override a RC channel value'),
     'wp'      : (cmd_wp,       'waypoint management'),
     'script'  : (cmd_script,   'run a script of MAVProxy commands'),
     'setup'   : (cmd_setup,    'go into setup mode'),
@@ -1362,16 +1302,6 @@ def periodic_tasks():
     if battery_period.trigger():
         battery_report()
 
-    if mpstate.override_period.trigger():
-        if (mpstate.status.override != [ 0 ] * 8 or
-            mpstate.status.override != mpstate.status.last_override or
-            mpstate.status.override_counter > 0):
-            mpstate.status.last_override = mpstate.status.override[:]
-            send_rc_override()
-            if mpstate.status.override_counter > 0:
-                mpstate.status.override_counter -= 1
-
-
     # call optional module idle tasks. These are called at several hundred Hz
     for m in mpstate.modules:
         if hasattr(m, 'idle_task'):
@@ -1620,10 +1550,6 @@ Auto-detected serial ports are:
     msg_period = mavutil.periodic_event(1.0/15)
     heartbeat_period = mavutil.periodic_event(1)
     battery_period = mavutil.periodic_event(0.1)
-    if mpstate.sitl_output:
-        mpstate.override_period = mavutil.periodic_event(20)
-    else:
-        mpstate.override_period = mavutil.periodic_event(1)
     heartbeat_check_period = mavutil.periodic_event(0.33)
 
     mpstate.rl = rline.rline("MAV> ", mpstate)
@@ -1644,7 +1570,7 @@ Auto-detected serial ports are:
 
     if not opts.setup:
         # some core functionality is in modules
-        standard_modules = ['log','rally','fence','param','tuneopt','arm','mode','calibration']
+        standard_modules = ['log','rally','fence','param','tuneopt','arm','mode','calibration','rc']
         for m in standard_modules:
             load_module(m, quiet=True)
 
