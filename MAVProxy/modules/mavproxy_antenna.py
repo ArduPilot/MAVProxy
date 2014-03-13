@@ -43,10 +43,6 @@ def init(_mpstate):
     mpstate.antenna_state = module_state()
     mpstate.command_map['antenna'] = (cmd_antenna, "antenna link control")
 
-def unload():
-    '''unload module'''
-    pass
-
 def mavlink_packet(m):
     '''handle an incoming mavlink packet'''
     state = mpstate.antenna_state

@@ -93,13 +93,6 @@ def description():
     '''return module description'''
     return "joystick aircraft control"
 
-def mavlink_packet(pkt):
-    pass
-
-def unload():
-    '''unload module'''
-    pass
-
 def init(_mpstate):
     '''initialise module'''
     global mpstate

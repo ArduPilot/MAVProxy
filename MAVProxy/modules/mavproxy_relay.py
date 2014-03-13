@@ -68,7 +68,3 @@ def init(_mpstate):
     mpstate = _mpstate
     mpstate.command_map['relay'] = (cmd_relay, "relay commands")
     mpstate.command_map['servo'] = (cmd_servo, "servo commands")
-
-def unload():
-    '''unload module'''
-    pass

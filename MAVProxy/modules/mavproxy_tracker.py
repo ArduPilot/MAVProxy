@@ -59,10 +59,6 @@ def init(_mpstate):
                                       'set (TRACKERSETTING)']
     mpstate.completion_functions['(TRACKERSETTING)'] = mpstate.tracker_state.settings.completion
 
-def unload():
-    '''unload module'''
-    pass
-
 def mavlink_packet(m):
     '''handle an incoming mavlink packet from the master vehicle. Relay it to the tracker
     if it is a GLOBAL_POSITION_INT'''
