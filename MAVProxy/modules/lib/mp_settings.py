@@ -46,6 +46,10 @@ class MPSettings(object):
             ret.append(v)
         return ret
 
+    def completion(self, text):
+        '''completion function for cmdline completion'''
+        return self.list()
+
     def command(self, args):
         '''control options from cmdline'''
         if len(args) == 0:

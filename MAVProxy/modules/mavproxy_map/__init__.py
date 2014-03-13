@@ -70,10 +70,6 @@ def cmd_map(args):
     else:
         print("usage: map <icon|set>")
 
-def complete_settings(text):
-    '''complete a setting'''
-    return mpstate.map_state.settings.list()
-
 def init(_mpstate):
     '''initialise module'''
     global mpstate
@@ -90,9 +86,7 @@ def init(_mpstate):
     mpstate.command_map['map'] = (cmd_map, "map control")
     mpstate.completions['map'] = ['icon',
                                   'set (MAPSETTING)']
-    mpstate.completion_functions['(MAPSETTING)'] = complete_settings
-    
-
+    mpstate.completion_functions['(MAPSETTING)'] = mpstate.map_state.settings.completion
 
 def display_waypoints():
     '''display the waypoints'''

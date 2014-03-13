@@ -49,10 +49,6 @@ def cmd_tracker(args):
     else:
         print("usage: tracker <start|set|arm|disarm|level>")
 
-def complete_settings(text):
-    '''complete a setting'''
-    return mpstate.tracker_state.settings.list()
-
 def init(_mpstate):
     '''initialise module'''
     global mpstate
@@ -61,7 +57,7 @@ def init(_mpstate):
     mpstate.command_map['tracker'] = (cmd_tracker, "antenna tracker control module")
     mpstate.completions['tracker'] = ['<start|arm|disarm|level>',
                                       'set (TRACKERSETTING)']
-    mpstate.completion_functions['(TRACKERSETTING)'] = complete_settings
+    mpstate.completion_functions['(TRACKERSETTING)'] = mpstate.tracker_state.settings.completion
 
 def unload():
     '''unload module'''

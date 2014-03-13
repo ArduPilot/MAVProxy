@@ -18,7 +18,7 @@ class rline(object):
         mpstate.completion_functions = {
             '(FILENAME)' : complete_filename,
             '(PARAMETER)' : complete_parameter,
-            '(SETTING)' : complete_settings
+            '(SETTING)' : rline_mpstate.settings.completion
             }
         
     def set_prompt(self, prompt):
@@ -44,10 +44,6 @@ def complete_filename(text):
 def complete_parameter(text):
     '''complete a parameter'''
     return rline_mpstate.mav_param.keys()
-
-def complete_settings(text):
-    '''complete a setting'''
-    return rline_mpstate.settings.list()
 
 def rule_expand(component, text):
     '''expand one rule component'''
