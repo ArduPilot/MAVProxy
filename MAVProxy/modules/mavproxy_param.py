@@ -119,7 +119,7 @@ def cmd_param(args):
         if not param.upper() in mpstate.mav_param:
             print("Unable to find parameter '%s'" % param)
             return
-        param_set(param, value)
+        mpstate.functions.param_set(param, value)
     elif args[0] == "load":
         if len(args) < 2:
             print("Usage: param load <filename> [wildcard]")

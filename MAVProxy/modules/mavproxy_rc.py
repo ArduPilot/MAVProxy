@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 '''rc command handling'''
 
-import time, os
+import time, os, struct
 from pymavlink import mavutil
 
 class rc_state(object):
