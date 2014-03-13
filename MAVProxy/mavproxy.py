@@ -644,10 +644,12 @@ def master_callback(m, master):
 
         if m.type in [mavutil.mavlink.MAV_TYPE_FIXED_WING]:
             mpstate.vehicle_type = 'plane'
+            mpstate.vehicle_name = 'ArduPlane'
         elif m.type in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER,
                         mavutil.mavlink.MAV_TYPE_SURFACE_BOAT,
                         mavutil.mavlink.MAV_TYPE_SUBMARINE]:
             mpstate.vehicle_type = 'rover'
+            mpstate.vehicle_name = 'APMrover2'
         elif m.type in [mavutil.mavlink.MAV_TYPE_QUADROTOR,
                         mavutil.mavlink.MAV_TYPE_COAXIAL,
                         mavutil.mavlink.MAV_TYPE_HEXAROTOR,
@@ -655,8 +657,10 @@ def master_callback(m, master):
                         mavutil.mavlink.MAV_TYPE_TRICOPTER,
                         mavutil.mavlink.MAV_TYPE_HELICOPTER]:
             mpstate.vehicle_type = 'copter'
+            mpstate.vehicle_name = 'ArduCopter'
         elif m.type in [mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER]:
             mpstate.vehicle_type = 'antenna'
+            mpstate.vehicle_name = 'AntennaTracker'
         
     elif mtype == 'STATUSTEXT':
         if m.text != mpstate.status.last_apm_msg or time.time() > mpstate.status.last_apm_msg_time+2:
