@@ -84,7 +84,7 @@ def idle_task():
 
     if m.get_type() == 'GLOBAL_POSITION_INT':
         (state.lat, state.lon, state.heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
-        if state.lat != 0 or state.lon != 0:
+        if mpstate.map != None and (state.lat != 0 or state.lon != 0):
             mavproxy_map.create_vehicle_icon('AntennaTracker', 'red', follow=False, vehicle_type='antenna')
             mpstate.map.set_position('AntennaTracker', (state.lat, state.lon), rotation=state.heading)
     
