@@ -221,3 +221,15 @@ def download_url(url):
         return None
     return resp.read()
 
+
+def download_files(files):
+    '''download an array of files'''
+    for (url, file) in files:
+            print("Downloading %s as %s" % (url, file))
+            data = download_url(url)
+            if data is None:
+                    continue
+            try:
+                    open(file, mode='w').write(data)
+            except Exception as e:
+                    print("Failed to save to %s : %s" % (file, e))
