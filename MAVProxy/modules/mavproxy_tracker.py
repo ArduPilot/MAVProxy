@@ -39,10 +39,7 @@ def cmd_tracker(args):
     if args[0] == "start":
         cmd_tracker_start()
     elif args[0] == "set":
-        if len(args) < 3:
-            state.settings.show_all()
-        else:
-            state.settings.set(args[1], args[2])
+        state.settings.command(args[1:])
     elif args[0] == 'arm':
         cmd_tracker_arm()
     elif args[0] == 'disarm':
@@ -52,12 +49,19 @@ def cmd_tracker(args):
     else:
         print("usage: tracker <start|set|arm|disarm|level>")
 
+def complete_settings(text):
+    '''complete a setting'''
+    return mpstate.tracker_state.settings.list()
+
 def init(_mpstate):
     '''initialise module'''
     global mpstate
     mpstate = _mpstate
     mpstate.tracker_state = tracker_state()
     mpstate.command_map['tracker'] = (cmd_tracker, "antenna tracker control module")
+    mpstate.completions['tracker'] = ['<start|arm|disarm|level>',
+                                      'set (TRACKERSETTING)']
+    mpstate.completion_functions['(TRACKERSETTING)'] = complete_settings
 
 def unload():
     '''unload module'''

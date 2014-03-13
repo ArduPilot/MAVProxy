@@ -188,17 +188,7 @@ def cmd_script(args):
 
 def cmd_set(args):
     '''control mavproxy options'''
-    if len(args) == 0:
-        mpstate.settings.show_all()
-        return
-
-    if getattr(mpstate.settings, args[0], None) is None:
-        print("Unknown setting '%s'" % args[0])
-        return
-    if len(args) == 1:
-        mpstate.settings.show(args[0])
-    else:
-        mpstate.settings.set(args[0], args[1])
+    mpstate.settings.command(args)
 
 def cmd_status(args):
     '''show status'''

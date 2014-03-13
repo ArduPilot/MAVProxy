@@ -65,13 +65,14 @@ def cmd_map(args):
                                                icon, layer=3, rotation=0, follow=False))
             state.icon_counter += 1
     elif args[0] == "set":
-        if len(args) < 3:
-            state.settings.show_all()
-        else:
-            state.settings.set(args[1], args[2])
-            mpstate.map.add_object(mp_slipmap.SlipBrightness(state.settings.brightness))
+        state.settings.command(args[1:])
+        mpstate.map.add_object(mp_slipmap.SlipBrightness(state.settings.brightness))
     else:
-        print("usage: map <brightness|icon|set>")
+        print("usage: map <icon|set>")
+
+def complete_settings(text):
+    '''complete a setting'''
+    return mpstate.map_state.settings.list()
 
 def init(_mpstate):
     '''initialise module'''
@@ -87,6 +88,10 @@ def init(_mpstate):
 
     mpstate.map.add_callback(functools.partial(map_callback))
     mpstate.command_map['map'] = (cmd_map, "map control")
+    mpstate.completions['map'] = ['icon',
+                                  'set (MAPSETTING)']
+    mpstate.completion_functions['(MAPSETTING)'] = complete_settings
+    
 
 
 def display_waypoints():

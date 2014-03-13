@@ -14,6 +14,12 @@ class rline(object):
         self.prompt = prompt
         self.line = None
         rline_mpstate = mpstate
+        # other modules can add their own completion functions
+        mpstate.completion_functions = {
+            '(FILENAME)' : complete_filename,
+            '(PARAMETER)' : complete_parameter,
+            '(SETTING)' : complete_settings
+            }
         
     def set_prompt(self, prompt):
         if prompt != self.prompt:
@@ -31,17 +37,25 @@ def complete_command():
     global rline_mpstate
     return rline_mpstate.command_map.keys()
 
+def complete_filename(text):
+    '''complete a filename'''
+    return glob.glob(text+'*')
+
+def complete_parameter(text):
+    '''complete a parameter'''
+    return rline_mpstate.mav_param.keys()
+
+def complete_settings(text):
+    '''complete a setting'''
+    return rline_mpstate.settings.list()
+
 def rule_expand(component, text):
     '''expand one rule component'''
     global rline_mpstate
     if component[0] == '<' and component[-1] == '>':
         return component[1:-1].split('|')
-    if component == '(FILENAME)':
-        return glob.glob(text+'*')
-    if component == '(PARAMETER)':
-        return rline_mpstate.mav_param.keys()
-    if component == '(SETTING)':
-        return rline_mpstate.settings.list()
+    if component in rline_mpstate.completion_functions:
+        return rline_mpstate.completion_functions[component](text)
     return [component]        
 
 def rule_match(component, cmd):

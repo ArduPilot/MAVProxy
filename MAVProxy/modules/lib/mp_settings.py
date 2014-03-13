@@ -45,3 +45,16 @@ class MPSettings(object):
         for (v,t,d) in self.vars:
             ret.append(v)
         return ret
+
+    def command(self, args):
+        '''control options from cmdline'''
+        if len(args) == 0:
+            self.show_all()
+            return
+        if getattr(self, args[0], None) is None:
+            print("Unknown setting '%s'" % args[0])
+            return
+        if len(args) == 1:
+            self.show(args[0])
+        else:
+            self.set(args[0], args[1])
