@@ -81,7 +81,12 @@ class MPStatus(object):
         f.close()
 
 class MAVFunctions(object):
-    pass
+    '''core functions available in modules'
+    def __init__(self):
+        self.say = say
+        self.process_stdin = process_stdin
+        self.param_set = param_set
+        self.get_mav_param = get_mav_param
 
 class MPState(object):
     '''holds state of mavproxy'''
@@ -131,10 +136,6 @@ class MPState(object):
         self.mav_param = mavparm.MAVParmDict()
         self.modules = []
         self.functions = MAVFunctions()
-        self.functions.say = say
-        self.functions.process_stdin = process_stdin
-        self.functions.param_set = param_set
-        self.functions.get_mav_param = get_mav_param
         self.select_extra = {}
         self.continue_mode = False
         self.aliases = {}
@@ -184,15 +185,6 @@ def param_set(name, value, retries=3):
 def cmd_reboot(args):
     '''reboot autopilot'''
     mpstate.master().reboot_autopilot()
-
-def cmd_servo(args):
-    '''set a servo'''
-    if len(args) != 2:
-        print("Usage: servo <channel> <pwmvalue>")
-        return
-    channel = int(args[0])
-    value   = int(args[1])
-    mpstate.master().set_servo(channel, value)
 
 def cmd_script(args):
     '''run a script'''
@@ -408,7 +400,6 @@ command_map = {
     'bat'     : (cmd_bat,      'show battery levels'),
     'alt'     : (cmd_alt,      'show relative altitude'),
     'link'    : (cmd_link,     'show link status'),
-    'servo'   : (cmd_servo,    'set a servo value'),
     'reboot'  : (cmd_reboot,   'reboot the autopilot'),
     'up'      : (cmd_up,       'adjust TRIM_PITCH_CD up by 5 degrees'),
     'watch'   : (cmd_watch,    'watch a MAVLink pattern'),
@@ -1214,7 +1205,7 @@ Auto-detected serial ports are:
 
     if not opts.setup:
         # some core functionality is in modules
-        standard_modules = ['log','rally','fence','param',
+        standard_modules = ['log','rally','fence','param','relay',
                             'tuneopt','arm','mode','calibration','rc','wp','auxopt']
         for m in standard_modules:
             load_module(m, quiet=True)
