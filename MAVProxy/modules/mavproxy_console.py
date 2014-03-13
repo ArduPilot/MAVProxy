@@ -125,8 +125,6 @@ def mavlink_packet(msg):
         else:
             gps_heading = mpstate.status.msgs['GPS_RAW'].hdg
         mpstate.console.set_status('Heading', 'Hdg %s/%u' % (master.field('VFR_HUD', 'heading', '-'), gps_heading))
-    elif type == 'HEARTBEAT':
-        mpstate.console.set_status('Mode', '%s' % master.flightmode, fg='blue')
     elif type == 'VFR_HUD':
         if master.mavlink10():
             alt = master.field('GPS_RAW_INT', 'alt', 0) / 1.0e3
@@ -212,6 +210,7 @@ def mavlink_packet(msg):
             fg = 'black'
         mpstate.console.set_status('Radio', 'Radio %u/%u %u/%u' % (msg.rssi, msg.noise, msg.remrssi, msg.remnoise), fg=fg)
     elif type == 'HEARTBEAT':
+        mpstate.console.set_status('Mode', '%s' % master.flightmode, fg='blue')
         for m in mpstate.mav_master:
             linkdelay = (mpstate.status.highest_msec - m.highest_msec)*1.0e-3
             linkline = "Link %u " % (m.linknum+1)
