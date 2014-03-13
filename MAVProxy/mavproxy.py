@@ -1228,6 +1228,17 @@ Auto-detected serial ports are:
         except KeyboardInterrupt:
             if mpstate.settings.requireexit:
                 print("Interrupt caught.  Use 'exit' to quit MAVProxy.")
+
+                #Just lost the map and console, get them back:
+                for m in mpstate.modules:
+                    if m.name() == "map" or m.name() == "console":
+                        try:
+                            m.unload()
+                        except Exception:
+                            pass
+                        reload(m)
+                        m.init(mpstate)   
+
             else:
                 mpstate.status.exit = True
                 sys.exit(1)
