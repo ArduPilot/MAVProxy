@@ -73,32 +73,29 @@ def idle_task():
 
 def param_help_download():
     '''download XML files for parameters'''
+    import multiprocessing
+    files = []
     for vehicle in ['APMrover2', 'ArduCopter', 'ArduPlane']:
         url = 'http://autotest.diydrones.com/Parameters/%s/apm.pdef.xml' % vehicle
         path = mp_util.dot_mavproxy("%s.xml" % vehicle)
-        print("Downloading %s to %s" % (url, path))
-        xml = mp_util.download_url(url)
-        try:
-            open(path, mode='w').write(xml)
-        except Exception as e:
-            print("Failed to save %s" % path)
+        files.append((url, path))
+        url = 'http://autotest.diydrones.com/%s-defaults.parm' % vehicle
+        path = mp_util.dot_mavproxy("%s-defaults.parm" % vehicle)
+        files.append((url, path))
+    try:
+        child = multiprocessing.Process(target=mp_util.download_files, args=(files,))
+        child.start()
+    except Exception as e:
+        print e
 
 def param_help(args):
     '''show help on a parameter'''
     if len(args) == 0:
         print("Usage: param help PARAMETER_NAME")
         return
-    vehicle_map = {
-        'plane' : 'ArduPlane',
-        'copter' : 'ArduCopter',
-        'rover' : 'APMrover2'
-        }
-    if not mpstate.vehicle_type in vehicle_map:
-        print("Unknown vehicle type %s" % str(mpstate.vehicle_type))
-        return
-    path = mp_util.dot_mavproxy("%s.xml" % vehicle_map[mpstate.vehicle_type])
+    path = mp_util.dot_mavproxy("%s.xml" % mpstate.vehicle_name)
     if not os.path.exists(path):
-        print("Please run 'param download' first")
+        print("Please run 'param download' first (vehicle_name=%s)" % mpstate.vehicle_name)
         return
     xml = open(path).read()
     from lxml import objectify
@@ -155,17 +152,19 @@ def cmd_param(args):
             param_wildcard = "*"
         mpstate.mav_param.save(args[1], param_wildcard, verbose=True)
     elif args[0] == "diff":
-        if len(args) < 2:
-            if opts.aircraft is not None:
-                filename = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(mpstate.status.logdir))), 'mavdefault.txt')
-            else:
-                print("Usage: param diff <filename>")
+        wildcard = '*'
+        if len(args) < 2 or args[1].find('*') != -1:
+            filename = mp_util.dot_mavproxy("%s-defaults.parm" % mpstate.vehicle_name)
+            if not os.path.exists(filename):
+                print("Please run 'param download' first (vehicle_name=%s)" % mpstate.vehicle_name)
+                return
+            if len(args) >= 2:
+                wildcard = args[1]
         else:
             filename = args[1]
-        if len(args) == 3:
-            wildcard = args[2]
-        else:
-            wildcard = '*'
+            if len(args) == 3:
+                wildcard = args[2]
+        print("%-16.16s %12.12s %12.12s" % ('Parameter', 'Defaults', 'Current'))
         mpstate.mav_param.diff(filename, wildcard=wildcard)
     elif args[0] == "set":
         if len(args) != 3:
