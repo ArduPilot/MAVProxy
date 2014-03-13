@@ -297,10 +297,11 @@ def cmd_module(args):
         modname = args[1]
         for m in mpstate.modules:
             if m.name() == modname:
-                try:
-                    m.unload()
-                except Exception:
-                    pass
+                if hasattr(m, 'unload'):
+                    try:
+                        m.unload()
+                    except Exception:
+                        pass
                 reload(m)
                 m.init(mpstate)
                 print("Reloaded module %s" % modname)
@@ -313,7 +314,8 @@ def cmd_module(args):
         modname = os.path.basename(args[1])
         for m in mpstate.modules:
             if m.name() == modname:
-                m.unload()
+                if hasattr(m, 'unload'):
+                    m.unload()
                 mpstate.modules.remove(m)
                 print("Unloaded module %s" % modname)
                 return
@@ -1231,11 +1233,12 @@ Auto-detected serial ports are:
 
                 #Just lost the map and console, get them back:
                 for m in mpstate.modules:
-                    if m.name() == "map" or m.name() == "console":
-                        try:
-                            m.unload()
-                        except Exception:
-                            pass
+                    if m.name() in ["map", "console"]:
+                        if hasattr(m, 'unload'):
+                            try:
+                                m.unload()
+                            except Exception:
+                                pass
                         reload(m)
                         m.init(mpstate)   
 
@@ -1245,7 +1248,8 @@ Auto-detected serial ports are:
 
     #this loop executes after leaving the above loop and is for cleanup on exit
     for m in mpstate.modules:
-        print "Unloading module:", m.name()
-        m.unload()
+        if hasattr(m, 'unload'):
+            print "Unloading module:", m.name()
+            m.unload()
         
     sys.exit(1)
