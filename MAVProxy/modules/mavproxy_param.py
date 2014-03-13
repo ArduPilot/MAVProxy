@@ -85,6 +85,9 @@ def param_help_download():
 
 def param_help(args):
     '''show help on a parameter'''
+    if len(args) == 0:
+        print("Usage: param help PARAMETER_NAME")
+        return
     vehicle_map = {
         'plane' : 'ArduPlane',
         'copter' : 'ArduCopter',
@@ -194,5 +197,5 @@ def cmd_param(args):
             pattern = "*"
         mpstate.mav_param.show(pattern)
     else:
-        print("Unknown subcommand '%s' (try 'fetch', 'save', 'set', 'show', 'load')" % args[0])
+        print("Unknown subcommand '%s' (try 'fetch', 'save', 'set', 'show', 'load', 'help')" % args[0])
 
