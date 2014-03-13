@@ -3,6 +3,7 @@
 
 import time, os, fnmatch
 from pymavlink import mavutil, mavparm
+from MAVProxy.modules.lib import mp_util
 
 class param_state(object):
     def __init__(self):
@@ -25,8 +26,8 @@ def init(_mpstate):
     mpstate = _mpstate
     mpstate.param_state = param_state()
     mpstate.command_map['param'] = (cmd_param, "parameter handling")
-    mpstate.completions['param'] = ["fetch",
-                                    "<set|show> (PARAMETER)",
+    mpstate.completions['param'] = ["<fetch|download>",
+                                    "<set|show|help> (PARAMETER)",
                                     "<load|save> (FILENAME)"]
     if mpstate.continue_mode and mpstate.status.logdir != None:
         parmfile = os.path.join(mpstate.status.logdir, 'mav.parm')
@@ -70,12 +71,65 @@ def idle_task():
                     mpstate.master().param_fetch_one(idx)
                     count += 1
 
+def param_help_download():
+    '''download XML files for parameters'''
+    for vehicle in ['APMrover2', 'ArduCopter', 'ArduPlane']:
+        url = 'http://autotest.diydrones.com/Parameters/%s/apm.pdef.xml' % vehicle
+        path = mp_util.dot_mavproxy("%s.xml" % vehicle)
+        print("Downloading %s to %s" % (url, path))
+        xml = mp_util.download_url(url)
+        try:
+            open(path, mode='w').write(xml)
+        except Exception as e:
+            print("Failed to save %s" % path)
+
+def param_help(args):
+    '''show help on a parameter'''
+    vehicle_map = {
+        'plane' : 'ArduPlane',
+        'copter' : 'ArduCopter',
+        'rover' : 'APMrover2'
+        }
+    if not mpstate.vehicle_type in vehicle_map:
+        print("Unknown vehicle type %s" % str(mpstate.vehicle_type))
+        return
+    path = mp_util.dot_mavproxy("%s.xml" % vehicle_map[mpstate.vehicle_type])
+    if not os.path.exists(path):
+        print("Please run 'param download' first")
+        return
+    xml = open(path).read()
+    from lxml import objectify
+    objectify.enable_recursive_str()
+    tree = objectify.fromstring(xml)
+    htree = {}
+    for p in tree.vehicles.parameters.param:
+        n = p.get('name').split(':')[1]
+        htree[n] = p
+    for lib in tree.libraries.parameters:
+        for p in lib.param:
+            n = p.get('name')
+            htree[n] = p
+    for h in args:
+        if h in htree:
+            help = htree[h]
+            print("%s: %s\n" % (h, help.get('humanName')))
+            print(help.get('documentation'))
+            try:
+                vchild = help.getchildren()[0]
+                print("\nValues: ")
+                for v in vchild.value:
+                    print("\t%s : %s" % (v.get('code'), str(v)))
+            except Exception as e:
+                pass
+        else:
+            print("Parameter '%s' not found in documentation" % h)
+
 def cmd_param(args):
     '''control parameters'''
     state = mpstate.param_state
     param_wildcard = "*"
     if len(args) < 1:
-        print("usage: param <fetch|set|show|diff>")
+        print("usage: param <fetch|set|show|diff|download|help>")
         return
     if args[0] == "fetch":
         if len(args) == 1:
@@ -129,6 +183,10 @@ def cmd_param(args):
         else:
             param_wildcard = "*"
         mpstate.mav_param.load(args[1], param_wildcard, mpstate.master())
+    elif args[0] == "download":
+        param_help_download()
+    elif args[0] == "help":
+        param_help(args[1:])
     elif args[0] == "show":
         if len(args) > 1:
             pattern = args[1]
