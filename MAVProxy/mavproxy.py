@@ -32,7 +32,6 @@ class MPStatus(object):
         self.mav_error = 0
         self.target_system = 1
         self.target_component = 1
-        self.speech = None
         self.altitude = 0
         self.last_altitude_announce = 0.0
         self.last_distance_announce = 0.0
@@ -80,13 +79,21 @@ class MPStatus(object):
         self.show(f)
         f.close()
 
+def say_text(text, priority='important'):
+    '''text output - default function for say()'''
+    mpstate.console.writeln(text)
+
+def say(text, priority='important'):
+    '''text and/or speech output'''
+    mpstate.functions.say(text, priority)
+
 class MAVFunctions(object):
-    '''core functions available in modules'
+    '''core functions available in modules'''
     def __init__(self):
-        self.say = say
         self.process_stdin = process_stdin
         self.param_set = param_set
         self.get_mav_param = get_mav_param
+        self.say = say_text
 
 class MPState(object):
     '''holds state of mavproxy'''
@@ -101,7 +108,6 @@ class MPState(object):
               ('distreadout', int, 200),
               ('heartbeat', int, 1),
               ('numcells', int, 1),
-              ('speech', int, 0),
               ('mavfwd', int, 1),
               ('mavfwd_rate', int, 0),
               ('streamrate', int, 4),
@@ -157,20 +163,6 @@ class MPState(object):
 def get_usec():
     '''time since 1970 in microseconds'''
     return int(time.time() * 1.0e6)
-
-def say(text, priority='important'):
-    '''speak some text'''
-    ''' http://cvs.freebsoft.org/doc/speechd/ssip.html see 4.3.1 for priorities'''
-    mpstate.console.writeln(text)
-    if mpstate.settings.speech:
-        import speechd
-        mpstate.status.speech = speechd.SSIPClient('MAVProxy%u' % os.getpid())
-        mpstate.status.speech.set_output_module('festival')
-        mpstate.status.speech.set_language('en')
-        mpstate.status.speech.set_priority(priority)
-        mpstate.status.speech.set_punctuation(speechd.PunctuationMode.SOME)
-        mpstate.status.speech.speak(text)
-        mpstate.status.speech.close()
 
 def get_mav_param(param, default=None):
     '''return a EEPROM parameter value'''
@@ -1124,7 +1116,7 @@ if __name__ == '__main__':
     if opts.speech:
         # start the speech-dispatcher early, so it doesn't inherit any ports from
         # modules/mavutil
-        say('Startup')
+        load_module('speech')
 
     if not opts.master:
         serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*", "*3D_Robotics*", "*USB_to_UART*"])
@@ -1178,7 +1170,6 @@ Auto-detected serial ports are:
         mpstate.sitl_output = mavutil.mavudp(opts.sitl, input=False)
 
     mpstate.settings.numcells = opts.num_cells
-    mpstate.settings.speech = opts.speech
     mpstate.settings.streamrate = opts.streamrate
     mpstate.settings.streamrate2 = opts.streamrate
 

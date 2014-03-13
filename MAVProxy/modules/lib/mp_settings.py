@@ -8,6 +8,12 @@ class MPSettings(object):
             (v,t,d) = var
             self.set(v, d)
 
+    def append(self, var):
+        '''add a new setting'''
+        (v,t,d) = var
+        self.vars.append(var)
+        self.set(v, d)
+
     def set(self, vname, value):
         '''set a setting'''
         if value is None or value == 'None':
