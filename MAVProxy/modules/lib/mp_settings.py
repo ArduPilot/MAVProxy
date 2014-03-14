@@ -55,7 +55,7 @@ class MPSettings(object):
         if len(args) == 0:
             self.show_all()
             return
-        if getattr(self, args[0], None) is None:
+        if getattr(self, args[0], [None]) == [None]:
             print("Unknown setting '%s'" % args[0])
             return
         if len(args) == 1:
