@@ -15,6 +15,13 @@ from pymavlink import mavutil
 
 mpstate = None
 
+# this should be in mavutil.py
+mode_mapping_antenna = {
+    'MANUAL' : 0, 
+    'AUTO' : 10,
+    'INITIALISING' : 16
+    }
+
 class tracker_state(object):
     def __init__(self):
         self.connection = None
@@ -34,7 +41,7 @@ def description():
     return "antenna tracker control module"
 
 def cmd_tracker(args):
-    '''set address to contact the tracker'''
+    '''tracker command parser'''
     state = mpstate.tracker_state
     if args[0] == "start":
         cmd_tracker_start()
@@ -48,8 +55,10 @@ def cmd_tracker(args):
         cmd_tracker_level()
     elif args[0] == 'param':
         cmd_tracker_param(args[1:])
+    elif args[0] == 'mode':
+        cmd_tracker_mode(args[1:])
     else:
-        print("usage: tracker <start|set|arm|disarm|level|param set NAME VALUE>")
+        print("usage: tracker <start|set|arm|disarm|level|param set NAME VALUE|mode MODE>")
 
 def init(_mpstate):
     '''initialise module'''
@@ -57,7 +66,7 @@ def init(_mpstate):
     mpstate = _mpstate
     mpstate.tracker_state = tracker_state()
     mpstate.command_map['tracker'] = (cmd_tracker, "antenna tracker control module")
-    mpstate.completions['tracker'] = ['<start|arm|disarm|level|param set NAME VALUE>',
+    mpstate.completions['tracker'] = ['<start|arm|disarm|level|param set NAME VALUE|mode MODE>',
                                       'set (TRACKERSETTING)']
     mpstate.completion_functions['(TRACKERSETTING)'] = mpstate.tracker_state.settings.completion
 
@@ -92,6 +101,7 @@ def idle_task():
     
 
 def cmd_tracker_start():
+    '''Start the tracker connection'''
     state = mpstate.tracker_state
     if state.settings.port == None:
         print("tracker port not set")
@@ -139,6 +149,19 @@ def cmd_tracker_param_set(name, value, retries=3):
     if not state.connection:
         print("tracker not connected")
         return
-    return mpstate.mav_param.mavset(state.connection , name.upper(), value, retries=retries)
+    return mpstate.mav_param.mavset(state.connection, name.upper(), value, retries=retries)
         
+def cmd_tracker_mode(args):
+    '''mode commands'''
+    state = mpstate.tracker_state
+    if not state.connection:
+        print("tracker not connected")
+        return
+    mode = args[0].upper()
+    if mode == "MANUAL":
+        state.connection.set_mode_manual()
+    elif mode == "AUTO":
+        state.connection.set_mode_auto()
+    else:
+        print('Unknown mode %s: ' % mode)
 
