@@ -18,7 +18,9 @@ class rline(object):
         mpstate.completion_functions = {
             '(FILENAME)' : complete_filename,
             '(PARAMETER)' : complete_parameter,
-            '(SETTING)' : rline_mpstate.settings.completion
+            '(SETTING)' : rline_mpstate.settings.completion,
+            '(COMMAND)' : complete_command,
+            '(ALIAS)' : complete_alias
             }
         
     def set_prompt(self, prompt):
@@ -27,12 +29,12 @@ class rline(object):
             sys.stdout.write(prompt)
 
 
-def complete_alias():
+def complete_alias(text):
     '''return list of aliases'''
     global rline_mpstate
     return rline_mpstate.aliases.keys()
 
-def complete_command():
+def complete_command(text):
     '''return list of commands'''
     global rline_mpstate
     return rline_mpstate.command_map.keys()
@@ -102,7 +104,7 @@ def complete(text, state):
 
     if len(cmd) == 1:
         # if on first part then complete on commands and aliases
-        last_clist = complete_command() + complete_alias()
+        last_clist = complete_command(text) + complete_alias(text)
     elif cmd[0] in rline_mpstate.completions:
         # we have a completion rule for this command
         last_clist = complete_rules(rline_mpstate.completions[cmd[0]], cmd[1:])
