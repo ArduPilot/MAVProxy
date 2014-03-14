@@ -46,8 +46,10 @@ def cmd_tracker(args):
         cmd_tracker_disarm()
     elif args[0] == 'level':
         cmd_tracker_level()
+    elif args[0] == 'param':
+        cmd_tracker_param(args[1:])
     else:
-        print("usage: tracker <start|set|arm|disarm|level>")
+        print("usage: tracker <start|set|arm|disarm|level|param set NAME VALUE>")
 
 def init(_mpstate):
     '''initialise module'''
@@ -55,7 +57,7 @@ def init(_mpstate):
     mpstate = _mpstate
     mpstate.tracker_state = tracker_state()
     mpstate.command_map['tracker'] = (cmd_tracker, "antenna tracker control module")
-    mpstate.completions['tracker'] = ['<start|arm|disarm|level>',
+    mpstate.completions['tracker'] = ['<start|arm|disarm|level|param set NAME VALUE>',
                                       'set (TRACKERSETTING)']
     mpstate.completion_functions['(TRACKERSETTING)'] = mpstate.tracker_state.settings.completion
 
@@ -123,3 +125,20 @@ def cmd_tracker_level():
         print("tracker not connected")
         return
     state.connection.calibrate_level()
+
+def cmd_tracker_param(args):
+    '''Parameter commands'''
+    if args[0] == "set" and len(args) > 2:
+        cmd_tracker_param_set(args[1], args[2])
+    else:
+        print("usage: tracker param set PARAMNAME VALUE")
+
+def cmd_tracker_param_set(name, value, retries=3):
+    '''Parameter setting'''
+    state = mpstate.tracker_state
+    if not state.connection:
+        print("tracker not connected")
+        return
+    return mpstate.mav_param.mavset(state.connection , name.upper(), value, retries=retries)
+        
+
