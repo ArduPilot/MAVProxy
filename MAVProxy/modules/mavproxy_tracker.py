@@ -57,6 +57,8 @@ def cmd_tracker(args):
         cmd_tracker_param(args[1:])
     elif args[0] == 'mode':
         cmd_tracker_mode(args[1:])
+    elif args[0] == 'position':
+        cmd_tracker_position(args[1:])
     else:
         print("usage: tracker <start|set|arm|disarm|level|param set NAME VALUE|mode MODE>")
 
@@ -165,3 +167,14 @@ def cmd_tracker_mode(args):
     else:
         print('Unknown mode %s: ' % mode)
 
+def cmd_tracker_position(args):
+    '''tracker manual positioning commands'''
+    state = mpstate.tracker_state
+    if not state.connection:
+        print("tracker not connected")
+        return
+    positions = [0, 0, 0, 0, 0] # x, y, z, r, buttons. only position[0] (yaw) and position[1] (pitch) are currently used
+    for i in range(0, 4):
+        if len(args) > i:
+            positions[i] = int(args[i]) # default values are 0
+    state.connection.mav.manual_control_send(state.connection.target_system, positions[0], positions[1], positions[2], positions[3], positions[4])
