@@ -119,8 +119,6 @@ def scale_channel(ch, value):
         v = -1
     elif v > 1:
         v = 1
-    if ch in [2,4]:
-        v = -v
     if ch == 3:
         if v < 0:
             v = 0
