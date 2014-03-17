@@ -6,7 +6,7 @@ view a mission log on a map
 
 import sys, time, os
 
-from pymavlink import mavutil, mavwp
+from pymavlink import mavutil, mavwp, mavextra
 from MAVProxy.modules.mavproxy_map import mp_slipmap, mp_tile
 from MAVProxy.modules.lib import mp_util
 import functools
@@ -27,6 +27,7 @@ parser.add_option("--flag", default=[], type='str', action='append', help="flag 
 parser.add_option("--rawgps", action='store_true', default=False, help="use GPS_RAW_INT")
 parser.add_option("--rawgps2", action='store_true', default=False, help="use GPS2_RAW")
 parser.add_option("--dualgps", action='store_true', default=False, help="use GPS_RAW_INT and GPS2_RAW")
+parser.add_option("--ekf", action='store_true', default=False, help="use EKF1 pos")
 parser.add_option("--debug", action='store_true', default=False, help="show debug info")
 parser.add_option("--multi", action='store_true', default=False, help="show multiple flights on one map")
 
@@ -40,7 +41,7 @@ def pixel_coords(latlon, ground_width=0, mt=None, topleft=None, width=None):
     (lat,lon) = (latlon[0], latlon[1])
     return mt.coord_to_pixel(topleft[0], topleft[1], width, ground_width, lat, lon)
 
-def create_imagefile(filename, latlon, ground_width, path_obj, mission_obj, width=600, height=600, path2_obj=None):
+def create_imagefile(filename, latlon, ground_width, path_objs, mission_obj, width=600, height=600):
     '''create path and mission as an image file'''
     mt = mp_tile.MPTile(service=opts.service)
 
@@ -53,9 +54,8 @@ def create_imagefile(filename, latlon, ground_width, path_obj, mission_obj, widt
                                width, height, ground_width)
     # a function to convert from (lat,lon) to (px,py) on the map
     pixmapper = functools.partial(pixel_coords, ground_width=ground_width, mt=mt, topleft=latlon, width=width)
-    path_obj.draw(map_img, pixmapper, None)
-    if path2_obj is not None:
-        path2_obj.draw(map_img, pixmapper, None)
+    for path_obj in path_objs:
+        path_obj.draw(map_img, pixmapper, None)
     if mission_obj is not None:
         mission_obj.draw(map_img, pixmapper, None)
     cv.CvtColor(map_img, map_img, cv.CV_BGR2RGB)
@@ -85,8 +85,7 @@ def mavflightview(filename):
     wp = mavwp.MAVWPLoader()
     if opts.mission is not None:
         wp.load(opts.mission)
-    path = []
-    path2 = []
+    path = [[]]
     types = ['MISSION_ITEM']
     if opts.rawgps:
         types.extend(['GPS', 'GPS_RAW_INT'])
@@ -94,8 +93,11 @@ def mavflightview(filename):
         types.extend(['GPS2_RAW','GPS2'])
     if opts.dualgps:
         types.extend(['GPS2_RAW','GPS2', 'GPS_RAW_INT', 'GPS'])
+    if opts.ekf:
+        types.extend(['EKF1'])
     if len(types) == 1:
         types.extend(['GPS','GLOBAL_POSITION_INT'])
+    print("Looking for types %s" % str(types))
     while True:
         m = mlog.recv_match(type=types)
         if m is None:
@@ -126,34 +128,44 @@ def mavflightview(filename):
                     print("Can't find longitude on GPS message")
                     print(m)
                     break                    
+        elif m.get_type() == 'EKF1':
+            pos = mavextra.ekf1_pos(m)
+            if pos is None:
+                continue
+            (lat, lng) = pos            
         else:
             lat = m.lat * 1.0e-7
             lng = m.lon * 1.0e-7
-        secondary = opts.dualgps and m.get_type() in ['GPS2_RAW', 'GPS2']
+        instance = 0
+        if opts.dualgps and m.get_type() in ['GPS2_RAW', 'GPS2']:
+            instance = 1
+        if m.get_type() == 'EKF1':
+            if opts.dualgps:
+                instance = 2
+            else:
+                instance = 1
         if lat != 0 or lng != 0:
             if getattr(mlog, 'flightmode','') in colourmap:
                 colour = colourmap[mlog.flightmode]
-                if secondary:
-                    (r,g,b) = colour
-                    (r,g,b) = (r+50,g+50,b+50)
-                    if r > 255:
-                        r = 205
-                    if g > 255:
-                        g = 205
-                    if b > 255:
-                        b = 205
-                    colour = (r,g,b)
+                (r,g,b) = colour
+                (r,g,b) = (r+instance*50,g+instance*50,b+instance*50)
+                if r > 255:
+                    r = 205
+                if g > 255:
+                    g = 205
+                if b > 255:
+                    b = 205
+                colour = (r,g,b)
                 point = (lat, lng, colour)
             else:
                 point = (lat, lng)
-            if secondary:
-                path2.append(point)
-            else:
-                path.append(point)
-    if len(path) == 0:
+            while instance >= len(path):
+                path.append([])
+            path[instance].append(point)
+    if len(path[0]) == 0:
         print("No points to plot")
         return
-    bounds = mp_util.polygon_bounds(path)
+    bounds = mp_util.polygon_bounds(path[0])
     (lat, lon) = (bounds[0]+bounds[2], bounds[1])
     (lat, lon) = mp_util.gps_newpos(lat, lon, -45, 50)
     ground_width = mp_util.gps_distance(lat, lon, lat-bounds[2], lon+bounds[3])
@@ -161,13 +173,11 @@ def mavflightview(filename):
            mp_util.gps_distance(lat, lon, lat, bounds[1]+bounds[3]) >= ground_width-20):
         ground_width += 10
 
-    path_obj = mp_slipmap.SlipPolygon('FlightPath-%s' % filename, path, layer='FlightPath',
-                                      linewidth=2, colour=(255,0,180))
-    if len(path2) != 0:
-        path2_obj = mp_slipmap.SlipPolygon('FlightPath2-%s' % filename, path2, layer='FlightPath',
-                                           linewidth=2, colour=(255,0,180))
-    else:
-        path2_obj = None
+    path_objs = []
+    for i in range(len(path)):
+        if len(path[i]) != 0:
+            path_objs.append(mp_slipmap.SlipPolygon('FlightPath[%u]-%s' % (i,filename), path[i], layer='FlightPath',
+                                                    linewidth=2, colour=(255,0,180)))
     mission = wp.polygon()
     if len(mission) > 1:
         mission_obj = mp_slipmap.SlipPolygon('Mission-%s' % filename, wp.polygon(), layer='Mission',
@@ -176,7 +186,7 @@ def mavflightview(filename):
         mission_obj = None
 
     if opts.imagefile:
-        create_imagefile(opts.imagefile, (lat,lon), ground_width, path_obj, mission_obj, path2_obj=path2_obj)
+        create_imagefile(opts.imagefile, (lat,lon), ground_width, path_objs, mission_obj)
     else:
         global multi_map
         if opts.multi and multi_map is not None:
@@ -192,9 +202,8 @@ def mavflightview(filename):
                                        debug=opts.debug)
         if opts.multi:
             multi_map = map
-        map.add_object(path_obj)
-        if path2_obj is not None:
-            map.add_object(path2_obj)            
+        for path_obj in path_objs:
+            map.add_object(path_obj)
         if mission_obj is not None:
             map.add_object(mission_obj)
 
