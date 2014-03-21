@@ -167,8 +167,11 @@ def cmd_param(args):
         print("%-16.16s %12.12s %12.12s" % ('Parameter', 'Defaults', 'Current'))
         mpstate.mav_param.diff(filename, wildcard=wildcard)
     elif args[0] == "set":
-        if len(args) != 3:
+        if len(args) < 2:
             print("Usage: param set PARMNAME VALUE")
+            return
+        if len(args) == 2:
+            mpstate.mav_param.show(args[1])            
             return
         param = args[1]
         value = args[2]
