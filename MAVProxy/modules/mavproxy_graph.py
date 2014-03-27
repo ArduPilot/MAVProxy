@@ -17,8 +17,8 @@ class GraphModule(mp_module.MPModule):
         self.timespan = 20
         self.tickresolution = 0.2
         self.graphs = []
-        self.add_command('graph', self.cmd_graph, "[expression...] add a live graph")
-        print("graph initialised")
+        self.add_command('graph', self.cmd_graph, "[expression...] add a live graph",
+                         ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)'])
 
     def cmd_graph(self, args):
         '''graph command'''
