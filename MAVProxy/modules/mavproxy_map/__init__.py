@@ -32,7 +32,7 @@ class MapModule(mp_module.MPModule):
         self.draw_line = None
         self.draw_callback = None
         self.vehicle_type_name = 'plane'
-        self.settings = mp_settings.MPSettings(
+        self.map_settings = mp_settings.MPSettings(
             [ ('showgpspos', int, 0),
               ('showgps2pos', int, 1),
               ('showsimpos', int, 0),
@@ -48,7 +48,7 @@ class MapModule(mp_module.MPModule):
         mpstate.map.add_callback(functools.partial(self.map_callback))
         self.add_command('map', self.cmd_map, "map control", ['icon',
                                       'set (MAPSETTING)'])
-        self.add_completion_function('(MAPSETTING)', self.settings.completion)
+        self.add_completion_function('(MAPSETTING)', self.map_settings.completion)
         
     def cmd_map(self, args):
         '''map commands'''
@@ -67,8 +67,8 @@ class MapModule(mp_module.MPModule):
                                                    icon, layer=3, rotation=0, follow=False))
                 self.icon_counter += 1
         elif args[0] == "set":
-            self.settings.command(args[1:])
-            self.mpstate.map.add_object(mp_slipmap.SlipBrightness(self.settings.brightness))
+            self.map_settings.command(args[1:])
+            self.mpstate.map.add_object(mp_slipmap.SlipBrightness(self.map_settings.brightness))
         else:
             print("usage: map <icon|set>")
     
@@ -209,21 +209,21 @@ class MapModule(mp_module.MPModule):
         # in the air at the same time
         vehicle = 'Vehicle%u' % m.get_srcSystem()
     
-        if m.get_type() == "SIMSTATE" and self.settings.showsimpos:
+        if m.get_type() == "SIMSTATE" and self.map_settings.showsimpos:
             self.create_vehicle_icon('Sim' + vehicle, 'green')
             self.mpstate.map.set_position('Sim' + vehicle, (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
     
-        if m.get_type() == "AHRS2" and self.settings.showahrs2pos:
+        if m.get_type() == "AHRS2" and self.map_settings.showahrs2pos:
             self.create_vehicle_icon('AHRS2' + vehicle, 'blue')
             self.mpstate.map.set_position('AHRS2' + vehicle, (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
     
-        if m.get_type() == "GPS_RAW_INT" and self.settings.showgpspos:
+        if m.get_type() == "GPS_RAW_INT" and self.map_settings.showgpspos:
             (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
             if lat != 0 or lon != 0:
                 self.create_vehicle_icon('GPS' + vehicle, 'blue')
                 self.mpstate.map.set_position('GPS' + vehicle, (lat, lon), rotation=m.cog*0.01)
     
-        if m.get_type() == "GPS2_RAW" and self.settings.showgps2pos:
+        if m.get_type() == "GPS2_RAW" and self.map_settings.showgps2pos:
             (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
             if lat != 0 or lon != 0:
                 self.create_vehicle_icon('GPS2' + vehicle, 'green')
