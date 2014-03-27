@@ -877,7 +877,11 @@ def open_logs():
         mode = 'w'
     logfile = opts.logfile
     if opts.aircraft is not None:
-        dirname = "%s/logs/%s" % (opts.aircraft, time.strftime("%Y-%m-%d"))
+        if opts.mission is not None:
+            print opts.mission
+            dirname = "%s/logs/%s/Mission%s" % (opts.aircraft, time.strftime("%Y-%m-%d"), opts.mission)
+        else:
+            dirname = "%s/logs/%s" % (opts.aircraft, time.strftime("%Y-%m-%d"))
         mkdir_p(dirname)
         highest = None
         for i in range(1, 10000):
@@ -1134,6 +1138,7 @@ if __name__ == '__main__':
     parser.add_option("--continue", dest='continue_mode', action='store_true', default=False, help="continue logs")
     parser.add_option("--dialect",  default="ardupilotmega", help="MAVLink dialect")
     parser.add_option("--rtscts",  action='store_true', help="enable hardware RTS/CTS flow control")
+    parser.add_option("--mission", dest="mission", help="mission name", default=None)
 
     (opts, args) = parser.parse_args()
 
