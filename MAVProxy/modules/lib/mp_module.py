@@ -30,7 +30,7 @@ class MPModule(object):
         pass
 
     def unknown_command(self, args):
-        '''Return True if we've handled the unknown command'''
+        '''Return True if we have handled the unknown command'''
         return False
 
     def mavlink_packet(self, packet):
@@ -61,6 +61,10 @@ class MPModule(object):
         return self.mpstate.vehicle_type
 
     @property
+    def vehicle_name(self):
+        return self.mpstate.vehicle_name
+
+    @property
     def sitl_output(self):
         return self.mpstate.sitl_output
 
@@ -82,9 +86,9 @@ class MPModule(object):
 
     @property
     def logdir(self):
-        return self.mpstate.status.logdir()
+        return self.mpstate.status.logdir
 
-    def say(self, msg):
+    def say(self, msg, priority='important'):
         return self.mpstate.functions.say(msg)
 
     def get_mav_param(self, param_name, default=None):
