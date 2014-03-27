@@ -14,9 +14,10 @@ class ParamModule(mp_module.MPModule):
         self.mav_param_count = 0
         self.param_period = mavutil.periodic_event(1)
         self.fetch_one = 0
-        self.add_command('param', self.cmd_param, "parameter handling", ["<fetch|download>",
-                                        "<set|show|help> (PARAMETER)",
-                                        "<load|save> (FILENAME)"])
+        self.add_command('param', self.cmd_param, "parameter handling",
+                         ["<fetch|download>",
+                          "<set|show|fetch|help> (PARAMETER)",
+                          "<load|save> (FILENAME)"])
         if self.continue_mode and self.logdir != None:
             parmfile = os.path.join(self.logdir, 'mav.parm')
             if os.path.exists(parmfile):
