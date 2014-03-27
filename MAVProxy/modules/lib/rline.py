@@ -18,6 +18,7 @@ class rline(object):
         mpstate.completion_functions = {
             '(FILENAME)' : complete_filename,
             '(PARAMETER)' : complete_parameter,
+            '(VARIABLE)' : complete_variable,
             '(SETTING)' : rline_mpstate.settings.completion,
             '(COMMAND)' : complete_command,
             '(ALIAS)' : complete_alias
@@ -46,6 +47,18 @@ def complete_filename(text):
 def complete_parameter(text):
     '''complete a parameter'''
     return rline_mpstate.mav_param.keys()
+
+def complete_variable(text):
+    '''complete a MAVLink variable'''
+    if text.find('.') != -1:
+        var = text.split('.')[0]
+        if var in rline_mpstate.status.msgs:
+            ret = []
+            for f in rline_mpstate.status.msgs[var].get_fieldnames():
+                ret.append(var + '.' + f)
+            return ret
+        return []
+    return rline_mpstate.status.msgs.keys()
 
 def rule_expand(component, text):
     '''expand one rule component'''
