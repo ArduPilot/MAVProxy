@@ -197,8 +197,8 @@ class ConsoleModule(mp_module.MPModule):
             self.console.set_status('Radio', 'Radio %u/%u %u/%u' % (msg.rssi, msg.noise, msg.remrssi, msg.remnoise), fg=fg)
         elif type == 'HEARTBEAT':
             self.console.set_status('Mode', '%s' % master.flightmode, fg='blue')
-            for m in mpstate.mav_master:
-                linkdelay = (mpstate.status.highest_msec - m.highest_msec)*1.0e-3
+            for m in self.mpstate.mav_master:
+                linkdelay = (self.mpstate.status.highest_msec - m.highest_msec)*1.0e-3
                 linkline = "Link %u " % (m.linknum+1)
                 if m.linkerror:
                     linkline += "down"
