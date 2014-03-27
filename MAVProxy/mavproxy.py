@@ -20,6 +20,7 @@ import select
 from MAVProxy.modules.lib import textconsole
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import rline
+from MAVProxy.modules.lib import dumpstacks
 
 class MPStatus(object):
     '''hold status information about the mavproxy'''
