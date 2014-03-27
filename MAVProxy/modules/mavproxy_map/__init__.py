@@ -247,7 +247,7 @@ class MapModule(mp_module.MPModule):
             
         # if the waypoints have changed, redisplay
         if self.wp_change_time != self.module('wp').wploader.last_change:
-            self.wp_change_time = self.module('wp').last_change
+            self.wp_change_time = self.module('wp').wploader.last_change
             self.display_waypoints()
     
         # if the fence has changed, redisplay
