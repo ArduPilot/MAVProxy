@@ -57,6 +57,10 @@ class MPModule(object):
         return self.mpstate.mav_param
 
     @property
+    def settings(self):
+        return self.mpstate.settings
+
+    @property
     def vehicle_type(self):
         return self.mpstate.vehicle_type
 
