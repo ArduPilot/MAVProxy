@@ -20,6 +20,7 @@ import select
 from MAVProxy.modules.lib import textconsole
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import rline
+from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import dumpstacks
 
 class MPStatus(object):
@@ -143,11 +144,16 @@ class MPState(object):
 
         self.mav_param = mavparm.MAVParmDict()
         self.modules = []
+        self.public_modules = {}
         self.functions = MAVFunctions()
         self.select_extra = {}
         self.continue_mode = False
         self.aliases = {}
 
+    def module(self, name):
+        '''Find a public module (most modules are private)'''
+        return self.mpstate.public_modules[name]
+    
     def master(self):
         '''return the currently chosen mavlink master object'''
         if self.settings.link > len(self.mav_master):
@@ -172,7 +178,6 @@ def get_mav_param(param, default=None):
 
 def param_set(name, value, retries=3):
     '''set a parameter'''
-    state = mpstate.param_state
     name = name.upper()
     return mpstate.mav_param.mavset(mpstate.master(), name, value, retries=retries)
 
@@ -264,11 +269,14 @@ def load_module(modname, quiet=False):
             m = import_package(modpath)
             if m in mpstate.modules:
                 raise RuntimeError("module %s already loaded" % (modname,))
-            m.init(mpstate)
-            mpstate.modules.append(m)
-            if not quiet:
-                print("Loaded module %s" % (modname,))
-            return True
+            module = m.init(mpstate)
+            if isinstance(module, mp_module.MPModule):
+                mpstate.modules.append(module)
+                if not quiet:
+                    print("Loaded module %s" % (modname,))
+                return True
+            else:
+                ex = "%s.init did not return a MPModule instance" % modname
         except ImportError, msg:
             ex = msg
             if mpstate.settings.moddebug > 1:
@@ -285,7 +293,7 @@ def cmd_module(args):
         return
     if args[0] == "list":
         for m in mpstate.modules:
-            print("%s: %s" % (m.name(), m.description()))
+            print("%s: %s" % (m.name, m.description))
     elif args[0] == "load":
         if len(args) < 2:
             print("usage: module load <name>")
