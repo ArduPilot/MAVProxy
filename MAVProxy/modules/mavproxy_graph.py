@@ -7,8 +7,6 @@
 from pymavlink import mavutil
 import re, os, sys
 
-mpstate = None
-
 from MAVProxy.modules.lib import live_graph
 
 from MAVProxy.modules.lib import mp_module
@@ -63,7 +61,7 @@ class GraphModule(mp_module.MPModule):
 
         # add data to the rest
         for g in self.graphs:
-            g.mavlink_packet(msg)
+            g.add_mavlink_packet(msg)
 
 
 def init(mpstate):
@@ -76,6 +74,7 @@ class Graph():
         self.fields = fields[:]
         self.field_types = []
         self.msg_types = set()
+        self.state = state
 
         re_caps = re.compile('[A-Z_][A-Z0-9_]+')
         for f in self.fields:
@@ -102,7 +101,7 @@ class Graph():
             self.livegraph.close()
         self.livegraph = None
 
-    def mavlink_packet(self, msg):
+    def add_mavlink_packet(self, msg):
         '''add data to the graph'''
         mtype = msg.get_type()
         if mtype not in self.msg_types:
@@ -111,6 +110,6 @@ class Graph():
             if mtype not in self.field_types[i]:
                 continue
             f = self.fields[i]
-            self.values[i] = mavutil.evaluate_expression(f, mpstate.master().messages)
+            self.values[i] = mavutil.evaluate_expression(f, self.state.master.messages)
         if self.livegraph is not None:
             self.livegraph.add_values(self.values)
