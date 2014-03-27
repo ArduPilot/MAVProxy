@@ -6,56 +6,40 @@ import mmap_server
 
 g_module_context = None
 
+from MAVProxy.modules.lib import mp_module
 
-class module_state(object):
-  def __init__(self):
-    self.lat = None
-    self.lon = None
-    self.alt = None
-    self.speed = None
-    self.heading = 0
-    self.wp_change_time = 0
-    self.fence_change_time = 0
-    self.server = None
+class MMapModule(mp_module.MPModule):
+    def __init__(self, mpstate):
+        super(MMapModule, self).__init__(mpstate, 'mmap', 'modest map display')
+        self.lat = None
+        self.lon = None
+        self.alt = None
+        self.speed = None
+        self.airspeed = None
+        self.groundspeed = None
+        self.heading = 0
+        self.wp_change_time = 0
+        self.fence_change_time = 0
+        self.server = None
+        self.server = mmap_server.start_server('127.0.0.1', port=9999, module_state=self)
+        webbrowser.open('http://127.0.0.1:9999/', autoraise=True)
+    
+    def unload(self):
+        """unload module"""
+        self.server.terminate()
+    
+    def mavlink_packet(self, m):
+        """handle an incoming mavlink packet"""
+        if m.get_type() == 'GPS_RAW':
+            (self.lat, self.lon) = (m.lat, m.lon)
+        elif m.get_type() == 'GPS_RAW_INT':
+            (self.lat, self.lon) = (m.lat / 1.0e7, m.lon / 1.0e7)
+        elif m.get_type() == "VFR_HUD":
+            self.heading = m.heading
+            self.alt = m.alt
+            self.airspeed = m.airspeed
+            self.groundspeed = m.groundspeed
 
-
-def name():
-  """return module name"""
-  return 'mmap'
-
-
-def description():
-  """return module description"""
-  return 'modest map display'
-
-
-def init(module_context):
-  """initialise module"""
-  global g_module_context
-  g_module_context = module_context
-  state = module_state()
-  g_module_context.mmap_state = state
-  state.server = mmap_server.start_server(
-    '127.0.0.1', port=9999, module_state=state)
-  webbrowser.open('http://127.0.0.1:9999/', autoraise=True)
-
-
-def unload():
-  """unload module"""
-  global g_module_context
-  g_module_context.mmap_state.server.terminate()
-
-
-def mavlink_packet(m):
-  """handle an incoming mavlink packet"""
-  global g_module_context
-  state = g_module_context.mmap_state
-  if m.get_type() == 'GPS_RAW':
-    (state.lat, state.lon) = (m.lat, m.lon)
-  elif m.get_type() == 'GPS_RAW_INT':
-    (state.lat, state.lon) = (m.lat / 1.0e7, m.lon / 1.0e7)
-  elif m.get_type() == "VFR_HUD":
-    state.heading = m.heading
-    state.alt = m.alt
-    state.airspeed = m.airspeed
-    state.groundspeed = m.groundspeed
+def init(mpstate):
+    '''initialise module'''
+    return MMapModule(mpstate)

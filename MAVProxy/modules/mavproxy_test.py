@@ -3,46 +3,36 @@
 
 import time, math
 
-
-mpstate = None
-
-def name():
-    '''return module name'''
-    return "test"
-
-def description():
-    '''return module description'''
-    return "test flight"
-
 def enum(**enums):
     return type('Enum', (), enums)
 
 TestState = enum(INIT=1, FBWA=2, AUTO=3)
 
-class test_state(object):
-    def __init__(self):
+from MAVProxy.modules.lib import mp_module
+
+class TestModule(mp_module.MPModule):
+    def __init__(self, mpstate):
+        super(TestModule, self).__init__(mpstate, "test", "test flight")
         self.state = TestState.INIT
+        print("Module test loaded")
+    
+    def mavlink_packet(self, m):
+        '''handle an incoming mavlink packet'''
+        if self.state == TestState.INIT:
+            if self.status.flightmode == "MANUAL":
+                self.mpstate.functions.process_stdin("switch 4")
+                self.mpstate.functions.process_stdin("rc 2 1300")
+                self.mpstate.functions.process_stdin("rc 3 2000")
+                self.mpstate.functions.process_stdin("module load sensors")
+                self.mpstate.functions.process_stdin("watch sensors")
+                self.mpstate.functions.process_stdin("wp list")
+                self.state = TestState.FBWA
+        if self.state == TestState.FBWA:
+            if self.status.altitude > 60:
+                self.mpstate.functions.process_stdin("rc 2 1500")
+                self.mpstate.functions.process_stdin("auto")
+                self.state = TestState.AUTO
 
-def init(_mpstate):
+def init(mpstate):
     '''initialise module'''
-    global mpstate
-    mpstate = _mpstate
-    mpstate.test_state = test_state()
-    print("Module test loaded")
-
-def mavlink_packet(m):
-    '''handle an incoming mavlink packet'''
-    if mpstate.test_state.state == TestState.INIT:
-        if mpstate.status.flightmode == "MANUAL":
-            mpstate.functions.process_stdin("switch 4")
-            mpstate.functions.process_stdin("rc 2 1300")
-            mpstate.functions.process_stdin("rc 3 2000")
-            mpstate.functions.process_stdin("module load sensors")
-            mpstate.functions.process_stdin("watch sensors")
-            mpstate.functions.process_stdin("wp list")
-            mpstate.test_state.state = TestState.FBWA
-    if mpstate.test_state.state == TestState.FBWA:
-        if mpstate.status.altitude > 60:
-            mpstate.functions.process_stdin("rc 2 1500")
-            mpstate.functions.process_stdin("auto")
-            mpstate.test_state.state = TestState.AUTO
+    return TestModule(mpstate)

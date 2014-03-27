@@ -5,47 +5,36 @@ support for a GCS attached DGPS system
 
 import socket, errno
 from pymavlink import mavutil
+from MAVProxy.modules.lib import mp_module
 
-class dgps_state(object):
-    def __init__(self):
+class DGPSModule(mp_module.MPModule):
+    def __init__(self, mpstate):
+        super(DGPSModule, self).__init__(mpstate, "DGPS", "DGPS injection support")
         self.portnum = 13320
+        self.port = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.port.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.port.bind(("127.0.0.1", self.portnum))
+        mavutil.set_close_on_exec(self.port.fileno())
+        self.port.setblocking(0)
 
-def idle_task():
-    '''called in idle time'''
-    state = mpstate.dgps_state
-    try:
-        data = state.port.recv(200)
-    except socket.error as e:
-        if e.errno in [ errno.EAGAIN, errno.EWOULDBLOCK ]:
+    def idle_task(self):
+        '''called in idle time'''
+        try:
+            data = self.port.recv(200)
+        except socket.error as e:
+            if e.errno in [ errno.EAGAIN, errno.EWOULDBLOCK ]:
+                return
+            raise
+        if len(data) > 110:
+            print("DGPS data too large: %u bytes" % len(data))
             return
-        raise
-    if len(data) > 110:
-        print("DGPS data too large: %u bytes" % len(data))
-        return
-    mpstate.master().mav.gps_inject_data_send(mpstate.status.target_system,
-                                              mpstate.status.target_component,
-                                              len(data), data)
-    
-def name():
-    '''return module name'''
-    return "DGPS"
+        self.master.mav.gps_inject_data_send(self.target_system,
+                                                  self.target_component,
+                                                  len(data), data)
 
-def description():
-    '''return module description'''
-    return "DGPS injection support"
-
-def mavlink_packet(pkt):
-    pass
-
-def init(_mpstate):
+def init(mpstate):
     '''initialise module'''
-    global mpstate
-    mpstate = _mpstate
-    state = dgps_state()
-    mpstate.dgps_state = state
+    return DGPSModule(mpstate)
 
-    state.port = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    state.port.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    state.port.bind(("127.0.0.1", state.portnum))
-    mavutil.set_close_on_exec(state.port.fileno())
-    state.port.setblocking(0)
+
+

@@ -11,9 +11,8 @@ from time import sleep
 
 mpstate = None
 
-class module_state(object):
-    def __init__(self):
-        self.js = None
+from MAVProxy.modules.lib import mp_module
+
 
 '''
 A map of joystick identifiers to channels and scalings.
@@ -63,69 +62,56 @@ joymap = {
      (3, 500,  1500)]
 }
 
-def idle_task():
-    '''called in idle time'''
-    state = mpstate.joystick_state
-    if state.js is None:
-        return
-    for e in pygame.event.get(): # iterate over event stack
-        #the following is somewhat custom for the specific joystick model:
-        override = mpstate.rc_state.override[:]
-        for i in range(len(state.map)):
-            m = state.map[i]
-            if m is None:
-                continue
-            (axis, mul, add) = m
-            if axis >= state.num_axes:
-                continue
-            v = int(state.js.get_axis(axis)*mul + add)
-            v = max(min(v, 2000), 1000)
-            override[i] = v
-        if override != mpstate.rc_state.override:
-            mpstate.rc_state.override = override
-            mpstate.rc_state.override_period.force()
 
-def name():
-    '''return module name'''
-    return "joystick"
+class JSModule(mp_module.MPModule):
+    def __init__(self, mpstate):
+        super(JSModule, self).__init__(mpstate, "joystick", "joystick aircraft control")
+        self.js = None
+ 
+        #initialize joystick, if available
+        pygame.init()
+        pygame.joystick.init() # main joystick device system
+    
+        for i in range(pygame.joystick.get_count()):
+            print("Trying joystick %u" % i)
+            try:
+                j = pygame.joystick.Joystick(i)
+                j.init() # init instance
+                name = j.get_name()
+                print 'joystick found: ' + name
+                for jtype in joymap:
+                    if fnmatch.fnmatch(name, jtype):
+                        print "Matched type '%s'" % jtype
+                        print '%u axes available' % j.get_numaxes()
+                        self.js = j
+                        self.num_axes = j.get_numaxes()
+                        self.map = joymap[jtype]
+                        break
+            except pygame.error:
+                continue    
+    
+    def idle_task(self):
+        '''called in idle time'''
+        if self.js is None:
+            return
+        for e in pygame.event.get(): # iterate over event stack
+            #the following is somewhat custom for the specific joystick model:
+            override = self.module('rc').override[:]
+            for i in range(len(self.map)):
+                m = self.map[i]
+                if m is None:
+                    continue
+                (axis, mul, add) = m
+                if axis >= self.num_axes:
+                    continue
+                v = int(self.js.get_axis(axis)*mul + add)
+                v = max(min(v, 2000), 1000)
+                override[i] = v
+            if override != self.module('rc').override:
+                self.module('rc').override = override
+                self.module('rc').override_period.force()
 
-def description():
-    '''return module description'''
-    return "joystick aircraft control"
-
-def init(_mpstate):
+def init(mpstate):
     '''initialise module'''
-    global mpstate
-    mpstate = _mpstate
-    state = module_state()
-    mpstate.joystick_state = state
-    
-    #initialize joystick, if available
-    pygame.init()
-    pygame.joystick.init() # main joystick device system
+    return JSModule(mpstate)
 
-    for i in range(pygame.joystick.get_count()):
-        print("Trying joystick %u" % i)
-        try:
-            j = pygame.joystick.Joystick(i)
-            j.init() # init instance
-            name = j.get_name()
-            print 'joystick found: ' + name
-            for jtype in joymap:
-                if fnmatch.fnmatch(name, jtype):
-                    print "Matched type '%s'" % jtype
-                    print '%u axes available' % j.get_numaxes()
-                    state.js = j
-                    state.num_axes = j.get_numaxes()
-                    state.map = joymap[jtype]
-                    break
-        except pygame.error:
-            continue    
-
-if __name__ == "__main__":
-    class dummy(object):
-        def __init__(self):
-            pass
-    d = dummy()
-    init(d)
-    

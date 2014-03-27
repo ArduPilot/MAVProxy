@@ -3,19 +3,7 @@
 
 import time, os
 
-def name():
-    '''return module name'''
-    return "tuneopt"
-
-def description():
-    '''return module description'''
-    return "tuneopt command handling"
-
-def init(_mpstate):
-    '''initialise module'''
-    global mpstate
-    mpstate = _mpstate
-    mpstate.command_map['tuneopt'] = (cmd_tuneopt,  'Select option for Tune Pot on Channel 6 (quadcopter only)')
+from MAVProxy.modules.lib import mp_module
 
 tune_options = {
     'None':             '0',
@@ -52,57 +40,65 @@ tune_options = {
     'SonarGain':       '41',
 }
 
-def tune_show():
-    opt_num = str(int(mpstate.functions.get_mav_param('TUNE')))
-    option = None
-    for k in tune_options.keys():
-        if opt_num == tune_options[k]:
-            option = k
-            break
-    else:
-        print("TUNE is currently set to unknown value " + opt_num)
-        return
-    low = mpstate.functions.get_mav_param('TUNE_LOW')
-    high = mpstate.functions.get_mav_param('TUNE_HIGH')
-    print("TUNE is currently set to %s LOW=%f HIGH=%f" % (option, low/1000, high/1000))
-
-def tune_option_validate(option):
-    for k in tune_options:
-        if option.upper() == k.upper():
-            return k
-    return None
-
-# TODO: Check/show the limits of LOW and HIGH
-def cmd_tuneopt(args):
-    '''Select option for Tune Pot on Channel 6 (quadcopter only)'''
-    usage = "usage: tuneopt <set|show|reset|list>"
-    if mpstate.vehicle_type != 'copter':
-        print("This command is only available for copter")
-        return
-    if len(args) < 1:
-        print(usage)
-        return
-    if args[0].lower() == 'reset':
-        mpstate.functions.param_set('TUNE', '0')
-    elif args[0].lower() == 'set':
-        if len(args) < 4:
-            print('Usage: tuneopt set OPTION LOW HIGH')
+class TuneoptModule(mp_module.MPModule):
+    def __init__(self, mpstate):
+        super(TuneoptModule, self).__init__(mpstate, "tuneopt", "tuneopt command handling")
+        self.add_command('tuneopt', self.cmd_tuneopt,  'Select option for Tune Pot on Channel 6 (quadcopter only)')
+    
+    def tune_show(self):
+        opt_num = str(int(self.get_mav_param('TUNE')))
+        option = None
+        for k in tune_options.keys():
+            if opt_num == tune_options[k]:
+                option = k
+                break
+        else:
+            print("TUNE is currently set to unknown value " + opt_num)
             return
-        option = tune_option_validate(args[1])
-        if not option:
-            print('Invalid Tune option: ' + args[1])
+        low = self.get_mav_param('TUNE_LOW')
+        high = self.get_mav_param('TUNE_HIGH')
+        print("TUNE is currently set to %s LOW=%f HIGH=%f" % (option, low/1000, high/1000))
+    
+    def tune_option_validate(self, option):
+        for k in tune_options:
+            if option.upper() == k.upper():
+                return k
+        return None
+    
+    # TODO: Check/show the limits of LOW and HIGH
+    def cmd_tuneopt(self, args):
+        '''Select option for Tune Pot on Channel 6 (quadcopter only)'''
+        usage = "usage: tuneopt <set|show|reset|list>"
+        if self.mpstate.vehicle_type != 'copter':
+            print("This command is only available for copter")
             return
-        low = args[2]
-        high = args[3]
-        mpstate.functions.param_set('TUNE', tune_options[option])
-        mpstate.functions.param_set('TUNE_LOW', float(low) * 1000)
-        mpstate.functions.param_set('TUNE_HIGH', float(high) * 1000)
-    elif args[0].lower() == 'show':
-        tune_show()
-    elif args[0].lower() == 'list':
-        print("Options available:")
-        for s in sorted(tune_options.keys()):
-            print('  ' + s)
-    else:
-        print(usage)
+        if len(args) < 1:
+            print(usage)
+            return
+        if args[0].lower() == 'reset':
+            self.param_set('TUNE', '0')
+        elif args[0].lower() == 'set':
+            if len(args) < 4:
+                print('Usage: tuneopt set OPTION LOW HIGH')
+                return
+            option = self.tune_option_validate(args[1])
+            if not option:
+                print('Invalid Tune option: ' + args[1])
+                return
+            low = args[2]
+            high = args[3]
+            self.param_set('TUNE', tune_options[option])
+            self.param_set('TUNE_LOW', float(low) * 1000)
+            self.param_set('TUNE_HIGH', float(high) * 1000)
+        elif args[0].lower() == 'show':
+            self.tune_show()
+        elif args[0].lower() == 'list':
+            print("Options available:")
+            for s in sorted(tune_options.keys()):
+                print('  ' + s)
+        else:
+            print(usage)
 
+def init(mpstate):
+    '''initialise module'''
+    return TuneoptModule(mpstate)
