@@ -282,6 +282,7 @@ def load_module(modname, quiet=False):
                 return True
             else:
                 ex = "%s.init did not return a MPModule instance" % modname
+                break
         except ImportError, msg:
             ex = msg
             if mpstate.settings.moddebug > 1:
