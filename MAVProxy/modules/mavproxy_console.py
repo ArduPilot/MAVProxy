@@ -126,7 +126,7 @@ class ConsoleModule(mp_module.MPModule):
             lat = master.field('GLOBAL_POSITION_INT', 'lat', 0) * 1.0e-7
             lng = master.field('GLOBAL_POSITION_INT', 'lon', 0) * 1.0e-7
             rel_alt = master.field('GLOBAL_POSITION_INT', 'relative_alt', 0) * 1.0e-3
-            if self.mpstate.settings.basealt != 0:
+            if self.settings.basealt != 0:
                 agl_alt = self.settings.basealt - self.console.ElevationMap.GetElevation(lat, lng)
             else:
                 agl_alt = self.console.ElevationMap.GetElevation(home_lat, home_lng) - self.console.ElevationMap.GetElevation(lat, lng)
