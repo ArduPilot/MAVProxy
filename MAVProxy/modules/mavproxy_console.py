@@ -90,7 +90,7 @@ class ConsoleModule(mp_module.MPModule):
         if not isinstance(self.console, wxconsole.MessageConsole):
             return
         if not self.console.is_alive():
-            self.console = textconsole.SimpleConsole()
+            self.mpstate.console = textconsole.SimpleConsole()
             return
         type = msg.get_type()
     
