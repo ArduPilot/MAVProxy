@@ -38,39 +38,38 @@ class TrackerModule(mp_module.MPModule):
                           'set (TRACKERSETTING)'])
         self.add_completion_function('(TRACKERSETTING)', self.settings.completion)
 
-    def cmd_tracker_position(args):
+    def cmd_tracker_position(self, args):
         '''tracker manual positioning commands'''
-        state = mpstate.tracker_state
-        if not state.connection:
+        if not self.connection:
             print("tracker not connected")
             return
         positions = [0, 0, 0, 0, 0] # x, y, z, r, buttons. only position[0] (yaw) and position[1] (pitch) are currently used
         for i in range(0, 4):
             if len(args) > i:
                 positions[i] = int(args[i]) # default values are 0
-        state.connection.mav.manual_control_send(state.connection.target_system,
-                                                 positions[0], positions[1],
-                                                 positions[2], positions[3],
-                                                 positions[4])
+        self.connection.mav.manual_control_send(self.connection.target_system,
+                                                positions[0], positions[1],
+                                                positions[2], positions[3],
+                                                positions[4])
     
-    def cmd_tracker(args):
+    def cmd_tracker(self, args):
         '''tracker command parser'''
         if args[0] == "start":
-            cmd_tracker_start()
+            self.cmd_tracker_start()
         elif args[0] == "set":
-            state.settings.command(args[1:])
+            self.settings.command(args[1:])
         elif args[0] == 'arm':
-            cmd_tracker_arm()
+            self.cmd_tracker_arm()
         elif args[0] == 'disarm':
-            cmd_tracker_disarm()
+            self.cmd_tracker_disarm()
         elif args[0] == 'level':
-            cmd_tracker_level()
+            self.cmd_tracker_level()
         elif args[0] == 'param':
-            cmd_tracker_param(args[1:])
+            self.cmd_tracker_param(args[1:])
         elif args[0] == 'mode':
-            cmd_tracker_mode(args[1:])
+            self.cmd_tracker_mode(args[1:])
         elif args[0] == 'position':
-            cmd_tracker_position(args[1:])
+            self.cmd_tracker_position(args[1:])
         else:
             print("usage: tracker <start|set|arm|disarm|level|param set NAME VALUE|mode MODE>")
 
@@ -94,11 +93,14 @@ class TrackerModule(mp_module.MPModule):
     
         if self.settings.debug:
             print m
+
+        if self.module('map') is None:
+            return
     
         if m.get_type() == 'GLOBAL_POSITION_INT':
             (self.lat, self.lon, self.heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
             if self.lat != 0 or self.lon != 0:
-                mavproxy_map.create_vehicle_icon('AntennaTracker', 'red', follow=False, vehicle_type='antenna')
+                self.module('map').create_vehicle_icon('AntennaTracker', 'red', follow=False, vehicle_type='antenna')
                 self.mpstate.map.set_position('AntennaTracker', (self.lat, self.lon), rotation=self.heading)
         
     
@@ -142,23 +144,21 @@ class TrackerModule(mp_module.MPModule):
 
     def cmd_tracker_param_set(name, value, retries=3):
         '''Parameter setting'''
-        state = mpstate.tracker_state
-        if not state.connection:
+        if not self.connection:
             print("tracker not connected")
             return
-        return mpstate.mav_param.mavset(state.connection, name.upper(), value, retries=retries)
+        return self.mav_param.mavset(self.connection, name.upper(), value, retries=retries)
         
     def cmd_tracker_mode(args):
         '''mode commands'''
-        state = mpstate.tracker_state
-        if not state.connection:
+        if not self.connection:
             print("tracker not connected")
             return
         mode = args[0].upper()
         if mode == "MANUAL":
-            state.connection.set_mode_manual()
+            self.connection.set_mode_manual()
         elif mode == "AUTO":
-            state.connection.set_mode_auto()
+            self.connection.set_mode_auto()
         else:
             print('Unknown mode %s: ' % mode)
 
