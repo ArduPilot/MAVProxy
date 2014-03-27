@@ -82,7 +82,7 @@ class ArmModule(mp_module.MPModule):
                 return
     
         if args[0] == "throttle":
-            self.arducopter_arm()
+            self.master.arducopter_arm()
             return
     
         print(usage)
