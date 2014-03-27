@@ -152,7 +152,9 @@ class MPState(object):
 
     def module(self, name):
         '''Find a public module (most modules are private)'''
-        return self.public_modules[name]
+        if name in self.public_modules:
+            return self.public_modules[name]
+        return None
     
     def master(self):
         '''return the currently chosen mavlink master object'''
