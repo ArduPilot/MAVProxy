@@ -182,7 +182,7 @@ class WPModule(mp_module.MPModule):
         state.wploader.target_component = self.target_component
         state.wploader.add(home)
         for p in points:
-            state.wploader.add_latlonalt(p[0], p[1], self.mpstate.settings.wpalt)
+            state.wploader.add_latlonalt(p[0], p[1], self.settings.wpalt)
         self.master.waypoint_clear_all_send()
         if state.wploader.count() == 0:
             return
@@ -289,9 +289,9 @@ class WPModule(mp_module.MPModule):
                 print("Need home location - refresh waypoints")
                 return
             if len(args) > 1:
-                self.mpstate.settings.wpalt = int(args[1])
+                self.settings.wpalt = int(args[1])
             self.mpstate.map_functions['draw_lines'](self.wp_draw_callback)
-            print("Drawing waypoints on map at altitude %d" % self.mpstate.settings.wpalt)
+            print("Drawing waypoints on map at altitude %d" % self.settings.wpalt)
         elif args[0] == "sethome":
             self.set_home_location()        
         elif args[0] == "loop":
