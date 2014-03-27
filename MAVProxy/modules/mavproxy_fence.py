@@ -20,7 +20,7 @@ class FenceModule(mp_module.MPModule):
                          ["<draw|list|clear|enable|disable>",
                           "<load|save> (FILENAME)"])
 
-        if self.continue_mode() and self.logdir() != None:
+        if self.continue_mode and self.logdir != None:
             fencetxt = os.path.join(self.logdir, 'fence.txt')
             if os.path.exists(fencetxt):
                 self.fenceloader.load(fencetxt)
@@ -35,10 +35,10 @@ class FenceModule(mp_module.MPModule):
             bits = mavutil.mavlink.MAV_SYS_STATUS_GEOFENCE
 
             present = ((m.onboard_control_sensors_present & bits) == bits)
-            if (mpstate.fence.present == False and present == True):
-                mpstate.functions.say("fence present")
-            elif (mpstate.fence.present == True and present == False):
-                mpstate.functions.say("fence removed")
+            if self.present == False and present == True:
+                self.say("fence present")
+            elif self.present == True and present == False:
+                self.say("fence removed")
             self.present = present
         
             enabled = ((m.onboard_control_sensors_enabled & bits) == bits)
