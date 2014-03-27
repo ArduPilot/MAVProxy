@@ -152,7 +152,7 @@ class MPState(object):
 
     def module(self, name):
         '''Find a public module (most modules are private)'''
-        return self.mpstate.public_modules[name]
+        return self.public_modules[name]
     
     def master(self):
         '''return the currently chosen mavlink master object'''
@@ -264,14 +264,17 @@ def cmd_watch(args):
 def load_module(modname, quiet=False):
     '''load a module'''
     modpaths = ['MAVProxy.modules.mavproxy_%s' % modname, modname]
+    for (m,pm) in mpstate.modules:
+        if m.name == modname:
+            if not quiet:
+                print("module %s already loaded" % modname)
+            return False
     for modpath in modpaths:
         try:
             m = import_package(modpath)
-            if m in mpstate.modules:
-                raise RuntimeError("module %s already loaded" % (modname,))
             module = m.init(mpstate)
             if isinstance(module, mp_module.MPModule):
-                mpstate.modules.append(module)
+                mpstate.modules.append((module, m))
                 if not quiet:
                     print("Loaded module %s" % (modname,))
                 return True
@@ -285,6 +288,18 @@ def load_module(modname, quiet=False):
     print("Failed to load module: %s" % ex)
     return False
 
+def unload_module(modname):
+    '''unload a module'''
+    for (m,pm) in mpstate.modules:
+        if m.name == modname:
+            if hasattr(m, 'unload'):
+                m.unload()
+            mpstate.modules.remove((m,pm))
+            print("Unloaded module %s" % modname)
+            return True
+    print("Unable to find module %s" % modname)
+    return False
+
 def cmd_module(args):
     '''module commands'''
     usage = "usage: module <list|load|reload|unload>"
@@ -292,7 +307,7 @@ def cmd_module(args):
         print(usage)
         return
     if args[0] == "list":
-        for m in mpstate.modules:
+        for (m,pm) in mpstate.modules:
             print("%s: %s" % (m.name, m.description))
     elif args[0] == "load":
         if len(args) < 2:
@@ -304,31 +319,23 @@ def cmd_module(args):
             print("usage: module reload <name>")
             return
         modname = args[1]
-        for m in mpstate.modules:
-            if m.name() == modname:
-                if hasattr(m, 'unload'):
-                    try:
-                        m.unload()
-                    except Exception:
-                        pass
-                reload(m)
-                m.init(mpstate)
+        pmodule = None
+        for (m,pm) in mpstate.modules:
+            if m.name == modname:
+                pmodule = pm
+        if pmodule is None:
+            print("Module %s not loaded" % modname)
+            return
+        if unload_module(modname):
+            reload(pmodule)
+            if load_module(modname, quiet=True):
                 print("Reloaded module %s" % modname)
-                return
-        print("Unable to find module %s" % modname)
     elif args[0] == "unload":
         if len(args) < 2:
             print("usage: module unload <name>")
             return
         modname = os.path.basename(args[1])
-        for m in mpstate.modules:
-            if m.name() == modname:
-                if hasattr(m, 'unload'):
-                    m.unload()
-                mpstate.modules.remove(m)
-                print("Unloaded module %s" % modname)
-                return
-        print("Unable to find module %s" % modname)
+        unload_module(modname)
     else:
         print(usage)
 
@@ -446,7 +453,7 @@ def process_stdin(line):
         return
 
     if not cmd in command_map:
-        for m in mpstate.modules:
+        for (m,pm) in mpstate.modules:
             if hasattr(m, 'unknown_command'):
                 try:
                     if m.unknown_command(args):
@@ -754,7 +761,7 @@ def master_callback(m, master):
                 r.write(m.get_msgbuf())
 
         # pass to modules
-        for mod in mpstate.modules:
+        for (mod,pm) in mpstate.modules:
             if not hasattr(mod, 'mavlink_packet'):
                 continue
             try:
@@ -948,7 +955,7 @@ def periodic_tasks():
         battery_report()
 
     # call optional module idle tasks. These are called at several hundred Hz
-    for m in mpstate.modules:
+    for (m,pm) in mpstate.modules:
         if hasattr(m, 'idle_task'):
             try:
                 m.idle_task()
@@ -1245,8 +1252,8 @@ Auto-detected serial ports are:
                 print("Interrupt caught.  Use 'exit' to quit MAVProxy.")
 
                 #Just lost the map and console, get them back:
-                for m in mpstate.modules:
-                    if m.name() in ["map", "console"]:
+                for (m,pm) in mpstate.modules:
+                    if m.name in ["map", "console"]:
                         if hasattr(m, 'unload'):
                             try:
                                 m.unload()
@@ -1260,9 +1267,9 @@ Auto-detected serial ports are:
                 sys.exit(1)
 
     #this loop executes after leaving the above loop and is for cleanup on exit
-    for m in mpstate.modules:
+    for (m,pm) in mpstate.modules:
         if hasattr(m, 'unload'):
-            print "Unloading module:", m.name()
+            print "Unloading module:", m.name
             m.unload()
         
     sys.exit(1)
