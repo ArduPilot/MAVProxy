@@ -68,7 +68,7 @@ def init(_mpstate):
     mpstate = _mpstate
     mpstate.tracker_state = tracker_state()
     mpstate.command_map['tracker'] = (cmd_tracker, "antenna tracker control module")
-    mpstate.completions['tracker'] = ['<start|arm|disarm|level|param set NAME VALUE|mode MODE>',
+    mpstate.completions['tracker'] = ['<start|arm|disarm|level|param|mode>',
                                       'set (TRACKERSETTING)']
     mpstate.completion_functions['(TRACKERSETTING)'] = mpstate.tracker_state.settings.completion
 
