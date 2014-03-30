@@ -27,33 +27,32 @@ class WPModule(mp_module.MPModule):
     
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
-        state = self
         mtype = m.get_type()
         if mtype in ['WAYPOINT_COUNT','MISSION_COUNT']:
-            if state.wp_op is None:
+            if self.wp_op is None:
                 self.console.error("No waypoint load started")
             else:
-                state.wploader.clear()
-                state.wploader.expected_count = m.count
+                self.wploader.clear()
+                self.wploader.expected_count = m.count
                 self.console.writeln("Requesting %u waypoints t=%s now=%s" % (m.count,
                                                                                  time.asctime(time.localtime(m._timestamp)),
                                                                                  time.asctime()))
                 self.master.waypoint_request_send(0)
     
-        elif mtype in ['WAYPOINT', 'MISSION_ITEM'] and state.wp_op != None:
-            if m.seq > state.wploader.count():
-                self.console.writeln("Unexpected waypoint number %u - expected %u" % (m.seq, state.wploader.count()))
-            elif m.seq < state.wploader.count():
+        elif mtype in ['WAYPOINT', 'MISSION_ITEM'] and self.wp_op != None:
+            if m.seq > self.wploader.count():
+                self.console.writeln("Unexpected waypoint number %u - expected %u" % (m.seq, self.wploader.count()))
+            elif m.seq < self.wploader.count():
                 # a duplicate
                 pass
             else:
-                state.wploader.add(m)
-            if m.seq+1 < state.wploader.expected_count:
+                self.wploader.add(m)
+            if m.seq+1 < self.wploader.expected_count:
                 self.master.waypoint_request_send(m.seq+1)
             else:
-                if state.wp_op == 'list':
-                    for i in range(state.wploader.count()):
-                        w = state.wploader.wp(i)
+                if self.wp_op == 'list':
+                    for i in range(self.wploader.count()):
+                        w = self.wploader.wp(i)
                         print("%u %u %.10f %.10f %f p1=%.1f p2=%.1f p3=%.1f p4=%.1f cur=%u auto=%u" % (
                             w.command, w.frame, w.x, w.y, w.z,
                             w.param1, w.param2, w.param3, w.param4,
@@ -62,16 +61,16 @@ class WPModule(mp_module.MPModule):
                         waytxt = os.path.join(self.logdir, 'way.txt')
                         self.save_waypoints(waytxt)
                         print("Saved waypoints to %s" % waytxt)
-                elif state.wp_op == "save":
-                    self.save_waypoints(state.wp_save_filename)
-                state.wp_op = None
+                elif self.wp_op == "save":
+                    self.save_waypoints(self.wp_save_filename)
+                self.wp_op = None
     
         elif mtype in ["WAYPOINT_REQUEST", "MISSION_REQUEST"]:
             self.process_waypoint_request(m, self.master)
     
         elif mtype in ["WAYPOINT_CURRENT", "MISSION_CURRENT"]:
-            if m.seq != state.last_waypoint:
-                state.last_waypoint = m.seq
+            if m.seq != self.last_waypoint:
+                self.last_waypoint = m.seq
                 self.say("waypoint %u" % m.seq,priority='message')
     
     
@@ -299,6 +298,11 @@ class WPModule(mp_module.MPModule):
         else:
             print("Usage: wp <list|load|save|set|show|clear|draw|loop>")
 
+    def fetch(self):
+        """Download wpts from vehicle (this operation is public to support other modules)"""
+        if self.wp_op is None:  # If we were already doing a list or save, just restart the fetch without changing the operation
+            self.wp_op = "fetch"
+        self.master.waypoint_request_list_send()
 
 def init(mpstate):
     '''initialise module'''
