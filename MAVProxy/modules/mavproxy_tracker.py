@@ -26,7 +26,7 @@ class TrackerModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(TrackerModule, self).__init__(mpstate, "tracker", "antenna tracker control module")
         self.connection = None
-        self.settings = mp_settings.MPSettings(
+        self.tracker_settings = mp_settings.MPSettings(
             [ ('port', str, "/dev/ttyUSB0"),
               ('baudrate', int, 57600),
               ('debug', int, 0)
@@ -36,7 +36,7 @@ class TrackerModule(mp_module.MPModule):
                          "antenna tracker control module",
                          ['<start|arm|disarm|level|param|mode|position>',
                           'set (TRACKERSETTING)'])
-        self.add_completion_function('(TRACKERSETTING)', self.settings.completion)
+        self.add_completion_function('(TRACKERSETTING)', self.tracker_settings.completion)
 
     def cmd_tracker_position(self, args):
         '''tracker manual positioning commands'''
@@ -54,10 +54,14 @@ class TrackerModule(mp_module.MPModule):
     
     def cmd_tracker(self, args):
         '''tracker command parser'''
+        usage = "usage: tracker <start|set|arm|disarm|level|param|mode|position> [options]"
+        if len(args) == 0:
+            print(usage)
+            return
         if args[0] == "start":
             self.cmd_tracker_start()
         elif args[0] == "set":
-            self.settings.command(args[1:])
+            self.tracker_settings.command(args[1:])
         elif args[0] == 'arm':
             self.cmd_tracker_arm()
         elif args[0] == 'disarm':
@@ -71,7 +75,7 @@ class TrackerModule(mp_module.MPModule):
         elif args[0] == 'position':
             self.cmd_tracker_position(args[1:])
         else:
-            print("usage: tracker <start|set|arm|disarm|level|param set NAME VALUE|mode MODE>")
+            print(usage)
 
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet from the master vehicle. Relay it to the tracker
@@ -91,7 +95,7 @@ class TrackerModule(mp_module.MPModule):
         if m is None:
             return
     
-        if self.settings.debug:
+        if self.tracker_settings.debug:
             print m
 
         if self.module('map') is None:
@@ -105,13 +109,14 @@ class TrackerModule(mp_module.MPModule):
         
     
     def cmd_tracker_start(self):
-        if self.settings.port == None:
+        if self.tracker_settings.port == None:
             print("tracker port not set")
             return
-        print("connecting to tracker %s at %d" % (self.settings.port, self.settings.baudrate))
-        m = mavutil.mavlink_connection(self.settings.port, 
+        print("connecting to tracker %s at %d" % (self.tracker_settings.port,
+                                                  self.tracker_settings.baudrate))
+        m = mavutil.mavlink_connection(self.tracker_settings.port, 
                                        autoreconnect=True, 
-                                       baud=self.settings.baudrate)
+                                       baud=self.tracker_settings.baudrate)
         self.connection = m
     
     def cmd_tracker_arm(self):
