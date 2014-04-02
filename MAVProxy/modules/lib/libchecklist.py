@@ -31,7 +31,7 @@ class UI():
         '''child process - this holds all the GUI elements'''
         import Tkinter as tk
 
-        '''curStep is which step in the list we're up to, increments +1 for each list completed
+        '''curStep is which step in the list we are up to, increments +1 for each list completed
         it is the same as the column number of the checklist item'''
         self.curStep = 0
 
@@ -422,7 +422,9 @@ class UI():
                 '''Go through all the controls in the main window'''
                 for child in self.root.winfo_children():
                     '''If the control is a checkbutton and it's name matches and we're in the right checklist step, update it'''
-                    if isinstance(child, tk.Checkbutton) and obj.name == child.cget('text') and int(child.grid_info()['column']) == self.curStep:
+                    if (isinstance(child, tk.Checkbutton) and
+                        obj.name == child.cget('text') and
+                        int(child.grid_info()['column']) == self.curStep):
                         if obj.state == 1:
                             child.select()
                         else:
