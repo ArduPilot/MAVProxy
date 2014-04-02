@@ -471,7 +471,8 @@ def process_stdin(line):
         fn(args[1:])
     except Exception as e:
         print("ERROR in command: %s" % str(e))
-        traceback.print_exc()
+        if mpstate.settings.moddebug > 1:
+            traceback.print_exc()
 
 
 def vcell_to_battery_percent(vcell):
