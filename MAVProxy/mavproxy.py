@@ -274,6 +274,7 @@ def load_module(modname, quiet=False):
     for modpath in modpaths:
         try:
             m = import_package(modpath)
+            reload(m)
             module = m.init(mpstate)
             if isinstance(module, mp_module.MPModule):
                 mpstate.modules.append((module, m))
