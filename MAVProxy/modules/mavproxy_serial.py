@@ -16,7 +16,7 @@ class SerialModule(mp_module.MPModule):
         self.serial_settings = mp_settings.MPSettings(
             [ ('port', int, 0),
               ('baudrate', int, 57600),
-              ('timeout', int, 100)
+              ('timeout', int, 500)
               ]
             )
         self.add_completion_function('(SERIALSETTING)', self.serial_settings.completion)
@@ -49,7 +49,7 @@ class SerialModule(mp_module.MPModule):
             flags |= mavutil.mavlink.SERIAL_CONTROL_FLAG_EXCLUSIVE
         if self.serial_settings.timeout != 0:
             flags |= mavutil.mavlink.SERIAL_CONTROL_FLAG_RESPOND
-        if self.serial_settings.timeout > 500:
+        if self.serial_settings.timeout >= 500:
             flags |= mavutil.mavlink.SERIAL_CONTROL_FLAG_MULTI
 
         s = ' '.join(args)
