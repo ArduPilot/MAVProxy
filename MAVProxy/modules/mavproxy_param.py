@@ -17,7 +17,7 @@ class ParamModule(mp_module.MPModule):
         self.add_command('param', self.cmd_param, "parameter handling",
                          ["<fetch|download>",
                           "<set|show|fetch|help> (PARAMETER)",
-                          "<load|save> (FILENAME)"])
+                          "<load|save|diff> (FILENAME)"])
         if self.continue_mode and self.logdir != None:
             parmfile = os.path.join(self.logdir, 'mav.parm')
             if os.path.exists(parmfile):
