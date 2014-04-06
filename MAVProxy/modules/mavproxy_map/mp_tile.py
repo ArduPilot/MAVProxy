@@ -345,6 +345,10 @@ class MPTile:
 					continue
 
 			# copy out the quadrant we want
+                        availx = min(TILES_WIDTH - tile_info.offsetx, width2)
+                        availy = min(TILES_HEIGHT - tile_info.offsety, height2)
+                        if availx != width2 or availy != height2:
+                                continue
 			cv.SetImageROI(img, (tile_info.offsetx, tile_info.offsety, width2, height2))
 			img2 = cv.CreateImage((width2,height2), 8, 3)
                         try:
