@@ -104,6 +104,7 @@ class MPState(object):
         self.map = None
         self.map_functions = {}
         self.vehicle_type = None
+        self.vehicle_name = None
         self.settings = mp_settings.MPSettings(
             [ ('link', int, 1),
               ('altreadout', int, 10),
@@ -122,7 +123,6 @@ class MPState(object):
               ('shownoise', int, 1),
               ('basealt', int, 0),
               ('wpalt', int, 100),
-              ('parambatch', int, 10),
               ('requireexit', int, 0)]
             )
 

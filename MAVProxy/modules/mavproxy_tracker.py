@@ -14,6 +14,7 @@ from MAVProxy.modules import mavproxy_map
 from pymavlink import mavutil
 
 from MAVProxy.modules.lib import mp_module
+from MAVProxy.modules.mavproxy_param import ParamState
 
 # this should be in mavutil.py
 mode_mapping_antenna = {
@@ -24,8 +25,11 @@ mode_mapping_antenna = {
 
 class TrackerModule(mp_module.MPModule):
     def __init__(self, mpstate):
+        from pymavlink import mavparm
         super(TrackerModule, self).__init__(mpstate, "tracker", "antenna tracker control module")
         self.connection = None
+        self.tracker_param = mavparm.MAVParmDict()
+        self.pstate = ParamState(self.tracker_param, self.logdir, self.vehicle_name, 'tracker.parm')
         self.tracker_settings = mp_settings.MPSettings(
             [ ('port', str, "/dev/ttyUSB0"),
               ('baudrate', int, 57600),
@@ -34,24 +38,27 @@ class TrackerModule(mp_module.MPModule):
             )
         self.add_command('tracker', self.cmd_tracker,
                          "antenna tracker control module",
-                         ['<start|arm|disarm|level|param|mode|position>',
-                          'set (TRACKERSETTING)'])
+                         ['<start|arm|disarm|level|mode|position|calpress|mode>',
+                          'set (TRACKERSETTING)',
+                          'param <set|show|fetch|help> (TRACKERPARAMETER)',
+                          'param (TRACKERSETTING)'])
         self.add_completion_function('(TRACKERSETTING)', self.tracker_settings.completion)
+        self.add_completion_function('(TRACKERPARAMETER)', self.complete_parameter)
 
-    def cmd_tracker_position(self, args):
-        '''tracker manual positioning commands'''
-        if not self.connection:
-            print("tracker not connected")
-            return
-        positions = [0, 0, 0, 0, 0] # x, y, z, r, buttons. only position[0] (yaw) and position[1] (pitch) are currently used
-        for i in range(0, 4):
-            if len(args) > i:
-                positions[i] = int(args[i]) # default values are 0
-        self.connection.mav.manual_control_send(self.connection.target_system,
-                                                positions[0], positions[1],
-                                                positions[2], positions[3],
-                                                positions[4])
-    
+    def complete_parameter(self, text):
+        '''complete a tracker parameter'''
+        return self.tracker_param.keys()
+
+    def find_connection(self):
+        '''find an antenna tracker connection if possible'''
+        if self.connection is not None:
+            return self.connection
+        for m in self.mpstate.mav_master:
+            if 'HEARTBEAT' in m.messages:
+                if m.messages['HEARTBEAT'].type == mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER:
+                    return m
+        return None
+
     def cmd_tracker(self, args):
         '''tracker command parser'''
         usage = "usage: tracker <start|set|arm|disarm|level|param|mode|position> [options]"
@@ -74,16 +81,62 @@ class TrackerModule(mp_module.MPModule):
             self.cmd_tracker_mode(args[1:])
         elif args[0] == 'position':
             self.cmd_tracker_position(args[1:])
+        elif args[0] == 'calpress':
+            self.cmd_tracker_calpress(args[1:])
         else:
             print(usage)
 
+    def cmd_tracker_position(self, args):
+        '''tracker manual positioning commands'''
+        connection = self.find_connection()
+        if not connection:
+            print("No antenna tracker found")
+            return
+        positions = [0, 0, 0, 0, 0] # x, y, z, r, buttons. only position[0] (yaw) and position[1] (pitch) are currently used
+        for i in range(0, 4):
+            if len(args) > i:
+                positions[i] = int(args[i]) # default values are 0
+        connection.mav.manual_control_send(connection.target_system,
+                                           positions[0], positions[1],
+                                           positions[2], positions[3],
+                                           positions[4])
+
+    def cmd_tracker_calpress(self, args):
+        '''calibrate barometer on tracker'''
+        connection = self.find_connection()
+        if not connection:
+            print("No antenna tracker found")
+            return
+        connection.calibrate_pressure()
+
+    def cmd_tracker_mode(self, args):
+        '''set arbitrary mode'''
+        connection = self.find_connection()
+        if not connection:
+            print("No antenna tracker found")
+            return
+        mode_mapping = connection.mode_mapping()
+        if mode_mapping is None:
+            print('No mode mapping available')
+            return
+        if len(args) != 1:
+            print('Available modes: ', mode_mapping.keys())
+            return
+        mode = args[0].upper()
+        if mode not in mode_mapping:
+            print('Unknown mode %s: ' % mode)
+            return
+        connection.set_mode(mode_mapping[mode])
+    
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet from the master vehicle. Relay it to the tracker
         if it is a GLOBAL_POSITION_INT'''
-        if not self.connection:
-            return
         if m.get_type() in ['GLOBAL_POSITION_INT', 'SCALED_PRESSURE']:
-            self.connection.mav.send(m)
+            connection = self.find_connection()
+            if not connection:
+                return
+            if m.get_srcSystem() != connection.target_system:
+                connection.mav.send(m)
     
     def idle_task(self):
         '''called in idle time'''
@@ -97,6 +150,9 @@ class TrackerModule(mp_module.MPModule):
     
         if self.tracker_settings.debug:
             print m
+
+        self.pstate.handle_mavlink_packet(self.connection, m)
+        self.pstate.fetch_check(self.connection)
 
         if self.module('map') is None:
             return
@@ -140,33 +196,12 @@ class TrackerModule(mp_module.MPModule):
             return
         self.connection.calibrate_level()
 
-    def cmd_tracker_param(args):
+    def cmd_tracker_param(self, args):
         '''Parameter commands'''
-        if args[0] == "set" and len(args) > 2:
-            cmd_tracker_param_set(args[1], args[2])
-        else:
-            print("usage: tracker param set PARAMNAME VALUE")
-
-    def cmd_tracker_param_set(name, value, retries=3):
-        '''Parameter setting'''
         if not self.connection:
             print("tracker not connected")
             return
-        return self.mav_param.mavset(self.connection, name.upper(), value, retries=retries)
-        
-    def cmd_tracker_mode(args):
-        '''mode commands'''
-        if not self.connection:
-            print("tracker not connected")
-            return
-        mode = args[0].upper()
-        if mode == "MANUAL":
-            self.connection.set_mode_manual()
-        elif mode == "AUTO":
-            self.connection.set_mode_auto()
-        else:
-            print('Unknown mode %s: ' % mode)
-
+        self.pstate.handle_command(self.connection, args)
 
 def init(mpstate):
     '''initialise module'''
