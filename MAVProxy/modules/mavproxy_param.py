@@ -7,56 +7,51 @@ from MAVProxy.modules.lib import mp_util
 
 from MAVProxy.modules.lib import mp_module
 
-class ParamModule(mp_module.MPModule):
-    def __init__(self, mpstate):
-        super(ParamModule, self).__init__(mpstate, "param", "parameter handling", public = True)
+class ParamState:
+    '''this class is separated to make it possible to use the parameter
+       functions on a secondary connection'''
+    def __init__(self, mav_param, logdir, vehicle_name, parm_file):
         self.mav_param_set = set()
         self.mav_param_count = 0
         self.param_period = mavutil.periodic_event(1)
         self.fetch_one = 0
-        self.add_command('param', self.cmd_param, "parameter handling",
-                         ["<fetch|download>",
-                          "<set|show|fetch|help> (PARAMETER)",
-                          "<load|save|diff> (FILENAME)"])
-        if self.continue_mode and self.logdir != None:
-            parmfile = os.path.join(self.logdir, 'mav.parm')
-            if os.path.exists(parmfile):
-                mpstate.mav_param.load(parmfile)
-                    
-    def mavlink_packet(self, m):
+        self.mav_param = mav_param
+        self.logdir = logdir
+        self.vehicle_name = vehicle_name
+        self.parm_file = parm_file
+
+    def handle_mavlink_packet(self, master, m):
         '''handle an incoming mavlink packet'''
-        state =self
         if m.get_type() == 'PARAM_VALUE':
             param_id = "%.16s" % m.param_id
-            if m.param_index != -1 and m.param_index not in state.mav_param_set:
+            if m.param_index != -1 and m.param_index not in self.mav_param_set:
                 added_new_parameter = True
-                state.mav_param_set.add(m.param_index)
+                self.mav_param_set.add(m.param_index)
             else:
                 added_new_parameter = False
             if m.param_count != -1:
-                state.mav_param_count = m.param_count
+                self.mav_param_count = m.param_count
             self.mav_param[str(param_id)] = m.param_value
-            if state.fetch_one > 0:
-                state.fetch_one -= 1
-                self.console.writeln("%s = %f" % (param_id, m.param_value))
-            if added_new_parameter and len(state.mav_param_set) == m.param_count:
-                self.console.writeln("Received %u parameters" % m.param_count)
-                if self.status.logdir != None:
-                    self.mav_param.save(os.path.join(self.status.logdir, 'mav.parm'), '*', verbose=True)
+            if self.fetch_one > 0:
+                self.fetch_one -= 1
+                print("%s = %f" % (param_id, m.param_value))
+            if added_new_parameter and len(self.mav_param_set) == m.param_count:
+                print("Received %u parameters" % m.param_count)
+                if self.logdir != None:
+                    self.mav_param.save(os.path.join(self.logdir, self.parm_file), '*', verbose=True)
     
-    def idle_task(self):
-        '''handle missing parameters'''
-        state = self
-        if state.param_period.trigger():
-            if len(state.mav_param_set) == 0:
-                self.master.param_fetch_all()
-            elif state.mav_param_count != 0 and len(state.mav_param_set) != state.mav_param_count:
-                if self.master.time_since('PARAM_VALUE') >= 1:
-                    diff = set(range(state.mav_param_count)).difference(state.mav_param_set)
+    def fetch_check(self, master):
+        '''check for missing parameters periodically'''
+        if self.param_period.trigger():
+            if len(self.mav_param_set) == 0:
+                master.param_fetch_all()
+            elif self.mav_param_count != 0 and len(self.mav_param_set) != self.mav_param_count:
+                if master.time_since('PARAM_VALUE') >= 1:
+                    diff = set(range(self.mav_param_count)).difference(self.mav_param_set)
                     count = 0
-                    while len(diff) > 0 and count < self.settings.parambatch:
+                    while len(diff) > 0 and count < 10:
                         idx = diff.pop()
-                        self.master.param_fetch_one(idx)
+                        master.param_fetch_one(idx)
                         count += 1
     
     def param_help_download(self):
@@ -80,6 +75,9 @@ class ParamModule(mp_module.MPModule):
         '''show help on a parameter'''
         if len(args) == 0:
             print("Usage: param help PARAMETER_NAME")
+            return
+        if self.vehicle_name is None:
+            print("Unknown vehicle type")
             return
         path = mp_util.dot_mavproxy("%s.xml" % self.vehicle_name)
         if not os.path.exists(path):
@@ -112,23 +110,22 @@ class ParamModule(mp_module.MPModule):
             else:
                 print("Parameter '%s' not found in documentation" % h)
     
-    def cmd_param(self, args):
-        '''control parameters'''
-        state = self
+    def handle_command(self, master, args):
+        '''handle parameter commands'''
         param_wildcard = "*"
         if len(args) < 1:
             print("usage: param <fetch|set|show|diff|download|help>")
             return
         if args[0] == "fetch":
             if len(args) == 1:
-                self.master.param_fetch_all()
-                state.mav_param_set = set()
+                master.param_fetch_all()
+                self.mav_param_set = set()
                 print("Requested parameter list")
             else:
                 for p in self.mav_param.keys():
                     if fnmatch.fnmatch(p, args[1].upper()):
-                        self.master.param_fetch_one(p)
-                        state.fetch_one += 1
+                        master.param_fetch_one(p)
+                        self.fetch_one += 1
                         print("Requested parameter %s" % p)
         elif args[0] == "save":
             if len(args) < 2:
@@ -142,6 +139,9 @@ class ParamModule(mp_module.MPModule):
         elif args[0] == "diff":
             wildcard = '*'
             if len(args) < 2 or args[1].find('*') != -1:
+                if self.vehicle_name is None:
+                    print("Unknown vehicle type")
+                return
                 filename = mp_util.dot_mavproxy("%s-defaults.parm" % self.vehicle_name)
                 if not os.path.exists(filename):
                     print("Please run 'param download' first (vehicle_name=%s)" % self.vehicle_name)
@@ -166,7 +166,7 @@ class ParamModule(mp_module.MPModule):
             if not param.upper() in self.mav_param:
                 print("Unable to find parameter '%s'" % param)
                 return
-            self.mpstate.functions.param_set(param, value)
+            self.mav_param.mavset(master, param.upper(), value, retries=3)
         elif args[0] == "load":
             if len(args) < 2:
                 print("Usage: param load <filename> [wildcard]")
@@ -175,7 +175,7 @@ class ParamModule(mp_module.MPModule):
                 param_wildcard = args[2]
             else:
                 param_wildcard = "*"
-            self.mav_param.load(args[1], param_wildcard, self.master)
+            self.mav_param.load(args[1], param_wildcard, master)
         elif args[0] == "download":
             self.param_help_download()
         elif args[0] == "help":
@@ -188,6 +188,33 @@ class ParamModule(mp_module.MPModule):
             self.mav_param.show(pattern)
         else:
             print("Unknown subcommand '%s' (try 'fetch', 'save', 'set', 'show', 'load', 'help')" % args[0])
+        
+
+class ParamModule(mp_module.MPModule):
+    def __init__(self, mpstate):
+        super(ParamModule, self).__init__(mpstate, "param", "parameter handling", public = True)
+        self.pstate = ParamState(self.mav_param, self.logdir, self.vehicle_name, 'mav.parm')
+        self.add_command('param', self.cmd_param, "parameter handling",
+                         ["<fetch|download>",
+                          "<set|show|fetch|help> (PARAMETER)",
+                          "<load|save|diff> (FILENAME)"])
+        if self.continue_mode and self.logdir != None:
+            parmfile = os.path.join(self.logdir, 'mav.parm')
+            if os.path.exists(parmfile):
+                mpstate.mav_param.load(parmfile)
+                    
+    def mavlink_packet(self, m):
+        '''handle an incoming mavlink packet'''
+        self.pstate.handle_mavlink_packet(self.master, m)
+    
+    def idle_task(self):
+        '''handle missing parameters'''
+        self.pstate.vehicle_name = self.vehicle_name
+        self.pstate.fetch_check(self.master)
+
+    def cmd_param(self, args):
+        '''control parameters'''
+        self.pstate.handle_command(self.master, args)
 
 def init(mpstate):
     '''initialise module'''
