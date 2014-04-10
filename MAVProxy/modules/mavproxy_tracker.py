@@ -173,6 +173,8 @@ class TrackerModule(mp_module.MPModule):
         m = mavutil.mavlink_connection(self.tracker_settings.port, 
                                        autoreconnect=True, 
                                        baud=self.tracker_settings.baudrate)
+        if self.logdir:
+            m.setup_logfile(os.path.join(self.logdir, 'tracker.tlog'))
         self.connection = m
     
     def cmd_tracker_arm(self):
