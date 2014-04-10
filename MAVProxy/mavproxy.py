@@ -123,6 +123,7 @@ class MPState(object):
               ('shownoise', int, 1),
               ('basealt', int, 0),
               ('wpalt', int, 100),
+              ('flushlogs', int, 0),
               ('requireexit', int, 0)]
             )
 
@@ -856,8 +857,9 @@ def log_writer():
             mpstate.logfile_raw.write(mpstate.logqueue_raw.get())
         while not mpstate.logqueue.empty():
             mpstate.logfile.write(mpstate.logqueue.get())
-        mpstate.logfile.flush()
-        mpstate.logfile_raw.flush()
+        if mpstate.settings.flushlogs:
+            mpstate.logfile.flush()
+            mpstate.logfile_raw.flush()
 
 def open_logs():
     '''open log files'''
