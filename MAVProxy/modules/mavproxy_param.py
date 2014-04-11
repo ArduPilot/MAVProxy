@@ -113,8 +113,9 @@ class ParamState:
     def handle_command(self, master, args):
         '''handle parameter commands'''
         param_wildcard = "*"
+        usage="Usage: param <fetch|set|show|load|preload|forceload|diff|download|help>"
         if len(args) < 1:
-            print("usage: param <fetch|set|show|diff|download|help>")
+            print(usage)
             return
         if args[0] == "fetch":
             if len(args) == 1:
@@ -176,6 +177,20 @@ class ParamState:
             else:
                 param_wildcard = "*"
             self.mav_param.load(args[1], param_wildcard, master)
+        elif args[0] == "preload":
+            if len(args) < 2:
+                print("Usage: param preload <filename>")
+                return
+            self.mav_param.load(args[1])
+        elif args[0] == "forceload":
+            if len(args) < 2:
+                print("Usage: param forceload <filename> [wildcard]")
+                return
+            if len(args) > 2:
+                param_wildcard = args[2]
+            else:
+                param_wildcard = "*"
+            self.mav_param.load(args[1], param_wildcard, master, check=False)
         elif args[0] == "download":
             self.param_help_download()
         elif args[0] == "help":
@@ -187,7 +202,7 @@ class ParamState:
                 pattern = "*"
             self.mav_param.show(pattern)
         else:
-            print("Unknown subcommand '%s' (try 'fetch', 'save', 'set', 'show', 'load', 'help')" % args[0])
+            print(usage)
         
 
 class ParamModule(mp_module.MPModule):
