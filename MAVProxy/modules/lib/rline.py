@@ -2,7 +2,7 @@
 readline handling for mavproxy
 '''
 
-import sys, glob
+import sys, glob, os
 
 rline_mpstate = None
 
@@ -41,7 +41,14 @@ def complete_command(text):
 
 def complete_filename(text):
     '''complete a filename'''
-    return glob.glob(text+'*')
+
+    #ensure directories have trailing slashes:
+    list = glob.glob(text+'*')
+    for idx, val in enumerate(list):
+        if os.path.isdir(val):
+            list[idx] = (val + os.path.sep)
+
+    return list
 
 def complete_parameter(text):
     '''complete a parameter'''
