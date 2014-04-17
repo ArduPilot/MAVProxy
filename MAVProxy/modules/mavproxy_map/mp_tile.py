@@ -562,7 +562,10 @@ def mp_icon(filename):
         # when we may be in a package zip file
         try:
                 import pkg_resources
-                raw = pkg_resources.resource_stream(__name__, "data/%s" % filename).read()
+                name = __name__
+                if name == "__main__":
+                        name = "MAVProxy.modules.mavproxy_map.mp_tile"
+                raw = pkg_resources.resource_stream(name, "data/%s" % filename).read()
         except Exception:
                 raw = open(os.path.join(__file__, 'data', filename)).read()
         imagefiledata = cv.CreateMatHeader(1, len(raw), cv.CV_8UC1)
