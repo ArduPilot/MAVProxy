@@ -84,12 +84,12 @@ class TabbedDialog(wx.Dialog):
             setting = self.setting_map[label]
             ctrl = self.controls[label]
             value = ctrl.GetValue()
-            if value != setting.value:
+            if str(value) != str(setting.value):
                 oldvalue = setting.value
                 if not setting.set(value):
-                    print("Invalid value %s for %s" % (value, setting.label))
+                    print("Invalid value %s for %s" % (value, setting.name))
                     continue
-                if oldvalue != setting.value:
+                if str(oldvalue) != str(setting.value):
                     self.parent_pipe.send(setting)
 
     def panel(self, tab_name):
@@ -104,7 +104,7 @@ class TabbedDialog(wx.Dialog):
         '''refit after elements are added'''
         self.SetSizerAndFit(self.dialog_sizer)
 
-    def _add_input(self, setting, ctrl, ctrl2=None):
+    def _add_input(self, setting, ctrl, ctrl2=None, value=None):
         tab_name = setting.tab
         label = setting.label
         tab = self.panel(tab_name)
@@ -116,12 +116,15 @@ class TabbedDialog(wx.Dialog):
             box.Add( ctrl2, 0, wx.ALIGN_CENTRE|wx.ALL, 5 )
         self.sizer(tab_name).Add(box, 0, wx.GROW|wx.ALIGN_CENTER_VERTICAL|wx.ALL, 5)
         self.controls[label] = ctrl
-        ctrl.Value = str(setting.value)
+        if value is not None:
+            ctrl.Value = value
+        else:
+            ctrl.Value = str(setting.value)
         self.control_map[ctrl.GetId()] = label
         self.setting_map[label] = setting
 
     def add_text(self, setting, width=300, height=100, multiline=False):
-        '''added a text input line'''
+        '''add a text input line'''
         tab = self.panel(setting.tab)
         if multiline:
             ctrl = wx.TextCtrl(tab, -1, "", size=(width,height), style=wx.TE_MULTILINE|wx.TE_PROCESS_ENTER)
@@ -130,7 +133,7 @@ class TabbedDialog(wx.Dialog):
         self._add_input(setting, ctrl)
 
     def add_filechooser(self, setting, width=300, directory=False):
-        '''added a file input line'''
+        '''add a file input line'''
         tab = self.panel(setting.tab)
         ctrl = wx.TextCtrl(tab, -1, "", size=(width,-1) )
         browse = wx.Button(tab, label='...')        
@@ -139,14 +142,43 @@ class TabbedDialog(wx.Dialog):
         self._add_input(setting, ctrl, ctrl2=browse)
 
     def add_choice(self, setting, choices):
-        '''added a choice input line'''
+        '''add a choice input line'''
         tab = self.panel(setting.tab)
+        default = setting.default
         if default is None:
             default = choices[0]
         ctrl = wx.ComboBox(tab, -1, choices=choices,
-                           value = default,
+                           value = str(default),
                            style = wx.CB_DROPDOWN | wx.CB_READONLY | wx.CB_SORT )
         self._add_input(setting, ctrl)
+
+    def add_intspin(self, setting):
+        '''add a spin control'''
+        tab = self.panel(setting.tab)
+        default = setting.default
+        (minv, maxv) = setting.range
+        ctrl = wx.SpinCtrl(tab, -1,
+                           initial = default,
+                           min = minv,
+                           max = maxv)
+        self._add_input(setting, ctrl, value=default)
+
+    def add_floatspin(self, setting):
+        '''add a floating point spin control'''
+        from wx.lib.agw.floatspin import FloatSpin
+        tab = self.panel(setting.tab)
+        default = setting.default
+        (minv, maxv) = setting.range
+        ctrl = FloatSpin(tab, -1,
+                         value = default,
+                         min_val = minv,
+                         max_val = maxv,
+                         increment = setting.increment)
+        if setting.format is not None:
+            ctrl.SetFormat(setting.format)
+        if setting.digits is not None:
+            ctrl.SetDigits(setting.digits)
+        self._add_input(setting, ctrl, value=default)
         
     def _on_select_path(self, event):
         label = self.browse_option_map[event.GetId()]
@@ -180,17 +212,34 @@ class SettingsDlg(TabbedDialog):
         TabbedDialog.__init__(self, tabs, title)
         for name in self.settings.list():
             setting = self.settings.get_setting(name)
-            self.add_text(setting)  
+            if setting.type == bool:
+                self.add_choice(setting, ['True', 'False'])
+            elif setting.choice is not None:
+                self.add_choice(setting, setting.choice)                
+            elif setting.type == int and setting.increment is not None and setting.range is not None:
+                self.add_intspin(setting)
+            elif setting.type == float and setting.increment is not None and setting.range is not None:
+                self.add_floatspin(setting)
+            else:
+                self.add_text(setting)  
         self.refit()
 
 if __name__ == "__main__":
+    def test_callback(setting):
+        '''callback on apply'''
+        print("Changing %s to %s" % (setting.name, setting.value))
+
     # test the settings
     import mp_settings, time
     from mp_settings import MPSetting
     settings = mp_settings.MPSettings(
         [ MPSetting('link', int, 1, tab='TabOne'),
-          ('altreadout', int, 10),
+          MPSetting('altreadout', int, 10, range=(-30,1017), increment=1),
+          MPSetting('pvalue', float, 0.3, range=(-3.0,1e6), increment=0.1, digits=2),
+          MPSetting('enable', bool, True, tab='TabTwo'),
+          MPSetting('colour', str, 'Blue', choice=['Red', 'Green', 'Blue']),
           MPSetting('foostr', str, 'blah', label='Foo String') ])
+    settings.set_callback(test_callback)
     dlg = WXSettings(settings)
     while dlg.is_alive():
         time.sleep(0.1)

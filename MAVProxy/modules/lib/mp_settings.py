@@ -2,7 +2,9 @@
 '''settings object for MAVProxy modules'''
 
 class MPSetting:
-    def __init__(self, name, type, default, label=None, tab=None):
+    def __init__(self, name, type, default, label=None, tab=None,
+                 range=None, increment=None, format=None,
+                 digits=None, choice=None,):
         if label is None:
             label = name
         self.name = name
@@ -11,15 +13,35 @@ class MPSetting:
         self.label = label
         self.value = default
         self.tab = tab
+        self.range = range
+        self.increment = increment
+        self.choice = choice
+        self.format = format
+        self.digits = digits
 
     def set(self, value):
         '''set a setting'''
         if value == 'None' and self.default is None:
             value = None
         if value is not None:
-            try:
-                value = self.type(value)
-            except:
+            if self.type == bool:
+                if str(value).lower() in ['1', 'true', 'yes']:
+                    value = True
+                elif str(value).lower() in ['0', 'false', 'no']:
+                    value = False
+                else:
+                    return False
+            else:
+                try:
+                    value = self.type(value)
+                except:
+                    return False
+        if self.range is not None:
+            (minv,maxv) = self.range
+            if value < minv or value > maxv:
+                return False
+        if self.choice is not None:
+            if value not in self.choice:
                 return False
         self.value = value
         return True
