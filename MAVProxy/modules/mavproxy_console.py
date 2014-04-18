@@ -74,7 +74,6 @@ class ConsoleModule(mp_module.MPModule):
 
     def menu_callback(self, m):
         '''called on menu selection'''
-        print(m.returnkey)
         if m.returnkey.startswith('# '):
             self.mpstate.functions.process_stdin(m.returnkey[2:])
         if m.returnkey == 'menuOptions':
