@@ -88,9 +88,12 @@ def say(text, priority='important'):
     '''text and/or speech output'''
     mpstate.functions.say(text, priority)
 
-def add_input(cmd):
+def add_input(cmd, immediate=False):
     '''add some command input to be processed'''
-    mpstate.input_queue.put(cmd)
+    if immediate:
+        process_stdin(cmd)
+    else:
+        mpstate.input_queue.put(cmd)
 
 class MAVFunctions(object):
     '''core functions available in modules'''
