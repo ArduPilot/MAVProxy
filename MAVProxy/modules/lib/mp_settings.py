@@ -30,6 +30,7 @@ class MPSettings(object):
         self._title = title
         self._default_tab = 'Settings'
         self._keys = []
+        self._callback = None
         for v in vars:
             self.append(v)
 
@@ -86,6 +87,8 @@ class MPSettings(object):
         if not setting.set(value):
             print("Unable to convert %s to type %s" % (value, setting.type))
             return False
+        if self._callback:
+            self._callback(setting)
         return True
 
     def show(self, v):
@@ -117,3 +120,7 @@ class MPSettings(object):
             self.show(args[0])
         else:
             self.set(args[0], args[1])
+
+    def set_callback(self, callback):
+        '''set a callback to be called on set()'''
+        self._callback = callback
