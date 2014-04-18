@@ -166,22 +166,21 @@ class SettingsDlg(TabbedDialog):
     def __init__(self, settings):
         title = "Resize the dialog and see how controls adapt!"
         self.settings = settings
-        tabs = {}
+        tabs = []
         for k in self.settings.list():
             setting = self.settings.get_setting(k)
             tab = setting.tab
             if tab is None:
                 tab = 'Settings'
             if not tab in tabs:
-                tabs[tab] = []
-            tabs[tab].append(setting)
+                tabs.append(tab)
         title = self.settings.get_title()
         if title is None:
             title = 'Settings'
-        TabbedDialog.__init__(self, tabs.keys(), title)
-        for tab in tabs.keys():
-            for setting in tabs[tab]:
-                self.add_text(setting)  
+        TabbedDialog.__init__(self, tabs, title)
+        for name in self.settings.list():
+            setting = self.settings.get_setting(name)
+            self.add_text(setting)  
         self.refit()
 
 if __name__ == "__main__":

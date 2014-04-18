@@ -29,6 +29,7 @@ class MPSettings(object):
         self._vars = {}
         self._title = title
         self._default_tab = 'Settings'
+        self._keys = []
         for v in vars:
             self.append(v)
 
@@ -60,6 +61,7 @@ class MPSettings(object):
         else:
             self._default_tab = setting.tab
         self._vars[setting.name] = setting
+        self._keys.append(setting.name)
             
 
     def __getattr__(self, name):
@@ -97,7 +99,7 @@ class MPSettings(object):
 
     def list(self):
         '''list all settings'''
-        return self._vars.keys()
+        return self._keys
 
     def completion(self, text):
         '''completion function for cmdline completion'''
