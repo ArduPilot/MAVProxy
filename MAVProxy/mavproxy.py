@@ -128,7 +128,8 @@ class MPState(object):
               MPSetting('requireexit', int, 0),
 
               MPSetting('basealt', int, 0, 'Base Altitude', tab='Altitude'),
-              MPSetting('wpalt', int, 100, 'WP Altitude')]
+              MPSetting('wpalt', int, 100, 'WP Altitude'),
+              MPSetting('rallyalt', int, 90, 'Rally Altitude')]
             )
 
         self.completions = {

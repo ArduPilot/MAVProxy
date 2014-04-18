@@ -51,8 +51,17 @@ class ConsoleModule(mp_module.MPModule):
         # create the View menu
         self.menu = MPMenuTop([
             MPMenuSubMenu('File',
-                          items=[MPMenuItem('Option\tCtrl+O', 'Options', 'menuOptions')]
-                          )])
+                          items=[MPMenuItem('Option\tCtrl+O', 'Options', 'menuOptions'),
+                                 MPMenuItem('Map', 'Map', '# module load map')]),
+            MPMenuSubMenu('Mission',
+                          items=[MPMenuItem('Clear', 'Clear', '# wp clear'),
+                                 MPMenuItem('List', 'List', '# wp list'),
+                                 MPMenuItem('Draw', 'Draw', '# wp draw'),
+                                 MPMenuItem('Loop', 'Loop', '# wp loop')]),
+            MPMenuSubMenu('Rally',
+                          items=[MPMenuItem('Clear', 'Clear', '# rally clear'),
+                                 MPMenuItem('List', 'List', '# rally list'),
+                                 MPMenuItem('Add', 'Add', '# rally add')])])
         mpstate.console.set_menu(self.menu, self.menu_callback)
     
         mpstate.console.ElevationMap = mp_elevation.ElevationModel()
@@ -66,8 +75,11 @@ class ConsoleModule(mp_module.MPModule):
     def menu_callback(self, m):
         '''called on menu selection'''
         print(m.returnkey)
+        if m.returnkey.startswith('# '):
+            self.mpstate.functions.process_stdin(m.returnkey[2:])
         if m.returnkey == 'menuOptions':
             wxsettings.WXSettings(self.settings)
+            
     
     def estimated_time_remaining(self, lat, lon, wpnum, speed):
         '''estimate time remaining in mission in seconds'''

@@ -22,9 +22,10 @@ class RallyModule(mp_module.MPModule):
     
         elif(args[0] == "add"):
             if (len(args) < 2):
-                print("Usage: rally add ALT <BREAK_ALT> <LAND_HDG>")
-                return
-    
+                alt = self.settings.rallyalt
+            else:
+                alt = float(args[1])
+                
             if (self.rallyloader.rally_count() > 4):
                 print ("Only 5 rally points possible per flight plan.")
                 return
@@ -38,9 +39,8 @@ class RallyModule(mp_module.MPModule):
                 print("No map click position available")
                 return
     
-            alt = float(args[1]);
             break_alt = 0.0
-            land_hdg = 0.0;
+            land_hdg = 0.0
             if (len(args) > 2):
                 break_alt = float(args[2])
             if (len(args) > 3):
@@ -48,7 +48,7 @@ class RallyModule(mp_module.MPModule):
     
             self.rallyloader.create_and_append_rally_point(latlon[0] * 1e7, latlon[1] * 1e7, alt, break_alt, land_hdg, 0)
     
-            self.send_rally_points();
+            self.send_rally_points()
     
             print("Added Rally point at %s %f" % (str(latlon), alt))
     
@@ -75,11 +75,11 @@ class RallyModule(mp_module.MPModule):
     
         elif(args[0] == "save"):
             if (len(args) < 2):
-                print("Usage: rally save filename");
+                print("Usage: rally save filename")
     
-            self.rallyloader.save(args[1]);
+            self.rallyloader.save(args[1])
     
-            print "Saved rally file ", args[1];
+            print("Saved rally file %s" % args[1])
     
         else:
             self.print_usage()
