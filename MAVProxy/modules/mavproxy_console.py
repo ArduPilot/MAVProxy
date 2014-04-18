@@ -12,6 +12,8 @@ from MAVProxy.modules.mavproxy_map import mp_elevation
 from pymavlink import mavutil
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
+from MAVProxy.modules.lib import wxsettings
+from MAVProxy.modules.lib.mp_menu import *
 
 class ConsoleModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -45,6 +47,13 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('AspdError', 'AspdError --', row=3)
         mpstate.console.set_status('FlightTime', 'FlightTime --', row=3)
         mpstate.console.set_status('ETR', 'ETR --', row=3)
+
+        # create the View menu
+        self.menu = MPMenuTop([
+            MPMenuSubMenu('File',
+                          items=[MPMenuItem('Option\tCtrl+O', 'Options', 'menuOptions')]
+                          )])
+        mpstate.console.set_menu(self.menu, self.menu_callback)
     
         mpstate.console.ElevationMap = mp_elevation.ElevationModel()
     
@@ -53,6 +62,12 @@ class ConsoleModule(mp_module.MPModule):
         '''unload module'''
         self.mpstate.console.close()
         self.mpstate.console = textconsole.SimpleConsole()
+
+    def menu_callback(self, m):
+        '''called on menu selection'''
+        print(m.returnkey)
+        if m.returnkey == 'menuOptions':
+            wxsettings.WXSettings(self.settings)
     
     def estimated_time_remaining(self, lat, lon, wpnum, speed):
         '''estimate time remaining in mission in seconds'''
