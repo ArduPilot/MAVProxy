@@ -113,26 +113,26 @@ class MPState(object):
         self.vehicle_name = None
         from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
         self.settings = MPSettings(
-            [ MPSetting('link', int, 1, 'Primary Link', tab='Link'),
-              MPSetting('streamrate', int, 4),
-              MPSetting('streamrate2', int, 4),
-              MPSetting('heartbeat', int, 1, 'Heartbeat'),
-              MPSetting('mavfwd', int, 1),
-              MPSetting('mavfwd_rate', int, 0),
-              MPSetting('shownoise', int, 1),
+            [ MPSetting('link', int, 1, 'Primary Link', tab='Link', range=(0,4), increment=1),
+              MPSetting('streamrate', int, 4, 'Stream rate link1', range=(0,20), increment=1),
+              MPSetting('streamrate2', int, 4, 'Stream rate link2', range=(0,20), increment=1),
+              MPSetting('heartbeat', int, 1, 'Heartbeat rate', range=(0,5), increment=1),
+              MPSetting('mavfwd', bool, True, 'Allow forwarded control'),
+              MPSetting('mavfwd_rate', bool, False, 'Allow forwarded rate control'),
+              MPSetting('shownoise', bool, True, 'Show non-MAVLink data'),
               
-              MPSetting('altreadout', int, 10, 'Altitude Readout', tab='Announcements'),
-              MPSetting('distreadout', int, 200, 'Distance Readout'),
-              MPSetting('heartbeatreport', int, 1, 'Heartbeat Report'),
+              MPSetting('altreadout', int, 10, 'Altitude Readout',
+                        range=(0,100), increment=1, tab='Announcements'),
+              MPSetting('distreadout', int, 200, 'Distance Readout', range=(0,10000), increment=1),
 
-              MPSetting('moddebug', int, 0, 'Module Debug', tab='Debug'),
-              MPSetting('numcells', int, 1),
-              MPSetting('flushlogs', int, 0),
-              MPSetting('requireexit', int, 0),
+              MPSetting('moddebug', int, 0, 'Module Debug Level', range=(0,3), increment=1, tab='Debug'),
+              MPSetting('numcells', int, 1, range=(0,10), increment=1),
+              MPSetting('flushlogs', bool, False, 'Flush logs on every packet'),
+              MPSetting('requireexit', bool, False, 'Require exit command'),
 
-              MPSetting('basealt', int, 0, 'Base Altitude', tab='Altitude'),
-              MPSetting('wpalt', int, 100, 'WP Altitude'),
-              MPSetting('rallyalt', int, 90, 'Rally Altitude')]
+              MPSetting('basealt', int, 0, 'Base Altitude', range=(0,30000), increment=1, tab='Altitude'),
+              MPSetting('wpalt', int, 100, 'Default WP Altitude', range=(0,10000), increment=1),
+              MPSetting('rallyalt', int, 90, 'Default Rally Altitude', range=(0,10000), increment=1)]
             )
 
         self.completions = {
