@@ -18,7 +18,6 @@ import select
 
 
 from MAVProxy.modules.lib import textconsole
-from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import rline
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import dumpstacks
@@ -105,26 +104,27 @@ class MPState(object):
         self.map_functions = {}
         self.vehicle_type = None
         self.vehicle_name = None
-        self.settings = mp_settings.MPSettings(
-            [ ('link', int, 1),
-              ('altreadout', int, 10),
-              ('distreadout', int, 200),
-              ('heartbeat', int, 1),
-              ('numcells', int, 1),
-              ('mavfwd', int, 1),
-              ('mavfwd_rate', int, 0),
-              ('streamrate', int, 4),
-              ('streamrate2', int, 4),
-              ('heartbeatreport', int, 1),
-              ('moddebug', int, 0),
-              ('rc1mul', int, 1),
-              ('rc2mul', int, 1),
-              ('rc4mul', int, 1),
-              ('shownoise', int, 1),
-              ('basealt', int, 0),
-              ('wpalt', int, 100),
-              ('flushlogs', int, 0),
-              ('requireexit', int, 0)]
+        from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
+        self.settings = MPSettings(
+            [ MPSetting('link', int, 1, 'Primary Link', tab='Link'),
+              MPSetting('streamrate', int, 4),
+              MPSetting('streamrate2', int, 4),
+              MPSetting('heartbeat', int, 1, 'Heartbeat'),
+              MPSetting('mavfwd', int, 1),
+              MPSetting('mavfwd_rate', int, 0),
+              MPSetting('shownoise', int, 1),
+              
+              MPSetting('altreadout', int, 10, 'Altitude Readout', tab='Announcements'),
+              MPSetting('distreadout', int, 200, 'Distance Readout'),
+              MPSetting('heartbeatreport', int, 1, 'Heartbeat Report'),
+
+              MPSetting('moddebug', int, 0, 'Module Debug', tab='Debug'),
+              MPSetting('numcells', int, 1),
+              MPSetting('flushlogs', int, 0),
+              MPSetting('requireexit', int, 0),
+
+              MPSetting('basealt', int, 0, 'Base Altitude', tab='Altitude'),
+              MPSetting('wpalt', int, 100, 'WP Altitude')]
             )
 
         self.completions = {
