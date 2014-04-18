@@ -12,7 +12,6 @@ class rline(object):
         import threading
         global rline_mpstate
         self.prompt = prompt
-        self.line = None
         rline_mpstate = mpstate
         # other modules can add their own completion functions
         mpstate.completion_functions = {

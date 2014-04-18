@@ -88,10 +88,14 @@ def say(text, priority='important'):
     '''text and/or speech output'''
     mpstate.functions.say(text, priority)
 
+def add_input(cmd):
+    '''add some command input to be processed'''
+    mpstate.input_queue.put(cmd)
+
 class MAVFunctions(object):
     '''core functions available in modules'''
     def __init__(self):
-        self.process_stdin = process_stdin
+        self.process_stdin = add_input
         self.param_set = param_set
         self.get_mav_param = get_mav_param
         self.say = say_text
@@ -986,11 +990,11 @@ def main_loop():
     while True:
         if mpstate is None or mpstate.status.exit:
             return
-        if mpstate.rl.line is not None:
-            cmds = mpstate.rl.line.split(';')
+        while not mpstate.input_queue.empty():
+            line = mpstate.input_queue.get()
+            cmds = line.split(';')
             for c in cmds:
                 process_stdin(c)
-            mpstate.rl.line = None
 
         for master in mpstate.mav_master:
             if master.fd is None:
@@ -1047,15 +1051,13 @@ def main_loop():
 def input_loop():
     '''wait for user input'''
     while mpstate.status.exit != True:
-        while mpstate.rl.line is not None:
-            time.sleep(0.01)
         try:
             if mpstate.status.exit != True:
                 line = raw_input(mpstate.rl.prompt)
         except EOFError:
             mpstate.status.exit = True
             sys.exit(1)
-        mpstate.rl.line = line
+        mpstate.input_queue.put(line)
 
 
 def run_script(scriptfile):
@@ -1217,6 +1219,7 @@ Auto-detected serial ports are:
     battery_period = mavutil.periodic_event(0.1)
     heartbeat_check_period = mavutil.periodic_event(0.33)
 
+    mpstate.input_queue = Queue.Queue()
     mpstate.rl = rline.rline("MAV> ", mpstate)
     if opts.setup:
         mpstate.rl.set_prompt("")
