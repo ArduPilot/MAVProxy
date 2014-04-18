@@ -3,7 +3,8 @@
 """
   MAVProxy message console, implemented in a child process  
 """
-import textconsole, wx
+import textconsole, wx, sys
+import mp_menu
 
 class Text():
     '''text to write to console'''
@@ -28,13 +29,17 @@ class MessageConsole(textconsole.SimpleConsole):
     def __init__(self,
                  title='MAVProxy: console'):
         textconsole.SimpleConsole.__init__(self)
-        import multiprocessing
+        import multiprocessing, threading
         self.title  = title
+        self.menu_callback = None
         self.parent_pipe,self.child_pipe = multiprocessing.Pipe()
         self.close_event = multiprocessing.Event()
         self.close_event.clear()
         self.child = multiprocessing.Process(target=self.child_task)
         self.child.start()
+        t = threading.Thread(target=self.watch_thread)
+        t.daemon = True
+        t.start()
 
     def child_task(self):
         '''child process - this holds all the GUI elements'''
@@ -43,6 +48,14 @@ class MessageConsole(textconsole.SimpleConsole):
         app.frame = ConsoleFrame(state=self, title=self.title)
         app.frame.Show()
         app.MainLoop()
+
+    def watch_thread(self):
+        '''watch for menu events from child'''
+        from mp_settings import MPSetting
+        while True:
+            msg = self.parent_pipe.recv()
+            if self.menu_callback is not None:
+                self.menu_callback(msg)
 
     def write(self, text, fg='black', bg='white'):
         '''write to the console'''
@@ -53,7 +66,11 @@ class MessageConsole(textconsole.SimpleConsole):
         '''set a status value'''
         if self.child.is_alive():
             self.parent_pipe.send(Value(name, text, row, fg, bg))
-        
+
+    def set_menu(self, menu, callback):
+        if self.child.is_alive():
+            self.parent_pipe.send(menu)
+            self.menu_callback = callback
 
     def close(self):
         '''close the console'''
@@ -76,6 +93,9 @@ class ConsoleFrame(wx.Frame):
         # values for the status bar
         self.values = {}
 
+        self.menu = None
+        self.menu_callback = None
+
         self.control = wx.TextCtrl(self.panel, style=wx.TE_MULTILINE | wx.TE_READONLY)
 
         
@@ -96,6 +116,14 @@ class ConsoleFrame(wx.Frame):
 
         self.Show(True)
         self.pending = []
+
+    def on_menu(self, event):
+        '''handle menu selections'''
+        state = self.state
+        ret = self.menu.find_selected(event)
+        if ret is None:
+            return
+        state.child_pipe.send(ret)
 
     def on_idle(self, event):
         import time
@@ -140,6 +168,10 @@ class ConsoleFrame(wx.Frame):
                     self.control.AppendText(p.text)
                     self.control.SetDefaultStyle(oldstyle)
                 self.pending = []
+            elif isinstance(obj, mp_menu.MPMenuTop):
+                self.menu = obj
+                self.SetMenuBar(self.menu.wx_menu())
+                self.Bind(wx.EVT_MENU, self.on_menu)                
     
 if __name__ == "__main__":
     # test the console
