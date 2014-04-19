@@ -12,6 +12,7 @@ class RallyModule(mp_module.MPModule):
         self.rallyloader = mavwp.MAVRallyLoader(mpstate.status.target_system, mpstate.status.target_component)
         self.add_command('rally', self.cmd_rally, "rally point control", ["<add|clear|list>",
                                     "<load|save> (FILENAME)"])
+        self.have_list = False
 
     def cmd_rally(self, args):
         '''rally point commands'''
@@ -25,6 +26,10 @@ class RallyModule(mp_module.MPModule):
                 alt = self.settings.rallyalt
             else:
                 alt = float(args[1])
+
+            if not self.have_list:
+                print("Please list rally points first")
+                return
                 
             if (self.rallyloader.rally_count() > 4):
                 print ("Only 5 rally points possible per flight plan.")
@@ -58,6 +63,7 @@ class RallyModule(mp_module.MPModule):
     
         elif(args[0] == "list"):
             self.list_rally_points()
+            self.have_list = True
     
         elif(args[0] == "load"):
             if (len(args) < 2):
@@ -70,6 +76,7 @@ class RallyModule(mp_module.MPModule):
                 return
         
             self.send_rally_points()
+            self.have_list = True
     
             print("Loaded %u rally points from %s" % (self.rallyloader.rally_count(), args[1]))
     
