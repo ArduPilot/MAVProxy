@@ -116,6 +116,13 @@ class MPSettings(object):
             self._callback(setting)
         return True
 
+    def get(self, name):
+        '''get a setting'''
+        if not name in self._vars:
+            raise AttributeError
+        setting = self._vars[name]
+        return setting.value
+
     def show(self, v):
         '''show settings'''
         print("%20s %s" % (v, getattr(self, v)))
