@@ -34,11 +34,13 @@ class SensorsModule(mp_module.MPModule):
         self.gps_alt = 0
         self.max_speed = 0
         self.last_watch = 0
-        self.speed_report = False
         self.reports = {}
         self.reports['heading'] = sensors_report()
         self.reports['altitude'] = sensors_report()
         self.reports['speed'] = sensors_report()
+
+        from MAVProxy.modules.lib.mp_settings import MPSetting
+        self.settings.append(MPSetting('speedreporting', bool, False, 'Speed Reporting', tab='Sensors'))
 
         if 'GPS_RAW' in self.status.msgs:
             # cope with reload
@@ -71,8 +73,8 @@ class SensorsModule(mp_module.MPModule):
 
     def cmd_speed(self, args):
         '''enable/disable speed report'''
-        self.speed_report = not self.speed_report
-        if self.speed_report:
+        self.settings.set('speedreporting', not self.settings.speedreporting)
+        if self.settings.speedreporting:
             self.console.writeln("Speed reporting enabled", bg='yellow')
         else:
             self.console.writeln("Speed reporting disabled", bg='yellow')
@@ -148,7 +150,7 @@ class SensorsModule(mp_module.MPModule):
         if m.get_type() == 'VFR_HUD' and ('GPS_RAW' in self.status.msgs or 'GPS_RAW_INT' in self.status.msgs):
             self.check_heading(m)
             self.check_altitude(m)
-            if self.speed_report:
+            if self.settings.speedreporting:
                 if m.airspeed != 0:
                     speed = m.airspeed
                 else:
