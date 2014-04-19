@@ -50,9 +50,9 @@ class ConsoleModule(mp_module.MPModule):
 
         # create the View menu
         self.menu = MPMenuTop([
-            MPMenuSubMenu('File',
-                          items=[MPMenuItem('Option\tCtrl+O', 'Options', 'menuOptions'),
-                                 MPMenuItem('Map', 'Map', '# module load map')]),
+            MPMenuSubMenu('MAVProxy',
+                          items=[MPMenuItem('Settings', 'Settings', 'menuSettings'),
+                                 MPMenuItem('Map', 'Load Map', '# module load map')]),
             MPMenuSubMenu('Mission',
                           items=[MPMenuItem('Clear', 'Clear', '# wp clear'),
                                  MPMenuItem('List', 'List', '# wp list'),
@@ -76,7 +76,7 @@ class ConsoleModule(mp_module.MPModule):
         '''called on menu selection'''
         if m.returnkey.startswith('# '):
             self.mpstate.functions.process_stdin(m.returnkey[2:])
-        if m.returnkey == 'menuOptions':
+        if m.returnkey == 'menuSettings':
             wxsettings.WXSettings(self.settings)
             
     
