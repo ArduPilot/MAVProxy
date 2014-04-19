@@ -25,10 +25,11 @@ from MAVProxy.modules.mavproxy_map import mp_widgets
 
 class SlipObject:
     '''an object to display on the map'''
-    def __init__(self, key, layer):
+    def __init__(self, key, layer, popup_menu=None):
         self.key = key
         self.layer = layer
         self.latlon = None
+        self.popup_menu = popup_menu
 
     def clip(self, px, py, w, h, img):
         '''clip an area for display on the map'''
@@ -68,14 +69,20 @@ class SlipObject:
         '''
         return None
 
+    def selection_info(self):
+        '''extra selection information sent when object is selected'''
+        return None
+
 class SlipPolygon(SlipObject):
     '''a polygon to display on the map'''
-    def __init__(self, key, points, layer, colour, linewidth):
-        SlipObject.__init__(self, key, layer, )
+    def __init__(self, key, points, layer, colour, linewidth, popup_menu=None):
+        SlipObject.__init__(self, key, layer, popup_menu=popup_menu)
         self.points = points
         self.colour = colour
         self.linewidth = linewidth
         self._bounds = mp_util.polygon_bounds(self.points)
+        self._pix_points = []
+        self._selected_vertex = None
 
     def bounds(self):
         '''return bounding box'''
@@ -91,9 +98,13 @@ class SlipPolygon(SlipObject):
         (pix1, pix2) = clipped
         cv.Line(img, pix1, pix2, colour, linewidth)
         cv.Circle(img, pix2, linewidth*2, colour)
+        if len(self._pix_points) == 0:
+            self._pix_points.append(pix1)
+        self._pix_points.append(pix2)
 
     def draw(self, img, pixmapper, bounds):
         '''draw a polygon on the image'''
+        self._pix_points = []
         for i in range(len(self.points)-1):
             if len(self.points[i]) > 2:
                 colour = self.points[i][2]
@@ -101,6 +112,21 @@ class SlipPolygon(SlipObject):
                 colour = self.colour
             self.draw_line(img, pixmapper, self.points[i], self.points[i+1],
                            colour, self.linewidth)
+
+    def clicked(self, px, py):
+        '''see if the polygon has been clicked on.
+        Consider it clicked if the pixel is within 3 of the point
+        '''
+        for i in range(len(self._pix_points)):
+            (pixx,pixy) = self._pix_points[i]
+            if abs(px - pixx) < 3 and abs(py - pixy) < 3:
+                self._selected_vertex = i
+                return math.sqrt((px - pixx)**2 + (py - pixy)**2)
+        return None
+
+    def selection_info(self):
+        '''extra selection information sent when object is selected'''
+        return self._selected_vertex
 
 
 class SlipGrid(SlipObject):
@@ -156,7 +182,7 @@ class SlipThumbnail(SlipObject):
     def __init__(self, key, latlon, layer, img,
                  border_colour=None, border_width=0,
                  popup_menu=None):
-        SlipObject.__init__(self, key, layer)
+        SlipObject.__init__(self, key, layer, popup_menu=popup_menu)
         self.latlon = latlon
         self._img = None
         self.imgstr = img.tostring()
@@ -166,7 +192,6 @@ class SlipThumbnail(SlipObject):
         self.border_colour = border_colour
         self.posx = -1
         self.posy = -1
-        self.popup_menu = popup_menu
 
     def bounds(self):
         '''return bounding box'''
@@ -406,10 +431,11 @@ class SlipInfoText(SlipInformation):
 
 class SlipObjectSelection:
     '''description of a object under the cursor during an event'''
-    def __init__(self, objkey, distance, layer):
+    def __init__(self, objkey, distance, layer, extra_info=None):
         self.distance = distance
         self.objkey = objkey
         self.layer = layer
+        self.extra_info = extra_info
 
 class SlipEvent:
     '''an event sent to the parent.
@@ -594,7 +620,8 @@ class MPSlipMapFrame(wx.Frame):
             ret = obj.popup_menu.find_selected(event)
             if ret is not None:
                 state.event_queue.put(SlipMenuEvent(state.popup_latlon, event,
-                                                    [SlipObjectSelection(obj.key, 0, obj.layer)], ret))
+                                                    [SlipObjectSelection(obj.key, 0, obj.layer, obj.selection_info())],
+                                                    ret))
                 state.popup_object = None
                 state.popup_latlon = None
                 return
@@ -972,9 +999,10 @@ class MPSlipMapPanel(wx.Panel):
         (px, py) = pos
         for layer in state.layers:
             for key in state.layers[layer]:
-                distance = state.layers[layer][key].clicked(px, py)
+                obj = state.layers[layer][key]
+                distance = obj.clicked(px, py)
                 if distance is not None:
-                    selected.append(SlipObjectSelection(key, distance, layer))
+                    selected.append(SlipObjectSelection(key, distance, layer, extra_info=obj.selection_info()))
         selected.sort(key=lambda c: c.distance)
         return selected
 
@@ -982,6 +1010,7 @@ class MPSlipMapPanel(wx.Panel):
         '''show popup menu for an object'''
         state = self.state
         wx_menu = selected.popup_menu.wx_menu()
+        print("showing popup")
         state.frame.PopupMenu(wx_menu, pos)
 
     def on_mouse(self, event):

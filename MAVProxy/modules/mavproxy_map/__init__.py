@@ -26,8 +26,9 @@ class MapModule(mp_module.MPModule):
         self.have_simstate = False
         self.have_vehicle = {}
         self.move_wp = -1
-        self.moving_wp = 0
+        self.moving_wp = None
         self.moving_rally = None
+        self.mission_list = None
         self.icon_counter = 0
         self.click_position = None
         self.click_time = 0
@@ -76,13 +77,18 @@ class MapModule(mp_module.MPModule):
     
     def display_waypoints(self):
         '''display the waypoints'''
+        self.mission_list = self.module('wp').wploader.view_list()
         polygons = self.module('wp').wploader.polygon_list()
         self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('Mission'))
         for i in range(len(polygons)):
             p = polygons[i]
             if len(p) > 1:
-                self.mpstate.map.add_object(mp_slipmap.SlipPolygon('mission%u' % i, p,
-                                                              layer='Mission', linewidth=2, colour=(255,255,255)))
+                popup = MPMenuSubMenu('Popup',
+                                      items=[MPMenuItem('Remove', returnkey='popupMissionRemove'),
+                                             MPMenuItem('Move', returnkey='popupMissionMove')])
+                self.mpstate.map.add_object(mp_slipmap.SlipPolygon('mission %u' % i, p,
+                                                                   layer='Mission', linewidth=2, colour=(255,255,255),
+                                                                   popup_menu=popup))
     
     def closest_waypoint(self, latlon):
         '''find closest waypoint to a position'''
@@ -118,6 +124,34 @@ class MapModule(mp_module.MPModule):
         i = int(a[1])
         self.moving_rally = i
 
+    def selection_index_to_idx(self, key, selection_index):
+        '''return a mission idx from a selection_index'''
+        a = key.split(' ')
+        if a[0] != 'mission' or len(a) != 2:
+            print("Bad mission object %s" % key)
+            return None
+        midx = int(a[1])
+        if midx < 0 or midx >= len(self.mission_list):
+            print("Bad mission index %s" % key)
+            return None
+        mlist = self.mission_list[midx]
+        if selection_index < 0 or selection_index >= len(mlist):
+            print("Bad mission polygon %s" % selection_index)
+            return None
+        idx = mlist[selection_index]
+        return idx
+
+    def move_mission(self, key, selection_index):
+        '''move a mission point'''
+        idx = self.selection_index_to_idx(key, selection_index)
+        self.moving_wp = idx
+        print("Moving wp %u" % idx)        
+
+    def remove_mission(self, key, selection_index):
+        '''remove a mission point'''
+        idx = self.selection_index_to_idx(key, selection_index)
+        self.mpstate.functions.process_stdin('wp remove %u' % idx) 
+
     def handle_menu_event(self, obj):
         '''handle a popup menu event from the map'''
         menuitem = obj.menuitem
@@ -125,6 +159,10 @@ class MapModule(mp_module.MPModule):
             self.remove_rally(obj.selected[0].objkey)
         elif menuitem.returnkey == 'popupRallyMove':
             self.move_rally(obj.selected[0].objkey)            
+        elif menuitem.returnkey == 'popupMissionRemove':
+            self.remove_mission(obj.selected[0].objkey, obj.selected[0].extra_info)
+        elif menuitem.returnkey == 'popupMissionMove':
+            self.move_mission(obj.selected[0].objkey, obj.selected[0].extra_info)
 
     def map_callback(self, obj):
         '''called when an event happens on the slipmap'''
@@ -140,9 +178,20 @@ class MapModule(mp_module.MPModule):
             self.mpstate.functions.process_stdin("rally move %u" % self.moving_rally)
             self.moving_rally = None
             return
-        if obj.event.m_leftDown and self.moving_wp != 0:
-            self.moving_wp = 0
-            print("cancelled WP move")
+        if obj.event.m_rightDown and self.moving_rally is not None:
+            print("Cancelled rally move")
+            self.moving_rally = None
+            return
+        if obj.event.m_leftDown and self.moving_wp is not None:
+            self.click_position = obj.latlon
+            self.click_time = time.time()
+            self.mpstate.functions.process_stdin("wp move %u" % self.moving_wp)
+            self.moving_wp = None
+            return
+        if obj.event.m_rightDown and self.moving_wp is not None:
+            print("Cancelled wp move")
+            self.moving_wp = None
+            return
         elif obj.event.m_leftDown:
             if time.time() - self.click_time > 0.1:
                 self.click_position = obj.latlon
@@ -151,35 +200,7 @@ class MapModule(mp_module.MPModule):
         if obj.event.m_rightDown:
             if self.draw_callback is not None:
                 self.drawing_end()
-                return
-            if self.moving_wp == 0:
-                wpnum = self.closest_waypoint(obj.latlon)
-                if wpnum != -1:
-                    self.moving_wp = time.time()
-                    self.move_wp = wpnum
-                    wp = self.module('wp').wploader.wp(self.move_wp)
-                    print("Selected WP %u : %s" % (wpnum, getattr(wp,'comment','')))
-            elif time.time() - self.moving_wp >= 1:
-                wp = self.module('wp').wploader.wp(self.move_wp)
-                (lat, lon) = obj.latlon
-                if getattr(self.console, 'ElevationMap', None) is not None:
-                    alt1 = self.console.ElevationMap.GetElevation(lat, lon) 
-                    alt2 = self.console.ElevationMap.GetElevation(wp.x, wp.y)
-                    wp.z += alt1 - alt2
-                wp.x = lat
-                wp.y = lon
-                
-                wp.target_system    = self.target_system
-                wp.target_component = self.target_component
-                self.moving_wp = 0
-                self.module('wp').loading_waypoints = True
-                self.module('wp').loading_waypoint_lasttime = time.time()
-                self.master.mav.mission_write_partial_list_send(self.target_system,
-                                                                     self.target_component,
-                                                                     self.move_wp, self.move_wp)
-                print("Moved WP %u to %f, %f at %.1fm" % (self.move_wp, lat, lon, wp.z))
-                self.display_waypoints()
-                
+                return                
             
     
     def unload(self):
