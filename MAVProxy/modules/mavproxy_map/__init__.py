@@ -12,6 +12,7 @@ from MAVProxy.modules.mavproxy_map import mp_slipmap
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_module
+from MAVProxy.modules.lib.mp_menu import *
 
 class MapModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -26,6 +27,7 @@ class MapModule(mp_module.MPModule):
         self.have_vehicle = {}
         self.move_wp = -1
         self.moving_wp = 0
+        self.moving_rally = None
         self.icon_counter = 0
         self.click_position = None
         self.click_time = 0
@@ -97,12 +99,46 @@ class MapModule(mp_module.MPModule):
             return closest
         else:
             return -1
-            
-    
+
+    def remove_rally(self, key):
+        '''remove a rally point'''
+        a = key.split(' ')
+        if a[0] != 'Rally' or len(a) != 2:
+            print("Bad rally object %s" % key)
+            return
+        i = int(a[1])
+        self.mpstate.functions.process_stdin('rally remove %u' % i)
+
+    def move_rally(self, key):
+        '''move a rally point'''
+        a = key.split(' ')
+        if a[0] != 'Rally' or len(a) != 2:
+            print("Bad rally object %s" % key)
+            return
+        i = int(a[1])
+        self.moving_rally = i
+
+    def handle_menu_event(self, obj):
+        '''handle a popup menu event from the map'''
+        menuitem = obj.menuitem
+        if menuitem.returnkey == 'popupRallyRemove':
+            self.remove_rally(obj.selected[0].objkey)
+        elif menuitem.returnkey == 'popupRallyMove':
+            self.move_rally(obj.selected[0].objkey)            
+
     def map_callback(self, obj):
         '''called when an event happens on the slipmap'''
         from MAVProxy.modules.mavproxy_map import mp_slipmap
+        if isinstance(obj, mp_slipmap.SlipMenuEvent):
+            self.handle_menu_event(obj)
+            return
         if not isinstance(obj, mp_slipmap.SlipMouseEvent):
+            return
+        if obj.event.m_leftDown and self.moving_rally is not None:
+            self.click_position = obj.latlon
+            self.click_time = time.time()
+            self.mpstate.functions.process_stdin("rally move %u" % self.moving_rally)
+            self.moving_rally = None
             return
         if obj.event.m_leftDown and self.moving_wp != 0:
             self.moving_wp = 0
@@ -264,8 +300,12 @@ class MapModule(mp_module.MPModule):
             self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('RallyPoints'))
             for i in range(self.module('rally').rallyloader.rally_count()):
                 rp = self.module('rally').rallyloader.rally_point(i)
-                self.mpstate.map.add_object(mp_slipmap.SlipIcon('Rally-%u' % i, (rp.lat*1.0e-7, rp.lng*1.0e-7), icon,
-                                                           layer='RallyPoints', rotation=0, follow=False))
+                popup = MPMenuSubMenu('Popup',
+                                      items=[MPMenuItem('Remove', returnkey='popupRallyRemove'),
+                                             MPMenuItem('Move', returnkey='popupRallyMove')])
+                self.mpstate.map.add_object(mp_slipmap.SlipIcon('Rally %u' % (i+1), (rp.lat*1.0e-7, rp.lng*1.0e-7), icon,
+                                                                layer='RallyPoints', rotation=0, follow=False,
+                                                                popup_menu=popup))
     
         # check for any events from the map
         self.mpstate.map.check_events()
