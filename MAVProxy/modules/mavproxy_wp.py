@@ -15,8 +15,9 @@ class WPModule(mp_module.MPModule):
         self.loading_waypoint_lasttime = time.time()
         self.last_waypoint = 0
         self.wp_period = mavutil.periodic_event(0.5)
-        self.add_command('wp', self.cmd_wp,       'waypoint management', ["<list|clear>",
-                                     "<load|update|save> (FILENAME)"])
+        self.add_command('wp', self.cmd_wp,       'waypoint management',
+                         ["<list|clear|move|remove|loop|set>",
+                          "<load|update|save> (FILENAME)"])
         
         if self.continue_mode and self.logdir != None:
             waytxt = os.path.join(mpstate.status.logdir, 'way.txt')
@@ -77,81 +78,79 @@ class WPModule(mp_module.MPModule):
     
     def idle_task(self):
         '''handle missing waypoints'''
-        state = self
-        if state.wp_period.trigger():
+        if self.wp_period.trigger():
             # cope with packet loss fetching mission
-            if self.master.time_since('MISSION_ITEM') >= 2 and state.wploader.count() < getattr(state.wploader,'expected_count',0):
-                seq = state.wploader.count()
+            if self.master.time_since('MISSION_ITEM') >= 2 and self.wploader.count() < getattr(self.wploader,'expected_count',0):
+                seq = self.wploader.count()
                 print("re-requesting WP %u" % seq)
                 self.master.waypoint_request_send(seq)
     
     def process_waypoint_request(self, m, master):
         '''process a waypoint request from the master'''
-        state = self
-        if (not state.loading_waypoints or
-            time.time() > state.loading_waypoint_lasttime + 10.0):
-            state.loading_waypoints = False
+        if (not self.loading_waypoints or
+            time.time() > self.loading_waypoint_lasttime + 10.0):
+            self.loading_waypoints = False
             self.console.error("not loading waypoints")
             return
-        if m.seq >= state.wploader.count():
-            self.console.error("Request for bad waypoint %u (max %u)" % (m.seq, state.wploader.count()))
+        if m.seq >= self.wploader.count():
+            self.console.error("Request for bad waypoint %u (max %u)" % (m.seq, self.wploader.count()))
             return
-        wp = state.wploader.wp(m.seq)
+        wp = self.wploader.wp(m.seq)
         wp.target_system = self.target_system
         wp.target_component = self.target_component
-        self.master.mav.send(state.wploader.wp(m.seq))
-        state.loading_waypoint_lasttime = time.time()
-        self.console.writeln("Sent waypoint %u : %s" % (m.seq, state.wploader.wp(m.seq)))
-        if m.seq == state.wploader.count() - 1:
-            state.loading_waypoints = False
-            self.console.writeln("Sent all %u waypoints" % state.wploader.count())
+        self.master.mav.send(self.wploader.wp(m.seq))
+        self.loading_waypoint_lasttime = time.time()
+        self.console.writeln("Sent waypoint %u : %s" % (m.seq, self.wploader.wp(m.seq)))
+        if m.seq == self.wploader.count() - 1:
+            self.loading_waypoints = False
+            self.console.writeln("Sent all %u waypoints" % self.wploader.count())
+
+    def send_all_waypoints(self):
+        '''send all waypoints to vehicle'''
+        self.master.waypoint_clear_all_send()
+        if self.wploader.count() == 0:
+            return
+        self.loading_waypoints = True
+        self.loading_waypoint_lasttime = time.time()
+        self.master.waypoint_count_send(self.wploader.count())
     
     def load_waypoints(self, filename):
         '''load waypoints from a file'''
-        state = self
-        state.wploader.target_system = self.target_system
-        state.wploader.target_component = self.target_component
-        try:
-            state.wploader.load(filename)
-        except Exception, msg:
-            print("Unable to load %s - %s" % (filename, msg))
-            return
-        print("Loaded %u waypoints from %s" % (state.wploader.count(), filename))
-    
-        self.master.waypoint_clear_all_send()
-        if state.wploader.count() == 0:
-            return
-    
-        state.loading_waypoints = True
-        state.loading_waypoint_lasttime = time.time()
-        self.master.waypoint_count_send(state.wploader.count())
-    
-    def update_waypoints(self, filename, wpnum):
-        '''update waypoints from a file'''
-        state = self
         self.wploader.target_system = self.target_system
         self.wploader.target_component = self.target_component
         try:
-            state.wploader.load(filename)
+            self.wploader.load(filename)
         except Exception, msg:
             print("Unable to load %s - %s" % (filename, msg))
             return
-        if state.wploader.count() == 0:
+        print("Loaded %u waypoints from %s" % (self.wploader.count(), filename))
+        self.send_all_waypoints()
+    
+    def update_waypoints(self, filename, wpnum):
+        '''update waypoints from a file'''
+        self.wploader.target_system = self.target_system
+        self.wploader.target_component = self.target_component
+        try:
+            self.wploader.load(filename)
+        except Exception, msg:
+            print("Unable to load %s - %s" % (filename, msg))
+            return
+        if self.wploader.count() == 0:
             print("No waypoints found in %s" % filename)
             return
         if wpnum == -1:
-            print("Loaded %u updated waypoints from %s" % (state.wploader.count(), filename))
-        elif wpnum >= state.wploader.count():
+            print("Loaded %u updated waypoints from %s" % (self.wploader.count(), filename))
+        elif wpnum >= self.wploader.count():
             print("Invalid waypoint number %u" % wpnum)
             return
         else:
             print("Loaded updated waypoint %u from %s" % (wpnum, filename))
     
-        state.loading_waypoints = True
-        state.loading_waypoint_lasttime = time.time()
+        self.loading_waypoints = True
+        self.loading_waypoint_lasttime = time.time()
         if wpnum == -1:
             start = 0
-            end = state.wploader.count()-1
+            end = self.wploader.count()-1
         else:
             start = wpnum
             end = wpnum
@@ -161,38 +160,30 @@ class WPModule(mp_module.MPModule):
     
     def save_waypoints(self, filename):
         '''save waypoints to a file'''
-        state = self
         try:
-            state.wploader.save(filename)
+            self.wploader.save(filename)
         except Exception, msg:
             print("Failed to save %s - %s" % (filename, msg))
             return
-        print("Saved %u waypoints to %s" % (state.wploader.count(), filename))
+        print("Saved %u waypoints to %s" % (self.wploader.count(), filename))
     
     def wp_draw_callback(self, points):
         '''callback from drawing waypoints'''
-        state = self
         if len(points) < 3:
             return
         from MAVProxy.modules.lib import mp_util
-        home = state.wploader.wp(0)
-        state.wploader.clear()
-        state.wploader.target_system = self.target_system
-        state.wploader.target_component = self.target_component
-        state.wploader.add(home)
+        home = self.wploader.wp(0)
+        self.wploader.clear()
+        self.wploader.target_system = self.target_system
+        self.wploader.target_component = self.target_component
+        self.wploader.add(home)
         for p in points:
-            state.wploader.add_latlonalt(p[0], p[1], self.settings.wpalt)
-        self.master.waypoint_clear_all_send()
-        if state.wploader.count() == 0:
-            return
-        state.loading_waypoints = True
-        state.loading_waypoint_lasttime = time.time()
-        self.master.waypoint_count_send(state.wploader.count())
+            self.wploader.add_latlonalt(p[0], p[1], self.settings.wpalt)
+        self.send_all_waypoints()
     
     def wp_loop(self):
         '''close the loop on a mission'''
-        state = self
-        loader = state.wploader
+        loader = self.wploader
         if loader.count() < 2:
             print("Not enough waypoints (%u)" % loader.count())
             return
@@ -204,14 +195,13 @@ class WPModule(mp_module.MPModule):
                                                           0, 1, 1, -1, 0, 0, 0, 0, 0)
         loader.add(wp)
         loader.add(loader.wp(1))
-        state.loading_waypoints = True
-        state.loading_waypoint_lasttime = time.time()
-        self.master.waypoint_count_send(state.wploader.count())
+        self.loading_waypoints = True
+        self.loading_waypoint_lasttime = time.time()
+        self.master.waypoint_count_send(self.wploader.count())
         print("Closed loop on mission")
     
     def set_home_location(self):
         '''set home location from last map click'''
-        state = self
         try:
             latlon = self.module('map').click_position
         except Exception:
@@ -219,24 +209,74 @@ class WPModule(mp_module.MPModule):
             return
         lat = float(latlon[0])
         lon = float(latlon[1])
-        if state.wploader.count() == 0:
-            state.wploader.add_latlonalt(lat, lon, 0)
-        w = state.wploader.wp(0)
+        if self.wploader.count() == 0:
+            self.wploader.add_latlonalt(lat, lon, 0)
+        w = self.wploader.wp(0)
         w.x = lat
         w.y = lon
-        state.wploader.set(w, 0)
-        state.loading_waypoints = True
-        state.loading_waypoint_lasttime = time.time()
+        self.wploader.set(w, 0)
+        self.loading_waypoints = True
+        self.loading_waypoint_lasttime = time.time()
         self.master.mav.mission_write_partial_list_send(self.target_system,
                                                              self.target_component,
                                                              0, 0)
         
+
+    def cmd_wp_move(self, args):
+        '''handle wp move'''
+        if len(args) != 1:
+            print("usage: wp move WPNUM")
+            return
+        idx = int(args[0])
+        if idx < 1 or idx > self.wploader.count():
+            print("Invalid wp number %u" % idx)
+            return
+        try:
+            latlon = self.module('map').click_position
+        except Exception:
+            print("No map available")
+            return
+        if latlon is None:
+            print("No map click position available")
+            return
+        wp = self.wploader.wp(idx)
+        (lat, lon) = latlon
+        if getattr(self.console, 'ElevationMap', None) is not None:
+            alt1 = self.console.ElevationMap.GetElevation(lat, lon) 
+            alt2 = self.console.ElevationMap.GetElevation(wp.x, wp.y)
+            wp.z += alt1 - alt2
+        wp.x = lat
+        wp.y = lon
+                
+        wp.target_system    = self.target_system
+        wp.target_component = self.target_component
+        self.loading_waypoints = True
+        self.loading_waypoint_lasttime = time.time()
+        self.master.mav.mission_write_partial_list_send(self.target_system,
+                                                        self.target_component,
+                                                        idx, idx)
+        self.wploader.set(wp, idx)
+        print("Moved WP %u to %f, %f at %.1fm" % (idx, lat, lon, wp.z))
+
+    def cmd_wp_remove(self, args):
+        '''handle wp remove'''
+        if len(args) != 1:
+            print("usage: wp remove WPNUM")
+            return
+        idx = int(args[0])
+        if idx < 0 or idx >= self.wploader.count():
+            print("Invalid wp number %u" % idx)
+            return
+        wp = self.wploader.wp(idx)
+        self.wploader.remove(wp)
+        self.send_all_waypoints()
+        print("Removed WP %u" % idx)
     
     def cmd_wp(self, args):
         '''waypoint commands'''
-        state = self
+        usage = "usage: wp <list|load|update|save|set|clear|loop|remove|move>"
         if len(args) < 1:
-            print("usage: wp <list|load|update|save|set|clear|loop>")
+            print(usage)
             return
     
         if args[0] == "load":
@@ -254,25 +294,29 @@ class WPModule(mp_module.MPModule):
                 wpnum = -1
             self.update_waypoints(args[1], wpnum)
         elif args[0] == "list":
-            state.wp_op = "list"
+            self.wp_op = "list"
             self.master.waypoint_request_list_send()
         elif args[0] == "save":
             if len(args) != 2:
                 print("usage: wp save <filename>")
                 return
-            state.wp_save_filename = args[1]
-            state.wp_op = "save"
+            self.wp_save_filename = args[1]
+            self.wp_op = "save"
             self.master.waypoint_request_list_send()
         elif args[0] == "savelocal":
             if len(args) != 2:
                 print("usage: wp savelocal <filename>")
                 return
-            state.wploader.save(args[1])
+            self.wploader.save(args[1])
         elif args[0] == "show":
             if len(args) != 2:
                 print("usage: wp show <filename>")
                 return
-            state.wploader.load(args[1])
+            self.wploader.load(args[1])
+        elif args[0] == "move":
+            self.cmd_wp_move(args[1:])
+        elif args[0] == "remove":
+            self.cmd_wp_remove(args[1:])
         elif args[0] == "set":
             if len(args) != 2:
                 print("usage: wp set <wpindex>")
@@ -284,7 +328,7 @@ class WPModule(mp_module.MPModule):
             if not 'draw_lines' in self.mpstate.map_functions:
                 print("No map drawing available")
                 return        
-            if state.wploader.count() == 0:
+            if self.wploader.count() == 0:
                 print("Need home location - refresh waypoints")
                 return
             if len(args) > 1:
@@ -296,7 +340,7 @@ class WPModule(mp_module.MPModule):
         elif args[0] == "loop":
             self.wp_loop()        
         else:
-            print("Usage: wp <list|load|save|set|show|clear|draw|loop>")
+            print(usage)
 
     def fetch(self):
         """Download wpts from vehicle (this operation is public to support other modules)"""
