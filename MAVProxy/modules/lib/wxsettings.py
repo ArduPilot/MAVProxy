@@ -144,7 +144,7 @@ class TabbedDialog(wx.Dialog):
     def add_choice(self, setting, choices):
         '''add a choice input line'''
         tab = self.panel(setting.tab)
-        default = setting.default
+        default = setting.value
         if default is None:
             default = choices[0]
         ctrl = wx.ComboBox(tab, -1, choices=choices,
@@ -155,7 +155,7 @@ class TabbedDialog(wx.Dialog):
     def add_intspin(self, setting):
         '''add a spin control'''
         tab = self.panel(setting.tab)
-        default = setting.default
+        default = setting.value
         (minv, maxv) = setting.range
         ctrl = wx.SpinCtrl(tab, -1,
                            initial = default,
@@ -167,7 +167,7 @@ class TabbedDialog(wx.Dialog):
         '''add a floating point spin control'''
         from wx.lib.agw.floatspin import FloatSpin
         tab = self.panel(setting.tab)
-        default = setting.default
+        default = setting.value
         (minv, maxv) = setting.range
         ctrl = FloatSpin(tab, -1,
                          value = default,
