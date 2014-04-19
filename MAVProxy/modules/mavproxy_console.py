@@ -56,12 +56,32 @@ class ConsoleModule(mp_module.MPModule):
             MPMenuSubMenu('Mission',
                           items=[MPMenuItem('Clear', 'Clear', '# wp clear'),
                                  MPMenuItem('List', 'List', '# wp list'),
-                                 MPMenuItem('Draw', 'Draw', '# wp draw'),
+                                 MPMenuItem('Load', 'Load', '# wp load ',
+                                            handler=MPMenuCallFileDialog(flags=wx.FD_OPEN,
+                                                                         title='Mission Load',
+                                                                         wildcard='*.txt')),
+                                 MPMenuItem('Save', 'Save', '# wp save ',
+                                            handler=MPMenuCallFileDialog(flags=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT,
+                                                                         title='Mission Save',
+                                                                         wildcard='*.txt')),
+                                 MPMenuItem('Draw', 'Draw', '# wp draw ',
+                                            handler=MPMenuCallTextDialog(title='Mission Altitude (m)',
+                                                                         default=100)),
                                  MPMenuItem('Loop', 'Loop', '# wp loop')]),
             MPMenuSubMenu('Rally',
                           items=[MPMenuItem('Clear', 'Clear', '# rally clear'),
                                  MPMenuItem('List', 'List', '# rally list'),
-                                 MPMenuItem('Add', 'Add', '# rally add')])])
+                                 MPMenuItem('Load', 'Load', '# rally load ',
+                                            handler=MPMenuCallFileDialog(flags=wx.FD_OPEN,
+                                                                         title='Rally Load',
+                                                                         wildcard='*.rally')),
+                                 MPMenuItem('Save', 'Save', '# rally save ',
+                                            handler=MPMenuCallFileDialog(flags=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT,
+                                                                         title='Rally Save',
+                                                                         wildcard='*.rally')),
+                                 MPMenuItem('Add', 'Add', '# rally add ',
+                                            handler=MPMenuCallTextDialog(title='Rally Altitude (m)',
+                                                                         default=100))])])
         mpstate.console.set_menu(self.menu, self.menu_callback)
     
         mpstate.console.ElevationMap = mp_elevation.ElevationModel()
@@ -75,7 +95,12 @@ class ConsoleModule(mp_module.MPModule):
     def menu_callback(self, m):
         '''called on menu selection'''
         if m.returnkey.startswith('# '):
-            self.mpstate.functions.process_stdin(m.returnkey[2:])
+            cmd = m.returnkey[2:]
+            if m.handler is not None:
+                if m.handler_result is None:
+                    return
+                cmd += m.handler_result
+            self.mpstate.functions.process_stdin(cmd)
         if m.returnkey == 'menuSettings':
             wxsettings.WXSettings(self.settings)
             
