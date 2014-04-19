@@ -123,6 +123,7 @@ class ConsoleFrame(wx.Frame):
         ret = self.menu.find_selected(event)
         if ret is None:
             return
+        ret.call_handler()
         state.child_pipe.send(ret)
 
     def on_idle(self, event):

@@ -41,17 +41,27 @@ class MPMenuSeparator(MPMenuGeneric):
 
 class MPMenuItem(MPMenuGeneric):
     '''a MP menu item'''
-    def __init__(self, name, description='', returnkey=None):
+    def __init__(self, name, description='', returnkey=None, handler=None):
         MPMenuGeneric.__init__(self)
         self.name = name
         self.description = description
         self.returnkey = returnkey
+        self.handler = handler
+        self.handler_result = None
         
     def find_selected(self, event):
         '''find the selected menu item'''
         if event.GetId() == self.id():
             return self
         return None
+
+    def call_handler(self):
+        '''optionally call a handler function'''
+        if self.handler is None:
+            return
+        call = getattr(self.handler, 'call', None)
+        if call is not None:
+            self.handler_result = call()
 
     def id(self):
         '''id used to identify the returned menu items
@@ -69,8 +79,8 @@ class MPMenuItem(MPMenuGeneric):
 
 class MPMenuCheckbox(MPMenuItem):
     '''a MP menu item as a checkbox'''
-    def __init__(self, name, description='', returnkey=None, checked=False):
-        MPMenuItem.__init__(self, name, description=description, returnkey=returnkey)
+    def __init__(self, name, description='', returnkey=None, checked=False, handler=None):
+        MPMenuItem.__init__(self, name, description=description, returnkey=returnkey, handler=handler)
         self.checked = checked
         
     def find_selected(self, event):
@@ -94,8 +104,8 @@ class MPMenuCheckbox(MPMenuItem):
 
 class MPMenuRadio(MPMenuItem):
     '''a MP menu item as a radio item'''
-    def __init__(self, name, description='', returnkey=None, selected=None, items=[]):
-        MPMenuItem.__init__(self, name, description=description, returnkey=returnkey)
+    def __init__(self, name, description='', returnkey=None, selected=None, items=[], handler=None):
+        MPMenuItem.__init__(self, name, description=description, returnkey=returnkey, handler=handler)
         self.items = items
         self.choice = 0
         self.initial = selected
@@ -196,7 +206,32 @@ class MPMenuTop(object):
                 return ret
         return None
 
+class MPMenuCallFileDialog(object):
+    '''used to create a file dialog callback'''
+    def __init__(self, flags=wx.FD_OPEN, title='Filename', wildcard='*.*'):
+        self.flags = flags
+        self.title = title
+        self.wildcard = wildcard
 
+    def call(self):
+        '''show a file dialog'''
+        dlg = wx.FileDialog(None, self.title, '', "", self.wildcard, self.flags)
+        if dlg.ShowModal() != wx.ID_OK:
+            return None
+        return dlg.GetPath()
+
+class MPMenuCallTextDialog(object):
+    '''used to create a value dialog callback'''
+    def __init__(self, title='Enter Value', default=''):
+        self.title = title
+        self.default = default
+
+    def call(self):
+        '''show a value dialog'''
+        dlg = wx.TextEntryDialog(None, self.title, self.title, defaultValue=str(self.default))
+        if dlg.ShowModal() != wx.ID_OK:
+            return None
+        return dlg.GetValue()
 
 if __name__ == '__main__':
     from MAVProxy.modules.mavproxy_map.mp_image import MPImage
