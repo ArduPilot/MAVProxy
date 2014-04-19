@@ -115,11 +115,11 @@ class SlipPolygon(SlipObject):
 
     def clicked(self, px, py):
         '''see if the polygon has been clicked on.
-        Consider it clicked if the pixel is within 3 of the point
+        Consider it clicked if the pixel is within 6 of the point
         '''
         for i in range(len(self._pix_points)):
             (pixx,pixy) = self._pix_points[i]
-            if abs(px - pixx) < 3 and abs(py - pixy) < 3:
+            if abs(px - pixx) < 6 and abs(py - pixy) < 6:
                 self._selected_vertex = i
                 return math.sqrt((px - pixx)**2 + (py - pixy)**2)
         return None
@@ -360,6 +360,10 @@ class SlipInformation:
         '''update the information'''
         pass
 
+class SlipDefaultPopup:
+    '''an object to hold a default popup menu'''
+    def __init__(self, popup):
+        self.popup = popup
 
 class SlipInfoImage(SlipInformation):
     '''an image to display in the info box'''
@@ -591,6 +595,8 @@ class MPSlipMapFrame(wx.Frame):
         state.follow = True
         state.popup_object = None
         state.popup_latlon = None
+        state.popup_started = False
+        state.default_popup = None
         state.panel = MPSlipMapPanel(self, state)
         self.Bind(wx.EVT_IDLE, self.on_idle)
         self.Bind(wx.EVT_SIZE, state.panel.on_size)
@@ -619,12 +625,18 @@ class MPSlipMapFrame(wx.Frame):
             obj = state.popup_object
             ret = obj.popup_menu.find_selected(event)
             if ret is not None:
+                ret.call_handler()
                 state.event_queue.put(SlipMenuEvent(state.popup_latlon, event,
                                                     [SlipObjectSelection(obj.key, 0, obj.layer, obj.selection_info())],
                                                     ret))
                 state.popup_object = None
                 state.popup_latlon = None
-                return
+        if state.default_popup is not None:
+            ret = state.default_popup.popup.find_selected(event)
+            if ret is not None:
+                ret.call_handler()
+                state.event_queue.put(SlipMenuEvent(state.popup_latlon, event, [], ret))
+            
         # otherwise a normal menu
         ret = self.menu.find_selected(event)
         if ret is None:
@@ -711,6 +723,9 @@ class MPSlipMapFrame(wx.Frame):
                     if getattr(object, 'follow', False):
                         self.follow(object)
                     state.need_redraw = True
+
+            if isinstance(obj, SlipDefaultPopup):
+                state.default_popup = obj
 
             if isinstance(obj, SlipInformation):
                 # see if its a existing one or a new one
@@ -1010,7 +1025,12 @@ class MPSlipMapPanel(wx.Panel):
         '''show popup menu for an object'''
         state = self.state
         wx_menu = selected.popup_menu.wx_menu()
-        print("showing popup")
+        state.frame.PopupMenu(wx_menu, pos)
+
+    def show_default_popup(self, pos):
+        '''show default popup menu'''
+        state = self.state
+        wx_menu = state.default_popup.popup.wx_menu()
         state.frame.PopupMenu(wx_menu, pos)
 
     def on_mouse(self, event):
@@ -1028,12 +1048,23 @@ class MPSlipMapPanel(wx.Panel):
             latlon = self.coordinates(pos.x, pos.y)
             selected = self.selected_objects(pos)
             state.event_queue.put(SlipMouseEvent(latlon, event, selected))
-            if event.ButtonIsDown(wx.MOUSE_BTN_RIGHT) and event.ButtonDown() and len(selected) > 0:
-                obj = state.layers[selected[0].layer][selected[0].objkey]
-                if obj.popup_menu is not None:
-                    state.popup_object = obj
+            if event.RightDown():
+                state.popup_object = None
+                state.popup_latlon = None
+                if len(selected) > 0:
+                    obj = state.layers[selected[0].layer][selected[0].objkey]
+                    if obj.popup_menu is not None:
+                        state.popup_object = obj
+                        state.popup_latlon = latlon
+                        self.show_popup(obj, pos)
+                        state.popup_started = True
+                if not state.popup_started and state.default_popup is not None:
                     state.popup_latlon = latlon
-                    self.show_popup(obj, pos)
+                    self.show_default_popup(pos)
+                    state.popup_started = True
+
+        if not event.ButtonIsDown(wx.MOUSE_BTN_RIGHT):
+            state.popup_started = False
 
         if event.LeftDown():
             self.mouse_down = pos

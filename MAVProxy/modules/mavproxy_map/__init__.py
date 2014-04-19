@@ -52,7 +52,43 @@ class MapModule(mp_module.MPModule):
         self.add_command('map', self.cmd_map, "map control", ['icon',
                                       'set (MAPSETTING)'])
         self.add_completion_function('(MAPSETTING)', self.map_settings.completion)
-        
+
+        popup = MPMenuSubMenu('Popup',
+                              items=[MPMenuSubMenu('Mission',
+                                                   items=[MPMenuItem('Clear', 'Clear', '# wp clear'),
+                                                          MPMenuItem('List', 'List', '# wp list'),
+                                                          MPMenuItem('Load', 'Load', '# wp load ',
+                                                                     handler=MPMenuCallFileDialog(flags=wx.FD_OPEN,
+                                                                                                  title='Mission Load',
+                                                                                                  wildcard='*.txt')),
+                                                          MPMenuItem('Save', 'Save', '# wp save ',
+                                                                     handler=MPMenuCallFileDialog(flags=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT,
+                                                                                                  title='Mission Save',
+                                                                                                  wildcard='*.txt')),
+                                                          MPMenuItem('Draw', 'Draw', '# wp draw ',
+                                                                     handler=MPMenuCallTextDialog(title='Mission Altitude (m)',
+                                                                                                  default=100)),
+                                                          MPMenuItem('Loop', 'Loop', '# wp loop')]),
+                                     MPMenuSubMenu('Rally',
+                                                   items=[MPMenuItem('Clear', 'Clear', '# rally clear'),
+                                                          MPMenuItem('List', 'List', '# rally list'),
+                                                          MPMenuItem('Load', 'Load', '# rally load ',
+                                                                     handler=MPMenuCallFileDialog(flags=wx.FD_OPEN,
+                                                                                                  title='Rally Load',
+                                                                                                  wildcard='*.rally')),
+                                                          MPMenuItem('Save', 'Save', '# rally save ',
+                                                                     handler=MPMenuCallFileDialog(flags=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT,
+                                                                                                  title='Rally Save',
+                                                                                                  wildcard='*.rally')),
+                                                          MPMenuItem('Add', 'Add', '# rally add ',
+                                                                     handler=MPMenuCallTextDialog(title='Rally Altitude (m)',
+                                                                                                  default=100))]),
+                                     MPMenuItem('Fly To', 'Fly To', '# guided ',
+                                                handler=MPMenuCallTextDialog(title='Altitude (m)',
+                                                                             default=100))])
+        self.default_popup = popup
+        mpstate.map.add_object(mp_slipmap.SlipDefaultPopup(popup))
+
     def cmd_map(self, args):
         '''map commands'''
         if args[0] == "icon":
@@ -84,7 +120,8 @@ class MapModule(mp_module.MPModule):
             p = polygons[i]
             if len(p) > 1:
                 popup = MPMenuSubMenu('Popup',
-                                      items=[MPMenuItem('Remove', returnkey='popupMissionRemove'),
+                                      items=[MPMenuItem('Set', returnkey='popupMissionSet'),
+                                             MPMenuItem('Remove', returnkey='popupMissionRemove'),
                                              MPMenuItem('Move', returnkey='popupMissionMove')])
                 self.mpstate.map.add_object(mp_slipmap.SlipPolygon('mission %u' % i, p,
                                                                    layer='Mission', linewidth=2, colour=(255,255,255),
@@ -152,15 +189,29 @@ class MapModule(mp_module.MPModule):
         idx = self.selection_index_to_idx(key, selection_index)
         self.mpstate.functions.process_stdin('wp remove %u' % idx) 
 
+    def set_mission(self, key, selection_index):
+        '''set a mission point'''
+        idx = self.selection_index_to_idx(key, selection_index)
+        self.mpstate.functions.process_stdin('wp set %u' % idx) 
+
     def handle_menu_event(self, obj):
         '''handle a popup menu event from the map'''
         menuitem = obj.menuitem
-        if menuitem.returnkey == 'popupRallyRemove':
+        if menuitem.returnkey.startswith('# '):
+            cmd = menuitem.returnkey[2:]
+            if menuitem.handler is not None:
+                if menuitem.handler_result is None:
+                    return
+                cmd += menuitem.handler_result
+            self.mpstate.functions.process_stdin(cmd)
+        elif menuitem.returnkey == 'popupRallyRemove':
             self.remove_rally(obj.selected[0].objkey)
         elif menuitem.returnkey == 'popupRallyMove':
             self.move_rally(obj.selected[0].objkey)            
         elif menuitem.returnkey == 'popupMissionRemove':
             self.remove_mission(obj.selected[0].objkey, obj.selected[0].extra_info)
+        elif menuitem.returnkey == 'popupMissionSet':
+            self.set_mission(obj.selected[0].objkey, obj.selected[0].extra_info)
         elif menuitem.returnkey == 'popupMissionMove':
             self.move_mission(obj.selected[0].objkey, obj.selected[0].extra_info)
 
@@ -235,12 +286,14 @@ class MapModule(mp_module.MPModule):
             return
         self.draw_callback(self.draw_line)
         self.draw_callback = None
+        mpstate.map.add_object(mp_slipmap.SlipDefaultPopup(self.default_popup))
         self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('Drawing'))
     
     def draw_lines(self, callback):
         '''draw a series of connected lines on the map, calling callback when done'''
         self.draw_callback = callback
         self.draw_line = []
+        mpstate.map.add_object(mp_slipmap.SlipDefaultPopup(None))
         
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
