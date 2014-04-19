@@ -14,6 +14,9 @@ class MPSetting:
         self.value = default
         self.tab = tab
         self.range = range
+        if range is not None:
+            # check syntax
+            (minv, maxv) = range
         self.increment = increment
         self.choice = choice
         self.format = format
