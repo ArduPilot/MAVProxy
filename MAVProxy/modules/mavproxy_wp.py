@@ -324,6 +324,7 @@ class WPModule(mp_module.MPModule):
             self.master.waypoint_set_current_send(int(args[1]))
         elif args[0] == "clear":
             self.master.waypoint_clear_all_send()
+            self.wploader.clear()
         elif args[0] == "draw":
             if not 'draw_lines' in self.mpstate.map_functions:
                 print("No map drawing available")
