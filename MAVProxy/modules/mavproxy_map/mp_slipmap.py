@@ -154,7 +154,8 @@ class SlipGrid(SlipObject):
 class SlipThumbnail(SlipObject):
     '''a thumbnail to display on the map'''
     def __init__(self, key, latlon, layer, img,
-                 border_colour=None, border_width=0):
+                 border_colour=None, border_width=0,
+                 popup_menu=None):
         SlipObject.__init__(self, key, layer)
         self.latlon = latlon
         self._img = None
@@ -165,6 +166,7 @@ class SlipThumbnail(SlipObject):
         self.border_colour = border_colour
         self.posx = -1
         self.posy = -1
+        self.popup_menu = popup_menu
 
     def bounds(self):
         '''return bounding box'''
@@ -243,11 +245,10 @@ class SlipIcon(SlipThumbnail):
     '''a icon to display on the map'''
     def __init__(self, key, latlon, img, layer=1, rotation=0,
                  follow=False, trail=None, popup_menu=None):
-        SlipThumbnail.__init__(self, key, latlon, layer, img)
+        SlipThumbnail.__init__(self, key, latlon, layer, img, popup_menu=popup_menu)
         self.rotation = rotation
         self.follow = follow
         self.trail = trail
-        self.popup_menu = popup_menu
 
     def img(self):
         '''return a cv image for the icon'''
