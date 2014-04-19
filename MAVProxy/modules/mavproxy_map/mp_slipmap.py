@@ -242,11 +242,12 @@ class SlipTrail:
 class SlipIcon(SlipThumbnail):
     '''a icon to display on the map'''
     def __init__(self, key, latlon, img, layer=1, rotation=0,
-                 follow=False, trail=None):
+                 follow=False, trail=None, popup_menu=None):
         SlipThumbnail.__init__(self, key, latlon, layer, img)
         self.rotation = rotation
         self.follow = follow
         self.trail = trail
+        self.popup_menu = popup_menu
 
     def img(self):
         '''return a cv image for the icon'''
@@ -404,9 +405,10 @@ class SlipInfoText(SlipInformation):
 
 class SlipObjectSelection:
     '''description of a object under the cursor during an event'''
-    def __init__(self, objkey, distance):
+    def __init__(self, objkey, distance, layer):
         self.distance = distance
         self.objkey = objkey
+        self.layer = layer
 
 class SlipEvent:
     '''an event sent to the parent.
@@ -429,6 +431,12 @@ class SlipKeyEvent(SlipEvent):
     '''a key event sent to the parent'''
     def __init__(self, latlon, event, selected):
         SlipEvent.__init__(self, latlon, event, selected)
+
+class SlipMenuEvent(SlipEvent):
+    '''a menu event sent to the parent'''
+    def __init__(self, latlon, event, selected, menuitem):
+        SlipEvent.__init__(self, latlon, event, selected)
+        self.menuitem = menuitem
 
 
 class MPSlipMap():
@@ -554,6 +562,8 @@ class MPSlipMapFrame(wx.Frame):
         state.frame = self
         state.grid = True
         state.follow = True
+        state.popup_object = None
+        state.popup_latlon = None
         state.panel = MPSlipMapPanel(self, state)
         self.Bind(wx.EVT_IDLE, self.on_idle)
         self.Bind(wx.EVT_SIZE, state.panel.on_size)
@@ -577,9 +587,21 @@ class MPSlipMapFrame(wx.Frame):
     def on_menu(self, event):
         '''handle menu selection'''
         state = self.state
+        # see if it is a popup menu
+        if state.popup_object is not None:
+            obj = state.popup_object
+            ret = obj.popup_menu.find_selected(event)
+            if ret is not None:
+                state.event_queue.put(SlipMenuEvent(state.popup_latlon, event,
+                                                    [SlipObjectSelection(obj.key, 0, obj.layer)], ret))
+                state.popup_object = None
+                state.popup_latlon = None
+                return
+        # otherwise a normal menu
         ret = self.menu.find_selected(event)
         if ret is None:
             return
+        ret.call_handler()
         if ret.returnkey == 'toggleGrid':
             state.grid = ret.IsChecked()
         elif ret.returnkey == 'toggleFollow':
@@ -951,10 +973,15 @@ class MPSlipMapPanel(wx.Panel):
             for key in state.layers[layer]:
                 distance = state.layers[layer][key].clicked(px, py)
                 if distance is not None:
-                    selected.append(SlipObjectSelection(key, distance))
+                    selected.append(SlipObjectSelection(key, distance, layer))
         selected.sort(key=lambda c: c.distance)
         return selected
 
+    def show_popup(self, selected, pos):
+        '''show popup menu for an object'''
+        state = self.state
+        wx_menu = selected.popup_menu.wx_menu()
+        state.frame.PopupMenu(wx_menu, pos)
 
     def on_mouse(self, event):
         '''handle mouse events'''
@@ -971,6 +998,12 @@ class MPSlipMapPanel(wx.Panel):
             latlon = self.coordinates(pos.x, pos.y)
             selected = self.selected_objects(pos)
             state.event_queue.put(SlipMouseEvent(latlon, event, selected))
+            if event.ButtonIsDown(wx.MOUSE_BTN_RIGHT) and event.ButtonDown() and len(selected) > 0:
+                obj = state.layers[selected[0].layer][selected[0].objkey]
+                if obj.popup_menu is not None:
+                    state.popup_object = obj
+                    state.popup_latlon = latlon
+                    self.show_popup(obj, pos)
 
         if event.LeftDown():
             self.mouse_down = pos
@@ -992,6 +1025,7 @@ class MPSlipMapPanel(wx.Panel):
                 self.redraw_map()
 
     def clear_thumbnails(self):
+        '''clear all thumbnails from the map'''
         state = self.state
         for l in state.layers:
             keys = state.layers[l].keys()[:]
