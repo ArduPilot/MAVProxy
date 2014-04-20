@@ -4,7 +4,7 @@
 class MPSetting:
     def __init__(self, name, type, default, label=None, tab=None,
                  range=None, increment=None, format=None,
-                 digits=None, choice=None,):
+                 digits=None, choice=None):
         if label is None:
             label = name
         self.name = name
@@ -109,10 +109,11 @@ class MPSettings(object):
         if not name in self._vars:
             raise AttributeError
         setting = self._vars[name]
+        oldvalue = setting.value
         if not setting.set(value):
             print("Unable to convert %s to type %s" % (value, setting.type))
             return False
-        if self._callback:
+        if self._callback and oldvalue != setting.value:
             self._callback(setting)
         return True
 
@@ -156,3 +157,35 @@ class MPSettings(object):
     def set_callback(self, callback):
         '''set a callback to be called on set()'''
         self._callback = callback
+
+    def save(self, filename):
+        '''save settings to a file. Return True/False on success/failure'''
+        try:
+            f = open(filename, mode='w')
+        except Exception:
+            return False
+        for k in self.list():
+            f.write("%s=%s\n" % (k, self.get(k)))
+        f.close()
+        return True
+    
+        
+    def load(self, filename):
+        '''load settings from a file. Return True/False on success/failure'''
+        try:
+            f = open(filename, mode='r')
+        except Exception:
+            return False
+        while True:
+            line = f.readline()
+            if not line:
+                break
+            line = line.rstrip()
+            eq = line.find('=')
+            if eq == -1:
+                continue
+            name = line[:eq]
+            value = line[eq+1:]
+            self.set(name, value)
+        f.close()
+        return True

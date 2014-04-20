@@ -66,11 +66,17 @@ class TabbedDialog(wx.Dialog):
         button_box = wx.BoxSizer(wx.HORIZONTAL)
         self.button_apply = wx.Button(self, -1, "Apply")
         self.button_cancel = wx.Button(self, -1, "Cancel")
+        self.button_save = wx.Button(self, -1, "Save")
+        self.button_load = wx.Button(self, -1, "Load")
         button_box.Add(self.button_cancel, 0, wx.ALL)
         button_box.Add(self.button_apply, 0, wx.ALL)
+        button_box.Add(self.button_save, 0, wx.ALL)
+        button_box.Add(self.button_load, 0, wx.ALL)
         self.dialog_sizer.Add(button_box, 0, wx.GROW|wx.ALIGN_CENTER_VERTICAL|wx.ALL, 5)
         wx.EVT_BUTTON(self, self.button_cancel.GetId(), self.on_cancel)
         wx.EVT_BUTTON(self, self.button_apply.GetId(), self.on_apply)
+        wx.EVT_BUTTON(self, self.button_save.GetId(), self.on_save)
+        wx.EVT_BUTTON(self, self.button_load.GetId(), self.on_load)
         self.Centre()
 
     def on_cancel(self, event):
@@ -91,6 +97,28 @@ class TabbedDialog(wx.Dialog):
                     continue
                 if str(oldvalue) != str(setting.value):
                     self.parent_pipe.send(setting)
+
+    def on_save(self, event):
+        '''called on save button'''
+        dlg = wx.FileDialog(None, self.settings.get_title(), '', "", '*.*',
+                            wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT)
+        if dlg.ShowModal() == wx.ID_OK:
+            self.settings.save(dlg.GetPath())
+
+    def on_load(self, event):
+        '''called on load button'''
+        dlg = wx.FileDialog(None, self.settings.get_title(), '', "", '*.*', wx.FD_OPEN)
+        if dlg.ShowModal() == wx.ID_OK:
+            self.settings.load(dlg.GetPath())
+        # update the controls with new values
+        for label in self.setting_map.keys():
+            setting = self.setting_map[label]
+            ctrl = self.controls[label]
+            value = ctrl.GetValue()
+            if isinstance(value, str) or isinstance(value, unicode):
+                ctrl.SetValue(str(setting.value))
+            else:
+                ctrl.SetValue(setting.value)
 
     def panel(self, tab_name):
         '''return the panel for a named tab'''
@@ -132,15 +160,6 @@ class TabbedDialog(wx.Dialog):
             ctrl = wx.TextCtrl(tab, -1, "", size=(width,-1) )
         self._add_input(setting, ctrl)
 
-    def add_filechooser(self, setting, width=300, directory=False):
-        '''add a file input line'''
-        tab = self.panel(setting.tab)
-        ctrl = wx.TextCtrl(tab, -1, "", size=(width,-1) )
-        browse = wx.Button(tab, label='...')        
-        wx.EVT_BUTTON(tab, browse.GetId(), self._on_select_path)
-        self.browse_option_map[browse.GetId()] = label
-        self._add_input(setting, ctrl, ctrl2=browse)
-
     def add_choice(self, setting, choices):
         '''add a choice input line'''
         tab = self.panel(setting.tab)
@@ -180,19 +199,6 @@ class TabbedDialog(wx.Dialog):
             ctrl.SetDigits(setting.digits)
         self._add_input(setting, ctrl, value=default)
         
-    def _on_select_path(self, event):
-        label = self.browse_option_map[event.GetId()]
-        ctrl = self.controls[label]
-        path = os.path.abspath(ctrl.Value)
-        dlg = wx.FileDialog(self,
-                            message = 'Select file for %s' % label,
-                            defaultDir = os.path.dirname(path),
-                            defaultFile = path)
-        dlg_result = dlg.ShowModal()
-        if wx.ID_OK != dlg_result:
-            return
-        ctrl.Value = dlg.GetPath()
-
 #----------------------------------------------------------------------
 class SettingsDlg(TabbedDialog):
     def __init__(self, settings):
