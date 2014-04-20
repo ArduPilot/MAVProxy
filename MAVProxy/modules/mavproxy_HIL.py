@@ -11,27 +11,6 @@ import sys, os, time, socket, errno, struct, math
 from math import degrees, radians
 from MAVProxy.modules.lib import mp_module
 
-def convert_body_frame(phi, theta, phiDot, thetaDot, psiDot):
-    '''convert a set of roll rates from earth frame to body frame'''
-    p = phiDot - psiDot*math.sin(theta)
-    q = math.cos(phi)*thetaDot + math.sin(phi)*psiDot*math.cos(theta)
-    r = math.cos(phi)*psiDot*math.cos(theta) - math.sin(phi)*thetaDot
-    return (p, q, r)
-    
-def scale_channel(ch, value):
-    '''scale a channel to 1000/1500/2000'''
-    v = value/10000.0
-    if v < -1:
-        v = -1
-    elif v > 1:
-        v = 1
-    if ch == 3:
-        if v < 0:
-            v = 0
-        return int(1000 + v*1000)
-    return int(1500 + v*500)
-    
-        
 class HILModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(HILModule, self).__init__(mpstate, "HIL", "rally point control")
@@ -83,7 +62,7 @@ class HILModule(mp_module.MPModule):
          phidot, thetadot, psidot,
          roll, pitch, yaw,
          vcas, check) = struct.unpack('<17dI', pkt)
-        (p, q, r) = convert_body_frame(radians(roll), radians(pitch), radians(phidot), radians(thetadot), radians(psidot))
+        (p, q, r) = self.convert_body_frame(radians(roll), radians(pitch), radians(phidot), radians(thetadot), radians(psidot))
     
         try:
             self.hil_state_msg = self.master.mav.hil_state_encode(int(time.time()*1e6),
@@ -117,7 +96,7 @@ class HILModule(mp_module.MPModule):
     
         servos = []
         for ch in range(1,9):
-            servos.append(scale_channel(ch, getattr(self.rc_channels_scaled, 'chan%u_scaled' % ch)))
+            servos.append(self.scale_channel(ch, getattr(self.rc_channels_scaled, 'chan%u_scaled' % ch)))
         servos.extend([0,0,0, 0,0,0])
         buf = struct.pack('<14H', *servos)
         try:
@@ -136,6 +115,26 @@ class HILModule(mp_module.MPModule):
         self.last_apm_send_time = now
         if self.hil_state_msg is not None:
             self.master.mav.send(self.hil_state_msg)
+
+    def convert_body_frame(self, phi, theta, phiDot, thetaDot, psiDot):
+        '''convert a set of roll rates from earth frame to body frame'''
+        p = phiDot - psiDot*math.sin(theta)
+        q = math.cos(phi)*thetaDot + math.sin(phi)*psiDot*math.cos(theta)
+        r = math.cos(phi)*psiDot*math.cos(theta) - math.sin(phi)*thetaDot
+        return (p, q, r)
+    
+    def scale_channel(self, ch, value):
+        '''scale a channel to 1000/1500/2000'''
+        v = value/10000.0
+        if v < -1:
+            v = -1
+        elif v > 1:
+            v = 1
+        if ch == 3 and self.mpstate.vehicle_type != 'rover':
+            if v < 0:
+                v = 0
+            return int(1000 + v*1000)
+        return int(1500 + v*500)
             
 def init(mpstate):
     '''initialise module'''
