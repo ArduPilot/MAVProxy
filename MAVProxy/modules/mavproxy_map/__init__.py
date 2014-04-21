@@ -27,6 +27,7 @@ class MapModule(mp_module.MPModule):
         self.have_vehicle = {}
         self.move_wp = -1
         self.moving_wp = None
+        self.moving_fencepoint = None
         self.moving_rally = None
         self.mission_list = None
         self.icon_counter = 0
@@ -94,12 +95,25 @@ class MapModule(mp_module.MPModule):
             if len(p) > 1:
                 popup = MPMenuSubMenu('Popup',
                                       items=[MPMenuItem('Set', returnkey='popupMissionSet'),
-                                             MPMenuItem('Remove', returnkey='popupMissionRemove'),
-                                             MPMenuItem('Move', returnkey='popupMissionMove')])
+                                             MPMenuItem('WP Remove', returnkey='popupMissionRemove'),
+                                             MPMenuItem('WP Move', returnkey='popupMissionMove')])
                 self.mpstate.map.add_object(mp_slipmap.SlipPolygon('mission %u' % i, p,
                                                                    layer='Mission', linewidth=2, colour=(255,255,255),
                                                                    popup_menu=popup))
-    
+
+    def display_fence(self):
+        '''display the fence'''
+        self.fence_change_time = self.module('fence').fenceloader.last_change
+        points = self.module('fence').fenceloader.polygon()
+        self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('Fence'))
+        if len(points) > 1:
+            popup = MPMenuSubMenu('Popup',
+                                  items=[MPMenuItem('FencePoint Remove', returnkey='popupFenceRemove'),
+                                         MPMenuItem('FencePoint Move', returnkey='popupFenceMove')])
+            self.mpstate.map.add_object(mp_slipmap.SlipPolygon('Fence', points, layer=1,
+                                                               linewidth=2, colour=(0,255,0), popup_menu=popup))
+
+            
     def closest_waypoint(self, latlon):
         '''find closest waypoint to a position'''
         (lat, lon) = latlon
@@ -162,6 +176,15 @@ class MapModule(mp_module.MPModule):
         idx = self.selection_index_to_idx(key, selection_index)
         self.mpstate.functions.process_stdin('wp remove %u' % idx) 
 
+    def remove_fencepoint(self, key, selection_index):
+        '''remove a fence point'''
+        self.mpstate.functions.process_stdin('fence remove %u' % selection_index) 
+
+    def move_fencepoint(self, key, selection_index):
+        '''move a fence point'''
+        self.moving_fencepoint = selection_index
+        print("Moving fence point %u" % selection_index) 
+
     def set_mission(self, key, selection_index):
         '''set a mission point'''
         idx = self.selection_index_to_idx(key, selection_index)
@@ -181,12 +204,16 @@ class MapModule(mp_module.MPModule):
             self.remove_rally(obj.selected[0].objkey)
         elif menuitem.returnkey == 'popupRallyMove':
             self.move_rally(obj.selected[0].objkey)            
-        elif menuitem.returnkey == 'popupMissionRemove':
-            self.remove_mission(obj.selected[0].objkey, obj.selected[0].extra_info)
         elif menuitem.returnkey == 'popupMissionSet':
             self.set_mission(obj.selected[0].objkey, obj.selected[0].extra_info)
+        elif menuitem.returnkey == 'popupMissionRemove':
+            self.remove_mission(obj.selected[0].objkey, obj.selected[0].extra_info)
         elif menuitem.returnkey == 'popupMissionMove':
             self.move_mission(obj.selected[0].objkey, obj.selected[0].extra_info)
+        elif menuitem.returnkey == 'popupFenceRemove':
+            self.remove_fencepoint(obj.selected[0].objkey, obj.selected[0].extra_info)
+        elif menuitem.returnkey == 'popupFenceMove':
+            self.move_fencepoint(obj.selected[0].objkey, obj.selected[0].extra_info)
 
     def map_callback(self, obj):
         '''called when an event happens on the slipmap'''
@@ -212,9 +239,19 @@ class MapModule(mp_module.MPModule):
             self.mpstate.functions.process_stdin("wp move %u" % self.moving_wp)
             self.moving_wp = None
             return
+        if obj.event.m_leftDown and self.moving_fencepoint is not None:
+            self.click_position = obj.latlon
+            self.click_time = time.time()
+            self.mpstate.functions.process_stdin("fence move %u" % self.moving_fencepoint)
+            self.moving_fencepoint = None
+            return
         if obj.event.m_rightDown and self.moving_wp is not None:
             print("Cancelled wp move")
             self.moving_wp = None
+            return
+        if obj.event.m_rightDown and self.moving_fencepoint is not None:
+            print("Cancelled fence move")
+            self.moving_fencepoint = None
             return
         elif obj.event.m_leftDown:
             if time.time() - self.click_time > 0.1:
@@ -335,10 +372,7 @@ class MapModule(mp_module.MPModule):
     
         # if the fence has changed, redisplay
         if self.fence_change_time != self.module('fence').fenceloader.last_change:
-            self.fence_change_time = self.module('fence').fenceloader.last_change
-            points = self.module('fence').fenceloader.polygon()
-            if len(points) > 1:
-                self.mpstate.map.add_object(mp_slipmap.SlipPolygon('fence', points, layer=1, linewidth=2, colour=(0,255,0)))
+            self.display_fence()
     
         # if the rallypoints have changed, redisplay
         if self.rally_change_time != self.module('rally').rallyloader.last_change:
@@ -348,8 +382,8 @@ class MapModule(mp_module.MPModule):
             for i in range(self.module('rally').rallyloader.rally_count()):
                 rp = self.module('rally').rallyloader.rally_point(i)
                 popup = MPMenuSubMenu('Popup',
-                                      items=[MPMenuItem('Remove', returnkey='popupRallyRemove'),
-                                             MPMenuItem('Move', returnkey='popupRallyMove')])
+                                      items=[MPMenuItem('Rally Remove', returnkey='popupRallyRemove'),
+                                             MPMenuItem('Rally Move', returnkey='popupRallyMove')])
                 self.mpstate.map.add_object(mp_slipmap.SlipIcon('Rally %u' % (i+1), (rp.lat*1.0e-7, rp.lng*1.0e-7), icon,
                                                                 layer='RallyPoints', rotation=0, follow=False,
                                                                 popup_menu=popup))

@@ -26,6 +26,31 @@ class FenceModule(mp_module.MPModule):
                 self.fenceloader.load(fencetxt)
                 print("Loaded fence from %s" % fencetxt)
 
+        self.menu_added_console = False
+        self.menu_added_map = False
+        from MAVProxy.modules.lib.mp_menu import *
+        self.menu = MPMenuSubMenu('Fence',
+                                  items=[MPMenuItem('Clear', 'Clear', '# fence clear'),
+                                         MPMenuItem('List', 'List', '# fence list'),
+                                         MPMenuItem('Load', 'Load', '# fence load ',
+                                                    handler=MPMenuCallFileDialog(flags=wx.FD_OPEN,
+                                                                                 title='Fence Load',
+                                                                                 wildcard='*.fen')),
+                                         MPMenuItem('Save', 'Save', '# fence save ',
+                                                    handler=MPMenuCallFileDialog(flags=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT,
+                                                                                 title='Fence Save',
+                                                                                 wildcard='*.fen')),
+                                         MPMenuItem('Draw', 'Draw', '# fence draw')])
+
+    def idle_task(self):
+        '''called on idle'''
+        if not self.menu_added_console and self.module('console') is not None:
+            self.menu_added_console = True
+            self.module('console').add_menu(self.menu)
+        if not self.menu_added_map and self.module('map') is not None:
+            self.menu_added_map = True
+            self.module('map').add_menu(self.menu)
+
     def mavlink_packet(self, m):
         '''handle and incoming mavlink packet'''
         if m.get_type() == "FENCE_STATUS":

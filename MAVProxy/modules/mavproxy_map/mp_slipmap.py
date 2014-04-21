@@ -1024,14 +1024,16 @@ class MPSlipMapPanel(wx.Panel):
     def show_popup(self, selected, pos):
         '''show popup menu for an object'''
         state = self.state
-        wx_menu = selected.popup_menu.wx_menu()
-        state.frame.PopupMenu(wx_menu, pos)
+        if selected.popup_menu is not None:
+            wx_menu = selected.popup_menu.wx_menu()
+            state.frame.PopupMenu(wx_menu, pos)
 
     def show_default_popup(self, pos):
         '''show default popup menu'''
         state = self.state
-        wx_menu = state.default_popup.popup.wx_menu()
-        state.frame.PopupMenu(wx_menu, pos)
+        if state.default_popup.popup is not None:
+            wx_menu = state.default_popup.popup.wx_menu()
+            state.frame.PopupMenu(wx_menu, pos)
 
     def on_mouse(self, event):
         '''handle mouse events'''
