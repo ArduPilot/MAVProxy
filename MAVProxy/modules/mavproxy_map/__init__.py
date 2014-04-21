@@ -178,7 +178,7 @@ class MapModule(mp_module.MPModule):
 
     def remove_fencepoint(self, key, selection_index):
         '''remove a fence point'''
-        self.mpstate.functions.process_stdin('fence remove %u' % selection_index) 
+        self.mpstate.functions.process_stdin('fence remove %u' % (selection_index+1)) 
 
     def move_fencepoint(self, key, selection_index):
         '''move a fence point'''

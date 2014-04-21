@@ -126,6 +126,27 @@ class FenceModule(mp_module.MPModule):
         self.fenceloader.move(idx, latlon[0], latlon[1])
         if self.send_fence():
             print("Moved fence point %u" % idx)
+
+    def cmd_fence_remove(self, args):
+        '''handle fencepoint remove'''
+        if len(args) < 1:
+            print("Usage: fence remove FENCEPOINTNUM")
+            return
+        if not self.have_list:
+            print("Please list fence points first")
+            return
+
+        idx = int(args[0])
+        if idx <= 0 or idx > self.fenceloader.count():
+            print("Invalid fence point number %u" % idx)
+            return
+
+        # note we don't subtract 1, as first fence point is the return point
+        self.fenceloader.remove(idx)
+        if self.send_fence():
+            print("Removed fence point %u" % idx)
+        else:
+            print("Failed to remove fence point %u" % idx)
     
     def cmd_fence(self, args):
         '''fence commands'''
@@ -146,6 +167,8 @@ class FenceModule(mp_module.MPModule):
             self.list_fence(None)
         elif args[0] == "move":
             self.cmd_fence_move(args[1:])
+        elif args[0] == "remove":
+            self.cmd_fence_remove(args[1:])
         elif args[0] == "save":
             if len(args) != 2:
                 print("usage: fence save <filename>")
@@ -271,7 +294,7 @@ class FenceModule(mp_module.MPModule):
         self.have_list = True
     
     def print_usage(self):
-        print("usage: fence <enable|disable|list|load|save|clear|draw>")
+        print("usage: fence <enable|disable|list|load|save|clear|draw|move|remove>")
 
 def init(mpstate):
     '''initialise module'''
