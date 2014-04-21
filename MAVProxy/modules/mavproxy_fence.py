@@ -17,13 +17,16 @@ class FenceModule(mp_module.MPModule):
         self.healthy = True
         self.add_command('fence', self.cmd_fence,
                          "geo-fence management",
-                         ["<draw|list|clear|enable|disable>",
+                         ["<draw|list|clear|enable|disable|move|remove>",
                           "<load|save> (FILENAME)"])
+
+        self.have_list = False
 
         if self.continue_mode and self.logdir != None:
             fencetxt = os.path.join(self.logdir, 'fence.txt')
             if os.path.exists(fencetxt):
                 self.fenceloader.load(fencetxt)
+                self.have_list = True
                 print("Loaded fence from %s" % fencetxt)
 
         self.menu_added_console = False
@@ -95,6 +98,34 @@ class FenceModule(mp_module.MPModule):
             self.target_component,
             mavutil.mavlink.MAV_CMD_DO_FENCE_ENABLE, 0,
             do_enable, 0, 0, 0, 0, 0, 0)
+
+    def cmd_fence_move(self, args):
+        '''handle fencepoint move'''
+        if len(args) < 1:
+            print("Usage: fence move FENCEPOINTNUM")
+            return
+        if not self.have_list:
+            print("Please list fence points first")
+            return
+
+        idx = int(args[0])
+        if idx <= 0 or idx > self.fenceloader.count():
+            print("Invalid fence point number %u" % idx)
+            return
+
+        try:
+            latlon = self.module('map').click_position
+        except Exception:
+            print("No map available")
+            return
+        if latlon is None:
+            print("No map click position available")
+            return
+
+        # note we don't subtract 1, as first fence point is the return point
+        self.fenceloader.move(idx, latlon[0], latlon[1])
+        if self.send_fence():
+            print("Moved fence point %u" % idx)
     
     def cmd_fence(self, args):
         '''fence commands'''
@@ -113,6 +144,8 @@ class FenceModule(mp_module.MPModule):
             self.load_fence(args[1])
         elif args[0] == "list":
             self.list_fence(None)
+        elif args[0] == "move":
+            self.cmd_fence_move(args[1:])
         elif args[0] == "save":
             if len(args) != 2:
                 print("usage: fence save <filename>")
@@ -123,6 +156,7 @@ class FenceModule(mp_module.MPModule):
                 print("usage: fence show <filename>")
                 return
             self.fenceloader.load(args[1])
+            self.have_list = True
         elif args[0] == "draw":
             if not 'draw_lines' in self.mpstate.map_functions:
                 print("No map drawing available")
@@ -149,6 +183,9 @@ class FenceModule(mp_module.MPModule):
     def send_fence(self):
         '''send fence points from fenceloader'''
         # must disable geo-fencing when loading
+        self.fenceloader.target_system = self.target_system
+        self.fenceloader.target_component = self.target_component
+        self.fenceloader.reindex()
         action = self.get_mav_param('FENCE_ACTION', mavutil.mavlink.FENCE_ACTION_NONE)
         self.param_set('FENCE_ACTION', mavutil.mavlink.FENCE_ACTION_NONE, 3)
         self.param_set('FENCE_TOTAL', self.fenceloader.count(), 3)
@@ -158,14 +195,15 @@ class FenceModule(mp_module.MPModule):
             p2 = self.fetch_fence_point(i)
             if p2 is None:
                 self.param_set('FENCE_ACTION', action, 3)
-                return
+                return False
             if (p.idx != p2.idx or
                 abs(p.lat - p2.lat) >= 0.00003 or
                 abs(p.lng - p2.lng) >= 0.00003):
                 print("Failed to send fence point %u" % i)
                 self.param_set('FENCE_ACTION', action, 3)
-                return
+                return False
         self.param_set('FENCE_ACTION', action, 3)
+        return True
     
     def fetch_fence_point(self ,i):
         '''fetch one fence point'''
@@ -200,6 +238,7 @@ class FenceModule(mp_module.MPModule):
         # close it
         self.fenceloader.add_latlon(points[0][0], points[0][1])
         self.send_fence()
+        self.have_list = True
     
     def list_fence(self, filename):
         '''list fence points, optionally saving to a file'''
@@ -229,6 +268,7 @@ class FenceModule(mp_module.MPModule):
             fencetxt = os.path.join(self.status.logdir, 'fence.txt')
             self.fenceloader.save(fencetxt)
             print("Saved fence to %s" % fencetxt)
+        self.have_list = True
     
     def print_usage(self):
         print("usage: fence <enable|disable|list|load|save|clear|draw>")

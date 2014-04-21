@@ -242,7 +242,7 @@ class MapModule(mp_module.MPModule):
         if obj.event.m_leftDown and self.moving_fencepoint is not None:
             self.click_position = obj.latlon
             self.click_time = time.time()
-            self.mpstate.functions.process_stdin("fence move %u" % self.moving_fencepoint)
+            self.mpstate.functions.process_stdin("fence move %u" % (self.moving_fencepoint+1))
             self.moving_fencepoint = None
             return
         if obj.event.m_rightDown and self.moving_wp is not None:
