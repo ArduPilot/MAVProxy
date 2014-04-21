@@ -89,6 +89,7 @@ class ConsoleFrame(wx.Frame):
         self.state = state
         wx.Frame.__init__(self, None, title=title, size=(800,300))
         self.panel = wx.Panel(self)
+        state.frame = self
         
         # values for the status bar
         self.values = {}
@@ -173,6 +174,8 @@ class ConsoleFrame(wx.Frame):
                 self.menu = obj
                 self.SetMenuBar(self.menu.wx_menu())
                 self.Bind(wx.EVT_MENU, self.on_menu)                
+                self.Refresh()
+                self.Update()
     
 if __name__ == "__main__":
     # test the console
