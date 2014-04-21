@@ -14,6 +14,34 @@ class RallyModule(mp_module.MPModule):
                                     "<load|save> (FILENAME)"])
         self.have_list = False
 
+        self.menu_added_console = False
+        self.menu_added_map = False
+        from MAVProxy.modules.lib.mp_menu import *
+        self.menu = MPMenuSubMenu('Rally',
+                                  items=[MPMenuItem('Clear', 'Clear', '# rally clear'),
+                                         MPMenuItem('List', 'List', '# rally list'),
+                                         MPMenuItem('Load', 'Load', '# rally load ',
+                                                    handler=MPMenuCallFileDialog(flags=wx.FD_OPEN,
+                                                                                 title='Rally Load',
+                                                                                 wildcard='*.rally')),
+                                         MPMenuItem('Save', 'Save', '# rally save ',
+                                                    handler=MPMenuCallFileDialog(flags=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT,
+                                                                                 title='Rally Save',
+                                                                                 wildcard='*.rally')),
+                                         MPMenuItem('Add', 'Add', '# rally add ',
+                                                    handler=MPMenuCallTextDialog(title='Rally Altitude (m)',
+                                                                                 default=100))])
+    
+
+    def idle_task(self):
+        '''called on idle'''
+        if not self.menu_added_console and self.module('console') is not None:
+            self.menu_added_console = True
+            self.module('console').add_menu(self.menu)
+        if not self.menu_added_map and self.module('map') is not None:
+            self.menu_added_map = True
+            self.module('map').add_menu(self.menu)
+
     def cmd_rally_add(self, args):
         '''handle rally add'''
         if len(args) < 1:

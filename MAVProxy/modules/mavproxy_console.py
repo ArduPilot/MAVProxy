@@ -17,7 +17,7 @@ from MAVProxy.modules.lib.mp_menu import *
 
 class ConsoleModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(ConsoleModule, self).__init__(mpstate, "console", "GUI console")
+        super(ConsoleModule, self).__init__(mpstate, "console", "GUI console", public=True)
         self.in_air = False
         self.start_time = 0.0
         self.total_time = 0.0
@@ -48,44 +48,18 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('FlightTime', 'FlightTime --', row=3)
         mpstate.console.set_status('ETR', 'ETR --', row=3)
 
-        # create the View menu
-        self.menu = MPMenuTop([
-            MPMenuSubMenu('MAVProxy',
-                          items=[MPMenuItem('Settings', 'Settings', 'menuSettings'),
-                                 MPMenuItem('Map', 'Load Map', '# module load map')]),
-            MPMenuSubMenu('Mission',
-                          items=[MPMenuItem('Clear', 'Clear', '# wp clear'),
-                                 MPMenuItem('List', 'List', '# wp list'),
-                                 MPMenuItem('Load', 'Load', '# wp load ',
-                                            handler=MPMenuCallFileDialog(flags=wx.FD_OPEN,
-                                                                         title='Mission Load',
-                                                                         wildcard='*.txt')),
-                                 MPMenuItem('Save', 'Save', '# wp save ',
-                                            handler=MPMenuCallFileDialog(flags=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT,
-                                                                         title='Mission Save',
-                                                                         wildcard='*.txt')),
-                                 MPMenuItem('Draw', 'Draw', '# wp draw ',
-                                            handler=MPMenuCallTextDialog(title='Mission Altitude (m)',
-                                                                         default=100)),
-                                 MPMenuItem('Loop', 'Loop', '# wp loop')]),
-            MPMenuSubMenu('Rally',
-                          items=[MPMenuItem('Clear', 'Clear', '# rally clear'),
-                                 MPMenuItem('List', 'List', '# rally list'),
-                                 MPMenuItem('Load', 'Load', '# rally load ',
-                                            handler=MPMenuCallFileDialog(flags=wx.FD_OPEN,
-                                                                         title='Rally Load',
-                                                                         wildcard='*.rally')),
-                                 MPMenuItem('Save', 'Save', '# rally save ',
-                                            handler=MPMenuCallFileDialog(flags=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT,
-                                                                         title='Rally Save',
-                                                                         wildcard='*.rally')),
-                                 MPMenuItem('Add', 'Add', '# rally add ',
-                                            handler=MPMenuCallTextDialog(title='Rally Altitude (m)',
-                                                                         default=100))])])
-        mpstate.console.set_menu(self.menu, self.menu_callback)
-    
         mpstate.console.ElevationMap = mp_elevation.ElevationModel()
-    
+
+        # create the main menu
+        self.menu = MPMenuTop([])
+        self.add_menu(MPMenuSubMenu('MAVProxy',
+                                    items=[MPMenuItem('Settings', 'Settings', 'menuSettings'),
+                                           MPMenuItem('Map', 'Load Map', '# module load map')]))
+        
+    def add_menu(self, menu):
+        '''add a new menu'''
+        self.menu.add(menu)
+        self.mpstate.console.set_menu(self.menu, self.menu_callback)
     
     def unload(self):
         '''unload module'''

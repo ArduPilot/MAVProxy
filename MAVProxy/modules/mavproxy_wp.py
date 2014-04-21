@@ -24,6 +24,25 @@ class WPModule(mp_module.MPModule):
             if os.path.exists(waytxt):
                 self.wploader.load(waytxt)
                 print("Loaded waypoints from %s" % waytxt)
+
+        self.menu_added_console = False
+        self.menu_added_map = False
+        from MAVProxy.modules.lib.mp_menu import *
+        self.menu = MPMenuSubMenu('Mission',
+                                  items=[MPMenuItem('Clear', 'Clear', '# wp clear'),
+                                         MPMenuItem('List', 'List', '# wp list'),
+                                         MPMenuItem('Load', 'Load', '# wp load ',
+                                                    handler=MPMenuCallFileDialog(flags=wx.FD_OPEN,
+                                                                                 title='Mission Load',
+                                                                                 wildcard='*.txt')),
+                                         MPMenuItem('Save', 'Save', '# wp save ',
+                                                    handler=MPMenuCallFileDialog(flags=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT,
+                                                                                 title='Mission Save',
+                                                                                 wildcard='*.txt')),
+                                         MPMenuItem('Draw', 'Draw', '# wp draw ',
+                                                    handler=MPMenuCallTextDialog(title='Mission Altitude (m)',
+                                                                                 default=100)),
+                                         MPMenuItem('Loop', 'Loop', '# wp loop')])
     
     
     def mavlink_packet(self, m):
@@ -84,6 +103,12 @@ class WPModule(mp_module.MPModule):
                 seq = self.wploader.count()
                 print("re-requesting WP %u" % seq)
                 self.master.waypoint_request_send(seq)
+        if not self.menu_added_console and self.module('console') is not None:
+            self.menu_added_console = True
+            self.module('console').add_menu(self.menu)
+        if not self.menu_added_map and self.module('map') is not None:
+            self.menu_added_map = True
+            self.module('map').add_menu(self.menu)
     
     def process_waypoint_request(self, m, master):
         '''process a waypoint request from the master'''

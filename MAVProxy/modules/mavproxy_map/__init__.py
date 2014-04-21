@@ -53,41 +53,14 @@ class MapModule(mp_module.MPModule):
                                       'set (MAPSETTING)'])
         self.add_completion_function('(MAPSETTING)', self.map_settings.completion)
 
-        popup = MPMenuSubMenu('Popup',
-                              items=[MPMenuSubMenu('Mission',
-                                                   items=[MPMenuItem('Clear', 'Clear', '# wp clear'),
-                                                          MPMenuItem('List', 'List', '# wp list'),
-                                                          MPMenuItem('Load', 'Load', '# wp load ',
-                                                                     handler=MPMenuCallFileDialog(flags=wx.FD_OPEN,
-                                                                                                  title='Mission Load',
-                                                                                                  wildcard='*.txt')),
-                                                          MPMenuItem('Save', 'Save', '# wp save ',
-                                                                     handler=MPMenuCallFileDialog(flags=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT,
-                                                                                                  title='Mission Save',
-                                                                                                  wildcard='*.txt')),
-                                                          MPMenuItem('Draw', 'Draw', '# wp draw ',
-                                                                     handler=MPMenuCallTextDialog(title='Mission Altitude (m)',
-                                                                                                  default=100)),
-                                                          MPMenuItem('Loop', 'Loop', '# wp loop')]),
-                                     MPMenuSubMenu('Rally',
-                                                   items=[MPMenuItem('Clear', 'Clear', '# rally clear'),
-                                                          MPMenuItem('List', 'List', '# rally list'),
-                                                          MPMenuItem('Load', 'Load', '# rally load ',
-                                                                     handler=MPMenuCallFileDialog(flags=wx.FD_OPEN,
-                                                                                                  title='Rally Load',
-                                                                                                  wildcard='*.rally')),
-                                                          MPMenuItem('Save', 'Save', '# rally save ',
-                                                                     handler=MPMenuCallFileDialog(flags=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT,
-                                                                                                  title='Rally Save',
-                                                                                                  wildcard='*.rally')),
-                                                          MPMenuItem('Add', 'Add', '# rally add ',
-                                                                     handler=MPMenuCallTextDialog(title='Rally Altitude (m)',
-                                                                                                  default=100))]),
-                                     MPMenuItem('Fly To', 'Fly To', '# guided ',
-                                                handler=MPMenuCallTextDialog(title='Altitude (m)',
-                                                                             default=100))])
-        self.default_popup = popup
-        mpstate.map.add_object(mp_slipmap.SlipDefaultPopup(popup))
+        self.default_popup = MPMenuSubMenu('Popup', items=[])
+        self.add_menu(MPMenuItem('Fly To', 'Fly To', '# guided ',
+                                 handler=MPMenuCallTextDialog(title='Altitude (m)', default=100)))
+
+    def add_menu(self, menu):
+        '''add to the default popup menu'''
+        self.default_popup.add(menu)
+        self.mpstate.map.add_object(mp_slipmap.SlipDefaultPopup(self.default_popup))
 
     def cmd_map(self, args):
         '''map commands'''
