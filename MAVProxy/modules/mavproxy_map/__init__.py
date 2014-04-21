@@ -286,14 +286,14 @@ class MapModule(mp_module.MPModule):
             return
         self.draw_callback(self.draw_line)
         self.draw_callback = None
-        mpstate.map.add_object(mp_slipmap.SlipDefaultPopup(self.default_popup))
+        self.mpstate.map.add_object(mp_slipmap.SlipDefaultPopup(self.default_popup))
         self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('Drawing'))
     
     def draw_lines(self, callback):
         '''draw a series of connected lines on the map, calling callback when done'''
         self.draw_callback = callback
         self.draw_line = []
-        mpstate.map.add_object(mp_slipmap.SlipDefaultPopup(None))
+        self.mpstate.map.add_object(mp_slipmap.SlipDefaultPopup(None))
         
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
