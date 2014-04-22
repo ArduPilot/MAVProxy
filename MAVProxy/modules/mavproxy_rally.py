@@ -2,7 +2,7 @@
     MAVProxy rally module
 """
 
-from pymavlink import mavwp
+from pymavlink import mavwp, mavutil
 import time
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib.mp_menu import *
@@ -11,9 +11,12 @@ class RallyModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(RallyModule, self).__init__(mpstate, "rally", "rally point control", public = True)
         self.rallyloader = mavwp.MAVRallyLoader(mpstate.status.target_system, mpstate.status.target_component)
-        self.add_command('rally', self.cmd_rally, "rally point control", ["<add|clear|list|move|remove>",
+        self.add_command('rally', self.cmd_rally, "rally point control", ["<add|clear|land|list|move|remove|>",
                                     "<load|save> (FILENAME)"])
         self.have_list = False
+        self.abort_first_send_time = 0
+        self.abort_previous_send_time = 0
+        self.abort_ack_received = True
 
         self.menu_added_console = False
         self.menu_added_map = False
@@ -42,12 +45,44 @@ class RallyModule(mp_module.MPModule):
             self.menu_added_map = True
             self.module('map').add_menu(self.menu)
 
+        '''handle abort command; it is critical that the AP to receive it'''
+        if self.abort_ack_received is False:
+            #only send abort every second (be insistent, but don't spam)
+            if (time.time() - self.abort_previous_send_time > 1):
+                self.master.mav.command_long_send(self.status.target_system,
+                    self.status.target_component,
+                    mavutil.mavlink.MAV_CMD_DO_GO_AROUND,
+                    0, int(self.settings.rally_breakalt), 0, 0, 0, 0, 0, 0,)
+                self.abort_previous_send_time = time.time()
+
+            #try to get an ACK from the plane:
+            if self.abort_first_send_time == 0:
+                self.abort_first_send_time = time.time()
+            elif time.time() - self.abort_first_send_time > 10: #give up after 10 seconds
+                print "Unable to send abort command!\n"
+                self.abort_ack_received = True
+
+
     def cmd_rally_add(self, args):
         '''handle rally add'''
         if len(args) < 1:
             alt = self.settings.rallyalt
         else:
             alt = float(args[0])
+
+        if len(args) < 2:
+            break_alt = self.settings.rally_breakalt
+        else:
+            break_alt = float(args[1])
+
+        if len(args) < 3:
+            flag = self.settings.rally_flags
+        else: 
+            flag = int(args[2])
+            #currently only supporting autoland values:
+            #True (nonzero) and False (zero) 
+            if (flag != 0):
+                flag = 2
 
         if not self.have_list:
             print("Please list rally points first")
@@ -65,17 +100,12 @@ class RallyModule(mp_module.MPModule):
         if latlon is None:
             print("No map click position available")
             return
-
-        break_alt = 0.0
+        
         land_hdg = 0.0
-        if (len(args) > 2):
-            break_alt = float(args[2])
-        if (len(args) > 3):
-            land_hdg = float(args[3])
-
-        self.rallyloader.create_and_append_rally_point(latlon[0] * 1e7, latlon[1] * 1e7, alt, break_alt, land_hdg, 0)
+    
+        self.rallyloader.create_and_append_rally_point(latlon[0] * 1e7, latlon[1] * 1e7, alt, break_alt, land_hdg, flag)
         self.send_rally_points()
-        print("Added Rally point at %s %f" % (str(latlon), alt))
+        print("Added Rally point at %s %f %f, autoland: %s" % (str(latlon), alt, break_alt, bool(flag & 2)))
 
     def cmd_rally_move(self, args):
         '''handle rally move'''
@@ -169,12 +199,34 @@ class RallyModule(mp_module.MPModule):
 
             print("Saved rally file %s" % args[1])
 
+        elif args[0] == "land":
+            if (len(args) >= 2 and args[1] == "abort"):
+                self.abort_ack_received = False
+                self.abort_first_send_time = 0 
+
+            else:
+                self.master.mav.command_long_send(self.status.target_system,
+                        self.status.target_component,
+                        mavutil.mavlink.MAV_CMD_DO_RALLY_LAND,
+                        0, 0, 0, 0, 0, 0, 0, 0)
+
         else:
             self.print_usage()
 
     def mavlink_packet(self, m):
         '''handle incoming mavlink packet'''
-        return #TODO when applicable
+        type = m.get_type()
+        if type in ['COMMAND_ACK']:
+            if m.command == mavutil.mavlink.MAV_CMD_DO_GO_AROUND:
+                if (m.result == 0 and self.abort_ack_received == False):
+                    self.say("Landing Abort Command Successfully Sent.")
+                    self.abort_ack_received = True
+                elif (m.result != 0 and self.abort_ack_received == False):
+                    self.say("Landing Abort Command Unsuccessful.")
+
+            elif m.command == mavutil.mavlink.MAV_CMD_DO_RALLY_LAND:
+                if (m.result == 0):
+                    self.say("Landing.")
 
     def send_rally_point(self, i):
         '''send rally points from fenceloader'''
@@ -221,11 +273,11 @@ class RallyModule(mp_module.MPModule):
 
         for i in range(self.rallyloader.rally_count()):
             p = self.rallyloader.rally_point(i)
-            self.console.writeln("lat=%f lng=%f alt=%f break_alt=%f land_dir=%f" % (p.lat * 1e-7, p.lng * 1e-7, p.alt, p.break_alt, p.land_dir))
-
+            self.console.writeln("lat=%f lng=%f alt=%f break_alt=%f land_dir=%f autoland=%f" % (p.lat * 1e-7, p.lng * 1e-7, p.alt, p.break_alt, p.land_dir, int(p.flags & 2!=0) ))
+    
     def print_usage(self):
-        print("Usage: rally <list|load|save|add|remove|move|clear>")
-
+        print("Usage: rally <list|load|land|save|add|remove|move|clear>")
+        
 def init(mpstate):
     '''initialise module'''
     return RallyModule(mpstate)
