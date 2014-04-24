@@ -372,6 +372,9 @@ class MapModule(mp_module.MPModule):
         if self.wp_change_time != self.module('wp').wploader.last_change:
             self.wp_change_time = self.module('wp').wploader.last_change
             self.display_waypoints()
+
+            #this may have affected the landing lines from the rally points:
+            self.rally_change_time = time.time()
     
         # if the fence has changed, redisplay
         if self.fence_change_time != self.module('fence').fenceloader.last_change:
@@ -390,7 +393,40 @@ class MapModule(mp_module.MPModule):
                 self.mpstate.map.add_object(mp_slipmap.SlipIcon('Rally %u' % (i+1), (rp.lat*1.0e-7, rp.lng*1.0e-7), icon,
                                                                 layer='RallyPoints', rotation=0, follow=False,
                                                                 popup_menu=popup))
-    
+
+                loiter_rad = self.get_mav_param('WP_LOITER_RAD')
+
+                self.mpstate.map.add_object(mp_slipmap.SlipCircle('Rally Circ %u' % (i+1), 'RallyPoints', (rp.lat*1.0e-7, rp.lng*1.0e-7), abs(loiter_rad), (255,255,0), 2))
+
+                #draw a line between rally point and nearest landing point
+                nearest_land_wp = None
+                nearest_distance = 10000000.0
+                for j in range(self.module('wp').wploader.count()):
+                    w = self.module('wp').wploader.wp(j)
+                    if (w.command == 21): #if landing waypoint
+                        #get distance between rally point and this waypoint
+                        dis = mp_util.gps_distance(w.x, w.y, rp.lat*1.0e-7, rp.lng*1.0e-7)
+                        if (dis < nearest_distance):
+                            nearest_land_wp = w
+                            nearest_distance = dis
+
+                if nearest_land_wp != None:
+                    points = []
+                    #tangential approach?
+                    if self.get_mav_param('LAND_BREAK_PATH') == 0:
+                        theta = math.degrees(math.atan(loiter_rad / nearest_distance))
+                        tan_dis = math.sqrt(nearest_distance * nearest_distance - (loiter_rad * loiter_rad))
+
+                        ral_bearing = mp_util.gps_bearing(nearest_land_wp.x, nearest_land_wp.y,rp.lat*1.0e-7, rp.lng*1.0e-7)
+
+                        points.append(mp_util.gps_newpos(nearest_land_wp.x,nearest_land_wp.y, ral_bearing + theta, tan_dis))
+
+                    else: #not tangential approach
+                        points.append((rp.lat*1.0e-7, rp.lng*1.0e-7))
+
+                    points.append((nearest_land_wp.x, nearest_land_wp.y))
+                    self.mpstate.map.add_object(mp_slipmap.SlipPolygon('Rally Land %u' % (i+1), points, 'RallyPoints', (255,255,0), 2))
+
         # check for any events from the map
         self.mpstate.map.check_events()
     
