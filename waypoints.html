@@ -27,7 +27,8 @@
         <section id="main_content">
           <h2>
 <a name="ContentWaypoint" class="anchor" href="#ContentWaypoint"><span class="octicon octicon-link"></span></a>Waypoints</h2>
-          <p>MAVProxy includes a few commands for managing waypoints.</p>
+          <p>MAVProxy includes a few commands for managing waypoints. These can be entered via the command line or via the menu bar of the GUI console.</p>
+
           <h4>wp list</h4>
           <p>View the currently loaded waypoints on the APM.</p>
 
@@ -45,6 +46,21 @@
           <h4>wp update</h4>
           <p>Similar to <code>wp load</code>, except only a single specified waypoint is loaded.</p>
           <p><code>wp update filename.txt 6</code></p>
+
+          <h4>wp move</h4>
+          <p>Move a specific waypoint to a new location. When entered, a new location can be selected on the map window. If a DTED map is available, the AGL height of the waypoint will be maintained. This requires the map module to be loaded.</p>
+          <p><code>wp move 6</code></p>
+
+          <h4>wp loop</h4>
+          <p>Closes the loop on a mission, allowing the APM to repeat a mission.</p>
+          
+          <h4>wp remove</h4>
+          <p>Remove a specific waypoint from the mission.</p>
+          <p><code>wp remove 6</code></p>
+
+          <h4>wp set</h4>
+          <p>The the specified waypoint as the current waypoint. The mission will be run from this waypoint onwards.</p>
+          <p><code>wp set 6</code></p>
 
           <h4>Using a GUI</h4>
           <p>The map module includes methods for viewing and editing waypoints on a map.</p>

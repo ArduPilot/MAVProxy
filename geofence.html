@@ -27,8 +27,10 @@
         <section id="main_content">
           <h2>
 <a name="ContentWaypoint" class="anchor" href="#ContentWaypoint"><span class="octicon octicon-link"></span></a>Geofence</h2>
-          <p>The geofence represents a hard limit to where the UAV will not fly beyond. It is useful for preventing runaway UAV’s (barring other software/hardware issues). If it breaches the fence the failsafe will be activated, returning it to the home point.</p>
+          <p>The geofence represents a hard limit to where the UAV will not fly beyond. It is useful for preventing runaway UAVs (barring other software/hardware issues). If it breaches the fence the failsafe will be activated, returning it to the home point.</p>
           <p>It is represented as an arbitrary polygon of waypoints around the flying area in the fixed-wing APM. In Arducopter, it is a radius and altitude parameter(s) representing a cylinder around the flying area.</p>
+          <p>A fence menu is available on the GUI console.</p>
+
           <h4>fence list</h4>
           <p>View the currently loaded geofence on the APM.</p>
 
@@ -40,9 +42,27 @@
           <p>Save the set of current geofence points to file.</p>
           <p><code>fence save filename.txt</code></p>
           
+          <h4>fence draw</h4>
+          <p>Draw the geofence on the map (if loaded).</p>
+
+          <h4>fence enable</h4>
+          <p>Enable the geofence failsafe.</p>
+
+          <h4>fence disable</h4>
+          <p>Disable the geofence failsafe.</p>
+
           <h4>fence clear</h4>
-          <p>Delete the geofence from the APM.</p>
-          
+          <p>Deletes all geofence waypoints.</p>
+
+          <h4>fence move</h4>
+          <p>Move a specific fence waypoint to a new location. When entered, a new location can be selected on the map window. This requires the map module to be loaded.</p>
+          <p><code>fence move 6</code></p>
+
+          <h4>fence remove</h4>
+          <p>Remove a specific geofence waypoint.</p>
+          <p><code>fence remove 6</code></p>
+
+       
         </section>
 
         <footer>

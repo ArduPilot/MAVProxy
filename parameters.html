@@ -28,6 +28,9 @@
           <h2>
 <a name="ContentParam" class="anchor" href="#ContentParam"><span class="octicon octicon-link"></span></a>Parameters</h2>
           <p>Parameters refer to the settings and configuration of the APM. The following commands can be used to view and change the parameters:</p>
+
+          <p>Any specific parameter can be tab-completed. Otherwise, a list of possible parameters is shown.</p>
+
           <h4>param show</h4>
           <p>View all current parameters on the APM.</p>
 
@@ -51,7 +54,14 @@
           <p>Any of the above commands can be filtered by using wildcards, if only a particular subset of parameters needs to be manipulated.</p>          
           <p><code>param show FLTMODE*</br>
           param load RC1*</code></p>            
-          
+
+          <h4>param download</h4>
+          <p>Downloads the parameter definitions from the Internet and cache.</p>
+          <p><code>param download</code></p>
+ 
+          <h4>param help</h4>
+          <p>Shows further information (usage, notes) of the specified parameter.</p>
+          <p><code>param help FLTMODE1</code></p>         
         </section>
 
         <footer>
