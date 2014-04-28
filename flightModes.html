@@ -10,7 +10,7 @@
     <!--[if lt IE 9]>
     <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
     <![endif]-->
-    <title>MAVProxy - Flight Modes</title>
+    <title>MAVProxy - Flight Modes and Arming</title>
   </head>
 
   <body>
@@ -27,20 +27,25 @@
         <section id="main_content">
           <h2>
 <a name="ContentTmp" class="anchor" href="#ContentTmp"><span class="octicon octicon-link"></span></a>Flight Modes</h2>
-          <p>Some flight modes can be directly entered on the command line. This will send to appropriate command to the APM.</p>
-          <h4>auto</h4>
+          <p>Flight modes can be directly entered on the command line. This will send to appropriate command to the APM. Use <code>mode n</code> to change mode, where n is the desired mode. To get a list of available modes, enter <code>mode</code>.</p>
+
+          <h4>mode auto</h4>
           <p>Enter AUTO mode, starting with the first waypoint.</p>
-          <h4>loiter</h4>
+          <h4>mode loiter</h4>
           <p>Enter LOITER mode around the UAV's current position.</p>
-          <h4>rtl</h4>
+          <h4>mode rtl</h4>
           <p>Enter Return to Launch mode.</p>
-          <h4>manual</h4>
+          <h4>mode manual</h4>
           <p>Enter manual mode. On Arducopter this is equivalent to STABILIZE mode</p>
-          <h4>fbwa</h4>
+          <h4>mode fbwa</h4>
           <p>Enter Fly By Wire A mode. Applicable on fixed wing APM's only.</p>
+
+          <p>A specific mode is guided. By entering <code>guided alt</code> (where alt is the desired altitude), the user can the select a point on the map window and the UAV will immediately begin flying towards that point.</p>
           
-          <h4>Arming/Disarming</h4>
-          <p>The APM can be armed and disarmed at any time by using the <code>arm</code> and <code>disarm</code> commands.</p>
+          <h2>Arming/Disarming</h2>
+          <p>The APM can be armed and disarmed at any time by using the <code>arm throttle</code> and <code>disarm</code> commands.</p>
+
+          <p>The pre-arming checks can be run (without actually arming the UAV) via <code>arm check</code>. A full list of these checks is given by <code>arm list</code>. To enable/disable a particular arming check, use <code>arm check n</code> and <code>arm uncheck n</code> respectively, where n is the name of the check.
         </section>
 
         <footer>
