@@ -7,6 +7,7 @@ class RCSetupModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(RCSetupModule, self).__init__(mpstate, "rcsetup")
         self.calibrating = False
+        self.num_channels = 4
         self.clear_rc_cal()
         self.add_command('rccal', self.cmd_rccal, "RC calibration start/stop")
         self.add_command('rctrim', self.cmd_rctrim, "RC min/max trim")
@@ -15,7 +16,7 @@ class RCSetupModule(mp_module.MPModule):
     def clear_rc_cal(self):
         self.rc_cal = []
         self.rc_cal.append("") # 0 will be empty
-        for i in range(1,9):
+        for i in range(1,self.num_channels+1):
             #min, max, modified
             self.rc_cal.append([1500, 1500, False])
 
@@ -52,6 +53,9 @@ class RCSetupModule(mp_module.MPModule):
             return
     
         if (args[0] == "start"):
+            if len(args) > 1:
+                self.num_channels = int(args[1])
+            print("Calibrating %u channels" % self.num_channels)
             print "WARNING: remove propellers from electric planes!!"
             print "Push return when ready to calibrate."
             raw_input()
@@ -88,7 +92,7 @@ class RCSetupModule(mp_module.MPModule):
             return
     
         if m.get_type() == 'RC_CHANNELS_RAW':
-            for i in range(1,9):
+            for i in range(1,self.num_channels+1):
                 v = getattr(m, 'chan%u_raw' % i)
     
                 if self.get_cal_min(i) > v:
