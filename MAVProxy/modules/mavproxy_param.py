@@ -142,7 +142,7 @@ class ParamState:
             if len(args) < 2 or args[1].find('*') != -1:
                 if self.vehicle_name is None:
                     print("Unknown vehicle type")
-                return
+                    return
                 filename = mp_util.dot_mavproxy("%s-defaults.parm" % self.vehicle_name)
                 if not os.path.exists(filename):
                     print("Please run 'param download' first (vehicle_name=%s)" % self.vehicle_name)
