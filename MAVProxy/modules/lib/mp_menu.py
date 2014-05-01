@@ -234,7 +234,7 @@ class MPMenuCallTextDialog(object):
         return dlg.GetValue()
 
 if __name__ == '__main__':
-    from MAVProxy.modules.mavproxy_map.mp_image import MPImage
+    from MAVProxy.modules.lib.mp_image import MPImage
     import time
     im = MPImage(mouse_events=True,
                  key_events=True,

@@ -20,7 +20,7 @@ from MAVProxy.modules.mavproxy_map import mp_elevation
 from MAVProxy.modules.mavproxy_map import mp_tile
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib.mp_menu import *
-from MAVProxy.modules.mavproxy_map import mp_widgets
+from MAVProxy.modules.lib import mp_widgets
 
 
 class SlipObject:

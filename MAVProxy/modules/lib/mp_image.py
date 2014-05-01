@@ -14,7 +14,7 @@ except ImportError:
     import cv
 
 from MAVProxy.modules.lib import mp_util
-from MAVProxy.modules.mavproxy_map import mp_widgets
+from MAVProxy.modules.lib import mp_widgets
 
 
 class MPImageData:
