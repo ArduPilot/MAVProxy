@@ -54,6 +54,11 @@ class MPImagePopupMenu:
     def __init__(self, menu):
         self.menu = menu
 
+class MPImageNewSize:
+    '''reported to parent when window size changes'''
+    def __init__(self, size):
+        self.size = size
+
 class MPImage():
     '''
     a generic image viewer widget for use in MP tools
@@ -66,7 +71,8 @@ class MPImage():
                  can_drag = False,
                  mouse_events = False,
                  key_events = False,
-                 auto_size = False):
+                 auto_size = False,
+                 report_size_changes = False):
         import multiprocessing
 
         self.title = title
@@ -77,6 +83,7 @@ class MPImage():
         self.mouse_events = mouse_events
         self.key_events = key_events
         self.auto_size = auto_size
+        self.report_size_changes = report_size_changes
         self.menu = None
         self.popup_menu = None
         
@@ -196,6 +203,7 @@ class MPImagePanel(wx.Panel):
         self.popup_menu = None
         self.wx_popup_menu = None
         self.popup_pos = None
+        self.last_size = None
         state.brightness = 1.0
 
         # dragpos is the top left position in image coordinates
@@ -317,7 +325,14 @@ class MPImagePanel(wx.Panel):
 
     def on_size(self, event):
         '''handle window size changes'''
+        state = self.state
         self.need_redraw = True
+        if state.report_size_changes:
+            # tell owner the new size
+            size = self.frame.GetSize()
+            if size != self.last_size:
+                self.last_size = size
+                state.out_queue.put(MPImageNewSize(size))        
 
     def limit_dragpos(self):
         '''limit dragpos to sane values'''
