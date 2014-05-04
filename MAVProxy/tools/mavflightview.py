@@ -99,8 +99,11 @@ def mavflightview(filename):
         types.extend(['GPS','GLOBAL_POSITION_INT'])
     print("Looking for types %s" % str(types))
     while True:
-        m = mlog.recv_match(type=types)
-        if m is None:
+        try:
+            m = mlog.recv_match(type=types)
+            if m is None:
+                break
+        except Exception:
             break
         if m.get_type() == 'MISSION_ITEM':
             wp.set(m, m.seq)            
