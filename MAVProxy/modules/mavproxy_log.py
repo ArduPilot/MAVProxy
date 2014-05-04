@@ -52,7 +52,9 @@ class LogModule(mp_module.MPModule):
             self.download_file.seek(m.ofs)
             self.download_ofs = m.ofs
         if m.count != 0:
-            self.download_file.write(m.data[:m.count])
+            data = m.data[:m.count]
+            s = ''.join(str(chr(x)) for x in data)
+            self.download_file.write(s)
             self.download_set.add(m.ofs // 90)
             self.download_ofs += m.count
         self.download_last_timestamp = time.time()
