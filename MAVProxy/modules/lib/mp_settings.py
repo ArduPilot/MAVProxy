@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 '''settings object for MAVProxy modules'''
 
+import time
+
 class MPSetting:
     def __init__(self, name, type, default, label=None, tab=None,
                  range=None, increment=None, format=None,
@@ -56,6 +58,7 @@ class MPSettings(object):
         self._default_tab = 'Settings'
         self._keys = []
         self._callback = None
+        self._last_change = time.time()
         for v in vars:
             self.append(v)
 
@@ -88,6 +91,7 @@ class MPSettings(object):
             self._default_tab = setting.tab
         self._vars[setting.name] = setting
         self._keys.append(setting.name)
+        self._last_change = time.time()
             
 
     def __getattr__(self, name):
@@ -113,8 +117,10 @@ class MPSettings(object):
         if not setting.set(value):
             print("Unable to convert %s to type %s" % (value, setting.type))
             return False
-        if self._callback and oldvalue != setting.value:
-            self._callback(setting)
+        if oldvalue != setting.value:
+            self._last_change = time.time()
+            if self._callback:
+                self._callback(setting)
         return True
 
     def get(self, name):
@@ -189,3 +195,8 @@ class MPSettings(object):
             self.set(name, value)
         f.close()
         return True
+
+    def last_change(self):
+        '''return last change time'''
+        return self._last_change
+    
