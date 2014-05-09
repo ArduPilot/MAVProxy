@@ -15,6 +15,7 @@ except ImportError:
 
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_widgets
+from MAVProxy.modules.lib.mp_menu import *
 
 
 class MPImageData:
@@ -89,8 +90,14 @@ class MPImage():
         
         self.in_queue = multiprocessing.Queue()
         self.out_queue = multiprocessing.Queue()
+
+        self.default_menu = MPMenuSubMenu('View',
+                                          items=[MPMenuItem('Fit Window', 'Fit Window', 'fitWindow'),
+                                                 MPMenuItem('Full Zoom',  'Full Zoom', 'fullSize')])
+
         self.child = multiprocessing.Process(target=self.child_task)
         self.child.start()
+        self.set_popup_menu(self.default_menu)
 
     def child_task(self):
         '''child process - this holds all the GUI elements'''
@@ -218,6 +225,8 @@ class MPImagePanel(wx.Panel):
         self.mainSizer.Add(self.imagePanel, flag=wx.TOP|wx.LEFT|wx.GROW, border=0)
         if state.mouse_events:
             self.imagePanel.Bind(wx.EVT_MOUSE_EVENTS, self.on_event)
+        else:
+            self.imagePanel.Bind(wx.EVT_MOUSE_EVENTS, self.on_mouse_event)
         if state.key_events:
             self.imagePanel.Bind(wx.EVT_KEY_DOWN, self.on_event)
         else:
@@ -340,6 +349,8 @@ class MPImagePanel(wx.Panel):
             self.dragpos.x = 0
         if self.dragpos.y < 0:
             self.dragpos.y = 0
+        if self.img is None:
+            return
         if self.dragpos.x >= self.img.GetWidth():
             self.dragpos.x = self.img.GetWidth()-1
         if self.dragpos.y >= self.img.GetHeight():
@@ -439,7 +450,12 @@ class MPImagePanel(wx.Panel):
             ret = self.popup_menu.find_selected(event)
             if ret is not None:
                 ret.popup_pos = self.popup_pos
-                state.out_queue.put(ret)
+                if ret.returnkey == 'fitWindow':
+                    self.fit_to_window()
+                elif ret.returnkey == 'fullSize':
+                    self.full_size()
+                else:
+                    state.out_queue.put(ret)
                 return
         if self.menu is not None:
             ret = self.menu.find_selected(event)
@@ -461,6 +477,7 @@ class MPImagePanel(wx.Panel):
             self.wx_popup_menu = None
         else:
             self.wx_popup_menu = menu.wx_menu()
+            self.frame.Bind(wx.EVT_MENU, self.on_menu)
 
     def fit_to_window(self):
         '''fit image to window'''
