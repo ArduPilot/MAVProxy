@@ -192,10 +192,6 @@ def param_set(name, value, retries=3):
     name = name.upper()
     return mpstate.mav_param.mavset(mpstate.master(), name, value, retries=retries)
 
-def cmd_reboot(args):
-    '''reboot autopilot'''
-    mpstate.master().reboot_autopilot()
-
 def cmd_script(args):
     '''run a script'''
     if len(args) < 1:
@@ -215,33 +211,6 @@ def cmd_status(args):
     else:
         for pattern in args:
             mpstate.status.show(sys.stdout, pattern=pattern)
-
-def cmd_bat(args):
-    '''show battery levels'''
-    print("Flight battery:   %u%%" % mpstate.status.battery_level)
-    print("Avionics battery: %u%%" % mpstate.status.avionics_battery_level)
-
-def cmd_alt(args):
-    '''show altitude'''
-    print("Altitude:  %.1f" % mpstate.status.altitude)
-
-
-def cmd_up(args):
-    '''adjust TRIM_PITCH_CD up by 5 degrees'''
-    if len(args) == 0:
-        adjust = 5.0
-    else:
-        adjust = float(args[0])
-    old_trim = get_mav_param('TRIM_PITCH_CD', None)
-    if old_trim is None:
-        print("Existing trim value unknown!")
-        return
-    new_trim = int(old_trim + (adjust*100))
-    if math.fabs(new_trim - old_trim) > 1000:
-        print("Adjustment by %d too large (from %d to %d)" % (adjust*100, old_trim, new_trim))
-        return
-    print("Adjusting TRIM_PITCH_CD from %d to %d" % (old_trim, new_trim))
-    param_set('TRIM_PITCH_CD', new_trim)
 
 def cmd_setup(args):
     mpstate.status.setup_mode = True
@@ -383,15 +352,6 @@ def cmd_alias(args):
         print(usage)
         return
 
-def cmd_time(args):
-  '''show autopilot time'''
-  tusec = mpstate.master().field('SYSTEM_TIME', 'time_unix_usec', 0)
-  if tusec == 0:
-      print("No SYSTEM_TIME time available")
-      return
-  print("%s (%s)\n" % (time.ctime(tusec * 1.0e-6), time.ctime()))
-
-
 # http://stackoverflow.com/questions/211100/pythons-import-doesnt-work-as-expected
 # has info on why this is necessary.
 
@@ -411,15 +371,10 @@ command_map = {
     'reset'   : (cmd_reset,    'reopen the connection to the MAVLink master'),
     'status'  : (cmd_status,   'show status'),
     'set'     : (cmd_set,      'mavproxy settings'),
-    'bat'     : (cmd_bat,      'show battery levels'),
-    'alt'     : (cmd_alt,      'show relative altitude'),
     'link'    : (cmd_link,     'show link status'),
-    'reboot'  : (cmd_reboot,   'reboot the autopilot'),
-    'up'      : (cmd_up,       'adjust TRIM_PITCH_CD up by 5 degrees'),
     'watch'   : (cmd_watch,    'watch a MAVLink pattern'),
     'module'  : (cmd_module,   'module commands'),
-    'alias'   : (cmd_alias,    'command aliases'),
-    'time'    : (cmd_time,     'Show autopilot time'),
+    'alias'   : (cmd_alias,    'command aliases')
     }
 
 def process_stdin(line):
@@ -1248,7 +1203,7 @@ Auto-detected serial ports are:
     if not opts.setup:
         # some core functionality is in modules
         standard_modules = ['log', 'wp', 'rally','fence','param','relay',
-                            'tuneopt','arm','mode','calibration','rc','auxopt']
+                            'tuneopt','arm','mode','calibration','rc','auxopt','misc']
         for m in standard_modules:
             load_module(m, quiet=True)
 
