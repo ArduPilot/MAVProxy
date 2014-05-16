@@ -15,9 +15,32 @@ class MiscModule(mp_module.MPModule):
         self.add_command('reboot', self.cmd_reboot, "reboot autopilot")
         self.add_command('time', self.cmd_time, "show autopilot time")
 
+    def altitude_difference(self, pressure1, pressure2, ground_temp):
+        '''calculate barometric altitude'''
+        scaling = pressure2 / pressure1
+        temp = ground_temp + 273.15
+        return 153.8462 * temp * (1.0 - math.exp(0.190259 * math.log(scaling)))
+
+    def qnh_estimate(self):
+        '''estimate QNH pressure from GPS altitude and scaled pressure'''
+        alt_gps = self.master.field('GPS_RAW_INT', 'alt', 0) * 0.001
+        pressure2 = self.master.field('SCALED_PRESSURE', 'press_abs', 0)
+        ground_temp = self.get_mav_param('GND_TEMP', 21)
+        temp = ground_temp + 273.15
+        pressure1 = pressure2 / math.exp(math.log(1.0 - (alt_gps / (153.8462 * temp))) / 0.190259)
+        return pressure1
+
     def cmd_alt(self, args):
         '''show altitude'''
         print("Altitude:  %.1f" % self.status.altitude)
+        qnh_pressure = self.get_mav_param('FS_QNH_PRESSURE', None)
+        if qnh_pressure is not None and qnh_pressure > 0:
+            ground_temp = self.get_mav_param('GND_TEMP', 21)
+            pressure = self.master.field('SCALED_PRESSURE', 'press_abs', 0)
+            qnh_alt = self.altitude_difference(qnh_pressure, pressure, ground_temp)
+            print("QNH Alt: %u meters %u feet for QNH pressure %.1f" % (qnh_alt, qnh_alt*3.2808, qnh_pressure))
+        print("QNH Estimate: %.1f millibars" % self.qnh_estimate())
+            
 
     def cmd_bat(self, args):
         '''show battery levels'''
