@@ -21,11 +21,12 @@ class SerialModule(mp_module.MPModule):
             )
         self.add_completion_function('(SERIALSETTING)', self.serial_settings.completion)
         self.locked = False
-    
+
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         if m.get_type() == 'SERIAL_CONTROL':
-            s = str(m.data[0:m.count])
+            data = m.data[:m.count]
+            s = ''.join(str(chr(x)) for x in data)
             sys.stdout.write(s)
 
     def serial_lock(self, lock):
@@ -39,7 +40,7 @@ class SerialModule(mp_module.MPModule):
             self.locked = False
         mav.serial_control_send(self.serial_settings.port,
                                 flags,
-                                0, 0, 0, "")
+                                0, 0, 0, [0]*70)
 
     def serial_send(self, args):
         '''send some bytes'''
@@ -55,11 +56,13 @@ class SerialModule(mp_module.MPModule):
         s = ' '.join(args)
         s = s.replace('\\r', '\r')
         s = s.replace('\\n', '\n')
+        buf = [ord(x) for x in s]
+        buf.extend([0]*(70-len(buf)))
         mav.serial_control_send(self.serial_settings.port,
                                 flags,
                                 self.serial_settings.timeout,
                                 self.serial_settings.baudrate,
-                                len(s), s)
+                                len(s), buf)
     
     def cmd_serial(self, args):
         '''serial control commands'''
