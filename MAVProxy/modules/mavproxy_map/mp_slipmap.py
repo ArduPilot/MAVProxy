@@ -362,8 +362,9 @@ class SlipInformation:
 
 class SlipDefaultPopup:
     '''an object to hold a default popup menu'''
-    def __init__(self, popup):
+    def __init__(self, popup, combine=False):
         self.popup = popup
+        self.combine = combine
 
 class SlipInfoImage(SlipInformation):
     '''an image to display in the info box'''
@@ -1025,7 +1026,13 @@ class MPSlipMapPanel(wx.Panel):
         '''show popup menu for an object'''
         state = self.state
         if selected.popup_menu is not None:
-            wx_menu = selected.popup_menu.wx_menu()
+            import copy
+            popup_menu = selected.popup_menu
+            if state.default_popup.popup is not None and state.default_popup.combine:
+                popup_menu = copy.deepcopy(popup_menu)
+                popup_menu.add(MPMenuSeparator())
+                popup_menu.combine(state.default_popup.popup)
+            wx_menu = popup_menu.wx_menu()
             state.frame.PopupMenu(wx_menu, pos)
 
     def show_default_popup(self, pos):

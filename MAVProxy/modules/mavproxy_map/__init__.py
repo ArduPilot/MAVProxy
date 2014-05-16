@@ -61,7 +61,7 @@ class MapModule(mp_module.MPModule):
     def add_menu(self, menu):
         '''add to the default popup menu'''
         self.default_popup.add(menu)
-        self.mpstate.map.add_object(mp_slipmap.SlipDefaultPopup(self.default_popup))
+        self.mpstate.map.add_object(mp_slipmap.SlipDefaultPopup(self.default_popup, combine=True))
 
     def cmd_map(self, args):
         '''map commands'''
@@ -296,7 +296,7 @@ class MapModule(mp_module.MPModule):
             return
         self.draw_callback(self.draw_line)
         self.draw_callback = None
-        self.mpstate.map.add_object(mp_slipmap.SlipDefaultPopup(self.default_popup))
+        self.mpstate.map.add_object(mp_slipmap.SlipDefaultPopup(self.default_popup, combine=True))
         self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('Drawing'))
     
     def draw_lines(self, callback):

@@ -154,6 +154,10 @@ class MPMenuSubMenu(MPMenuGeneric):
             items = [items]
         self.items.extend(items)
 
+    def combine(self, submenu):
+        '''combine a new menu with an existing one'''
+        self.items.extend(submenu.items)
+
     def wx_menu(self):
         '''return a wx.Menu() for this menu'''
         menu = wx.Menu()
