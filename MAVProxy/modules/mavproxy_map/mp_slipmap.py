@@ -1075,7 +1075,7 @@ class MPSlipMapPanel(wx.Panel):
         if not event.ButtonIsDown(wx.MOUSE_BTN_RIGHT):
             state.popup_started = False
 
-        if event.LeftDown():
+        if event.LeftDown() or event.RightDown():
             self.mouse_down = pos
             self.last_click_pos = self.click_pos
             self.click_pos = self.coordinates(pos.x, pos.y)

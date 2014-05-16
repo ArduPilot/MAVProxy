@@ -262,6 +262,9 @@ class MapModule(mp_module.MPModule):
             if self.draw_callback is not None:
                 self.drawing_end()
                 return                
+            if time.time() - self.click_time > 0.1:
+                self.click_position = obj.latlon
+                self.click_time = time.time()
             
     
     def unload(self):
