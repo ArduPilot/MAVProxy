@@ -32,6 +32,7 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('INS', 'INS', fg='grey', row=0)
         mpstate.console.set_status('MAG', 'MAG', fg='grey', row=0)
         mpstate.console.set_status('AS', 'AS', fg='grey', row=0)
+        mpstate.console.set_status('AHRS', 'AHRS', fg='grey', row=0)
         mpstate.console.set_status('Heading', 'Hdg ---/---', row=2)
         mpstate.console.set_status('Alt', 'Alt ---', row=2)
         mpstate.console.set_status('AGL', 'AGL ---', row=2)
@@ -183,7 +184,8 @@ class ConsoleModule(mp_module.MPModule):
         elif type in ['SYS_STATUS']:
             sensors = { 'AS'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_DIFFERENTIAL_PRESSURE,
                         'MAG' : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_MAG,
-                        'INS' : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_ACCEL | mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_GYRO }
+                        'INS' : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_ACCEL | mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_GYRO,
+                        'AHRS' : mavutil.mavlink.MAV_SYS_STATUS_AHRS}
             for s in sensors.keys():
                 bits = sensors[s]
                 present = ((msg.onboard_control_sensors_enabled & bits) == bits)
