@@ -11,7 +11,7 @@ class ModeModule(mp_module.MPModule):
         super(ModeModule, self).__init__(mpstate, "mode")
         self.add_command('mode', self.cmd_mode, "mode change")
         self.add_command('guided', self.cmd_guided, "fly to a clicked location on map")
-    
+
     def cmd_mode(self, args):
         '''set arbitrary mode'''
         mode_mapping = self.master.mode_mapping()
@@ -26,7 +26,7 @@ class ModeModule(mp_module.MPModule):
             print('Unknown mode %s: ' % mode)
             return
         self.master.set_mode(mode_mapping[mode])
-    
+
     def unknown_command(self, args):
         '''handle mode switch by mode name as command'''
         mode_mapping = self.master.mode_mapping()
@@ -35,7 +35,7 @@ class ModeModule(mp_module.MPModule):
             self.master.set_mode(mode_mapping[mode])
             return True
         return False
-    
+
     def cmd_guided(self, args):
         '''set GUIDED target'''
         if len(args) != 1:
@@ -48,7 +48,7 @@ class ModeModule(mp_module.MPModule):
             return
         if latlon is None:
             print("No map click position available")
-            return        
+            return
         altitude = int(args[0])
         print("Guided %s %d" % (str(latlon), altitude))
         self.master.mav.mission_item_send(self.target_system,

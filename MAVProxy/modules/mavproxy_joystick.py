@@ -31,7 +31,7 @@ joymap = {
      None,
      (2, 500, 1500),
      (5, 500, 1500)],
-    
+
     'Sony PLAYSTATION(R)3 Controller':
     # only 4 axes usable. This assumes mode 1
     [(2, 500,  1500),
@@ -67,11 +67,11 @@ class JSModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(JSModule, self).__init__(mpstate, "joystick", "joystick aircraft control")
         self.js = None
- 
+
         #initialize joystick, if available
         pygame.init()
         pygame.joystick.init() # main joystick device system
-    
+
         for i in range(pygame.joystick.get_count()):
             print("Trying joystick %u" % i)
             try:
@@ -88,8 +88,8 @@ class JSModule(mp_module.MPModule):
                         self.map = joymap[jtype]
                         break
             except pygame.error:
-                continue    
-    
+                continue
+
     def idle_task(self):
         '''called in idle time'''
         if self.js is None:
@@ -114,4 +114,3 @@ class JSModule(mp_module.MPModule):
 def init(mpstate):
     '''initialise module'''
     return JSModule(mpstate)
-

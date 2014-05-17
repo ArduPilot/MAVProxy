@@ -10,7 +10,7 @@ class RelayModule(mp_module.MPModule):
         super(RelayModule, self).__init__(mpstate, "relay")
         self.add_command('relay', self.cmd_relay, "relay commands")
         self.add_command('servo', self.cmd_servo, "servo commands")
-    
+
     def cmd_relay(self, args):
         '''set relays'''
         if len(args) == 0 or args[0] not in ['set', 'repeat']:
@@ -34,7 +34,7 @@ class RelayModule(mp_module.MPModule):
                                                    mavutil.mavlink.MAV_CMD_DO_REPEAT_RELAY, 0,
                                                    int(args[1]), int(args[2]), float(args[3]),
                                                    0, 0, 0, 0)
-    
+
     def cmd_servo(self, args):
         '''set servos'''
         if len(args) == 0 or args[0] not in ['set', 'repeat']:
@@ -58,8 +58,8 @@ class RelayModule(mp_module.MPModule):
                                                    mavutil.mavlink.MAV_CMD_DO_REPEAT_SERVO, 0,
                                                    int(args[1]), int(args[2]), int(args[3]), float(args[4]),
                                                    0, 0, 0)
-            
-              
+
+
 def init(mpstate):
     '''initialise module'''
     return RelayModule(mpstate)

@@ -12,7 +12,7 @@ class RCSetupModule(mp_module.MPModule):
         self.add_command('rccal', self.cmd_rccal, "RC calibration start/stop")
         self.add_command('rctrim', self.cmd_rctrim, "RC min/max trim")
         print("rcsetup initialised")
-    
+
     def clear_rc_cal(self):
         self.rc_cal = []
         self.rc_cal.append("") # 0 will be empty
@@ -34,7 +34,7 @@ class RCSetupModule(mp_module.MPModule):
 
     def get_cal_min(self, channel):
         return self.rc_cal[channel][0]
-        
+
     def get_cal_max(self, channel):
         return self.rc_cal[channel][1]
 
@@ -45,13 +45,13 @@ class RCSetupModule(mp_module.MPModule):
     def set_cal_max(self, channel, val):
         self.rc_cal[channel][1] = val
         self.rc_cal[channel][2] = True
-    
+
     def cmd_rccal(self, args):
         '''start/stop RC calibration'''
         if len(args) < 1:
             self.print_cal_usage()
             return
-    
+
         if (args[0] == "start"):
             if len(args) > 1:
                 self.num_channels = int(args[1])
@@ -59,7 +59,7 @@ class RCSetupModule(mp_module.MPModule):
             print("WARNING: remove propellers from electric planes!!")
             print("Push return when ready to calibrate.")
             raw_input()
-    
+
             self.clear_rc_cal()
             self.calibrating = True
         elif (args[0] == "done"):
@@ -67,7 +67,7 @@ class RCSetupModule(mp_module.MPModule):
             self.apply_rc_cal()
         else:
             self.print_cal_usage()
-    
+
     def cmd_rctrim(self, args):
         '''set RCx_TRIM'''
         if not 'RC_CHANNELS_RAW' in self.status.msgs:
@@ -76,32 +76,32 @@ class RCSetupModule(mp_module.MPModule):
         m = self.status.msgs['RC_CHANNELS_RAW']
         for ch in range(1,5):
             self.param_set('RC%u_TRIM' % ch, getattr(m, 'chan%u_raw' % ch))
-    
-    
+
+
     def unload(self):
         if 'rcreset' in self.mpstate.command_map:
             self.mpstate.command_map.pop('rcreset')
         if 'rctrim' in self.mpstate.command_map:
             self.mpstate.command_map.pop('rctrim')
-    
-        
+
+
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         #do nothing if not caibrating
         if (self.calibrating == False):
             return
-    
+
         if m.get_type() == 'RC_CHANNELS_RAW':
             for i in range(1,self.num_channels+1):
                 v = getattr(m, 'chan%u_raw' % i)
-    
+
                 if self.get_cal_min(i) > v:
                     self.set_cal_min(i,v)
                     self.console.writeln("Calibrating: RC%u_MIN=%u" % (i, v))
                 if self.get_cal_max(i) < v:
                     self.set_cal_max(i,v)
                     self.console.writeln("Calibrating: RC%u_MAX=%u" % (i, v))
-    
+
     def print_cal_usage(self):
         print("Usage rccal <start|done>")
 

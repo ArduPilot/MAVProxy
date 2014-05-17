@@ -14,15 +14,15 @@ class CalibrationModule(mp_module.MPModule):
         self.add_command('compassmot', self.cmd_compassmot, 'do compass/motor interference calibration')
         self.add_command('calpress', self.cmd_calpressure,'calibrate pressure sensors')
         self.add_command('accelcal', self.cmd_accelcal, 'do 3D accelerometer calibration')
-    
+
     def cmd_ground(self, args):
         '''do a ground start mode'''
         self.master.calibrate_imu()
-    
+
     def cmd_level(self, args):
         '''run a accel level'''
         self.master.calibrate_level()
-    
+
     def cmd_accelcal(self, args):
         '''do a full 3D accel calibration'''
         mav = self.master
@@ -45,8 +45,8 @@ class CalibrationModule(mp_module.MPModule):
             count += 1
             # tell the APM that we've done as requested
             mav.mav.command_ack_send(count, 1)
-    
-    
+
+
     def cmd_compassmot(self, args):
         '''do a compass/motor interference calibration'''
         mav = self.master
@@ -67,7 +67,7 @@ class CalibrationModule(mp_module.MPModule):
                 break
             time.sleep(0.01)
         print("compassmot done")
-    
+
     def cmd_calpressure(self, args):
         '''calibrate pressure sensors'''
         self.master.calibrate_pressure()

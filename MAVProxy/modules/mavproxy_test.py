@@ -15,7 +15,7 @@ class TestModule(mp_module.MPModule):
         super(TestModule, self).__init__(mpstate, "test", "test flight")
         self.state = TestState.INIT
         print("Module test loaded")
-    
+
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         if self.state == TestState.INIT:

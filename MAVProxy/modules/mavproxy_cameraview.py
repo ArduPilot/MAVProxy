@@ -17,7 +17,7 @@ from cuav.camera.cam_params import CameraParams
 scale_latlon = 1e-7
 scale_hdg = 1e-2
 scale_relative_alt = 1e-3
-    
+
 from MAVProxy.modules.lib import mp_module
 
 class CameraViewModule(mp_module.MPModule):
@@ -43,7 +43,7 @@ class CameraViewModule(mp_module.MPModule):
               ('b', float, 1.0),
             ])
         self.update_col()
-        
+
     def update_col(self):
         self.col = tuple(int(255*c) for c in (self.settings.r, self.settings.g, self.settings.b))
 
@@ -58,11 +58,11 @@ class CameraViewModule(mp_module.MPModule):
                 state.update_col()
         else:
             print('usage: cameraview set')
-    
+
     def unload(self):
         '''unload module'''
         pass
-    
+
     def scale_rc(self, servo, min, max, param):
         '''scale a PWM value'''
         # default to servo range of 1000 to 2000
@@ -97,7 +97,7 @@ class CameraViewModule(mp_module.MPModule):
                 home = [self.master.field('HOME', c)*scale_latlon for c in ['lat', 'lon']]
             old = state.home_height # TODO TMP
             state.home_height = state.elevation_model.GetElevation(*home)
-    
+
             # TODO TMP
             if state.home_height != old:
                 # tridge said to get home pos from wploader,
@@ -126,7 +126,7 @@ class CameraViewModule(mp_module.MPModule):
         if self.mpstate.map: # if the map module is loaded, redraw polygon
             # get rid of the old polygon
             self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('CameraView'))
-    
+
             # camera view polygon determined by projecting corner pixels of the image onto the ground
             pixel_positions = [cuav_util.pixel_position(px[0],px[1], state.height, state.pitch+state.mount_pitch, state.roll+state.mount_roll, state.yaw+state.mount_yaw, state.camera_params) for px in [(0,0), (state.camera_params.xresolution,0), (state.camera_params.xresolution,state.camera_params.yresolution), (0,state.camera_params.yresolution)]]
             if any(pixel_position is None for pixel_position in pixel_positions):
@@ -134,11 +134,11 @@ class CameraViewModule(mp_module.MPModule):
                 # so it doesn't make sense to try to draw the polygon
                 return
             gps_positions = [mp_util.gps_newpos(state.lat, state.lon, math.degrees(math.atan2(*pixel_position)), math.hypot(*pixel_position)) for pixel_position in pixel_positions]
-    
+
             # draw new polygon
             self.mpstate.map.add_object(mp_slipmap.SlipPolygon('cameraview', gps_positions+[gps_positions[0]], # append first element to close polygon
                                                           layer='CameraView', linewidth=2, colour=state.col))
-            
+
 def init(mpstate):
     '''initialise module'''
-    return CameraViewModule(mpstate) 
+    return CameraViewModule(mpstate)

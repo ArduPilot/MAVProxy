@@ -35,6 +35,3 @@ class DGPSModule(mp_module.MPModule):
 def init(mpstate):
     '''initialise module'''
     return DGPSModule(mpstate)
-
-
-

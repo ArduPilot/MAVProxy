@@ -40,7 +40,7 @@ class MiscModule(mp_module.MPModule):
             qnh_alt = self.altitude_difference(qnh_pressure, pressure, ground_temp)
             print("QNH Alt: %u meters %u feet for QNH pressure %.1f" % (qnh_alt, qnh_alt*3.2808, qnh_pressure))
         print("QNH Estimate: %.1f millibars" % self.qnh_estimate())
-            
+
 
     def cmd_bat(self, args):
         '''show battery levels'''

@@ -44,7 +44,7 @@ class TuneoptModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(TuneoptModule, self).__init__(mpstate, "tuneopt", "tuneopt command handling")
         self.add_command('tuneopt', self.cmd_tuneopt,  'Select option for Tune Pot on Channel 6 (quadcopter only)')
-    
+
     def tune_show(self):
         opt_num = str(int(self.get_mav_param('TUNE')))
         option = None
@@ -58,13 +58,13 @@ class TuneoptModule(mp_module.MPModule):
         low = self.get_mav_param('TUNE_LOW')
         high = self.get_mav_param('TUNE_HIGH')
         print("TUNE is currently set to %s LOW=%f HIGH=%f" % (option, low/1000, high/1000))
-    
+
     def tune_option_validate(self, option):
         for k in tune_options:
             if option.upper() == k.upper():
                 return k
         return None
-    
+
     # TODO: Check/show the limits of LOW and HIGH
     def cmd_tuneopt(self, args):
         '''Select option for Tune Pot on Channel 6 (quadcopter only)'''

@@ -39,7 +39,7 @@ class ParamState:
                 print("Received %u parameters" % m.param_count)
                 if self.logdir != None:
                     self.mav_param.save(os.path.join(self.logdir, self.parm_file), '*', verbose=True)
-    
+
     def fetch_check(self, master):
         '''check for missing parameters periodically'''
         if self.param_period.trigger():
@@ -53,7 +53,7 @@ class ParamState:
                         idx = diff.pop()
                         master.param_fetch_one(idx)
                         count += 1
-    
+
     def param_help_download(self):
         '''download XML files for parameters'''
         import multiprocessing
@@ -70,7 +70,7 @@ class ParamState:
             child.start()
         except Exception as e:
             print(e)
-    
+
     def param_help(self, args):
         '''show help on a parameter'''
         if len(args) == 0:
@@ -109,7 +109,7 @@ class ParamState:
                     pass
             else:
                 print("Parameter '%s' not found in documentation" % h)
-    
+
     def handle_command(self, master, args):
         '''handle parameter commands'''
         param_wildcard = "*"
@@ -160,7 +160,7 @@ class ParamState:
                 print("Usage: param set PARMNAME VALUE")
                 return
             if len(args) == 2:
-                self.mav_param.show(args[1])            
+                self.mav_param.show(args[1])
                 return
             param = args[1]
             value = args[2]
@@ -203,7 +203,7 @@ class ParamState:
             self.mav_param.show(pattern)
         else:
             print(usage)
-        
+
 
 class ParamModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -217,11 +217,11 @@ class ParamModule(mp_module.MPModule):
             parmfile = os.path.join(self.logdir, 'mav.parm')
             if os.path.exists(parmfile):
                 mpstate.mav_param.load(parmfile)
-                    
+
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         self.pstate.handle_mavlink_packet(self.master, m)
-    
+
     def idle_task(self):
         '''handle missing parameters'''
         self.pstate.vehicle_name = self.vehicle_name

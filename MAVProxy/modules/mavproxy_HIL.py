@@ -33,18 +33,18 @@ class HILModule(mp_module.MPModule):
         '''unload module'''
         self.sim_in.close()
         self.sim_out.close()
-    
+
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         if m.get_type() == 'RC_CHANNELS_SCALED':
             self.rc_channels_scaled = m
-    
+
     def idle_task(self):
         '''called from main loop'''
         self.check_sim_in()
         self.check_sim_out()
         self.check_apm_out()
-    
+
     def check_sim_in(self):
         '''check for FDM packets from runsim'''
         try:
@@ -52,7 +52,7 @@ class HILModule(mp_module.MPModule):
         except socket.error as e:
             if not e.errno in [ errno.EAGAIN, errno.EWOULDBLOCK ]:
                 raise
-            return        
+            return
         if len(pkt) != 17*8 + 4:
             # wrong size, discard it
             print("wrong size %u" % len(pkt))
@@ -63,7 +63,7 @@ class HILModule(mp_module.MPModule):
          roll, pitch, yaw,
          vcas, check) = struct.unpack('<17dI', pkt)
         (p, q, r) = self.convert_body_frame(radians(roll), radians(pitch), radians(phidot), radians(thetadot), radians(psidot))
-    
+
         try:
             self.hil_state_msg = self.master.mav.hil_state_encode(int(time.time()*1e6),
                                                                         radians(roll),
@@ -83,17 +83,17 @@ class HILModule(mp_module.MPModule):
                                                                         int(az*1000/9.81))
         except Exception:
             return
-        
-    
 
-    
+
+
+
     def check_sim_out(self):
         '''check if we should send new servos to flightgear'''
         now = time.time()
         if now - self.last_sim_send_time < 0.02 or self.rc_channels_scaled is None:
             return
         self.last_sim_send_time = now
-    
+
         servos = []
         for ch in range(1,9):
             servos.append(self.scale_channel(ch, getattr(self.rc_channels_scaled, 'chan%u_scaled' % ch)))
@@ -104,9 +104,9 @@ class HILModule(mp_module.MPModule):
         except socket.error as e:
             if not e.errno in [ errno.ECONNREFUSED ]:
                 raise
-            return        
-            
-    
+            return
+
+
     def check_apm_out(self):
         '''check if we should send new data to the APM'''
         now = time.time()
@@ -122,7 +122,7 @@ class HILModule(mp_module.MPModule):
         q = math.cos(phi)*thetaDot + math.sin(phi)*psiDot*math.cos(theta)
         r = math.cos(phi)*psiDot*math.cos(theta) - math.sin(phi)*thetaDot
         return (p, q, r)
-    
+
     def scale_channel(self, ch, value):
         '''scale a channel to 1000/1500/2000'''
         v = value/10000.0
@@ -135,7 +135,7 @@ class HILModule(mp_module.MPModule):
                 v = 0
             return int(1000 + v*1000)
         return int(1500 + v*500)
-            
+
 def init(mpstate):
     '''initialise module'''
-    return HILModule(mpstate) 
+    return HILModule(mpstate)

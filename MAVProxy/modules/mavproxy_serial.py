@@ -63,7 +63,7 @@ class SerialModule(mp_module.MPModule):
                                 self.serial_settings.timeout,
                                 self.serial_settings.baudrate,
                                 len(s), buf)
-    
+
     def cmd_serial(self, args):
         '''serial control commands'''
         usage = "Usage: serial <lock|unlock|set|send>"

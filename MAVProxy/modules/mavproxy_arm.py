@@ -26,21 +26,21 @@ class ArmModule(mp_module.MPModule):
                                       'throttle'])
         self.add_command('disarm', self.cmd_disarm,   'disarm motors')
 
-    
+
     def cmd_arm(self, args):
         '''arm commands'''
         usage = "usage: arm <check|uncheck|list|throttle>"
         checkables = "<all|baro|compass|gps|ins|params|rc|voltage|battery>"
-    
+
         if len(args) <= 0:
             print(usage)
             return
-            
+
         if args[0] == "check":
             if (len(args) < 2):
                 print("usage: arm check", checkables)
-                return            
-            
+                return
+
             arming_mask = int(self.get_mav_param("ARMING_CHECK",0))
             name = args[1].lower()
             if name == 'all':
@@ -53,12 +53,12 @@ class ArmModule(mp_module.MPModule):
                 return
             self.param_set("ARMING_CHECK", arming_mask)
             return
-        
+
         if args[0] == "uncheck":
             if (len(args) < 2):
                 print("usage: arm uncheck", checkables)
                 return
-    
+
             arming_mask = int(self.get_mav_param("ARMING_CHECK",0))
             name = args[1].lower()
             if name == 'all':
@@ -68,25 +68,25 @@ class ArmModule(mp_module.MPModule):
             else:
                 print("unrecognized arm check:", args[1])
                 return
-    
+
             self.param_set("ARMING_CHECK", arming_mask)
             return
-    
+
         if args[0] == "list":
-                arming_mask = int(self.get_mav_param("ARMING_CHECK",0))
-                if arming_mask == 0:
-                    print("NONE")
-                for name in arming_masks.keys():
-                    if arming_masks[name] & arming_mask:
-                        print(name)
-                return
-    
+            arming_mask = int(self.get_mav_param("ARMING_CHECK",0))
+            if arming_mask == 0:
+                print("NONE")
+            for name in arming_masks.keys():
+                if arming_masks[name] & arming_mask:
+                    print(name)
+            return
+
         if args[0] == "throttle":
             self.master.arducopter_arm()
             return
-    
+
         print(usage)
-    
+
     def cmd_disarm(self, args):
         '''disarm motors'''
         self.master.arducopter_disarm()

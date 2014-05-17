@@ -31,7 +31,7 @@ class AuxoptModule(mp_module.MPModule):
                          ['set <7|8> <Nothing|Flip|SimpleMode|RTL|SaveTrim|SaveWP|MultiMode|CameraTrigger|Sonar|Fence|ResetYaw|SuperSimpleMode|AcroTrainer|Acro|Auto|AutoTune|Land>',
                           'reset <7|8|all>',
                           '<show|list>'])
-    
+
     def aux_show(self, channel):
         param = "CH%s_OPT" % channel
         opt_num = str(int(self.get_mav_param(param)))
@@ -44,13 +44,13 @@ class AuxoptModule(mp_module.MPModule):
             print("AUX Channel is currently set to unknown value " + opt_num)
             return
         print("AUX Channel is currently set to " + option)
-    
+
     def aux_option_validate(self, option):
         for k in aux_options:
             if option.upper() == k.upper():
                 return k
         return None
-    
+
     def cmd_auxopt(self, args):
         '''handle AUX switches (CH7, CH8) settings'''
         if self.mpstate.vehicle_type != 'copter':

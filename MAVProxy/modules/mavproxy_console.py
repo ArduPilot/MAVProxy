@@ -23,7 +23,7 @@ class ConsoleModule(mp_module.MPModule):
         self.total_time = 0.0
         self.speed = 0
         mpstate.console = wxconsole.MessageConsole(title='Console')
-    
+
         # setup some default status information
         mpstate.console.set_status('Mode', 'UNKNOWN', row=0, fg='blue')
         mpstate.console.set_status('GPS', 'GPS: --', fg='red', row=0)
@@ -56,12 +56,12 @@ class ConsoleModule(mp_module.MPModule):
         self.add_menu(MPMenuSubMenu('MAVProxy',
                                     items=[MPMenuItem('Settings', 'Settings', 'menuSettings'),
                                            MPMenuItem('Map', 'Load Map', '# module load map')]))
-        
+
     def add_menu(self, menu):
         '''add a new menu'''
         self.menu.add(menu)
         self.mpstate.console.set_menu(self.menu, self.menu_callback)
-    
+
     def unload(self):
         '''unload module'''
         self.mpstate.console.close()
@@ -78,8 +78,8 @@ class ConsoleModule(mp_module.MPModule):
             self.mpstate.functions.process_stdin(cmd)
         if m.returnkey == 'menuSettings':
             wxsettings.WXSettings(self.settings)
-            
-    
+
+
     def estimated_time_remaining(self, lat, lon, wpnum, speed):
         '''estimate time remaining in mission in seconds'''
         idx = wpnum
@@ -108,9 +108,9 @@ class ConsoleModule(mp_module.MPModule):
                 if w.command == mavutil.mavlink.MAV_CMD_NAV_LAND:
                     break
         return distance / speed
-            
-            
-            
+
+
+
     def mavlink_packet(self, msg):
         '''handle an incoming mavlink packet'''
         if not isinstance(self.console, wxconsole.MessageConsole):
@@ -119,7 +119,7 @@ class ConsoleModule(mp_module.MPModule):
             self.mpstate.console = textconsole.SimpleConsole()
             return
         type = msg.get_type()
-    
+
         master = self.master
         # add some status fields
         if type in [ 'GPS_RAW', 'GPS_RAW_INT' ]:
@@ -196,7 +196,7 @@ class ConsoleModule(mp_module.MPModule):
                     fg = 'red'
                 else:
                     fg = 'green'
-                self.console.set_status(s, s, fg=fg)            
+                self.console.set_status(s, s, fg=fg)
         elif type == 'HWSTATUS':
             if msg.Vcc >= 4600 and msg.Vcc <= 5300:
                 fg = 'green'
@@ -255,7 +255,7 @@ class ConsoleModule(mp_module.MPModule):
                 self.speed = max(1, self.speed)
                 time_remaining = int(self.estimated_time_remaining(lat, lng, msg.seq, self.speed))
                 self.console.set_status('ETR', 'ETR %u:%02u' % (time_remaining/60, time_remaining%60))
-                
+
         elif type == 'NAV_CONTROLLER_OUTPUT':
             self.console.set_status('WPDist', 'Distance %u' % msg.wp_dist)
             self.console.set_status('WPBearing', 'Bearing %u' % msg.target_bearing)

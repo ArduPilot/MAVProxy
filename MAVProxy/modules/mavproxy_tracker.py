@@ -18,7 +18,7 @@ from MAVProxy.modules.mavproxy_param import ParamState
 
 # this should be in mavutil.py
 mode_mapping_antenna = {
-    'MANUAL' : 0, 
+    'MANUAL' : 0,
     'AUTO' : 10,
     'INITIALISING' : 16
     }
@@ -127,7 +127,7 @@ class TrackerModule(mp_module.MPModule):
             print('Unknown mode %s: ' % mode)
             return
         connection.set_mode(mode_mapping[mode])
-    
+
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet from the master vehicle. Relay it to the tracker
         if it is a GLOBAL_POSITION_INT'''
@@ -137,17 +137,17 @@ class TrackerModule(mp_module.MPModule):
                 return
             if m.get_srcSystem() != connection.target_system:
                 connection.mav.send(m)
-    
+
     def idle_task(self):
         '''called in idle time'''
         if not self.connection:
             return
-    
+
         # check for a mavlink message from the tracker
         m = self.connection.recv_msg()
         if m is None:
             return
-    
+
         if self.tracker_settings.debug:
             print(m)
 
@@ -156,41 +156,41 @@ class TrackerModule(mp_module.MPModule):
 
         if self.module('map') is None:
             return
-    
+
         if m.get_type() == 'GLOBAL_POSITION_INT':
             (self.lat, self.lon, self.heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
             if self.lat != 0 or self.lon != 0:
                 self.module('map').create_vehicle_icon('AntennaTracker', 'red', follow=False, vehicle_type='antenna')
                 self.mpstate.map.set_position('AntennaTracker', (self.lat, self.lon), rotation=self.heading)
-        
-    
+
+
     def cmd_tracker_start(self):
         if self.tracker_settings.port == None:
             print("tracker port not set")
             return
         print("connecting to tracker %s at %d" % (self.tracker_settings.port,
                                                   self.tracker_settings.baudrate))
-        m = mavutil.mavlink_connection(self.tracker_settings.port, 
-                                       autoreconnect=True, 
+        m = mavutil.mavlink_connection(self.tracker_settings.port,
+                                       autoreconnect=True,
                                        baud=self.tracker_settings.baudrate)
         if self.logdir:
             m.setup_logfile(os.path.join(self.logdir, 'tracker.tlog'))
         self.connection = m
-    
+
     def cmd_tracker_arm(self):
         '''Enable the servos in the tracker so the antenna will move'''
         if not self.connection:
             print("tracker not connected")
             return
         self.connection.arducopter_arm()
-    
+
     def cmd_tracker_disarm(self):
         '''Disable the servos in the tracker so the antenna will not move'''
         if not self.connection:
             print("tracker not connected")
             return
         self.connection.arducopter_disarm()
-    
+
     def cmd_tracker_level(self):
         '''Calibrate the accelerometers. Disarm and move the antenna level first'''
         if not self.connection:

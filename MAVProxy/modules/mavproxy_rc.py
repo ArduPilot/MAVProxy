@@ -89,6 +89,3 @@ class RCModule(mp_module.MPModule):
 def init(mpstate):
     '''initialise module'''
     return RCModule(mpstate)
-
-
-

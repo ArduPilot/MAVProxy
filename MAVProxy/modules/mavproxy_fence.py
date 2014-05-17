@@ -68,21 +68,21 @@ class FenceModule(mp_module.MPModule):
             elif self.present == True and present == False:
                 self.say("fence removed")
             self.present = present
-        
+
             enabled = ((m.onboard_control_sensors_enabled & bits) == bits)
             if self.enabled == False and enabled == True:
                 self.say("fence enabled")
             elif self.enabled == True and enabled == False:
                 self.say("fence disabled")
             self.enabled = enabled
-            
+
             healthy = ((m.onboard_control_sensors_health & bits) == bits)
             if self.healthy == False and healthy == True:
                 self.say("fence OK")
             elif self.healthy == True and healthy == False:
                 self.say("fence breach")
-            self.healthy = healthy 
-    
+            self.healthy = healthy
+
             #console output for fence:
             if self.enabled == False:
                 self.console.set_status('Fence', 'FEN', row=0, fg='grey')
@@ -90,7 +90,7 @@ class FenceModule(mp_module.MPModule):
                 self.console.set_status('Fence', 'FEN', row=0, fg='green')
             elif self.enabled == True and self.healthy == False:
                 self.console.set_status('Fence', 'FEN', row=0, fg='red')
-    
+
     def set_fence_enabled(self, do_enable):
         '''Enable or disable fence'''
         self.master.mav.command_long_send(
@@ -147,13 +147,13 @@ class FenceModule(mp_module.MPModule):
             print("Removed fence point %u" % idx)
         else:
             print("Failed to remove fence point %u" % idx)
-    
+
     def cmd_fence(self, args):
         '''fence commands'''
         if len(args) < 1:
             self.print_usage()
             return
-    
+
         if args[0] == "enable":
             self.set_fence_enabled(1)
         elif args[0] == "disable":
@@ -183,14 +183,14 @@ class FenceModule(mp_module.MPModule):
         elif args[0] == "draw":
             if not 'draw_lines' in self.mpstate.map_functions:
                 print("No map drawing available")
-                return        
+                return
             self.mpstate.map_functions['draw_lines'](self.fence_draw_callback)
             print("Drawing fence on map")
         elif args[0] == "clear":
             self.param_set('FENCE_TOTAL', 0, 3)
         else:
             self.print_usage()
-    
+
     def load_fence(self, filename):
         '''load fence points from a file'''
         try:
@@ -202,7 +202,7 @@ class FenceModule(mp_module.MPModule):
             return
         print("Loaded %u geo-fence points from %s" % (self.fenceloader.count(), filename))
         self.send_fence()
-    
+
     def send_fence(self):
         '''send fence points from fenceloader'''
         # must disable geo-fencing when loading
@@ -227,7 +227,7 @@ class FenceModule(mp_module.MPModule):
                 return False
         self.param_set('FENCE_ACTION', action, 3)
         return True
-    
+
     def fetch_fence_point(self ,i):
         '''fetch one fence point'''
         self.master.mav.fence_fetch_point_send(self.target_system,
@@ -244,7 +244,7 @@ class FenceModule(mp_module.MPModule):
             self.console.error("Failed to fetch point %u" % i)
             return None
         return p
-    
+
     def fence_draw_callback(self, points):
         '''callback from drawing a fence'''
         self.fenceloader.clear()
@@ -262,7 +262,7 @@ class FenceModule(mp_module.MPModule):
         self.fenceloader.add_latlon(points[0][0], points[0][1])
         self.send_fence()
         self.have_list = True
-    
+
     def list_fence(self, filename):
         '''list fence points, optionally saving to a file'''
         self.fenceloader.clear()
@@ -275,7 +275,7 @@ class FenceModule(mp_module.MPModule):
             if p is None:
                 return
             self.fenceloader.add(p)
-    
+
         if filename is not None:
             try:
                 self.fenceloader.save(filename)
@@ -292,7 +292,7 @@ class FenceModule(mp_module.MPModule):
             self.fenceloader.save(fencetxt)
             print("Saved fence to %s" % fencetxt)
         self.have_list = True
-    
+
     def print_usage(self):
         print("usage: fence <enable|disable|list|load|save|clear|draw|move|remove>")
 

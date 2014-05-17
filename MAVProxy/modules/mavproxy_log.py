@@ -118,7 +118,7 @@ class LogModule(mp_module.MPModule):
                                                                           size,
                                                                           speed,
                                                                           self.retries))
-    
+
     def log_download(self, log_num, filename):
         '''download a log file'''
         print("Downloading log %u as %s" % (log_num, filename))

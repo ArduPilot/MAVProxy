@@ -31,7 +31,7 @@ class RallyModule(mp_module.MPModule):
                                          MPMenuItem('Add', 'Add', '# rally add ',
                                                     handler=MPMenuCallTextDialog(title='Rally Altitude (m)',
                                                                                  default=100))])
-    
+
 
     def idle_task(self):
         '''called on idle'''
@@ -52,11 +52,11 @@ class RallyModule(mp_module.MPModule):
         if not self.have_list:
             print("Please list rally points first")
             return
-                
+
         if (self.rallyloader.rally_count() > 4):
             print ("Only 5 rally points possible per flight plan.")
             return
-    
+
         try:
             latlon = self.module('map').click_position
         except Exception:
@@ -65,14 +65,14 @@ class RallyModule(mp_module.MPModule):
         if latlon is None:
             print("No map click position available")
             return
-    
+
         break_alt = 0.0
         land_hdg = 0.0
         if (len(args) > 2):
             break_alt = float(args[2])
         if (len(args) > 3):
             land_hdg = float(args[3])
-    
+
         self.rallyloader.create_and_append_rally_point(latlon[0] * 1e7, latlon[1] * 1e7, alt, break_alt, land_hdg, 0)
         self.send_rally_points()
         print("Added Rally point at %s %f" % (str(latlon), alt))
@@ -92,7 +92,7 @@ class RallyModule(mp_module.MPModule):
             return
 
         rpoint = self.rallyloader.rally_point(idx-1)
-                
+
         try:
             latlon = self.module('map').click_position
         except Exception:
@@ -111,7 +111,7 @@ class RallyModule(mp_module.MPModule):
             return
         self.rallyloader.reindex()
         print("Moved rally point from %s to %s at %fm" % (str(oldpos), str(latlon), rpoint.alt))
-    
+
 
     def cmd_rally(self, args):
         '''rally point commands'''
@@ -119,7 +119,7 @@ class RallyModule(mp_module.MPModule):
         if len(args) < 1:
             self.print_usage()
             return
-    
+
         elif args[0] == "add":
             self.cmd_rally_add(args[1:])
 
@@ -138,44 +138,44 @@ class RallyModule(mp_module.MPModule):
                 print("Usage: rally remove RALLYNUM")
                 return
             self.rallyloader.remove(int(args[1]))
-            self.send_rally_points()            
-    
+            self.send_rally_points()
+
         elif args[0] == "list":
             self.list_rally_points()
             self.have_list = True
-    
+
         elif args[0] == "load":
             if (len(args) < 2):
                 print("Usage: rally load filename")
                 return
-    
+
             try:
                 self.rallyloader.load(args[1])
             except Exception as msg:
                 print("Unable to load %s - %s" % (args[1], msg))
                 return
-        
+
             self.send_rally_points()
             self.have_list = True
-    
+
             print("Loaded %u rally points from %s" % (self.rallyloader.rally_count(), args[1]))
-    
+
         elif args[0] == "save":
             if (len(args) < 2):
                 print("Usage: rally save filename")
                 return
-    
+
             self.rallyloader.save(args[1])
-    
+
             print("Saved rally file %s" % args[1])
-    
+
         else:
             self.print_usage()
-    
+
     def mavlink_packet(self, m):
         '''handle incoming mavlink packet'''
         return #TODO when applicable
-    
+
     def send_rally_point(self, i):
         '''send rally points from fenceloader'''
         p = self.rallyloader.rally_point(i)
@@ -186,10 +186,10 @@ class RallyModule(mp_module.MPModule):
     def send_rally_points(self):
         '''send rally points from fenceloader'''
         self.mav_param.mavset(self.master,'RALLY_TOTAL',self.rallyloader.rally_count(),3)
-    
+
         for i in range(self.rallyloader.rally_count()):
             self.send_rally_point(i)
-           
+
     def fetch_rally_point(self, i):
         '''fetch one rally point'''
         self.master.mav.rally_fetch_point_send(self.target_system,
@@ -206,7 +206,7 @@ class RallyModule(mp_module.MPModule):
             self.console.error("Failed to fetch rally point %u" % i)
             return None
         return p
-    
+
     def list_rally_points(self):
         self.rallyloader.clear()
         rally_count = self.mav_param.get('RALLY_TOTAL',0)
@@ -218,14 +218,14 @@ class RallyModule(mp_module.MPModule):
             if p is None:
                 return
             self.rallyloader.append_rally_point(p)
-    
+
         for i in range(self.rallyloader.rally_count()):
             p = self.rallyloader.rally_point(i)
             self.console.writeln("lat=%f lng=%f alt=%f break_alt=%f land_dir=%f" % (p.lat * 1e-7, p.lng * 1e-7, p.alt, p.break_alt, p.land_dir))
-    
+
     def print_usage(self):
         print("Usage: rally <list|load|save|add|remove|move|clear>")
-        
+
 def init(mpstate):
     '''initialise module'''
-    return RallyModule(mpstate)       
+    return RallyModule(mpstate)
