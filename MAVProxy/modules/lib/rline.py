@@ -22,7 +22,7 @@ class rline(object):
             '(COMMAND)' : complete_command,
             '(ALIAS)' : complete_alias
             }
-        
+
     def set_prompt(self, prompt):
         if prompt != self.prompt:
             self.prompt = prompt
@@ -73,7 +73,7 @@ def rule_expand(component, text):
         return component[1:-1].split('|')
     if component in rline_mpstate.completion_functions:
         return rline_mpstate.completion_functions[component](text)
-    return [component]        
+    return [component]
 
 def rule_match(component, cmd):
     '''see if one rule component matches'''
@@ -82,7 +82,7 @@ def rule_match(component, cmd):
     expanded = rule_expand(component, cmd)
     if cmd in expanded:
         return True
-    return False      
+    return False
 
 def complete_rule(rule, cmd):
     '''complete using one rule'''
@@ -97,7 +97,7 @@ def complete_rule(rule, cmd):
     # expand the next rule component
     expanded = rule_expand(rule_components[len(cmd)-1], cmd[-1])
     return expanded
-    
+
 
 def complete_rules(rules, cmd):
     '''complete using a list of completion rules'''
@@ -107,7 +107,7 @@ def complete_rules(rules, cmd):
     for r in rules:
         ret += complete_rule(r, cmd)
     return ret
-   
+
 
 last_clist = None
 
@@ -117,7 +117,7 @@ def complete(text, state):
     global rline_mpstate
     if state != 0 and last_clist is not None:
         return last_clist[state]
-        
+
     # split the command so far
     cmd = readline.get_line_buffer().split(' ')
 
@@ -137,8 +137,8 @@ def complete(text, state):
     ret.append(None)
     last_clist = ret
     return last_clist[state]
-    
-    
+
+
 
 # some python distributions don't have readline, so handle that case
 # with a try/except

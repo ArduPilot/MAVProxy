@@ -23,4 +23,3 @@ try:
 except Exception as e:
     # Silently ignore failures installing this handler (probably won't work on Windows)
     pass
-

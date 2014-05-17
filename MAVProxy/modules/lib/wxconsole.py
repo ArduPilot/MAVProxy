@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-  MAVProxy message console, implemented in a child process  
+  MAVProxy message console, implemented in a child process
 """
 import textconsole, wx, sys
 import mp_menu
@@ -84,13 +84,13 @@ class MessageConsole(textconsole.SimpleConsole):
 
 class ConsoleFrame(wx.Frame):
     """ The main frame of the console"""
-    
+
     def __init__(self, state, title):
         self.state = state
         wx.Frame.__init__(self, None, title=title, size=(800,300))
         self.panel = wx.Panel(self)
         state.frame = self
-        
+
         # values for the status bar
         self.values = {}
 
@@ -99,18 +99,18 @@ class ConsoleFrame(wx.Frame):
 
         self.control = wx.TextCtrl(self.panel, style=wx.TE_MULTILINE | wx.TE_READONLY)
 
-        
+
         self.vbox = wx.BoxSizer(wx.VERTICAL)
         # start with one status row
         self.status = [wx.BoxSizer(wx.HORIZONTAL)]
         self.vbox.Add(self.status[0], 0, flag=wx.ALIGN_LEFT | wx.TOP)
-        self.vbox.Add(self.control, 1, flag=wx.LEFT | wx.BOTTOM | wx.GROW)        
+        self.vbox.Add(self.control, 1, flag=wx.LEFT | wx.BOTTOM | wx.GROW)
 
         self.panel.SetSizer(self.vbox)
 
         self.timer = wx.Timer(self)
 
-        self.Bind(wx.EVT_TIMER, self.on_timer, self.timer)        
+        self.Bind(wx.EVT_TIMER, self.on_timer, self.timer)
         self.timer.Start(100)
 
         self.Bind(wx.EVT_IDLE, self.on_idle)
@@ -130,7 +130,7 @@ class ConsoleFrame(wx.Frame):
     def on_idle(self, event):
         import time
         time.sleep(0.05)
-    
+
     def on_timer(self, event):
         state = self.state
         if state.close_event.wait(0.001):
@@ -151,7 +151,7 @@ class ConsoleFrame(wx.Frame):
                         self.vbox.Layout()
                     self.status[obj.row].Add(value, border=5)
                     self.status[obj.row].AddSpacer(20)
-                    self.values[obj.name] = value                    
+                    self.values[obj.name] = value
                 value = self.values[obj.name]
                 value.SetForegroundColour(obj.fg)
                 value.SetBackgroundColour(obj.bg)
@@ -173,10 +173,10 @@ class ConsoleFrame(wx.Frame):
             elif isinstance(obj, mp_menu.MPMenuTop):
                 self.menu = obj
                 self.SetMenuBar(self.menu.wx_menu())
-                self.Bind(wx.EVT_MENU, self.on_menu)                
+                self.Bind(wx.EVT_MENU, self.on_menu)
                 self.Refresh()
                 self.Update()
-    
+
 if __name__ == "__main__":
     # test the console
     import time

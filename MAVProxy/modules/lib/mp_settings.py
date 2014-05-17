@@ -92,7 +92,7 @@ class MPSettings(object):
         self._vars[setting.name] = setting
         self._keys.append(setting.name)
         self._last_change = time.time()
-            
+
 
     def __getattr__(self, name):
         if name in self._vars:
@@ -174,8 +174,8 @@ class MPSettings(object):
             f.write("%s=%s\n" % (k, self.get(k)))
         f.close()
         return True
-    
-        
+
+
     def load(self, filename):
         '''load settings from a file. Return True/False on success/failure'''
         try:
@@ -199,4 +199,3 @@ class MPSettings(object):
     def last_change(self):
         '''return last change time'''
         return self._last_change
-    

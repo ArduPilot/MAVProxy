@@ -83,7 +83,7 @@ class TabbedDialog(wx.Dialog):
         '''called on cancel'''
         self.Destroy()
         sys.exit(0)
-        
+
     def on_apply(self, event):
         '''called on apply'''
         for label in self.setting_map.keys():
@@ -198,7 +198,7 @@ class TabbedDialog(wx.Dialog):
         if setting.digits is not None:
             ctrl.SetDigits(setting.digits)
         self._add_input(setting, ctrl, value=default)
-        
+
 #----------------------------------------------------------------------
 class SettingsDlg(TabbedDialog):
     def __init__(self, settings):
@@ -221,13 +221,13 @@ class SettingsDlg(TabbedDialog):
             if setting.type == bool:
                 self.add_choice(setting, ['True', 'False'])
             elif setting.choice is not None:
-                self.add_choice(setting, setting.choice)                
+                self.add_choice(setting, setting.choice)
             elif setting.type == int and setting.increment is not None and setting.range is not None:
                 self.add_intspin(setting)
             elif setting.type == float and setting.increment is not None and setting.range is not None:
                 self.add_floatspin(setting)
             else:
-                self.add_text(setting)  
+                self.add_text(setting)
         self.refit()
 
 if __name__ == "__main__":

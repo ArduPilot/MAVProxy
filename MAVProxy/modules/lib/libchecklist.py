@@ -42,7 +42,7 @@ class UI():
         self.createWidgets(self.root)
         self.on_timer()
 
-        self.root.mainloop()  
+        self.root.mainloop()
 
 
     def createLists(self):
@@ -130,7 +130,7 @@ class UI():
 
         '''before assembly checklist'''
         i = 1
-        for key in self.beforeAssemblyList:     
+        for key in self.beforeAssemblyList:
             if self.beforeAssemblyList[key] == 0:
                 self.beforeAssemblyList[key] = tk.IntVar()
                 aCheckButton = tk.Checkbutton(text=key, variable=self.beforeAssemblyList[key], state="disabled", wraplength=170, justify='left', onvalue=1, offvalue=0)
@@ -141,12 +141,12 @@ class UI():
                 aCheckButton.grid(row = i, column=0, sticky='w')
             i = i+1
 
-        self.beforeAssemblyButton = tk.Button(text='Close final hatches', state="active", command=self.beforeAssemblyListCheck)      
+        self.beforeAssemblyButton = tk.Button(text='Close final hatches', state="active", command=self.beforeAssemblyListCheck)
         self.beforeAssemblyButton.grid(row = i, column=0, sticky='w')
-        
+
         '''before Engine Start checklist'''
         i = 1
-        for key in self.beforeEngineList:     
+        for key in self.beforeEngineList:
             if self.beforeEngineList[key] == 0:
                 self.beforeEngineList[key] = tk.IntVar()
                 aCheckButton = tk.Checkbutton(text=key, variable=self.beforeEngineList[key], state="disabled", wraplength=170, justify='left', onvalue=1, offvalue=0)
@@ -157,12 +157,12 @@ class UI():
                 aCheckButton.grid(row = i, column=1, sticky='w')
             i = i+1
 
-        self.beforeEngineButton = tk.Button(text='Ready for Engine start', state="disabled", command=self.beforeEngineCheck)      
+        self.beforeEngineButton = tk.Button(text='Ready for Engine start', state="disabled", command=self.beforeEngineCheck)
         self.beforeEngineButton.grid(row = i, column=1, sticky='w')
 
         '''before takeoff checklist'''
         i = 1
-        for key in self.beforeTakeoffList:     
+        for key in self.beforeTakeoffList:
             if self.beforeTakeoffList[key] == 0:
                 self.beforeTakeoffList[key] = tk.IntVar()
                 aCheckButton = tk.Checkbutton(text=key, variable=self.beforeTakeoffList[key], state="disabled", wraplength=170, justify='left', onvalue=1, offvalue=0)
@@ -173,12 +173,12 @@ class UI():
                 aCheckButton.grid(row = i, column=2, sticky='w')
             i = i+1
 
-        self.beforeTakeoffButton = tk.Button(text='Ready for Takeoff', state="disabled", command=self.beforeTakeoffCheck)      
+        self.beforeTakeoffButton = tk.Button(text='Ready for Takeoff', state="disabled", command=self.beforeTakeoffCheck)
         self.beforeTakeoffButton.grid(row = i, column=2, sticky='w')
 
         '''After takeoff'''
         i=1
-        for key in self.beforeCruiseList:     
+        for key in self.beforeCruiseList:
             if self.beforeCruiseList[key] == 0:
                 self.beforeCruiseList[key] = tk.IntVar()
                 aCheckButton = tk.Checkbutton(text=key, variable=self.beforeCruiseList[key], state="disabled", wraplength=170, justify='left', onvalue=1, offvalue=0)
@@ -189,12 +189,12 @@ class UI():
                 aCheckButton.grid(row = i, column=3, sticky='w')
             i = i+1
 
-        self.beforeCruiseButton = tk.Button(text='Ready for Cruise', state="disabled", command=self.beforeCruiseCheck)      
+        self.beforeCruiseButton = tk.Button(text='Ready for Cruise', state="disabled", command=self.beforeCruiseCheck)
         self.beforeCruiseButton.grid(row = i, column=3, sticky='w')
 
         '''Before bottle drop'''
         '''i=1
-        for key in self.bottleDropList:     
+        for key in self.bottleDropList:
             if self.bottleDropList[key] == 0:
                 self.bottleDropList[key] = tk.IntVar()
                 aCheckButton = tk.Checkbutton(text=key, variable=self.bottleDropList[key], state="disabled", wraplength=170, justify='left', onvalue=1, offvalue=0)
@@ -205,12 +205,12 @@ class UI():
                 aCheckButton.grid(row = i, column=4, sticky='w')
             i = i+1
 
-        self.bottleDropButton = tk.Button(text='Bottle drop completed', state="disabled", command=self.bottleDropCheck)      
+        self.bottleDropButton = tk.Button(text='Bottle drop completed', state="disabled", command=self.bottleDropCheck)
         self.bottleDropButton.grid(row = i, column=4, sticky='w')'''
 
         '''Before landing'''
         '''i=1
-        for key in self.beforeLandingList:     
+        for key in self.beforeLandingList:
             if self.beforeLandingList[key] == 0:
                 self.beforeLandingList[key] = tk.IntVar()
                 aCheckButton = tk.Checkbutton(text=key, variable=self.beforeLandingList[key], state="disabled", wraplength=170, justify='left', onvalue=1, offvalue=0)
@@ -221,12 +221,12 @@ class UI():
                 aCheckButton.grid(row = i, column=5, sticky='w')
             i = i+1
 
-        self.beforeLandingButton = tk.Button(text='Ready for landing', state="disabled", command=self.beforeLandingCheck)      
+        self.beforeLandingButton = tk.Button(text='Ready for landing', state="disabled", command=self.beforeLandingCheck)
         self.beforeLandingButton.grid(row = i, column=5, sticky='w')'''
 
         '''before shutdown checklist'''
         '''i = 1
-        for key in self.beforeShutdownList:     
+        for key in self.beforeShutdownList:
             if self.beforeShutdownList[key] == 0:
                 self.beforeShutdownList[key] = tk.IntVar()
                 aCheckButton = tk.Checkbutton(text=key, variable=self.beforeShutdownList[key], state="disabled", wraplength=170, justify='left', onvalue=1, offvalue=0)
@@ -237,7 +237,7 @@ class UI():
                 aCheckButton.grid(row = i, column=6, sticky='w')
             i = i+1
 
-        self.beforeShutdownButton = tk.Button(text='Shutdown', state="disabled", command=self.beforeShutdownCheck)      
+        self.beforeShutdownButton = tk.Button(text='Shutdown', state="disabled", command=self.beforeShutdownCheck)
         self.beforeShutdownButton.grid(row = i, column=6, sticky='w')'''
 
 
@@ -304,8 +304,8 @@ class UI():
 
         '''if we made it here, the checklist is OK'''
         self.beforeCruiseButton.config(state="normal")
-        self.beforeTakeoffButton.config(text='Checklist Completed', state="disabled") 
-        self.curStep = 3  
+        self.beforeTakeoffButton.config(text='Checklist Completed', state="disabled")
+        self.curStep = 3
 
 
     def beforeCruiseCheck(self):
@@ -439,16 +439,13 @@ class UI():
         if self.child.is_alive():
             self.parent_pipe.send(CheckItem(name, status))
 
-    
+
 if __name__ == "__main__":
     # test the console
     import time
 
     checklist = UI()
-    
+
     while checklist.is_alive():
         checklist.set_status("Compass Offsets", 1)
         time.sleep(0.5)
-
-
-
