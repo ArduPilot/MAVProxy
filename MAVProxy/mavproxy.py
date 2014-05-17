@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''
 mavproxy - a MAVLink proxy program
 
@@ -9,7 +9,7 @@ Released under the GNU GPL version 3 or later
 
 import sys, os, struct, math, time, socket
 import fnmatch, errno, threading
-import serial, Queue, select
+import serial, queue, select
 import traceback
 import select
 
@@ -252,7 +252,8 @@ def load_module(modname, quiet=False):
     for modpath in modpaths:
         try:
             m = import_package(modpath)
-            reload(m)
+            import imp
+            imp.reload(m)
             module = m.init(mpstate)
             if isinstance(module, mp_module.MPModule):
                 mpstate.modules.append((module, m))
@@ -262,11 +263,11 @@ def load_module(modname, quiet=False):
             else:
                 ex = "%s.init did not return a MPModule instance" % modname
                 break
-        except ImportError, msg:
+        except ImportError as msg:
             ex = msg
             if mpstate.settings.moddebug > 1:
                 import traceback
-                print traceback.format_exc()
+                print(traceback.format_exc())
     print("Failed to load module: %s" % ex)
     return False
 
@@ -736,7 +737,7 @@ def master_callback(m, master):
                 continue
             try:
                 mod.mavlink_packet(m)
-            except Exception, msg:
+            except Exception as msg:
                 if mpstate.settings.moddebug == 1:
                     print(msg)
                 elif mpstate.settings.moddebug > 1:
@@ -833,7 +834,7 @@ def open_logs():
     logfile = opts.logfile
     if opts.aircraft is not None:
         if opts.mission is not None:
-            print opts.mission
+            print(opts.mission)
             dirname = "%s/logs/%s/Mission%s" % (opts.aircraft, time.strftime("%Y-%m-%d"), opts.mission)
         else:
             dirname = "%s/logs/%s" % (opts.aircraft, time.strftime("%Y-%m-%d"))
@@ -859,8 +860,8 @@ def open_logs():
     print("Logging to %s" % logfile)
 
     # queues for logging
-    mpstate.logqueue = Queue.Queue()
-    mpstate.logqueue_raw = Queue.Queue()
+    mpstate.logqueue = queue.Queue()
+    mpstate.logqueue_raw = queue.Queue()
 
     # use a separate thread for writing to the logfile to prevent
     # delays during disk writes (important as delays can be long if camera
@@ -933,7 +934,7 @@ def periodic_tasks():
         if hasattr(m, 'idle_task'):
             try:
                 m.idle_task()
-            except Exception, msg:
+            except Exception as msg:
                 if mpstate.settings.moddebug == 1:
                     print(msg)
                 elif mpstate.settings.moddebug > 1:
@@ -1003,7 +1004,7 @@ def main_loop():
                     # call the registered read function
                     (fn, args) = mpstate.select_extra[fd]
                     fn(args)
-                except Exception, msg:
+                except Exception as msg:
                     if mpstate.settings.moddebug == 1:
                         print(msg)
                     # on an exception, remove it from the select list
@@ -1183,7 +1184,7 @@ Auto-detected serial ports are:
     battery_period = mavutil.periodic_event(0.1)
     heartbeat_check_period = mavutil.periodic_event(0.33)
 
-    mpstate.input_queue = Queue.Queue()
+    mpstate.input_queue = queue.Queue()
     mpstate.rl = rline.rline("MAV> ", mpstate)
     if opts.setup:
         mpstate.rl.set_prompt("")
@@ -1245,7 +1246,8 @@ Auto-detected serial ports are:
                                 m.unload()
                             except Exception:
                                 pass
-                        reload(m)
+                        import imp
+                        imp.reload(m)
                         m.init(mpstate)   
 
             else:
@@ -1255,7 +1257,7 @@ Auto-detected serial ports are:
     #this loop executes after leaving the above loop and is for cleanup on exit
     for (m,pm) in mpstate.modules:
         if hasattr(m, 'unload'):
-            print "Unloading module:", m.name
+            print("Unloading module %s" % m.name)
             m.unload()
         
     sys.exit(1)

@@ -5,6 +5,7 @@ import os, time
 from pymavlink import mavwp, mavutil
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
+from MAVProxy.modules.lib.mp_menu import *
 
 class FenceModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -31,7 +32,6 @@ class FenceModule(mp_module.MPModule):
 
         self.menu_added_console = False
         self.menu_added_map = False
-        from MAVProxy.modules.lib.mp_menu import *
         self.menu = MPMenuSubMenu('Fence',
                                   items=[MPMenuItem('Clear', 'Clear', '# fence clear'),
                                          MPMenuItem('List', 'List', '# fence list'),
@@ -197,7 +197,7 @@ class FenceModule(mp_module.MPModule):
             self.fenceloader.target_system = self.target_system
             self.fenceloader.target_component = self.target_component
             self.fenceloader.load(filename)
-        except Exception, msg:
+        except Exception as msg:
             print("Unable to load %s - %s" % (filename, msg))
             return
         print("Loaded %u geo-fence points from %s" % (self.fenceloader.count(), filename))
@@ -279,7 +279,7 @@ class FenceModule(mp_module.MPModule):
         if filename is not None:
             try:
                 self.fenceloader.save(filename)
-            except Exception, msg:
+            except Exception as msg:
                 print("Unable to save %s - %s" % (filename, msg))
                 return
             print("Saved %u geo-fence points to %s" % (self.fenceloader.count(), filename))

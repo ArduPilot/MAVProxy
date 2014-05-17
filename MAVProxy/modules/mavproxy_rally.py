@@ -5,6 +5,7 @@
 from pymavlink import mavwp
 import time
 from MAVProxy.modules.lib import mp_module
+from MAVProxy.modules.lib.mp_menu import *
 
 class RallyModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -16,7 +17,6 @@ class RallyModule(mp_module.MPModule):
 
         self.menu_added_console = False
         self.menu_added_map = False
-        from MAVProxy.modules.lib.mp_menu import *
         self.menu = MPMenuSubMenu('Rally',
                                   items=[MPMenuItem('Clear', 'Clear', '# rally clear'),
                                          MPMenuItem('List', 'List', '# rally list'),
@@ -151,7 +151,7 @@ class RallyModule(mp_module.MPModule):
     
             try:
                 self.rallyloader.load(args[1])
-            except Exception, msg:
+            except Exception as msg:
                 print("Unable to load %s - %s" % (args[1], msg))
                 return
         

@@ -72,7 +72,7 @@ class PPPModule(mp_module.MPModule):
         '''set ppp parameters and start link'''
         usage = "ppp <command|start|stop>"
         if len(args) == 0:
-            print usage
+            print(usage)
             return
         if args[0] == "command":
             if len(args) == 1:

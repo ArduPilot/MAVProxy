@@ -149,7 +149,7 @@ class TrackerModule(mp_module.MPModule):
             return
     
         if self.tracker_settings.debug:
-            print m
+            print(m)
 
         self.pstate.handle_mavlink_packet(self.connection, m)
         self.pstate.fetch_check(self.connection)

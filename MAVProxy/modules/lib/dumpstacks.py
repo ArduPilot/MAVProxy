@@ -15,7 +15,7 @@ def dumpstacks(signal, frame):
             code.append('File: "%s", line %d, in %s' % (filename, lineno, name))
             if line:
                 code.append("  %s" % (line.strip()))
-    print "\n".join(code)
+    print("\n".join(code))
 
 try:
     import signal

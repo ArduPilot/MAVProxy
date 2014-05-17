@@ -57,7 +57,7 @@ class CameraViewModule(mp_module.MPModule):
                 state.settings.set(args[1], args[2])
                 state.update_col()
         else:
-            print 'usage: cameraview set'
+            print('usage: cameraview set')
     
     def unload(self):
         '''unload module'''
@@ -105,7 +105,7 @@ class CameraViewModule(mp_module.MPModule):
                 # using master() gives the right coordinates
                 # (i.e. matches GLOBAL_POSITION_INT coords, and $IMHOME in sim_arduplane.sh)
                 # and wploader is a bit off
-                print 'home height changed from',old,'to',state.home_height
+                print('home height changed from',old,'to',state.home_height)
         elif m.get_type() == 'SERVO_OUTPUT_RAW':
             for (axis, attr) in [('ROLL', 'mount_roll'), ('TILT', 'mount_pitch'), ('PAN', 'mount_yaw')]:
                 channel = int(self.get_mav_param('MNT_RC_IN_{0}'.format(axis), 0))

@@ -69,7 +69,7 @@ class ParamState:
             child = multiprocessing.Process(target=mp_util.download_files, args=(files,))
             child.start()
         except Exception as e:
-            print e
+            print(e)
     
     def param_help(self, args):
         '''show help on a parameter'''

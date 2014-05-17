@@ -78,10 +78,10 @@ class JSModule(mp_module.MPModule):
                 j = pygame.joystick.Joystick(i)
                 j.init() # init instance
                 name = j.get_name()
-                print 'joystick found: ' + name
+                print('joystick found: ' + name)
                 for jtype in joymap:
                     if fnmatch.fnmatch(name, jtype):
-                        print "Matched type '%s'" % jtype
+                        print("Matched type '%s'" % jtype)
                         print '%u axes available' % j.get_numaxes()
                         self.js = j
                         self.num_axes = j.get_numaxes()

@@ -4,6 +4,7 @@
 import time, os, fnmatch
 from pymavlink import mavutil, mavwp
 from MAVProxy.modules.lib import mp_module
+from MAVProxy.modules.lib.mp_menu import *
 
 class WPModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -27,7 +28,6 @@ class WPModule(mp_module.MPModule):
 
         self.menu_added_console = False
         self.menu_added_map = False
-        from MAVProxy.modules.lib.mp_menu import *
         self.menu = MPMenuSubMenu('Mission',
                                   items=[MPMenuItem('Clear', 'Clear', '# wp clear'),
                                          MPMenuItem('List', 'List', '# wp list'),
@@ -145,7 +145,7 @@ class WPModule(mp_module.MPModule):
         self.wploader.target_component = self.target_component
         try:
             self.wploader.load(filename)
-        except Exception, msg:
+        except Exception as msg:
             print("Unable to load %s - %s" % (filename, msg))
             return
         print("Loaded %u waypoints from %s" % (self.wploader.count(), filename))
@@ -157,7 +157,7 @@ class WPModule(mp_module.MPModule):
         self.wploader.target_component = self.target_component
         try:
             self.wploader.load(filename)
-        except Exception, msg:
+        except Exception as msg:
             print("Unable to load %s - %s" % (filename, msg))
             return
         if self.wploader.count() == 0:
@@ -187,7 +187,7 @@ class WPModule(mp_module.MPModule):
         '''save waypoints to a file'''
         try:
             self.wploader.save(filename)
-        except Exception, msg:
+        except Exception as msg:
             print("Failed to save %s - %s" % (filename, msg))
             return
         print("Saved %u waypoints to %s" % (self.wploader.count(), filename))
