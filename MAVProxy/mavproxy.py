@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 '''
 mavproxy - a MAVLink proxy program
 
@@ -9,7 +9,7 @@ Released under the GNU GPL version 3 or later
 
 import sys, os, struct, math, time, socket
 import fnmatch, errno, threading
-import serial, queue, select
+import serial, Queue, select
 import traceback
 import select
 
@@ -860,8 +860,8 @@ def open_logs():
     print("Logging to %s" % logfile)
 
     # queues for logging
-    mpstate.logqueue = queue.Queue()
-    mpstate.logqueue_raw = queue.Queue()
+    mpstate.logqueue = Queue.Queue()
+    mpstate.logqueue_raw = Queue.Queue()
 
     # use a separate thread for writing to the logfile to prevent
     # delays during disk writes (important as delays can be long if camera
@@ -1184,7 +1184,7 @@ Auto-detected serial ports are:
     battery_period = mavutil.periodic_event(0.1)
     heartbeat_check_period = mavutil.periodic_event(0.33)
 
-    mpstate.input_queue = queue.Queue()
+    mpstate.input_queue = Queue.Queue()
     mpstate.rl = rline.rline("MAV> ", mpstate)
     if opts.setup:
         mpstate.rl.set_prompt("")
