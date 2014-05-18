@@ -664,7 +664,7 @@ def master_callback(m, master):
             have_gps_fix = True
         if 'GPS_RAW_INT' in mpstate.status.msgs and mpstate.status.msgs['GPS_RAW_INT'].fix_type == 3:
             have_gps_fix = True
-        if have_gps_fix and not mpstate.status.have_gps_lock:
+        if have_gps_fix and not mpstate.status.have_gps_lock and m.alt != 0:
                 say("GPS lock at %u meters" % m.alt, priority='notification')
                 mpstate.status.have_gps_lock = True
 
