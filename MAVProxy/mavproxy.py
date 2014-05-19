@@ -252,8 +252,7 @@ def load_module(modname, quiet=False):
     for modpath in modpaths:
         try:
             m = import_package(modpath)
-            import imp
-            imp.reload(m)
+            reload(m)
             module = m.init(mpstate)
             if isinstance(module, mp_module.MPModule):
                 mpstate.modules.append((module, m))
@@ -1250,8 +1249,7 @@ Auto-detected serial ports are:
                                 m.unload()
                             except Exception:
                                 pass
-                        import imp
-                        imp.reload(m)
+                        reload(m)
                         m.init(mpstate)   
 
             else:
