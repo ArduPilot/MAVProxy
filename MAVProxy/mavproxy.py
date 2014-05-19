@@ -1098,6 +1098,10 @@ if __name__ == '__main__':
 
     (opts, args) = parser.parse_args()
 
+    # warn people about ModemManager which interferes badly with APM and Pixhawk
+    if os.path.exists("/usr/sbin/ModemManager"):
+        print("WARNING: You should uninstall ModemManager as it conflicts with APM and Pixhawk")
+
     if opts.mav09:
         os.environ['MAVLINK09'] = '1'
     from pymavlink import mavutil, mavparm
