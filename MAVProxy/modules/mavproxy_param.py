@@ -110,7 +110,7 @@ class ParamState:
             else:
                 print("Parameter '%s' not found in documentation" % h)
 
-    def handle_command(self, master, args):
+    def handle_command(self, master, mpstate, args):
         '''handle parameter commands'''
         param_wildcard = "*"
         usage="Usage: param <fetch|set|show|load|preload|forceload|diff|download|help>"
@@ -168,6 +168,11 @@ class ParamState:
                 print("Unable to find parameter '%s'" % param)
                 return
             self.mav_param.mavset(master, param.upper(), value, retries=3)
+
+            if (param.upper() == "WP_LOITER_RAD" or param.upper() == "LAND_BREAK_PATH"):
+                #need to redraw rally points
+                mpstate.module('rally').rallyloader.last_change = time.time()
+
         elif args[0] == "load":
             if len(args) < 2:
                 print("Usage: param load <filename> [wildcard]")
@@ -229,7 +234,7 @@ class ParamModule(mp_module.MPModule):
 
     def cmd_param(self, args):
         '''control parameters'''
-        self.pstate.handle_command(self.master, args)
+        self.pstate.handle_command(self.master, self.mpstate, args)
 
 def init(mpstate):
     '''initialise module'''
