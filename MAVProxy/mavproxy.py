@@ -120,7 +120,7 @@ class MPState(object):
               MPSetting('mavfwd', bool, True, 'Allow forwarded control'),
               MPSetting('mavfwd_rate', bool, False, 'Allow forwarded rate control'),
               MPSetting('shownoise', bool, True, 'Show non-MAVLink data'),
-              
+
               MPSetting('altreadout', int, 10, 'Altitude Readout',
                         range=(0,100), increment=1, tab='Announcements'),
               MPSetting('distreadout', int, 200, 'Distance Readout', range=(0,10000), increment=1),
@@ -164,7 +164,7 @@ class MPState(object):
         if name in self.public_modules:
             return self.public_modules[name]
         return None
-    
+
     def master(self):
         '''return the currently chosen mavlink master object'''
         if self.settings.link > len(self.mav_master):
@@ -406,7 +406,7 @@ def process_stdin(line):
         line = mpstate.aliases[cmd]
         args = line.split() + args[1:]
         cmd = args[0]
-        
+
     if cmd == 'help':
         k = command_map.keys()
         k.sort()
@@ -480,7 +480,7 @@ def battery_update(SYS_STATUS):
 def battery_report():
     batt_mon = get_mav_param('BATT_MONITOR',0)
 
-    #report voltage level only 
+    #report voltage level only
     if batt_mon == 3:
         mpstate.console.set_status('Battery', 'Batt: %.2fV' % (float(mpstate.status.voltage_level) / 1000.0), row=1)
     elif batt_mon == 4:
@@ -647,7 +647,7 @@ def master_callback(m, master):
         elif m.type in [mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER]:
             mpstate.vehicle_type = 'antenna'
             mpstate.vehicle_name = 'AntennaTracker'
-        
+
     elif mtype == 'STATUSTEXT':
         if m.text != mpstate.status.last_apm_msg or time.time() > mpstate.status.last_apm_msg_time+2:
             mpstate.console.writeln("APM: %s" % m.text, bg='red')
@@ -680,13 +680,13 @@ def master_callback(m, master):
 
     elif mtype == "GPS_RAW_INT":
         if mpstate.status.have_gps_lock:
-            if m.fix_type != 3 and not mpstate.status.lost_gps_lock and (time.time() - mpstate.status.last_gps_lock) > 3:
+            if m.fix_type < 3 and not mpstate.status.lost_gps_lock and (time.time() - mpstate.status.last_gps_lock) > 3:
                 say("GPS fix lost")
                 mpstate.status.lost_gps_lock = True
-            if m.fix_type == 3 and mpstate.status.lost_gps_lock:
+            if m.fix_type >= 3 and mpstate.status.lost_gps_lock:
                 say("GPS OK")
                 mpstate.status.lost_gps_lock = False
-            if m.fix_type == 3:
+            if m.fix_type >= 3:
                 mpstate.status.last_gps_lock = time.time()
 
     elif mtype == "NAV_CONTROLLER_OUTPUT" and mpstate.status.flightmode == "AUTO" and mpstate.settings.distreadout:
@@ -695,7 +695,7 @@ def master_callback(m, master):
             if rounded_dist != 0:
                 say("%u" % rounded_dist, priority="progress")
             mpstate.status.last_distance_announce = rounded_dist
-    
+
     elif mtype == "GLOBAL_POSITION_INT":
         report_altitude(m.relative_alt*0.001)
 
@@ -756,7 +756,7 @@ def process_master(m):
     if len(s) == 0:
         time.sleep(0.1)
         return
-    
+
     if mpstate.logqueue_raw:
         mpstate.logqueue_raw.put(str(s))
 
@@ -1169,7 +1169,7 @@ Auto-detected serial ports are:
     # open any mavlink UDP ports
     for p in opts.output:
         if ',' in p and not os.path.exists(p):
-            port, baud = p.split(',')            
+            port, baud = p.split(',')
         else:
             port, baud = p, opts.baudrate
 
@@ -1250,7 +1250,7 @@ Auto-detected serial ports are:
                             except Exception:
                                 pass
                         reload(m)
-                        m.init(mpstate)   
+                        m.init(mpstate)
 
             else:
                 mpstate.status.exit = True
@@ -1261,5 +1261,5 @@ Auto-detected serial ports are:
         if hasattr(m, 'unload'):
             print("Unloading module %s" % m.name)
             m.unload()
-        
+
     sys.exit(1)
