@@ -72,6 +72,8 @@ class RCModule(mp_module.MPModule):
             print("Usage: rc <channel|all> <pwmvalue>")
             return
         value = int(args[1])
+        if value > 65535 or value < -1:
+            raise ValueError("PWM value must be a positive integer between 0 and 65535")
         if value == -1:
             value = 65535
         if args[0] == 'all':
