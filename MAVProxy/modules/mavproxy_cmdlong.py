@@ -10,6 +10,7 @@ class CmdlongModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(CmdlongModule, self).__init__(mpstate, "cmdlong")
         self.add_command('speed', self.cmd_do_change_speed, "do_change_speed")
+        self.add_command('yaw', self.cmd_condition_yaw, "condition_yaw")
 
     def cmd_do_change_speed(self, args):
         '''speed value'''
@@ -29,6 +30,30 @@ class CmdlongModule(mp_module.MPModule):
                 speed, # param2 (Speed value)
                 0, # param3
                 0, # param4
+                0, # param5
+                0, # param6
+                0) # param7
+
+    def cmd_condition_yaw(self, args):
+        '''yaw angle angular_speed angle_mode'''
+        if ( len(args) != 3):
+            print("Usage: yaw ANGLE ANGULAR_SPEED MODE:[0 absolute / 1 relative]")
+            return
+        
+        if (len(args) == 3):
+            angle = float(args[0])
+            angular_speed = float(args[1])
+            angle_mode = float(args[2])
+            print("ANGLE %s" % (str(angle)))
+            self.master.mav.command_long_send(
+                self.status.target_system,  # target_system
+                mavutil.mavlink.MAV_COMP_ID_SYSTEM_CONTROL, # target_component
+                mavutil.mavlink.MAV_CMD_CONDITION_YAW, # command
+                0, # confirmation
+                angle, # param1 (angle value)
+                angular_speed, # param2 (angular speed value)
+                0, # param3
+                angle_mode, # param4 (mode: 0->absolute / 1->relative)
                 0, # param5
                 0, # param6
                 0) # param7
