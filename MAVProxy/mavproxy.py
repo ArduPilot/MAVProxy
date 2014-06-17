@@ -37,6 +37,7 @@ class MPStatus(object):
         self.last_altitude_announce = 0.0
         self.last_distance_announce = 0.0
         self.last_battery_announce = 0
+        self.last_battery_announce_time = 0
         self.last_avionics_battery_announce = 0
         self.battery_level = -1
         self.voltage_level = -1
@@ -120,6 +121,7 @@ class MPState(object):
               MPSetting('mavfwd', bool, True, 'Allow forwarded control'),
               MPSetting('mavfwd_rate', bool, False, 'Allow forwarded rate control'),
               MPSetting('shownoise', bool, True, 'Show non-MAVLink data'),
+              MPSetting('battwarn', int, 1, 'Battery Warning Time'),
               
               MPSetting('altreadout', int, 10, 'Altitude Readout',
                         range=(0,100), increment=1, tab='Announcements'),
@@ -488,11 +490,13 @@ def battery_report():
 
         rbattery_level = int((mpstate.status.battery_level+5)/10)*10
 
-        if rbattery_level != mpstate.status.last_battery_announce:
-            say("Flight battery %u percent" % rbattery_level, priority='notification')
-            mpstate.status.last_battery_announce = rbattery_level
-        if rbattery_level <= 20:
-            say("Flight battery warning")
+        if mpstate.settings.battwarn > 0 and time.time() > mpstate.status.last_battery_announce_time + 60*mpstate.settings.battwarn:
+            mpstate.status.last_battery_announce_time = time.time()
+            if rbattery_level != mpstate.status.last_battery_announce:
+                say("Flight battery %u percent" % rbattery_level, priority='notification')
+                mpstate.status.last_battery_announce = rbattery_level
+            if rbattery_level <= 20:
+                say("Flight battery warning")
 
     else:
         #clear battery status
