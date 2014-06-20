@@ -15,11 +15,12 @@ class CmdlongModule(mp_module.MPModule):
 
     def cmd_takeoff(self, args):
         '''take off'''
-        if ( len(args) != 0):
-            print("Usage: takeoff")
+        if ( len(args) != 1):
+            print("Usage: takeoff ALTITUDE_IN_METERS")
             return
         
-        if (len(args) == 0):
+        if (len(args) == 1):
+            altitude = float(args[0])
             print("Take Off started")
             self.master.mav.command_long_send(
                 self.status.target_system,  # target_system
@@ -32,7 +33,7 @@ class CmdlongModule(mp_module.MPModule):
                 0, # param4
                 0, # param5
                 0, # param6
-                0) # param7
+                altitude) # param7
 
     def cmd_do_change_speed(self, args):
         '''speed value'''
