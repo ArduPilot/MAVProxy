@@ -959,6 +959,7 @@ def main_loop():
             return
         while not mpstate.input_queue.empty():
             line = mpstate.input_queue.get()
+            mpstate.input_count += 1
             cmds = line.split(';')
             for c in cmds:
                 process_stdin(c)
@@ -1192,6 +1193,7 @@ Auto-detected serial ports are:
     heartbeat_check_period = mavutil.periodic_event(0.33)
 
     mpstate.input_queue = Queue.Queue()
+    mpstate.input_count = 0
     mpstate.rl = rline.rline("MAV> ", mpstate)
     if opts.setup:
         mpstate.rl.set_prompt("")

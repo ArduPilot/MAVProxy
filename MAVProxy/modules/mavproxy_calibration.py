@@ -15,6 +15,9 @@ class CalibrationModule(mp_module.MPModule):
         self.add_command('calpress', self.cmd_calpressure,'calibrate pressure sensors')
         self.add_command('accelcal', self.cmd_accelcal, 'do 3D accelerometer calibration')
         self.accelcal_count = -1
+        self.accelcal_wait_enter = False
+        self.compassmot_running = False
+        self.input_count = 0
 
     def cmd_ground(self, args):
         '''do a ground start mode'''
@@ -32,27 +35,35 @@ class CalibrationModule(mp_module.MPModule):
                                   mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, 0,
                                   0, 0, 0, 0, 1, 0, 0)
         self.accelcal_count = 0
+        self.accelcal_wait_enter = False
 
     def mavlink_packet(self, m):
         '''handle mavlink packets'''
-        if self.accelcal_count == -1:
-            return
-        if m.get_type() == 'STATUSTEXT':
-            text = str(m.text)
-            if not text.startswith('Place '):
-                return
-            # drain the input queue
-            while not self.mpstate.input_queue.empty():
-                self.mpstate.input_queue.get()
-            # wait for user to hit enter
-            while self.mpstate.input_queue.empty():
-                time.sleep(0.1)
-            self.mpstate.input_queue.get()
-            self.accelcal_count += 1
-            # tell the APM that we've done as requested
-            self.master.mav.command_ack_send(self.accelcal_count, 1)
-            if self.accelcal_count >= 6:
-                self.accelcal_count = -1
+        if self.accelcal_count != -1:
+            if m.get_type() == 'STATUSTEXT':
+                # handle accelcal packet
+                text = str(m.text)
+                if text.startswith('Place '):
+                    self.accelcal_wait_enter = True
+                    self.input_count = self.mpstate.input_count
+
+    def idle_task(self):
+        '''handle mavlink packets'''
+        if self.accelcal_count != -1:
+            if self.accelcal_wait_enter and self.input_count != self.mpstate.input_count:
+                self.accelcal_wait_enter = False
+                self.accelcal_count += 1
+                # tell the APM that user has done as requested
+                self.master.mav.command_ack_send(self.accelcal_count, 1)
+                if self.accelcal_count >= 6:
+                    self.accelcal_count = -1
+
+        if self.compassmot_running:
+            if self.mpstate.input_count != self.input_count:
+                # user has hit enter, stop the process
+                    self.compassmot_running = False
+                    print("sending stop")
+                    self.master.mav.command_ack_send(0, 1)
 
     
     def cmd_compassmot(self, args):
@@ -62,19 +73,8 @@ class CalibrationModule(mp_module.MPModule):
         mav.mav.command_long_send(mav.target_system, mav.target_component,
                                   mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, 0,
                                   0, 0, 0, 0, 0, 1, 0)
-        self.mpstate.rl.line = None
-        while True:
-            m = mav.recv_match(type=['COMMAND_ACK','COMPASSMOT_STATUS'], blocking=False)
-            if m is not None:
-                print(m)
-                if m.get_type() == 'COMMAND_ACK':
-                    break
-            if self.mpstate.rl.line is not None:
-                # user has hit enter, stop the process
-                mav.mav.command_ack_send(0, 1)
-                break
-            time.sleep(0.01)
-        print("compassmot done")
+        self.compassmot_running = True
+        self.input_count = self.mpstate.input_count
 
     def cmd_calpressure(self, args):
         '''calibrate pressure sensors'''
