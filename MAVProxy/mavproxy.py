@@ -684,13 +684,13 @@ def master_callback(m, master):
 
     elif mtype == "GPS_RAW_INT":
         if mpstate.status.have_gps_lock:
-            if m.fix_type != 3 and not mpstate.status.lost_gps_lock and (time.time() - mpstate.status.last_gps_lock) > 3:
+            if m.fix_type < 3 and not mpstate.status.lost_gps_lock and (time.time() - mpstate.status.last_gps_lock) > 3:
                 say("GPS fix lost")
                 mpstate.status.lost_gps_lock = True
-            if m.fix_type == 3 and mpstate.status.lost_gps_lock:
+            if m.fix_type >= 3 and mpstate.status.lost_gps_lock:
                 say("GPS OK")
                 mpstate.status.lost_gps_lock = False
-            if m.fix_type == 3:
+            if m.fix_type >= 3:
                 mpstate.status.last_gps_lock = time.time()
 
     elif mtype == "NAV_CONTROLLER_OUTPUT" and mpstate.status.flightmode == "AUTO" and mpstate.settings.distreadout:
