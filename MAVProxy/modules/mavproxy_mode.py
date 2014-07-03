@@ -38,26 +38,41 @@ class ModeModule(mp_module.MPModule):
 
     def cmd_guided(self, args):
         '''set GUIDED target'''
-        if len(args) != 1:
+        if ( len(args) != 1 and len(args) != 3):
             print("Usage: guided ALTITUDE")
             return
-        try:
-            latlon = self.module('map').click_position
-        except Exception:
-            print("No map available")
-            return
-        if latlon is None:
-            print("No map click position available")
-            return
-        altitude = int(args[0])
-        print("Guided %s %d" % (str(latlon), altitude))
-        self.master.mav.mission_item_send(self.target_system,
-                                               self.target_component,
-                                               0,
-                                               mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                               mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
-                                               2, 0, 0, 0, 0, 0,
-                                               latlon[0], latlon[1], altitude)
+        
+        if (len(args) == 1):
+            try:
+                latlon = self.map_state.click_position
+            except Exception:
+                print("No map available")
+                return
+            if latlon is None:
+                print("No map click position available")
+                return        
+            altitude = int(args[0])
+            print("Guided %s %d" % (str(latlon), altitude))
+            self.master.mav.mission_item_send (self.status.target_system,
+                                                   self.status.target_component,
+                                                   0,
+                                                   mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                                   mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
+                                                   2, 0, 0, 0, 0, 0,
+                                                   latlon[0], latlon[1], altitude)
+            
+        if (len(args) == 3):
+            latitude = float(args[0])
+            longitude = float(args[1])
+            altitude = int(args[2])
+            print("Guided %s %s %d" % (str(latitude), str(longitude), altitude))
+            self.master.mav.mission_item_send(self.status.target_system,
+                                                   self.status.target_component,
+                                                   0,
+                                                   mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                                   mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
+                                                   2, 0, 0, 0, 0, 0,
+                                                   latitude, longitude, altitude)
 
 def init(mpstate):
     '''initialise module'''
