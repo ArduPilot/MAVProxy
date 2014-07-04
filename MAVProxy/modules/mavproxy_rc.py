@@ -66,6 +66,12 @@ class RCModule(mp_module.MPModule):
             print("Set RC switch override to %u (PWM=%u channel=%u)" % (
                 value, mapping[value], flite_mode_ch_parm))
 
+    def set_override(self, newchannels):
+        '''this is a public method for use by drone API or other scripting'''
+        self.override = newchannels
+        self.override_counter = 10
+        self.send_rc_override()
+
     def cmd_rc(self, args):
         '''handle RC value override'''
         if len(args) != 2:
@@ -76,17 +82,17 @@ class RCModule(mp_module.MPModule):
             raise ValueError("PWM value must be a positive integer between 0 and 65535")
         if value == -1:
             value = 65535
+        channels = self.override
         if args[0] == 'all':
             for i in range(8):
-                self.override[i] = value
+                channels[i] = value
         else:
             channel = int(args[0])
-            self.override[channel - 1] = value
+            channels[channel - 1] = value
             if channel < 1 or channel > 8:
                 print("Channel must be between 1 and 8 or 'all'")
                 return
-        self.override_counter = 10
-        self.send_rc_override()
+        self.set_override(channels)
 
 def init(mpstate):
     '''initialise module'''
