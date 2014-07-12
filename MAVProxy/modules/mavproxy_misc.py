@@ -10,7 +10,6 @@ class MiscModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(MiscModule, self).__init__(mpstate, "misc", "misc commands")
         self.add_command('alt', self.cmd_alt, "show altitude information")
-        self.add_command('bat', self.cmd_bat, "show battery information")
         self.add_command('up', self.cmd_up, "adjust pitch trim by up to 5 degrees")
         self.add_command('reboot', self.cmd_reboot, "reboot autopilot")
         self.add_command('time', self.cmd_time, "show autopilot time")
@@ -41,11 +40,6 @@ class MiscModule(mp_module.MPModule):
             print("QNH Alt: %u meters %u feet for QNH pressure %.1f" % (qnh_alt, qnh_alt*3.2808, qnh_pressure))
         print("QNH Estimate: %.1f millibars" % self.qnh_estimate())
 
-
-    def cmd_bat(self, args):
-        '''show battery levels'''
-        print("Flight battery:   %u%%" % self.status.battery_level)
-        print("Avionics battery: %u%%" % self.status.avionics_battery_level)
 
     def cmd_up(self, args):
         '''adjust TRIM_PITCH_CD up by 5 degrees'''

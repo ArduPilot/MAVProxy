@@ -36,12 +36,6 @@ class MPStatus(object):
         self.altitude = 0
         self.last_altitude_announce = 0.0
         self.last_distance_announce = 0.0
-        self.last_battery_announce = 0
-        self.last_battery_announce_time = 0
-        self.last_avionics_battery_announce = 0
-        self.battery_level = -1
-        self.voltage_level = -1
-        self.avionics_battery_level = -1
         self.exit = False
         self.flightmode = 'MAV'
         self.last_mode_announce = 0
@@ -121,14 +115,12 @@ class MPState(object):
               MPSetting('mavfwd', bool, True, 'Allow forwarded control'),
               MPSetting('mavfwd_rate', bool, False, 'Allow forwarded rate control'),
               MPSetting('shownoise', bool, True, 'Show non-MAVLink data'),
-              MPSetting('battwarn', int, 1, 'Battery Warning Time'),
-              
+
               MPSetting('altreadout', int, 10, 'Altitude Readout',
                         range=(0,100), increment=1, tab='Announcements'),
               MPSetting('distreadout', int, 200, 'Distance Readout', range=(0,10000), increment=1),
 
               MPSetting('moddebug', int, 0, 'Module Debug Level', range=(0,3), increment=1, tab='Debug'),
-              MPSetting('numcells', int, 1, range=(0,10), increment=1),
               MPSetting('flushlogs', bool, False, 'Flush logs on every packet'),
               MPSetting('requireexit', bool, False, 'Require exit command'),
 
@@ -441,78 +433,6 @@ def process_stdin(line):
             traceback.print_exc()
 
 
-def vcell_to_battery_percent(vcell):
-    '''convert a cell voltage to a percentage battery level'''
-    if vcell > 4.1:
-        # above 4.1 is 100% battery
-        return 100.0
-    elif vcell > 3.81:
-        # 3.81 is 17% remaining, from flight logs
-        return 17.0 + 83.0 * (vcell - 3.81) / (4.1 - 3.81)
-    elif vcell > 3.2:
-        # below 3.2 it degrades fast. It's dead at 3.2
-        return 0.0 + 17.0 * (vcell - 3.20) / (3.81 - 3.20)
-    # it's dead or disconnected
-    return 0.0
-
-
-def battery_update(SYS_STATUS):
-    '''update battery level'''
-
-    # main flight battery
-    mpstate.status.battery_level = SYS_STATUS.battery_remaining
-    mpstate.status.voltage_level = SYS_STATUS.voltage_battery
-
-    # avionics battery
-    if not 'AP_ADC' in mpstate.status.msgs:
-        return
-    rawvalue = float(mpstate.status.msgs['AP_ADC'].adc2)
-    INPUT_VOLTAGE = 4.68
-    VOLT_DIV_RATIO = 3.56
-    voltage = rawvalue*(INPUT_VOLTAGE/1024.0)*VOLT_DIV_RATIO
-    vcell = voltage / mpstate.settings.numcells
-
-    avionics_battery_level = vcell_to_battery_percent(vcell)
-
-    if mpstate.status.avionics_battery_level == -1 or abs(avionics_battery_level-mpstate.status.avionics_battery_level) > 70:
-        mpstate.status.avionics_battery_level = avionics_battery_level
-    else:
-        mpstate.status.avionics_battery_level = (95*mpstate.status.avionics_battery_level + 5*avionics_battery_level)/100
-
-def battery_report():
-    batt_mon = get_mav_param('BATT_MONITOR',0)
-
-    #report voltage level only 
-    if batt_mon == 3:
-        mpstate.console.set_status('Battery', 'Batt: %.2fV' % (float(mpstate.status.voltage_level) / 1000.0), row=1)
-    elif batt_mon == 4:
-        mpstate.console.set_status('Battery', 'Batt: %u%%/%.2fV' % (mpstate.status.battery_level, (float(mpstate.status.voltage_level) / 1000.0)), row=1)
-
-        rbattery_level = int((mpstate.status.battery_level+5)/10)*10
-
-        if mpstate.settings.battwarn > 0 and time.time() > mpstate.status.last_battery_announce_time + 60*mpstate.settings.battwarn:
-            mpstate.status.last_battery_announce_time = time.time()
-            if rbattery_level != mpstate.status.last_battery_announce:
-                say("Flight battery %u percent" % rbattery_level, priority='notification')
-                mpstate.status.last_battery_announce = rbattery_level
-            if rbattery_level <= 20:
-                say("Flight battery warning")
-
-    else:
-        #clear battery status
-        mpstate.console.set_status('Battery')
-
-    # avionics battery reporting disabled for now
-    return
-    avionics_rbattery_level = int((mpstate.status.avionics_battery_level+5)/10)*10
-
-    if avionics_rbattery_level != mpstate.status.last_avionics_battery_announce:
-        say("Avionics Battery %u percent" % avionics_rbattery_level, priority='notification')
-        mpstate.status.last_avionics_battery_announce = avionics_rbattery_level
-    if avionics_rbattery_level <= 20:
-        say("Avionics battery warning")
-
-
 def handle_msec_timestamp(m, master):
     '''special handling for MAVLink packets with a time_boot_ms field'''
 
@@ -657,9 +577,6 @@ def master_callback(m, master):
             mpstate.console.writeln("APM: %s" % m.text, bg='red')
             mpstate.status.last_apm_msg = m.text
             mpstate.status.last_apm_msg_time = time.time()
-
-    elif mtype == "SYS_STATUS":
-        battery_update(m)
 
     elif mtype == "VFR_HUD":
         have_gps_fix = False
@@ -929,9 +846,6 @@ def periodic_tasks():
 
     set_stream_rates()
 
-    if battery_period.trigger():
-        battery_report()
-
     # call optional module idle tasks. These are called at several hundred Hz
     for (m,pm) in mpstate.modules:
         if hasattr(m, 'idle_task'):
@@ -1081,8 +995,6 @@ if __name__ == '__main__':
                       action='store_true', default=False)
     parser.add_option("--speech", dest="speech", help="use text to speach",
                       action='store_true', default=False)
-    parser.add_option("--num-cells", dest="num_cells", help="number of LiPo battery cells",
-                      type='int', default=0)
     parser.add_option("--aircraft", dest="aircraft", help="aircraft name", default=None)
     parser.add_option("--cmd", dest="cmd", help="initial commands", default=None)
     parser.add_option("--console", action='store_true', help="use GUI console")
@@ -1183,13 +1095,11 @@ Auto-detected serial ports are:
     if opts.sitl:
         mpstate.sitl_output = mavutil.mavudp(opts.sitl, input=False)
 
-    mpstate.settings.numcells = opts.num_cells
     mpstate.settings.streamrate = opts.streamrate
     mpstate.settings.streamrate2 = opts.streamrate
 
     msg_period = mavutil.periodic_event(1.0/15)
     heartbeat_period = mavutil.periodic_event(1)
-    battery_period = mavutil.periodic_event(0.1)
     heartbeat_check_period = mavutil.periodic_event(0.33)
 
     mpstate.input_queue = Queue.Queue()
@@ -1213,7 +1123,7 @@ Auto-detected serial ports are:
     if not opts.setup:
         # some core functionality is in modules
         standard_modules = ['log', 'wp', 'rally','fence','param','relay',
-                            'tuneopt','arm','mode','calibration','rc','auxopt','misc','cmdlong']
+                            'tuneopt','arm','mode','calibration','rc','auxopt','misc','cmdlong','battery']
         for m in standard_modules:
             load_module(m, quiet=True)
 
