@@ -417,9 +417,7 @@ def process_stdin(line):
             print("%-15s : %s" % (cmd, help))
         return
     if cmd == 'exit' and mpstate.settings.requireexit:
-        reply = raw_input("Are you sure you want to exit? (y/N)")
-        if reply.lower() == 'y':
-            mpstate.status.exit = True
+        mpstate.status.exit = True
         return
 
     if not cmd in command_map:
