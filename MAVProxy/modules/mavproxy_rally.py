@@ -80,6 +80,30 @@ class RallyModule(mp_module.MPModule):
         self.send_rally_points()
         print("Added Rally point at %s %f" % (str(latlon), alt))
 
+    def cmd_rally_alt(self, args):
+        '''handle rally alt change'''
+        if (len(args) < 2):
+            print("Usage: rally alt RALLYNUM newAlt <newBreakAlt>")
+            return
+        if not self.have_list:
+            print("Please list rally points first")
+            return
+        
+        idx = int(args[0])
+        if idx <= 0 or idx > self.rallyloader.rally_count():
+            print("Invalid rally point number %u" % idx)
+            return
+
+        new_alt = int(args[1])
+        new_break_alt = None
+        if (len(args) > 2):
+            new_break_alt = int(args[2])
+
+        self.rallyloader.set_alt(idx, new_alt, new_break_alt)
+        self.send_rally_point(idx-1)
+        self.fetch_rally_point(idx-1)
+        self.rallyloader.reindex()
+
     def cmd_rally_move(self, args):
         '''handle rally move'''
         if len(args) < 1:
@@ -172,6 +196,9 @@ class RallyModule(mp_module.MPModule):
 
             print("Saved rally file %s" % args[1])
 
+        elif args[0] == "alt":
+            self.cmd_rally_alt(args[1:])
+
         else:
             self.print_usage()
 
@@ -232,7 +259,7 @@ class RallyModule(mp_module.MPModule):
             print("Saved rally points to %s" % ral_file_path)
 
     def print_usage(self):
-        print("Usage: rally <list|load|save|add|remove|move|clear>")
+        print("Usage: rally <list|load|save|add|remove|move|alt|clear>")
 
 def init(mpstate):
     '''initialise module'''
