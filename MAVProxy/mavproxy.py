@@ -127,7 +127,8 @@ class MPState(object):
               MPSetting('basealt', int, 0, 'Base Altitude', range=(0,30000), increment=1, tab='Altitude'),
               MPSetting('wpalt', int, 100, 'Default WP Altitude', range=(0,10000), increment=1),
               MPSetting('rallyalt', int, 90, 'Default Rally Altitude', range=(0,10000), increment=1),
-              MPSetting('terrainalt', str, 'Auto', 'Use terrain altitudes', choice=['Auto','True','False'])]
+              MPSetting('terrainalt', str, 'Auto', 'Use terrain altitudes', choice=['Auto','True','False']),
+              MPSetting('wpupdates', bool, True, 'Show waypoint updates')]
             )
 
         self.completions = {
