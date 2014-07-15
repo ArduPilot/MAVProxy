@@ -100,6 +100,15 @@ class MapModule(mp_module.MPModule):
                 self.mpstate.map.add_object(mp_slipmap.SlipPolygon('mission %u' % i, p,
                                                                    layer='Mission', linewidth=2, colour=(255,255,255),
                                                                    popup_menu=popup))
+        labeled_wps = {}
+        for i in range(len(self.mission_list)):
+            next_list = self.mission_list[i]
+            for j in range(len(next_list)):
+                #label already printed for this wp?
+                if (next_list[j] not in labeled_wps):
+                    self.mpstate.map.add_object(mp_slipmap.SlipLabel(
+                        'miss_cmd %u' % j, polygons[i][j], str(next_list[j]), 'Mission', colour=(0,255,255)))  
+                    labeled_wps[next_list[j]] = (i,j)
 
     def display_fence(self):
         '''display the fence'''

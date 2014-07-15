@@ -73,6 +73,24 @@ class SlipObject:
         '''extra selection information sent when object is selected'''
         return None
 
+class SlipLabel(SlipObject):
+    '''a text label to display on the map'''
+    def __init__(self, key, point, label, layer, colour):
+        SlipObject.__init__(self, key, layer)
+        self.point = point
+        self.colour = colour
+        self.label = label
+
+    def bounds(self):
+        return None
+
+    def draw_label(self, img, pixmapper):
+        pix1 = pixmapper(self.point)
+        cv.PutText(img, self.label, pix1, cv.InitFont(cv.CV_FONT_HERSHEY_SIMPLEX, 1.0,1.0), self.colour)
+
+    def draw(self, img, pixmapper, bounds):
+        self.draw_label(img, pixmapper)
+
 class SlipPolygon(SlipObject):
     '''a polygon to display on the map'''
     def __init__(self, key, points, layer, colour, linewidth, popup_menu=None):
@@ -175,8 +193,6 @@ class SlipGrid(SlipObject):
             pos3 = mp_util.gps_newpos(pos1[0], pos1[1], 90, 3*count*spacing)
             self.draw_line(img, pixmapper, pos1, pos3, self.colour, self.linewidth)
 
-
-
 class SlipThumbnail(SlipObject):
     '''a thumbnail to display on the map'''
     def __init__(self, key, latlon, layer, img,
@@ -238,7 +254,6 @@ class SlipThumbnail(SlipObject):
             abs(py - self.posy) > self.height/2):
             return None
         return math.sqrt((px-self.posx)**2 + (py-self.posy)**2)
-
 
 class SlipTrail:
     '''trail information for a moving icon'''
