@@ -97,8 +97,8 @@ class WPModule(mp_module.MPModule):
         elif mtype in ["WAYPOINT_CURRENT", "MISSION_CURRENT"]:
             if m.seq != self.last_waypoint:
                 self.last_waypoint = m.seq
-                self.say("waypoint %u" % m.seq,priority='message')
-
+                if self.settings.wpupdates:
+                    self.say("waypoint %u" % m.seq,priority='message')
 
 
     def idle_task(self):
