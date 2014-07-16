@@ -41,6 +41,7 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('Thr', 'Thr ---', row=2)
         mpstate.console.set_status('Roll', 'Roll ---', row=2)
         mpstate.console.set_status('Pitch', 'Pitch ---', row=2)
+        mpstate.console.set_status('Wind', 'Wind ---/---', row=2)
         mpstate.console.set_status('WP', 'WP --', row=3)
         mpstate.console.set_status('WPDist', 'Distance ---', row=3)
         mpstate.console.set_status('WPBearing', 'Bearing ---', row=3)
@@ -197,6 +198,10 @@ class ConsoleModule(mp_module.MPModule):
                 else:
                     fg = 'green'
                 self.console.set_status(s, s, fg=fg)
+
+        elif type == 'WIND':
+            self.console.set_status('Wind', 'Wind %u/%.2f' % (msg.direction, msg.speed))
+
         elif type == 'HWSTATUS':
             if msg.Vcc >= 4600 and msg.Vcc <= 5300:
                 fg = 'green'
