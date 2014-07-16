@@ -33,6 +33,7 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('MAG', 'MAG', fg='grey', row=0)
         mpstate.console.set_status('AS', 'AS', fg='grey', row=0)
         mpstate.console.set_status('AHRS', 'AHRS', fg='grey', row=0)
+        mpstate.console.set_status('Battery', 'Batt --', row=1)
         mpstate.console.set_status('Heading', 'Hdg ---/---', row=2)
         mpstate.console.set_status('Alt', 'Alt ---', row=2)
         mpstate.console.set_status('AGL', 'AGL ---', row=2)
@@ -109,7 +110,76 @@ class ConsoleModule(mp_module.MPModule):
                     break
         return distance / speed
 
+    def vcell_to_battery_percent(self, vcell):
+        '''convert a cell voltage to a percentage battery level'''
+        if vcell > 4.1:
+            # above 4.1 is 100% battery
+            return 100.0
+        elif vcell > 3.81:
+            # 3.81 is 17% remaining, from flight logs
+            return 17.0 + 83.0 * (vcell - 3.81) / (4.1 - 3.81)
+        elif vcell > 3.2:
+            # below 3.2 it degrades fast. It's dead at 3.2
+            return 0.0 + 17.0 * (vcell - 3.20) / (3.81 - 3.20)
+        # it's dead or disconnected
+        return 0.0
 
+    def battery_update(self, SYS_STATUS):
+        '''update battery level'''
+
+        # main flight battery
+        self.mpstate.status.battery_level = SYS_STATUS.battery_remaining
+        self.mpstate.status.voltage_level = SYS_STATUS.voltage_battery
+        self.mpstate.status.current_battery = SYS_STATUS.current_battery
+
+        # avionics battery
+        if not 'AP_ADC' in self.mpstate.status.msgs:
+            return
+            rawvalue = float(self.mpstate.status.msgs['AP_ADC'].adc2)
+            INPUT_VOLTAGE = 4.68
+            VOLT_DIV_RATIO = 3.56
+            voltage = rawvalue*(INPUT_VOLTAGE/1024.0)*VOLT_DIV_RATIO
+            vcell = voltage / self.mpstate.settings.numcells
+
+            avionics_battery_level = vcell_to_battery_percent(vcell)
+
+            if self.mpstate.status.avionics_battery_level == -1 or abs(avionics_battery_level-self.mpstate.status.avionics_battery_level) > 70:
+                self.mpstate.status.avionics_battery_level = avionics_battery_level
+            else:
+                self.mpstate.status.avionics_battery_level = (95*self.mpstate.status.avionics_battery_level + 5*avionics_battery_level)/100
+
+    def battery_report(self):
+        batt_mon = self.get_mav_param('BATT_MONITOR',0)
+
+        #report voltage level only 
+        if batt_mon == 3:
+            self.mpstate.console.set_status('Battery', 'Batt: %.2fV' % (float(self.mpstate.status.voltage_level) / 1000.0), row=1)
+        elif batt_mon == 4:
+            self.mpstate.console.set_status('Battery', 'Batt: %u%%/%.2fV %.1fA' % (self.mpstate.status.battery_level, (float(self.mpstate.status.voltage_level) / 1000.0), self.mpstate.status.current_battery / 100.0 ), row=1)
+
+            rbattery_level = int((self.mpstate.status.battery_level+5)/10)*10
+
+            if self.mpstate.settings.battwarn > 0 and time.time() > self.mpstate.status.last_battery_announce_time + 60*self.mpstate.settings.battwarn:
+                self.mpstate.status.last_battery_announce_time = time.time()
+                if rbattery_level != self.mpstate.status.last_battery_announce:
+                    self.say("Flight battery %u percent" % rbattery_level, priority='notification')
+                    self.mpstate.status.last_battery_announce = rbattery_level
+                if rbattery_level <= 20:
+                    self.say("Flight battery warning")
+
+        else:
+            #clear battery status
+            self.mpstate.console.set_status('Battery')
+
+        # avionics battery reporting disabled for now
+        return
+        avionics_rbattery_level = int((self.mpstate.status.avionics_battery_level+5)/10)*10
+
+        if avionics_rbattery_level != self.mpstate.status.last_avionics_battery_announce:
+            self.say("Avionics Battery %u percent" % avionics_rbattery_level, priority='notification')
+            self.mpstate.status.last_avionics_battery_announce = avionics_rbattery_level
+        if avionics_rbattery_level <= 20:
+            self.say("Avionics battery warning")
 
     def mavlink_packet(self, msg):
         '''handle an incoming mavlink packet'''
@@ -197,6 +267,10 @@ class ConsoleModule(mp_module.MPModule):
                 else:
                     fg = 'green'
                 self.console.set_status(s, s, fg=fg)
+
+            self.battery_update(msg)
+            self.battery_report()
+
         elif type == 'HWSTATUS':
             if msg.Vcc >= 4600 and msg.Vcc <= 5300:
                 fg = 'green'
