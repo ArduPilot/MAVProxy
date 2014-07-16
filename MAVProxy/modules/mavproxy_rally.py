@@ -17,6 +17,7 @@ class RallyModule(mp_module.MPModule):
         self.add_command('rally', self.cmd_rally, "rally point control", ["<add|clear|land|list|move|remove|>",
                                     "<load|save> (FILENAME)"])
         self.have_list = False
+        self.abort_alt = 50
         self.abort_first_send_time = 0
         self.abort_previous_send_time = 0
         self.abort_ack_received = True
@@ -56,7 +57,7 @@ class RallyModule(mp_module.MPModule):
                 self.master.mav.command_long_send(self.status.target_system,
                     self.status.target_component,
                     mavutil.mavlink.MAV_CMD_DO_GO_AROUND,
-                    0, int(self.settings.rally_breakalt), 0, 0, 0, 0, 0, 0,)
+                    0, int(self.abort_alt), 0, 0, 0, 0, 0, 0,)
                 self.abort_previous_send_time = time.time()
 
             #try to get an ACK from the plane:
@@ -233,7 +234,11 @@ class RallyModule(mp_module.MPModule):
         elif args[0] == "land":
             if (len(args) >= 2 and args[1] == "abort"):
                 self.abort_ack_received = False
-                self.abort_first_send_time = 0 
+                self.abort_first_send_time = 0
+
+                self.abort_alt = self.settings.rally_breakalt
+                if (len(args) >= 3):
+                    self.abort_alt = int(args[2])
 
             else:
                 self.master.mav.command_long_send(self.status.target_system,
