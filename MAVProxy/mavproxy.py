@@ -41,6 +41,7 @@ class MPStatus(object):
         self.last_avionics_battery_announce = 0
         self.battery_level = -1
         self.voltage_level = -1
+        self.current_battery = -1
         self.avionics_battery_level = -1
         self.exit = False
         self.flightmode = 'MAV'

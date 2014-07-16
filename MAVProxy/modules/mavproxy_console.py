@@ -130,6 +130,7 @@ class ConsoleModule(mp_module.MPModule):
         # main flight battery
         self.mpstate.status.battery_level = SYS_STATUS.battery_remaining
         self.mpstate.status.voltage_level = SYS_STATUS.voltage_battery
+        self.mpstate.status.current_battery = SYS_STATUS.current_battery
 
         # avionics battery
         if not 'AP_ADC' in self.mpstate.status.msgs:
@@ -154,7 +155,7 @@ class ConsoleModule(mp_module.MPModule):
         if batt_mon == 3:
             self.mpstate.console.set_status('Battery', 'Batt: %.2fV' % (float(self.mpstate.status.voltage_level) / 1000.0), row=1)
         elif batt_mon == 4:
-            self.mpstate.console.set_status('Battery', 'Batt: %u%%/%.2fV' % (self.mpstate.status.battery_level, (float(self.mpstate.status.voltage_level) / 1000.0)), row=1)
+            self.mpstate.console.set_status('Battery', 'Batt: %u%%/%.2fV %.1fA' % (self.mpstate.status.battery_level, (float(self.mpstate.status.voltage_level) / 1000.0), self.mpstate.status.current_battery / 100.0 ), row=1)
 
             rbattery_level = int((self.mpstate.status.battery_level+5)/10)*10
 
