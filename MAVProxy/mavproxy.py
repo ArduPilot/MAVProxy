@@ -630,6 +630,10 @@ def master_callback(m, master):
             mpstate.console.write(str(m.data), bg='red')
     elif mtype in [ "COMMAND_ACK", "MISSION_ACK" ]:
         mpstate.console.writeln("Got MAVLink msg: %s" % m)
+
+        if m.command == mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION:
+            if m.result == mavutil.mavlink.MAV_RESULT_ACCEPTED:
+                say("Calibrated")
     else:
         #mpstate.console.writeln("Got MAVLink msg: %s" % m)
         pass
