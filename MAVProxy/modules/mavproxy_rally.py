@@ -5,8 +5,8 @@
 from pymavlink import mavwp
 from pymavlink import mavutil
 import time, os, platform
-
 from MAVProxy.modules.lib import mp_module
+
 if "CYGWIN" not in platform.system():
     from MAVProxy.modules.lib.mp_menu import *
 
@@ -311,6 +311,11 @@ class RallyModule(mp_module.MPModule):
             p = self.rallyloader.rally_point(i)
             self.console.writeln("lat=%f lng=%f alt=%f break_alt=%f land_dir=%f autoland=%f" % (p.lat * 1e-7, p.lng * 1e-7, p.alt, p.break_alt, p.land_dir, int(p.flags & 2!=0) ))
     
+        if self.logdir != None:
+            ral_file_path = os.path.join(self.logdir, 'ral.txt')
+            self.rallyloader.save(ral_file_path)
+            print("Saved rally points to %s" % ral_file_path)
+
     def print_usage(self):
         print("Usage: rally <list|load|land|save|add|remove|move|clear|alt>")
         
