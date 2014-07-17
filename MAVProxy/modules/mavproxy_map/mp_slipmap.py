@@ -73,6 +73,30 @@ class SlipObject:
         '''extra selection information sent when object is selected'''
         return None
 
+class SlipCircle(SlipObject):
+    '''a circle to display on the map'''
+    def __init__(self, key, layer, latlon, radius, color, linewidth, popup_menu=None):
+        SlipObject.__init__(self, key, layer, popup_menu=popup_menu)
+        self.latlon = latlon
+        self.radius = float(radius)
+        self.color = color
+        self.linewidth = linewidth
+
+    def draw(self, img, pixmapper, bounds):
+        center_px = pixmapper(self.latlon)
+        #figure out pixels per meter
+        ref_pt = (self.latlon[0] + 1.0, self.latlon[1])
+        dis = mp_util.gps_distance(self.latlon[0], self.latlon[1], ref_pt[0], ref_pt[1])
+        ref_px = pixmapper(ref_pt)
+        dis_px = math.sqrt(float(center_px[1] - ref_px[1]) ** 2.0)
+        pixels_per_meter = dis_px / dis
+
+        cv.Circle(img, center_px, int(self.radius * pixels_per_meter), self.color, self.linewidth)
+
+    def bounds(self):
+        return None
+
+
 class SlipPolygon(SlipObject):
     '''a polygon to display on the map'''
     def __init__(self, key, points, layer, colour, linewidth, popup_menu=None):
