@@ -3,7 +3,8 @@
 """
 
 from pymavlink import mavwp
-import time, platform
+import time, os, platform
+
 from MAVProxy.modules.lib import mp_module
 if "CYGWIN" not in platform.system():
     from MAVProxy.modules.lib.mp_menu import *
@@ -186,7 +187,7 @@ class RallyModule(mp_module.MPModule):
         self.master.mav.send(p)
 
     def send_rally_points(self):
-        '''send rally points from fenceloader'''
+        '''send rally points from rallyloader'''
         self.mav_param.mavset(self.master,'RALLY_TOTAL',self.rallyloader.rally_count(),3)
 
         for i in range(self.rallyloader.rally_count()):
@@ -224,6 +225,11 @@ class RallyModule(mp_module.MPModule):
         for i in range(self.rallyloader.rally_count()):
             p = self.rallyloader.rally_point(i)
             self.console.writeln("lat=%f lng=%f alt=%f break_alt=%f land_dir=%f" % (p.lat * 1e-7, p.lng * 1e-7, p.alt, p.break_alt, p.land_dir))
+
+        if self.logdir != None:
+            ral_file_path = os.path.join(self.logdir, 'ral.txt')
+            self.rallyloader.save(ral_file_path)
+            print("Saved rally points to %s" % ral_file_path)
 
     def print_usage(self):
         print("Usage: rally <list|load|save|add|remove|move|clear>")
