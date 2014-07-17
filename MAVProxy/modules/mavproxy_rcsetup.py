@@ -7,7 +7,7 @@ class RCSetupModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(RCSetupModule, self).__init__(mpstate, "rcsetup")
         self.calibrating = False
-        self.num_channels = 4
+        self.num_channels = 8
         self.clear_rc_cal()
         self.add_command('rccal', self.cmd_rccal, "RC calibration start/stop")
         self.add_command('rctrim', self.cmd_rctrim, "RC min/max trim")
