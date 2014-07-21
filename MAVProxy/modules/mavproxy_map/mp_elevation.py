@@ -32,10 +32,8 @@ class ElevationModel():
             self.mappy = GAreader.ERMap()
             self.mappy.read_ermapper(os.path.join(os.environ['HOME'], './Documents/Elevation/Canberra/GSNSW_P756demg'))
 
-    def GetElevation(self, latitude, longitude):
-        '''Returns the altitude (m ASL) of a given lat/long pair'''
-        if latitude == 0 or longitude == 0:
-            return 0
+    def GetElevation(self, latitude, longitude, timeout=0):
+        '''Returns the altitude (m ASL) of a given lat/long pair, or None if unknown'''
         if self.database == 'srtm':
             TileID = (numpy.floor(latitude), numpy.floor(longitude))
             if TileID in self.tileDict:
@@ -43,7 +41,14 @@ class ElevationModel():
             else:
                 tile = self.downloader.getTile(numpy.floor(latitude), numpy.floor(longitude))
                 if tile == 0:
-                    return -1
+                    if timeout > 0:
+                        t0 = time.time()
+                        while time.time() < t0+timeout and tile == 0:
+                            tile = self.downloader.getTile(numpy.floor(latitude), numpy.floor(longitude))
+                            if tile == 0:
+                                time.sleep(0.1)
+                if tile == 0:
+                    return None
                 self.tileDict[TileID] = tile
                 alt = tile.getAltitudeFromLatLon(latitude, longitude)
         if self.database == 'geoscience':
@@ -67,24 +72,27 @@ if __name__ == "__main__":
     lon = opts.lon
 
     '''Do a few lat/long pairs to demonstrate the caching
-    Note the +0.000001 to the time. On faster PC's, the two time periods
+    Note the +0.000001 to the time. On faster PCs, the two time periods
     may in fact be equal, so we add a little extra time on the end to account for this'''
     t0 = time.time()
-    alt = EleModel.GetElevation(lat, lon)
+    alt = EleModel.GetElevation(lat, lon, timeout=10)
+    if alt is None:
+        print("Tile not available")
+        sys.exit(1)
     t1 = time.time()+.000001
     print("Altitude at (%.6f, %.6f) is %u m. Pulled at %.1f FPS" % (lat, lon, alt, 1/(t1-t0)))
 
     lat = opts.lat+0.001
     lon = opts.lon+0.001
     t0 = time.time()
-    alt = EleModel.GetElevation(lat, lon)
+    alt = EleModel.GetElevation(lat, lon, timeout=10)
     t1 = time.time()+.000001
     print("Altitude at (%.6f, %.6f) is %u m. Pulled at %.1f FPS" % (lat, lon, alt, 1/(t1-t0)))
 
     lat = opts.lat-0.001
     lon = opts.lon-0.001
     t0 = time.time()
-    alt = EleModel.GetElevation(lat, lon)
+    alt = EleModel.GetElevation(lat, lon, timeout=10)
     t1 = time.time()+.000001
     print("Altitude at (%.6f, %.6f) is %u m. Pulled at %.1f FPS" % (lat, lon, alt, 1/(t1-t0)))
 
