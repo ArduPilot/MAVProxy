@@ -53,7 +53,7 @@ class BatteryModule(mp_module.MPModule):
             if rbattery_level <= 20:
                 self.say("Flight battery warning")
 
-        if self.per_cell < self.settings.batwarncell and time.time() > self.last_battery_cell_announce_time + 60*self.settings.battwarn:
+        if self.settings.numcells != 0 and self.per_cell < self.settings.batwarncell and time.time() > self.last_battery_cell_announce_time + 60*self.settings.battwarn:
             self.say("Cell warning")
             self.last_battery_cell_announce_time = time.time()
             

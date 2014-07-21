@@ -157,12 +157,20 @@ class ConsoleModule(mp_module.MPModule):
             lat = master.field('GLOBAL_POSITION_INT', 'lat', 0) * 1.0e-7
             lng = master.field('GLOBAL_POSITION_INT', 'lon', 0) * 1.0e-7
             rel_alt = master.field('GLOBAL_POSITION_INT', 'relative_alt', 0) * 1.0e-3
+            agl_alt = None
             if self.settings.basealt != 0:
-                agl_alt = self.settings.basealt - self.console.ElevationMap.GetElevation(lat, lng)
+                agl_alt = self.console.ElevationMap.GetElevation(lat, lng)
+                if agl_alt is not None:
+                    agl_alt = self.settings.basealt - agl_alt
             else:
-                agl_alt = self.console.ElevationMap.GetElevation(home_lat, home_lng) - self.console.ElevationMap.GetElevation(lat, lng)
-            agl_alt += rel_alt
-            self.console.set_status('AGL', 'AGL %u' % agl_alt)
+                agl_alt_home = self.console.ElevationMap.GetElevation(home_lat, home_lng)
+                if agl_alt_home is not None:
+                    agl_alt = self.console.ElevationMap.GetElevation(lat, lng)
+                if agl_alt is not None:
+                    agl_alt = agl_alt_home - agl_alt
+            if agl_alt is not None:
+                agl_alt += rel_alt
+                self.console.set_status('AGL', 'AGL %u' % agl_alt)
             self.console.set_status('Alt', 'Alt %u' % rel_alt)
             self.console.set_status('AirSpeed', 'AirSpeed %u' % msg.airspeed)
             self.console.set_status('GPSSpeed', 'GPSSpeed %u' % msg.groundspeed)

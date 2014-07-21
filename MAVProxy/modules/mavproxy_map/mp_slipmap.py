@@ -889,7 +889,8 @@ class MPSlipMapPanel(wx.Panel):
             newtext += 'Cursor: %f %f (%s)' % (lat, lon, mp_util.latlon_to_grid((lat, lon)))
             if state.elevation:
                 alt = self.ElevationMap.GetElevation(lat, lon)
-                newtext += ' %.1fm' % alt
+                if alt is not None:
+                    newtext += ' %.1fm' % alt
         pending = state.mt.tiles_pending()
         if pending:
             newtext += ' Map Downloading %u ' % pending

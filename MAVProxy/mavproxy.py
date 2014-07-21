@@ -466,8 +466,9 @@ def report_altitude(altitude):
         lat = master.field('GLOBAL_POSITION_INT', 'lat', 0)*1.0e-7
         lon = master.field('GLOBAL_POSITION_INT', 'lon', 0)*1.0e-7
         alt1 = mpstate.console.ElevationMap.GetElevation(lat, lon)
-        alt2 = mpstate.settings.basealt
-        altitude += alt2 - alt1
+        if alt1 is not None:
+            alt2 = mpstate.settings.basealt
+            altitude += alt2 - alt1
     mpstate.status.altitude = altitude
     if (int(mpstate.settings.altreadout) > 0 and
         math.fabs(mpstate.status.altitude - mpstate.status.last_altitude_announce) >= int(mpstate.settings.altreadout)):
@@ -1123,7 +1124,8 @@ Auto-detected serial ports are:
     if not opts.setup:
         # some core functionality is in modules
         standard_modules = ['log', 'wp', 'rally','fence','param','relay',
-                            'tuneopt','arm','mode','calibration','rc','auxopt','misc','cmdlong','battery']
+                            'tuneopt','arm','mode','calibration','rc','auxopt','misc','cmdlong',
+                            'battery']
         for m in standard_modules:
             load_module(m, quiet=True)
 

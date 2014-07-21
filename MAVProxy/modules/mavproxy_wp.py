@@ -269,7 +269,8 @@ class WPModule(mp_module.MPModule):
         if getattr(self.console, 'ElevationMap', None) is not None:
             alt1 = self.console.ElevationMap.GetElevation(lat, lon)
             alt2 = self.console.ElevationMap.GetElevation(wp.x, wp.y)
-            wp.z += alt1 - alt2
+            if alt1 is not None and alt2 is not None:
+                wp.z += alt1 - alt2
         wp.x = lat
         wp.y = lon
 

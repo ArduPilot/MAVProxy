@@ -87,7 +87,9 @@ class CameraViewModule(mp_module.MPModule):
         if m.get_type() == 'GLOBAL_POSITION_INT':
             state.lat, state.lon = m.lat*scale_latlon, m.lon*scale_latlon
             state.hdg = m.hdg*scale_hdg
-            state.height = m.relative_alt*scale_relative_alt + state.home_height - state.elevation_model.GetElevation(state.lat, state.lon)
+            agl = state.elevation_model.GetElevation(state.lat, state.lon)
+            if agl is not None:
+                state.height = m.relative_alt*scale_relative_alt + state.home_height - agl
         elif m.get_type() == 'ATTITUDE':
             state.roll, state.pitch, state.yaw = math.degrees(m.roll), math.degrees(m.pitch), math.degrees(m.yaw)
         elif m.get_type() in ['GPS_RAW', 'GPS_RAW_INT']:
@@ -96,7 +98,10 @@ class CameraViewModule(mp_module.MPModule):
             else:
                 home = [self.master.field('HOME', c)*scale_latlon for c in ['lat', 'lon']]
             old = state.home_height # TODO TMP
-            state.home_height = state.elevation_model.GetElevation(*home)
+            agl = state.elevation_model.GetElevation(*home)
+            if agl is None:
+                return
+            state.home_height = agl
 
             # TODO TMP
             if state.home_height != old:
