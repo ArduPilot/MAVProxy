@@ -3,9 +3,10 @@
 """
 
 from pymavlink import mavwp
-import time
+import time, platform
 from MAVProxy.modules.lib import mp_module
-from MAVProxy.modules.lib.mp_menu import *
+if "CYGWIN" not in platform.system():
+    from MAVProxy.modules.lib.mp_menu import *
 
 class RallyModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -15,9 +16,10 @@ class RallyModule(mp_module.MPModule):
                                     "<load|save> (FILENAME)"])
         self.have_list = False
 
-        self.menu_added_console = False
-        self.menu_added_map = False
-        self.menu = MPMenuSubMenu('Rally',
+        if "CYGWIN" not in platform.system():
+            self.menu_added_console = False
+            self.menu_added_map = False
+            self.menu = MPMenuSubMenu('Rally',
                                   items=[MPMenuItem('Clear', 'Clear', '# rally clear'),
                                          MPMenuItem('List', 'List', '# rally list'),
                                          MPMenuItem('Load', 'Load', '# rally load ',
