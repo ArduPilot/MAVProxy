@@ -57,6 +57,7 @@ class MapModule(mp_module.MPModule):
         self.default_popup = MPMenuSubMenu('Popup', items=[])
         self.add_menu(MPMenuItem('Fly To', 'Fly To', '# guided ',
                                  handler=MPMenuCallTextDialog(title='Altitude (m)', default=100)))
+        self.add_menu(MPMenuItem('Terrain Check', 'Terrain Check', '# terrain check'))
 
     def add_menu(self, menu):
         '''add to the default popup menu'''
