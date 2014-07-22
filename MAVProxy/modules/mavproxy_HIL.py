@@ -13,7 +13,7 @@ from MAVProxy.modules.lib import mp_module
 
 class HILModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(HILModule, self).__init__(mpstate, "HIL", "rally point control")
+        super(HILModule, self).__init__(mpstate, "HIL", "HIL simulation")
         self.last_sim_send_time = time.time()
         self.last_apm_send_time = time.time()
         self.rc_channels_scaled = None
