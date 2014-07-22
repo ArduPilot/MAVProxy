@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 '''waypoint command handling'''
 
-import time, os, fnmatch
+import time, os, fnmatch, platform
 from pymavlink import mavutil, mavwp
 from MAVProxy.modules.lib import mp_module
-from MAVProxy.modules.lib.mp_menu import *
+if "CYGWIN" not in platform.system():
+    from MAVProxy.modules.lib.mp_menu import *
 
 class WPModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -26,9 +27,10 @@ class WPModule(mp_module.MPModule):
                 self.wploader.load(waytxt)
                 print("Loaded waypoints from %s" % waytxt)
 
-        self.menu_added_console = False
-        self.menu_added_map = False
-        self.menu = MPMenuSubMenu('Mission',
+        if "CYGWIN" not in platform.system():
+            self.menu_added_console = False
+            self.menu_added_map = False
+            self.menu = MPMenuSubMenu('Mission',
                                   items=[MPMenuItem('Clear', 'Clear', '# wp clear'),
                                          MPMenuItem('List', 'List', '# wp list'),
                                          MPMenuItem('Load', 'Load', '# wp load ',
