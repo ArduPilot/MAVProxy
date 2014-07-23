@@ -1,11 +1,12 @@
 """
     MAVProxy geofence module
 """
-import os, time
+import os, time, platform
 from pymavlink import mavwp, mavutil
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
-from MAVProxy.modules.lib.mp_menu import *
+if "CYGWIN" not in platform.system():
+    from MAVProxy.modules.lib.mp_menu import *
 
 class FenceModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -30,9 +31,10 @@ class FenceModule(mp_module.MPModule):
                 self.have_list = True
                 print("Loaded fence from %s" % fencetxt)
 
-        self.menu_added_console = False
-        self.menu_added_map = False
-        self.menu = MPMenuSubMenu('Fence',
+        if "CYGWIN" not in platform.system():
+            self.menu_added_console = False
+            self.menu_added_map = False
+            self.menu = MPMenuSubMenu('Fence',
                                   items=[MPMenuItem('Clear', 'Clear', '# fence clear'),
                                          MPMenuItem('List', 'List', '# fence list'),
                                          MPMenuItem('Load', 'Load', '# fence load ',
