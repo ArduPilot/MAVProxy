@@ -16,8 +16,9 @@ class WPModule(mp_module.MPModule):
         self.loading_waypoint_lasttime = time.time()
         self.last_waypoint = 0
         self.wp_period = mavutil.periodic_event(0.5)
+        self.use_terrain = False
         self.add_command('wp', self.cmd_wp,       'waypoint management',
-                         ["<list|clear|move|remove|loop|set>",
+                         ["<list|clear|move|remove|loop|set|terrain>",
                           "<load|update|save> (FILENAME)"])
 
         if self.continue_mode and self.logdir != None:
@@ -203,7 +204,7 @@ class WPModule(mp_module.MPModule):
         self.wploader.target_component = self.target_component
         self.wploader.add(home)
         for p in points:
-            self.wploader.add_latlonalt(p[0], p[1], self.settings.wpalt)
+            self.wploader.add_latlonalt(p[0], p[1], self.settings.wpalt, terrain_alt=self.use_terrain)
         self.send_all_waypoints()
 
     def wp_loop(self):
@@ -300,7 +301,7 @@ class WPModule(mp_module.MPModule):
 
     def cmd_wp(self, args):
         '''waypoint commands'''
-        usage = "usage: wp <list|load|update|save|set|clear|loop|remove|move>"
+        usage = "usage: wp <list|load|update|save|set|clear|loop|remove|move|terrain>"
         if len(args) < 1:
             print(usage)
             return
@@ -348,6 +349,12 @@ class WPModule(mp_module.MPModule):
                 print("usage: wp set <wpindex>")
                 return
             self.master.waypoint_set_current_send(int(args[1]))
+        elif args[0] == "terrain":
+            if len(args) > 1 and args[1] in ['1','true','yes']:
+                self.use_terrain = True
+            elif len(args) > 1 and args[1] in ['0','false','no']:
+                self.use_terrain = False
+            print("terrain: %s" % self.use_terrain)
         elif args[0] == "clear":
             self.master.waypoint_clear_all_send()
             self.wploader.clear()
