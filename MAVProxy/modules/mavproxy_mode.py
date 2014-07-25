@@ -58,10 +58,14 @@ class ModeModule(mp_module.MPModule):
             altitude = int(args[0])
             
         print("Guided %s %d" % (str(latlon), altitude))
+        if self.settings.terrainalt:
+            frame = mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT
+        else:
+            frame = mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT
         self.master.mav.mission_item_send (self.status.target_system,
                                            self.status.target_component,
                                            0,
-                                           mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                           frame,
                                            mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
                                            2, 0, 0, 0, 0, 0,
                                            latlon[0], latlon[1], altitude)
