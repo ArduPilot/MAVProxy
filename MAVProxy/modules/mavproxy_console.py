@@ -193,7 +193,8 @@ class ConsoleModule(mp_module.MPModule):
             sensors = { 'AS'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_DIFFERENTIAL_PRESSURE,
                         'MAG' : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_MAG,
                         'INS' : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_ACCEL | mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_GYRO,
-                        'AHRS' : mavutil.mavlink.MAV_SYS_STATUS_AHRS}
+                        'AHRS' : mavutil.mavlink.MAV_SYS_STATUS_AHRS,
+                        'TERR' : mavutil.mavlink.MAV_SYS_STATUS_TERRAIN}
             for s in sensors.keys():
                 bits = sensors[s]
                 present = ((msg.onboard_control_sensors_enabled & bits) == bits)
