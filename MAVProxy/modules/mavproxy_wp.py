@@ -192,6 +192,16 @@ class WPModule(mp_module.MPModule):
             return
         print("Saved %u waypoints to %s" % (self.wploader.count(), filename))
 
+    def get_default_frame(self):
+        '''default frame for waypoints'''
+        if self.settings.terrainalt == 'Auto':
+            if self.get_mav_param('TERRAIN_FOLLOW',0) == 1:
+                return mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT
+            return mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT
+        if self.settings.terrainalt == 'True':
+            return mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT
+        return mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT
+
     def wp_draw_callback(self, points):
         '''callback from drawing waypoints'''
         if len(points) < 3:
@@ -202,8 +212,12 @@ class WPModule(mp_module.MPModule):
         self.wploader.target_system = self.target_system
         self.wploader.target_component = self.target_component
         self.wploader.add(home)
+        if self.get_default_frame() == mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT:
+            use_terrain = True
+        else:
+            use_terrain = False
         for p in points:
-            self.wploader.add_latlonalt(p[0], p[1], self.settings.wpalt, terrain_alt=self.settings.terrainalt)
+            self.wploader.add_latlonalt(p[0], p[1], self.settings.wpalt, terrain_alt=use_terrain)
         self.send_all_waypoints()
 
     def wp_loop(self):
