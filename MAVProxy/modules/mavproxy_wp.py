@@ -266,7 +266,7 @@ class WPModule(mp_module.MPModule):
             return
         wp = self.wploader.wp(idx)
         (lat, lon) = latlon
-        if getattr(self.console, 'ElevationMap', None) is not None:
+        if getattr(self.console, 'ElevationMap', None) is not None and wp.frame != mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT:
             alt1 = self.console.ElevationMap.GetElevation(lat, lon)
             alt2 = self.console.ElevationMap.GetElevation(wp.x, wp.y)
             if alt1 is not None and alt2 is not None:
