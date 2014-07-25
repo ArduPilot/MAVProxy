@@ -46,7 +46,14 @@ class MPSetting:
             if value < minv or value > maxv:
                 return False
         if self.choice is not None:
-            if value not in self.choice:
+            found = False
+            for v in self.choice:
+                if v.lower() == value.lower():
+                    found = True
+                    value = v
+                    break
+            if not found:
+                print("Must be one of %s" % str(self.choice))
                 return False
         self.value = value
         return True
