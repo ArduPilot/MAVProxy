@@ -35,7 +35,7 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('AHRS', 'AHRS', fg='grey', row=0)
         mpstate.console.set_status('Heading', 'Hdg ---/---', row=2)
         mpstate.console.set_status('Alt', 'Alt ---', row=2)
-        mpstate.console.set_status('AGL', 'AGL ---', row=2)
+        mpstate.console.set_status('AGL', 'AGL ---/---', row=2)
         mpstate.console.set_status('AirSpeed', 'AirSpeed --', row=2)
         mpstate.console.set_status('GPSSpeed', 'GPSSpeed --', row=2)
         mpstate.console.set_status('Thr', 'Thr ---', row=2)
@@ -170,7 +170,12 @@ class ConsoleModule(mp_module.MPModule):
                     agl_alt = agl_alt_home - agl_alt
             if agl_alt is not None:
                 agl_alt += rel_alt
-                self.console.set_status('AGL', 'AGL %u' % agl_alt)
+                vehicle_agl = master.field('TERRAIN_REPORT', 'current_height', None)
+                if vehicle_agl is None:
+                    vehicle_agl = '---'
+                else:
+                    vehicle_agl = int(vehicle_agl)
+                self.console.set_status('AGL', 'AGL %u/%s' % (agl_alt, vehicle_agl))
             self.console.set_status('Alt', 'Alt %u' % rel_alt)
             self.console.set_status('AirSpeed', 'AirSpeed %u' % msg.airspeed)
             self.console.set_status('GPSSpeed', 'GPSSpeed %u' % msg.groundspeed)
