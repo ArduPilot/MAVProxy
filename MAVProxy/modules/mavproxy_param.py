@@ -210,7 +210,7 @@ class ParamModule(mp_module.MPModule):
         super(ParamModule, self).__init__(mpstate, "param", "parameter handling", public = True)
         self.pstate = ParamState(self.mav_param, self.logdir, self.vehicle_name, 'mav.parm')
         self.add_command('param', self.cmd_param, "parameter handling",
-                         ["<fetch|download>",
+                         ["<download>",
                           "<set|show|fetch|help> (PARAMETER)",
                           "<load|save|diff> (FILENAME)"])
         if self.continue_mode and self.logdir != None:
