@@ -94,6 +94,9 @@ class SlipPolygon(SlipObject):
         pix2 = pixmapper(pt2)
         clipped = cv.ClipLine((img.width, img.height), pix1, pix2)
         if clipped is None:
+            if len(self._pix_points) == 0:
+                self._pix_points.append(None)
+            self._pix_points.append(None)
             return
         (pix1, pix2) = clipped
         cv.Line(img, pix1, pix2, colour, linewidth)
@@ -118,6 +121,8 @@ class SlipPolygon(SlipObject):
         Consider it clicked if the pixel is within 6 of the point
         '''
         for i in range(len(self._pix_points)):
+            if self._pix_points[i] is None:
+                continue
             (pixx,pixy) = self._pix_points[i]
             if abs(px - pixx) < 6 and abs(py - pixy) < 6:
                 self._selected_vertex = i
