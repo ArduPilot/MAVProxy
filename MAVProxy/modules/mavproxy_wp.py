@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 '''waypoint command handling'''
 
-import time, os, fnmatch
+import time, os, fnmatch, copy
 from pymavlink import mavutil, mavwp
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib.mp_menu import *
@@ -16,8 +16,11 @@ class WPModule(mp_module.MPModule):
         self.loading_waypoint_lasttime = time.time()
         self.last_waypoint = 0
         self.wp_period = mavutil.periodic_event(0.5)
+        self.undo_wp = None
+        self.undo_type = None
+        self.undo_wp_idx = -1
         self.add_command('wp', self.cmd_wp,       'waypoint management',
-                         ["<list|clear|move|remove|loop|set>",
+                         ["<list|clear|move|remove|loop|set|undo>",
                           "<load|update|save> (FILENAME)"])
 
         if self.continue_mode and self.logdir != None:
@@ -42,6 +45,7 @@ class WPModule(mp_module.MPModule):
                                          MPMenuItem('Draw', 'Draw', '# wp draw ',
                                                     handler=MPMenuCallTextDialog(title='Mission Altitude (m)',
                                                                                  default=100)),
+                                         MPMenuItem('Undo', 'Undo', '# wp undo'),
                                          MPMenuItem('Loop', 'Loop', '# wp loop')])
 
 
@@ -279,6 +283,12 @@ class WPModule(mp_module.MPModule):
             print("No map click position available")
             return
         wp = self.wploader.wp(idx)
+
+        # setup for undo
+        self.undo_wp = copy.copy(wp)
+        self.undo_wp_idx = idx
+        self.undo_type = "move"
+
         (lat, lon) = latlon
         if getattr(self.console, 'ElevationMap', None) is not None and wp.frame != mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT:
             alt1 = self.console.ElevationMap.GetElevation(lat, lon)
@@ -308,9 +318,40 @@ class WPModule(mp_module.MPModule):
             print("Invalid wp number %u" % idx)
             return
         wp = self.wploader.wp(idx)
+
+        # setup for undo
+        self.undo_wp = copy.copy(wp)
+        self.undo_wp_idx = idx
+        self.undo_type = "remove"
+
         self.wploader.remove(wp)
         self.send_all_waypoints()
         print("Removed WP %u" % idx)
+
+    def cmd_wp_undo(self):
+        '''handle wp undo'''
+        if self.undo_wp_idx == -1 or self.undo_wp is None:
+            print("No undo information")
+            return
+        wp = self.undo_wp
+        if self.undo_type == 'move':
+            wp.target_system    = self.target_system
+            wp.target_component = self.target_component
+            self.loading_waypoints = True
+            self.loading_waypoint_lasttime = time.time()
+            self.master.mav.mission_write_partial_list_send(self.target_system,
+                                                            self.target_component,
+                                                            self.undo_wp_idx, self.undo_wp_idx)
+            self.wploader.set(wp, self.undo_wp_idx)
+            print("Undid WP move")
+        elif self.undo_type == 'remove':
+            self.wploader.insert(self.undo_wp_idx, wp)
+            self.send_all_waypoints()
+            print("Undid WP remove")
+        else:
+            print("bad undo type")
+        self.undo_wp = None
+        self.undo_wp_idx = -1
 
     def cmd_wp(self, args):
         '''waypoint commands'''
@@ -357,6 +398,8 @@ class WPModule(mp_module.MPModule):
             self.cmd_wp_move(args[1:])
         elif args[0] == "remove":
             self.cmd_wp_remove(args[1:])
+        elif args[0] == "undo":
+            self.cmd_wp_undo()
         elif args[0] == "set":
             if len(args) != 2:
                 print("usage: wp set <wpindex>")
