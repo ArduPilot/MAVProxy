@@ -8,10 +8,11 @@ July 2014
 import sys, os, time
 from MAVProxy.modules.lib import mp_checklist
 from MAVProxy.modules.lib import mp_module
+from pymavlink import mavutil
 
 class ChecklistModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(ChecklistModule, self).__init__(mpstate, "checklist", "checklist module", public=True)
+        super(ChecklistModule, self).__init__(mpstate, "checklist", "checklist module")
         self.checklist = mp_checklist.CheckUI()
 
     def mavlink_packet(self, msg):
@@ -68,7 +69,7 @@ class ChecklistModule(mp_module.MPModule):
 
         '''beforeEngineList - Waypoints Loaded'''
         if type == 'HEARTBEAT':
-            if self.mpstate.status.wploader.count() == 0:
+            if self.module('wp').wploader.count() == 0:
                 self.checklist.set_check("Waypoints Loaded", 0)
             else:
                 self.checklist.set_check("Waypoints Loaded", 1)
