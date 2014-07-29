@@ -22,6 +22,7 @@ parser.add_option("--service", default="MicrosoftSat", help="tile service")
 parser.add_option("--mode", default=None, help="flight mode")
 parser.add_option("--condition", default=None, help="conditional check on log")
 parser.add_option("--mission", default=None, help="mission file (defaults to logged mission)")
+parser.add_option("--fence", default=None, help="fence file")
 parser.add_option("--imagefile", default=None, help="output to image file")
 parser.add_option("--flag", default=[], type='str', action='append', help="flag positions")
 parser.add_option("--rawgps", action='store_true', default=False, help="use GPS_RAW_INT")
@@ -41,7 +42,7 @@ def pixel_coords(latlon, ground_width=0, mt=None, topleft=None, width=None):
     (lat,lon) = (latlon[0], latlon[1])
     return mt.coord_to_pixel(topleft[0], topleft[1], width, ground_width, lat, lon)
 
-def create_imagefile(filename, latlon, ground_width, path_objs, mission_obj, width=600, height=600):
+def create_imagefile(filename, latlon, ground_width, path_objs, mission_obj, fence_obj, width=600, height=600):
     '''create path and mission as an image file'''
     mt = mp_tile.MPTile(service=opts.service)
 
@@ -58,6 +59,8 @@ def create_imagefile(filename, latlon, ground_width, path_objs, mission_obj, wid
         path_obj.draw(map_img, pixmapper, None)
     if mission_obj is not None:
         mission_obj.draw(map_img, pixmapper, None)
+    if fence_obj is not None:
+        fence_obj.draw(map_img, pixmapper, None)
     cv.CvtColor(map_img, map_img, cv.CV_BGR2RGB)
     cv.SaveImage(filename, map_img)
 
@@ -85,6 +88,9 @@ def mavflightview(filename):
     wp = mavwp.MAVWPLoader()
     if opts.mission is not None:
         wp.load(opts.mission)
+    fen = mavwp.MAVFenceLoader()
+    if opts.fence is not None:
+        fen.load(opts.fence)
     path = [[]]
     types = ['MISSION_ITEM']
     if opts.rawgps:
@@ -188,8 +194,15 @@ def mavflightview(filename):
     else:
         mission_obj = None
 
+    fence = fen.polygon()
+    if len(fence) > 1:
+        fence_obj = mp_slipmap.SlipPolygon('Fence-%s' % filename, fen.polygon(), layer='Fence',
+                                           linewidth=2, colour=(0,255,0))
+    else:
+        fence_obj = None
+
     if opts.imagefile:
-        create_imagefile(opts.imagefile, (lat,lon), ground_width, path_objs, mission_obj)
+        create_imagefile(opts.imagefile, (lat,lon), ground_width, path_objs, mission_obj, fence_obj)
     else:
         global multi_map
         if opts.multi and multi_map is not None:
@@ -209,6 +222,8 @@ def mavflightview(filename):
             map.add_object(path_obj)
         if mission_obj is not None:
             map.add_object(mission_obj)
+        if fence_obj is not None:
+            map.add_object(fence_obj)
 
         for flag in opts.flag:
             a = flag.split(',')
