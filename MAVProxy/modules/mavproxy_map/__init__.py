@@ -269,6 +269,10 @@ class MapModule(mp_module.MPModule):
                 self.click_position = obj.latlon
                 self.click_time = time.time()
                 self.drawing_update()
+
+            if self.module('misseditor') is not None:
+                self.module('misseditor').update_map_click_position(self.click_position)
+
         if obj.event.m_rightDown:
             if self.draw_callback is not None:
                 self.drawing_end()
