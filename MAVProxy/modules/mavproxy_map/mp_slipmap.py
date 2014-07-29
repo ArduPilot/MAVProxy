@@ -73,6 +73,10 @@ class SlipObject:
         '''extra selection information sent when object is selected'''
         return None
 
+    def bounds(self):
+        '''return bounding box or None'''
+        return None
+
 class SlipLabel(SlipObject):
     '''a text label to display on the map'''
     def __init__(self, key, point, label, layer, colour):
@@ -81,15 +85,16 @@ class SlipLabel(SlipObject):
         self.colour = colour
         self.label = label
 
-    def bounds(self):
-        return None
-
     def draw_label(self, img, pixmapper):
         pix1 = pixmapper(self.point)
         cv.PutText(img, self.label, pix1, cv.InitFont(cv.CV_FONT_HERSHEY_SIMPLEX, 1.0,1.0), self.colour)
 
     def draw(self, img, pixmapper, bounds):
         self.draw_label(img, pixmapper)
+
+    def bounds(self):
+        '''return bounding box'''
+        return (self.point[0], self.point[1], 0, 0)
 
 class SlipCircle(SlipObject):
     '''a circle to display on the map'''
@@ -110,6 +115,10 @@ class SlipCircle(SlipObject):
         pixels_per_meter = dis_px / dis
 
         cv.Circle(img, center_px, int(self.radius * pixels_per_meter), self.color, self.linewidth)
+
+    def bounds(self):
+        '''return bounding box'''
+        return (self.latlon[0], self.latlon[1], 0, 0)
 
 class SlipPolygon(SlipObject):
     '''a polygon to display on the map'''
@@ -178,10 +187,6 @@ class SlipGrid(SlipObject):
         SlipObject.__init__(self, key, layer, )
         self.colour = colour
         self.linewidth = linewidth
-
-    def bounds(self):
-        '''return bounding box'''
-        return None
 
     def draw_line(self, img, pixmapper, pt1, pt2, colour, linewidth):
         '''draw a line on the image'''
