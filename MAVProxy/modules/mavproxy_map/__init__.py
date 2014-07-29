@@ -380,8 +380,9 @@ class MapModule(mp_module.MPModule):
     
             
         # if the waypoints have changed, redisplay
-        if self.wp_change_time != self.module('wp').wploader.last_change:
-            self.wp_change_time = self.module('wp').wploader.last_change
+        last_wp_change = self.module('wp').wploader.last_change
+        if self.wp_change_time != last_wp_change and abs(time.time() - last_wp_change) > 1:
+            self.wp_change_time = last_wp_change
             self.display_waypoints()
 
             #this may have affected the landing lines from the rally points:
