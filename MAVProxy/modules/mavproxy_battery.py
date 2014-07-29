@@ -16,13 +16,14 @@ class BatteryModule(mp_module.MPModule):
         self.last_battery_cell_announce_time = 0
         self.battery_level = -1
         self.voltage_level = -1
+        self.current_battery = -1
         self.per_cell = 0
         self.settings.append(
             MPSetting('battwarn', int, 1, 'Battery Warning Time'))
         self.settings.append(
             MPSetting('batwarncell', float, 3.7, 'Battery cell Warning level'))
         self.settings.append(MPSetting('numcells', int, 0, range=(0,10), increment=1))
-        self.battery_period = mavutil.periodic_event(0.3)
+        self.battery_period = mavutil.periodic_event(5)
 
     def cmd_bat(self, args):
         '''show battery levels'''
@@ -39,7 +40,8 @@ class BatteryModule(mp_module.MPModule):
         if batt_mon == 3:
             self.console.set_status('Battery', 'Batt: %.2fV' % (float(self.voltage_level) / 1000.0), row=1)
         elif batt_mon == 4:
-            self.console.set_status('Battery', 'Batt: %u%%/%.2fV' % (self.battery_level, (float(self.voltage_level) / 1000.0)), row=1)
+            self.console.set_status('Battery', 'Batt: %u%%/%.2fV %.1fA' % (self.battery_level, (float(self.voltage_level) / 1000.0), self.current_battery / 100.0 ), row=1)
+ 
         else:
             #clear battery status
             self.console.set_status('Battery', row=1)
@@ -50,7 +52,9 @@ class BatteryModule(mp_module.MPModule):
             if rbattery_level != self.last_battery_announce:
                 self.say("Flight battery %u percent" % rbattery_level, priority='notification')
                 self.last_battery_announce = rbattery_level
-            if rbattery_level <= 20:
+            #check voltage level to ensure we've actually received data about
+            #the battery (prevents false positive warning at startup)
+            if self.voltage_level != -1 and rbattery_level <= 20:
                 self.say("Flight battery warning")
 
         if self.settings.numcells != 0 and self.per_cell < self.settings.batwarncell and time.time() > self.last_battery_cell_announce_time + 60*self.settings.battwarn:
@@ -79,6 +83,7 @@ class BatteryModule(mp_module.MPModule):
         # main flight battery
         self.battery_level = SYS_STATUS.battery_remaining
         self.voltage_level = SYS_STATUS.voltage_battery
+        self.current_battery = SYS_STATUS.current_battery
         if self.settings.numcells != 0:
             self.per_cell = (self.voltage_level*0.001) / self.settings.numcells
 
