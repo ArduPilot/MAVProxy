@@ -26,6 +26,7 @@ MEGE_SET_MISS_ITEM = 2
 MEGE_SET_WP_RAD = 3
 MEGE_SET_LOIT_RAD = 4
 MEGE_SET_WP_DEFAULT_ALT = 5
+MEGE_SET_LAST_MAP_CLICK_POS = 6
 
 class MissionEditorEvent:        
     def __init__(self, type, **kwargs):

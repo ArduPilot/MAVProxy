@@ -95,6 +95,9 @@ class MissionEditorFrame(wx.Frame):
         #remember what mission we opened/saved last
         self.last_mission_file_path = ""
 
+        #remember last map click position
+        self.last_map_click_pos = None
+
     def __set_properties(self):
         # begin wxGlade: MissionEditorFrame.__set_properties
         self.SetTitle("Mission Editor")
@@ -276,8 +279,9 @@ class MissionEditorFrame(wx.Frame):
                 self.text_ctrl_wp_default_alt.SetValue(str(
                     event.get_arg("def_wp_alt")))
                 self.text_ctrl_wp_default_alt.SetForegroundColour(wx.Colour(0, 0, 0))
+            elif event.get_type() == me_event.MEGE_SET_LAST_MAP_CLICK_POS:
+                self.last_map_click_pos = event.get_arg("click_pos") 
 
-           
         self.gui_event_queue_lock.release()
        
         if (event_processed == True):
@@ -389,6 +393,14 @@ class MissionEditorFrame(wx.Frame):
         
         self.grid_mission.InsertRows(row_selected+1)
         self.prep_new_row(row_selected+1)
+
+        #set lat/lon based on last map click position:
+        if self.last_map_click_pos is not None:
+            self.grid_mission.SetCellValue(row_selected + 1, 5,
+                    str(self.last_map_click_pos[0]))
+            self.grid_mission.SetCellValue(row_selected + 1, 6,
+                    str(self.last_map_click_pos[1]))            
+
         #highlight new row
         self.grid_mission.SelectRow(row_selected+1)
         self.set_modified_state(True)

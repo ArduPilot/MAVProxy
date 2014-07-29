@@ -246,6 +246,12 @@ class MissionEditorModule(mp_module.MPModule):
     def read_waypoints(self):
         self.module('wp').cmd_wp(['list'])
 
+    def update_map_click_position(self, new_click_pos):
+        self.gui_event_queue_lock.acquire()
+        self.gui_event_queue.put(MissionEditorEvent(
+            me_event.MEGE_SET_LAST_MAP_CLICK_POS,click_pos=new_click_pos))
+        self.gui_event_queue_lock.release()
+
 def init(mpstate):
     '''initialise module'''
     return MissionEditorModule(mpstate)
