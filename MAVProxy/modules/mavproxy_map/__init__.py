@@ -41,7 +41,8 @@ class MapModule(mp_module.MPModule):
               ('showgps2pos', int, 1),
               ('showsimpos', int, 0),
               ('showahrs2pos', int, 0),
-              ('brightness', float, 1)])
+              ('brightness', float, 1),
+              ('rallycircle', bool, False)])
         service='YahooSat'
         if 'MAP_SERVICE' in os.environ:
             service = os.environ['MAP_SERVICE']
@@ -406,7 +407,8 @@ class MapModule(mp_module.MPModule):
 
                 loiter_rad = self.get_mav_param('WP_LOITER_RAD')
 
-                self.mpstate.map.add_object(mp_slipmap.SlipCircle('Rally Circ %u' % (i+1), 'RallyPoints', (rp.lat*1.0e-7, rp.lng*1.0e-7), abs(loiter_rad), (255,255,0), 2))
+                if self.map_settings.rallycircle:
+                    self.mpstate.map.add_object(mp_slipmap.SlipCircle('Rally Circ %u' % (i+1), 'RallyPoints', (rp.lat*1.0e-7, rp.lng*1.0e-7), abs(loiter_rad), (255,255,0), 2))
 
                 #draw a line between rally point and nearest landing point
                 nearest_land_wp = None
