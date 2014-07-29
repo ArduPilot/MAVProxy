@@ -1130,7 +1130,7 @@ Auto-detected serial ports are:
         # some core functionality is in modules
         standard_modules = ['log', 'wp', 'rally','fence','param','relay',
                             'tuneopt','arm','mode','calibration','rc','auxopt','misc','cmdlong',
-                            'battery','terrain']
+                            'battery','terrain','output']
         for m in standard_modules:
             load_module(m, quiet=True)
 
