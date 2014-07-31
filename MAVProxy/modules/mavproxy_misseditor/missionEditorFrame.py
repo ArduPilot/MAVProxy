@@ -294,7 +294,7 @@ class MissionEditorFrame(wx.Frame):
             
         cell_ed = wx.grid.GridCellChoiceEditor(command_choices)
         self.grid_mission.SetCellEditor(row_num, 0, cell_ed)
-        self.grid_mission.SetCellValue(row_num, 0, "Waypoint")
+        self.grid_mission.SetCellValue(row_num, 0, "NAV_WAYPOINT")
 
         for i in range(1, 7):
             self.grid_mission.SetCellValue(row_num, i, "0.0")
@@ -430,23 +430,13 @@ class MissionEditorFrame(wx.Frame):
         self.grid_mission.SetColLabelValue(2, "P2")
         self.grid_mission.SetColLabelValue(3, "P3")
         self.grid_mission.SetColLabelValue(4, "P4")
+        self.grid_mission.SetColLabelValue(5, "P5")
+        self.grid_mission.SetColLabelValue(6, "P6")
+        self.grid_mission.SetColLabelValue(7, "P7")
 
-        if (command == "Takeoff"):
-            self.grid_mission.SetColLabelValue(1, "Ptch")
-        elif (command == "Do Jump"):
-            self.grid_mission.SetColLabelValue(1, "WP#")
-            self.grid_mission.SetColLabelValue(2, "Reps")
-        elif (command == "Do Chng Speed"):
-            self.grid_mission.SetColLabelValue(1, "Type(0=as,1=gs)")
-            self.grid_mission.SetColLabelValue(2, "Spd")
-        elif (command == "Loiter Unlim"):
-            self.grid_mission.SetColLabelValue(3, "Dir(1=CW)")
-        elif (command == "Loiter Turns"):
-            self.grid_mission.SetColLabelValue(1, "Turns")
-            self.grid_mission.SetColLabelValue(3, "Dir(1=CW)")
-        elif (command == "Loiter Time"):
-            self.grid_mission.SetColLabelValue(1, "Secs")
-            self.grid_mission.SetColLabelValue(3, "Dir(1=CW)")
+        col_labels = me_defines.get_column_labels(command)
+        for col in col_labels.keys():
+            self.grid_mission.SetColLabelValue(col, col_labels[col])
 
         event.Skip()
     
