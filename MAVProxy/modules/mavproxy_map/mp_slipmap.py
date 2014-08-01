@@ -30,6 +30,7 @@ class SlipObject:
         self.layer = layer
         self.latlon = None
         self.popup_menu = popup_menu
+        self.hidden = False
 
     def clip(self, px, py, w, h, img):
         '''clip an area for display on the map'''
@@ -77,6 +78,10 @@ class SlipObject:
         '''return bounding box or None'''
         return None
 
+    def set_hidden(self, hidden):
+        '''set hidden attribute'''
+        self.hidden = hidden
+
 class SlipLabel(SlipObject):
     '''a text label to display on the map'''
     def __init__(self, key, point, label, layer, colour):
@@ -90,10 +95,14 @@ class SlipLabel(SlipObject):
         cv.PutText(img, self.label, pix1, cv.InitFont(cv.CV_FONT_HERSHEY_SIMPLEX, 1.0,1.0), self.colour)
 
     def draw(self, img, pixmapper, bounds):
+        if self.hidden:
+            return
         self.draw_label(img, pixmapper)
 
     def bounds(self):
         '''return bounding box'''
+        if self.hidden:
+            return None
         return (self.point[0], self.point[1], 0, 0)
 
 class SlipCircle(SlipObject):
@@ -106,6 +115,8 @@ class SlipCircle(SlipObject):
         self.linewidth = linewidth
 
     def draw(self, img, pixmapper, bounds):
+        if self.hidden:
+            return
         center_px = pixmapper(self.latlon)
         #figure out pixels per meter
         ref_pt = (self.latlon[0] + 1.0, self.latlon[1])
@@ -118,6 +129,8 @@ class SlipCircle(SlipObject):
 
     def bounds(self):
         '''return bounding box'''
+        if self.hidden:
+            return None
         return (self.latlon[0], self.latlon[1], 0, 0)
 
 class SlipPolygon(SlipObject):
@@ -133,6 +146,8 @@ class SlipPolygon(SlipObject):
 
     def bounds(self):
         '''return bounding box'''
+        if self.hidden:
+            return None
         return self._bounds
 
     def draw_line(self, img, pixmapper, pt1, pt2, colour, linewidth):
@@ -154,6 +169,8 @@ class SlipPolygon(SlipObject):
 
     def draw(self, img, pixmapper, bounds):
         '''draw a polygon on the image'''
+        if self.hidden:
+            return
         self._pix_points = []
         for i in range(len(self.points)-1):
             if len(self.points[i]) > 2:
@@ -167,6 +184,8 @@ class SlipPolygon(SlipObject):
         '''see if the polygon has been clicked on.
         Consider it clicked if the pixel is within 6 of the point
         '''
+        if self.hidden:
+            return None
         for i in range(len(self._pix_points)):
             if self._pix_points[i] is None:
                 continue
@@ -201,6 +220,8 @@ class SlipGrid(SlipObject):
 
     def draw(self, img, pixmapper, bounds):
         '''draw a polygon on the image'''
+        if self.hidden:
+            return
 	(x,y,w,h) = bounds
         spacing = 1000
         while True:
@@ -241,6 +262,8 @@ class SlipThumbnail(SlipObject):
 
     def bounds(self):
         '''return bounding box'''
+        if self.hidden:
+            return None
         return (self.latlon[0], self.latlon[1], 0, 0)
 
     def img(self):
@@ -257,6 +280,8 @@ class SlipThumbnail(SlipObject):
 
     def draw(self, img, pixmapper, bounds):
         '''draw the thumbnail on the image'''
+        if self.hidden:
+            return
         thumb = self.img()
         (px,py) = pixmapper(self.latlon)
 
@@ -280,6 +305,8 @@ class SlipThumbnail(SlipObject):
 
     def clicked(self, px, py):
         '''see if the image has been clicked on'''
+        if self.hidden:
+            return None
         if (abs(px - self.posx) > self.width/2 or
             abs(py - self.posy) > self.height/2):
             return None
@@ -338,6 +365,9 @@ class SlipIcon(SlipThumbnail):
     def draw(self, img, pixmapper, bounds):
         '''draw the icon on the image'''
 
+        if self.hidden:
+            return
+
         if self.trail is not None:
             self.trail.draw(img, pixmapper, bounds)
 
@@ -390,6 +420,12 @@ class SlipRemoveObject:
     '''remove an object by key'''
     def __init__(self, key):
         self.key = key
+
+class SlipHideObject:
+    '''hide an object by key'''
+    def __init__(self, key, hide):
+        self.key = key
+        self.hide = hide
 
 
 class SlipInformation:
@@ -597,6 +633,14 @@ class MPSlipMap():
         '''add or update an object on the map'''
         self.object_queue.put(obj)
 
+    def remove_object(self, key):
+        '''remove an object on the map by key'''
+        self.object_queue.put(SlipRemoveObject(key))
+
+    def hide_object(self, key, hide=True):
+        '''hide an object on the map by key'''
+        self.object_queue.put(SlipHideObject(key, hide))
+
     def set_position(self, key, latlon, layer=None, rotation=0):
         '''move an object on the map'''
         self.object_queue.put(SlipPosition(key, latlon, layer, rotation))
@@ -802,8 +846,16 @@ class MPSlipMapFrame(wx.Frame):
 
             if isinstance(obj, SlipRemoveObject):
                 # remove an object by key
-                if obj.layer in state.layers:
-                    state.layers.pop(obj.layer)
+                for layer in state.layers:
+                    if obj.key in state.layers[layer]:
+                        state.layers[layer].pop(obj.key)
+                state.need_redraw = True
+
+            if isinstance(obj, SlipHideObject):
+                # hide an object by key
+                for layer in state.layers:
+                    if obj.key in state.layers[layer]:
+                        state.layers[layer][obj.key].set_hidden(obj.hide)
                 state.need_redraw = True
         
         if obj is None:
