@@ -109,8 +109,9 @@ class MapModule(mp_module.MPModule):
                 #label already printed for this wp?
                 if (next_list[j] not in labeled_wps):
                     self.mpstate.map.add_object(mp_slipmap.SlipLabel(
-                        'miss_cmd %u' % j, polygons[i][j], str(next_list[j]), 'Mission', colour=(0,255,255)))  
+                        'miss_cmd %u/%u' % (i,j), polygons[i][j], str(next_list[j]), 'Mission', colour=(0,255,255)))  
                     labeled_wps[next_list[j]] = (i,j)
+                    
 
     def display_fence(self):
         '''display the fence'''
