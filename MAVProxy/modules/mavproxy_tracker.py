@@ -203,7 +203,7 @@ class TrackerModule(mp_module.MPModule):
         if not self.connection:
             print("tracker not connected")
             return
-        self.pstate.handle_command(self.connection, args)
+        self.pstate.handle_command(self.connection, self.mpstate, args)
 
 def init(mpstate):
     '''initialise module'''
