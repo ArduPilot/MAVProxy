@@ -19,6 +19,19 @@ from MAVProxy.modules.mavproxy_misseditor import me_defines
 
 from MAVProxy.modules.mavproxy_misseditor import button_renderer
 
+#define column names via "enums":
+ME_COMMAND_COL = 0
+ME_P1_COL = 1
+ME_P2_COL = 2
+ME_P3_COL = 3
+ME_P4_COL = 4
+ME_LAT_COL = 5 
+ME_LON_COL = 6
+ME_ALT_COL = 7
+ME_DELETE_COL = 8
+ME_UP_COL = 9
+ME_DOWN_COL = 10
+
 class MissionEditorFrame(wx.Frame):
     def __init__(self, *args, **kwds):
         # begin wxGlade: MissionEditorFrame.__init__
@@ -88,9 +101,9 @@ class MissionEditorFrame(wx.Frame):
         self.down_attr.SetReadOnly(True)
         self.down_attr.SetRenderer(down_br)
 
-        self.grid_mission.SetColAttr(8, self.del_attr)
-        self.grid_mission.SetColAttr(9, self.up_attr)
-        self.grid_mission.SetColAttr(10, self.down_attr)
+        self.grid_mission.SetColAttr(ME_DELETE_COL, self.del_attr)
+        self.grid_mission.SetColAttr(ME_UP_COL, self.up_attr)
+        self.grid_mission.SetColAttr(ME_DOWN_COL, self.down_attr)
 
         #remember what mission we opened/saved last
         self.last_mission_file_path = ""
@@ -214,10 +227,10 @@ class MissionEditorFrame(wx.Frame):
                 self.grid_mission.DeleteRows(0, 
                         self.grid_mission.GetNumberRows())
                 self.grid_mission.SetDefaultColSize(50, True)
-                self.grid_mission.SetColSize(0, 150)
-                self.grid_mission.SetColSize(5, 100)
-                self.grid_mission.SetColSize(6, 100)
-                self.grid_mission.SetColSize(7, 75)
+                self.grid_mission.SetColSize(ME_COMMAND_COL, 150)
+                self.grid_mission.SetColSize(ME_LAT_COL, 100)
+                self.grid_mission.SetColSize(ME_LON_COL, 100)
+                self.grid_mission.SetColSize(ME_ALT_COL, 75)
 
                 self.grid_mission.ForceRefresh()
             elif event.get_type() == me_event.MEGE_ADD_MISS_TABLE_ROWS:
@@ -243,25 +256,25 @@ class MissionEditorFrame(wx.Frame):
 
                 else: #not the first mission item
                     if (me_defines.miss_cmds.has_key(command)):
-                        self.grid_mission.SetCellValue(row, 0, 
+                        self.grid_mission.SetCellValue(row, ME_COMMAND_COL, 
                                 me_defines.miss_cmds[command])
                     else:
-                        self.grid_mission.SetCellValue(row, 0,
+                        self.grid_mission.SetCellValue(row, ME_COMMAND_COL,
                                 str(command))
 
-                    self.grid_mission.SetCellValue(row, 1, 
+                    self.grid_mission.SetCellValue(row, ME_P1_COL, 
                             str(event.get_arg("param1")))
-                    self.grid_mission.SetCellValue(row, 2, 
+                    self.grid_mission.SetCellValue(row, ME_P2_COL, 
                             str(event.get_arg("param2")))
-                    self.grid_mission.SetCellValue(row, 3, 
+                    self.grid_mission.SetCellValue(row, ME_P3_COL, 
                             str(event.get_arg("param3")))
-                    self.grid_mission.SetCellValue(row, 4, 
+                    self.grid_mission.SetCellValue(row, ME_P4_COL, 
                             str(event.get_arg("param4")))
-                    self.grid_mission.SetCellValue(row, 5, 
+                    self.grid_mission.SetCellValue(row, ME_LAT_COL, 
                             str(event.get_arg("lat")))
-                    self.grid_mission.SetCellValue(row, 6, 
+                    self.grid_mission.SetCellValue(row, ME_LON_COL, 
                             str(event.get_arg("lon")))
-                    self.grid_mission.SetCellValue(row, 7, 
+                    self.grid_mission.SetCellValue(row, ME_ALT_COL, 
                             "%.2f" % event.get_arg("alt"))
             elif event.get_type() == me_event.MEGE_SET_WP_RAD:
                 self.text_ctrl_wp_radius.SetValue(str(event.get_arg("wp_rad")))
@@ -293,19 +306,19 @@ class MissionEditorFrame(wx.Frame):
         command_choices = me_defines.miss_cmds.values()
             
         cell_ed = wx.grid.GridCellChoiceEditor(command_choices)
-        self.grid_mission.SetCellEditor(row_num, 0, cell_ed)
-        self.grid_mission.SetCellValue(row_num, 0, "NAV_WAYPOINT")
+        self.grid_mission.SetCellEditor(row_num, ME_COMMAND_COL, cell_ed)
+        self.grid_mission.SetCellValue(row_num, ME_COMMAND_COL, "NAV_WAYPOINT")
 
         for i in range(1, 7):
             self.grid_mission.SetCellValue(row_num, i, "0.0")
 
         #set altitude to default:
-        self.grid_mission.SetCellValue(row_num, 7, 
+        self.grid_mission.SetCellValue(row_num, ME_ALT_COL, 
                 self.text_ctrl_wp_default_alt.GetValue())
 
         #this makes newest row always have the cursor in it,
         #making the "Add Below" button work like I want:
-        self.grid_mission.SetGridCursor(row_num,0)
+        self.grid_mission.SetGridCursor(row_num, ME_COMMAND_COL)
         
     def prep_new_rows(self, start_row, num_rows):
         num_remaining = num_rows
@@ -353,13 +366,13 @@ class MissionEditorFrame(wx.Frame):
             
         for i in range(0, self.grid_mission.GetNumberRows()):
             cmd_id = me_defines.cmd_reverse_lookup(self.grid_mission.GetCellValue(i,0))
-            p1 = float(self.grid_mission.GetCellValue(i,1))
-            p2 = float(self.grid_mission.GetCellValue(i,2))
-            p3 = float(self.grid_mission.GetCellValue(i,3))
-            p4 = float(self.grid_mission.GetCellValue(i,4))
-            lat = float(self.grid_mission.GetCellValue(i,5))
-            lon = float(self.grid_mission.GetCellValue(i,6))
-            alt = float(self.grid_mission.GetCellValue(i,7))
+            p1 = float(self.grid_mission.GetCellValue(i,ME_P1_COL))
+            p2 = float(self.grid_mission.GetCellValue(i,ME_P2_COL))
+            p3 = float(self.grid_mission.GetCellValue(i,ME_P3_COL))
+            p4 = float(self.grid_mission.GetCellValue(i,ME_P4_COL))
+            lat = float(self.grid_mission.GetCellValue(i,ME_LAT_COL))
+            lon = float(self.grid_mission.GetCellValue(i,ME_LON_COL))
+            alt = float(self.grid_mission.GetCellValue(i,ME_ALT_COL))
                 
             self.event_queue.put(MissionEditorEvent(me_event.MEE_WRITE_WP_NUM,
                 num=i+1,cmd_id=cmd_id,p1=p1,p2=p2,p3=p3,p4=p4,
@@ -396,9 +409,9 @@ class MissionEditorFrame(wx.Frame):
 
         #set lat/lon based on last map click position:
         if self.last_map_click_pos is not None:
-            self.grid_mission.SetCellValue(row_selected + 1, 5,
+            self.grid_mission.SetCellValue(row_selected + 1, ME_LAT_COL,
                     str(self.last_map_click_pos[0]))
-            self.grid_mission.SetCellValue(row_selected + 1, 6,
+            self.grid_mission.SetCellValue(row_selected + 1, ME_LON_COL,
                     str(self.last_map_click_pos[1]))            
 
         #highlight new row
@@ -425,14 +438,14 @@ class MissionEditorFrame(wx.Frame):
         event.Skip()
 
     def on_mission_grid_cell_select(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
-        command = self.grid_mission.GetCellValue(event.GetRow(), 0)
-        self.grid_mission.SetColLabelValue(1, "P1")
-        self.grid_mission.SetColLabelValue(2, "P2")
-        self.grid_mission.SetColLabelValue(3, "P3")
-        self.grid_mission.SetColLabelValue(4, "P4")
-        self.grid_mission.SetColLabelValue(5, "P5")
-        self.grid_mission.SetColLabelValue(6, "P6")
-        self.grid_mission.SetColLabelValue(7, "P7")
+        command = self.grid_mission.GetCellValue(event.GetRow(), ME_COMMAND_COL)
+        self.grid_mission.SetColLabelValue(ME_P1_COL, "P1")
+        self.grid_mission.SetColLabelValue(ME_P2_COL, "P2")
+        self.grid_mission.SetColLabelValue(ME_P3_COL, "P3")
+        self.grid_mission.SetColLabelValue(ME_P4_COL, "P4")
+        self.grid_mission.SetColLabelValue(ME_LAT_COL, "Lat")
+        self.grid_mission.SetColLabelValue(ME_LON_COL, "Lon")
+        self.grid_mission.SetColLabelValue(ME_ALT_COL, "Alt")
 
         col_labels = me_defines.get_column_labels(command)
         for col in col_labels.keys():
@@ -442,7 +455,7 @@ class MissionEditorFrame(wx.Frame):
     
     def on_mission_grid_cell_left_click(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
         #delete column?
-        if (event.GetCol() == 8):
+        if (event.GetCol() == ME_DELETE_COL):
             row = event.GetRow()
             dlg = wx.MessageDialog(self, 'Sure you want to delete item ' + str(row+1) + '?', 'Really Delete?', wx.YES_NO | wx.ICON_EXCLAMATION)
             result = dlg.ShowModal()
@@ -452,7 +465,7 @@ class MissionEditorFrame(wx.Frame):
                 self.grid_mission.DeleteRows(row)
                 self.set_modified_state(True)
         #up column?
-        elif (event.GetCol() == 9):
+        elif (event.GetCol() == ME_UP_COL):
             row = event.GetRow()
             if (row == 0): #can't go any higher
                 return
@@ -464,7 +477,7 @@ class MissionEditorFrame(wx.Frame):
                     self.grid_mission.GetCellValue(row+1,i))
             self.grid_mission.DeleteRows(row+1)
             #move the cursor to where the row moved and highlight the row
-            self.grid_mission.SetGridCursor(row-1,9)
+            self.grid_mission.SetGridCursor(row-1,ME_UP_COL)
             self.grid_mission.SelectRow(row-1)
 
             self.set_modified_state(True)
@@ -473,7 +486,7 @@ class MissionEditorFrame(wx.Frame):
             return
 
         #down column?
-        elif (event.GetCol() == 10):
+        elif (event.GetCol() == ME_DOWN_COL):
             row = event.GetRow()
             if (row == self.grid_mission.GetNumberRows() - 1): #can't go lower
                 return
@@ -487,7 +500,7 @@ class MissionEditorFrame(wx.Frame):
             self.grid_mission.DeleteRows(row)
 
             #move the cursor to where the row moved and highlight the row
-            self.grid_mission.SetGridCursor(row+1,10)
+            self.grid_mission.SetGridCursor(row+1,ME_DOWN_COL)
             self.grid_mission.SelectRow(row+1)
 
             self.set_modified_state(True)
