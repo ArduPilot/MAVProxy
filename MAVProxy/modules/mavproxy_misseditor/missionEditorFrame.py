@@ -28,9 +28,10 @@ ME_P4_COL = 4
 ME_LAT_COL = 5 
 ME_LON_COL = 6
 ME_ALT_COL = 7
-ME_DELETE_COL = 8
-ME_UP_COL = 9
-ME_DOWN_COL = 10
+ME_FRAME_COL = 8
+ME_DELETE_COL = 9
+ME_UP_COL = 10
+ME_DOWN_COL = 11
 
 class MissionEditorFrame(wx.Frame):
     def __init__(self, *args, **kwds):
@@ -125,7 +126,7 @@ class MissionEditorFrame(wx.Frame):
         self.label_home_lon_value.SetMinSize((100, 17))
         self.label_home_lon_value.SetForegroundColour(wx.Colour(0, 127, 255))
         self.label_home_alt_value.SetForegroundColour(wx.Colour(0, 127, 255))
-        self.grid_mission.CreateGrid(0, 11)
+        self.grid_mission.CreateGrid(0, 12)
         self.grid_mission.SetRowLabelSize(20)
         self.grid_mission.SetColLabelSize(20)
         self.grid_mission.SetColLabelValue(0, "Command")
@@ -137,9 +138,10 @@ class MissionEditorFrame(wx.Frame):
         self.grid_mission.SetColLabelValue(5, "Lat")
         self.grid_mission.SetColLabelValue(6, "Lon")
         self.grid_mission.SetColLabelValue(7, "Alt")
-        self.grid_mission.SetColLabelValue(8, "Delete")
-        self.grid_mission.SetColLabelValue(9, "Up")
-        self.grid_mission.SetColLabelValue(10, "Down")
+        self.grid_mission.SetColLabelValue(8, "Frame")
+        self.grid_mission.SetColLabelValue(9, "Delete")
+        self.grid_mission.SetColLabelValue(10, "Up")
+        self.grid_mission.SetColLabelValue(11, "Down")
         # end wxGlade
 
     def __do_layout(self):
@@ -276,6 +278,15 @@ class MissionEditorFrame(wx.Frame):
                             str(event.get_arg("lon")))
                     self.grid_mission.SetCellValue(row, ME_ALT_COL, 
                             "%.2f" % event.get_arg("alt"))
+
+                    frame_num = event.get_arg("frame") 
+                    if (me_defines.frame_enum.has_key(frame_num)): 
+                        self.grid_mission.SetCellValue(row, ME_FRAME_COL,
+                            me_defines.frame_enum[frame_num])
+                    else:
+                        self.grid_mission.SetCellValue(row, ME_FRAME_COL, "Und")
+
+
             elif event.get_type() == me_event.MEGE_SET_WP_RAD:
                 self.text_ctrl_wp_radius.SetValue(str(event.get_arg("wp_rad")))
                 self.text_ctrl_wp_radius.SetForegroundColour(wx.Colour(0, 0, 0))
@@ -315,6 +326,12 @@ class MissionEditorFrame(wx.Frame):
         #set altitude to default:
         self.grid_mission.SetCellValue(row_num, ME_ALT_COL, 
                 self.text_ctrl_wp_default_alt.GetValue())
+
+        #populate frm cell editor and set to default value
+
+        frame_cell_ed = wx.grid.GridCellChoiceEditor(me_defines.frame_enum.values())
+        self.grid_mission.SetCellEditor(row_num, ME_FRAME_COL, frame_cell_ed)
+        self.grid_mission.SetCellValue(row_num, ME_FRAME_COL, "Rel")
 
         #this makes newest row always have the cursor in it,
         #making the "Add Below" button work like I want:
