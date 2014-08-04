@@ -213,7 +213,7 @@ class MissionEditorModule(mp_module.MPModule):
                         me_event.MEGE_SET_MISS_ITEM,
                         num=m.seq,command=m.command,param1=m.param1,
                         param2=m.param2,param3=m.param3,param4=m.param4,
-                        lat=m.x,lon=m.y,alt=m.z))
+                        lat=m.x,lon=m.y,alt=m.z,frame=m.frame))
 
                     self.wps_received[m.seq] = True
 
