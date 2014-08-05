@@ -239,7 +239,6 @@ class WPModule(mp_module.MPModule):
         wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0, 0, mavutil.mavlink.MAV_CMD_DO_JUMP,
                                                           0, 1, 1, -1, 0, 0, 0, 0, 0)
         loader.add(wp)
-        loader.add(loader.wp(1))
         self.loading_waypoints = True
         self.loading_waypoint_lasttime = time.time()
         self.master.waypoint_count_send(self.wploader.count())
