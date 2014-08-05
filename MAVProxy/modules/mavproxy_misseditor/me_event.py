@@ -33,11 +33,19 @@ class MissionEditorEvent:
         self.type = type
         self.arg_dict = kwargs
 
-        if (self.type != MEE_READ_WPS and self.type != MEE_WRITE_WPS and self.type != MEGE_CLEAR_MISS_TABLE and self.type != MEGE_ADD_MISS_TABLE_ROWS and self.type != MEGE_SET_MISS_ITEM and self.type != MEE_TIME_TO_QUIT and self.type != MEE_GET_WP_RAD and self.type != MEE_GET_LOIT_RAD and self.type != MEGE_SET_WP_RAD and self.type != MEGE_SET_LOIT_RAD and self.type != MEE_GET_WP_DEFAULT_ALT and self.type != MEGE_SET_WP_DEFAULT_ALT and self.type != MEE_WRITE_WP_NUM and self.type != MEE_LOAD_WP_FILE and self.type != MEE_SAVE_WP_FILE and self.type != MEE_SET_WP_RAD and self.type != MEE_SET_LOIT_RAD and self.type != MEE_SET_WP_DEFAULT_ALT):
+        if not self.type in [MEE_READ_WPS, MEE_WRITE_WPS, MEGE_CLEAR_MISS_TABLE,
+                             MEGE_ADD_MISS_TABLE_ROWS, MEGE_SET_MISS_ITEM, MEE_TIME_TO_QUIT,
+                             MEE_GET_WP_RAD, MEE_GET_LOIT_RAD, MEGE_SET_WP_RAD, MEGE_SET_LOIT_RAD,
+                             MEE_GET_WP_DEFAULT_ALT, MEGE_SET_WP_DEFAULT_ALT, MEE_WRITE_WP_NUM,
+                             MEE_LOAD_WP_FILE, MEE_SAVE_WP_FILE, MEE_SET_WP_RAD, MEE_SET_LOIT_RAD,
+                             MEE_SET_WP_DEFAULT_ALT]:
             raise TypeError("Unrecongized MissionEditorEvent type:" + str(self.type))
 
     def get_type(self):
         return self.type
     
     def get_arg(self, key):
+        if not key in self.arg_dict:
+            print("No key %s in %s" % (key, str(self.type)))
+            return None
         return self.arg_dict[key]

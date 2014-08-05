@@ -3,6 +3,7 @@ import fnmatch
 
 miss_cmds = {}
 frame_enum = {0: "Abs", 3: "Rel", 10: "AGL"}
+frame_enum_rev = {v:k for k,v in frame_enum.items()}
 
 # auto-generate the list of mission commands
 for cmd in mavutil.mavlink.enums['MAV_CMD']:

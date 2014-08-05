@@ -44,6 +44,7 @@ class MissionEditorFrame(wx.Frame):
         self.label_loiter_rad = wx.StaticText(self, wx.ID_ANY, "Loiter Radius")
         self.text_ctrl_loiter_radius = wx.TextCtrl(self, wx.ID_ANY, "", style=wx.TE_PROCESS_ENTER | wx.TE_PROCESS_TAB)
         self.checkbox_loiter_dir = wx.CheckBox(self, wx.ID_ANY, "CW")
+        self.checkbox_agl = wx.CheckBox(self, wx.ID_ANY, "AGL")
         self.label_default_alt = wx.StaticText(self, wx.ID_ANY, "Default Alt")
         self.text_ctrl_wp_default_alt = wx.TextCtrl(self, wx.ID_ANY, "", style=wx.TE_PROCESS_ENTER | wx.TE_PROCESS_TAB)
         self.label_home_location = wx.StaticText(self, wx.ID_ANY, "Home Location")
@@ -315,6 +316,7 @@ class MissionEditorFrame(wx.Frame):
         
     def prep_new_row(self, row_num):
         command_choices = me_defines.miss_cmds.values()
+        command_choices.sort()
             
         cell_ed = wx.grid.GridCellChoiceEditor(command_choices)
         self.grid_mission.SetCellEditor(row_num, ME_COMMAND_COL, cell_ed)
@@ -331,7 +333,15 @@ class MissionEditorFrame(wx.Frame):
 
         frame_cell_ed = wx.grid.GridCellChoiceEditor(me_defines.frame_enum.values())
         self.grid_mission.SetCellEditor(row_num, ME_FRAME_COL, frame_cell_ed)
-        self.grid_mission.SetCellValue(row_num, ME_FRAME_COL, "Rel")
+
+        # default to previous rows frame
+        if row_num > 0:
+            frame = self.grid_mission.GetCellValue(row_num-1, ME_FRAME_COL)
+            if frame not in ["Rel", "AGL"]:
+                frame = "Rel"
+        else:
+            frame = "Rel"
+        self.grid_mission.SetCellValue(row_num, ME_FRAME_COL, frame)
 
         #this makes newest row always have the cursor in it,
         #making the "Add Below" button work like I want:
@@ -378,8 +388,8 @@ class MissionEditorFrame(wx.Frame):
         lon = float(self.label_home_lon_value.GetLabel())
         alt = float(self.label_home_alt_value.GetLabel())
         self.event_queue.put(MissionEditorEvent(me_event.MEE_WRITE_WP_NUM,
-            num=0,cmd_id=16,p1=0.0,p2=0.0,p3=0.0,p4=0.0,
-            lat=lat,lon=lon,alt=alt))
+                                                num=0,cmd_id=16,p1=0.0,p2=0.0,p3=0.0,p4=0.0,
+                                                lat=lat,lon=lon,alt=alt,frame=0))
             
         for i in range(0, self.grid_mission.GetNumberRows()):
             cmd_id = me_defines.cmd_reverse_lookup(self.grid_mission.GetCellValue(i,0))
@@ -390,10 +400,11 @@ class MissionEditorFrame(wx.Frame):
             lat = float(self.grid_mission.GetCellValue(i,ME_LAT_COL))
             lon = float(self.grid_mission.GetCellValue(i,ME_LON_COL))
             alt = float(self.grid_mission.GetCellValue(i,ME_ALT_COL))
+            frame = float(me_defines.frame_enum_rev[self.grid_mission.GetCellValue(i,ME_FRAME_COL)])
                 
             self.event_queue.put(MissionEditorEvent(me_event.MEE_WRITE_WP_NUM,
-                num=i+1,cmd_id=cmd_id,p1=p1,p2=p2,p3=p3,p4=p4,
-                lat=lat,lon=lon,alt=alt))
+                                                    num=i+1,cmd_id=cmd_id,p1=p1,p2=p2,p3=p3,p4=p4,
+                                                    lat=lat,lon=lon,alt=alt,frame=frame))
 
         self.event_queue_lock.release()
 

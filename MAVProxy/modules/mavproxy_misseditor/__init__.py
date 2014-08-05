@@ -98,7 +98,7 @@ class MissionEditorEventThread(threading.Thread):
                         self.mp_misseditor.target_system,
                         self.mp_misseditor.target_component,
                         event.get_arg("num"),
-                        self.mp_misseditor.module('wp').get_default_frame(),
+                        event.get_arg("frame"),
                         event.get_arg("cmd_id"),
                         0, 1,
                         event.get_arg("p1"), event.get_arg("p2"),
