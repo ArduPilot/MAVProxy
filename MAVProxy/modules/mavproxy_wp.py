@@ -22,7 +22,7 @@ class WPModule(mp_module.MPModule):
         self.undo_wp_idx = -1
         self.add_command('wp', self.cmd_wp,       'waypoint management',
                          ["<list|clear|move|remove|loop|set|undo>",
-                          "<load|update|save> (FILENAME)"])
+                          "<load|update|save|show> (FILENAME)"])
 
         if self.continue_mode and self.logdir != None:
             waytxt = os.path.join(mpstate.status.logdir, 'way.txt')
