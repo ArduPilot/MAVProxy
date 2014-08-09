@@ -10,13 +10,14 @@ This interfaces to Tools/autotest/jsbsim/runsim.py to run the JSBSim flight simu
 import sys, os, time, socket, errno, struct, math
 from math import degrees, radians
 from MAVProxy.modules.lib import mp_module
+from pymavlink import mavutil
 
 class HILModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(HILModule, self).__init__(mpstate, "HIL", "HIL simulation")
         self.last_sim_send_time = time.time()
         self.last_apm_send_time = time.time()
-        self.rc_channels_scaled = None
+        self.rc_channels_scaled = mavutil.mavlink.MAVLink_rc_channels_scaled_message(0, 0, 0, 0, -10000, 0, 0, 0, 0, 0, 0)
         self.hil_state_msg = None
         sim_in_address  = ('127.0.0.1', 5501)
         sim_out_address  = ('127.0.0.1', 5502)
@@ -28,6 +29,10 @@ class HILModule(mp_module.MPModule):
         self.sim_out = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sim_out.connect(sim_out_address)
         self.sim_out.setblocking(0)
+
+        # HIL needs very fast idle loop calls
+        if self.mpstate.select_timeout > 0.001:
+            self.mpstate.select_timeout = 0.001
 
     def unload(self):
         '''unload module'''

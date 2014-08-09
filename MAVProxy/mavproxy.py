@@ -156,6 +156,8 @@ class MPState(object):
         self.select_extra = {}
         self.continue_mode = False
         self.aliases = {}
+        # this can be adjusted for HIL
+        self.select_timeout = 0.01
 
     def module(self, name):
         '''Find a public module (most modules are private)'''
@@ -905,7 +907,7 @@ def main_loop():
         for fd in mpstate.select_extra:
             rin.append(fd)
         try:
-            (rin, win, xin) = select.select(rin, [], [], 0.01)
+            (rin, win, xin) = select.select(rin, [], [], mpstate.select_timeout)
         except select.error:
             continue
 
