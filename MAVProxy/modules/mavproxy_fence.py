@@ -5,7 +5,7 @@ import os, time, platform
 from pymavlink import mavwp, mavutil
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
-if "CYGWIN" not in platform.system():
+if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import *
 
 class FenceModule(mp_module.MPModule):
@@ -31,7 +31,7 @@ class FenceModule(mp_module.MPModule):
                 self.have_list = True
                 print("Loaded fence from %s" % fencetxt)
 
-        if "CYGWIN" not in platform.system():
+        if mp_util.has_wxpython:
             self.menu_added_console = False
             self.menu_added_map = False
             self.menu = MPMenuSubMenu('Fence',
@@ -49,10 +49,10 @@ class FenceModule(mp_module.MPModule):
 
     def idle_task(self):
         '''called on idle'''
-        if not self.menu_added_console and self.module('console') is not None:
+        if self.module('console') is not None and not self.menu_added_console:
             self.menu_added_console = True
             self.module('console').add_menu(self.menu)
-        if not self.menu_added_map and self.module('map') is not None:
+        if self.module('map') is not None and not self.menu_added_map:
             self.menu_added_map = True
             self.module('map').add_menu(self.menu)
 

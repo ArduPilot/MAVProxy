@@ -4,7 +4,8 @@
 import time, os, fnmatch, copy, platform
 from pymavlink import mavutil, mavwp
 from MAVProxy.modules.lib import mp_module
-if "CYGWIN" not in platform.system():
+from MAVProxy.modules.lib import mp_util
+if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import *
 
 class WPModule(mp_module.MPModule):
@@ -30,7 +31,7 @@ class WPModule(mp_module.MPModule):
                 self.wploader.load(waytxt)
                 print("Loaded waypoints from %s" % waytxt)
 
-        if "CYGWIN" not in platform.system():
+        if mp_util.has_wxpython:
             self.menu_added_console = False
             self.menu_added_map = False
             self.menu = MPMenuSubMenu('Mission',
@@ -109,10 +110,10 @@ class WPModule(mp_module.MPModule):
                 seq = self.wploader.count()
                 print("re-requesting WP %u" % seq)
                 self.master.waypoint_request_send(seq)
-        if not self.menu_added_console and self.module('console') is not None:
+        if self.module('console') is not None and not self.menu_added_console:
             self.menu_added_console = True
             self.module('console').add_menu(self.menu)
-        if not self.menu_added_map and self.module('map') is not None:
+        if self.module('map') is not None and not self.menu_added_map:
             self.menu_added_map = True
             self.module('map').add_menu(self.menu)
 
