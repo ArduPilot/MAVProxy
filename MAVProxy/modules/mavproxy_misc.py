@@ -32,7 +32,7 @@ class MiscModule(mp_module.MPModule):
     def cmd_alt(self, args):
         '''show altitude'''
         print("Altitude:  %.1f" % self.status.altitude)
-        qnh_pressure = self.get_mav_param('FS_QNH_PRESSURE', None)
+        qnh_pressure = self.get_mav_param('AFS_QNH_PRESSURE', None)
         if qnh_pressure is not None and qnh_pressure > 0:
             ground_temp = self.get_mav_param('GND_TEMP', 21)
             pressure = self.master.field('SCALED_PRESSURE', 'press_abs', 0)
