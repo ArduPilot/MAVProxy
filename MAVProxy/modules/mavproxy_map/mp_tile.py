@@ -199,13 +199,11 @@ class MPTile:
 		self._unavailable = mp_icon('unavailable.jpg')
 		try:
 			self._tile_cache = collections.OrderedDict()
-			self._old_cache = collections.OrderedDict()
 		except AttributeError:
 			# OrderedDicts in python 2.6 come from the ordereddict module
 			# which is a 3rd party package, not in python2.6 distribution
 			import ordereddict
 			self._tile_cache = ordereddict.OrderedDict()
-			self._old_cache = ordereddict.OrderedDict()
 
         def set_service(self, service):
                 '''set tile service'''
