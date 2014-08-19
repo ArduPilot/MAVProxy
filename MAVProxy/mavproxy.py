@@ -784,7 +784,7 @@ if __name__ == '__main__':
     parser.add_option("--speech", dest="speech", help="use text to speach",
                       action='store_true', default=False)
     parser.add_option("--aircraft", dest="aircraft", help="aircraft name", default=None)
-    parser.add_option("--cmd", dest="cmd", help="initial commands", default=None)
+    parser.add_option("--cmd", dest="cmd", help="initial commands", default=None, action='append')
     parser.add_option("--console", action='store_true', help="use GUI console")
     parser.add_option("--map", action='store_true', help="load map module")
     parser.add_option(
@@ -908,9 +908,10 @@ Auto-detected serial ports are:
             process_stdin('module load %s' % mod)
 
     if opts.cmd is not None:
-        cmds = opts.cmd.split(';')
-        for c in cmds:
-            process_stdin(c)
+        for cstr in opts.cmd:
+            cmds = cstr.split(';')
+            for c in cmds:
+                process_stdin(c)
 
     # run main loop as a thread
     mpstate.status.thread = threading.Thread(target=main_loop)
