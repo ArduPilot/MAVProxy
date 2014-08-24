@@ -17,6 +17,7 @@ class BatteryModule(mp_module.MPModule):
         self.battery_level = -1
         self.voltage_level = -1
         self.current_battery = -1
+        self.battery2_voltage = -1
         self.per_cell = 0
         self.settings.append(
             MPSetting('battwarn', int, 1, 'Battery Warning Time'))
@@ -37,14 +38,15 @@ class BatteryModule(mp_module.MPModule):
         batt_mon = int(self.get_mav_param('BATT_MONITOR',0))
 
         #report voltage level only 
+        battery_string = ''
         if batt_mon == 3:
-            self.console.set_status('Battery', 'Batt: %.2fV' % (float(self.voltage_level) / 1000.0), row=1)
+            battery_string = 'Batt: %.2fV' % (float(self.voltage_level) / 1000.0)
         elif batt_mon == 4:
-            self.console.set_status('Battery', 'Batt: %u%%/%.2fV %.1fA' % (self.battery_level, (float(self.voltage_level) / 1000.0), self.current_battery / 100.0 ), row=1)
- 
-        else:
-            #clear battery status
-            self.console.set_status('Battery', row=1)
+            battery_string = 'Batt: %u%%/%.2fV %.1fA' % (self.battery_level, (float(self.voltage_level) / 1000.0), self.current_battery / 100.0 )
+        if self.battery2_voltage != -1:
+            battery_string += ' %.2fV' % self.battery2_voltage
+
+        self.console.set_status('Battery', battery_string, row=1)
 
         rbattery_level = int((self.battery_level+5)/10)*10
         if self.settings.battwarn > 0 and time.time() > self.last_battery_announce_time + 60*self.settings.battwarn:
@@ -92,6 +94,8 @@ class BatteryModule(mp_module.MPModule):
         mtype = m.get_type()
         if mtype == "SYS_STATUS":
             self.battery_update(m)
+        if mtype == "BATTERY2":
+            self.battery2_voltage = m.voltage * 0.001
         if self.battery_period.trigger():
             self.battery_report()
 
