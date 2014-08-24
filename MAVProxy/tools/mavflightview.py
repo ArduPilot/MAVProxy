@@ -29,6 +29,7 @@ parser.add_option("--rawgps", action='store_true', default=False, help="use GPS_
 parser.add_option("--rawgps2", action='store_true', default=False, help="use GPS2_RAW")
 parser.add_option("--dualgps", action='store_true', default=False, help="use GPS_RAW_INT and GPS2_RAW")
 parser.add_option("--ekf", action='store_true', default=False, help="use EKF1 pos")
+parser.add_option("--ahr2", action='store_true', default=False, help="use AHR2 pos")
 parser.add_option("--debug", action='store_true', default=False, help="show debug info")
 parser.add_option("--multi", action='store_true', default=False, help="show multiple flights on one map")
 
@@ -100,7 +101,9 @@ def mavflightview(filename):
     if opts.dualgps:
         types.extend(['GPS2_RAW','GPS2', 'GPS_RAW_INT', 'GPS'])
     if opts.ekf:
-        types.extend(['EKF1'])
+        types.extend(['EKF1', 'GPS'])
+    if opts.ahr2:
+        types.extend(['AHR2', 'GPS'])
     if len(types) == 1:
         types.extend(['GPS','GLOBAL_POSITION_INT'])
     print("Looking for types %s" % str(types))
@@ -142,6 +145,8 @@ def mavflightview(filename):
             if pos is None:
                 continue
             (lat, lng) = pos            
+        elif m.get_type() == 'AHR2':
+            (lat, lng) = (m.Lat, m.Lng)
         else:
             lat = m.lat * 1.0e-7
             lng = m.lon * 1.0e-7
@@ -149,6 +154,11 @@ def mavflightview(filename):
         if opts.dualgps and m.get_type() in ['GPS2_RAW', 'GPS2']:
             instance = 1
         if m.get_type() == 'EKF1':
+            if opts.dualgps:
+                instance = 2
+            else:
+                instance = 1
+        if m.get_type() == 'AHR2':
             if opts.dualgps:
                 instance = 2
             else:
