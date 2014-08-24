@@ -1117,6 +1117,14 @@ Auto-detected serial ports are:
     if opts.setup:
         mpstate.rl.set_prompt("")
 
+    if not opts.setup:
+        # some core functionality is in modules
+        standard_modules = ['log', 'wp', 'rally','fence','param','relay',
+                            'tuneopt','arm','mode','calibration','rc','auxopt','misc','cmdlong',
+                            'battery','terrain','output']
+        for m in standard_modules:
+            load_module(m, quiet=True)
+
     if 'HOME' in os.environ and not opts.setup:
         start_script = os.path.join(os.environ['HOME'], ".mavinit.scr")
         if os.path.exists(start_script):
@@ -1128,14 +1136,6 @@ Auto-detected serial ports are:
             run_script(start_script)
         else:
             print("no script %s" % start_script)
-
-    if not opts.setup:
-        # some core functionality is in modules
-        standard_modules = ['log', 'wp', 'rally','fence','param','relay',
-                            'tuneopt','arm','mode','calibration','rc','auxopt','misc','cmdlong',
-                            'battery','terrain','output']
-        for m in standard_modules:
-            load_module(m, quiet=True)
 
     if opts.console:
         process_stdin('module load console')
