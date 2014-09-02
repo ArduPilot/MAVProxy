@@ -348,7 +348,7 @@ class WPModule(mp_module.MPModule):
         distance = mp_util.gps_distance(wp.x, wp.y, lat, lon)
         bearing  = mp_util.gps_bearing(wp.x, wp.y, lat, lon)
 
-        for wpnum in range(wpstart, wpend):
+        for wpnum in range(wpstart, wpend+1):
             wp = self.wploader.wp(wpnum)
             if not self.wploader.is_location_command(wp.command):
                 continue
@@ -368,7 +368,7 @@ class WPModule(mp_module.MPModule):
         self.loading_waypoint_lasttime = time.time()
         self.master.mav.mission_write_partial_list_send(self.target_system,
                                                         self.target_component,
-                                                        wpstart, wpend)
+                                                        wpstart, wpend+1)
         print("Moved WPs %u:%u to %f, %f" % (wpstart, wpend, lat, lon))
 
     def cmd_wp_remove(self, args):
