@@ -55,8 +55,8 @@ class InvalidTileError(Exception):
 
 class SRTMDownloader():
     """Automatically download SRTM tiles."""
-    def __init__(self, server="dds.cr.usgs.gov",
-                 directory="/srtm/version2_1/SRTM3/",
+    def __init__(self, server="firmware.diydrones.com",
+                 directory="/SRTM/",
                  cachedir=None,
                  offline=0):
 
