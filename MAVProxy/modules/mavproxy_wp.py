@@ -22,7 +22,7 @@ class WPModule(mp_module.MPModule):
         self.undo_type = None
         self.undo_wp_idx = -1
         self.add_command('wp', self.cmd_wp,       'waypoint management',
-                         ["<list|clear|move|remove|loop|set|undo>",
+                         ["<list|clear|move|remove|loop|set|undo|movemulti>",
                           "<load|update|save|show> (FILENAME)"])
 
         if self.continue_mode and self.logdir != None:
@@ -310,6 +310,67 @@ class WPModule(mp_module.MPModule):
         self.wploader.set(wp, idx)
         print("Moved WP %u to %f, %f at %.1fm" % (idx, lat, lon, wp.z))
 
+
+    def cmd_wp_movemulti(self, args):
+        '''handle wp move of multiple waypoints'''
+        if len(args) != 3:
+            print("usage: wp movemulti WPNUM WPSTART WPEND")
+            return
+        idx = int(args[0])
+        if idx < 1 or idx > self.wploader.count():
+            print("Invalid wp number %u" % idx)
+            return
+        wpstart = int(args[1])
+        if wpstart < 1 or wpstart > self.wploader.count():
+            print("Invalid wp number %u" % wpstart)
+            return
+        wpend = int(args[2])
+        if wpend < 1 or wpend > self.wploader.count():
+            print("Invalid wp number %u" % wpend)
+            return
+        if idx < wpstart or idx > wpend:
+            print("WPNUM must be between WPSTART and WPEND")
+            return
+        try:
+            latlon = self.module('map').click_position
+        except Exception:
+            print("No map available")
+            return
+        if latlon is None:
+            print("No map click position available")
+            return
+        wp = self.wploader.wp(idx)
+        if not self.wploader.is_location_command(wp.command):
+            print("WP must be a location command")
+            return
+
+        (lat, lon) = latlon
+        distance = mp_util.gps_distance(wp.x, wp.y, lat, lon)
+        bearing  = mp_util.gps_bearing(wp.x, wp.y, lat, lon)
+
+        for wpnum in range(wpstart, wpend):
+            wp = self.wploader.wp(wpnum)
+            if not self.wploader.is_location_command(wp.command):
+                continue
+            (newlat, newlon) = mp_util.gps_newpos(wp.x, wp.y, bearing, distance)
+            if getattr(self.console, 'ElevationMap', None) is not None and wp.frame != mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT:
+                alt1 = self.console.ElevationMap.GetElevation(newlat, newlon)
+                alt2 = self.console.ElevationMap.GetElevation(wp.x, wp.y)
+                if alt1 is not None and alt2 is not None:
+                    wp.z += alt1 - alt2
+            wp.x = newlat
+            wp.y = newlon
+            wp.target_system    = self.target_system
+            wp.target_component = self.target_component
+            self.wploader.set(wp, wpnum)
+            
+        self.loading_waypoints = True
+        self.loading_waypoint_lasttime = time.time()
+        self.master.mav.mission_write_partial_list_send(self.target_system,
+                                                        self.target_component,
+                                                        wpstart, wpend)
+        print("Moved WPs %u:%u to %f, %f" % (wpstart, wpend, lat, lon))
+
     def cmd_wp_remove(self, args):
         '''handle wp remove'''
         if len(args) != 1:
@@ -398,6 +459,8 @@ class WPModule(mp_module.MPModule):
             self.wploader.load(args[1])
         elif args[0] == "move":
             self.cmd_wp_move(args[1:])
+        elif args[0] == "movemulti":
+            self.cmd_wp_movemulti(args[1:])
         elif args[0] == "remove":
             self.cmd_wp_remove(args[1:])
         elif args[0] == "undo":
