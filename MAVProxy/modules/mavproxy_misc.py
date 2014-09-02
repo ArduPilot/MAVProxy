@@ -6,6 +6,47 @@ from pymavlink import mavutil
 
 from MAVProxy.modules.lib import mp_module
 
+
+from os import kill
+from signal import alarm, signal, SIGALRM, SIGKILL
+from subprocess import PIPE, Popen
+
+def run_command(args, cwd = None, shell = False, timeout = None, env = None):
+    '''
+    Run a shell command with a timeout.
+    See http://stackoverflow.com/questions/1191374/subprocess-with-timeout
+    '''
+    from subprocess import PIPE, Popen
+    from StringIO import StringIO
+    import fcntl, os, signal
+    p = Popen(args, shell = shell, cwd = cwd, stdout = PIPE, stderr = PIPE, env = env)
+    tstart = time.time()
+    buf = StringIO()
+
+    # try to make it non-blocking
+    try:
+        fcntl.fcntl(p.stdout, fcntl.F_SETFL, fcntl.fcntl(p.stdout, fcntl.F_GETFL) | os.O_NONBLOCK)
+    except Exception:
+        pass
+
+    while True:
+        time.sleep(0.1)
+        retcode = p.poll()
+        try:
+            buf.write(p.stdout.read())
+        except Exception:
+            pass
+        if retcode is not None:
+            break
+        if timeout is not None and time.time() > tstart + timeout:
+            print("timeout in process %u" % p.pid)
+            try: 
+                os.kill(p.pid, signal.SIGKILL)
+            except OSError:
+                pass
+            p.wait()
+    return buf.getvalue()
+
 class MiscModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(MiscModule, self).__init__(mpstate, "misc", "misc commands")
@@ -13,6 +54,7 @@ class MiscModule(mp_module.MPModule):
         self.add_command('up', self.cmd_up, "adjust pitch trim by up to 5 degrees")
         self.add_command('reboot', self.cmd_reboot, "reboot autopilot")
         self.add_command('time', self.cmd_time, "show autopilot time")
+        self.add_command('shell', self.cmd_shell, "run shell command")
 
     def altitude_difference(self, pressure1, pressure2, ground_temp):
         '''calculate barometric altitude'''
@@ -40,6 +82,9 @@ class MiscModule(mp_module.MPModule):
             print("QNH Alt: %u meters %u feet for QNH pressure %.1f" % (qnh_alt, qnh_alt*3.2808, qnh_pressure))
         print("QNH Estimate: %.1f millibars" % self.qnh_estimate())
 
+    def cmd_shell(self, args):
+        '''shell command'''
+        print(run_command(args, shell=False, timeout=3))
 
     def cmd_up(self, args):
         '''adjust TRIM_PITCH_CD up by 5 degrees'''
