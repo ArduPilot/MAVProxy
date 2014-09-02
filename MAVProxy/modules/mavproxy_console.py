@@ -211,6 +211,9 @@ class ConsoleModule(mp_module.MPModule):
                     fg = 'red'
                 else:
                     fg = 'green'
+                # for terrain show yellow if still loading
+                if s == 'TERR' and fg == 'green' and master.field('TERRAIN_REPORT', 'pending', 0) != 0:
+                    fg = 'yellow'
                 self.console.set_status(s, s, fg=fg)
 
         elif type == 'WIND':
