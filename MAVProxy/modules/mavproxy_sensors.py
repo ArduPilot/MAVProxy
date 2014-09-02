@@ -119,37 +119,10 @@ class SensorsModule(mp_module.MPModule):
             return
         self.report('heading', diff < 20, 'heading error %u' % diff)
 
-    def check_altitude(self, m):
-        '''check altitude discrepancy'''
-        if 'GPS_RAW' in self.status.msgs:
-            gps = self.status.msgs['GPS_RAW']
-            if gps.fix_type != 2:
-                return
-            v = gps.v
-            alt = gps.alt
-        elif 'GPS_RAW_INT' in self.status.msgs:
-            gps = self.status.msgs['GPS_RAW_INT']
-            if gps.fix_type != 3:
-                return
-            v = gps.vel / 100
-            alt = gps.alt / 1000
-        else:
-            return
-
-        if v > self.max_speed:
-            self.max_speed = v
-        if self.max_speed < 5:
-            self.ground_alt = alt
-            return
-        self.gps_alt = alt - self.ground_alt
-        diff = math.fabs(self.gps_alt - self.status.altitude)
-        self.report('altitude', diff < 30, 'altitude error %u' % diff)
-
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         if m.get_type() == 'VFR_HUD' and ('GPS_RAW' in self.status.msgs or 'GPS_RAW_INT' in self.status.msgs):
             self.check_heading(m)
-            self.check_altitude(m)
             if self.settings.speedreporting:
                 if m.airspeed != 0:
                     speed = m.airspeed
