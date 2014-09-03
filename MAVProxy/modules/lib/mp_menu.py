@@ -237,6 +237,28 @@ class MPMenuCallTextDialog(object):
             return None
         return dlg.GetValue()
 
+class MPMenuChildMessageDialog(object):
+    '''used to create a message dialog in a child process'''
+    def __init__(self, title='Information', message='', font_size=18):
+        self.title = title
+        self.message = message
+        self.font_size = font_size
+        
+        import multiprocessing
+        t = multiprocessing.Process(target=self.show)
+        t.start()
+
+    def show(self):
+        '''show the dialog as a child process'''
+        from wx.lib.agw.genericmessagedialog import GenericMessageDialog
+        app = wx.PySimpleApp()
+        # note! font size change is not working. I don't know why yet
+        font = wx.Font(self.font_size, wx.MODERN, wx.NORMAL, wx.NORMAL)
+        dlg = GenericMessageDialog(None, self.message, self.title, wx.ICON_INFORMATION|wx.OK)
+        dlg.SetFont(font)
+        dlg.ShowModal()
+        app.MainLoop()
+
 if __name__ == '__main__':
     from MAVProxy.modules.lib.mp_image import MPImage
     import time
