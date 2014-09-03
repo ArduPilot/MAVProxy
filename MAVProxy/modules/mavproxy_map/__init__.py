@@ -70,7 +70,7 @@ class MapModule(mp_module.MPModule):
         '''show map position click information'''
         pos = self.click_position
         dms = (mp_util.degrees_to_dms(pos[0]), mp_util.degrees_to_dms(pos[1]))
-        msg =  "Coordinates\n"
+        msg =  "Coordinates in WGS84\n"
         msg += "Decimal: %.6f %.6f\n" % (pos[0], pos[1])
         msg += "DMS:     %s %s\n" % (dms[0], dms[1])
         msg += "Grid:    %s\n" % mp_util.latlon_to_grid(pos)
