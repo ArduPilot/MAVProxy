@@ -22,7 +22,7 @@ class WPModule(mp_module.MPModule):
         self.undo_type = None
         self.undo_wp_idx = -1
         self.add_command('wp', self.cmd_wp,       'waypoint management',
-                         ["<list|clear|move|remove|loop|set|undo|movemulti>",
+                         ["<list|clear|move|remove|loop|set|undo|movemulti|param>",
                           "<load|update|save|show> (FILENAME)"])
 
         if self.continue_mode and self.logdir != None:
@@ -429,6 +429,42 @@ class WPModule(mp_module.MPModule):
         self.undo_wp = None
         self.undo_wp_idx = -1
 
+    def cmd_wp_param(self, args):
+        '''handle wp parameter change'''
+        if len(args) < 2:
+            print("usage: wp param WPNUM PNUM <VALUE>")
+            return
+        idx = int(args[0])
+        if idx < 1 or idx > self.wploader.count():
+            print("Invalid wp number %u" % idx)
+            return
+        wp = self.wploader.wp(idx)
+        param = [wp.param1, wp.param2, wp.param3, wp.param4]
+        pnum = int(args[1])
+        if pnum < 1 or pnum > 4:
+            print("Invalid param number %u" % pnum)
+            return
+
+        if len(args) == 2:
+            print("Param %u: %f" % (pnum, param[pnum-1]))
+            return
+
+        param[pnum-1] = float(args[2])
+        wp.param1 = param[0]
+        wp.param2 = param[1]
+        wp.param3 = param[2]
+        wp.param4 = param[3]
+        
+        wp.target_system    = self.target_system
+        wp.target_component = self.target_component
+        self.loading_waypoints = True
+        self.loading_waypoint_lasttime = time.time()
+        self.master.mav.mission_write_partial_list_send(self.target_system,
+                                                        self.target_component,
+                                                        idx, idx)
+        self.wploader.set(wp, idx)
+        print("Set param %u for %u to %f" % (pnum, idx, param[pnum-1]))
+
     def cmd_wp(self, args):
         '''waypoint commands'''
         usage = "usage: wp <list|load|update|save|set|clear|loop|remove|move>"
@@ -474,6 +510,8 @@ class WPModule(mp_module.MPModule):
             self.cmd_wp_move(args[1:])
         elif args[0] == "movemulti":
             self.cmd_wp_movemulti(args[1:])
+        elif args[0] == "param":
+            self.cmd_wp_param(args[1:])
         elif args[0] == "remove":
             self.cmd_wp_remove(args[1:])
         elif args[0] == "undo":
