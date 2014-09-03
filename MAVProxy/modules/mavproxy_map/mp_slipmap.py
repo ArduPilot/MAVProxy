@@ -683,6 +683,7 @@ class MPSlipMapFrame(wx.Frame):
         state.frame = self
         state.grid = True
         state.follow = True
+        state.download = True
         state.popup_object = None
         state.popup_latlon = None
         state.popup_started = False
@@ -700,6 +701,8 @@ class MPSlipMapFrame(wx.Frame):
                                                     MPMenuItem('Goto\tCtrl+P', 'Goto Position', 'gotoPosition'),
                                                     MPMenuItem('Brightness +\tCtrl+B', 'Increase Brightness', 'increaseBrightness'),
                                                     MPMenuItem('Brightness -\tCtrl+Shift+B', 'Decrease Brightness', 'decreaseBrightness'),
+                                                    MPMenuCheckbox('Download Tiles\tCtrl+D', 'Enable Tile Download', 'toggleDownload',
+                                                                   checked=state.download),
                                                     MPMenuRadio('Service', 'Select map service',
                                                                 returnkey='setService',
                                                                 selected=state.mt.get_service(),
@@ -736,6 +739,8 @@ class MPSlipMapFrame(wx.Frame):
             state.grid = ret.IsChecked()
         elif ret.returnkey == 'toggleFollow':
             state.follow = ret.IsChecked()
+        elif ret.returnkey == 'toggleDownload':
+            state.download = ret.IsChecked()
         elif ret.returnkey == 'setService':
             state.mt.set_service(ret.get_choice())
         elif ret.returnkey == 'gotoPosition':
@@ -988,7 +993,10 @@ class MPSlipMapPanel(wx.Panel):
                 alt = self.ElevationMap.GetElevation(lat, lon)
                 if alt is not None:
                     newtext += ' %.1fm' % alt
-        pending = state.mt.tiles_pending()
+        state.mt.set_download(state.download)
+        pending = 0
+        if state.download:
+            pending = state.mt.tiles_pending()
         if pending:
             newtext += ' Map Downloading %u ' % pending
         if alt == -1:

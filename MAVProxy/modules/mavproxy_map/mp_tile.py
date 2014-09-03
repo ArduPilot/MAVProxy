@@ -219,6 +219,10 @@ class MPTile:
                 service_list.sort()
                 return service_list
 
+        def set_download(self, download):
+                '''set download enable'''
+                self.download = download
+
 	def coord_to_tile(self, lat, lon, zoom):
 		'''convert lat/lon/zoom to a TileInfo'''
 		world_tiles = 1<<zoom
