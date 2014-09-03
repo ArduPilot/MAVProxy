@@ -59,11 +59,22 @@ class MapModule(mp_module.MPModule):
         self.add_menu(MPMenuItem('Fly To', 'Fly To', '# guided ',
                                  handler=MPMenuCallTextDialog(title='Altitude (m)', default=100)))
         self.add_menu(MPMenuItem('Terrain Check', 'Terrain Check', '# terrain check'))
+        self.add_menu(MPMenuItem('Show Position', 'Show Position', 'showPosition'))
 
     def add_menu(self, menu):
         '''add to the default popup menu'''
         self.default_popup.add(menu)
         self.mpstate.map.add_object(mp_slipmap.SlipDefaultPopup(self.default_popup, combine=True))
+
+    def show_position(self):
+        '''show map position click information'''
+        pos = self.click_position
+        dms = (mp_util.degrees_to_dms(pos[0]), mp_util.degrees_to_dms(pos[1]))
+        msg =  "Coordinates\n"
+        msg += "Decimal: %.6f %.6f\n" % (pos[0], pos[1])
+        msg += "DMS:     %s %s\n" % (dms[0], dms[1])
+        msg += "Grid:    %s\n" % mp_util.latlon_to_grid(pos)
+        MPMenuChildMessageDialog('Position', msg, font_size=32)
 
     def cmd_map(self, args):
         '''map commands'''
@@ -226,6 +237,8 @@ class MapModule(mp_module.MPModule):
             self.remove_fencepoint(obj.selected[0].objkey, obj.selected[0].extra_info)
         elif menuitem.returnkey == 'popupFenceMove':
             self.move_fencepoint(obj.selected[0].objkey, obj.selected[0].extra_info)
+        elif menuitem.returnkey == 'showPosition':
+            self.show_position()
 
     def map_callback(self, obj):
         '''called when an event happens on the slipmap'''
