@@ -74,6 +74,10 @@ class MapModule(mp_module.MPModule):
         msg += "Decimal: %.6f %.6f\n" % (pos[0], pos[1])
         msg += "DMS:     %s %s\n" % (dms[0], dms[1])
         msg += "Grid:    %s\n" % mp_util.latlon_to_grid(pos)
+        if self.logdir:
+            logf = open(os.path.join(self.logdir, "positions.txt"), "a")
+            logf.write("Position: %.6f %.6f at %s\n" % (pos[0], pos[1], time.ctime()))
+            logf.close()
         MPMenuChildMessageDialog('Position', msg, font_size=32)
 
     def cmd_map(self, args):
