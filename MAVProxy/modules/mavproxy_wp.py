@@ -313,8 +313,8 @@ class WPModule(mp_module.MPModule):
 
     def cmd_wp_movemulti(self, args):
         '''handle wp move of multiple waypoints'''
-        if len(args) != 3:
-            print("usage: wp movemulti WPNUM WPSTART WPEND")
+        if len(args) < 3:
+            print("usage: wp movemulti WPNUM WPSTART WPEND <rotation>")
             return
         idx = int(args[0])
         if idx < 1 or idx > self.wploader.count():
@@ -331,6 +331,13 @@ class WPModule(mp_module.MPModule):
         if idx < wpstart or idx > wpend:
             print("WPNUM must be between WPSTART and WPEND")
             return
+
+        # optional rotation about center point
+        if len(args) > 3:
+            rotation = float(args[3])
+        else:
+            rotation = 0
+
         try:
             latlon = self.module('map').click_position
         except Exception:
@@ -353,6 +360,12 @@ class WPModule(mp_module.MPModule):
             if not self.wploader.is_location_command(wp.command):
                 continue
             (newlat, newlon) = mp_util.gps_newpos(wp.x, wp.y, bearing, distance)
+            if wpnum != idx and rotation != 0:
+                # add in rotation
+                d2 = mp_util.gps_distance(lat, lon, newlat, newlon)
+                b2 = mp_util.gps_bearing(lat, lon, newlat, newlon)
+                (newlat, newlon) = mp_util.gps_newpos(lat, lon, b2+rotation, d2)
+                
             if getattr(self.console, 'ElevationMap', None) is not None and wp.frame != mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT:
                 alt1 = self.console.ElevationMap.GetElevation(newlat, newlon)
                 alt2 = self.console.ElevationMap.GetElevation(wp.x, wp.y)
@@ -369,7 +382,7 @@ class WPModule(mp_module.MPModule):
         self.master.mav.mission_write_partial_list_send(self.target_system,
                                                         self.target_component,
                                                         wpstart, wpend+1)
-        print("Moved WPs %u:%u to %f, %f" % (wpstart, wpend, lat, lon))
+        print("Moved WPs %u:%u to %f, %f rotation=%.1f" % (wpstart, wpend, lat, lon, rotation))
 
     def cmd_wp_remove(self, args):
         '''handle wp remove'''
