@@ -59,9 +59,18 @@ joymap = {
      None,
      None,
      None,
-     (3, 500,  1500)]
-}
+     (3, 500,  1500)],
 
+    # This supports a Spektrum DX7s with the USB Adapter from:
+    # http://www.amazon.com/gp/product/B000RO7JAI/ref=oh_aui_detailpage_o03_s00?ie=UTF8&psc=1
+    'WAILLY PPM TO USB Adapter':
+    [(1, 570, 1500), # Roll
+     (2, 614, 1500), # Pitch
+     (0, 770, 1500), # Throttle
+     (5, 571, 1500), # Yaw
+     None,
+     None]
+}
 
 class JSModule(mp_module.MPModule):
     def __init__(self, mpstate):
