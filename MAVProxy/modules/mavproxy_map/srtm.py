@@ -183,6 +183,9 @@ class SRTMDownloader():
             continent, filename = self.filelist[(int(lat), int(lon))]
         except KeyError:
             '''print "here??"'''
+            if len(self.filelist) > 14500:
+                # we appear to have a full filelist - this must be ocean
+                return SRTMOceanTile(int(lat), int(lon))
             return 0
 
         if not os.path.exists(os.path.join(self.cachedir, filename)):
@@ -333,6 +336,14 @@ class SRTMTile:
         #        value00, value10, value1, value01, value11, value2, value)
         return value
 
+class SRTMOceanTile(SRTMTile):
+    '''a tile for areas of zero altitude'''
+    def __init__(self, lat, lon):
+        self.lat = lat
+        self.lon = lon
+
+    def getAltitudeFromLatLon(self, lat, lon):
+        return 0
 
 
 class parseHTMLDirectoryListing(HTMLParser):
