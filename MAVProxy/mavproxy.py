@@ -874,7 +874,8 @@ def main_loop():
     if not mpstate.status.setup_mode and not opts.nowait:
         for master in mpstate.mav_master:
             send_heartbeat(master)
-            master.wait_heartbeat()
+            if master.linknum == 0:
+                master.wait_heartbeat()
         set_stream_rates()
 
     while True:
