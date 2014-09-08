@@ -59,7 +59,8 @@ def create_imagefile(filename, latlon, ground_width, path_objs, mission_obj, fen
     for path_obj in path_objs:
         path_obj.draw(map_img, pixmapper, None)
     if mission_obj is not None:
-        mission_obj.draw(map_img, pixmapper, None)
+        for m in mission_obj:
+            m.draw(map_img, pixmapper, None)
     if fence_obj is not None:
         fence_obj.draw(map_img, pixmapper, None)
     cv.CvtColor(map_img, map_img, cv.CV_BGR2RGB)
@@ -115,7 +116,10 @@ def mavflightview(filename):
         except Exception:
             break
         if m.get_type() == 'MISSION_ITEM':
-            wp.set(m, m.seq)            
+            try:
+                wp.set(m, m.seq)
+            except Exception:
+                pass
             continue
         if not mlog.check_condition(opts.condition):
             continue
@@ -197,10 +201,13 @@ def mavflightview(filename):
         if len(path[i]) != 0:
             path_objs.append(mp_slipmap.SlipPolygon('FlightPath[%u]-%s' % (i,filename), path[i], layer='FlightPath',
                                                     linewidth=2, colour=(255,0,180)))
-    mission = wp.polygon()
-    if len(mission) > 1:
-        mission_obj = mp_slipmap.SlipPolygon('Mission-%s' % filename, wp.polygon(), layer='Mission',
-                                             linewidth=2, colour=(255,255,255))
+    plist = wp.polygon_list()
+    mission_obj = None
+    if len(plist) > 0:
+        mission_obj = []
+        for i in range(len(plist)):
+            mission_obj.append(mp_slipmap.SlipPolygon('Mission-%s-%u' % (filename,i), plist[i], layer='Mission',
+                                                      linewidth=2, colour=(255,255,255)))
     else:
         mission_obj = None
 
@@ -231,7 +238,8 @@ def mavflightview(filename):
         for path_obj in path_objs:
             map.add_object(path_obj)
         if mission_obj is not None:
-            map.add_object(mission_obj)
+            for m in mission_obj:
+                map.add_object(m)
         if fence_obj is not None:
             map.add_object(fence_obj)
 
