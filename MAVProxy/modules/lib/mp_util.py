@@ -241,3 +241,31 @@ def download_files(files):
             open(file, mode='w').write(data)
         except Exception as e:
             print("Failed to save to %s : %s" % (file, e))
+
+
+child_fd_list = []
+
+def child_close_fds():
+    '''close file descriptors that a child process should not inherit.
+       Should be called from child processes.'''
+    global child_fd_list
+    import os
+    while len(child_fd_list) > 0:
+        fd = child_fd_list.pop(0)
+        try:
+            os.close(fd)
+        except Exception as msg:
+            pass
+
+def child_fd_list_add(fd):
+    '''add a file descriptor to list to be closed in child processes'''
+    global child_fd_list
+    child_fd_list.append(fd)
+    
+def child_fd_list_remove(fd):
+    '''remove a file descriptor to list to be closed in child processes'''
+    global child_fd_list
+    try:
+        child_fd_list.remove(fd)
+    except Exception:
+        pass

@@ -7,6 +7,7 @@ November 2013
 '''
 
 import wx
+from MAVProxy.modules.lib import mp_util
 
 class MPMenuGeneric(object):
     '''a MP menu separator'''
@@ -250,6 +251,7 @@ class MPMenuChildMessageDialog(object):
 
     def show(self):
         '''show the dialog as a child process'''
+        mp_util.child_close_fds()
         from wx.lib.agw.genericmessagedialog import GenericMessageDialog
         app = wx.PySimpleApp()
         # note! font size change is not working. I don't know why yet

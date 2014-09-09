@@ -6,6 +6,7 @@
 """
 
 import wx, sys
+from MAVProxy.modules.lib import mp_util
 
 class CheckItem():
     '''Checklist item used for information transfer
@@ -31,6 +32,7 @@ class CheckUI():
 
     def child_task(self):
         '''child process - this holds all the GUI elements'''
+        mp_util.child_close_fds()
         import wx
         
         app = wx.PySimpleApp()

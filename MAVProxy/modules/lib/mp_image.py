@@ -101,6 +101,7 @@ class MPImage():
 
     def child_task(self):
         '''child process - this holds all the GUI elements'''
+        mp_util.child_close_fds()
         import wx
         state = self
 

@@ -5,6 +5,7 @@
 """
 import textconsole, wx, sys
 import mp_menu
+from MAVProxy.modules.lib import mp_util
 
 class Text():
     '''text to write to console'''
@@ -43,6 +44,7 @@ class MessageConsole(textconsole.SimpleConsole):
 
     def child_task(self):
         '''child process - this holds all the GUI elements'''
+        mp_util.child_close_fds()
         import wx
         app = wx.PySimpleApp()
         app.frame = ConsoleFrame(state=self, title=self.title)

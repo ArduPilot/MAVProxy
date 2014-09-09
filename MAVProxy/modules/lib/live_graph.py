@@ -8,6 +8,8 @@
   http://eli.thegreenplace.net/files/prog_code/wx_mpl_dynamic_graph.py.txt
 """
 
+from MAVProxy.modules.lib import mp_util
+
 class LiveGraph():
     '''
     a live graph object using wx and matplotlib
@@ -38,6 +40,7 @@ class LiveGraph():
 
     def child_task(self):
         '''child process - this holds all the GUI elements'''
+        mp_util.child_close_fds()
         import wx, matplotlib
         matplotlib.use('WXAgg')
         app = wx.PySimpleApp()

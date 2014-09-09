@@ -2,6 +2,7 @@
 Graphical editing of mp_settings object
 '''
 import os, wx, sys
+from MAVProxy.modules.lib import mp_util
 
 class WXSettings(object):
     '''
@@ -21,7 +22,7 @@ class WXSettings(object):
 
     def child_task(self):
         '''child process - this holds all the GUI elements'''
-        import threading
+        mp_util.child_close_fds()
         app = wx.PySimpleApp()
         dlg = SettingsDlg(self.settings)
         dlg.parent_pipe = self.parent_pipe
