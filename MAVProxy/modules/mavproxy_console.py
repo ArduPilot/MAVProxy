@@ -22,6 +22,7 @@ class ConsoleModule(mp_module.MPModule):
         self.start_time = 0.0
         self.total_time = 0.0
         self.speed = 0
+        self.max_link_num = 0
         mpstate.console = wxconsole.MessageConsole(title='Console')
 
         # setup some default status information
@@ -251,6 +252,10 @@ class ConsoleModule(mp_module.MPModule):
             self.console.set_status('Radio', 'Radio %u/%u %u/%u' % (msg.rssi, msg.noise, msg.remrssi, msg.remnoise), fg=fg)
         elif type == 'HEARTBEAT':
             self.console.set_status('Mode', '%s' % master.flightmode, fg='blue')
+            if self.max_link_num != len(self.mpstate.mav_master):
+                for i in range(self.max_link_num):
+                    self.console.set_status('Link%u'%(i+1), '', row=1)
+                self.max_link_num = len(self.mpstate.mav_master)
             for m in self.mpstate.mav_master:
                 linkdelay = (self.mpstate.status.highest_msec - m.highest_msec)*1.0e-3
                 linkline = "Link %u " % (m.linknum+1)

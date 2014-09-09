@@ -7,7 +7,7 @@ Released under the GNU GPL version 3 or later
 
 '''
 
-import sys, os, struct, math, time, socket
+import sys, os, time, socket
 import fnmatch, errno, threading
 import serial, Queue, select
 import traceback
@@ -130,7 +130,9 @@ class MPState(object):
               MPSetting('terrainalt', str, 'Auto', 'Use terrain altitudes', choice=['Auto','True','False']),
               MPSetting('wpupdates', bool, True, 'Show waypoint updates'),
               MPSetting('rally_breakalt', int, 40, 'Default Rally Break Altitude', range=(0,10000), increment=1),
-              MPSetting('rally_flags', int, 0, 'Default Rally Flags`', range=(0,10000), increment=1)]
+              MPSetting('rally_flags', int, 0, 'Default Rally Flags`', range=(0,10000), increment=1),
+              MPSetting('baudrate', int, opts.baudrate, 'baudrate for new links', range=(0,10000000), increment=1),
+              MPSetting('rtscts', bool, opts.rtscts, 'enable flow control')]
             )
 
         self.completions = {
@@ -179,10 +181,6 @@ class MPState(object):
         return self.mav_master[self.settings.link-1]
 
 
-def get_usec():
-    '''time since 1970 in microseconds'''
-    return int(time.time() * 1.0e6)
-
 def get_mav_param(param, default=None):
     '''return a EEPROM parameter value'''
     return mpstate.mav_param.get(param, default)
@@ -220,18 +218,6 @@ def cmd_setup(args):
 def cmd_reset(args):
     print("Resetting master")
     mpstate.master().reset()
-
-def cmd_link(args):
-    for master in mpstate.mav_master:
-        linkdelay = (mpstate.status.highest_msec - master.highest_msec)*1.0e-3
-        if master.linkerror:
-            print("link %u down" % (master.linknum+1))
-        else:
-            print("link %u OK (%u packets, %.2fs delay, %u lost, %.1f%% loss)" % (master.linknum+1,
-                                                                                  mpstate.status.counters['MasterIn'][master.linknum],
-                                                                                  linkdelay,
-                                                                                  master.mav_loss,
-                                                                                  master.packet_loss()))
 
 def cmd_watch(args):
     '''watch a mavlink packet pattern'''
@@ -371,7 +357,6 @@ command_map = {
     'reset'   : (cmd_reset,    'reopen the connection to the MAVLink master'),
     'status'  : (cmd_status,   'show status'),
     'set'     : (cmd_set,      'mavproxy settings'),
-    'link'    : (cmd_link,     'show link status'),
     'watch'   : (cmd_watch,    'watch a MAVLink pattern'),
     'module'  : (cmd_module,   'module commands'),
     'alias'   : (cmd_alias,    'command aliases')
@@ -436,243 +421,6 @@ def process_stdin(line):
         if mpstate.settings.moddebug > 1:
             traceback.print_exc()
 
-
-def handle_msec_timestamp(m, master):
-    '''special handling for MAVLink packets with a time_boot_ms field'''
-
-    if m.get_type() == 'GLOBAL_POSITION_INT':
-        # this is fix time, not boot time
-        return
-
-    msec = m.time_boot_ms
-    if msec + 30000 < master.highest_msec:
-        say('Time has wrapped')
-        print('Time has wrapped', msec, master.highest_msec)
-        mpstate.status.highest_msec = msec
-        for mm in mpstate.mav_master:
-            mm.link_delayed = False
-            mm.highest_msec = msec
-        return
-
-    # we want to detect when a link is delayed
-    master.highest_msec = msec
-    if msec > mpstate.status.highest_msec:
-        mpstate.status.highest_msec = msec
-    if msec < mpstate.status.highest_msec and len(mpstate.mav_master) > 1:
-        master.link_delayed = True
-    else:
-        master.link_delayed = False
-
-def report_altitude(altitude):
-    '''possibly report a new altitude'''
-    master = mpstate.master()
-    if getattr(mpstate.console, 'ElevationMap', None) is not None and mpstate.settings.basealt != 0:
-        lat = master.field('GLOBAL_POSITION_INT', 'lat', 0)*1.0e-7
-        lon = master.field('GLOBAL_POSITION_INT', 'lon', 0)*1.0e-7
-        alt1 = mpstate.console.ElevationMap.GetElevation(lat, lon)
-        if alt1 is not None:
-            alt2 = mpstate.settings.basealt
-            altitude += alt2 - alt1
-    mpstate.status.altitude = altitude
-    if (int(mpstate.settings.altreadout) > 0 and
-        math.fabs(mpstate.status.altitude - mpstate.status.last_altitude_announce) >= int(mpstate.settings.altreadout)):
-        mpstate.status.last_altitude_announce = mpstate.status.altitude
-        rounded_alt = int(mpstate.settings.altreadout) * ((mpstate.settings.altreadout/2 + int(mpstate.status.altitude)) / int(mpstate.settings.altreadout))
-        say("height %u" % rounded_alt, priority='notification')
-
-
-def master_send_callback(m, master):
-    '''called on sending a message'''
-    mtype = m.get_type()
-
-    if mtype != 'BAD_DATA' and mpstate.logqueue:
-        usec = get_usec()
-        usec = (usec & ~3) | 3 # linknum 3
-        mpstate.logqueue.put(str(struct.pack('>Q', usec) + m.get_msgbuf()))
-
-
-def master_callback(m, master):
-    '''process mavlink message m on master, sending any messages to recipients'''
-
-    if getattr(m, '_timestamp', None) is None:
-        master.post_message(m)
-    mpstate.status.counters['MasterIn'][master.linknum] += 1
-
-    if getattr(m, 'time_boot_ms', None) is not None:
-        # update link_delayed attribute
-        handle_msec_timestamp(m, master)
-
-    mtype = m.get_type()
-
-    # and log them
-    if mtype not in ['BAD_DATA','LOG_DATA'] and mpstate.logqueue:
-        # put link number in bottom 2 bits, so we can analyse packet
-        # delay in saved logs
-        usec = get_usec()
-        usec = (usec & ~3) | master.linknum
-        mpstate.logqueue.put(str(struct.pack('>Q', usec) + m.get_msgbuf()))
-
-    if mtype in [ 'HEARTBEAT', 'GPS_RAW_INT', 'GPS_RAW', 'GLOBAL_POSITION_INT', 'SYS_STATUS' ]:
-        if master.linkerror:
-            master.linkerror = False
-            say("link %u OK" % (master.linknum+1))
-        mpstate.status.last_message = time.time()
-        master.last_message = mpstate.status.last_message
-
-    if master.link_delayed:
-        # don't process delayed packets that cause double reporting
-        if mtype in [ 'MISSION_CURRENT', 'SYS_STATUS', 'VFR_HUD',
-                      'GPS_RAW_INT', 'SCALED_PRESSURE', 'GLOBAL_POSITION_INT',
-                      'NAV_CONTROLLER_OUTPUT' ]:
-            return
-
-    if mtype == 'HEARTBEAT' and m.get_srcSystem() != 255:
-        if (mpstate.status.target_system != m.get_srcSystem() or
-            mpstate.status.target_component != m.get_srcComponent()):
-            mpstate.status.target_system = m.get_srcSystem()
-            mpstate.status.target_component = m.get_srcComponent()
-            say("online system %u component %u" % (mpstate.status.target_system, mpstate.status.target_component),'message')
-
-        if mpstate.status.heartbeat_error:
-            mpstate.status.heartbeat_error = False
-            say("heartbeat OK")
-        if master.linkerror:
-            master.linkerror = False
-            say("link %u OK" % (master.linknum+1))
-
-        mpstate.status.last_heartbeat = time.time()
-        master.last_heartbeat = mpstate.status.last_heartbeat
-
-        armed = mpstate.master().motors_armed()
-        if armed != mpstate.status.armed:
-            mpstate.status.armed = armed
-            if armed:
-                say("ARMED")
-            else:
-                say("DISARMED")
-
-        if master.flightmode != mpstate.status.flightmode and time.time() > mpstate.status.last_mode_announce + 2:
-            mpstate.status.flightmode = master.flightmode
-            mpstate.status.last_mode_announce = time.time()
-            mpstate.rl.set_prompt(mpstate.status.flightmode + "> ")
-            say("Mode " + mpstate.status.flightmode)
-
-        if m.type in [mavutil.mavlink.MAV_TYPE_FIXED_WING]:
-            mpstate.vehicle_type = 'plane'
-            mpstate.vehicle_name = 'ArduPlane'
-        elif m.type in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER,
-                        mavutil.mavlink.MAV_TYPE_SURFACE_BOAT,
-                        mavutil.mavlink.MAV_TYPE_SUBMARINE]:
-            mpstate.vehicle_type = 'rover'
-            mpstate.vehicle_name = 'APMrover2'
-        elif m.type in [mavutil.mavlink.MAV_TYPE_QUADROTOR,
-                        mavutil.mavlink.MAV_TYPE_COAXIAL,
-                        mavutil.mavlink.MAV_TYPE_HEXAROTOR,
-                        mavutil.mavlink.MAV_TYPE_OCTOROTOR,
-                        mavutil.mavlink.MAV_TYPE_TRICOPTER,
-                        mavutil.mavlink.MAV_TYPE_HELICOPTER]:
-            mpstate.vehicle_type = 'copter'
-            mpstate.vehicle_name = 'ArduCopter'
-        elif m.type in [mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER]:
-            mpstate.vehicle_type = 'antenna'
-            mpstate.vehicle_name = 'AntennaTracker'
-        
-    elif mtype == 'STATUSTEXT':
-        if m.text != mpstate.status.last_apm_msg or time.time() > mpstate.status.last_apm_msg_time+2:
-            mpstate.console.writeln("APM: %s" % m.text, bg='red')
-            mpstate.status.last_apm_msg = m.text
-            mpstate.status.last_apm_msg_time = time.time()
-
-    elif mtype == "VFR_HUD":
-        have_gps_fix = False
-        if 'GPS_RAW' in mpstate.status.msgs and mpstate.status.msgs['GPS_RAW'].fix_type == 2:
-            have_gps_fix = True
-        if 'GPS_RAW_INT' in mpstate.status.msgs and mpstate.status.msgs['GPS_RAW_INT'].fix_type == 3:
-            have_gps_fix = True
-        if have_gps_fix and not mpstate.status.have_gps_lock and m.alt != 0:
-                say("GPS lock at %u meters" % m.alt, priority='notification')
-                mpstate.status.have_gps_lock = True
-
-    elif mtype == "GPS_RAW":
-        if mpstate.status.have_gps_lock:
-            if m.fix_type != 2 and not mpstate.status.lost_gps_lock and (time.time() - mpstate.status.last_gps_lock) > 3:
-                say("GPS fix lost")
-                mpstate.status.lost_gps_lock = True
-            if m.fix_type == 2 and mpstate.status.lost_gps_lock:
-                say("GPS OK")
-                mpstate.status.lost_gps_lock = False
-            if m.fix_type == 2:
-                mpstate.status.last_gps_lock = time.time()
-
-    elif mtype == "GPS_RAW_INT":
-        if mpstate.status.have_gps_lock:
-            if m.fix_type < 3 and not mpstate.status.lost_gps_lock and (time.time() - mpstate.status.last_gps_lock) > 3:
-                say("GPS fix lost")
-                mpstate.status.lost_gps_lock = True
-            if m.fix_type >= 3 and mpstate.status.lost_gps_lock:
-                say("GPS OK")
-                mpstate.status.lost_gps_lock = False
-            if m.fix_type >= 3:
-                mpstate.status.last_gps_lock = time.time()
-
-    elif mtype == "NAV_CONTROLLER_OUTPUT" and mpstate.status.flightmode == "AUTO" and mpstate.settings.distreadout:
-        rounded_dist = int(m.wp_dist/mpstate.settings.distreadout)*mpstate.settings.distreadout
-        if math.fabs(rounded_dist - mpstate.status.last_distance_announce) >= mpstate.settings.distreadout:
-            if rounded_dist != 0:
-                say("%u" % rounded_dist, priority="progress")
-            mpstate.status.last_distance_announce = rounded_dist
-    
-    elif mtype == "GLOBAL_POSITION_INT":
-        report_altitude(m.relative_alt*0.001)
-
-    elif mtype == "COMPASSMOT_STATUS":
-        print(m)
-
-    elif mtype == "BAD_DATA":
-        if mpstate.settings.shownoise and mavutil.all_printable(m.data):
-            mpstate.console.write(str(m.data), bg='red')
-    elif mtype in [ "COMMAND_ACK", "MISSION_ACK" ]:
-        mpstate.console.writeln("Got MAVLink msg: %s" % m)
-
-        if mtype == "COMMAND_ACK" and m.command == mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION:
-            if m.result == mavutil.mavlink.MAV_RESULT_ACCEPTED:
-                say("Calibrated")
-    else:
-        #mpstate.console.writeln("Got MAVLink msg: %s" % m)
-        pass
-
-    if mpstate.status.watch is not None:
-        if fnmatch.fnmatch(m.get_type().upper(), mpstate.status.watch.upper()):
-            mpstate.console.writeln(m)
-
-    # keep the last message of each type around
-    mpstate.status.msgs[m.get_type()] = m
-    if not m.get_type() in mpstate.status.msg_count:
-        mpstate.status.msg_count[m.get_type()] = 0
-    mpstate.status.msg_count[m.get_type()] += 1
-
-    # don't pass along bad data
-    if mtype != "BAD_DATA":
-        # pass messages along to listeners, except for REQUEST_DATA_STREAM, which
-        # would lead a conflict in stream rate setting between mavproxy and the other
-        # GCS
-        if mpstate.settings.mavfwd_rate or mtype != 'REQUEST_DATA_STREAM':
-            for r in mpstate.mav_outputs:
-                r.write(m.get_msgbuf())
-
-        # pass to modules
-        for (mod,pm) in mpstate.modules:
-            if not hasattr(mod, 'mavlink_packet'):
-                continue
-            try:
-                mod.mavlink_packet(m)
-            except Exception as msg:
-                if mpstate.settings.moddebug == 1:
-                    print(msg)
-                elif mpstate.settings.moddebug > 1:
-                    exc_type, exc_value, exc_traceback = sys.exc_info()
-                    traceback.print_exception(exc_type, exc_value, exc_traceback,
-                                              limit=2, file=sys.stdout)
 
 def process_master(m):
     '''process packets from the MAVLink master'''
@@ -1068,39 +816,19 @@ Auto-detected serial ports are:
 
     mpstate.mav_master = []
 
+    load_module('link', quiet=True)
+
     # open master link
     for mdev in opts.master:
-        if ',' in mdev and not os.path.exists(mdev):
-            port, baud = mdev.split(',')
-        else:
-            port, baud = mdev, opts.baudrate
-
-        m = mavutil.mavlink_connection(port, autoreconnect=True, baud=int(baud))
-        m.mav.set_callback(master_callback, m)
-        if hasattr(m.mav, 'set_send_callback'):
-            m.mav.set_send_callback(master_send_callback, m)
-        if opts.rtscts:
-            m.set_rtscts(True)
-        m.linknum = len(mpstate.mav_master)
-        m.linkerror = False
-        m.link_delayed = False
-        m.last_heartbeat = 0
-        m.last_message = 0
-        m.highest_msec = 0
-        mpstate.mav_master.append(m)
-        mpstate.status.counters['MasterIn'].append(0)
+        if not mpstate.module('link').link_add(mdev):
+            sys.exit(1)
 
     # log all packets from the master, for later replay
     open_logs()
 
-    # open any mavlink UDP ports
-    for p in opts.output:
-        if ',' in p and not os.path.exists(p):
-            port, baud = p.split(',')            
-        else:
-            port, baud = p, opts.baudrate
-
-        mpstate.mav_outputs.append(mavutil.mavlink_connection(port, baud=int(baud), input=False))
+    # open any mavlink output ports
+    for port in opts.output:
+        mpstate.mav_outputs.append(mavutil.mavlink_connection(port, baud=int(opts.baudrate), input=False))
 
     if opts.sitl:
         mpstate.sitl_output = mavutil.mavudp(opts.sitl, input=False)

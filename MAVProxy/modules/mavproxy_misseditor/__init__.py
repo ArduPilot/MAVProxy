@@ -6,6 +6,7 @@ June 2104
 '''
 
 from MAVProxy.modules.lib import mp_module
+from MAVProxy.modules.lib import mp_util
 
 from MAVProxy.modules.mavproxy_misseditor import missionEditorFrame
 from MAVProxy.modules.mavproxy_misseditor import me_event
@@ -221,6 +222,7 @@ class MissionEditorModule(mp_module.MPModule):
 
     def child_task(self, q, l, gq, gl):
         '''child process - this holds GUI elements'''
+        mp_util.child_close_fds()
         import wx
         self.app = wx.PySimpleApp()
         self.app.frame = missionEditorFrame.MissionEditorFrame(parent=None,id=wx.ID_ANY)

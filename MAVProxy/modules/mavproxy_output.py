@@ -10,6 +10,7 @@ from pymavlink import mavutil
 
 
 from MAVProxy.modules.lib import mp_module
+from MAVProxy.modules.lib import mp_util
 
 class OutputModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -51,6 +52,10 @@ class OutputModule(mp_module.MPModule):
             print("Failed to connect to %s" % device)
             return
         self.mpstate.mav_outputs.append(conn)
+        try:
+            mp_util.child_fd_list_add(conn.port.fileno())
+        except Exception:
+            pass
 
     def cmd_output_remove(self, args):
         '''remove an output'''
@@ -59,6 +64,11 @@ class OutputModule(mp_module.MPModule):
             conn = self.mpstate.mav_outputs[i]
             if str(i) == device or conn.address == device:
                 print("Removing output %s" % conn.address)
+                try:
+                    mp_util.child_fd_list_add(conn.port.fileno())
+                except Exception:
+                    pass
+                conn.close()
                 self.mpstate.mav_outputs.pop(i)
                 return
         

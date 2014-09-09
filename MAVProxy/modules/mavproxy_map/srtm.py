@@ -111,6 +111,7 @@ class SRTMDownloader():
         HTTP file transfer protocol (rather than ftp).
         30may2010  GJ ORIGINAL VERSION
         """
+        mp_util.child_close_fds()
         conn = httplib.HTTPConnection(server)
         conn.request("GET",directory)
         r1 = conn.getresponse()
@@ -206,6 +207,7 @@ class SRTMDownloader():
 
     def downloadTile(self, continent, filename):
         #Use HTTP
+        mp_util.child_close_fds()
         if self.offline == 1:
             return
         conn = httplib.HTTPConnection(self.server)
