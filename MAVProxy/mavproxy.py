@@ -295,7 +295,12 @@ def cmd_module(args):
             print("Module %s not loaded" % modname)
             return
         if unload_module(modname):
-            reload(pmodule)
+            import zipimport
+            try:
+                reload(pmodule)
+            except ImportError:
+                clear_zipimport_cache()
+                reload(pmodule)                
             if load_module(modname, quiet=True):
                 print("Reloaded module %s" % modname)
     elif args[0] == "unload":
@@ -338,13 +343,32 @@ def cmd_alias(args):
         print(usage)
         return
 
+
+def clear_zipimport_cache():
+    """Clear out cached entries from _zip_directory_cache.
+    See http://www.digi.com/wiki/developer/index.php/Error_messages"""
+    import sys, zipimport
+    syspath_backup = list(sys.path)
+    zipimport._zip_directory_cache.clear()
+ 
+    # load back items onto sys.path
+    sys.path = syspath_backup
+    # add this too: see https://mail.python.org/pipermail/python-list/2005-May/353229.html
+    sys.path_importer_cache.clear()
+
 # http://stackoverflow.com/questions/211100/pythons-import-doesnt-work-as-expected
 # has info on why this is necessary.
 
 def import_package(name):
     """Given a package name like 'foo.bar.quux', imports the package
     and returns the desired module."""
-    mod = __import__(name)
+    import zipimport
+    try:
+        mod = __import__(name)
+    except ImportError:
+        clear_zipimport_cache()
+        mod = __import__(name)
+        
     components = name.split('.')
     for comp in components[1:]:
         mod = getattr(mod, comp)
