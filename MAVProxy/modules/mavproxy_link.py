@@ -7,7 +7,7 @@
 '''    
 
 from pymavlink import mavutil
-import time, struct, math
+import time, struct, math, sys
 
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
