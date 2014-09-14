@@ -669,7 +669,7 @@ def main_loop():
 
         rin = []
         for master in mpstate.mav_master:
-            if master.fd is not None:
+            if master.fd is not None and not master.portdead:
                 rin.append(master.fd)
         for m in mpstate.mav_outputs:
             rin.append(m.fd)
