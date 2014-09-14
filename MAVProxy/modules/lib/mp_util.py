@@ -157,7 +157,7 @@ def degrees_to_dms(degrees):
     deg = int(degrees)
     min = int((degrees - deg)*60)
     sec = ((degrees - deg) - (min/60.0))*60*60
-    return u'%u\u00b0%02u\'%04.1f"' % (deg, abs(min), abs(sec))
+    return u'%d\u00b0%02u\'%05.2f"' % (deg, abs(min), abs(sec))
 
 
 class UTMGrid:
