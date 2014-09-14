@@ -17,6 +17,8 @@ class LinkModule(mp_module.MPModule):
         super(LinkModule, self).__init__(mpstate, "link", "link control", public=True)
         self.add_command('link', self.cmd_link, "link control",
                          ["<list|add|remove>"])
+        self.no_fwd_types = set()
+        self.no_fwd_types.add("BAD_DATA")
 
     def cmd_link(self, args):
         '''handle link commands'''
@@ -334,7 +336,7 @@ class LinkModule(mp_module.MPModule):
         self.status.msg_count[m.get_type()] += 1
 
         # don't pass along bad data
-        if mtype != "BAD_DATA":
+        if not mtype in self.no_fwd_types:
             # pass messages along to listeners, except for REQUEST_DATA_STREAM, which
             # would lead a conflict in stream rate setting between mavproxy and the other
             # GCS
