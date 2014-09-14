@@ -336,13 +336,14 @@ class LinkModule(mp_module.MPModule):
         self.status.msg_count[m.get_type()] += 1
 
         # don't pass along bad data
-        if not mtype in self.no_fwd_types:
+        if not mtype in ['BAD_DATA']:
             # pass messages along to listeners, except for REQUEST_DATA_STREAM, which
             # would lead a conflict in stream rate setting between mavproxy and the other
             # GCS
             if self.mpstate.settings.mavfwd_rate or mtype != 'REQUEST_DATA_STREAM':
-                for r in self.mpstate.mav_outputs:
-                    r.write(m.get_msgbuf())
+                if not mtype in self.no_fwd_types:
+                    for r in self.mpstate.mav_outputs:
+                        r.write(m.get_msgbuf())
 
             # pass to modules
             for (mod,pm) in self.mpstate.modules:
