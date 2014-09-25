@@ -69,6 +69,16 @@ joymap = {
      (0, 770, 1500), # Throttle
      (5, 571, 1500), # Yaw
      None,
+     None],
+
+    # This supports a ADC cheap ebay USB controller
+    # sold as a "FMS Simulator" joystick
+    'ADC':
+    [(0, -500, 1500), # Roll
+     (1, -500, 1500), # Pitch
+     (2, -500, 1500), # Throttle
+     (4, 500, 1500), # Yaw
+     None,
      None]
 }
 
