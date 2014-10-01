@@ -4,6 +4,7 @@
 import time, os
 
 from MAVProxy.modules.lib import mp_module
+from pymavlink import mavutil
 
 arming_masks = {
     "all"     : 0x0001,
@@ -23,7 +24,9 @@ class ArmModule(mp_module.MPModule):
         self.add_command('arm', self.cmd_arm,      'arm motors', ['check <all|baro|compass|gps|ins|params|rc|voltage|battery>',
                                       'uncheck <all|baro|compass|gps|ins|params|rc|voltage|battery>',
                                       'list',
-                                      'throttle'])
+                                      'throttle',
+                                      'safetyon',
+                                      'safetyoff'])
         self.add_command('disarm', self.cmd_disarm,   'disarm motors')
 
 
@@ -83,6 +86,18 @@ class ArmModule(mp_module.MPModule):
 
         if args[0] == "throttle":
             self.master.arducopter_arm()
+            return
+
+        if args[0] == "safetyon":
+            self.master.mav.set_mode_send(self.target_system,
+                                          mavutil.mavlink.MAV_MODE_FLAG_DECODE_POSITION_SAFETY,
+                                          1)
+            return
+
+        if args[0] == "safetyoff":
+            self.master.mav.set_mode_send(self.target_system,
+                                          mavutil.mavlink.MAV_MODE_FLAG_DECODE_POSITION_SAFETY,
+                                          0)
             return
 
         print(usage)
