@@ -244,7 +244,7 @@ class RallyModule(mp_module.MPModule):
             else:
                 self.master.mav.command_long_send(self.status.target_system,
                         self.status.target_component,
-                        mavutil.mavlink.MAV_CMD_DO_RALLY_LAND,
+                        mavutil.mavlink.MAV_CMD_DO_RALLY_LAND_START,
                         0, 0, 0, 0, 0, 0, 0, 0)
 
         else:
@@ -261,7 +261,7 @@ class RallyModule(mp_module.MPModule):
                 elif (m.result != 0 and self.abort_ack_received == False):
                     self.say("Landing Abort Command Unsuccessful.")
 
-            elif m.command == mavutil.mavlink.MAV_CMD_DO_RALLY_LAND:
+            elif m.command == mavutil.mavlink.MAV_CMD_DO_RALLY_LAND_START:
                 if (m.result == 0):
                     self.say("Landing.")
 
