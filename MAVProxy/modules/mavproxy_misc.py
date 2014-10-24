@@ -56,6 +56,7 @@ class MiscModule(mp_module.MPModule):
         self.add_command('time', self.cmd_time, "show autopilot time")
         self.add_command('shell', self.cmd_shell, "run shell command")
         self.add_command('changealt', self.cmd_changealt, "change target altitude")
+        self.add_command('land', self.cmd_land, "auto land")
 
     def altitude_difference(self, pressure1, pressure2, ground_temp):
         '''calculate barometric altitude'''
@@ -131,6 +132,20 @@ class MiscModule(mp_module.MPModule):
                                           0, 0, relalt)
         print("Sent change altitude command for %.1f meters" % relalt)
 
+    def cmd_land(self, args):
+        '''auto land commands'''
+        if len(args) < 1:
+            self.master.mav.command_long_send(self.status.target_system,
+                self.status.target_component,
+                mavutil.mavlink.MAV_CMD_DO_LAND_START,
+                0, 0, 0, 0, 0, 0, 0, 0)
+        elif args[0] == 'abort':
+            self.master.mav.command_long_send(self.status.target_system,
+                self.status.target_component,
+                mavutil.mavlink.MAV_CMD_DO_GO_AROUND,
+                0, 0, 0, 0, 0, 0, 0, 0)
+        else:
+            print("Usage: land [abort]")
 
 def init(mpstate):
     '''initialise module'''
