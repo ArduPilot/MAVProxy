@@ -39,11 +39,6 @@ TILE_SERVICES = {
 	"GoogleMap"      : "https://mt${GOOG_DIGIT}.google.com/vt/lyrs=m@132&hl=pt-PT&x=${X}&y=${Y}&z=${ZOOM}&s=${GALILEO}",
 	"GoogleTer"      : "https://mt${GOOG_DIGIT}.google.com/vt/v=t@132,r@249&hl=pt-PT&x=${X}&y=${Y}&z=${ZOOM}&s=${GALILEO}",
 	"GoogleChina"    : "http://mt${GOOG_DIGIT}.google.cn/vt/lyrs=m@121&hl=en&gl=cn&x=${X}&y=${Y}&z=${ZOOM}&s=${GALILEO}",
-	"YahooMap"       : "http://maps${Y_DIGIT}.yimg.com/hx/tl?v=4.3&.intl=en&x=${X}&y=${YAHOO_Y}&z=${YAHOO_ZOOM}&r=1",
-	"YahooSat"       : "http://maps${Y_DIGIT}.yimg.com/ae/ximg?v=1.9&t=a&s=256&.intl=en&x=${X}&y=${YAHOO_Y}&z=${YAHOO_ZOOM}&r=1",
-	"YahooInMap"     : "http://maps.yimg.com/hw/tile?locale=en&imgtype=png&yimgv=1.2&v=4.1&x=${X}&y=${YAHOO_Y}&z=${YAHOO_ZOOM_2}",
-	"YahooInHyb"     : "http://maps.yimg.com/hw/tile?imgtype=png&yimgv=0.95&t=h&x=${X}&y=${YAHOO_Y}&z=${YAHOO_ZOOM_2}",
-	"YahooHyb"       : "http://maps${Y_DIGIT}.yimg.com/hx/tl?v=4.3&t=h&.intl=en&x=${X}&y=${YAHOO_Y}&z=${YAHOO_ZOOM}&r=1",
 	"MicrosoftBrMap" : "http://imakm${MS_DIGITBR}.maplink3.com.br/maps.ashx?v=${QUAD}|t&call=2.2.4",
 	"MicrosoftHyb"   : "http://ecn.t${MS_DIGIT}.tiles.virtualearth.net/tiles/h${QUAD}.png?g=441&mkt=en-us&n=z",
 	"MicrosoftSat"   : "http://ecn.t${MS_DIGIT}.tiles.virtualearth.net/tiles/a${QUAD}.png?g=441&mkt=en-us&n=z",
@@ -77,9 +72,6 @@ class TileServiceInfo:
 			quadcode += str((((((y >> i) & 1) << 1) + ((x >> i) & 1))))
 		self.ZOOM = zoom
 		self.QUAD = quadcode
-		self.YAHOO_Y = 2**(zoom-1) - 1 - y
-		self.YAHOO_ZOOM = zoom + 1
-		self.YAHOO_ZOOM_2 = 17 - zoom + 1
 		self.OAM_ZOOM = 17 - zoom
 		self.GOOG_DIGIT = (x + y) & 3
 		self.MS_DIGITBR = (((y & 1) << 1) + (x & 1)) + 1
@@ -590,7 +582,7 @@ if __name__ == "__main__":
 	parser.add_option("--lat", type='float', default=-35.362938, help="start latitude")
 	parser.add_option("--lon", type='float', default=149.165085, help="start longitude")
 	parser.add_option("--width", type='float', default=1000.0, help="width in meters")
-	parser.add_option("--service", default="YahooSat", help="tile service")
+	parser.add_option("--service", default="OviHybrid", help="tile service")
 	parser.add_option("--zoom", default=None, type='int', help="zoom level")
 	parser.add_option("--max-zoom", type='int', default=19, help="maximum tile zoom")
 	parser.add_option("--delay", type='float', default=1.0, help="tile download delay")
