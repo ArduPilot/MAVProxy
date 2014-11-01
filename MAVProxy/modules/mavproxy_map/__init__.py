@@ -43,7 +43,7 @@ class MapModule(mp_module.MPModule):
               ('showahrs2pos', int, 0),
               ('brightness', float, 1),
               ('rallycircle', bool, False)])
-        service='YahooSat'
+        service='OviHybrid'
         if 'MAP_SERVICE' in os.environ:
             service = os.environ['MAP_SERVICE']
         import platform
