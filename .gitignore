@@ -10,3 +10,4 @@ gtest/
 *.tlog
 *.raw
 MANIFEST
+*.egg-info
