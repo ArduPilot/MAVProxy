@@ -268,14 +268,14 @@ class LinkModule(mp_module.MPModule):
                 self.status.last_apm_msg_time = time.time()
 
         elif mtype == "VFR_HUD":
-            have_gps_fix = False
+            have_gps_lock = False
             if 'GPS_RAW' in self.status.msgs and self.status.msgs['GPS_RAW'].fix_type == 2:
-                have_gps_fix = True
-                if 'GPS_RAW_INT' in self.status.msgs and self.status.msgs['GPS_RAW_INT'].fix_type == 3:
-                    have_gps_fix = True
-                if have_gps_fix and not self.status.have_gps_lock and m.alt != 0:
-                    self.say("GPS lock at %u meters" % m.alt, priority='notification')
-                    self.status.have_gps_lock = True
+                have_gps_lock = True
+            elif 'GPS_RAW_INT' in self.status.msgs and self.status.msgs['GPS_RAW_INT'].fix_type == 3:
+                have_gps_lock = True
+            if have_gps_lock and not self.status.have_gps_lock and m.alt != 0:
+                self.say("GPS lock at %u meters" % m.alt, priority='notification')
+                self.status.have_gps_lock = True
 
         elif mtype == "GPS_RAW":
             if self.status.have_gps_lock:
