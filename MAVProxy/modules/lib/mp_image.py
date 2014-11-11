@@ -73,7 +73,8 @@ class MPImage():
                  mouse_events = False,
                  key_events = False,
                  auto_size = False,
-                 report_size_changes = False):
+                 report_size_changes = False,
+                 daemon = False):
         import multiprocessing
 
         self.title = title
@@ -96,6 +97,7 @@ class MPImage():
                                                  MPMenuItem('Full Zoom',  'Full Zoom', 'fullSize')])
 
         self.child = multiprocessing.Process(target=self.child_task)
+        self.child.daemon = daemon
         self.child.start()
         self.set_popup_menu(self.default_menu)
 
@@ -169,6 +171,11 @@ class MPImage():
         while self.out_queue.qsize():
             ret.append(self.out_queue.get())
         return ret
+
+    def terminate(self):
+        '''terminate child process'''
+        self.child.terminate()
+        self.child.join()
 
 from PIL import Image
 
