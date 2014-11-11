@@ -66,9 +66,9 @@ class MPMenuItem(MPMenuGeneric):
 
     def id(self):
         '''id used to identify the returned menu items
-        uses a 16 bit unsigned integer'''
-        # 0xFFFF is used as windows only allows for 16 bit IDs
-        return int(hash((self.name, self.returnkey)) & 0xFFFF)
+        uses a 16 bit signed integer'''
+        # 0x7FFF is used as windows only allows for 16 bit IDs
+        return int(hash((self.name, self.returnkey)) & 0x7FFF)
 
     def _append(self, menu):
         '''append this menu item to a menu'''
