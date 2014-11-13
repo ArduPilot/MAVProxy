@@ -71,6 +71,18 @@ joymap = {
      None,
      None],
 
+    # Support for Optic 6 with the IPACS easyFly2 Interface USB Adapter from:
+    # http://www.ikarus.net/deutsch-infos-zubehor/die-ikarus-interfacekabel/?lang=en
+    'IPACS easyFly2 Interface':
+    [(0, 758, 1242), # Roll
+     (1, 758, 1242), # Pitch
+     (2, 770, 1230), # Throttle
+     (4, 2553, 974), # (custom: flaps?)
+     None,
+     (3, 758, 1242), # Yaw
+     (5, 758, 1242), # (custom: switch)
+     None],
+
     # This supports a ADC cheap ebay USB controller
     # sold as a "FMS Simulator" joystick
     'ADC':
@@ -114,21 +126,30 @@ class JSModule(mp_module.MPModule):
         if self.js is None:
             return
         for e in pygame.event.get(): # iterate over event stack
-            #the following is somewhat custom for the specific joystick model:
-            override = self.module('rc').override[:]
-            for i in range(len(self.map)):
-                m = self.map[i]
+            if e.type in [
+                pygame.JOYAXISMOTION,
+                pygame.JOYBALLMOTION,
+                pygame.JOYBUTTONDOWN,
+                pygame.JOYBUTTONUP,
+                pygame.JOYHATMOTION
+            ] :
+                # print '--- %s ' % pygame.event.event_name(e.type)
+                # print 'axis %u : %f' % (e.axis, e.value)
+                m = self.map[e.axis]
                 if m is None:
                     continue
                 (axis, mul, add) = m
                 if axis >= self.num_axes:
                     continue
-                v = int(self.js.get_axis(axis)*mul + add)
+                v = int(e.value * mul + add)
                 v = max(min(v, 2000), 1000)
-                override[i] = v
-            if override != self.module('rc').override:
-                self.module('rc').override = override
-                self.module('rc').override_period.force()
+                # if e.axis == 0 :
+                #     print 'e.axis: %u, axis: %u, v: %u' % (e.axis, axis, v)
+                override = self.module('rc').override[:]
+                override[e.axis] = v
+                if override != self.module('rc').override:
+                    self.module('rc').override = override
+                    self.module('rc').override_period.force()
 
 def init(mpstate):
     '''initialise module'''
