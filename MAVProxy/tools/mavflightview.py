@@ -167,7 +167,7 @@ def mavflightview(filename):
                 instance = 2
             else:
                 instance = 1
-        if lat != 0 or lng != 0:
+        if abs(lat)>0.01 or abs(lng)>0.01:
             if getattr(mlog, 'flightmode','') in colourmap:
                 colour = colourmap[mlog.flightmode]
                 (r,g,b) = colour
