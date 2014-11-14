@@ -84,6 +84,26 @@ colourmap = {
     }
 
 
+def display_waypoints(wploader, map):
+    '''display the waypoints'''
+    mission_list = wploader.view_list()
+    polygons = wploader.polygon_list()
+    map.add_object(mp_slipmap.SlipClearLayer('Mission'))
+    for i in range(len(polygons)):
+        p = polygons[i]
+        if len(p) > 1:
+            map.add_object(mp_slipmap.SlipPolygon('mission %u' % i, p,
+                                                  layer='Mission', linewidth=2, colour=(255,255,255)))
+        labeled_wps = {}
+        for i in range(len(mission_list)):
+            next_list = mission_list[i]
+            for j in range(len(next_list)):
+                #label already printed for this wp?
+                if (next_list[j] not in labeled_wps):
+                    map.add_object(mp_slipmap.SlipLabel(
+                        'miss_cmd %u/%u' % (i,j), polygons[i][j], str(next_list[j]), 'Mission', colour=(0,255,255)))  
+                    labeled_wps[next_list[j]] = (i,j)
+
 def mavflightview(filename):
     print("Loading %s ..." % filename)
     mlog = mavutil.mavlink_connection(filename)
@@ -238,8 +258,7 @@ def mavflightview(filename):
         for path_obj in path_objs:
             map.add_object(path_obj)
         if mission_obj is not None:
-            for m in mission_obj:
-                map.add_object(m)
+            display_waypoints(wp, map)
         if fence_obj is not None:
             map.add_object(fence_obj)
 
