@@ -33,6 +33,7 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('INS', 'INS', fg='grey', row=0)
         mpstate.console.set_status('MAG', 'MAG', fg='grey', row=0)
         mpstate.console.set_status('AS', 'AS', fg='grey', row=0)
+        mpstate.console.set_status('RNG', 'RNG', fg='grey', row=0)
         mpstate.console.set_status('AHRS', 'AHRS', fg='grey', row=0)
         mpstate.console.set_status('Heading', 'Hdg ---/---', row=2)
         mpstate.console.set_status('Alt', 'Alt ---', row=2)
@@ -197,11 +198,12 @@ class ConsoleModule(mp_module.MPModule):
             self.console.set_status('Roll', 'Roll %u' % math.degrees(msg.roll))
             self.console.set_status('Pitch', 'Pitch %u' % math.degrees(msg.pitch))
         elif type in ['SYS_STATUS']:
-            sensors = { 'AS'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_DIFFERENTIAL_PRESSURE,
-                        'MAG' : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_MAG,
-                        'INS' : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_ACCEL | mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_GYRO,
+            sensors = { 'AS'   : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_DIFFERENTIAL_PRESSURE,
+                        'MAG'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_MAG,
+                        'INS'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_ACCEL | mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_GYRO,
                         'AHRS' : mavutil.mavlink.MAV_SYS_STATUS_AHRS,
-                        'TERR' : mavutil.mavlink.MAV_SYS_STATUS_TERRAIN}
+                        'TERR' : mavutil.mavlink.MAV_SYS_STATUS_TERRAIN,
+                        'RNG'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_LASER_POSITION}
             for s in sensors.keys():
                 bits = sensors[s]
                 present = ((msg.onboard_control_sensors_enabled & bits) == bits)
