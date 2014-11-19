@@ -114,7 +114,7 @@ def mavflightview(filename):
     if opts.fence is not None:
         fen.load(opts.fence)
     path = [[]]
-    types = ['MISSION_ITEM']
+    types = ['MISSION_ITEM','CMD']
     if opts.rawgps:
         types.extend(['GPS', 'GPS_RAW_INT'])
     if opts.rawgps2:
@@ -125,7 +125,7 @@ def mavflightview(filename):
         types.extend(['EKF1', 'GPS'])
     if opts.ahr2:
         types.extend(['AHR2', 'GPS'])
-    if len(types) == 1:
+    if len(types) == 2:
         types.extend(['GPS','GLOBAL_POSITION_INT'])
     print("Looking for types %s" % str(types))
     while True:
@@ -137,6 +137,26 @@ def mavflightview(filename):
             break
         if m.get_type() == 'MISSION_ITEM':
             try:
+                while m.seq > wp.count():
+                    print("Adding dummy WP %u" % wp.count())
+                    wp.set(m, wp.count())
+                wp.set(m, m.seq)
+            except Exception:
+                pass
+            continue
+        if m.get_type() == 'CMD':
+            m = mavutil.mavlink.MAVLink_mission_item_message(0,
+                                                             0,
+                                                             m.CNum,
+                                                             mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                                             m.CId,
+                                                             0, 1,
+                                                             m.Prm1, m.Prm2, m.Prm3, m.Prm4,
+                                                             m.Lat, m.Lng, m.Alt)
+            try:
+                while m.seq > wp.count():
+                    print("Adding dummy WP %u" % wp.count())
+                    wp.set(m, wp.count())
                 wp.set(m, m.seq)
             except Exception:
                 pass
