@@ -31,8 +31,8 @@ class HILModule(mp_module.MPModule):
         self.sim_out.setblocking(0)
 
         # HIL needs very fast idle loop calls
-        if self.mpstate.select_timeout > 0.001:
-            self.mpstate.select_timeout = 0.001
+        if self.settings.select_timeout > 0.001:
+            self.settings.select_timeout = 0.001
 
     def unload(self):
         '''unload module'''
