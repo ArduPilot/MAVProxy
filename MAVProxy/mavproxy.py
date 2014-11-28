@@ -809,6 +809,7 @@ if __name__ == '__main__':
     parser.add_option("--dialect",  default="ardupilotmega", help="MAVLink dialect")
     parser.add_option("--rtscts",  action='store_true', help="enable hardware RTS/CTS flow control")
     parser.add_option("--mission", dest="mission", help="mission name", default=None)
+    parser.add_option("--daemon", action='store_true', help="run in daemon mode, do not start interactive shell")
 
     (opts, args) = parser.parse_args()
 
@@ -916,34 +917,37 @@ if __name__ == '__main__':
             for c in cmds:
                 process_stdin(c)
 
-    # run main loop as a thread
-    mpstate.status.thread = threading.Thread(target=main_loop)
-    mpstate.status.thread.daemon = True
-    mpstate.status.thread.start()
+    if opts.daemon:
+        main_loop()
+    else:
+        # run main loop as a thread
+        mpstate.status.thread = threading.Thread(target=main_loop)
+        mpstate.status.thread.daemon = True
+        mpstate.status.thread.start()
 
-    # use main program for input. This ensures the terminal cleans
-    # up on exit
-    while (mpstate.status.exit != True):
-        try:
-            input_loop()
-        except KeyboardInterrupt:
-            if mpstate.settings.requireexit:
-                print("Interrupt caught.  Use 'exit' to quit MAVProxy.")
+        # use main program for input. This ensures the terminal cleans
+        # up on exit
+        while (mpstate.status.exit != True):
+            try:
+                input_loop()
+            except KeyboardInterrupt:
+                if mpstate.settings.requireexit:
+                    print("Interrupt caught.  Use 'exit' to quit MAVProxy.")
 
-                #Just lost the map and console, get them back:
-                for (m,pm) in mpstate.modules:
-                    if m.name in ["map", "console"]:
-                        if hasattr(m, 'unload'):
-                            try:
-                                m.unload()
-                            except Exception:
-                                pass
-                        reload(m)
-                        m.init(mpstate)   
+                    #Just lost the map and console, get them back:
+                    for (m,pm) in mpstate.modules:
+                        if m.name in ["map", "console"]:
+                            if hasattr(m, 'unload'):
+                                try:
+                                    m.unload()
+                                except Exception:
+                                    pass
+                            reload(m)
+                            m.init(mpstate)
 
-            else:
-                mpstate.status.exit = True
-                sys.exit(1)
+                else:
+                    mpstate.status.exit = True
+                    sys.exit(1)
 
     #this loop executes after leaving the above loop and is for cleanup on exit
     for (m,pm) in mpstate.modules:
