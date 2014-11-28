@@ -121,6 +121,7 @@ class MPState(object):
               MPSetting('distreadout', int, 200, 'Distance Readout', range=(0,10000), increment=1),
 
               MPSetting('moddebug', int, 0, 'Module Debug Level', range=(0,3), increment=1, tab='Debug'),
+              MPSetting('compdebug', int, 0, 'Computation Debug Mask', range=(0,3), tab='Debug'),
               MPSetting('flushlogs', bool, False, 'Flush logs on every packet'),
               MPSetting('requireexit', bool, False, 'Require exit command'),
 
@@ -458,6 +459,9 @@ def process_master(m):
         time.sleep(0.1)
         return
 
+    if (mpstate.settings.compdebug & 1) != 0:
+        return
+
     if mpstate.logqueue_raw:
         mpstate.logqueue_raw.put(str(s))
 
@@ -611,6 +615,9 @@ def send_heartbeat(master):
 def periodic_tasks():
     '''run periodic checks'''
     if mpstate.status.setup_mode:
+        return
+
+    if (mpstate.settings.compdebug & 2) != 0:
         return
 
     if mpstate.settings.heartbeat != 0:
