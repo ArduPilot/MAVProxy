@@ -474,7 +474,7 @@ def process_master(m):
     if len(s) == 0:
         time.sleep(0.1)
         return
-    
+
     if mpstate.logqueue_raw:
         mpstate.logqueue_raw.put(str(s))
 
@@ -583,7 +583,7 @@ def open_logs():
     # use a separate thread for writing to the logfile to prevent
     # delays during disk writes (important as delays can be long if camera
     # app is running)
-    t = threading.Thread(target=log_writer)
+    t = threading.Thread(target=log_writer, name='log_writer')
     t.daemon = True
     t.start()
 
@@ -934,7 +934,7 @@ if __name__ == '__main__':
                 process_stdin(c)
 
     # run main loop as a thread
-    mpstate.status.thread = threading.Thread(target=main_loop)
+    mpstate.status.thread = threading.Thread(target=main_loop, name='main_loop')
     mpstate.status.thread.daemon = True
     mpstate.status.thread.start()
 
