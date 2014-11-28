@@ -7,7 +7,7 @@ Released under the GNU GPL version 3 or later
 
 '''
 
-import sys, os, time, socket
+import sys, os, time, socket, signal
 import fnmatch, errno, threading
 import serial, Queue, select
 import traceback
@@ -840,6 +840,22 @@ Auto-detected serial ports are:
 
     mpstate.mav_master = []
 
+    def quit_handler(signum = None, frame = None):
+        #print 'Signal handler called with signal', signum
+        if mpstate.status.exit:
+            print 'Clean shutdown impossible, forcing an exit'
+            sys.exit(0)
+        else:
+            mpstate.status.exit = True
+
+    # Listen for kill signals to cleanly shutdown modules
+    fatalsignals = [signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT]
+    if opts.daemon: # SIGINT breaks readline parsing - if we are interactive, just let things die
+        fatalsignals.append(signal.SIGINT)
+
+    for sig in fatalsignals:
+        signal.signal(sig, quit_handler)
+
     load_module('link', quiet=True)
 
     # open master link
@@ -907,37 +923,37 @@ Auto-detected serial ports are:
             for c in cmds:
                 process_stdin(c)
 
-    if opts.daemon:
-        main_loop()
-    else:
-        # run main loop as a thread
-        mpstate.status.thread = threading.Thread(target=main_loop)
-        mpstate.status.thread.daemon = True
-        mpstate.status.thread.start()
+    # run main loop as a thread
+    mpstate.status.thread = threading.Thread(target=main_loop)
+    mpstate.status.thread.daemon = True
+    mpstate.status.thread.start()
 
-        # use main program for input. This ensures the terminal cleans
-        # up on exit
-        while (mpstate.status.exit != True):
-            try:
+    # use main program for input. This ensures the terminal cleans
+    # up on exit
+    while (mpstate.status.exit != True):
+        try:
+            if opts.daemon:
+                time.sleep(0.1)
+            else:
                 input_loop()
-            except KeyboardInterrupt:
-                if mpstate.settings.requireexit:
-                    print("Interrupt caught.  Use 'exit' to quit MAVProxy.")
+        except KeyboardInterrupt:
+            if mpstate.settings.requireexit:
+                print("Interrupt caught.  Use 'exit' to quit MAVProxy.")
 
-                    #Just lost the map and console, get them back:
-                    for (m,pm) in mpstate.modules:
-                        if m.name in ["map", "console"]:
-                            if hasattr(m, 'unload'):
-                                try:
-                                    m.unload()
-                                except Exception:
-                                    pass
-                            reload(m)
-                            m.init(mpstate)
+                #Just lost the map and console, get them back:
+                for (m,pm) in mpstate.modules:
+                    if m.name in ["map", "console"]:
+                        if hasattr(m, 'unload'):
+                            try:
+                                m.unload()
+                            except Exception:
+                                pass
+                        reload(m)
+                        m.init(mpstate)
 
-                else:
-                    mpstate.status.exit = True
-                    sys.exit(1)
+            else:
+                mpstate.status.exit = True
+                sys.exit(1)
 
     #this loop executes after leaving the above loop and is for cleanup on exit
     for (m,pm) in mpstate.modules:
