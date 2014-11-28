@@ -146,7 +146,7 @@ class JSModule(mp_module.MPModule):
                 # if e.axis == 0 :
                 #     print 'e.axis: %u, axis: %u, v: %u' % (e.axis, axis, v)
                 override = self.module('rc').override[:]
-                override[e.axis] = v
+                override[axis] = v
                 if override != self.module('rc').override:
                     self.module('rc').override = override
                     self.module('rc').override_period.force()
