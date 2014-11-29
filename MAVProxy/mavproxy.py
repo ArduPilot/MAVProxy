@@ -817,6 +817,7 @@ if __name__ == '__main__':
     parser.add_option("--rtscts",  action='store_true', help="enable hardware RTS/CTS flow control")
     parser.add_option("--mission", dest="mission", help="mission name", default=None)
     parser.add_option("--daemon", action='store_true', help="run in daemon mode, do not start interactive shell")
+    parser.add_option("--profile", action='store_true', help="run the Yappi python profiler")
 
     (opts, args) = parser.parse_args()
 
@@ -940,6 +941,10 @@ if __name__ == '__main__':
             for c in cmds:
                 process_stdin(c)
 
+    if opts.profile:
+        import yappi    # We do the import here so that we won't barf if run normally and yappi not available
+        yappi.start()
+
     # run main loop as a thread
     mpstate.status.thread = threading.Thread(target=main_loop, name='main_loop')
     mpstate.status.thread.daemon = True
@@ -971,6 +976,10 @@ if __name__ == '__main__':
             else:
                 mpstate.status.exit = True
                 sys.exit(1)
+
+    if opts.profile:
+        yappi.get_func_stats().print_all()
+        yappi.get_thread_stats().print_all()
 
     #this loop executes after leaving the above loop and is for cleanup on exit
     for (m,pm) in mpstate.modules:
