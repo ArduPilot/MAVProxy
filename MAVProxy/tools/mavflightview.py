@@ -32,6 +32,7 @@ parser.add_option("--ekf", action='store_true', default=False, help="use EKF1 po
 parser.add_option("--ahr2", action='store_true', default=False, help="use AHR2 pos")
 parser.add_option("--debug", action='store_true', default=False, help="show debug info")
 parser.add_option("--multi", action='store_true', default=False, help="show multiple flights on one map")
+parser.add_option("--types", default=None, help="types of position messages to show")
 
 (opts, args) = parser.parse_args()
 
@@ -114,19 +115,20 @@ def mavflightview(filename):
     if opts.fence is not None:
         fen.load(opts.fence)
     path = [[]]
+    instances = {}
     types = ['MISSION_ITEM','CMD']
-    if opts.rawgps:
-        types.extend(['GPS', 'GPS_RAW_INT'])
-    if opts.rawgps2:
-        types.extend(['GPS2_RAW','GPS2'])
-    if opts.dualgps:
-        types.extend(['GPS2_RAW','GPS2', 'GPS_RAW_INT', 'GPS'])
-    if opts.ekf:
-        types.extend(['EKF1', 'GPS'])
-    if opts.ahr2:
-        types.extend(['AHR2', 'GPS'])
-    if len(types) == 2:
+    if opts.types is not None:
+        types.extend(opts.types.split(','))
+    else:
         types.extend(['GPS','GLOBAL_POSITION_INT'])
+        if opts.rawgps or opts.dualgps:
+            types.extend(['GPS', 'GPS_RAW_INT'])
+        if opts.rawgps2 or opts.dualgps:
+            types.extend(['GPS2_RAW','GPS2'])
+        if opts.ekf:
+            types.extend(['EKF1', 'GPS'])
+        if opts.ahr2:
+            types.extend(['AHR2', 'AHRS2', 'GPS'])
     print("Looking for types %s" % str(types))
     while True:
         try:
@@ -191,22 +193,19 @@ def mavflightview(filename):
             (lat, lng) = pos            
         elif m.get_type() == 'AHR2':
             (lat, lng) = (m.Lat, m.Lng)
+        elif m.get_type() == 'AHRS2':
+            (lat, lng) = (m.lat*1.0e-7, m.lng*1.0e-7)
         else:
             lat = m.lat * 1.0e-7
             lng = m.lon * 1.0e-7
-        instance = 0
-        if opts.dualgps and m.get_type() in ['GPS2_RAW', 'GPS2']:
-            instance = 1
-        if m.get_type() == 'EKF1':
-            if opts.dualgps:
-                instance = 2
-            else:
-                instance = 1
-        if m.get_type() == 'AHR2':
-            if opts.dualgps:
-                instance = 2
-            else:
-                instance = 1
+
+        # automatically add new types to instances
+        if m.get_type() not in instances:
+            instances[m.get_type()] = len(instances)
+            while len(instances) >= len(path):
+                path.append([])
+        instance = instances[m.get_type()]
+
         if abs(lat)>0.01 or abs(lng)>0.01:
             if getattr(mlog, 'flightmode','') in colourmap:
                 colour = colourmap[mlog.flightmode]
@@ -222,8 +221,6 @@ def mavflightview(filename):
                 point = (lat, lng, colour)
             else:
                 point = (lat, lng)
-            while instance >= len(path):
-                path.append([])
             path[instance].append(point)
     if len(path[0]) == 0:
         print("No points to plot")
