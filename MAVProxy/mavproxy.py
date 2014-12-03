@@ -426,13 +426,6 @@ def process_stdin(line):
         mpstate.status.exit = True
         return
 
-    if cmd == 'land':
-        mpstate.master().mav.command_long_send(mpstate.status.target_system,
-                         mpstate.status.target_component,
-                         mavutil.mavlink.MAV_CMD_DO_LAND_START,
-                         0, 0, 0, 0, 0, 0, 0, 0)
-        return
-
     if not cmd in command_map:
         for (m,pm) in mpstate.modules:
             if hasattr(m, 'unknown_command'):
