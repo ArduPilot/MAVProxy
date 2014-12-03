@@ -55,6 +55,7 @@ class MiscModule(mp_module.MPModule):
         self.add_command('reboot', self.cmd_reboot, "reboot autopilot")
         self.add_command('time', self.cmd_time, "show autopilot time")
         self.add_command('shell', self.cmd_shell, "run shell command")
+        self.add_command('changealt', self.cmd_changealt, "change target altitude")
 
     def altitude_difference(self, pressure1, pressure2, ground_temp):
         '''calculate barometric altitude'''
@@ -115,6 +116,20 @@ class MiscModule(mp_module.MPModule):
             return
         print("%s (%s)\n" % (time.ctime(tusec * 1.0e-6), time.ctime()))
 
+    def cmd_changealt(self, args):
+        '''change target altitude'''
+        if len(args) < 1:
+            print("usage: changealt <relaltitude>")
+            return
+        relalt = float(args[0])
+        self.master.mav.mission_item_send(self.status.target_system,
+                                          self.status.target_component,
+                                          0,
+                                          3,
+                                          mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
+                                          3, 1, 0, 0, 0, 0,
+                                          0, 0, relalt)
+        print("Sent change altitude command for %.1f meters" % relalt)
 
 
 def init(mpstate):
