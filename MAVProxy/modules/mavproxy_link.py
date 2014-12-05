@@ -15,7 +15,14 @@ from MAVProxy.modules.lib import mp_util
 if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import *
 
+dataPackets = frozenset(['BAD_DATA','LOG_DATA'])
+delayedPackets = frozenset([ 'MISSION_CURRENT', 'SYS_STATUS', 'VFR_HUD',
+                  'GPS_RAW_INT', 'SCALED_PRESSURE', 'GLOBAL_POSITION_INT',
+                  'NAV_CONTROLLER_OUTPUT' ])
+activityPackets = frozenset([ 'HEARTBEAT', 'GPS_RAW_INT', 'GPS_RAW', 'GLOBAL_POSITION_INT', 'SYS_STATUS' ])
+
 class LinkModule(mp_module.MPModule):
+
     def __init__(self, mpstate):
         super(LinkModule, self).__init__(mpstate, "link", "link control", public=True)
         self.add_command('link', self.cmd_link, "link control",
@@ -234,14 +241,14 @@ class LinkModule(mp_module.MPModule):
         mtype = m.get_type()
 
         # and log them
-        if mtype not in ['BAD_DATA','LOG_DATA'] and self.mpstate.logqueue:
+        if mtype not in dataPackets and self.mpstate.logqueue:
             # put link number in bottom 2 bits, so we can analyse packet
             # delay in saved logs
             usec = self.get_usec()
             usec = (usec & ~3) | master.linknum
             self.mpstate.logqueue.put(str(struct.pack('>Q', usec) + m.get_msgbuf()))
 
-        if mtype in [ 'HEARTBEAT', 'GPS_RAW_INT', 'GPS_RAW', 'GLOBAL_POSITION_INT', 'SYS_STATUS' ]:
+        if mtype in activityPackets:
             if master.linkerror:
                 master.linkerror = False
                 self.say("link %u OK" % (master.linknum+1))
@@ -250,9 +257,7 @@ class LinkModule(mp_module.MPModule):
 
         if master.link_delayed:
             # don't process delayed packets that cause double reporting
-            if mtype in [ 'MISSION_CURRENT', 'SYS_STATUS', 'VFR_HUD',
-                          'GPS_RAW_INT', 'SCALED_PRESSURE', 'GLOBAL_POSITION_INT',
-                          'NAV_CONTROLLER_OUTPUT' ]:
+            if mtype in delayedPackets:
                 return
 
         if mtype == 'HEARTBEAT' and m.get_srcSystem() != 255:
@@ -286,7 +291,7 @@ class LinkModule(mp_module.MPModule):
                 self.mpstate.rl.set_prompt(self.status.flightmode + "> ")
                 self.say("Mode " + self.status.flightmode)
 
-            if m.type in [mavutil.mavlink.MAV_TYPE_FIXED_WING]:
+            if m.type == mavutil.mavlink.MAV_TYPE_FIXED_WING:
                 self.mpstate.vehicle_type = 'plane'
                 self.mpstate.vehicle_name = 'ArduPlane'
             elif m.type in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER,
@@ -381,7 +386,7 @@ class LinkModule(mp_module.MPModule):
         self.status.msg_count[m.get_type()] += 1
 
         # don't pass along bad data
-        if not mtype in ['BAD_DATA']:
+        if mtype != 'BAD_DATA':
             # pass messages along to listeners, except for REQUEST_DATA_STREAM, which
             # would lead a conflict in stream rate setting between mavproxy and the other
             # GCS
