@@ -33,6 +33,7 @@ parser.add_option("--ahr2", action='store_true', default=False, help="use AHR2 p
 parser.add_option("--debug", action='store_true', default=False, help="show debug info")
 parser.add_option("--multi", action='store_true', default=False, help="show multiple flights on one map")
 parser.add_option("--types", default=None, help="types of position messages to show")
+parser.add_option("--ekf-sample", type='int', default=1, help="sub-sampling of EKF messages")
 
 (opts, args) = parser.parse_args()
 
@@ -81,7 +82,8 @@ colourmap = {
     'CIRCLE'    : (100, 255, 100),
     'GUIDED'    : (100, 100, 255),
     'ACRO'      : (255, 255,   0),
-    'CRUISE'    : (0,   255, 255)
+    'CRUISE'    : (0,   255, 255),
+    'UNKNOWN'   : (30,  120, 75)
     }
 
 
@@ -116,6 +118,7 @@ def mavflightview(filename):
         fen.load(opts.fence)
     path = [[]]
     instances = {}
+    ekf_counter = 0
     types = ['MISSION_ITEM','CMD']
     if opts.types is not None:
         types.extend(opts.types.split(','))
@@ -190,6 +193,9 @@ def mavflightview(filename):
             pos = mavextra.ekf1_pos(m)
             if pos is None:
                 continue
+            ekf_counter += 1
+            if ekf_counter % opts.ekf_sample != 0:
+                continue
             (lat, lng) = pos            
         elif m.get_type() == 'AHR2':
             (lat, lng) = (m.Lat, m.Lng)
@@ -207,20 +213,23 @@ def mavflightview(filename):
         instance = instances[m.get_type()]
 
         if abs(lat)>0.01 or abs(lng)>0.01:
-            if getattr(mlog, 'flightmode','') in colourmap:
-                colour = colourmap[mlog.flightmode]
-                (r,g,b) = colour
-                (r,g,b) = (r+instance*50,g+instance*50,b+instance*50)
-                if r > 255:
-                    r = 205
-                if g > 255:
-                    g = 205
-                if b > 255:
-                    b = 205
-                colour = (r,g,b)
-                point = (lat, lng, colour)
+            fmode = getattr(mlog, 'flightmode','')
+            if fmode in colourmap:
+                colour = colourmap[fmode]
             else:
-                point = (lat, lng)
+                colour = colourmap['UNKNOWN']
+            (r,g,b) = colour
+            (r,g,b) = (r+instance*80,g+instance*50,b+instance*70)
+            if r > 255:
+                r = 205
+            if g > 255:
+                g = 205
+            if g < 0:
+                g = 0
+            if b > 255:
+                b = 205
+            colour = (r,g,b)
+            point = (lat, lng, colour)
             path[instance].append(point)
     if len(path[0]) == 0:
         print("No points to plot")
