@@ -74,7 +74,8 @@ class TerrainModule(mp_module.MPModule):
             self.requests_received += 1
         elif type == 'TERRAIN_REPORT':
             if (msg.lat == self.check_lat and
-                msg.lon == self.check_lon):
+                msg.lon == self.check_lon and
+                (self.check_lat != 0 or self.check_lon != 0)):
                 print(msg)
                 self.check_lat = 0
                 self.check_lon = 0
