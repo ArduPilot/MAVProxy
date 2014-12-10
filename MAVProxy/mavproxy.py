@@ -7,7 +7,7 @@ Released under the GNU GPL version 3 or later
 
 '''
 
-import sys, os, time, socket
+import sys, os, time, socket, signal
 import fnmatch, errno, threading
 import serial, Queue, select
 import traceback
@@ -121,6 +121,7 @@ class MPState(object):
               MPSetting('distreadout', int, 200, 'Distance Readout', range=(0,10000), increment=1),
 
               MPSetting('moddebug', int, 0, 'Module Debug Level', range=(0,3), increment=1, tab='Debug'),
+              MPSetting('compdebug', int, 0, 'Computation Debug Mask', range=(0,3), tab='Debug'),
               MPSetting('flushlogs', bool, False, 'Flush logs on every packet'),
               MPSetting('requireexit', bool, False, 'Require exit command'),
 
@@ -457,7 +458,10 @@ def process_master(m):
     if len(s) == 0:
         time.sleep(0.1)
         return
-    
+
+    if (mpstate.settings.compdebug & 1) != 0:
+        return
+
     if mpstate.logqueue_raw:
         mpstate.logqueue_raw.put(str(s))
 
@@ -566,7 +570,7 @@ def open_logs():
     # use a separate thread for writing to the logfile to prevent
     # delays during disk writes (important as delays can be long if camera
     # app is running)
-    t = threading.Thread(target=log_writer)
+    t = threading.Thread(target=log_writer, name='log_writer')
     t.daemon = True
     t.start()
 
@@ -611,6 +615,9 @@ def send_heartbeat(master):
 def periodic_tasks():
     '''run periodic checks'''
     if mpstate.status.setup_mode:
+        return
+
+    if (mpstate.settings.compdebug & 2) != 0:
         return
 
     if mpstate.settings.heartbeat != 0:
@@ -792,6 +799,8 @@ if __name__ == '__main__':
     parser.add_option("--dialect",  default="ardupilotmega", help="MAVLink dialect")
     parser.add_option("--rtscts",  action='store_true', help="enable hardware RTS/CTS flow control")
     parser.add_option("--mission", dest="mission", help="mission name", default=None)
+    parser.add_option("--daemon", action='store_true', help="run in daemon mode, do not start interactive shell")
+    parser.add_option("--profile", action='store_true', help="run the Yappi python profiler")
 
     (opts, args) = parser.parse_args()
 
@@ -838,6 +847,22 @@ Auto-detected serial ports are:
     mpstate.status.target_component = opts.TARGET_COMPONENT
 
     mpstate.mav_master = []
+
+    def quit_handler(signum = None, frame = None):
+        #print 'Signal handler called with signal', signum
+        if mpstate.status.exit:
+            print 'Clean shutdown impossible, forcing an exit'
+            sys.exit(0)
+        else:
+            mpstate.status.exit = True
+
+    # Listen for kill signals to cleanly shutdown modules
+    fatalsignals = [signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT]
+    if opts.daemon: # SIGINT breaks readline parsing - if we are interactive, just let things die
+        fatalsignals.append(signal.SIGINT)
+
+    for sig in fatalsignals:
+        signal.signal(sig, quit_handler)
 
     load_module('link', quiet=True)
 
@@ -906,8 +931,12 @@ Auto-detected serial ports are:
             for c in cmds:
                 process_stdin(c)
 
+    if opts.profile:
+        import yappi    # We do the import here so that we won't barf if run normally and yappi not available
+        yappi.start()
+
     # run main loop as a thread
-    mpstate.status.thread = threading.Thread(target=main_loop)
+    mpstate.status.thread = threading.Thread(target=main_loop, name='main_loop')
     mpstate.status.thread.daemon = True
     mpstate.status.thread.start()
 
@@ -915,7 +944,10 @@ Auto-detected serial ports are:
     # up on exit
     while (mpstate.status.exit != True):
         try:
-            input_loop()
+            if opts.daemon:
+                time.sleep(0.1)
+            else:
+                input_loop()
         except KeyboardInterrupt:
             if mpstate.settings.requireexit:
                 print("Interrupt caught.  Use 'exit' to quit MAVProxy.")
@@ -929,11 +961,15 @@ Auto-detected serial ports are:
                             except Exception:
                                 pass
                         reload(m)
-                        m.init(mpstate)   
+                        m.init(mpstate)
 
             else:
                 mpstate.status.exit = True
                 sys.exit(1)
+
+    if opts.profile:
+        yappi.get_func_stats().print_all()
+        yappi.get_thread_stats().print_all()
 
     #this loop executes after leaving the above loop and is for cleanup on exit
     for (m,pm) in mpstate.modules:
