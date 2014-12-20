@@ -22,6 +22,17 @@ from MAVProxy.modules.lib import rline
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import dumpstacks
 
+# adding all this allows pyinstaller to build a working windows executable
+from multiprocessing import freeze_support
+from pymavlink import mavwp, mavutil
+import cv, cv2
+import wx, matplotlib
+import pylab
+import numpy
+
+if __name__ == '__main__':
+      freeze_support()
+
 class MPStatus(object):
     '''hold status information about the mavproxy'''
     def __init__(self):
