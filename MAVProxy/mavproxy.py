@@ -23,12 +23,17 @@ from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import dumpstacks
 
 # adding all this allows pyinstaller to build a working windows executable
-from multiprocessing import freeze_support
-from pymavlink import mavwp, mavutil
-import cv, cv2
-import wx, matplotlib
-import pylab
-import numpy
+# note that using --hidden-import does not work for these modules
+try:
+      from multiprocessing import freeze_support
+      from pymavlink import mavwp, mavutil
+      import wx, matplotlib
+      try:
+            import readline
+      except ImportError:
+            import pyreadline as readline
+except Exception:
+      pass
 
 if __name__ == '__main__':
       freeze_support()
@@ -890,6 +895,10 @@ Auto-detected serial ports are:
 
     if 'HOME' in os.environ and not opts.setup:
         start_script = os.path.join(os.environ['HOME'], ".mavinit.scr")
+        if os.path.exists(start_script):
+            run_script(start_script)
+    if 'LOCALAPPDATA' in os.environ and not opts.setup:
+        start_script = os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy", "mavinit.scr")
         if os.path.exists(start_script):
             run_script(start_script)
 

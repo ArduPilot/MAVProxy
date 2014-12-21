@@ -8,7 +8,7 @@ from MAVProxy.modules.lib import mp_module
 
 
 from os import kill
-from signal import signal, SIGALRM, SIGKILL
+from signal import signal
 from subprocess import PIPE, Popen
 
 def run_command(args, cwd = None, shell = False, timeout = None, env = None):

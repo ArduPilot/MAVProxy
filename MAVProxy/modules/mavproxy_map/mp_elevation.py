@@ -11,9 +11,7 @@ import time
 
 import numpy
 
-from MAVProxy.modules.mavproxy_map import GAreader
 from MAVProxy.modules.mavproxy_map import srtm
-
 
 class ElevationModel():
     '''Elevation Model. Only SRTM for now'''
@@ -29,6 +27,7 @@ class ElevationModel():
 
         '''Use the Geoscience Australia database instead - watch for the correct database path'''
         if self.database == 'geoscience':
+            from MAVProxy.modules.mavproxy_map import GAreader
             self.mappy = GAreader.ERMap()
             self.mappy.read_ermapper(os.path.join(os.environ['HOME'], './Documents/Elevation/Canberra/GSNSW_P756demg'))
 
