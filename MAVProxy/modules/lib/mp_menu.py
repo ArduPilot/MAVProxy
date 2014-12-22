@@ -153,6 +153,14 @@ class MPMenuSubMenu(MPMenuGeneric):
         '''add more items to a sub-menu'''
         if not isinstance(items, list):
             items = [items]
+        for m in items:
+            updated = False
+            for i in range(len(self.items)):
+                if self.items[i].name == m.name:
+                    self.items[i] = m
+                    updated = True
+            if not updated:
+                self.items.append(m)
         self.items.extend(items)
 
     def combine(self, submenu):
@@ -192,7 +200,14 @@ class MPMenuTop(object):
         '''add a submenu'''
         if not isinstance(items, list):
             items = [items]
-        self.items.extend(items)
+        for m in items:
+            updated = False
+            for i in range(len(self.items)):
+                if self.items[i].name == m.name:
+                    self.items[i] = m
+                    updated = True
+            if not updated:
+                self.items.append(m)
 
     def wx_menu(self):
         '''return a wx.MenuBar() for the menu'''
