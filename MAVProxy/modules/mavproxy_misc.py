@@ -174,7 +174,7 @@ class MiscModule(mp_module.MPModule):
             if len(args) < 3:
                 print("Usage: repeat add PERIOD CMD")
                 return
-            self.repeats.append(RepeatCommand(int(args[1]), " ".join(args[2:])))
+            self.repeats.append(RepeatCommand(float(args[1]), " ".join(args[2:])))
         elif args[0] == 'remove':
             if len(args) < 2:
                 print("Usage: repeat remove INDEX")
@@ -187,6 +187,8 @@ class MiscModule(mp_module.MPModule):
             return
         elif args[0] == 'clean':
             self.repeats = []
+        else:
+            print("Usage: repeat <add|remove|clean>")
 
     def idle_task(self):
         '''called on idle'''
