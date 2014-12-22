@@ -7,7 +7,8 @@ a = Analysis(['mavproxy.py'],
              hiddenimports=['cv', 'cv2', 'wx', 'pylab', 
                             'numpy', 'dateutil', 'matplotlib',
                             'pymavlink.mavwp', 'pymavlink.mavutil', 
-                            'pyreadline'],
+                            'pyreadline',
+                            'HTMLParser'],
              hookspath=None,
              runtime_hooks=None)
 pyz = PYZ(a.pure)
