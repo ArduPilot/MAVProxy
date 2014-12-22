@@ -12,20 +12,50 @@ import time, struct, math, sys, fnmatch, traceback
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
 
+if mp_util.has_wxpython:
+    from MAVProxy.modules.lib.mp_menu import *
+
 class LinkModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(LinkModule, self).__init__(mpstate, "link", "link control", public=True)
         self.add_command('link', self.cmd_link, "link control",
-                         ["<list|remove|ports>",
-                          'add (SERIALPORT)'])
+                         ["<list|ports>",
+                          'add (SERIALPORT)',
+                          'remove (LINKS)'])
         self.no_fwd_types = set()
         self.no_fwd_types.add("BAD_DATA")
         self.add_completion_function('(SERIALPORT)', self.complete_serial_ports)
+        self.add_completion_function('(LINKS)', self.complete_links)
+
+        if mp_util.has_wxpython:
+            self.menu_added_console = False
+            self.menu_add = MPMenuSubMenu('Add', items=[])
+            self.menu_rm = MPMenuSubMenu('Remove', items=[])
+            self.menu = MPMenuSubMenu('Link',
+                                      items=[self.menu_add,
+                                             self.menu_rm,
+                                             MPMenuItem('Ports', 'Ports', '# link ports'),
+                                             MPMenuItem('List', 'List', '# link list'),
+                                             MPMenuItem('Status', 'Status', '# link')])
+            self.last_menu_update = 0
+
+    def idle_task(self):
+        '''called on idle'''
+        if not self.menu_added_console and self.module('console') is not None:
+            self.menu_added_console = True
+            # we don't dynamically update these yet due to a wx bug
+            self.menu_add.items = [ MPMenuItem(p, p, '# link add %s' % p) for p in self.complete_serial_ports('') ]
+            self.menu_rm.items = [ MPMenuItem(p, p, '# link remove %s' % p) for p in self.complete_links('') ]
+            self.module('console').add_menu(self.menu)
 
     def complete_serial_ports(self, text):
         '''return list of serial ports'''
         ports = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*", "*3D_Robotics*", "*USB_to_UART*", '*PX4*', '*FMU*'])
         return [ p.device for p in ports ]
+
+    def complete_links(self, text):
+        '''return list of links'''
+        return [ m.address for m in self.mpstate.mav_master ]
 
     def cmd_link(self, args):
         '''handle link commands'''
