@@ -16,9 +16,16 @@ class LinkModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(LinkModule, self).__init__(mpstate, "link", "link control", public=True)
         self.add_command('link', self.cmd_link, "link control",
-                         ["<list|add|remove>"])
+                         ["<list|remove|ports>",
+                          'add (SERIALPORT)'])
         self.no_fwd_types = set()
         self.no_fwd_types.add("BAD_DATA")
+        self.add_completion_function('(SERIALPORT)', self.complete_serial_ports)
+
+    def complete_serial_ports(self, text):
+        '''return list of serial ports'''
+        ports = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*", "*3D_Robotics*", "*USB_to_UART*", '*PX4*', '*FMU*'])
+        return [ p.device for p in ports ]
 
     def cmd_link(self, args):
         '''handle link commands'''
@@ -31,6 +38,8 @@ class LinkModule(mp_module.MPModule):
                 print("Usage: link add LINK")
                 return
             self.cmd_link_add(args[1:])
+        elif args[0] == "ports":
+            self.cmd_link_ports()
         elif args[0] == "remove":
             if len(args) != 2:
                 print("Usage: link remove LINK")
@@ -90,6 +99,12 @@ class LinkModule(mp_module.MPModule):
         device = args[0]
         print("Adding link %s" % device)
         self.link_add(device)
+
+    def cmd_link_ports(self):
+        '''show available ports'''
+        ports = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*", "*3D_Robotics*", "*USB_to_UART*", '*PX4*', '*FMU*'])
+        for p in ports:
+            print("%s : %s : %s" % (p.device, p.description, p.hwid))
 
     def cmd_link_remove(self, args):
         '''remove an link'''
