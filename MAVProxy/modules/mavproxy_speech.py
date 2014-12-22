@@ -10,7 +10,7 @@ class SpeechModule(mp_module.MPModule):
         self.mpstate.functions.say = self.say
         self.settings.append(('speech', int, 1))
         self.kill_speech_dispatcher()
-        for backend in [self.say_speechd, self.say_espeak]:
+        for backend in [self.say_speechd, self.say_espeak, self.say_speech]:
             try:
                 backend("")
                 self.say_backend = backend
@@ -22,6 +22,8 @@ class SpeechModule(mp_module.MPModule):
 
     def kill_speech_dispatcher(self):
         '''kill speech dispatcher processs'''
+        if not 'HOME' in os.environ:
+            return
         pidpath = os.path.join(os.environ['HOME'], '.speech-dispatcher',
                                'pid', 'speech-dispatcher.pid')
         if os.path.exists(pidpath):
@@ -54,9 +56,13 @@ class SpeechModule(mp_module.MPModule):
 
     def say_espeak(self, text, priority='important'):
         '''speak some text using espeak'''
-        ''' http://cvs.freebsoft.org/doc/speechd/ssip.html see 4.3.1 for priorities'''
         from espeak import espeak
         espeak.synth(text)
+
+    def say_speech(self, text, priority='important'):
+        '''speak some text using speech module'''
+        import speech
+        speech.say(text)
 
     def say(self, text, priority='important'):
         '''speak some text'''
