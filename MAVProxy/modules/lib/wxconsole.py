@@ -3,7 +3,8 @@
 """
   MAVProxy message console, implemented in a child process
 """
-import textconsole, wx, sys
+import multiprocessing, threading
+import textconsole, wx, sys, time
 import mp_menu
 from MAVProxy.modules.lib import mp_util
 
@@ -30,21 +31,24 @@ class MessageConsole(textconsole.SimpleConsole):
     def __init__(self,
                  title='MAVProxy: console'):
         textconsole.SimpleConsole.__init__(self)
-        import multiprocessing, threading
         self.title  = title
         self.menu_callback = None
-        self.parent_pipe,self.child_pipe = multiprocessing.Pipe()
+        self.parent_pipe_recv,self.child_pipe_send = multiprocessing.Pipe(duplex=False)
+        self.child_pipe_recv,self.parent_pipe_send = multiprocessing.Pipe(duplex=False)
         self.close_event = multiprocessing.Event()
         self.close_event.clear()
         self.child = multiprocessing.Process(target=self.child_task)
         self.child.start()
+        self.child_pipe_send.close()
+        self.child_pipe_recv.close()
         t = threading.Thread(target=self.watch_thread)
         t.daemon = True
         t.start()
 
     def child_task(self):
         '''child process - this holds all the GUI elements'''
-        mp_util.child_close_fds()
+        self.parent_pipe_send.close()
+        self.parent_pipe_recv.close()
         import wx
         app = wx.PySimpleApp()
         app.frame = ConsoleFrame(state=self, title=self.title)
@@ -55,23 +59,24 @@ class MessageConsole(textconsole.SimpleConsole):
         '''watch for menu events from child'''
         from mp_settings import MPSetting
         while True:
-            msg = self.parent_pipe.recv()
+            msg = self.parent_pipe_recv.recv()
             if self.menu_callback is not None:
                 self.menu_callback(msg)
+            time.sleep(0.1)
 
     def write(self, text, fg='black', bg='white'):
         '''write to the console'''
-        if self.child.is_alive():
-            self.parent_pipe.send(Text(text, fg, bg))
+        if self.is_alive():
+            self.parent_pipe_send.send(Text(text, fg, bg))
 
     def set_status(self, name, text='', row=0, fg='black', bg='white'):
         '''set a status value'''
-        if self.child.is_alive():
-            self.parent_pipe.send(Value(name, text, row, fg, bg))
+        if self.is_alive():
+            self.parent_pipe_send.send(Value(name, text, row, fg, bg))
 
     def set_menu(self, menu, callback):
-        if self.child.is_alive():
-            self.parent_pipe.send(menu)
+        if self.is_alive():
+            self.parent_pipe_send.send(menu)
             self.menu_callback = callback
 
     def close(self):
@@ -127,10 +132,9 @@ class ConsoleFrame(wx.Frame):
         if ret is None:
             return
         ret.call_handler()
-        state.child_pipe.send(ret)
+        state.child_pipe_send.send(ret)
 
     def on_idle(self, event):
-        import time
         time.sleep(0.05)
 
     def on_timer(self, event):
@@ -139,8 +143,8 @@ class ConsoleFrame(wx.Frame):
             self.timer.Stop()
             self.Destroy()
             return
-        while state.child_pipe.poll():
-            obj = state.child_pipe.recv()
+        while state.child_pipe_recv.poll():
+            obj = state.child_pipe_recv.recv()
             if isinstance(obj, Value):
                 # request to set a status field
                 if not obj.name in self.values:
@@ -181,7 +185,7 @@ class ConsoleFrame(wx.Frame):
 
 if __name__ == "__main__":
     # test the console
-    import time
+    multiprocessing.freeze_support()
     console = MessageConsole()
     while console.is_alive():
         console.write('Tick', fg='red')
