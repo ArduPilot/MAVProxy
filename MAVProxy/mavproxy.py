@@ -180,6 +180,8 @@ class MPState(object):
     
     def master(self):
         '''return the currently chosen mavlink master object'''
+        if len(self.mav_master) == 0:
+              return None
         if self.settings.link > len(self.mav_master):
             self.settings.link = 1
 
@@ -829,27 +831,17 @@ if __name__ == '__main__':
 
     if not opts.master:
         serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*", "*3D_Robotics*", "*USB_to_UART*", '*PX4*', '*FMU*'])
-        if len(serial_list) == 1:
-            opts.master = [serial_list[0].device]
-        else:
-            print('''
-Please choose a MAVLink master with --master
-For example:
-    --master=com14
-    --master=/dev/ttyUSB0
-    --master=127.0.0.1:14550
-
-Auto-detected serial ports are:
-''')
-            for port in serial_list:
-                print("%s" % port)
-            sys.exit(1)
+        print('Auto-detected serial ports are:')
+        for port in serial_list:
+              print("%s" % port)
 
     # container for status information
     mpstate.status.target_system = opts.TARGET_SYSTEM
     mpstate.status.target_component = opts.TARGET_COMPONENT
 
     mpstate.mav_master = []
+
+    mpstate.rl = rline.rline("MAV> ", mpstate)
 
     load_module('link', quiet=True)
 
@@ -877,7 +869,6 @@ Auto-detected serial ports are:
 
     mpstate.input_queue = Queue.Queue()
     mpstate.input_count = 0
-    mpstate.rl = rline.rline("MAV> ", mpstate)
     if opts.setup:
         mpstate.rl.set_prompt("")
 
