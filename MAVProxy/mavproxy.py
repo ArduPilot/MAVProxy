@@ -13,10 +13,6 @@ import serial, Queue, select
 import traceback
 import select
 
-# allow running without installing
-#sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
-
-
 from MAVProxy.modules.lib import textconsole
 from MAVProxy.modules.lib import rline
 from MAVProxy.modules.lib import mp_module
@@ -27,7 +23,7 @@ from MAVProxy.modules.lib import dumpstacks
 try:
       from multiprocessing import freeze_support
       from pymavlink import mavwp, mavutil
-      import wx, matplotlib
+      import wx, matplotlib, HTMLParser
       try:
             import readline
       except ImportError:
@@ -832,7 +828,7 @@ if __name__ == '__main__':
         load_module('speech')
 
     if not opts.master:
-        serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*", "*3D_Robotics*", "*USB_to_UART*"])
+        serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*", "*3D_Robotics*", "*USB_to_UART*", '*PX4*', '*FMU*'])
         if len(serial_list) == 1:
             opts.master = [serial_list[0].device]
         else:
