@@ -11,6 +11,17 @@ from os import kill
 from signal import signal
 from subprocess import PIPE, Popen
 
+class RepeatCommand(object):
+    '''repeated command object'''
+    def __init__(self, period, cmd):
+        self.period = period
+        self.cmd = cmd
+        self.event = mavutil.periodic_event(1.0/period)
+
+    def __str__(self):
+        return "Every %u seconds: %s" % (self.period, self.cmd)
+        
+
 def run_command(args, cwd = None, shell = False, timeout = None, env = None):
     '''
     Run a shell command with a timeout.
@@ -57,6 +68,9 @@ class MiscModule(mp_module.MPModule):
         self.add_command('shell', self.cmd_shell, "run shell command")
         self.add_command('changealt', self.cmd_changealt, "change target altitude")
         self.add_command('land', self.cmd_land, "auto land")
+        self.add_command('repeat', self.cmd_repeat, "repeat a command at regular intervals",
+                         ["<add|remove|clear>"])
+        self.repeats = []
 
     def altitude_difference(self, pressure1, pressure2, ground_temp):
         '''calculate barometric altitude'''
@@ -146,6 +160,39 @@ class MiscModule(mp_module.MPModule):
                 0, 0, 0, 0, 0, 0, 0, 0)
         else:
             print("Usage: land [abort]")
+
+    def cmd_repeat(self, args):
+        '''repeat a command at regular intervals'''
+        if len(args) == 0:
+            if len(self.repeats) == 0:
+                print("No repeats")
+                return
+            for i in range(len(self.repeats)):
+                print("%u: %s" % (i, self.repeats[i]))
+            return
+        if args[0] == 'add':
+            if len(args) < 3:
+                print("Usage: repeat add PERIOD CMD")
+                return
+            self.repeats.append(RepeatCommand(int(args[1]), " ".join(args[2:])))
+        elif args[0] == 'remove':
+            if len(args) < 2:
+                print("Usage: repeat remove INDEX")
+                return
+            i = int(args[1])
+            if i < 0 or i >= len(self.repeats):
+                print("Invalid index %d" % i)
+                return
+            self.repeats.pop(i)
+            return
+        elif args[0] == 'clean':
+            self.repeats = []
+
+    def idle_task(self):
+        '''called on idle'''
+        for r in self.repeats:
+            if r.event.trigger():
+                self.mpstate.functions.process_stdin(r.cmd, immediate=True)
 
 def init(mpstate):
     '''initialise module'''
