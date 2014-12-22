@@ -19,7 +19,7 @@ class RepeatCommand(object):
         self.event = mavutil.periodic_event(1.0/period)
 
     def __str__(self):
-        return "Every %u seconds: %s" % (self.period, self.cmd)
+        return "Every %.1f seconds: %s" % (self.period, self.cmd)
         
 
 def run_command(args, cwd = None, shell = False, timeout = None, env = None):
