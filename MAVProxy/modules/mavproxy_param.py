@@ -43,6 +43,8 @@ class ParamState:
     def fetch_check(self, master):
         '''check for missing parameters periodically'''
         if self.param_period.trigger():
+            if master is None:
+                return
             if len(self.mav_param_set) == 0:
                 master.param_fetch_all()
             elif self.mav_param_count != 0 and len(self.mav_param_set) != self.mav_param_count:

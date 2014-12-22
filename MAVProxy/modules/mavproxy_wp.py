@@ -106,7 +106,7 @@ class WPModule(mp_module.MPModule):
         '''handle missing waypoints'''
         if self.wp_period.trigger():
             # cope with packet loss fetching mission
-            if self.master.time_since('MISSION_ITEM') >= 2 and self.wploader.count() < getattr(self.wploader,'expected_count',0):
+            if self.master is not None and self.master.time_since('MISSION_ITEM') >= 2 and self.wploader.count() < getattr(self.wploader,'expected_count',0):
                 seq = self.wploader.count()
                 print("re-requesting WP %u" % seq)
                 self.master.waypoint_request_send(seq)
