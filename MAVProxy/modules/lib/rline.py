@@ -20,7 +20,9 @@ class rline(object):
             '(VARIABLE)' : complete_variable,
             '(SETTING)' : rline_mpstate.settings.completion,
             '(COMMAND)' : complete_command,
-            '(ALIAS)' : complete_alias
+            '(ALIAS)' : complete_alias,
+            '(AVAILMODULES)' : complete_modules,
+            '(LOADEDMODULES)' : complete_loadedmodules
             }
 
     def set_prompt(self, prompt):
@@ -38,6 +40,24 @@ def complete_command(text):
     '''return list of commands'''
     global rline_mpstate
     return rline_mpstate.command_map.keys()
+
+def complete_loadedmodules(text):
+    global rline_mpstate
+    return [ m.name for (m,pm) in rline_mpstate.modules ]
+
+def complete_modules(text):
+    '''complete mavproxy module names'''
+    import MAVProxy.modules, pkgutil
+    modlist = [x[1] for x in pkgutil.iter_modules(MAVProxy.modules.__path__)]
+    ret = []
+    loaded = set(complete_loadedmodules(''))
+    for m in modlist:
+        if not m.startswith("mavproxy_"):
+            continue
+        name = m[9:]
+        if not name in loaded:
+            ret.append(name)
+    return ret
 
 def complete_filename(text):
     '''complete a filename'''
