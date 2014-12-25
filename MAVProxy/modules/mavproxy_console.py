@@ -4,7 +4,7 @@
   uses lib/console.py for display
 """
 
-import os, sys, math, time
+import os, sys, math, time, zipfile
 
 from MAVProxy.modules.lib import wxconsole
 from MAVProxy.modules.lib import textconsole
@@ -59,7 +59,63 @@ class ConsoleModule(mp_module.MPModule):
         self.add_menu(MPMenuSubMenu('MAVProxy',
                                     items=[MPMenuItem('Settings', 'Settings', 'menuSettings'),
                                            MPMenuItem('Map', 'Load Map', '# module load map')]))
-
+                                           
+        # and a menu for the modules
+        # first make a list of available modules as a (name + descr, name) tuple
+        self.ModList = []
+        for pths in sys.path:
+            if os.access(pths, os.R_OK) and pths.endswith(".egg"):
+                egg = zipfile.ZipFile(pths, 'r')
+                for fileMod in egg.infolist():
+                    if fileMod.filename.endswith(".py") and 'def __init__(self, mpstate):' in egg.open(fileMod).read():
+                        fullfile = str(egg.open(fileMod).read())
+                        indstart = fullfile.find(".__init__(mpstate, ")
+                        indmid = fullfile.find("\"", indstart+20)
+                        indend = fullfile.find("\"", indmid+4)
+                        
+                        if (not indstart == -1) and len(fullfile[indmid+4:indend]) < 35:
+                            self.ModList.append((fullfile[indstart+20:indmid], fullfile[indmid+4:indend]))
+                        elif (not indstart == -1):
+                            self.ModList.append((fullfile[indstart+20:indmid], ""))
+                
+            elif os.access(pths, os.R_OK):
+                for fileMod in os.listdir(pths):
+                    if fileMod.endswith(".py") and 'def __init__(self, mpstate):' in open(os.path.join(pths, fileMod)).read():
+                        fullfile = str(open(os.path.join(pths, fileMod)).read())
+                        indstart = fullfile.find(".__init__(mpstate, ")
+                        indmid = fullfile.find("\"", indstart+20)
+                        indend = fullfile.find("\"", indmid+4)
+                        
+                        if (not indstart == -1) and len(fullfile[indmid+4:indend]) < 35:
+                            self.ModList.append((fullfile[indstart+20:indmid], fullfile[indmid+4:indend]))
+                        elif (not indstart == -1):
+                            self.ModList.append((fullfile[indstart+20:indmid], ""))
+        
+        #and actually add the menu to the GUI
+        self.create_mod_menu()
+ 
+    def create_mod_menu(self):
+        '''create the modules menu. Tick the modules that are already active'''             
+        ModMenuList = []
+        self.ModList.sort()
+        for mods in self.ModList:
+        #    ModMenuList.append(MPMenuItem(mods[0] + " (" + mods[1] + ")", mods[0], '# module load ' + mods[0]))
+            inserted = False
+            if mods[0] == "console":
+                ModMenuList.append(MPMenuCheckbox(mods[0] + " (" + mods[1] + ")", mods[0], checked=True, returnkey='# module'))
+            for (m,pm) in self.mpstate.modules:
+                if m.name == mods[0] and mods[0] != "console":
+                    ModMenuList.append(MPMenuCheckbox(mods[0] + " (" + mods[1] + ")", mods[0], checked=True, returnkey='# module'))
+                    inserted = True
+            if not inserted and mods[0] != "console":
+                ModMenuList.append(MPMenuCheckbox(mods[0] + " (" + mods[1] + ")", mods[0], checked=False, returnkey='# module'))
+        self.add_menu(MPMenuSubMenu('Modules', items = ModMenuList))
+        
+    def edit_mod_menu(self, modName, state):
+        '''Update the status on an item on the Modules menu'''
+        for subItems in self.menu.MenuItems:
+            print subItems.name
+        
     def add_menu(self, menu):
         '''add a new menu'''
         self.menu.add(menu)
@@ -78,6 +134,12 @@ class ConsoleModule(mp_module.MPModule):
                 if m.handler_result is None:
                     return
                 cmd += m.handler_result
+            #special handler for the Modules menu
+            if isinstance(m, MPMenuCheckbox) and m.returnkey == '# module':
+                if m.IsChecked():
+                    cmd = 'module load ' + m.description
+                else:
+                    cmd = 'module unload ' + m.description                                                
             self.mpstate.functions.process_stdin(cmd)
         if m.returnkey == 'menuSettings':
             wxsettings.WXSettings(self.settings)
