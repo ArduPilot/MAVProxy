@@ -161,7 +161,6 @@ class MPMenuSubMenu(MPMenuGeneric):
                     updated = True
             if not updated:
                 self.items.append(m)
-        self.items.extend(items)
 
     def combine(self, submenu):
         '''combine a new menu with an existing one'''
