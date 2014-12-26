@@ -49,7 +49,7 @@ class BatteryModule(mp_module.MPModule):
         self.console.set_status('Battery', battery_string, row=1)
 
         rbattery_level = int((self.battery_level+5)/10)*10
-        if self.settings.battwarn > 0 and time.time() > self.last_battery_announce_time + 60*self.settings.battwarn:
+        if batt_mon >= 4 and self.settings.battwarn > 0 and time.time() > self.last_battery_announce_time + 60*self.settings.battwarn:
             self.last_battery_announce_time = time.time()
             if rbattery_level != self.last_battery_announce:
                 self.say("Flight battery %u percent" % rbattery_level, priority='notification')
