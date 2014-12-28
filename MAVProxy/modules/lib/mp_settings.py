@@ -102,9 +102,10 @@ class MPSettings(object):
 
 
     def __getattr__(self, name):
-        if name in self._vars:
+        try:
             return self._vars[name].value
-        raise AttributeError
+        except Exception:
+            raise AttributeError
 
     def __setattr__(self, name, value):
         if name[0] == '_':
