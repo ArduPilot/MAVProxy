@@ -3,13 +3,13 @@ Graphical editing of mp_settings object
 '''
 import os, wx, sys
 from MAVProxy.modules.lib import mp_util
+import multiprocessing, threading
 
 class WXSettings(object):
     '''
     a graphical settings dialog for mavproxy
     '''
     def __init__(self, settings):
-        import multiprocessing, threading
         self.settings  = settings
         self.parent_pipe,self.child_pipe = multiprocessing.Pipe()
         self.close_event = multiprocessing.Event()
@@ -232,6 +232,8 @@ class SettingsDlg(TabbedDialog):
         self.refit()
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
+
     def test_callback(setting):
         '''callback on apply'''
         print("Changing %s to %s" % (setting.name, setting.value))
