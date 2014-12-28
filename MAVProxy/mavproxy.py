@@ -711,13 +711,19 @@ def main_loop():
             return
 
         for fd in rin:
+            if mpstate is None:
+                  return
             for master in mpstate.mav_master:
-                if fd == master.fd:
-                    process_master(master)
-                    continue
+                  if fd == master.fd:
+                        process_master(master)
+                        if mpstate is None:
+                              return
+                        continue
             for m in mpstate.mav_outputs:
                 if fd == m.fd:
                     process_mavlink(m)
+                    if mpstate is None:
+                          return
                     continue
 
             # this allow modules to register their own file descriptors
@@ -864,7 +870,11 @@ if __name__ == '__main__':
             mpstate.status.exit = True
 
     # Listen for kill signals to cleanly shutdown modules
-    fatalsignals = [signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT]
+    fatalsignals = [signal.SIGTERM]
+    try:
+          fatalsignals.append(signal.SIGHUP, signal.SIGQUIT)
+    except Exception:
+          pass
     if opts.daemon: # SIGINT breaks readline parsing - if we are interactive, just let things die
         fatalsignals.append(signal.SIGINT)
 
