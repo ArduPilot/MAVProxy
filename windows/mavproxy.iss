@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "MAVProxy"
-#define MyAppVersion "1.4"
+#define MyAppVersion "1.4.2"
 #define MyAppPublisher "Andrew Tridgell"
 #define MyAppURL "http://tridge.github.io/MAVProxy"
 #define MyAppExeName "mavproxy.exe"
