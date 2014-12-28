@@ -20,7 +20,7 @@ class BatteryModule(mp_module.MPModule):
         self.battery2_voltage = -1
         self.per_cell = 0
         self.settings.append(
-            MPSetting('battwarn', int, 1, 'Battery Warning Time'))
+            MPSetting('battwarn', int, 1, 'Battery Warning Time', tab='Battery'))
         self.settings.append(
             MPSetting('batwarncell', float, 3.7, 'Battery cell Warning level'))
         self.settings.append(MPSetting('numcells', int, 0, range=(0,10), increment=1))
