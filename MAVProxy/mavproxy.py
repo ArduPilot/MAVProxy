@@ -127,6 +127,9 @@ class MPState(object):
               MPSetting('mavfwd', bool, True, 'Allow forwarded control'),
               MPSetting('mavfwd_rate', bool, False, 'Allow forwarded rate control'),
               MPSetting('shownoise', bool, True, 'Show non-MAVLink data'),
+              MPSetting('baudrate', int, opts.baudrate, 'baudrate for new links', range=(0,10000000), increment=1),
+              MPSetting('rtscts', bool, opts.rtscts, 'enable flow control'),
+              MPSetting('select_timeout', float, 0.01, 'select timeout'),
 
               MPSetting('altreadout', int, 10, 'Altitude Readout',
                         range=(0,100), increment=1, tab='Announcements'),
@@ -136,18 +139,15 @@ class MPState(object):
               MPSetting('compdebug', int, 0, 'Computation Debug Mask', range=(0,3), tab='Debug'),
               MPSetting('flushlogs', bool, False, 'Flush logs on every packet'),
               MPSetting('requireexit', bool, False, 'Require exit command'),
+              MPSetting('wpupdates', bool, True, 'Announce waypoint updates'),
 
               MPSetting('basealt', int, 0, 'Base Altitude', range=(0,30000), increment=1, tab='Altitude'),
               MPSetting('wpalt', int, 100, 'Default WP Altitude', range=(0,10000), increment=1),
               MPSetting('rallyalt', int, 90, 'Default Rally Altitude', range=(0,10000), increment=1),
               MPSetting('terrainalt', str, 'Auto', 'Use terrain altitudes', choice=['Auto','True','False']),
-              MPSetting('wpupdates', bool, True, 'Show waypoint updates'),
               MPSetting('rally_breakalt', int, 40, 'Default Rally Break Altitude', range=(0,10000), increment=1),
-              MPSetting('rally_flags', int, 0, 'Default Rally Flags`', range=(0,10000), increment=1),
-              MPSetting('baudrate', int, opts.baudrate, 'baudrate for new links', range=(0,10000000), increment=1),
-              MPSetting('rtscts', bool, opts.rtscts, 'enable flow control'),
-              MPSetting('select_timeout', float, 0.01, 'select timeout')]
-            )
+              MPSetting('rally_flags', int, 0, 'Default Rally Flags', range=(0,10000), increment=1)
+            ])
 
         self.completions = {
             "script"         : ["(FILENAME)"],
