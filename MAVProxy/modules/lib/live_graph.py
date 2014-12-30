@@ -150,8 +150,7 @@ class GraphFrame(wx.Frame):
         self.axes.set_xbound(lower=self.xdata[0], upper=0)
         if min_y == max_y:
             self.axes.set_ybound(min_y, max_y+0.1)
-
-
+        self.axes.legend(self.state.fields, loc='upper left', bbox_to_anchor=(0, 1.1))
 
     def draw_plot(self):
         """ Redraws the plot
@@ -226,7 +225,6 @@ class GraphFrame(wx.Frame):
         for i in range(len(self.plot_data)):
             if state.values[i] is None or len(self.data[i]) < 2:
                 return
-        self.axes.legend(state.fields, loc='upper left', bbox_to_anchor=(0, 1.1))
         self.draw_plot()
 
 if __name__ == "__main__":
