@@ -231,9 +231,16 @@ class GraphFrame(wx.Frame):
 if __name__ == "__main__":
     # test the graph
     import time, math
-    livegraph = LiveGraph(['sin(t)', 'cos(t)'],
+    livegraph = LiveGraph(['sin(t)', 'cos(t)', 'sin(t+1)',
+                           'cos(t+1)', 'sin(t+2)', 'cos(t+2)',
+                           'cos(t+1)', 'sin(t+2)', 'cos(t+2)', 'x'],
+                          timespan=30,
                           title='Graph Test')
     while livegraph.is_alive():
         t = time.time()
-        livegraph.add_values([math.sin(t), math.cos(t)])
+        livegraph.add_values([math.sin(t), math.cos(t),
+                              math.sin(t+1), math.cos(t+1),
+                              math.sin(t+1), math.cos(t+1),
+                              math.sin(t+1), math.cos(t+1),
+                              math.sin(t+2), math.cos(t+2)])
         time.sleep(0.05)
