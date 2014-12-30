@@ -23,7 +23,8 @@ class LiveGraph():
                  title='MAVProxy: LiveGraph',
                  timespan=20.0,
                  tickresolution=0.2,
-                 colors=[ 'red', 'green', 'blue', 'orange', 'olive', 'yellow', 'grey', 'black']):
+                 colors=[ 'red', 'green', 'blue', 'orange', 'olive', 'cyan', 'magenta', 'brown', 'darkgreen',
+                          'violet', 'purple', 'grey', 'black']):
         import multiprocessing
         self.fields = fields
         self.colors = colors
