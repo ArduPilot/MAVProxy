@@ -888,6 +888,10 @@ if __name__ == '__main__':
         if not mpstate.module('link').link_add(mdev):
             sys.exit(1)
 
+    if not opts.master and len(serial_list) == 1:
+          print("Connecting to %s" % serial_list[0])
+          mpstate.module('link').link_add(serial_list[0].device)
+
     # log all packets from the master, for later replay
     open_logs()
 
