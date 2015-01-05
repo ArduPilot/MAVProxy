@@ -37,7 +37,7 @@ class CameraViewModule(mp_module.MPModule):
         self.hdg = 0
         self.elevation_model = mp_elevation.ElevationModel()
         self.camera_params = CameraParams() # TODO how to get actual camera params
-        self.settings = mp_settings.MPSettings(
+        self.view_settings = mp_settings.MPSettings(
             [ ('r', float, 0.5),
               ('g', float, 0.5),
               ('b', float, 1.0),
@@ -45,16 +45,16 @@ class CameraViewModule(mp_module.MPModule):
         self.update_col()
 
     def update_col(self):
-        self.col = tuple(int(255*c) for c in (self.settings.r, self.settings.g, self.settings.b))
+        self.col = tuple(int(255*c) for c in (self.view_settings.r, self.view_settings.g, self.view_settings.b))
 
     def cmd_cameraview(self, args):
         '''camera view commands'''
         state = self
         if args and args[0] == 'set':
             if len(args) < 3:
-                state.settings.show_all()
+                state.view_settings.show_all()
             else:
-                state.settings.set(args[1], args[2])
+                state.view_settings.set(args[1], args[2])
                 state.update_col()
         else:
             print('usage: cameraview set')
