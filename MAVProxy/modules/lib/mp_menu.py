@@ -156,9 +156,12 @@ class MPMenuSubMenu(MPMenuGeneric):
         for m in items:
             updated = False
             for i in range(len(self.items)):
-                if self.items[i].name == m.name:
-                    self.items[i] = m
-                    updated = True
+                try:
+                    if self.items[i].name == m.name:
+                        self.items[i] = m
+                        updated = True
+                except Exception:
+                    pass
             if not updated:
                 self.items.append(m)
 
