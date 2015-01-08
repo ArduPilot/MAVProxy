@@ -236,7 +236,7 @@ class FenceModule(mp_module.MPModule):
                                                     self.target_component, i)
         tstart = time.time()
         p = None
-        while time.time() - tstart < 1:
+        while time.time() - tstart < 3:
             p = self.master.recv_match(type='FENCE_POINT', blocking=False)
             if p is not None:
                 break
