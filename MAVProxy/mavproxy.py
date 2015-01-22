@@ -818,6 +818,7 @@ if __name__ == '__main__':
     parser.add_option("--mav09", action='store_true', default=False, help="Use MAVLink protocol 0.9")
     parser.add_option("--auto-protocol", action='store_true', default=False, help="Auto detect MAVLink protocol version")
     parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
+    parser.add_option("--nocrc", action='store_true', default=False, help="don't check CRCs on UDP receive")
     parser.add_option("-c", "--continue", dest='continue_mode', action='store_true', default=False, help="continue logs")
     parser.add_option("--dialect",  default="ardupilotmega", help="MAVLink dialect")
     parser.add_option("--rtscts",  action='store_true', help="enable hardware RTS/CTS flow control")
@@ -900,7 +901,7 @@ if __name__ == '__main__':
         mpstate.mav_outputs.append(mavutil.mavlink_connection(port, baud=int(opts.baudrate), input=False))
 
     if opts.sitl:
-        mpstate.sitl_output = mavutil.mavudp(opts.sitl, input=False)
+        mpstate.sitl_output = mavutil.mavudp(opts.sitl, input=False, check_crc=not opts.nocrc)
 
     mpstate.settings.streamrate = opts.streamrate
     mpstate.settings.streamrate2 = opts.streamrate
