@@ -884,24 +884,26 @@ if __name__ == '__main__':
 
     load_module('link', quiet=True)
 
+    check_crc = not opts.nocrc
+
     # open master link
     for mdev in opts.master:
-        if not mpstate.module('link').link_add(mdev):
+        if not mpstate.module('link').link_add(mdev, check_crc=check_crc):
             sys.exit(1)
 
     if not opts.master and len(serial_list) == 1:
           print("Connecting to %s" % serial_list[0])
-          mpstate.module('link').link_add(serial_list[0].device)
+          mpstate.module('link').link_add(serial_list[0].device, check_crc=check_crc)
 
     # log all packets from the master, for later replay
     open_logs()
 
     # open any mavlink output ports
     for port in opts.output:
-        mpstate.mav_outputs.append(mavutil.mavlink_connection(port, baud=int(opts.baudrate), input=False))
+        mpstate.mav_outputs.append(mavutil.mavlink_connection(port, baud=int(opts.baudrate), input=False, check_crc=check_crc))
 
     if opts.sitl:
-        mpstate.sitl_output = mavutil.mavudp(opts.sitl, input=False, check_crc=not opts.nocrc)
+        mpstate.sitl_output = mavutil.mavudp(opts.sitl, input=False, check_crc=check_crc)
 
     mpstate.settings.streamrate = opts.streamrate
     mpstate.settings.streamrate2 = opts.streamrate
