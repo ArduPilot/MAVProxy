@@ -234,10 +234,6 @@ class LinkModule(mp_module.MPModule):
             master.post_message(m)
         self.status.counters['MasterIn'][master.linknum] += 1
 
-        if getattr(m, 'time_boot_ms', None) is not None:
-            # update link_delayed attribute
-            self.handle_msec_timestamp(m, master)
-
         mtype = m.get_type()
 
         # and log them
@@ -247,6 +243,20 @@ class LinkModule(mp_module.MPModule):
             usec = self.get_usec()
             usec = (usec & ~3) | master.linknum
             self.mpstate.logqueue.put(str(struct.pack('>Q', usec) + m.get_msgbuf()))
+
+        # keep the last message of each type around
+        self.status.msgs[m.get_type()] = m
+        if not m.get_type() in self.status.msg_count:
+            self.status.msg_count[m.get_type()] = 0
+        self.status.msg_count[m.get_type()] += 1
+
+        if m.get_srcComponent() == mavutil.mavlink.MAV_COMP_ID_GIMBAL and m.get_type() == 'HEARTBEAT':
+            # silence gimbal heartbeat packets for now
+            return
+
+        if getattr(m, 'time_boot_ms', None) is not None:
+            # update link_delayed attribute
+            self.handle_msec_timestamp(m, master)
 
         if mtype in activityPackets:
             if master.linkerror:
@@ -378,12 +388,6 @@ class LinkModule(mp_module.MPModule):
         if self.status.watch is not None:
             if fnmatch.fnmatch(m.get_type().upper(), self.status.watch.upper()):
                 self.mpstate.console.writeln(m)
-
-        # keep the last message of each type around
-        self.status.msgs[m.get_type()] = m
-        if not m.get_type() in self.status.msg_count:
-            self.status.msg_count[m.get_type()] = 0
-        self.status.msg_count[m.get_type()] += 1
 
         # don't pass along bad data
         if mtype != 'BAD_DATA':
