@@ -33,9 +33,9 @@ class GimbalModule(mp_module.MPModule):
     def cmd_gimbal_rate(self, args):
         '''control gimbal rate'''
         if len(args) != 4:
-            print("usage: gimbal rate YAW ROLL PITCH")
+            print("usage: gimbal rate ROLL PITCH YAW")
             return
-        (yaw, roll, pitch) = (float(args[1]), float(args[2]), float(args[3]))
+        (roll, pitch, yaw) = (float(args[1]), float(args[2]), float(args[3]))
         self.master.mav.gimbal_control_send(self.target_system,
                                             mavutil.mavlink.MAV_COMP_ID_GIMBAL,
                                             radians(roll),
@@ -74,7 +74,7 @@ class GimbalModule(mp_module.MPModule):
         vehicle_dcm.from_euler(att.roll, att.pitch, att.yaw)
 
         rotmat_copter_gimbal = Matrix3()
-        rotmat_copter_gimbal.from_euler312(m.joint_yaw, m.joint_roll, m.joint_pitch)
+        rotmat_copter_gimbal.from_euler312(m.joint_roll, m.joint_pitch, m.joint_yaw)
         gimbal_dcm = vehicle_dcm * rotmat_copter_gimbal.transposed()
         
         lat = gpi.lat * 1.0e-7
