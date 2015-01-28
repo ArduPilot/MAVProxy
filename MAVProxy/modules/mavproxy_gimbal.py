@@ -7,8 +7,10 @@ January 2015
 
 import sys, os, time
 from MAVProxy.modules.lib import mp_module
+from MAVProxy.modules.lib import mp_util
+from MAVProxy.modules.mavproxy_map import mp_slipmap
 from pymavlink import mavutil
-from pymavlink.rotmat import Vector3
+from pymavlink.rotmat import Vector3, Matrix3, Plane, Line
 from math import radians
 
 class GimbalModule(mp_module.MPModule):
@@ -47,6 +49,66 @@ class GimbalModule(mp_module.MPModule):
             print(master.messages['GIMBAL_REPORT'])
         else:
             print("No GIMBAL_REPORT messages")
+
+    def mavlink_packet(self, m):
+        '''handle an incoming mavlink packet'''
+
+        if not self.mpstate.map:
+            # don't draw if no map
+            return
+
+        if m.get_type() != 'GIMBAL_REPORT':
+            return
+
+        needed = ['ATTITUDE', 'GLOBAL_POSITION_INT']
+        for n in needed:
+            if not n in self.master.messages:
+                return
+
+        # clear the camera icon
+        self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('GimbalView'))
+
+        gpi = self.master.messages['GLOBAL_POSITION_INT']
+        att = self.master.messages['ATTITUDE']
+        vehicle_dcm = Matrix3()
+        vehicle_dcm.from_euler(att.roll, att.pitch, att.yaw)
+
+        rotmat_copter_gimbal = Matrix3()
+        rotmat_copter_gimbal.from_euler312(m.joint_yaw, m.joint_roll, m.joint_pitch)
+        gimbal_dcm = vehicle_dcm * rotmat_copter_gimbal.transposed()
+        
+        lat = gpi.lat * 1.0e-7
+        lon = gpi.lon * 1.0e-7
+        alt = gpi.relative_alt * 1.0e-3
+
+        # ground plane
+        ground_plane = Plane()
+
+        # the position of the camera in the air, remembering its a right
+        # hand coordinate system, so +ve z is down
+        camera_point = Vector3(0, 0, -alt)
+
+        # get view point of camera when not rotated
+        view_point = Vector3(1, 0, 0)
+    
+        # rotate view_point to form current view vector
+        rot_point = gimbal_dcm * view_point
+
+        # a line from the camera to the ground
+        line = Line(camera_point, rot_point)
+
+        # find the intersection with the ground
+        pt = line.plane_intersection(ground_plane, forward_only=True)
+        if pt is None:
+	    # its pointing up into the sky
+	    return None
+
+        (view_lat, view_lon) = mp_util.gps_offset(lat, lon, pt.y, pt.x)
+
+        icon = self.mpstate.map.icon('camera-small-red.png')
+        self.mpstate.map.add_object(mp_slipmap.SlipIcon('gimbalview',
+                                                        (view_lat,view_lon),
+                                                        icon, layer='GimbalView', rotation=0, follow=False))
 
 
 def init(mpstate):
