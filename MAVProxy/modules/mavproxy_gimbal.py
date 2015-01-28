@@ -75,7 +75,7 @@ class GimbalModule(mp_module.MPModule):
 
         rotmat_copter_gimbal = Matrix3()
         rotmat_copter_gimbal.from_euler312(m.joint_roll, m.joint_pitch, m.joint_yaw)
-        gimbal_dcm = vehicle_dcm * rotmat_copter_gimbal.transposed()
+        gimbal_dcm = vehicle_dcm * rotmat_copter_gimbal
         
         lat = gpi.lat * 1.0e-7
         lon = gpi.lon * 1.0e-7
