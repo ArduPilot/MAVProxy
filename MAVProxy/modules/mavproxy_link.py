@@ -237,7 +237,7 @@ class LinkModule(mp_module.MPModule):
         mtype = m.get_type()
 
         # and log them
-        if mtype not in dataPackets and self.mpstate.logqueue:
+        if self.mpstate.logqueue and mtype not in dataPackets:
             # put link number in bottom 2 bits, so we can analyse packet
             # delay in saved logs
             usec = self.get_usec()
@@ -269,6 +269,29 @@ class LinkModule(mp_module.MPModule):
             # don't process delayed packets that cause double reporting
             if mtype in delayedPackets:
                 return
+
+        self.__update_state(m, master)
+
+        if self.status.watch is not None:
+            if fnmatch.fnmatch(m.get_type().upper(), self.status.watch.upper()):
+                self.mpstate.console.writeln(m)
+
+        # don't pass along bad data
+        if mtype != 'BAD_DATA':
+            # pass messages along to listeners, except for REQUEST_DATA_STREAM, which
+            # would lead a conflict in stream rate setting between mavproxy and the other
+            # GCS
+            if self.mpstate.settings.mavfwd_rate or mtype != 'REQUEST_DATA_STREAM':
+                if not mtype in self.no_fwd_types:
+                    for r in self.mpstate.mav_outputs:
+                        print "forwarding"
+                        r.write(m.get_msgbuf())
+
+        self.__to_modules(m)
+
+    def __update_state(self, m, master):
+        """Update our model state based on the received message"""
+        mtype = m.get_type()
 
         if mtype == 'HEARTBEAT' and m.get_srcSystem() != 255:
             if (self.status.target_system != m.get_srcSystem() or
@@ -385,33 +408,22 @@ class LinkModule(mp_module.MPModule):
             #self.mpstate.console.writeln("Got MAVLink msg: %s" % m)
             pass
 
-        if self.status.watch is not None:
-            if fnmatch.fnmatch(m.get_type().upper(), self.status.watch.upper()):
-                self.mpstate.console.writeln(m)
+    def __to_modules(self, m):
+        """In a separate method to facilitate profiling"""
 
-        # don't pass along bad data
-        if mtype != 'BAD_DATA':
-            # pass messages along to listeners, except for REQUEST_DATA_STREAM, which
-            # would lead a conflict in stream rate setting between mavproxy and the other
-            # GCS
-            if self.mpstate.settings.mavfwd_rate or mtype != 'REQUEST_DATA_STREAM':
-                if not mtype in self.no_fwd_types:
-                    for r in self.mpstate.mav_outputs:
-                        r.write(m.get_msgbuf())
-
-            # pass to modules
-            for (mod,pm) in self.mpstate.modules:
-                if not hasattr(mod, 'mavlink_packet'):
-                    continue
-                try:
-                    mod.mavlink_packet(m)
-                except Exception as msg:
-                    if self.mpstate.settings.moddebug == 1:
-                        print(msg)
-                    elif self.mpstate.settings.moddebug > 1:
-                        exc_type, exc_value, exc_traceback = sys.exc_info()
-                        traceback.print_exception(exc_type, exc_value, exc_traceback,
-                                                  limit=2, file=sys.stdout)
+        # pass to modules
+        for (mod,pm) in self.mpstate.modules:
+            if not hasattr(mod, 'mavlink_packet'):
+                continue
+            try:
+                mod.mavlink_packet(m)
+            except Exception as msg:
+                if self.mpstate.settings.moddebug == 1:
+                    print(msg)
+                elif self.mpstate.settings.moddebug > 1:
+                    exc_type, exc_value, exc_traceback = sys.exc_info()
+                    traceback.print_exception(exc_type, exc_value, exc_traceback,
+                                              limit=2, file=sys.stdout)
 
 def init(mpstate):
     '''initialise module'''
