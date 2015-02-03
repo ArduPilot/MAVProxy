@@ -284,7 +284,6 @@ class LinkModule(mp_module.MPModule):
             if self.mpstate.settings.mavfwd_rate or mtype != 'REQUEST_DATA_STREAM':
                 if not mtype in self.no_fwd_types:
                     for r in self.mpstate.mav_outputs:
-                        print "forwarding"
                         r.write(m.get_msgbuf())
 
         self.__to_modules(m)

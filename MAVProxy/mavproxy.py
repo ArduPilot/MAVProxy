@@ -129,7 +129,7 @@ class MPState(object):
               MPSetting('shownoise', bool, True, 'Show non-MAVLink data'),
               MPSetting('baudrate', int, opts.baudrate, 'baudrate for new links', range=(0,10000000), increment=1),
               MPSetting('rtscts', bool, opts.rtscts, 'enable flow control'),
-              MPSetting('select_timeout', float, 0.01, 'select timeout'),
+              MPSetting('select_timeout', float, 0.5, 'select timeout'),
 
               MPSetting('altreadout', int, 10, 'Altitude Readout',
                         range=(0,100), increment=1, tab='Announcements'),
@@ -700,7 +700,7 @@ def main_loop():
         for m in mpstate.mav_outputs:
             rin.append(m.fd)
         if rin == []:
-            time.sleep(0.0001)
+            time.sleep(0.1) # We have no ports, check back again in 100ms
             continue
 
         for fd in mpstate.select_extra:
