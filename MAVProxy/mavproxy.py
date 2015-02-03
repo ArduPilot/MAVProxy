@@ -829,6 +829,7 @@ if __name__ == '__main__':
     parser.add_option("--mission", dest="mission", help="mission name", default=None)
     parser.add_option("--daemon", action='store_true', help="run in daemon mode, do not start interactive shell")
     parser.add_option("--profile", action='store_true', help="run the Yappi python profiler")
+    parser.add_option("--max-packets", default=None, dest='max_packets', type='int', help='Exit once this many packets have been received (for profiling)')    
 
     (opts, args) = parser.parse_args()
 
@@ -961,8 +962,10 @@ if __name__ == '__main__':
             for c in cmds:
                 process_stdin(c)
 
+    if opts.max_packets:
+        mpstate.max_rx_packets = opts.max_packets # Exit mavproxy after a fixed # of rx packets - for repeatability
+
     if opts.profile:
-        mpstate.max_rx_packets = 5000 # Exit mavproxy after a fixed # of rx packets - for repeatability
         import yappi    # We do the import here so that we won't barf if run normally and yappi not available
         yappi.start()
 
