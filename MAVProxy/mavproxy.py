@@ -175,6 +175,7 @@ class MPState(object):
         self.select_extra = {}
         self.continue_mode = False
         self.aliases = {}
+        self.max_rx_packets = None
 
     def module(self, name):
         '''Find a public module (most modules are private)'''
@@ -716,8 +717,9 @@ def main_loop():
             for master in mpstate.mav_master:
                   if fd == master.fd:
                         process_master(master)
-                        if mpstate is None:
-                              return
+                        if mpstate.max_rx_packets != None and master.mav.total_packets_received > mpstate.max_rx_packets:
+                            print "Received %s packets, exiting." % master.mav.total_packets_received
+                            mpstate.status.exit = True
                         continue
             for m in mpstate.mav_outputs:
                 if fd == m.fd:
@@ -956,6 +958,7 @@ if __name__ == '__main__':
                 process_stdin(c)
 
     if opts.profile:
+        mpstate.max_rx_packets = 5000 # Exit mavproxy after a fixed # of rx packets - for repeatability
         import yappi    # We do the import here so that we won't barf if run normally and yappi not available
         yappi.start()
 
