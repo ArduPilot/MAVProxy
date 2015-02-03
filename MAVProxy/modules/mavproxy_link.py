@@ -245,12 +245,12 @@ class LinkModule(mp_module.MPModule):
             self.mpstate.logqueue.put(str(struct.pack('>Q', usec) + m.get_msgbuf()))
 
         # keep the last message of each type around
-        self.status.msgs[m.get_type()] = m
-        if not m.get_type() in self.status.msg_count:
-            self.status.msg_count[m.get_type()] = 0
-        self.status.msg_count[m.get_type()] += 1
+        self.status.msgs[mtype] = m
+        if not mtype in self.status.msg_count:
+            self.status.msg_count[mtype] = 0
+        self.status.msg_count[mtype] += 1
 
-        if m.get_srcComponent() == mavutil.mavlink.MAV_COMP_ID_GIMBAL and m.get_type() == 'HEARTBEAT':
+        if m.get_srcComponent() == mavutil.mavlink.MAV_COMP_ID_GIMBAL and mtype == 'HEARTBEAT':
             # silence gimbal heartbeat packets for now
             return
 
@@ -270,10 +270,10 @@ class LinkModule(mp_module.MPModule):
             if mtype in delayedPackets:
                 return
 
-        self.__update_state(m, master)
+        self.__update_state(mtype, m, master)
 
         if self.status.watch is not None:
-            if fnmatch.fnmatch(m.get_type().upper(), self.status.watch.upper()):
+            if fnmatch.fnmatch(mtype.upper(), self.status.watch.upper()):
                 self.mpstate.console.writeln(m)
 
         # don't pass along bad data
@@ -289,10 +289,8 @@ class LinkModule(mp_module.MPModule):
 
         self.__to_modules(m)
 
-    def __update_state(self, m, master):
+    def __update_state(self, mtype, m, master):
         """Update our model state based on the received message"""
-        mtype = m.get_type()
-
         if mtype == 'HEARTBEAT' and m.get_srcSystem() != 255:
             if (self.status.target_system != m.get_srcSystem() or
                 self.status.target_component != m.get_srcComponent()):
