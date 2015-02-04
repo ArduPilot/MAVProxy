@@ -104,10 +104,10 @@ class LinkModule(mp_module.MPModule):
             conn = self.mpstate.mav_master[i]
             print("%u: %s" % (i, conn.address))
 
-    def link_add(self, device):
+    def link_add(self, device, use_native=False):
         '''add new link'''
         try:
-            conn = mavutil.mavlink_connection(device, autoreconnect=True, baud=self.settings.baudrate)
+            conn = mavutil.mavlink_connection(device, autoreconnect=True, baud=self.settings.baudrate, use_native=use_native)
         except Exception as msg:
             print("Failed to connect to %s : %s" % (device, msg))
             return False

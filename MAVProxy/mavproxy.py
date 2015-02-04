@@ -844,7 +844,8 @@ if __name__ == '__main__':
     parser.add_option("--rtscts",  action='store_true', help="enable hardware RTS/CTS flow control")
     parser.add_option("--mission", dest="mission", help="mission name", default=None)
     parser.add_option("--daemon", action='store_true', help="run in daemon mode, do not start interactive shell")
-    parser.add_option("--max-packets", default=None, dest='max_packets', type='int', help='Exit once this many packets have been received (for profiling)')    
+    parser.add_option("--max-packets", default=None, dest='max_packets', type='int', help='Exit once this many packets have been received (for profiling)')
+    parser.add_option("--native", default=False, dest='native', action='store_true', help='Use native C protocol code (if available)')
 
     (opts, args) = parser.parse_args()
 
@@ -906,7 +907,7 @@ if __name__ == '__main__':
 
     # open master link
     for mdev in opts.master:
-        if not mpstate.module('link').link_add(mdev):
+        if not mpstate.module('link').link_add(mdev, use_native=opts.native):
             sys.exit(1)
 
     if not opts.master and len(serial_list) == 1:
@@ -919,7 +920,7 @@ if __name__ == '__main__':
 
     # open any mavlink output ports
     for port in opts.output:
-        mpstate.mav_outputs.append(mavutil.mavlink_connection(port, baud=int(opts.baudrate), input=False))
+        mpstate.mav_outputs.append(mavutil.mavlink_connection(port, baud=int(opts.baudrate), input=False, use_native=opts.native))
 
     if opts.sitl:
         mpstate.sitl_output = mavutil.mavudp(opts.sitl, input=False)
