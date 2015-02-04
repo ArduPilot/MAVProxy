@@ -466,21 +466,23 @@ def process_stdin(line):
             traceback.print_exc()
 
 
-def process_master(m):
-    '''process packets from the MAVLink master'''
+
+def process_master(m, sleep_time = 0.1):
+    '''process packets from the MAVLink master, returns number of packets processed'''
     try:
         s = m.recv(16*1024)
     except Exception:
-        time.sleep(0.1)
-        return
+        print "Exception on read"
+        time.sleep(sleep_time)
+        return 0
     # prevent a dead serial port from causing the CPU to spin. The user hitting enter will
     # cause it to try and reconnect
     if len(s) == 0:
-        time.sleep(0.1)
-        return
+        time.sleep(sleep_time)
+        return 0
 
     if (mpstate.settings.compdebug & 1) != 0:
-        return
+        return 0
 
     if mpstate.logqueue_raw:
         mpstate.logqueue_raw.put(str(s))
@@ -488,7 +490,7 @@ def process_master(m):
     if mpstate.status.setup_mode:
         sys.stdout.write(str(s))
         sys.stdout.flush()
-        return
+        return 0
 
     if m.first_byte and opts.auto_protocol:
         m.auto_mavlink_version(s)
@@ -501,6 +503,20 @@ def process_master(m):
                 if opts.show_errors:
                     mpstate.console.writeln("MAV error: %s" % msg)
                 mpstate.status.mav_error += 1
+        return len(msgs)
+    else:
+        return 0
+
+def process_master_all(m):
+    '''Process all packets that were waiting at the master, returns number of packets processed'''
+    # We can decrease the amount of redundant idle callback processing by making sure we consume all waiting packets on an interface
+    # For serial/file interfaces, all results should be ready in the first call to process_master, but for UDP we might need to
+    # make multiple calls to m.recv
+    num_read_total = num_read = process_master(m)
+    while num_read != 0:
+        num_read = process_master(m, 0) # We use a 0 sec timeout in this case
+        num_read_total += num_read
+    return num_read
 
 
 
@@ -689,7 +705,7 @@ def main_loop():
         for master in mpstate.mav_master:
             if master.fd is None:
                 if master.port.inWaiting() > 0:
-                    process_master(master)
+                    process_master_all(master)
 
         periodic_tasks()
 
@@ -718,7 +734,7 @@ def main_loop():
                   return
             for master in mpstate.mav_master:
                   if fd == master.fd:
-                        process_master(master)
+                        process_master_all(master)
                         if mpstate.max_rx_packets != None and master.mav.total_packets_received > mpstate.max_rx_packets:
                             print "Received %s packets, exiting." % master.mav.total_packets_received
                             mpstate.status.exit = True
