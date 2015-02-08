@@ -79,6 +79,16 @@ joymap = {
      (2, -500, 1500), # Throttle
      (4, 500, 1500), # Yaw
      None,
+     None],
+     
+    # This supports a Hobbyking AeroFly FMS
+    # http://www.hobbyking.com/hobbyking/store/__13597__USB_Simulator_Cable_XTR_AeroFly_FMS.html
+    '*SAILI Simulator --- G5.0 Controller*':
+    [(0, 500, 1500), # Roll
+     (1, 500, 1500), # Pitch
+     (2, 500, 1500), # Throttle
+     (4, 500, 1500), # Yaw
+     None,
      None]
 }
 
