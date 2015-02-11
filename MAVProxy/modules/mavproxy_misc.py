@@ -70,6 +70,7 @@ class MiscModule(mp_module.MPModule):
         self.add_command('land', self.cmd_land, "auto land")
         self.add_command('repeat', self.cmd_repeat, "repeat a command at regular intervals",
                          ["<add|remove|clear>"])
+        self.add_command('version', self.cmd_version, "show version")
         self.repeats = []
 
     def altitude_difference(self, pressure1, pressure2, ground_temp):
@@ -160,6 +161,14 @@ class MiscModule(mp_module.MPModule):
                 0, 0, 0, 0, 0, 0, 0, 0)
         else:
             print("Usage: land [abort]")
+
+    def cmd_version(self, args):
+        '''show version'''
+        self.master.mav.command_long_send(self.status.target_system,
+                                          self.status.target_component,
+                                          mavutil.mavlink.MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES,
+                                          0,
+                                          1, 0, 0, 0, 0, 0, 0)
 
     def cmd_repeat(self, args):
         '''repeat a command at regular intervals'''
