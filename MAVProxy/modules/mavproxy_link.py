@@ -230,11 +230,14 @@ class LinkModule(mp_module.MPModule):
     def master_callback(self, m, master):
         '''process mavlink message m on master, sending any messages to recipients'''
 
+        mtype = m.get_type()
+
+        if mtype in self.mpstate.rx_blacklist:
+            return
+
         if getattr(m, '_timestamp', None) is None:
             master.post_message(m)
         self.status.counters['MasterIn'][master.linknum] += 1
-
-        mtype = m.get_type()
 
         # and log them
         if self.mpstate.logqueue and mtype not in dataPackets:

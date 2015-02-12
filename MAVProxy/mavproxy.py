@@ -180,6 +180,7 @@ class MPState(object):
         self.max_rx_packets = None
         self.logqueue = None
         self.logqueue_raw = None
+        self.rx_blacklist = set() # A set of message types which could never be delegated to packet handlers (for use by DroneAPI high speed processing)
 
     def module(self, name):
         '''Find a public module (most modules are private)'''
