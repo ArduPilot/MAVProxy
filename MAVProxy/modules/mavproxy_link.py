@@ -321,15 +321,15 @@ class LinkModule(mp_module.MPModule):
                 self.mpstate.rl.set_prompt(self.status.flightmode + "> ")
                 self.say("Mode " + self.status.flightmode)
 
-            if m.type == mavutil.mavlink.MAV_TYPE_FIXED_WING:
+            if mtype == mavutil.mavlink.MAV_TYPE_FIXED_WING:
                 self.mpstate.vehicle_type = 'plane'
                 self.mpstate.vehicle_name = 'ArduPlane'
-            elif m.type in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER,
+            elif mtype in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER,
                             mavutil.mavlink.MAV_TYPE_SURFACE_BOAT,
                             mavutil.mavlink.MAV_TYPE_SUBMARINE]:
                 self.mpstate.vehicle_type = 'rover'
                 self.mpstate.vehicle_name = 'APMrover2'
-            elif m.type in [mavutil.mavlink.MAV_TYPE_QUADROTOR,
+            elif mtype in [mavutil.mavlink.MAV_TYPE_QUADROTOR,
                             mavutil.mavlink.MAV_TYPE_COAXIAL,
                             mavutil.mavlink.MAV_TYPE_HEXAROTOR,
                             mavutil.mavlink.MAV_TYPE_OCTOROTOR,
@@ -337,7 +337,7 @@ class LinkModule(mp_module.MPModule):
                             mavutil.mavlink.MAV_TYPE_HELICOPTER]:
                 self.mpstate.vehicle_type = 'copter'
                 self.mpstate.vehicle_name = 'ArduCopter'
-            elif m.type in [mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER]:
+            elif mtype in [mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER]:
                 self.mpstate.vehicle_type = 'antenna'
                 self.mpstate.vehicle_name = 'AntennaTracker'
         
