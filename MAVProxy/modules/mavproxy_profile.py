@@ -23,7 +23,7 @@ class ProfileModule(mp_module.MPModule):
         '''stop profiling'''
         print "Profile results:"
         import yappi    # We do the import here so that we won't barf if run normally and yappi not available        
-        yappi.get_func_stats().print_all()
+        yappi.get_func_stats().print_all(columns={0:("name",50), 1:("ncall", 5), 2:("tsub", 8), 3:("ttot", 8), 4:("tavg",8)})
         yappi.get_thread_stats().print_all()
         yappi.stop()
 
