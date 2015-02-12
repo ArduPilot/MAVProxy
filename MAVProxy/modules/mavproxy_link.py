@@ -288,6 +288,7 @@ class LinkModule(mp_module.MPModule):
 
         self.__to_modules(m)
 
+    # In the common case the following routine has very low cost
     def __update_state(self, mtype, m, master):
         """Update our model state based on the received message"""
         if mtype == 'HEARTBEAT' and m.get_srcSystem() != 255:
@@ -395,10 +396,9 @@ class LinkModule(mp_module.MPModule):
         elif mtype == "BAD_DATA":
             if self.mpstate.settings.shownoise and mavutil.all_printable(m.data):
                 self.mpstate.console.write(str(m.data), bg='red')
-        elif mtype in [ "COMMAND_ACK", "MISSION_ACK" ]:
+        elif mtype == "MISSION_ACK":
             self.mpstate.console.writeln("Got MAVLink msg: %s" % m)
-
-            if mtype == "COMMAND_ACK" and m.command == mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION:
+        elif mtype == "COMMAND_ACK" and m.command == mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION:
                 if m.result == mavutil.mavlink.MAV_RESULT_ACCEPTED:
                     self.say("Calibrated")
         else:
@@ -409,9 +409,7 @@ class LinkModule(mp_module.MPModule):
         """In a separate method to facilitate profiling"""
 
         # pass to modules
-        for (mod,pm) in self.mpstate.modules:
-            if not hasattr(mod, 'mavlink_packet'):
-                continue
+        for (mod,pm) in self.mpstate.modules_packet:
             try:
                 mod.mavlink_packet(m)
             except Exception as msg:

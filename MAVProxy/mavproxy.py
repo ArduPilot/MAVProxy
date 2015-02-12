@@ -170,6 +170,8 @@ class MPState(object):
 
         self.mav_param = mavparm.MAVParmDict()
         self.modules = []
+        self.modules_idle = [] # modules with idle callbacks
+        self.modules_packet = [] # modules that want to read packets
         self.public_modules = {}
         self.functions = MAVFunctions()
         self.select_extra = {}
@@ -262,6 +264,12 @@ def load_module(modname, quiet=False):
             module = m.init(mpstate)
             if isinstance(module, mp_module.MPModule):
                 mpstate.modules.append((module, m))
+
+                if hasattr(module, 'mavlink_packet'):
+                    mpstate.modules_packet.append((module, m))
+                if hasattr(module, 'idle_task'):
+                    mpstate.modules_idle.append((module, m))
+
                 if not quiet:
                     print("Loaded module %s" % (modname,))
                 return True
@@ -283,6 +291,8 @@ def unload_module(modname):
             if hasattr(m, 'unload'):
                 m.unload()
             mpstate.modules.remove((m,pm))
+            mpstate.modules_idle.remove((m,pm))
+            mpstate.modules_packet.remove((m,pm))
             print("Unloaded module %s" % modname)
             return True
     print("Unable to find module %s" % modname)
@@ -670,17 +680,16 @@ def periodic_tasks():
     set_stream_rates()
 
     # call optional module idle tasks. These are called at several hundred Hz
-    for (m,pm) in mpstate.modules:
-        if hasattr(m, 'idle_task'):
-            try:
-                m.idle_task()
-            except Exception as msg:
-                if mpstate.settings.moddebug == 1:
-                    print(msg)
-                elif mpstate.settings.moddebug > 1:
-                    exc_type, exc_value, exc_traceback = sys.exc_info()
-                    traceback.print_exception(exc_type, exc_value, exc_traceback,
-                                              limit=2, file=sys.stdout)
+    for (m,pm) in mpstate.modules_idle:
+        try:
+            m.idle_task()
+        except Exception as msg:
+            if mpstate.settings.moddebug == 1:
+                print(msg)
+            elif mpstate.settings.moddebug > 1:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                traceback.print_exception(exc_type, exc_value, exc_traceback,
+                                          limit=2, file=sys.stdout)
 
 
 def main_loop():
