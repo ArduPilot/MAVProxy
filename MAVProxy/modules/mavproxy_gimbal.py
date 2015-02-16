@@ -22,8 +22,9 @@ class GimbalModule(mp_module.MPModule):
                          ['<rate|point|roi|mode|status>'])
         if mp_util.has_wxpython:
             self.menu = MPMenuSubMenu('Mount',
-                                      items=[MPMenuItem('GPS Mode', 'GPS Mode', '# gimbal mode gps'),
-                                             MPMenuItem('MAVLink Mode', 'MAVLink Mode', '# gimbal mode mavlink'),
+                                      items=[MPMenuItem('GPS targeting Mode', 'GPS Mode', '# gimbal mode gps'),
+                                             MPMenuItem('MAVLink targeting Mode', 'MAVLink Mode', '# gimbal mode mavlink'),
+                                             MPMenuItem('RC targeting Mode', 'RC Mode', '# gimbal mode rc'),
                                              MPMenuItem('Point At', 'Point At', '# gimbal roi')])
             self.menu_added_map = False
         else:
@@ -61,6 +62,8 @@ class GimbalModule(mp_module.MPModule):
             mode = mavutil.mavlink.MAV_MOUNT_MODE_GPS_POINT
         elif args[0].upper() == 'MAVLINK':
             mode = mavutil.mavlink.MAV_MOUNT_MODE_MAVLINK_TARGETING
+        elif args[0].upper() == 'RC':
+            mode = mavutil.mavlink.MAV_MOUNT_MODE_RC_TARGETING
         else:
             print("Unsupported mode %s" % args[0])
         self.master.mav.mount_configure_send(self.target_system,
