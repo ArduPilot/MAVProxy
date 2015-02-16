@@ -59,7 +59,26 @@ class ConsoleModule(mp_module.MPModule):
         self.add_menu(MPMenuSubMenu('MAVProxy',
                                     items=[MPMenuItem('Settings', 'Settings', 'menuSettings'),
                                            MPMenuItem('Map', 'Load Map', '# module load map')]))
+                                           
+        # and a menu for the modules
+        ModMenuList = []
+        import MAVProxy.modules, pkgutil
+        modlist = [x[1] for x in pkgutil.iter_modules(MAVProxy.modules.__path__)]
+        loaded = set(self.complete_loadedmodules(''))
+        for m in modlist:
+            if not m.startswith("mavproxy_"):
+                continue
+            name = m[9:]
+            if name in loaded or name == 'console':
+                ModMenuList.append(MPMenuCheckbox(name, name, checked=True, returnkey='# module'))
+            elif not name in loaded:
+                ModMenuList.append(MPMenuCheckbox(name, name, checked=False, returnkey='# module'))
+        
+        self.add_menu(MPMenuSubMenu('Modules', items = ModMenuList))
 
+    def complete_loadedmodules(self, text):
+        return [ m.name for (m,pm) in self.mpstate.modules ]
+  
     def add_menu(self, menu):
         '''add a new menu'''
         self.menu.add(menu)
@@ -78,6 +97,12 @@ class ConsoleModule(mp_module.MPModule):
                 if m.handler_result is None:
                     return
                 cmd += m.handler_result
+            #special handler for the Modules menu
+            if isinstance(m, MPMenuCheckbox) and m.returnkey == '# module':
+                if m.IsChecked():
+                    cmd = 'module load ' + m.description
+                else:
+                    cmd = 'module unload ' + m.description                                                
             self.mpstate.functions.process_stdin(cmd)
         if m.returnkey == 'menuSettings':
             wxsettings.WXSettings(self.settings)
