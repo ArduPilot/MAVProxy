@@ -267,9 +267,8 @@ def load_module(modname, quiet=False):
                 break
         except ImportError as msg:
             ex = msg
-            if mpstate.settings.moddebug > 1:
-                import traceback
-                print(traceback.format_exc())
+            import traceback
+            print(traceback.format_exc())
     print("Failed to load module: %s" % ex)
     return False
 
