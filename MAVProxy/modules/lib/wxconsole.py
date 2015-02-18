@@ -192,6 +192,6 @@ if __name__ == "__main__":
         console.write(" %s " % time.asctime())
         console.writeln('tock', bg='yellow')
         console.set_status('GPS', 'GPS: OK', fg='blue', bg='green')
-        console.set_status('Link1', 'Link1: OK', fg='green', bg='write')
-        console.set_status('Date', 'Date: %s' % time.asctime(), fg='red', bg='write', row=2)
+        console.set_status('Link1', 'Link1: OK', fg='green', bg='white')
+        console.set_status('Date', 'Date: %s' % time.asctime(), fg='red', bg='white', row=2)
         time.sleep(0.5)
