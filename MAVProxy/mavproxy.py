@@ -270,7 +270,7 @@ def load_module(modname, quiet=False):
             if mpstate.settings.moddebug > 1:
                 import traceback
                 print(traceback.format_exc())
-    print("Failed to load module: %s" % ex)
+    print("Failed to load module: %s. Use \"set moddebug 3\" in the MAVProxy console to enable traceback" % ex)
     return False
 
 def unload_module(modname):
