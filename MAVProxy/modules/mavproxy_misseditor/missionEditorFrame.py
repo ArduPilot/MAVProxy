@@ -227,8 +227,9 @@ class MissionEditorFrame(wx.Frame):
             event = self.gui_event_queue.get()
             if event.get_type() == me_event.MEGE_CLEAR_MISS_TABLE:
                 self.grid_mission.ClearGrid()
-                self.grid_mission.DeleteRows(0, 
-                        self.grid_mission.GetNumberRows())
+                if (self.grid_mission.GetNumberRows() > 0):
+                    self.grid_mission.DeleteRows(0, 
+                            self.grid_mission.GetNumberRows())
                 self.grid_mission.SetDefaultColSize(50, True)
                 self.grid_mission.SetColSize(ME_COMMAND_COL, 150)
                 self.grid_mission.SetColSize(ME_LAT_COL, 100)
