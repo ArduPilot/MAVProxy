@@ -24,7 +24,10 @@ class ParamState:
         '''handle an incoming mavlink packet'''
         if m.get_type() == 'PARAM_VALUE':
             param_id = "%.16s" % m.param_id
-            if m.param_index != -1 and m.param_index not in self.mav_param_set:
+            # Note: the xml specifies param_index is a uint16, so -1 in that field will show as 65535
+            # We accept both -1 and 65535 as 'unknown index' to future proof us against someday having that
+            # xml fixed.
+            if m.param_index != -1 and m.param_index != 65535 and m.param_index not in self.mav_param_set:
                 added_new_parameter = True
                 self.mav_param_set.add(m.param_index)
             else:
