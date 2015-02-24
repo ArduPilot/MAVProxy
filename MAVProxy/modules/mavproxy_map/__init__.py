@@ -9,10 +9,12 @@ import sys, os, math
 import functools
 import time
 from MAVProxy.modules.mavproxy_map import mp_slipmap
+from MAVProxy.modules.mavproxy_map import mp_elevation
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib.mp_menu import *
+from pymavlink import mavutil
 
 class MapModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -36,6 +38,7 @@ class MapModule(mp_module.MPModule):
         self.draw_line = None
         self.draw_callback = None
         self.vehicle_type_name = 'plane'
+        self.ElevationMap = mp_elevation.ElevationModel()
         self.map_settings = mp_settings.MPSettings(
             [ ('showgpspos', int, 0),
               ('showgps2pos', int, 1),
@@ -58,6 +61,7 @@ class MapModule(mp_module.MPModule):
         self.default_popup = MPMenuSubMenu('Popup', items=[])
         self.add_menu(MPMenuItem('Fly To', 'Fly To', '# guided ',
                                  handler=MPMenuCallTextDialog(title='Altitude (m)', default=100)))
+        self.add_menu(MPMenuItem('Set Home', 'Set Home', '# map sethome '))
         self.add_menu(MPMenuItem('Terrain Check', 'Terrain Check', '# terrain check'))
         self.add_menu(MPMenuItem('Show Position', 'Show Position', 'showPosition'))
 
@@ -99,6 +103,8 @@ class MapModule(mp_module.MPModule):
         elif args[0] == "set":
             self.map_settings.command(args[1:])
             self.mpstate.map.add_object(mp_slipmap.SlipBrightness(self.map_settings.brightness))
+        elif args[0] == "sethome":
+            self.cmd_set_home(args)
         else:
             print("usage: map <icon|set>")
     
@@ -340,11 +346,28 @@ class MapModule(mp_module.MPModule):
         self.draw_callback = callback
         self.draw_line = []
         self.mpstate.map.add_object(mp_slipmap.SlipDefaultPopup(None))
+
+    def cmd_set_home(self, args):
+        '''called when user selects "Set Home" on map'''
+        (lat, lon) = (self.click_position[0], self.click_position[1])
+        alt = self.ElevationMap.GetElevation(lat, lon)
+        print("Setting home to: ", lat, lon, alt)
+        self.master.mav.command_long_send(
+            self.status.target_system, self.status.target_component,
+            mavutil.mavlink.MAV_CMD_DO_SET_HOME,
+            1, # set position
+            0, # param1
+            0, # param2
+            0, # param3
+            0, # param4
+            lat, # lat
+            lon, # lon
+            alt) # param7
+        
         
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         if m.get_type() == "HEARTBEAT":
-            from pymavlink import mavutil
             if m.type in [mavutil.mavlink.MAV_TYPE_FIXED_WING]:
                 self.vehicle_type_name = 'plane'
             elif m.type in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER,
