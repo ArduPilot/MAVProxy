@@ -378,9 +378,10 @@ class MapModule(mp_module.MPModule):
                             mavutil.mavlink.MAV_TYPE_COAXIAL,
                             mavutil.mavlink.MAV_TYPE_HEXAROTOR,
                             mavutil.mavlink.MAV_TYPE_OCTOROTOR,
-                            mavutil.mavlink.MAV_TYPE_TRICOPTER,
-                            mavutil.mavlink.MAV_TYPE_HELICOPTER]:
+                            mavutil.mavlink.MAV_TYPE_TRICOPTER]:
                 self.vehicle_type_name = 'copter'
+            elif m.type in [mavutil.mavlink.MAV_TYPE_HELICOPTER]:
+                self.vehicle_type_name = 'heli'
             elif m.type in [mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER]:
                 self.vehicle_type_name = 'antenna'     
     
