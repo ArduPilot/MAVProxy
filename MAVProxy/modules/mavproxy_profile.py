@@ -16,12 +16,12 @@ class ProfileModule(mp_module.MPModule):
     def cmd_reset(self, args):
         '''restart profiling'''
         import yappi    # We do the import here so that we won't barf if run normally and yappi not available
-        print "NOW PROFILING..."
+        print("NOW PROFILING...")
         yappi.start()
 
     def cmd_stop(self, args):
         '''stop profiling'''
-        print "Profile results:"
+        print("Profile results:")
         import yappi    # We do the import here so that we won't barf if run normally and yappi not available        
         yappi.get_func_stats().print_all(columns={0:("name",50), 1:("ncall", 5), 2:("tsub", 8), 3:("ttot", 8), 4:("tavg",8)})
         yappi.get_thread_stats().print_all()

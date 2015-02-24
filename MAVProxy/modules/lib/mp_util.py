@@ -10,7 +10,7 @@ has_wxpython = False
 try:
     import wx
     has_wxpython = True
-except ImportError, e:
+except ImportError:
     pass
 
 radius_of_earth = 6378100.0 # in meters

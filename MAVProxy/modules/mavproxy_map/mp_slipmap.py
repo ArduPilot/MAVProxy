@@ -222,7 +222,7 @@ class SlipGrid(SlipObject):
         '''draw a polygon on the image'''
         if self.hidden:
             return
-	(x,y,w,h) = bounds
+        (x,y,w,h) = bounds
         spacing = 1000
         while True:
             start = mp_util.latlon_round((x,y), spacing)

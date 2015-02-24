@@ -9,9 +9,21 @@ Released under the GNU GPL version 3 or later
 
 import sys, os, time, socket, signal
 import fnmatch, errno, threading
-import serial, Queue, select
+import serial, select
 import traceback
 import select
+
+if sys.version_info[0] < 3:
+    import Queue
+else:
+    import queue as Queue
+
+    def reload(p):
+        import importlib
+        return importlib.reload(p)
+
+    def raw_input(p):
+        return input(p)
 
 from MAVProxy.modules.lib import textconsole
 from MAVProxy.modules.lib import rline
@@ -483,7 +495,7 @@ def process_master(m, sleep_time = 0.1):
     try:
         s = m.recv(16*1024)
     except Exception:
-        print "Exception on read"
+        print("Exception on read")
         time.sleep(sleep_time)
         return 0
     # prevent a dead serial port from causing the CPU to spin. The user hitting enter will
@@ -746,7 +758,7 @@ def main_loop():
                   if fd == master.fd:
                         process_master_all(master)
                         if mpstate.max_rx_packets != None and master.mav.total_packets_received > mpstate.max_rx_packets:
-                            print "Received %s packets, exiting." % master.mav.total_packets_received
+                            print("Received %s packets, exiting." % master.mav.total_packets_received)
                             mpstate.status.exit = True
                         continue
             for m in mpstate.mav_outputs:
@@ -894,9 +906,9 @@ if __name__ == '__main__':
     mpstate.rl = rline.rline("MAV> ", mpstate)
 
     def quit_handler(signum = None, frame = None):
-        #print 'Signal handler called with signal', signum
+        #print('Signal handler called with signal', signum)
         if mpstate.status.exit:
-            print 'Clean shutdown impossible, forcing an exit'
+            print('Clean shutdown impossible, forcing an exit')
             sys.exit(0)
         else:
             mpstate.status.exit = True
