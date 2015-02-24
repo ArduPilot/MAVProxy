@@ -48,7 +48,7 @@ class LinkModule(mp_module.MPModule):
 
     def idle_task(self):
         '''called on idle'''
-        if not self.menu_added_console and self.module('console') is not None:
+        if mp_util.has_wxpython and (not self.menu_added_console and self.module('console') is not None):
             self.menu_added_console = True
             # we don't dynamically update these yet due to a wx bug
             self.menu_add.items = [ MPMenuItem(p, p, '# link add %s' % p) for p in self.complete_serial_ports('') ]
