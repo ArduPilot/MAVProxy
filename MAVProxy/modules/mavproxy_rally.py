@@ -14,7 +14,7 @@ if mp_util.has_wxpython:
 class RallyModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(RallyModule, self).__init__(mpstate, "rally", "rally point control", public = True)
-        self.rallyloader = mavwp.MAVRallyLoader(mpstate.status.target_system, mpstate.status.target_component)
+        self.rallyloader = mavwp.MAVRallyLoader(mpstate.settings.target_system, mpstate.settings.target_component)
         self.add_command('rally', self.cmd_rally, "rally point control", ["<add|clear|land|list|move|remove|>",
                                     "<load|save> (FILENAME)"])
         self.have_list = False
@@ -55,8 +55,8 @@ class RallyModule(mp_module.MPModule):
         if self.abort_ack_received is False:
             #only send abort every second (be insistent, but don't spam)
             if (time.time() - self.abort_previous_send_time > 1):
-                self.master.mav.command_long_send(self.status.target_system,
-                    self.status.target_component,
+                self.master.mav.command_long_send(self.settings.target_system,
+                    self.settings.target_component,
                     mavutil.mavlink.MAV_CMD_DO_GO_AROUND,
                     0, int(self.abort_alt), 0, 0, 0, 0, 0, 0,)
                 self.abort_previous_send_time = time.time()
@@ -242,8 +242,8 @@ class RallyModule(mp_module.MPModule):
                     self.abort_alt = int(args[2])
 
             else:
-                self.master.mav.command_long_send(self.status.target_system,
-                        self.status.target_component,
+                self.master.mav.command_long_send(self.settings.target_system,
+                        self.settings.target_component,
                         mavutil.mavlink.MAV_CMD_DO_RALLY_LAND,
                         0, 0, 0, 0, 0, 0, 0, 0)
 

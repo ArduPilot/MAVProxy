@@ -353,7 +353,7 @@ class MapModule(mp_module.MPModule):
         alt = self.ElevationMap.GetElevation(lat, lon)
         print("Setting home to: ", lat, lon, alt)
         self.master.mav.command_long_send(
-            self.status.target_system, self.status.target_component,
+            self.settings.target_system, self.settings.target_component,
             mavutil.mavlink.MAV_CMD_DO_SET_HOME,
             1, # set position
             0, # param1

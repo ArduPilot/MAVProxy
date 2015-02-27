@@ -172,7 +172,9 @@ class TrackerModule(mp_module.MPModule):
                                                   self.tracker_settings.baudrate))
         m = mavutil.mavlink_connection(self.tracker_settings.port,
                                        autoreconnect=True,
+                                       source_system=self.settings.source_system,
                                        baud=self.tracker_settings.baudrate)
+        m.mav.srcComponent = self.settings.source_component
         if self.logdir:
             m.setup_logfile(os.path.join(self.logdir, 'tracker.tlog'))
         self.connection = m

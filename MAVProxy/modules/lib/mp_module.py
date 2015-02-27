@@ -74,11 +74,11 @@ class MPModule(object):
 
     @property
     def target_system(self):
-        return self.mpstate.status.target_system
+        return self.settings.target_system
 
     @property
     def target_component(self):
-        return self.mpstate.status.target_component
+        return self.settings.target_component
 
     @property
     def master(self):

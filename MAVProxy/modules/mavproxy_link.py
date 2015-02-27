@@ -54,6 +54,10 @@ class LinkModule(mp_module.MPModule):
             self.menu_add.items = [ MPMenuItem(p, p, '# link add %s' % p) for p in self.complete_serial_ports('') ]
             self.menu_rm.items = [ MPMenuItem(p, p, '# link remove %s' % p) for p in self.complete_links('') ]
             self.module('console').add_menu(self.menu)
+        for m in self.mpstate.mav_master:
+            m.source_system = self.settings.source_system
+            m.mav.srcSystem = m.source_system
+            m.mav.srcComponent = self.settings.source_component
 
     def complete_serial_ports(self, text):
         '''return list of serial ports'''
@@ -107,7 +111,11 @@ class LinkModule(mp_module.MPModule):
     def link_add(self, device):
         '''add new link'''
         try:
-            conn = mavutil.mavlink_connection(device, autoreconnect=True, baud=self.settings.baudrate)
+            print("Connect %s source_system=%d" % (device, self.settings.source_system))
+            conn = mavutil.mavlink_connection(device, autoreconnect=True,
+                                              source_system=self.settings.source_system,
+                                              baud=self.settings.baudrate)
+            conn.mav.srcComponent = self.settings.source_component
         except Exception as msg:
             print("Failed to connect to %s : %s" % (device, msg))
             return False
@@ -271,11 +279,9 @@ class LinkModule(mp_module.MPModule):
                 return
 
         if mtype == 'HEARTBEAT' and m.get_srcSystem() != 255:
-            if (self.status.target_system != m.get_srcSystem() or
-                self.status.target_component != m.get_srcComponent()):
-                self.status.target_system = m.get_srcSystem()
-                self.status.target_component = m.get_srcComponent()
-                self.say("online system %u component %u" % (self.status.target_system, self.status.target_component),'message')
+            if self.settings.target_system == -1 and self.settings.target_system != m.get_srcSystem():
+                self.settings.target_system = m.get_srcSystem()
+                self.say("online system %u" % self.settings.target_system,'message')
 
             if self.status.heartbeat_error:
                 self.status.heartbeat_error = False

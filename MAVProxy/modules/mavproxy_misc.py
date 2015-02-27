@@ -138,8 +138,8 @@ class MiscModule(mp_module.MPModule):
             print("usage: changealt <relaltitude>")
             return
         relalt = float(args[0])
-        self.master.mav.mission_item_send(self.status.target_system,
-                                          self.status.target_component,
+        self.master.mav.mission_item_send(self.settings.target_system,
+                                          self.settings.target_component,
                                           0,
                                           3,
                                           mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
@@ -150,22 +150,22 @@ class MiscModule(mp_module.MPModule):
     def cmd_land(self, args):
         '''auto land commands'''
         if len(args) < 1:
-            self.master.mav.command_long_send(self.status.target_system,
-                self.status.target_component,
-                mavutil.mavlink.MAV_CMD_DO_LAND_START,
-                0, 0, 0, 0, 0, 0, 0, 0)
+            self.master.mav.command_long_send(self.settings.target_system,
+                                              0,
+                                              mavutil.mavlink.MAV_CMD_DO_LAND_START,
+                                              0, 0, 0, 0, 0, 0, 0, 0)
         elif args[0] == 'abort':
-            self.master.mav.command_long_send(self.status.target_system,
-                self.status.target_component,
-                mavutil.mavlink.MAV_CMD_DO_GO_AROUND,
-                0, 0, 0, 0, 0, 0, 0, 0)
+            self.master.mav.command_long_send(self.settings.target_system,
+                                              0,
+                                              mavutil.mavlink.MAV_CMD_DO_GO_AROUND,
+                                              0, 0, 0, 0, 0, 0, 0, 0)
         else:
             print("Usage: land [abort]")
 
     def cmd_version(self, args):
         '''show version'''
-        self.master.mav.command_long_send(self.status.target_system,
-                                          self.status.target_component,
+        self.master.mav.command_long_send(self.settings.target_system,
+                                          self.settings.target_component,
                                           mavutil.mavlink.MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES,
                                           0,
                                           1, 0, 0, 0, 0, 0, 0)

@@ -47,7 +47,8 @@ class OutputModule(mp_module.MPModule):
         device = args[0]
         print("Adding output %s" % device)
         try:
-            conn = mavutil.mavlink_connection(device, input=False)
+            conn = mavutil.mavlink_connection(device, input=False, source_system=self.settings.source_system)
+            conn.mav.srcComponent = self.settings.source_component
         except Exception:
             print("Failed to connect to %s" % device)
             return
@@ -71,6 +72,13 @@ class OutputModule(mp_module.MPModule):
                 conn.close()
                 self.mpstate.mav_outputs.pop(i)
                 return
+
+    def idle_task(self):
+        '''called on idle'''
+        for m in self.mpstate.mav_outputs:
+            m.source_system = self.settings.source_system
+            m.mav.srcSystem = m.source_system
+            m.mav.srcComponent = self.settings.source_component
         
 def init(mpstate):
     '''initialise module'''

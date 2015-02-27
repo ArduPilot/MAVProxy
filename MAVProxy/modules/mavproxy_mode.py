@@ -58,8 +58,8 @@ class ModeModule(mp_module.MPModule):
             altitude = int(args[0])
             
         print("Guided %s %d" % (str(latlon), altitude))
-        self.master.mav.mission_item_send (self.status.target_system,
-                                           self.status.target_component,
+        self.master.mav.mission_item_send (self.settings.target_system,
+                                           self.settings.target_component,
                                            0,
                                            self.module('wp').get_default_frame(),
                                            mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
