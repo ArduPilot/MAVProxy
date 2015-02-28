@@ -1,0 +1,11 @@
+[camera0]
+# for no camera set type = 0, for webcam set type = 1
+type = 2
+#width = 640
+#height = 480
+#horizontal-fov = 70.42
+#vertical-fov = 43.3
+#video_output_file = ~/smartcamera-%%Y-%%m-%%d-%%H-%%M.avi
+
+[general]
+#debug = True
