@@ -27,7 +27,7 @@
 #****************************************************************************
 
 # System Header files and Module Headers
-import time, math
+import time, math, sched
 
 # Module Dependent Headers
 from pymavlink import mavutil
@@ -68,12 +68,20 @@ class SmartCameraModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(SmartCameraModule, self).__init__(mpstate, "SmartCamera", "SmartCamera commands")
         self.add_command('camtrigger', self.__vCmdCamTrigger, "Trigger camera")
+        self.add_command('connectcams', self.__vCmdConnectCameras, "Connect to Cameras")
+        self.add_command('setCamISO', self.__vCmdSetCamISO, "Set Camera ISO")
+        self.CamRetryScheduler = sched.scheduler(time.time, time.sleep)
+        self.WirelessPort = "eth1"
+        self.u8RetryTimeout = 0
+        self.u8MaxRetries = 5
         self.__vRegisterCameras()
  
  #****************************************************************************
- #   Method Name     : __vRegisterCameras
+ #   Method Name     : __vRegisterQXCamera
  #
- #   Description     : Creates camera objects based on camera-type configuration
+ #   Description     : Tries to connect to a QX camera on the specified Wireless
+ #                     port. If no camera is found it will retry every 5 seconds
+ #                     until u8MaxRetries is reached.
  #
  #   Parameters      : None
  #
@@ -82,6 +90,34 @@ class SmartCameraModule(mp_module.MPModule):
  #   Autor           : Jaime Machuca
  #
  #****************************************************************************
+
+    def __vRegisterQXCamera(self,u8CamNumber):
+        if (self.u8RetryTimeout < self.u8MaxRetries):
+            new_camera = SmartCamera_SonyQX(u8CamNumber, self.WirelessPort)
+            if new_camera.boValidCameraFound() is True:
+                self.camera_list = self.camera_list + [new_camera]
+                print("Found QX Camera")
+            else:
+                print("No Valid Camera Found, retry in 5 sec")
+                self.u8RetryTimeout = self.u8RetryTimeout + 1
+                self.CamRetryScheduler.enter(5, 1, self.__vRegisterQXCamera, [u8CamNumber])
+                self.CamRetryScheduler.run()
+        else:
+            print("Max retries reached, No QX Camera Found")
+            self.u8RetryTimeout = 0
+
+#****************************************************************************
+#   Method Name     : __vRegisterCameras
+#
+#   Description     : Creates camera objects based on camera-type configuration
+#
+#   Parameters      : None
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
 
     def __vRegisterCameras(self):
         
@@ -99,11 +135,8 @@ class SmartCameraModule(mp_module.MPModule):
             
             # Sony QX1
             if camera_type == 2:
-                new_camera = SmartCamera_SonyQX(i,"wlan0")
-                if new_camera.boValidCameraFound() is True:
-                    self.camera_list = self.camera_list + [new_camera]
-                    print("Found QX Camera")
-
+                self.__vRegisterQXCamera(i)
+    
         # display number of cameras found
         print ("cameras found: %d" % len(self.camera_list))
 
@@ -122,13 +155,55 @@ class SmartCameraModule(mp_module.MPModule):
 
     def __vCmdCamTrigger(self, CAMERA_FEEDBACK):
         '''Trigger Camera'''
-        print(self.camera_list)
+        #print(self.camera_list)
         for cam in self.camera_list:
             cam.take_picture()
+            print time.time()
             print("Trigger Cam %s" % cam)
-            print ("Latitude: %f" % CAMERA_FEEDBACK.lat)
-            print ("Longitude: %f" % CAMERA_FEEDBACK.lng)
-            print ("Altitude: %f" % CAMERA_FEEDBACK.alt_msl)
+
+#****************************************************************************
+#   Method Name     : __vCmdConnectCameras
+#
+#   Description     : Initiates connection to cameras
+#
+#   Parameters      : None
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+    def __vCmdConnectCameras(self, args):
+        '''ToDo: Validate the argument as a valid port'''
+        if len(args) >= 1:
+            self.WirelessPort = args[0]
+        print ("Connecting to Cameras on %s" % self.WirelessPort)
+        self.__vRegisterCameras()
+
+#****************************************************************************
+#   Method Name     : __vCmdSetCamISO
+#
+#   Description     : Sets the ISO value for the camera
+#
+#   Parameters      : Cam Number, ISO Value
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+    def __vCmdSetCamISO(self, args):
+        '''ToDo: Validate CAM number and Valid ISO Value'''
+        if len(args) == 1:
+            for cam in self.camera_list:
+                cam.boSetISO(args[0])
+        elif len(args) == 2:
+            cam = self.camera_list[int(args[1])]
+            cam.boSetISO(int(args[0]))
+        else:
+            print ("Usage: setCamISO ISOVALUE [CAMNUMBER]")
 
 #****************************************************************************
 #   Method Name     : mavlink_packet
