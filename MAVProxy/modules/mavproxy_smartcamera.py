@@ -72,6 +72,7 @@ class SmartCameraModule(mp_module.MPModule):
         self.add_command('setCamISO', self.__vCmdSetCamISO, "Set Camera ISO")
         self.add_command('setCamAperture', self.__vCmdSetCamAperture, "Set Camera Aperture")
         self.add_command('setCamShutterSpeed', self.__vCmdSetCamShutterSpeed, "Set Camera Shutter Speed")
+        self.add_command('setCamExposureMode', self.__vCmdSetCamExposureMode, "Set Camera Exposure Mode")
         self.CamRetryScheduler = sched.scheduler(time.time, time.sleep)
         self.WirelessPort = "eth1"
         self.u8RetryTimeout = 0
@@ -181,6 +182,32 @@ class SmartCameraModule(mp_module.MPModule):
             self.WirelessPort = args[0]
         print ("Connecting to Cameras on %s" % self.WirelessPort)
         self.__vRegisterCameras()
+
+#****************************************************************************
+#   Method Name     : __vCmdSetCamExposureMode
+#
+#   Description     : Sets the camera exposure mode
+#
+#   Parameters      : Exposure Mode, Cam number
+#                     Valid values are Program Auto, Aperture, Shutter, Manual
+#                     Intelligent Auto, Superior Auto
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+    def __vCmdSetCamExposureMode(self, args):
+        '''ToDo: Validate CAM number and Valid Mode Values'''
+        if len(args) == 1:
+            for cam in self.camera_list:
+                cam.boSetExposureMode(args[0])
+        elif len(args) == 2:
+            cam = self.camera_list[int(args[1])]
+            cam.boSetExposureMode(args[0])
+        else:
+            print ("Usage: setCamExposureMode MODE [CAMNUMBER], Valid values for MODE: Program Auto, Aperture, Shutter, Manual, Intelligent Auto, Superior Auto")
 
 #****************************************************************************
 #   Method Name     : __vCmdSetCamAperture
