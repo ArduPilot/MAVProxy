@@ -366,12 +366,20 @@ class SmartCamera_SonyQX():
 
         # Send command to set Exposure Mode
         sResponse = self.__sSimpleCall("setFNumber", adictParams=[sFValue])
-            
+        
         # Check response for a succesful result
         if 'result' in sResponse:
+            sResponse = self.__sSimpleCall("getFNumber")
+            
+            if sFValue not in sResponse["result"]:
+                print ("Failed to set aperture, current value: %s" %sResponse["result"])
+                return False
+            
+            print ("Aperture set to %s" % sFValue)
             return True
             
         # In case of an error, return false
+        print ("Failed to set aperture")
         return False
 
 #****************************************************************************

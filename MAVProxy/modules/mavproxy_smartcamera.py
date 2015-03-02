@@ -70,6 +70,7 @@ class SmartCameraModule(mp_module.MPModule):
         self.add_command('camtrigger', self.__vCmdCamTrigger, "Trigger camera")
         self.add_command('connectcams', self.__vCmdConnectCameras, "Connect to Cameras")
         self.add_command('setCamISO', self.__vCmdSetCamISO, "Set Camera ISO")
+        self.add_command('setCamAperture', self.__vCmdSetCamAperture, "Set Camera Aperture")
         self.CamRetryScheduler = sched.scheduler(time.time, time.sleep)
         self.WirelessPort = "eth1"
         self.u8RetryTimeout = 0
@@ -182,11 +183,35 @@ class SmartCameraModule(mp_module.MPModule):
         self.__vRegisterCameras()
 
 #****************************************************************************
+#   Method Name     : __vCmdSetCamAperture
+#
+#   Description     : Sets the camera aperture
+#
+#   Parameters      : Aperture Value, Cam number
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+    def __vCmdSetCamAperture(self, args):
+        '''ToDo: Validate CAM number and Valid Aperture Value'''
+        if len(args) == 1:
+            for cam in self.camera_list:
+                cam.boSetAperture(int(args[0]))
+        elif len(args) == 2:
+            cam = self.camera_list[int(args[1])]
+            cam.boSetAperture(int(args[0]))
+        else:
+            print ("Usage: setCamAperture APERTURE [CAMNUMBER], APERTURE is value x10")
+
+#****************************************************************************
 #   Method Name     : __vCmdSetCamISO
 #
 #   Description     : Sets the ISO value for the camera
 #
-#   Parameters      : Cam Number, ISO Value
+#   Parameters      : ISO Value, Cam Number
 #
 #   Return Value    : None
 #
@@ -198,7 +223,7 @@ class SmartCameraModule(mp_module.MPModule):
         '''ToDo: Validate CAM number and Valid ISO Value'''
         if len(args) == 1:
             for cam in self.camera_list:
-                cam.boSetISO(args[0])
+                cam.boSetISO(int(args[0]))
         elif len(args) == 2:
             cam = self.camera_list[int(args[1])]
             cam.boSetISO(int(args[0]))
