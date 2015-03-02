@@ -333,15 +333,24 @@ class SmartCamera_SonyQX():
     def boSetShutterSpeed(self,u16ShutterSpeed):
         # Create Shutter Speed String
         sShutterSpeed = "1/%s" % str(u16ShutterSpeed)
-        
+
         # Send command to set Exposure Mode
         sResponse = self.__sSimpleCall("setShutterSpeed", adictParams=[sShutterSpeed])
             
         # Check response for a succesful result
         if 'result' in sResponse:
+            time.sleep(0.25)
+            sResponse = self.__sSimpleCall("getShutterSpeed")
+            
+            if sShutterSpeed not in sResponse["result"]:
+                print ("Failed to set Shutter Speed, current value: %s" %sResponse["result"])
+                return False
+
+            print ("Shutter Speed set to %s" % sShutterSpeed)
             return True
-    
+        
         # In case of an error, return false
+        print ("Failed to set Shutter Speed")
         return False
 
 #****************************************************************************
@@ -369,6 +378,7 @@ class SmartCamera_SonyQX():
         
         # Check response for a succesful result
         if 'result' in sResponse:
+            time.sleep(0.25)
             sResponse = self.__sSimpleCall("getFNumber")
             
             if sFValue not in sResponse["result"]:
