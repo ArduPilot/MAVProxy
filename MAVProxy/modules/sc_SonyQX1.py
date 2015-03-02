@@ -305,7 +305,7 @@ class SmartCamera_SonyQX():
 
     def boSetExposureMode(self,sExposureMode):
         # Send command to set Exposure Mode
-        sResponse = self.__sSimpleCall("setExposureMode", params=[sExposureMode])
+        sResponse = self.__sSimpleCall("setExposureMode", adictParams=[sExposureMode])
         
         # Check response for a succesful result
         if 'result' in sResponse:
@@ -335,7 +335,7 @@ class SmartCamera_SonyQX():
         sShutterSpeed = "1/%s" % str(u16ShutterSpeed)
         
         # Send command to set Exposure Mode
-        sResponse = self.__sSimpleCall("setShutterSpeed", params=[sShutterSpeed])
+        sResponse = self.__sSimpleCall("setShutterSpeed", adictParams=[sShutterSpeed])
             
         # Check response for a succesful result
         if 'result' in sResponse:
@@ -365,7 +365,7 @@ class SmartCamera_SonyQX():
         sFValue = str(fFvalue)
 
         # Send command to set Exposure Mode
-        sResponse = self.__sSimpleCall("setFNumber", params=[sFValue])
+        sResponse = self.__sSimpleCall("setFNumber", adictParams=[sFValue])
             
         # Check response for a succesful result
         if 'result' in sResponse:
@@ -394,14 +394,40 @@ class SmartCamera_SonyQX():
         sISO = str(u16ISO)
         
         # Send command to set Exposure Mode
-        sResponse = self.__sSimpleCall("setIsoSpeedRate", params=[sISO])
-            
+        sResponse = self.__sSimpleCall("setIsoSpeedRate", adictParams=[sISO])
+       
         # Check response for a succesful result
         if 'result' in sResponse:
+            sResponse = self.__sSimpleCall("getIsoSpeedRate")
+
+            if sISO not in sResponse["result"]:
+                print ("Failed to Set ISO, current value: %s" %sResponse["result"])
+                return False
+            
+            print ("ISO set to %s" % sISO)
             return True
         
         # In case of an error, return false
+        print ("Failed to Set ISO")
         return False
+
+#****************************************************************************
+#   Method Name     : __vAddGeotagToLog
+#
+#   Description     : Adds an entry to the log file with the name of the image
+#                     and geoposition and orientation of the shot.
+#
+#   Parameters      : Image file name, position, orientation
+#
+#   Return Value    : True if succesful
+#                     False if no URL was recieved for the image
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+    def __boAddGeotagToLog(self, sImageFileName):
+        return True
 
 #****************************************************************************
 #   Method Name     : boTakePicture
@@ -424,6 +450,7 @@ class SmartCamera_SonyQX():
         # Check response for a succesful result and save latest image URL
         if 'result' in sResponse:
             self.sLatestImageURL = sResponse['result'][0][0]
+            self.__boAddGeotagToLog(self.sLatestImageURL)
             self.u32ImgCounter = self.u32ImgCounter+1
             return True
 
