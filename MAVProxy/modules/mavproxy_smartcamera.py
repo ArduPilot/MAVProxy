@@ -71,6 +71,7 @@ class SmartCameraModule(mp_module.MPModule):
         self.add_command('connectcams', self.__vCmdConnectCameras, "Connect to Cameras")
         self.add_command('setCamISO', self.__vCmdSetCamISO, "Set Camera ISO")
         self.add_command('setCamAperture', self.__vCmdSetCamAperture, "Set Camera Aperture")
+        self.add_command('setCamShutterSpeed', self.__vCmdSetCamShutterSpeed, "Set Camera Shutter Speed")
         self.CamRetryScheduler = sched.scheduler(time.time, time.sleep)
         self.WirelessPort = "eth1"
         self.u8RetryTimeout = 0
@@ -159,7 +160,6 @@ class SmartCameraModule(mp_module.MPModule):
         #print(self.camera_list)
         for cam in self.camera_list:
             cam.take_picture()
-            print time.time()
             print("Trigger Cam %s" % cam)
 
 #****************************************************************************
@@ -205,6 +205,30 @@ class SmartCameraModule(mp_module.MPModule):
             cam.boSetAperture(int(args[0]))
         else:
             print ("Usage: setCamAperture APERTURE [CAMNUMBER], APERTURE is value x10")
+
+#****************************************************************************
+#   Method Name     : __vCmdSetCamShutterSpeed
+#
+#   Description     : Sets the shutter speed for the camera
+#
+#   Parameters      : Shutter speed, Cam Number
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+    def __vCmdSetCamShutterSpeed(self, args):
+        '''ToDo: Validate CAM number and Valid Shutter Speed'''
+        if len(args) == 1:
+            for cam in self.camera_list:
+                cam.boSetShutterSpeed(int(args[0]))
+        elif len(args) == 2:
+            cam = self.camera_list[int(args[1])]
+            cam.boSetShutterSpeed(int(args[0]))
+        else:
+            print ("Usage: setCamShutterSpeed SHUTTERVALUE [CAMNUMBER], Shutter value is the devisor in 1/x (only works for values smaller than 1)")
 
 #****************************************************************************
 #   Method Name     : __vCmdSetCamISO
