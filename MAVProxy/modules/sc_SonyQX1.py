@@ -309,9 +309,18 @@ class SmartCamera_SonyQX():
         
         # Check response for a succesful result
         if 'result' in sResponse:
+            time.sleep(0.25)
+            sResponse = self.__sSimpleCall("getExposureMode")
+            
+            if sExposureMode not in sResponse["result"]:
+                print ("Failed to set Exposure Mode, current value: %s" %sResponse["result"])
+                return False
+            
+            print ("Exposure Mode set to %s" % sExposureMode)
             return True
-
+        
         # In case of an error, return false
+        print ("Failed to set Exposure Mode")
         return False
 
 #****************************************************************************
