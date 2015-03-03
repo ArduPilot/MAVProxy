@@ -305,6 +305,14 @@ class SmartCameraModule(mp_module.MPModule):
             self.__vCmdCamTrigger(m)
         if mtype == "COMMAND_LONG":
             print ("Recieved Command Long")
+            print m.command
+            print m.param1
+            print m.param2
+            print m.param3
+            print m.param4
+            print m.param5
+            print m.param6
+            print m.param7
 
 #****************************************************************************
 #   Method Name     : init
