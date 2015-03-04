@@ -28,6 +28,7 @@
 
 # System Header files and Module Headers
 import time, math, sched
+from enum import IntEnum
 
 # Module Dependent Headers
 from pymavlink import mavutil
@@ -39,6 +40,17 @@ from MAVProxy.modules.lib.mp_settings import MPSetting
 from sc_webcam import SmartCameraWebCam
 from sc_SonyQX1 import SmartCamera_SonyQX
 import sc_config
+
+#****************************************************************************
+# LOCAL DEFINES
+#****************************************************************************
+class enExposureMode(IntEnum):
+    ProgramAuto = 1
+    Aperture = 2
+    Shutter = 3
+    Manual = 4
+    IntelligentAuto = 5
+    SuperiorAuto = 6
 
 #****************************************************************************
 # Class name       : SmartCameraModule
@@ -156,7 +168,7 @@ class SmartCameraModule(mp_module.MPModule):
 #
 #****************************************************************************
 
-    def __vCmdCamTrigger(self, CAMERA_FEEDBACK):
+    def __vCmdCamTrigger(self):
         '''Trigger Camera'''
         #print(self.camera_list)
         for cam in self.camera_list:
@@ -282,6 +294,63 @@ class SmartCameraModule(mp_module.MPModule):
             print ("Usage: setCamISO ISOVALUE [CAMNUMBER]")
 
 #****************************************************************************
+#   Method Name     : __vDecodeDIGICAMConfigure
+#
+#   Description     : Decode and process the camera configuration Messages
+#
+#   Parameters      : CommandLong Message
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+    def __vDecodeDIGICAMConfigure(self, mCommand_Long):
+        if mCommand_Long.param1 != 0:   '''Mode'''
+            if mCommand_Long.param1 == enExposureMode.Auto:
+                self.__vCmdSetCamExposureMode("Program Auto")
+            elif mCommand_Long.param1 == enExposureMode.Aperture:
+                self.__vCmdSetCamExposureMode("Aperture")
+            elif mCommand_Long.param1 == enExposureMode.Shutter:
+                self.__vCmdSetCamExposureMode("Shutter")
+        
+        if mCommand_Long.param2 != 0:   '''Shutter Speed'''
+            self.__vCmdSetCamShutterSpeed(mCommand_Long.param2)
+        
+        if mCommand_Long.param3 != 0:   '''Aperture'''
+            self.__vCmdSetCamAperture(mCommand_Long.param3)
+        
+        if mCommand_Long.param4 != 0:   '''ISO'''
+            self.__vCmdSetCamISO(mCommand_Long.param4)
+        
+        if mCommand_Long.param5 != 0:   '''Exposure Type'''
+
+
+#****************************************************************************
+#   Method Name     : __vDecodeDIGICAMControl
+#
+#   Description     : Decode and process the camera control Messages
+#
+#   Parameters      : CommandLong Message
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+    def __vDecodeDIGICAMControl(self, mCommand_Long):
+        if mCommand_Long.param1 != 0:   '''Session'''
+        if mCommand_Long.param2 != 0:   '''Zoom Position'''
+        if mCommand_Long.param3 != 0:   '''Zooming Step Value'''
+        if mCommand_Long.param4 != 0:   '''Focus 0=Unlock/1=Lock/2=relock'''
+        if mCommand_Long.param5 != 0:   '''Trigger'''
+            self.__vCmdCamTrigger()
+
+
+
+#****************************************************************************
 #   Method Name     : mavlink_packet
 #
 #   Description     : MAVProxy requiered callback function used to recieve MAVlink
@@ -302,17 +371,14 @@ class SmartCameraModule(mp_module.MPModule):
             print ("Got Message camera_status")
         if mtype == "CAMERA_FEEDBACK":
             print ("Got Message camera_feedback triggering Cameras")
-            self.__vCmdCamTrigger(m)
+            self.__vCmdCamTrigger()
         if mtype == "COMMAND_LONG":
-            print ("Recieved Command Long")
-            print m.command
-            print m.param1
-            print m.param2
-            print m.param3
-            print m.param4
-            print m.param5
-            print m.param6
-            print m.param7
+            if m.command == mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONFIGURE:
+                print ("Got Message Digicam_configure")
+                self.__vDecodeDIGICAMConfigure(m)
+            elif m.command == mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONTROL:
+                print ("Got Message Digicam_control")
+                self.__vDecodeDIGICAMControl(m)
 
 #****************************************************************************
 #   Method Name     : init
