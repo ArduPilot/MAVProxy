@@ -307,13 +307,13 @@ class SmartCameraModule(mp_module.MPModule):
 #****************************************************************************
 
     def __vDecodeDIGICAMConfigure(self, mCommand_Long):
-        if mCommand_Long.param1 != 0:
-            if mCommand_Long.param1 == enExposureMode.Auto:
-                self.__vCmdSetCamExposureMode("Program Auto")
-            elif mCommand_Long.param1 == enExposureMode.Aperture:
-                self.__vCmdSetCamExposureMode("Aperture")
-            elif mCommand_Long.param1 == enExposureMode.Shutter:
-                self.__vCmdSetCamExposureMode("Shutter")
+#        if mCommand_Long.param1 != 0:
+#            if mCommand_Long.param1 == enExposureMode.Auto:
+#                self.__vCmdSetCamExposureMode("Program Auto")
+#            elif mCommand_Long.param1 == enExposureMode.Aperture:
+#                self.__vCmdSetCamExposureMode("Aperture")
+#            elif mCommand_Long.param1 == enExposureMode.Shutter:
+#                self.__vCmdSetCamExposureMode("Shutter")
 
         '''Shutter Speed'''
         if mCommand_Long.param2 != 0:
