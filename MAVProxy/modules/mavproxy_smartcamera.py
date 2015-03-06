@@ -28,7 +28,6 @@
 
 # System Header files and Module Headers
 import time, math, sched
-import enum
 
 # Module Dependent Headers
 from pymavlink import mavutil
@@ -44,13 +43,7 @@ import sc_config
 #****************************************************************************
 # LOCAL DEFINES
 #****************************************************************************
-class enExposureMode(IntEnum):
-    ProgramAuto = 1
-    Aperture = 2
-    Shutter = 3
-    Manual = 4
-    IntelligentAuto = 5
-    SuperiorAuto = 6
+
 
 #****************************************************************************
 # Class name       : SmartCameraModule
@@ -86,6 +79,12 @@ class SmartCameraModule(mp_module.MPModule):
         self.add_command('setCamShutterSpeed', self.__vCmdSetCamShutterSpeed, "Set Camera Shutter Speed")
         self.add_command('setCamExposureMode', self.__vCmdSetCamExposureMode, "Set Camera Exposure Mode")
         self.CamRetryScheduler = sched.scheduler(time.time, time.sleep)
+        self.ProgramAuto = 1
+        self.Aperture = 2
+        self.Shutter = 3
+        self.Manual = 4
+        self.IntelligentAuto = 5
+        self.SuperiorAuto = 6
         self.WirelessPort = "eth1"
         self.u8RetryTimeout = 0
         self.u8MaxRetries = 5
@@ -307,13 +306,13 @@ class SmartCameraModule(mp_module.MPModule):
 #****************************************************************************
 
     def __vDecodeDIGICAMConfigure(self, mCommand_Long):
-#        if mCommand_Long.param1 != 0:
-#            if mCommand_Long.param1 == enExposureMode.Auto:
-#                self.__vCmdSetCamExposureMode("Program Auto")
-#            elif mCommand_Long.param1 == enExposureMode.Aperture:
-#                self.__vCmdSetCamExposureMode("Aperture")
-#            elif mCommand_Long.param1 == enExposureMode.Shutter:
-#                self.__vCmdSetCamExposureMode("Shutter")
+        if mCommand_Long.param1 != 0:
+            if mCommand_Long.param1 == self.Auto:
+                self.__vCmdSetCamExposureMode("Program Auto")
+            elif mCommand_Long.param1 == self.Aperture:
+                self.__vCmdSetCamExposureMode("Aperture")
+            elif mCommand_Long.param1 == self.Shutter:
+                self.__vCmdSetCamExposureMode("Shutter")
 
         '''Shutter Speed'''
         if mCommand_Long.param2 != 0:
