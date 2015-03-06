@@ -167,7 +167,7 @@ class SmartCameraModule(mp_module.MPModule):
 #
 #****************************************************************************
 
-    def __vCmdCamTrigger(self):
+    def __vCmdCamTrigger(self, args):
         '''Trigger Camera'''
         #print(self.camera_list)
         for cam in self.camera_list:
