@@ -307,24 +307,25 @@ class SmartCameraModule(mp_module.MPModule):
 #****************************************************************************
 
     def __vDecodeDIGICAMConfigure(self, mCommand_Long):
-        if mCommand_Long.param1 != 0: 
+        if mCommand_Long.param1 != 0:
             if mCommand_Long.param1 == enExposureMode.Auto:
                 self.__vCmdSetCamExposureMode("Program Auto")
             elif mCommand_Long.param1 == enExposureMode.Aperture:
                 self.__vCmdSetCamExposureMode("Aperture")
             elif mCommand_Long.param1 == enExposureMode.Shutter:
                 self.__vCmdSetCamExposureMode("Shutter")
-        
-        if mCommand_Long.param2 != 0:   '''Shutter Speed'''
+
+        '''Shutter Speed'''
+        if mCommand_Long.param2 != 0:
             self.__vCmdSetCamShutterSpeed(mCommand_Long.param2)
-        
-        if mCommand_Long.param3 != 0:   '''Aperture'''
+        '''Aperture'''
+        if mCommand_Long.param3 != 0:
             self.__vCmdSetCamAperture(mCommand_Long.param3)
-        
-        if mCommand_Long.param4 != 0:   '''ISO'''
+        '''ISO'''
+        if mCommand_Long.param4 != 0:
             self.__vCmdSetCamISO(mCommand_Long.param4)
-        
-        if mCommand_Long.param5 != 0:   '''Exposure Type'''
+        '''Exposure Type'''
+        if mCommand_Long.param5 != 0:
 
 
 #****************************************************************************
@@ -341,11 +342,16 @@ class SmartCameraModule(mp_module.MPModule):
 #****************************************************************************
 
     def __vDecodeDIGICAMControl(self, mCommand_Long):
-        if mCommand_Long.param1 != 0:   '''Session'''
-        if mCommand_Long.param2 != 0:   '''Zoom Position'''
-        if mCommand_Long.param3 != 0:   '''Zooming Step Value'''
-        if mCommand_Long.param4 != 0:   '''Focus 0=Unlock/1=Lock/2=relock'''
-        if mCommand_Long.param5 != 0:   '''Trigger'''
+        '''Session'''
+        if mCommand_Long.param1 != 0:
+        '''Zooming Step Value'''
+        if mCommand_Long.param2 != 0:
+        '''Zooming Step Value'''
+        if mCommand_Long.param3 != 0:
+        '''Focus 0=Unlock/1=Lock/2=relock'''
+        if mCommand_Long.param4 != 0:
+        '''Trigger'''
+        if mCommand_Long.param5 != 0:
             self.__vCmdCamTrigger()
 
 
