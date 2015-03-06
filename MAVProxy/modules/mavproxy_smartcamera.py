@@ -307,7 +307,7 @@ class SmartCameraModule(mp_module.MPModule):
 #****************************************************************************
 
     def __vDecodeDIGICAMConfigure(self, mCommand_Long):
-        if mCommand_Long.param1 != 0:   '''Mode'''
+        if mCommand_Long.param1 != 0: 
             if mCommand_Long.param1 == enExposureMode.Auto:
                 self.__vCmdSetCamExposureMode("Program Auto")
             elif mCommand_Long.param1 == enExposureMode.Aperture:
