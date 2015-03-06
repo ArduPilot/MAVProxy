@@ -28,7 +28,7 @@
 
 # System Header files and Module Headers
 import time, math, sched
-from enum import IntEnum
+import enum
 
 # Module Dependent Headers
 from pymavlink import mavutil
