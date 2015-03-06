@@ -326,6 +326,7 @@ class SmartCameraModule(mp_module.MPModule):
             self.__vCmdSetCamISO(mCommand_Long.param4)
         '''Exposure Type'''
         if mCommand_Long.param5 != 0:
+            return
 
 
 #****************************************************************************
