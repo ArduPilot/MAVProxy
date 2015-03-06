@@ -345,12 +345,20 @@ class SmartCameraModule(mp_module.MPModule):
     def __vDecodeDIGICAMControl(self, mCommand_Long):
         '''Session'''
         if mCommand_Long.param1 != 0:
+            return
+        
         '''Zooming Step Value'''
         if mCommand_Long.param2 != 0:
+            return
+        
         '''Zooming Step Value'''
         if mCommand_Long.param3 != 0:
+            return
+        
         '''Focus 0=Unlock/1=Lock/2=relock'''
         if mCommand_Long.param4 != 0:
+            return
+        
         '''Trigger'''
         if mCommand_Long.param5 != 0:
             self.__vCmdCamTrigger()
