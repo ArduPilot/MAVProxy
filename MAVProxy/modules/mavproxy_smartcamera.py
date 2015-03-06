@@ -85,7 +85,7 @@ class SmartCameraModule(mp_module.MPModule):
         self.Manual = 4
         self.IntelligentAuto = 5
         self.SuperiorAuto = 6
-        self.WirelessPort = "eth1"
+        self.WirelessPort = "wlan0"
         self.u8RetryTimeout = 0
         self.u8MaxRetries = 5
         self.__vRegisterCameras()
