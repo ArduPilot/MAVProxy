@@ -683,6 +683,8 @@ def main_loop():
             line = mpstate.input_queue.get()
             mpstate.input_count += 1
             cmds = line.split(';')
+            if len(cmds) == 1 and cmds[0] == "":
+                  mpstate.empty_input_count += 1                 
             for c in cmds:
                 process_stdin(c)
 
@@ -919,6 +921,7 @@ if __name__ == '__main__':
 
     mpstate.input_queue = Queue.Queue()
     mpstate.input_count = 0
+    mpstate.empty_input_count = 0
     if opts.setup:
         mpstate.rl.set_prompt("")
 
