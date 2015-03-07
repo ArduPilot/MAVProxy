@@ -32,7 +32,7 @@ class ArmModule(mp_module.MPModule):
 
     def cmd_arm(self, args):
         '''arm commands'''
-        usage = "usage: arm <check|uncheck|list|throttle>"
+        usage = "usage: arm <check|uncheck|list|throttle|safetyon|safetyoff>"
         checkables = "<all|baro|compass|gps|ins|params|rc|voltage|battery>"
 
         if len(args) <= 0:
