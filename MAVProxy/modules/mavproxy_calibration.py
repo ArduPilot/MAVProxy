@@ -18,7 +18,7 @@ class CalibrationModule(mp_module.MPModule):
         self.accelcal_count = -1
         self.accelcal_wait_enter = False
         self.compassmot_running = False
-        self.input_count = 0
+        self.empty_input_count = 0
 
     def cmd_ground(self, args):
         '''do a ground start mode'''
@@ -53,12 +53,12 @@ class CalibrationModule(mp_module.MPModule):
                 text = str(m.text)
                 if text.startswith('Place '):
                     self.accelcal_wait_enter = True
-                    self.input_count = self.mpstate.input_count
+                    self.empty_input_count = self.mpstate.empty_input_count
 
     def idle_task(self):
         '''handle mavlink packets'''
         if self.accelcal_count != -1:
-            if self.accelcal_wait_enter and self.input_count != self.mpstate.input_count:
+            if self.accelcal_wait_enter and self.empty_input_count != self.mpstate.empty_input_count:
                 self.accelcal_wait_enter = False
                 self.accelcal_count += 1
                 # tell the APM that user has done as requested
@@ -67,7 +67,7 @@ class CalibrationModule(mp_module.MPModule):
                     self.accelcal_count = -1
 
         if self.compassmot_running:
-            if self.mpstate.input_count != self.input_count:
+            if self.mpstate.empty_input_count != self.empty_input_count:
                 # user has hit enter, stop the process
                     self.compassmot_running = False
                     print("sending stop")
@@ -82,7 +82,7 @@ class CalibrationModule(mp_module.MPModule):
                                   mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, 0,
                                   0, 0, 0, 0, 0, 1, 0)
         self.compassmot_running = True
-        self.input_count = self.mpstate.input_count
+        self.empty_input_count = self.mpstate.empty_input_count
 
     def cmd_calpressure(self, args):
         '''calibrate pressure sensors'''
