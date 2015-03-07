@@ -14,6 +14,7 @@ class CalibrationModule(mp_module.MPModule):
         self.add_command('compassmot', self.cmd_compassmot, 'do compass/motor interference calibration')
         self.add_command('calpress', self.cmd_calpressure,'calibrate pressure sensors')
         self.add_command('accelcal', self.cmd_accelcal, 'do 3D accelerometer calibration')
+        self.add_command('gyrocal', self.cmd_gyrocal, 'do gyro calibration')
         self.accelcal_count = -1
         self.accelcal_wait_enter = False
         self.compassmot_running = False
@@ -36,6 +37,13 @@ class CalibrationModule(mp_module.MPModule):
                                   0, 0, 0, 0, 1, 0, 0)
         self.accelcal_count = 0
         self.accelcal_wait_enter = False
+
+    def cmd_gyrocal(self, args):
+        '''do a full gyro calibration'''
+        mav = self.master
+        mav.mav.command_long_send(mav.target_system, mav.target_component,
+                                  mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, 0,
+                                  1, 0, 0, 0, 0, 0, 0)
 
     def mavlink_packet(self, m):
         '''handle mavlink packets'''
