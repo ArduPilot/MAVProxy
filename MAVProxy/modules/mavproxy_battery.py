@@ -41,7 +41,7 @@ class BatteryModule(mp_module.MPModule):
         battery_string = ''
         if batt_mon == 3:
             battery_string = 'Batt: %.2fV' % (float(self.voltage_level) / 1000.0)
-        elif batt_mon == 4:
+        elif batt_mon >= 4:
             battery_string = 'Batt: %u%%/%.2fV %.1fA' % (self.battery_level, (float(self.voltage_level) / 1000.0), self.current_battery / 100.0 )
         if self.battery2_voltage != -1:
             battery_string += ' %.2fV' % self.battery2_voltage
