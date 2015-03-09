@@ -385,7 +385,7 @@ class SmartCameraModule(mp_module.MPModule):
             print ("Got Message camera_status")
         if mtype == "CAMERA_FEEDBACK":
             print ("Got Message camera_feedback triggering Cameras")
-            self.__vCmdCamTrigger()
+            self.__vCmdCamTrigger(m)
         if mtype == "COMMAND_LONG":
             if m.command == mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONFIGURE:
                 print ("Got Message Digicam_configure")
