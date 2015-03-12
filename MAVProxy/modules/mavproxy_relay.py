@@ -10,6 +10,7 @@ class RelayModule(mp_module.MPModule):
         super(RelayModule, self).__init__(mpstate, "relay")
         self.add_command('relay', self.cmd_relay, "relay commands")
         self.add_command('servo', self.cmd_servo, "servo commands")
+        self.add_command('motortest', self.cmd_motortest, "motortest commands")
 
     def cmd_relay(self, args):
         '''set relays'''
@@ -58,6 +59,18 @@ class RelayModule(mp_module.MPModule):
                                                    mavutil.mavlink.MAV_CMD_DO_REPEAT_SERVO, 0,
                                                    int(args[1]), int(args[2]), int(args[3]), float(args[4]),
                                                    0, 0, 0)
+
+
+    def cmd_motortest(self, args):
+        '''run motortests on copter'''
+        if len(args) != 4:
+            print("Usage: motortest motornum type value timeout")
+            return
+        self.master.mav.command_long_send(self.target_system,
+                                          0,
+                                          mavutil.mavlink.MAV_CMD_DO_MOTOR_TEST, 0,
+                                          int(args[0]), int(args[1]), int(args[2]), int(args[3]),
+                                          0, 0, 0)
 
 
 def init(mpstate):
