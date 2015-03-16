@@ -27,6 +27,7 @@ class ConsoleModule(mp_module.MPModule):
 
         # setup some default status information
         mpstate.console.set_status('Mode', 'UNKNOWN', row=0, fg='blue')
+        mpstate.console.set_status('ARM', 'ARM', fg='grey', row=0)
         mpstate.console.set_status('GPS', 'GPS: --', fg='red', row=0)
         mpstate.console.set_status('Vcc', 'Vcc: --', fg='red', row=0)
         mpstate.console.set_status('Radio', 'Radio: --', row=0)
@@ -254,6 +255,11 @@ class ConsoleModule(mp_module.MPModule):
             self.console.set_status('Radio', 'Radio %u/%u %u/%u' % (msg.rssi, msg.noise, msg.remrssi, msg.remnoise), fg=fg)
         elif type == 'HEARTBEAT':
             self.console.set_status('Mode', '%s' % master.flightmode, fg='blue')
+            if self.master.motors_armed():
+                arm_colour = 'green'
+            else:
+                arm_colour = 'red'
+            self.console.set_status('ARM', 'ARM', fg=arm_colour)
             if self.max_link_num != len(self.mpstate.mav_master):
                 for i in range(self.max_link_num):
                     self.console.set_status('Link%u'%(i+1), '', row=1)
