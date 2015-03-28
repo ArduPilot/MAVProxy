@@ -36,6 +36,7 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('AS', 'AS', fg='grey', row=0)
         mpstate.console.set_status('RNG', 'RNG', fg='grey', row=0)
         mpstate.console.set_status('AHRS', 'AHRS', fg='grey', row=0)
+        mpstate.console.set_status('EKF', 'EKF', fg='grey', row=0)
         mpstate.console.set_status('Heading', 'Hdg ---/---', row=2)
         mpstate.console.set_status('Alt', 'Alt ---', row=2)
         mpstate.console.set_status('AGL', 'AGL ---/---', row=2)
@@ -222,6 +223,24 @@ class ConsoleModule(mp_module.MPModule):
 
         elif type == 'WIND':
             self.console.set_status('Wind', 'Wind %u/%.2f' % (msg.direction, msg.speed))
+
+        elif type == 'EKF_STATUS_REPORT':
+            highest = 0.0
+            vars = ['velocity_variance',
+                    'pos_horiz_variance',
+                    'pos_vert_variance',
+                    'compass_variance',
+                    'terrain_alt_variance']
+            for var in vars:
+                v = getattr(msg, var, 0)
+                highest = max(v, highest)
+            if highest >= 1.0:
+                fg = 'red'
+            elif highest >= 0.5:
+                fg = 'orange'
+            else:
+                fg = 'green'
+            self.console.set_status('EKF', 'EKF', fg=fg)
 
         elif type == 'HWSTATUS':
             if msg.Vcc >= 4600 and msg.Vcc <= 5300:
