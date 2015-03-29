@@ -1190,16 +1190,17 @@ class MPSlipMapPanel(wx.Panel):
         if event.Dragging() and event.ButtonIsDown(wx.MOUSE_BTN_LEFT):
             # drag map to new position
             newpos = pos
-            dx = (self.mouse_down.x - newpos.x)
-            dy = -(self.mouse_down.y - newpos.y)
-            pdist = math.sqrt(dx**2 + dy**2)
-            if pdist > state.drag_step:
-                bearing = math.degrees(math.atan2(dx, dy))
-                distance = (state.ground_width/float(state.width)) * pdist
-                newlatlon = mp_util.gps_newpos(state.lat, state.lon, bearing, distance)
-                (state.lat, state.lon) = newlatlon
-                self.mouse_down = newpos
-                self.redraw_map()
+            if self.mouse_down and newpos:
+                dx = (self.mouse_down.x - newpos.x)
+                dy = -(self.mouse_down.y - newpos.y)
+                pdist = math.sqrt(dx**2 + dy**2)
+                if pdist > state.drag_step:
+                    bearing = math.degrees(math.atan2(dx, dy))
+                    distance = (state.ground_width/float(state.width)) * pdist
+                    newlatlon = mp_util.gps_newpos(state.lat, state.lon, bearing, distance)
+                    (state.lat, state.lon) = newlatlon
+                    self.mouse_down = newpos
+                    self.redraw_map()
 
     def clear_thumbnails(self):
         '''clear all thumbnails from the map'''
