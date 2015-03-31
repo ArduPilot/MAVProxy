@@ -307,6 +307,7 @@ class SmartCameraModule(mp_module.MPModule):
 
     def __vDecodeDIGICAMConfigure(self, mCommand_Long):
         if mCommand_Long.param1 != 0:
+            print ("Exposure Mode = %d" % mCommand_Long.param1)
             if mCommand_Long.param1 == self.Auto:
                 self.__vCmdSetCamExposureMode("Program Auto")
             elif mCommand_Long.param1 == self.Aperture:
@@ -316,16 +317,19 @@ class SmartCameraModule(mp_module.MPModule):
 
         '''Shutter Speed'''
         if mCommand_Long.param2 != 0:
+            print ("Shutter Speed= %d" % mCommand_Long.param2)
             self.__vCmdSetCamShutterSpeed(mCommand_Long.param2)
         '''Aperture'''
         if mCommand_Long.param3 != 0:
+            print ("Aperture = %d" % mCommand_Long.param3)
             self.__vCmdSetCamAperture(mCommand_Long.param3)
         '''ISO'''
         if mCommand_Long.param4 != 0:
+            print ("ISO = %d" % mCommand_Long.param4)
             self.__vCmdSetCamISO(mCommand_Long.param4)
         '''Exposure Type'''
         if mCommand_Long.param5 != 0:
-            return
+            print ("Exposure type= %d" % mCommand_Long.param5)
 
 
 #****************************************************************************
@@ -344,22 +348,23 @@ class SmartCameraModule(mp_module.MPModule):
     def __vDecodeDIGICAMControl(self, mCommand_Long):
         '''Session'''
         if mCommand_Long.param1 != 0:
-            return
+            print ("Session = %d" % mCommand_Long.param1)
         
         '''Zooming Step Value'''
         if mCommand_Long.param2 != 0:
-            return
+            print ("Zooming Step = %d" % mCommand_Long.param2)
         
         '''Zooming Step Value'''
         if mCommand_Long.param3 != 0:
-            return
+            print ("Zooming Value = %d" % mCommand_Long.param3)
         
         '''Focus 0=Unlock/1=Lock/2=relock'''
         if mCommand_Long.param4 != 0:
-            return
+            print ("Focus = %d" % mCommand_Long.param4)
         
         '''Trigger'''
         if mCommand_Long.param5 != 0:
+            print ("Trigger = %d" % mCommand_Long.param5)
             self.__vCmdCamTrigger()
 
 
