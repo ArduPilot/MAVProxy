@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "MAVProxy"
-#define MyAppVersion "1.4.4"
+#define MyAppVersion "1.4.11"
 #define MyAppPublisher "Andrew Tridgell"
 #define MyAppURL "http://tridge.github.io/MAVProxy"
 #define MyAppExeName "mavproxy.exe"
@@ -38,11 +38,11 @@ Source: "..\MAVProxy\dist\mavproxy\*"; DestDir: "{app}"; Flags: ignoreversion re
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 Source: "..\windows\mavinit.scr"; DestDir: "{localappdata}\MAVProxy"; Flags: ignoreversion
 
-
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 Name: "{group}\{cm:UninstallProgram, {#MyAppName}}"; Filename: "{uninstallexe}"
+Name: "{group}\Documentation"; Filename: "http://tridge.github.io/MAVProxy/"
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
