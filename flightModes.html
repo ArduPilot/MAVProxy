@@ -45,7 +45,9 @@
           <h2>Arming/Disarming</h2>
           <p>The APM can be armed and disarmed at any time by using the <code>arm throttle</code> and <code>disarm</code> commands.</p>
 
-          <p>The pre-arming checks can be run (without actually arming the UAV) via <code>arm check</code>. A full list of these checks is given by <code>arm list</code>. To enable/disable a particular arming check, use <code>arm check n</code> and <code>arm uncheck n</code> respectively, where n is the name of the check.
+          <p>The pre-arming checks can be run (without actually arming the UAV) via <code>arm check</code>. A full list of these checks is given by <code>arm list</code>. To enable/disable a particular arming check, use <code>arm check n</code> and <code>arm uncheck n</code> respectively, where n is the name of the check.</p>
+          
+          <p>The above commands are contained within the <code>mode</code> and <code>arm</code> modules respectively, which are loaded by default at MAVProxy startup</p>
         </section>
 
         <footer>

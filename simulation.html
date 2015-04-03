@@ -34,18 +34,21 @@
           </ul>
           
           <h3>Linux - SITL</h3>
-          <p>Download the <a href="https://github.com/diydrones/ardupilot">APM source code</a> and the <a href="https://github.com/tridge/jsbsim">jsbsim</a> simulator.</p>
+          <p>Download the <a href="https://github.com/diydrones/ardupilot">APM source code</a> and the <a href="https://github.com/tridge/jsbsim">jsbsim</a> simulator. Depending on your system setup, other packages may be required</p>
           
-          <p>In the APM source code run <code>make configure</code> in either the "Arducopter" or "ArduPlane" directories to set up the build environment.</p>
+          <p>A full guide for setting up the environment is at the <a href="http://dev.ardupilot.com/wiki/simulation-2/sitl-simulator-software-in-the-loop/setting-up-sitl-on-linux/">APM Wiki</a>.</p>
           
-          <p>In the APM source code, the "Tools/autotest/" directory contains the scripts for running the simulator:</p>
+          <p>Some useful command line options are:</p>
           <ul>
-            <li>sim_arduplane.sh - Builds the APM software and runs the SITL environment for a fixed wing aircraft.</li>
-            <li>sim_arducopter.sh - Builds the APM software and runs the SITL environment for a multicopter. A quadcopter is used by default, but an octocopter can be specified instead.</li>
-            <li>sim_rover.sh - Builds the APM software and runs the SITL environment for a rover.</li>            
-            <li>fg_plane_view.sh - Run Flightgear for a 3D view of the fixed-wing aircraft in the simulation.</li>
-            <li>fg_quad_view.sh - Run Flightgear for a 3D view of the quadcopter in the simulation.</li>
-          </ul>   
+            <li>-v VEHICLE       vehicle type (ArduPlane, ArduCopter or APMrover2)</li>
+            <li>-L               select start location from Tools/autotest/locations.txt</li>
+            <li>-w               wipe EEPROM and reload parameters</li>
+            <li>-j NUM_PROC      number of processors to use during build (default 1)</li>
+            <li>-c               do a make clean before building</li>
+          </ul>
+          
+          <p>Any arguments to be sent to MAVProxy can simply be specified at the end of the command:</p>
+          <code>sim_vehicle.sh -v Arduplane -j 4 [mavproxy_options]</code>
           
           <p>Note that the correct parameters for the vehicles in the simulator are required to be loaded. The parameters are in the Rover.parm, Arducopter.parm, ArduPlane.parm for the relevant vehicles.</p>
 

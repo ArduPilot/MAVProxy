@@ -39,7 +39,7 @@
           module list</code></p>
           
           <h3>Default Modules</h3>
-          <p>MAVProxy comes with several modules by default.</p>
+          <p>MAVProxy comes with several modules by default. The following list only describes modules that do not have their own dedicated page in the documentation.</p>
           
           <h4>console</h4>
           <p>A GUI console that displays important information to the UAV's current state. The area below the menu bar shows on the upper row (left to right): Flight mode, GPS status, System voltage, Telemetry radio link quality, Inertial system availability, magnetometer availability, airspeed sensor availability and geofence status. The second row shows further details of the telemetry link quality. The third and fourth rows show selected sensor readings.</p>
@@ -66,10 +66,6 @@
           <p><code>graph add VFR_HUD.alt VFR_HUD.airspeed:2</code></p>
           <p>Aribary mathematical functions can alse be used.</p>
           <p><code>graph add "(VFR_HUD.alt/1000.0)+5"</code></p>
-          
-          <h4>joystick</h4>
-          <p>Allows a joystick connected to the ground station computer to be used a an RC controller. The commands are sent via MAVLink.</p>
-          <p>This module is only compatible with the CarolBox USB, PS3, Great Planes Interlink and Great Planes GP controllers.</p>
 
           <h4>antenna</h4>
           <p>By specifying the ground station location, this module will output (via text and speech) the relevant azimuth and elevation angles to point at the UAV throughout it's flight. This is useful for a manually pointed antenna.</p>
@@ -121,6 +117,10 @@
           <h4>tuneopt</h4>
           <p>This module manages the action mapped to channel 6. It is used for multicopters only. Use <code>tuneopt [set|show|reset|list]</code> to manage the mapped action. For the <code>set</code> command, use the format <code>tuneopt set [OPTION] [LOW] [HIGH]</code> to map a tuning action and it's range of values.</p>
 
+          <h4>misseditor</h4>
+          <p>This module is a GUI waypoint editor. It is useful for reading, loading and editing waypoints.</p>
+          <a href="images/missedit.png" class="media" title="missedit.png"><img src="images/missedit.png" class="media" alt="" /></a>
+          
         </section>
 
         <footer>

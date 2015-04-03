@@ -38,7 +38,7 @@
           </code></p>
           
           <h4><a name="Serial" class="anchor" href="#Serial"><span class="octicon octicon-link"></span></a>Over Serial/Radio link</h4>
-          <p>If there is only 1 APM connected, the <code>--master</code> is not required. MAVProxy will autodetect correct port.The baud rate will need to match the serial link being used. It is usually 57600 baud.</p>
+          <p>If there is only 1 APM connected, the <code>--master</code> is not required. MAVProxy will autodetect correct port and baud rate. If not, the baud rate can be manually specified.</p>
           <p>Linux:</br><code>
             mavproxy.py --master=/dev/ttyUSB0 --baudrate=57600
           </code></p>
@@ -51,16 +51,6 @@
           <p><code>
             mavproxy.py --master=192.168.1.1:14550
           </code></p>
-
-          <h4><a name="WinIssues" class="anchor" href="#WinIssues"><span class="octicon octicon-link"></span></a>Windows Specific Issues</h4>
-          <p>Windows users may need to add the Python path before using MAVProxy.</p>
-          <p><code>
-            setlocal</br>
-            SET PATH=%PATH%;C:\Python27\Scripts</br>
-            mavproxy.py --master=192.168.1.4:14550</br>
-            pause
-          </code></p>
-        </section>
 
         <footer>
           MAVProxy is maintained by <a href="https://github.com/tridge">Andrew Tridgell</a> and documentation is by <a href="https://github.com/stephendade">Stephen Dade</a><br>
