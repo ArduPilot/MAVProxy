@@ -37,6 +37,7 @@ class MapModule(mp_module.MPModule):
         self.click_time = 0
         self.draw_line = None
         self.draw_callback = None
+        self.have_global_position = False
         self.vehicle_type_name = 'plane'
         self.ElevationMap = mp_elevation.ElevationModel()
         self.map_settings = mp_settings.MPSettings(
@@ -411,9 +412,16 @@ class MapModule(mp_module.MPModule):
     
         if m.get_type() == 'GLOBAL_POSITION_INT':
             (self.lat, self.lon, self.heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
-            if self.lat != 0 or self.lon != 0:
+            if abs(self.lat) > 1.0e-3 or abs(self.lon) > 1.0e-3:
+                self.have_global_position = True
                 self.create_vehicle_icon('Pos' + vehicle, 'red', follow=True)
                 self.mpstate.map.set_position('Pos' + vehicle, (self.lat, self.lon), rotation=self.heading)
+
+        if m.get_type() == 'LOCAL_POSITION_NED' and not self.have_global_position:
+            (self.lat, self.lon) = mp_util.gps_offset(0, 0, m.x, m.y)
+            self.heading = math.degrees(math.atan2(m.vy, m.vx))
+            self.create_vehicle_icon('Pos' + vehicle, 'red', follow=True)
+            self.mpstate.map.set_position('Pos' + vehicle, (self.lat, self.lon), rotation=self.heading)
     
         if m.get_type() == "NAV_CONTROLLER_OUTPUT":
             if self.master.flightmode in [ "AUTO", "GUIDED", "LOITER", "RTL" ]:
