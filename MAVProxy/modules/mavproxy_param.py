@@ -177,6 +177,8 @@ class ParamState:
             if (param.upper() == "WP_LOITER_RAD" or param.upper() == "LAND_BREAK_PATH"):
                 #need to redraw rally points
                 mpstate.module('rally').rallyloader.last_change = time.time()
+                #need to redraw loiter points
+                mpstate.module('wp').wploader.last_change = time.time()
 
         elif args[0] == "load":
             if len(args) < 2:
