@@ -100,8 +100,7 @@ class GimbalModule(mp_module.MPModule):
                                             mavutil.mavlink.MAV_COMP_ID_GIMBAL,
                                             radians(roll),
                                             radians(pitch),
-                                            radians(yaw),
-                                            0, 0, 0)
+                                            radians(yaw))
 
     def cmd_gimbal_point(self, args):
         '''control gimbal pointing'''
