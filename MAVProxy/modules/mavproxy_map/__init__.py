@@ -46,7 +46,8 @@ class MapModule(mp_module.MPModule):
               ('showsimpos', int, 0),
               ('showahrs2pos', int, 0),
               ('brightness', float, 1),
-              ('rallycircle', bool, False)])
+              ('rallycircle', bool, False),
+              ('loitercircle',bool, False)])
         service='OviHybrid'
         if 'MAP_SERVICE' in os.environ:
             service = os.environ['MAP_SERVICE']
@@ -124,6 +125,7 @@ class MapModule(mp_module.MPModule):
                 self.mpstate.map.add_object(mp_slipmap.SlipPolygon('mission %u' % i, p,
                                                                    layer='Mission', linewidth=2, colour=(255,255,255),
                                                                    popup_menu=popup))
+        loiter_rad = self.get_mav_param('WP_LOITER_RAD')
         labeled_wps = {}
         for i in range(len(self.mission_list)):
             next_list = self.mission_list[i]
@@ -131,9 +133,13 @@ class MapModule(mp_module.MPModule):
                 #label already printed for this wp?
                 if (next_list[j] not in labeled_wps):
                     self.mpstate.map.add_object(mp_slipmap.SlipLabel(
-                        'miss_cmd %u/%u' % (i,j), polygons[i][j], str(next_list[j]), 'Mission', colour=(0,255,255)))  
+                        'miss_cmd %u/%u' % (i,j), polygons[i][j], str(next_list[j]), 'Mission', colour=(0,255,255)))
+
+                    if (self.module('wp').wploader.wp_is_loiter(next_list[j])
+                        and self.map_settings.loitercircle):
+                        self.mpstate.map.add_object(mp_slipmap.SlipCircle('Loiter Cirlce %u' % (next_list[j] + 1), 'LoiterCircles', polygons[i][j], abs(loiter_rad), (255, 255, 255), 2))
+
                     labeled_wps[next_list[j]] = (i,j)
-                    
 
     def display_fence(self):
         '''display the fence'''
