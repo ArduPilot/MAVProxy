@@ -394,18 +394,40 @@ class MissionEditorFrame(wx.Frame):
             
         for i in range(0, self.grid_mission.GetNumberRows()):
             cmd_id = me_defines.cmd_reverse_lookup(self.grid_mission.GetCellValue(i,0))
+            #don't lock up the misseditor on missing input!
+            #anything missing will just be zero
             try:
                 p1 = float(self.grid_mission.GetCellValue(i,ME_P1_COL))
+            except:
+                p1 = 0.0
+            try:
                 p2 = float(self.grid_mission.GetCellValue(i,ME_P2_COL))
+            except:
+                p2 = 0.0
+            try:
                 p3 = float(self.grid_mission.GetCellValue(i,ME_P3_COL))
+            except:
+                p3 = 0.0
+            try:
                 p4 = float(self.grid_mission.GetCellValue(i,ME_P4_COL))
+            except:
+                p4 = 0.0
+            try:
                 lat = float(self.grid_mission.GetCellValue(i,ME_LAT_COL))
+            except:
+                lat = 0.0
+            try:
                 lon = float(self.grid_mission.GetCellValue(i,ME_LON_COL))
+            except:
+                lon = 0.0
+            try:
                 alt = float(self.grid_mission.GetCellValue(i,ME_ALT_COL))
+            except:
+                alt = 0.0
+            try:
                 frame = float(me_defines.frame_enum_rev[self.grid_mission.GetCellValue(i,ME_FRAME_COL)])
             except:
-                #don't lock up the misseditor on missing input!
-                pass #anything missing will just be zero
+                frame = 0.0                
                 
             self.event_queue.put(MissionEditorEvent(me_event.MEE_WRITE_WP_NUM,
                                                     num=i+1,cmd_id=cmd_id,p1=p1,p2=p2,p3=p3,p4=p4,
