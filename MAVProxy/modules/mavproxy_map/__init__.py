@@ -127,6 +127,7 @@ class MapModule(mp_module.MPModule):
                                                                    popup_menu=popup))
         loiter_rad = self.get_mav_param('WP_LOITER_RAD')
         labeled_wps = {}
+        self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('LoiterCircles'))
         for i in range(len(self.mission_list)):
             next_list = self.mission_list[i]
             for j in range(len(next_list)):
@@ -137,7 +138,7 @@ class MapModule(mp_module.MPModule):
 
                     if (self.module('wp').wploader.wp_is_loiter(next_list[j])
                         and self.map_settings.loitercircle):
-                        self.mpstate.map.add_object(mp_slipmap.SlipCircle('Loiter Cirlce %u' % (next_list[j] + 1), 'LoiterCircles', polygons[i][j], abs(loiter_rad), (255, 255, 255), 2))
+                        self.mpstate.map.add_object(mp_slipmap.SlipCircle('Loiter Circle %u' % (next_list[j] + 1), 'LoiterCircles', polygons[i][j], abs(loiter_rad), (255, 255, 255), 2))
 
                     labeled_wps[next_list[j]] = (i,j)
 
