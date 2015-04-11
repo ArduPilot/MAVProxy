@@ -308,10 +308,13 @@ class SmartCameraModule(mp_module.MPModule):
     def __vDecodeDIGICAMConfigure(self, mCommand_Long):
         if mCommand_Long.param1 != 0:
             print ("Exposure Mode = %d" % mCommand_Long.param1)
-            if mCommand_Long.param1 == self.Auto:
+            
+            if mCommand_Long.param1 == self.ProgramAuto:
                 self.__vCmdSetCamExposureMode("Program Auto")
+            
             elif mCommand_Long.param1 == self.Aperture:
                 self.__vCmdSetCamExposureMode("Aperture")
+            
             elif mCommand_Long.param1 == self.Shutter:
                 self.__vCmdSetCamExposureMode("Shutter")
 
@@ -365,7 +368,7 @@ class SmartCameraModule(mp_module.MPModule):
         '''Trigger'''
         if mCommand_Long.param5 != 0:
             print ("Trigger = %d" % mCommand_Long.param5)
-            self.__vCmdCamTrigger()
+            self.__vCmdCamTrigger(true)
 
 
 
@@ -392,14 +395,14 @@ class SmartCameraModule(mp_module.MPModule):
             print ("Got Message camera_feedback triggering Cameras")
             self.__vCmdCamTrigger(m)
         if mtype == "COMMAND_LONG":
-                print ("Command: %d" % m.command)
-                print ("Param1: %d" % m.param1)
-                print ("Param2: %d" % m.param2)
-                print ("Param3: %d" % m.param3)
-                print ("Param4: %d" % m.param4)
-                print ("Param5: %d" % m.param5)
-                print ("Param6: %d" % m.param6)
-                print ("Param7: %d" % m.param7)
+            print ("Command: %d" % m.command)
+            print ("Param1: %d" % m.param1)
+            print ("Param2: %d" % m.param2)
+            print ("Param3: %d" % m.param3)
+            print ("Param4: %d" % m.param4)
+            print ("Param5: %d" % m.param5)
+            print ("Param6: %d" % m.param6)
+            print ("Param7: %d" % m.param7)
                     
             if m.command == mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONFIGURE:
                 print ("Got Message Digicam_configure")
