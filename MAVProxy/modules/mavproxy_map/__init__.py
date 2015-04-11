@@ -135,8 +135,8 @@ class MapModule(mp_module.MPModule):
                     self.mpstate.map.add_object(mp_slipmap.SlipLabel(
                         'miss_cmd %u/%u' % (i,j), polygons[i][j], str(next_list[j]), 'Mission', colour=(0,255,255)))
 
-                    if (self.module('wp').wploader.wp_is_loiter(next_list[j])
-                        and self.map_settings.loitercircle):
+                    if (self.map_settings.loitercircle and
+                        self.module('wp').wploader.wp_is_loiter(next_list[j])):
                         self.mpstate.map.add_object(mp_slipmap.SlipCircle('Loiter Cirlce %u' % (next_list[j] + 1), 'LoiterCircles', polygons[i][j], abs(loiter_rad), (255, 255, 255), 2))
 
                     labeled_wps[next_list[j]] = (i,j)
