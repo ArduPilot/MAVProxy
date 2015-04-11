@@ -148,7 +148,7 @@ class MPState(object):
 
               MPSetting('source_system', int, 255, 'MAVLink Source system', range=(0,255), increment=1, tab='MAVLink'),
               MPSetting('source_component', int, 0, 'MAVLink Source component', range=(0,255), increment=1),
-              MPSetting('target_system', int, -1, 'MAVLink target system', range=(-1,255), increment=1),
+              MPSetting('target_system', int, 0, 'MAVLink target system', range=(0,255), increment=1),
               MPSetting('target_component', int, 0, 'MAVLink target component', range=(0,255), increment=1)
             ])
 

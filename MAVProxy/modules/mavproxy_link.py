@@ -279,7 +279,7 @@ class LinkModule(mp_module.MPModule):
                 return
 
         if mtype == 'HEARTBEAT' and m.get_srcSystem() != 255:
-            if self.settings.target_system == -1 and self.settings.target_system != m.get_srcSystem():
+            if self.settings.target_system == 0 and self.settings.target_system != m.get_srcSystem():
                 self.settings.target_system = m.get_srcSystem()
                 self.say("online system %u" % self.settings.target_system,'message')
 
