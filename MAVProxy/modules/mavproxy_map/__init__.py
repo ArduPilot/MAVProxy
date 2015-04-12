@@ -39,6 +39,14 @@ class MapModule(mp_module.MPModule):
         self.draw_callback = None
         self.have_global_position = False
         self.vehicle_type_name = 'plane'
+        self.drag_mission = False
+        self.drag_mission_start = None
+        self.drag_mission_draw_time = time.time()
+        self.drag_mission_last_drag = time.time()
+        self.drag_mission_start_idx = 1
+        self.drag_mission_end_idx = 0
+        self.drag_lat = 0.0
+        self.darg_lon = 0.0
         self.ElevationMap = mp_elevation.ElevationModel()
         self.map_settings = mp_settings.MPSettings(
             [ ('showgpspos', int, 0),
@@ -115,6 +123,7 @@ class MapModule(mp_module.MPModule):
         self.mission_list = self.module('wp').wploader.view_list()
         polygons = self.module('wp').wploader.polygon_list()
         self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('Mission'))
+
         for i in range(len(polygons)):
             p = polygons[i]
             if len(p) > 1:
@@ -133,13 +142,103 @@ class MapModule(mp_module.MPModule):
                 #label already printed for this wp?
                 if (next_list[j] not in labeled_wps):
                     self.mpstate.map.add_object(mp_slipmap.SlipLabel(
-                        'miss_cmd %u/%u' % (i,j), polygons[i][j], str(next_list[j]), 'Mission', colour=(0,255,255)))
+                        'Label %u' % next_list[j], polygons[i][j], str(next_list[j]), 'Mission', colour=(0,255,255)))
 
-                    if (self.map_settings.loitercircle and
+                    if (self.map_settings.loitercircle and 
                         self.module('wp').wploader.wp_is_loiter(next_list[j])):
-                        self.mpstate.map.add_object(mp_slipmap.SlipCircle('Loiter Cirlce %u' % (next_list[j] + 1), 'LoiterCircles', polygons[i][j], abs(loiter_rad), (255, 255, 255), 2))
+                        self.mpstate.map.add_object(mp_slipmap.SlipCircle('Loiter Circle %u' % next_list[j], 'LoiterCircles', polygons[i][j], abs(loiter_rad), (255, 255, 255), 2))
 
                     labeled_wps[next_list[j]] = (i,j)
+
+    def display_drag_mission(self):
+        '''display the visualization for dragging a mission'''
+        if (self.drag_mission == False):
+            #not currently dragging the mission; nothing to draw
+            return
+
+        self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('DragMission'))
+        self.drag_mission_draw_time = self.drag_mission_last_drag
+        loit_rad = self.get_mav_param('WP_LOITER_RAD')
+        prev_wp = None
+
+        start_idx = self.drag_mission_start_idx
+        end_idx = self.module('wp').wploader.count() - 1
+
+        if self.drag_mission_end_idx <= end_idx:
+            end_idx = self.drag_mission_end_idx
+
+        for wp in self.module('wp').wploader.wpoints:
+           #skip home point, skip mission commands that don't have positions
+            if (wp.seq == 0 or 
+               (wp.x == 0.0 and wp.y == 0.0 and 
+                wp.command is not mavutil.mavlink.MAV_CMD_DO_JUMP)):
+                continue
+
+            #skip waypoints the user doesn't want to drag
+            if wp.seq < start_idx:
+                continue
+            if wp.seq > end_idx:
+                #done with all waypoints user wants to drag
+                break
+
+            offset_lat = wp.x + self.drag_lat
+            offset_lon = wp.y + self.drag_lon
+
+            self.mpstate.map.add_object(mp_slipmap.SlipLabel(
+                'DragLabel %u' % wp.seq, (offset_lat, offset_lon), 
+                str(wp.seq), 'DragMission', colour=(255,0,0)))
+
+            if (self.map_settings.loitercircle and
+                self.module('wp').wploader.wp_is_loiter(wp.seq)):
+                self.mpstate.map.add_object(mp_slipmap.SlipCircle(
+                    'DragPoint %u' % wp.seq, 'DragMission',
+                    (offset_lat, offset_lon), abs(loit_rad), (255, 0, 0), 2))
+           
+            #Cant' just use: 
+            #polygons = self.module('wp').wploader.polygon_list()
+            #because we might only be moving a subset of the mission
+            #and it is not possible to split the list of vertices
+            #returned from wploader.polygon_list()
+            #based on waypoint index number.  Hence the following
+            #to draw lines between waypoints:
+            if (prev_wp != None and
+                wp.command is not mavutil.mavlink.MAV_CMD_DO_JUMP):
+                self.mpstate.map.add_object(mp_slipmap.SlipPolygon(
+                    'DragLine %u' % wp.seq, 
+                    [(offset_lat, offset_lon),
+                    (prev_wp.x + self.drag_lat, prev_wp.y + self.drag_lon)],
+                    layer='DragMission', linewidth=2, colour=(255, 0, 0)))
+            
+            if wp.command is mavutil.mavlink.MAV_CMD_DO_JUMP:
+                jump_wp = self.module('wp').wploader.wp(int(wp.param1))
+                if jump_wp is not None:
+                    if jump_wp.x == 0.0 and jump_wp.y == 0.0:
+                        wp = None
+                    else:
+                        self.mpstate.map.add_object(mp_slipmap.SlipPolygon(
+                         'DragLine %u' % wp.seq, 
+                         [(prev_wp.x + self.drag_lat,
+                         prev_wp.y + self.drag_lon),
+                         (jump_wp.x + self.drag_lat,
+                         jump_wp.y + self.drag_lon)],
+                         layer='DragMission', linewidth=2, colour=(255, 0, 0)))
+                        
+            prev_wp = wp
+            if prev_wp.command is mavutil.mavlink.MAV_CMD_DO_JUMP:
+                 prev_wp = None
+
+    def start_drag_mission(self, start_idx, end_idx):
+         self.drag_mission_start = None
+         self.drag_mission = True
+         self.drag_lat = 0.0
+         self.drag_lon = 0.0
+         self.drag_mission_start_idx = start_idx
+         self.drag_mission_end_idx = end_idx
+         self.drag_mission_last_drag = time.time()
+
+    def stop_drag_mission(self):
+        self.drag_mission = False
+        self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('DragMission'))
 
     def display_fence(self):
         '''display the fence'''
@@ -311,8 +410,47 @@ class MapModule(mp_module.MPModule):
             if time.time() - self.click_time > 0.1:
                 self.click_position = obj.latlon
                 self.click_time = time.time()
+           
+        if obj.event.m_middleDown and self.drag_mission:
+            if (self.drag_mission_start == None):
+                self.drag_mission_start = obj.latlon
+
+            self.drag_lat = obj.latlon[0] - self.drag_mission_start[0]
+            self.drag_lon = obj.latlon[1] - self.drag_mission_start[1]
+
+            #redraw
+            self.drag_mission_last_drag = time.time()
+
+        if obj.event.m_leftDown and self.drag_mission:
+            #if no change to apply then don't bother sending up waypoints:
+            if self.drag_lat == 0.0 and self.drag_lon == 0.0:
+                self.stop_drag_mission()
+                return
+
+            #apply mouse drag change to mission
+            for wp in self.module('wp').wploader.wpoints:
+                #skip home point and waypoints with no position information
+                if wp.seq == 0 or wp.x == 0.0 or wp.y == 0.0:
+                    continue
+
+                #skip waypoints the user doesn't want to drag
+                if wp.seq < self.drag_mission_start_idx:
+                    continue
+                if wp.seq > self.drag_mission_end_idx:
+                    #done with all waypoints user wants to drag
+                    break
+
+                self.module('wp').cmd_wp_move([str(wp.seq)], wp.x + self.drag_lat, 
+                                                             wp.y + self.drag_lon) 
             
-    
+            self.module('wp').loading_waypoints = True
+            self.module('wp').loading_waypoint_lasttime = time.time()
+            self.master.mav.mission_write_partial_list_send(
+                    self.module('wp').target_system, self.module('wp').target_component,
+                    1,self.module('wp').wploader.count())
+
+            self.stop_drag_mission()
+
     def unload(self):
         '''unload module'''
         self.mpstate.map.close()
@@ -451,6 +589,10 @@ class MapModule(mp_module.MPModule):
         # if the fence has changed, redisplay
         if self.fence_change_time != self.module('fence').fenceloader.last_change:
             self.display_fence()
+
+        #if the mission drag visualization needs update, redraw it:
+        if self.drag_mission_draw_time != self.drag_mission_last_drag:
+            self.display_drag_mission()
     
         # if the rallypoints have changed, redisplay
         if self.rally_change_time != self.module('rally').rallyloader.last_change:
