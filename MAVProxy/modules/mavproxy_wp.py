@@ -20,7 +20,7 @@ class WPModule(mp_module.MPModule):
         self.wp_period = mavutil.periodic_event(0.5)
         self.undo_wp = None
         self.undo_type = None
-        self.undo_wp_idx = -1
+        self.undo_wp_idx = -1        
         self.add_command('wp', self.cmd_wp,       'waypoint management',
                          ["<list|clear|move|remove|loop|set|undo|movemulti|param>",
                           "<load|update|save|show> (FILENAME)"])
@@ -49,7 +49,9 @@ class WPModule(mp_module.MPModule):
                                                     handler=MPMenuCallTextDialog(title='Mission Altitude (m)',
                                                                                  default=100)),
                                          MPMenuItem('Undo', 'Undo', '# wp undo'),
-                                         MPMenuItem('Loop', 'Loop', '# wp loop')])
+                                         MPMenuItem('Loop', 'Loop', '# wp loop'),
+                                         MPMenuItem('Drag', 'Drag', '# wp drag ',
+                                                    handler=MPMenuCallTextDialog(title='Enter Start and End Waypoints to drag.', default='1,100'))])
 
 
     def mavlink_packet(self, m):
@@ -267,7 +269,7 @@ class WPModule(mp_module.MPModule):
                                                              0, 0)
 
 
-    def cmd_wp_move(self, args):
+    def cmd_wp_move(self, args, lat = None, lon = None):
         '''handle wp move'''
         if len(args) != 1:
             print("usage: wp move WPNUM")
@@ -276,11 +278,18 @@ class WPModule(mp_module.MPModule):
         if idx < 1 or idx > self.wploader.count():
             print("Invalid wp number %u" % idx)
             return
-        try:
-            latlon = self.module('map').click_position
-        except Exception:
-            print("No map available")
-            return
+        
+        latlon = None
+        if lat is not None and lon is not None:
+            latlon = (lat, lon)
+          
+        if latlon is None:
+            try:
+                latlon = self.module('map').click_position
+            except Exception:
+                print("No map available")
+                return
+
         if latlon is None:
             print("No map click position available")
             return
@@ -467,7 +476,7 @@ class WPModule(mp_module.MPModule):
 
     def cmd_wp(self, args):
         '''waypoint commands'''
-        usage = "usage: wp <list|load|update|save|set|clear|loop|remove|move>"
+        usage = "usage: wp <list|load|update|save|set|clear|loop|remove|move|drag>"
         if len(args) < 1:
             print(usage)
             return
@@ -506,6 +515,32 @@ class WPModule(mp_module.MPModule):
                 print("usage: wp show <filename>")
                 return
             self.wploader.load(args[1])
+        elif args[0] == "drag":
+            if self.mpstate.module_is_loaded('map') == False:
+                print("Please load map module first.")
+                return
+
+            if len(args) < 2:
+                print("usage: wp drag first_wp_idx,last_wp_idx")
+                return
+
+            tokens = args[1].split(",")
+            try:
+                s_idx = int(tokens[0])
+                e_idx = int(tokens[1])
+            except:
+                print("usage: wp drag first_wp_idx,last_wp_idx")
+                return
+            
+            if s_idx > e_idx:
+                temp = s_idx
+                s_idx = e_idx
+                e_idx = temp
+
+            self.module('map').start_drag_mission(s_idx, e_idx)
+
+            print("Hold middle mouse button on map to begin dragging mission. Left click when finished.")
+
         elif args[0] == "move":
             self.cmd_wp_move(args[1:])
         elif args[0] == "movemulti":
