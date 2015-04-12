@@ -184,6 +184,14 @@ class MPState(object):
         if name in self.public_modules:
             return self.public_modules[name]
         return None
+
+    def module_is_loaded(self, module_name):
+        '''Return True if module with module_name is loaded, False otherwise'''
+        for (m,pm) in self.modules:
+            if m.name == module_name:
+                return True
+                
+        return False
     
     def master(self):
         '''return the currently chosen mavlink master object'''
