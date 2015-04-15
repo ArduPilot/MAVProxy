@@ -1,5 +1,8 @@
 #!/usr/bin/env python
-'''arm/disarm command handling'''
+'''gopro control over mavlink for the solo-gimbal
+
+To use this module connect to a Solo with a GoPro installed on the gimbal.
+'''
 
 import time, os
 
