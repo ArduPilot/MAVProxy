@@ -184,6 +184,10 @@ class LinkModule(mp_module.MPModule):
 
     def master_send_callback(self, m, master):
         '''called on sending a message'''
+        if self.status.watch is not None:
+            if fnmatch.fnmatch(m.get_type().upper(), self.status.watch.upper()):
+                self.mpstate.console.writeln('> '+ str(m))
+
         mtype = m.get_type()
         if mtype != 'BAD_DATA' and self.mpstate.logqueue:
             usec = self.get_usec()
@@ -393,7 +397,7 @@ class LinkModule(mp_module.MPModule):
 
         if self.status.watch is not None:
             if fnmatch.fnmatch(m.get_type().upper(), self.status.watch.upper()):
-                self.mpstate.console.writeln(m)
+                self.mpstate.console.writeln('< '+str(m))
 
         # don't pass along bad data
         if mtype != 'BAD_DATA':
