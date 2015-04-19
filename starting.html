@@ -51,9 +51,11 @@
           <p>Forward the MAVLink packets to a remote device (serial, USB or network address/port). Useful if using multiple ground station computers or relaying the stream through an intermediate node.</p>
           <p>MAVlink usually uses port 14550 for IP-based packet forwarding, though other ports can be used if needed.</p>
           <p>If a serial port is given (for example a radio device connecting an airbourne MAVProxy instance with the GCS), a link-specific baud rate can be given after the device, delimited by a comma.  This overrides the global default baudrate specified by <code>--baudrate</code>.</p>
+          <p>If forwarding to a network address via tcp or udp, this must be prefixed before the IP address.</p>
           <p><code>
-            mavproxy.py --master=/dev/ttyUSB0 --out=192.168.1.1:14550</br>
-            mavproxy.py --master=/dev/ttyACM0,115200 --out=/dev/ttyUSB0,57600
+            mavproxy.py --master=/dev/ttyUSB0 --out=udp:192.168.1.1:14550</br>
+            mavproxy.py --master=/dev/ttyACM0,115200 --out=/dev/ttyUSB0,57600</br>
+            mavproxy.py --master=/dev/ttyACM0,115200 --out=COM17,57600
           </code></p>       
 
           <h4>--sitl</h4>

@@ -27,9 +27,9 @@
         <section id="main_content">
           <h2>
 <a name="Quickstart" class="anchor" href="#Quickstart"><span class="octicon octicon-link"></span></a>Quickstart</h2>
-          <p>In the simplest form, MAVProxy only needs to address of the USB port or network address to connect to.</p>
+          <p>In it's simplest form, MAVProxy only needs the address of the USB port or network address to connect to.</p>
           <h4><a name="USB" class="anchor" href="#USB"><span class="octicon octicon-link"></span></a>Over USB</h4>
-          <p>If there is only 1 APM connected, the <code>--master</code> is not required. MAVProxy will autodetect correct port.</p>
+          <p>If there is only 1 APM connected, the <code>--master</code> is not required. MAVProxy will autodetect the correct port.</p>
           <p>Linux:</br><code>
             mavproxy.py --master=/dev/ttyUSB0
           </code></p>
@@ -38,7 +38,7 @@
           </code></p>
           
           <h4><a name="Serial" class="anchor" href="#Serial"><span class="octicon octicon-link"></span></a>Over Serial/Radio link</h4>
-          <p>If there is only 1 APM connected, the <code>--master</code> is not required. MAVProxy will autodetect correct port and baud rate. If not, the baud rate can be manually specified.</p>
+          <p>If there is only 1 APM connected, the <code>--master</code> is not required. MAVProxy will autodetect the correct port and baud rate. If not, the baud rate can be manually specified.</p>
           <p>Linux:</br><code>
             mavproxy.py --master=/dev/ttyUSB0 --baudrate=57600
           </code></p>

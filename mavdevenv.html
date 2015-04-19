@@ -27,11 +27,11 @@
         <section id="main_content">
           <h2>
 <a name="ContentTmp" class="anchor" href="#ContentTmp"><span class="octicon octicon-link"></span></a>Development Environment</h2>
-          <p>For developing MAVProxy (such as writing custom modules), the slightly more complex setup is required. The following section will show how this setup is achieved.</p>
+          <p>For developing MAVProxy (such as writing custom modules), a slightly more complex setup is required. The following section will show how this setup is achieved.</p>
           
-          <p>This section assumes basic knowlege of setting up development environments, Python and git.</p>
+          <p>This section assumes basic knowledge of setting up development environments, Python and git.</p>
           <h4>Linux</h4>
-          <p>Install the python libraries and mavlink as per the <a href="./index.html#installLinux">guide</a>. Additionally, install the <code>setuptools</code> package via <code>pip</code></p>
+          <p>Install the Python and MAVlink libraries as per the <a href="./index.html#installLinux">guide</a>. Additionally, install the <code>setuptools</code> package via <code>pip</code></p>
           <p>Use git to download the MAVProxy source: <code>git clone https://github.com/tridge/MAVProxy.git</code></p>
           <p>After making the desired changes, MAVProxy is required to be installed (the modules won't work otherwise). This needs to happen after any changes to the source code. This can be done by:</p>
           <code>python setup.py build install --user</code>
@@ -41,10 +41,10 @@
           <h4>Windows</h4>
           <p>In Windows, the process is a bit more complicated.</p>
           
-          <p>You will need to have <a href="http://www.python.org/download/releases/2.7/">Python 2.7</a> and <a href="http://www.wxpython.org/download.php">wxPython</a> installed first.</p>
+          <p>You will need to have <a href="http://www.python.org/download/releases/2.7/">Python 2.7</a>, <a href="http://www.wxpython.org/download.php">wxPython</a> and <a href="http://pygame.org/download.shtml">pygame</a> installed first.</p>
           
           <p>Next, open up a console in the Python scripts install path (C:\Python27\Scripts or similar) and use <code>pip</code> to install the other packages:
-          <code></br>pip install pyinstaller </br>pip install matplotlib </br>pip install pyreadline </br>pip install pyserial </br>pip install pymavlink</code></p>
+          <code></br>pip install pyinstaller </br>pip install matplotlib </br>pip install pyreadline </br>pip install pyserial </br>pip install pymavlink </br> pip install python-dateutil pytz pyparsing six</code></p>
           
           <p>The final set of prerequisites use pip to install, but need to be manually downloaded. Use <code>pip install [filepath]</code> to install them:</p>
           <ul>
@@ -54,7 +54,7 @@
           </ul>
           
           <p>Download the MAVProxy <a href="https://github.com/tridge/MAVProxy">source</a>.</p>
-          <p>After making the desired changes, MAVProxy is required to be installed (the modules won't work otherwise). This needs to happen after any changes to the source code. This can be done by running the <code>./MAVProxy/MAVProxyWinUSB.bat</code> file. This will install and run MAVProxy.</p>
+          <p>After making the desired changes, MAVProxy is required to be compiled and copied into the Python directory (the modules won't work otherwise). This needs to happen after any changes to the source code. This can be done by running the <code>./MAVProxy/MAVProxyWinUSB.bat</code> file. This will perform the necessary actions and then run MAVProxy.</p>
           
         </section>
 
