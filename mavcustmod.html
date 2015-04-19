@@ -29,7 +29,7 @@
 <a name="ContentTmp" class="anchor" href="#ContentTmp"><span class="octicon octicon-link"></span></a>Module Development</h2>
           <p>This section is a quick tutorial on how to create custom modules in MAVProxy.</p>
           <h4>Location</h4>
-          <p>Modules are placed in the <code>MAVProxy/modules</code> folder. When installing MAVProxy via the <code>setup.py</code> routine, any modules in this foler will be automatically picked up and become part of the installation.</p>
+          <p>Modules are placed in the <code>MAVProxy/modules</code> folder. When installing MAVProxy via the <code>setup.py</code> routine, any modules in this folder will be automatically picked up and become part of the installation.</p>
           
           <h4>Module File Structure</h4>
           <p>At the base level, a MAVProxy module is an instance of the MPModule class, with hooks for initialisation and reading Mavlink packets:</p>
@@ -55,11 +55,11 @@
           <code>self.add_command('bat', self.cmd_bat, "show some information")</code>
           <p>The above will add the "bat" command, which the MAVProxy help will show "show some information" and the self.cmd_bat function will be run.</p>
           
-          <p>Within the packet handling, the <a href="https://pixhawk.ethz.ch/mavlink/">Mavlink</a> reference is useful for filtering the incoming packets for the relvant data:</p>
+          <p>Within the packet handling, the <a href="https://pixhawk.ethz.ch/mavlink/">Mavlink</a> reference is useful for filtering the incoming packets for the relevant data:</p>
           <code>if m.get_type() == 'VFR_HUD': </br>
           &nbsp;&nbsp;&nbsp;&nbsp;curspeed =  m.airspeed</code>
           
-          <p></br>There are a great number of MAVProxy modules, so the best reference would be to look through the these modules for examples of what you want to do.</p>
+          <p></br>There are a great number of MAVProxy modules, so the best reference would be to look through the these <a href="https://github.com/tridge/MAVProxy/tree/master/MAVProxy/modules">modules</a> for examples of what you want to do.</p>
           
         </section>
 

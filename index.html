@@ -57,9 +57,18 @@ Running under Windows 7:
 <h2>
 <a name="install" class="anchor" href="#install"><span class="octicon octicon-link"></span></a>Download and Installation</h2>
 
+<p>A list of commits to MAVProxy (closest thing to a changelog that is available) can be seen <a href="https:/github.com/tridge/MAVProxy/commits/master">here</a>.</p>
+
 <h4><a name="installWin" class="anchor" href="#installWin"><span class="octicon octicon-link"></span></a>Windows</h4>
 
-<p>A complete installer for MAVProxy is available <a href="files/MAVProxy_setup_1.4.11.exe">here</a>.</p>
+<p>A complete installer for MAVProxy 1.4.13 (19/04/2015) is available <a href="files/MAVProxy_setup_1.4.13.exe">here</a>.</p>
+
+<p>Previous versions:</p>
+<ul>
+    <li><a href="files/MAVProxy_setup_1.4.11.exe">MAVProxy 1.4.11</a> (05/04/2015)</li>
+</ul>
+
+<p>Please note that the "missionedit" module does not currently run on the Windows package of MAVProxy. This is being investigated and will hopefully be fixed soon.</p>
 
 <h4><a name="installLinux" class="anchor" href="#installLinux"><span class="octicon octicon-link"></span></a>Linux</h4>
 <p>Linux users can use the PyPi program to get the needed packages:<br>
@@ -76,6 +85,8 @@ pip install MAVProxy
 <code>
 sudo apt-get install python-opencv python-wxgtk
 </code></p>
+
+<p>Note that on some Linux systems, <code>python-wxgtk</code> may be instead named as <code>python-wxgtk2.8</code>.
 
 <h4><a name="installMac" class="anchor" href="#installMac"><span class="octicon octicon-link"></span></a>Mac</h4>
 <p>Some users have reported difficulties with installing wxPython on the latest version of OSX. These issues have not yet been resolved, so you may have mixed results trying to get MAVProxy up and running.</p>
@@ -112,7 +123,7 @@ sudo apt-get install python-opencv python-wxgtk
 
 <h4><a name="guideJoy" class="anchor" href="joystick.html">Joystick Input</a></h4>
 
-<h4><a name="guidegimbal" class="anchor" href="gimbal.html">Gimbals</a></h4>
+<h4><a name="guidegimbal" class="anchor" href="gimbals.html">Gimbals</a></h4>
 
 <h4><a name="guidePlayback" class="anchor" href="playback.html">Playback from Log</a></h4>
 

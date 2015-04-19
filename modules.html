@@ -28,7 +28,7 @@
           <h2>
 <a name="ContentModules" class="anchor" href="#ContentModules"><span class="octicon octicon-link"></span></a>Modules</h2>
           <p>MAVProxy can be extended with modules. These run in parallel threads to the main MAVProxy program in order to maintain overall stability.</p>
-          <p>Modules can include such things a GUI elements and diagnostic and monitoring applications.</p>
+          <p>Modules can include such things as GUI elements and diagnostic and monitoring applications.</p>
           <h4>Module Management</h4>
           <p>Modules need to be loaded before they can be used. The following command can be used:</p>
           <p><code>module load modulename</code></p>
@@ -42,7 +42,7 @@
           <p>MAVProxy comes with several modules by default. The following list only describes modules that do not have their own dedicated page in the documentation.</p>
           
           <h4>console</h4>
-          <p>A GUI console that displays important information to the UAV's current state. The area below the menu bar shows on the upper row (left to right): Flight mode, GPS status, System voltage, Telemetry radio link quality, Inertial system availability, magnetometer availability, airspeed sensor availability and geofence status. The second row shows further details of the telemetry link quality. The third and fourth rows show selected sensor readings.</p>
+          <p>A GUI console that displays important information to the UAV's current state. The area below the menu bar shows on the upper row (left to right): Flight mode and arming state, GPS status, system voltage, telemetry radio link quality, inertial system availability, magnetometer availability, airspeed sensor availability, Sonar/Lidar availability, Attitude control system(AHRS and EKF) state, geofence status and terrain dataset availibility. The second row shows further details of the telemetry link quality. The third and fourth rows show selected sensor readings.</p>
 
           <p>The menu bar allows the user to change any of the global MAVProxy settings, as well as shortcuts to command waypoint, rally point and geofence commands.</p>
           
@@ -62,9 +62,9 @@
           <p>A module to plot (graph) data in realtime from the UAV. It is useful for looking for time-varying patterns in the data</p>
           <p>After loading, new plots can be created by:</p>
           <p><code>graph add dataname</code></p>
-          <p>Multiple items can be added at one. Use the <code>:2</code> to specify using the right vertical axis.</p>
+          <p>Multiple items can be added at once. Use the <code>:2</code> to specify using the right vertical axis.</p>
           <p><code>graph add VFR_HUD.alt VFR_HUD.airspeed:2</code></p>
-          <p>Aribary mathematical functions can alse be used.</p>
+          <p>Arbitrary mathematical functions can also be used.</p>
           <p><code>graph add "(VFR_HUD.alt/1000.0)+5"</code></p>
 
           <h4>antenna</h4>
@@ -90,7 +90,7 @@
           <h4>log</h4>
           <p>Allows the user to manage the logs on an APM. Use <code>log list</code> to view a list of the logs on the APM and <code>log erase</code> to delete all logs on the APM.</p>
 
-          <p>Use <code>log download [lognumber] [filename]</code> to start downloading a specific log to filename. <code>log status</code> to see the transfer status and <code>log cancel</code> to cancel the download.</p>
+          <p>Use <code>log download [lognumber] [filename]</code> to start to download a specific log to the specified file name. <code>log status</code> to see the transfer status and <code>log cancel</code> to cancel the download.</p>
 
           <h4>relay</h4>
           <p>Control the operation of the output servos. Note this should only be used for the non-flight-control servos. An example of usage would be camera shutter controls. Use <code>servo set [SERVO_NUM] [PWM]</code> to set an output servo to a particular PWM value. Use <code>servo repeat [SERVO_NUM] [PWM] [COUNT] [PERIOD]</code> to make the servo repeat between it's current and specified PWM values.</p>
