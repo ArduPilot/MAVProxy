@@ -12,6 +12,7 @@ class CmdlongModule(mp_module.MPModule):
         self.add_command('setspeed', self.cmd_do_change_speed, "do_change_speed")
         self.add_command('setyaw', self.cmd_condition_yaw, "condition_yaw")
         self.add_command('takeoff', self.cmd_takeoff, "takeoff")
+        self.add_command('velocity', self.cmd_velocity, "velocity")
 
     def cmd_takeoff(self, args):
         '''take off'''
@@ -80,6 +81,28 @@ class CmdlongModule(mp_module.MPModule):
                 0, # param5
                 0, # param6
                 0) # param7
+
+    def cmd_velocity(self, args):
+        '''velocity x-ms y-ms z-ms'''
+        if (len(args) != 3):
+            print("Usage: velocity x y z (m/s)")
+            return
+
+        if (len(args) == 3):
+            x_mps = float(args[0])
+            y_mps = float(args[1])
+            z_mps = float(args[2])
+            print("x:%f, y:%f, z:%f" % (x_mps, y_mps, z_mps))
+            self.master.mav.set_position_target_local_ned_send(
+                                      0,  # system time in milliseconds
+                                      1,  # target system
+                                      0,  # target component
+                                      8,  # coordinate frame MAV_FRAME_BODY_NED
+                                      455,      # type mask (vel only)
+                                      0, 0, 0,  # position x,y,z
+                                      x_mps, y_mps, z_mps,  # velocity x,y,z
+                                      0, 0, 0,  # accel x,y,z
+                                      0, 0)     # yaw, yaw rate
 
 def init(mpstate):
     '''initialise module'''
