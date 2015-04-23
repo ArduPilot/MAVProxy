@@ -21,11 +21,15 @@ class ModeModule(mp_module.MPModule):
         if len(args) != 1:
             print('Available modes: ', mode_mapping.keys())
             return
-        mode = args[0].upper()
-        if mode not in mode_mapping:
-            print('Unknown mode %s: ' % mode)
-            return
-        self.master.set_mode(mode_mapping[mode])
+        if args[0].isdigit():
+            modenum = int(args[0])
+        else:
+            mode = args[0].upper()
+            if mode not in mode_mapping:
+                print('Unknown mode %s: ' % mode)
+                return
+            modenum = mode_mapping[mode]
+        self.master.set_mode(modenum)
 
     def unknown_command(self, args):
         '''handle mode switch by mode name as command'''
