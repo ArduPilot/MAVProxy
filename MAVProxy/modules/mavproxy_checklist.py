@@ -40,7 +40,7 @@ class ChecklistModule(mp_module.MPModule):
 
         if type in [ 'GPS_RAW', 'GPS_RAW_INT' ]:
             '''beforeEngineList - GPS lock'''
-            if ((msg.fix_type == 3 and master.mavlink10()) or
+            if ((msg.fix_type >= 3 and master.mavlink10()) or
                 (msg.fix_type == 2 and not master.mavlink10())):
                 self.checklist.set_check("GPS lock", 1)
             else:
