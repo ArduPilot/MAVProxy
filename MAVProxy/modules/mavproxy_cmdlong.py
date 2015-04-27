@@ -14,6 +14,7 @@ class CmdlongModule(mp_module.MPModule):
         self.add_command('takeoff', self.cmd_takeoff, "takeoff")
         self.add_command('velocity', self.cmd_velocity, "velocity")
         self.add_command('cammsg', self.cmd_takeoff, "cammsg")
+        self.add_command('camctrlmsg', self.cmd_camctrlmsg, "camctrlmsg")
 
     def cmd_takeoff(self, args):
         '''take off'''
@@ -37,22 +38,39 @@ class CmdlongModule(mp_module.MPModule):
                 0, # param6
                 altitude) # param7
 
+    def cmd_camctrlmsg(self, args):
+        '''camctrlmsg'''
+        
+        print("Sent DIGICAM_CONFIGURE CMD_LONG")
+        self.master.mav.command_long_send(
+            self.settings.target_system,  # target_system
+            0, # target_component
+            mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONFIGURE, # command
+            0, # confirmation
+            10, # param1
+            20, # param2
+            30, # param3
+            40, # param4
+            50, # param5
+            60, # param6
+            70) # param7
+
     def cmd_cammsg(self, args):
         '''cammsg'''
   
         print("Sent DIGICAM_CONTROL CMD_LONG")
         self.master.mav.command_long_send(
             self.settings.target_system,  # target_system
-            mavutil.mavlink.MAV_COMP_ID_SYSTEM_CONTROL, # target_component
+            0, # target_component
             mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONTROL, # command
             0, # confirmation
-            0, # param1
-            0, # param2
-            0, # param3
-            0, # param4
-            0, # param5
-            0, # param6
-            altitude) # param7
+            10, # param1
+            20, # param2
+            30, # param3
+            40, # param4
+            50, # param5
+            60, # param6
+            70) # param7
 
     def cmd_do_change_speed(self, args):
         '''speed value'''
