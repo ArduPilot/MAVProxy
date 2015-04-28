@@ -1,6 +1,6 @@
 from setuptools import setup
 
-version = "1.4.14"
+version = "1.4.15"
 
 setup(name='MAVProxy',
       version=version,
