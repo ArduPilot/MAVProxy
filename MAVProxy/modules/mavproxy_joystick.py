@@ -53,6 +53,17 @@ joymap = {
      (3, -500, 1000),
      (0, -500,  1500)],
 
+    'Microsoft X-Box 360 pad':
+    # This is for a USB cabled X-Box 360 controller
+    # only 4 axes usable. Left and right trigger are ch5 and ch4.
+    # This assumes mode 1
+    [(3, 500,  1500),
+     (1, -500,  1500),
+     (4, -500, 1500),
+     (0, 500,  1500),
+     (2, 500, 1500),
+     (5, 500, 1500)],
+
     'GREAT PLANES InterLink Elite':
     # 4 axes usable
     [(0, 500,  1500),
