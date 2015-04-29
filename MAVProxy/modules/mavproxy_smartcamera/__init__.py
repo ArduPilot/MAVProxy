@@ -396,7 +396,7 @@ class SmartCameraModule(mp_module.MPModule):
             
             if (mCommand_Long.param2 == 1):
                 self.__vCmdCamZoomIn()
-            if (mCommand_Long.param2 == 2):
+            elif (mCommand_Long.param2 == 2):
                 self.__vCmdCamZoomOut()
             else:
                 print ("Invalid Zoom Value")
@@ -412,7 +412,7 @@ class SmartCameraModule(mp_module.MPModule):
         '''Trigger'''
         if mCommand_Long.param5 != 0:
             print ("Trigger = %d" % mCommand_Long.param5)
-            self.__vCmdCamTrigger(true)
+            self.__vCmdCamTrigger(mCommand_Long)
 
 
 
@@ -436,8 +436,8 @@ class SmartCameraModule(mp_module.MPModule):
         if mtype == "CAMERA_STATUS":
             print ("Got Message camera_status")
         if mtype == "CAMERA_FEEDBACK":
-            print ("Got Message camera_feedback triggering Cameras")
-            self.__vCmdCamTrigger(m)
+            print ("Got Message camera_feedback")
+            '''self.__vCmdCamTrigger(m)'''
         if mtype == "COMMAND_LONG":
             if m.command == mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONFIGURE:
                 print ("Got Message Digicam_configure")
