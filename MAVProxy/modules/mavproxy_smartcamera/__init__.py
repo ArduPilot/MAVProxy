@@ -344,28 +344,28 @@ class SmartCameraModule(mp_module.MPModule):
             print ("Exposure Mode = %d" % mCommand_Long.param1)
             
             if mCommand_Long.param1 == self.ProgramAuto:
-                self.__vCmdSetCamExposureMode("Program Auto")
+                self.__vCmdSetCamExposureMode(["Program Auto"])
             
             elif mCommand_Long.param1 == self.Aperture:
-                self.__vCmdSetCamExposureMode("Aperture")
+                self.__vCmdSetCamExposureMode(["Aperture"])
             
             elif mCommand_Long.param1 == self.Shutter:
-                self.__vCmdSetCamExposureMode("Shutter")
+                self.__vCmdSetCamExposureMode(["Shutter"])
 
         '''Shutter Speed'''
         if mCommand_Long.param2 != 0:
             print ("Shutter Speed= %d" % mCommand_Long.param2)
-            self.__vCmdSetCamShutterSpeed(mCommand_Long.param2)
+            self.__vCmdSetCamShutterSpeed([mCommand_Long.param2])
         
         '''Aperture'''
         if mCommand_Long.param3 != 0:
             print ("Aperture = %d" % mCommand_Long.param3)
-            self.__vCmdSetCamAperture(mCommand_Long.param3)
+            self.__vCmdSetCamAperture([mCommand_Long.param3])
 
         '''ISO'''
         if mCommand_Long.param4 != 0:
             print ("ISO = %d" % mCommand_Long.param4)
-            self.__vCmdSetCamISO(mCommand_Long.param4)
+            self.__vCmdSetCamISO([mCommand_Long.param4])
 
         '''Exposure Type'''
         if mCommand_Long.param5 != 0:
