@@ -393,17 +393,17 @@ class SmartCameraModule(mp_module.MPModule):
         '''Zooming Step Value'''
         if mCommand_Long.param2 != 0:
             print ("Zooming Step = %d" % mCommand_Long.param2)
-            
-            if (mCommand_Long.param2 == 1):
-                self.__vCmdCamZoomIn()
-            elif (mCommand_Long.param2 == 2):
-                self.__vCmdCamZoomOut()
-            else:
-                print ("Invalid Zoom Value")
         
         '''Zooming Step Value'''
         if mCommand_Long.param3 != 0:
             print ("Zooming Value = %d" % mCommand_Long.param3)
+
+            if (mCommand_Long.param3 == 1):
+                self.__vCmdCamZoomIn()
+            elif (mCommand_Long.param3 == -1):
+                self.__vCmdCamZoomOut()
+            else:
+                print ("Invalid Zoom Value")
         
         '''Focus 0=Unlock/1=Lock/2=relock'''
         if mCommand_Long.param4 != 0:
