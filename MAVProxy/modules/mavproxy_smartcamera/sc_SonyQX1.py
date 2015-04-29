@@ -44,6 +44,8 @@ import ssdp
 #                    boSetShutterSpeed
 #                    boSetAperture
 #                    boSetISO
+#                    boZoomIn
+#                    boZoomOut
 #
 # Private Methods  : __sFindInterfaceIPAddress
 #                    __sFindCameraURL
@@ -287,7 +289,63 @@ class SmartCamera_SonyQX():
 
     def u32GetImageCounter(self):
         return self.u32ImgCounter
-    
+
+#****************************************************************************
+#   Method Name     : boZoomIn
+#
+#   Description     : Commands the camera to do a Zoom In step
+#
+#   Parameters      : None
+#
+#   Return Value    : True if succesful
+#                     False if Error Recieved
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+    def boZoomIn(self):
+
+        # Send command to set Exposure Mode
+        sResponse = self.__sSimpleCall("actZoom", adictParams=["in","1shot"])
+        
+        # Check response for a succesful result
+        if 'result' in sResponse:
+            print ("Zoomed in")
+            return True
+        
+        # In case of an error, return false
+        print ("Failed to Zoom")
+        return False
+
+#****************************************************************************
+#   Method Name     : boZoomOut
+#
+#   Description     : Commands the camera to do a Zoom In step
+#
+#   Parameters      : None
+#
+#   Return Value    : True if succesful
+#                     False if Error Recieved
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+    def boZoomOut(self):
+        
+        # Send command to set Exposure Mode
+        sResponse = self.__sSimpleCall("actZoom", adictParams=["out","1shot"])
+        
+        # Check response for a succesful result
+        if 'result' in sResponse:
+            print ("Zoomed out")
+            return True
+
+        # In case of an error, return false
+        print ("Failed to Zoom")
+        return False
+
 #****************************************************************************
 #   Method Name     : boSetExposureMode
 #

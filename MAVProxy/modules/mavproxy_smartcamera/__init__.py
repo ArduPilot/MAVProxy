@@ -293,6 +293,40 @@ class SmartCameraModule(mp_module.MPModule):
             print ("Usage: setCamISO ISOVALUE [CAMNUMBER]")
 
 #****************************************************************************
+#   Method Name     : __vCmdCamZoomIn
+#
+#   Description     : Commands the Camera to Zoom In
+#
+#   Parameters      : None
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+    def __vCmdCamZoomIn(self):
+        for cam in self.camera_list:
+            cam.boZoomIn()
+ 
+#****************************************************************************
+#   Method Name     : __vCmdCamZoomOut
+#
+#   Description     : Commands the Camera to Zoom In
+#
+#   Parameters      : None
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+    def __vCmdCamZoomOut(self):
+        for cam in self.camera_list:
+            cam.boZoomOut()
+ 
+#****************************************************************************
 #   Method Name     : __vDecodeDIGICAMConfigure
 #
 #   Description     : Decode and process the camera configuration Messages
@@ -322,14 +356,17 @@ class SmartCameraModule(mp_module.MPModule):
         if mCommand_Long.param2 != 0:
             print ("Shutter Speed= %d" % mCommand_Long.param2)
             self.__vCmdSetCamShutterSpeed(mCommand_Long.param2)
+        
         '''Aperture'''
         if mCommand_Long.param3 != 0:
             print ("Aperture = %d" % mCommand_Long.param3)
             self.__vCmdSetCamAperture(mCommand_Long.param3)
+
         '''ISO'''
         if mCommand_Long.param4 != 0:
             print ("ISO = %d" % mCommand_Long.param4)
             self.__vCmdSetCamISO(mCommand_Long.param4)
+
         '''Exposure Type'''
         if mCommand_Long.param5 != 0:
             print ("Exposure type= %d" % mCommand_Long.param5)
@@ -356,6 +393,13 @@ class SmartCameraModule(mp_module.MPModule):
         '''Zooming Step Value'''
         if mCommand_Long.param2 != 0:
             print ("Zooming Step = %d" % mCommand_Long.param2)
+            
+            if (mCommand_Long.param2 == 1):
+                self.__vCmdCamZoomIn()
+            if (mCommand_Long.param2 == 2):
+                self.__vCmdCamZoomOut()
+            else:
+                print ("Invalid Zoom Value")
         
         '''Zooming Step Value'''
         if mCommand_Long.param3 != 0:
@@ -395,15 +439,6 @@ class SmartCameraModule(mp_module.MPModule):
             print ("Got Message camera_feedback triggering Cameras")
             self.__vCmdCamTrigger(m)
         if mtype == "COMMAND_LONG":
-            print ("Command: %d" % m.command)
-            print ("Param1: %d" % m.param1)
-            print ("Param2: %d" % m.param2)
-            print ("Param3: %d" % m.param3)
-            print ("Param4: %d" % m.param4)
-            print ("Param5: %d" % m.param5)
-            print ("Param6: %d" % m.param6)
-            print ("Param7: %d" % m.param7)
-                    
             if m.command == mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONFIGURE:
                 print ("Got Message Digicam_configure")
                 self.__vDecodeDIGICAMConfigure(m)
