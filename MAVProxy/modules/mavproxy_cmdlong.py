@@ -13,7 +13,7 @@ class CmdlongModule(mp_module.MPModule):
         self.add_command('setyaw', self.cmd_condition_yaw, "condition_yaw")
         self.add_command('takeoff', self.cmd_takeoff, "takeoff")
         self.add_command('velocity', self.cmd_velocity, "velocity")
-        self.add_command('cammsg', self.cmd_takeoff, "cammsg")
+        self.add_command('cammsg', self.cmd_cammsg, "cammsg")
         self.add_command('camctrlmsg', self.cmd_camctrlmsg, "camctrlmsg")
 
     def cmd_takeoff(self, args):
