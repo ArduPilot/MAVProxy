@@ -50,6 +50,7 @@ class ModeModule(mp_module.MPModule):
             latitude = float(args[0])
             longitude = float(args[1])
             altitude = int(args[2])
+            latlon = (latitude, longitude)
         else:
             try:
                 latlon = self.module('map').click_position
