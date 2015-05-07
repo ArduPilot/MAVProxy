@@ -177,8 +177,6 @@ class MPImage():
         self.child.terminate()
         self.child.join()
 
-from PIL import Image
-
 class MPImageFrame(wx.Frame):
     """ The main frame of the viewer
     """
@@ -219,6 +217,7 @@ class MPImagePanel(wx.Panel):
         self.wx_popup_menu = None
         self.popup_pos = None
         self.last_size = None
+        self.done_PIL_warning = False
         state.brightness = 1.0
 
         # dragpos is the top left position in image coordinates
@@ -290,9 +289,17 @@ class MPImagePanel(wx.Panel):
         scaled_image = scaled_image.GetSubImage(rect);
         scaled_image = scaled_image.Rescale(int(rect.width*self.zoom), int(rect.height*self.zoom))
         if state.brightness != 1.0:
-            pimg = mp_util.wxToPIL(scaled_image)
-            pimg = Image.eval(pimg, lambda x: int(x * state.brightness))
-            scaled_image = mp_util.PILTowx(pimg)
+            try:
+                from PIL import Image
+                pimg = mp_util.wxToPIL(scaled_image)
+                pimg = Image.eval(pimg, lambda x: int(x * state.brightness))
+                scaled_image = mp_util.PILTowx(pimg)
+            except Exception:
+                if not self.done_PIL_warning:
+                    print("Please install PIL for brightness control")
+                    self.done_PIL_warning = True
+                # ignore lack of PIL library
+                pass
         self.imagePanel.set_image(scaled_image)
         self.need_redraw = False
 

@@ -673,7 +673,6 @@ class MPSlipMap():
 
 
 import wx
-from PIL import Image
 
 class MPSlipMapFrame(wx.Frame):
     """ The main frame of the viewer
