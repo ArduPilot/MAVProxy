@@ -129,9 +129,13 @@ class SRTMDownloader():
 
         for continent in continents:
             '''print "Downloading file list for", continent'''
-            conn.request("GET","%s/%s" % \
-                         (self.directory,continent))
-            r1 = conn.getresponse()
+            url = "%s/%s" % (self.directory,continent)
+            try:
+                conn.request("GET", url)
+                r1 = conn.getresponse()
+            except Exception as ex:
+                print("Failed to download %s : %s" % (url, ex))
+                continue
             '''if r1.status==200:
                 print "status200 received ok"
             else:
