@@ -169,6 +169,8 @@ class ParamState:
                 return
             param = args[1]
             value = args[2]
+            if value.startswith('0x'):
+                value = int(value, base=16)
             if not param.upper() in self.mav_param:
                 print("Unable to find parameter '%s'" % param)
                 return
