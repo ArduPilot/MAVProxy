@@ -16,12 +16,12 @@ from MAVProxy.modules.mavproxy_map import srtm
 class ElevationModel():
     '''Elevation Model. Only SRTM for now'''
 
-    def __init__(self, database='srtm', offline=0):
+    def __init__(self, database='srtm', offline=0, debug=False):
         '''Use offline=1 to disable any downloading of tiles, regardless of whether the
         tile exists'''
         self.database = database
         if self.database == 'srtm':
-            self.downloader = srtm.SRTMDownloader(offline=offline)
+            self.downloader = srtm.SRTMDownloader(offline=offline, debug=debug)
             self.downloader.loadFileList()
             self.tileDict = dict()
 
@@ -62,10 +62,11 @@ if __name__ == "__main__":
     parser.add_option("--lat", type='float', default=-35.052544, help="start latitude")
     parser.add_option("--lon", type='float', default=149.509165, help="start longitude")
     parser.add_option("--database", type='string', default='srtm', help="elevation database")
+    parser.add_option("--debug", action='store_true', help="enabled debugging")
 
     (opts, args) = parser.parse_args()
 
-    EleModel = ElevationModel(opts.database)
+    EleModel = ElevationModel(opts.database, debug=opts.debug)
 
     lat = opts.lat
     lon = opts.lon

@@ -58,7 +58,8 @@ class SRTMDownloader():
     def __init__(self, server="firmware.diydrones.com",
                  directory="/SRTM/",
                  cachedir=None,
-                 offline=0):
+                 offline=0,
+                 debug=False):
 
         if cachedir is None:
             try:
@@ -66,6 +67,7 @@ class SRTMDownloader():
             except Exception:
                 cachedir = os.path.join(tempfile.gettempdir(), 'MAVProxySRTM')
 
+        self.debug = debug
         self.offline = offline
         self.first_failure = False
         self.server = server
@@ -112,6 +114,8 @@ class SRTMDownloader():
         30may2010  GJ ORIGINAL VERSION
         """
         mp_util.child_close_fds()
+        if self.debug:
+            print("Connecting to %s" % server)
         conn = httplib.HTTPConnection(server)
         conn.request("GET",directory)
         r1 = conn.getresponse()
@@ -129,7 +133,9 @@ class SRTMDownloader():
 
         for continent in continents:
             '''print "Downloading file list for", continent'''
-            url = "%s/%s" % (self.directory,continent)
+            url = "%s%s" % (self.directory,continent)
+            if self.debug:
+                print("fetching %s" % url)
             try:
                 conn.request("GET", url)
                 r1 = conn.getresponse()
@@ -156,6 +162,8 @@ class SRTMDownloader():
         self.filelist["directory"] = self.directory
         with open(self.filelist_file , 'wb') as output:
             pickle.dump(self.filelist, output)
+        if self.debug:
+            print("created file list with %u entries" % len(self.filelist))
 
     def parseFilename(self, filename):
         """Get lat/lon values from filename."""
