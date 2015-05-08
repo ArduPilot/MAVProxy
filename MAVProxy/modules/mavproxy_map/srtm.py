@@ -83,6 +83,7 @@ class SRTMDownloader():
         self.filelist_file = os.path.join(self.cachedir, "filelist_python")
         self.childFileListDownload = None
         self.childTileDownload = None
+        self.min_filelist_len = 14500
 
     def loadFileList(self):
         """Load a previously created file list or create a new one if none is
@@ -96,6 +97,10 @@ class SRTMDownloader():
             return
         try:
             self.filelist = pickle.load(data)
+            if len(self.filelist) < self.min_filelist_len:
+                self.filelist = {}
+                if self.offline == 0:
+                    self.createFileList()
         except:
             '''print "Unknown error loading cached SRTM file list. Creating new one!"'''
             if self.offline == 0:
@@ -130,13 +135,17 @@ class SRTMDownloader():
         parser.feed(data)
         continents = parser.getDirListing()
         '''print continents'''
+        conn.close()
 
         for continent in continents:
+            if not continent[0].isalpha() or continent.startswith('README'):
+                continue
             '''print "Downloading file list for", continent'''
             url = "%s%s" % (self.directory,continent)
             if self.debug:
                 print("fetching %s" % url)
             try:
+                conn = httplib.HTTPConnection(server)
                 conn.request("GET", url)
                 r1 = conn.getresponse()
             except Exception as ex:
@@ -148,6 +157,7 @@ class SRTMDownloader():
                 print "oh no = status=%d %s" \
                       % (r1.status,r1.reason)'''
             data = r1.read()
+            conn.close()
             parser = parseHTMLDirectoryListing()
             parser.feed(data)
             files = parser.getDirListing()
@@ -196,7 +206,7 @@ class SRTMDownloader():
             continent, filename = self.filelist[(int(lat), int(lon))]
         except KeyError:
             '''print "here??"'''
-            if len(self.filelist) > 14500:
+            if len(self.filelist) > self.min_filelist_len:
                 # we appear to have a full filelist - this must be ocean
                 return SRTMOceanTile(int(lat), int(lon))
             return 0
