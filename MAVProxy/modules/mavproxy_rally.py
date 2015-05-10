@@ -14,7 +14,7 @@ if mp_util.has_wxpython:
 class RallyModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(RallyModule, self).__init__(mpstate, "rally", "rally point control", public = True)
-        self.rallyloader = mavwp.MAVRallyLoader(mpstate.settings.target_system, mpstate.settings.target_component)
+        self.rallyloader = mavwp.MAVRallyLoader(self.settings.target_system, self.settings.target_component)
         self.add_command('rally', self.cmd_rally, "rally point control", ["<add|clear|land|list|move|remove|>",
                                     "<load|save> (FILENAME)"])
         self.have_list = False
