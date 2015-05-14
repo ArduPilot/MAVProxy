@@ -19,7 +19,7 @@ class GimbalModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(GimbalModule, self).__init__(mpstate, "gimbal", "gimbal control module")
         self.add_command('gimbal', self.cmd_gimbal, "gimbal link control",
-                         ['<rate|point|roi|mode|status>'])
+                         ['<rate|point|roi|roivel|mode|status>'])
         if mp_util.has_wxpython:
             self.menu = MPMenuSubMenu('Mount',
                                       items=[MPMenuItem('GPS targeting Mode', 'GPS Mode', '# gimbal mode gps'),
@@ -38,7 +38,7 @@ class GimbalModule(mp_module.MPModule):
 
     def cmd_gimbal(self, args):
         '''control gimbal'''
-        usage = 'Usage: gimbal <rate|status>'
+        usage = 'Usage: gimbal <rate|point|roi|roivel|mode|status>'
         if len(args) == 0:
             print(usage)
             return
@@ -52,6 +52,8 @@ class GimbalModule(mp_module.MPModule):
             self.cmd_gimbal_mode(args[1:])
         elif args[0] == 'status':
             self.cmd_gimbal_status(args[1:])
+        elif args[0] == 'roivel':
+            self.cmd_gimbal_roi_vel(args[1:])
 
     def cmd_gimbal_mode(self, args):
         '''control gimbal mode'''
@@ -89,6 +91,42 @@ class GimbalModule(mp_module.MPModule):
                                            0, # altitude zero for now
                                            0)
         
+    def cmd_gimbal_roi_vel(self, args):
+        '''control roi position and velocity'''
+        if len(args) != 0 and len(args) != 3 and len(args) != 6:
+            print("usage: gimbal roivel [VEL_NORTH VEL_EAST VEL_DOWN] [ACC_NORTH ACC_EASY ACC_DOWN]")
+            return
+        latlon = None
+        vel = [0,0,0]
+        acc = [0,0,0]
+        if (len(args) >= 3):
+            vel[0:3] = args[0:3]
+        if (len(args) == 6):
+            acc[0:3] = args[3:6]
+        try:
+            latlon = self.module('map').click_position
+        except Exception:
+            print("No map available")
+            return
+        if latlon is None:
+            print("No map click position available")
+            latlon = (0,0,0)
+        self.master.mav.set_roi_global_int_send(0, #time_boot_ms
+            1, #target_system
+            1, #target_component
+            mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
+            0, #type_mask
+            0, #roi_index
+            0, #timeout_ms
+            int(latlon[0]*1e7), #lat int
+            int(latlon[1]*1e7), #lng int
+            float(0),       #alt
+            float(vel[0]), #vx
+            float(vel[1]), #vy
+            float(vel[2]), #vz
+            float(acc[0]), #ax
+            float(acc[1]), #ay
+            float(acc[2])) #az
 
     def cmd_gimbal_rate(self, args):
         '''control gimbal rate'''
