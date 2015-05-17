@@ -177,9 +177,11 @@ class ConsoleFrame(wx.Frame):
                     self.control.SetDefaultStyle(oldstyle)
                 self.pending = []
             elif isinstance(obj, mp_menu.MPMenuTop):
-                self.menu = obj
-                self.SetMenuBar(self.menu.wx_menu())
-                self.Bind(wx.EVT_MENU, self.on_menu)
+                if obj is not None:
+                    self.SetMenuBar(None)
+                    self.menu = obj
+                    self.SetMenuBar(self.menu.wx_menu())
+                    self.Bind(wx.EVT_MENU, self.on_menu)
                 self.Refresh()
                 self.Update()
 
