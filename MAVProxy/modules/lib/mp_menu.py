@@ -278,12 +278,13 @@ class MPMenuChildMessageDialog(object):
         self.title = title
         self.message = message
         self.font_size = font_size
-        
+
+    def show(self):        
         import multiprocessing
-        t = multiprocessing.Process(target=self.show)
+        t = multiprocessing.Process(target=self.call)
         t.start()
 
-    def show(self):
+    def call(self):
         '''show the dialog as a child process'''
         mp_util.child_close_fds()
         import wx_processguard
@@ -297,6 +298,16 @@ class MPMenuChildMessageDialog(object):
         dlg.ShowModal()
         app.MainLoop()
 
+class MPMenuOpenWeblink(object):
+    '''used to open a weblink in the default webbrowser'''
+    def __init__(self, url='www.google.com'):
+        self.url = url
+
+    def call(self):
+        '''show the dialog as a child process'''
+        import webbrowser
+        webbrowser.open_new_tab(self.url)
+        
 if __name__ == '__main__':
     from MAVProxy.modules.lib.mp_image import MPImage
     import time
