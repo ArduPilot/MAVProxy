@@ -84,7 +84,8 @@ class MapModule(mp_module.MPModule):
             logf = open(os.path.join(self.logdir, "positions.txt"), "a")
             logf.write("Position: %.6f %.6f at %s\n" % (pos[0], pos[1], time.ctime()))
             logf.close()
-        MPMenuChildMessageDialog('Position', msg, font_size=32)
+        posbox = MPMenuChildMessageDialog('Position', msg, font_size=32)
+        posbox.show()
 
     def cmd_map(self, args):
         '''map commands'''
