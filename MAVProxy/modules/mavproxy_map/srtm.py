@@ -97,6 +97,7 @@ class SRTMDownloader():
             return
         try:
             self.filelist = pickle.load(data)
+            data.close()
             if len(self.filelist) < self.min_filelist_len:
                 self.filelist = {}
                 if self.offline == 0:
@@ -110,19 +111,19 @@ class SRTMDownloader():
         """SRTM data is split into different directories, get a list of all of
             them and create a dictionary for easy lookup."""
         if self.childFileListDownload is None or not self.childFileListDownload.is_alive():
-            self.childFileListDownload = multiprocessing.Process(target=self.createFileListHTTP, args=(self.server, self.directory))
+            self.childFileListDownload = multiprocessing.Process(target=self.createFileListHTTP)
             self.childFileListDownload.start()
 
-    def createFileListHTTP(self, server, directory):
+    def createFileListHTTP(self):
         """Create a list of the available SRTM files on the server using
         HTTP file transfer protocol (rather than ftp).
         30may2010  GJ ORIGINAL VERSION
         """
         mp_util.child_close_fds()
         if self.debug:
-            print("Connecting to %s" % server)
-        conn = httplib.HTTPConnection(server)
-        conn.request("GET",directory)
+            print("Connecting to %s" % self.server)
+        conn = httplib.HTTPConnection(self.server)
+        conn.request("GET",self.directory)
         r1 = conn.getresponse()
         '''if r1.status==200:
             print "status200 received ok"
@@ -145,7 +146,7 @@ class SRTMDownloader():
             if self.debug:
                 print("fetching %s" % url)
             try:
-                conn = httplib.HTTPConnection(server)
+                conn = httplib.HTTPConnection(self.server)
                 conn.request("GET", url)
                 r1 = conn.getresponse()
             except Exception as ex:
@@ -172,6 +173,7 @@ class SRTMDownloader():
         self.filelist["directory"] = self.directory
         with open(self.filelist_file , 'wb') as output:
             pickle.dump(self.filelist, output)
+            output.close()
         if self.debug:
             print("created file list with %u entries" % len(self.filelist))
 
@@ -201,6 +203,7 @@ class SRTMDownloader():
             '''print "Filelist download complete, loading data"'''
             data = open(self.filelist_file, 'rb')
             self.filelist = pickle.load(data)
+            data.close()
 
         try:
             continent, filename = self.filelist[(int(lat), int(lon))]
