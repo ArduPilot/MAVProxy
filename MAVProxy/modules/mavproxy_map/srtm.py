@@ -19,6 +19,9 @@ import multiprocessing
 from MAVProxy.modules.lib import mp_util
 import tempfile
 
+childTileDownload = None
+childFileListDownload = None
+
 class NoSuchTileError(Exception):
     """Raised when there is no tile for a region."""
     def __init__(self, lat, lon):
@@ -81,8 +84,6 @@ class SRTMDownloader():
         self.filename_regex = re.compile(
                 r"([NS])(\d{2})([EW])(\d{3})\.hgt\.zip")
         self.filelist_file = os.path.join(self.cachedir, "filelist_python")
-        self.childFileListDownload = None
-        self.childTileDownload = None
         self.min_filelist_len = 14500
 
     def loadFileList(self):
@@ -110,9 +111,10 @@ class SRTMDownloader():
     def createFileList(self):
         """SRTM data is split into different directories, get a list of all of
             them and create a dictionary for easy lookup."""
-        if self.childFileListDownload is None or not self.childFileListDownload.is_alive():
-            self.childFileListDownload = multiprocessing.Process(target=self.createFileListHTTP)
-            self.childFileListDownload.start()
+        global childFileListDownload
+        if childFileListDownload is None or not childFileListDownload.is_alive():
+            childFileListDownload = multiprocessing.Process(target=self.createFileListHTTP)
+            childFileListDownload.start()
 
     def createFileListHTTP(self):
         """Create a list of the available SRTM files on the server using
@@ -171,9 +173,15 @@ class SRTMDownloader():
         # Add meta info
         self.filelist["server"] = self.server
         self.filelist["directory"] = self.directory
-        with open(self.filelist_file , 'wb') as output:
+        tmpname = self.filelist_file + ".tmp"
+        with open(tmpname , 'wb') as output:
             pickle.dump(self.filelist, output)
             output.close()
+            try:
+                os.unlink(self.filelist_file)
+            except Exception:
+                pass
+            os.rename(tmpname, self.filelist_file)
         if self.debug:
             print("created file list with %u entries" % len(self.filelist))
 
@@ -196,7 +204,8 @@ class SRTMDownloader():
         """Get a SRTM tile object. This function can return either an SRTM1 or
             SRTM3 object depending on what is available, however currently it
             only returns SRTM3 objects."""
-        if self.childFileListDownload is not None and self.childFileListDownload.is_alive():
+        global childFileListDownload
+        if childFileListDownload is not None and childFileListDownload.is_alive():
             '''print "Getting file list"'''
             return 0
         elif not self.filelist:
@@ -214,13 +223,18 @@ class SRTMDownloader():
                 return SRTMOceanTile(int(lat), int(lon))
             return 0
 
+        global childTileDownload
         if not os.path.exists(os.path.join(self.cachedir, filename)):
-            if self.childTileDownload is None or not self.childTileDownload.is_alive():
-                self.childTileDownload = multiprocessing.Process(target=self.downloadTile, args=(continent, filename))
-                self.childTileDownload.start()
+            if childTileDownload is None or not childTileDownload.is_alive():
+                try:
+                    childTileDownload = multiprocessing.Process(target=self.downloadTile, args=(str(continent), str(filename)))
+                    childTileDownload.start()
+                except Exception as ex:
+                    childTileDownload = None
+                    return 0
                 '''print "Getting Tile"'''
             return 0
-        elif self.childTileDownload is not None and self.childTileDownload.is_alive():
+        elif childTileDownload is not None and childTileDownload.is_alive():
             '''print "Still Getting Tile"'''
             return 0
         # TODO: Currently we create a new tile object each time.
@@ -239,7 +253,6 @@ class SRTMDownloader():
         conn.set_debuglevel(0)
         filepath = "%s%s%s" % \
                      (self.directory,continent,filename)
-        '''print "filepath=%s" % filepath'''
         try:
             conn.request("GET", filepath)
             r1 = conn.getresponse()
