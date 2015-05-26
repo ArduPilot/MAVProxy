@@ -168,7 +168,11 @@ class ConsoleModule(mp_module.MPModule):
                 if agl_alt is not None:
                     agl_alt = self.settings.basealt - agl_alt
             else:
-                agl_alt_home = self.console.ElevationMap.GetElevation(home_lat, home_lng)
+                try:
+                    agl_alt_home = self.console.ElevationMap.GetElevation(home_lat, home_lng)
+                except Exception as ex:
+                    print(ex)
+                    agl_alt_home = None
                 if agl_alt_home is not None:
                     agl_alt = self.console.ElevationMap.GetElevation(lat, lng)
                 if agl_alt is not None:
