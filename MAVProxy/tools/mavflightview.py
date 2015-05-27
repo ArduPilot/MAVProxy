@@ -189,7 +189,7 @@ def mavflightview(filename):
                     print("Can't find longitude on GPS message")
                     print(m)
                     break                    
-        elif m.get_type() == 'EKF1':
+        elif m.get_type() in ['EKF1', 'ANU1']:
             pos = mavextra.ekf1_pos(m)
             if pos is None:
                 continue
