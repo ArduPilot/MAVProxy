@@ -591,8 +591,8 @@ class MPSlipMap():
         self.title = title
         self.event_queue = multiprocessing.Queue()
         self.object_queue = multiprocessing.Queue()
-        self.close_window = multiprocessing.Event()
-        self.close_window.clear()
+        self.close_window = multiprocessing.Semaphore()
+        self.close_window.acquire()
         self.child = multiprocessing.Process(target=self.child_task)
         self.child.start()
         self._callbacks = set()
@@ -614,17 +614,23 @@ class MPSlipMap():
         state.need_redraw = True
 
         self.app = wx.PySimpleApp()
+        self.app.SetExitOnFrameDelete(True)
         self.app.frame = MPSlipMapFrame(state=self)
         self.app.frame.Show()
         self.app.MainLoop()
 
     def close(self):
         '''close the window'''
-        self.close_window.set()
-        if self.is_alive():
-            self.child.join(2)
+        self.close_window.release()
+        count=0
+        while self.child.is_alive() and count < 30: # 3 seconds to die...
+            time.sleep(0.1) #?
+            count+=1
 
-        self.child.terminate()
+        if self.child.is_alive():
+            self.child.terminate()
+
+        self.child.join()
 
     def is_alive(self):
         '''check if graph is still going'''
@@ -800,6 +806,9 @@ class MPSlipMapFrame(wx.Frame):
     def on_idle(self, event):
         '''prevent the main loop spinning too fast'''
         state = self.state
+
+        if state.close_window.acquire(False):
+            self.state.app.ExitMainLoop()
 
         # receive any display objects from the parent
         obj = None
