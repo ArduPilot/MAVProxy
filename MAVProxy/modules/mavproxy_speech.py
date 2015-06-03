@@ -7,8 +7,12 @@ from MAVProxy.modules.lib import mp_module
 class SpeechModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(SpeechModule, self).__init__(mpstate, "speech", "speech output")
+        self.old_mpstate_say_function = self.mpstate.functions.say
         self.mpstate.functions.say = self.say
-        self.settings.append(('speech', int, 1))
+        try:
+            self.settings.set('speech', 1)
+        except AttributeError:
+            self.settings.append(('speech', int, 1))
         self.kill_speech_dispatcher()
         for backend in [self.say_speechd, self.say_espeak, self.say_speech]:
             try:
@@ -40,6 +44,9 @@ class SpeechModule(mp_module.MPModule):
 
     def unload(self):
         '''unload module'''
+        self.settings.set('speech', 0)
+        if self.mpstate.functions.say == self.mpstate.functions.say:
+            self.mpstate.functions.say = self.old_mpstate_say_function
         self.kill_speech_dispatcher()
 
     def say_speechd(self, text, priority='important'):
