@@ -39,6 +39,8 @@ class MapModule(mp_module.MPModule):
         self.have_global_position = False
         self.vehicle_type_name = 'plane'
         self.ElevationMap = mp_elevation.ElevationModel()
+        self.last_unload_check_time = time.time()
+        self.unload_check_interval = 0.1 # seconds
         self.map_settings = mp_settings.MPSettings(
             [ ('showgpspos', int, 0),
               ('showgps2pos', int, 1),
@@ -326,6 +328,13 @@ class MapModule(mp_module.MPModule):
         self.mpstate.map = None
         self.mpstate.map_functions = {}
     
+    def idle_task(self):
+        now = time.time()
+        if self.last_unload_check_time + self.unload_check_interval < now:
+            self.last_unload_check_time = now
+            if not self.mpstate.map.is_alive():
+                self.needs_unloading = True
+
     def create_vehicle_icon(self, name, colour, follow=False, vehicle_type=None):
         '''add a vehicle to the map'''
         from MAVProxy.modules.mavproxy_map import mp_slipmap

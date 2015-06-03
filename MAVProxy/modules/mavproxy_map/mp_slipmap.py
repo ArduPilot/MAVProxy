@@ -62,8 +62,8 @@ class MPSlipMap():
         from ..lib.multiprocessing_queue import makeIPCQueue
         self.event_queue = makeIPCQueue()
         self.object_queue = makeIPCQueue()
-        self.close_window = multiprocessing.Event()
-        self.close_window.clear()
+        self.close_window = multiprocessing.Semaphore()
+        self.close_window.acquire()
         self.child = multiprocessing.Process(target=self.child_task)
         self.child.start()
         self._callbacks = set()
@@ -89,17 +89,23 @@ class MPSlipMap():
         state.need_redraw = True
 
         self.app = wx.App(False)
+        self.app.SetExitOnFrameDelete(True)
         self.app.frame = MPSlipMapFrame(state=self)
         self.app.frame.Show()
         self.app.MainLoop()
 
     def close(self):
         '''close the window'''
-        self.close_window.set()
-        if self.is_alive():
-            self.child.join(2)
+        self.close_window.release()
+        count=0
+        while self.child.is_alive() and count < 30: # 3 seconds to die...
+            time.sleep(0.1) #?
+            count+=1
 
-        self.child.terminate()
+        if self.child.is_alive():
+            self.child.terminate()
+
+        self.child.join()
 
     def is_alive(self):
         '''check if graph is still going'''

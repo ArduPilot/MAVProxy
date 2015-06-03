@@ -137,6 +137,9 @@ class MPSlipMapFrame(wx.Frame):
         '''prevent the main loop spinning too fast'''
         state = self.state
 
+        if state.close_window.acquire(False):
+            self.state.app.ExitMainLoop()
+
         # receive any display objects from the parent
         obj = None
 
