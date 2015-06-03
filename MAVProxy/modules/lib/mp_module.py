@@ -12,6 +12,8 @@ class MPModule(object):
         '''
         self.mpstate = mpstate
         self.name = name
+        self.needs_unloading = False
+
         if description is None:
             self.description = name + " handling"
         else:
