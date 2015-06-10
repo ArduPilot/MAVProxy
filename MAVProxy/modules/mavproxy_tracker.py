@@ -168,6 +168,10 @@ class TrackerModule(mp_module.MPModule):
         if self.tracker_settings.port == None:
             print("tracker port not set")
             return
+        if self.connection is not None:
+            self.connection.close()
+            self.connection = None
+            print("Closed old connection")
         print("connecting to tracker %s at %d" % (self.tracker_settings.port,
                                                   self.tracker_settings.baudrate))
         m = mavutil.mavlink_connection(self.tracker_settings.port,
