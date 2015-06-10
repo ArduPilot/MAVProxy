@@ -71,6 +71,7 @@ class MiscModule(mp_module.MPModule):
         self.add_command('repeat', self.cmd_repeat, "repeat a command at regular intervals",
                          ["<add|remove|clear>"])
         self.add_command('version', self.cmd_version, "show version")
+        self.add_command('rcbind', self.cmd_rcbind, "bind RC receiver")
         self.repeats = []
 
     def altitude_difference(self, pressure1, pressure2, ground_temp):
@@ -169,6 +170,17 @@ class MiscModule(mp_module.MPModule):
                                           mavutil.mavlink.MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES,
                                           0,
                                           1, 0, 0, 0, 0, 0, 0)
+
+    def cmd_rcbind(self, args):
+        '''start RC bind'''
+        if len(args) < 1:
+            print("Usage: rcbind <dsmmode>")
+            return
+        self.master.mav.command_long_send(self.settings.target_system,
+                                          self.settings.target_component,
+                                          mavutil.mavlink.MAV_CMD_START_RX_PAIR,
+                                          0,
+                                          float(args[0]), 0, 0, 0, 0, 0, 0)
 
     def cmd_repeat(self, args):
         '''repeat a command at regular intervals'''
