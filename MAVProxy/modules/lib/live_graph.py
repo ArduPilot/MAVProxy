@@ -42,9 +42,12 @@ class LiveGraph():
     def child_task(self):
         '''child process - this holds all the GUI elements'''
         mp_util.child_close_fds()
-        import wx, matplotlib
+        
+        import matplotlib
+        from wx_loader import wx
+
         matplotlib.use('WXAgg')
-        app = wx.PySimpleApp()
+        app = wx.App(False)
         app.frame = GraphFrame(state=self)
         app.frame.Show()
         app.MainLoop()
@@ -64,7 +67,7 @@ class LiveGraph():
         '''check if graph is still going'''
         return self.child.is_alive()
 
-import wx
+from wx_loader import wx
 
 class GraphFrame(wx.Frame):
     """ The main frame of the application

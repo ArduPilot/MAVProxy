@@ -38,11 +38,11 @@ class FenceModule(mp_module.MPModule):
                                   items=[MPMenuItem('Clear', 'Clear', '# fence clear'),
                                          MPMenuItem('List', 'List', '# fence list'),
                                          MPMenuItem('Load', 'Load', '# fence load ',
-                                                    handler=MPMenuCallFileDialog(flags=wx.FD_OPEN,
+                                                    handler=MPMenuCallFileDialog(flags=('open',),
                                                                                  title='Fence Load',
                                                                                  wildcard='*.fen')),
                                          MPMenuItem('Save', 'Save', '# fence save ',
-                                                    handler=MPMenuCallFileDialog(flags=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT,
+                                                    handler=MPMenuCallFileDialog(flags=('save', 'overwrite_prompt'),
                                                                                  title='Fence Save',
                                                                                  wildcard='*.fen')),
                                          MPMenuItem('Draw', 'Draw', '# fence draw')])

@@ -5,10 +5,12 @@
 import math
 import os
 
-# Some platforms (CYGWIN and others) many not have this library
+# Some platforms (CYGWIN and others) many not have the wx library
+# use imp to see if wx is on the path
 has_wxpython = False
+import imp
 try:
-    import wx
+    imp.find_module('wx')
     has_wxpython = True
 except ImportError, e:
     pass
@@ -207,7 +209,7 @@ def wxToPIL(wimg):
 
 def PILTowx(pimg):
     '''convert a PIL Image to a wx image'''
-    import wx
+    from wx_loader import wx
     wimg = wx.EmptyImage(pimg.size[0], pimg.size[1])
     wimg.SetData(pimg.convert('RGB').tostring())
     return wimg
