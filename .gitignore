@@ -11,3 +11,4 @@ gtest/
 *.raw
 MANIFEST
 *.egg-info
+.DS_Store

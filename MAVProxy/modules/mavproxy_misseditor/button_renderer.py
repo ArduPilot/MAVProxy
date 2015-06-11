@@ -6,9 +6,7 @@ Michael Day
 June 2014
 '''
 
-import wx
-import wx.grid
-
+from wx_loader.wx import grid
 import copy
 
 class ButtonRenderer(wx.grid.PyGridCellRenderer):

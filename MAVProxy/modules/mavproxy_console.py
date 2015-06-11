@@ -57,10 +57,11 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.ElevationMap = mp_elevation.ElevationModel()
 
         # create the main menu
-        self.menu = MPMenuTop([])
-        self.add_menu(MPMenuSubMenu('MAVProxy',
-                                    items=[MPMenuItem('Settings', 'Settings', 'menuSettings'),
-                                           MPMenuItem('Map', 'Load Map', '# module load map')]))
+        if mp_util.has_wxpython:
+            self.menu = MPMenuTop([])
+            self.add_menu(MPMenuSubMenu('MAVProxy',
+                                        items=[MPMenuItem('Settings', 'Settings', 'menuSettings'),
+                                               MPMenuItem('Map', 'Load Map', '# module load map')]))
 
     def add_menu(self, menu):
         '''add a new menu'''

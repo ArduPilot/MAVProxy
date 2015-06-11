@@ -223,8 +223,10 @@ class MissionEditorModule(mp_module.MPModule):
     def child_task(self, q, l, gq, gl):
         '''child process - this holds GUI elements'''
         mp_util.child_close_fds()
-        import wx
-        self.app = wx.PySimpleApp()
+
+        from wx_loader import wx
+        
+        self.app = wx.App(False)
         self.app.frame = missionEditorFrame.MissionEditorFrame(parent=None,id=wx.ID_ANY)
 
         self.app.frame.set_event_queue(q)
