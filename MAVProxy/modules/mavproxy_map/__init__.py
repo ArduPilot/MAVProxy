@@ -45,6 +45,7 @@ class MapModule(mp_module.MPModule):
               ('showgps2pos', int, 1),
               ('showsimpos', int, 0),
               ('showahrs2pos', int, 0),
+              ('showahrs3pos', int, 0),
               ('brightness', float, 1),
               ('rallycircle', bool, False),
               ('loitercircle',bool, False)])
@@ -404,7 +405,11 @@ class MapModule(mp_module.MPModule):
         if m.get_type() == "AHRS2" and self.map_settings.showahrs2pos:
             self.create_vehicle_icon('AHRS2' + vehicle, 'blue')
             self.mpstate.map.set_position('AHRS2' + vehicle, (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
-    
+
+        if m.get_type() == "AHRS3" and self.map_settings.showahrs3pos:
+            self.create_vehicle_icon('AHRS3' + vehicle, 'orange')
+            self.mpstate.map.set_position('AHRS3' + vehicle, (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
+
         if m.get_type() == "GPS_RAW_INT" and self.map_settings.showgpspos:
             (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
             if lat != 0 or lon != 0:
