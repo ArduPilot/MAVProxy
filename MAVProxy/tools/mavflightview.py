@@ -197,6 +197,8 @@ def mavflightview(filename):
             if ekf_counter % opts.ekf_sample != 0:
                 continue
             (lat, lng) = pos            
+        elif m.get_type() in ['ANU5']:
+            (lat, lng) = (m.Alat*1.0e-7, m.Alng*1.0e-7)
         elif m.get_type() in ['AHR2', 'POS']:
             (lat, lng) = (m.Lat, m.Lng)
         elif m.get_type() == 'AHRS2':
