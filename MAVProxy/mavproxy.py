@@ -180,6 +180,8 @@ class MPState(object):
         self.select_extra = {}
         self.continue_mode = False
         self.aliases = {}
+        import platform
+        self.system = platform.system()
 
     def module(self, name):
         '''Find a public module (most modules are private)'''
@@ -494,6 +496,9 @@ def process_master(m):
         mpstate.logqueue_raw.put(str(s))
 
     if mpstate.status.setup_mode:
+        if self.mpstate.system == 'Windows':
+           # strip nsh ansi codes
+           s = s.replace("\033[K","")
         sys.stdout.write(str(s))
         sys.stdout.flush()
         return

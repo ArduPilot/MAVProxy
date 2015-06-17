@@ -22,6 +22,9 @@ class NSHModule(mp_module.MPModule):
             data = m.data[:m.count]
             if m.count > 0:
                 s = ''.join(str(chr(x)) for x in data)
+                if self.mpstate.system == 'Windows':
+                    # strip nsh ansi codes
+                    s = s.replace("\033[K","")
                 sys.stdout.write(s)
                 self.last_packet = time.time()
 
