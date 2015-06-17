@@ -496,7 +496,7 @@ def process_master(m):
         mpstate.logqueue_raw.put(str(s))
 
     if mpstate.status.setup_mode:
-        if self.mpstate.system == 'Windows':
+        if mpstate.system == 'Windows':
            # strip nsh ansi codes
            s = s.replace("\033[K","")
         sys.stdout.write(str(s))
