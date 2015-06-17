@@ -800,7 +800,7 @@ if __name__ == '__main__':
                       metavar="DEVICE[,BAUD]", help="MAVLink output port and optional baud rate",
                       default=[])
     parser.add_option("--baudrate", dest="baudrate", type='int',
-                      help="default serial baud rate", default=115200)
+                      help="default serial baud rate", default=57600)
     parser.add_option("--sitl", dest="sitl",  default=None, help="SITL output port")
     parser.add_option("--streamrate",dest="streamrate", default=4, type='int',
                       help="MAVLink stream rate")
