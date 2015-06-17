@@ -42,7 +42,7 @@ class NSHModule(mp_module.MPModule):
         buf = [ord(x) for x in line]
         buf.extend([0]*(70-len(buf)))
         mav.serial_control_send(mavutil.mavlink.SERIAL_CONTROL_DEV_SHELL,
-                                mavutil.mavlink.SERIAL_CONTROL_FLAG_RESPOND,
+                                mavutil.mavlink.SERIAL_CONTROL_FLAG_RESPOND | mavutil.mavlink.SERIAL_CONTROL_FLAG_MULTI,
                                 0, 0,
                                 len(line), buf)
 
@@ -52,14 +52,14 @@ class NSHModule(mp_module.MPModule):
             return
         now = time.time()
         if now - self.last_packet < 1:
-            timeout = 0.01
+            timeout = 0.05
         else:
             timeout = 0.2
         if now - self.last_check > timeout:
             self.last_check = now
             mav = self.master.mav
             mav.serial_control_send(mavutil.mavlink.SERIAL_CONTROL_DEV_SHELL,
-                                    mavutil.mavlink.SERIAL_CONTROL_FLAG_RESPOND,
+                                    mavutil.mavlink.SERIAL_CONTROL_FLAG_RESPOND | mavutil.mavlink.SERIAL_CONTROL_FLAG_MULTI,
                                     0, 0,
                                     0, [0]*70)
             
