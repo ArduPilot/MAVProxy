@@ -107,6 +107,8 @@ class MAVFunctions(object):
         self.param_set = param_set
         self.get_mav_param = get_mav_param
         self.say = say_text
+        # input handler can be overridden by a module
+        self.input_handler = None
 
 class MPState(object):
     '''holds state of mavproxy'''
@@ -410,6 +412,12 @@ def process_stdin(line):
     '''handle commands from user'''
     if line is None:
         sys.exit(0)
+
+    # allow for modules to override input handling
+    if mpstate.functions.input_handler is not None:
+          mpstate.functions.input_handler(line)
+          return
+    
     line = line.strip()
 
     if mpstate.status.setup_mode:
