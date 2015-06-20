@@ -845,6 +845,7 @@ if __name__ == '__main__':
     parser.add_option("--mission", dest="mission", help="mission name", default=None)
     parser.add_option("--daemon", action='store_true', help="run in daemon mode, do not start interactive shell")
     parser.add_option("--profile", action='store_true', help="run the Yappi python profiler")
+    parser.add_option("--version", action='store_true', help="version information")
 
     (opts, args) = parser.parse_args()
 
@@ -857,6 +858,14 @@ if __name__ == '__main__':
     from pymavlink import mavutil, mavparm
     mavutil.set_dialect(opts.dialect)
 
+    #version information
+    if opts.version:
+        import pkg_resources
+        version = pkg_resources.require("mavproxy")[0].version
+        print "MAVProxy is a modular ground station using the mavlink protocol"
+        print "MAVProxy Version: " + version
+        sys.exit(1)
+    
     # global mavproxy state
     mpstate = MPState()
     mpstate.status.exit = False
