@@ -28,6 +28,9 @@ OutputBaseFilename=MAVProxySetup-{#MyAppVersion}
 Compression=lzma
 SolidCompression=yes
 
+[InstallDelete]
+Type: filesandordirs; Name: {pf}\{#MyAppName}
+
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
