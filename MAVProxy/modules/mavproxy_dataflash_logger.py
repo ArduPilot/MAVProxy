@@ -10,6 +10,7 @@ import random
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
 import time
+from MAVProxy.modules.lib import mp_settings
 
 
 class dataflash_logger(mp_module.MPModule):
@@ -21,19 +22,32 @@ class dataflash_logger(mp_module.MPModule):
         self.time_last_start_packet_sent = 0
         self.time_last_stop_packet_sent = 0
         self.dataflash_dir = self._dataflash_dir(mpstate)
-        self.add_command('dataflash_logger', self.cmd_dataflash_logger, "[stop] manipulate dataflash logging")
+
+        self.log_settings = mp_settings.MPSettings(
+            [ ('verbose', bool, False),
+          ])
+        self.add_command('dataflash_logger', self.cmd_dataflash_logger, "dataflash logging control", ['start','stop','set (LOGSETTING)'])
+        self.add_completion_function('(LOGSETTING)', self.log_settings.completion)
+
+    def usage(self):
+        return "Usage: dataflash_logger <start|stop|set>"
 
     def cmd_dataflash_logger(self, args):
         '''dataflash_logger cmd'''
         if len(args) == 0:
-            return
+            print self.usage()
         elif args[0] == "stop":
             self.new_log_started = False
             self.stopped = True
         elif args[0] == "start":
             self.stopped = False
+        elif args[0] == "set":
+            self.log_settings.command(args[1:])
         else:
-            print "Usage: dataflash_logger <stop>"
+            print self.usage()
+
+    def usage_set(self):
+        return "Usage: dataflash_logger set <var> <value>"
 
     def _dataflash_dir(self, mpstate):
         if mpstate.settings.state_basedir is None:
@@ -145,7 +159,8 @@ class dataflash_logger(mp_module.MPModule):
 
     def idle_task_started(self):
         max_blocks = 5 # limit the number of blocks we process in any idle loop
-        self.idle_print_download_rate()
+        if self.log_settings.verbose:
+            self.idle_print_download_rate()
         self.idle_send_acks_and_nacks()
 
     def idle_task(self):
@@ -158,7 +173,8 @@ class dataflash_logger(mp_module.MPModule):
             if self.stopped:
                 # send a stop packet every second until the other end gets the idea:
                 if now - self.time_last_stop_packet_sent > 1:
-                    print("DFLogger: Sending stop packet")
+                    if self.log_settings.verbose:
+                        print("DFLogger: Sending stop packet")
                     self.master.mav.remote_log_block_status_send(4294967294,1)
                 return
 
@@ -167,7 +183,8 @@ class dataflash_logger(mp_module.MPModule):
 
 
             if not self.new_log_started:
-                print("Received data packet - starting new log")
+                if self.log_settings.verbose:
+                    print("Received data packet - starting new log")
                 self.start_new_log()
                 self.new_log_started = True
             if self.new_log_started == True:
@@ -178,7 +195,8 @@ class dataflash_logger(mp_module.MPModule):
                 self.logfile.write(data)
 
                 if m.block_cnt in self.missing_blocks:
-                    print("DFLogger: Received missing block: %d" % (m.block_cnt,))
+                    if self.log_settings.verbose:
+                        print("DFLogger: Received missing block: %d" % (m.block_cnt,))
                     del self.missing_blocks[m.block_cnt]
                     self.missing_found += 1
                     self.blocks_to_ack_and_nack.append([self.master,m.block_cnt,1,now,None])
@@ -200,16 +218,18 @@ class dataflash_logger(mp_module.MPModule):
                                 if block not in self.missing_blocks and \
                                    block not in self.acking_blocks:
                                     self.missing_blocks[block] = 1
-                                    print "DFLogger: setting %d for nacking" % (block,)
+                                    if self.log_settings.verbose:
+                                        print "DFLogger: setting %d for nacking" % (block,)
                                     self.blocks_to_ack_and_nack.append([self.master,block,0,now,None])
                         #print "\nmissed blocks: ",self.missing_blocks
                     if self.block_cnt < m.block_cnt:
                         self.block_cnt = m.block_cnt
                 self.download += size
         elif not self.new_log_started and not self.stopped:
-            # send an start packet every second until the other end gets the idea:
+            # send a start packet every second until the other end gets the idea:
             if now - self.time_last_start_packet_sent > 1:
-                print("DFLogger: Sending start packet")
+                if self.log_settings.verbose:
+                    print("DFLogger: Sending start packet")
                 self.master.mav.remote_log_block_status_send(4294967295,1)
                 self.time_last_start_packet_sent = now
 
