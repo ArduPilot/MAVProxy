@@ -19,10 +19,19 @@ class BatteryModule(mp_module.MPModule):
         self.current_battery = -1
         self.battery2_voltage = -1
         self.per_cell = 0
+        self.servo_voltage = -1
+        self.high_servo_voltage = -1
+        self.last_servo_warn_time = 0
+        self.last_vcc_warn_time = 0
+        
         self.settings.append(
             MPSetting('battwarn', int, 1, 'Battery Warning Time', tab='Battery'))
         self.settings.append(
             MPSetting('batwarncell', float, 3.7, 'Battery cell Warning level'))
+        self.settings.append(
+            MPSetting('servowarn', float, 4.3, 'Servo voltage warning level'))
+        self.settings.append(
+            MPSetting('vccwarn', float, 4.3, 'Vcc voltage warning level'))
         self.settings.append(MPSetting('numcells', int, 0, range=(0,10), increment=1))
         self.battery_period = mavutil.periodic_event(5)
 
@@ -89,6 +98,26 @@ class BatteryModule(mp_module.MPModule):
         if self.settings.numcells != 0:
             self.per_cell = (self.voltage_level*0.001) / self.settings.numcells
 
+    def power_status_update(self, POWER_STATUS):
+        '''update POWER_STATUS warnings level'''
+        now = time.time()
+        Vservo = POWER_STATUS.Vservo * 0.001
+        Vcc = POWER_STATUS.Vcc * 0.001
+        self.high_servo_voltage = max(self.high_servo_voltage, Vservo)
+        if self.high_servo_voltage > 1 and Vservo < self.settings.servowarn:
+            if now - self.last_servo_warn_time > 30:
+                self.last_servo_warn_time = now
+                self.say("Servo volt %.1f" % Vservo)
+                if Vservo < 1:
+                    # prevent continuous announcements on power down
+                    self.high_servo_voltage = Vservo
+
+        if Vcc < self.settings.vccwarn:
+            if now - self.last_vcc_warn_time > 30:
+                self.last_vcc_warn_time = now
+                self.say("Vcc %.1f" % Vcc)
+        
+
     def mavlink_packet(self, m):
         '''handle a mavlink packet'''
         mtype = m.get_type()
@@ -96,6 +125,8 @@ class BatteryModule(mp_module.MPModule):
             self.battery_update(m)
         if mtype == "BATTERY2":
             self.battery2_voltage = m.voltage * 0.001
+        if mtype == "POWER_STATUS":
+            self.power_status_update(m)
         if self.battery_period.trigger():
             self.battery_report()
 
