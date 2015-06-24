@@ -11,7 +11,14 @@ class NSHModule(mp_module.MPModule):
         super(NSHModule, self).__init__(mpstate, "nsh", "remote nsh shell")
         self.add_command('nsh', self.cmd_nsh,
                          'nsh shell control',
-                         ['<start|stop>'])
+                         ['<start|stop>',
+                          'set (SERIALSETTING)'])
+        self.serial_settings = mp_settings.MPSettings(
+            [ ('port', int, mavutil.mavlink.SERIAL_CONTROL_DEV_SHELL),
+              ('baudrate', int, 57600)
+              ]
+            )
+        self.add_completion_function('(SERIALSETTING)', self.serial_settings.completion)
         self.last_packet = time.time()
         self.last_check = time.time()
         self.started = False
@@ -33,6 +40,12 @@ class NSHModule(mp_module.MPModule):
         self.mpstate.rl.set_prompt(self.status.flightmode + "> ")
         self.mpstate.functions.input_handler = None
         self.started = False
+        # unlock the port
+        mav = self.master.mav
+        mav.serial_control_send(self.serial_settings.port,
+                                0,
+                                0, self.serial_settings.baudrate,
+                                0, [0]*70)
 
     def send(self, line):
         '''send some bytes'''
@@ -41,12 +54,17 @@ class NSHModule(mp_module.MPModule):
             self.stop()
             return
         mav = self.master.mav
-        line += "\r\n"
+        if line != '+++':
+            line += "\r\n"
         buf = [ord(x) for x in line]
         buf.extend([0]*(70-len(buf)))
-        mav.serial_control_send(mavutil.mavlink.SERIAL_CONTROL_DEV_SHELL,
-                                mavutil.mavlink.SERIAL_CONTROL_FLAG_RESPOND | mavutil.mavlink.SERIAL_CONTROL_FLAG_MULTI,
-                                0, 0,
+
+        flags = mavutil.mavlink.SERIAL_CONTROL_FLAG_RESPOND
+        flags |= mavutil.mavlink.SERIAL_CONTROL_FLAG_MULTI
+        flags |= mavutil.mavlink.SERIAL_CONTROL_FLAG_EXCLUSIVE
+        mav.serial_control_send(self.serial_settings.port,
+                                flags,
+                                0, self.serial_settings.baudrate,
                                 len(line), buf)
 
     def idle_task(self):
@@ -61,15 +79,18 @@ class NSHModule(mp_module.MPModule):
         if now - self.last_check > timeout:
             self.last_check = now
             mav = self.master.mav
-            mav.serial_control_send(mavutil.mavlink.SERIAL_CONTROL_DEV_SHELL,
-                                    mavutil.mavlink.SERIAL_CONTROL_FLAG_RESPOND | mavutil.mavlink.SERIAL_CONTROL_FLAG_MULTI,
-                                    0, 0,
+            flags = mavutil.mavlink.SERIAL_CONTROL_FLAG_RESPOND
+            flags |= mavutil.mavlink.SERIAL_CONTROL_FLAG_MULTI
+            flags |= mavutil.mavlink.SERIAL_CONTROL_FLAG_EXCLUSIVE
+            mav.serial_control_send(self.serial_settings.port,
+                                    flags,
+                                    0, self.serial_settings.baudrate,
                                     0, [0]*70)
             
             
     def cmd_nsh(self, args):
         '''nsh shell commands'''
-        usage = "Usage: nsh <start|stop>"
+        usage = "Usage: nsh <start|stop|set>"
         if len(args) < 1:
             print(usage)
             return
@@ -79,6 +100,8 @@ class NSHModule(mp_module.MPModule):
             self.mpstate.rl.set_prompt("")
         elif args[0] == "stop":
             self.stop()
+        elif args[0] == "set":
+            self.serial_settings.command(args[1:])
         else:
             print(usage)
 
