@@ -104,7 +104,22 @@ class ArmModule(mp_module.MPModule):
 
     def cmd_disarm(self, args):
         '''disarm motors'''
-        self.master.arducopter_disarm()
+        p2 = 0
+        if len(args) == 1 and args[0] == 'force':
+            p2 = 21196
+        print(args, p2)
+        self.master.mav.command_long_send(
+            self.target_system,  # target_system
+            0,
+            mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM, # command
+            0, # confirmation
+            0, # param1 (0 to indicate disarm)
+            p2, # param2 (all other params meaningless)
+            0, # param3
+            0, # param4
+            0, # param5
+            0, # param6
+            0) # param7
 
 def init(mpstate):
     '''initialise module'''
