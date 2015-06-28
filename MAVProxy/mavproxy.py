@@ -562,12 +562,7 @@ def log_writer():
             mpstate.logfile.flush()
             mpstate.logfile_raw.flush()
 
-def open_logs():
-    '''open log files'''
-    if opts.append_log or opts.continue_mode:
-        mode = 'a'
-    else:
-        mode = 'w'
+def telem_log_filepath():
     logfile = opts.logfile
     if opts.aircraft is not None:
         if opts.mission is not None:
@@ -587,14 +582,26 @@ def open_logs():
         elif os.path.exists(fdir):
             print("Flight logs full")
             sys.exit(1)
-        mkdir_p(fdir)
-        print(fdir)
         logfile = os.path.join(fdir, 'flight.tlog')
-        mpstate.status.logdir = fdir
-    mpstate.logfile_name = logfile
-    mpstate.logfile = open(logfile, mode=mode)
-    mpstate.logfile_raw = open(logfile+'.raw', mode=mode)
-    print("Logging to %s" % logfile)
+    else:
+        fdir = os.path.dirname(logfile)
+    mkdir_p(fdir)
+    print("Log Directory: %s" % fdir)
+    mpstate.status.logdir = fdir
+    return logfile
+
+def telem_raw_log_filepath():
+      return telem_log_filepath() + '.raw'
+
+def open_logs():
+    '''open log files'''
+    if opts.append_log or opts.continue_mode:
+        mode = 'a'
+    else:
+        mode = 'w'
+    mpstate.logfile = open(telem_log_filepath(), mode=mode)
+    mpstate.logfile_raw = open(telem_raw_log_filepath(), mode=mode)
+    print("Logging to %s" % mpstate.logfile)
 
     # queues for logging
     mpstate.logqueue = Queue.Queue()
