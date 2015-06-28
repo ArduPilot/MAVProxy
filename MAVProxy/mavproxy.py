@@ -151,7 +151,8 @@ class MPState(object):
               MPSetting('source_system', int, 255, 'MAVLink Source system', range=(0,255), increment=1, tab='MAVLink'),
               MPSetting('source_component', int, 0, 'MAVLink Source component', range=(0,255), increment=1),
               MPSetting('target_system', int, 0, 'MAVLink target system', range=(0,255), increment=1),
-              MPSetting('target_component', int, 0, 'MAVLink target component', range=(0,255), increment=1)
+              MPSetting('target_component', int, 0, 'MAVLink target component', range=(0,255), increment=1),
+              MPSetting('state_basedir', str, None, 'base directory for logs and aircraft directories')
             ])
 
         self.completions = {
@@ -583,11 +584,14 @@ def telem_log_filepath():
             print("Flight logs full")
             sys.exit(1)
         logfile = os.path.join(fdir, 'flight.tlog')
-    else:
-        fdir = os.path.dirname(logfile)
-    mkdir_p(fdir)
-    print("Log Directory: %s" % fdir)
-    mpstate.status.logdir = fdir
+
+    # If state_basedir is NOT set then paths for logs and aircraft
+    # directories are relative to mavproxy's cwd
+    if not os.path.isabs(logfile) and mpstate.settings.state_basedir is not None:
+        logfile = os.path.join(mpstate.settings.state_basedir, logfile)
+
+    mpstate.status.logdir = os.path.dirname(logfile)
+    mkdir_p(mpstate.status.logdir)
     return logfile
 
 def telem_raw_log_filepath():
@@ -601,7 +605,8 @@ def open_telemetry_logs():
         mode = 'w'
     mpstate.logfile = open(telem_log_filepath(), mode=mode)
     mpstate.logfile_raw = open(telem_raw_log_filepath(), mode=mode)
-    print("Logging to %s" % mpstate.logfile)
+    print("Log Directory: %s" % mpstate.status.logdir)
+    print("Telemetry log: %s" % mpstate.logfile)
 
     # queues for logging
     mpstate.logqueue = Queue.Queue()
@@ -852,6 +857,7 @@ if __name__ == '__main__':
     parser.add_option("--mission", dest="mission", help="mission name", default=None)
     parser.add_option("--daemon", action='store_true', help="run in daemon mode, do not start interactive shell")
     parser.add_option("--profile", action='store_true', help="run the Yappi python profiler")
+    parser.add_option("--state_basedir", default=None, help="base directory for logs and aircraft directories")
 
     (opts, args) = parser.parse_args()
 
@@ -932,6 +938,9 @@ if __name__ == '__main__':
 
     mpstate.settings.streamrate = opts.streamrate
     mpstate.settings.streamrate2 = opts.streamrate
+
+    if opts.state_basedir is not None:
+        mpstate.settings.state_basedir = opts.state_basedir
 
     msg_period = mavutil.periodic_event(1.0/15)
     heartbeat_period = mavutil.periodic_event(1)
