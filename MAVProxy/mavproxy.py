@@ -593,7 +593,7 @@ def telem_log_filepath():
 def telem_raw_log_filepath():
       return telem_log_filepath() + '.raw'
 
-def open_logs():
+def open_telemetry_logs():
     '''open log files'''
     if opts.append_log or opts.continue_mode:
         mode = 'a'
@@ -923,9 +923,6 @@ if __name__ == '__main__':
           print("Connecting to %s" % serial_list[0])
           mpstate.module('link').link_add(serial_list[0].device)
 
-    # log all packets from the master, for later replay
-    open_logs()
-
     # open any mavlink output ports
     for port in opts.output:
         mpstate.mav_outputs.append(mavutil.mavlink_connection(port, baud=int(opts.baudrate), input=False))
@@ -990,6 +987,9 @@ if __name__ == '__main__':
     if opts.profile:
         import yappi    # We do the import here so that we won't barf if run normally and yappi not available
         yappi.start()
+
+    # log all packets from the master, for later replay
+    open_telemetry_logs()
 
     # run main loop as a thread
     mpstate.status.thread = threading.Thread(target=main_loop, name='main_loop')
