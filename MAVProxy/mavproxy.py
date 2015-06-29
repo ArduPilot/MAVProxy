@@ -603,10 +603,11 @@ def open_telemetry_logs():
         mode = 'a'
     else:
         mode = 'w'
-    mpstate.logfile = open(telem_log_filepath(), mode=mode)
+    log_filepath = telem_log_filepath()
+    mpstate.logfile = open(log_filepath, mode=mode)
     mpstate.logfile_raw = open(telem_raw_log_filepath(), mode=mode)
     print("Log Directory: %s" % mpstate.status.logdir)
-    print("Telemetry log: %s" % mpstate.logfile)
+    print("Telemetry log: %s" % log_filepath)
 
     # queues for logging
     mpstate.logqueue = Queue.Queue()
@@ -857,7 +858,7 @@ if __name__ == '__main__':
     parser.add_option("--mission", dest="mission", help="mission name", default=None)
     parser.add_option("--daemon", action='store_true', help="run in daemon mode, do not start interactive shell")
     parser.add_option("--profile", action='store_true', help="run the Yappi python profiler")
-    parser.add_option("--state_basedir", default=None, help="base directory for logs and aircraft directories")
+    parser.add_option("--state-basedir", default=None, help="base directory for logs and aircraft directories")
 
     (opts, args) = parser.parse_args()
 
