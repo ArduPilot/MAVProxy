@@ -563,14 +563,19 @@ def log_writer():
             mpstate.logfile.flush()
             mpstate.logfile_raw.flush()
 
-def telem_log_filepath():
-    logfile = opts.logfile
+# If state_basedir is NOT set then paths for logs and aircraft
+# directories are relative to mavproxy's cwd
+def log_paths():
+    '''Returns tuple (logdir, telemetry_log_filepath, raw_telemetry_log_filepath)'''
     if opts.aircraft is not None:
         if opts.mission is not None:
             print(opts.mission)
             dirname = "%s/logs/%s/Mission%s" % (opts.aircraft, time.strftime("%Y-%m-%d"), opts.mission)
         else:
             dirname = "%s/logs/%s" % (opts.aircraft, time.strftime("%Y-%m-%d"))
+        # dirname is currently relative.  Possibly add state_basedir:
+        if mpstate.settings.state_basedir is not None:
+            dirname = os.path.join(mpstate.settings.state_basedir,dirname)
         mkdir_p(dirname)
         highest = None
         for i in range(1, 10000):
@@ -583,31 +588,31 @@ def telem_log_filepath():
         elif os.path.exists(fdir):
             print("Flight logs full")
             sys.exit(1)
-        logfile = os.path.join(fdir, 'flight.tlog')
+        logname = 'flight.tlog'
+        logdir = fdir
+    else:
+        logname = os.path.basename(opts.logfile)
+        dir_path = os.path.dirname(opts.logfile)
+        if not os.path.isabs(dir_path) and mpstate.settings.state_basedir is not None:
+            dir_path = os.path.join(mpstate.settings.state_basedir,dir_path)
+        logdir = dir_path
 
-    # If state_basedir is NOT set then paths for logs and aircraft
-    # directories are relative to mavproxy's cwd
-    if not os.path.isabs(logfile) and mpstate.settings.state_basedir is not None:
-        logfile = os.path.join(mpstate.settings.state_basedir, logfile)
+    mkdir_p(logdir)
+    return (logdir,
+            os.path.join(logdir, logname),
+            os.path.join(logdir, logname + '.raw'))
 
-    mpstate.status.logdir = os.path.dirname(logfile)
-    mkdir_p(mpstate.status.logdir)
-    return logfile
 
-def telem_raw_log_filepath():
-      return telem_log_filepath() + '.raw'
-
-def open_telemetry_logs():
+def open_telemetry_logs(logpath_telem, logpath_telem_raw):
     '''open log files'''
     if opts.append_log or opts.continue_mode:
         mode = 'a'
     else:
         mode = 'w'
-    log_filepath = telem_log_filepath()
-    mpstate.logfile = open(log_filepath, mode=mode)
-    mpstate.logfile_raw = open(telem_raw_log_filepath(), mode=mode)
+    mpstate.logfile = open(logpath_telem, mode=mode)
+    mpstate.logfile_raw = open(logpath_telem_raw, mode=mode)
     print("Log Directory: %s" % mpstate.status.logdir)
-    print("Telemetry log: %s" % log_filepath)
+    print("Telemetry log: %s" % logpath_telem)
 
     # queues for logging
     mpstate.logqueue = Queue.Queue()
@@ -954,7 +959,7 @@ if __name__ == '__main__':
         mpstate.rl.set_prompt("")
 
     # call this early so that logdir is setup based on --aircraft
-    telem_log_filepath()
+    (mpstate.status.logdir, logpath_telem, logpath_telem_raw) = log_paths()
 
     if not opts.setup:
         # some core functionality is in modules
@@ -1002,7 +1007,7 @@ if __name__ == '__main__':
         yappi.start()
 
     # log all packets from the master, for later replay
-    open_telemetry_logs()
+    open_telemetry_logs(logpath_telem, logpath_telem_raw)
 
     # run main loop as a thread
     mpstate.status.thread = threading.Thread(target=main_loop, name='main_loop')
