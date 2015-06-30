@@ -107,7 +107,6 @@ class ArmModule(mp_module.MPModule):
         p2 = 0
         if len(args) == 1 and args[0] == 'force':
             p2 = 21196
-        print(args, p2)
         self.master.mav.command_long_send(
             self.target_system,  # target_system
             0,
