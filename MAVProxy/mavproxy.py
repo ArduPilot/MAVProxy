@@ -953,6 +953,9 @@ if __name__ == '__main__':
     if opts.setup:
         mpstate.rl.set_prompt("")
 
+    # call this early so that logdir is setup based on --aircraft
+    telem_log_filepath()
+
     if not opts.setup:
         # some core functionality is in modules
         standard_modules = ['log', 'wp', 'rally','fence','param','relay',
