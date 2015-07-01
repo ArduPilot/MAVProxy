@@ -206,7 +206,7 @@ def mavflightview(filename):
             (lat, lng) = pos            
         elif type in ['ANU5']:
             (lat, lng) = (m.Alat*1.0e-7, m.Alng*1.0e-7)
-        elif type in ['AHR2', 'POS']:
+        elif type in ['AHR2', 'POS', 'CHEK']:
             (lat, lng) = (m.Lat, m.Lng)
         elif type == 'AHRS2':
             (lat, lng) = (m.lat*1.0e-7, m.lng*1.0e-7)
