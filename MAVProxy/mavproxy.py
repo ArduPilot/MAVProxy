@@ -614,10 +614,6 @@ def open_telemetry_logs(logpath_telem, logpath_telem_raw):
     print("Log Directory: %s" % mpstate.status.logdir)
     print("Telemetry log: %s" % logpath_telem)
 
-    # queues for logging
-    mpstate.logqueue = Queue.Queue()
-    mpstate.logqueue_raw = Queue.Queue()
-
     # use a separate thread for writing to the logfile to prevent
     # delays during disk writes (important as delays can be long if camera
     # app is running)
@@ -881,6 +877,10 @@ if __name__ == '__main__':
     mpstate.status.exit = False
     mpstate.command_map = command_map
     mpstate.continue_mode = opts.continue_mode
+    # queues for logging
+    mpstate.logqueue = Queue.Queue()
+    mpstate.logqueue_raw = Queue.Queue()
+
 
     if opts.speech:
         # start the speech-dispatcher early, so it doesn't inherit any ports from
