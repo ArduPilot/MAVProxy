@@ -321,6 +321,10 @@ class MapModule(mp_module.MPModule):
         self.mpstate.map = None
         self.mpstate.map_functions = {}
     
+    def idle_task(self):
+        if not self.mpstate.map.is_alive():
+            self.needs_unloading = True
+
     def create_vehicle_icon(self, name, colour, follow=False, vehicle_type=None):
         '''add a vehicle to the map'''
         if vehicle_type is None:

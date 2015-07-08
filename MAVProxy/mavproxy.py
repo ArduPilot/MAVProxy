@@ -697,6 +697,9 @@ def periodic_tasks():
                     traceback.print_exception(exc_type, exc_value, exc_traceback,
                                               limit=2, file=sys.stdout)
 
+        # also see if the module should be unloaded:
+        if m.needs_unloading:
+            unload_module(m.name)
 
 def main_loop():
     '''main processing loop'''
