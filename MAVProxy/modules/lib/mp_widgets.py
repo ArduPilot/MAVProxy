@@ -6,7 +6,7 @@ Andrew Tridgell
 June 2012
 '''
 
-import wx
+from wx_loader import wx
 
 class ImagePanel(wx.Panel):
     '''a resizable panel containing an image'''
