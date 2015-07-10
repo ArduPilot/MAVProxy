@@ -4,16 +4,22 @@
 
 import math
 import os
+import platform
 
 # Some platforms (CYGWIN and others) many not have the wx library
 # use imp to see if wx is on the path
 has_wxpython = False
-import imp
-try:
-    imp.find_module('wx')
-    has_wxpython = True
-except ImportError, e:
-    pass
+
+if platform.system() == 'Windows':
+    # auto-detection is failing on windows, for an unknown reason
+    has_wxpython = True    
+else:
+    import imp
+    try:
+        imp.find_module('wx')
+        has_wxpython = True
+    except ImportError, e:
+        pass
 
 radius_of_earth = 6378100.0 # in meters
 
