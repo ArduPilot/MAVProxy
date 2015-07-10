@@ -286,7 +286,9 @@ class MPMenuChildMessageDialog(object):
     def show(self):
         '''show the dialog as a child process'''
         mp_util.child_close_fds()
-        from wx_loader.wx.lib.agw.genericmessagedialog import GenericMessageDialog
+        import wx_processguard
+        from wx_loader import wx
+        from wx.lib.agw.genericmessagedialog import GenericMessageDialog
         app = wx.App(False)
         # note! font size change is not working. I don't know why yet
         font = wx.Font(self.font_size, wx.MODERN, wx.NORMAL, wx.NORMAL)
