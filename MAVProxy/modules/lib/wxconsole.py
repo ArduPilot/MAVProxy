@@ -44,11 +44,14 @@ class MessageConsole(textconsole.SimpleConsole):
     def watch_thread(self):
         '''watch for menu events from child'''
         from mp_settings import MPSetting
-        while True:
-            msg = self.parent_pipe_recv.recv()
-            if self.menu_callback is not None:
-                self.menu_callback(msg)
-            time.sleep(0.1)
+        try:
+            while True:
+                msg = self.parent_pipe_recv.recv()
+                if self.menu_callback is not None:
+                    self.menu_callback(msg)
+                time.sleep(0.1)
+        except EOFError:
+            pass
 
     def write(self, text, fg='black', bg='white'):
         '''write to the console'''

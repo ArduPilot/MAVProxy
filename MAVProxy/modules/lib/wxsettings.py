@@ -22,8 +22,9 @@ class WXSettings(object):
     def child_task(self):
         '''child process - this holds all the GUI elements'''
         from MAVProxy.modules.lib import mp_util
-        from wxsettings_ui import TabbedDialog
+        import wx_processguard
         from wx_loader import wx
+        from wxsettings_ui import SettingsDlg
         
         mp_util.child_close_fds()
         app = wx.App(False)
