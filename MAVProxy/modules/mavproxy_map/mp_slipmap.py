@@ -59,9 +59,9 @@ class MPSlipMap():
         self.drag_step = 10
 
         self.title = title
-        from ..lib.bugfix_mp import mpQueue
-        self.event_queue = mpQueue()
-        self.object_queue = mpQueue()
+        from ..lib.multiprocessing_queue import makeIPCQueue
+        self.event_queue = makeIPCQueue()
+        self.object_queue = makeIPCQueue()
         self.close_window = multiprocessing.Event()
         self.close_window.clear()
         self.child = multiprocessing.Process(target=self.child_task)

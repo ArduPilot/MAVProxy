@@ -89,9 +89,9 @@ class MPImage():
         self.menu = None
         self.popup_menu = None
 
-        from bugfix_mp import mpQueue
-        self.in_queue = mpQueue()
-        self.out_queue = mpQueue()
+        from multiprocessing_queue import makeIPCQueue
+        self.in_queue = makeIPCQueue()
+        self.out_queue = makeIPCQueue()
 
         self.default_menu = MPMenuSubMenu('View',
                                           items=[MPMenuItem('Fit Window', 'Fit Window', 'fitWindow'),
