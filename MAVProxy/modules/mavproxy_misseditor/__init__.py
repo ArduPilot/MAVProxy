@@ -154,10 +154,10 @@ class MissionEditorModule(mp_module.MPModule):
         self.num_wps_expected = 0 #helps me to know if all my waypoints I'm expecting have arrived
         self.wps_received = {}
 
-        from ..lib.bugfix_mp import mpQueue
-        self.event_queue = mpQueue()
+        from ..lib.multiprocessing_queue import makeIPCQueue
+        self.event_queue = makeIPCQueue()
         self.event_queue_lock = multiprocessing.Lock()
-        self.gui_event_queue = mpQueue()
+        self.gui_event_queue = makeIPCQueue()
         self.gui_event_queue_lock = multiprocessing.Lock()
 
         self.event_thread = MissionEditorEventThread(self, self.event_queue, self.event_queue_lock)
