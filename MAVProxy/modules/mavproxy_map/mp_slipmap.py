@@ -75,7 +75,7 @@ class MPSlipMap():
 
         from ..lib import wx_processguard
         from ..lib.wx_loader import wx
-        from mp_slipmap_ui import *
+        from mp_slipmap_ui import MPSlipMapFrame
         
         state = self
 
