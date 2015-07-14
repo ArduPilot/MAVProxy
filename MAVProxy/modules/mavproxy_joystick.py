@@ -151,21 +151,30 @@ class JSModule(mp_module.MPModule):
         if self.js is None:
             return
         for e in pygame.event.get(): # iterate over event stack
-            #the following is somewhat custom for the specific joystick model:
-            override = self.module('rc').override[:]
-            for i in range(len(self.map)):
-                m = self.map[i]
+            if e.type in [
+                pygame.JOYAXISMOTION,
+                pygame.JOYBALLMOTION,
+                pygame.JOYBUTTONDOWN,
+                pygame.JOYBUTTONUP,
+                pygame.JOYHATMOTION
+            ] :
+                # print '--- %s ' % pygame.event.event_name(e.type)
+                # print 'axis %u : %f' % (e.axis, e.value)
+                m = self.map[e.axis]
                 if m is None:
                     continue
                 (axis, mul, add) = m
                 if axis >= self.num_axes:
                     continue
-                v = int(self.js.get_axis(axis)*mul + add)
+                v = int(e.value * mul + add)
                 v = max(min(v, 2000), 1000)
-                override[i] = v
-            if override != self.module('rc').override:
-                self.module('rc').override = override
-                self.module('rc').override_period.force()
+                # if e.axis == 0 :
+                #     print 'e.axis: %u, axis: %u, v: %u' % (e.axis, axis, v)
+                override = self.module('rc').override[:]
+                override[axis] = v
+                if override != self.module('rc').override:
+                    self.module('rc').override = override
+                    self.module('rc').override_period.force()
 
 def init(mpstate):
     '''initialise module'''
