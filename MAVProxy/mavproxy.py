@@ -938,6 +938,10 @@ if __name__ == '__main__':
     if not opts.master and len(serial_list) == 1:
           print("Connecting to %s" % serial_list[0])
           mpstate.module('link').link_add(serial_list[0].device)
+    elif not opts.master:
+          wifi_device = '0.0.0.0:14550'
+          mpstate.module('link').link_add(wifi_device)
+
 
     # open any mavlink output ports
     for port in opts.output:
