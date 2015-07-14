@@ -31,9 +31,9 @@ class FenceModule(mp_module.MPModule):
                 self.have_list = True
                 print("Loaded fence from %s" % fencetxt)
 
+        self.menu_added_console = False
+        self.menu_added_map = False
         if mp_util.has_wxpython:
-            self.menu_added_console = False
-            self.menu_added_map = False
             self.menu = MPMenuSubMenu('Fence',
                                   items=[MPMenuItem('Clear', 'Clear', '# fence clear'),
                                          MPMenuItem('List', 'List', '# fence list'),

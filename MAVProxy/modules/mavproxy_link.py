@@ -34,8 +34,8 @@ class LinkModule(mp_module.MPModule):
         self.add_completion_function('(SERIALPORT)', self.complete_serial_ports)
         self.add_completion_function('(LINKS)', self.complete_links)
 
+        self.menu_added_console = False
         if mp_util.has_wxpython:
-            self.menu_added_console = False
             self.menu_add = MPMenuSubMenu('Add', items=[])
             self.menu_rm = MPMenuSubMenu('Remove', items=[])
             self.menu = MPMenuSubMenu('Link',

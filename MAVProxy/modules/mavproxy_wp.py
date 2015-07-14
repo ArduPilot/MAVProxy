@@ -31,9 +31,9 @@ class WPModule(mp_module.MPModule):
                 self.wploader.load(waytxt)
                 print("Loaded waypoints from %s" % waytxt)
 
+        self.menu_added_console = False
+        self.menu_added_map = False
         if mp_util.has_wxpython:
-            self.menu_added_console = False
-            self.menu_added_map = False
             self.menu = MPMenuSubMenu('Mission',
                                   items=[MPMenuItem('Clear', 'Clear', '# wp clear'),
                                          MPMenuItem('List', 'List', '# wp list'),
