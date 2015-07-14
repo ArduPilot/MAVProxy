@@ -6,7 +6,7 @@ June 2012
 '''
 
 import time
-import wx
+from wx_loader import wx
 
 try:
     import cv2.cv as cv
@@ -89,8 +89,9 @@ class MPImage():
         self.menu = None
         self.popup_menu = None
 
-        self.in_queue = multiprocessing.Queue()
-        self.out_queue = multiprocessing.Queue()
+        from multiprocessing_queue import makeIPCQueue
+        self.in_queue = makeIPCQueue()
+        self.out_queue = makeIPCQueue()
 
         self.default_menu = MPMenuSubMenu('View',
                                           items=[MPMenuItem('Fit Window', 'Fit Window', 'fitWindow'),
@@ -104,10 +105,10 @@ class MPImage():
     def child_task(self):
         '''child process - this holds all the GUI elements'''
         mp_util.child_close_fds()
-        import wx
+        from wx_loader import wx
         state = self
 
-        self.app = wx.PySimpleApp()
+        self.app = wx.App(False)
         self.app.frame = MPImageFrame(state=self)
         self.app.frame.Show()
         self.app.MainLoop()

@@ -8,7 +8,6 @@ June 2104
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
 
-from MAVProxy.modules.mavproxy_misseditor import missionEditorFrame
 from MAVProxy.modules.mavproxy_misseditor import me_event
 MissionEditorEvent = me_event.MissionEditorEvent
 
@@ -155,9 +154,10 @@ class MissionEditorModule(mp_module.MPModule):
         self.num_wps_expected = 0 #helps me to know if all my waypoints I'm expecting have arrived
         self.wps_received = {}
 
-        self.event_queue = multiprocessing.Queue()
+        from ..lib.multiprocessing_queue import makeIPCQueue
+        self.event_queue = makeIPCQueue()
         self.event_queue_lock = multiprocessing.Lock()
-        self.gui_event_queue = multiprocessing.Queue()
+        self.gui_event_queue = makeIPCQueue()
         self.gui_event_queue_lock = multiprocessing.Lock()
 
         self.event_thread = MissionEditorEventThread(self, self.event_queue, self.event_queue_lock)
@@ -223,8 +223,12 @@ class MissionEditorModule(mp_module.MPModule):
     def child_task(self, q, l, gq, gl):
         '''child process - this holds GUI elements'''
         mp_util.child_close_fds()
-        import wx
-        self.app = wx.PySimpleApp()
+
+        from ..lib import wx_processguard
+        from ..lib.wx_loader import wx
+        from MAVProxy.modules.mavproxy_misseditor import missionEditorFrame
+        
+        self.app = wx.App(False)
         self.app.frame = missionEditorFrame.MissionEditorFrame(parent=None,id=wx.ID_ANY)
 
         self.app.frame.set_event_queue(q)

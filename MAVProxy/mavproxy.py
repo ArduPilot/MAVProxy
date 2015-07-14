@@ -23,7 +23,7 @@ from MAVProxy.modules.lib import dumpstacks
 try:
       from multiprocessing import freeze_support
       from pymavlink import mavwp, mavutil
-      import wx, matplotlib, HTMLParser
+      import matplotlib, HTMLParser
       try:
             import readline
       except ImportError:
@@ -472,7 +472,7 @@ def process_stdin(line):
     try:
         fn(args[1:])
     except Exception as e:
-        print("ERROR in command: %s" % str(e))
+        print("ERROR in command %s: %s" % (args[1:], str(e)))
         if mpstate.settings.moddebug > 1:
             traceback.print_exc()
 
@@ -912,9 +912,10 @@ if __name__ == '__main__':
     # Listen for kill signals to cleanly shutdown modules
     fatalsignals = [signal.SIGTERM]
     try:
-          fatalsignals.append(signal.SIGHUP, signal.SIGQUIT)
+        fatalsignals.append(signal.SIGHUP)
+        fatalsignals.append(signal.SIGQUIT)
     except Exception:
-          pass
+        pass
     if opts.daemon: # SIGINT breaks readline parsing - if we are interactive, just let things die
         fatalsignals.append(signal.SIGINT)
 

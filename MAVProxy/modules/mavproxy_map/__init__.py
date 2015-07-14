@@ -8,7 +8,6 @@ June 2012
 import sys, os, math
 import functools
 import time
-from MAVProxy.modules.mavproxy_map import mp_slipmap
 from MAVProxy.modules.mavproxy_map import mp_elevation
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_settings
@@ -53,6 +52,7 @@ class MapModule(mp_module.MPModule):
         if 'MAP_SERVICE' in os.environ:
             service = os.environ['MAP_SERVICE']
         import platform
+        from MAVProxy.modules.mavproxy_map import mp_slipmap
         mpstate.map = mp_slipmap.MPSlipMap(service=service, elevation=True, title='Map')
         mpstate.map_functions = { 'draw_lines' : self.draw_lines }
     
@@ -70,6 +70,7 @@ class MapModule(mp_module.MPModule):
 
     def add_menu(self, menu):
         '''add to the default popup menu'''
+        from MAVProxy.modules.mavproxy_map import mp_slipmap
         self.default_popup.add(menu)
         self.mpstate.map.add_object(mp_slipmap.SlipDefaultPopup(self.default_popup, combine=True))
 
@@ -89,6 +90,7 @@ class MapModule(mp_module.MPModule):
 
     def cmd_map(self, args):
         '''map commands'''
+        from MAVProxy.modules.mavproxy_map import mp_slipmap
         if args[0] == "icon":
             if len(args) < 3:
                 print("Usage: map icon <lat> <lon> <icon>")
@@ -113,6 +115,7 @@ class MapModule(mp_module.MPModule):
     
     def display_waypoints(self):
         '''display the waypoints'''
+        from MAVProxy.modules.mavproxy_map import mp_slipmap
         self.mission_list = self.module('wp').wploader.view_list()
         polygons = self.module('wp').wploader.polygon_list()
         self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('Mission'))
@@ -145,6 +148,7 @@ class MapModule(mp_module.MPModule):
 
     def display_fence(self):
         '''display the fence'''
+        from MAVProxy.modules.mavproxy_map import mp_slipmap
         self.fence_change_time = self.module('fence').fenceloader.last_change
         points = self.module('fence').fenceloader.polygon()
         self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('Fence'))
@@ -323,6 +327,7 @@ class MapModule(mp_module.MPModule):
     
     def create_vehicle_icon(self, name, colour, follow=False, vehicle_type=None):
         '''add a vehicle to the map'''
+        from MAVProxy.modules.mavproxy_map import mp_slipmap
         if vehicle_type is None:
             vehicle_type = self.vehicle_type_name
         if name in self.have_vehicle and self.have_vehicle[name] == vehicle_type:
@@ -334,6 +339,7 @@ class MapModule(mp_module.MPModule):
     
     def drawing_update(self):
         '''update line drawing'''
+        from MAVProxy.modules.mavproxy_map import mp_slipmap
         if self.draw_callback is None:
             return
         self.draw_line.append(self.click_position)
@@ -343,6 +349,7 @@ class MapModule(mp_module.MPModule):
     
     def drawing_end(self):
         '''end line drawing'''
+        from MAVProxy.modules.mavproxy_map import mp_slipmap
         if self.draw_callback is None:
             return
         self.draw_callback(self.draw_line)
@@ -352,6 +359,7 @@ class MapModule(mp_module.MPModule):
     
     def draw_lines(self, callback):
         '''draw a series of connected lines on the map, calling callback when done'''
+        from MAVProxy.modules.mavproxy_map import mp_slipmap
         self.draw_callback = callback
         self.draw_line = []
         self.mpstate.map.add_object(mp_slipmap.SlipDefaultPopup(None))
@@ -376,6 +384,7 @@ class MapModule(mp_module.MPModule):
         
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
+        from MAVProxy.modules.mavproxy_map import mp_slipmap
         if m.get_type() == "HEARTBEAT":
             if m.type in [mavutil.mavlink.MAV_TYPE_FIXED_WING]:
                 self.vehicle_type_name = 'plane'
