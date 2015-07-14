@@ -96,6 +96,18 @@ joymap = {
      None,
      None],
 
+    # Support for Optic 6 with the IPACS easyFly2 Interface USB Adapter from:
+    # http://www.ikarus.net/deutsch-infos-zubehor/die-ikarus-interfacekabel/?lang=en
+    'IPACS easyFly2 Interface':
+    [(0, 758, 1242), # Roll
+     (1, 758, 1242), # Pitch
+     (2, 770, 1230), # Throttle
+     (4, 2553, 974), # (custom: flaps?)
+     None,
+     (3, 758, 1242), # Yaw
+     (5, 758, 1242), # (custom: switch)
+     None],
+
     # This supports a ADC cheap ebay USB controller
     # sold as a "FMS Simulator" joystick
     'ADC':
