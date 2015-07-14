@@ -152,8 +152,14 @@ def complete(text, state):
         last_clist = glob.glob(text+'*')
     ret = []
     for c in last_clist:
-        if c.startswith(text):
+        if c.startswith(text) or c.startswith(text.upper()):
             ret.append(c)
+    if len(ret) == 0:
+        # if we had no matches then try case insensitively
+        text = text.lower()
+        for c in last_clist:
+            if c.lower().startswith(text):
+                ret.append(c)
     ret.append(None)
     last_clist = ret
     return last_clist[state]
