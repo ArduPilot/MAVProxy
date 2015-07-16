@@ -17,7 +17,6 @@ import threading
 import types
 import sys
 from pymavlink import mavutil
-import random
 import errno
 
 from MAVProxy.modules.lib import mp_module
@@ -30,7 +29,7 @@ class dataflash_logger(mp_module.MPModule):
     def __init__(self, mpstate):
         """Initialise module.  We start poking the UAV for messages after this is called"""
         super(dataflash_logger, self).__init__(mpstate, "dataflash_logger", "logging of mavlink dataflash messages")
-        self.new_log_started = False
+        self.sender = None
         self.stopped = False
         self.time_last_start_packet_sent = 0
         self.time_last_stop_packet_sent = 0
@@ -38,6 +37,8 @@ class dataflash_logger(mp_module.MPModule):
 
         self.log_settings = mp_settings.MPSettings(
             [ ('verbose', bool, False),
+              ('df_target_system', int, 0),
+              ('df_target_component', int, mavutil.mavlink.MAV_COMP_ID_LOG)
           ])
         self.add_command('dataflash_logger', self.cmd_dataflash_logger, "dataflash logging control", ['status','start','stop','set (LOGSETTING)'])
         self.add_completion_function('(LOGSETTING)', self.log_settings.completion)
@@ -53,7 +54,7 @@ class dataflash_logger(mp_module.MPModule):
         elif args[0] == "status":
             print self.status()
         elif args[0] == "stop":
-            self.new_log_started = False
+            self.sender = None
             self.stopped = True
         elif args[0] == "start":
             self.stopped = False
@@ -99,7 +100,7 @@ class dataflash_logger(mp_module.MPModule):
         '''open a new dataflash log, reset state'''
         filename = self.new_log_filepath()
 
-        self.block_cnt = 0
+        self.last_seqno = 0
         self.logfile = open(filename, 'w+b')
         print("DFLogger: logging started (%s)" % (filename))
         self.prev_cnt = 0
@@ -112,6 +113,7 @@ class dataflash_logger(mp_module.MPModule):
         self.blocks_to_ack_and_nack = []
         self.missing_found = 0
         self.abandoned = 0
+        self.dropped = 0
 
     def status(self):
         '''returns information about module'''
@@ -122,12 +124,13 @@ class dataflash_logger(mp_module.MPModule):
         return("DFLogger: %(state)s Rate(%(interval)ds):%(rate).3fkB/s Block:%(block_cnt)d Missing:%(missing)d Fixed:%(fixed)d Abandoned:%(abandoned)d" %
               {"interval": interval,
                "rate": transfered/(interval*1000),
-               "block_cnt": self.block_cnt,
+               "block_cnt": self.last_seqno,
                "missing": len(self.missing_blocks),
                "fixed": self.missing_found,
                "abandoned": self.abandoned,
                "state": "Inactive" if self.stopped else "Active"
            })
+
     def idle_print_status(self):
         '''print out statistics every 10 seconds from idle loop'''
         now = time.time()
@@ -149,7 +152,12 @@ class dataflash_logger(mp_module.MPModule):
             [master, block, status, first_sent, last_sent] = stuff
             if status == 1:
 #                print("DFLogger: ACKing block (%d)" % (block,))
-                self.master.mav.remote_log_block_status_send(block,status)
+                mavstatus = mavutil.mavlink.MAV_REMOTE_LOG_DATA_BLOCK_ACK
+                (target_sys,target_comp) = self.sender
+                self.master.mav.remote_log_block_status_send(target_sys,
+                                                             target_comp,
+                                                             block,
+                                                             mavstatus)
                 blocks_sent += 1
                 del self.acking_blocks[block]
                 del self.blocks_to_ack_and_nack[i]
@@ -161,10 +169,10 @@ class dataflash_logger(mp_module.MPModule):
                 continue
 
             # give up on packet if we have seen one with a much higher
-            # number:
-            if self.block_cnt - block > 200 or \
-               now - first_sent > 60:
-                print("DFLogger: Abandoning block (%d)" % (block,))
+            # number (or after 60 seconds):
+            if (self.last_seqno - block > 200) or (now - first_sent > 60):
+                if self.log_settings.verbose:
+                    print("DFLogger: Abandoning block (%d)" % (block,))
                 del self.blocks_to_ack_and_nack[i]
                 del self.missing_blocks[block]
                 self.abandoned += 1
@@ -176,8 +184,14 @@ class dataflash_logger(mp_module.MPModule):
                 if now - last_sent < 0.1:
                     continue
 
-            print("DFLogger: NACKing block (%d)" % (block,))
-            self.master.mav.remote_log_block_status_send(block,status)
+            if self.log_settings.verbose:
+                print("DFLogger: Asking for block (%d)" % (block,))
+            mavstatus = mavutil.mavlink.MAV_REMOTE_LOG_DATA_BLOCK_NACK
+            (target_sys,target_comp) = self.sender
+            self.master.mav.remote_log_block_status_send(target_sys,
+                                                         target_comp,
+                                                         block,
+                                                         mavstatus)
             blocks_sent += 1
             stuff[4] = now
 
@@ -187,59 +201,110 @@ class dataflash_logger(mp_module.MPModule):
             self.idle_print_status()
         self.idle_send_acks_and_nacks()
 
+    def idle_task_not_started(self):
+        '''called in idle task only when logging is not running'''
+        if not self.stopped:
+            self.tell_sender_to_start()
+
     def idle_task(self):
-        if self.new_log_started == True:
+        '''called rapidly by mavproxy'''
+        if self.sender is not None:
             self.idle_task_started()
+        else:
+            self.idle_task_not_started()
+
+    def tell_sender_to_stop(self, m):
+        '''send a stop packet (if we haven't sent one in the last second)'''
+        now = time.time()
+        if now - self.time_last_stop_packet_sent < 1:
+            return
+        if self.log_settings.verbose:
+            print("DFLogger: Sending stop packet")
+        self.time_last_stop_packet_sent = now
+        self.master.mav.remote_log_block_status_send(m.get_srcSystem(),
+                                                     m.get_srcComponent(),
+                                                     mavutil.mavlink.MAV_REMOTE_LOG_DATA_BLOCK_STOP,
+                                                     1)
+    def tell_sender_to_start(self):
+        '''send a start packet (if we haven't sent one in the last second)'''
+        now = time.time()
+        if now - self.time_last_start_packet_sent < 1:
+            return
+        self.time_last_start_packet_sent = now
+
+        if self.log_settings.verbose:
+            print("DFLogger: Sending start packet")
+       
+        target_sys = self.log_settings.df_target_system
+        target_comp = self.log_settings.df_target_component
+        self.master.mav.remote_log_block_status_send(target_sys,
+                                                     target_comp,
+                                                     mavutil.mavlink.MAV_REMOTE_LOG_DATA_BLOCK_START,
+                                                     1)
+
+    def packet_is_for_me(self, m):
+        '''returns true if this packet is appropriately addressed'''
+        if m.target_system != self.master.mav.srcSystem:
+            return False
+        if m.target_component != self.master.mav.srcComponent:
+            return False
+        # if have a sender we can also check the source address:
+        if self.sender is not None:
+            if (m.get_srcSystem(),m.get_srcComponent()) != self.sender:
+                return False;
+        return True
 
     def mavlink_packet(self, m):
-        '''handle REMOTE_LOG_DATA_BLOCK packets'''
-        now = time.time()
+        '''handle mavlink packets'''
         if m.get_type() == 'REMOTE_LOG_DATA_BLOCK':
-            if self.stopped:
-                # send a stop packet every second until the other end gets the idea:
-                if now - self.time_last_stop_packet_sent > 1:
-                    if self.log_settings.verbose:
-                        print("DFLogger: Sending stop packet")
-                    self.master.mav.remote_log_block_status_send(mavutil.mavlink.MAV_REMOTE_LOG_DATA_BLOCK_STOP,1)
+            now = time.time()
+            if not self.packet_is_for_me(m):
+                dropped += 1
                 return
 
-#            if random.random() < 0.1: # drop 1 packet in 10
-#                return
-
-
-            if not self.new_log_started:
+            if self.sender is None and m.seqno == 0:
                 if self.log_settings.verbose:
                     print("DFLogger: Received data packet - starting new log")
                 self.start_new_log()
-                self.new_log_started = True
-            if self.new_log_started == True:
-                size = m.block_size
+                self.sender = (m.get_srcSystem(), m.get_srcComponent())
+    
+            if self.sender is None:
+                # No connection at the moment, and this packet did not start one
+                return
+    
+            if self.stopped:
+                # send a stop packet every second until the other end gets the idea:
+                self.tell_sender_to_stop(m)
+                return
+    
+            if self.sender is not None:
+                size = len(m.data)
                 data = ''.join(str(chr(x)) for x in m.data[:size])
-                ofs = size*(m.block_cnt)
+                ofs = size*(m.seqno)
                 self.logfile.seek(ofs)
                 self.logfile.write(data)
-
-                if m.block_cnt in self.missing_blocks:
+    
+                if m.seqno in self.missing_blocks:
                     if self.log_settings.verbose:
-                        print("DFLogger: Received missing block: %d" % (m.block_cnt,))
-                    del self.missing_blocks[m.block_cnt]
+                        print("DFLogger: Received missing block: %d" % (m.seqno,))
+                    del self.missing_blocks[m.seqno]
                     self.missing_found += 1
-                    self.blocks_to_ack_and_nack.append([self.master,m.block_cnt,1,now,None])
-                    self.acking_blocks[m.block_cnt] = 1
+                    self.blocks_to_ack_and_nack.append([self.master,m.seqno,1,now,None])
+                    self.acking_blocks[m.seqno] = 1
 #                    print("DFLogger: missing blocks: %s" % (str(self.missing_blocks),))
                 else:
                     # ACK the block we just got:
-                    if m.block_cnt in self.acking_blocks:
+                    if m.seqno in self.acking_blocks:
                         # already acking this one; we probably sent
                         # multiple nacks and received this one
                         # multiple times
                         pass
                     else:
-                        self.blocks_to_ack_and_nack.append([self.master,m.block_cnt,1,now,None])
-                        self.acking_blocks[m.block_cnt] = 1
+                        self.blocks_to_ack_and_nack.append([self.master,m.seqno,1,now,None])
+                        self.acking_blocks[m.seqno] = 1
                         # NACK any blocks we haven't seen and should have:
-                        if(m.block_cnt - self.block_cnt > 1):
-                            for block in range(self.block_cnt+1, m.block_cnt):
+                        if(m.seqno - self.last_seqno > 1):
+                            for block in range(self.last_seqno+1, m.seqno):
                                 if block not in self.missing_blocks and \
                                    block not in self.acking_blocks:
                                     self.missing_blocks[block] = 1
@@ -247,16 +312,9 @@ class dataflash_logger(mp_module.MPModule):
                                         print "DFLogger: setting %d for nacking" % (block,)
                                     self.blocks_to_ack_and_nack.append([self.master,block,0,now,None])
                         #print "\nmissed blocks: ",self.missing_blocks
-                    if self.block_cnt < m.block_cnt:
-                        self.block_cnt = m.block_cnt
+                    if self.last_seqno < m.seqno:
+                        self.last_seqno = m.seqno
                 self.download += size
-        elif not self.new_log_started and not self.stopped:
-            # send a start packet every second until the other end gets the idea:
-            if now - self.time_last_start_packet_sent > 1:
-                if self.log_settings.verbose:
-                    print("DFLogger: Sending start packet")
-                self.master.mav.remote_log_block_status_send(mavutil.mavlink.MAV_REMOTE_LOG_DATA_BLOCK_START,1)
-                self.time_last_start_packet_sent = now
 
 def init(mpstate):
     '''initialise module'''
