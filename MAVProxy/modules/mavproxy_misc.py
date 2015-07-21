@@ -72,6 +72,7 @@ class MiscModule(mp_module.MPModule):
                          ["<add|remove|clear>"])
         self.add_command('version', self.cmd_version, "show version")
         self.add_command('rcbind', self.cmd_rcbind, "bind RC receiver")
+        self.add_command('mission_set_current', self.cmd_mission_set_current, "mission_set_current")
         self.repeats = []
 
     def altitude_difference(self, pressure1, pressure2, ground_temp):
@@ -216,6 +217,17 @@ class MiscModule(mp_module.MPModule):
         for r in self.repeats:
             if r.event.trigger():
                 self.mpstate.functions.process_stdin(r.cmd, immediate=True)
+
+    def cmd_mission_set_current(self, args):
+        '''mission_set_current waypoint'''
+        if (len(args) != 1):
+            print("Usage: mission_set_current waypoint")
+            return
+
+        print("Sent mission_set_current " + str(args[0]))
+        self.master.mav.mission_set_current_send(self.settings.target_system,
+                                                 self.settings.target_component,
+                                                 int(args[0]))
 
 def init(mpstate):
     '''initialise module'''
