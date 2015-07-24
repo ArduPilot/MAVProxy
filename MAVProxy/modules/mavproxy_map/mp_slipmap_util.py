@@ -456,12 +456,14 @@ class SlipInfoImage(SlipInformation):
 
     def img(self):
         '''return a wx image'''
+        import wx
         img = wx.EmptyImage(self.width, self.height)
         img.SetData(self.imgstr)
         return img
 
     def draw(self, parent, box):
         '''redraw the image'''
+        import wx
         from MAVProxy.modules.lib import mp_widgets
         if self.imgpanel is None:
             self.imgpanel = mp_widgets.ImagePanel(parent, self.img())
@@ -499,6 +501,7 @@ class SlipInfoText(SlipInformation):
 
     def draw(self, parent, box):
         '''redraw the text'''
+        import wx
         if self.textctrl is None:
             self.textctrl = wx.TextCtrl(parent, style=wx.TE_MULTILINE|wx.TE_READONLY)
             self.textctrl.WriteText(self.text)
