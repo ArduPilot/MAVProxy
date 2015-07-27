@@ -37,8 +37,7 @@
             mavproxy.py --master="com14"
           </code></p>
           
-          <h4><a name="Serial" class="anchor" href="#Serial"><span class="octicon octicon-link"></span></a>Over Serial/Radio link</h4>
-          <p>If there is only 1 APM connected, the <code>--master</code> is not required. MAVProxy will autodetect the correct port and baud rate. If not, the baud rate can be manually specified.</p>
+          <p>Normally MAVProxy will auto-detect the correct baudrate. If required, the baud rate can instead be manually specified.</p>
           <p>Linux:</br><code>
             mavproxy.py --master=/dev/ttyUSB0 --baudrate=57600
           </code></p>
@@ -47,7 +46,7 @@
           </code></p>
           
            <h4><a name="Network" class="anchor" href="#Network"><span class="octicon octicon-link"></span></a>Over Network</h4>
-          <p>The address to connect to must be your own IP address.</p>
+          <p>Specify the IP address and port containing a mavlink stream. The address to connect to must be your own IP address.</p>
           <p><code>
             mavproxy.py --master=192.168.1.1:14550
           </code></p>

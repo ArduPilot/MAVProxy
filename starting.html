@@ -28,6 +28,7 @@
           <h2>
 <a name="ContentTmp" class="anchor" href="#ContentTmp"><span class="octicon octicon-link"></span></a>Startup Options</h2>
           <p>There are no mandatory command line options for MAVProxy. An exception to this is the <code>--master</code> option if there is more than 1 APM connected to the system.</p>
+          <p>Note that MAVProxy can only connect to 1 vehicle at a time. If control of multiple vehicles is desired, multiple MAVProxy sessions should be used - one session for each vehicle.</p>
           <h4>--master</h4>
           <p>Specifies which port (serial, USB or network address/port) the UAV is communicating on.</p>
           <p>Multiple <code>--master</code> can be used. MAVProxy will sort the packets into a single stream automatically. This is useful if independent redundant links are being used.</p>
@@ -45,7 +46,7 @@
           <p>Use quadcopter controls.</p>
           
           <h4>--baudrate</h4>
-          <p>Default baudrate of <code>--master</code> and <code>--out</code> ports. Only applicable for serial links.</p>
+          <p>Specify baudrate of <code>--master</code> and <code>--out</code> ports. Only applicable for serial links.</p>
           
           <h4>--out</h4>
           <p>Forward the MAVLink packets to a remote device (serial, USB or network address/port). Useful if using multiple ground station computers or relaying the stream through an intermediate node.</p>
@@ -104,10 +105,10 @@
           </code></p>    
 
           <h4>--console</h4>
-          <p>Load the GUI console module.</p>
+          <p>Load the GUI console module on startup.</p>
 
           <h4>--map</h4>
-          <p>Load the moving map module.</p>        
+          <p>Load the moving map module on startup.</p>        
 
           <h4>--load-module</h4>
           <p>Load the specified module on startup. Can be used multiple times, or with a comma separated list.</p>    
@@ -137,7 +138,13 @@
         </section>
 
           <h4>--daemon</h4>
-          <p>Run in daemon mode (as a background process). No interative shell will be started.</p>             
+          <p>Run in daemon mode (as a background process). No interactive shell will be started.</p>  
+          
+          <h4>--state-basedir</h4>
+          <p>The base directory will logs are stored, if it is not the current directory.</p> 
+          
+          <h4>--version</h4>
+          <p>Return version information about MAVProxy.</p>            
         </section>
         
         <footer>

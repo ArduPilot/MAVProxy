@@ -10,7 +10,7 @@
     <!--[if lt IE 9]>
     <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
     <![endif]-->
-    <title>MAVProxy - System Commands</title>
+    <title>MAVProxy - Terrain</title>
   </head>
 
   <body>
@@ -26,31 +26,18 @@
 
         <section id="main_content">
           <h2>
-<a name="ContentSystem" class="anchor" href="#ContentSystem"><span class="octicon octicon-link"></span></a>System Commands</h2>
-          <p>There are a number of overall system and miscellaneous commands:</p>
-          <h4>reboot</h4>
-          <p>Reboots the APM.</p>
+<a name="ContentWaypoint" class="anchor" href="#ContentTerrain"><span class="octicon octicon-link"></span></a>Terrain Module</h2>
+          <p>The terrian module passes downloads and manages DTEM (Digital Terrain Elevation Model) datasets and adds terrain height functionality to the map module. It also allows the APM to download terrain data of the surrounding area so that it has an approximate idea of it's height above ground.</p>
           
-          <h4>setup</h4>
-          <p>Goes into the setup (CLI) mode of the APM.</p>
+          <p>By default, it uses the freely available <a href=https://en.wikipedia.org/wiki/Shuttle_Radar_Topography_Mission>SRTM dataset</a>. For the purposes of this module, a copy of this dataset hosted by  <a href=http://firmware.diydrones.com/SRTM/>DIYDrones</a> at level 1 resolution is used.</p>
           
-          <h4>rc</h4>
-          <p>Override a RC (input) channel. This value remains in effect until a value of 0 is set. Uses the form of <code>rc chan value</code>. Use <code>all</code> to set a global value for all RC channels.</p>
-          
-          <p><code>rc 1 1000</br>
-          rc all 0</code></p>
-          
-          <h4>time</h4>
-          <p>Displays the current time from the autopilot, if supported. The time in brackets is the ground station time.</p>
+          <p>Whilst this module does require an Internet connection to download the nearby SRTM tiles, it will cache them on the local hard drive for offline use.</p>
 
-          <h4>script</h4>
-          <p>Runs a text file containing MAVProxy commands, much like the <a href="mavinit.html">startup scripts</a>.</p>
+        <p>Once loaded with <code>module load terrain</code>, the module will automatically download, cache and send small SRTM tiles to the APM's internal memory (the SD card on the Pixhawk, for example).</p>
+        
+        <p>The status of the module can be shown by entering <code>terrain status</code>.</p>
 
-          <h4>shell</h4>
-          <p>Run a shell command.</p>
-          
-          <h4>status</h4>
-          <p>Shows the latest packets received from the autopilot. Useful for reading the state of the UAV.</p>          
+            
         </section>
 
         <footer>
