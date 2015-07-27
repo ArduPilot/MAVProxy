@@ -61,11 +61,13 @@
           <h4>graph</h4>
           <p>A module to plot (graph) data in realtime from the UAV. It is useful for looking for time-varying patterns in the data</p>
           <p>After loading, new plots can be created by:</p>
-          <p><code>graph add dataname</code></p>
+          <p><code>graph dataname</code></p>
           <p>Multiple items can be added at once. Use the <code>:2</code> to specify using the right vertical axis.</p>
-          <p><code>graph add VFR_HUD.alt VFR_HUD.airspeed:2</code></p>
+          <p><code>graph VFR_HUD.alt VFR_HUD.airspeed:2</code></p>
           <p>Arbitrary mathematical functions can also be used.</p>
-          <p><code>graph add "(VFR_HUD.alt/1000.0)+5"</code></p>
+          <p><code>graph "(VFR_HUD.alt/1000.0)+5"</code></p>
+          
+          <p>Additionally, the timespan and tick resolution of the graph window can be changed. Use <code>graph timespan X</code> to change the timespace to X seconds and <code>graph tickresolution Y</code> to change the tick resolution to Y seconds.</p>
 
           <h4>antenna</h4>
           <p>By specifying the ground station location, this module will output (via text and speech) the relevant azimuth and elevation angles to point at the UAV throughout it's flight. This is useful for a manually pointed antenna.</p>
