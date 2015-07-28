@@ -303,7 +303,7 @@ class ConsoleModule(mp_module.MPModule):
                     if linkdelay > 1:
                         fg = 'orange'
                     else:
-                        fg = 'darkgreen'
+                        fg = 'dark green'
                 self.console.set_status('Link%u'%m.linknum, linkline, row=1, fg=fg)
         elif type in ['WAYPOINT_CURRENT', 'MISSION_CURRENT']:
             self.console.set_status('WP', 'WP %u' % msg.seq)
