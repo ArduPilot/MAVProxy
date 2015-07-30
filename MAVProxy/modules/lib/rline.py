@@ -5,6 +5,7 @@ readline handling for mavproxy
 import sys, glob, os
 
 rline_mpstate = None
+redisplay = None
 
 class rline(object):
     '''async readline abstraction'''
@@ -29,6 +30,10 @@ class rline(object):
         if prompt != self.prompt:
             self.prompt = prompt
             sys.stdout.write(prompt)
+            try:
+                redisplay()
+            except Exception as ex:
+                pass
 
 
 def complete_alias(text):
@@ -176,6 +181,7 @@ try:
     readline.set_completer_delims(' \t\n;')
     readline.parse_and_bind("tab: complete")
     readline.set_completer(complete)
+    redisplay = readline.redisplay
 except Exception:
     pass
 
