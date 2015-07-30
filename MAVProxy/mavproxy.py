@@ -158,6 +158,7 @@ class MPState(object):
         self.completions = {
             "script"         : ["(FILENAME)"],
             "set"            : ["(SETTING)"],
+            "status"         : ["(VARIABLE)"],
             "module"    : ["list",
                            "load (AVAILMODULES)",
                            "<unload|reload> (LOADEDMODULES)"]
