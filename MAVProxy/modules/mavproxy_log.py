@@ -113,11 +113,14 @@ class LogModule(mp_module.MPModule):
             size = 0
         else:
             size = m.size
-        print("Downloading %s - %u/%u bytes %.1f kbyte/s (%u retries)" % (self.download_filename,
-                                                                          os.path.getsize(self.download_filename),
-                                                                          size,
-                                                                          speed,
-                                                                          self.retries))
+        highest = max(self.download_set)
+        diff = set(range(highest)).difference(self.download_set)
+        print("Downloading %s - %u/%u bytes %.1f kbyte/s (%u retries %u missing)" % (self.download_filename,
+                                                                                     os.path.getsize(self.download_filename),
+                                                                                     size,
+                                                                                     speed,
+                                                                                     self.retries,
+                                                                                     len(diff)))
 
     def log_download(self, log_num, filename):
         '''download a log file'''
