@@ -13,6 +13,10 @@ class SpeechModule(mp_module.MPModule):
             self.settings.set('speech', 1)
         except AttributeError:
             self.settings.append(('speech', int, 1))
+        try:
+            self.settings.set('speechfemale', 0)
+        except AttributeError:
+            self.settings.append(('speechfemale', int, 0))                
         self.kill_speech_dispatcher()
         for backend in [self.say_speechd, self.say_espeak, self.say_speech]:
             try:
@@ -64,6 +68,10 @@ class SpeechModule(mp_module.MPModule):
     def say_espeak(self, text, priority='important'):
         '''speak some text using espeak'''
         from espeak import espeak
+        if self.settings.get('speechfemale') == 1:
+            espeak.set_voice('female2')
+        else:
+            espeak.set_voice('male3')
         espeak.synth(text)
 
     def say_speech(self, text, priority='important'):
