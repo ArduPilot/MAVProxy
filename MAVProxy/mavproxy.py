@@ -707,6 +707,7 @@ def main_loop():
         for master in mpstate.mav_master:
             send_heartbeat(master)
             if master.linknum == 0:
+                print("Waiting for heartbeat from %s" % master.address)
                 master.wait_heartbeat()
         set_stream_rates()
 
