@@ -13,6 +13,7 @@ class CmdlongModule(mp_module.MPModule):
         self.add_command('setyaw', self.cmd_condition_yaw, "condition_yaw")
         self.add_command('takeoff', self.cmd_takeoff, "takeoff")
         self.add_command('velocity', self.cmd_velocity, "velocity")
+        self.add_command('position', self.cmd_position, "position")
         self.add_command('cammsg', self.cmd_cammsg, "cammsg")
         self.add_command('camctrlmsg', self.cmd_camctrlmsg, "camctrlmsg")
 
@@ -137,6 +138,28 @@ class CmdlongModule(mp_module.MPModule):
                                       455,      # type mask (vel only)
                                       0, 0, 0,  # position x,y,z
                                       x_mps, y_mps, z_mps,  # velocity x,y,z
+                                      0, 0, 0,  # accel x,y,z
+                                      0, 0)     # yaw, yaw rate
+
+    def cmd_position(self, args):
+        '''position x-m y-m z-m'''
+        if (len(args) != 3):
+            print("Usage: position x y z (meters)")
+            return
+
+        if (len(args) == 3):
+            x_m = float(args[0])
+            y_m = float(args[1])
+            z_m = float(args[2])
+            print("x:%f, y:%f, z:%f" % (x_m, y_m, z_m))
+            self.master.mav.set_position_target_local_ned_send(
+                                      0,  # system time in milliseconds
+                                      1,  # target system
+                                      0,  # target component
+                                      8,  # coordinate frame MAV_FRAME_BODY_NED
+                                      3576,     # type mask (pos only)
+                                      x_m, y_m, z_m,  # position x,y,z
+                                      0, 0, 0,  # velocity x,y,z
                                       0, 0, 0,  # accel x,y,z
                                       0, 0)     # yaw, yaw rate
 
