@@ -12,6 +12,7 @@ import fnmatch, errno, threading
 import serial, Queue, select
 import traceback
 import select
+import shlex
 
 from MAVProxy.modules.lib import textconsole
 from MAVProxy.modules.lib import rline
@@ -441,11 +442,11 @@ def process_stdin(line):
     if not line:
         return
 
-    args = line.split()
+    args = shlex.split(line)
     cmd = args[0]
     while cmd in mpstate.aliases:
         line = mpstate.aliases[cmd]
-        args = line.split() + args[1:]
+        args = shlex.split(line) + args[1:]
         cmd = args[0]
         
     if cmd == 'help':
