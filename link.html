@@ -32,8 +32,9 @@
           <p>A link menu is available on the GUI console.</p>
 
           <h4>link add</h4>
-          <p>Add an additional communications link. This can be either a network address or serial port.</p>
+          <p>Add an additional communications link. This can be either a network address or serial port. For a serial port, the default baud rate is 57600. Use <code>set baudrate xxx</code> to change baud rate for any susequent link add's.</p>
           <p><code>link add 127.0.0.1:14550 </br>
+          set baudrate 115200</br>
           link add COM17</code></p>
 
           <h4>link remove</h4>
