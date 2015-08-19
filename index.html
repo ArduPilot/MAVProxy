@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <link href='https://fonts.googleapis.com/css?family=Chivo:900' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print" />
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <title>MAVProxy</title>
+  </head>
+
+  <body>
+    <div id="container">
+      <div class="inner">
+
+        <header>
+          <h1>MAVProxy</h1>
+          <h2>A UAV ground station software package for MAVLink based systems</h2>
+        </header>
+
+        <hr>
+
+        <section id="main_content">
+          <h2>
+<a name="mavproxy" class="anchor" href="#mavproxy"><span class="octicon octicon-link"></span></a>MAVProxy</h2>
+
+<p>MAVProxy is a fully-functioning GCS for UAV's. The intent is for a minimalist, portable and extendable GCS for any UAV supporting the MAVLink protocol (such as the APM).</p>
+
+<h2>
+<a name="features" class="anchor" href="#features"><span class="octicon octicon-link"></span></a>Features</h2>
+<ul>
+<li>It is a command-line, console based app. There are plugins included in MAVProxy to provide a basic GUI.</li>
+<li>Can be networked and run over any number of computers.</li>
+<li>It's portable; it should run on any POSIX OS with python, pyserial, and select() function calls, which means Linux, OS X, Windows, and others.</li>
+<li>The light-weight design means it can run on small netbooks with ease.</li>
+<li>It supports loadable modules, and has modules to support console/s, moving maps, joysticks, antenna trackers, etc</li>
+<li>Tab-completion of commands.</li>
+</ul>
+
+<p>
+Running under Ubuntu:
+</p>
+<p>
+<a href="images/mavproxy_linux.jpg" class="media" title="mavproxy_linux.jpg"><img src="images/mavproxy_linux.jpg" class="media" alt="" width="622" /></a>
+</p>
+
+<p>
+Running under Windows 7:
+</p>
+<p>
+<a href="images/mavproxy_windows.jpg" class="media" title="mavproxy_windows.jpg"><img src="images/mavproxy_windows.jpg" class="media" alt="" width="622" /></a>
+</p>
+<h2>
+<a name="install" class="anchor" href="#install"><span class="octicon octicon-link"></span></a>Download and Installation</h2>
+
+<p>A list of commits to MAVProxy (closest thing to a changelog that is available) can be seen <a href="https://github.com/Dronecode/MAVProxy/commits/master">here</a>.</p>
+
+<h4><a name="installWin" class="anchor" href="#installWin"><span class="octicon octicon-link"></span></a>Windows</h4>
+
+<p>A complete windows installer for MAVProxy is available at <a href="http://firmware.diydrones.com/Tools/MAVProxy/">http://firmware.diydrones.com/Tools/MAVProxy/</a>.</p>
+
+<p>Please note that the "missionedit" module does not currently run on the Windows package of MAVProxy. This is being investigated and will hopefully be fixed soon.</p>
+
+<h4><a name="installLinux" class="anchor" href="#installLinux"><span class="octicon octicon-link"></span></a>Linux</h4>
+<p>Linux users can use the PyPi program to get the needed packages:<br>
+<code>
+sudo apt-get install python-pip
+</code></p>
+
+<p>Then download and install MAVProxy. Prerequisites will be automatically downloaded too. Note a sudo may be required in some circumstances if the install generates errors.<br>
+<code>
+pip install MAVProxy
+</code></p>
+
+<p>The following other packages may also be required:</br>
+<code>
+sudo apt-get install python-opencv python-wxgtk
+</code></p>
+
+<p>Note that on some Linux systems, <code>python-wxgtk</code> may be instead named as <code>python-wxgtk2.8</code>.
+
+<h4><a name="installMac" class="anchor" href="#installMac"><span class="octicon octicon-link"></span></a>Mac</h4>
+<p>Some users have reported difficulties with installing wxPython on the latest version of OSX. These issues have not yet been resolved, so you may have mixed results trying to get MAVProxy up and running.</p>
+
+<p>OSX should require the same prerequisites as for the Windows installations.</p>
+
+
+<h1><a name="guide" class="anchor" href="#guide"><span class="octicon octicon-link"></span></a>User Guide</h1>
+<h2><span class="octicon octicon-link"></span></a>Startup</h2>
+<h4><a name="guideQStart" class="anchor" href="quickstart.html">Quickstart</a></h4>
+<h4><a name="guideStart" class="anchor" href="starting.html">Starting MAVProxy</a></h4>
+<h4><a name="guideSCR" class="anchor" href="mavinit.html">Startup Scripts</a></h4>
+<h4><a name="guideLink" class="anchor" href="link.html">Link Management</a></h4>
+</br>
+<h2><span class="octicon octicon-link"></span></a>UAV Configuration</h2>
+<h4><a name="guideParam" class="anchor" href="parameters.html">Parameters</a></h4>
+<h4><a name="guideWP" class="anchor" href="waypoints.html">Waypoints</a></h4>
+<h4><a name="guideGF" class="anchor" href="geofence.html">GeoFence</a></h4>
+<h4><a name="guideRally" class="anchor" href="rally.html">Rally Points</a></h4>
+<h4><a name="guideModes" class="anchor" href="flightModes.html">Flight Modes and Arming</a></h4>
+<h4><a name="guideCal" class="anchor" href="calibration.html">Calibration</a></h4>
+<h4><a name="guidegimbal" class="anchor" href="gimbals.html">Gimbals</a></h4>
+</br>
+<h2><span class="octicon octicon-link"></span></a>Advanced MAVProxy Modules</h2>
+<h4><a name="guideJoy" class="anchor" href="joystick.html">Joystick Input</a></h4>
+<h4><a name="guideterrain" class="anchor" href="terrain.html">Terrain</a></h4>
+<h4><a name="guidensh" class="anchor" href="nsh.html">Nsh Console</a></h4>
+<h4><a name="guideMisc" class="anchor" href="system.html">System Commands</a></h4>
+<h4><a name="guideMod" class="anchor" href="modules.html">Other Modules</a></h4>
+</br>
+<h2><span class="octicon octicon-link"></span></a>Analysis and Simulation</h2>
+<h4><a name="guidePlayback" class="anchor" href="playback.html">Playback from Log</a></h4>
+<h4><a name="guideTools" class="anchor" href="mavtools.html">MAVLink Tools</a></h4>
+<h4><a name="guideSim" class="anchor" href="simulation.html">Running a Simulation Environment</a></h4>
+</br>
+<h2>
+<a name="devel" class="anchor" href="#devel"><span class="octicon octicon-link"></span></a>Development</h2>
+<h4><a name="guideTools" class="anchor" href="mavdevenv.html">Installing the Development Environment</a></h4>
+<h4><a name="guideTools" class="anchor" href="mavcustmod.html">Creating Custom Modules</a></h4>
+<h2>
+</br></br>
+<a name="license" class="anchor" href="#license"><span class="octicon octicon-link"></span></a>License</h2>
+
+<p>MAVProxy is released under the GNU General Public License v3 or later</p>
+        </section>
+
+        <footer>
+          MAVProxy is maintained by <a href="https://github.com/tridge">Andrew Tridgell</a> and documentation is by <a href="https://github.com/stephendade">Stephen Dade</a><br>
+          This page was generated by <a href="http://pages.github.com">GitHub Pages</a>. Tactile theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.
+        </footer>
+
+        
+      </div>
+    </div>
+  </body>
+</html>
