@@ -1,0 +1,566 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Startup Options &mdash; MAVProxy 1.4.24 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="MAVProxy 1.4.24 documentation" href="../index.html"/>
+        <link rel="up" title="Getting Started" href="index.html"/>
+        <link rel="next" title="Startup Scripts" href="mavinit.html"/>
+        <link rel="prev" title="Quickstart" href="quickstart.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-nav-search">
+        
+
+        
+          <a href="../index.html" class="icon icon-home"> MAVProxy
+        
+
+        
+        </a>
+
+        
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+        
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+        
+          
+          
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting Started</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="download_and_installation.html">Download and Installation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="download_and_installation.html#windows">Windows</a></li>
+<li class="toctree-l3"><a class="reference internal" href="download_and_installation.html#linux">Linux</a></li>
+<li class="toctree-l3"><a class="reference internal" href="download_and_installation.html#mac">Mac</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html">Quickstart</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="quickstart.html#over-usb">Over USB</a></li>
+<li class="toctree-l3"><a class="reference internal" href="quickstart.html#over-network">Over Network</a></li>
+</ul>
+</li>
+<li class="toctree-l2 current"><a class="current reference internal" href="">Startup Options</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#master">&#8211;master</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#quadcopter">&#8211;quadcopter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#baudrate">&#8211;baudrate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#out">&#8211;out</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#sitl">&#8211;sitl</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#streamrate">&#8211;streamrate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#source-system">&#8211;source-system</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#target-system">&#8211;target-system</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#target-component">&#8211;target-component</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#logfile">&#8211;logfile</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#append-log">&#8211;append-log</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#setup">&#8211;setup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#nodtr">&#8211;nodtr</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#show-errors">&#8211;show-errors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#speech">&#8211;speech</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#num-cells">&#8211;num-cells</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aircraft">&#8211;aircraft</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#cmd">&#8211;cmd</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#console">&#8211;console</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#map">&#8211;map</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#load-module">&#8211;load-module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#mav09">&#8211;mav09</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#auto-protocol">&#8211;auto-protocol</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#continue">&#8211;continue</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#nowait">&#8211;nowait</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dialect">&#8211;dialect</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#rtscts">&#8211;rtscts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#mission">&#8211;mission</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#daemon">&#8211;daemon</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#state-basedir">&#8211;state-basedir</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#version">&#8211;version</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="mavinit.html">Startup Scripts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="link.html">Link Management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="link.html#link-add">link add</a></li>
+<li class="toctree-l3"><a class="reference internal" href="link.html#link-remove">link remove</a></li>
+<li class="toctree-l3"><a class="reference internal" href="link.html#link-list">link list</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../uav_configuration/parameters.html">Parameters</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/parameters.html#param-show">param show</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/parameters.html#param-set">param set</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/parameters.html#param-save">param save</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/parameters.html#param-load">param load</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/parameters.html#param-diff">param diff</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/parameters.html#wildcards">Wildcards</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/parameters.html#param-download">param download</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/parameters.html#param-help">param help</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../uav_configuration/waypoints.html">Waypoints</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/waypoints.html#wp-list">wp list</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/waypoints.html#wp-load">wp load</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/waypoints.html#wp-save">wp save</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/waypoints.html#wp-clear">wp clear</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/waypoints.html#wp-update">wp update</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/waypoints.html#wp-move">wp move</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/waypoints.html#wp-loop">wp loop</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/waypoints.html#wp-remove">wp remove</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/waypoints.html#wp-set">wp set</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/waypoints.html#wp-undo">wp undo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/waypoints.html#using-a-gui">Using a GUI</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../uav_configuration/geofence.html">Geofence</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/geofence.html#fence-list">fence list</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/geofence.html#fence-load">fence load</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/geofence.html#fence-save">fence save</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/geofence.html#fence-draw">fence draw</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/geofence.html#fence-enable">fence enable</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/geofence.html#fence-disable">fence disable</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/geofence.html#fence-clear">fence clear</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/geofence.html#fence-move">fence move</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/geofence.html#fence-remove">fence remove</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../uav_configuration/rally.html">Rally Points</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/rally.html#rally-list">rally list</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/rally.html#rally-load">rally load</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/rally.html#rally-save">rally save</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/rally.html#rally-clear">rally clear</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/rally.html#rally-move">rally move</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/rally.html#rally-add">rally add</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/rally.html#rally-remove">rally remove</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/rally.html#rally-land">rally land</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../uav_configuration/flightModes.html">Flight Modes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/flightModes.html#mode-auto">mode auto</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/flightModes.html#mode-loiter">mode loiter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/flightModes.html#mode-rtl">mode rtl</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/flightModes.html#mode-manual">mode manual</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/flightModes.html#mode-fbwa">mode fbwa</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/flightModes.html#land">land</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../uav_configuration/flightModes.html#arming-disarming">Arming/Disarming</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../uav_configuration/calibration.html">Calibration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/calibration.html#accelcal">accelcal</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/calibration.html#gyrocal">gyrocal</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/calibration.html#calpress">calpress</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/calibration.html#compassmot">compassmot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/calibration.html#level">level</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/calibration.html#rccal">rccal</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/calibration.html#ground">ground</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../uav_configuration/gimbals.html">Gimbal Module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/gimbals.html#gimbal-mode">gimbal mode</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/gimbals.html#gimbal-rate-roll-pitch-yaw">gimbal rate ROLL PITCH YAW</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/gimbals.html#gimbal-point-roll-pitch-yaw">gimbal point ROLL PITCH YAW</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/gimbals.html#gimbal-roi">gimbal roi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uav_configuration/gimbals.html#gimbal-status">gimbal status</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../advanced_modules/index.html">Advanced MAVProxy Modules</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../advanced_modules/joystick.html">Joystick Module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../advanced_modules/terrain.html">Terrain Module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../advanced_modules/nsh.html">nsh Module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../advanced_modules/system.html">System Commands</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/system.html#reboot">reboot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/system.html#setup">setup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/system.html#rc">rc</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/system.html#time">time</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/system.html#script">script</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/system.html#shell">shell</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/system.html#status">status</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../advanced_modules/modules.html">Modules</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/modules.html#module-management">Module Management</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../advanced_modules/modules.html#default-modules">Default Modules</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/modules.html#console">console</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/modules.html#map">map</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/modules.html#graph">graph</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/modules.html#antenna">antenna</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/modules.html#auxopt">auxopt</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/modules.html#cameraview">cameraview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/modules.html#dgps">DGPS</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/modules.html#hil">HIL</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/modules.html#log">log</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/modules.html#relay">relay</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/modules.html#sensors">sensors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/modules.html#serial">serial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/modules.html#speech">speech</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/modules.html#tracker">tracker</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/modules.html#tuneopt">tuneopt</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../advanced_modules/modules.html#misseditor">misseditor</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../analysis_and_simulation/playback.html">Playback</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../analysis_and_simulation/mavtools.html">Offline Tools</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../analysis_and_simulation/mavtools.html#mavgraph-py">mavgraph.py</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../analysis_and_simulation/mavtools.html#mavtogpx-py">mavtogpx.py</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../analysis_and_simulation/mavtools.html#mavparms-py">mavparms.py</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../analysis_and_simulation/mavtools.html#mavflighttime-py">mavflighttime.py</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../analysis_and_simulation/mavtools.html#mavflightmodes-py">mavflightmodes.py</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../analysis_and_simulation/simulation.html">Simulation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../analysis_and_simulation/simulation.html#linux-sitl">Linux - SITL</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../analysis_and_simulation/simulation.html#caveats">Caveats</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../development/mavdevenv.html">Development Environment</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../development/mavdevenv.html#linux">Linux</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../development/mavdevenv.html#windows">Windows</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../development/mavcustmod.html">Module Development</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../development/mavcustmod.html#location">Location</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../development/mavcustmod.html#module-file-structure">Module File Structure</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+
+          
+        
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../index.html">MAVProxy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="index.html">Getting Started</a> &raquo;</li>
+      
+    <li>Startup Options</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../_sources/getting_started/starting.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document">
+            
+  <div class="section" id="startup-options">
+<h1>Startup Options<a class="headerlink" href="#startup-options" title="Permalink to this headline">¶</a></h1>
+<p>There are no mandatory command line options for MAVProxy. An exception
+to this is the <code class="docutils literal"><span class="pre">--master</span></code> option if there is more than 1 APM connected
+to the system.</p>
+<p>Note that MAVProxy can only connect to 1 vehicle at a time. If control
+of multiple vehicles is desired, multiple MAVProxy sessions should be
+used - one session for each vehicle.</p>
+<div class="section" id="master">
+<h2>&#8211;master<a class="headerlink" href="#master" title="Permalink to this headline">¶</a></h2>
+<p>Specifies which port (serial, USB or network address/port) the UAV is
+communicating on.</p>
+<p>Multiple <code class="docutils literal"><span class="pre">--master</span></code> can be used. MAVProxy will sort the packets into a
+single stream automatically. This is useful if independent redundant
+links are being used.</p>
+<p>If an IP address is specified, it must be the local computer&#8217;s IP
+address.</p>
+<p>If a serial port is specified, an optional comma-separated baud rate may
+also be specified. If present, this overrides the rate given by
+<code class="docutils literal"><span class="pre">--baudrate</span></code>.</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>mavproxy.py --master=/dev/ttyUSB0
+mavproxy.py --master=&quot;com14&quot;
+mavproxy.py --master=192.168.1.1:14550
+mavproxy.py --master=192.168.1.1:14550 --master=/dev/ttyUSB0
+mavproxy.py --master=/dev/ttyUSB0,57600           ``
+</pre></div>
+</div>
+</div>
+<div class="section" id="quadcopter">
+<h2>&#8211;quadcopter<a class="headerlink" href="#quadcopter" title="Permalink to this headline">¶</a></h2>
+<p>Use quadcopter controls.</p>
+</div>
+<div class="section" id="baudrate">
+<h2>&#8211;baudrate<a class="headerlink" href="#baudrate" title="Permalink to this headline">¶</a></h2>
+<p>Specify baudrate of <code class="docutils literal"><span class="pre">--master</span></code> and <code class="docutils literal"><span class="pre">--out</span></code> ports. Only applicable
+for serial links.</p>
+</div>
+<div class="section" id="out">
+<h2>&#8211;out<a class="headerlink" href="#out" title="Permalink to this headline">¶</a></h2>
+<p>Forward the MAVLink packets to a remote device (serial, USB or network
+address/port). Useful if using multiple ground station computers or
+relaying the stream through an intermediate node.</p>
+<p>MAVlink usually uses port 14550 for IP-based packet forwarding, though
+other ports can be used if needed.</p>
+<p>If a serial port is given (for example a radio device connecting an
+airbourne MAVProxy instance with the GCS), a link-specific baud rate can
+be given after the device, delimited by a comma. This overrides the
+global default baudrate specified by <code class="docutils literal"><span class="pre">--baudrate</span></code>.</p>
+<p>If forwarding to a network address via tcp or udp, this must be prefixed
+before the IP address.</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>mavproxy.py --master=/dev/ttyUSB0 --out=udp:192.168.1.1:14550
+mavproxy.py --master=/dev/ttyACM0,115200 --out=/dev/ttyUSB0,57600
+mavproxy.py --master=/dev/ttyACM0,115200 --out=COM17,57600
+</pre></div>
+</div>
+</div>
+<div class="section" id="sitl">
+<h2>&#8211;sitl<a class="headerlink" href="#sitl" title="Permalink to this headline">¶</a></h2>
+<p>Input from APM Software in the loop (SITL) simulator. Usually <code class="docutils literal"><span class="pre">--sitl=127.0.0.1:5501</span></code></p>
+</div>
+<div class="section" id="streamrate">
+<h2>&#8211;streamrate<a class="headerlink" href="#streamrate" title="Permalink to this headline">¶</a></h2>
+<p>MAVLink stream rate.</p>
+</div>
+<div class="section" id="source-system">
+<h2>&#8211;source-system<a class="headerlink" href="#source-system" title="Permalink to this headline">¶</a></h2>
+<p>MAVLink source system for this GCS.</p>
+</div>
+<div class="section" id="target-system">
+<h2>&#8211;target-system<a class="headerlink" href="#target-system" title="Permalink to this headline">¶</a></h2>
+<p>MAVLink target master system.</p>
+</div>
+<div class="section" id="target-component">
+<h2>&#8211;target-component<a class="headerlink" href="#target-component" title="Permalink to this headline">¶</a></h2>
+<p>MAVLink target master component.</p>
+</div>
+<div class="section" id="logfile">
+<h2>&#8211;logfile<a class="headerlink" href="#logfile" title="Permalink to this headline">¶</a></h2>
+<p>Name of MAVLink master logfile. Default is mav.tlog.</p>
+</div>
+<div class="section" id="append-log">
+<h2>&#8211;append-log<a class="headerlink" href="#append-log" title="Permalink to this headline">¶</a></h2>
+<p>Append to latest log file, rather than creating a new one. Useful if
+re-connecting mid-flight.</p>
+</div>
+<div class="section" id="setup">
+<h2>&#8211;setup<a class="headerlink" href="#setup" title="Permalink to this headline">¶</a></h2>
+<p>Startup in the APM&#8217;s command line interface (CLI) mode.</p>
+</div>
+<div class="section" id="nodtr">
+<h2>&#8211;nodtr<a class="headerlink" href="#nodtr" title="Permalink to this headline">¶</a></h2>
+<p>Disable DTR drop on close.</p>
+</div>
+<div class="section" id="show-errors">
+<h2>&#8211;show-errors<a class="headerlink" href="#show-errors" title="Permalink to this headline">¶</a></h2>
+<p>Show MAVLink error packets.</p>
+</div>
+<div class="section" id="speech">
+<h2>&#8211;speech<a class="headerlink" href="#speech" title="Permalink to this headline">¶</a></h2>
+<p>Use text-to-speech. Requires the speechd software on Linux.</p>
+</div>
+<div class="section" id="num-cells">
+<h2>&#8211;num-cells<a class="headerlink" href="#num-cells" title="Permalink to this headline">¶</a></h2>
+<p>Number of Lipo battery cells in main battery. Used for detecting low
+battery voltage.</p>
+</div>
+<div class="section" id="aircraft">
+<h2>&#8211;aircraft<a class="headerlink" href="#aircraft" title="Permalink to this headline">¶</a></h2>
+<p>Name of the aircraft being flown. If used, logfiles will be stored in
+<strong>/Logs/AircraftName/Date/flightNumber/flight.tlog</strong>. Useful for keeping
+flight logs organised.</p>
+</div>
+<div class="section" id="cmd">
+<h2>&#8211;cmd<a class="headerlink" href="#cmd" title="Permalink to this headline">¶</a></h2>
+<p>Initial commands to run in MAVProxy. Delimited by <code class="docutils literal"><span class="pre">;</span></code></p>
+<div class="code bash highlight-python"><div class="highlight"><pre>mavproxy.py --master=/dev/ttyUSB0 --cmd=&quot;param load init.parm; module load map;&quot;
+</pre></div>
+</div>
+</div>
+<div class="section" id="console">
+<h2>&#8211;console<a class="headerlink" href="#console" title="Permalink to this headline">¶</a></h2>
+<p>Load the GUI console module on startup.</p>
+</div>
+<div class="section" id="map">
+<h2>&#8211;map<a class="headerlink" href="#map" title="Permalink to this headline">¶</a></h2>
+<p>Load the moving map module on startup.</p>
+</div>
+<div class="section" id="load-module">
+<h2>&#8211;load-module<a class="headerlink" href="#load-module" title="Permalink to this headline">¶</a></h2>
+<p>Load the specified module on startup. Can be used multiple times, or
+with a comma separated list.</p>
+</div>
+<div class="section" id="mav09">
+<h2>&#8211;mav09<a class="headerlink" href="#mav09" title="Permalink to this headline">¶</a></h2>
+<p>Use MAVLink protocol 0.9. Recent versions of the APM software use
+version 1.0 of MAVLink.</p>
+</div>
+<div class="section" id="auto-protocol">
+<h2>&#8211;auto-protocol<a class="headerlink" href="#auto-protocol" title="Permalink to this headline">¶</a></h2>
+<p>Auto detect MAVLink protocol version.</p>
+</div>
+<div class="section" id="continue">
+<h2>&#8211;continue<a class="headerlink" href="#continue" title="Permalink to this headline">¶</a></h2>
+<p>Continue logs.</p>
+</div>
+<div class="section" id="nowait">
+<h2>&#8211;nowait<a class="headerlink" href="#nowait" title="Permalink to this headline">¶</a></h2>
+<p>Don&#8217;t wait for HEARTBEAT packets on startup.</p>
+</div>
+<div class="section" id="dialect">
+<h2>&#8211;dialect<a class="headerlink" href="#dialect" title="Permalink to this headline">¶</a></h2>
+<p>MAVLink dialect. Uses the APM dialect by default.</p>
+</div>
+<div class="section" id="rtscts">
+<h2>&#8211;rtscts<a class="headerlink" href="#rtscts" title="Permalink to this headline">¶</a></h2>
+<p>Use RTS/CTS hardware flow control.</p>
+</div>
+<div class="section" id="mission">
+<h2>&#8211;mission<a class="headerlink" href="#mission" title="Permalink to this headline">¶</a></h2>
+<p>Give the current mission a name. If used, the flight log will be stored
+as <code class="file docutils literal"><span class="pre">/Logs/aircraftname/missionname</span></code> rather than the default
+<code class="file docutils literal"><span class="pre">/Logs/aircraftname/currentdatetime</span></code>.</p>
+</div>
+<div class="section" id="daemon">
+<h2>&#8211;daemon<a class="headerlink" href="#daemon" title="Permalink to this headline">¶</a></h2>
+<p>Run in daemon mode (as a background process). No interactive shell will
+be started.</p>
+</div>
+<div class="section" id="state-basedir">
+<h2>&#8211;state-basedir<a class="headerlink" href="#state-basedir" title="Permalink to this headline">¶</a></h2>
+<p>The base directory will logs are stored, if it is not the current
+directory.</p>
+</div>
+<div class="section" id="version">
+<h2>&#8211;version<a class="headerlink" href="#version" title="Permalink to this headline">¶</a></h2>
+<p>Return version information about MAVProxy.</p>
+</div>
+</div>
+
+
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="mavinit.html" class="btn btn-neutral float-right" title="Startup Scripts" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="quickstart.html" class="btn btn-neutral" title="Quickstart" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2015, Stephen Dade.
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'1.4.24',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
