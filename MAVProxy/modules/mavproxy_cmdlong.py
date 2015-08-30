@@ -15,6 +15,7 @@ class CmdlongModule(mp_module.MPModule):
         self.add_command('velocity', self.cmd_velocity, "velocity")
         self.add_command('cammsg', self.cmd_cammsg, "cammsg")
         self.add_command('camctrlmsg', self.cmd_camctrlmsg, "camctrlmsg")
+        self.add_command('posvel', self.cmd_posvel, "posvel")
 
     def cmd_takeoff(self, args):
         '''take off'''
@@ -139,6 +140,46 @@ class CmdlongModule(mp_module.MPModule):
                                       x_mps, y_mps, z_mps,  # velocity x,y,z
                                       0, 0, 0,  # accel x,y,z
                                       0, 0)     # yaw, yaw rate
+
+    def cmd_posvel(self, args):
+        '''posvel mapclick vN vE vD'''
+        ignoremask = 511
+        latlon = None
+        try:
+            latlon = self.module('map').click_position
+        except Exception:
+            pass
+        if latlon is None:
+            print "set latlon to zeros"
+            latlon = [0, 0]
+        else:
+            ignoremask = ignoremask & 504
+            print "found latlon", ignoremask            
+        vN = 0
+        vE = 0
+        vD = 0
+        if (len(args) == 3):
+            vN = float(args[0])
+            vE = float(args[1])
+            vD = float(args[2])
+            ignoremask = ignoremask & 455
+
+        print "ignoremask",ignoremask
+        print latlon
+        self.master.mav.set_position_target_global_int_send(
+            0,  # system time in ms
+            1,  # target system
+            0,  # target component
+            mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
+            ignoremask, # ignore
+            int(latlon[0] * 1e7),
+            int(latlon[1] * 1e7),
+            10,
+            vN, vE, vD, # velocity
+            0, 0, 0, # accel x,y,z
+            0, 0) # yaw, yaw rate
+
+
 
 def init(mpstate):
     '''initialise module'''
