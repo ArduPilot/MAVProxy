@@ -42,6 +42,7 @@ Source: "..\MAVProxy\dist\mavproxy\mavproxy.exe"; DestDir: "{app}"; Flags: ignor
 Source: "..\MAVProxy\dist\mavproxy\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 Source: "..\windows\mavinit.scr"; DestDir: "{localappdata}\MAVProxy"; Flags: ignoreversion
+Source: "..\windows\version.txt"; DestDir: "{localappdata}\MAVProxy"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
