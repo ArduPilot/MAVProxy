@@ -16,10 +16,12 @@ class CalibrationModule(mp_module.MPModule):
         self.add_command('accelcal', self.cmd_accelcal, 'do 3D accelerometer calibration')
         self.add_command('gyrocal', self.cmd_gyrocal, 'do gyro calibration')
         self.add_command('ahrstrim', self.cmd_ahrstrim, 'do AHRS trim')
+        self.add_command('magcal', self.cmd_magcal, "magcal")
         self.accelcal_count = -1
         self.accelcal_wait_enter = False
         self.compassmot_running = False
         self.empty_input_count = 0
+        self.magcal_progess = []
 
     def cmd_ground(self, args):
         '''do a ground start mode'''
@@ -62,6 +64,16 @@ class CalibrationModule(mp_module.MPModule):
                 if text.startswith('Place '):
                     self.accelcal_wait_enter = True
                     self.empty_input_count = self.mpstate.empty_input_count
+        if m.get_type() == 'MAG_CAL_PROGRESS':
+            while m.compass_id >= len(self.magcal_progess):
+                self.magcal_progess.append(0)
+            self.magcal_progess[m.compass_id] = m.completion_pct
+            s = ""
+            for v in self.magcal_progess:
+                s += "%u%% " % v
+            self.console.set_status('Progress', 'Calibration Progress: %s' % s, row=4)
+        if m.get_type() == 'MAG_CAL_REPORT':
+            print("Calibration of compass %u complete: fitness %.3f" % (m.compass_id, m.fitness))
 
     def idle_task(self):
         '''handle mavlink packets'''
@@ -96,6 +108,52 @@ class CalibrationModule(mp_module.MPModule):
         '''calibrate pressure sensors'''
         self.master.calibrate_pressure()
 
+    def cmd_magcal(self, args):
+        '''control magnetometer calibration'''
+        if len(args) < 1:
+            print("Usage: magcal <start|accept|cancel>")
+            return
+
+        if args[0] == 'start':
+            self.master.mav.command_long_send(
+                self.settings.target_system,  # target_system
+                0, # target_component
+                mavutil.mavlink.MAV_CMD_DO_START_MAG_CAL, # command
+                0, # confirmation
+                0, # p1: mag_mask
+                0, # p2: retry
+                1, # p3: autosave
+                0, # p4: delay
+                0, # param5
+                0, # param6
+                0) # param7
+        elif args[0] == 'accept':
+            self.master.mav.command_long_send(
+                self.settings.target_system,  # target_system
+                0, # target_component
+                mavutil.mavlink.MAV_CMD_DO_ACCEPT_MAG_CAL, # command
+                0, # confirmation
+                0, # p1: mag_mask
+                0, # param2
+                1, # param3
+                0, # param4
+                0, # param5
+                0, # param6
+                0) # param7
+        elif args[0] == 'cancel':
+            self.master.mav.command_long_send(
+                self.settings.target_system,  # target_system
+                0, # target_component
+                mavutil.mavlink.MAV_CMD_DO_CANCEL_MAG_CAL, # command
+                0, # confirmation
+                0, # p1: mag_mask
+                0, # param2
+                1, # param3
+                0, # param4
+                0, # param5
+                0, # param6
+                0) # param7
+            
 def init(mpstate):
     '''initialise module'''
     return CalibrationModule(mpstate)
