@@ -2,7 +2,6 @@
     MAVProxy help/versioning module
 """
 import os, time, platform, re
-import pkg_resources
 from urllib2 import Request, urlopen, URLError, HTTPError
 from pymavlink import mavwp, mavutil
 from MAVProxy.modules.lib import mp_util
@@ -13,13 +12,20 @@ if mp_util.has_wxpython:
         
 class HelpModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(HelpModule, self).__init__(mpstate, "help", "Help and version information", public = True)
+        super(HelpModule, self).__init__(mpstate, "mavhelp", "Help and version information", public = True)
         self.enabled = False
         self.add_command('mavhelp', self.cmd_help, "help and version information", "<about|site>")
         self.have_list = False
         
         #versioning info
-        self.version = pkg_resources.require("mavproxy")[0].version
+        #pkg_resources doesn't work in the windows exe build, so read the version file
+        try:
+            import pkg_resources
+            self.version = pkg_resources.require("mavproxy")[0].version
+        except:
+            start_script = os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy", "version.txt")
+            f = open(start_script, 'r')
+            self.version = f.readline()
         self.host = platform.system() + platform.release()
         self.pythonversion = str(platform.python_version())
         if mp_util.has_wxpython:
@@ -58,9 +64,11 @@ class HelpModule(mp_module.MPModule):
                 self.newversion = available[0]
                 
         #and format the update string
-        if re.search('[a-zA-Z]', self.newversion):
+        if not isinstance(self.newversion, basestring):
+            self.newversion = "Error finding update"
+        elif re.search('[a-zA-Z]', self.newversion):
             self.newversion = "Error finding update: " + self.newversion
-        elif self.newversion == self.version:
+        elif self.newversion.strip() == self.version.strip():
             self.newversion = "Running latest version"
         else:
             self.newversion = "New version " + self.newversion + " available (currently running " + self.version + ")"
@@ -68,7 +76,7 @@ class HelpModule(mp_module.MPModule):
         if mp_util.has_wxpython:
             self.menu_added_console = False
             self.menu = MPMenuSubMenu('Help',
-                                  items=[MPMenuItem('MAVProxy website', 'MAVProxy website', '', handler=MPMenuOpenWeblink('http://tridge.github.io/MAVProxy/')),
+                                  items=[MPMenuItem('MAVProxy website', 'MAVProxy website', '', handler=MPMenuOpenWeblink('http://dronecode.github.io/MAVProxy/')),
                                          MPMenuItem('Check for Updates', 'Check for Updates', '', handler=MPMenuChildMessageDialog(title="Updates", message=self.newversion)), 
                                          MPMenuItem('About', 'About', '', handler=MPMenuChildMessageDialog(title="About MAVProxy", message="MAVProxy Version " + self.version + "\nOS: " + self.host + "\nPython " +  self.pythonversion + "\nWXPython " + self.wxVersion))])
     
@@ -94,7 +102,7 @@ class HelpModule(mp_module.MPModule):
         if args[0] == "about":
             print("MAVProxy Version " + self.version + "\nOS: " + self.host + "\nPython " +  self.pythonversion)
         elif args[0] == "site":
-            print("See http://tridge.github.io/MAVProxy/ for documentation")
+            print("See http://dronecode.github.io/MAVProxy/ for documentation")
         else:
             self.print_usage()
             
@@ -102,7 +110,7 @@ class HelpModule(mp_module.MPModule):
         '''handle and incoming mavlink packets'''
 
     def print_usage(self):
-        print("usage: help <about|site>")
+        print("usage: mavhelp <about|site>")
 
 def init(mpstate):
     '''initialise module'''

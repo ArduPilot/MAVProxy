@@ -14,7 +14,10 @@ a = Analysis(['mavproxy.py'],
                             'pygame.cdrom', 'pygame.cursors', 'pygame.display', 'pygame.draw', 
                             'pygame.event', 'pygame.image', 'pygame.joystick', 'pygame.key', 
                             'pygame.mouse', 'pygame.sprite', 'pygame.threads', 'pygame.time', 
-                            'pygame.transform', 'pygame.surface', 'pygame.bufferproxy', 'wx._grid'],
+                            'pygame.transform', 'pygame.surface', 'pygame.bufferproxy', 'wx._grid',
+                            'wx.lib.agw.genericmessagedialog', 'wx.lib.wordwrap', 'wx.lib.buttons',
+                            'wx.lib.embeddedimage', 'wx.lib.imageutils', 'wx.lib.agw.aquabutton', 
+                            'wx.lib.agw.gradientbutton'],
              hookspath=None,
              runtime_hooks=None)
 pyz = PYZ(a.pure)
