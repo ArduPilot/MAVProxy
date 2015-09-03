@@ -73,7 +73,11 @@ class CalibrationModule(mp_module.MPModule):
                 s += "%u%% " % v
             self.console.set_status('Progress', 'Calibration Progress: %s' % s, row=4)
         if m.get_type() == 'MAG_CAL_REPORT':
-            print("Calibration of compass %u complete: fitness %.3f" % (m.compass_id, m.fitness))
+            if m.cal_status == mavutil.mavlink.MAG_CAL_SUCCESS:
+                result = "SUCCESS"
+            else:
+                result = "FAILED"
+            print("Calibration of compass %u %s: fitness %.3f" % (m.compass_id, result, m.fitness))
 
     def idle_task(self):
         '''handle mavlink packets'''
