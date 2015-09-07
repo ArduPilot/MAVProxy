@@ -66,17 +66,16 @@ class CalibrationModule(mp_module.MPModule):
                     self.empty_input_count = self.mpstate.empty_input_count
         if m.get_type() == 'MAG_CAL_PROGRESS':
             while m.compass_id >= len(self.magcal_progess):
-                self.magcal_progess.append(0)
-            self.magcal_progess[m.compass_id] = m.completion_pct
-            s = ""
-            for v in self.magcal_progess:
-                s += "%u%% " % v
-            self.console.set_status('Progress', 'Calibration Progress: %s' % s, row=4)
+                self.magcal_progess.append("")
+            self.magcal_progess[m.compass_id] = "%u%%" % m.completion_pct
+            self.console.set_status('Progress', 'Calibration Progress: ' + " ".join(self.magcal_progess), row=4)
         if m.get_type() == 'MAG_CAL_REPORT':
             if m.cal_status == mavutil.mavlink.MAG_CAL_SUCCESS:
                 result = "SUCCESS"
             else:
                 result = "FAILED"
+            self.magcal_progess[m.compass_id] = result
+            self.console.set_status('Progress', 'Calibration Progress: ' + " ".join(self.magcal_progess), row=4)
             print("Calibration of compass %u %s: fitness %.3f" % (m.compass_id, result, m.fitness))
 
     def idle_task(self):
