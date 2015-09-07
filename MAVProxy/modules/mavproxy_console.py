@@ -191,13 +191,18 @@ class ConsoleModule(mp_module.MPModule):
             self.console.set_status('GPSSpeed', 'GPSSpeed %u' % msg.groundspeed)
             self.console.set_status('Thr', 'Thr %u' % msg.throttle)
             t = time.localtime(msg._timestamp)
-            if msg.groundspeed > 3 and not self.in_air:
+            flying = False
+            if self.mpstate.vehicle_type == 'copter':
+                flying = self.master.motors_armed()
+            else:
+                flying = msg.groundspeed > 3
+            if flying and not self.in_air:
                 self.in_air = True
                 self.start_time = time.mktime(t)
-            elif msg.groundspeed > 3 and self.in_air:
+            elif flying and self.in_air:
                 self.total_time = time.mktime(t) - self.start_time
                 self.console.set_status('FlightTime', 'FlightTime %u:%02u' % (int(self.total_time)/60, int(self.total_time)%60))
-            elif msg.groundspeed < 3 and self.in_air:
+            elif not flying and self.in_air:
                 self.in_air = False
                 self.total_time = time.mktime(t) - self.start_time
                 self.console.set_status('FlightTime', 'FlightTime %u:%02u' % (int(self.total_time)/60, int(self.total_time)%60))
