@@ -90,6 +90,7 @@
 <li class="toctree-l2"><a class="reference internal" href="mavtools.html">Offline Tools</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="">Simulation</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#linux-sitl">Linux - SITL</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#linux-hil">Linux - HIL</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#caveats">Caveats</a></li>
 </ul>
 </li>
@@ -151,13 +152,14 @@ board and a simulator on a connected PC provides sensor inputs.</li>
 <li>Software In The Loop (SITL) - The APM code is built and run on a PC.
 A simulator provides sensor inputs.</li>
 </ul>
+<p>Arduplane uses JSBSim for the simulator in both cases. Rover and Copter use basic Python scripts for simulation.</p>
 <div class="section" id="linux-sitl">
 <h2>Linux - SITL<a class="headerlink" href="#linux-sitl" title="Permalink to this headline">¶</a></h2>
 <p>Download the <a class="reference external" href="https://github.com/diydrones/ardupilot">APM source
 code</a> and the
 <a class="reference external" href="https://github.com/tridge/jsbsim">jsbsim</a> simulator. Depending on
 your system setup, other packages may be required</p>
-<p>A full guide for setting up the environment is at the <a class="reference external" href="http://dev.ardupilot.com/wiki/simulation-2/sitl-simulator-software-in-the-loop/setting-up-sitl-on-linux/">APM
+<p>A full guide for setting up the environment is at the <a class="reference external" href="http://dev.ardupilot.com/wiki/setting-up-sitl-on-linux/">APM
 Wiki</a>.</p>
 <p>Some useful command line options are:</p>
 <ul class="simple">
@@ -166,15 +168,24 @@ Wiki</a>.</p>
 <li>-w wipe EEPROM and reload parameters</li>
 <li>-j NUM_PROC number of processors to use during build (default 1)</li>
 <li>-c do a make clean before building</li>
+<li>-G Use GDB for debugging</li>
 </ul>
 <p>Any arguments to be sent to MAVProxy can simply be specified at the end
 of the command:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>sim_vehicle.sh -v Arduplane -j 4 [mavproxy_options]
-</pre></div>
-</div>
 <p>Note that the correct parameters for the vehicles in the simulator are
-required to be loaded. The parameters are in the Rover.parm,
+required to be loaded. This can be done via the -w option above. The parameters are in the Rover.parm,
 Arducopter.parm, ArduPlane.parm for the relevant vehicles.</p>
+</div>
+<div class="section" id="linux-hil">
+<h2>Linux - HIL<a class="headerlink" href="#linux-hil" title="Permalink to this headline">¶</a></h2>
+<p>Download the <a class="reference external" href="https://github.com/diydrones/ardupilot">APM source
+code</a> and the
+<a class="reference external" href="https://github.com/tridge/jsbsim">jsbsim</a> simulator. Depending on
+your system setup, other packages may be required.</p>
+<p>Refer to the SITL guide <a class="reference external" href="http://dev.ardupilot.com/wiki/setting-up-sitl-on-linux/">APM
+Wiki</a> for setting up the JSBSim simulator.</p>
+<p>The options for HIL mode are the same as for SITL. Note that the -w and -G commands are not applicable to HIL</p>
+<p>HIL mode can be enabled on any APM firmware by setting the HIL_MODE parameter to 1. However, the simulator only supports Arduplane at this time. When the APM is rebooted, it will go into HIL mode and get all sensor data from the simulator. Set HIL_MODE to 0 to disable HIL mode upon the next reboot.</p>
 </div>
 <div class="section" id="caveats">
 <h2>Caveats<a class="headerlink" href="#caveats" title="Permalink to this headline">¶</a></h2>

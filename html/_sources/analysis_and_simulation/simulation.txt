@@ -9,6 +9,8 @@ simulation environment. There are two types of simulation environments:
   board and a simulator on a connected PC provides sensor inputs.
 - Software In The Loop (SITL) - The APM code is built and run on a PC.
   A simulator provides sensor inputs.
+  
+Arduplane uses JSBSim for the simulator in both cases. Rover and Copter use basic Python scripts for simulation.
 
 Linux - SITL
 ============
@@ -19,7 +21,7 @@ code <https://github.com/diydrones/ardupilot>`_ and the
 your system setup, other packages may be required
 
 A full guide for setting up the environment is at the `APM
-Wiki <http://dev.ardupilot.com/wiki/simulation-2/sitl-simulator-software-in-the-loop/setting-up-sitl-on-linux/>`_.
+Wiki <http://dev.ardupilot.com/wiki/setting-up-sitl-on-linux/>`_.
 
 Some useful command line options are:
 
@@ -28,17 +30,43 @@ Some useful command line options are:
 -  -w wipe EEPROM and reload parameters
 -  -j NUM\_PROC number of processors to use during build (default 1)
 -  -c do a make clean before building
+-  -G Use GDB for debugging
 
 Any arguments to be sent to MAVProxy can simply be specified at the end
 of the command:
 
 .. code:: bash
-
+    cd ./Ardupilot/Tools/autotest
     sim_vehicle.sh -v Arduplane -j 4 [mavproxy_options]
 
 Note that the correct parameters for the vehicles in the simulator are
-required to be loaded. The parameters are in the Rover.parm,
+required to be loaded. This can be done via the -w option above. The parameters are in the Rover.parm,
 Arducopter.parm, ArduPlane.parm for the relevant vehicles.
+
+Linux - HIL
+============
+
+Download the `APM source
+code <https://github.com/diydrones/ardupilot>`_ and the
+`jsbsim <https://github.com/tridge/jsbsim>`_ simulator. Depending on
+your system setup, other packages may be required.
+
+Refer to the SITL guide `APM
+Wiki <http://dev.ardupilot.com/wiki/setting-up-sitl-on-linux/>`_ for setting up the JSBSim simulator.
+
+The options for HIL mode are the same as for SITL. Note that the -w and -G commands are not applicable to HIL
+
+HIL mode can be enabled on any APM firmware by setting the HIL_MODE parameter to 1. However, the simulator only supports Arduplane at this time. When the APM is rebooted, it will go into HIL mode and get all sensor data from the simulator. Set HIL_MODE to 0 to disable HIL mode upon the next reboot.
+
+.. code:: bash
+    cd ./Ardupilot/Tools/autotest
+    sim_vehicle.sh -v Arduplane -H --map --console
+
+    Changing the APM to HIL mode in the MAVProxy console if required:
+    
+.. code:: bash
+    param set HIL_MODE 1
+    reboot
 
 Caveats
 =======
