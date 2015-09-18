@@ -990,6 +990,17 @@ if __name__ == '__main__':
         for m in standard_modules:
             load_module(m, quiet=True)
 
+    if opts.console:
+        process_stdin('module load console')
+
+    if opts.map:
+        process_stdin('module load map')
+
+    for module in opts.load_module:
+        modlist = module.split(',')
+        for mod in modlist:
+            process_stdin('module load %s' % mod)
+
     if 'HOME' in os.environ and not opts.setup:
         start_script = os.path.join(os.environ['HOME'], ".mavinit.scr")
         if os.path.exists(start_script):
@@ -1005,17 +1016,6 @@ if __name__ == '__main__':
             run_script(start_script)
         else:
             print("no script %s" % start_script)
-
-    if opts.console:
-        process_stdin('module load console')
-
-    if opts.map:
-        process_stdin('module load map')
-
-    for module in opts.load_module:
-        modlist = module.split(',')
-        for mod in modlist:
-            process_stdin('module load %s' % mod)
 
     if opts.cmd is not None:
         for cstr in opts.cmd:
