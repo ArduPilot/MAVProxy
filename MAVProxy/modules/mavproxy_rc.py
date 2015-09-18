@@ -72,6 +72,16 @@ class RCModule(mp_module.MPModule):
         self.override_counter = 10
         self.send_rc_override()
 
+    def set_override_chan(self, channel, value):
+        '''this is a public method for use by drone API or other scripting'''
+        self.override[channel] = value
+        self.override_counter = 10
+        self.send_rc_override()
+
+    def get_override_chan(self, channel):
+        '''this is a public method for use by drone API or other scripting'''
+        return self.override[channel]
+
     def cmd_rc(self, args):
         '''handle RC value override'''
         if len(args) != 2:
