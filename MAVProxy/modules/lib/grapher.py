@@ -189,8 +189,6 @@ class MavGraph(object):
         mtype = msg.get_type()
         if self.flightmode is not None and (len(self.modes) == 0 or self.modes[-1][1] != flightmode):
             self.modes.append((t, flightmode))
-        if mtype not in self.msg_types:
-            return
         for i in range(0, len(self.fields)):
             if mtype not in self.field_types[i]:
                 continue
@@ -218,9 +216,14 @@ class MavGraph(object):
         '''process one file'''
         self.vars = {}
         while True:
-            msg = mlog.recv_match(self.condition)
+            msg = mlog.recv_msg()
             if msg is None:
                 break
+            if msg.get_type() not in self.msg_types:
+                continue
+            if self.condition:
+                if mavutil.evaluate_condition(self.condition, mlog.messages):
+                    continue
             tdays = matplotlib.dates.date2num(datetime.datetime.fromtimestamp(msg._timestamp+timeshift))
             self.add_data(tdays, msg, mlog.messages, mlog.flightmode)
 
@@ -277,7 +280,10 @@ class MavGraph(object):
             for i in range(0, len(self.x)):
                 self.x[i] = []
                 self.y[i] = []
-                    
+        pylab.draw()
+
+    def show(self, block=True):
+        '''show graph'''
         pylab.show(block=block)
 
 if __name__ == "__main__":
@@ -318,3 +324,4 @@ if __name__ == "__main__":
     mg.xaxis = args.xaxis
     mg.marker = args.marker
     mg.process()
+    mg.show()
