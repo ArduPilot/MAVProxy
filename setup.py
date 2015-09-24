@@ -43,7 +43,9 @@ on how to use MAVProxy.''',
       # large numbers of modules like numpy etc which may be already installed
       install_requires=['pymavlink>=1.1.50',
                         'pyserial'],
-      scripts=['MAVProxy/mavproxy.py', 'MAVProxy/tools/mavflightview.py',
+      scripts=['MAVProxy/mavproxy.py',
+               'MAVProxy/tools/mavflightview.py',
+               'MAVProxy/tools/MAVExplorer.py',
                'MAVProxy/modules/mavproxy_map/mp_slipmap.py',
                'MAVProxy/modules/mavproxy_map/mp_tile.py'],
       package_data={'MAVProxy':
