@@ -48,7 +48,7 @@ class GasHeliModule(mp_module.MPModule):
                 ign_colour = 'green'
             else:
                 ign_colour = 'red'
-            self.console.set_status('IGN', 'IGN', fg=ign_colour)
+            self.console.set_status('IGN', 'IGN', fg=ign_colour, row=4)
 
         if type in [ 'SERVO_OUTPUT_RAW' ]:
             rc8 = msg.servo8_raw
@@ -58,7 +58,7 @@ class GasHeliModule(mp_module.MPModule):
                 thr_colour = 'orange'
             else:
                 thr_colour = 'green'
-            self.console.set_status('THR', 'THR', fg=thr_colour)
+            self.console.set_status('THR', 'THR', fg=thr_colour, row=4)
 
         if type in [ 'RPM' ]:
             rpm = msg.rpm1
@@ -68,7 +68,7 @@ class GasHeliModule(mp_module.MPModule):
                 rpm_colour = 'orange'
             else:
                 rpm_colour = 'green'
-            self.console.set_status('RPM', 'RPM: %u' % rpm, fg=rpm_colour)
+            self.console.set_status('RPM', 'RPM: %u' % rpm, fg=rpm_colour, row=4)
 
     def valid_starter_settings(self):
         '''check starter settings'''
