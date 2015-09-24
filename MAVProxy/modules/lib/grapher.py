@@ -213,6 +213,7 @@ class MavGraph(object):
             self.y[i].append(v)
             self.x[i].append(xv)
 
+
     def process_mav(self, mlog, timeshift):
         '''process one file'''
         self.vars = {}
@@ -223,7 +224,7 @@ class MavGraph(object):
             tdays = matplotlib.dates.date2num(datetime.datetime.fromtimestamp(msg._timestamp+timeshift))
             self.add_data(tdays, msg, mlog.messages, mlog.flightmode)
 
-    def process(self):
+    def process(self, block=True):
         '''process and display graph'''
         self.msg_types = set()
         self.multiplier = []
@@ -277,8 +278,7 @@ class MavGraph(object):
                 self.x[i] = []
                 self.y[i] = []
                     
-        pylab.show()
-        pylab.draw()
+        pylab.show(block=block)
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -317,8 +317,4 @@ if __name__ == "__main__":
     mg.condition = args.condition
     mg.xaxis = args.xaxis
     mg.marker = args.marker
-
     mg.process()
-    input('press enter to exit....')
-    
-    
