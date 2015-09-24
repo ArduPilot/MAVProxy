@@ -36,6 +36,7 @@ Any arguments to be sent to MAVProxy can simply be specified at the end
 of the command:
 
 .. code:: bash
+
     cd ./Ardupilot/Tools/autotest
     sim_vehicle.sh -v Arduplane -j 4 [mavproxy_options]
 
@@ -59,12 +60,14 @@ The options for HIL mode are the same as for SITL. Note that the -w and -G comma
 HIL mode can be enabled on any APM firmware by setting the HIL_MODE parameter to 1. However, the simulator only supports Arduplane at this time. When the APM is rebooted, it will go into HIL mode and get all sensor data from the simulator. Set HIL_MODE to 0 to disable HIL mode upon the next reboot.
 
 .. code:: bash
+
     cd ./Ardupilot/Tools/autotest
     sim_vehicle.sh -v Arduplane -H --map --console
 
     Changing the APM to HIL mode in the MAVProxy console if required:
     
 .. code:: bash
+
     param set HIL_MODE 1
     reboot
 
