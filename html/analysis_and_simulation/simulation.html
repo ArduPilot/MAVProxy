@@ -172,6 +172,10 @@ Wiki</a>.</p>
 </ul>
 <p>Any arguments to be sent to MAVProxy can simply be specified at the end
 of the command:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>cd ./Ardupilot/Tools/autotest
+sim_vehicle.sh -v Arduplane -j 4 [mavproxy_options]
+</pre></div>
+</div>
 <p>Note that the correct parameters for the vehicles in the simulator are
 required to be loaded. This can be done via the -w option above. The parameters are in the Rover.parm,
 Arducopter.parm, ArduPlane.parm for the relevant vehicles.</p>
@@ -186,6 +190,16 @@ your system setup, other packages may be required.</p>
 Wiki</a> for setting up the JSBSim simulator.</p>
 <p>The options for HIL mode are the same as for SITL. Note that the -w and -G commands are not applicable to HIL</p>
 <p>HIL mode can be enabled on any APM firmware by setting the HIL_MODE parameter to 1. However, the simulator only supports Arduplane at this time. When the APM is rebooted, it will go into HIL mode and get all sensor data from the simulator. Set HIL_MODE to 0 to disable HIL mode upon the next reboot.</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>cd ./Ardupilot/Tools/autotest
+sim_vehicle.sh -v Arduplane -H --map --console
+
+Changing the APM to HIL mode in the MAVProxy console if required:
+</pre></div>
+</div>
+<div class="code bash highlight-python"><div class="highlight"><pre>param set HIL_MODE 1
+reboot
+</pre></div>
+</div>
 </div>
 <div class="section" id="caveats">
 <h2>Caveats<a class="headerlink" href="#caveats" title="Permalink to this headline">¶</a></h2>
@@ -222,7 +236,7 @@ may sometimes flip over whilst sitting on the runway.</li>
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
 <div style="float:right;"><a href="https://github.com/Dronecode/MAVProxy/issues/new?title=Simulation%20-%20&body=URL:%20../analysis_and_simulation/simulation%0ATitle:%20Simulation%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
-    <p><a href="https://www.dronecode.org/"><img src="../_static\images\dronecodelogo.png" width="130" alt="Dronecode" class /></a><br/> 
+    <p><a href="https://www.dronecode.org/"><img src="../_static/images/dronecodelogo.png" width="130" alt="Dronecode" class /></a><br/> 
     This is a Dronecode project.</p>     
 
     <p>

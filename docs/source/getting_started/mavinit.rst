@@ -17,7 +17,7 @@ Alternatively, a :file:`.mavinit.scr` can be placed in the user's home directory
 :file:`C:\\Users\\username\\AppData\\Local\\MAVProxy` in Windows) and will be
 loaded with MAVProxy regardless of the --aircraft option.
 
-An example script can be found `here <_static/files/mavinit.scr>`_.
+An example script can be found `here <../_static/files/mavinit.scr>`_.
 
 In this particular script, aliases are used as shortcuts to common
 commands.
