@@ -69,6 +69,42 @@ class MavGraph(object):
         '''add another data source to plot'''
         self.mav_list.append(mav)
 
+    def set_condition(self, condition):
+        '''set graph condition'''
+        self.condition = condition
+
+    def set_xaxis(self, xaxis):
+        '''set graph xaxis'''
+        self.xaxis = xaxis
+
+    def set_marker(self, marker):
+        '''set graph marker'''
+        self.marker = marker
+
+    def set_timeshift(self, timeshift):
+        '''set graph timeshift'''
+        self.timeshift = timeshift
+
+    def set_legend2(self, legend2):
+        '''set graph legend2'''
+        self.legend2 = legend2
+
+    def set_legend(self, legend):
+        '''set graph legend'''
+        self.legend = legend
+
+    def set_flightmode(self, flightmode):
+        '''set graph flightmode'''
+        self.flightmode = flightmode
+
+    def set_linestyle(self, linestyle):
+        '''set graph linestyle'''
+        self.linestyle = linestyle
+
+    def set_multi(self, multi):
+        '''set multiple graph option'''
+        self.multi = multi
+
     def make_format(self, current, other):
         # current and other are axes
         def format_coord(x, y):
@@ -169,11 +205,11 @@ class MavGraph(object):
 
             empty = False
             if self.flightmode is not None:
-                for i in range(len(modes)-1):
-                    c = colourmap[self.flightmode].get(modes[i][1], edge_colour)
-                    ax1.axvspan(modes[i][0], modes[i+1][0], fc=c, ec=edge_colour, alpha=0.1)
-                c = colourmap[self.flightmode].get(modes[-1][1], edge_colour)
-                ax1.axvspan(modes[-1][0], ax1.get_xlim()[1], fc=c, ec=edge_colour, alpha=0.1)
+                for i in range(len(self.modes)-1):
+                    c = colourmap[self.flightmode].get(self.modes[i][1], edge_colour)
+                    ax1.axvspan(self.modes[i][0], self.modes[i+1][0], fc=c, ec=edge_colour, alpha=0.1)
+                c = colourmap[self.flightmode].get(self.modes[-1][1], edge_colour)
+                ax1.axvspan(self.modes[-1][0], ax1.get_xlim()[1], fc=c, ec=edge_colour, alpha=0.1)
 
             if ax1_labels != []:
                 ax1.legend(ax1_labels,loc=self.legend)
@@ -320,8 +356,12 @@ if __name__ == "__main__":
             mg.add_mav(mlog)
         else:
             mg.add_field(f)
-    mg.condition = args.condition
-    mg.xaxis = args.xaxis
-    mg.marker = args.marker
+    mg.set_condition(args.condition)
+    mg.set_xaxis(args.xaxis)
+    mg.set_marker(args.marker)
+    mg.set_legend(args.legend)
+    mg.set_legend2(args.legend2)
+    mg.set_multi(args.multi)
+    mg.set_flightmode(args.flightmode)
     mg.process()
     mg.show()

@@ -15,6 +15,7 @@ from MAVProxy.modules.lib import grapher
 from pymavlink.mavextra import *
 from pymavlink import mavutil
 from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
+from MAVProxy.modules.lib import wxsettings
 
 class MEStatus(object):
     '''status object to conform with mavproxy structure for modules'''
@@ -30,7 +31,16 @@ class MEState(object):
         self.exit = False
         self.status = MEStatus()
         self.settings = MPSettings(
-            [ MPSetting('marker', str, None, 'graph data marker', tab='Graph') ])
+            [ MPSetting('marker', str, None, 'data marker', tab='Graph'),
+              MPSetting('condition', str, None, 'condition'),
+              MPSetting('xaxis', str, None, 'xaxis'),
+              MPSetting('linestyle', str, None, 'linestyle'),
+              MPSetting('flightmode', str, None, 'flightmode', choice=['apm','px4']),
+              MPSetting('legend', str, 'upper left', 'legend position'),
+              MPSetting('legend2', str, 'upper right', 'legend2 position')
+              ]
+            )
+
         self.mlog = None
         self.command_map = command_map
         self.completions = {
@@ -39,14 +49,45 @@ class MEState(object):
             }
         self.aliases = {}
 
+def menu_callback(m):
+    '''called on menu selection'''
+    if m.returnkey.startswith('# '):
+        cmd = m.returnkey[2:]
+        if m.handler is not None:
+            if m.handler_result is None:
+                return
+            cmd += m.handler_result
+        process_stdin(cmd)
+    elif m.returnkey == 'menuSettings':
+        wxsettings.WXSettings(mestate.settings)
+
+def setup_menus():
+    '''setup console menus'''
+    from MAVProxy.modules.lib.mp_menu import *
+    menu = MPMenuTop([])
+    menu.add(MPMenuSubMenu('MAVExplorer',
+                           items=[MPMenuItem('Settings', 'Settings', 'menuSettings')]))
+    mestate.console.set_menu(menu, menu_callback)
+    
+
 
 def graph_process(fields):
     '''process for a graph'''
     mg = grapher.MavGraph()
+    mg.set_marker(mestate.settings.marker)
+    mg.set_condition(mestate.settings.condition)
+    mg.set_xaxis(mestate.settings.xaxis)
+    mg.set_linestyle(mestate.settings.linestyle)
+    mg.set_flightmode(mestate.settings.flightmode)
+    mg.set_legend(mestate.settings.legend)
     mg.add_mav(mestate.mlog)
     for f in fields:
         mg.add_field(f)
+    t0 = time.time()
     mg.process()
+    t1 = time.time()
+    print(t1-t0)
+    mg.show()
 
 def cmd_graph(args):
     '''graph command'''
@@ -132,11 +173,15 @@ if len(args.files) == 0:
     sys.exit(1)
 
 print("Loading %s..." % args.files[0])
+t0 = time.time()
 mlog = mavutil.mavlink_connection(args.files[0], notimestamps=False,
                                   zero_time_base=False)
 mestate.mlog = mavutil.mavmemlog(mlog)
 mestate.status.msgs = mlog.messages
-print("done (%u messages)" % mestate.mlog._count)
+t1 = time.time()
+print("done (%u messages in %.1fs)" % (mestate.mlog._count, t1-t0))
+
+setup_menus()
 
 # run main loop as a thread
 mestate.thread = threading.Thread(target=main_loop, name='main_loop')
