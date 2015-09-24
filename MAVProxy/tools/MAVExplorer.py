@@ -101,6 +101,10 @@ def cmd_graph(args):
 def cmd_test(args):
     process_stdin('graph VFR_HUD.groundspeed VFR_HUD.airspeed')
 
+def cmd_set(args):
+    '''control MAVExporer options'''
+    mestate.settings.command(args)
+
 def process_stdin(line):
     '''handle commands from user'''
     if line is None:
@@ -157,6 +161,7 @@ def main_loop():
 
 command_map = {
     'graph'   : (cmd_graph,    'display a graph'),
+    'set'     : (cmd_set,      'control settings'),
     'test'    : (cmd_test,    'display a graph')
     }
 
