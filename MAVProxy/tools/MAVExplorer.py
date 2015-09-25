@@ -35,7 +35,7 @@ class MEState(object):
         self.exit = False
         self.status = MEStatus()
         self.settings = MPSettings(
-            [ MPSetting('marker', str, None, 'data marker', tab='Graph'),
+            [ MPSetting('marker', str, '+', 'data marker', tab='Graph'),
               MPSetting('condition', str, None, 'condition'),
               MPSetting('xaxis', str, None, 'xaxis'),
               MPSetting('linestyle', str, None, 'linestyle'),
@@ -135,7 +135,10 @@ def resource_file(filename):
 
 def load_graph_xml(xml):
     '''load a graph from one xml string'''
-    root = objectify.fromstring(xml)
+    try:
+        root = objectify.fromstring(xml)
+    except Exception:
+        return
     if root.tag != 'graphs':
         return
     if not hasattr(root, 'graph'):
@@ -150,6 +153,8 @@ def load_graph_xml(xml):
             fields = e.split()
             for f in fields:
                 try:
+                    if f.endswith(':2'):
+                        f = f[:-2]
                     if mavutil.evaluate_expression(f, mestate.status.msgs) is None:
                         graph_ok = False                        
                 except Exception:
