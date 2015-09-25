@@ -115,7 +115,8 @@ def setup_menus():
     '''setup console menus'''
     menu = MPMenuTop([])
     menu.add(MPMenuSubMenu('MAVExplorer',
-                           items=[MPMenuItem('Settings', 'Settings', 'menuSettings')]))
+                           items=[MPMenuItem('Settings', 'Settings', 'menuSettings'),
+                                  MPMenuItem('Map', 'Map', '# map')]))
 
     menu.add(graph_menus())
     menu.add(MPMenuSubMenu('FlightMode', items=flightmode_menu()))
@@ -215,8 +216,7 @@ def cmd_graph(args):
         mestate.console.write("Added graph: %s\n" % g.name)
         if g.description:
             mestate.console.write("%s\n" % g.description, fg='blue')
-    else:
-        mestate.console.write("Added graph: %s\n" % ' '.join(args))
+    mestate.console.write("Expression: %s\n" % ' '.join(args))
     child = multiprocessing.Process(target=graph_process, args=[args])
     child.start()
 
