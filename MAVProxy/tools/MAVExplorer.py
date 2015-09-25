@@ -12,6 +12,7 @@ from math import *
 from MAVProxy.modules.lib import rline
 from MAVProxy.modules.lib import wxconsole
 from MAVProxy.modules.lib import grapher
+from MAVProxy.modules.lib import mavmemlog
 from pymavlink.mavextra import *
 from MAVProxy.modules.lib.mp_menu import *
 from pymavlink import mavutil
@@ -51,6 +52,7 @@ class MEState(object):
             }
         self.aliases = {}
         self.graphs = []
+        self.flightmode_selections = []
 
 def have_graph(name):
     '''return true if we have a graph of the given name'''
@@ -70,6 +72,25 @@ def menu_callback(m):
         process_stdin(cmd)
     elif m.returnkey == 'menuSettings':
         wxsettings.WXSettings(mestate.settings)
+    elif m.returnkey.startswith("mode-"):
+        idx = int(m.returnkey[5:])
+        mestate.flightmode_selections[idx] = m.IsChecked()
+    else:
+        print('Unknown menu selection: %s' % m.returnkey)
+
+
+def flightmode_menu():
+    '''construct flightmode menu'''
+    modes = mestate.mlog.flightmode_list()
+    ret = []
+    idx = 0
+    for (mode,t1,t2) in modes:
+        modestr = "%s %us" % (mode, (t2-t1))
+        ret.append(MPMenuCheckbox(modestr, modestr, 'mode-%u' % idx))
+        idx += 1
+        mestate.flightmode_selections.append(False)
+    return ret
+
 
 def setup_menus():
     '''setup console menus'''
@@ -80,6 +101,9 @@ def setup_menus():
     for g in mestate.graphs:
         graphs.append(MPMenuItem(g.name, g.name, '# graph %s' % g.expression))
     menu.add(MPMenuSubMenu('Graph', items=graphs))
+
+    menu.add(MPMenuSubMenu('FlightMode', items=flightmode_menu()))
+
     mestate.console.set_menu(menu, menu_callback)
 
 class GraphDefinition(object):
@@ -139,6 +163,8 @@ def load_graphs():
 
 def graph_process(fields):
     '''process for a graph'''
+    mestate.mlog.reduce_by_flightmodes(mestate.flightmode_selections)
+    
     mg = grapher.MavGraph()
     mg.set_marker(mestate.settings.marker)
     mg.set_condition(mestate.settings.condition)
@@ -245,7 +271,7 @@ print("Loading %s..." % args.files[0])
 t0 = time.time()
 mlog = mavutil.mavlink_connection(args.files[0], notimestamps=False,
                                   zero_time_base=False)
-mestate.mlog = mavutil.mavmemlog(mlog)
+mestate.mlog = mavmemlog.mavmemlog(mlog)
 mestate.status.msgs = mlog.messages
 t1 = time.time()
 print("done (%u messages in %.1fs)" % (mestate.mlog._count, t1-t0))
