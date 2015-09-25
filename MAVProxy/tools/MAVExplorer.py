@@ -133,7 +133,6 @@ def load_graphs():
     for file in gfiles:
         if not os.path.exists(file):
             continue
-        print("checking ", file)
         load_graph_xml(open(file).read())
     # also load the built in graphs
     load_graph_xml(resource_file('mavgraphs.xml'))
