@@ -220,16 +220,20 @@ def cmd_graph(args):
     child = multiprocessing.Process(target=graph_process, args=[args])
     child.start()
 
-def cmd_map(args):
-    '''map command'''
+def map_process(args):
+    '''process for a graph'''
     from mavflightview import mavflightview_mav, mavflightview_options
-
+    mestate.mlog.reduce_by_flightmodes(mestate.flightmode_selections)
+    
     options = mavflightview_options()
     options.condition = mestate.settings.condition
     if len(args) > 0:
         options.types = ','.join(args)
-    
-    child = multiprocessing.Process(target=mavflightview_mav, args=[mestate.mlog, options])
+    mavflightview_mav(mestate.mlog, options)
+
+def cmd_map(args):
+    '''map command'''
+    child = multiprocessing.Process(target=map_process, args=[args])
     child.start()
 
 def cmd_set(args):
