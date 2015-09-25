@@ -165,6 +165,18 @@ class MPMenuSubMenu(MPMenuGeneric):
             if not updated:
                 self.items.append(m)
 
+    def add_to_submenu(self, submenu_path, item):
+        '''add an item to a submenu using a menu path array'''
+        if len(submenu_path) == 0:
+            self.add(item)
+            return
+        for m in self.items:
+            if isinstance(m, MPMenuSubMenu) and submenu_path[0] == m.name:
+                m.add_to_submenu(submenu_path[1:], item)
+                return
+        self.add(MPMenuSubMenu(submenu_path[0], []))
+        self.add_to_submenu(submenu_path, item)
+
     def combine(self, submenu):
         '''combine a new menu with an existing one'''
         self.items.extend(submenu.items)

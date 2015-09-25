@@ -7,6 +7,7 @@ Andrew Tridgell December 2014
 import sys, struct, time, os, datetime
 import math, re
 import Queue
+import fnmatch
 import threading, multiprocessing
 from math import *
 from MAVProxy.modules.lib import rline
@@ -92,16 +93,28 @@ def flightmode_menu():
     return ret
 
 
+class graph_tree_state(object):
+    def __init__(self, graphs):
+        self.prefix = None
+        self.graphs = graphs[:]
+
+def graph_menus():
+    '''return menu tree for graphs (recursive)'''
+    ret = MPMenuSubMenu('Graphs', [])
+    for g in mestate.graphs:
+        path = g.name.split('/')
+        name = path[-1]
+        path = path[:-1]
+        ret.add_to_submenu(path, MPMenuItem(name, name, '# graph %s' % g.expression))
+    return ret
+
 def setup_menus():
     '''setup console menus'''
     menu = MPMenuTop([])
     menu.add(MPMenuSubMenu('MAVExplorer',
                            items=[MPMenuItem('Settings', 'Settings', 'menuSettings')]))
-    graphs = []
-    for g in mestate.graphs:
-        graphs.append(MPMenuItem(g.name, g.name, '# graph %s' % g.expression))
-    menu.add(MPMenuSubMenu('Graph', items=graphs))
 
+    menu.add(graph_menus())
     menu.add(MPMenuSubMenu('FlightMode', items=flightmode_menu()))
 
     mestate.console.set_menu(menu, menu_callback)
@@ -161,6 +174,7 @@ def load_graphs():
         load_graph_xml(open(file).read())
     # also load the built in graphs
     load_graph_xml(resource_file('mavgraphs.xml'))
+    mestate.graphs = sorted(mestate.graphs, key=lambda g: g.name)
 
 def graph_process(fields):
     '''process for a graph'''
@@ -198,6 +212,17 @@ def cmd_reload(args):
     load_graphs()
     setup_menus()
     mestate.console.write("Loaded %u graphs\n" % len(mestate.graphs))
+
+def cmd_param(args):
+    '''show parameters'''
+    if len(args) > 0:
+        wildcard = args[0]
+    else:
+        wildcard = '*'
+    k = sorted(mestate.mlog.params.keys())
+    for p in k:
+        if fnmatch.fnmatch(str(p).upper(), wildcard.upper()):
+            print("%-16.16s %f" % (str(p), mestate.mlog.params[p]))
 
 def process_stdin(line):
     '''handle commands from user'''
@@ -257,6 +282,7 @@ command_map = {
     'graph'   : (cmd_graph,    'display a graph'),
     'set'     : (cmd_set,      'control settings'),
     'reload'  : (cmd_reload,   'reload graphs'),
+    'param'   : (cmd_param,    'show parameters'),
     }
 
 mestate = MEState()

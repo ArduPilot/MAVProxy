@@ -27,6 +27,7 @@ class mavmemlog(mavutil.mavfile):
                 last_flightmode = mav.flightmode
             self._count += 1
             last_timestamp = m._timestamp
+            self.check_param(m)
         if last_timestamp is not None and len(self._flightmodes) > 0:
             (mode, t1, t2) = self._flightmodes[-1]
             self._flightmodes[-1] = (mode, t1, last_timestamp)
@@ -37,9 +38,10 @@ class mavmemlog(mavutil.mavfile):
         if self._index >= self._count:
             return None
         m = self._msgs[self._index]
+        type = m.get_type()
         self._index += 1
         self.percent = (100.0 * self._index) / self._count
-        self.messages[m.get_type()] = m
+        self.messages[type] = m
         self._timestamp = m._timestamp
 
         if self._flightmode_index < len(self._flightmodes):
@@ -47,7 +49,17 @@ class mavmemlog(mavutil.mavfile):
             if m._timestamp >= tstamp:
                 self.flightmode = mode
                 self._flightmode_index += 1
+
+        self.check_param(m)
         return m
+
+    def check_param(self, m):
+        type = m.get_type()
+        if type == 'PARAM_VALUE':
+            s = str(m.param_id)
+            self.params[str(m.param_id)] = m.param_value
+        elif type == 'PARM' and getattr(m, 'Name', None) is not None:
+            self.params[m.Name] = m.Value
 
     def rewind(self):
         '''rewind to start'''
@@ -57,6 +69,7 @@ class mavmemlog(mavutil.mavfile):
         self._flightmode_index = 0
         self._timestamp = None
         self.flightmode = None
+        self.params = {}
 
     def flightmode_list(self):
         '''return list of all flightmodes as tuple of mode and start time'''
