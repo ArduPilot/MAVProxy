@@ -13,9 +13,11 @@ from MAVProxy.modules.lib import rline
 from MAVProxy.modules.lib import wxconsole
 from MAVProxy.modules.lib import grapher
 from pymavlink.mavextra import *
+from MAVProxy.modules.lib.mp_menu import *
 from pymavlink import mavutil
 from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
 from MAVProxy.modules.lib import wxsettings
+from lxml import objectify
 
 class MEStatus(object):
     '''status object to conform with mavproxy structure for modules'''
@@ -48,6 +50,14 @@ class MEState(object):
             "graph"  : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)']
             }
         self.aliases = {}
+        self.graphs = []
+
+def have_graph(name):
+    '''return true if we have a graph of the given name'''
+    for g in mestate.graphs:
+        if g.name == name:
+            return True
+    return False
 
 def menu_callback(m):
     '''called on menu selection'''
@@ -63,13 +73,70 @@ def menu_callback(m):
 
 def setup_menus():
     '''setup console menus'''
-    from MAVProxy.modules.lib.mp_menu import *
     menu = MPMenuTop([])
     menu.add(MPMenuSubMenu('MAVExplorer',
                            items=[MPMenuItem('Settings', 'Settings', 'menuSettings')]))
+    graphs = []
+    for g in mestate.graphs:
+        graphs.append(MPMenuItem(g.name, g.name, '# graph %s' % g.expression))
+    menu.add(MPMenuSubMenu('Graph', items=graphs))
     mestate.console.set_menu(menu, menu_callback)
-    
 
+class GraphDefinition(object):
+    '''a pre-defined graph'''
+    def __init__(self, name, expression, description):
+        self.name = name
+        self.expression = expression
+        self.description = description
+
+def resource_file(filename):
+    '''load a resource file'''
+    import pkg_resources
+    name = "MAVProxy"
+    raw = pkg_resources.resource_stream(name, "tools/graphs/%s" % filename).read()
+    return raw
+
+def load_graph_xml(xml):
+    '''load a graph from one xml string'''
+    root = objectify.fromstring(xml)
+    if root.tag != 'graphs':
+        return
+    if not hasattr(root, 'graph'):
+        return
+    for g in root.graph:
+        name = g.attrib['name']
+        if have_graph(name):
+            continue
+        expressions = [e.text for e in g.expression]
+        for e in expressions:
+            graph_ok = True
+            fields = e.split(' ')
+            for f in fields:
+                try:
+                    if mavutil.evaluate_expression(f, mestate.status.msgs) is None:
+                        graph_ok = False                        
+                except Exception:
+                    graph_ok = False
+                    break
+            if graph_ok:
+                mestate.graphs.append(GraphDefinition(name, e, g.description.text))
+                break
+
+def load_graphs():
+    '''load graphs from mavgraphs.xml'''
+    gfiles = ['mavgraphs.xml']
+    if 'HOME' in os.environ:
+        for dirname, dirnames, filenames in os.walk(os.path.join(os.environ['HOME'], ".mavproxy")):
+            for filename in filenames:
+                if filename.lower().endswith('.xml'):
+                    gfiles.append(os.path.join(dirname, filename))
+    for file in gfiles:
+        if not os.path.exists(file):
+            continue
+        print("checking ", file)
+        load_graph_xml(open(file).read())
+    # also load the built in graphs
+    load_graph_xml(resource_file('mavgraphs.xml'))
 
 def graph_process(fields):
     '''process for a graph'''
@@ -83,10 +150,7 @@ def graph_process(fields):
     mg.add_mav(mestate.mlog)
     for f in fields:
         mg.add_field(f)
-    t0 = time.time()
     mg.process()
-    t1 = time.time()
-    print(t1-t0)
     mg.show()
 
 def cmd_graph(args):
@@ -97,6 +161,7 @@ def cmd_graph(args):
         return
     child = multiprocessing.Process(target=graph_process, args=[args])
     child.start()
+    mestate.console.write("Added graph: %s\n" % ' '.join(args))
 
 def cmd_test(args):
     process_stdin('graph VFR_HUD.groundspeed VFR_HUD.airspeed')
@@ -186,6 +251,7 @@ mestate.status.msgs = mlog.messages
 t1 = time.time()
 print("done (%u messages in %.1fs)" % (mestate.mlog._count, t1-t0))
 
+load_graphs()
 setup_menus()
 
 # run main loop as a thread
