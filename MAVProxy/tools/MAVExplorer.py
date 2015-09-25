@@ -101,11 +101,12 @@ class graph_tree_state(object):
 def graph_menus():
     '''return menu tree for graphs (recursive)'''
     ret = MPMenuSubMenu('Graphs', [])
-    for g in mestate.graphs:
+    for i in range(len(mestate.graphs)):
+        g = mestate.graphs[i]
         path = g.name.split('/')
         name = path[-1]
         path = path[:-1]
-        ret.add_to_submenu(path, MPMenuItem(name, name, '# graph %s' % g.expression))
+        ret.add_to_submenu(path, MPMenuItem(name, name, '# graph :%u' % i))
     return ret
 
 def setup_menus():
@@ -204,9 +205,18 @@ def cmd_graph(args):
     if len(args) < 1:
         print(usage)
         return
+    if args[0][0] == ':':
+        i = int(args[0][1:])
+        g = mestate.graphs[i]
+        expression = g.expression
+        args = expression.split()
+        mestate.console.write("Added graph: %s\n" % g.name)
+        if g.description:
+            mestate.console.write("%s\n" % g.description, fg='blue')
+    else:
+        mestate.console.write("Added graph: %s\n" % ' '.join(args))
     child = multiprocessing.Process(target=graph_process, args=[args])
     child.start()
-    mestate.console.write("Added graph: %s\n" % ' '.join(args))
 
 def cmd_set(args):
     '''control MAVExporer options'''
