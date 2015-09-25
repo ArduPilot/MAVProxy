@@ -302,14 +302,19 @@ if len(args.files) == 0:
     print("Usage: MAVExplorer FILE")
     sys.exit(1)
 
-print("Loading %s..." % args.files[0])
+
+def progress_bar(pct):
+    if pct % 2 == 0:
+        mestate.console.write('#')
+
+mestate.console.write("Loading %s...\n" % args.files[0])
 t0 = time.time()
 mlog = mavutil.mavlink_connection(args.files[0], notimestamps=False,
                                   zero_time_base=False)
-mestate.mlog = mavmemlog.mavmemlog(mlog)
+mestate.mlog = mavmemlog.mavmemlog(mlog, progress_bar)
 mestate.status.msgs = mlog.messages
 t1 = time.time()
-print("done (%u messages in %.1fs)" % (mestate.mlog._count, t1-t0))
+mestate.console.write("\ndone (%u messages in %.1fs)\n" % (mestate.mlog._count, t1-t0))
 
 load_graphs()
 setup_menus()

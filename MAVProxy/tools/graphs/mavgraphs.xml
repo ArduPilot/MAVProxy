@@ -176,5 +176,49 @@
     <expression>mag_heading(RAW_IMU,ATTITUDE) degrees(ATTITUDE.yaw)</expression>
     <expression>mag_heading_df(MAG,ATT) ATT.Yaw</expression>
   </graph>
+
+  <graph name='Servos/Servos 1-4'>
+    <description>First 4 servo outputs</description>
+    <expression>
+      SERVO_OUTPUT_RAW.servo1_raw SERVO_OUTPUT_RAW.servo2_raw SERVO_OUTPUT_RAW.servo3_raw SERVO_OUTPUT_RAW.servo4_raw
+    </expression>
+    <expression>
+      RCOU.Ch1 RCOU.Ch2 RCOU.Ch3 RCOU.Ch4
+    </expression>
+  </graph>
+
+  <graph name='Servos/Servos 1-8'>
+    <description>First 8 servo outputs</description>
+    <expression>
+      SERVO_OUTPUT_RAW.servo1_raw SERVO_OUTPUT_RAW.servo2_raw SERVO_OUTPUT_RAW.servo3_raw SERVO_OUTPUT_RAW.servo4_raw
+      SERVO_OUTPUT_RAW.servo5_raw SERVO_OUTPUT_RAW.servo6_raw SERVO_OUTPUT_RAW.servo7_raw SERVO_OUTPUT_RAW.servo8_raw
+    </expression>
+    <expression>
+      RCOU.Ch1 RCOU.Ch2 RCOU.Ch3 RCOU.Ch4
+      RCOU.Ch5 RCOU.Ch6 RCOU.Ch7 RCOU.Ch8
+    </expression>
+  </graph>
+
+  <graph name='RC/RC Input 1-4'>
+    <description>First 4 RC inputs</description>
+    <expression>
+      RC_CHANNELS_RAW.chan1_raw RC_CHANNELS_RAW.chan2_raw RC_CHANNELS_RAW.chan3_raw RC_CHANNELS_RAW.chan4_raw
+    </expression>
+    <expression>
+      RCIN.C1 RCIN.C2 RCIN.C3 RCIN.C4
+    </expression>
+  </graph>
+
+  <graph name='RC/RC Input 1-8'>
+    <description>First 8 RC inputs</description>
+    <expression>
+      RC_CHANNELS_RAW.chan1_raw RC_CHANNELS_RAW.chan2_raw RC_CHANNELS_RAW.chan3_raw RC_CHANNELS_RAW.chan4_raw
+      RC_CHANNELS_RAW.chan5_raw RC_CHANNELS_RAW.chan6_raw RC_CHANNELS_RAW.chan7_raw RC_CHANNELS_RAW.chan7_raw
+    </expression>
+    <expression>
+      RCIN.C1 RCIN.C2 RCIN.C3 RCIN.C4
+      RCIN.C5 RCIN.C6 RCIN.C7 RCIN.C8
+    </expression>
+  </graph>
   
 </graphs>

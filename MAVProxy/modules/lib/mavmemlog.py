@@ -5,7 +5,7 @@ from pymavlink import mavutil
 class mavmemlog(mavutil.mavfile):
     '''a MAVLink log in memory. This allows loading a log into
     memory to make it easier to do multiple sweeps over a log'''
-    def __init__(self, mav):
+    def __init__(self, mav, progress_callback=None):
         mavutil.mavfile.__init__(self, None, 'memlog')
         self._msgs = []
         self._count = 0
@@ -13,11 +13,15 @@ class mavmemlog(mavutil.mavfile):
         self._flightmodes = []
         last_flightmode = None
         last_timestamp = None
+        last_pct = 0
         
         while True:
             m = mav.recv_msg()
             if m is None:
                 break
+            if int(mav.percent) != last_pct and progress_callback:
+                progress_callback(int(mav.percent))
+                last_pct = int(mav.percent)
             self._msgs.append(m)
             if mav.flightmode != last_flightmode:
                 if len(self._flightmodes) > 0:
