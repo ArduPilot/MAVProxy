@@ -16,28 +16,6 @@ try:
 except ImportError:
     import cv
 
-from optparse import OptionParser
-parser = OptionParser("mavflightview.py [options]")
-parser.add_option("--service", default="MicrosoftSat", help="tile service")
-parser.add_option("--mode", default=None, help="flight mode")
-parser.add_option("--condition", default=None, help="conditional check on log")
-parser.add_option("--mission", default=None, help="mission file (defaults to logged mission)")
-parser.add_option("--fence", default=None, help="fence file")
-parser.add_option("--imagefile", default=None, help="output to image file")
-parser.add_option("--flag", default=[], type='str', action='append', help="flag positions")
-parser.add_option("--rawgps", action='store_true', default=False, help="use GPS_RAW_INT")
-parser.add_option("--rawgps2", action='store_true', default=False, help="use GPS2_RAW")
-parser.add_option("--dualgps", action='store_true', default=False, help="use GPS_RAW_INT and GPS2_RAW")
-parser.add_option("--ekf", action='store_true', default=False, help="use EKF1 pos")
-parser.add_option("--ahr2", action='store_true', default=False, help="use AHR2 pos")
-parser.add_option("--debug", action='store_true', default=False, help="show debug info")
-parser.add_option("--multi", action='store_true', default=False, help="show multiple flights on one map")
-parser.add_option("--types", default=None, help="types of position messages to show")
-parser.add_option("--ekf-sample", type='int', default=1, help="sub-sampling of EKF messages")
-parser.add_option("--rate", type='int', default=0, help="maximum message rate to display (0 means all points)")
-
-(opts, args) = parser.parse_args()
-
 def create_map(title):
     '''create map object'''
 
@@ -46,9 +24,9 @@ def pixel_coords(latlon, ground_width=0, mt=None, topleft=None, width=None):
     (lat,lon) = (latlon[0], latlon[1])
     return mt.coord_to_pixel(topleft[0], topleft[1], width, ground_width, lat, lon)
 
-def create_imagefile(filename, latlon, ground_width, path_objs, mission_obj, fence_obj, width=600, height=600):
+def create_imagefile(options, filename, latlon, ground_width, path_objs, mission_obj, fence_obj, width=600, height=600):
     '''create path and mission as an image file'''
-    mt = mp_tile.MPTile(service=opts.service)
+    mt = mp_tile.MPTile(service=options.service)
 
     map_img = mt.area_to_image(latlon[0], latlon[1],
                                width, height, ground_width)
@@ -108,30 +86,31 @@ def display_waypoints(wploader, map):
                         'miss_cmd %u/%u' % (i,j), polygons[i][j], str(next_list[j]), 'Mission', colour=(0,255,255)))  
                     labeled_wps[next_list[j]] = (i,j)
 
-def mavflightview(filename):
-    print("Loading %s ..." % filename)
-    mlog = mavutil.mavlink_connection(filename)
+def mavflightview_mav(mlog, options=None, title=None):
+    '''create a map for a log file'''
+    if not title:
+        title='MAVFlightView'
     wp = mavwp.MAVWPLoader()
-    if opts.mission is not None:
-        wp.load(opts.mission)
+    if options.mission is not None:
+        wp.load(options.mission)
     fen = mavwp.MAVFenceLoader()
-    if opts.fence is not None:
-        fen.load(opts.fence)
+    if options.fence is not None:
+        fen.load(options.fence)
     path = [[]]
     instances = {}
     ekf_counter = 0
     types = ['MISSION_ITEM','CMD']
-    if opts.types is not None:
-        types.extend(opts.types.split(','))
+    if options.types is not None:
+        types.extend(options.types.split(','))
     else:
         types.extend(['GPS','GLOBAL_POSITION_INT'])
-        if opts.rawgps or opts.dualgps:
+        if options.rawgps or options.dualgps:
             types.extend(['GPS', 'GPS_RAW_INT'])
-        if opts.rawgps2 or opts.dualgps:
+        if options.rawgps2 or options.dualgps:
             types.extend(['GPS2_RAW','GPS2'])
-        if opts.ekf:
+        if options.ekf:
             types.extend(['EKF1', 'GPS'])
-        if opts.ahr2:
+        if options.ahr2:
             types.extend(['AHR2', 'AHRS2', 'GPS'])
     print("Looking for types %s" % str(types))
 
@@ -173,9 +152,9 @@ def mavflightview(filename):
             except Exception:
                 pass
             continue
-        if not mlog.check_condition(opts.condition):
+        if not mlog.check_condition(options.condition):
             continue
-        if opts.mode is not None and mlog.flightmode.lower() != opts.mode.lower():
+        if options.mode is not None and mlog.flightmode.lower() != options.mode.lower():
             continue
         if type in ['GPS','GPS2']:
             status = getattr(m, 'Status', None)
@@ -201,7 +180,7 @@ def mavflightview(filename):
             if pos is None:
                 continue
             ekf_counter += 1
-            if ekf_counter % opts.ekf_sample != 0:
+            if ekf_counter % options.ekf_sample != 0:
                 continue
             (lat, lng) = pos            
         elif type in ['ANU5']:
@@ -240,7 +219,7 @@ def mavflightview(filename):
             colour = (r,g,b)
             point = (lat, lng, colour)
 
-            if opts.rate == 0 or not type in last_timestamps or m._timestamp - last_timestamps[type] > 1.0/opts.rate:
+            if options.rate == 0 or not type in last_timestamps or m._timestamp - last_timestamps[type] > 1.0/options.rate:
                 last_timestamps[type] = m._timestamp
                 path[instance].append(point)
     if len(path[0]) == 0:
@@ -257,41 +236,41 @@ def mavflightview(filename):
     path_objs = []
     for i in range(len(path)):
         if len(path[i]) != 0:
-            path_objs.append(mp_slipmap.SlipPolygon('FlightPath[%u]-%s' % (i,filename), path[i], layer='FlightPath',
+            path_objs.append(mp_slipmap.SlipPolygon('FlightPath[%u]-%s' % (i,title), path[i], layer='FlightPath',
                                                     linewidth=2, colour=(255,0,180)))
     plist = wp.polygon_list()
     mission_obj = None
     if len(plist) > 0:
         mission_obj = []
         for i in range(len(plist)):
-            mission_obj.append(mp_slipmap.SlipPolygon('Mission-%s-%u' % (filename,i), plist[i], layer='Mission',
+            mission_obj.append(mp_slipmap.SlipPolygon('Mission-%s-%u' % (title,i), plist[i], layer='Mission',
                                                       linewidth=2, colour=(255,255,255)))
     else:
         mission_obj = None
 
     fence = fen.polygon()
     if len(fence) > 1:
-        fence_obj = mp_slipmap.SlipPolygon('Fence-%s' % filename, fen.polygon(), layer='Fence',
+        fence_obj = mp_slipmap.SlipPolygon('Fence-%s' % title, fen.polygon(), layer='Fence',
                                            linewidth=2, colour=(0,255,0))
     else:
         fence_obj = None
 
-    if opts.imagefile:
-        create_imagefile(opts.imagefile, (lat,lon), ground_width, path_objs, mission_obj, fence_obj)
+    if options.imagefile:
+        create_imagefile(options, options.imagefile, (lat,lon), ground_width, path_objs, mission_obj, fence_obj)
     else:
         global multi_map
-        if opts.multi and multi_map is not None:
+        if options.multi and multi_map is not None:
             map = multi_map
         else:
-            map = mp_slipmap.MPSlipMap(title=filename,
-                                       service=opts.service,
+            map = mp_slipmap.MPSlipMap(title=title,
+                                       service=options.service,
                                        elevation=True,
                                        width=600,
                                        height=600,
                                        ground_width=ground_width,
                                        lat=lat, lon=lon,
-                                       debug=opts.debug)
-        if opts.multi:
+                                       debug=options.debug)
+        if options.multi:
             multi_map = map
         for path_obj in path_objs:
             map.add_object(path_obj)
@@ -300,7 +279,7 @@ def mavflightview(filename):
         if fence_obj is not None:
             map.add_object(fence_obj)
 
-        for flag in opts.flag:
+        for flag in options.flag:
             a = flag.split(',')
             lat = a[0]
             lon = a[1]
@@ -310,13 +289,60 @@ def mavflightview(filename):
             icon = map.icon(icon)
             map.add_object(mp_slipmap.SlipIcon('icon - %s' % str(flag), (float(lat),float(lon)), icon, layer=3, rotation=0, follow=False))
 
-if len(args) < 1:
-    print("Usage: mavflightview.py [options] <LOGFILE...>")
-    sys.exit(1)
+def mavflightview(filename, options):
+    print("Loading %s ..." % filename)
+    mlog = mavutil.mavlink_connection(filename)
+    mavflightview_mav(mlog, options, title=filename)
+
+class mavflightview_options(object):
+    def __init__(self):
+        self.service = "MicrosoftHyb"
+        self.mode = None
+        self.condition = None
+        self.mission = None
+        self.fence = None
+        self.imagefile = None
+        self.flag = []
+        self.rawgps = False
+        self.rawgps2 = False
+        self.dualgps = False
+        self.ekf = False
+        self.ahr2 = False
+        self.debug = False
+        self.multi = False
+        self.types = None
+        self.ekf_sample = 1
+        self.rate = 0
 
 if __name__ == "__main__":
+    from optparse import OptionParser
+    parser = OptionParser("mavflightview.py [options]")
+    parser.add_option("--service", default="MicrosoftSat", help="tile service")
+    parser.add_option("--mode", default=None, help="flight mode")
+    parser.add_option("--condition", default=None, help="conditional check on log")
+    parser.add_option("--mission", default=None, help="mission file (defaults to logged mission)")
+    parser.add_option("--fence", default=None, help="fence file")
+    parser.add_option("--imagefile", default=None, help="output to image file")
+    parser.add_option("--flag", default=[], type='str', action='append', help="flag positions")
+    parser.add_option("--rawgps", action='store_true', default=False, help="use GPS_RAW_INT")
+    parser.add_option("--rawgps2", action='store_true', default=False, help="use GPS2_RAW")
+    parser.add_option("--dualgps", action='store_true', default=False, help="use GPS_RAW_INT and GPS2_RAW")
+    parser.add_option("--ekf", action='store_true', default=False, help="use EKF1 pos")
+    parser.add_option("--ahr2", action='store_true', default=False, help="use AHR2 pos")
+    parser.add_option("--debug", action='store_true', default=False, help="show debug info")
+    parser.add_option("--multi", action='store_true', default=False, help="show multiple flights on one map")
+    parser.add_option("--types", default=None, help="types of position messages to show")
+    parser.add_option("--ekf-sample", type='int', default=1, help="sub-sampling of EKF messages")
+    parser.add_option("--rate", type='int', default=0, help="maximum message rate to display (0 means all points)")
+    
+    (opts, args) = parser.parse_args()
+
+    if len(args) < 1:
+        print("Usage: mavflightview.py [options] <LOGFILE...>")
+        sys.exit(1)
+
     if opts.multi:
         multi_map = None
 
     for f in args:
-        mavflightview(f)
+        mavflightview(f, opts)

@@ -258,7 +258,7 @@ class MavGraph(object):
             if msg.get_type() not in self.msg_types:
                 continue
             if self.condition:
-                if mavutil.evaluate_condition(self.condition, mlog.messages):
+                if not mavutil.evaluate_condition(self.condition, mlog.messages):
                     continue
             tdays = matplotlib.dates.date2num(datetime.datetime.fromtimestamp(msg._timestamp+timeshift))
             self.add_data(tdays, msg, mlog.messages, mlog.flightmode)

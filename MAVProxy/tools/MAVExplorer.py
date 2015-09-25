@@ -48,8 +48,10 @@ class MEState(object):
         self.mlog = None
         self.command_map = command_map
         self.completions = {
-            "set"    : ["(SETTING)"],
-            "graph"  : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)']
+            "set"       : ["(SETTING)"],
+            "condition" : ["(VARIABLE)"],
+            "graph"     : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)'],
+            "map"       : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)']
             }
         self.aliases = {}
         self.graphs = []
@@ -218,9 +220,28 @@ def cmd_graph(args):
     child = multiprocessing.Process(target=graph_process, args=[args])
     child.start()
 
+def cmd_map(args):
+    '''map command'''
+    from mavflightview import mavflightview_mav, mavflightview_options
+
+    options = mavflightview_options()
+    options.condition = mestate.settings.condition
+    if len(args) > 0:
+        options.types = ','.join(args)
+    
+    child = multiprocessing.Process(target=mavflightview_mav, args=[mestate.mlog, options])
+    child.start()
+
 def cmd_set(args):
     '''control MAVExporer options'''
     mestate.settings.command(args)
+
+def cmd_condition(args):
+    '''control MAVExporer conditions'''
+    if len(args) == 0:
+        print("condition is: %s" % mestate.settings.condition)
+        return
+    mestate.settings.condition = ' '.join(args)
 
 def cmd_reload(args):
     '''reload graphs'''
@@ -294,10 +315,12 @@ def main_loop():
         time.sleep(0.1)
 
 command_map = {
-    'graph'   : (cmd_graph,    'display a graph'),
-    'set'     : (cmd_set,      'control settings'),
-    'reload'  : (cmd_reload,   'reload graphs'),
-    'param'   : (cmd_param,    'show parameters'),
+    'graph'      : (cmd_graph,     'display a graph'),
+    'set'        : (cmd_set,       'control settings'),
+    'reload'     : (cmd_reload,    'reload graphs'),
+    'condition'  : (cmd_condition, 'set graph conditions'),
+    'param'      : (cmd_param,     'show parameters'),
+    'map'        : (cmd_map,       'show map view'),
     }
 
 mestate = MEState()
