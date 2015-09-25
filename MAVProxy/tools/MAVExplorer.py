@@ -134,7 +134,7 @@ def load_graph_xml(xml):
         expressions = [e.text for e in g.expression]
         for e in expressions:
             graph_ok = True
-            fields = e.split(' ')
+            fields = e.split()
             for f in fields:
                 try:
                     if mavutil.evaluate_expression(f, mestate.status.msgs) is None:
@@ -148,6 +148,7 @@ def load_graph_xml(xml):
 
 def load_graphs():
     '''load graphs from mavgraphs.xml'''
+    mestate.graphs = []
     gfiles = ['mavgraphs.xml']
     if 'HOME' in os.environ:
         for dirname, dirnames, filenames in os.walk(os.path.join(os.environ['HOME'], ".mavproxy")):
@@ -188,12 +189,15 @@ def cmd_graph(args):
     child.start()
     mestate.console.write("Added graph: %s\n" % ' '.join(args))
 
-def cmd_test(args):
-    process_stdin('graph VFR_HUD.groundspeed VFR_HUD.airspeed')
-
 def cmd_set(args):
     '''control MAVExporer options'''
     mestate.settings.command(args)
+
+def cmd_reload(args):
+    '''reload graphs'''
+    load_graphs()
+    setup_menus()
+    mestate.console.write("Loaded %u graphs\n" % len(mestate.graphs))
 
 def process_stdin(line):
     '''handle commands from user'''
@@ -252,7 +256,7 @@ def main_loop():
 command_map = {
     'graph'   : (cmd_graph,    'display a graph'),
     'set'     : (cmd_set,      'control settings'),
-    'test'    : (cmd_test,    'display a graph')
+    'reload'  : (cmd_reload,   'reload graphs'),
     }
 
 mestate = MEState()
