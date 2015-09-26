@@ -42,7 +42,8 @@ on how to use MAVProxy.''',
       # use the system versions of these dependencies, so it tries to download and install
       # large numbers of modules like numpy etc which may be already installed
       install_requires=['pymavlink>=1.1.50',
-                        'pyserial'],
+                        'pyserial',
+                        'lxml'],
       scripts=['MAVProxy/mavproxy.py',
                'MAVProxy/tools/mavflightview.py',
                'MAVProxy/tools/MAVExplorer.py',
