@@ -93,7 +93,7 @@ class mavmemlog(mavutil.mavfile):
         new_msgs = []
         idx = 0
         for m in self._msgs:
-            while idx < len(flightmode_selections) and m._timestamp >= self._flightmodes[idx][2]:
+            while idx < len(self._flightmodes) and m._timestamp >= self._flightmodes[idx][2]:
                 idx += 1
             if idx < len(flightmode_selections) and flightmode_selections[idx]:
                 new_msgs.append(m)
