@@ -20,6 +20,7 @@ from pymavlink import mavutil
 from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
 from MAVProxy.modules.lib import wxsettings
 from lxml import objectify
+import pkg_resources
 
 class MEStatus(object):
     '''status object to conform with mavproxy structure for modules'''
@@ -130,23 +131,16 @@ class GraphDefinition(object):
         self.expression = expression
         self.description = description
 
-def resource_file(filename):
-    '''load a resource file'''
-    import pkg_resources
-    name = "MAVProxy"
-    raw = pkg_resources.resource_stream(name, "tools/graphs/%s" % filename).read()
-    return raw
-
 def load_graph_xml(xml):
     '''load a graph from one xml string'''
     try:
         root = objectify.fromstring(xml)
     except Exception:
-        return
+        return False
     if root.tag != 'graphs':
-        return
+        return False
     if not hasattr(root, 'graph'):
-        return
+        return False
     for g in root.graph:
         name = g.attrib['name']
         if have_graph(name):
@@ -167,6 +161,7 @@ def load_graph_xml(xml):
             if graph_ok:
                 mestate.graphs.append(GraphDefinition(name, e, g.description.text))
                 break
+    return True
 
 def load_graphs():
     '''load graphs from mavgraphs.xml'''
@@ -180,9 +175,14 @@ def load_graphs():
     for file in gfiles:
         if not os.path.exists(file):
             continue
-        load_graph_xml(open(file).read())
+        if load_graph_xml(open(file).read()):
+            mestate.console.writeln("Loaded %s" % file)
     # also load the built in graphs
-    load_graph_xml(resource_file('mavgraphs.xml'))
+    dlist = pkg_resources.resource_listdir("MAVProxy", "tools/graphs")
+    for f in dlist:
+        raw = pkg_resources.resource_stream("MAVProxy", "tools/graphs/%s" % f).read()
+        if load_graph_xml(raw):
+            mestate.console.writeln("Loaded %s" % f)
     mestate.graphs = sorted(mestate.graphs, key=lambda g: g.name)
 
 def graph_process(fields):

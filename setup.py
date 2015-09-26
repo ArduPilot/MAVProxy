@@ -52,5 +52,5 @@ on how to use MAVProxy.''',
       package_data={'MAVProxy':
                     ['modules/mavproxy_map/data/*.jpg', 
                      'modules/mavproxy_map/data/*.png',
-                     'tools/graphs/mavgraphs.xml']}
+                     'tools/graphs/*.xml']}
     )
