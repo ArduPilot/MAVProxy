@@ -24,6 +24,9 @@ from MAVProxy.modules.lib.wxgrapheditor import GraphDefinition, GraphDialog
 from lxml import objectify
 import pkg_resources
 
+if __name__ == "__main__":
+    multiprocessing.freeze_support()
+
 class MEStatus(object):
     '''status object to conform with mavproxy structure for modules'''
     def __init__(self):
@@ -404,49 +407,49 @@ command_map = {
     'map'        : (cmd_map,       'show map view'),
     }
 
-mestate = MEState()
-mestate.rl = rline.rline("MAV> ", mestate)
-
-from argparse import ArgumentParser
-parser = ArgumentParser(description=__doc__)
-parser.add_argument("files", metavar="<FILE>", nargs="+")
-args = parser.parse_args()
-
-if len(args.files) == 0:
-    print("Usage: MAVExplorer FILE")
-    sys.exit(1)
-
-
 def progress_bar(pct):
     if pct % 2 == 0:
         mestate.console.write('#')
 
-mestate.console.write("Loading %s...\n" % args.files[0])
-t0 = time.time()
-mlog = mavutil.mavlink_connection(args.files[0], notimestamps=False,
-                                  zero_time_base=False)
-mestate.mlog = mavmemlog.mavmemlog(mlog, progress_bar)
-mestate.status.msgs = mlog.messages
-t1 = time.time()
-mestate.console.write("\ndone (%u messages in %.1fs)\n" % (mestate.mlog._count, t1-t0))
+if __name__ == "__main__":
+    mestate = MEState()
+    mestate.rl = rline.rline("MAV> ", mestate)
 
-load_graphs()
-setup_menus()
+    from argparse import ArgumentParser
+    parser = ArgumentParser(description=__doc__)
+    parser.add_argument("files", metavar="<FILE>", nargs="+")
+    args = parser.parse_args()
 
-# run main loop as a thread
-mestate.thread = threading.Thread(target=main_loop, name='main_loop')
-mestate.thread.daemon = True
-mestate.thread.start()
+    if len(args.files) == 0:
+        print("Usage: MAVExplorer FILE")
+        sys.exit(1)
 
-# input loop
-while True:
-    try:
+    mestate.console.write("Loading %s...\n" % args.files[0])
+    t0 = time.time()
+    mlog = mavutil.mavlink_connection(args.files[0], notimestamps=False,
+                                      zero_time_base=False)
+    mestate.mlog = mavmemlog.mavmemlog(mlog, progress_bar)
+    mestate.status.msgs = mlog.messages
+    t1 = time.time()
+    mestate.console.write("\ndone (%u messages in %.1fs)\n" % (mestate.mlog._count, t1-t0))
+
+    load_graphs()
+    setup_menus()
+
+    # run main loop as a thread
+    mestate.thread = threading.Thread(target=main_loop, name='main_loop')
+    mestate.thread.daemon = True
+    mestate.thread.start()
+
+    # input loop
+    while True:
         try:
-            line = raw_input(mestate.rl.prompt)
-        except EOFError:
+            try:
+                line = raw_input(mestate.rl.prompt)
+            except EOFError:
+                mestate.exit = True
+                break
+            mestate.input_queue.put(line)
+        except KeyboardInterrupt:
             mestate.exit = True
             break
-        mestate.input_queue.put(line)
-    except KeyboardInterrupt:
-        mestate.exit = True
-        break
