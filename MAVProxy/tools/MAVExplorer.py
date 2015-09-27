@@ -16,9 +16,11 @@ from MAVProxy.modules.lib import grapher
 from MAVProxy.modules.lib import mavmemlog
 from pymavlink.mavextra import *
 from MAVProxy.modules.lib.mp_menu import *
+import MAVProxy.modules.lib.mp_util as mp_util
 from pymavlink import mavutil
 from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
 from MAVProxy.modules.lib import wxsettings
+from MAVProxy.modules.lib.wxgrapheditor import GraphDefinition, GraphDialog
 from lxml import objectify
 import pkg_resources
 
@@ -57,6 +59,7 @@ class MEState(object):
         self.aliases = {}
         self.graphs = []
         self.flightmode_selections = []
+        self.last_graph = GraphDefinition('Untitled', '', '', [], None)
 
 def have_graph(name):
     '''return true if we have a graph of the given name'''
@@ -96,11 +99,6 @@ def flightmode_menu():
     return ret
 
 
-class graph_tree_state(object):
-    def __init__(self, graphs):
-        self.prefix = None
-        self.graphs = graphs[:]
-
 def graph_menus():
     '''return menu tree for graphs (recursive)'''
     ret = MPMenuSubMenu('Graphs', [])
@@ -117,51 +115,53 @@ def setup_menus():
     menu = MPMenuTop([])
     menu.add(MPMenuSubMenu('MAVExplorer',
                            items=[MPMenuItem('Settings', 'Settings', 'menuSettings'),
-                                  MPMenuItem('Map', 'Map', '# map')]))
-
+                                  MPMenuItem('Map', 'Map', '# map'),
+                                  MPMenuItem('Save Graph', 'Save', '# save'),
+                                  MPMenuItem('Reload Graphs', 'Reload', '# reload')]))
     menu.add(graph_menus())
     menu.add(MPMenuSubMenu('FlightMode', items=flightmode_menu()))
 
     mestate.console.set_menu(menu, menu_callback)
 
-class GraphDefinition(object):
-    '''a pre-defined graph'''
-    def __init__(self, name, expression, description):
-        self.name = name
-        self.expression = expression
-        self.description = description
+def expression_ok(expression):
+    '''return True if an expression is OK with current messages'''
+    expression_ok = True
+    fields = expression.split()
+    for f in fields:
+        try:
+            if f.endswith(':2'):
+                f = f[:-2]
+            if mavutil.evaluate_expression(f, mestate.status.msgs) is None:
+                expression_ok = False                        
+        except Exception:
+            expression_ok = False
+            break
+    return expression_ok
 
-def load_graph_xml(xml):
+def load_graph_xml(xml, filename, load_all=False):
     '''load a graph from one xml string'''
+    ret = []
     try:
         root = objectify.fromstring(xml)
     except Exception:
-        return False
+        return []
     if root.tag != 'graphs':
-        return False
+        return []
     if not hasattr(root, 'graph'):
-        return False
+        return []
     for g in root.graph:
         name = g.attrib['name']
+        expressions = [e.text for e in g.expression]
+        if load_all:
+            ret.append(GraphDefinition(name, e, g.description.text, expressions, filename))
+            continue
         if have_graph(name):
             continue
-        expressions = [e.text for e in g.expression]
         for e in expressions:
-            graph_ok = True
-            fields = e.split()
-            for f in fields:
-                try:
-                    if f.endswith(':2'):
-                        f = f[:-2]
-                    if mavutil.evaluate_expression(f, mestate.status.msgs) is None:
-                        graph_ok = False                        
-                except Exception:
-                    graph_ok = False
-                    break
-            if graph_ok:
-                mestate.graphs.append(GraphDefinition(name, e, g.description.text))
+            if expression_ok(e):
+                ret.append(GraphDefinition(name, e, g.description.text, expressions, filename))
                 break
-    return True
+    return ret
 
 def load_graphs():
     '''load graphs from mavgraphs.xml'''
@@ -176,13 +176,17 @@ def load_graphs():
     for file in gfiles:
         if not os.path.exists(file):
             continue
-        if load_graph_xml(open(file).read()):
+        graphs = load_graph_xml(open(file).read(), file)
+        if graphs:
+            mestate.graphs.extend(graphs)
             mestate.console.writeln("Loaded %s" % file)
     # also load the built in graphs
     dlist = pkg_resources.resource_listdir("MAVProxy", "tools/graphs")
     for f in dlist:
         raw = pkg_resources.resource_stream("MAVProxy", "tools/graphs/%s" % f).read()
-        if load_graph_xml(raw):
+        graphs = load_graph_xml(raw, None)
+        if graphs:
+            mestate.graphs.extend(graphs)
             mestate.console.writeln("Loaded %s" % f)
     mestate.graphs = sorted(mestate.graphs, key=lambda g: g.name)
 
@@ -203,6 +207,12 @@ def graph_process(fields):
     mg.process()
     mg.show()
 
+def display_graph(graphdef):
+    '''display a graph'''
+    mestate.console.write("Expression: %s\n" % ' '.join(graphdef.expression.split()))
+    child = multiprocessing.Process(target=graph_process, args=[graphdef.expression.split()])
+    child.start()
+
 def cmd_graph(args):
     '''graph command'''
     usage = "usage: graph <FIELD...>"
@@ -218,9 +228,10 @@ def cmd_graph(args):
         if g.description:
             mestate.console.write("%s\n" % g.description, fg='blue')
         mestate.rl.add_history("graph %s" % ' '.join(expression.split()))
-    mestate.console.write("Expression: %s\n" % ' '.join(args))
-    child = multiprocessing.Process(target=graph_process, args=[args])
-    child.start()
+        mestate.last_graph = g
+    else:
+        mestate.last_graph = GraphDefinition('Untitled', expression, '', [expression], None)
+    display_graph(mestate.last_graph)
 
 def map_process(args):
     '''process for a graph'''
@@ -251,9 +262,72 @@ def cmd_condition(args):
 
 def cmd_reload(args):
     '''reload graphs'''
+    mestate.console.writeln('Reloading graphs', fg='blue')
     load_graphs()
     setup_menus()
     mestate.console.write("Loaded %u graphs\n" % len(mestate.graphs))
+
+def save_graph(graphdef):
+    '''save a graph as XML'''
+    if graphdef.filename is None:
+        if 'HOME' in os.environ:
+            dname = os.path.join(os.environ['HOME'], '.mavproxy')
+            mp_util.mkdir_p(dname)
+            graphdef.filename = os.path.join(dname, 'mavgraphs.xml')
+        else:
+            graphdef.filename = 'mavgraphs.xml'
+    if graphdef.filename is None:
+        mestate.console.writeln("No file to save graph to", fg='red')
+        return
+    graphs = load_graph_xml(open(graphdef.filename).read(), graphdef.filename, load_all=True)
+    found_name = False
+    for i in range(len(graphs)):
+        if graphs[i].name == graphdef.name:
+            graphs[i] = graphdef
+            found_name = True
+            break
+    if not found_name:
+        graphs.append(graphdef)
+    mestate.console.writeln("Saving %u graphs to %s" % (len(graphs), graphdef.filename))
+    f = open(graphdef.filename, "w")
+    f.write("<graphs>\n\n")
+    for g in graphs:
+        f.write(" <graph name='%s'>\n" % g.name.strip())
+        f.write("  <description>%s</description>\n" % g.description.strip())
+        for e in g.expressions:
+            f.write("  <expression>%s</expression>\n" % e.strip())
+        f.write(" </graph>\n\n")
+    f.write("</graphs>\n")
+    f.close()
+
+def save_callback(operation, graphdef):
+    '''callback from save thread'''
+    if operation == 'test':
+        for e in graphdef.expressions:
+            if expression_ok(e):
+                graphdef.expression = e
+                display_graph(graphdef)
+                return
+        mestate.console.writeln('Invalid graph expressions', fg='red')
+        return
+    if operation == 'save':
+        save_graph(graphdef)
+
+def save_process():
+    '''process for saving a graph'''
+    from MAVProxy.modules.lib.wx_loader import wx
+    app = wx.App(False)
+    frame = GraphDialog('Graph Editor',
+                        mestate.last_graph,
+                        save_callback)
+    frame.ShowModal()
+    frame.Destroy()
+    
+
+def cmd_save(args):
+    '''save a graph'''
+    child = multiprocessing.Process(target=save_process)
+    child.start()
 
 def cmd_param(args):
     '''show parameters'''
@@ -324,6 +398,7 @@ command_map = {
     'graph'      : (cmd_graph,     'display a graph'),
     'set'        : (cmd_set,       'control settings'),
     'reload'     : (cmd_reload,    'reload graphs'),
+    'save'       : (cmd_save,      'save a graph'),
     'condition'  : (cmd_condition, 'set graph conditions'),
     'param'      : (cmd_param,     'show parameters'),
     'map'        : (cmd_map,       'show map view'),

@@ -55,8 +55,10 @@ class MessageConsole(textconsole.SimpleConsole):
 
     def write(self, text, fg='black', bg='white'):
         '''write to the console'''
-        if self.is_alive():
+        try:
             self.parent_pipe_send.send(Text(text, fg, bg))
+        except Exception:
+            pass
 
     def set_status(self, name, text='', row=0, fg='black', bg='white'):
         '''set a status value'''
