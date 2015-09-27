@@ -170,6 +170,7 @@ def load_graphs():
     if 'HOME' in os.environ:
         for dirname, dirnames, filenames in os.walk(os.path.join(os.environ['HOME'], ".mavproxy")):
             for filename in filenames:
+                
                 if filename.lower().endswith('.xml'):
                     gfiles.append(os.path.join(dirname, filename))
     for file in gfiles:
@@ -216,6 +217,7 @@ def cmd_graph(args):
         mestate.console.write("Added graph: %s\n" % g.name)
         if g.description:
             mestate.console.write("%s\n" % g.description, fg='blue')
+        mestate.rl.add_history("graph %s" % ' '.join(expression.split()))
     mestate.console.write("Expression: %s\n" % ' '.join(args))
     child = multiprocessing.Process(target=graph_process, args=[args])
     child.start()
