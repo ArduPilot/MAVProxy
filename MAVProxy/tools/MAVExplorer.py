@@ -233,6 +233,7 @@ def cmd_graph(args):
         mestate.rl.add_history("graph %s" % ' '.join(expression.split()))
         mestate.last_graph = g
     else:
+        expression = ' '.join(args)
         mestate.last_graph = GraphDefinition('Untitled', expression, '', [expression], None)
     display_graph(mestate.last_graph)
 
