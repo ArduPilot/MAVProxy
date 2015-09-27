@@ -23,6 +23,7 @@ class ConsoleModule(mp_module.MPModule):
         self.total_time = 0.0
         self.speed = 0
         self.max_link_num = 0
+        self.last_sys_status_health = 0
         mpstate.console = wxconsole.MessageConsole(title='Console')
 
         # setup some default status information
@@ -214,8 +215,10 @@ class ConsoleModule(mp_module.MPModule):
                         'MAG'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_MAG,
                         'INS'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_ACCEL | mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_GYRO,
                         'AHRS' : mavutil.mavlink.MAV_SYS_STATUS_AHRS,
+                        'RC'   : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_RC_RECEIVER,
                         'TERR' : mavutil.mavlink.MAV_SYS_STATUS_TERRAIN,
                         'RNG'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_LASER_POSITION}
+            announce = [ 'AS', 'MAG', 'INS', 'AHRS', 'RC' ]
             for s in sensors.keys():
                 bits = sensors[s]
                 present = ((msg.onboard_control_sensors_enabled & bits) == bits)
@@ -230,6 +233,14 @@ class ConsoleModule(mp_module.MPModule):
                 if s == 'TERR' and fg == 'green' and master.field('TERRAIN_REPORT', 'pending', 0) != 0:
                     fg = 'yellow'
                 self.console.set_status(s, s, fg=fg)
+            for s in announce:
+                bits = sensors[s]
+                present = ((msg.onboard_control_sensors_enabled & bits) == bits)
+                healthy = ((msg.onboard_control_sensors_health & bits) == bits)
+                was_healthy = ((self.last_sys_status_health & bits) == bits)
+                if present and not healthy and was_healthy:
+                    self.say("%s fail" % s)
+            self.last_sys_status_health = msg.onboard_control_sensors_health
 
         elif type == 'WIND':
             self.console.set_status('Wind', 'Wind %u/%.2f' % (msg.direction, msg.speed))
