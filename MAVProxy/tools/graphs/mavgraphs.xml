@@ -220,5 +220,25 @@
       RCIN.C5 RCIN.C6 RCIN.C7 RCIN.C8
     </expression>
   </graph>
+
+ <graph name='Sensors/Lidar/Rangefinder vs Baro'>
+  <description>Rangefinders vs Barometric Altitude</description>
+  <expression>BARO.Alt RFND.Dist1 RFND.Dist2</expression>
+ </graph>
+
+ <graph name='Plane/PID Tuning/Pitch Controller'>
+  <description>This shows how well the pitch controller is tracking the desired pitch rate.
+For a well tuned aircraft PIDP.Des should match the smoothed IMU.GyrY value. 
+If PIDP.I has a constant positive value then it means the aircraft is a bit tail heavy, and the integrator is learning the elevator offset needed to keep the aircraft level. If PIDP.I has a constant negative value then the aircraft is a bit nose heavy.
+You should also check PIDP.D and look for signs of oscillation, in which case PTCH2SRV_D is too high.</description>
+  <expression>PIDP.Des PIDP.P PIDP.I PIDP.D lowpass(degrees(IMU.GyrY),"gy",0.9)</expression>
+ </graph>
+
+ <graph name='Plane/PID Tuning/Roll Controller'>
+  <description>This shows how well the roll controller is tracking the desired roll rate.
+For a well tuned aircraft PIDR.Des should match the smoothed IMU.GyrX value. 
+If PIDR.I has a constant positive value then it means the aircraft is trimmed to roll to the left side, and the integrator is learning the aileron offset needed to keep the aircraft level. If PIDR.I has a constant negative value then the aircraft is trimmed a bit to the right.</description>
+  <expression>PIDR.Des PIDR.P PIDR.I PIDR.D lowpass(degrees(IMU.GyrX),"gx",0.9)</expression>
+ </graph>
   
 </graphs>
