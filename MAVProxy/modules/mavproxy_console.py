@@ -218,7 +218,7 @@ class ConsoleModule(mp_module.MPModule):
                         'RC'   : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_RC_RECEIVER,
                         'TERR' : mavutil.mavlink.MAV_SYS_STATUS_TERRAIN,
                         'RNG'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_LASER_POSITION}
-            announce = [ 'AS', 'MAG', 'INS', 'AHRS', 'RC' ]
+            announce = [ 'RC' ]
             for s in sensors.keys():
                 bits = sensors[s]
                 present = ((msg.onboard_control_sensors_enabled & bits) == bits)
