@@ -73,6 +73,18 @@
     <expression>EKF1.Roll EKF1.Pitch AHR2.Roll AHR2.Pitch</expression>
   </graph>
 
+  <graph name='EKF/Euler Roll'>
+    <description>Euler Roll</description>
+    <expression>EKF1.Roll AHR2.Roll NKF1.Roll</expression>
+    <expression>EKF1.Roll AHR2.Roll</expression>
+  </graph>
+
+  <graph name='EKF/Euler Pitch'>
+    <description>Euler Pitch</description>
+    <expression> EKF1.Pitch AHR2.Pitch NKF1.Pitch </expression>
+    <expression>EKF1.Pitch AHR2.Pitch</expression>
+  </graph>
+
   <graph name='EKF/Euler Yaw'>
     <description>Euler Yaw</description>
     <expression>EKF1.Yaw AHR2.Yaw NKF1.Yaw </expression>
@@ -103,6 +115,34 @@
     <expression>EKF3.IMX EKF3.IMY EKF3.IMZ</expression>
   </graph>
 
+  <graph name='EKF/Magnetometer Innovation X'>
+    <description>Magnetometer Innovation X</description>
+    <expression>EKF3.IMX NKF3.IMX</expression>
+    <expression>EKF3.IMX</expression>
+  </graph>
+
+  <graph name='EKF/Magnetometer Innovation Y'>
+    <description>Magnetometer Innovation Y</description>
+    <expression>EKF3.IMY NKF3.IMY</expression>
+    <expression>EKF3.IMY</expression>
+  </graph>
+
+  <graph name='EKF/Magnetometer Innovation Z'>
+    <description>Magnetometer Innovation Z</description>
+    <expression>EKF3.IMZ NKF3.IMZ</expression>
+    <expression>EKF3.IMZ</expression>
+  </graph>
+
+  <graph name='EKF/Magnetometer Innovations - EKF1'>
+    <description>Magnetometer Innovations - EKF1</description>
+    <expression>EKF3.IMX EKF3.IMY EKF3.IMZ</expression>
+  </graph>
+
+  <graph name='EKF/Magnetometer Innovations - EKF2'>
+    <description>Magnetometer Innovations - EKF2</description>
+    <expression>NKF3.IMX NKF3.IMY NKF3.IMZ NKF3.IYAW:2</expression>
+  </graph>
+
   <graph name='EKF/Magnetometer Body Field'>
     <description>Magnetometer Body Field</description>
     <expression>EKF2.MX EKF2.MY EKF2.MZ NKF2.MX NKF2.MY NKF2.MZ </expression>
@@ -113,6 +153,12 @@
     <description>Magnetometer Earth Field</description>
     <expression>EKF2.MN EKF2.ME EKF2.MD NKF2.MN NKF2.ME NKF2.MD</expression>
     <expression>EKF2.MN EKF2.ME EKF2.MD</expression>
+  </graph>
+
+  <graph name='EKF/Magnetic Declination'>
+    <description>Magnetic Declination</description>
+    <expression>degrees(atan2(EKF2.ME,EKF2.MN)) degrees(atan2(NKF2.ME,NKF2.MN))</expression>
+    <expression>degrees(atan2(EKF2.ME,EKF2.MN))</expression>
   </graph>
 
   <graph name='EKF/Gyro Bias'>
@@ -126,6 +172,18 @@
     <expression>NKF2.GSX NKF2.GSY NKF2.GSZ</expression>
   </graph>
 
+  <graph name='EKF/Wind Velocity NE'>
+    <description>Wind Velocity NE</description>
+    <expression>EKF2.VWN EKF2.VWE NKF2.VWN NKF2.VWE</expression>
+    <expression>EKF2.VWN EKF2.VWE</expression>
+  </graph>
+
+  <graph name='EKF/Wind Speed and Direction'>
+    <description>Wind Velocity NE</description>
+    <expression>sqrt(EKF2.VWN**2+EKF2.VWE**2) wrap_360(degrees(atan2(-EKF2.VWE,-EKF2.VWN))):2 sqrt(NKF2.VWN**2+NKF2.VWE**2) wrap_360(degrees(atan2(-NKF2.VWE,-NKF2.VWN))):2</expression>
+    <expression>sqrt(EKF2.VWN**2+EKF2.VWE**2) wrap_360(degrees(atan2(-EKF2.VWE,-EKF2.VWN))):2</expression>
+  </graph>
+
   <graph name='EKF/Accel Bias'>
     <description>Accel Bias</description>
     <expression>EKF2.AZ1bias EKF2.AZ2bias EKF2.Ratio:2 NKF2.AZbias </expression>
@@ -134,3 +192,4 @@
 
 
 </graphs>
+
