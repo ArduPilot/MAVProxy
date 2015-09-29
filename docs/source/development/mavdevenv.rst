@@ -42,8 +42,14 @@ You will need to have `Python
 `pygame <http://pygame.org/download.shtml>`_ installed first.
 
 Next, open up a console in the Python scripts install path
-(C:\\Python27\\Scripts or similar) and use ``pip`` to install the other
-packages:
+(C:\\Python27\\Scripts or similar). Use ``pip install [filepath]`` to install them
+
+- `numPY <http://www.lfd.uci.edu/~gohlke/pythonlibs/#numpy>`_
+- `Pillow (replaces
+  PIL) <http://www.lfd.uci.edu/~gohlke/pythonlibs/#pillow>`_
+- `OpenCV <http://www.lfd.uci.edu/~gohlke/pythonlibs/#opencv>`_
+
+Use ``pip`` to install the other packages:
 
 .. code:: bash
 
@@ -52,21 +58,16 @@ packages:
     pip install pyreadline 
     pip install pyserial 
     pip install pymavlink  
-    pip install python-dateutil pytz pyparsing six
-
-The final set of prerequisites use pip to install, but need to be
-manually downloaded. Use ``pip install [filepath]`` to install them:
-
-- `numPY <http://www.lfd.uci.edu/~gohlke/pythonlibs/#numpy>`_
-- `Pillow (replaces
-  PIL) <http://www.lfd.uci.edu/~gohlke/pythonlibs/#pillow>`_
-- `OpenCV <http://www.lfd.uci.edu/~gohlke/pythonlibs/#opencv>`_
+    pip install lxml python-dateutil pytz pyparsing six
 
 Download the MAVProxy `source <https://github.com/tridge/MAVProxy>`_.
 
 After making the desired changes, MAVProxy is required to be compiled
 and copied into the Python directory (the modules won't work otherwise).
 This needs to happen after any changes to the source code. This can be
-done by running the :file:`./MAVProxy/MAVProxyWinUSB.bat` file. This will
-perform the necessary actions and then run MAVProxy.
+done by running the :file:`./MAVProxy/MAVProxyWinUSB.bat` or 
+:file:`./MAVProxy/MAVProxyWinLAN.bat` file. This will
+perform the necessary build actions and then run MAVProxy. Some of the 
+details in the batch files (port numbers, etc) may need to be altered to 
+match the user's system configuration.
 
