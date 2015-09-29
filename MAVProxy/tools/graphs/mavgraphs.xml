@@ -28,7 +28,7 @@
   </graph>
   
   <graph name='Attitude/Attitude Control'>
-    <description>Desired versus achieved roll and pitch</description>
+  <description>Desired versus achieved roll and pitch. This shows you how well the attitude controller are for your aircraft. In a well tuned aircraft the desired and achieved roll and pitch should match to within a couple of degrees for any portion of the flight where stabilisation is enabled.</description>
     <expression>NAV_CONTROLLER_OUTPUT.nav_roll NAV_CONTROLLER_OUTPUT.nav_pitch degrees(ATTITUDE.roll) degrees(ATTITUDE.pitch)</expression>
     <expression>ATT.DesRoll ATT.Roll ATT.DesPitch ATT.Pitch</expression>
     <expression>CTUN.NavRoll CTUN.Roll CTUN.NavPitch CTUN.Pitch</expression>
