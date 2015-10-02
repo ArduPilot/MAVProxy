@@ -297,6 +297,8 @@ def save_graph(graphdef):
     f.write("<graphs>\n\n")
     for g in graphs:
         f.write(" <graph name='%s'>\n" % g.name.strip())
+        if g.description is None:
+            g.description = ''
         f.write("  <description>%s</description>\n" % g.description.strip())
         for e in g.expressions:
             f.write("  <expression>%s</expression>\n" % e.strip())
