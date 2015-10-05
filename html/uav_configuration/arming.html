@@ -1,0 +1,258 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Arming and Disarming &mdash; MAVProxy 1.4.24 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="MAVProxy 1.4.24 documentation" href="../index.html"/>
+        <link rel="up" title="UAV Configuration" href="index.html"/>
+        <link rel="next" title="Parameters" href="parameters.html"/>
+        <link rel="prev" title="UAV Configuration" href="index.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-nav-search">
+        
+
+        
+          <a href="../index.html" class="icon icon-home"> MAVProxy
+        
+
+        
+        </a>
+
+        
+          
+          
+            <div class="version">
+              1.4.24
+            </div>
+          
+        
+
+        
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+        
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+        
+          
+          
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">UAV Configuration</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="">Arming and Disarming</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#arming">Arming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#disarming">Disarming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#safety-switch">Safety Switch</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#arming-checks">Arming Checks</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="parameters.html">Parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="waypoints.html">Waypoints</a></li>
+<li class="toctree-l2"><a class="reference internal" href="geofence.html">Geofence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="rally.html">Rally Points</a></li>
+<li class="toctree-l2"><a class="reference internal" href="flightModes.html">Flight Modes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="calibration.html">Calibration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="system.html">System Commands</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/index.html">Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+
+          
+        
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../index.html">MAVProxy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="index.html">UAV Configuration</a> &raquo;</li>
+      
+    <li>Arming and Disarming</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="arming-and-disarming">
+<h1>Arming and Disarming<a class="headerlink" href="#arming-and-disarming" title="Permalink to this headline">¶</a></h1>
+<p>The UAV can be remotely armed and disarmed.</p>
+<div class="section" id="arming">
+<h2>Arming<a class="headerlink" href="#arming" title="Permalink to this headline">¶</a></h2>
+<p>The APM can be armed by:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>arm throttle
+</pre></div>
+</div>
+</div>
+<div class="section" id="disarming">
+<h2>Disarming<a class="headerlink" href="#disarming" title="Permalink to this headline">¶</a></h2>
+<p>The APM can be disarmed by:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre><span class="n">disarm</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="safety-switch">
+<h2>Safety Switch<a class="headerlink" href="#safety-switch" title="Permalink to this headline">¶</a></h2>
+<p>The safety switch can be remotely turned on and off via:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>arm safetyon
+arm safetyoff
+</pre></div>
+</div>
+</div>
+<div class="section" id="arming-checks">
+<h2>Arming Checks<a class="headerlink" href="#arming-checks" title="Permalink to this headline">¶</a></h2>
+<p>The individual arming checks can be enabled or disabled as per:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>arm check X
+arm uncheck X
+</pre></div>
+</div>
+<p>Where X can be: all, baro, compass, gps, ins, params, rc, voltage, battery</p>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="parameters.html" class="btn btn-neutral float-right" title="Parameters" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="index.html" class="btn btn-neutral" title="UAV Configuration" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
+<div style="float:right;"><a href="https://github.com/Dronecode/MAVProxy/issues/new?title=Arming%20and%20Disarming%20-%20&body=URL:%20../uav_configuration/arming%0ATitle:%20Arming%20and%20Disarming%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
+    <p><a href="https://www.dronecode.org/"><img src="../_static/images/dronecodelogo.png" width="130" alt="Dronecode" class /></a><br/> 
+    This is a Dronecode project.</p>     
+
+    <p>
+
+    </p>
+  </div>
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'1.4.24',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
