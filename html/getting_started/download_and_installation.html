@@ -146,28 +146,22 @@
             
   <div class="section" id="download-and-installation">
 <h1>Download and Installation<a class="headerlink" href="#download-and-installation" title="Permalink to this headline">¶</a></h1>
+<p>The following instructions are for user that just want to run MAVProxy. Developers should look at the <a class="reference internal" href="../development/mavdevenv.html"><em>Developer&#8217;s Guide</em></a> for setting up the development environment.</p>
 <div class="section" id="windows">
 <h2>Windows<a class="headerlink" href="#windows" title="Permalink to this headline">¶</a></h2>
 <p>A complete windows installer for MAVProxy is available at
 <a class="reference external" href="http://firmware.diydrones.com/Tools/MAVProxy/">http://firmware.diydrones.com/Tools/MAVProxy/</a>.</p>
-<p>Please note that the &#8220;missionedit&#8221; module does not currently run on the
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Please note that the &#8220;missionedit&#8221; module does not currently run on the
 Windows package of MAVProxy. This is being investigated and will
-hopefully be fixed soon.</p>
+hopefully be fixed soon. See <a class="reference external" href="https://github.com/Dronecode/MAVProxy/issues/129">https://github.com/Dronecode/MAVProxy/issues/129</a> for more details.</p>
+</div>
 </div>
 <div class="section" id="linux">
 <h2>Linux<a class="headerlink" href="#linux" title="Permalink to this headline">¶</a></h2>
-<p>Linux users can use the PyPi program to get the needed packages:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>sudo apt-get install python-pip``
-</pre></div>
-</div>
-<p>Then download and install MAVProxy. Prerequisites will be
-automatically downloaded too. Note a sudo may be required in some
-circumstances if the install generates errors.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>pip install MAVProxy
-</pre></div>
-</div>
-<p>The following other packages may also be required:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>sudo apt-get install python-opencv python-wxgtk
+<p>First, a few pre-requisite packages need to be installed :</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>sudo apt-get install python-opencv python-wxgtk python-pip
 </pre></div>
 </div>
 <div class="admonition note">
@@ -175,14 +169,36 @@ circumstances if the install generates errors.</p>
 <p class="last">On some Linux systems, <code class="docutils literal"><span class="pre">python-wxgtk</span></code> may be instead named
 as <code class="docutils literal"><span class="pre">python-wxgtk2.8</span></code>.</p>
 </div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>Those using <a class="reference external" href="http://python.dronekit.io/">Dronekit</a> may also require the following packages: python-dev python-serial python-pyparsing via:</p>
+<div class="code bash last highlight-python"><div class="highlight"><pre>sudo apt-get install python-dev python-serial python-pyparsing
+</pre></div>
+</div>
+</div>
+<p>Then download and install MAVProxy via Pypi. Prerequisites will be
+automatically downloaded too. Note a sudo may be required in some
+circumstances if the install generates errors.</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>pip install MAVProxy
+</pre></div>
+</div>
 </div>
 <div class="section" id="mac">
 <h2>Mac<a class="headerlink" href="#mac" title="Permalink to this headline">¶</a></h2>
-<p>Some users have reported difficulties with installing wxPython on the
-latest version of OSX. These issues have not yet been resolved, so you
-may have mixed results trying to get MAVProxy up and running.</p>
-<p>OSX should require the same prerequisites as for the Windows
-installations.</p>
+<p>If you’re on Mac OSX, you can use Homebrew to install WXMac.</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>brew tap homebrew/science
+brew install wxmac wxpython opencv
+</pre></div>
+</div>
+<p>Uninstall python-dateutil (OSX and Windows come bundled with a version that is not supported for some dependencies):</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>sudo pip uninstall python-dateutil
+</pre></div>
+</div>
+<p>Install DroneKit-Python and its remaining dependencies (including MAVProxy) from the public PyPi repository:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>sudo pip install numpy pyparsing
+sudo pip install droneapi
+</pre></div>
+</div>
 </div>
 </div>
 
