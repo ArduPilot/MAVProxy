@@ -149,8 +149,11 @@ environments, Python and git.</p>
 <div class="section" id="linux">
 <h2>Linux<a class="headerlink" href="#linux" title="Permalink to this headline">¶</a></h2>
 <p>Install the Python and MAVlink libraries as per the
-topic <a class="reference internal" href="../getting_started/download_and_installation.html"><em>Download and Installation</em></a>. Additionally, install the
-<code class="docutils literal"><span class="pre">setuptools</span></code> package via <code class="docutils literal"><span class="pre">pip</span></code></p>
+topic <a class="reference internal" href="../getting_started/download_and_installation.html"><em>Download and Installation</em></a>. Additionally, install:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>sudo apt-get install python-dev
+pip install setuptools
+</pre></div>
+</div>
 <p>Use git to download the MAVProxy source:</p>
 <div class="code bash highlight-python"><div class="highlight"><pre>git clone https://github.com/Dronecode/MAVProxy.git
 </pre></div>
@@ -162,6 +165,13 @@ changes to the source code. This can be done by:</p>
 </pre></div>
 </div>
 <p>MAVProxy can then be run as per normal.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>Those using <a class="reference external" href="http://python.dronekit.io/">Dronekit</a> may also require the following packages: python-dev python-serial python-pyparsing via:</p>
+<div class="code bash last highlight-python"><div class="highlight"><pre>sudo apt-get install python-serial python-pyparsing
+</pre></div>
+</div>
+</div>
 </div>
 <div class="section" id="windows">
 <h2>Windows<a class="headerlink" href="#windows" title="Permalink to this headline">¶</a></h2>

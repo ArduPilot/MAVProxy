@@ -12,8 +12,12 @@ Linux
 =====
 
 Install the Python and MAVlink libraries as per the
-topic :doc:`../getting_started/download_and_installation`. Additionally, install the
-``setuptools`` package via ``pip``
+topic :doc:`../getting_started/download_and_installation`. Additionally, install:
+
+.. code:: bash
+
+    sudo apt-get install python-dev
+    pip install setuptools
 
 Use git to download the MAVProxy source:
 
@@ -30,6 +34,14 @@ changes to the source code. This can be done by:
     python setup.py build install --user
 
 MAVProxy can then be run as per normal.
+
+.. note::
+
+    Those using `Dronekit <http://python.dronekit.io/>`_ may also require the following packages: python-dev python-serial python-pyparsing via:
+    
+    .. code:: bash
+    
+        sudo apt-get install python-serial python-pyparsing
 
 Windows
 =======

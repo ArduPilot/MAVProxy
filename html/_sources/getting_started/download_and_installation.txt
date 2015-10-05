@@ -31,14 +31,6 @@ First, a few pre-requisite packages need to be installed :
     On some Linux systems, ``python-wxgtk`` may be instead named
     as ``python-wxgtk2.8``.
     
-.. note::
-
-    Those using `Dronekit <http://python.dronekit.io/>`_ may also require the following packages: python-dev python-serial python-pyparsing via:
-    
-    .. code:: bash
-    
-        sudo apt-get install python-dev python-serial python-pyparsing
-    
 Then download and install MAVProxy via Pypi. Prerequisites will be
 automatically downloaded too. Note a sudo may be required in some
 circumstances if the install generates errors.
