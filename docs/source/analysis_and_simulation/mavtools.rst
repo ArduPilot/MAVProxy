@@ -15,7 +15,7 @@ This can graph any of the flight data.
     mavgraph.py flight.tlog VFR_HUD.alt
 
 Other than specifying the tlog file, the commands are exactly the same
-as the :doc:`graph <../advanced_modules/modules>` module in MAVProxy.
+as the :doc:`graph <../modules/graph>` module in MAVProxy.
 
 mavtogpx.py
 ===========

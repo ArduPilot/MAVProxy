@@ -13,4 +13,4 @@ This section contains topics showing how to query and set vehicle configuration.
     rally
     flightModes
     calibration    
-    gimbals
+
