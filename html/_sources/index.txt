@@ -33,11 +33,11 @@ available) can be seen `here <https://github.com/Dronecode/MAVProxy/commits/mast
 Screenshots
 ============
 
-.. figure:: _static/images/mavproxy_linux.jpg
+.. figure:: getting_started/mavproxy_linux.jpg
 
    MAVProxy running under Ubuntu
 
-.. figure:: _static/images/mavproxy_windows.jpg
+.. figure:: getting_started/mavproxy_windows.jpg
 
    MAVProxy running under Windows 7
 
@@ -62,7 +62,7 @@ This page was generated using Sphinx SSG and is hosted using `GitHub Pages <http
 
     getting_started/index
     uav_configuration/index
-    advanced_modules/index
+    modules/index
     analysis_and_simulation/index
     development/index
     license

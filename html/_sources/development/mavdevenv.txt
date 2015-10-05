@@ -12,14 +12,18 @@ Linux
 =====
 
 Install the Python and MAVlink libraries as per the
-topic :doc:`../getting_started/download_and_installation`. Additionally, install the
-``setuptools`` package via ``pip``
+topic :doc:`../getting_started/download_and_installation`. Additionally, install:
+
+.. code:: bash
+
+    sudo apt-get install python-dev
+    pip install setuptools
 
 Use git to download the MAVProxy source:
 
 .. code:: bash
 
-    git clone https://github.com/tridge/MAVProxy.git
+    git clone https://github.com/Dronecode/MAVProxy.git
 
 After making the desired changes, MAVProxy is required to be installed
 (the modules won't work otherwise). This needs to happen after any
@@ -30,6 +34,14 @@ changes to the source code. This can be done by:
     python setup.py build install --user
 
 MAVProxy can then be run as per normal.
+
+.. note::
+
+    Those using `Dronekit <http://python.dronekit.io/>`_ may also require the following packages: python-dev python-serial python-pyparsing via:
+    
+    .. code:: bash
+    
+        sudo apt-get install python-serial python-pyparsing
 
 Windows
 =======
@@ -42,17 +54,23 @@ You will need to have `Python
 `pygame <http://pygame.org/download.shtml>`_ installed first.
 
 Next, open up a console in the Python scripts install path
-(C:\\Python27\\Scripts or similar). Use ``pip install [filepath]`` to install them
+(:file:`C:\\Python27\\Scripts` or similar). Use ``pip install [filepath]`` to install them
 
 - `numPY <http://www.lfd.uci.edu/~gohlke/pythonlibs/#numpy>`_
 - `Pillow (replaces
   PIL) <http://www.lfd.uci.edu/~gohlke/pythonlibs/#pillow>`_
 - `OpenCV <http://www.lfd.uci.edu/~gohlke/pythonlibs/#opencv>`_
 
+.. code:: bash
+
+    cd C:\Python27\Scripts
+    pip install C:\Users\Stephen\Desktop\numpy.whl
+
 Use ``pip`` to install the other packages:
 
 .. code:: bash
 
+    cd C:\\Python27\\Scripts
     pip install pyinstaller 
     pip install matplotlib 
     pip install pyreadline 
@@ -60,7 +78,7 @@ Use ``pip`` to install the other packages:
     pip install pymavlink  
     pip install lxml python-dateutil pytz pyparsing six
 
-Download the MAVProxy `source <https://github.com/tridge/MAVProxy>`_.
+Download the MAVProxy `source <https://github.com/Dronecode/MAVProxy>`_.
 
 After making the desired changes, MAVProxy is required to be compiled
 and copied into the Python directory (the modules won't work otherwise).

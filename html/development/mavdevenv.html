@@ -84,7 +84,7 @@
               <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting Started</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../advanced_modules/index.html">Advanced MAVProxy Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/index.html">Modules</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Development</a><ul class="current">
 <li class="toctree-l2 current"><a class="current reference internal" href="">Development Environment</a><ul>
@@ -149,10 +149,13 @@ environments, Python and git.</p>
 <div class="section" id="linux">
 <h2>Linux<a class="headerlink" href="#linux" title="Permalink to this headline">¶</a></h2>
 <p>Install the Python and MAVlink libraries as per the
-topic <a class="reference internal" href="../getting_started/download_and_installation.html"><em>Download and Installation</em></a>. Additionally, install the
-<code class="docutils literal"><span class="pre">setuptools</span></code> package via <code class="docutils literal"><span class="pre">pip</span></code></p>
+topic <a class="reference internal" href="../getting_started/download_and_installation.html"><em>Download and Installation</em></a>. Additionally, install:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>sudo apt-get install python-dev
+pip install setuptools
+</pre></div>
+</div>
 <p>Use git to download the MAVProxy source:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>git clone https://github.com/tridge/MAVProxy.git
+<div class="code bash highlight-python"><div class="highlight"><pre>git clone https://github.com/Dronecode/MAVProxy.git
 </pre></div>
 </div>
 <p>After making the desired changes, MAVProxy is required to be installed
@@ -162,6 +165,13 @@ changes to the source code. This can be done by:</p>
 </pre></div>
 </div>
 <p>MAVProxy can then be run as per normal.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>Those using <a class="reference external" href="http://python.dronekit.io/">Dronekit</a> may also require the following packages: python-dev python-serial python-pyparsing via:</p>
+<div class="code bash last highlight-python"><div class="highlight"><pre>sudo apt-get install python-serial python-pyparsing
+</pre></div>
+</div>
+</div>
 </div>
 <div class="section" id="windows">
 <h2>Windows<a class="headerlink" href="#windows" title="Permalink to this headline">¶</a></h2>
@@ -171,15 +181,20 @@ changes to the source code. This can be done by:</p>
 <a class="reference external" href="http://www.wxpython.org/download.php">wxPython</a> and
 <a class="reference external" href="http://pygame.org/download.shtml">pygame</a> installed first.</p>
 <p>Next, open up a console in the Python scripts install path
-(C:\Python27\Scripts or similar). Use <code class="docutils literal"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">[filepath]</span></code> to install them</p>
+(<code class="file docutils literal"><span class="pre">C:\Python27\Scripts</span></code> or similar). Use <code class="docutils literal"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">[filepath]</span></code> to install them</p>
 <ul class="simple">
 <li><a class="reference external" href="http://www.lfd.uci.edu/~gohlke/pythonlibs/#numpy">numPY</a></li>
 <li><a class="reference external" href="http://www.lfd.uci.edu/~gohlke/pythonlibs/#pillow">Pillow (replaces
 PIL)</a></li>
 <li><a class="reference external" href="http://www.lfd.uci.edu/~gohlke/pythonlibs/#opencv">OpenCV</a></li>
 </ul>
+<div class="code bash highlight-python"><div class="highlight"><pre>cd C:\Python27\Scripts
+pip install C:\Users\Stephen\Desktop\numpy.whl
+</pre></div>
+</div>
 <p>Use <code class="docutils literal"><span class="pre">pip</span></code> to install the other packages:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>pip install pyinstaller
+<div class="code bash highlight-python"><div class="highlight"><pre>cd C:\\Python27\\Scripts
+pip install pyinstaller
 pip install matplotlib
 pip install pyreadline
 pip install pyserial
@@ -187,7 +202,7 @@ pip install pymavlink
 pip install lxml python-dateutil pytz pyparsing six
 </pre></div>
 </div>
-<p>Download the MAVProxy <a class="reference external" href="https://github.com/tridge/MAVProxy">source</a>.</p>
+<p>Download the MAVProxy <a class="reference external" href="https://github.com/Dronecode/MAVProxy">source</a>.</p>
 <p>After making the desired changes, MAVProxy is required to be compiled
 and copied into the Python directory (the modules won&#8217;t work otherwise).
 This needs to happen after any changes to the source code. This can be

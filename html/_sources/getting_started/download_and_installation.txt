@@ -2,6 +2,7 @@
 Download and Installation
 =========================
 
+The following instructions are for user that just want to run MAVProxy. Developers should look at the :doc:`Developer's Guide <../development/mavdevenv>` for setting up the development environment.
 
 Windows
 =======
@@ -9,21 +10,28 @@ Windows
 A complete windows installer for MAVProxy is available at
 http://firmware.diydrones.com/Tools/MAVProxy/.
 
-Please note that the "missionedit" module does not currently run on the
-Windows package of MAVProxy. This is being investigated and will
-hopefully be fixed soon.
+.. note::
+
+    Please note that the "missionedit" module does not currently run on the
+    Windows package of MAVProxy. This is being investigated and will
+    hopefully be fixed soon. See https://github.com/Dronecode/MAVProxy/issues/129 for more details.
 
 
 Linux
 =====
 
-Linux users can use the PyPi program to get the needed packages:
+First, a few pre-requisite packages need to be installed :
 
 .. code:: bash
 
-    sudo apt-get install python-pip``
+    sudo apt-get install python-opencv python-wxgtk python-pip
 
-Then download and install MAVProxy. Prerequisites will be
+.. note::
+
+    On some Linux systems, ``python-wxgtk`` may be instead named
+    as ``python-wxgtk2.8``.
+    
+Then download and install MAVProxy via Pypi. Prerequisites will be
 automatically downloaded too. Note a sudo may be required in some
 circumstances if the install generates errors.
 
@@ -31,23 +39,27 @@ circumstances if the install generates errors.
 
     pip install MAVProxy
 
-The following other packages may also be required:
-
-.. code:: bash
-
-    sudo apt-get install python-opencv python-wxgtk
-
-.. note::
-
-    On some Linux systems, ``python-wxgtk`` may be instead named
-    as ``python-wxgtk2.8``.
-
 Mac
 ===
 
-Some users have reported difficulties with installing wxPython on the
-latest version of OSX. These issues have not yet been resolved, so you
-may have mixed results trying to get MAVProxy up and running.
+If you’re on Mac OSX, you can use Homebrew to install WXMac.
 
-OSX should require the same prerequisites as for the Windows
-installations.
+.. code:: bash
+
+    brew tap homebrew/science
+    brew install wxmac wxpython opencv
+
+Uninstall python-dateutil (OSX and Windows come bundled with a version that is not supported for some dependencies):
+
+.. code:: bash
+
+    sudo pip uninstall python-dateutil
+
+Install DroneKit-Python and its remaining dependencies (including MAVProxy) from the public PyPi repository:
+
+.. code:: bash
+
+    sudo pip install numpy pyparsing
+    sudo pip install droneapi
+
+
