@@ -139,8 +139,7 @@ class TabbedDialog(wx.Dialog):
 
     def add_floatspin(self, setting):
         '''add a floating point spin control'''
-        from wx_loader import wx
-        FloatSpin = wx.lib.agw.floatspin
+        from wx.lib.agw.floatspin import FloatSpin
         
         tab = self.panel(setting.tab)
         default = setting.value
