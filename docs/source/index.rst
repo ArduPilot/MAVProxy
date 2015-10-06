@@ -65,6 +65,7 @@ This page was generated using Sphinx SSG and is hosted using `GitHub Pages <http
     modules/index
     analysis_and_simulation/index
     development/index
+    cuav_module/index
     license
 
 
