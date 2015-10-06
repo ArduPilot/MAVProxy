@@ -6,6 +6,8 @@ This section details how to use the cuav module.
 
 The cuav module is a specialised module for performing on-the-fly image analysis of imagery collected by a UAV (and other vehicle). It is tightly integrated with the APM flight controller, which it uses for giving precise coordinates of detected items in images.
 
+Source code is available at https://github.com/tridge/cuav
+
 ----------
 Installing
 ----------
@@ -25,7 +27,7 @@ The cuav module requires the following pre-requisites (this assumes the MAVproxy
 Using
 -----
 
-Within MAVProxy, use the following the activate cuav:
+Within MAVProxy, use the following to activate cuav:
 
 .. code:: bash
 
