@@ -14,6 +14,7 @@ class CmdlongModule(mp_module.MPModule):
         self.add_command('takeoff', self.cmd_takeoff, "takeoff")
         self.add_command('velocity', self.cmd_velocity, "velocity")
         self.add_command('position', self.cmd_position, "position")
+        self.add_command('attitude', self.cmd_attitude, "attitude")
         self.add_command('cammsg', self.cmd_cammsg, "cammsg")
         self.add_command('camctrlmsg', self.cmd_camctrlmsg, "camctrlmsg")
 
@@ -162,6 +163,31 @@ class CmdlongModule(mp_module.MPModule):
                                       0, 0, 0,  # velocity x,y,z
                                       0, 0, 0,  # accel x,y,z
                                       0, 0)     # yaw, yaw rate
+
+    def cmd_attitude(self, args):
+        '''attitude q0 q1 q2 q3 thrust'''
+        if (len(args) != 5):
+            print("Usage: attitude q0 q1 q2 q3 thrust (0~1)")
+            return
+
+        if (len(args) == 5):
+            q0 = float(args[0])
+            q1 = float(args[1])
+            q2 = float(args[2])
+            q3 = float(args[3])
+            thrust = float(args[4])
+            att_target = [q0, q1, q2, q3]
+            print("q0:%.3f, q1:%.3f, q2:%.3f q3:%.3f thrust:%.2f" % (q0, q1, q2, q3, thrust))
+            self.master.mav.set_attitude_target_send(
+                                      0,  # system time in milliseconds
+                                      1,  # target system
+                                      0,  # target component
+                                      63, # type mask (ignore all except attitude + thrust)
+                                      att_target, # quaternion attitude
+                                      0,  # body roll rate
+                                      0,  # body pich rate
+                                      0,  # body yaw rate
+                                      thrust)  # thrust
 
 def init(mpstate):
     '''initialise module'''
