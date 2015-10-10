@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Graphing Live Data &mdash; MAVProxy 1.4.24 documentation</title>
+  <title>Link Management &mdash; MAVProxy 1.4.24 documentation</title>
   
 
   
@@ -32,8 +32,8 @@
   
     <link rel="top" title="MAVProxy 1.4.24 documentation" href="../index.html"/>
         <link rel="up" title="Modules" href="index.html"/>
-        <link rel="next" title="HIL" href="hil.html"/>
-        <link rel="prev" title="Gimbal Management" href="gimbals.html"/> 
+        <link rel="next" title="Log Management" href="log.html"/>
+        <link rel="prev" title="Joystick Input" href="joystick.html"/> 
 
   
   <script src="../_static/js/modernizr.min.js"></script>
@@ -91,10 +91,15 @@
 <li class="toctree-l2"><a class="reference internal" href="console.html">Graphical Console</a></li>
 <li class="toctree-l2"><a class="reference internal" href="dgps.html">Differential GPS</a></li>
 <li class="toctree-l2"><a class="reference internal" href="gimbals.html">Gimbal Management</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="">Graphing Live Data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="graph.html">Graphing Live Data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="hil.html">HIL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="joystick.html">Joystick Input</a></li>
-<li class="toctree-l2"><a class="reference internal" href="link.html">Link Management</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="">Link Management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#link-add">link add</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#link-remove">link remove</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#link-list">link list</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="log.html">Log Management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="map.html">Moving Map</a></li>
 <li class="toctree-l2"><a class="reference internal" href="misseditor.html">Mission Editor</a></li>
@@ -145,7 +150,7 @@
       
           <li><a href="index.html">Modules</a> &raquo;</li>
       
-    <li>Graphing Live Data</li>
+    <li>Link Management</li>
       <li class="wy-breadcrumbs-aside">
         
           
@@ -157,31 +162,41 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="graphing-live-data">
-<h1>Graphing Live Data<a class="headerlink" href="#graphing-live-data" title="Permalink to this headline">¶</a></h1>
-<div class="code bash highlight-python"><div class="highlight"><pre>module load graph
+  <div class="section" id="link-management">
+<h1>Link Management<a class="headerlink" href="#link-management" title="Permalink to this headline">¶</a></h1>
+<p>The link module allows the user to add, remove and monitor the status of
+communications links to the APM. This can be done at any time.</p>
+<p>It is useful for UAV systems that have multiple communications links.
+MAVProxy will automatically read the data from both links, no user
+intervention is necessary for link failover.</p>
+<p>A link menu is available on the GUI console.</p>
+<div class="section" id="link-add">
+<h2>link add<a class="headerlink" href="#link-add" title="Permalink to this headline">¶</a></h2>
+<p>Add an additional communications link. This can be either a network
+address or serial port. For a serial port, the default baud rate is
+57600. Use <code class="docutils literal"><span class="pre">set</span> <span class="pre">baudrate</span> <span class="pre">xxx</span></code> to change baud rate for any subsequent
+link add&#8217;s.</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>link add 127.0.0.1:14550
+set baudrate 115200
+link add COM17
 </pre></div>
 </div>
-<p>A module to plot (graph) data in realtime from the UAV. It is useful for
-looking for time-varying patterns in the data</p>
-<p>After loading, new plots can be created by:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>graph dataname
+</div>
+<div class="section" id="link-remove">
+<h2>link remove<a class="headerlink" href="#link-remove" title="Permalink to this headline">¶</a></h2>
+<p>Remove a communications link. The ID of the link is used to identify the
+link to remove.</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>link remove 2
 </pre></div>
 </div>
-<p>Multiple items can be added at once. Use the <code class="docutils literal"><span class="pre">:2</span></code> to specify using the
-right vertical axis.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>graph VFR_HUD.alt VFR_HUD.airspeed:2
+</div>
+<div class="section" id="link-list">
+<h2>link list<a class="headerlink" href="#link-list" title="Permalink to this headline">¶</a></h2>
+<p>List the active communications links and their ID&#8217;s</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>link list
 </pre></div>
 </div>
-<p>Arbitrary mathematical functions can also be used.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>graph &quot;(VFR_HUD.alt/1000.0)+5&quot;
-</pre></div>
 </div>
-<p>Additionally, the timespan and tick resolution of the graph window can
-be changed. Use <code class="docutils literal"><span class="pre">graph</span> <span class="pre">timespan</span> <span class="pre">X</span></code> to change the timespace to X
-seconds and <code class="docutils literal"><span class="pre">graph</span> <span class="pre">tickresolution</span> <span class="pre">Y</span></code> to change the tick resolution to
-Y seconds.</p>
-<img alt="../_images/graph.png" src="../_images/graph.png" />
 </div>
 
 
@@ -191,10 +206,10 @@ Y seconds.</p>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="hil.html" class="btn btn-neutral float-right" title="HIL" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="log.html" class="btn btn-neutral float-right" title="Log Management" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="gimbals.html" class="btn btn-neutral" title="Gimbal Management" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="joystick.html" class="btn btn-neutral" title="Joystick Input" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
@@ -203,7 +218,7 @@ Y seconds.</p>
 
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
-<div style="float:right;"><a href="https://github.com/Dronecode/MAVProxy/issues/new?title=Graphing%20Live%20Data%20-%20&body=URL:%20../modules/graph%0ATitle:%20Graphing%20Live%20Data%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
+<div style="float:right;"><a href="https://github.com/Dronecode/MAVProxy/issues/new?title=Link%20Management%20-%20&body=URL:%20../modules/link%0ATitle:%20Link%20Management%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
     <p><a href="https://www.dronecode.org/"><img src="../_static/images/dronecodelogo.png" width="130" alt="Dronecode" class /></a><br/> 
     This is a Dronecode project.</p>     
 

@@ -33,4 +33,5 @@ be changed. Use ``graph timespan X`` to change the timespace to X
 seconds and ``graph tickresolution Y`` to change the tick resolution to
 Y seconds.
 
+.. image:: graph.png
 
