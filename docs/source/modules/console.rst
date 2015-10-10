@@ -22,6 +22,7 @@ geofence commands.
 
 .. image:: console.png
 
+.. image:: console_win.png
 
 
 

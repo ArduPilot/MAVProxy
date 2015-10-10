@@ -21,6 +21,7 @@ monitoring applications.
     graph
     hil
     joystick
+    link
     log
     map
     misseditor

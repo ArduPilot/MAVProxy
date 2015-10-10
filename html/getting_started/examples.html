@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Download and Installation &mdash; MAVProxy 1.4.24 documentation</title>
+  <title>Examples &mdash; MAVProxy 1.4.24 documentation</title>
   
 
   
@@ -32,8 +32,8 @@
   
     <link rel="top" title="MAVProxy 1.4.24 documentation" href="../index.html"/>
         <link rel="up" title="Getting Started" href="index.html"/>
-        <link rel="next" title="Quickstart" href="quickstart.html"/>
-        <link rel="prev" title="Getting Started" href="index.html"/> 
+        <link rel="next" title="UAV Configuration" href="../uav_configuration/index.html"/>
+        <link rel="prev" title="Startup Scripts" href="mavinit.html"/> 
 
   
   <script src="../_static/js/modernizr.min.js"></script>
@@ -83,16 +83,11 @@
           
               <ul class="current">
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting Started</a><ul class="current">
-<li class="toctree-l2 current"><a class="current reference internal" href="">Download and Installation</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#windows">Windows</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#linux">Linux</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#mac">Mac</a></li>
-</ul>
-</li>
+<li class="toctree-l2"><a class="reference internal" href="download_and_installation.html">Download and Installation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
 <li class="toctree-l2"><a class="reference internal" href="starting.html">Startup Options</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mavinit.html">Startup Scripts</a></li>
-<li class="toctree-l2"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="">Examples</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
@@ -133,7 +128,7 @@
       
           <li><a href="index.html">Getting Started</a> &raquo;</li>
       
-    <li>Download and Installation</li>
+    <li>Examples</li>
       <li class="wy-breadcrumbs-aside">
         
           
@@ -145,54 +140,23 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="download-and-installation">
-<h1>Download and Installation<a class="headerlink" href="#download-and-installation" title="Permalink to this headline">¶</a></h1>
-<p>The following instructions are for user that just want to run MAVProxy. Developers should look at the <a class="reference internal" href="../development/mavdevenv.html"><em>Developer&#8217;s Guide</em></a> for setting up the development environment.</p>
-<div class="section" id="windows">
-<h2>Windows<a class="headerlink" href="#windows" title="Permalink to this headline">¶</a></h2>
-<p>A complete windows installer for MAVProxy is available at
-<a class="reference external" href="http://firmware.diydrones.com/Tools/MAVProxy/">http://firmware.diydrones.com/Tools/MAVProxy/</a>.</p>
-<div class="admonition note">
-<p class="first admonition-title">Note</p>
-<p class="last">Please note that the &#8220;missionedit&#8221; module does not currently run on the
-Windows package of MAVProxy. This is being investigated and will
-hopefully be fixed soon. See <a class="reference external" href="https://github.com/Dronecode/MAVProxy/issues/129">https://github.com/Dronecode/MAVProxy/issues/129</a> for more details.</p>
-</div>
-</div>
-<div class="section" id="linux">
-<h2>Linux<a class="headerlink" href="#linux" title="Permalink to this headline">¶</a></h2>
-<p>First, a few pre-requisite packages need to be installed :</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>sudo apt-get install python-opencv python-wxgtk python-pip python-dev
+  <div class="section" id="examples">
+<h1>Examples<a class="headerlink" href="#examples" title="Permalink to this headline">¶</a></h1>
+<p>The following section provides a couple of common usage scenarios for MAVProxy.</p>
+<p>Quadcopter over a standard (57600 kbps) radio link on a serial port. MAVProxy will auto-detect the correct serial port. The quadcopter is called &#8220;Quaddy&#8221;. The GUI console, map and text-to-speech are also enabled:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">baud</span><span class="o">=</span><span class="mi">57600</span> <span class="o">--</span><span class="n">aircraft</span><span class="o">=</span><span class="s">&quot;Quaddy&quot;</span> <span class="o">--</span><span class="n">speech</span> <span class="o">--</span><span class="n">console</span> <span class="o">--</span><span class="nb">map</span> <span class="o">--</span><span class="n">quadcopter</span>
 </pre></div>
 </div>
-<div class="admonition note">
-<p class="first admonition-title">Note</p>
-<p class="last">On some Linux systems, <code class="docutils literal"><span class="pre">python-wxgtk</span></code> may be instead named
-as <code class="docutils literal"><span class="pre">python-wxgtk2.8</span></code>.</p>
-</div>
-<p>Then download and install MAVProxy via Pypi. Prerequisites will be
-automatically downloaded too. Note a sudo may be required in some
-circumstances if the install generates errors.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>pip install MAVProxy
+<p>Run MAVProxy in daemon mode, taking in a radio link (COM17 at 9600 kbps) and outputting it to the local network. This allows a single instance of MAVProxy to distribute the telemetry stream to multiple clients:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>mavproxy.py --master=COM17,57600 --out=udpin:0.0.0.0:14550 --daemon
+
+(client, xxx.xxx.xxx.xxx is the daemon&#39;s IP address)
+mavproxy.py –master=udpout:xxx.xxx.xxx.xxx:14550
 </pre></div>
 </div>
-</div>
-<div class="section" id="mac">
-<h2>Mac<a class="headerlink" href="#mac" title="Permalink to this headline">¶</a></h2>
-<p>If you’re on Mac OSX, you can use Homebrew to install WXMac.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>brew tap homebrew/science
-brew install wxmac wxpython opencv
+<p>Use multiple radio links (one serial, one network) to the remote vehicle. This is useful for situations where a backup radio link is required:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>mavproxy.py --master=\dev\ttyUSB0,57600 --master=192.168.16.15:2626
 </pre></div>
-</div>
-<p>Uninstall python-dateutil (OSX and Windows come bundled with a version that is not supported for some dependencies):</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>sudo pip uninstall python-dateutil
-</pre></div>
-</div>
-<p>Install MAVProxy and its remaining dependencies from the public PyPi repository:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>sudo pip install numpy pyparsing
-sudo pip install MAVProxy
-</pre></div>
-</div>
 </div>
 </div>
 
@@ -203,10 +167,10 @@ sudo pip install MAVProxy
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="quickstart.html" class="btn btn-neutral float-right" title="Quickstart" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="../uav_configuration/index.html" class="btn btn-neutral float-right" title="UAV Configuration" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="index.html" class="btn btn-neutral" title="Getting Started" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="mavinit.html" class="btn btn-neutral" title="Startup Scripts" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
@@ -215,7 +179,7 @@ sudo pip install MAVProxy
 
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
-<div style="float:right;"><a href="https://github.com/Dronecode/MAVProxy/issues/new?title=Download%20and%20Installation%20-%20&body=URL:%20../getting_started/download_and_installation%0ATitle:%20Download%20and%20Installation%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
+<div style="float:right;"><a href="https://github.com/Dronecode/MAVProxy/issues/new?title=Examples%20-%20&body=URL:%20../getting_started/examples%0ATitle:%20Examples%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
     <p><a href="https://www.dronecode.org/"><img src="../_static/images/dronecodelogo.png" width="130" alt="Dronecode" class /></a><br/> 
     This is a Dronecode project.</p>     
 

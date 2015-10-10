@@ -24,7 +24,7 @@ First, a few pre-requisite packages need to be installed :
 
 .. code:: bash
 
-    sudo apt-get install python-opencv python-wxgtk python-pip
+    sudo apt-get install python-opencv python-wxgtk python-pip python-dev
 
 .. note::
 
@@ -55,11 +55,11 @@ Uninstall python-dateutil (OSX and Windows come bundled with a version that is n
 
     sudo pip uninstall python-dateutil
 
-Install DroneKit-Python and its remaining dependencies (including MAVProxy) from the public PyPi repository:
+Install MAVProxy and its remaining dependencies from the public PyPi repository:
 
 .. code:: bash
 
     sudo pip install numpy pyparsing
-    sudo pip install droneapi
+    sudo pip install MAVProxy
 
 

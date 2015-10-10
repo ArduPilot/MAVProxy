@@ -26,5 +26,5 @@ Use the "g" key to specify a position to move the map to.
 
 .. image:: map.png
 
-
+.. image:: map_win.png
 

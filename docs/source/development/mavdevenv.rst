@@ -16,7 +16,6 @@ topic :doc:`../getting_started/download_and_installation`. Additionally, install
 
 .. code:: bash
 
-    sudo apt-get install python-dev
     pip install setuptools
 
 Use git to download the MAVProxy source:
@@ -70,7 +69,7 @@ Use ``pip`` to install the other packages:
 
 .. code:: bash
 
-    cd C:\\Python27\\Scripts
+    cd C:\Python27\Scripts
     pip install pyinstaller 
     pip install matplotlib 
     pip install pyreadline 
