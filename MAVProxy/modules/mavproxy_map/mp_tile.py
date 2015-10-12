@@ -49,7 +49,9 @@ TILE_SERVICES = {
 	"OpenStreetMap"  : "http://tile.openstreetmap.org/${ZOOM}/${X}/${Y}.png",
 	"OSMARender"     : "http://tah.openstreetmap.org/Tiles/tile/${ZOOM}/${X}/${Y}.png",
 	"OpenAerialMap"  : "http://tile.openaerialmap.org/tiles/?v=mgm&layer=openaerialmap-900913&x=${X}&y=${Y}&zoom=${OAM_ZOOM}",
-	"OpenCycleMap"   : "http://andy.sandbox.cloudmade.com/tiles/cycle/${ZOOM}/${X}/${Y}.png"
+	"OpenCycleMap"   : "http://andy.sandbox.cloudmade.com/tiles/cycle/${ZOOM}/${X}/${Y}.png",
+	"StatKartTopo2" : "http://opencache.statkart.no/gatekeeper/gk/gk.open_gmaps?layers=topo2&zoom=${ZOOM}&x=${X}&y=${Y}"
+        
 	}
 
 # these are the md5sums of "unavailable" tiles
