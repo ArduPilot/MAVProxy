@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Image Processing with cuav &mdash; MAVProxy 1.4.24 documentation</title>
+  <title>Image Processing with cuav &mdash; MAVProxy 1.4.34 documentation</title>
   
 
   
@@ -30,7 +30,7 @@
   
 
   
-    <link rel="top" title="MAVProxy 1.4.24 documentation" href="../index.html"/>
+    <link rel="top" title="MAVProxy 1.4.34 documentation" href="../index.html"/>
         <link rel="next" title="License" href="../license.html"/>
         <link rel="prev" title="Module Development" href="../development/mavcustmod.html"/> 
 
@@ -59,7 +59,7 @@
           
           
             <div class="version">
-              1.4.24
+              1.4.34
             </div>
           
         
@@ -88,7 +88,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="">Image Processing with cuav</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#installing">Installing</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#using">Using</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#compatibility-and-system-setup">Compatibility and System Setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#usage">Usage</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
@@ -151,8 +152,14 @@ pip install cuav
 <p class="last">Some users may also require the following packages: python-pyexiv2 python-httplib2 libjpeg-turbo-progs</p>
 </div>
 </div>
-<div class="section" id="using">
-<h2>Using<a class="headerlink" href="#using" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="compatibility-and-system-setup">
+<h2>Compatibility and System Setup<a class="headerlink" href="#compatibility-and-system-setup" title="Permalink to this headline">¶</a></h2>
+<p>The cauv module is compatible with any IEEE 1394 (Firewire) based cameras that conform to the 1394-based Digital Camera Specifications (also known as the IIDC or DCAM Specifications). Note this does include some USB 2.0 cameras from Point Grey.</p>
+<p>A modified <a class="reference external" href="http://damien.douxchamps.net/ieee1394/libdc1394/">dc1394</a> library is used for communication with the camera.</p>
+<p>This module has only been tested with the <a class="reference external" href="http://www.ptgrey.com/chameleon-usb2-cameras">Point Grey Chameleon</a> camera.</p>
+</div>
+<div class="section" id="usage">
+<h2>Usage<a class="headerlink" href="#usage" title="Permalink to this headline">¶</a></h2>
 <p>Within MAVProxy, use the following to activate cuav:</p>
 <div class="code bash highlight-python"><div class="highlight"><pre>module load cuav.modules.camera
 </pre></div>
@@ -402,7 +409,7 @@ camera stop
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../',
-            VERSION:'1.4.24',
+            VERSION:'1.4.34',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true
