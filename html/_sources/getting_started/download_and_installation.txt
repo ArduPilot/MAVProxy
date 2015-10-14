@@ -30,7 +30,12 @@ First, a few pre-requisite packages need to be installed :
 
     On some Linux systems, ``python-wxgtk`` may be instead named
     as ``python-wxgtk2.8``.
-    
+
+.. note::
+
+    MAVProxy runs on the Python 2.7.x environment. Ensure your system is running
+    the correct version of Python.
+        
 Then download and install MAVProxy via Pypi. Prerequisites will be
 automatically downloaded too. Note a sudo may be required in some
 circumstances if the install generates errors.

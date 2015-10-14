@@ -22,9 +22,19 @@ The cuav module requires the following pre-requisites (this assumes the MAVproxy
 .. note::
 
     Some users may also require the following packages: python-pyexiv2 python-httplib2 libjpeg-turbo-progs
-    
+ 
+------------------------------
+Compatibility and System Setup
+------------------------------
+
+The cauv module is compatible with any IEEE 1394 (Firewire) based cameras that conform to the 1394-based Digital Camera Specifications (also known as the IIDC or DCAM Specifications). Note this does include some USB 2.0 cameras from Point Grey.
+
+A modified `dc1394 <http://damien.douxchamps.net/ieee1394/libdc1394/>`_ library is used for communication with the camera.
+
+This module has only been tested with the `Point Grey Chameleon <http://www.ptgrey.com/chameleon-usb2-cameras>`_ camera.
+
 -----
-Using
+Usage
 -----
 
 Within MAVProxy, use the following to activate cuav:
