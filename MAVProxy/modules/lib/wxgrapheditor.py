@@ -2,15 +2,7 @@
 Graphical editing of graph definition
 '''
 from wx_loader import wx
-
-class GraphDefinition(object):
-    '''a pre-defined graph'''
-    def __init__(self, name, expression, description, expressions, filename):
-        self.name = name
-        self.expression = expression
-        self.description = description
-        self.expressions = expressions
-        self.filename = filename
+from graphdefinition import GraphDefinition
 
 class GraphDialog(wx.Dialog):
     def __init__(self, title, graphdef, callback):

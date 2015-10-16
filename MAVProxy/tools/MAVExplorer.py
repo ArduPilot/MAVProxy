@@ -20,7 +20,7 @@ import MAVProxy.modules.lib.mp_util as mp_util
 from pymavlink import mavutil
 from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
 from MAVProxy.modules.lib import wxsettings
-from MAVProxy.modules.lib.wxgrapheditor import GraphDefinition, GraphDialog
+from MAVProxy.modules.lib.graphdefinition import GraphDefinition
 from lxml import objectify
 import pkg_resources
 
@@ -321,7 +321,9 @@ def save_callback(operation, graphdef):
 
 def save_process():
     '''process for saving a graph'''
+    from MAVProxy.modules.lib import wx_processguard
     from MAVProxy.modules.lib.wx_loader import wx
+    from MAVProxy.modules.lib.wxgrapheditor import GraphDialog
     app = wx.App(False)
     frame = GraphDialog('Graph Editor',
                         mestate.last_graph,
