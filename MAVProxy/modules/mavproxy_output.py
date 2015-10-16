@@ -16,7 +16,7 @@ class OutputModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(OutputModule, self).__init__(mpstate, "output", "output control", public=True)
         self.add_command('output', self.cmd_output, "output control",
-                         ["<list|add|remove>"])
+                         ["<list|add|remove|sysid>"])
 
     def cmd_output(self, args):
         '''handle output commands'''
@@ -32,8 +32,13 @@ class OutputModule(mp_module.MPModule):
                 print("Usage: output remove OUTPUT")
                 return
             self.cmd_output_remove(args[1:])
+        elif args[0] == "sysid":
+            if len(args) != 3:
+                print("Usage: output sysid SYSID OUTPUT")
+                return
+            self.cmd_output_sysid(args[1:])
         else:
-            print("usage: output <list|add|remove>")
+            print("usage: output <list|add|remove|sysid>")
 
     def cmd_output_list(self):
         '''list outputs'''
@@ -41,6 +46,11 @@ class OutputModule(mp_module.MPModule):
         for i in range(len(self.mpstate.mav_outputs)):
             conn = self.mpstate.mav_outputs[i]
             print("%u: %s" % (i, conn.address))
+        if len(self.mpstate.sysid_outputs) > 0:
+            print("%u sysid outputs" % len(self.mpstate.sysid_outputs))
+            for sysid in self.mpstate.sysid_outputs:
+                conn = self.mpstate.sysid_outputs[sysid]
+                print("%u: %s" % (sysid, conn.address))
 
     def cmd_output_add(self, args):
         '''add new output'''
@@ -57,6 +67,25 @@ class OutputModule(mp_module.MPModule):
             mp_util.child_fd_list_add(conn.port.fileno())
         except Exception:
             pass
+
+    def cmd_output_sysid(self, args):
+        '''add new output for a specific MAVLink sysID'''
+        sysid = int(args[0])
+        device = args[1]
+        print("Adding output %s for sysid %u" % (device, sysid))
+        try:
+            conn = mavutil.mavlink_connection(device, input=False, source_system=self.settings.source_system)
+            conn.mav.srcComponent = self.settings.source_component
+        except Exception:
+            print("Failed to connect to %s" % device)
+            return
+        try:
+            mp_util.child_fd_list_add(conn.port.fileno())
+        except Exception:
+            pass
+        if sysid in self.mpstate.sysid_outputs:
+            self.mpstate.sysid_outputs[sysid].close()
+        self.mpstate.sysid_outputs[sysid] = conn
 
     def cmd_output_remove(self, args):
         '''remove an output'''

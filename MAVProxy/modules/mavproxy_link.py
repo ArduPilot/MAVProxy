@@ -242,6 +242,12 @@ class LinkModule(mp_module.MPModule):
     def master_callback(self, m, master):
         '''process mavlink message m on master, sending any messages to recipients'''
 
+        # see if it is handled by a specialised sysid connection
+        sysid = m.get_srcSystem()
+        if sysid in self.mpstate.sysid_outputs:
+            self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
+            return
+
         if getattr(m, '_timestamp', None) is None:
             master.post_message(m)
         self.status.counters['MasterIn'][master.linknum] += 1

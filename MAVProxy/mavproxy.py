@@ -172,6 +172,7 @@ class MPState(object):
 
         # mavlink outputs
         self.mav_outputs = []
+        self.sysid_outputs = {}
 
         # SITL output
         self.sitl_output = None
@@ -511,6 +512,10 @@ def process_master(m):
     msgs = m.mav.parse_buffer(s)
     if msgs:
         for msg in msgs:
+            sysid = msg.get_srcSystem()
+            if sysid in mpstate.sysid_outputs:
+                  # the message has been handled by a specialised handler for this system
+                  continue
             if getattr(m, '_timestamp', None) is None:
                 m.post_message(msg)
             if msg.get_type() == "BAD_DATA":
@@ -737,6 +742,9 @@ def main_loop():
                 rin.append(master.fd)
         for m in mpstate.mav_outputs:
             rin.append(m.fd)
+        for sysid in mpstate.sysid_outputs:
+            m = mpstate.sysid_outputs[sysid]
+            rin.append(m.fd)
         if rin == []:
             time.sleep(0.0001)
             continue
@@ -761,6 +769,14 @@ def main_loop():
                               return
                         continue
             for m in mpstate.mav_outputs:
+                if fd == m.fd:
+                    process_mavlink(m)
+                    if mpstate is None:
+                          return
+                    continue
+
+            for sysid in mpstate.sysid_outputs:
+                m = mpstate.sysid_outputs[sysid]
                 if fd == m.fd:
                     process_mavlink(m)
                     if mpstate is None:
