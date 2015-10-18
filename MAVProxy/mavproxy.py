@@ -579,11 +579,13 @@ def log_writer():
 def log_paths():
     '''Returns tuple (logdir, telemetry_log_filepath, raw_telemetry_log_filepath)'''
     if opts.aircraft is not None:
+        if(opts.daemon):
+            dirname = '/var/log/'
         if opts.mission is not None:
             print(opts.mission)
-            dirname = "%s/logs/%s/Mission%s" % (opts.aircraft, time.strftime("%Y-%m-%d"), opts.mission)
+            dirname += "%s/logs/%s/Mission%s" % (opts.aircraft, time.strftime("%Y-%m-%d"), opts.mission)
         else:
-            dirname = "%s/logs/%s" % (opts.aircraft, time.strftime("%Y-%m-%d"))
+            dirname += "%s/logs/%s" % (opts.aircraft, time.strftime("%Y-%m-%d"))
         # dirname is currently relative.  Possibly add state_basedir:
         if mpstate.settings.state_basedir is not None:
             dirname = os.path.join(mpstate.settings.state_basedir,dirname)
@@ -606,7 +608,11 @@ def log_paths():
         dir_path = os.path.dirname(opts.logfile)
         if not os.path.isabs(dir_path) and mpstate.settings.state_basedir is not None:
             dir_path = os.path.join(mpstate.settings.state_basedir,dir_path)
-        logdir = dir_path
+            
+        if(opts.daemon):
+            logdir = '/var/log'
+        else:        
+            logdir = dir_path
 
     mkdir_p(logdir)
     return (logdir,
@@ -620,17 +626,31 @@ def open_telemetry_logs(logpath_telem, logpath_telem_raw):
         mode = 'a'
     else:
         mode = 'w'
-    mpstate.logfile = open(logpath_telem, mode=mode)
-    mpstate.logfile_raw = open(logpath_telem_raw, mode=mode)
-    print("Log Directory: %s" % mpstate.status.logdir)
-    print("Telemetry log: %s" % logpath_telem)
+    
+    try:
+        mpstate.logfile = open(logpath_telem, mode=mode)
+        mpstate.logfile_raw = open(logpath_telem_raw, mode=mode)
+        print("Log Directory: %s" % mpstate.status.logdir)
+        print("Telemetry log: %s" % logpath_telem)
 
-    # use a separate thread for writing to the logfile to prevent
-    # delays during disk writes (important as delays can be long if camera
-    # app is running)
-    t = threading.Thread(target=log_writer, name='log_writer')
-    t.daemon = True
-    t.start()
+        #make sure there's enough free disk space for the logfile (>200Mb)
+        stat = os.statvfs(logpath_telem)
+        if stat.f_bfree*stat.f_bsize < 209715200:
+            print("ERROR: Not enough free disk space for logfile")
+            mpstate.status.exit = True
+            return
+                
+        # use a separate thread for writing to the logfile to prevent
+        # delays during disk writes (important as delays can be long if camera
+        # app is running)
+        t = threading.Thread(target=log_writer, name='log_writer')
+        t.daemon = True
+        t.start()
+    except Exception as e:
+        print("ERROR: opening log file for writing: %s" % e)
+        mpstate.status.exit = True
+        return
+
 
 def set_stream_rates():
     '''set mavlink stream rates'''
