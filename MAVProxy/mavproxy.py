@@ -579,6 +579,7 @@ def log_writer():
 def log_paths():
     '''Returns tuple (logdir, telemetry_log_filepath, raw_telemetry_log_filepath)'''
     if opts.aircraft is not None:
+        dirname = ""
         if(opts.daemon):
             dirname = '/var/log/'
         if opts.mission is not None:
