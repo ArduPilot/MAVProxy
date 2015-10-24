@@ -26,6 +26,7 @@
 
 # System Header files and Module Headers
 import sys, time, math, cv2, struct, fcntl
+from datetime import datetime
 
 # Module Dependent Headers
 import requests, json, socket, StringIO
@@ -53,7 +54,36 @@ import ssdp
 #                    __sSimpleCall
 #****************************************************************************
 class SmartCamera_SonyQX():
+
+
+
+    # Geo reference log for all the GoPro pictures
+    def __geoRef_write(self, arg):
+        #self.geoRef_writer.write(datetime.now().strftime('%d-%m-%Y %H:%M:%S.%f')[:-3])
+        self.geoRef_writer.write(arg)
+        self.geoRef_writer.write('\n')
+        self.geoRef_writer.flush()
     
+    def get_real_Yaw(self, yaw):
+        if (yaw < 0):
+            return yaw+360
+        return yaw
+    
+    def __writeGeoRefToFile(self, sImageFileName1):
+        self.__geoRef_write(sImageFileName1)
+        #self.geoRef_write(",%f,%f,%f,%f,%f,%f,%f,%f,%f" % (self.vehicle.location.lat, self.vehicle.location.lon, self.GPS_AMSL, math.degrees(self.vehicle.attitude.pitch), math.degrees(self.vehicle.attitude.roll), self.get_real_Yaw(math.degrees(self.vehicle.attitude.yaw)), self.vehicle.mount_status[0], self.vehicle.mount_status[2], self.get_real_Yaw(self.vehicle.mount_status[1])))
+
+    def __openGeoTagLogFile(self):
+        #Open GeoTag Log File
+        i = 0
+        while os.path.exists('~/geoRef%s.log' % i):
+            i += 1
+
+        self.geoRef_writer = open('~/geoRef%s.log' % i, 'w', 0)
+        self.geoRef_writer.write('Time, Latitude, Longitude, Alt, Pitch, Roll, Yaw, Mount Pitch, Mount Roll, Mount Yaw\n')
+            
+        print('Opened GeoTag Log File with Filename: geoRef%s.log' % i)
+
 #****************************************************************************
 #   Method Name     : __init__ Class Initializer
 #
@@ -74,7 +104,10 @@ class SmartCamera_SonyQX():
         # record instance
         self.u8Instance = u8Instance
         self.sConfigGroup = "Camera%d" % self.u8Instance
-
+        
+        # open geoTag Log
+        self.__openGeoTagLogFile()
+        
         # background image processing variables
         self.u32ImgCounter = 0              # num images requested so far
 
@@ -512,6 +545,7 @@ class SmartCamera_SonyQX():
 #****************************************************************************
 
     def __boAddGeotagToLog(self, sImageFileName):
+        self.__writeGeoRefToFile(sImageFileName)
         return True
 
 #****************************************************************************
