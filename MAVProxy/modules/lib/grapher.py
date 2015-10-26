@@ -34,11 +34,17 @@ colourmap = {
         'CRUISE'    : (  0, 1.0, 1.0)
         },
     'px4' : {
-        'MANUAL'    : (1.0,   0,   0),
-        'SEATBELT'  : (  0.5, 0.5,   0),
-        'EASY'      : (  0, 1.0,   0),
-        'AUTO'    : (  0,   0, 1.0),
-        'UNKNOWN'    : (  1.0,   1.0, 1.0)
+        'MANUAL'    : (  1.0, 0.0, 0.0),
+        'SEATBELT'  : (  0.5, 0.5, 0.0),
+        'EASY'      : (  0.0, 1.0, 0.0),
+        'AUTO'      : (  0.0, 0.0, 1.0),
+        'UNKNOWN'   : (  1.0, 1.0, 1.0),
+        'LOITER'    : (  0.0, 0.0, 1.0),
+        'RTL'       : (  1.0, 0.5, 0.5),
+        'LAND'      : (  0.0, 1.0, 0.5),
+        'SPORT'     : (  1.0, 1.0, 0.5),
+        'STABILIZE' : (  1.0, 0.5, 1.0),
+        'ACRO'      : (  0.5, 1.0, 1.0)
         }
     }
 
@@ -57,9 +63,11 @@ class MavGraph(object):
         self.flightmode = None
         self.legend = 'upper left'
         self.legend2 = 'upper right'
+        self.legend_flightmode = 'lower left'
         self.timeshift = 0
         self.labels = None
         self.multi = False
+        self.modes_plotted = {}
 
     def add_field(self, field):
         '''add another field to plot'''
@@ -205,19 +213,35 @@ class MavGraph(object):
 
             empty = False
             if self.flightmode is not None:
+                alpha = 0.1
                 for i in range(len(self.modes)-1):
                     c = colourmap[self.flightmode].get(self.modes[i][1], edge_colour)
-                    ax1.axvspan(self.modes[i][0], self.modes[i+1][0], fc=c, ec=edge_colour, alpha=0.1)
+                    ax1.axvspan(self.modes[i][0], self.modes[i+1][0], fc=c, ec=edge_colour, alpha=alpha)
+                    self.modes_plotted[self.modes[i][1]] = (c, alpha)
                 c = colourmap[self.flightmode].get(self.modes[-1][1], edge_colour)
-                ax1.axvspan(self.modes[-1][0], ax1.get_xlim()[1], fc=c, ec=edge_colour, alpha=0.1)
+                ax1.axvspan(self.modes[-1][0], ax1.get_xlim()[1], fc=c, ec=edge_colour, alpha=alpha)
+                self.modes_plotted[self.modes[-1][1]] = (c, alpha)
 
-            if ax1_labels != []:
-                ax1.legend(ax1_labels,loc=self.legend)
-            if ax2_labels != []:
-                ax2.legend(ax2_labels,loc=self.legend2)
             if empty:
                 print("No data to graph")
                 return
+
+        if self.flightmode is not None:
+            mode_patches = []
+            for mode in self.modes_plotted.keys():
+                (color, alpha) = self.modes_plotted[mode]
+                mode_patches.append(matplotlib.patches.Patch(color=color,
+                                                             label=mode, alpha=alpha))
+            if ax1_labels != []:
+                ax1.add_artist(pylab.legend(handles=mode_patches, loc=self.legend_flightmode))
+            else:
+                pylab.legend(handles=mode_patches)
+
+        if ax1_labels != []:
+            ax1.legend(ax1_labels,loc=self.legend)
+        if ax2_labels != []:
+            ax2.legend(ax2_labels,loc=self.legend2)
+
 
 
     def add_data(self, t, msg, vars, flightmode):
