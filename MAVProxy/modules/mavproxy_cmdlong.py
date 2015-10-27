@@ -18,6 +18,8 @@ class CmdlongModule(mp_module.MPModule):
         self.add_command('cammsg', self.cmd_cammsg, "cammsg")
         self.add_command('camctrlmsg', self.cmd_camctrlmsg, "camctrlmsg")
         self.add_command('posvel', self.cmd_posvel, "posvel")
+        self.add_command('parachute', self.cmd_parachute, "parachute",
+                         ['<enable|disable|release>'])
 
     def cmd_takeoff(self, args):
         '''take off'''
@@ -40,6 +42,30 @@ class CmdlongModule(mp_module.MPModule):
                 0, # param5
                 0, # param6
                 altitude) # param7
+
+    def cmd_parachute(self, args):
+        '''parachute control'''
+        usage = "Usage: parachute <enable|disable|release>"
+        if len(args) != 1:
+            print(usage)
+            return
+
+        cmds = {
+            'enable'  : mavutil.mavlink.PARACHUTE_ENABLE,
+            'disable' : mavutil.mavlink.PARACHUTE_DISABLE,
+            'release' : mavutil.mavlink.PARACHUTE_RELEASE
+            }
+        if not args[0] in cmds:
+            print(usage)
+            return
+        cmd = cmds[args[0]]
+        self.master.mav.command_long_send(
+            self.settings.target_system,  # target_system
+            0, # target_component
+            mavutil.mavlink.MAV_CMD_DO_PARACHUTE,
+            0,
+            cmd,
+            0, 0, 0, 0, 0, 0)
 
     def cmd_camctrlmsg(self, args):
         '''camctrlmsg'''
