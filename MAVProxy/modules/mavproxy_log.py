@@ -21,6 +21,7 @@ class LogModule(mp_module.MPModule):
         self.download_ofs = 0
         self.retries = 0
         self.entries = {}
+        self.download_queue = []
 
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
@@ -71,6 +72,8 @@ class LogModule(mp_module.MPModule):
             self.download_file = None
             self.download_filename = None
             self.download_set = set()
+            if len(self.download_queue):
+                self.log_download_next()
 
     def handle_log_data_missing(self):
         '''handling missing incoming log data'''
@@ -122,6 +125,18 @@ class LogModule(mp_module.MPModule):
                                                                                      self.retries,
                                                                                      len(diff)))
 
+    def log_download_next(self):
+        latest = self.download_queue.pop()
+        filename = self.default_log_filename(latest)
+        self.log_download(latest, filename)
+
+    def log_download_all(self):
+        if len(self.entries.keys()) == 0:
+            print("Please use log list first")
+            return
+        self.download_queue = sorted(self.entries, key=lambda id: self.entries[id].time_utc)
+        self.log_download_next()
+
     def log_download(self, log_num, filename):
         '''download a log file'''
         print("Downloading log %u as %s" % (log_num, filename))
@@ -137,10 +152,13 @@ class LogModule(mp_module.MPModule):
         self.download_ofs = 0
         self.retries = 0
 
+    def default_log_filename(self, log_num):
+        return "log%u.bin" % log_num
+
     def cmd_log(self, args):
         '''log commands'''
         if len(args) < 1:
-            print("usage: log <list|download|erase|resume|status|cancel>")
+            print("usage: log <list|download|download-all|erase|resume|status|cancel>")
             return
 
         if args[0] == "status":
@@ -169,6 +187,9 @@ class LogModule(mp_module.MPModule):
             if len(args) < 2:
                 print("usage: log download <lognumber> <filename>")
                 return
+            if args[1] == 'all':
+                self.log_download_all()
+                return
             if args[1] == 'latest':
                 if len(self.entries.keys()) == 0:
                     print("Please use log list first")
@@ -179,8 +200,9 @@ class LogModule(mp_module.MPModule):
             if len(args) > 2:
                 filename = args[2]
             else:
-                filename = "log%u.bin" % log_num
+                filename = self.default_log_filename(log_num)
             self.log_download(log_num, filename)
+
 
     def idle_task(self):
         '''handle missing log data'''
