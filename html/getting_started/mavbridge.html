@@ -1,0 +1,282 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>MAVProxy Wifi Bridge &mdash; MAVProxy 1.4.34 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="MAVProxy 1.4.34 documentation" href="../index.html"/>
+        <link rel="up" title="Getting Started" href="index.html"/>
+        <link rel="next" title="UAV Configuration" href="../uav_configuration/index.html"/>
+        <link rel="prev" title="Examples" href="examples.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-nav-search">
+        
+
+        
+          <a href="../index.html" class="icon icon-home"> MAVProxy
+        
+
+        
+        </a>
+
+        
+          
+          
+            <div class="version">
+              1.4.34
+            </div>
+          
+        
+
+        
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+        
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+        
+          
+          
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting Started</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="download_and_installation.html">Download and Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l2"><a class="reference internal" href="starting.html">Startup Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mavinit.html">Startup Scripts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="">MAVProxy Wifi Bridge</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#requirements">Requirements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#setting-up-the-pi">Setting up the Pi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#setting-up-mavproxy">Setting up MAVProxy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#setting-up-the-daemon">Setting up the Daemon</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#running">Running</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/index.html">Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+
+          
+        
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../index.html">MAVProxy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="index.html">Getting Started</a> &raquo;</li>
+      
+    <li>MAVProxy Wifi Bridge</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="mavproxy-wifi-bridge">
+<h1>MAVProxy Wifi Bridge<a class="headerlink" href="#mavproxy-wifi-bridge" title="Permalink to this headline">¶</a></h1>
+<p>MAVProxy can be used to create a network bridge between a telemetry radio and Wifi or wired network.</p>
+<div class="figure">
+<img alt="../_images/bridge.png" src="../_images/bridge.png" />
+</div>
+<p>This is useful in the circumstances when a telemetry stream is required to be distributed to a group of clients on a network or the GCS client is not able to be directly connected to the telemetry radio (ie. a tablet running the GCS software does not have an available USB port to connect to a USB telemetry radio).</p>
+<div class="section" id="requirements">
+<h2>Requirements<a class="headerlink" href="#requirements" title="Permalink to this headline">¶</a></h2>
+<p>Raspberry Pi or similar with compatible Wifi dongle (if streaming telemetry to Wifi). Any similar small computer would work. The onyl requirement is that it is able to run the Ubuntu operating system.</p>
+</div>
+<div class="section" id="setting-up-the-pi">
+<h2>Setting up the Pi<a class="headerlink" href="#setting-up-the-pi" title="Permalink to this headline">¶</a></h2>
+<p>The instructions for setting up the Wifi Access Point can be found here: <a class="reference external" href="http://dev.ardupilot.com/wiki/making-a-mavlink-wifi-bridge-using-the-raspberry-pi/">http://dev.ardupilot.com/wiki/making-a-mavlink-wifi-bridge-using-the-raspberry-pi/</a>. Follow steps 1-3.</p>
+</div>
+<div class="section" id="setting-up-mavproxy">
+<h2>Setting up MAVProxy<a class="headerlink" href="#setting-up-mavproxy" title="Permalink to this headline">¶</a></h2>
+<p>Follow the download and installation instructions <a class="reference internal" href="download_and_installation.html"><em>here</em></a>.</p>
+</div>
+<div class="section" id="setting-up-the-daemon">
+<h2>Setting up the Daemon<a class="headerlink" href="#setting-up-the-daemon" title="Permalink to this headline">¶</a></h2>
+<p>For this section, a terminal on the Pi is required.</p>
+<p>Make a new file for the daemon, based on a skeleton file:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>sudo cp /etc/init.d/skeleton /etc/init.d/mavgateway
+</pre></div>
+</div>
+<p>Edit /etc/init.d/mavgateway:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>sudo nano /etc/init.d/mavgateway
+</pre></div>
+</div>
+<p>And edit these lines:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>DAEMON_ARGS=&quot;--master=/dev/ttyAMA0,57600 --out=udpin:0.0.0.0:14550 --daemon&quot;
+NAME=mavproxy.py
+DESC=&quot;Mavproxy based mavlink to wifi gateway&quot;
+Provides: mavgateway
+Short-Description: Mavlink to UDP gateway service
+DAEMON=/usr/local/bin/$NAME
+</pre></div>
+</div>
+<p>Use CTRL-x to exit the editor</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">In the DAEMON_ARGS line above, edit the ttyAMA0 port and 57600 baudrate to match the name and baudrate of the telemetry radio connected to the Pi.</p>
+</div>
+<p>Edit the permissions for mavgateway and update the system to include the mavgateway daemon upon startup:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>sudo chown root:root /etc/init.d/mavgateway
+sudo update-rc.d mavgateway defaults
+</pre></div>
+</div>
+</div>
+<div class="section" id="running">
+<h2>Running<a class="headerlink" href="#running" title="Permalink to this headline">¶</a></h2>
+<p>The Pi bridge will automatically start up when the Pi is booted.</p>
+<p>On the GCS client, first connect to the Pi&#8217;s network, then connect (via UDP) to 192.168.42.1, port 14550. For example, on a MAVProxy client:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>mavproxy.py –master=192.168.42.1:14550
+</pre></div>
+</div>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../uav_configuration/index.html" class="btn btn-neutral float-right" title="UAV Configuration" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="examples.html" class="btn btn-neutral" title="Examples" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
+<div style="float:right;"><a href="https://github.com/Dronecode/MAVProxy/issues/new?title=MAVProxy%20Wifi%20Bridge%20-%20&body=URL:%20../getting_started/mavbridge%0ATitle:%20MAVProxy%20Wifi%20Bridge%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
+    <p><a href="https://www.dronecode.org/"><img src="../_static/images/dronecodelogo.png" width="130" alt="Dronecode" class /></a><br/> 
+    This is a Dronecode project.</p>     
+
+    <p>
+
+    </p>
+  </div>
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'1.4.34',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
