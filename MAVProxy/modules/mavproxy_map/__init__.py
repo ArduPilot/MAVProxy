@@ -463,7 +463,12 @@ class MapModule(mp_module.MPModule):
                                                                    linewidth=2, colour=(255,0,180)))
             else:
                 self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('Trajectory'))
-    
+
+        if m.get_type() == "ADSB_VEHICLE":
+            id = 'ADSB-' + str(m.ICAO_address)
+            # use plane icon for now
+            self.create_vehicle_icon(id, 'green', vehicle_type='plane')
+            self.mpstate.map.set_position(id, (m.lat, m.lon), rotation=m.heading)    
             
         # if the waypoints have changed, redisplay
         last_wp_change = self.module('wp').wploader.last_change
