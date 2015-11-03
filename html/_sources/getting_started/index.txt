@@ -12,6 +12,7 @@ This section contains basic topics to help you get started with MAVProxy.
     starting
     mavinit
     examples
+    mavbridge
 
 
     
