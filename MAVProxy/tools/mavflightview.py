@@ -99,6 +99,7 @@ def mavflightview_mav(mlog, options=None, title=None):
     path = [[]]
     instances = {}
     ekf_counter = 0
+    nkf_counter = 0
     types = ['MISSION_ITEM','CMD']
     if options.types is not None:
         types.extend(options.types.split(','))
@@ -110,6 +111,8 @@ def mavflightview_mav(mlog, options=None, title=None):
             types.extend(['GPS2_RAW','GPS2'])
         if options.ekf:
             types.extend(['EKF1', 'GPS'])
+        if options.nkf:
+            types.extend(['NKF1', 'GPS'])
         if options.ahr2:
             types.extend(['AHR2', 'AHRS2', 'GPS'])
     print("Looking for types %s" % str(types))
@@ -183,6 +186,14 @@ def mavflightview_mav(mlog, options=None, title=None):
             if ekf_counter % options.ekf_sample != 0:
                 continue
             (lat, lng) = pos            
+        elif type in ['NKF1']:
+            pos = mavextra.ekf1_pos(m)
+            if pos is None:
+                continue
+            nkf_counter += 1
+            if nkf_counter % options.nkf_sample != 0:
+                continue
+            (lat, lng) = pos
         elif type in ['ANU5']:
             (lat, lng) = (m.Alat*1.0e-7, m.Alng*1.0e-7)
         elif type in ['AHR2', 'POS', 'CHEK']:
@@ -307,6 +318,7 @@ class mavflightview_options(object):
         self.rawgps2 = False
         self.dualgps = False
         self.ekf = False
+        self.nkf = False
         self.ahr2 = False
         self.debug = False
         self.multi = False
@@ -328,11 +340,13 @@ if __name__ == "__main__":
     parser.add_option("--rawgps2", action='store_true', default=False, help="use GPS2_RAW")
     parser.add_option("--dualgps", action='store_true', default=False, help="use GPS_RAW_INT and GPS2_RAW")
     parser.add_option("--ekf", action='store_true', default=False, help="use EKF1 pos")
+    parser.add_option("--nkf", action='store_true', default=False, help="use NKF1 pos")
     parser.add_option("--ahr2", action='store_true', default=False, help="use AHR2 pos")
     parser.add_option("--debug", action='store_true', default=False, help="show debug info")
     parser.add_option("--multi", action='store_true', default=False, help="show multiple flights on one map")
     parser.add_option("--types", default=None, help="types of position messages to show")
     parser.add_option("--ekf-sample", type='int', default=1, help="sub-sampling of EKF messages")
+    parser.add_option("--nkf-sample", type='int', default=1, help="sub-sampling of NKF messages")
     parser.add_option("--rate", type='int', default=0, help="maximum message rate to display (0 means all points)")
     
     (opts, args) = parser.parse_args()
