@@ -24,6 +24,7 @@ class ConsoleModule(mp_module.MPModule):
         self.speed = 0
         self.max_link_num = 0
         self.last_sys_status_health = 0
+        self.last_link_state = 0
         mpstate.console = wxconsole.MessageConsole(title='Console')
 
         # setup some default status information
@@ -290,8 +291,14 @@ class ConsoleModule(mp_module.MPModule):
         elif type in ['RADIO', 'RADIO_STATUS']:
             if msg.rssi < msg.noise+10 or msg.remrssi < msg.remnoise+10:
                 fg = 'red'
+                if self.last_link_state <> 1:
+                    self.say("telemetry link warning")
+                self.last_link_state = 1
             else:
                 fg = 'black'
+                if self.last_link_state <> 0:
+                    self.say("telemetry link normal")
+                self.last_link_state = 0
             self.console.set_status('Radio', 'Radio %u/%u %u/%u' % (msg.rssi, msg.noise, msg.remrssi, msg.remnoise), fg=fg)
         elif type == 'HEARTBEAT':
             self.console.set_status('Mode', '%s' % master.flightmode, fg='blue')
