@@ -231,6 +231,7 @@ class ParamModule(mp_module.MPModule):
             parmfile = os.path.join(self.logdir, 'mav.parm')
             if os.path.exists(parmfile):
                 mpstate.mav_param.load(parmfile)
+                self.pstate.mav_param_set = set(self.mav_param.keys())
 
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''

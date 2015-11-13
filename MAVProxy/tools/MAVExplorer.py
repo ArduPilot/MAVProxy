@@ -263,6 +263,8 @@ def cmd_condition(args):
         print("condition is: %s" % mestate.settings.condition)
         return
     mestate.settings.condition = ' '.join(args)
+    if len(mestate.settings.condition) == 0 or mestate.settings.condition == 'clear':
+        mestate.settings.condition = None
 
 def cmd_reload(args):
     '''reload graphs'''
