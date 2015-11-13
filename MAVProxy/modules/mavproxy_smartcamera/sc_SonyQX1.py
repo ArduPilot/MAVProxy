@@ -55,12 +55,16 @@ import ssdp
 #****************************************************************************
 class SmartCamera_SonyQX():
 
+    def mavlink_packet(self, m):
+        if m.get_type() == 'GLOBAL_POSITION_INT':
+            (self.vehicleLat, self.vehicleLon, self.vehicleHdg, self.vehicleAMSL) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01, m.alt*0.001)
 
 
     # Geo reference log for all the GoPro pictures
     def __geoRef_write(self, arg):
         #self.geoRef_writer.write(datetime.now().strftime('%d-%m-%Y %H:%M:%S.%f')[:-3])
         self.geoRef_writer.write(arg)
+        self.geoRef_writer.write(",%f,%f,%f,%f" % (self.vehicleLat, self.vehicleLon, self.vehicleAMSL, self.vehicleHdg))
         self.geoRef_writer.write('\n')
         self.geoRef_writer.flush()
     
@@ -80,7 +84,7 @@ class SmartCamera_SonyQX():
             print('checking /log/geoRef%s.log' % i)
             i += 1
 
-        self.geoRef_writer = open('~/geoRef%s.log' % i, 'w', 0)
+        self.geoRef_writer = open('/log/geoRef%s.log' % i, 'w', 0)
         self.geoRef_writer.write('Time, Latitude, Longitude, Alt, Pitch, Roll, Yaw, Mount Pitch, Mount Roll, Mount Yaw\n')
             
         print('Opened GeoTag Log File with Filename: geoRef%s.log' % i)
@@ -118,6 +122,11 @@ class SmartCamera_SonyQX():
         # latest image downloaded
         self.sLatestImageFilename = None    #String with the Filename for the last downloaded image
         self.sLatestFileName = None         #String with the camera file name for the last image taken
+        
+        self.vehicleLat = None              # Current Vehicle Latitude
+        self.vehicleLon = None              # Current Vehicle Longitude
+        self.vehicleHdg = None              # Current Vehicle Heading
+        self.vehicleAMSL = None             # Current Vehicle Altitude above mean sea level
     
         # Look Camera and Get URL
         self.sCameraURL = self.__sFindCameraURL(sNetInterface)
@@ -574,10 +583,9 @@ class SmartCamera_SonyQX():
 
             start = self.sLatestImageURL.find('DSC')
             end = self.sLatestImageURL.find('JPG', start)
-            
-            self.sLatestFileName = sLatestImageURL[start:end]
-            
+            self.sLatestFileName = self.sLatestImageURL[start:end]
             self.__boAddGeotagToLog(self.sLatestFileName)
+
             self.u32ImgCounter = self.u32ImgCounter+1
             return True
 
