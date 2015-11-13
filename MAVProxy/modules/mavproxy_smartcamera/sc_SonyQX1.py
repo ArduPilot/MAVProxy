@@ -25,7 +25,7 @@
 #****************************************************************************
 
 # System Header files and Module Headers
-import sys, time, math, cv2, struct, fcntl
+import os, sys, time, math, cv2, struct, fcntl
 from datetime import datetime
 
 # Module Dependent Headers
@@ -76,7 +76,8 @@ class SmartCamera_SonyQX():
     def __openGeoTagLogFile(self):
         #Open GeoTag Log File
         i = 0
-        while os.path.exists('~/geoRef%s.log' % i):
+        while os.path.exists('/log/geoRef%s.log' % i):
+            print('checking /log/geoRef%s.log' % i)
             i += 1
 
         self.geoRef_writer = open('~/geoRef%s.log' % i, 'w', 0)
@@ -115,7 +116,8 @@ class SmartCamera_SonyQX():
         self.sLatestImageURL = None         # String with the URL to the latest image
         
         # latest image downloaded
-        self.sLatestImageFilename = None    #String with the file name for the last downloaded image
+        self.sLatestImageFilename = None    #String with the Filename for the last downloaded image
+        self.sLatestFileName = None         #String with the camera file name for the last image taken
     
         # Look Camera and Get URL
         self.sCameraURL = self.__sFindCameraURL(sNetInterface)
@@ -569,7 +571,13 @@ class SmartCamera_SonyQX():
         # Check response for a succesful result and save latest image URL
         if 'result' in sResponse:
             self.sLatestImageURL = sResponse['result'][0][0]
-            self.__boAddGeotagToLog(self.sLatestImageURL)
+
+            start = self.sLatestImageURL.find('DSC')
+            end = self.sLatestImageURL.find('JPG', start)
+            
+            self.sLatestFileName = sLatestImageURL[start:end]
+            
+            self.__boAddGeotagToLog(self.sLatestFileName)
             self.u32ImgCounter = self.u32ImgCounter+1
             return True
 
