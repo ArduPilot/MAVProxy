@@ -88,11 +88,6 @@ class SmartCameraModule(mp_module.MPModule):
         self.WirelessPort = "wlan0"
         self.u8RetryTimeout = 0
         self.u8MaxRetries = 5
-        self.vehicleLat = None              # Current Vehicle Latitude
-        self.vehicleLon = None              # Current Vehicle Longitude
-        self.vehicleHdg = None              # Current Vehicle Heading
-        self.vehicleAMSL = None             # Current Vehicle Altitude above mean sea level
-
         self.__vRegisterCameras()
  
  #****************************************************************************
@@ -439,8 +434,7 @@ class SmartCameraModule(mp_module.MPModule):
         '''handle a mavlink packet'''
         mtype = m.get_type()
         if mtype == 'GLOBAL_POSITION_INT':
-            print('got GPS')
-            (self.vehicleLat, self.vehicleLon, self.vehicleHdg, self.vehicleAMSL) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01, m.alt*0.001)
+            cam.get_GPS(m)
         if mtype == "CAMERA_STATUS":
             print ("Got Message camera_status")
         if mtype == "CAMERA_FEEDBACK":
