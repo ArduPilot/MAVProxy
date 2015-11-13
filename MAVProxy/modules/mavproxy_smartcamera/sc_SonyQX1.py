@@ -83,11 +83,11 @@ class SmartCamera_SonyQX():
     def __openGeoTagLogFile(self):
         #Open GeoTag Log File
         i = 0
-        while os.path.exists('/log/geoRef%s.log' % i):
-            print('checking /log/geoRef%s.log' % i)
+        while os.path.exists('/sdcard/log/geoRef%s.log' % i):
+            print('checking /sdcard/log/geoRef%s.log' % i)
             i += 1
 
-        self.geoRef_writer = open('/log/geoRef%s.log' % i, 'w', 0)
+        self.geoRef_writer = open('/sdcard/log/geoRef%s.log' % i, 'w', 0)
         self.geoRef_writer.write('Time, Latitude, Longitude, Alt, Pitch, Roll, Yaw, Mount Pitch, Mount Roll, Mount Yaw\n')
             
         print('Opened GeoTag Log File with Filename: geoRef%s.log' % i)
