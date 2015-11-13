@@ -433,8 +433,12 @@ class SmartCameraModule(mp_module.MPModule):
     def mavlink_packet(self, m):
         '''handle a mavlink packet'''
         mtype = m.get_type()
-        if mtype == 'GLOBAL_POSITION_INT':
-            cam.get_GPS(m)
+        if mtype == "GLOBAL_POSITION_INT":
+            for cam in self.camera_list:
+                cam.boSet_GPS(m)
+        if mtype == "ATTITUDE":
+            for cam in self.camera_list:
+                cam.boSet_Attitude(m)
         if mtype == "CAMERA_STATUS":
             print ("Got Message camera_status")
         if mtype == "CAMERA_FEEDBACK":

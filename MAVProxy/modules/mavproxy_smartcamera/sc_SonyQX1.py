@@ -55,16 +55,19 @@ import ssdp
 #****************************************************************************
 class SmartCamera_SonyQX():
 
-    def get_GPS(self, m):
+    def boSet_GPS(self, m):
         if m.get_type() == 'GLOBAL_POSITION_INT':
-            print('got GPS')
             (self.vehicleLat, self.vehicleLon, self.vehicleHdg, self.vehicleAMSL) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01, m.alt*0.001)
+
+    def boSet_Attitude(self, m):
+        if m.get_type() == 'ATTITUDE':
+            (self.vehicleRoll, self.vehiclePitch) = (math.degrees(m.roll), math.degrees(m.pitch))
 
     # Geo reference log for all the GoPro pictures
     def __geoRef_write(self, arg):
         #self.geoRef_writer.write(datetime.now().strftime('%d-%m-%Y %H:%M:%S.%f')[:-3])
         self.geoRef_writer.write(arg)
-        self.geoRef_writer.write(",%f,%f,%f,%f" % (self.vehicleLat, self.vehicleLon, self.vehicleAMSL, self.vehicleHdg))
+        self.geoRef_writer.write(",%f,%f,%f,%f,%f,%f" % (self.vehicleLat, self.vehicleLon, self.vehicleAMSL, self.vehicleRoll, self.vehiclePitch,self.vehicleHdg))
         self.geoRef_writer.write('\n')
         self.geoRef_writer.flush()
     
@@ -582,7 +585,7 @@ class SmartCamera_SonyQX():
             self.sLatestImageURL = sResponse['result'][0][0]
 
             start = self.sLatestImageURL.find('DSC')
-            end = self.sLatestImageURL.find('JPG', start)
+            end = self.sLatestImageURL.find('JPG', start) + 3
             self.sLatestFileName = self.sLatestImageURL[start:end]
             self.__boAddGeotagToLog(self.sLatestFileName)
 
