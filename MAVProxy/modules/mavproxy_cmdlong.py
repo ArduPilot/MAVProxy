@@ -20,6 +20,17 @@ class CmdlongModule(mp_module.MPModule):
         self.add_command('posvel', self.cmd_posvel, "posvel")
         self.add_command('parachute', self.cmd_parachute, "parachute",
                          ['<enable|disable|release>'])
+        self.add_command('long', self.cmd_long, "execute mavlink long command",
+                         self.cmd_long_commands())
+
+    def cmd_long_commands(self):
+        atts = dir(mavutil.mavlink)
+        atts = filter( lambda x : x.lower().startswith("mav_cmd"), atts)
+        ret = []
+        for att in atts:
+            ret.append(att)
+            ret.append(str(att[8:]))
+        return ret
 
     def cmd_takeoff(self, args):
         '''take off'''
@@ -253,6 +264,36 @@ class CmdlongModule(mp_module.MPModule):
             vN, vE, vD, # velocity
             0, 0, 0, # accel x,y,z
             0, 0) # yaw, yaw rate
+
+    def cmd_long(self, args):
+        '''execute supplied command long'''
+        if len(args) < 1:
+            print("Usage: long <command> [arg1] [arg2]...")
+            return
+        command = None
+        if args[0].isdigit():
+            command = int(args[0])
+        else:
+            try:
+                command = eval("mavutil.mavlink." + args[0])
+            except AttributeError as e:
+                try:
+                    command = eval("mavutil.mavlink.MAV_CMD_" + args[0])
+                except AttributeError as e:
+                    pass
+
+        if command is None:
+            print("Unknown command long ({0})".format(args[0]))
+            return
+
+        floating_args = [ float(x) for x in args[1:] ]
+        while len(floating_args) < 7:
+            floating_args.append(float(0))
+        self.master.mav.command_long_send(self.settings.target_system,
+                                          self.settings.target_component,
+                                          command,
+                                          0,
+                                          *floating_args)
 
 def init(mpstate):
     '''initialise module'''
