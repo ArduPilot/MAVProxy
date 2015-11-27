@@ -52,6 +52,7 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('WPBearing', 'Bearing ---', row=3)
         mpstate.console.set_status('AltError', 'AltError --', row=3)
         mpstate.console.set_status('AspdError', 'AspdError --', row=3)
+        mpstate.console.set_status('XtrackError', 'XtrackError --', row=3)
         mpstate.console.set_status('FlightTime', 'FlightTime --', row=3)
         mpstate.console.set_status('ETR', 'ETR --', row=3)
 
@@ -348,6 +349,7 @@ class ConsoleModule(mp_module.MPModule):
                 aspd_error_sign = "H"
             self.console.set_status('AltError', 'AltError %d%s' % (msg.alt_error, alt_error_sign))
             self.console.set_status('AspdError', 'AspdError %.1f%s' % (msg.aspd_error*0.01, aspd_error_sign))
+            self.console.set_status('XtrackError', 'XtrackError %d' % (msg.xtrack_error))
 
 def init(mpstate):
     '''initialise module'''
