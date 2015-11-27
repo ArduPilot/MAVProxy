@@ -54,6 +54,7 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('AspdError', 'AspdError --', row=3)
         mpstate.console.set_status('FlightTime', 'FlightTime --', row=3)
         mpstate.console.set_status('ETR', 'ETR --', row=3)
+        mpstate.console.set_status('Photos', 'Photos --', row=4)
 
         mpstate.console.ElevationMap = mp_elevation.ElevationModel()
 
@@ -244,6 +245,9 @@ class ConsoleModule(mp_module.MPModule):
 
         elif type == 'WIND':
             self.console.set_status('Wind', 'Wind %u/%.2f' % (msg.direction, msg.speed))
+
+        elif type == 'CAMERA_FEEDBACK':
+            self.console.set_status('Photos', 'Photos %u' % (msg.img_idx))
 
         elif type == 'EKF_STATUS_REPORT':
             highest = 0.0
