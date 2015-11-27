@@ -15,6 +15,7 @@ class CmdlongModule(mp_module.MPModule):
         self.add_command('velocity', self.cmd_velocity, "velocity")
         self.add_command('cammsg', self.cmd_cammsg, "cammsg")
         self.add_command('camctrlmsg', self.cmd_camctrlmsg, "camctrlmsg")
+        self.add_command('landtarget', self.cmd_landtarget, "landtarget")
 
     def cmd_takeoff(self, args):
         '''take off'''
@@ -140,6 +141,27 @@ class CmdlongModule(mp_module.MPModule):
                                       0, 0, 0,  # accel x,y,z
                                       0, 0)     # yaw, yaw rate
 
+    def cmd_landtarget(self, args):
+        '''landtarget frame angle-x-rad angle-y-rad'''
+        if (len(args) != 3):
+            print("Usage: landtarget frame(1=gimbaled-camera or 8=hard-mounted-camera) angle-x angle-y (radians)")
+            return
+
+        if (len(args) == 3):
+            frame = float(args[0])
+            x_rad = float(args[1])
+            y_rad = float(args[2])
+            print("frame:%f x:%f, y:%f" % (frame, x_rad, y_rad))
+            self.master.mav.landing_target_send(
+                                      0,  # system time in microseconds (not used)
+                                      1,  # landing target number (not used)
+                                      frame,  # frame, for body_frame use 8/MAV_FRAME_BODY_NED, for earth-frame use 1/MAV_FRAME_LOCAL_NED
+                                      x_rad,  # angle_x (in radians)
+                                      y_rad,  # angle_y (in radians)
+                                      0,  # distance in meters (not used)
+                                      0,  # size along x-axis (in radians, not used)
+                                      0)  # size along y-axis (in radians, not used)
+                                      
 def init(mpstate):
     '''initialise module'''
     return CmdlongModule(mpstate)
