@@ -322,7 +322,12 @@ class ConsoleModule(mp_module.MPModule):
                         fg = 'dark green'
                 self.console.set_status('Link%u'%m.linknum, linkline, row=1, fg=fg)
         elif type in ['WAYPOINT_CURRENT', 'MISSION_CURRENT']:
-            self.console.set_status('WP', 'WP %u' % msg.seq)
+            wpmax = self.module('wp').wploader.count()
+            if wpmax > 0:
+                wpmax = "/%u" % wpmax
+            else:
+                wpmax = ""
+            self.console.set_status('WP', 'WP %u%s' % (msg.seq, wpmax))
             lat = master.field('GLOBAL_POSITION_INT', 'lat', 0) * 1.0e-7
             lng = master.field('GLOBAL_POSITION_INT', 'lon', 0) * 1.0e-7
             if lat != 0 and lng != 0:
