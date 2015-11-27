@@ -462,13 +462,7 @@ class MapModule(mp_module.MPModule):
                 self.mpstate.map.add_object(mp_slipmap.SlipPolygon('trajectory', trajectory, layer='Trajectory',
                                                                    linewidth=2, colour=(255,0,180)))
             else:
-                self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('Trajectory'))
-
-        if m.get_type() == "ADSB_VEHICLE":
-            id = 'ADSB-' + str(m.ICAO_address)
-            # use plane icon for now
-            self.create_vehicle_icon(id, 'green', vehicle_type='plane')
-            self.mpstate.map.set_position(id, (m.lat*1e-7, m.lon*1e-7), rotation=m.heading)    
+                self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('Trajectory'))    
             
         # if the waypoints have changed, redisplay
         last_wp_change = self.module('wp').wploader.last_change
