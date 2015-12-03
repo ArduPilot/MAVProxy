@@ -37,7 +37,7 @@ class ADSBModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(ADSBModule, self).__init__(mpstate, "ADSB", "ADS-B data support")
         self.threat_vehicles = {}
-        self.active_threats = [] #holds all threats the vehicle is evading
+        self.active_threat_ids = [] #holds all threat ids the vehicle is evading
         
         self.add_command('ADSB', self.cmd_ADSB, ["ADSB control",
                                                  "<status>", 
@@ -57,7 +57,7 @@ class ADSBModule(mp_module.MPModule):
             print(usage)
             return
         if args[0] == "status":
-            print("total threat count: %u  active threat count: %u" % (len(self.threat_vehicles), len(self.active_threats)))
+            print("total threat count: %u  active threat count: %u" % (len(self.threat_vehicles), len(self.active_threat_ids)))
             
             for id in self.threat_vehicles.keys():
                 print("id: %s  distance: %.2f m  callsign: %s  alt: %.2f" % (id,
@@ -84,7 +84,7 @@ class ADSBModule(mp_module.MPModule):
                     #if the threat is known to the module and outside the threat clear radius...
                     self.threat_vehicles[id].is_evading_threat = False #clear flag to action threat
                     
-        self.active_threats = [id for id in self.threat_vehicles.keys() if self.threat_vehicles[id].is_evading_threat]
+        self.active_threat_ids = [id for id in self.threat_vehicles.keys() if self.threat_vehicles[id].is_evading_threat]
     
     def update_threat_distances(self, latlonalt):
         '''update the distance between threats and vehicle'''
@@ -181,7 +181,7 @@ class ADSBModule(mp_module.MPModule):
         
         if self.theat_detection_timer.trigger():
             self.perform_threat_detection()
-            #TODO: possibly evade detected threats with ids in self.active_threats
+            #TODO: possibly evade detected threats with ids in self.active_threat_ids
                 
 def init(mpstate):
     '''initialise module'''
