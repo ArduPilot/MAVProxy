@@ -5,6 +5,7 @@ import time
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.mavproxy_map import mp_slipmap
 from MAVProxy.modules.lib import mp_settings
+from MAVProxy.modules.lib.mp_menu import * #popup menus
 
 class ADSB_Vehicle(object):
     def __init__(self, id, state ):
@@ -56,16 +57,17 @@ class ADSBModule(mp_module.MPModule):
                 self.threat_vehicles[id] = ADSB_Vehicle(id = id, state = m.to_dict())
                 if self.mpstate.map: #if the map is loaded...
                     icon = self.mpstate.map.icon('greenplane' + '.png')# use plane icon for now
+                    popup = MPMenuSubMenu('ADSB',
+                                  items=[MPMenuItem(name=id, returnkey=None)])
                     #draw the vehicle on the map
                     self.mpstate.map.add_object(mp_slipmap.SlipIcon(id, (m.lat*1e-7,m.lon*1e-7), icon, layer=3, rotation=m.heading, follow=False,
-                                                trail=mp_slipmap.SlipTrail()))
+                                                trail=mp_slipmap.SlipTrail(colour=(0, 255, 255)), popup_menu=popup))
             else: #the vehicle is in the dict
                 #update the dict entry
                 self.threat_vehicles[id].update(m.to_dict())
                 if self.mpstate.map: #if the map is loaded...
                     #update the map
                     self.mpstate.map.set_position(id, (m.lat*1e-7, m.lon*1e-7), rotation=m.heading)
-            
     
                 
     def idle_task(self):
