@@ -158,7 +158,7 @@ class LogModule(mp_module.MPModule):
     def cmd_log(self, args):
         '''log commands'''
         if len(args) < 1:
-            print("usage: log <list|download|download-all|erase|resume|status|cancel>")
+            print("usage: log <list|download|erase|resume|status|cancel>")
             return
 
         if args[0] == "status":
