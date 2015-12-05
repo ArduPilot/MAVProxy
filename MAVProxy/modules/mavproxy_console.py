@@ -346,7 +346,11 @@ class ConsoleModule(mp_module.MPModule):
                 aspd_error_sign = "L"
             else:
                 aspd_error_sign = "H"
-            self.console.set_status('AltError', 'AltError %d%s' % (msg.alt_error, alt_error_sign))
+            if math.isnan(msg.alt_error):
+                alt_error = "NaN"
+            else:
+                alt_error = "%d%s" % (msg.alt_error, alt_error_sign)
+            self.console.set_status('AltError', 'AltError %s' % alt_error)
             self.console.set_status('AspdError', 'AspdError %.1f%s' % (msg.aspd_error*0.01, aspd_error_sign))
 
 def init(mpstate):
