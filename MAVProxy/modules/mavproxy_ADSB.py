@@ -47,10 +47,8 @@ class ADSBModule(mp_module.MPModule):
                                                  "set (ADSBSETTING)"])
 
         self.ADSB_settings = mp_settings.MPSettings([("timeout", int, 10),  # seconds
-                                                     # meters
-                                                     ("threat_radius", int, 200),
-                                                     ("show_threat_radius",
-                                                      bool, False),
+                                                     ("threat_radius", int, 200),  # meters
+                                                     ("show_threat_radius",bool, False),
                                                      # threat_radius_clear = threat_radius*threat_radius_clear_multiplier
                                                      ("threat_radius_clear_multiplier", int, 2),
                                                      ("show_threat_radius_clear", bool, False)])
@@ -106,10 +104,8 @@ class ADSBModule(mp_module.MPModule):
                                 self.threat_vehicles[id].state['lon'] * 1e-7,
                                 self.threat_vehicles[id].state['altitude'])
 
-            self.threat_vehicles[id].h_distance = self.get_h_distance(
-                latlonalt, threat_latlonalt)
-            self.threat_vehicles[id].v_distance = self.get_v_distance(
-                latlonalt, threat_latlonalt)
+            self.threat_vehicles[id].h_distance = self.get_h_distance(latlonalt, threat_latlonalt)
+            self.threat_vehicles[id].v_distance = self.get_v_distance(latlonalt, threat_latlonalt)
 
             # calculate and set the total distance between threat and vehicle
             self.threat_vehicles[id].distance = sqrt(
@@ -146,22 +142,21 @@ class ADSBModule(mp_module.MPModule):
             id = 'ADSB-' + str(m.ICAO_address)
             if id not in self.threat_vehicles.keys():  # check to see if the vehicle is in the dict
                 # if not then add it
-                self.threat_vehicles[id] = ADSBVehicle(
-                    id=id, state=m.to_dict())
+                self.threat_vehicles[id] = ADSBVehicle(id=id, state=m.to_dict())
                 if self.mpstate.map:  # if the map is loaded...
                     icon = self.mpstate.map.icon(self.threat_vehicles[id].icon)
-                    popup = MPMenuSubMenu('ADSB',
-                                          items=[MPMenuItem(name=id, returnkey=None)])
+                    popup = MPMenuSubMenu('ADSB',items=[MPMenuItem(name=id, returnkey=None)])
                     # draw the vehicle on the map
-                    self.mpstate.map.add_object(mp_slipmap.SlipIcon(id, (m.lat * 1e-7, m.lon * 1e-7), icon, layer=3, rotation=m.heading, follow=False,
-                                                                    trail=mp_slipmap.SlipTrail(colour=(0, 255, 255)), popup_menu=popup))
+                    self.mpstate.map.add_object(mp_slipmap.SlipIcon(id, (m.lat * 1e-7, m.lon * 1e-7),
+                                                                    icon, layer=3, rotation=m.heading, follow=False,
+                                                                    trail=mp_slipmap.SlipTrail(colour=(0, 255, 255)),
+                                                                    popup_menu=popup))
             else:  # the vehicle is in the dict
                 # update the dict entry
                 self.threat_vehicles[id].update(m.to_dict())
                 if self.mpstate.map:  # if the map is loaded...
                     # update the map
-                    self.mpstate.map.set_position(
-                        id, (m.lat * 1e-7, m.lon * 1e-7), rotation=m.heading)
+                    self.mpstate.map.set_position(id, (m.lat * 1e-7, m.lon * 1e-7), rotation=m.heading)
 
         if m.get_type() == "GLOBAL_POSITION_INT":
             if self.mpstate.map:
@@ -186,14 +181,13 @@ class ADSBModule(mp_module.MPModule):
                                                              m.lon * 1e-7),
                                                             threat_radius_clear,
                                                             (0, 255, 255), linewidth=1)
-                threat_clear_circle.set_hidden(
-                    not self.ADSB_settings.show_threat_radius_clear)  # show the circle?
+                # show the circle?
+                threat_clear_circle.set_hidden(not self.ADSB_settings.show_threat_radius_clear)
                 self.mpstate.map.add_object(threat_clear_circle)
 
             # we assume this is handled much more oftern than ADS-B messages
             # so update the distance between vehicle and threat here
-            self.update_threat_distances(
-                (m.lat * 1e-7, m.lon * 1e-7, m.alt * 1e-3))
+            self.update_threat_distances((m.lat * 1e-7, m.lon * 1e-7, m.alt * 1e-3))
 
     def idle_task(self):
         '''called on idle'''
