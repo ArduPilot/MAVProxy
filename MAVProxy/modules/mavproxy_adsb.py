@@ -38,11 +38,11 @@ class ADSBVehicle(object):
 class ADSBModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(ADSBModule, self).__init__(mpstate, "ADSB", "ADS-B data support")
+        super(ADSBModule, self).__init__(mpstate, "adsb", "ADS-B data support")
         self.threat_vehicles = {}
         self.active_threat_ids = []  # holds all threat ids the vehicle is evading
 
-        self.add_command('ADSB', self.cmd_ADSB, ["ADSB control",
+        self.add_command('adsb', self.cmd_ADSB, ["adsb control",
                                                  "<status>",
                                                  "set (ADSBSETTING)"])
 
@@ -56,8 +56,8 @@ class ADSBModule(mp_module.MPModule):
         self.threat_timeout_timer = mavutil.periodic_event(2)
 
     def cmd_ADSB(self, args):
-        '''ADSB command parser'''
-        usage = "usage: ADSB <set>"
+        '''adsb command parser'''
+        usage = "usage: adsb <set>"
         if len(args) == 0:
             print(usage)
             return
