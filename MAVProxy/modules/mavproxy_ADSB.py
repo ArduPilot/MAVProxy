@@ -48,11 +48,12 @@ class ADSBModule(mp_module.MPModule):
 
         self.ADSB_settings = mp_settings.MPSettings([("timeout", int, 10),  # seconds
                                                      ("threat_radius", int, 200),  # meters
-                                                     ("show_threat_radius",bool, False),
+                                                     ("show_threat_radius", bool, False),
                                                      # threat_radius_clear = threat_radius*threat_radius_clear_multiplier
                                                      ("threat_radius_clear_multiplier", int, 2),
                                                      ("show_threat_radius_clear", bool, False)])
-        self.theat_detection_timer = mavutil.periodic_event(2)
+        self.threat_detection_timer = mavutil.periodic_event(2)
+        self.threat_timeout_timer = mavutil.periodic_event(2)
 
     def cmd_ADSB(self, args):
         '''ADSB command parser'''
@@ -66,9 +67,9 @@ class ADSBModule(mp_module.MPModule):
 
             for id in self.threat_vehicles.keys():
                 print("id: %s  distance: %.2f m callsign: %s  alt: %.2f" % (id,
-                                                                             self.threat_vehicles[id].distance,
-                                                                             self.threat_vehicles[id].state['callsign'],
-                                                                             self.threat_vehicles[id].state['altitude']))
+                                                                            self.threat_vehicles[id].distance,
+                                                                            self.threat_vehicles[id].state['callsign'],
+                                                                            self.threat_vehicles[id].state['altitude']))
         elif args[0] == "set":
             self.ADSB_settings.command(args[1:])
         else:
@@ -135,6 +136,17 @@ class ADSBModule(mp_module.MPModule):
         (lat2, lon2, alt2) = latlonalt2
         return alt2 - alt1
 
+    def check_threat_timeout(self):
+        '''check and handle threat time out'''
+        current_time = time.time()
+        for id in self.threat_vehicles.keys():
+            if current_time - self.threat_vehicles[id].update_time > self.ADSB_settings.timeout:
+                # if the threat has timed out...
+                del self.threat_vehicles[id]  # remove the threat from the dict
+                if self.mpstate.map:
+                    # remove the threat from the map
+                    self.mpstate.map.remove_object(id)
+
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         if m.get_type() == "ADSB_VEHICLE":
@@ -145,7 +157,7 @@ class ADSBModule(mp_module.MPModule):
                 self.threat_vehicles[id] = ADSBVehicle(id=id, state=m.to_dict())
                 if self.mpstate.map:  # if the map is loaded...
                     icon = self.mpstate.map.icon(self.threat_vehicles[id].icon)
-                    popup = MPMenuSubMenu('ADSB',items=[MPMenuItem(name=id, returnkey=None)])
+                    popup = MPMenuSubMenu('ADSB', items=[MPMenuItem(name=id, returnkey=None)])
                     # draw the vehicle on the map
                     self.mpstate.map.add_object(mp_slipmap.SlipIcon(id, (m.lat * 1e-7, m.lon * 1e-7),
                                                                     icon, layer=3, rotation=m.heading, follow=False,
@@ -160,7 +172,7 @@ class ADSBModule(mp_module.MPModule):
 
         if m.get_type() == "GLOBAL_POSITION_INT":
             if self.mpstate.map:
-                if len(self.active_threats) > 0:
+                if len(self.active_threat_ids) > 0:
                     threat_circle_width = 2
                 else:
                     threat_circle_width = 1
@@ -191,17 +203,10 @@ class ADSBModule(mp_module.MPModule):
 
     def idle_task(self):
         '''called on idle'''
-        current_time = time.time()
+        if self.threat_timeout_timer.trigger():
+            self.check_threat_timeout()
 
-        for id in self.threat_vehicles.keys():
-            if current_time - self.threat_vehicles[id].update_time > self.ADSB_settings.timeout:
-                # if the treat has timed out...
-                del self.threat_vehicles[id]  # remove the threat from the dict
-                if self.mpstate.map:
-                    # remove the threat from the map
-                    self.mpstate.map.remove_object(id)
-
-        if self.theat_detection_timer.trigger():
+        if self.threat_detection_timer.trigger():
             self.perform_threat_detection()
             # TODO: possibly evade detected threats with ids in
             # self.active_threat_ids
