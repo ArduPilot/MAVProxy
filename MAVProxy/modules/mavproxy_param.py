@@ -106,6 +106,12 @@ class ParamState:
                 print("%s: %s\n" % (h, help.get('humanName')))
                 print(help.get('documentation'))
                 try:
+                    print("\n")
+                    for f in help.field:
+                        print("%s : %s" % (f.get('name'), str(f)))
+                except Exception as e:
+                    pass
+                try:
                     vchild = help.getchildren()[0]
                     print("\nValues: ")
                     for v in vchild.value:
