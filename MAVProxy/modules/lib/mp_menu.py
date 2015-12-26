@@ -262,9 +262,13 @@ class MPMenuCallFileDialog(object):
             'save': wx.FD_SAVE,
             'overwrite_prompt': wx.FD_OVERWRITE_PROMPT,
         }
-        flags = map(lambda x: flag_map[x], self.flags)
-
-        dlg = wx.FileDialog(None, self.title, '', "", self.wildcard, flags)
+        flagsMapped = map(lambda x: flag_map[x], self.flags)
+        
+        #need to OR together the elements of the flagsMapped tuple
+        if len(flagsMapped) == 1:
+            dlg = wx.FileDialog(None, self.title, '', "", self.wildcard, flagsMapped[0])
+        else:
+            dlg = wx.FileDialog(None, self.title, '', "", self.wildcard, flagsMapped[0]|flagsMapped[1])
         if dlg.ShowModal() != wx.ID_OK:
             return None
         return dlg.GetPath()
