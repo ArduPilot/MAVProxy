@@ -24,6 +24,9 @@ from MAVProxy.modules.lib.graphdefinition import GraphDefinition
 from lxml import objectify
 import pkg_resources
 
+#Global var to hold the GUI menu element
+TopMenu = None
+
 if __name__ == "__main__":
     multiprocessing.freeze_support()
 
@@ -85,6 +88,14 @@ def menu_callback(m):
     elif m.returnkey.startswith("mode-"):
         idx = int(m.returnkey[5:])
         mestate.flightmode_selections[idx] = m.IsChecked()
+    elif m.returnkey.startswith("loadLog"):
+        print "File: " + m.returnkey[8:]
+    elif m.returnkey == 'quit':
+        mestate.console.close()
+        mestate.exit = True
+        print "Exited. Press Enter to continue."
+        sys.exit(0)
+        
     else:
         print('Unknown menu selection: %s' % m.returnkey)
 
@@ -113,18 +124,30 @@ def graph_menus():
         ret.add_to_submenu(path, MPMenuItem(name, name, '# graph :%u' % i))
     return ret
 
+def setup_file_menu():
+    global TopMenu
+    TopMenu = MPMenuTop([])
+    TopMenu.add(MPMenuSubMenu('MAVExplorer',
+                           items=[MPMenuItem('Settings', 'Settings', 'menuSettings'),
+                                  MPMenuItem('&Open\tCtrl+O', 'Open Log', '# loadLog ',
+                                            handler=MPMenuCallFileDialog(
+                                                                        flags=('open',),
+                                                                        title='Logfile Load',
+                                                                        wildcard='*.tlog')),
+                                  MPMenuItem('&Quit\tCtrl+Q', 'Quit', 'quit')]))
+    mestate.console.set_menu(TopMenu, menu_callback)
+    
 def setup_menus():
     '''setup console menus'''
-    menu = MPMenuTop([])
-    menu.add(MPMenuSubMenu('MAVExplorer',
-                           items=[MPMenuItem('Settings', 'Settings', 'menuSettings'),
-                                  MPMenuItem('Map', 'Map', '# map'),
+    global TopMenu
+    TopMenu.add(MPMenuSubMenu('Display',
+                           items=[MPMenuItem('Map', 'Map', '# map'),
                                   MPMenuItem('Save Graph', 'Save', '# save'),
                                   MPMenuItem('Reload Graphs', 'Reload', '# reload')]))
-    menu.add(graph_menus())
-    menu.add(MPMenuSubMenu('FlightMode', items=flightmode_menu()))
+    TopMenu.add(graph_menus())
+    TopMenu.add(MPMenuSubMenu('FlightMode', items=flightmode_menu()))
 
-    mestate.console.set_menu(menu, menu_callback)
+    mestate.console.set_menu(TopMenu, menu_callback)
 
 def expression_ok(expression):
     '''return True if an expression is OK with current messages'''
@@ -349,6 +372,27 @@ def cmd_param(args):
     for p in k:
         if fnmatch.fnmatch(str(p).upper(), wildcard.upper()):
             print("%-16.16s %f" % (str(p), mestate.mlog.params[p]))
+            
+def cmd_loadfile(args):
+    '''callback from menu to load a log file'''
+    if len(args) != 1:
+        print "Error loading file"
+        return
+    loadfile(args[0])
+    
+def loadfile(args):    
+    '''load a log file (path given by arg)'''
+    mestate.console.write("Loading %s...\n" % args)
+    t0 = time.time()
+    mlog = mavutil.mavlink_connection(args, notimestamps=False,
+                                      zero_time_base=False)
+    mestate.mlog = mavmemlog.mavmemlog(mlog, progress_bar)
+    mestate.status.msgs = mlog.messages
+    t1 = time.time()
+    mestate.console.write("\ndone (%u messages in %.1fs)\n" % (mestate.mlog._count, t1-t0))
+
+    load_graphs()
+    setup_menus()
 
 def process_stdin(line):
     '''handle commands from user'''
@@ -412,6 +456,7 @@ command_map = {
     'condition'  : (cmd_condition, 'set graph conditions'),
     'param'      : (cmd_param,     'show parameters'),
     'map'        : (cmd_map,       'show map view'),
+    'loadLog'    : (cmd_loadfile,  'load a log file'),
     }
 
 def progress_bar(pct):
@@ -420,28 +465,18 @@ def progress_bar(pct):
 
 if __name__ == "__main__":
     mestate = MEState()
+    setup_file_menu()
+    
     mestate.rl = rline.rline("MAV> ", mestate)
-
+    
     from argparse import ArgumentParser
     parser = ArgumentParser(description=__doc__)
-    parser.add_argument("files", metavar="<FILE>", nargs="+")
-    args = parser.parse_args()
+    parser.add_argument("files", metavar="<FILE>", nargs="?")
+    args = parser.parse_args() 
 
-    if len(args.files) == 0:
-        print("Usage: MAVExplorer FILE")
-        sys.exit(1)
-
-    mestate.console.write("Loading %s...\n" % args.files[0])
-    t0 = time.time()
-    mlog = mavutil.mavlink_connection(args.files[0], notimestamps=False,
-                                      zero_time_base=False)
-    mestate.mlog = mavmemlog.mavmemlog(mlog, progress_bar)
-    mestate.status.msgs = mlog.messages
-    t1 = time.time()
-    mestate.console.write("\ndone (%u messages in %.1fs)\n" % (mestate.mlog._count, t1-t0))
-
-    load_graphs()
-    setup_menus()
+    #If specified, open the log file
+    if args.files != None and len(args.files) != 0: 
+        loadfile(args.files)     
 
     # run main loop as a thread
     mestate.thread = threading.Thread(target=main_loop, name='main_loop')
@@ -449,9 +484,9 @@ if __name__ == "__main__":
     mestate.thread.start()
 
     # input loop
-    while True:
+    while mestate.rl != None and mestate.exit != True:        
         try:
-            try:
+            try:           
                 line = raw_input(mestate.rl.prompt)
             except EOFError:
                 mestate.exit = True
@@ -460,3 +495,4 @@ if __name__ == "__main__":
         except KeyboardInterrupt:
             mestate.exit = True
             break
+            
