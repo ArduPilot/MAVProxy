@@ -15,7 +15,7 @@ C:\Python27\Scripts\pip install pymavlink -U
 
 rem -----Build MAVProxy-----
 cd ..\
-python setup.py clean build install --user
+python setup.py clean build install
 cd .\MAVProxy
 C:\Python27\Scripts\pyinstaller --clean ..\windows\mavproxy.spec
 

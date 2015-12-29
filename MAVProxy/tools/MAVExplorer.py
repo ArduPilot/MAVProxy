@@ -27,9 +27,6 @@ import pkg_resources
 #Global var to hold the GUI menu element
 TopMenu = None
 
-if __name__ == "__main__":
-    multiprocessing.freeze_support()
-
 class MEStatus(object):
     '''status object to conform with mavproxy structure for modules'''
     def __init__(self):
@@ -196,9 +193,14 @@ def load_graphs():
     if 'HOME' in os.environ:
         for dirname, dirnames, filenames in os.walk(os.path.join(os.environ['HOME'], ".mavproxy")):
             for filename in filenames:
-                
                 if filename.lower().endswith('.xml'):
                     gfiles.append(os.path.join(dirname, filename))
+    elif 'LOCALAPPDATA' in os.environ:
+        for dirname, dirnames, filenames in os.walk(os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy")):
+            for filename in filenames:
+                if filename.lower().endswith('.xml'):
+                    gfiles.append(os.path.join(dirname, filename))
+                    
     for file in gfiles:
         if not os.path.exists(file):
             continue
@@ -216,18 +218,18 @@ def load_graphs():
             mestate.console.writeln("Loaded %s" % f)
     mestate.graphs = sorted(mestate.graphs, key=lambda g: g.name)
 
-def graph_process(fields):
+def graph_process(fields, mavExpLog, mavExpFlightModeSel, mavExpSettings):
     '''process for a graph'''
-    mestate.mlog.reduce_by_flightmodes(mestate.flightmode_selections)
+    mavExpLog.reduce_by_flightmodes(mavExpFlightModeSel)
     
     mg = grapher.MavGraph()
-    mg.set_marker(mestate.settings.marker)
-    mg.set_condition(mestate.settings.condition)
-    mg.set_xaxis(mestate.settings.xaxis)
-    mg.set_linestyle(mestate.settings.linestyle)
-    mg.set_flightmode(mestate.settings.flightmode)
-    mg.set_legend(mestate.settings.legend)
-    mg.add_mav(mestate.mlog)
+    mg.set_marker(mavExpSettings.marker)
+    mg.set_condition(mavExpSettings.condition)
+    mg.set_xaxis(mavExpSettings.xaxis)
+    mg.set_linestyle(mavExpSettings.linestyle)
+    mg.set_flightmode(mavExpSettings.flightmode)
+    mg.set_legend(mavExpSettings.legend)
+    mg.add_mav(mavExpLog)
     for f in fields:
         mg.add_field(f)
     mg.process()
@@ -236,7 +238,7 @@ def graph_process(fields):
 def display_graph(graphdef):
     '''display a graph'''
     mestate.console.write("Expression: %s\n" % ' '.join(graphdef.expression.split()))
-    child = multiprocessing.Process(target=graph_process, args=[graphdef.expression.split()])
+    child = multiprocessing.Process(target=graph_process, args=[graphdef.expression.split(), mestate.mlog, mestate.flightmode_selections, mestate.settings])
     child.start()
 
 def cmd_graph(args):
@@ -260,20 +262,20 @@ def cmd_graph(args):
         mestate.last_graph = GraphDefinition('Untitled', expression, '', [expression], None)
     display_graph(mestate.last_graph)
 
-def map_process(args):
+def map_process(args, MAVExpLog, MAVExpFlightModes, MAVExpSettings):
     '''process for a graph'''
     from mavflightview import mavflightview_mav, mavflightview_options
-    mestate.mlog.reduce_by_flightmodes(mestate.flightmode_selections)
+    MAVExpLog.reduce_by_flightmodes(MAVExpFlightModes)
     
     options = mavflightview_options()
-    options.condition = mestate.settings.condition
+    options.condition = MAVExpSettings.condition
     if len(args) > 0:
         options.types = ','.join(args)
-    mavflightview_mav(mestate.mlog, options)
+    mavflightview_mav(MAVExpLog, options)
 
 def cmd_map(args):
     '''map command'''
-    child = multiprocessing.Process(target=map_process, args=[args])
+    child = multiprocessing.Process(target=map_process, args=[args, mestate.mlog, mestate.flightmode_selections, mestate.settings])
     child.start()
 
 def cmd_set(args):
@@ -301,8 +303,14 @@ def save_graph(graphdef):
     if graphdef.filename is None:
         if 'HOME' in os.environ:
             dname = os.path.join(os.environ['HOME'], '.mavproxy')
-            mp_util.mkdir_p(dname)
-            graphdef.filename = os.path.join(dname, 'mavgraphs.xml')
+            if os.path.exists(dname):
+                mp_util.mkdir_p(dname)
+                graphdef.filename = os.path.join(dname, 'mavgraphs.xml')
+        elif 'LOCALAPPDATA' in os.environ:
+            dname = os.path.join(os.environ['LOCALAPPDATA'], 'MAVProxy')
+            if os.path.exists(dname):
+                mp_util.mkdir_p(dname)
+                graphdef.filename = os.path.join(dname, 'mavgraphs.xml')
         else:
             graphdef.filename = 'mavgraphs.xml'
     if graphdef.filename is None:
@@ -342,16 +350,16 @@ def save_callback(operation, graphdef):
         mestate.console.writeln('Invalid graph expressions', fg='red')
         return
     if operation == 'save':
-        save_graph(graphdef)
+        save_graph(graphdef, mestate)
 
-def save_process():
+def save_process(MAVExpLastGraph):
     '''process for saving a graph'''
     from MAVProxy.modules.lib import wx_processguard
     from MAVProxy.modules.lib.wx_loader import wx
     from MAVProxy.modules.lib.wxgrapheditor import GraphDialog
     app = wx.App(False)
     frame = GraphDialog('Graph Editor',
-                        mestate.last_graph,
+                        MAVExpLastGraph,
                         save_callback)
     frame.ShowModal()
     frame.Destroy()
@@ -359,7 +367,7 @@ def save_process():
 
 def cmd_save(args):
     '''save a graph'''
-    child = multiprocessing.Process(target=save_process)
+    child = multiprocessing.Process(target=save_process, args=[mestate.last_graph])
     child.start()
 
 def cmd_param(args):
@@ -464,6 +472,7 @@ def progress_bar(pct):
         mestate.console.write('#')
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     mestate = MEState()
     setup_file_menu()
     
