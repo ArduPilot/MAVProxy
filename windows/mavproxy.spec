@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 # spec file for pyinstaller to build mavproxy for windows
-a = Analysis(['mavproxy.py'],
+MAVProxyAny = Analysis(['mavproxy.py'],
              pathex=[os.path.abspath('.')],
              # for some unknown reason these hidden imports don't pull in
              # all the needed pieces, so we also import them in mavproxy.py
@@ -20,19 +20,50 @@ a = Analysis(['mavproxy.py'],
                             'wx.lib.agw.gradientbutton'],
              hookspath=None,
              runtime_hooks=None)
-pyz = PYZ(a.pure)
-exe = EXE(pyz,
-          a.scripts,
+MAVExpAny = Analysis(['.\\tools\\MAVExplorer.py'],
+             pathex=[os.path.abspath('.')],
+             # for some unknown reason these hidden imports don't pull in
+             # all the needed pieces, so we also import them in mavproxy.py
+             hiddenimports=['cv', 'cv2', 'wx', 'pylab', 
+                            'numpy', 'dateutil', 'matplotlib',
+                            'pymavlink.mavwp', 'pymavlink.mavutil', 
+                            'pyreadline', 'HTMLParser', 'wx.grid', 'wx._grid',
+                            'wx.lib.agw.genericmessagedialog', 'wx.lib.wordwrap', 'wx.lib.buttons',
+                            'wx.lib.embeddedimage', 'wx.lib.imageutils', 'wx.lib.agw.aquabutton', 
+                            'wx.lib.agw.gradientbutton', 'FileDialog', 'Dialog'],
+             hookspath=None,
+             runtime_hooks=None)
+MERGE( (MAVProxyAny, 'mavproxy', 'mavproxy'), (MAVExpAny, 'MAVExplorer', 'MAVExplorer') )
+MAVProxy_pyz = PYZ(MAVProxyAny.pure)
+MAVProxy_exe = EXE(MAVProxy_pyz,
+          MAVProxyAny.scripts,
           exclude_binaries=True,
           name='mavproxy.exe',
           debug=False,
           strip=None,
           upx=True,
           console=True )
-coll = COLLECT(exe,
-               a.binaries,
-               a.zipfiles,
-               a.datas,
+MAVProxy_coll = COLLECT(MAVProxy_exe,
+               MAVProxyAny.binaries,
+               MAVProxyAny.zipfiles,
+               MAVProxyAny.datas,
                strip=None,
                upx=True,
                name='mavproxy')
+
+MAVExp_pyz = PYZ(MAVExpAny.pure)
+MAVExp_exe = EXE(MAVExp_pyz,
+          MAVExpAny.scripts,
+          exclude_binaries=True,
+          name='MAVExplorer.exe',
+          debug=False,
+          strip=None,
+          upx=True,
+          console=True )
+MAVExp_coll = COLLECT(MAVExp_exe,
+               MAVExpAny.binaries,
+               MAVExpAny.zipfiles,
+               MAVExpAny.datas,
+               strip=None,
+               upx=True,
+               name='MAVExplorer')
