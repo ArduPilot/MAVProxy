@@ -67,9 +67,9 @@ joymap = {
     'GREAT PLANES InterLink Elite':
     # 4 axes usable
     [(0, 500,  1500),
-     (1, -500,  1500),
+     (1, 500,  1500),
      (2, -1000, 1500),
-     (4, -500,  1500),
+     (4, 500,  1500),
      None,
      None,
      None,
@@ -116,7 +116,15 @@ joymap = {
      (2, -500, 1500), # Throttle
      (4, 500, 1500), # Yaw
      None,
-     None]
+     None],
+
+    'WAILLY PPM*':
+    [(0, 500, 1500),
+     (1, 500, 1500),
+     (2, 500, 1500),
+     (5, 500, 1500),
+     (3, 500, 1600),
+     (4, 500, 1500)]
 }
 
 class JSModule(mp_module.MPModule):
