@@ -55,43 +55,6 @@ import ssdp
 #****************************************************************************
 class SmartCamera_SonyQX():
 
-    def boSet_GPS(self, m):
-        if m.get_type() == 'GLOBAL_POSITION_INT':
-            (self.vehicleLat, self.vehicleLon, self.vehicleHdg, self.vehicleAMSL) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01, m.alt*0.001)
-
-    def boSet_Attitude(self, m):
-        if m.get_type() == 'ATTITUDE':
-            (self.vehicleRoll, self.vehiclePitch) = (math.degrees(m.roll), math.degrees(m.pitch))
-
-    # Geo reference log for all the GoPro pictures
-    def __geoRef_write(self, arg):
-        #self.geoRef_writer.write(datetime.now().strftime('%d-%m-%Y %H:%M:%S.%f')[:-3])
-        self.geoRef_writer.write(arg)
-        self.geoRef_writer.write(",%f,%f,%f,%f,%f,%f" % (self.vehicleLat, self.vehicleLon, self.vehicleAMSL, self.vehicleRoll, self.vehiclePitch,self.vehicleHdg))
-        self.geoRef_writer.write('\n')
-        self.geoRef_writer.flush()
-    
-    def get_real_Yaw(self, yaw):
-        if (yaw < 0):
-            return yaw+360
-        return yaw
-    
-    def __writeGeoRefToFile(self, sImageFileName1):
-        self.__geoRef_write(sImageFileName1)
-        #self.geoRef_write(",%f,%f,%f,%f,%f,%f,%f,%f,%f" % (self.vehicle.location.lat, self.vehicle.location.lon, self.GPS_AMSL, math.degrees(self.vehicle.attitude.pitch), math.degrees(self.vehicle.attitude.roll), self.get_real_Yaw(math.degrees(self.vehicle.attitude.yaw)), self.vehicle.mount_status[0], self.vehicle.mount_status[2], self.get_real_Yaw(self.vehicle.mount_status[1])))
-
-    def __openGeoTagLogFile(self):
-        #Open GeoTag Log File
-        i = 0
-        while os.path.exists('/sdcard/log/geoRef%s.log' % i):
-            print('checking /sdcard/log/geoRef%s.log' % i)
-            i += 1
-
-        self.geoRef_writer = open('/sdcard/log/geoRef%s.log' % i, 'w', 0)
-        self.geoRef_writer.write('Time, Latitude, Longitude, Alt, Pitch, Roll, Yaw, Mount Pitch, Mount Roll, Mount Yaw\n')
-            
-        print('Opened GeoTag Log File with Filename: geoRef%s.log' % i)
-
 #****************************************************************************
 #   Method Name     : __init__ Class Initializer
 #
@@ -153,6 +116,125 @@ class SmartCamera_SonyQX():
     def __str__(self):
         return "SmartCameraSonyQX Object for %s" % self.sConfigGroup
 
+#****************************************************************************
+#   Method Name     : boSet_GPS
+#
+#   Description     : Gets the GPS Position from the provided message
+#
+#   Parameters      : mGPSMessage       GPS Mavlink Message type
+#
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+    def boSet_GPS(self, mGPSMessage):
+        if mGPSMessage.get_type() == 'GLOBAL_POSITION_INT':
+            (self.vehicleLat, self.vehicleLon, self.vehicleHdg, self.vehicleAMSL) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01, m.alt*0.001)
+        
+#****************************************************************************
+#   Method Name     : boSet_Attitude
+#
+#   Description     : Gets the vehicle attitude from the provided message
+#
+#   Parameters      : mAttitudeMessage  MAVlink Attitude Message type
+#
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+    
+    def boSet_Attitude(self, mAttitudeMessage):
+        if mAttitudeMessage.get_type() == 'ATTITUDE':
+            (self.vehicleRoll, self.vehiclePitch) = (math.degrees(m.roll), math.degrees(m.pitch))
+
+#****************************************************************************
+#   Method Name     : __geoRef_write
+#
+#   Description     : Writes GeoReference to file
+#
+#   Parameters      : sImageFileName    File name of image to be entered into the log
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+
+    # Geo reference log for all the GoPro pictures
+    def __geoRef_write(self, sImageFileName):
+        #self.geoRef_writer.write(datetime.now().strftime('%d-%m-%Y %H:%M:%S.%f')[:-3])
+        self.geoRef_writer.write(sImageFileName)
+            self.geoRef_writer.write(",%f,%f,%f,%f,%f,%f" % (self.vehicleLat, self.vehicleLon, self.vehicleAMSL, self.vehicleRoll, self.vehiclePitch,self.vehicleHdg))
+            self.geoRef_writer.write('\n')
+            self.geoRef_writer.flush()
+
+#****************************************************************************
+#   Method Name     : get_real_Yaw
+#
+#   Description     : Helper method to get the real Yaw
+#
+#   Parameters      : yaw        Vehicle Yaw
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+    def get_real_Yaw(self, yaw):
+        if (yaw < 0):
+            return yaw+360
+        return yaw
+    
+#****************************************************************************
+#   Method Name     : __writeGeoRefToFile
+#
+#   Description     : Writes the Georeference of the image to the log. NOT SURE
+#                     IF IT IS DUPLICATED FOR A GOOD REASON.
+#
+#   Parameters      : sImageFileName1   Image file name
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+    
+    def __writeGeoRefToFile(self, sImageFileName1):
+        self.__geoRef_write(sImageFileName1)
+    
+#****************************************************************************
+#   Method Name     : __openGeoTagLogFile
+#
+#   Description     : Checks for existing log files and creates a new Log file
+#                     with an incremented index number
+#
+#   Parameters      : None
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+    def __openGeoTagLogFile(self):
+        #Open GeoTag Log File
+        i = 0
+        while os.path.exists('/sdcard/log/geoRef%s.log' % i):
+            print('checking /sdcard/log/geoRef%s.log' % i)
+            i += 1
+        
+        self.geoRef_writer = open('/sdcard/log/geoRef%s.log' % i, 'w', 0)
+        self.geoRef_writer.write('Time, Latitude, Longitude, Alt, Pitch, Roll, Yaw, Mount Pitch, Mount Roll, Mount Yaw\n')
+        
+    print('Opened GeoTag Log File with Filename: geoRef%s.log' % i)
+    
 #****************************************************************************
 #   Method Name     : __sFindInterfaceIPAddress
 #
@@ -277,6 +359,15 @@ class SmartCamera_SonyQX():
         print ("Checking URL at %s" % self.sCameraURL)
         if self.sCameraURL is None:
             return False
+        
+        # Check if we need to do 'startRecMode'
+        APIList = self.__sSimpleCall("getAvailableApiList")
+        
+        # For those cameras which need it
+        if 'startRecMode' in (APIList['result'])[0]:
+            print("Need to send startRecMode, sending...")
+            self.__sSimpleCall("startRecMode")
+
         return True
 
 #****************************************************************************
