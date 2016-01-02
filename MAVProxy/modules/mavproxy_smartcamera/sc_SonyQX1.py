@@ -89,15 +89,21 @@ class SmartCamera_SonyQX():
         self.sLatestImageFilename = None    #String with the Filename for the last downloaded image
         self.sLatestFileName = None         #String with the camera file name for the last image taken
         
-        self.vehicleLat = None              # Current Vehicle Latitude
-        self.vehicleLon = None              # Current Vehicle Longitude
-        self.vehicleHdg = None              # Current Vehicle Heading
-        self.vehicleAMSL = None             # Current Vehicle Altitude above mean sea level
-    
+        self.vehicleLat = 0.0              # Current Vehicle Latitude
+        self.vehicleLon = 0.0              # Current Vehicle Longitude
+        self.vehicleHdg = 0.0              # Current Vehicle Heading
+        self.vehicleAMSL = 0.0             # Current Vehicle Altitude above mean sea level
+
+        self.vehicleRoll = 0.0              # Current Vehicle Roll
+        self.vehiclePitch = 0.0              # Current Vehicle Pitch
+
+
         # Look Camera and Get URL
         self.sCameraURL = self.__sFindCameraURL(sNetInterface)
         if self.sCameraURL is None:
             print("No QX camera found, failed to open QX camera %d" % self.u8Instance)
+        else
+            self.boCameraInitialSetup()     # Setup Initial camera parameters
 
 #****************************************************************************
 #   Method Name     : __str__
@@ -115,6 +121,47 @@ class SmartCamera_SonyQX():
     # __str__ - print position vector as string
     def __str__(self):
         return "SmartCameraSonyQX Object for %s" % self.sConfigGroup
+
+#****************************************************************************
+#   Method Name     : boCameraInitialSetup
+#
+#   Description     : Sets Initial Camera Parameters
+#
+#   Parameters      : None
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+    def boCameraInitialSetup(self):
+        print("Setting up Camera Initial Parameters")
+        # Check if we need to do 'startRecMode'
+        APIList = self.__sSimpleCall("getAvailableApiList")
+            
+        # For those cameras which need it
+        if 'startRecMode' in (APIList['result'])[0]:
+            print("Need to send startRecMode, sending...")
+            self.__sSimpleCall("startRecMode")
+
+        # Set Postview Size to Orignial size to get real image filename
+        sResponse = self.__sSimpleCall("setPostviewImageSize", adictParams=["Original"])
+        
+        # Set Exposure Mode to Shutter Priority
+        SupportedModes = self.__sSimpleCall("getSupportedExposureMode")
+        if 'Shutter' in (SupportedModes['result'])[0]:
+            sResponse =self.__sSimpleCall("setExposureMode", adictParams=["Shutter"])
+            print("Exposure Mode set to Shutter")
+        #elif 'Manual' in (SupportedModes['result'])[0]:
+        #    sResponse = self__sSimpleCall("setExposureMode", adictParams=["Manual"])
+        #    print("Exposure Mode set to Manual")
+        else
+            print("Error no Shutter Priority Mode")
+                
+        # Set Target Shutter Speed
+        sResponse = self.__sSimpleCall("setShutterSpeed", adictParams=["1/1600"])
+
 
 #****************************************************************************
 #   Method Name     : boSet_GPS
@@ -170,9 +217,9 @@ class SmartCamera_SonyQX():
     def __geoRef_write(self, sImageFileName):
         #self.geoRef_writer.write(datetime.now().strftime('%d-%m-%Y %H:%M:%S.%f')[:-3])
         self.geoRef_writer.write(sImageFileName)
-            self.geoRef_writer.write(",%f,%f,%f,%f,%f,%f" % (self.vehicleLat, self.vehicleLon, self.vehicleAMSL, self.vehicleRoll, self.vehiclePitch,self.vehicleHdg))
-            self.geoRef_writer.write('\n')
-            self.geoRef_writer.flush()
+        self.geoRef_writer.write(",%f,%f,%f,%f,%f,%f" % (self.vehicleLat, self.vehicleLon, self.vehicleAMSL, self.vehicleRoll, self.vehiclePitch,self.vehicleHdg))
+        self.geoRef_writer.write('\n')
+        self.geoRef_writer.flush()
 
 #****************************************************************************
 #   Method Name     : get_real_Yaw
@@ -233,7 +280,7 @@ class SmartCamera_SonyQX():
         self.geoRef_writer = open('/sdcard/log/geoRef%s.log' % i, 'w', 0)
         self.geoRef_writer.write('Time, Latitude, Longitude, Alt, Pitch, Roll, Yaw, Mount Pitch, Mount Roll, Mount Yaw\n')
         
-    print('Opened GeoTag Log File with Filename: geoRef%s.log' % i)
+        print('Opened GeoTag Log File with Filename: geoRef%s.log' % i)
     
 #****************************************************************************
 #   Method Name     : __sFindInterfaceIPAddress
@@ -360,14 +407,6 @@ class SmartCamera_SonyQX():
         if self.sCameraURL is None:
             return False
         
-        # Check if we need to do 'startRecMode'
-        APIList = self.__sSimpleCall("getAvailableApiList")
-        
-        # For those cameras which need it
-        if 'startRecMode' in (APIList['result'])[0]:
-            print("Need to send startRecMode, sending...")
-            self.__sSimpleCall("startRecMode")
-
         return True
 
 #****************************************************************************
@@ -678,6 +717,8 @@ class SmartCamera_SonyQX():
             start = self.sLatestImageURL.find('DSC')
             end = self.sLatestImageURL.find('JPG', start) + 3
             self.sLatestFileName = self.sLatestImageURL[start:end]
+            print("image URL: %s" % self.sLatestImageURL)
+            print("image Name: %s" % self.sLatestFileName)
             self.__boAddGeotagToLog(self.sLatestFileName)
 
             self.u32ImgCounter = self.u32ImgCounter+1
