@@ -36,6 +36,15 @@ import xml.etree.ElementTree as ET
 import ssdp
 
 #****************************************************************************
+# Constants
+#****************************************************************************
+
+# Target Initial Camera Values
+targetShutterSpeed = 1600
+targetAperture = 120
+targetISOValue = "AUTO"
+
+#****************************************************************************
 # Class name       : SmartCamera_SonyQX
 #
 # Public Methods   : boGetLatestImage
@@ -102,7 +111,7 @@ class SmartCamera_SonyQX():
         self.sCameraURL = self.__sFindCameraURL(sNetInterface)
         if self.sCameraURL is None:
             print("No QX camera found, failed to open QX camera %d" % self.u8Instance)
-        else
+        else:
             self.boCameraInitialSetup()     # Setup Initial camera parameters
 
 #****************************************************************************
@@ -147,21 +156,21 @@ class SmartCamera_SonyQX():
 
         # Set Postview Size to Orignial size to get real image filename
         sResponse = self.__sSimpleCall("setPostviewImageSize", adictParams=["Original"])
-        
-        # Set Exposure Mode to Shutter Priority
+
+        # Set Mode to Shutter Priority if available
         SupportedModes = self.__sSimpleCall("getSupportedExposureMode")
         if 'Shutter' in (SupportedModes['result'])[0]:
-            sResponse =self.__sSimpleCall("setExposureMode", adictParams=["Shutter"])
-            print("Exposure Mode set to Shutter")
+            self.boSetExposureMode("Shutter")
         #elif 'Manual' in (SupportedModes['result'])[0]:
-        #    sResponse = self__sSimpleCall("setExposureMode", adictParams=["Manual"])
-        #    print("Exposure Mode set to Manual")
-        else
+        #    self.boSetExposureMode("Manual")
+        else:
             print("Error no Shutter Priority Mode")
                 
         # Set Target Shutter Speed
-        sResponse = self.__sSimpleCall("setShutterSpeed", adictParams=["1/1600"])
-
+        self.boSetShutterSpeed(targetShutterSpeed)
+            
+        # Set Target ISO Value
+        self.boSetISO(targetISOValue)
 
 #****************************************************************************
 #   Method Name     : boSet_GPS
