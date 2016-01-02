@@ -85,9 +85,6 @@ class SmartCamera_SonyQX():
         self.u8Instance = u8Instance
         self.sConfigGroup = "Camera%d" % self.u8Instance
         
-        # open geoTag Log
-        self.__openGeoTagLogFile()
-        
         # background image processing variables
         self.u32ImgCounter = 0              # num images requested so far
 
@@ -112,6 +109,7 @@ class SmartCamera_SonyQX():
         if self.sCameraURL is None:
             print("No QX camera found, failed to open QX camera %d" % self.u8Instance)
         else:
+            self.__openGeoTagLogFile()      # open geoTag Log
             self.boCameraInitialSetup()     # Setup Initial camera parameters
 
 #****************************************************************************
@@ -151,8 +149,17 @@ class SmartCamera_SonyQX():
             
         # For those cameras which need it
         if 'startRecMode' in (APIList['result'])[0]:
-            print("Need to send startRecMode, sending...")
+            print("Need to send startRecMode, sending and waiting 5 sec...")
             self.__sSimpleCall("startRecMode")
+            time.sleep(1)
+            print("4 sec")
+            time.sleep(1)
+            print("3 sec")
+            time.sleep(1)
+            print("2 sec")
+            time.sleep(1)
+            print("1 sec")
+            time.sleep(1)
 
         # Set Postview Size to Orignial size to get real image filename
         sResponse = self.__sSimpleCall("setPostviewImageSize", adictParams=["Original"])
@@ -287,7 +294,7 @@ class SmartCamera_SonyQX():
             i += 1
         
         self.geoRef_writer = open('/sdcard/log/geoRef%s.log' % i, 'w', 0)
-        self.geoRef_writer.write('Time, Latitude, Longitude, Alt, Pitch, Roll, Yaw, Mount Pitch, Mount Roll, Mount Yaw\n')
+        self.geoRef_writer.write('Filename, Latitude, Longitude, Alt (AMSL), Roll, Pitch, Yaw\n')
         
         print('Opened GeoTag Log File with Filename: geoRef%s.log' % i)
     
