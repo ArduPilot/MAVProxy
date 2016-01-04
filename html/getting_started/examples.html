@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Examples &mdash; MAVProxy 1.4.34 documentation</title>
+  <title>Examples &mdash; MAVProxy 1.4.38 documentation</title>
   
 
   
@@ -30,9 +30,9 @@
   
 
   
-    <link rel="top" title="MAVProxy 1.4.34 documentation" href="../index.html"/>
+    <link rel="top" title="MAVProxy 1.4.38 documentation" href="../index.html"/>
         <link rel="up" title="Getting Started" href="index.html"/>
-        <link rel="next" title="UAV Configuration" href="../uav_configuration/index.html"/>
+        <link rel="next" title="MAVProxy Wifi Bridge" href="mavbridge.html"/>
         <link rel="prev" title="Startup Scripts" href="mavinit.html"/> 
 
   
@@ -60,7 +60,7 @@
           
           
             <div class="version">
-              1.4.34
+              1.4.38
             </div>
           
         
@@ -88,6 +88,7 @@
 <li class="toctree-l2"><a class="reference internal" href="starting.html">Startup Options</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mavinit.html">Startup Scripts</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="">Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mavbridge.html">MAVProxy Wifi Bridge</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
@@ -148,7 +149,7 @@
 </pre></div>
 </div>
 <p>Run MAVProxy in daemon mode, taking in a radio link (COM17 at 9600 kbps) and outputting it to the local network. This allows a single instance of MAVProxy to distribute the telemetry stream to multiple clients:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>mavproxy.py --master=COM17,57600 --out=udpin:0.0.0.0:14550 --daemon
+<div class="code bash highlight-python"><div class="highlight"><pre>mavproxy.py --master=COM17,9600 --out=udpin:0.0.0.0:14550 --daemon
 
 (client, xxx.xxx.xxx.xxx is the daemon&#39;s IP address)
 mavproxy.py –master=udpout:xxx.xxx.xxx.xxx:14550
@@ -167,7 +168,7 @@ mavproxy.py –master=udpout:xxx.xxx.xxx.xxx:14550
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="../uav_configuration/index.html" class="btn btn-neutral float-right" title="UAV Configuration" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="mavbridge.html" class="btn btn-neutral float-right" title="MAVProxy Wifi Bridge" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
         <a href="mavinit.html" class="btn btn-neutral" title="Startup Scripts" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
@@ -204,7 +205,7 @@ mavproxy.py –master=udpout:xxx.xxx.xxx.xxx:14550
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../',
-            VERSION:'1.4.34',
+            VERSION:'1.4.38',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true

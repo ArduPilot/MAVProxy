@@ -14,7 +14,7 @@ Run MAVProxy in daemon mode, taking in a radio link (COM17 at 9600 kbps) and out
 
 .. code:: bash
 
-    mavproxy.py --master=COM17,57600 --out=udpin:0.0.0.0:14550 --daemon
+    mavproxy.py --master=COM17,9600 --out=udpin:0.0.0.0:14550 --daemon
     
     (client, xxx.xxx.xxx.xxx is the daemon's IP address)
     mavproxy.py –master=udpout:xxx.xxx.xxx.xxx:14550

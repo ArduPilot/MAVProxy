@@ -10,5 +10,6 @@ This section contains topics explaining MAVProxy's simulation, playback, graphin
     playback
     mavtools
     simulation
+    mavexp
 
     

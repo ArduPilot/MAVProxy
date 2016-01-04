@@ -128,12 +128,6 @@ Show MAVLink error packets.
 
 Use text-to-speech. Requires the speechd software on Linux.
 
---num-cells
-===========
-
-Number of Lipo battery cells in main battery. Used for detecting low
-battery voltage.
-
 --aircraft
 ==========
 

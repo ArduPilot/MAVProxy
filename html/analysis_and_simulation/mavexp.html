@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Antenna Pointing &mdash; MAVProxy 1.4.38 documentation</title>
+  <title>MAVExplorer &mdash; MAVProxy 1.4.38 documentation</title>
   
 
   
@@ -31,9 +31,9 @@
 
   
     <link rel="top" title="MAVProxy 1.4.38 documentation" href="../index.html"/>
-        <link rel="up" title="Modules" href="index.html"/>
-        <link rel="next" title="Auxiliary (RC 6,7) Options" href="auxopt.html"/>
-        <link rel="prev" title="Modules" href="index.html"/> 
+        <link rel="up" title="Analysis and Simulation" href="index.html"/>
+        <link rel="next" title="Development" href="../development/index.html"/>
+        <link rel="prev" title="Simulation" href="simulation.html"/> 
 
   
   <script src="../_static/js/modernizr.min.js"></script>
@@ -84,32 +84,14 @@
               <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting Started</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
-<li class="toctree-l1 current"><a class="reference internal" href="index.html">Modules</a><ul class="current">
-<li class="toctree-l2 current"><a class="current reference internal" href="">Antenna Pointing</a></li>
-<li class="toctree-l2"><a class="reference internal" href="auxopt.html">Auxiliary (RC 6,7) Options</a></li>
-<li class="toctree-l2"><a class="reference internal" href="cameraview.html">Camera Viewer</a></li>
-<li class="toctree-l2"><a class="reference internal" href="console.html">Graphical Console</a></li>
-<li class="toctree-l2"><a class="reference internal" href="dgps.html">Differential GPS</a></li>
-<li class="toctree-l2"><a class="reference internal" href="gimbals.html">Gimbal Management</a></li>
-<li class="toctree-l2"><a class="reference internal" href="graph.html">Graphing Live Data</a></li>
-<li class="toctree-l2"><a class="reference internal" href="hil.html">HIL</a></li>
-<li class="toctree-l2"><a class="reference internal" href="joystick.html">Joystick Input</a></li>
-<li class="toctree-l2"><a class="reference internal" href="link.html">Link Management</a></li>
-<li class="toctree-l2"><a class="reference internal" href="log.html">Log Management</a></li>
-<li class="toctree-l2"><a class="reference internal" href="map.html">Moving Map</a></li>
-<li class="toctree-l2"><a class="reference internal" href="misseditor.html">Mission Editor</a></li>
-<li class="toctree-l2"><a class="reference internal" href="nsh.html">Nuttx Shell</a></li>
-<li class="toctree-l2"><a class="reference internal" href="relay.html">Relay Management</a></li>
-<li class="toctree-l2"><a class="reference internal" href="sensors.html">Sensor Reporting</a></li>
-<li class="toctree-l2"><a class="reference internal" href="serial.html">Writing to Serial Port</a></li>
-<li class="toctree-l2"><a class="reference internal" href="speech.html">Text-to-Speech</a></li>
-<li class="toctree-l2"><a class="reference internal" href="terrain.html">Terrain Reporting</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tracker.html">Antenna Tracker</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tuneopt.html">Tuning Options</a></li>
-<li class="toctree-l2"><a class="reference internal" href="index.html#module-management">Module Management</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/index.html">Modules</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Analysis and Simulation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="playback.html">Playback</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mavtools.html">Offline Tools</a></li>
+<li class="toctree-l2"><a class="reference internal" href="simulation.html">Simulation</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="">MAVExplorer</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
@@ -143,9 +125,9 @@
   <ul class="wy-breadcrumbs">
     <li><a href="../index.html">Docs</a> &raquo;</li>
       
-          <li><a href="index.html">Modules</a> &raquo;</li>
+          <li><a href="index.html">Analysis and Simulation</a> &raquo;</li>
       
-    <li>Antenna Pointing</li>
+    <li>MAVExplorer</li>
       <li class="wy-breadcrumbs-aside">
         
           
@@ -157,14 +139,26 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="antenna-pointing">
-<h1>Antenna Pointing<a class="headerlink" href="#antenna-pointing" title="Permalink to this headline">¶</a></h1>
-<p>By specifying the ground station location, this module will output (via
-text and speech) the relevant azimuth and elevation angles to point at
-the UAV throughout it&#8217;s flight. This is useful for a manually pointed
-antenna.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>module load antenna [lat] [long]
-</pre></div>
+  <div class="section" id="mavexplorer">
+<h1>MAVExplorer<a class="headerlink" href="#mavexplorer" title="Permalink to this headline">¶</a></h1>
+<p>The MAVExplorer tool is an interactive tool for graphing APM logfiles.</p>
+<p>Use the MAVExplorer-&gt;Open menu to open tlog files to graph.</p>
+<div class="figure">
+<img alt="../_images/mavexp1.png" src="../_images/mavexp1.png" />
+</div>
+<p>The Graphs menu will automatically populate based upon the available packets in the logfile.</p>
+<p>To narrow down the log file to a particular phase of the logfile, select the relevant mode from the FlightMode menu. Any future graphs will only cover the selected section of the flight.</p>
+<div class="figure">
+<img alt="../_images/mavexp2.png" src="../_images/mavexp2.png" />
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Under Windows, it may take some time for MAVExplorer to process the graphs when plotting them.</p>
+</div>
+<p>The Display menu contains methods for displaying a map of the GPS points of the logfile and reloading the logfile. Additionally there are methods for creating and saving custom graphs, using the same notation as with the <a class="reference internal" href="../modules/graph.html"><em>graph</em></a> module in MAVProxy.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Saving custom graphs is not currently available on Windows.</p>
 </div>
 </div>
 
@@ -175,10 +169,10 @@ antenna.</p>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="auxopt.html" class="btn btn-neutral float-right" title="Auxiliary (RC 6,7) Options" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="../development/index.html" class="btn btn-neutral float-right" title="Development" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="index.html" class="btn btn-neutral" title="Modules" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="simulation.html" class="btn btn-neutral" title="Simulation" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
@@ -187,7 +181,7 @@ antenna.</p>
 
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
-<div style="float:right;"><a href="https://github.com/Dronecode/MAVProxy/issues/new?title=Antenna%20Pointing%20-%20&body=URL:%20../modules/antenna%0ATitle:%20Antenna%20Pointing%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
+<div style="float:right;"><a href="https://github.com/Dronecode/MAVProxy/issues/new?title=MAVExplorer%20-%20&body=URL:%20../analysis_and_simulation/mavexp%0ATitle:%20MAVExplorer%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
     <p><a href="https://www.dronecode.org/"><img src="../_static/images/dronecodelogo.png" width="130" alt="Dronecode" class /></a><br/> 
     This is a Dronecode project.</p>     
 
