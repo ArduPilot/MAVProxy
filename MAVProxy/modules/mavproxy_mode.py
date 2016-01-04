@@ -9,7 +9,7 @@ from MAVProxy.modules.lib import mp_module
 class ModeModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(ModeModule, self).__init__(mpstate, "mode")
-        self.add_command('mode', self.cmd_mode, "mode change")
+        self.add_command('mode', self.cmd_mode, "mode change", self.available_modes())
         self.add_command('guided', self.cmd_guided, "fly to a clicked location on map")
 
     def cmd_mode(self, args):
@@ -30,6 +30,13 @@ class ModeModule(mp_module.MPModule):
                 return
             modenum = mode_mapping[mode]
         self.master.set_mode(modenum)
+
+    def available_modes(self):
+        mode_mapping = self.master.mode_mapping()
+        if mode_mapping is None:
+            print('No mode mapping available')
+            return []
+        return mode_mapping.keys()
 
     def unknown_command(self, args):
         '''handle mode switch by mode name as command'''
