@@ -50,11 +50,11 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('WP', 'WP --', row=3)
         mpstate.console.set_status('WPDist', 'Distance ---', row=3)
         mpstate.console.set_status('WPBearing', 'Bearing ---', row=3)
-        mpstate.console.set_status('AltError', 'AltError --', row=3)
-        mpstate.console.set_status('AspdError', 'AspdError --', row=3)
-        mpstate.console.set_status('XtrackError', 'XtrackError --', row=3)
         mpstate.console.set_status('FlightTime', 'FlightTime --', row=3)
         mpstate.console.set_status('ETR', 'ETR --', row=3)
+        mpstate.console.set_status('XtrackError', 'XtrackError --', row=4)
+        mpstate.console.set_status('AltError', 'AltError --', row=4)
+        mpstate.console.set_status('AspdError', 'AspdError --', row=4)
 
         mpstate.console.ElevationMap = mp_elevation.ElevationModel()
 
