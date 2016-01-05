@@ -285,10 +285,10 @@ class SmartCameraModule(mp_module.MPModule):
         '''ToDo: Validate CAM number and Valid ISO Value'''
         if len(args) == 1:
             for cam in self.camera_list:
-                cam.boSetISO(int(args[0]))
+                cam.boSetISO(args[0])
         elif len(args) == 2:
             cam = self.camera_list[int(args[1])]
-            cam.boSetISO(int(args[0]))
+            cam.boSetISO(args[0])
         else:
             print ("Usage: setCamISO ISOVALUE [CAMNUMBER]")
 
@@ -433,6 +433,12 @@ class SmartCameraModule(mp_module.MPModule):
     def mavlink_packet(self, m):
         '''handle a mavlink packet'''
         mtype = m.get_type()
+        if mtype == "GLOBAL_POSITION_INT":
+            for cam in self.camera_list:
+                cam.boSet_GPS(m)
+        if mtype == "ATTITUDE":
+            for cam in self.camera_list:
+                cam.boSet_Attitude(m)
         if mtype == "CAMERA_STATUS":
             print ("Got Message camera_status")
         if mtype == "CAMERA_FEEDBACK":
