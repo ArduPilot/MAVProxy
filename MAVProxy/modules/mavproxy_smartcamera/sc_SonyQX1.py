@@ -25,7 +25,8 @@
 #****************************************************************************
 
 # System Header files and Module Headers
-import sys, time, math, cv2, struct, fcntl
+import os, sys, time, math, cv2, struct, fcntl
+from datetime import datetime
 
 # Module Dependent Headers
 import requests, json, socket, StringIO
@@ -33,6 +34,15 @@ import xml.etree.ElementTree as ET
 
 # Own Headers
 import ssdp
+
+#****************************************************************************
+# Constants
+#****************************************************************************
+
+# Target Initial Camera Values
+targetShutterSpeed = 1600
+targetAperture = 120
+targetISOValue = "AUTO"
 
 #****************************************************************************
 # Class name       : SmartCamera_SonyQX
@@ -53,7 +63,7 @@ import ssdp
 #                    __sSimpleCall
 #****************************************************************************
 class SmartCamera_SonyQX():
-    
+
 #****************************************************************************
 #   Method Name     : __init__ Class Initializer
 #
@@ -74,7 +84,7 @@ class SmartCamera_SonyQX():
         # record instance
         self.u8Instance = u8Instance
         self.sConfigGroup = "Camera%d" % self.u8Instance
-
+        
         # background image processing variables
         self.u32ImgCounter = 0              # num images requested so far
 
@@ -82,12 +92,25 @@ class SmartCamera_SonyQX():
         self.sLatestImageURL = None         # String with the URL to the latest image
         
         # latest image downloaded
-        self.sLatestImageFilename = None    #String with the file name for the last downloaded image
-    
+        self.sLatestImageFilename = None    #String with the Filename for the last downloaded image
+        self.sLatestFileName = None         #String with the camera file name for the last image taken
+        
+        self.vehicleLat = 0.0              # Current Vehicle Latitude
+        self.vehicleLon = 0.0              # Current Vehicle Longitude
+        self.vehicleHdg = 0.0              # Current Vehicle Heading
+        self.vehicleAMSL = 0.0             # Current Vehicle Altitude above mean sea level
+
+        self.vehicleRoll = 0.0              # Current Vehicle Roll
+        self.vehiclePitch = 0.0              # Current Vehicle Pitch
+
+
         # Look Camera and Get URL
         self.sCameraURL = self.__sFindCameraURL(sNetInterface)
         if self.sCameraURL is None:
             print("No QX camera found, failed to open QX camera %d" % self.u8Instance)
+        else:
+            self.__openGeoTagLogFile()      # open geoTag Log
+            self.boCameraInitialSetup()     # Setup Initial camera parameters
 
 #****************************************************************************
 #   Method Name     : __str__
@@ -106,6 +129,175 @@ class SmartCamera_SonyQX():
     def __str__(self):
         return "SmartCameraSonyQX Object for %s" % self.sConfigGroup
 
+#****************************************************************************
+#   Method Name     : boCameraInitialSetup
+#
+#   Description     : Sets Initial Camera Parameters
+#
+#   Parameters      : None
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+    def boCameraInitialSetup(self):
+        print("Setting up Camera Initial Parameters")
+        # Check if we need to do 'startRecMode'
+        APIList = self.__sSimpleCall("getAvailableApiList")
+            
+        # For those cameras which need it
+        if 'startRecMode' in (APIList['result'])[0]:
+            print("Need to send startRecMode, sending and waiting 5 sec...")
+            self.__sSimpleCall("startRecMode")
+            time.sleep(1)
+            print("4 sec")
+            time.sleep(1)
+            print("3 sec")
+            time.sleep(1)
+            print("2 sec")
+            time.sleep(1)
+            print("1 sec")
+            time.sleep(1)
+
+        # Set Postview Size to Orignial size to get real image filename
+        sResponse = self.__sSimpleCall("setPostviewImageSize", adictParams=["Original"])
+
+        # Set Mode to Shutter Priority if available
+        SupportedModes = self.__sSimpleCall("getSupportedExposureMode")
+        if 'Shutter' in (SupportedModes['result'])[0]:
+            self.boSetExposureMode("Shutter")
+        #elif 'Manual' in (SupportedModes['result'])[0]:
+        #    self.boSetExposureMode("Manual")
+        else:
+            print("Error no Shutter Priority Mode")
+                
+        # Set Target Shutter Speed
+        self.boSetShutterSpeed(targetShutterSpeed)
+            
+        # Set Target ISO Value
+        self.boSetISO(targetISOValue)
+
+#****************************************************************************
+#   Method Name     : boSet_GPS
+#
+#   Description     : Gets the GPS Position from the provided message
+#
+#   Parameters      : mGPSMessage       GPS Mavlink Message type
+#
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+    def boSet_GPS(self, mGPSMessage):
+        if mGPSMessage.get_type() == 'GLOBAL_POSITION_INT':
+            (self.vehicleLat, self.vehicleLon, self.vehicleHdg, self.vehicleAMSL) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01, m.alt*0.001)
+        
+#****************************************************************************
+#   Method Name     : boSet_Attitude
+#
+#   Description     : Gets the vehicle attitude from the provided message
+#
+#   Parameters      : mAttitudeMessage  MAVlink Attitude Message type
+#
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+    
+    def boSet_Attitude(self, mAttitudeMessage):
+        if mAttitudeMessage.get_type() == 'ATTITUDE':
+            (self.vehicleRoll, self.vehiclePitch) = (math.degrees(m.roll), math.degrees(m.pitch))
+
+#****************************************************************************
+#   Method Name     : __geoRef_write
+#
+#   Description     : Writes GeoReference to file
+#
+#   Parameters      : sImageFileName    File name of image to be entered into the log
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+
+    # Geo reference log for all the GoPro pictures
+    def __geoRef_write(self, sImageFileName):
+        #self.geoRef_writer.write(datetime.now().strftime('%d-%m-%Y %H:%M:%S.%f')[:-3])
+        self.geoRef_writer.write(sImageFileName)
+        self.geoRef_writer.write(",%f,%f,%f,%f,%f,%f" % (self.vehicleLat, self.vehicleLon, self.vehicleAMSL, self.vehicleRoll, self.vehiclePitch,self.vehicleHdg))
+        self.geoRef_writer.write('\n')
+        self.geoRef_writer.flush()
+
+#****************************************************************************
+#   Method Name     : get_real_Yaw
+#
+#   Description     : Helper method to get the real Yaw
+#
+#   Parameters      : yaw        Vehicle Yaw
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+    def get_real_Yaw(self, yaw):
+        if (yaw < 0):
+            return yaw+360
+        return yaw
+    
+#****************************************************************************
+#   Method Name     : __writeGeoRefToFile
+#
+#   Description     : Writes the Georeference of the image to the log. NOT SURE
+#                     IF IT IS DUPLICATED FOR A GOOD REASON.
+#
+#   Parameters      : sImageFileName1   Image file name
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+    
+    def __writeGeoRefToFile(self, sImageFileName1):
+        self.__geoRef_write(sImageFileName1)
+    
+#****************************************************************************
+#   Method Name     : __openGeoTagLogFile
+#
+#   Description     : Checks for existing log files and creates a new Log file
+#                     with an incremented index number
+#
+#   Parameters      : None
+#
+#   Return Value    : None
+#
+#   Autor           : Jaime Machuca
+#
+#****************************************************************************
+
+    def __openGeoTagLogFile(self):
+        #Open GeoTag Log File
+        i = 0
+        while os.path.exists('/sdcard/log/geoRef%s.log' % i):
+            print('checking /sdcard/log/geoRef%s.log' % i)
+            i += 1
+        
+        self.geoRef_writer = open('/sdcard/log/geoRef%s.log' % i, 'w', 0)
+        self.geoRef_writer.write('Filename, Latitude, Longitude, Alt (AMSL), Roll, Pitch, Yaw\n')
+        
+        print('Opened GeoTag Log File with Filename: geoRef%s.log' % i)
+    
 #****************************************************************************
 #   Method Name     : __sFindInterfaceIPAddress
 #
@@ -230,6 +422,7 @@ class SmartCamera_SonyQX():
         print ("Checking URL at %s" % self.sCameraURL)
         if self.sCameraURL is None:
             return False
+        
         return True
 
 #****************************************************************************
@@ -512,6 +705,7 @@ class SmartCamera_SonyQX():
 #****************************************************************************
 
     def __boAddGeotagToLog(self, sImageFileName):
+        self.__writeGeoRefToFile(sImageFileName)
         return True
 
 #****************************************************************************
@@ -535,7 +729,14 @@ class SmartCamera_SonyQX():
         # Check response for a succesful result and save latest image URL
         if 'result' in sResponse:
             self.sLatestImageURL = sResponse['result'][0][0]
-            self.__boAddGeotagToLog(self.sLatestImageURL)
+
+            start = self.sLatestImageURL.find('DSC')
+            end = self.sLatestImageURL.find('JPG', start) + 3
+            self.sLatestFileName = self.sLatestImageURL[start:end]
+            print("image URL: %s" % self.sLatestImageURL)
+            print("image Name: %s" % self.sLatestFileName)
+            self.__boAddGeotagToLog(self.sLatestFileName)
+
             self.u32ImgCounter = self.u32ImgCounter+1
             return True
 
