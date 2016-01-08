@@ -45,7 +45,7 @@ class MEState(object):
               MPSetting('condition', str, None, 'condition'),
               MPSetting('xaxis', str, None, 'xaxis'),
               MPSetting('linestyle', str, None, 'linestyle'),
-              MPSetting('flightmode', str, None, 'flightmode', choice=['apm','px4']),
+              MPSetting('show_flightmode', bool, True, 'show flightmode'),
               MPSetting('legend', str, 'upper left', 'legend position'),
               MPSetting('legend2', str, 'upper right', 'legend2 position')
               ]
@@ -227,7 +227,7 @@ def graph_process(fields, mavExpLog, mavExpFlightModeSel, mavExpSettings):
     mg.set_condition(mavExpSettings.condition)
     mg.set_xaxis(mavExpSettings.xaxis)
     mg.set_linestyle(mavExpSettings.linestyle)
-    mg.set_flightmode(mavExpSettings.flightmode)
+    mg.set_show_flightmode(mavExpSettings.show_flightmode)
     mg.set_legend(mavExpSettings.legend)
     mg.add_mav(mavExpLog)
     for f in fields:

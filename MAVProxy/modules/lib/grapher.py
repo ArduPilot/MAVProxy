@@ -4,6 +4,7 @@
  core library for graphing in mavexplorer
 '''
 
+import ast
 import sys, struct, time, os, datetime
 import math, re
 import matplotlib
@@ -15,38 +16,25 @@ from pymavlink import mavutil
 colors = [ 'red', 'green', 'blue', 'orange', 'olive', 'black', 'grey', 'yellow', 'brown', 'darkcyan',
            'cornflowerblue', 'darkmagenta', 'deeppink', 'darkred']
 
-colourmap = {
-    'apm' : {
-        'MANUAL'    : (1.0,   0,   0),
-        'AUTO'      : (  0, 1.0,   0),
-        'LOITER'    : (  0,   0, 1.0),
-        'FBWA'      : (1.0, 0.5,   0),
-        'RTL'       : (  1,   0, 0.5),
-        'STABILIZE' : (0.5, 1.0,   0),
-        'LAND'      : (  0, 1.0, 0.5),
-        'STEERING'  : (0.5,   0, 1.0),
-        'HOLD'      : (  0, 0.5, 1.0),
-        'ALT_HOLD'  : (1.0, 0.5, 0.5),
-        'CIRCLE'    : (0.5, 1.0, 0.5),
-        'POSITION'  : (1.0, 0.0, 1.0),
-        'GUIDED'    : (0.5, 0.5, 1.0),
-        'ACRO'      : (1.0, 1.0,   0),
-        'CRUISE'    : (  0, 1.0, 1.0)
-        },
-    'px4' : {
-        'MANUAL'    : (  1.0, 0.0, 0.0),
-        'SEATBELT'  : (  0.5, 0.5, 0.0),
-        'EASY'      : (  0.0, 1.0, 0.0),
-        'AUTO'      : (  0.0, 0.0, 1.0),
-        'UNKNOWN'   : (  1.0, 1.0, 1.0),
-        'LOITER'    : (  0.0, 0.0, 1.0),
-        'RTL'       : (  1.0, 0.5, 0.5),
-        'LAND'      : (  0.0, 1.0, 0.5),
-        'SPORT'     : (  1.0, 1.0, 0.5),
-        'STABILIZE' : (  1.0, 0.5, 1.0),
-        'ACRO'      : (  0.5, 1.0, 1.0)
-        }
-    }
+flightmode_colours = [
+    (1.0,   0,   0),
+    (  0, 1.0,   0),
+    (  0,   0, 1.0),
+
+    (  0, 1.0, 1.0),
+    (1.0,   0, 1.0),
+    (1.0, 1.0,   0),
+
+    (1.0, 0.5,   0),
+    (1.0,   0, 0.5),
+    (0.5, 1.0,   0),
+    (  0, 1.0, 0.5),
+    (0.5,   0, 1.0),
+    (  0, 0.5, 1.0),
+    (1.0, 0.5, 0.5),
+    (0.5, 1.0, 0.5),
+    (0.5, 0.5, 1.0)
+]
 
 edge_colour = (0.1, 0.1, 0.1)
 
@@ -60,7 +48,7 @@ class MavGraph(object):
         self.xaxis = None
         self.marker = None
         self.linestyle = None
-        self.flightmode = None
+        self.show_flightmode = True
         self.legend = 'upper left'
         self.legend2 = 'upper right'
         self.legend_flightmode = 'lower left'
@@ -68,6 +56,8 @@ class MavGraph(object):
         self.labels = None
         self.multi = False
         self.modes_plotted = {}
+        self.flightmode_colour_index = 0
+        self.flightmode_colourmap = {}
 
     def add_field(self, field):
         '''add another field to plot'''
@@ -101,9 +91,9 @@ class MavGraph(object):
         '''set graph legend'''
         self.legend = legend
 
-    def set_flightmode(self, flightmode):
-        '''set graph flightmode'''
-        self.flightmode = flightmode
+    def set_show_flightmode(self, value):
+        '''set to true if flightmodes are to be shown'''
+        self.show_flightmode = value
 
     def set_linestyle(self, linestyle):
         '''set graph linestyle'''
@@ -129,6 +119,21 @@ class MavGraph(object):
             else:
                 return ('x=%s Left=%.3f Right=%.3f' % (xstr, y2, y))
         return format_coord
+
+    def next_flightmode_colour(self):
+        '''allocate a colour to be used for a flight mode'''
+        if self.flightmode_colour_index > len(flightmode_colours):
+            print("Out of colours; reusing")
+            self.flightmode_colour_index = 0
+        ret = flightmode_colours[self.flightmode_colour_index]
+        self.flightmode_colour_index += 1
+        return ret
+
+    def flightmode_colour(self, flightmode):
+        '''return colour to be used for rendering a flight mode background'''
+        if flightmode not in self.flightmode_colourmap:
+            self.flightmode_colourmap[flightmode] = self.next_flightmode_colour()
+        return self.flightmode_colourmap[flightmode]
 
     def plotit(self, x, y, fields, colors=[]):
         '''plot a set of graphs using date for x axis'''
@@ -212,13 +217,15 @@ class MavGraph(object):
                              linestyle=linestyle, marker=marker, tz=None)
 
             empty = False
-            if self.flightmode is not None:
-                alpha = 0.1
+            if self.show_flightmode:
+                alpha = 0.05
                 for i in range(len(self.modes)-1):
-                    c = colourmap[self.flightmode].get(self.modes[i][1], edge_colour)
+                    mode_name = self.modes[i][1]
+                    c = self.flightmode_colour(mode_name)
                     ax1.axvspan(self.modes[i][0], self.modes[i+1][0], fc=c, ec=edge_colour, alpha=alpha)
                     self.modes_plotted[self.modes[i][1]] = (c, alpha)
-                c = colourmap[self.flightmode].get(self.modes[-1][1], edge_colour)
+                mode_name = self.modes[-1][1]
+                c = self.flightmode_colour(mode_name)
                 ax1.axvspan(self.modes[-1][0], ax1.get_xlim()[1], fc=c, ec=edge_colour, alpha=alpha)
                 self.modes_plotted[self.modes[-1][1]] = (c, alpha)
 
@@ -226,7 +233,7 @@ class MavGraph(object):
                 print("No data to graph")
                 return
 
-        if self.flightmode is not None:
+        if self.show_flightmode:
             mode_patches = []
             for mode in self.modes_plotted.keys():
                 (color, alpha) = self.modes_plotted[mode]
@@ -247,7 +254,7 @@ class MavGraph(object):
     def add_data(self, t, msg, vars, flightmode):
         '''add some data'''
         mtype = msg.get_type()
-        if self.flightmode is not None and (len(self.modes) == 0 or self.modes[-1][1] != flightmode):
+        if self.show_flightmode and (len(self.modes) == 0 or self.modes[-1][1] != flightmode):
             self.modes.append((t, flightmode))
         for i in range(0, len(self.fields)):
             if mtype not in self.field_types[i]:
@@ -361,8 +368,8 @@ if __name__ == "__main__":
     parser.add_argument("--xaxis", default=None, help="X axis expression")
     parser.add_argument("--multi", action='store_true', help="multiple files with same colours")
     parser.add_argument("--zero-time-base", action='store_true', help="use Z time base for DF logs")
-    parser.add_argument("--flightmode", default=None,
-                        help="Choose the plot background according to the active flight mode of the specified type, e.g. --flightmode=apm for ArduPilot or --flightmode=px4 for PX4 stack logs.  Cannot be specified with --xaxis.")
+    parser.add_argument("--show-flightmode", default=True,
+                        help="Add background colour to plot corresponding to current flight mode.  Cannot be specified with --xaxis.")
     parser.add_argument("--dialect", default="ardupilotmega", help="MAVLink dialect")
     parser.add_argument("--output", default=None, help="provide an output format")
     parser.add_argument("--timeshift", type=float, default=0, help="shift time on first graph in seconds")
@@ -386,6 +393,6 @@ if __name__ == "__main__":
     mg.set_legend(args.legend)
     mg.set_legend2(args.legend2)
     mg.set_multi(args.multi)
-    mg.set_flightmode(args.flightmode)
+    mg.set_show_flightmode(ast.literal_eval(args.show_flightmode))
     mg.process()
     mg.show()
