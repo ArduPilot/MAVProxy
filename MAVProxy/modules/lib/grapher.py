@@ -218,7 +218,7 @@ class MavGraph(object):
 
             empty = False
             if self.show_flightmode:
-                alpha = 0.05
+                alpha = 0.04
                 for i in range(len(self.modes)-1):
                     mode_name = self.modes[i][1]
                     c = self.flightmode_colour(mode_name)
@@ -238,7 +238,7 @@ class MavGraph(object):
             for mode in self.modes_plotted.keys():
                 (color, alpha) = self.modes_plotted[mode]
                 mode_patches.append(matplotlib.patches.Patch(color=color,
-                                                             label=mode, alpha=alpha))
+                                                             label=mode, alpha=alpha*5))
             if ax1_labels != []:
                 ax1.add_artist(pylab.legend(handles=mode_patches, loc=self.legend_flightmode))
             else:
