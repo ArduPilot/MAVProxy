@@ -130,7 +130,7 @@ def setup_file_menu():
                                             handler=MPMenuCallFileDialog(
                                                                         flags=('open',),
                                                                         title='Logfile Load',
-                                                                        wildcard='*.tlog')),
+                                                                        wildcard='*.tlog;*.log;*.BIN;*.bin')),
                                   MPMenuItem('&Quit\tCtrl+Q', 'Quit', 'quit')]))
     mestate.console.set_menu(TopMenu, menu_callback)
     
