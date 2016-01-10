@@ -298,7 +298,7 @@ def cmd_reload(args):
     setup_menus()
     mestate.console.write("Loaded %u graphs\n" % len(mestate.graphs))
 
-def save_graph(graphdef):
+def save_graph(graphdef, mestate):
     '''save a graph as XML'''
     if graphdef.filename is None:
         if 'HOME' in os.environ:
