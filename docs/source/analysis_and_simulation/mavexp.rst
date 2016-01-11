@@ -4,6 +4,14 @@ MAVExplorer
 
 The MAVExplorer tool is an interactive tool for graphing APM logfiles.
 
+Under Linux, it can be accessed by:
+
+.. code:: bash
+
+    mavexplorer.py inputlog.tlog
+    
+Under Windows, it can be found in the Start Menu with the rest of MAVProxy.
+
 Use the MAVExplorer->Open menu to open tlog files to graph.
 
 .. figure:: mavexp1.png

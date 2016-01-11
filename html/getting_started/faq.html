@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>MAVExplorer &mdash; MAVProxy 1.4.38 documentation</title>
+  <title>Frequently Asked Questions and Issues &mdash; MAVProxy 1.4.38 documentation</title>
   
 
   
@@ -31,9 +31,9 @@
 
   
     <link rel="top" title="MAVProxy 1.4.38 documentation" href="../index.html"/>
-        <link rel="up" title="Analysis and Simulation" href="index.html"/>
-        <link rel="next" title="Development" href="../development/index.html"/>
-        <link rel="prev" title="Simulation" href="simulation.html"/> 
+        <link rel="up" title="Getting Started" href="index.html"/>
+        <link rel="next" title="UAV Configuration" href="../uav_configuration/index.html"/>
+        <link rel="prev" title="MAVProxy Wifi Bridge" href="mavbridge.html"/> 
 
   
   <script src="../_static/js/modernizr.min.js"></script>
@@ -82,16 +82,19 @@
           
           
               <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting Started</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/index.html">Modules</a></li>
-<li class="toctree-l1 current"><a class="reference internal" href="index.html">Analysis and Simulation</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="playback.html">Playback</a></li>
-<li class="toctree-l2"><a class="reference internal" href="mavtools.html">Offline Tools</a></li>
-<li class="toctree-l2"><a class="reference internal" href="simulation.html">Simulation</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="">MAVExplorer</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting Started</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="download_and_installation.html">Download and Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l2"><a class="reference internal" href="starting.html">Startup Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mavinit.html">Startup Scripts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mavbridge.html">MAVProxy Wifi Bridge</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="">Frequently Asked Questions and Issues</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/index.html">Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
@@ -125,9 +128,9 @@
   <ul class="wy-breadcrumbs">
     <li><a href="../index.html">Docs</a> &raquo;</li>
       
-          <li><a href="index.html">Analysis and Simulation</a> &raquo;</li>
+          <li><a href="index.html">Getting Started</a> &raquo;</li>
       
-    <li>MAVExplorer</li>
+    <li>Frequently Asked Questions and Issues</li>
       <li class="wy-breadcrumbs-aside">
         
           
@@ -139,32 +142,25 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="mavexplorer">
-<h1>MAVExplorer<a class="headerlink" href="#mavexplorer" title="Permalink to this headline">¶</a></h1>
-<p>The MAVExplorer tool is an interactive tool for graphing APM logfiles.</p>
-<p>Under Linux, it can be accessed by:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>mavexplorer.py inputlog.tlog
-</pre></div>
-</div>
-<p>Under Windows, it can be found in the Start Menu with the rest of MAVProxy.</p>
-<p>Use the MAVExplorer-&gt;Open menu to open tlog files to graph.</p>
-<div class="figure">
-<img alt="../_images/mavexp1.png" src="../_images/mavexp1.png" />
-</div>
-<p>The Graphs menu will automatically populate based upon the available packets in the logfile.</p>
-<p>To narrow down the log file to a particular phase of the logfile, select the relevant mode from the FlightMode menu. Any future graphs will only cover the selected section of the flight.</p>
-<div class="figure">
-<img alt="../_images/mavexp2.png" src="../_images/mavexp2.png" />
-</div>
-<div class="admonition note">
-<p class="first admonition-title">Note</p>
-<p class="last">Under Windows, it may take some time for MAVExplorer to process the graphs when plotting them.</p>
-</div>
-<p>The Display menu contains methods for displaying a map of the GPS points of the logfile and reloading the logfile. Additionally there are methods for creating and saving custom graphs, using the same notation as with the <a class="reference internal" href="../modules/graph.html"><em>graph</em></a> module in MAVProxy.</p>
-<div class="admonition note">
-<p class="first admonition-title">Note</p>
-<p class="last">Saving custom graphs is not currently available on Windows.</p>
-</div>
+  <div class="section" id="frequently-asked-questions-and-issues">
+<h1>Frequently Asked Questions and Issues<a class="headerlink" href="#frequently-asked-questions-and-issues" title="Permalink to this headline">¶</a></h1>
+<ol class="arabic">
+<li><p class="first">I have random &#8220;noise&#8221; displaying on the console, showing as corrupted text. How do I remove it?</p>
+<blockquote>
+<div><p>MAVProxy will, by default, show corrupted packets. To disable showing them, use <code class="docutils literal"><span class="pre">set</span> <span class="pre">shownoise</span> <span class="pre">false</span></code> in the MAVProxy console.</p>
+</div></blockquote>
+</li>
+<li><p class="first">How do I get MAVProxy to execute specific commands on startup?</p>
+<blockquote>
+<div><p>Put the commands in mavinit.scr as per <a class="reference internal" href="mavinit.html"><em>Startup Scripts</em></a></p>
+</div></blockquote>
+</li>
+<li><p class="first">Which Flight controllers are compatible with MAVProxy?</p>
+<blockquote>
+<div><p>The APM branches (<a class="reference external" href="http://plane.ardupilot.com/">APM:Plane</a>, <a class="reference external" href="http://copter.ardupilot.com/">APM:Copter</a>, <a class="reference external" href="http://rover.ardupilot.com/">APM:Rover</a>) are fully compatible. Other Mavlink-based flight controllers (such as the <a class="reference external" href="http://px4.io/">PX4</a> stack) should be compatible, but may show all flight data.</p>
+</div></blockquote>
+</li>
+</ol>
 </div>
 
 
@@ -174,10 +170,10 @@
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="../development/index.html" class="btn btn-neutral float-right" title="Development" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="../uav_configuration/index.html" class="btn btn-neutral float-right" title="UAV Configuration" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="simulation.html" class="btn btn-neutral" title="Simulation" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="mavbridge.html" class="btn btn-neutral" title="MAVProxy Wifi Bridge" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
@@ -186,7 +182,7 @@
 
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
-<div style="float:right;"><a href="https://github.com/Dronecode/MAVProxy/issues/new?title=MAVExplorer%20-%20&body=URL:%20../analysis_and_simulation/mavexp%0ATitle:%20MAVExplorer%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
+<div style="float:right;"><a href="https://github.com/Dronecode/MAVProxy/issues/new?title=Frequently%20Asked%20Questions%20and%20Issues%20-%20&body=URL:%20../getting_started/faq%0ATitle:%20Frequently%20Asked%20Questions%20and%20Issues%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
     <p><a href="https://www.dronecode.org/"><img src="../_static/images/dronecodelogo.png" width="130" alt="Dronecode" class /></a><br/> 
     This is a Dronecode project.</p>     
 
