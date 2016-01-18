@@ -88,3 +88,15 @@ perform the necessary build actions and then run MAVProxy. Some of the
 details in the batch files (port numbers, etc) may need to be altered to 
 match the user's system configuration.
 
+Visual Studio Setup
+-------------------
+
+In the ``windows`` folder, there is a Visual Studio Project file. It does require the `Python Tools for Visual Studio <http://microsoft.github.io/PTVS/>`_ to be installed.
+
+.. figure:: VS1.png
+
+Use the build or debug commands to run the ``setup.py`` to build MAVProxy. Then right-click on mavproxy.py and select ``Start`` (with or without debugging). The mavexplorer.py can be run in the same way.
+
+.. figure:: VS2.png
+
+

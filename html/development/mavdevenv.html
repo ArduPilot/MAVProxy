@@ -89,7 +89,10 @@
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Development</a><ul class="current">
 <li class="toctree-l2 current"><a class="current reference internal" href="">Development Environment</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#linux">Linux</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#windows">Windows</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#windows">Windows</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#visual-studio-setup">Visual Studio Setup</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="mavcustmod.html">Module Development</a></li>
@@ -211,6 +214,17 @@ done by running the <code class="file docutils literal"><span class="pre">./MAVP
 perform the necessary build actions and then run MAVProxy. Some of the
 details in the batch files (port numbers, etc) may need to be altered to
 match the user&#8217;s system configuration.</p>
+<div class="section" id="visual-studio-setup">
+<h3>Visual Studio Setup<a class="headerlink" href="#visual-studio-setup" title="Permalink to this headline">¶</a></h3>
+<p>In the <code class="docutils literal"><span class="pre">windows</span></code> folder, there is a Visual Studio Project file. It does require the <a class="reference external" href="http://microsoft.github.io/PTVS/">Python Tools for Visual Studio</a> to be installed.</p>
+<div class="figure">
+<img alt="../_images/VS1.png" src="../_images/VS1.png" />
+</div>
+<p>Use the build or debug commands to run the <code class="docutils literal"><span class="pre">setup.py</span></code> to build MAVProxy. Then right-click on mavproxy.py and select <code class="docutils literal"><span class="pre">Start</span></code> (with or without debugging). The mavexplorer.py can be run in the same way.</p>
+<div class="figure">
+<img alt="../_images/VS2.png" src="../_images/VS2.png" />
+</div>
+</div>
 </div>
 </div>
 
