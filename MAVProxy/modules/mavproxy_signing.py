@@ -17,7 +17,7 @@ class SigningModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(SigningModule, self).__init__(mpstate, "link", "link control", public=True)
         self.add_command('signing', self.cmd_signing, "signing control",
-                         ["<setup|key>"])
+                         ["<setup|remove|disable|key>"])
         self.allow = None
 
     def cmd_signing(self, args):
@@ -29,6 +29,10 @@ class SigningModule(mp_module.MPModule):
             self.cmd_signing_setup(args[1:])
         elif args[0] == 'key':
             self.cmd_signing_key(args[1:])
+        elif args[0] == 'disable':
+            self.cmd_signing_disable(args[1:])
+        elif args[0] == 'remove':
+            self.cmd_signing_remove(args[1:])
         else:
             print(usage)
 
@@ -80,6 +84,17 @@ class SigningModule(mp_module.MPModule):
         key = self.passphrase_to_key(passphrase)
         self.master.setup_signing(key, sign_outgoing=True, allow_unsigned_callback=self.allow_unsigned)
         print("Setup signing key")
+
+    def cmd_signing_disable(self, args):
+        '''disable signing locally'''
+        self.master.disable_signing()
+        print("Disabled signing")
+
+    def cmd_signing_remove(self, args):
+        '''remove signing from server'''
+        self.master.mav.setup_signing_send(self.target_system, self.target_component, [0]*32, 0)
+        self.master.disable_signing()
+        print("Removed signing")
         
 def init(mpstate):
     '''initialise module'''
