@@ -153,7 +153,8 @@ class MPState(object):
               MPSetting('source_component', int, 0, 'MAVLink Source component', range=(0,255), increment=1),
               MPSetting('target_system', int, 0, 'MAVLink target system', range=(0,255), increment=1),
               MPSetting('target_component', int, 0, 'MAVLink target component', range=(0,255), increment=1),
-              MPSetting('state_basedir', str, None, 'base directory for logs and aircraft directories')
+              MPSetting('state_basedir', str, None, 'base directory for logs and aircraft directories'),
+              MPSetting('allow_unsigned', bool, True, 'whether unsigned packets will be accepted')
             ])
 
         self.completions = {

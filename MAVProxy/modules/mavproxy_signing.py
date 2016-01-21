@@ -18,6 +18,7 @@ class SigningModule(mp_module.MPModule):
         super(SigningModule, self).__init__(mpstate, "link", "link control", public=True)
         self.add_command('signing', self.cmd_signing, "signing control",
                          ["<setup|key>"])
+        self.allow = None
 
     def cmd_signing(self, args):
         '''handle link commands'''
@@ -55,12 +56,20 @@ class SigningModule(mp_module.MPModule):
         self.master.mav.setup_signing_send(self.target_system, self.target_component,
                                            secret_key, initial_timestamp)
         print("Sent secret_key")
+        self.cmd_signing_key([passphrase])
 
 
     def allow_unsigned(self, mav, dialect, msgId):
         '''see if an unsigned packet should be allowed'''
-        print("allow_unsigned: %u %u" % (dialect, msgId))
-        return True
+        if self.allow is None:
+            self.allow = {
+                (mavutil.mavlink.MAVLINK_MSG_DIALECT_RADIO_STATUS, mavutil.mavlink.MAVLINK_MSG_ID_RADIO_STATUS) : True 
+                }
+        if (dialect,msgId) in self.allow:
+            return True
+        if self.settings.allow_unsigned:
+            return True
+        return False
 
     def cmd_signing_key(self, args):
         '''set signing key on connection'''
