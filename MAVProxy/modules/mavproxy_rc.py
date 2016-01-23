@@ -20,7 +20,7 @@ class RCModule(mp_module.MPModule):
 
     def idle_task(self):
         if self.override_period.trigger():
-            if (self.override != [ 0 ] * 8 or
+            if (self.override != [ 0 ] * 16 or
                 self.override != self.last_override or
                 self.override_counter > 0):
                 self.last_override = self.override[:]
