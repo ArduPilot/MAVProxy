@@ -91,11 +91,15 @@ match the user's system configuration.
 Visual Studio Setup
 -------------------
 
-In the ``windows`` folder, there is a Visual Studio Project file. It does require the `Python Tools for Visual Studio <http://microsoft.github.io/PTVS/>`_ to be installed.
+Visual Studio can be used to develop MAVProxy on Windows platforms.
+
+Within the ``windows`` subfolder in MAVProxy, there is a Visual Studio Project file. It does require the `Python Tools for Visual Studio <http://microsoft.github.io/PTVS/>`_ to be installed.
 
 .. figure:: VS1.png
 
-Use the build or debug commands to run the ``setup.py`` to build MAVProxy. Then right-click on mavproxy.py and select ``Start`` (with or without debugging). The mavexplorer.py can be run in the same way.
+Use the build or debug commands in Visual Studio to install MAVProxy to the local Python folder. This is required in order for MAVProxy to be run correctly.
+
+MAVProxy can then be run by right-clicking on mavproxy.py and selecting ``Start`` (with or without debugging). The mavexplorer.py can be run in the same way.
 
 .. figure:: VS2.png
 

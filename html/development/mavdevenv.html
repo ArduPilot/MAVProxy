@@ -216,11 +216,13 @@ details in the batch files (port numbers, etc) may need to be altered to
 match the user&#8217;s system configuration.</p>
 <div class="section" id="visual-studio-setup">
 <h3>Visual Studio Setup<a class="headerlink" href="#visual-studio-setup" title="Permalink to this headline">¶</a></h3>
-<p>In the <code class="docutils literal"><span class="pre">windows</span></code> folder, there is a Visual Studio Project file. It does require the <a class="reference external" href="http://microsoft.github.io/PTVS/">Python Tools for Visual Studio</a> to be installed.</p>
+<p>Visual Studio can be used to develop MAVProxy on Windows platforms.</p>
+<p>Within the <code class="docutils literal"><span class="pre">windows</span></code> subfolder in MAVProxy, there is a Visual Studio Project file. It does require the <a class="reference external" href="http://microsoft.github.io/PTVS/">Python Tools for Visual Studio</a> to be installed.</p>
 <div class="figure">
 <img alt="../_images/VS1.png" src="../_images/VS1.png" />
 </div>
-<p>Use the build or debug commands to run the <code class="docutils literal"><span class="pre">setup.py</span></code> to build MAVProxy. Then right-click on mavproxy.py and select <code class="docutils literal"><span class="pre">Start</span></code> (with or without debugging). The mavexplorer.py can be run in the same way.</p>
+<p>Use the build or debug commands in Visual Studio to install MAVProxy to the local Python folder. This is required in order for MAVProxy to be run correctly.</p>
+<p>MAVProxy can then be run by right-clicking on mavproxy.py and selecting <code class="docutils literal"><span class="pre">Start</span></code> (with or without debugging). The mavexplorer.py can be run in the same way.</p>
 <div class="figure">
 <img alt="../_images/VS2.png" src="../_images/VS2.png" />
 </div>
