@@ -299,7 +299,12 @@ class ConsoleModule(mp_module.MPModule):
                 arm_colour = 'green'
             else:
                 arm_colour = 'red'
-            self.console.set_status('ARM', 'ARM', fg=arm_colour)
+            armstring = 'ARM'
+            # add safety switch state
+            if 'SYS_STATUS' in self.mpstate.status.msgs:
+                if (self.mpstate.status.msgs['SYS_STATUS'].onboard_control_sensors_enabled & mavutil.mavlink.MAV_SYS_STATUS_SENSOR_MOTOR_OUTPUTS) == 0:
+                    armstring += '(SAFE)'
+            self.console.set_status('ARM', armstring, fg=arm_colour)
             if self.max_link_num != len(self.mpstate.mav_master):
                 for i in range(self.max_link_num):
                     self.console.set_status('Link%u'%(i+1), '', row=1)
