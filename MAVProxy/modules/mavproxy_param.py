@@ -99,6 +99,24 @@ class ParamState:
                 htree[n] = p
         return htree
 
+    def param_apropos(self, args):
+        '''search parameter help for a keyword, list those parameters'''
+        if len(args) == 0:
+            print("Usage: param apropos keyword")
+            return
+
+        htree = self.param_help_tree()
+        if htree is None:
+            return
+
+        contains = {}
+        for keyword in args:
+            for param in htree.keys():
+                if str(htree[param]).find(keyword) != -1:
+                    contains[param] = True
+        for param in contains.keys():
+            print("%s" % (param,))
+
     def param_help(self, args):
         '''show help on a parameter'''
         if len(args) == 0:
@@ -222,6 +240,8 @@ class ParamState:
             self.mav_param.load(args[1], param_wildcard, master, check=False)
         elif args[0] == "download":
             self.param_help_download()
+        elif args[0] == "apropos":
+            self.param_apropos(args[1:])
         elif args[0] == "help":
             self.param_help(args[1:])
         elif args[0] == "show":
@@ -242,7 +262,7 @@ class ParamModule(mp_module.MPModule):
         self.pstate = ParamState(self.mav_param, self.logdir, self.vehicle_name, 'mav.parm')
         self.add_command('param', self.cmd_param, "parameter handling",
                          ["<download|status>",
-                          "<set|show|fetch|help> (PARAMETER)",
+                          "<set|show|fetch|help|apropos> (PARAMETER)",
                           "<load|save|diff> (FILENAME)"])
         if self.continue_mode and self.logdir != None:
             parmfile = os.path.join(self.logdir, 'mav.parm')
