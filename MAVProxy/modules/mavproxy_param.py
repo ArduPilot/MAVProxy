@@ -76,18 +76,15 @@ class ParamState:
         except Exception as e:
             print(e)
 
-    def param_help(self, args):
-        '''show help on a parameter'''
-        if len(args) == 0:
-            print("Usage: param help PARAMETER_NAME")
-            return
+    def param_help_tree(self):
+        '''return a "help tree", a map between a parameter and its metadata.  May return None if help is not available'''
         if self.vehicle_name is None:
             print("Unknown vehicle type")
-            return
+            return None
         path = mp_util.dot_mavproxy("%s.xml" % self.vehicle_name)
         if not os.path.exists(path):
             print("Please run 'param download' first (vehicle_name=%s)" % self.vehicle_name)
-            return
+            return None
         xml = open(path).read()
         from lxml import objectify
         objectify.enable_recursive_str()
@@ -100,6 +97,18 @@ class ParamState:
             for p in lib.param:
                 n = p.get('name')
                 htree[n] = p
+        return htree
+
+    def param_help(self, args):
+        '''show help on a parameter'''
+        if len(args) == 0:
+            print("Usage: param help PARAMETER_NAME")
+            return
+
+        htree = self.param_help_tree()
+        if htree is None:
+            return
+
         for h in args:
             if h in htree:
                 help = htree[h]
