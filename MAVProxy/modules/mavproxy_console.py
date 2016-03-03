@@ -139,9 +139,13 @@ class ConsoleModule(mp_module.MPModule):
                 sats_string = "%u" % num_sats1
             else:
                 sats_string = "%u/%u" % (num_sats1, num_sats2)
-            if ((msg.fix_type == 3 and master.mavlink10()) or
+            if ((msg.fix_type >= 3 and master.mavlink10()) or
                 (msg.fix_type == 2 and not master.mavlink10())):
-                self.console.set_status('GPS', 'GPS: OK (%s)' % sats_string, fg='green')
+                if (msg.fix_type >= 4):
+                    fix_type = "%u" % msg.fix_type
+                else:
+                    fix_type = ""
+                self.console.set_status('GPS', 'GPS: OK%s (%s)' % (fix_type, sats_string), fg='green')
             else:
                 self.console.set_status('GPS', 'GPS: %u (%s)' % (msg.fix_type, sats_string), fg='red')
             if master.mavlink10():
