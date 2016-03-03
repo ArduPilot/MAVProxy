@@ -35,7 +35,7 @@ class HelpModule(mp_module.MPModule):
             
         #check for updates, if able
         if platform.system() == 'Windows':
-            req = Request('http://firmware.diydrones.com/Tools/MAVProxy/')
+            req = Request('http://firmware.ardupilot.org/Tools/MAVProxy/')
             html = ''
             self.newversion = '1.0'
             try:

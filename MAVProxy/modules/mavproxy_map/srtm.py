@@ -58,7 +58,7 @@ class InvalidTileError(Exception):
 
 class SRTMDownloader():
     """Automatically download SRTM tiles."""
-    def __init__(self, server="firmware.diydrones.com",
+    def __init__(self, server="firmware.ardupilot.org",
                  directory="/SRTM/",
                  cachedir=None,
                  offline=0,
