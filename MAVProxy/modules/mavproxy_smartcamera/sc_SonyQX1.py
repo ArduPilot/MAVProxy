@@ -162,8 +162,15 @@ class SmartCamera_SonyQX():
             time.sleep(1)
 
         # Set Postview Size to Orignial size to get real image filename
-        sResponse = self.__sSimpleCall("setPostviewImageSize", adictParams=["Original"])
+        sResponse = self.__sSimpleCall("getSupportedPostviewImageSize")
+        print("%s" % sResponse)
 
+        sResponse = self.__sSimpleCall("setPostviewImageSize", adictParams=["Original"])
+        print("%s" % sResponse)
+
+        sResponse = self.__sSimpleCall("getPostviewImageSize")
+        print("%s" % sResponse)
+        
         # Set Mode to Shutter Priority if available
         SupportedModes = self.__sSimpleCall("getSupportedExposureMode")
         if 'Shutter' in (SupportedModes['result'])[0]:
@@ -178,6 +185,9 @@ class SmartCamera_SonyQX():
             
         # Set Target ISO Value
         self.boSetISO(targetISOValue)
+
+        #Take Confirmation Picture
+        self.boTakePicture()
 
 #****************************************************************************
 #   Method Name     : boSet_GPS
@@ -195,7 +205,7 @@ class SmartCamera_SonyQX():
 
     def boSet_GPS(self, mGPSMessage):
         if mGPSMessage.get_type() == 'GLOBAL_POSITION_INT':
-            (self.vehicleLat, self.vehicleLon, self.vehicleHdg, self.vehicleAMSL) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01, m.alt*0.001)
+            (self.vehicleLat, self.vehicleLon, self.vehicleHdg, self.vehicleAMSL) = (mGPSMessage.lat*1.0e-7, mGPSMessage.lon*1.0e-7, mGPSMessage.hdg*0.01, mGPSMessage.alt*0.001)
         
 #****************************************************************************
 #   Method Name     : boSet_Attitude
@@ -213,7 +223,7 @@ class SmartCamera_SonyQX():
     
     def boSet_Attitude(self, mAttitudeMessage):
         if mAttitudeMessage.get_type() == 'ATTITUDE':
-            (self.vehicleRoll, self.vehiclePitch) = (math.degrees(m.roll), math.degrees(m.pitch))
+            (self.vehicleRoll, self.vehiclePitch) = (math.degrees(mAttitudeMessage.roll), math.degrees(mAttitudeMessage.pitch))
 
 #****************************************************************************
 #   Method Name     : __geoRef_write

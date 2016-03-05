@@ -8,4 +8,5 @@ type = 2
 #video_output_file = ~/smartcamera-%%Y-%%m-%%d-%%H-%%M.avi
 
 [general]
+WirelessPort = wlan0
 #debug = True
