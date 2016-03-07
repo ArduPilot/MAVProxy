@@ -7,11 +7,8 @@ June 2012
 
 import time
 from wx_loader import wx
-
-try:
-    import cv2.cv as cv
-except ImportError:
-    import cv
+import cv2
+import numpy as np
 
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_widgets
@@ -122,8 +119,7 @@ class MPImage():
         if not self.is_alive():
             return
         if bgr:
-            img = cv.CloneImage(img)
-            cv.CvtColor(img, img, cv.CV_BGR2RGB)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         self.in_queue.put(MPImageData(img))
 
     def set_title(self, title):
@@ -523,7 +519,7 @@ if __name__ == "__main__":
                  can_drag = opts.drag,
                  can_zoom = opts.zoom,
                  auto_size = opts.autosize)
-    img = cv.LoadImage(args[0])
+    img = cv2.imread(args[0])
     im.set_image(img, bgr=True)
 
     while im.is_alive():
