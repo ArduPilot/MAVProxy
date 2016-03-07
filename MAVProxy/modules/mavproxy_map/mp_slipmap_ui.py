@@ -4,11 +4,8 @@ import mp_elevation
 import os
 import functools
 from mp_slipmap_util import *
-
-try:
-    import cv2.cv as cv
-except ImportError:
-    import cv
+import cv2
+import numpy as np
 
 class MPSlipMapFrame(wx.Frame):
     """ The main frame of the viewer
@@ -256,7 +253,7 @@ class MPSlipMapPanel(wx.Panel):
         self.mainSizer.AddSpacer(2)
 
         # panel for the main map image
-        self.imagePanel = mp_widgets.ImagePanel(self, wx.EmptyImage(state.width,state.height))
+        self.imagePanel = mp_widgets.ImagePanel(self, np.zeros((state.height, state.width, 3), dtype=np.uint8))
         self.mainSizer.Add(self.imagePanel, flag=wx.GROW, border=5)
         self.imagePanel.Bind(wx.EVT_MOUSE_EVENTS, self.on_mouse)
         self.imagePanel.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
@@ -384,7 +381,7 @@ class MPSlipMapPanel(wx.Panel):
         '''redraw the map with current settings'''
         state = self.state
 
-        view_same = (self.last_view and self.map_img and self.last_view == self.current_view())
+        view_same = (self.last_view is not None and self.map_img is not None and self.last_view == self.current_view())
 
         if view_same and not state.need_redraw:
             return
@@ -393,7 +390,7 @@ class MPSlipMapPanel(wx.Panel):
         self.map_img = state.mt.area_to_image(state.lat, state.lon,
                                               state.width, state.height, state.ground_width)
         if state.brightness != 1.0:
-            cv.ConvertScale(self.map_img, self.map_img, scale=state.brightness)
+            self.map_img = self.map_img*state.brightness
 
 
         # find display bounding box
@@ -401,7 +398,7 @@ class MPSlipMapPanel(wx.Panel):
         bounds = (lat2, state.lon, state.lat-lat2, lon2-state.lon)
 
         # get the image
-        img = cv.CloneImage(self.map_img)
+        img = self.map_img.copy()
 
         # possibly draw a grid
         if state.grid:
@@ -418,9 +415,7 @@ class MPSlipMapPanel(wx.Panel):
             state.info[key].draw(state.panel, state.panel.information)
 
         # display the image
-        self.img = wx.EmptyImage(state.width,state.height)
-        self.img.SetData(img.tostring())
-        self.imagePanel.set_image(self.img)
+        self.imagePanel.set_image(img)
 
         self.update_position()
 

@@ -19,11 +19,8 @@ import os
 import sys
 import string
 import time
-
-try:
-	import cv2.cv as cv
-except ImportError:
-	import cv
+import cv2
+import numpy as np
 
 from MAVProxy.modules.lib import mp_util
 
@@ -44,8 +41,8 @@ TILE_SERVICES = {
 	"MicrosoftSat"   : "http://ecn.t${MS_DIGIT}.tiles.virtualearth.net/tiles/a${QUAD}.png?g=441&mkt=en-us&n=z",
 	"MicrosoftMap"   : "http://ecn.t${MS_DIGIT}.tiles.virtualearth.net/tiles/r${QUAD}.png?g=441&mkt=en-us&n=z",
 	"MicrosoftTer"   : "http://ecn.t${MS_DIGIT}.tiles.virtualearth.net/tiles/r${QUAD}.png?g=441&mkt=en-us&shading=hill&n=z",
-        "OviSat"         : "http://maptile.maps.svc.ovi.com/maptiler/v2/maptile/newest/satellite.day/${Z}/${X}/${Y}/256/png8",
-        "OviHybrid"      : "http://maptile.maps.svc.ovi.com/maptiler/v2/maptile/newest/hybrid.day/${Z}/${X}/${Y}/256/png8",
+	"OviSat"         : "http://maptile.maps.svc.ovi.com/maptiler/v2/maptile/newest/satellite.day/${Z}/${X}/${Y}/256/png8",
+	"OviHybrid"      : "http://maptile.maps.svc.ovi.com/maptiler/v2/maptile/newest/hybrid.day/${Z}/${X}/${Y}/256/png8",
 	"OpenStreetMap"  : "http://tile.openstreetmap.org/${ZOOM}/${X}/${Y}.png",
 	"OSMARender"     : "http://tah.openstreetmap.org/Tiles/tile/${ZOOM}/${X}/${Y}.png",
 	"OpenAerialMap"  : "http://tile.openaerialmap.org/tiles/?v=mgm&layer=openaerialmap-900913&x=${X}&y=${Y}&zoom=${OAM_ZOOM}",
@@ -56,8 +53,8 @@ TILE_SERVICES = {
 
 # these are the md5sums of "unavailable" tiles
 BLANK_TILES = set(["d16657bbee25d7f15c583f5c5bf23f50",
-                   "c0e76e6e90ff881da047c15dbea380c7",
-		   "d41d8cd98f00b204e9800998ecf8427e"])
+					"c0e76e6e90ff881da047c15dbea380c7",
+					"d41d8cd98f00b204e9800998ecf8427e"])
 
 # all tiles are 256x256
 TILES_WIDTH = 256
@@ -91,7 +88,7 @@ class TileInfo:
 		self.tile = tile
 		(self.x, self.y) = tile
 		self.zoom = zoom
-                self.service = service
+		self.service = service
 		(self.offsetx, self.offsety) = offset
 		self.refresh_time()
 
@@ -134,8 +131,8 @@ class TileInfo:
 		'''return relative path of tile image'''
 		(x, y) = self.tile
 		return os.path.join('%u' % self.zoom,
-				    '%u' % y,
-				    '%u.img' % x)
+					'%u' % y,
+					'%u.img' % x)
 
 	def url(self, service):
 		'''return URL for a tile'''
@@ -181,7 +178,7 @@ class MPTile:
 		self.tile_delay = tile_delay
 		self.service = service
 		self.debug = debug
-                self.refresh_age = refresh_age
+		self.refresh_age = refresh_age
 
 		if service not in TILE_SERVICES:
 			raise TileException('unknown tile service %s' % service)
@@ -189,7 +186,7 @@ class MPTile:
 		# _download_pending is a dictionary of TileInfo objects
 		self._download_pending = {}
 		self._download_thread = None
-                self._loading = mp_icon('loading.jpg')
+		self._loading = mp_icon('loading.jpg')
 		self._unavailable = mp_icon('unavailable.jpg')
 		try:
 			self._tile_cache = collections.OrderedDict()
@@ -199,23 +196,23 @@ class MPTile:
 			import ordereddict
 			self._tile_cache = ordereddict.OrderedDict()
 
-        def set_service(self, service):
-                '''set tile service'''
-                self.service = service
+	def set_service(self, service):
+		'''set tile service'''
+		self.service = service
 
-        def get_service(self):
-                '''get tile service'''
-                return self.service
+	def get_service(self):
+		'''get tile service'''
+		return self.service
 
-        def get_service_list(self):
-                '''return list of available services'''
-                service_list = TILE_SERVICES.keys()
-                service_list.sort()
-                return service_list
+	def get_service_list(self):
+		'''return list of available services'''
+		service_list = TILE_SERVICES.keys()
+		service_list.sort()
+		return service_list
 
-        def set_download(self, download):
-                '''set download enable'''
-                self.download = download
+	def set_download(self, download):
+		'''set download enable'''
+		self.download = download
 
 	def coord_to_tile(self, lat, lon, zoom):
 		'''convert lat/lon/zoom to a TileInfo'''
@@ -263,22 +260,22 @@ class MPTile:
 			try:
 				if self.debug:
 					print("Downloading %s [%u left]" % (url, len(keys)))
-                                req = urllib2.Request(url)
-                                if url.find('google') != -1:
-                                        req.add_header('Referer', 'https://maps.google.com/')
+				req = urllib2.Request(url)
+				if url.find('google') != -1:
+					req.add_header('Referer', 'https://maps.google.com/')
 				resp = urllib2.urlopen(req)
 				headers = resp.info()
 			except urllib2.URLError as e:
 				#print('Error loading %s' % url)
-                                if not key in self._tile_cache:
-                                        self._tile_cache[key] = self._unavailable
+				if not key in self._tile_cache:
+					self._tile_cache[key] = self._unavailable
 				self._download_pending.pop(key)
 				if self.debug:
 					print("Failed %s: %s" % (url, str(e)))
 				continue
 			if 'content-type' not in headers or headers['content-type'].find('image') == -1:
-                                if not key in self._tile_cache:
-                                        self._tile_cache[key] = self._unavailable
+				if not key in self._tile_cache:
+					self._tile_cache[key] = self._unavailable
 				self._download_pending.pop(key)
 				if self.debug:
 					print("non-image response %s" % url)
@@ -291,8 +288,8 @@ class MPTile:
 			if md5 in BLANK_TILES:
 				if self.debug:
 					print("blank tile %s" % url)
-                                if not key in self._tile_cache:
-                                        self._tile_cache[key] = self._unavailable
+					if not key in self._tile_cache:
+						self._tile_cache[key] = self._unavailable
 				self._download_pending.pop(key)
 				continue
 
@@ -300,11 +297,11 @@ class MPTile:
 			h = open(path+'.tmp','wb')
 			h.write(img)
 			h.close()
-                        try:
-                                os.unlink(path)
-                        except Exception:
-                                pass
-                        os.rename(path+'.tmp', path)
+			try:
+				os.unlink(path)
+			except Exception:
+				pass
+			os.rename(path+'.tmp', path)
 			self._download_pending.pop(key)
 		self._download_thread = None
 
@@ -342,35 +339,27 @@ class MPTile:
 			key = tile_info.key()
 			if key in self._tile_cache:
 				img = self._tile_cache[key]
-				if img == self._unavailable:
+				if np.array_equal(img, np.array(self._unavailable)):
 					continue
 			else:
 				path = self.tile_to_path(tile_info)
-				try:
-					img = cv.LoadImage(path)
-					# add it to the tile cache
-					self._tile_cache[key] = img
-					while len(self._tile_cache) > self.cache_size:
-						self._tile_cache.popitem(0)
-				except IOError as e:
+				img = cv2.imread(path)
+				if img is None:
 					continue
+				# add it to the tile cache
+				self._tile_cache[key] = img
+				while len(self._tile_cache) > self.cache_size:
+					self._tile_cache.popitem(0)
 
 			# copy out the quadrant we want
-                        availx = min(TILES_WIDTH - tile_info.offsetx, width2)
-                        availy = min(TILES_HEIGHT - tile_info.offsety, height2)
-                        if availx != width2 or availy != height2:
-                                continue
-			cv.SetImageROI(img, (tile_info.offsetx, tile_info.offsety, width2, height2))
-			img2 = cv.CreateImage((width2,height2), 8, 3)
-                        try:
-                            cv.Copy(img, img2)
-                        except Exception:
-                            continue
-			cv.ResetImageROI(img)
+			availx = min(TILES_WIDTH - tile_info.offsetx, width2)
+			availy = min(TILES_HEIGHT - tile_info.offsety, height2)
+			if availx != width2 or availy != height2:
+				continue
+			roi = img[tile_info.offsety:tile_info.offsety+height2, tile_info.offsetx:tile_info.offsetx+width2]
 
 			# and scale it
-			scaled = cv.CreateImage((TILES_WIDTH, TILES_HEIGHT), 8, 3)
-			cv.Resize(img2, scaled)
+			scaled = cv2.resize(roi, (TILES_HEIGHT,TILES_WIDTH))
 			#cv.Rectangle(scaled, (0,0), (255,255), (0,255,0), 1)
 			return scaled
 		return None
@@ -382,7 +371,7 @@ class MPTile:
 		key = tile.key()
 		if key in self._tile_cache:
 			img = self._tile_cache[key]
-			if img == self._unavailable:
+			if np.array_equal(img, self._unavailable):
 				img = self.load_tile_lowres(tile)
 				if img is None:
 					img = self._unavailable
@@ -390,27 +379,22 @@ class MPTile:
 
 
 		path = self.tile_to_path(tile)
-		try:
-			ret = cv.LoadImage(path)
-
-                        # if it is an old tile, then try to refresh
-                        if os.path.getmtime(path) + self.refresh_age < time.time():
-                                try:
-                                        self._download_pending[key].refresh_time()
-                                except Exception:
-                                        self._download_pending[key] = tile
-                                self.start_download_thread()
+		ret = cv2.imread(path)
+		if ret is not None:
+			# if it is an old tile, then try to refresh
+			if os.path.getmtime(path) + self.refresh_age < time.time():
+				try:
+						self._download_pending[key].refresh_time()
+				except Exception:
+						self._download_pending[key] = tile
+				self.start_download_thread()
+					
 			# add it to the tile cache
 			self._tile_cache[key] = ret
 			while len(self._tile_cache) > self.cache_size:
 				self._tile_cache.popitem(0)
 			return ret
-		except IOError as e:
-			# windows gives errno 0 for some versions of python, treat that as ENOENT
-			# and try a download
-			if not e.errno in [errno.ENOENT,0]:
-				raise
-			pass
+
 		if not self.download:
 			img = self.load_tile_lowres(tile)
 			if img is None:
@@ -433,9 +417,8 @@ class MPTile:
 		'''return a scaled tile'''
 		width = int(TILES_WIDTH / tile.scale)
 		height = int(TILES_HEIGHT / tile.scale)
-		scaled_tile = cv.CreateImage((width,height), 8, 3)
 		full_tile = self.load_tile(tile)
-		cv.Resize(full_tile, scaled_tile)
+		scaled_tile = cv2.resize(full_tile, (height, width))
 		return scaled_tile
 
 
@@ -519,7 +502,7 @@ class MPTile:
 			for x in range(tile_min.x, tile_max.x+1):
 				if dstx < width and dsty < height:
 					ret.append(TileInfoScaled((x,y), zoom, scale,
-                                                                  (srcx,srcy), (dstx,dsty), self.service))
+																  (srcx,srcy), (dstx,dsty), self.service))
 				dstx += scaled_tile_width-srcx
 				srcx = 0
 			dsty += scaled_tile_height-srcy
@@ -533,7 +516,7 @@ class MPTile:
 		lat/lon is the top left corner. The zoom is automatically
 		chosen to avoid having to grow the tiles'''
 
-		img = cv.CreateImage((width,height),8,3)
+		img = np.zeros((height,width,3), np.uint8)
 
 		tlist = self.area_to_tile_list(lat, lon, width, height, ground_width, zoom)
 
@@ -546,35 +529,33 @@ class MPTile:
 		for t in tlist:
 			scaled_tile = self.scaled_tile(t)
 
-			w = min(width - t.dstx, scaled_tile.width - t.srcx)
-			h = min(height - t.dsty, scaled_tile.height - t.srcy)
+			w = min(width - t.dstx, scaled_tile.shape[1] - t.srcx)
+			h = min(height - t.dsty, scaled_tile.shape[0] - t.srcy)
 			if w > 0 and h > 0:
-				cv.SetImageROI(scaled_tile, (t.srcx, t.srcy, w, h))
-				cv.SetImageROI(img, (t.dstx, t.dsty, w, h))
-				cv.Copy(scaled_tile, img)
-				cv.ResetImageROI(img)
-				cv.ResetImageROI(scaled_tile)
+				scaled_tile_roi = scaled_tile[t.srcy:t.srcy+h, t.srcx:t.srcx+w]
+				img[t.dsty:t.dsty+h, t.dstx:t.dstx+w] = scaled_tile_roi.copy()
 
 		# return as an RGB image
-		cv.CvtColor(img, img, cv.CV_BGR2RGB)
+		img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 		return img
 
 def mp_icon(filename):
-        '''load an icon from the data directory'''
-        # we have to jump through a lot of hoops to get an OpenCV image
-        # when we may be in a package zip file
-        try:
-                import pkg_resources
-                name = __name__
-                if name == "__main__":
-                        name = "MAVProxy.modules.mavproxy_map.mp_tile"
-                raw = pkg_resources.resource_stream(name, "data/%s" % filename).read()
-        except Exception:
-                raw = open(os.path.join(__file__, 'data', filename)).read()
-        imagefiledata = cv.CreateMatHeader(1, len(raw), cv.CV_8UC1)
-        cv.SetData(imagefiledata, raw, len(raw))
-        img = cv.DecodeImage(imagefiledata, cv.CV_LOAD_IMAGE_COLOR)
-        return img
+	'''load an icon from the data directory'''
+	# we have to jump through a lot of hoops to get an OpenCV image
+	# when we may be in a package zip file
+	try:
+		import pkg_resources
+		name = __name__
+		if name == "__main__":
+			name = "MAVProxy.modules.mavproxy_map.mp_tile"
+		stream = pkg_resources.resource_stream(name, "data/%s" % filename).read()
+		raw = np.fromstring(stream, dtype=np.uint8)
+	except Exception:
+		stream = open(os.path.join(__file__, 'data', filename)).read()
+		raw = np.fromstring(stream, dtype=np.uint8)
+		
+	img = cv2.imdecode(raw, cv2.IMREAD_COLOR)
+	return img
 
 
 if __name__ == "__main__":
@@ -606,14 +587,14 @@ if __name__ == "__main__":
 		print lat, lon, ground_width
 
 	mt = MPTile(debug=opts.debug, service=opts.service,
-		    tile_delay=opts.delay, max_zoom=opts.max_zoom)
+			tile_delay=opts.delay, max_zoom=opts.max_zoom)
 	if opts.zoom is None:
 		zooms = range(mt.min_zoom, mt.max_zoom+1)
 	else:
 		zooms = [opts.zoom]
 	for zoom in zooms:
 		tlist = mt.area_to_tile_list(lat, lon, width=1024, height=1024,
-					     ground_width=ground_width, zoom=zoom)
+						 ground_width=ground_width, zoom=zoom)
 		print("zoom %u needs %u tiles" % (zoom, len(tlist)))
 		for tile in tlist:
 			mt.load_tile(tile)
