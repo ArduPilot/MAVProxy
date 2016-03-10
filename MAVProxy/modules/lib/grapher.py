@@ -239,10 +239,11 @@ class MavGraph(object):
                 (color, alpha) = self.modes_plotted[mode]
                 mode_patches.append(matplotlib.patches.Patch(color=color,
                                                              label=mode, alpha=alpha*5))
+            labels = [patch.get_label() for patch in mode_patches]
             if ax1_labels != []:
-                ax1.add_artist(pylab.legend(handles=mode_patches, loc=self.legend_flightmode))
+                ax1.add_artist(matplotlib.pyplot.legend(mode_patches, labels, loc=self.legend_flightmode))
             else:
-                pylab.legend(handles=mode_patches)
+                pylab.legend(mode_patches, labels)
 
         if ax1_labels != []:
             ax1.legend(ax1_labels,loc=self.legend)
@@ -393,6 +394,6 @@ if __name__ == "__main__":
     mg.set_legend(args.legend)
     mg.set_legend2(args.legend2)
     mg.set_multi(args.multi)
-    mg.set_show_flightmode(ast.literal_eval(args.show_flightmode))
+    mg.set_show_flightmode(args.show_flightmode)
     mg.process()
     mg.show()
