@@ -21,7 +21,8 @@ single stream automatically. This is useful if independent redundant
 links are being used.
 
 If an IP address is specified, it must be the local computer's IP
-address.
+address. The IP connection type (TCP or UDP) must be prefixed to the
+IP address.
 
 If a serial port is specified, an optional comma-separated baud rate may
 also be specified. If present, this overrides the rate given by
@@ -31,9 +32,9 @@ also be specified. If present, this overrides the rate given by
 
     mavproxy.py --master=/dev/ttyUSB0
     mavproxy.py --master="com14"
-    mavproxy.py --master=192.168.1.1:14550
-    mavproxy.py --master=192.168.1.1:14550 --master=/dev/ttyUSB0
-    mavproxy.py --master=/dev/ttyUSB0,57600           ``
+    mavproxy.py --master=tcp:192.168.1.1:14550
+    mavproxy.py --master=udp:192.168.1.1:14550 --master=/dev/ttyUSB0
+    mavproxy.py --master=/dev/ttyUSB0,57600
 
 
 --quadcopter
@@ -65,11 +66,17 @@ global default baudrate specified by ``--baudrate``.
 If forwarding to a network address via tcp or udp, this must be prefixed
 before the IP address.
 
+A UDB broadcast can be made via the udpbcast:<ip>:<port> that starts as 
+UDP broadcast then locks onto the first client that connects. <ip> specifies 
+the valid client range. For example, udpbcast:192.168.2.255:14550 will connect to 
+the first client in the 192.168.2.0 to 192.168.2.254 range on port 14550.
+
 .. code:: bash
 
     mavproxy.py --master=/dev/ttyUSB0 --out=udp:192.168.1.1:14550
     mavproxy.py --master=/dev/ttyACM0,115200 --out=/dev/ttyUSB0,57600
     mavproxy.py --master=/dev/ttyACM0,115200 --out=COM17,57600
+    mavproxy.py --master=/dev/ttyACM0,57600 --out=udpbcast:192.168.2.255:14550 
 
 
 --sitl
