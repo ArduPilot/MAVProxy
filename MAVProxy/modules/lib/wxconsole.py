@@ -38,6 +38,7 @@ class MessageConsole(textconsole.SimpleConsole):
         from wxconsole_ui import ConsoleFrame
         app = wx.App(False)
         app.frame = ConsoleFrame(state=self, title=self.title)
+        app.frame.SetDoubleBuffered(True)
         app.frame.Show()
         app.MainLoop()
 

@@ -17,7 +17,7 @@ MAVProxyAny = Analysis(['mavproxy.py'],
                             'pygame.transform', 'pygame.surface', 'pygame.bufferproxy', 'wx._grid',
                             'wx.lib.agw.genericmessagedialog', 'wx.lib.wordwrap', 'wx.lib.buttons',
                             'wx.lib.embeddedimage', 'wx.lib.imageutils', 'wx.lib.agw.aquabutton', 
-                            'wx.lib.agw.gradientbutton'],
+                            'wx.lib.agw.gradientbutton', 'wxversion'],
              hookspath=None,
              runtime_hooks=None)
 MAVExpAny = Analysis(['.\\tools\\MAVExplorer.py'],
