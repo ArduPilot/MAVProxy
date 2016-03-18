@@ -160,7 +160,7 @@ class ADSBModule(mp_module.MPModule):
                     popup = MPMenuSubMenu('ADSB', items=[MPMenuItem(name=id, returnkey=None)])
                     # draw the vehicle on the map
                     self.mpstate.map.add_object(mp_slipmap.SlipIcon(id, (m.lat * 1e-7, m.lon * 1e-7),
-                                                                    icon, layer=3, rotation=m.heading, follow=False,
+                                                                    icon, layer=3, rotation=m.heading*0.01, follow=False,
                                                                     trail=mp_slipmap.SlipTrail(colour=(0, 255, 255)),
                                                                     popup_menu=popup))
             else:  # the vehicle is in the dict
@@ -168,7 +168,7 @@ class ADSBModule(mp_module.MPModule):
                 self.threat_vehicles[id].update(m.to_dict())
                 if self.mpstate.map:  # if the map is loaded...
                     # update the map
-                    self.mpstate.map.set_position(id, (m.lat * 1e-7, m.lon * 1e-7), rotation=m.heading)
+                    self.mpstate.map.set_position(id, (m.lat * 1e-7, m.lon * 1e-7), rotation=m.heading*0.01)
 
         if m.get_type() == "GLOBAL_POSITION_INT":
             if self.mpstate.map:
