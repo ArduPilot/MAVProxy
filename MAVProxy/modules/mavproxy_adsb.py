@@ -146,6 +146,10 @@ class ADSBModule(mp_module.MPModule):
                 if self.mpstate.map:
                     # remove the threat from the map
                     self.mpstate.map.remove_object(id)
+                # we've modified the dict we're iterating over, so
+                # we'll get any more timed-out threats next time we're
+                # called:
+                return
 
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
