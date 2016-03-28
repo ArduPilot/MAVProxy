@@ -316,7 +316,10 @@ def save_graph(graphdef, mestate):
     if graphdef.filename is None:
         mestate.console.writeln("No file to save graph to", fg='red')
         return
-    graphs = load_graph_xml(open(graphdef.filename).read(), graphdef.filename, load_all=True)
+    try:
+        graphs = load_graph_xml(open(graphdef.filename).read(), graphdef.filename, load_all=True)
+    except Exception:
+        graphs = []
     found_name = False
     for i in range(len(graphs)):
         if graphs[i].name == graphdef.name:
