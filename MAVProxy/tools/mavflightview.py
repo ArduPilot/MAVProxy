@@ -86,6 +86,26 @@ def display_waypoints(wploader, map):
                         'miss_cmd %u/%u' % (i,j), polygons[i][j], str(next_list[j]), 'Mission', colour=(0,255,255)))  
                     labeled_wps[next_list[j]] = (i,j)
 
+def colour_for_point(mlog, point, instance, options):
+    '''indicate a colour to be used to plot point'''
+    fmode = getattr(mlog, 'flightmode','')
+    if fmode in colourmap:
+        colour = colourmap[fmode]
+    else:
+        colour = colourmap['UNKNOWN']
+    (r,g,b) = colour
+    (r,g,b) = (r+instance*80,g+instance*50,b+instance*70)
+    if r > 255:
+        r = 205
+    if g > 255:
+        g = 205
+    if g < 0:
+        g = 0
+    if b > 255:
+        b = 205
+    colour = (r,g,b)
+    return colour
+
 def mavflightview_mav(mlog, options=None, title=None):
     '''create a map for a log file'''
     if not title:
@@ -212,22 +232,7 @@ def mavflightview_mav(mlog, options=None, title=None):
         instance = instances[type]
 
         if abs(lat)>0.01 or abs(lng)>0.01:
-            fmode = getattr(mlog, 'flightmode','')
-            if fmode in colourmap:
-                colour = colourmap[fmode]
-            else:
-                colour = colourmap['UNKNOWN']
-            (r,g,b) = colour
-            (r,g,b) = (r+instance*80,g+instance*50,b+instance*70)
-            if r > 255:
-                r = 205
-            if g > 255:
-                g = 205
-            if g < 0:
-                g = 0
-            if b > 255:
-                b = 205
-            colour = (r,g,b)
+            colour = colour_for_point(mlog, (lat, lng), instance, options)
             point = (lat, lng, colour)
 
             if options.rate == 0 or not type in last_timestamps or m._timestamp - last_timestamps[type] > 1.0/options.rate:
