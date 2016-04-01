@@ -63,14 +63,18 @@ class RelayModule(mp_module.MPModule):
 
     def cmd_motortest(self, args):
         '''run motortests on copter'''
-        if len(args) != 4:
-            print("Usage: motortest motornum type value timeout")
+        if len(args) < 4:
+            print("Usage: motortest motornum type value timeout <count>")
             return
+        if len(args) == 5:
+            count = int(args[4])
+        else:
+            count = 0
         self.master.mav.command_long_send(self.target_system,
                                           0,
                                           mavutil.mavlink.MAV_CMD_DO_MOTOR_TEST, 0,
-                                          int(args[0]), int(args[1]), int(args[2]), int(args[3]),
-                                          0, 0, 0)
+                                          int(args[0]), int(args[1]), int(args[2]), int(args[3]), count,
+                                          0, 0)
 
 
 def init(mpstate):
