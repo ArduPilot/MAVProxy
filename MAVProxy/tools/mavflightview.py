@@ -86,8 +86,60 @@ def display_waypoints(wploader, map):
                         'miss_cmd %u/%u' % (i,j), polygons[i][j], str(next_list[j]), 'Mission', colour=(0,255,255)))  
                     labeled_wps[next_list[j]] = (i,j)
 
+colour_expression_exceptions = dict()
+colour_source_min = 255
+colour_source_max = 0
+
 def colour_for_point(mlog, point, instance, options):
+    global colour_expression_exceptions, colour_source_max, colour_source_min
     '''indicate a colour to be used to plot point'''
+    source = getattr(options, "colour_source", "flightmode")
+    if source == "flightmode":
+        return colour_for_point_flightmode(mlog, point, instance, options)
+
+    # evaluate source as an expression which should return a
+    # number in the range 0..255
+    try:
+        v = eval(source, globals(),mlog.messages)
+    except Exception as e:
+        str_e = str(e)
+        try:
+            count = colour_expression_exceptions[str_e]
+        except KeyError:
+            colour_expression_exceptions[str_e] = 0
+            count = 0
+        if count > 100:
+            print("Too many exceptions processing (%s): %s" % (source, str_e))
+            sys.exit(1)
+        colour_expression_exceptions[str_e] += 1
+        v = 0
+
+    # we don't use evaluate_expression as we want the exceptions...
+#    v = mavutil.evaluate_expression(source, mlog.messages)
+
+    if v is None:
+        v = 0
+    elif isinstance(v, str):
+        print("colour expression returned a string: %s" % v)
+        sys.exit(1)
+    elif v < 0:
+        print("colour expression returned %d (< 0)" % v)
+        v = 0
+    elif v > 255:
+        print("colour expression returned %d (> 255)" % v)
+        v = 255
+
+    if v < colour_source_min:
+        colour_source_min = v
+    if v > colour_source_max:
+        colour_source_max = v
+
+    r = 255
+    g = 255
+    b = v
+    return (b,b,b)
+
+def colour_for_point_flightmode(mlog, point, instance, options):
     fmode = getattr(mlog, 'flightmode','')
     if fmode in colourmap:
         colour = colourmap[fmode]
@@ -305,6 +357,10 @@ def mavflightview_mav(mlog, options=None, title=None):
             icon = map.icon(icon)
             map.add_object(mp_slipmap.SlipIcon('icon - %s' % str(flag), (float(lat),float(lon)), icon, layer=3, rotation=0, follow=False))
 
+    source = getattr(options, "colour_source", "flightmode")
+    if source != "flightmode":
+        print("colour-source: min=%f max=%f" % (colour_source_min, colour_source_max))
+
 def mavflightview(filename, options):
     print("Loading %s ..." % filename)
     mlog = mavutil.mavlink_connection(filename)
@@ -353,6 +409,7 @@ if __name__ == "__main__":
     parser.add_option("--ekf-sample", type='int', default=1, help="sub-sampling of EKF messages")
     parser.add_option("--nkf-sample", type='int', default=1, help="sub-sampling of NKF messages")
     parser.add_option("--rate", type='int', default=0, help="maximum message rate to display (0 means all points)")
+    parser.add_option("--colour-source", type="str", default="flightmode", help="expression with range 0f..255f used for point colour")
     
     (opts, args) = parser.parse_args()
 
