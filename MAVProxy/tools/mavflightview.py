@@ -44,24 +44,75 @@ def create_imagefile(options, filename, latlon, ground_width, path_objs, mission
     map_img = cv2.cvtColor(map_img, cv2.COLOR_BGR2RGB)
     cv2.imwrite(filename, map_img)
 
-colourmap = {
-    'MANUAL'    : (255,   0,   0),
-    'AUTO'      : (  0, 255,   0),
-    'LOITER'    : (  0,   0, 255),
-    'FBWA'      : (255, 100,   0),
-    'RTL'       : (255,   0, 100),
-    'STABILIZE' : (100, 255,   0),
-    'LAND'      : (  0, 255, 100),
-    'STEERING'  : (100,   0, 255),
-    'HOLD'      : (  0, 100, 255),
-    'ALT_HOLD'  : (255, 100, 100),
-    'CIRCLE'    : (100, 255, 100),
-    'GUIDED'    : (100, 100, 255),
-    'ACRO'      : (255, 255,   0),
-    'CRUISE'    : (0,   255, 255),
-    'UNKNOWN'   : (230, 70,  40)
-    }
+map_colours = [ (255,   0,   0),
+                (  0, 255,   0),
+                (  0,   0, 255),
+                (127,   0,   0),
+                (  0, 127,   0),
+#                (  0,   0, 127),
+                (255, 255,   0),
+                (255,   0, 255),
+                (  0, 255, 255),
+                (127, 127,   0),
+                (127,   0, 127),
+                (  0, 127, 127),
 
+                (255,  191,   0),
+                (255,   0,  191),
+                (255,  191,  191),
+
+                (191, 255,   0),
+                (191,   0, 255),
+                (191, 255, 255),
+
+                ( 0, 255,  191),
+                ( 0,  191, 255),
+                ( 0, 255, 255),
+]
+colour_map_copter = {}
+colour_map_plane = {}
+colour_map_rover = {}
+colour_map_tracker = {}
+colour_map_submarine = {}
+
+for mytuple in ((mavutil.mode_mapping_apm.values(),colour_map_plane),
+                (mavutil.mode_mapping_acm.values(),colour_map_copter),
+                (mavutil.mode_mapping_rover.values(),colour_map_rover),
+                (mavutil.mode_mapping_tracker.values(),colour_map_tracker),
+                (mavutil.mode_mapping_sub.values(),colour_map_submarine),
+):
+    (mode_names, colour_map) = mytuple
+    i=0
+    for mode_name in mode_names:
+        colour_map[mode_name] = map_colours[i]
+        i += 1
+    colour_map["UNKNOWN"] = (0, 0, 0)
+
+colourmap_check_done = False
+def colourmap_for_mav_type(mav_type):
+    # swiped from "def mode_mapping_byname(mav_type):" in mavutil
+    map = None
+    if mav_type in [mavutil.mavlink.MAV_TYPE_QUADROTOR,
+                    mavutil.mavlink.MAV_TYPE_HELICOPTER,
+                    mavutil.mavlink.MAV_TYPE_HEXAROTOR,
+                    mavutil.mavlink.MAV_TYPE_OCTOROTOR,
+                    mavutil.mavlink.MAV_TYPE_COAXIAL,
+                    mavutil.mavlink.MAV_TYPE_TRICOPTER]:
+        map = colour_map_copter
+    if mav_type == mavutil.mavlink.MAV_TYPE_FIXED_WING:
+        map = colour_map_plane
+    if mav_type == mavutil.mavlink.MAV_TYPE_GROUND_ROVER:
+        map = colour_map_rover
+    if mav_type == mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER:
+        map = colour_map_tracker
+    if mav_type == mavutil.mavlink.MAV_TYPE_SUBMARINE:
+        map = colour_map_submarine
+    if map is None:
+        print("No colormap for mav_type=%u" % (map,))
+        # we probably don't have a valid mode map, so returning
+        # anything but the empty map here is probably pointless:
+        map = colour_map_plane
+    return map
 
 def display_waypoints(wploader, map):
     '''display the waypoints'''
@@ -137,12 +188,14 @@ def colour_for_point(mlog, point, instance, options):
     return (b,b,b)
 
 def colour_for_point_flightmode(mlog, point, instance, options):
-    return colour_for_flightmode(getattr(mlog, 'flightmode',''), instance)
+    return colour_for_flightmode(getattr(mlog, 'mav_type',None), getattr(mlog, 'flightmode',''), instance)
 
-def colour_for_flightmode(fmode, instance=0):
+def colour_for_flightmode(mav_type, fmode, instance=0):
+    colourmap = colourmap_for_mav_type(mav_type)
     if fmode in colourmap:
         colour = colourmap[fmode]
     else:
+        print("No entry in colourmap for %s" % (str(fmode)))
         colour = colourmap['UNKNOWN']
     (r,g,b) = colour
     (r,g,b) = (r+instance*80,g+instance*50,b+instance*70)
@@ -302,9 +355,9 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
         print("No points to plot")
         return None
 
-    return [path, wp, fen, used_flightmodes]
+    return [path, wp, fen, used_flightmodes, getattr(mlog, 'mav_type',None)]
 
-def mavflightview_show(path, wp, fen, used_flightmodes, options, title=None):
+def mavflightview_show(path, wp, fen, used_flightmodes, mav_type, options, title=None):
     if not title:
         title='MAVFlightView'
 
@@ -374,7 +427,7 @@ def mavflightview_show(path, wp, fen, used_flightmodes, options, title=None):
             map.add_object(mp_slipmap.SlipIcon('icon - %s' % str(flag), (float(lat),float(lon)), icon, layer=3, rotation=0, follow=False))
 
     if options.colour_source == "flightmode":
-        tuples = [ (mode, colour_for_flightmode(mode))
+        tuples = [ (mode, colour_for_flightmode(mav_type, mode))
                    for mode in used_flightmodes.keys() ]
         map.add_object(mp_slipmap.SlipFlightModeLegend("legend", tuples))
     else:
@@ -386,8 +439,8 @@ def mavflightview(filename, options):
     stuff = mavflightview_mav(mlog, options)
     if stuff is None:
         return
-    [path, wp, fen, used_flightmodes] = stuff
-    mavflightview_show(path, wp, fen, used_flightmodes, options, title=filename)
+    [path, wp, fen, used_flightmodes, mav_type] = stuff
+    mavflightview_show(path, wp, fen, used_flightmodes, mav_type, options, title=filename)
 
 class mavflightview_options(object):
     def __init__(self):
