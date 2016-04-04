@@ -63,13 +63,14 @@ class SigningModule(mp_module.MPModule):
         self.cmd_signing_key([passphrase])
 
 
-    def allow_unsigned(self, mav, dialect, msgId):
+    def allow_unsigned(self, mav, msgId):
         '''see if an unsigned packet should be allowed'''
         if self.allow is None:
             self.allow = {
-                (mavutil.mavlink.MAVLINK_MSG_DIALECT_RADIO_STATUS, mavutil.mavlink.MAVLINK_MSG_ID_RADIO_STATUS) : True 
+                mavutil.mavlink.MAVLINK_MSG_ID_RADIO : True,
+                mavutil.mavlink.MAVLINK_MSG_ID_RADIO_STATUS : True 
                 }
-        if (dialect,msgId) in self.allow:
+        if msgId in self.allow:
             return True
         if self.settings.allow_unsigned:
             return True
