@@ -220,10 +220,12 @@ def PILTowx(pimg):
     wimg.SetData(pimg.convert('RGB').tostring())
     return wimg
 
-def dot_mavproxy(name):
+def dot_mavproxy(name=None):
     '''return a path to store mavproxy data'''
     dir = os.path.join(os.environ['HOME'], '.mavproxy')
     mkdir_p(dir)
+    if name is None:
+        return dir
     return os.path.join(dir, name)
 
 def download_url(url):
