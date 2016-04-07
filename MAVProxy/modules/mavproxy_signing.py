@@ -22,7 +22,7 @@ class SigningModule(mp_module.MPModule):
 
     def cmd_signing(self, args):
         '''handle link commands'''
-        usage = "signing: <setup|key> passphrase"
+        usage = "signing: <setup|remove|disable|key> passphrase"
         if len(args) == 0:
             print(usage)
         elif args[0] == 'setup':
