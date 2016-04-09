@@ -288,7 +288,7 @@ class LinkModule(mp_module.MPModule):
             if mtype in delayedPackets:
                 return
 
-        if mtype == 'HEARTBEAT' and m.get_srcSystem() != 255:
+        if mtype == 'HEARTBEAT' and m.type != mavutil.mavlink.MAV_TYPE_GCS:
             if self.settings.target_system == 0 and self.settings.target_system != m.get_srcSystem():
                 self.settings.target_system = m.get_srcSystem()
                 self.say("online system %u" % self.settings.target_system,'message')
