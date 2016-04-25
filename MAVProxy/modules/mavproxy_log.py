@@ -157,8 +157,9 @@ class LogModule(mp_module.MPModule):
 
     def cmd_log(self, args):
         '''log commands'''
+        usage = "usage: log <list|download|erase|resume|status|cancel>"
         if len(args) < 1:
-            print("usage: log <list|download|erase|resume|status|cancel>")
+            print(usage)
             return
 
         if args[0] == "status":
@@ -202,6 +203,8 @@ class LogModule(mp_module.MPModule):
             else:
                 filename = self.default_log_filename(log_num)
             self.log_download(log_num, filename)
+        else:
+            print(usage)            
 
 
     def idle_task(self):
