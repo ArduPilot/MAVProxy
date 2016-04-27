@@ -50,6 +50,7 @@ class MPStatus(object):
         self.exit = False
         self.flightmode = 'MAV'
         self.last_mode_announce = 0
+        self.last_mode_announced = 'MAV'
         self.logdir = None
         self.last_heartbeat = 0
         self.last_message = 0
