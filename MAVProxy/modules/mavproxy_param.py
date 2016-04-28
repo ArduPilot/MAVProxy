@@ -76,18 +76,15 @@ class ParamState:
         except Exception as e:
             print(e)
 
-    def param_help(self, args):
-        '''show help on a parameter'''
-        if len(args) == 0:
-            print("Usage: param help PARAMETER_NAME")
-            return
+    def param_help_tree(self):
+        '''return a "help tree", a map between a parameter and its metadata.  May return None if help is not available'''
         if self.vehicle_name is None:
             print("Unknown vehicle type")
-            return
+            return None
         path = mp_util.dot_mavproxy("%s.xml" % self.vehicle_name)
         if not os.path.exists(path):
             print("Please run 'param download' first (vehicle_name=%s)" % self.vehicle_name)
-            return
+            return None
         xml = open(path).read()
         from lxml import objectify
         objectify.enable_recursive_str()
@@ -100,6 +97,36 @@ class ParamState:
             for p in lib.param:
                 n = p.get('name')
                 htree[n] = p
+        return htree
+
+    def param_apropos(self, args):
+        '''search parameter help for a keyword, list those parameters'''
+        if len(args) == 0:
+            print("Usage: param apropos keyword")
+            return
+
+        htree = self.param_help_tree()
+        if htree is None:
+            return
+
+        contains = {}
+        for keyword in args:
+            for param in htree.keys():
+                if str(htree[param]).find(keyword) != -1:
+                    contains[param] = True
+        for param in contains.keys():
+            print("%s" % (param,))
+
+    def param_help(self, args):
+        '''show help on a parameter'''
+        if len(args) == 0:
+            print("Usage: param help PARAMETER_NAME")
+            return
+
+        htree = self.param_help_tree()
+        if htree is None:
+            return
+
         for h in args:
             if h in htree:
                 help = htree[h]
@@ -213,6 +240,8 @@ class ParamState:
             self.mav_param.load(args[1], param_wildcard, master, check=False)
         elif args[0] == "download":
             self.param_help_download()
+        elif args[0] == "apropos":
+            self.param_apropos(args[1:])
         elif args[0] == "help":
             self.param_help(args[1:])
         elif args[0] == "show":
@@ -231,7 +260,7 @@ class ParamModule(mp_module.MPModule):
         self.pstate = ParamState(self.mav_param, self.logdir, self.vehicle_name, 'mav.parm')
         self.add_command('param', self.cmd_param, "parameter handling",
                          ["<download>",
-                          "<set|show|fetch|help> (PARAMETER)",
+                          "<set|show|fetch|help|apropos> (PARAMETER)",
                           "<load|save|diff> (FILENAME)"])
         if self.continue_mode and self.logdir != None:
             parmfile = os.path.join(self.logdir, 'mav.parm')
