@@ -476,7 +476,7 @@ class MapModule(mp_module.MPModule):
             self.mpstate.map.set_position('Pos' + vehicle, (self.lat, self.lon), rotation=self.heading)
     
         if m.get_type() == "NAV_CONTROLLER_OUTPUT":
-            if (self.master.flightmode in [ "AUTO", "GUIDED", "LOITER", "RTL" ] and
+            if (self.master.flightmode in [ "AUTO", "GUIDED", "LOITER", "RTL", "QRTL", "QLOITER", "QLAND" ] and
                 self.lat is not None and self.lon is not None):
                 trajectory = [ (self.lat, self.lon),
                                mp_util.gps_newpos(self.lat, self.lon, m.target_bearing, m.wp_dist) ]
