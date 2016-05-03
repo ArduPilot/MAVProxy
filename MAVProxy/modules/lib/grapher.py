@@ -241,7 +241,8 @@ class MavGraph(object):
                                                              label=mode, alpha=alpha*5))
             labels = [patch.get_label() for patch in mode_patches]
             if ax1_labels != []:
-                ax1.add_artist(matplotlib.pyplot.legend(mode_patches, labels, loc=self.legend_flightmode))
+                patches_legend = matplotlib.pyplot.legend(mode_patches, labels, loc=self.legend_flightmode)
+                fig.gca().add_artist(patches_legend)
             else:
                 pylab.legend(mode_patches, labels)
 
