@@ -164,7 +164,7 @@ class LogModule(mp_module.MPModule):
 
         if args[0] == "status":
             self.log_status()
-        if args[0] == "list":
+        elif args[0] == "list":
             print("Requesting log list")
             self.download_set = set()
             self.master.mav.log_request_list_send(self.target_system,
