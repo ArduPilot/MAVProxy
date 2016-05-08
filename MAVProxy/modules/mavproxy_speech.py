@@ -78,6 +78,14 @@ class SpeechModule(mp_module.MPModule):
         if self.settings.speech and self.say_backend is not None:
             self.say_backend(text, priority=priority)
 
+    def mavlink_packet(self, msg):
+        '''handle an incoming mavlink packet'''
+        type = msg.get_type()
+        if type == "STATUSTEXT":
+            # say some statustext values
+            if msg.text.startswith("Tuning: "):
+                self.say(msg.text[8:])
+                
 def init(mpstate):
     '''initialise module'''
     return SpeechModule(mpstate)
