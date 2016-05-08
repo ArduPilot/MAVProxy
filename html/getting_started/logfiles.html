@@ -1,0 +1,247 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Logfiles &mdash; MAVProxy 1.4.38 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="MAVProxy 1.4.38 documentation" href="../index.html"/>
+        <link rel="up" title="Getting Started" href="index.html"/>
+        <link rel="next" title="Startup Scripts" href="mavinit.html"/>
+        <link rel="prev" title="Startup Options" href="starting.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-nav-search">
+        
+
+        
+          <a href="../index.html" class="icon icon-home"> MAVProxy
+        
+
+        
+        </a>
+
+        
+          
+          
+            <div class="version">
+              1.4.38
+            </div>
+          
+        
+
+        
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+        
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+        
+          
+          
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting Started</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="download_and_installation.html">Download and Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l2"><a class="reference internal" href="starting.html">Startup Options</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="">Logfiles</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mavinit.html">Startup Scripts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mavbridge.html">MAVProxy Wifi Bridge</a></li>
+<li class="toctree-l2"><a class="reference internal" href="faq.html">Frequently Asked Questions and Issues</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/index.html">Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
+</ul>
+
+          
+        
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../index.html">MAVProxy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="index.html">Getting Started</a> &raquo;</li>
+      
+    <li>Logfiles</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="logfiles">
+<h1>Logfiles<a class="headerlink" href="#logfiles" title="Permalink to this headline">¶</a></h1>
+<p>When connected to a vehicle, MAVProxy will automatically save any recieved telemetry to a logfile.</p>
+<p>This logfile can be used for post-flight analysis or flight replay.</p>
+<p>By default, the logfile will be saved as <code class="docutils literal"><span class="pre">mav.tlog</span></code> and <code class="docutils literal"><span class="pre">mav.tlog.raw</span></code> in the same folder that MAVProxy was executed from. For example:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>~/Documents/code/MAVProxy$ mavproxy.py
+</pre></div>
+</div>
+<p>Will log the telemetry to <code class="docutils literal"><span class="pre">mav.tlog</span></code> and <code class="docutils literal"><span class="pre">mav.tlog.raw</span></code> in the <code class="docutils literal"><span class="pre">~/Documents/code/MAVProxy</span></code> folder.</p>
+<p>In the example:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>C:\users\stephen\Documents\logs&gt; mavproxy.py
+</pre></div>
+</div>
+<p>Will log the telemetry to <code class="docutils literal"><span class="pre">mav.tlog</span></code> and <code class="docutils literal"><span class="pre">mav.tlog.raw</span></code> in the <code class="docutils literal"><span class="pre">C:\users\stephen\Documents\logs</span></code> folder.</p>
+<p>Note that both the <code class="docutils literal"><span class="pre">mav.tlog</span></code> and the <code class="docutils literal"><span class="pre">mav.tlog.raw</span></code> files contain the same data (albiet in different formats). In most cases however the raw file is not used by the analysis or replay tools.</p>
+<p>MAVProxy can use the <code class="docutils literal"><span class="pre">--aircraft=name</span></code> (<a class="reference internal" href="starting.html"><em>Startup Options</em></a>) argument to place the logfile in a specific name and date folder. This is useful for keeping logfiles sorted. See starting for further details.</p>
+<p>For example:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>C:\users\stephen\Documents&gt; mavproxy.py --aircraft=copter
+</pre></div>
+</div>
+<p>Will log the telemetry to <code class="docutils literal"><span class="pre">flight.tlog</span></code> and <code class="docutils literal"><span class="pre">flight.tlog.raw</span></code> in the <code class="docutils literal"><span class="pre">C:\users\stephen\Documents\Logs\Copter\&lt;date&gt;\flight&lt;n&gt;\</span></code> folder.</p>
+<p>The <code class="docutils literal"><span class="pre">--mission=name</span></code> (<a class="reference internal" href="starting.html"><em>Startup Options</em></a>) startup argument can be used with the <code class="docutils literal"><span class="pre">--aircraft=name</span></code> argument to use a specific name for the flight, rather than &lt;date&gt;. For example:</p>
+<blockquote>
+<div><div class="code bash highlight-python"><div class="highlight"><pre>C:\users\stephen\Documents&gt; mavproxy.py --aircraft=copter --mission=flyby
+</pre></div>
+</div>
+</div></blockquote>
+<p>Will log the telemetry to <code class="docutils literal"><span class="pre">flight.tlog</span></code> and <code class="docutils literal"><span class="pre">flight.tlog.raw</span></code> in the <code class="docutils literal"><span class="pre">C:\users\stephen\Documents\Logs\Copter\flyby\flight&lt;n&gt;\</span></code> folder.</p>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="mavinit.html" class="btn btn-neutral float-right" title="Startup Scripts" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="starting.html" class="btn btn-neutral" title="Startup Options" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
+<div style="float:right;"><a href="https://github.com/Dronecode/MAVProxy/issues/new?title=Logfiles%20-%20&body=URL:%20../getting_started/logfiles%0ATitle:%20Logfiles%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
+    <p><a href="https://www.dronecode.org/"><img src="../_static/images/dronecodelogo.png" width="130" alt="Dronecode" class /></a><br/> 
+    This is a Dronecode project.</p>     
+
+    <p>
+
+    </p>
+  </div>
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'1.4.38',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
