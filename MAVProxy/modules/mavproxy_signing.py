@@ -15,7 +15,7 @@ if mp_util.has_wxpython:
 class SigningModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(SigningModule, self).__init__(mpstate, "link", "link control", public=True)
+        super(SigningModule, self).__init__(mpstate, "signing", "signing control", public=True)
         self.add_command('signing', self.cmd_signing, "signing control",
                          ["<setup|remove|disable|key>"])
         self.allow = None
