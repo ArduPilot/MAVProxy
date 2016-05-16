@@ -16,6 +16,7 @@ class CmdlongModule(mp_module.MPModule):
         self.add_command('position', self.cmd_position, "position")
         self.add_command('attitude', self.cmd_attitude, "attitude")
         self.add_command('cammsg', self.cmd_cammsg, "cammsg")
+        self.add_command('cammsg_old', self.cmd_cammsg_old, "cammsg_old")
         self.add_command('camctrlmsg', self.cmd_camctrlmsg, "camctrlmsg")
         self.add_command('posvel', self.cmd_posvel, "posvel")
         self.add_command('parachute', self.cmd_parachute, "parachute",
@@ -111,6 +112,15 @@ class CmdlongModule(mp_module.MPModule):
             50, # param5
             60, # param6
             70) # param7
+
+    def cmd_cammsg_old(self, args):
+        '''cammsg_old'''
+  
+        print("Sent old DIGICAM_CONTROL")
+        self.master.mav.digicam_control_send(
+            self.settings.target_system,  # target_system
+            0, # target_component
+            0, 0, 0, 0, 1, 0, 0, 0)
 
     def cmd_do_change_speed(self, args):
         '''speed value'''
