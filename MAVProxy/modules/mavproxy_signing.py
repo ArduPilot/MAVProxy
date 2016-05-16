@@ -48,6 +48,9 @@ class SigningModule(mp_module.MPModule):
         if len(args) == 0:
             print("usage: signing setup passphrase")
             return
+        if not self.master.mavlink20():
+            print("You must be using MAVLink2 for signing")
+            return
         passphrase = args[0]
         key = self.passphrase_to_key(passphrase)
         secret_key = []
@@ -81,6 +84,9 @@ class SigningModule(mp_module.MPModule):
         if len(args) == 0:
             print("usage: signing setup passphrase")
             return
+        if not self.master.mavlink20():
+            print("You must be using MAVLink2 for signing")
+            return
         passphrase = args[0]
         key = self.passphrase_to_key(passphrase)
         self.master.setup_signing(key, sign_outgoing=True, allow_unsigned_callback=self.allow_unsigned)
@@ -93,6 +99,9 @@ class SigningModule(mp_module.MPModule):
 
     def cmd_signing_remove(self, args):
         '''remove signing from server'''
+        if not self.master.mavlink20():
+            print("You must be using MAVLink2 for signing")
+            return
         self.master.mav.setup_signing_send(self.target_system, self.target_component, [0]*32, 0)
         self.master.disable_signing()
         print("Removed signing")
