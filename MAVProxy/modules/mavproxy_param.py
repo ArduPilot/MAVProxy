@@ -221,6 +221,8 @@ class ParamState:
             else:
                 pattern = "*"
             self.mav_param.show(pattern)
+        elif args[0] == "status":
+            print("Have %u/%u params" % (len(self.mav_param_set), self.mav_param_count))
         else:
             print(usage)
 
@@ -230,7 +232,7 @@ class ParamModule(mp_module.MPModule):
         super(ParamModule, self).__init__(mpstate, "param", "parameter handling", public = True)
         self.pstate = ParamState(self.mav_param, self.logdir, self.vehicle_name, 'mav.parm')
         self.add_command('param', self.cmd_param, "parameter handling",
-                         ["<download>",
+                         ["<download|status>",
                           "<set|show|fetch|help> (PARAMETER)",
                           "<load|save|diff> (FILENAME)"])
         if self.continue_mode and self.logdir != None:
