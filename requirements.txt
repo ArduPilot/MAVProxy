@@ -1,3 +1,2 @@
 pymavlink>=1.1.73
 pyserial>=3.0
-matplotlib>=1.5.0
