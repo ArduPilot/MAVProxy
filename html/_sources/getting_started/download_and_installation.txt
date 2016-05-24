@@ -20,15 +20,15 @@ http://firmware.diydrones.com/Tools/MAVProxy/.
 Linux
 =====
 
-First, a few pre-requisite packages need to be installed :
+First, a few pre-requisite packages need to be installed:
 
 .. code:: bash
 
-    sudo apt-get install python-opencv python-wxgtk python-pip python-dev
+    sudo apt-get install python-opencv python-wxgtk3.0 python-pip python-matplotlib python-pygame python-lxml
 
 .. note::
 
-    On some Linux systems, ``python-wxgtk`` may be instead named
+    On some older Linux systems, ``python-wxgtk3.0`` may be instead named
     as ``python-wxgtk2.8``.
 
 .. note::
@@ -38,11 +38,27 @@ First, a few pre-requisite packages need to be installed :
         
 Then download and install MAVProxy via Pypi. Prerequisites will be
 automatically downloaded too. Note a sudo may be required in some
-circumstances if the install generates errors.
+circumstances if the install generates errors:
 
 .. code:: bash
 
     pip install MAVProxy
+    
+Depending on user and system settings, there may be some extra configuration required.
+
+If not already set, MAVProxy needs to be on the system path:
+
+.. code:: bash
+
+    echo "export PATH=$PATH:$HOME/.local/bin" > ~./bashrc
+
+The user permissions may also need to be changed to allow access to serial devices:
+   
+.. code:: bash
+
+    sudo adduser <username> dialout    
+
+The system will need to be logged out and logged back in again to apply the above two changes.
 
 Mac
 ===

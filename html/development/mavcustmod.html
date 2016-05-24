@@ -119,7 +119,7 @@
         <div class="rst-content">
           
 
-
+ 
 
 
 
@@ -184,7 +184,7 @@ class TestModule(mp_module.MPModule):
 </div>
 <p>The initialisation section defines commands and module-wide variables.
 To add a command:</p>
-<div class="code python highlight-python"><div class="highlight"><pre><span class="bp">self</span><span class="o">.</span><span class="n">add_command</span><span class="p">(</span><span class="s">&#39;bat&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cmd_bat</span><span class="p">,</span> <span class="s">&quot;show some information&quot;</span><span class="p">)</span>
+<div class="code python highlight-python"><div class="highlight"><pre><span class="bp">self</span><span class="o">.</span><span class="n">add_command</span><span class="p">(</span><span class="s1">&#39;bat&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cmd_bat</span><span class="p">,</span> <span class="s2">&quot;show some information&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>The above will add the &#8220;bat&#8221; command, which the MAVProxy help will show
@@ -192,7 +192,7 @@ To add a command:</p>
 <p>Within the packet handling, the
 <a class="reference external" href="https://pixhawk.ethz.ch/mavlink/">Mavlink</a> reference is useful for
 filtering the incoming packets for the relevant data:</p>
-<div class="code python highlight-python"><div class="highlight"><pre><span class="k">if</span> <span class="n">m</span><span class="o">.</span><span class="n">get_type</span><span class="p">()</span> <span class="o">==</span> <span class="s">&#39;VFR_HUD&#39;</span><span class="p">:</span>
+<div class="code python highlight-python"><div class="highlight"><pre><span class="k">if</span> <span class="n">m</span><span class="o">.</span><span class="n">get_type</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;VFR_HUD&#39;</span><span class="p">:</span>
   <span class="n">curspeed</span> <span class="o">=</span>  <span class="n">m</span><span class="o">.</span><span class="n">airspeed</span>
 </pre></div>
 </div>

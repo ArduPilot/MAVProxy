@@ -125,7 +125,7 @@
         <div class="rst-content">
           
 
-
+ 
 
 
 
@@ -163,13 +163,13 @@ hopefully be fixed soon. See <a class="reference external" href="https://github.
 </div>
 <div class="section" id="linux">
 <h2>Linux<a class="headerlink" href="#linux" title="Permalink to this headline">¶</a></h2>
-<p>First, a few pre-requisite packages need to be installed :</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>sudo apt-get install python-opencv python-wxgtk python-pip python-dev
+<p>First, a few pre-requisite packages need to be installed:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>sudo apt-get install python-opencv python-wxgtk3.0 python-pip python-matplotlib python-pygame python-lxml
 </pre></div>
 </div>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
-<p class="last">On some Linux systems, <code class="docutils literal"><span class="pre">python-wxgtk</span></code> may be instead named
+<p class="last">On some older Linux systems, <code class="docutils literal"><span class="pre">python-wxgtk3.0</span></code> may be instead named
 as <code class="docutils literal"><span class="pre">python-wxgtk2.8</span></code>.</p>
 </div>
 <div class="admonition note">
@@ -179,10 +179,20 @@ the correct version of Python.</p>
 </div>
 <p>Then download and install MAVProxy via Pypi. Prerequisites will be
 automatically downloaded too. Note a sudo may be required in some
-circumstances if the install generates errors.</p>
+circumstances if the install generates errors:</p>
 <div class="code bash highlight-python"><div class="highlight"><pre>pip install MAVProxy
 </pre></div>
 </div>
+<p>Depending on user and system settings, there may be some extra configuration required.</p>
+<p>If not already set, MAVProxy needs to be on the system path:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>echo &quot;export PATH=$PATH:$HOME/.local/bin&quot; &gt; ~./bashrc
+</pre></div>
+</div>
+<p>The user permissions may also need to be changed to allow access to serial devices:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>sudo adduser &lt;username&gt; dialout
+</pre></div>
+</div>
+<p>The system will need to be logged out and logged back in again to apply the above two changes.</p>
 </div>
 <div class="section" id="mac">
 <h2>Mac<a class="headerlink" href="#mac" title="Permalink to this headline">¶</a></h2>
