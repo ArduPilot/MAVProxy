@@ -50,7 +50,7 @@ If not already set, MAVProxy needs to be on the system path:
 
 .. code:: bash
 
-    echo "export PATH=$PATH:$HOME/.local/bin" > ~./bashrc
+    echo "export PATH=$PATH:$HOME/.local/bin" >> ~/.bashrc
 
 The user permissions may also need to be changed to allow access to serial devices:
    
