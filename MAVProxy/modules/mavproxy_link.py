@@ -94,13 +94,21 @@ class LinkModule(mp_module.MPModule):
         for master in self.mpstate.mav_master:
             linkdelay = (self.status.highest_msec - master.highest_msec)*1.0e-3
             if master.linkerror:
-                print("link %u down" % (master.linknum+1))
+                status = "DOWN"
             else:
-                print("link %u OK (%u packets, %.2fs delay, %u lost, %.1f%% loss)" % (master.linknum+1,
-                                                                                      self.status.counters['MasterIn'][master.linknum],
-                                                                                      linkdelay,
-                                                                                      master.mav_loss,
-                                                                                      master.packet_loss()))
+                status = "OK"
+            sign_string = ''
+            try:
+                sign_string = ", unsigned %u reject %u" % (master.mav.signing.unsigned_count, master.mav.signing.reject_count)
+            except Exception:
+                pass
+            print("link %u %s (%u packets, %.2fs delay, %u lost, %.1f%% loss%s)" % (master.linknum+1,
+                                                                                    status,
+                                                                                    self.status.counters['MasterIn'][master.linknum],
+                                                                                    linkdelay,
+                                                                                    master.mav_loss,
+                                                                                    master.packet_loss(),
+                                                                                    sign_string))
     def cmd_link_list(self):
         '''list links'''
         print("%u links" % len(self.mpstate.mav_master))
