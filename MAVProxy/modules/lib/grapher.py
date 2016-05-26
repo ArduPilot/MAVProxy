@@ -58,6 +58,8 @@ class MavGraph(object):
         self.modes_plotted = {}
         self.flightmode_colour_index = 0
         self.flightmode_colourmap = {}
+        self.ax1 = None
+        self.locator = None
 
     def add_field(self, field):
         '''add another field to plot'''
@@ -135,13 +137,31 @@ class MavGraph(object):
             self.flightmode_colourmap[flightmode] = self.next_flightmode_colour()
         return self.flightmode_colourmap[flightmode]
 
+    def setup_xrange(self, xrange):
+        '''setup plotting ticks on x axis'''
+        if self.xaxis:
+            return
+        xrange *= 24 * 60 * 60
+        interval = 1
+        intervals = [ 1, 2, 5, 10, 15, 30, 60, 120, 240, 300, 600,
+                      900, 1800, 3600, 7200, 5*3600, 10*3600, 24*3600 ]
+        for interval in intervals:
+            if xrange / interval < 12:
+                break
+        self.locator = matplotlib.dates.SecondLocator(interval=interval)
+        self.ax1.xaxis.set_major_locator(self.locator)
+
+    def xlim_changed(self, axsubplot):
+        '''called when x limits are changed'''
+        xrange = axsubplot.get_xbound()
+        self.setup_xrange(xrange[1] - xrange[0])
+
     def plotit(self, x, y, fields, colors=[]):
         '''plot a set of graphs using date for x axis'''
         pylab.ion()
         fig = pylab.figure(num=1, figsize=(12,6))
-        ax1 = fig.gca()
+        self.ax1 = fig.gca()
         ax2 = None
-        xrange = 0.0
         for i in range(0, len(fields)):
             if len(x[i]) == 0: continue
             if self.lowest_x is None or x[i][0] < self.lowest_x:
@@ -150,19 +170,11 @@ class MavGraph(object):
                 self.highest_x = x[i][-1]
         if self.highest_x is None or self.lowest_x is None:
             return
-        xrange = self.highest_x - self.lowest_x
-        xrange *= 24 * 60 * 60
         self.formatter = matplotlib.dates.DateFormatter('%H:%M:%S')
-        interval = 1
-        intervals = [ 1, 2, 5, 10, 15, 30, 60, 120, 240, 300, 600,
-                      900, 1800, 3600, 7200, 5*3600, 10*3600, 24*3600 ]
-        for interval in intervals:
-            if xrange / interval < 15:
-                break
-        locator = matplotlib.dates.SecondLocator(interval=interval)
         if not self.xaxis:
-            ax1.xaxis.set_major_locator(locator)
-            ax1.xaxis.set_major_formatter(self.formatter)
+            self.setup_xrange(self.highest_x - self.lowest_x)
+            self.ax1.xaxis.set_major_formatter(self.formatter)
+            self.ax1.callbacks.connect('xlim_changed', self.xlim_changed)
         empty = True
         ax1_labels = []
         ax2_labels = []
@@ -179,11 +191,11 @@ class MavGraph(object):
 
             if self.axes[i] == 2:
                 if ax2 == None:
-                    ax2 = ax1.twinx()
-                    ax2.format_coord = self.make_format(ax2, ax1)
+                    ax2 = self.ax1.twinx()
+                    ax2.format_coord = self.make_format(ax2, self.ax1)
                 ax = ax2
                 if not self.xaxis:
-                    ax2.xaxis.set_major_locator(locator)
+                    ax2.xaxis.set_major_locator(self.locator)
                     ax2.xaxis.set_major_formatter(self.formatter)
                 label = fields[i]
                 if label.endswith(":2"):
@@ -191,7 +203,7 @@ class MavGraph(object):
                 ax2_labels.append(label)
             else:
                 ax1_labels.append(fields[i])
-                ax = ax1
+                ax = self.ax1
             
             if self.xaxis:
                 if self.marker is not None:
@@ -222,11 +234,11 @@ class MavGraph(object):
                 for i in range(len(self.modes)-1):
                     mode_name = self.modes[i][1]
                     c = self.flightmode_colour(mode_name)
-                    ax1.axvspan(self.modes[i][0], self.modes[i+1][0], fc=c, ec=edge_colour, alpha=alpha)
+                    self.ax1.axvspan(self.modes[i][0], self.modes[i+1][0], fc=c, ec=edge_colour, alpha=alpha)
                     self.modes_plotted[self.modes[i][1]] = (c, alpha)
                 mode_name = self.modes[-1][1]
                 c = self.flightmode_colour(mode_name)
-                ax1.axvspan(self.modes[-1][0], ax1.get_xlim()[1], fc=c, ec=edge_colour, alpha=alpha)
+                self.ax1.axvspan(self.modes[-1][0], self.ax1.get_xlim()[1], fc=c, ec=edge_colour, alpha=alpha)
                 self.modes_plotted[self.modes[-1][1]] = (c, alpha)
 
             if empty:
@@ -247,7 +259,7 @@ class MavGraph(object):
                 pylab.legend(mode_patches, labels)
 
         if ax1_labels != []:
-            ax1.legend(ax1_labels,loc=self.legend)
+            self.ax1.legend(ax1_labels,loc=self.legend)
         if ax2_labels != []:
             ax2.legend(ax2_labels,loc=self.legend2)
 
