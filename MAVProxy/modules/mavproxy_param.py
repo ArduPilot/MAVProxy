@@ -19,6 +19,7 @@ class ParamState:
         self.logdir = logdir
         self.vehicle_name = vehicle_name
         self.parm_file = parm_file
+        self.fetch_set = None
 
     def handle_mavlink_packet(self, master, m):
         '''handle an incoming mavlink packet'''
@@ -27,6 +28,8 @@ class ParamState:
             # Note: the xml specifies param_index is a uint16, so -1 in that field will show as 65535
             # We accept both -1 and 65535 as 'unknown index' to future proof us against someday having that
             # xml fixed.
+            if self.fetch_set is not None:
+                self.fetch_set.discard(m.param_index)
             if m.param_index != -1 and m.param_index != 65535 and m.param_index not in self.mav_param_set:
                 added_new_parameter = True
                 self.mav_param_set.add(m.param_index)
@@ -42,21 +45,27 @@ class ParamState:
                 print("Received %u parameters" % m.param_count)
                 if self.logdir != None:
                     self.mav_param.save(os.path.join(self.logdir, self.parm_file), '*', verbose=True)
+                    self.fetch_set = None
+            if self.fetch_set is not None and len(self.fetch_set) == 0:
+                self.fetch_check(master, force=True)
 
-    def fetch_check(self, master):
+    def fetch_check(self, master, force=False):
         '''check for missing parameters periodically'''
-        if self.param_period.trigger():
+        if self.param_period.trigger() or force:
             if master is None:
                 return
             if len(self.mav_param_set) == 0:
                 master.param_fetch_all()
             elif self.mav_param_count != 0 and len(self.mav_param_set) != self.mav_param_count:
-                if master.time_since('PARAM_VALUE') >= 1:
+                if master.time_since('PARAM_VALUE') >= 1 or force:
                     diff = set(range(self.mav_param_count)).difference(self.mav_param_set)
                     count = 0
                     while len(diff) > 0 and count < 10:
                         idx = diff.pop()
                         master.param_fetch_one(idx)
+                        if self.fetch_set is None:
+                            self.fetch_set = set()
+                        self.fetch_set.add(idx)
                         count += 1
 
     def param_help_download(self):
