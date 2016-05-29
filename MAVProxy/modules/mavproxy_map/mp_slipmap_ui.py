@@ -115,7 +115,7 @@ class MPSlipMapFrame(wx.Frame):
         state.panel.re_center(state.width/2, state.height/2, lat, lon)
 
     def add_object(self, obj):
-        '''add an object to a later'''
+        '''add an object to a layer'''
         state = self.state
         if not obj.layer in state.layers:
             # its a new layer
