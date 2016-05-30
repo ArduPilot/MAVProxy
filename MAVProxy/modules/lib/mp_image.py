@@ -18,8 +18,8 @@ from MAVProxy.modules.lib.mp_menu import *
 class MPImageData:
     '''image data to display'''
     def __init__(self, img):
-        self.width = img.width
-        self.height = img.height
+        self.width = img.shape[1]
+        self.height = img.shape[0]
         self.data = img.tostring()
 
 class MPImageTitle:
