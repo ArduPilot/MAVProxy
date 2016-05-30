@@ -277,10 +277,10 @@ class SlipThumbnail(SlipObject):
         (px,py) = pixmapper(self.latlon)
 
         # find top left
-        px -= thumb.width/2
-        py -= thumb.height/2
-        w = thumb.width
-        h = thumb.height
+        px -= thumb.shape[1]/2
+        py -= thumb.shape[0]/2
+        w = thumb.shape[1]
+        h = thumb.shape[0]
 
         (px, py, sx, sy, w, h) = self.clip(px, py, w, h, img)
 
@@ -367,8 +367,7 @@ class SlipIcon(SlipThumbnail):
 
         (px, py, sx, sy, w, h) = self.clip(px, py, w, h, img)
 
-        img_roi = img[py:py+h, px:px+w]
-        icon[sy:sy+h, sx:sx+w] = cv2.add(img_roi, img_roi)
+        img[py:py+h, px:px+w] += icon[sy:sy+h, sx:sx+w]
 
         # remember where we placed it for clicked()
         self.posx = px+w/2
@@ -434,8 +433,8 @@ class SlipInfoImage(SlipInformation):
     def __init__(self, key, img):
         SlipInformation.__init__(self, key)
         self.imgstr = img.tostring()
-        self.width = img.width
-        self.height = img.height
+        self.width = img.shape[1]
+        self.height = img.shape[0]
         self.imgpanel = None
 
     def img(self):
