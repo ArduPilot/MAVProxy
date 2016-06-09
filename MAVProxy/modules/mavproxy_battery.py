@@ -112,7 +112,7 @@ class BatteryModule(mp_module.MPModule):
                     # prevent continuous announcements on power down
                     self.high_servo_voltage = Vservo
 
-        if Vcc < self.settings.vccwarn:
+        if Vcc > 0 and Vcc < self.settings.vccwarn:
             if now - self.last_vcc_warn_time > 30:
                 self.last_vcc_warn_time = now
                 self.say("Vcc %.1f" % Vcc)
