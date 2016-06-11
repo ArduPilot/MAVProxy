@@ -24,7 +24,7 @@ First, a few pre-requisite packages need to be installed:
 
 .. code:: bash
 
-    sudo apt-get install python-opencv python-wxgtk3.0 python-pip python-matplotlib python-pygame python-lxml
+    sudo apt-get install python-dev python-opencv python-wxgtk3.0 python-pip python-matplotlib python-pygame python-lxml
 
 .. note::
 
