@@ -194,7 +194,8 @@ DAEMON=/usr/local/bin/$NAME
 <p class="last">In the DAEMON_ARGS line above, edit the ttyAMA0 port and 57600 baudrate to match the name and baudrate of the telemetry radio connected to the Pi.</p>
 </div>
 <p>Edit the permissions for mavgateway and update the system to include the mavgateway daemon upon startup:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>sudo chown root:root /etc/init.d/mavgateway
+<div class="code bash highlight-python"><div class="highlight"><pre>sudo chmod +x /etc/init.d/mavgateway
+sudo chown root:root /etc/init.d/mavgateway
 sudo update-rc.d mavgateway defaults
 </pre></div>
 </div>

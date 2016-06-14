@@ -164,7 +164,7 @@ hopefully be fixed soon. See <a class="reference external" href="https://github.
 <div class="section" id="linux">
 <h2>Linux<a class="headerlink" href="#linux" title="Permalink to this headline">¶</a></h2>
 <p>First, a few pre-requisite packages need to be installed:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>sudo apt-get install python-opencv python-wxgtk3.0 python-pip python-matplotlib python-pygame python-lxml
+<div class="code bash highlight-python"><div class="highlight"><pre>sudo apt-get install python-dev python-opencv python-wxgtk3.0 python-pip python-matplotlib python-pygame python-lxml
 </pre></div>
 </div>
 <div class="admonition note">
@@ -185,7 +185,7 @@ circumstances if the install generates errors:</p>
 </div>
 <p>Depending on user and system settings, there may be some extra configuration required.</p>
 <p>If not already set, MAVProxy needs to be on the system path:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>echo &quot;export PATH=$PATH:$HOME/.local/bin&quot; &gt; ~./bashrc
+<div class="code bash highlight-python"><div class="highlight"><pre>echo &quot;export PATH=$PATH:$HOME/.local/bin&quot; &gt;&gt; ~/.bashrc
 </pre></div>
 </div>
 <p>The user permissions may also need to be changed to allow access to serial devices:</p>

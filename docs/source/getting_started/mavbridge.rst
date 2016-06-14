@@ -63,6 +63,7 @@ Edit the permissions for mavgateway and update the system to include the mavgate
 
 .. code:: bash
 
+    sudo chmod +x /etc/init.d/mavgateway
     sudo chown root:root /etc/init.d/mavgateway
     sudo update-rc.d mavgateway defaults
 
