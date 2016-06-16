@@ -109,7 +109,7 @@ class GasHeliModule(mp_module.MPModule):
         else:
             # nothing more to do
             self.starting_motor = False
-        
+
         # setup starter run
         self.master.mav.command_long_send(self.target_system,
                                           self.target_component,

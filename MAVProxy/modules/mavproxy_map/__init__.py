@@ -58,7 +58,7 @@ class MapModule(mp_module.MPModule):
         from MAVProxy.modules.mavproxy_map import mp_slipmap
         mpstate.map = mp_slipmap.MPSlipMap(service=service, elevation=True, title='Map')
         mpstate.map_functions = { 'draw_lines' : self.draw_lines }
-    
+
         mpstate.map.add_callback(functools.partial(self.map_callback))
         self.add_command('map', self.cmd_map, "map control", ['icon',
                                       'set (MAPSETTING)'])
@@ -77,7 +77,7 @@ class MapModule(mp_module.MPModule):
         from MAVProxy.modules.mavproxy_map import mp_slipmap
         self.default_popup.add(menu)
         self.mpstate.map.add_object(mp_slipmap.SlipDefaultPopup(self.default_popup, combine=True))
-        
+
     def show_LandingZone(self):
         '''show/hide the UAV Challenge landing zone around the clicked point'''
         from MAVProxy.modules.mavproxy_map import mp_slipmap
@@ -91,7 +91,7 @@ class MapModule(mp_module.MPModule):
             self.mpstate.map.remove_object('LandingZoneInner')
             self.mpstate.map.remove_object('LandingZoneOuter')
             self.mpstate.map.remove_object('LandingZone')
-   
+
 
     def show_position(self):
         '''show map position click information'''
@@ -132,7 +132,7 @@ class MapModule(mp_module.MPModule):
             self.cmd_set_home(args)
         else:
             print("usage: map <icon|set>")
-    
+
     def display_waypoints(self):
         '''display the waypoints'''
         from MAVProxy.modules.mavproxy_map import mp_slipmap
@@ -179,7 +179,7 @@ class MapModule(mp_module.MPModule):
             self.mpstate.map.add_object(mp_slipmap.SlipPolygon('Fence', points, layer=1,
                                                                linewidth=2, colour=(0,255,0), popup_menu=popup))
 
-            
+
     def closest_waypoint(self, latlon):
         '''find closest waypoint to a position'''
         (lat, lon) = latlon
@@ -235,26 +235,26 @@ class MapModule(mp_module.MPModule):
         '''move a mission point'''
         idx = self.selection_index_to_idx(key, selection_index)
         self.moving_wp = idx
-        print("Moving wp %u" % idx)        
+        print("Moving wp %u" % idx)
 
     def remove_mission(self, key, selection_index):
         '''remove a mission point'''
         idx = self.selection_index_to_idx(key, selection_index)
-        self.mpstate.functions.process_stdin('wp remove %u' % idx) 
+        self.mpstate.functions.process_stdin('wp remove %u' % idx)
 
     def remove_fencepoint(self, key, selection_index):
         '''remove a fence point'''
-        self.mpstate.functions.process_stdin('fence remove %u' % (selection_index+1)) 
+        self.mpstate.functions.process_stdin('fence remove %u' % (selection_index+1))
 
     def move_fencepoint(self, key, selection_index):
         '''move a fence point'''
         self.moving_fencepoint = selection_index
-        print("Moving fence point %u" % selection_index) 
+        print("Moving fence point %u" % selection_index)
 
     def set_mission(self, key, selection_index):
         '''set a mission point'''
         idx = self.selection_index_to_idx(key, selection_index)
-        self.mpstate.functions.process_stdin('wp set %u' % idx) 
+        self.mpstate.functions.process_stdin('wp set %u' % idx)
 
     def handle_menu_event(self, obj):
         '''handle a popup menu event from the map'''
@@ -269,7 +269,7 @@ class MapModule(mp_module.MPModule):
         elif menuitem.returnkey == 'popupRallyRemove':
             self.remove_rally(obj.selected[0].objkey)
         elif menuitem.returnkey == 'popupRallyMove':
-            self.move_rally(obj.selected[0].objkey)            
+            self.move_rally(obj.selected[0].objkey)
         elif menuitem.returnkey == 'popupMissionSet':
             self.set_mission(obj.selected[0].objkey, obj.selected[0].extra_info)
         elif menuitem.returnkey == 'popupMissionRemove':
@@ -337,18 +337,18 @@ class MapModule(mp_module.MPModule):
         if obj.event.m_rightDown:
             if self.draw_callback is not None:
                 self.drawing_end()
-                return                
+                return
             if time.time() - self.click_time > 0.1:
                 self.click_position = obj.latlon
                 self.click_time = time.time()
-            
-    
+
+
     def unload(self):
         '''unload module'''
         self.mpstate.map.close()
         self.mpstate.map = None
         self.mpstate.map_functions = {}
-    
+
     def idle_task(self):
         now = time.time()
         if self.last_unload_check_time + self.unload_check_interval < now:
@@ -367,7 +367,7 @@ class MapModule(mp_module.MPModule):
         icon = self.mpstate.map.icon(colour + vehicle_type + '.png')
         self.mpstate.map.add_object(mp_slipmap.SlipIcon(name, (0,0), icon, layer=3, rotation=0, follow=follow,
                                                    trail=mp_slipmap.SlipTrail()))
-    
+
     def drawing_update(self):
         '''update line drawing'''
         from MAVProxy.modules.mavproxy_map import mp_slipmap
@@ -377,7 +377,7 @@ class MapModule(mp_module.MPModule):
         if len(self.draw_line) > 1:
             self.mpstate.map.add_object(mp_slipmap.SlipPolygon('drawing', self.draw_line,
                                                           layer='Drawing', linewidth=2, colour=(128,128,255)))
-    
+
     def drawing_end(self):
         '''end line drawing'''
         from MAVProxy.modules.mavproxy_map import mp_slipmap
@@ -387,7 +387,7 @@ class MapModule(mp_module.MPModule):
         self.draw_callback = None
         self.mpstate.map.add_object(mp_slipmap.SlipDefaultPopup(self.default_popup, combine=True))
         self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('Drawing'))
-    
+
     def draw_lines(self, callback):
         '''draw a series of connected lines on the map, calling callback when done'''
         from MAVProxy.modules.mavproxy_map import mp_slipmap
@@ -411,8 +411,8 @@ class MapModule(mp_module.MPModule):
             lat, # lat
             lon, # lon
             alt) # param7
-        
-        
+
+
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         from MAVProxy.modules.mavproxy_map import mp_slipmap
@@ -433,16 +433,16 @@ class MapModule(mp_module.MPModule):
             elif m.type in [mavutil.mavlink.MAV_TYPE_HELICOPTER]:
                 self.vehicle_type_name = 'heli'
             elif m.type in [mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER]:
-                self.vehicle_type_name = 'antenna'     
-    
+                self.vehicle_type_name = 'antenna'
+
         # this is the beginnings of allowing support for multiple vehicles
         # in the air at the same time
         vehicle = 'Vehicle%u' % m.get_srcSystem()
-    
+
         if m.get_type() == "SIMSTATE" and self.map_settings.showsimpos:
             self.create_vehicle_icon('Sim' + vehicle, 'green')
             self.mpstate.map.set_position('Sim' + vehicle, (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
-    
+
         if m.get_type() == "AHRS2" and self.map_settings.showahrs2pos:
             self.create_vehicle_icon('AHRS2' + vehicle, 'blue')
             self.mpstate.map.set_position('AHRS2' + vehicle, (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
@@ -456,13 +456,13 @@ class MapModule(mp_module.MPModule):
             if lat != 0 or lon != 0:
                 self.create_vehicle_icon('GPS' + vehicle, 'blue')
                 self.mpstate.map.set_position('GPS' + vehicle, (lat, lon), rotation=m.cog*0.01)
-    
+
         if m.get_type() == "GPS2_RAW" and self.map_settings.showgps2pos:
             (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
             if lat != 0 or lon != 0:
                 self.create_vehicle_icon('GPS2' + vehicle, 'green')
                 self.mpstate.map.set_position('GPS2' + vehicle, (lat, lon), rotation=m.cog*0.01)
-    
+
         if m.get_type() == 'GLOBAL_POSITION_INT':
             (self.lat, self.lon, self.heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
             if abs(self.lat) > 1.0e-3 or abs(self.lon) > 1.0e-3:
@@ -475,7 +475,7 @@ class MapModule(mp_module.MPModule):
             self.heading = math.degrees(math.atan2(m.vy, m.vx))
             self.create_vehicle_icon('Pos' + vehicle, 'red', follow=True)
             self.mpstate.map.set_position('Pos' + vehicle, (self.lat, self.lon), rotation=self.heading)
-    
+
         if m.get_type() == "NAV_CONTROLLER_OUTPUT":
             if (self.master.flightmode in [ "AUTO", "GUIDED", "LOITER", "RTL", "QRTL", "QLOITER", "QLAND" ] and
                 self.lat is not None and self.lon is not None):
@@ -485,7 +485,7 @@ class MapModule(mp_module.MPModule):
                                                                    linewidth=2, colour=(255,0,180)))
             else:
                 self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('Trajectory'))
-            
+
         # if the waypoints have changed, redisplay
         last_wp_change = self.module('wp').wploader.last_change
         if self.wp_change_time != last_wp_change and abs(time.time() - last_wp_change) > 1:
@@ -494,11 +494,11 @@ class MapModule(mp_module.MPModule):
 
             #this may have affected the landing lines from the rally points:
             self.rally_change_time = time.time()
-    
+
         # if the fence has changed, redisplay
         if self.fence_change_time != self.module('fence').fenceloader.last_change:
             self.display_fence()
-    
+
         # if the rallypoints have changed, redisplay
         if self.rally_change_time != self.module('rally').rallyloader.last_change:
             self.rally_change_time = self.module('rally').rallyloader.last_change
@@ -549,7 +549,7 @@ class MapModule(mp_module.MPModule):
 
         # check for any events from the map
         self.mpstate.map.check_events()
-    
+
 def init(mpstate):
     '''initialise module'''
     return MapModule(mpstate)

@@ -288,7 +288,7 @@ class SRTMTile:
         try:
             zipf = zipfile.ZipFile(f, 'r')
         except Exception:
-            raise InvalidTileError(lat, lon)            
+            raise InvalidTileError(lat, lon)
         names = zipf.namelist()
         if len(names) != 1:
             raise InvalidTileError(lat, lon)

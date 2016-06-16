@@ -5,5 +5,5 @@ if not wx_util.safe:
     import traceback
     print traceback.print_stack()
     raise Exception('Cannot access wx from main thread')
-    
+
 import wx

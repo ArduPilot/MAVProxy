@@ -229,7 +229,7 @@ class MPMenuTop(object):
     def wx_menu(self):
         '''return a wx.MenuBar() for the menu'''
         from wx_loader import wx
-        
+
         menubar = wx.MenuBar()
         for i in range(len(self.items)):
             m = self.items[i]
@@ -263,7 +263,7 @@ class MPMenuCallFileDialog(object):
             'overwrite_prompt': wx.FD_OVERWRITE_PROMPT,
         }
         flagsMapped = map(lambda x: flag_map[x], self.flags)
-        
+
         #need to OR together the elements of the flagsMapped tuple
         if len(flagsMapped) == 1:
             dlg = wx.FileDialog(None, self.title, '', "", self.wildcard, flagsMapped[0])
@@ -295,7 +295,7 @@ class MPMenuChildMessageDialog(object):
         self.message = message
         self.font_size = font_size
 
-    def show(self):        
+    def show(self):
         import multiprocessing
         t = multiprocessing.Process(target=self.call)
         t.start()
@@ -323,7 +323,7 @@ class MPMenuOpenWeblink(object):
         '''show the dialog as a child process'''
         import webbrowser
         webbrowser.open_new_tab(self.url)
-        
+
 if __name__ == '__main__':
     from MAVProxy.modules.lib.mp_image import MPImage
     import time

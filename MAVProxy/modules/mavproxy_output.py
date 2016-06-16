@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 '''enable run-time addition and removal of UDP clients , just like --out on the cnd line'''
-''' TO USE: 
+''' TO USE:
     output add 10.11.12.13:14550
     output list
     output remove 3      # to remove 3rd output
-'''    
+'''
 
 from pymavlink import mavutil
 
@@ -108,7 +108,7 @@ class OutputModule(mp_module.MPModule):
             m.source_system = self.settings.source_system
             m.mav.srcSystem = m.source_system
             m.mav.srcComponent = self.settings.source_component
-        
+
 def init(mpstate):
     '''initialise module'''
     return OutputModule(mpstate)

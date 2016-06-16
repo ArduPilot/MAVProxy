@@ -83,7 +83,7 @@ def display_waypoints(wploader, map):
                 #label already printed for this wp?
                 if (next_list[j] not in labeled_wps):
                     map.add_object(mp_slipmap.SlipLabel(
-                        'miss_cmd %u/%u' % (i,j), polygons[i][j], str(next_list[j]), 'Mission', colour=(0,255,255)))  
+                        'miss_cmd %u/%u' % (i,j), polygons[i][j], str(next_list[j]), 'Mission', colour=(0,255,255)))
                     labeled_wps[next_list[j]] = (i,j)
 
 colour_expression_exceptions = dict()
@@ -200,7 +200,7 @@ def mavflightview_mav(mlog, options=None, title=None):
             break
 
         type = m.get_type()
-        
+
         if type == 'MISSION_ITEM':
             try:
                 while m.seq > wp.count():
@@ -249,7 +249,7 @@ def mavflightview_mav(mlog, options=None, title=None):
                 if lng is None:
                     print("Can't find longitude on GPS message")
                     print(m)
-                    break                    
+                    break
         elif type in ['EKF1', 'ANU1']:
             pos = mavextra.ekf1_pos(m)
             if pos is None:
@@ -257,7 +257,7 @@ def mavflightview_mav(mlog, options=None, title=None):
             ekf_counter += 1
             if ekf_counter % options.ekf_sample != 0:
                 continue
-            (lat, lng) = pos            
+            (lat, lng) = pos
         elif type in ['NKF1']:
             pos = mavextra.ekf1_pos(m)
             if pos is None:
@@ -410,7 +410,7 @@ if __name__ == "__main__":
     parser.add_option("--nkf-sample", type='int', default=1, help="sub-sampling of NKF messages")
     parser.add_option("--rate", type='int', default=0, help="maximum message rate to display (0 means all points)")
     parser.add_option("--colour-source", type="str", default="flightmode", help="expression with range 0f..255f used for point colour")
-    
+
     (opts, args) = parser.parse_args()
 
     if len(args) < 1:

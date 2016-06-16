@@ -26,7 +26,7 @@ class SmartCameraVideo:
         # get image center
         self.img_center_x = self.img_width / 2
         self.img_center_y = self.img_height / 2
-        
+
         # define field of view
         self.cam_hfov = sc_config.config.get_float('camera','horizontal-fov',70.42)
         self.cam_vfov = sc_config.config.get_float('camera','vertical-fov',43.3)
@@ -45,7 +45,7 @@ class SmartCameraVideo:
     def __str__(self):
         return "SmartCameraVideo Object W:%d H:%d" % (self.img_width, self.img_height)
 
-    # get_camera - initialises camera and returns VideoCapture object 
+    # get_camera - initialises camera and returns VideoCapture object
     def get_camera(self):
         # setup video capture
         self.camera = cv2.VideoCapture(0)
@@ -65,24 +65,24 @@ class SmartCameraVideo:
         # Note: setting ex to -1 will display pop-up requesting user choose the encoder
         ex = int(cv2.cv.CV_FOURCC('M','J','P','G'))
         self.video_writer = cv2.VideoWriter(self.video_filename, ex, 25, (self.img_width,self.img_height))
-    
+
         return self.video_writer
 
-    # pixels_to_angle_x - converts a number of pixels into an angle in radians 
+    # pixels_to_angle_x - converts a number of pixels into an angle in radians
     def pixels_to_angle_x(self, num_pixels):
         return num_pixels * math.radians(self.cam_hfov) / self.img_width
-    
-    # pixels_to_angle_y - converts a number of pixels into an angle in radians 
+
+    # pixels_to_angle_y - converts a number of pixels into an angle in radians
     def pixels_to_angle_y(self, num_pixels):
         return num_pixels * math.radians(self.cam_vfov) / self.img_height
-    
+
     # angle_to_pixels_x - converts a horizontal angle (i.e. yaw) to a number of pixels
     #    angle : angle in radians
     def angle_to_pixels_x(self, angle):
         return int(angle * self.img_width / math.radians(self.cam_hfov))
-    
+
     # angle_to_pixels_y - converts a vertical angle (i.e. pitch) to a number of pixels
-    #    angle : angle in radians 
+    #    angle : angle in radians
     def angle_to_pixels_y(self, angle):
         return int(angle * self.img_height / math.radians(self.cam_vfov))
 
@@ -167,19 +167,19 @@ class SmartCameraVideo:
         while True:
             # send request to image capture for image
             img = self.get_image()
-    
+
             # check image is valid
             if not img is None:
                 # display image
                 cv2.imshow ('image_display', img)
             else:
                 print "no image"
-    
+
             # check for ESC key being pressed
             k = cv2.waitKey(5) & 0xFF
             if k == 27:
                 break
-    
+
             # take a rest for a bit
             time.sleep(0.1)
 

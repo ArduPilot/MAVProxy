@@ -52,7 +52,7 @@ class ModeModule(mp_module.MPModule):
         if len(args) != 1 and len(args) != 3:
             print("Usage: guided ALTITUDE | guided LAT LON ALTITUDE")
             return
-        
+
         if len(args) == 3:
             latitude = float(args[0])
             longitude = float(args[1])
@@ -66,9 +66,9 @@ class ModeModule(mp_module.MPModule):
                 return
             if latlon is None:
                 print("No map click position available")
-                return        
+                return
             altitude = int(args[0])
-            
+
         print("Guided %s %d" % (str(latlon), altitude))
         self.master.mav.mission_item_send (self.settings.target_system,
                                            self.settings.target_component,

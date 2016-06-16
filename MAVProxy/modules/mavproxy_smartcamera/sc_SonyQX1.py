@@ -84,17 +84,17 @@ class SmartCamera_SonyQX():
         # record instance
         self.u8Instance = u8Instance
         self.sConfigGroup = "Camera%d" % self.u8Instance
-        
+
         # background image processing variables
         self.u32ImgCounter = 0              # num images requested so far
 
         # latest image captured
         self.sLatestImageURL = None         # String with the URL to the latest image
-        
+
         # latest image downloaded
         self.sLatestImageFilename = None    #String with the Filename for the last downloaded image
         self.sLatestFileName = None         #String with the camera file name for the last image taken
-        
+
         self.vehicleLat = 0.0              # Current Vehicle Latitude
         self.vehicleLon = 0.0              # Current Vehicle Longitude
         self.vehicleHdg = 0.0              # Current Vehicle Heading
@@ -146,7 +146,7 @@ class SmartCamera_SonyQX():
         print("Setting up Camera Initial Parameters")
         # Check if we need to do 'startRecMode'
         APIList = self.__sSimpleCall("getAvailableApiList")
-            
+
         # For those cameras which need it
         if 'startRecMode' in (APIList['result'])[0]:
             print("Need to send startRecMode, sending and waiting 5 sec...")
@@ -170,7 +170,7 @@ class SmartCamera_SonyQX():
 
         sResponse = self.__sSimpleCall("getPostviewImageSize")
         print("%s" % sResponse)
-        
+
         # Set Mode to Shutter Priority if available
         SupportedModes = self.__sSimpleCall("getSupportedExposureMode")
         if 'Shutter' in (SupportedModes['result'])[0]:
@@ -179,10 +179,10 @@ class SmartCamera_SonyQX():
         #    self.boSetExposureMode("Manual")
         else:
             print("Error no Shutter Priority Mode")
-                
+
         # Set Target Shutter Speed
         self.boSetShutterSpeed(targetShutterSpeed)
-            
+
         # Set Target ISO Value
         self.boSetISO(targetISOValue)
 
@@ -206,7 +206,7 @@ class SmartCamera_SonyQX():
     def boSet_GPS(self, mGPSMessage):
         if mGPSMessage.get_type() == 'GLOBAL_POSITION_INT':
             (self.vehicleLat, self.vehicleLon, self.vehicleHdg, self.vehicleAMSL) = (mGPSMessage.lat*1.0e-7, mGPSMessage.lon*1.0e-7, mGPSMessage.hdg*0.01, mGPSMessage.alt*0.001)
-        
+
 #****************************************************************************
 #   Method Name     : boSet_Attitude
 #
@@ -220,7 +220,7 @@ class SmartCamera_SonyQX():
 #   Author           : Jaime Machuca
 #
 #****************************************************************************
-    
+
     def boSet_Attitude(self, mAttitudeMessage):
         if mAttitudeMessage.get_type() == 'ATTITUDE':
             (self.vehicleRoll, self.vehiclePitch) = (math.degrees(mAttitudeMessage.roll), math.degrees(mAttitudeMessage.pitch))
@@ -264,7 +264,7 @@ class SmartCamera_SonyQX():
         if (yaw < 0):
             return yaw+360
         return yaw
-    
+
 #****************************************************************************
 #   Method Name     : __writeGeoRefToFile
 #
@@ -278,10 +278,10 @@ class SmartCamera_SonyQX():
 #   Author           : Jaime Machuca
 #
 #****************************************************************************
-    
+
     def __writeGeoRefToFile(self, sImageFileName1):
         self.__geoRef_write(sImageFileName1)
-    
+
 #****************************************************************************
 #   Method Name     : __openGeoTagLogFile
 #
@@ -302,12 +302,12 @@ class SmartCamera_SonyQX():
         while os.path.exists('/sdcard/log/geoRef%s.log' % i):
             print('checking /sdcard/log/geoRef%s.log' % i)
             i += 1
-        
+
         self.geoRef_writer = open('/sdcard/log/geoRef%s.log' % i, 'w', 0)
         self.geoRef_writer.write('Filename, Latitude, Longitude, Alt (AMSL), Roll, Pitch, Yaw\n')
-        
+
         print('Opened GeoTag Log File with Filename: geoRef%s.log' % i)
-    
+
 #****************************************************************************
 #   Method Name     : __sFindInterfaceIPAddress
 #
@@ -351,7 +351,7 @@ class SmartCamera_SonyQX():
                                   data=sData,
                                   headers=adictHeaders).json()
         return sResponse
-    
+
 #****************************************************************************
 #   Method Name     : __sSimpleCall
 #
@@ -401,10 +401,10 @@ class SmartCamera_SonyQX():
         if len(sRet) == 0:
             return None
         sDMS_URL = sRet[0].location
-        
+
         print("Fetching DMS from %s" % sDMS_URL)
         xmlReq = requests.request('GET', sDMS_URL)
-        
+
         xmlTree = ET.ElementTree(file=StringIO.StringIO(xmlReq.content))
         for xmlElem in xmlTree.iter():
             if xmlElem.tag == '{urn:schemas-sony-com:av}X_ScalarWebAPI_ActionList_URL':
@@ -432,7 +432,7 @@ class SmartCamera_SonyQX():
         print ("Checking URL at %s" % self.sCameraURL)
         if self.sCameraURL is None:
             return False
-        
+
         return True
 
 #****************************************************************************
@@ -476,7 +476,7 @@ class SmartCamera_SonyQX():
 
     def sGetLatestImageFilename(self):
         return self.sLatestImageFilename
-    
+
 #****************************************************************************
 #   Method Name     : u32GetImageCounter
 #
@@ -511,12 +511,12 @@ class SmartCamera_SonyQX():
 
         # Send command to set Exposure Mode
         sResponse = self.__sSimpleCall("actZoom", adictParams=["in","1shot"])
-        
+
         # Check response for a successful result
         if 'result' in sResponse:
             print ("Zoomed in")
             return True
-        
+
         # In case of an error, return false
         print ("Failed to Zoom")
         return False
@@ -536,10 +536,10 @@ class SmartCamera_SonyQX():
 #****************************************************************************
 
     def boZoomOut(self):
-        
+
         # Send command to set Exposure Mode
         sResponse = self.__sSimpleCall("actZoom", adictParams=["out","1shot"])
-        
+
         # Check response for a successful result
         if 'result' in sResponse:
             print ("Zoomed out")
@@ -567,19 +567,19 @@ class SmartCamera_SonyQX():
     def boSetExposureMode(self,sExposureMode):
         # Send command to set Exposure Mode
         sResponse = self.__sSimpleCall("setExposureMode", adictParams=[sExposureMode])
-        
+
         # Check response for a successful result
         if 'result' in sResponse:
             time.sleep(0.25)
             sResponse = self.__sSimpleCall("getExposureMode")
-            
+
             if sExposureMode not in sResponse["result"]:
                 print ("Failed to set Exposure Mode, current value: %s" %sResponse["result"])
                 return False
-            
+
             print ("Exposure Mode set to %s" % sExposureMode)
             return True
-        
+
         # In case of an error, return false
         print ("Failed to set Exposure Mode")
         return False
@@ -606,19 +606,19 @@ class SmartCamera_SonyQX():
 
         # Send command to set Exposure Mode
         sResponse = self.__sSimpleCall("setShutterSpeed", adictParams=[sShutterSpeed])
-            
+
         # Check response for a successful result
         if 'result' in sResponse:
             time.sleep(0.25)
             sResponse = self.__sSimpleCall("getShutterSpeed")
-            
+
             if sShutterSpeed not in sResponse["result"]:
                 print ("Failed to set Shutter Speed, current value: %s" %sResponse["result"])
                 return False
 
             print ("Shutter Speed set to %s" % sShutterSpeed)
             return True
-        
+
         # In case of an error, return false
         print ("Failed to set Shutter Speed")
         return False
@@ -645,19 +645,19 @@ class SmartCamera_SonyQX():
 
         # Send command to set Exposure Mode
         sResponse = self.__sSimpleCall("setFNumber", adictParams=[sFValue])
-        
+
         # Check response for a successful result
         if 'result' in sResponse:
             time.sleep(0.25)
             sResponse = self.__sSimpleCall("getFNumber")
-            
+
             if sFValue not in sResponse["result"]:
                 print ("Failed to set aperture, current value: %s" %sResponse["result"])
                 return False
-            
+
             print ("Aperture set to %s" % sFValue)
             return True
-            
+
         # In case of an error, return false
         print ("Failed to set aperture")
         return False
@@ -680,10 +680,10 @@ class SmartCamera_SonyQX():
     def boSetISO(self,u16ISO):
         # Create ISO String
         sISO = str(u16ISO)
-        
+
         # Send command to set Exposure Mode
         sResponse = self.__sSimpleCall("setIsoSpeedRate", adictParams=[sISO])
-       
+
         # Check response for a successful result
         if 'result' in sResponse:
             sResponse = self.__sSimpleCall("getIsoSpeedRate")
@@ -691,10 +691,10 @@ class SmartCamera_SonyQX():
             if sISO not in sResponse["result"]:
                 print ("Failed to Set ISO, current value: %s" %sResponse["result"])
                 return False
-            
+
             print ("ISO set to %s" % sISO)
             return True
-        
+
         # In case of an error, return false
         print ("Failed to Set ISO")
         return False
@@ -778,12 +778,12 @@ class SmartCamera_SonyQX():
                 cv2.imshow ('image_display', self.get_latest_image())
             else:
                 print "no image"
-    
+
             # check for ESC key being pressed
             k = cv2.waitKey(5) & 0xFF
             if k == 27:
                 break
-    
+
             # take a rest for a bit
             time.sleep(0.01)
 

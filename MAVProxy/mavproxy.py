@@ -194,7 +194,7 @@ class MPState(object):
         if name in self.public_modules:
             return self.public_modules[name]
         return None
-    
+
     def master(self):
         '''return the currently chosen mavlink master object'''
         if len(self.mav_master) == 0:
@@ -330,7 +330,7 @@ def cmd_module(args):
                 reload(pmodule)
             except ImportError:
                 clear_zipimport_cache()
-                reload(pmodule)                
+                reload(pmodule)
             if load_module(modname, quiet=True):
                 print("Reloaded module %s" % modname)
     elif args[0] == "unload":
@@ -380,7 +380,7 @@ def clear_zipimport_cache():
     import sys, zipimport
     syspath_backup = list(sys.path)
     zipimport._zip_directory_cache.clear()
- 
+
     # load back items onto sys.path
     sys.path = syspath_backup
     # add this too: see https://mail.python.org/pipermail/python-list/2005-May/353229.html
@@ -398,7 +398,7 @@ def import_package(name):
     except ImportError:
         clear_zipimport_cache()
         mod = __import__(name)
-        
+
     components = name.split('.')
     for comp in components[1:]:
         mod = getattr(mod, comp)
@@ -433,7 +433,7 @@ def process_stdin(line):
     if mpstate.functions.input_handler is not None:
           mpstate.functions.input_handler(line)
           return
-    
+
     line = line.strip()
 
     if mpstate.status.setup_mode:
@@ -459,7 +459,7 @@ def process_stdin(line):
         line = mpstate.aliases[cmd]
         args = shlex.split(line) + args[1:]
         cmd = args[0]
-        
+
     if cmd == 'help':
         k = command_map.keys()
         k.sort()
@@ -618,10 +618,10 @@ def log_paths():
         dir_path = os.path.dirname(opts.logfile)
         if not os.path.isabs(dir_path) and mpstate.settings.state_basedir is not None:
             dir_path = os.path.join(mpstate.settings.state_basedir,dir_path)
-            
+
         if(opts.daemon):
             logdir = '/var/log'
-        else:        
+        else:
             logdir = dir_path
 
     mkdir_p(logdir)
@@ -636,7 +636,7 @@ def open_telemetry_logs(logpath_telem, logpath_telem_raw):
         mode = 'a'
     else:
         mode = 'w'
-    
+
     try:
         mpstate.logfile = open(logpath_telem, mode=mode)
         mpstate.logfile_raw = open(logpath_telem_raw, mode=mode)
@@ -649,7 +649,7 @@ def open_telemetry_logs(logpath_telem, logpath_telem_raw):
             print("ERROR: Not enough free disk space for logfile")
             mpstate.status.exit = True
             return
-                
+
         # use a separate thread for writing to the logfile to prevent
         # delays during disk writes (important as delays can be long if camera
         # app is running)
@@ -756,7 +756,7 @@ def main_loop():
             mpstate.input_count += 1
             cmds = line.split(';')
             if len(cmds) == 1 and cmds[0] == "":
-                  mpstate.empty_input_count += 1                 
+                  mpstate.empty_input_count += 1
             for c in cmds:
                 process_stdin(c)
 
@@ -940,7 +940,7 @@ if __name__ == '__main__':
         print "MAVProxy is a modular ground station using the mavlink protocol"
         print "MAVProxy Version: " + version
         sys.exit(1)
-    
+
     # global mavproxy state
     mpstate = MPState()
     mpstate.status.exit = False
@@ -1122,5 +1122,5 @@ if __name__ == '__main__':
         if hasattr(m, 'unload'):
             print("Unloading module %s" % m.name)
             m.unload()
-        
+
     sys.exit(1)

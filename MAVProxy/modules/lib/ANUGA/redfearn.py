@@ -17,15 +17,15 @@ from geo_reference import Geo_reference, DEFAULT_ZONE
 
 def degminsec2decimal_degrees(dd,mm,ss):
     assert abs(mm) == mm
-    assert abs(ss) == ss    
+    assert abs(ss) == ss
 
     if dd < 0:
         sign = -1
     else:
         sign = 1
-    
-    return sign * (abs(dd) + mm/60. + ss/3600.)      
-    
+
+    return sign * (abs(dd) + mm/60. + ss/3600.)
+
 def decimal_degrees2degminsec(dec):
 
     if dec < 0:
@@ -33,13 +33,13 @@ def decimal_degrees2degminsec(dec):
     else:
         sign = 1
 
-    dec = abs(dec)    
+    dec = abs(dec)
     dd = int(dec)
     f = dec-dd
 
     mm = int(f*60)
     ss = (f*60-mm)*60
-    
+
     return sign*dd, mm, ss
 
 def redfearn(lat, lon, false_easting=None, false_northing=None,
@@ -62,20 +62,20 @@ def redfearn(lat, lon, false_easting=None, false_northing=None,
 
 
     from math import pi, sqrt, sin, cos, tan
-    
+
 
 
     #GDA Specifications
     a = 6378137.0                       #Semi major axis
     inverse_flattening = 298.257222101  #1/f
     if scale_factor is None:
-        K0 = 0.9996                         #Central scale factor    
+        K0 = 0.9996                         #Central scale factor
     else:
         K0 = scale_factor
     #print 'scale', K0
     zone_width = 6                      #Degrees
 
-    longitude_of_central_meridian_zone0 = -183    
+    longitude_of_central_meridian_zone0 = -183
     longitude_of_western_edge_zone0 = -186
 
     if false_easting is None:
@@ -86,8 +86,8 @@ def redfearn(lat, lon, false_easting=None, false_northing=None,
             false_northing = 10000000  #Southern hemisphere
         else:
             false_northing = 0         #Northern hemisphere)
-        
-    
+
+
     #Derived constants
     f = 1.0/inverse_flattening
     b = a*(1-f)       #Semi minor axis
@@ -110,7 +110,7 @@ def redfearn(lat, lon, false_easting=None, false_northing=None,
 
     phi = lat*pi/180     #Convert latitude to radians
 
-    sinphi = sin(phi)   
+    sinphi = sin(phi)
     sin2phi = sin(2*phi)
     sin4phi = sin(4*phi)
     sin6phi = sin(6*phi)
@@ -119,16 +119,16 @@ def redfearn(lat, lon, false_easting=None, false_northing=None,
     cosphi2 = cosphi*cosphi
     cosphi3 = cosphi*cosphi2
     cosphi4 = cosphi2*cosphi2
-    cosphi5 = cosphi*cosphi4    
+    cosphi5 = cosphi*cosphi4
     cosphi6 = cosphi2*cosphi4
     cosphi7 = cosphi*cosphi6
-    cosphi8 = cosphi4*cosphi4        
+    cosphi8 = cosphi4*cosphi4
 
     t = tan(phi)
     t2 = t*t
     t4 = t2*t2
     t6 = t2*t4
-    
+
     #Radius of Curvature
     rho = a*(1-e2)/(1-e2*sinphi*sinphi)**1.5
     nu = a/(1-e2*sinphi*sinphi)**0.5
@@ -145,7 +145,7 @@ def redfearn(lat, lon, false_easting=None, false_northing=None,
     A2 = 3.0/8*(e2+e4/4+15*e6/128)
     A4 = 15.0/256*(e4+3*e6/4)
     A6 = 35*e6/3072
-    
+
     term1 = a*A0*phi
     term2 = -a*A2*sin2phi
     term3 = a*A4*sin4phi
@@ -156,7 +156,7 @@ def redfearn(lat, lon, false_easting=None, false_northing=None,
     if zone is not None and central_meridian is not None:
         msg = 'You specified both zone and central_meridian. Provide only one of them'
         raise Exception, msg
-    
+
     # Zone
     if zone is None:
         zone = int((lon - longitude_of_western_edge_zone0)/zone_width)
@@ -175,9 +175,9 @@ def redfearn(lat, lon, false_easting=None, false_northing=None,
     omega6 = omega3*omega3
     omega7 = omega*omega6
     omega8 = omega4*omega4
-     
+
     #Northing
-    term1 = nu*sinphi*cosphi*omega2/2  
+    term1 = nu*sinphi*cosphi*omega2/2
     term2 = nu*sinphi*cosphi3*(4*psi2+psi-t2)*omega4/24
     term3 = nu*sinphi*cosphi5*\
             (8*psi4*(11-24*t2)-28*psi3*(1-6*t2)+\
@@ -191,7 +191,7 @@ def redfearn(lat, lon, false_easting=None, false_northing=None,
     term3 = nu*cosphi5*(4*psi3*(1-6*t2)+psi2*(1+8*t2)-2*psi*t2+t4)*omega5/120
     term4 = nu*cosphi7*(61-479*t2+179*t4-t6)*omega7/5040
     easting = false_easting + K0*(term1 + term2 + term3 + term4)
-    
+
     return zone, easting, northing
 
 
@@ -208,7 +208,7 @@ def convert_from_latlon_to_utm(points=None,
 
     points: list of points given in decimal degrees (latitude, longitude) or
     latitudes: list of latitudes   and
-    longitudes: list of longitudes 
+    longitudes: list of longitudes
     false_easting (optional)
     false_northing (optional)
 
@@ -221,23 +221,23 @@ def convert_from_latlon_to_utm(points=None,
     Notes
 
     Assume the false_easting and false_northing are the same for each list.
-    If points end up in different UTM zones, an ANUGAerror is thrown.    
+    If points end up in different UTM zones, an ANUGAerror is thrown.
     """
 
-    old_geo = Geo_reference()    
+    old_geo = Geo_reference()
     utm_points = []
     if points == None:
         assert len(latitudes) == len(longitudes)
         points =  map(None, latitudes, longitudes)
-        
+
     for point in points:
-        
+
         zone, easting, northing = redfearn(float(point[0]),
                                            float(point[1]),
                                            false_easting=false_easting,
                                            false_northing=false_northing)
         new_geo = Geo_reference(zone)
-        old_geo.reconcile_zones(new_geo)        
+        old_geo.reconcile_zones(new_geo)
         utm_points.append([easting, northing])
 
     return utm_points, old_geo.get_zone()

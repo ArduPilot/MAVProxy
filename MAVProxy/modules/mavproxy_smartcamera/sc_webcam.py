@@ -22,7 +22,7 @@ class SmartCameraWebCam:
         self.healthy = False;
 
         # record instance
-        self.instance = instance        
+        self.instance = instance
         self.config_group = "camera%d" % self.instance
 
         # get image resolution
@@ -46,7 +46,7 @@ class SmartCameraWebCam:
     def __str__(self):
         return "SmartCameraWebCam Object W:%d H:%d" % (self.img_width, self.img_height)
 
-    # latest_image - returns latest image captured 
+    # latest_image - returns latest image captured
     def get_latest_image(self):
         # write to file
         #imgfilename = "C:\Users\rmackay9\Documents\GitHub\ardupilot-balloon-finder\smart_camera\img%d-%d.jpg" % (cam_num,cam.get_image_counter())
@@ -55,12 +55,12 @@ class SmartCameraWebCam:
         cv2.imwrite(imgfilename, self.latest_image)
         return self.latest_image
 
-    # get_image_counter - returns number of images captured since startup 
+    # get_image_counter - returns number of images captured since startup
     def get_image_counter(self):
         return self.img_counter
 
     # take_picture - take a picture
-    #   returns True on success 
+    #   returns True on success
     def take_picture(self):
         # setup video capture
         print("Taking Picture")
@@ -97,12 +97,12 @@ class SmartCameraWebCam:
                 cv2.imshow ('image_display', self.get_latest_image())
             else:
                 print "no image"
-    
+
             # check for ESC key being pressed
             k = cv2.waitKey(5) & 0xFF
             if k == 27:
                 break
-    
+
             # take a rest for a bit
             time.sleep(0.01)
 

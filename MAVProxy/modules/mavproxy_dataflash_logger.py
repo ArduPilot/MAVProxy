@@ -234,7 +234,7 @@ class dataflash_logger(mp_module.MPModule):
 
         if self.log_settings.verbose:
             print("DFLogger: Sending start packet")
-       
+
         target_sys = self.log_settings.df_target_system
         target_comp = self.log_settings.df_target_component
         self.master.mav.remote_log_block_status_send(target_sys,
@@ -267,23 +267,23 @@ class dataflash_logger(mp_module.MPModule):
                     print("DFLogger: Received data packet - starting new log")
                 self.start_new_log()
                 self.sender = (m.get_srcSystem(), m.get_srcComponent())
-    
+
             if self.sender is None:
                 # No connection at the moment, and this packet did not start one
                 return
-    
+
             if self.stopped:
                 # send a stop packet every second until the other end gets the idea:
                 self.tell_sender_to_stop(m)
                 return
-    
+
             if self.sender is not None:
                 size = len(m.data)
                 data = ''.join(str(chr(x)) for x in m.data[:size])
                 ofs = size*(m.seqno)
                 self.logfile.seek(ofs)
                 self.logfile.write(data)
-    
+
                 if m.seqno in self.missing_blocks:
                     if self.log_settings.verbose:
                         print("DFLogger: Received missing block: %d" % (m.seqno,))

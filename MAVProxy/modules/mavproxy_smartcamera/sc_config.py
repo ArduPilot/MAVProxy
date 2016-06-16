@@ -33,7 +33,7 @@ class SmartCameraConfig(object):
         except IOError as e:
             print 'Error {0} reading config file: {1}: '.format(e.errno, e.strerror)
         return
-    
+
     # save - saves the config to disk
     def save(self):
         try:
@@ -52,13 +52,13 @@ class SmartCameraConfig(object):
     # get_boolean - returns the boolean found in the specified section/option or the default if not found
     def get_boolean(self, section, option, default):
         try:
-            return self.parser.getboolean(section, option) 
+            return self.parser.getboolean(section, option)
         except ConfigParser.Error:
             return default
 
     # set_boolean - sets the boolean to the specified section/option
     def set_boolean(self, section, option, new_value):
-        self.check_section(section) 
+        self.check_section(section)
         self.parser.set(section, option, str(bool(new_value)))
         return
 

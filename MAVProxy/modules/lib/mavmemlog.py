@@ -14,7 +14,7 @@ class mavmemlog(mavutil.mavfile):
         last_flightmode = None
         last_timestamp = None
         last_pct = 0
-        
+
         while True:
             m = mav.recv_msg()
             if m is None:
@@ -35,7 +35,7 @@ class mavmemlog(mavutil.mavfile):
         if last_timestamp is not None and len(self._flightmodes) > 0:
             (mode, t1, t2) = self._flightmodes[-1]
             self._flightmodes[-1] = (mode, t1, last_timestamp)
-        
+
 
     def recv_msg(self):
         '''message receive routine'''

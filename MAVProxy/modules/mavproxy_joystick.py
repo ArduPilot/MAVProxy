@@ -36,7 +36,7 @@ joymap = {
     # Same as above but is reporting a different name
     # http://www.hobbyking.com/hobbyking/store/__13597__USB_Simulator_Cable_XTR_AeroFly_FMS.html
     # has 4 usable axes. The last 4 are binary switches and not PWM outputs.
-    # Axis, Scaling Number, 
+    # Axis, Scaling Number,
     [(0, 500, 1500),
      (3, 500, 1500),
      (1, 500, 1500),

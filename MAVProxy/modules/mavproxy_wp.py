@@ -365,7 +365,7 @@ class WPModule(mp_module.MPModule):
                 d2 = mp_util.gps_distance(lat, lon, newlat, newlon)
                 b2 = mp_util.gps_bearing(lat, lon, newlat, newlon)
                 (newlat, newlon) = mp_util.gps_newpos(lat, lon, b2+rotation, d2)
-                
+
             if getattr(self.console, 'ElevationMap', None) is not None and wp.frame != mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT:
                 alt1 = self.console.ElevationMap.GetElevation(newlat, newlon)
                 alt2 = self.console.ElevationMap.GetElevation(wp.x, wp.y)
@@ -376,7 +376,7 @@ class WPModule(mp_module.MPModule):
             wp.target_system    = self.target_system
             wp.target_component = self.target_component
             self.wploader.set(wp, wpnum)
-            
+
         self.loading_waypoints = True
         self.loading_waypoint_lasttime = time.time()
         self.master.mav.mission_write_partial_list_send(self.target_system,
@@ -454,7 +454,7 @@ class WPModule(mp_module.MPModule):
         wp.param2 = param[1]
         wp.param3 = param[2]
         wp.param4 = param[3]
-        
+
         wp.target_system    = self.target_system
         wp.target_component = self.target_component
         self.loading_waypoints = True

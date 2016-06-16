@@ -25,7 +25,7 @@ ME_P1_COL = 1
 ME_P2_COL = 2
 ME_P3_COL = 3
 ME_P4_COL = 4
-ME_LAT_COL = 5 
+ME_LAT_COL = 5
 ME_LON_COL = 6
 ME_ALT_COL = 7
 ME_FRAME_COL = 8
@@ -228,7 +228,7 @@ class MissionEditorFrame(wx.Frame):
             if event.get_type() == me_event.MEGE_CLEAR_MISS_TABLE:
                 self.grid_mission.ClearGrid()
                 if (self.grid_mission.GetNumberRows() > 0):
-                    self.grid_mission.DeleteRows(0, 
+                    self.grid_mission.DeleteRows(0,
                             self.grid_mission.GetNumberRows())
                 self.grid_mission.SetDefaultColSize(50, True)
                 self.grid_mission.SetColSize(ME_COMMAND_COL, 150)
@@ -260,29 +260,29 @@ class MissionEditorFrame(wx.Frame):
 
                 else: #not the first mission item
                     if (me_defines.miss_cmds.has_key(command)):
-                        self.grid_mission.SetCellValue(row, ME_COMMAND_COL, 
+                        self.grid_mission.SetCellValue(row, ME_COMMAND_COL,
                                 me_defines.miss_cmds[command])
                     else:
                         self.grid_mission.SetCellValue(row, ME_COMMAND_COL,
                                 str(command))
 
-                    self.grid_mission.SetCellValue(row, ME_P1_COL, 
+                    self.grid_mission.SetCellValue(row, ME_P1_COL,
                             str(event.get_arg("param1")))
-                    self.grid_mission.SetCellValue(row, ME_P2_COL, 
+                    self.grid_mission.SetCellValue(row, ME_P2_COL,
                             str(event.get_arg("param2")))
-                    self.grid_mission.SetCellValue(row, ME_P3_COL, 
+                    self.grid_mission.SetCellValue(row, ME_P3_COL,
                             str(event.get_arg("param3")))
-                    self.grid_mission.SetCellValue(row, ME_P4_COL, 
+                    self.grid_mission.SetCellValue(row, ME_P4_COL,
                             str(event.get_arg("param4")))
-                    self.grid_mission.SetCellValue(row, ME_LAT_COL, 
+                    self.grid_mission.SetCellValue(row, ME_LAT_COL,
                             str(event.get_arg("lat")))
-                    self.grid_mission.SetCellValue(row, ME_LON_COL, 
+                    self.grid_mission.SetCellValue(row, ME_LON_COL,
                             str(event.get_arg("lon")))
-                    self.grid_mission.SetCellValue(row, ME_ALT_COL, 
+                    self.grid_mission.SetCellValue(row, ME_ALT_COL,
                             "%.2f" % event.get_arg("alt"))
 
-                    frame_num = event.get_arg("frame") 
-                    if (me_defines.frame_enum.has_key(frame_num)): 
+                    frame_num = event.get_arg("frame")
+                    if (me_defines.frame_enum.has_key(frame_num)):
                         self.grid_mission.SetCellValue(row, ME_FRAME_COL,
                             me_defines.frame_enum[frame_num])
                     else:
@@ -293,7 +293,7 @@ class MissionEditorFrame(wx.Frame):
                 self.text_ctrl_wp_radius.SetValue(str(event.get_arg("wp_rad")))
                 self.text_ctrl_wp_radius.SetForegroundColour(wx.Colour(0, 0, 0))
             elif event.get_type() == me_event.MEGE_SET_LOIT_RAD:
-                loiter_radius = event.get_arg("loit_rad")    
+                loiter_radius = event.get_arg("loit_rad")
                 self.text_ctrl_loiter_radius.SetValue(
                         str(math.fabs(loiter_radius)))
                 self.text_ctrl_loiter_radius.SetForegroundColour(wx.Colour(0, 0, 0))
@@ -306,19 +306,19 @@ class MissionEditorFrame(wx.Frame):
                     event.get_arg("def_wp_alt")))
                 self.text_ctrl_wp_default_alt.SetForegroundColour(wx.Colour(0, 0, 0))
             elif event.get_type() == me_event.MEGE_SET_LAST_MAP_CLICK_POS:
-                self.last_map_click_pos = event.get_arg("click_pos") 
+                self.last_map_click_pos = event.get_arg("click_pos")
 
         self.gui_event_queue_lock.release()
-       
+
         if (event_processed == True):
             #redraw window to apply changes
             self.Refresh()
             self.Update()
-        
+
     def prep_new_row(self, row_num):
         command_choices = me_defines.miss_cmds.values()
         command_choices.sort()
-            
+
         cell_ed = wx.grid.GridCellChoiceEditor(command_choices)
         self.grid_mission.SetCellEditor(row_num, ME_COMMAND_COL, cell_ed)
         self.grid_mission.SetCellValue(row_num, ME_COMMAND_COL, "NAV_WAYPOINT")
@@ -327,7 +327,7 @@ class MissionEditorFrame(wx.Frame):
             self.grid_mission.SetCellValue(row_num, i, "0.0")
 
         #set altitude to default:
-        self.grid_mission.SetCellValue(row_num, ME_ALT_COL, 
+        self.grid_mission.SetCellValue(row_num, ME_ALT_COL,
                 self.text_ctrl_wp_default_alt.GetValue())
 
         #populate frm cell editor and set to default value
@@ -347,7 +347,7 @@ class MissionEditorFrame(wx.Frame):
         #this makes newest row always have the cursor in it,
         #making the "Add Below" button work like I want:
         self.grid_mission.SetGridCursor(row_num, ME_COMMAND_COL)
-        
+
     def prep_new_rows(self, start_row, num_rows):
         num_remaining = num_rows
         current_row = start_row
@@ -372,7 +372,7 @@ class MissionEditorFrame(wx.Frame):
         self.event_queue.put(MissionEditorEvent(me_event.MEE_GET_WP_RAD))
         self.event_queue.put(MissionEditorEvent(me_event.MEE_GET_LOIT_RAD))
         self.event_queue.put(MissionEditorEvent(me_event.MEE_GET_WP_DEFAULT_ALT))
-        
+
         self.event_queue_lock.release()
         event.Skip()
 
@@ -391,7 +391,7 @@ class MissionEditorFrame(wx.Frame):
         self.event_queue.put(MissionEditorEvent(me_event.MEE_WRITE_WP_NUM,
                                                 num=0,cmd_id=16,p1=0.0,p2=0.0,p3=0.0,p4=0.0,
                                                 lat=lat,lon=lon,alt=alt,frame=0))
-            
+
         for i in range(0, self.grid_mission.GetNumberRows()):
             cmd_id = me_defines.cmd_reverse_lookup(self.grid_mission.GetCellValue(i,0))
             #don't lock up the misseditor on missing input!
@@ -427,8 +427,8 @@ class MissionEditorFrame(wx.Frame):
             try:
                 frame = float(me_defines.frame_enum_rev[self.grid_mission.GetCellValue(i,ME_FRAME_COL)])
             except:
-                frame = 0.0                
-                
+                frame = 0.0
+
             self.event_queue.put(MissionEditorEvent(me_event.MEE_WRITE_WP_NUM,
                                                     num=i+1,cmd_id=cmd_id,p1=p1,p2=p2,p3=p3,p4=p4,
                                                     lat=lat,lon=lon,alt=alt,frame=frame))
@@ -444,21 +444,21 @@ class MissionEditorFrame(wx.Frame):
                 "*.wp|*", wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
         if (fd.ShowModal() == wx.ID_CANCEL):
             return #user changed their mind...
-       
+
         self.event_queue_lock.acquire()
         self.event_queue.put(MissionEditorEvent(me_event.MEE_LOAD_WP_FILE,
             path=fd.GetPath()))
         self.event_queue_lock.release()
-        
+
         self.last_mission_file_path = fd.GetPath()
-        
+
         event.Skip()
 
     def add_wp_below_pushed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
         row_selected = self.grid_mission.GetGridCursorRow()
         if (row_selected < 0):
             row_selected = self.grid_mission.GetNumberRows()-1
-        
+
         self.grid_mission.InsertRows(row_selected+1)
         self.prep_new_row(row_selected+1)
 
@@ -467,12 +467,12 @@ class MissionEditorFrame(wx.Frame):
             self.grid_mission.SetCellValue(row_selected + 1, ME_LAT_COL,
                     str(self.last_map_click_pos[0]))
             self.grid_mission.SetCellValue(row_selected + 1, ME_LON_COL,
-                    str(self.last_map_click_pos[1]))            
+                    str(self.last_map_click_pos[1]))
 
         #highlight new row
         self.grid_mission.SelectRow(row_selected+1)
         self.set_modified_state(True)
-        
+
         event.Skip()
 
     def save_wp_file_pushed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
@@ -487,7 +487,7 @@ class MissionEditorFrame(wx.Frame):
         self.event_queue.put(MissionEditorEvent(me_event.MEE_SAVE_WP_FILE,
             path=fd.GetPath()))
         self.event_queue_lock.release()
-        
+
         self.last_mission_file_path = fd.GetPath()
 
         event.Skip()
@@ -507,14 +507,14 @@ class MissionEditorFrame(wx.Frame):
             self.grid_mission.SetColLabelValue(col, col_labels[col])
 
         event.Skip()
-    
+
     def on_mission_grid_cell_left_click(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
         #delete column?
         if (event.GetCol() == ME_DELETE_COL):
             row = event.GetRow()
             dlg = wx.MessageDialog(self, 'Sure you want to delete item ' + str(row+1) + '?', 'Really Delete?', wx.YES_NO | wx.ICON_EXCLAMATION)
             result = dlg.ShowModal()
-            
+
             if (result == wx.ID_YES):
                 #delete this row
                 self.grid_mission.DeleteRows(row)
@@ -525,7 +525,7 @@ class MissionEditorFrame(wx.Frame):
             if (row == 0): #can't go any higher
                 return
             #insert a copy of this row above the previous row, then delete this row
-            self.grid_mission.InsertRows(row-1)     
+            self.grid_mission.InsertRows(row-1)
             self.prep_new_row(row-1)
             for i in range(0, self.grid_mission.GetNumberCols()):
                 self.grid_mission.SetCellValue(row-1, i,
@@ -536,7 +536,7 @@ class MissionEditorFrame(wx.Frame):
             self.grid_mission.SelectRow(row-1)
 
             self.set_modified_state(True)
-        
+
             #Return so we don't skip the event so the cursor will go where expected
             return
 
@@ -562,11 +562,11 @@ class MissionEditorFrame(wx.Frame):
 
             #Return so we don't skip the event so the cursor will go where expected
             return
-         
+
         event.Skip()
 
     def on_mission_grid_cell_changed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
-        self.set_modified_state(True) 
+        self.set_modified_state(True)
         event.Skip()
     def on_wp_radius_changed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
         #change text red
@@ -609,7 +609,7 @@ class MissionEditorFrame(wx.Frame):
         self.event_queue_lock.release()
 
     def on_loiter_rad_enter(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
-        self.send_loiter_rad_msg()        
+        self.send_loiter_rad_msg()
 
         event.Skip()
 

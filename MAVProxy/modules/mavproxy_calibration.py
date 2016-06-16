@@ -96,7 +96,7 @@ class CalibrationModule(mp_module.MPModule):
                     print("sending stop")
                     self.master.mav.command_ack_send(0, 1)
 
-    
+
     def cmd_compassmot(self, args):
         '''do a compass/motor interference calibration'''
         mav = self.master
@@ -156,7 +156,7 @@ class CalibrationModule(mp_module.MPModule):
                 0, # param5
                 0, # param6
                 0) # param7
-            
+
 def init(mpstate):
     '''initialise module'''
     return CalibrationModule(mpstate)

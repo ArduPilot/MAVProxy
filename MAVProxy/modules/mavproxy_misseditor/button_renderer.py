@@ -43,12 +43,12 @@ class ButtonRenderer(wx.grid.PyGridCellRenderer):
                 rect.GetRight()-strength, rect.GetBottom());
         dc.DrawLine(rect.GetLeft(), rect.GetBottom(),
                 rect.GetRight() - strength, rect.GetBottom());
- 
+
         '''
         #another drawing routine
         #(taken from src/generic/renderg.cpp)
         #Could port this later for animating the button when clicking
-        
+
   const wxCoord x = rect.x,
                 y = rect.y,
                 w = rect.width,
@@ -57,7 +57,7 @@ class ButtonRenderer(wx.grid.PyGridCellRenderer):
   dc.SetBrush(*wxTRANSPARENT_BRUSH);
 
   wxPen pen(*wxBLACK, 1);
- 
+
   dc.SetPen(pen);
   dc.DrawLine( x+w, y, x+w, y+h );            // right (outer)
   dc.DrawRectangle( x, y+h, w+1, 1 );         // bottom (outer)

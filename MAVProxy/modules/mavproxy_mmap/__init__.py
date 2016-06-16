@@ -23,11 +23,11 @@ class MMapModule(mp_module.MPModule):
         self.server = None
         self.server = mmap_server.start_server('127.0.0.1', port=9999, module_state=self)
         webbrowser.open('http://127.0.0.1:9999/', autoraise=True)
-    
+
     def unload(self):
         """unload module"""
         self.server.terminate()
-    
+
     def mavlink_packet(self, m):
         """handle an incoming mavlink packet"""
         if m.get_type() == 'GPS_RAW':

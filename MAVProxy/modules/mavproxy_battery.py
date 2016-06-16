@@ -23,7 +23,7 @@ class BatteryModule(mp_module.MPModule):
         self.high_servo_voltage = -1
         self.last_servo_warn_time = 0
         self.last_vcc_warn_time = 0
-        
+
         self.settings.append(
             MPSetting('battwarn', int, 1, 'Battery Warning Time', tab='Battery'))
         self.settings.append(
@@ -46,7 +46,7 @@ class BatteryModule(mp_module.MPModule):
     def battery_report(self):
         batt_mon = int(self.get_mav_param('BATT_MONITOR',0))
 
-        #report voltage level only 
+        #report voltage level only
         battery_string = ''
         if batt_mon == 3:
             battery_string = 'Batt: %.2fV' % (float(self.voltage_level) / 1000.0)
@@ -71,7 +71,7 @@ class BatteryModule(mp_module.MPModule):
         if self.settings.numcells != 0 and self.per_cell < self.settings.batwarncell and time.time() > self.last_battery_cell_announce_time + 60*self.settings.battwarn:
             self.say("Cell warning")
             self.last_battery_cell_announce_time = time.time()
-            
+
 
     def vcell_to_battery_percent(self, vcell):
         '''convert a cell voltage to an approximate
@@ -116,7 +116,7 @@ class BatteryModule(mp_module.MPModule):
             if now - self.last_vcc_warn_time > 30:
                 self.last_vcc_warn_time = now
                 self.say("Vcc %.1f" % Vcc)
-        
+
 
     def mavlink_packet(self, m):
         '''handle a mavlink packet'''
