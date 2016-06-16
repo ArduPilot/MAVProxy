@@ -21,7 +21,7 @@ class ChecklistModule(mp_module.MPModule):
             return
         if not self.checklist.is_alive():
             return
-        
+
         type = msg.get_type()
         master = self.master
 

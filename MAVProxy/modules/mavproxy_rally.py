@@ -83,10 +83,10 @@ class RallyModule(mp_module.MPModule):
 
         if len(args) < 3:
             flag = self.settings.rally_flags
-        else: 
+        else:
             flag = int(args[2])
             #currently only supporting autoland values:
-            #True (nonzero) and False (zero) 
+            #True (nonzero) and False (zero)
             if (flag != 0):
                 flag = 2
 
@@ -106,9 +106,9 @@ class RallyModule(mp_module.MPModule):
         if latlon is None:
             print("No map click position available")
             return
-        
+
         land_hdg = 0.0
-    
+
         self.rallyloader.create_and_append_rally_point(latlon[0] * 1e7, latlon[1] * 1e7, alt, break_alt, land_hdg, flag)
         self.send_rally_points()
         print("Added Rally point at %s %f %f, autoland: %s" % (str(latlon), alt, break_alt, bool(flag & 2)))
@@ -121,7 +121,7 @@ class RallyModule(mp_module.MPModule):
         if not self.have_list:
             print("Please list rally points first")
             return
-        
+
         idx = int(args[0])
         if idx <= 0 or idx > self.rallyloader.rally_count():
             print("Invalid rally point number %u" % idx)
@@ -311,7 +311,7 @@ class RallyModule(mp_module.MPModule):
         for i in range(self.rallyloader.rally_count()):
             p = self.rallyloader.rally_point(i)
             self.console.writeln("lat=%f lng=%f alt=%f break_alt=%f land_dir=%f autoland=%f" % (p.lat * 1e-7, p.lng * 1e-7, p.alt, p.break_alt, p.land_dir, int(p.flags & 2!=0) ))
-    
+
         if self.logdir != None:
             ral_file_path = os.path.join(self.logdir, 'ral.txt')
             self.rallyloader.save(ral_file_path)
@@ -319,7 +319,7 @@ class RallyModule(mp_module.MPModule):
 
     def print_usage(self):
         print("Usage: rally <list|load|land|save|add|remove|move|clear|alt>")
-        
+
 def init(mpstate):
     '''initialise module'''
     return RallyModule(mpstate)

@@ -26,7 +26,7 @@ class GraphDialog(wx.Dialog):
         # expression entry
         st = wx.StaticText(self.panel, -1, 'Expressions: ')
         vbox.Add(st, 0, wx.LEFT, 10)
-        
+
         hbox_expressions = wx.BoxSizer(wx.HORIZONTAL)
         self.tc_expressions = wx.TextCtrl(self.panel, -1, style=wx.TE_MULTILINE|wx.HSCROLL, size=(800, 80))
         elist = []
@@ -55,7 +55,7 @@ class GraphDialog(wx.Dialog):
         self.Bind(wx.EVT_BUTTON, self.OnSave, id=1)
         self.Bind(wx.EVT_BUTTON, self.OnCancel, id=2)
         self.Bind(wx.EVT_BUTTON, self.OnTest, id=3)
-        
+
         self.panel.SetSizer(vbox)
         self.Centre()
 

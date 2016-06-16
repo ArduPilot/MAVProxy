@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 '''
 control MAVLink2 signing
-'''    
+'''
 
 from pymavlink import mavutil
 import time, struct, math, sys
@@ -71,7 +71,7 @@ class SigningModule(mp_module.MPModule):
         if self.allow is None:
             self.allow = {
                 mavutil.mavlink.MAVLINK_MSG_ID_RADIO : True,
-                mavutil.mavlink.MAVLINK_MSG_ID_RADIO_STATUS : True 
+                mavutil.mavlink.MAVLINK_MSG_ID_RADIO_STATUS : True
                 }
         if msgId in self.allow:
             return True
@@ -105,7 +105,7 @@ class SigningModule(mp_module.MPModule):
         self.master.mav.setup_signing_send(self.target_system, self.target_component, [0]*32, 0)
         self.master.disable_signing()
         print("Removed signing")
-        
+
 def init(mpstate):
     '''initialise module'''
     return SigningModule(mpstate)

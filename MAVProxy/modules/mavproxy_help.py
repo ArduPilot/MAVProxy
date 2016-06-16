@@ -9,14 +9,14 @@ from MAVProxy.modules.lib import mp_module
 if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import *
     import wxversion
-        
+
 class HelpModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(HelpModule, self).__init__(mpstate, "mavhelp", "Help and version information", public = True)
         self.enabled = False
         self.add_command('mavhelp', self.cmd_help, "help and version information", "<about|site>")
         self.have_list = False
-        
+
         #versioning info
         #pkg_resources doesn't work in the windows exe build, so read the version file
         try:
@@ -32,7 +32,7 @@ class HelpModule(mp_module.MPModule):
             self.wxVersion = str(wxversion.getInstalled())
         else:
             self.wxVersion = ''
-            
+
         #check for updates, if able
         if platform.system() == 'Windows':
             req = Request('http://firmware.ardupilot.org/Tools/MAVProxy/')
@@ -60,9 +60,9 @@ class HelpModule(mp_module.MPModule):
             available = pypi.package_releases('MAVProxy')
             if not available:
                 self.newversion = 'Error finding update'
-            else:        
+            else:
                 self.newversion = available[0]
-                
+
         #and format the update string
         if not isinstance(self.newversion, basestring):
             self.newversion = "Error finding update"
@@ -72,21 +72,21 @@ class HelpModule(mp_module.MPModule):
             self.newversion = "Running latest version"
         else:
             self.newversion = "New version " + self.newversion + " available (currently running " + self.version + ")"
-            
+
         if mp_util.has_wxpython:
             self.menu_added_console = False
             self.menu = MPMenuSubMenu('Help',
                                   items=[MPMenuItem('MAVProxy website', 'MAVProxy website', '', handler=MPMenuOpenWeblink('http://dronecode.github.io/MAVProxy/')),
-                                         MPMenuItem('Check for Updates', 'Check for Updates', '', handler=MPMenuChildMessageDialog(title="Updates", message=self.newversion)), 
+                                         MPMenuItem('Check for Updates', 'Check for Updates', '', handler=MPMenuChildMessageDialog(title="Updates", message=self.newversion)),
                                          MPMenuItem('About', 'About', '', handler=MPMenuChildMessageDialog(title="About MAVProxy", message="MAVProxy Version " + self.version + "\nOS: " + self.host + "\nPython " +  self.pythonversion + "\nWXPython " + self.wxVersion))])
-    
-    
+
+
     #version number comparison for update checking
     def mycmp(self, version1, version2):
         def normalize(v):
             return [int(x) for x in re.sub(r'(\.0+)*$','', v).split(".")]
         return cmp(normalize(version1), normalize(version2))
-        
+
     def idle_task(self):
         '''called on idle'''
         if self.module('console') is not None and not self.menu_added_console:
@@ -105,7 +105,7 @@ class HelpModule(mp_module.MPModule):
             print("See http://dronecode.github.io/MAVProxy/ for documentation")
         else:
             self.print_usage()
-            
+
     def mavlink_packet(self, m):
         '''handle and incoming mavlink packets'''
 

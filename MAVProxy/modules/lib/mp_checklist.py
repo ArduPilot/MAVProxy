@@ -35,7 +35,7 @@ class CheckUI():
         '''child process - this holds all the GUI elements'''
         mp_util.child_close_fds()
         from wx_loader import wx
-        
+
         app = wx.App(False)
         app.frame = ChecklistFrame(state=self, title=self.title)
         app.frame.Show()
@@ -50,13 +50,13 @@ class CheckUI():
     def is_alive(self):
         '''check if child is still going'''
         return self.child.is_alive()
-        
+
     def set_check(self, name, state):
         '''set a status value'''
         if self.child.is_alive():
             self.parent_pipe.send(CheckItem(name, state))
-       
-        
+
+
 class ChecklistFrame(wx.Frame):
     """ The main frame of the console"""
 
@@ -71,7 +71,7 @@ class ChecklistFrame(wx.Frame):
 
         #create the tabs
         self.createWidgets()
-        
+
         #assign events to the buttons on the tabs
         self.createActions()
 
@@ -80,13 +80,13 @@ class ChecklistFrame(wx.Frame):
         #self.Bind(wx.EVT_TIMER, self.on_timer, self.timer)
         self.Bind(wx.EVT_TIMER, lambda evt, notebook=self.nb: self.on_timer(evt, notebook), self.timer)
         self.timer.Start(100)
-        
+
         # finally, put the notebook in a sizer for the panel to manage
         # the layout
         sizer = wx.BoxSizer()
         sizer.Add(self.nb, 1, wx.EXPAND)
         self.panel.SetSizer(sizer)
-  
+
         self.Show(True)
         self.pending = []
 
@@ -160,7 +160,7 @@ class ChecklistFrame(wx.Frame):
         'Ignition power off':2,
         'Avionics power off':2
         }
-        
+
     # create controls on form - labels, buttons, etc
     def createWidgets(self):
         #create the panels for the tabs
@@ -169,43 +169,43 @@ class ChecklistFrame(wx.Frame):
         PanelAssembly.SetAutoLayout(True)
         PanelAssembly.SetSizer(boxAssembly)
         PanelAssembly.Layout()
-        
+
         PanelEngine = wx.Panel(self.nb)
         boxEngine = wx.BoxSizer(wx.VERTICAL)
         PanelEngine.SetAutoLayout(True)
         PanelEngine.SetSizer(boxEngine)
         PanelEngine.Layout()
-        
+
         PanelTakeoff = wx.Panel(self.nb)
         boxTakeoff = wx.BoxSizer(wx.VERTICAL)
         PanelTakeoff.SetAutoLayout(True)
         PanelTakeoff.SetSizer(boxTakeoff)
         PanelTakeoff.Layout()
-    
+
         PanelCruise = wx.Panel(self.nb)
         boxCruise = wx.BoxSizer(wx.VERTICAL)
         PanelCruise.SetAutoLayout(True)
         PanelCruise.SetSizer(boxCruise)
         PanelCruise.Layout()
-        
+
         PanelDrop = wx.Panel(self.nb)
         boxDrop = wx.BoxSizer(wx.VERTICAL)
         PanelDrop.SetAutoLayout(True)
         PanelDrop.SetSizer(boxDrop)
         PanelDrop.Layout()
-        
+
         PanelLanding = wx.Panel(self.nb)
         boxLanding = wx.BoxSizer(wx.VERTICAL)
         PanelLanding.SetAutoLayout(True)
         PanelLanding.SetSizer(boxLanding)
         PanelLanding.Layout()
-        
+
         PanelShutdown = wx.Panel(self.nb)
         boxShutdown = wx.BoxSizer(wx.VERTICAL)
         PanelShutdown.SetAutoLayout(True)
         PanelShutdown.SetSizer(boxShutdown)
         PanelShutdown.Layout()
-        
+
         #add the data to the individual tabs
 
         '''before assembly checklist'''
@@ -215,11 +215,11 @@ class ChecklistFrame(wx.Frame):
                 disCheckBox.Enable(False)
                 boxAssembly.Add(disCheckBox)
             if self.beforeAssemblyList[key] == 2:
-                boxAssembly.Add(wx.CheckBox(PanelAssembly, wx.ID_ANY, key))                  
+                boxAssembly.Add(wx.CheckBox(PanelAssembly, wx.ID_ANY, key))
 
         self.AssemblyButton = wx.Button(PanelAssembly, wx.ID_ANY, "Close final hatches")
         boxAssembly.Add(self.AssemblyButton)
-    
+
         '''before Engine Start checklist'''
         for key in self.beforeEngineList:
             if self.beforeEngineList[key] == 0:
@@ -231,7 +231,7 @@ class ChecklistFrame(wx.Frame):
 
         self.EngineButton = wx.Button(PanelEngine, wx.ID_ANY, "Ready for Engine start")
         boxEngine.Add(self.EngineButton)
-        
+
         '''before takeoff checklist'''
         for key in self.beforeTakeoffList:
             if self.beforeTakeoffList[key] == 0:
@@ -279,7 +279,7 @@ class ChecklistFrame(wx.Frame):
 
         self.LandingButton = wx.Button(PanelLanding, wx.ID_ANY, "Ready for Landing")
         boxLanding.Add(self.LandingButton)
-        
+
         '''before shutdown checklist'''
         for key in self.beforeShutdownList:
             if self.beforeShutdownList[key] == 0:
@@ -290,8 +290,8 @@ class ChecklistFrame(wx.Frame):
                 boxShutdown.Add(wx.CheckBox(PanelShutdown, wx.ID_ANY, key))
 
         self.ShutdownButton = wx.Button(PanelShutdown, wx.ID_ANY, "Ready for Shutdown")
-        boxShutdown.Add(self.ShutdownButton)   
-                             
+        boxShutdown.Add(self.ShutdownButton)
+
         #and add in the tabs
         self.nb.AddPage(PanelAssembly, "1. During Assembly")
         self.nb.AddPage(PanelEngine, "2. Before Engine Start")
@@ -300,7 +300,7 @@ class ChecklistFrame(wx.Frame):
         self.nb.AddPage(PanelDrop, "5. Before Bottle Drop")
         self.nb.AddPage(PanelLanding, "6. Before Landing")
         self.nb.AddPage(PanelShutdown, "7. Before Shutdown")
-        
+
     #Create the actions for the buttons
     def createActions(self):
         self.Bind(wx.EVT_BUTTON, self.on_Button, self.AssemblyButton)
@@ -310,7 +310,7 @@ class ChecklistFrame(wx.Frame):
         self.Bind(wx.EVT_BUTTON, self.on_Button, self.DropButton)
         self.Bind(wx.EVT_BUTTON, self.on_Button, self.LandingButton)
         self.Bind(wx.EVT_BUTTON, self.on_ButtonLast, self.ShutdownButton)
-                
+
     #do a final check of the current panel and move to the next
     def on_Button( self, event ):
         win = (event.GetEventObject()).GetParent()
@@ -336,11 +336,11 @@ class ChecklistFrame(wx.Frame):
         dlg = wx.MessageDialog(win, "Checklist Complete", "Done", wx.OK | wx.ICON_INFORMATION)
         dlg.ShowModal()
         dlg.Destroy()
-        
+
     #Receive messages from MAVProxy and process them
     def on_timer(self, event, notebook):
         state = self.state
-        win = notebook.GetPage(notebook.GetSelection()) 
+        win = notebook.GetPage(notebook.GetSelection())
         if state.close_event.wait(0.001):
             self.timer.Stop()
             self.Destroy()
@@ -349,12 +349,12 @@ class ChecklistFrame(wx.Frame):
             obj = state.child_pipe.recv()
             if isinstance(obj, CheckItem):
                 #go through each item in the current tab and (un)check as needed
-                #print obj.name + ", " + str(obj.state)             
+                #print obj.name + ", " + str(obj.state)
                 for widget in win.GetChildren():
                     if type(widget) is wx.CheckBox and widget.GetLabel() == obj.name:
                         widget.SetValue(obj.state)
-        
-                  
+
+
 if __name__ == "__main__":
     # test the console
     import time

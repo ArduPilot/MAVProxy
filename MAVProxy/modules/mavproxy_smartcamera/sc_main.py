@@ -62,12 +62,12 @@ class SmartCamera(object):
         #look for up to 2 cameras
         for i in range(0,2):
             config_group = "camera%d" % i
-            camera_type = sc_config.config.get_integer(config_group, 'type', 0) 
+            camera_type = sc_config.config.get_integer(config_group, 'type', 0)
             # webcam
             if camera_type == 1:
                 new_camera = SmartCameraWebCam(i)
                 self.camera_list = self.camera_list + [new_camera]
-            
+
             # Sony QX1
             if camera_type == 2:
                 new_camera = SmartCamera_SonyQX(i,"wlan0")
@@ -176,7 +176,7 @@ class SmartCamera(object):
             #imgfilename = "img%d-%d.jpg" % (cam_num,cam.get_image_counter())
             #print (imgfilename)
             #cv2.imwrite(imgfilename, img)
-            
+
             # check for ESC key being pressed
             k = cv2.waitKey(5) & 0xFF
             if k == 27:
@@ -215,7 +215,7 @@ class SmartCamera(object):
 
                 # start video if required
                 self.check_video_out()
-    
+
                 # check if we are controlling the vehicle
                 self.check_status()
 

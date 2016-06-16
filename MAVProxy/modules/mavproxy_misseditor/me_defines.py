@@ -54,7 +54,7 @@ def make_column_label(command_name, description, default):
         if fnmatch.fnmatch(description, pattern):
             return label
     return default
-        
+
 
 def get_column_labels(command_name):
     '''return dictionary of column labels if available'''

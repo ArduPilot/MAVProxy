@@ -126,7 +126,7 @@ def LLtoUTM( Lat, Long, ReferenceEllipsoid=23):
         UTMNorthing = UTMNorthing + 10000000.0; #10000000 meter offset for southern hemisphere
     #UTMZone was originally returned here.  I don't know what the
     #letter at the end was for.
-    #print "UTMZone", UTMZone 
+    #print "UTMZone", UTMZone
     return (ZoneNumber, UTMEasting, UTMNorthing)
 
 
@@ -175,30 +175,30 @@ def UTMtoLL(northing, easting, zone, isSouthernHemisphere=True,
 Using
 http://www.ga.gov.au/geodesy/datums/redfearn_geo_to_grid.jsp
 
-    Site Name:    GDA-MGA: (UTM with GRS80 ellipsoid) 
-Zone:   36    
-Easting:  511669.521  Northing: 19328195.112 
-Latitude:   84  0 ' 0.00000 ''  Longitude: 34  0 ' 0.00000 '' 
+    Site Name:    GDA-MGA: (UTM with GRS80 ellipsoid)
+Zone:   36
+Easting:  511669.521  Northing: 19328195.112
+Latitude:   84  0 ' 0.00000 ''  Longitude: 34  0 ' 0.00000 ''
 Grid Convergence:  0  -59 ' 40.28 ''  Point Scale: 0.99960166
 
 ____________
-Site Name:    GDA-MGA: (UTM with GRS80 ellipsoid) 
-Zone:   36    
-Easting:  519384.803  Northing: 1118247.585 
-Latitude:   -80  0 ' 0.00000 ''  Longitude: 34  0 ' 0.00000 '' 
-Grid Convergence:  0  59 ' 5.32 ''  Point Scale: 0.99960459 
+Site Name:    GDA-MGA: (UTM with GRS80 ellipsoid)
+Zone:   36
+Easting:  519384.803  Northing: 1118247.585
+Latitude:   -80  0 ' 0.00000 ''  Longitude: 34  0 ' 0.00000 ''
+Grid Convergence:  0  59 ' 5.32 ''  Point Scale: 0.99960459
 ___________
-Site Name:    GDA-MGA: (UTM with GRS80 ellipsoid) 
-Zone:   36    
-Easting:  611263.812  Northing: 10110547.106 
-Latitude:   1  0 ' 0.00000 ''  Longitude: 34  0 ' 0.00000 '' 
-Grid Convergence:  0  -1 ' 2.84 ''  Point Scale: 0.99975325 
+Site Name:    GDA-MGA: (UTM with GRS80 ellipsoid)
+Zone:   36
+Easting:  611263.812  Northing: 10110547.106
+Latitude:   1  0 ' 0.00000 ''  Longitude: 34  0 ' 0.00000 ''
+Grid Convergence:  0  -1 ' 2.84 ''  Point Scale: 0.99975325
 ______________
-Site Name:    GDA-MGA: (UTM with GRS80 ellipsoid) 
-Zone:   36    
-Easting:  611263.812  Northing: 9889452.894 
-Latitude:   -1  0 ' 0.00000 ''  Longitude: 34  0 ' 0.00000 '' 
-Grid Convergence:  0  1 ' 2.84 ''  Point Scale: 0.99975325 
+Site Name:    GDA-MGA: (UTM with GRS80 ellipsoid)
+Zone:   36
+Easting:  611263.812  Northing: 9889452.894
+Latitude:   -1  0 ' 0.00000 ''  Longitude: 34  0 ' 0.00000 ''
+Grid Convergence:  0  1 ' 2.84 ''  Point Scale: 0.99975325
 
 So this uses a false northing of 10000000 in the both hemispheres.
 ArcGIS used a false northing of 0 in the northern hem though.

@@ -79,7 +79,7 @@ class TerrainModule(mp_module.MPModule):
                 print(msg)
                 self.check_lat = 0
                 self.check_lon = 0
-            
+
     def send_terrain_data_bit(self, bit):
         '''send some terrain data'''
         lat = self.current_request.lat * 1.0e-7
@@ -119,7 +119,7 @@ class TerrainModule(mp_module.MPModule):
                                              north=28*self.current_request.grid_spacing)
             print("--lat=%f --lon=%f %.1f" % (
                 lat2, lon2, self.ElevationModel.GetElevation(lat2, lon2)))
-                                             
+
 
     def send_terrain_data(self):
         '''send some terrain data'''

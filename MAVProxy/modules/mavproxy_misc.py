@@ -20,7 +20,7 @@ class RepeatCommand(object):
 
     def __str__(self):
         return "Every %.1f seconds: %s" % (self.period, self.cmd)
-        
+
 
 def run_command(args, cwd = None, shell = False, timeout = None, env = None):
     '''
@@ -51,7 +51,7 @@ def run_command(args, cwd = None, shell = False, timeout = None, env = None):
             break
         if timeout is not None and time.time() > tstart + timeout:
             print("timeout in process %u" % p.pid)
-            try: 
+            try:
                 os.kill(p.pid, signal.SIGKILL)
             except OSError:
                 pass

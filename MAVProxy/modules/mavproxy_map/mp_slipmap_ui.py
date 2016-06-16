@@ -65,7 +65,7 @@ class MPSlipMapFrame(wx.Frame):
             if ret is not None:
                 ret.call_handler()
                 state.event_queue.put(SlipMenuEvent(state.popup_latlon, event, [], ret))
-            
+
         # otherwise a normal menu
         ret = self.menu.find_selected(event)
         if ret is None:
@@ -201,7 +201,7 @@ class MPSlipMapFrame(wx.Frame):
                     if obj.key in state.layers[layer]:
                         state.layers[layer][obj.key].set_hidden(obj.hide)
                 state.need_redraw = True
-        
+
         if obj is None:
             time.sleep(0.05)
 

@@ -204,7 +204,7 @@ class LogModule(mp_module.MPModule):
                 filename = self.default_log_filename(log_num)
             self.log_download(log_num, filename)
         else:
-            print(usage)            
+            print(usage)
 
 
     def idle_task(self):

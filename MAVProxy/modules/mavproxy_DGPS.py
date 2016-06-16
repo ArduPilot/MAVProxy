@@ -32,9 +32,9 @@ class DGPSModule(mp_module.MPModule):
         try:
 
             self.master.mav.gps_inject_data_send(
-                self.target_system,                                  
+                self.target_system,
                 self.target_component,
-                len(data), 
+                len(data),
                 bytearray(data.ljust(110, '\0')))
 
         except Exception,e:

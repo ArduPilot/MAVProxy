@@ -86,8 +86,8 @@ class NSHModule(mp_module.MPModule):
                                     flags,
                                     0, self.serial_settings.baudrate,
                                     0, [0]*70)
-            
-            
+
+
     def cmd_nsh(self, args):
         '''nsh shell commands'''
         usage = "Usage: nsh <start|stop|set>"

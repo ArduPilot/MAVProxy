@@ -69,7 +69,7 @@ class SmartCameraModule(mp_module.MPModule):
 #   Author           : Jaime Machuca
 #
 #****************************************************************************
-    
+
     def __init__(self, mpstate):
         super(SmartCameraModule, self).__init__(mpstate, "SmartCamera", "SmartCamera commands")
         self.add_command('camtrigger', self.__vCmdCamTrigger, "Trigger camera")
@@ -89,7 +89,7 @@ class SmartCameraModule(mp_module.MPModule):
         self.u8RetryTimeout = 0
         self.u8MaxRetries = 5
         self.__vRegisterCameras()
- 
+
  #****************************************************************************
  #   Method Name     : __vRegisterQXCamera
  #
@@ -134,10 +134,10 @@ class SmartCameraModule(mp_module.MPModule):
 #****************************************************************************
 
     def __vRegisterCameras(self):
-        
+
         # initialise list
         self.camera_list = []
-        
+
         #look for up to 2 cameras
         for i in range(0,2):
             config_group = "camera%d" % i
@@ -146,11 +146,11 @@ class SmartCameraModule(mp_module.MPModule):
             if camera_type == 1:
                 new_camera = SmartCameraWebCam(i)
                 self.camera_list = self.camera_list + [new_camera]
-            
+
             # Sony QX1
             if camera_type == 2:
                 self.__vRegisterQXCamera(i)
-    
+
         # display number of cameras found
         print ("cameras found: %d" % len(self.camera_list))
 
@@ -308,7 +308,7 @@ class SmartCameraModule(mp_module.MPModule):
     def __vCmdCamZoomIn(self):
         for cam in self.camera_list:
             cam.boZoomIn()
- 
+
 #****************************************************************************
 #   Method Name     : __vCmdCamZoomOut
 #
@@ -325,7 +325,7 @@ class SmartCameraModule(mp_module.MPModule):
     def __vCmdCamZoomOut(self):
         for cam in self.camera_list:
             cam.boZoomOut()
- 
+
 #****************************************************************************
 #   Method Name     : __vDecodeDIGICAMConfigure
 #
@@ -342,13 +342,13 @@ class SmartCameraModule(mp_module.MPModule):
     def __vDecodeDIGICAMConfigure(self, mCommand_Long):
         if mCommand_Long.param1 != 0:
             print ("Exposure Mode = %d" % mCommand_Long.param1)
-            
+
             if mCommand_Long.param1 == self.ProgramAuto:
                 self.__vCmdSetCamExposureMode(["Program Auto"])
-            
+
             elif mCommand_Long.param1 == self.Aperture:
                 self.__vCmdSetCamExposureMode(["Aperture"])
-            
+
             elif mCommand_Long.param1 == self.Shutter:
                 self.__vCmdSetCamExposureMode(["Shutter"])
 
@@ -356,7 +356,7 @@ class SmartCameraModule(mp_module.MPModule):
         if mCommand_Long.param2 != 0:
             print ("Shutter Speed= %d" % mCommand_Long.param2)
             self.__vCmdSetCamShutterSpeed([mCommand_Long.param2])
-        
+
         '''Aperture'''
         if mCommand_Long.param3 != 0:
             print ("Aperture = %d" % mCommand_Long.param3)
@@ -389,11 +389,11 @@ class SmartCameraModule(mp_module.MPModule):
         '''Session'''
         if mCommand_Long.param1 != 0:
             print ("Session = %d" % mCommand_Long.param1)
-        
+
         '''Zooming Step Value'''
         if mCommand_Long.param2 != 0:
             print ("Zooming Step = %d" % mCommand_Long.param2)
-        
+
         '''Zooming Step Value'''
         if mCommand_Long.param3 != 0:
             print ("Zooming Value = %d" % mCommand_Long.param3)
@@ -404,11 +404,11 @@ class SmartCameraModule(mp_module.MPModule):
                 self.__vCmdCamZoomOut()
             else:
                 print ("Invalid Zoom Value")
-        
+
         '''Focus 0=Unlock/1=Lock/2=relock'''
         if mCommand_Long.param4 != 0:
             print ("Focus = %d" % mCommand_Long.param4)
-        
+
         '''Trigger'''
         if mCommand_Long.param5 != 0:
             print ("Trigger = %d" % mCommand_Long.param5)

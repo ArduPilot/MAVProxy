@@ -90,7 +90,7 @@ class GimbalModule(mp_module.MPModule):
                                            latlon[1]*1e7,
                                            0, # altitude zero for now
                                            0)
-        
+
     def cmd_gimbal_roi_vel(self, args):
         '''control roi position and velocity'''
         if len(args) != 0 and len(args) != 3 and len(args) != 6:
@@ -187,7 +187,7 @@ class GimbalModule(mp_module.MPModule):
         rotmat_copter_gimbal = Matrix3()
         rotmat_copter_gimbal.from_euler312(m.joint_roll, m.joint_el, m.joint_az)
         gimbal_dcm = vehicle_dcm * rotmat_copter_gimbal
-        
+
         lat = gpi.lat * 1.0e-7
         lon = gpi.lon * 1.0e-7
         alt = gpi.relative_alt * 1.0e-3
@@ -201,7 +201,7 @@ class GimbalModule(mp_module.MPModule):
 
         # get view point of camera when not rotated
         view_point = Vector3(1, 0, 0)
-    
+
         # rotate view_point to form current view vector
         rot_point = gimbal_dcm * view_point
 

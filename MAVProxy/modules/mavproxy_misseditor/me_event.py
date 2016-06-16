@@ -28,7 +28,7 @@ MEGE_SET_LOIT_RAD = 4
 MEGE_SET_WP_DEFAULT_ALT = 5
 MEGE_SET_LAST_MAP_CLICK_POS = 6
 
-class MissionEditorEvent:        
+class MissionEditorEvent:
     def __init__(self, type, **kwargs):
         self.type = type
         self.arg_dict = kwargs
@@ -43,7 +43,7 @@ class MissionEditorEvent:
 
     def get_type(self):
         return self.type
-    
+
     def get_arg(self, key):
         if not key in self.arg_dict:
             print("No key %s in %s" % (key, str(self.type)))

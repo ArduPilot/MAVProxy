@@ -43,7 +43,7 @@ class rline(object):
             redisplay()
         except Exception as ex:
             pass
-        
+
 
 
 def complete_alias(text):
@@ -198,7 +198,7 @@ except Exception:
 
 if __name__ == "__main__":
     from mp_settings import MPSettings, MPSetting
-    
+
     class mystate(object):
         def __init__(self):
             self.settings = MPSettings(

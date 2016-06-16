@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 '''enable run-time addition and removal of master link, just like --master on the cnd line'''
-''' TO USE: 
+''' TO USE:
     link add 10.11.12.13:14550
     link list
     link remove 3      # to remove 3rd output
-'''    
+'''
 
 from pymavlink import mavutil
 import time, struct, math, sys, fnmatch, traceback
@@ -348,7 +348,7 @@ class LinkModule(mp_module.MPModule):
             elif m.type in [mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER]:
                 self.mpstate.vehicle_type = 'antenna'
                 self.mpstate.vehicle_name = 'AntennaTracker'
-        
+
         elif mtype == 'STATUSTEXT':
             if m.text != self.status.last_apm_msg or time.time() > self.status.last_apm_msg_time+2:
                 self.mpstate.console.writeln("APM: %s" % m.text, bg='red')
@@ -393,7 +393,7 @@ class LinkModule(mp_module.MPModule):
                 if rounded_dist != 0:
                     self.say("%u" % rounded_dist, priority="progress")
             self.status.last_distance_announce = rounded_dist
-    
+
         elif mtype == "GLOBAL_POSITION_INT":
             self.report_altitude(m.relative_alt*0.001)
 

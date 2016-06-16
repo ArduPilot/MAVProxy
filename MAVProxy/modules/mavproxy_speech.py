@@ -85,7 +85,7 @@ class SpeechModule(mp_module.MPModule):
             # say some statustext values
             if msg.text.startswith("Tuning: "):
                 self.say(msg.text[8:])
-                
+
 def init(mpstate):
     '''initialise module'''
     return SpeechModule(mpstate)

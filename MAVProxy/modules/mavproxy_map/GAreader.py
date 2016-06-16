@@ -31,7 +31,7 @@ class ERMap:
         else:
             data_file = ifile
             header_file = ifile + '.ers'
-        
+
         self.header = self.read_ermapper_header(header_file)
 
         nroflines = int(self.header['nroflines'])
@@ -71,7 +71,7 @@ class ERMap:
                 tmp_string = line.strip().split('=')
                 header[tmp_string[0].strip().lower()]= tmp_string[1].strip()
 
-        return header                      
+        return header
 
     def read_ermapper_data(self, ifile, data_format = numpy.float32, offset=0):
         # open input file in a binary format and read the input string
@@ -174,7 +174,7 @@ if __name__ == '__main__':
     mappy = ERMap()
     mappy.read_ermapper(os.path.join(os.environ['HOME'], './Documents/Elevation/Canberra/GSNSW_P756demg'))
 
-    #print some header data   
+    #print some header data
     mappy.printBoundingBox()
 
     #get a measure of data quality

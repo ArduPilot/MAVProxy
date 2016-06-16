@@ -204,7 +204,7 @@ class MavGraph(object):
             else:
                 ax1_labels.append(fields[i])
                 ax = self.ax1
-            
+
             if self.xaxis:
                 if self.marker is not None:
                     marker = self.marker
@@ -338,7 +338,7 @@ class MavGraph(object):
                 return
         else:
             labels = None
-            
+
         timeshift = self.timeshift
 
         for fi in range(0, len(self.mav_list)):

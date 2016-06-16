@@ -25,7 +25,7 @@ class WXSettings(object):
         import wx_processguard
         from wx_loader import wx
         from wxsettings_ui import SettingsDlg
-        
+
         mp_util.child_close_fds()
         app = wx.App(False)
         dlg = SettingsDlg(self.settings)

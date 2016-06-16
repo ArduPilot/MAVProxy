@@ -51,7 +51,7 @@ TILE_SERVICES = {
 	"OpenAerialMap"  : "http://tile.openaerialmap.org/tiles/?v=mgm&layer=openaerialmap-900913&x=${X}&y=${Y}&zoom=${OAM_ZOOM}",
 	"OpenCycleMap"   : "http://andy.sandbox.cloudmade.com/tiles/cycle/${ZOOM}/${X}/${Y}.png",
 	"StatKartTopo2" : "http://opencache.statkart.no/gatekeeper/gk/gk.open_gmaps?layers=topo2&zoom=${ZOOM}&x=${X}&y=${Y}"
-        
+
 	}
 
 # these are the md5sums of "unavailable" tiles
@@ -162,7 +162,7 @@ class MPTile:
 	def __init__(self, cache_path=None, download=True, cache_size=500,
 		     service="MicrosoftSat", tile_delay=0.3, debug=False,
 		     max_zoom=19, refresh_age=30*24*60*60):
-		
+
 		if cache_path is None:
 			try:
 				cache_path = os.path.join(os.environ['HOME'], '.tilecache')
