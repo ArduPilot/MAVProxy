@@ -66,7 +66,7 @@ class SmartCameraModule(mp_module.MPModule):
 #
 #   Return Value    : None
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
     
@@ -101,7 +101,7 @@ class SmartCameraModule(mp_module.MPModule):
  #
  #   Return Value    : None
  #
- #   Autor           : Jaime Machuca
+ #   Author           : Jaime Machuca
  #
  #****************************************************************************
 
@@ -129,7 +129,7 @@ class SmartCameraModule(mp_module.MPModule):
 #
 #   Return Value    : None
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -163,7 +163,7 @@ class SmartCameraModule(mp_module.MPModule):
 #
 #   Return Value    : None
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -183,7 +183,7 @@ class SmartCameraModule(mp_module.MPModule):
 #
 #   Return Value    : None
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -205,7 +205,7 @@ class SmartCameraModule(mp_module.MPModule):
 #
 #   Return Value    : None
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -229,7 +229,7 @@ class SmartCameraModule(mp_module.MPModule):
 #
 #   Return Value    : None
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -253,7 +253,7 @@ class SmartCameraModule(mp_module.MPModule):
 #
 #   Return Value    : None
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -277,7 +277,7 @@ class SmartCameraModule(mp_module.MPModule):
 #
 #   Return Value    : None
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -301,7 +301,7 @@ class SmartCameraModule(mp_module.MPModule):
 #
 #   Return Value    : None
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -318,7 +318,7 @@ class SmartCameraModule(mp_module.MPModule):
 #
 #   Return Value    : None
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -335,7 +335,7 @@ class SmartCameraModule(mp_module.MPModule):
 #
 #   Return Value    : None
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -381,7 +381,7 @@ class SmartCameraModule(mp_module.MPModule):
 #
 #   Return Value    : None
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -419,14 +419,14 @@ class SmartCameraModule(mp_module.MPModule):
 #****************************************************************************
 #   Method Name     : mavlink_packet
 #
-#   Description     : MAVProxy requiered callback function used to recieve MAVlink
+#   Description     : MAVProxy requiered callback function used to receive MAVlink
 #                     packets
 #
 #   Parameters      : MAVLink Message
 #
 #   Return Value    : None
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -461,7 +461,7 @@ class SmartCameraModule(mp_module.MPModule):
 #
 #   Return Value    : SmartCameraModule Instance
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 

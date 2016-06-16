@@ -233,7 +233,7 @@ class CmdlongModule(mp_module.MPModule):
                                       63, # type mask (ignore all except attitude + thrust)
                                       att_target, # quaternion attitude
                                       0,  # body roll rate
-                                      0,  # body pich rate
+                                      0,  # body pitch rate
                                       0,  # body yaw rate
                                       thrust)  # thrust
 

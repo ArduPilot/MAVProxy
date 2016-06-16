@@ -337,7 +337,7 @@ class ChecklistFrame(wx.Frame):
         dlg.ShowModal()
         dlg.Destroy()
         
-    #Recieve messages from MAVProxy and process them
+    #Receive messages from MAVProxy and process them
     def on_timer(self, event, notebook):
         state = self.state
         win = notebook.GetPage(notebook.GetSelection()) 

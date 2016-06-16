@@ -409,7 +409,7 @@ class Geo_reference:
     # @return 0 if instances have the same attributes, else 1.
     # @note Attributes are: zone, xllcorner, yllcorner.
     def __cmp__(self, other):
-        # FIXME (DSG) add a tolerence
+        # FIXME (DSG) add a tolerance
         if other is None:
             return 1
         cmp = 0
