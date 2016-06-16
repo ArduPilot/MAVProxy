@@ -894,7 +894,7 @@ if __name__ == '__main__':
                       action='store_true', default=False)
     parser.add_option("--show-errors", dest="show_errors", help="show MAVLink error packets",
                       action='store_true', default=False)
-    parser.add_option("--speech", dest="speech", help="use text to speach",
+    parser.add_option("--speech", dest="speech", help="use text to speech",
                       action='store_true', default=False)
     parser.add_option("--aircraft", dest="aircraft", help="aircraft name", default=None)
     parser.add_option("--cmd", dest="cmd", help="initial commands", default=None, action='append')

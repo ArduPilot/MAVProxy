@@ -63,7 +63,7 @@ class SlipObject:
 
     def clicked(self, px, py):
         '''check if a click on px,py should be considered a click
-        on the object. Return None if definately not a click,
+        on the object. Return None if definitely not a click,
         otherwise return the distance of the click, smaller being nearer
         '''
         return None

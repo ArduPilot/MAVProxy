@@ -75,7 +75,7 @@ class SmartCamera_SonyQX():
 #
 #   Return Value    : None
 #
-#   Autor           : Jaime Machuca, Randy Mackay
+#   Author           : Jaime Machuca, Randy Mackay
 #
 #****************************************************************************
 
@@ -121,7 +121,7 @@ class SmartCamera_SonyQX():
 #
 #   Return Value    : String with object instance name
 #
-#   Autor           : Randy Mackay
+#   Author           : Randy Mackay
 #
 #****************************************************************************
 
@@ -138,7 +138,7 @@ class SmartCamera_SonyQX():
 #
 #   Return Value    : None
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -199,7 +199,7 @@ class SmartCamera_SonyQX():
 #
 #   Return Value    : None
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -217,7 +217,7 @@ class SmartCamera_SonyQX():
 #
 #   Return Value    : None
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
     
@@ -234,7 +234,7 @@ class SmartCamera_SonyQX():
 #
 #   Return Value    : None
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -256,7 +256,7 @@ class SmartCamera_SonyQX():
 #
 #   Return Value    : None
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -275,7 +275,7 @@ class SmartCamera_SonyQX():
 #
 #   Return Value    : None
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
     
@@ -292,7 +292,7 @@ class SmartCamera_SonyQX():
 #
 #   Return Value    : None
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -317,7 +317,7 @@ class SmartCamera_SonyQX():
 #
 #   Return Value    : String with the IP Address for the requested interface
 #
-#   Autor           : Jaime Machuca,
+#   Author           : Jaime Machuca,
 #
 #****************************************************************************
 
@@ -339,7 +339,7 @@ class SmartCamera_SonyQX():
 #
 #   Return Value    : JSON encoded string with camera response
 #
-#   Autor           : Andrew Tridgell, Jaime Machuca
+#   Author           : Andrew Tridgell, Jaime Machuca
 #
 #****************************************************************************
 
@@ -366,7 +366,7 @@ class SmartCamera_SonyQX():
 #
 #   Return Value    : JSON encoded string with camera response
 #
-#   Autor           : Andrew Tridgell, Jaime Machuca
+#   Author           : Andrew Tridgell, Jaime Machuca
 #
 #****************************************************************************
 
@@ -389,7 +389,7 @@ class SmartCamera_SonyQX():
 #   Return Value    : String containing the URL for sending commands to the
 #                     Camera
 #
-#   Autor           : Andrew Tridgell, Jaime Machuca
+#   Author           : Andrew Tridgell, Jaime Machuca
 #
 #****************************************************************************
 
@@ -424,7 +424,7 @@ class SmartCamera_SonyQX():
 #   Return Value    : True if camera has been found
 #                     False if no camera has been found
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -438,16 +438,16 @@ class SmartCamera_SonyQX():
 #****************************************************************************
 #   Method Name     : boGetLatestImage
 #
-#   Description     : Dowloads the latest image taken by the camera and then
+#   Description     : Downloads the latest image taken by the camera and then
 #                     saves it to a file name composed by the camera instance
 #                     and image number.
 #
 #   Parameters      : none
 #
-#   Return Value    : True if it was succesful
+#   Return Value    : True if it was successful
 #                     False if no image was downloaded
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -470,7 +470,7 @@ class SmartCamera_SonyQX():
 #
 #   Return Value    : String containing the image file name
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -486,7 +486,7 @@ class SmartCamera_SonyQX():
 #
 #   Return Value    : Integer with the number of images
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -500,10 +500,10 @@ class SmartCamera_SonyQX():
 #
 #   Parameters      : None
 #
-#   Return Value    : True if succesful
-#                     False if Error Recieved
+#   Return Value    : True if successful
+#                     False if Error Received
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -512,7 +512,7 @@ class SmartCamera_SonyQX():
         # Send command to set Exposure Mode
         sResponse = self.__sSimpleCall("actZoom", adictParams=["in","1shot"])
         
-        # Check response for a succesful result
+        # Check response for a successful result
         if 'result' in sResponse:
             print ("Zoomed in")
             return True
@@ -528,10 +528,10 @@ class SmartCamera_SonyQX():
 #
 #   Parameters      : None
 #
-#   Return Value    : True if succesful
-#                     False if Error Recieved
+#   Return Value    : True if successful
+#                     False if Error Received
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -540,7 +540,7 @@ class SmartCamera_SonyQX():
         # Send command to set Exposure Mode
         sResponse = self.__sSimpleCall("actZoom", adictParams=["out","1shot"])
         
-        # Check response for a succesful result
+        # Check response for a successful result
         if 'result' in sResponse:
             print ("Zoomed out")
             return True
@@ -557,10 +557,10 @@ class SmartCamera_SonyQX():
 #   Parameters      : Exposure Mode String
 #                     Program Auto, Aperture, Shutter, Manual, Intelligent Auto, Superior Auto
 #
-#   Return Value    : True if succesful
-#                     False if Error Recieved
+#   Return Value    : True if successful
+#                     False if Error Received
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -568,7 +568,7 @@ class SmartCamera_SonyQX():
         # Send command to set Exposure Mode
         sResponse = self.__sSimpleCall("setExposureMode", adictParams=[sExposureMode])
         
-        # Check response for a succesful result
+        # Check response for a successful result
         if 'result' in sResponse:
             time.sleep(0.25)
             sResponse = self.__sSimpleCall("getExposureMode")
@@ -593,10 +593,10 @@ class SmartCamera_SonyQX():
 #                     i.e. 1/1000 = 1000
 #                     NOTE: This will only work for shutter speeds smaller than 1 sec
 #
-#   Return Value    : True if succesful
-#                     False if Error Recieved
+#   Return Value    : True if successful
+#                     False if Error Received
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -607,7 +607,7 @@ class SmartCamera_SonyQX():
         # Send command to set Exposure Mode
         sResponse = self.__sSimpleCall("setShutterSpeed", adictParams=[sShutterSpeed])
             
-        # Check response for a succesful result
+        # Check response for a successful result
         if 'result' in sResponse:
             time.sleep(0.25)
             sResponse = self.__sSimpleCall("getShutterSpeed")
@@ -631,10 +631,10 @@ class SmartCamera_SonyQX():
 #   Parameters      : F number * 10
 #                     i.e. F 2.8 = 28
 #
-#   Return Value    : True if succesful
-#                     False if Error Recieved
+#   Return Value    : True if successful
+#                     False if Error Received
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -646,7 +646,7 @@ class SmartCamera_SonyQX():
         # Send command to set Exposure Mode
         sResponse = self.__sSimpleCall("setFNumber", adictParams=[sFValue])
         
-        # Check response for a succesful result
+        # Check response for a successful result
         if 'result' in sResponse:
             time.sleep(0.25)
             sResponse = self.__sSimpleCall("getFNumber")
@@ -670,10 +670,10 @@ class SmartCamera_SonyQX():
 #   Parameters      : ISO Value
 #                     80, 100, 1000, 3200, etc...
 #
-#   Return Value    : True if succesful
-#                     False if Error Recieved
+#   Return Value    : True if successful
+#                     False if Error Received
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -684,7 +684,7 @@ class SmartCamera_SonyQX():
         # Send command to set Exposure Mode
         sResponse = self.__sSimpleCall("setIsoSpeedRate", adictParams=[sISO])
        
-        # Check response for a succesful result
+        # Check response for a successful result
         if 'result' in sResponse:
             sResponse = self.__sSimpleCall("getIsoSpeedRate")
 
@@ -707,10 +707,10 @@ class SmartCamera_SonyQX():
 #
 #   Parameters      : Image file name, position, orientation
 #
-#   Return Value    : True if succesful
-#                     False if no URL was recieved for the image
+#   Return Value    : True if successful
+#                     False if no URL was received for the image
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -725,10 +725,10 @@ class SmartCamera_SonyQX():
 #
 #   Parameters      : none
 #
-#   Return Value    : True if succesful
-#                     False if no URL was recieved for the image
+#   Return Value    : True if successful
+#                     False if no URL was received for the image
 #
-#   Autor           : Jaime Machuca
+#   Author           : Jaime Machuca
 #
 #****************************************************************************
 
@@ -736,7 +736,7 @@ class SmartCamera_SonyQX():
         # Send command to take picture to camera
         sResponse = self.__sSimpleCall("actTakePicture")
 
-        # Check response for a succesful result and save latest image URL
+        # Check response for a successful result and save latest image URL
         if 'result' in sResponse:
             self.sLatestImageURL = sResponse['result'][0][0]
 
