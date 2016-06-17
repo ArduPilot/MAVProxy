@@ -124,8 +124,11 @@ class SRTMDownloader():
         mp_util.child_close_fds()
         if self.debug:
             print("Connecting to %s" % self.server)
-        conn = httplib.HTTPConnection(self.server)
-        conn.request("GET",self.directory)
+        try:
+            conn = httplib.HTTPConnection(self.server)
+            conn.request("GET",self.directory)
+        except Exception:
+            return
         r1 = conn.getresponse()
         '''if r1.status==200:
             print "status200 received ok"
