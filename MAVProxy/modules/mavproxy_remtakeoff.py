@@ -26,7 +26,53 @@ class remtakeoffModule(mp_module.MPModule):
         self.add_command('remtakeoff', self.cmd_takeoff, "Begin Remote Takeoff Sequence")
         self.add_command('remabort', self.cmd_abort, "Abort Remote Takeoff Sequence")
         
+        #try setting up the Rasberry Pi button input
+        #Requires the RPi.GPIO library from pip
+        #using button 11
+        try:
+            import RPi.GPIO as GPIO
+            GPIO.setup(11, GPIO.IN)
+            #200ms software de-bouncing, adding event handler for rising event on button 11
+            GPIO.add_event_detect(11, GPIO.RISING, callback=pi_button_rising, bouncetime=200)
+            print("Remote takeoff - YES Rpi hardware handling")
+        except:
+            print("Remote takeoff - no Rpi hardware handling")
+            
+        #try setting up for Odroid button handling
+        #requires https://github.com/hardkernel/WiringPi2-Python
+        try:
+            import wiringpi2 as wpi
+            wpi.wiringPiSetupSys()
+            wpi.pinMode(11, 0) #set pin 11 to input
+            #wpi.wiringPiISR (11, wpi.INT_EDGE_RISING,  void (*function)(void)) ;
+            #note this library doesn't support interrupts, so using a process instead
+            Odroidchild = multiprocessing.Process(target=OdroidLoop, args=(11))
+            print("Remote takeoff - YES Odroid hardware handling")
+            Odroidchild.start()
+        except:
+            print("Remote takeoff - no Odroid hardware handling")
+            
+    def OdroidLoop(channel):
+        '''Event handling for the Odroid'''
+        debounceCount = 0
+        while(True):
+            if wiringpi.digitalRead(channel) == 1:
+                debounceCount = debounceCount+1
+            if wiringpi.digitalRead(channel) == 0:
+                debounceCount = 0
+            #wait for 20*10ms of button push (software debouncing)
+            if debounceCount > 20:
+                print('RPi button push detected')
+                debounceCount = 0
+                self.cmd_takeoff()
+                break 
+            time.sleep(0.01)
+        return   
 
+    def pi_button_rising(channel):
+        '''Event handler for Rasberry Pi'''
+        print('RPi button push detected')
+        self.cmd_takeoff()
         
     def cmd_takeoff(self, args):
         '''Begin the takeoff countdown - via new thread'''
