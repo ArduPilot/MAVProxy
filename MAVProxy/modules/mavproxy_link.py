@@ -205,14 +205,16 @@ class LinkModule(mp_module.MPModule):
     def handle_msec_timestamp(self, m, master):
         '''special handling for MAVLink packets with a time_boot_ms field'''
 
-        if m.get_type() == 'GLOBAL_POSITION_INT':
+        if m.get_type() == 'GLOBAL_POSITION_INT' or \
+           m.get_type() == 'SET_ATTITUDE_TARGET' or \
+           m.get_type() == 'SET_POSITION_TARGET_GLOBAL_INT':
             # this is fix time, not boot time
             return
 
         msec = m.time_boot_ms
         if msec + 30000 < master.highest_msec:
             self.say('Time has wrapped')
-            print('Time has wrapped', msec, master.highest_msec)
+            print('Time has wrapped', msec, master.highest_msec, m.get_type())
             self.status.highest_msec = msec
             for mm in self.mpstate.mav_master:
                 mm.link_delayed = False
