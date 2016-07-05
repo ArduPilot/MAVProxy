@@ -27,7 +27,7 @@
 #****************************************************************************
 
 # System Header files and Module Headers
-import time, math, sched
+import time, math, sched, threading
 
 # Module Dependent Headers
 from pymavlink import mavutil
@@ -89,6 +89,32 @@ class SmartCameraModule(mp_module.MPModule):
         self.u8RetryTimeout = 0
         self.u8MaxRetries = 5
         self.__vRegisterCameras()
+
+        self.mpstate = mpstate
+        
+        # Start a 10 second timer to kill heartbeats as a workaround
+        threading.Timer(10, self.__vKillHeartbeat).start()
+    
+#****************************************************************************
+#   Method Name     : __vKillHeartbeat
+#
+#   Description     : Sets heartbeat setting to 0 to stop sending heartbeats
+#                     this is a temporary workaround for systems that do not
+#                     properly interpret the heartbeat contents like 3DR Solo
+#                     in such systems the heartbeats from the camera controller
+#                     and the main system are confused causing potential issues
+#
+#   Parameters      : None
+#
+#   Return Value    : None
+#
+#   Author           : Jaime Machuca
+#
+#****************************************************************************
+
+    def __vKillHeartbeat(self):
+        print("Killing Heartbeat - Solo Workaround")
+        self.mpstate.settings.heartbeat = 0
 
  #****************************************************************************
  #   Method Name     : __vRegisterQXCamera
