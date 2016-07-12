@@ -1,0 +1,3 @@
+[submodule "MAVProxy/modules/mavproxy_cesium"]
+	path = MAVProxy/modules/mavproxy_cesium
+	url = https://github.com/SamuelDudley/MAVCesium.git
