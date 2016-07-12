@@ -38,6 +38,7 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('RNG', 'RNG', fg='grey', row=0)
         mpstate.console.set_status('AHRS', 'AHRS', fg='grey', row=0)
         mpstate.console.set_status('EKF', 'EKF', fg='grey', row=0)
+        mpstate.console.set_status('LOG', 'LOG', fg='grey', row=0)
         mpstate.console.set_status('Heading', 'Hdg ---/---', row=2)
         mpstate.console.set_status('Alt', 'Alt ---', row=2)
         mpstate.console.set_status('AGL', 'AGL ---/---', row=2)
@@ -221,13 +222,18 @@ class ConsoleModule(mp_module.MPModule):
                         'AHRS' : mavutil.mavlink.MAV_SYS_STATUS_AHRS,
                         'RC'   : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_RC_RECEIVER,
                         'TERR' : mavutil.mavlink.MAV_SYS_STATUS_TERRAIN,
-                        'RNG'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_LASER_POSITION}
+                        'RNG'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_LASER_POSITION,
+                        'LOG'  : mavutil.mavlink.MAV_SYS_STATUS_LOGGING,
+            }
             announce = [ 'RC' ]
             for s in sensors.keys():
                 bits = sensors[s]
-                present = ((msg.onboard_control_sensors_enabled & bits) == bits)
+                present = ((msg.onboard_control_sensors_present & bits) == bits)
+                enabled = ((msg.onboard_control_sensors_enabled & bits) == bits)
                 healthy = ((msg.onboard_control_sensors_health & bits) == bits)
                 if not present:
+                    fg = 'black'
+                elif not enabled:
                     fg = 'grey'
                 elif not healthy:
                     fg = 'red'
@@ -239,10 +245,10 @@ class ConsoleModule(mp_module.MPModule):
                 self.console.set_status(s, s, fg=fg)
             for s in announce:
                 bits = sensors[s]
-                present = ((msg.onboard_control_sensors_enabled & bits) == bits)
+                enabled = ((msg.onboard_control_sensors_enabled & bits) == bits)
                 healthy = ((msg.onboard_control_sensors_health & bits) == bits)
                 was_healthy = ((self.last_sys_status_health & bits) == bits)
-                if present and not healthy and was_healthy:
+                if enabled and not healthy and was_healthy:
                     self.say("%s fail" % s)
             self.last_sys_status_health = msg.onboard_control_sensors_health
 
