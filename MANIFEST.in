@@ -1,0 +1,1 @@
+recursive-include MAVProxy/modules/mavproxy_cesium/app *
