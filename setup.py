@@ -1,11 +1,25 @@
 from setuptools import setup
+import os
 
 version = "1.5.1"
 
+def package_files(directory):
+    paths = []
+    for (path, directories, filenames) in os.walk(directory):
+        for filename in filenames:
+            paths.append(os.path.join('..', path, filename))
+    return paths
+
+package_data = ['modules/mavproxy_map/data/*.jpg', 
+                'modules/mavproxy_map/data/*.png',
+                'tools/graphs/*.xml',
+]
+
+package_data.extend(package_files('MAVProxy/modules/mavproxy_cesium/app'))
+
 setup(name='MAVProxy',
       version=version,
-      zip_safe=False,
-      include_package_data=True,
+      zip_safe=True,
       description='MAVProxy MAVLink ground station',
       long_description='''A MAVLink protocol proxy and ground station. MAVProxy
 is oriented towards command line operation, and is suitable for embedding in
@@ -51,7 +65,5 @@ on how to use MAVProxy.''',
                'MAVProxy/modules/mavproxy_map/mp_slipmap.py',
                'MAVProxy/modules/mavproxy_map/mp_tile.py'],
       package_data={'MAVProxy':
-                    ['modules/mavproxy_map/data/*.jpg', 
-                     'modules/mavproxy_map/data/*.png',
-                     'tools/graphs/*.xml']}
+                    package_data}
     )
