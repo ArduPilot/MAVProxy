@@ -14,7 +14,7 @@
 #
 # Responsible  : Jaime Machuca
 #
-# License      : CC BY-NC-SA
+# License      : GNU GPL version 3
 #
 # Editor Used  : Xcode 6.1.1 (6A2008a)
 #
@@ -297,6 +297,11 @@ class SmartCamera_SonyQX():
 #****************************************************************************
 
     def __openGeoTagLogFile(self):
+        
+        # Verify folder exists
+        if not !os.path.exists('/sdcard/log'):
+            os.makedirs('/sdcard/log')
+ 
         #Open GeoTag Log File
         i = 0
         while os.path.exists('/sdcard/log/geoRef%s.log' % i):
