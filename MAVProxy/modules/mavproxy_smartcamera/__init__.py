@@ -16,7 +16,7 @@
 #
 # Responsible  : Jaime Machuca
 #
-# License      : CC BY-NC-SA
+# License      : GNU GPL version 3
 #
 # Editor Used  : Xcode 6.1.1 (6A2008a)
 #
@@ -88,12 +88,14 @@ class SmartCameraModule(mp_module.MPModule):
         self.WirelessPort = sc_config.config.get_string("general", 'WirelessPort', "wlan0")
         self.u8RetryTimeout = 0
         self.u8MaxRetries = 5
+        self.tLastCheckTime = time.time()
+        self.u8KillHeartbeatTimer = 10
         self.__vRegisterCameras()
 
         self.mpstate = mpstate
         
         # Start a 10 second timer to kill heartbeats as a workaround
-        threading.Timer(10, self.__vKillHeartbeat).start()
+        # threading.Timer(10, self.__vKillHeartbeat).start()
     
 #****************************************************************************
 #   Method Name     : __vKillHeartbeat
@@ -477,6 +479,28 @@ class SmartCameraModule(mp_module.MPModule):
             elif m.command == mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONTROL:
                 print ("Got Message Digicam_control")
                 self.__vDecodeDIGICAMControl(m)
+
+#****************************************************************************
+#   Method Name     : idle_task
+#
+#   Description     :
+#
+#   Parameters      : none
+#
+#   Return Value    : none
+#
+#   Author           : Jaime Machuca
+#
+#****************************************************************************
+
+    def idle_task(self):
+        now = time.time()
+        if not self.u8KillHeartbeatTimer == 0 and self.tLastCheckTime > 1:
+            print ("Time to Kill= %d" % self.u8KillHeartbeatTimer)
+            self.tLastCheckTime = now
+            self.u8KillHeartbeatTimer -= 1
+            if self.u8KillHeartbeatTimer == 0:
+                self.__vKillHeartbeat();
 
 #****************************************************************************
 #   Method Name     : init
