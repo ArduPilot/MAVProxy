@@ -139,6 +139,7 @@ class SmartCameraModule(mp_module.MPModule):
             if new_camera.boValidCameraFound() is True:
                 self.camera_list = self.camera_list + [new_camera]
                 print("Found QX Camera")
+                self.master.mav.statustext_send(6,"Camera found status text")
             else:
                 print("No Valid Camera Found, retry in 5 sec")
                 self.u8RetryTimeout = self.u8RetryTimeout + 1
@@ -146,6 +147,7 @@ class SmartCameraModule(mp_module.MPModule):
                 self.CamRetryScheduler.run()
         else:
             print("Max retries reached, No QX Camera Found")
+            self.master.mav.statustext_send(6,"Camera not found status text")
             self.u8RetryTimeout = 0
 
 #****************************************************************************
