@@ -139,7 +139,7 @@ class SmartCameraModule(mp_module.MPModule):
             if new_camera.boValidCameraFound() is True:
                 self.camera_list = self.camera_list + [new_camera]
                 print("Found QX Camera")
-                self.master.mav.statustext_send(6,"Camera found status text")
+                self.master.mav.statustext_i(MAV_SEVERITY_INFO,"Camera Controller: Found QX Camera, Ready to Fly")
             else:
                 print("No Valid Camera Found, retry in 5 sec")
                 self.u8RetryTimeout = self.u8RetryTimeout + 1
@@ -147,7 +147,7 @@ class SmartCameraModule(mp_module.MPModule):
                 self.CamRetryScheduler.run()
         else:
             print("Max retries reached, No QX Camera Found")
-            self.master.mav.statustext_send(6,"Camera not found status text")
+            self.master.mav.statustext_send(MAV_SEVERITY_ERROR,"Camera Controller: Warning! Camera not found")
             self.u8RetryTimeout = 0
 
 #****************************************************************************
@@ -485,7 +485,7 @@ class SmartCameraModule(mp_module.MPModule):
 #****************************************************************************
 #   Method Name     : idle_task
 #
-#   Description     :
+#   Description     : used for heartbeat work arround timer
 #
 #   Parameters      : none
 #
@@ -498,7 +498,6 @@ class SmartCameraModule(mp_module.MPModule):
     def idle_task(self):
         now = time.time()
         if not self.u8KillHeartbeatTimer == 0 and self.tLastCheckTime > 1:
-            print ("Time to Kill= %d" % self.u8KillHeartbeatTimer)
             self.tLastCheckTime = now
             self.u8KillHeartbeatTimer -= 1
             if self.u8KillHeartbeatTimer == 0:
