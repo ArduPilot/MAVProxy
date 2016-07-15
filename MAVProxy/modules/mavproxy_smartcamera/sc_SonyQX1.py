@@ -299,7 +299,7 @@ class SmartCamera_SonyQX():
     def __openGeoTagLogFile(self):
         
         # Verify folder exists
-        if not !os.path.exists('/sdcard/log'):
+        if not os.path.exists('/sdcard/log'):
             os.makedirs('/sdcard/log')
  
         #Open GeoTag Log File
