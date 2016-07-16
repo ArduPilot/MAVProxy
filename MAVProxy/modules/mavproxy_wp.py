@@ -467,7 +467,7 @@ class WPModule(mp_module.MPModule):
 
     def cmd_wp(self, args):
         '''waypoint commands'''
-        usage = "usage: wp <list|load|update|save|set|clear|loop|remove|move>"
+        usage = "usage: wp <list|load|update|save|set|clear|loop|remove|move|movemulti>"
         if len(args) < 1:
             print(usage)
             return
