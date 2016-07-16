@@ -72,6 +72,7 @@ class MiscModule(mp_module.MPModule):
                          ["<add|remove|clear>"])
         self.add_command('version', self.cmd_version, "show version")
         self.add_command('rcbind', self.cmd_rcbind, "bind RC receiver")
+        self.add_command('led', self.cmd_led, "control board LED")
         self.repeats = []
 
     def altitude_difference(self, pressure1, pressure2, ground_temp):
@@ -181,6 +182,26 @@ class MiscModule(mp_module.MPModule):
                                           mavutil.mavlink.MAV_CMD_START_RX_PAIR,
                                           0,
                                           float(args[0]), 0, 0, 0, 0, 0, 0)
+
+    def cmd_led(self, args):
+        '''send LED pattern as override'''
+        if len(args) < 3:
+            print("Usage: led RED GREEN BLUE <RATE>")
+            return
+        pattern = [0] * 24
+        pattern[0] = int(args[0])
+        pattern[1] = int(args[1])
+        pattern[2] = int(args[2])
+        
+        if len(args) == 4:
+            plen = 4
+            pattern[3] = int(args[3])
+        else:
+            plen = 3
+            
+        self.master.mav.led_control_send(self.settings.target_system,
+                                         self.settings.target_component,
+                                         0, 0, plen, pattern)
 
     def cmd_repeat(self, args):
         '''repeat a command at regular intervals'''
