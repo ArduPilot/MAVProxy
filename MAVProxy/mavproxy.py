@@ -592,8 +592,6 @@ def log_paths():
     '''Returns tuple (logdir, telemetry_log_filepath, raw_telemetry_log_filepath)'''
     if opts.aircraft is not None:
         dirname = ""
-        if(opts.daemon):
-            dirname = '/var/log/'
         if opts.mission is not None:
             print(opts.mission)
             dirname += "%s/logs/%s/Mission%s" % (opts.aircraft, time.strftime("%Y-%m-%d"), opts.mission)
@@ -622,10 +620,7 @@ def log_paths():
         if not os.path.isabs(dir_path) and mpstate.settings.state_basedir is not None:
             dir_path = os.path.join(mpstate.settings.state_basedir,dir_path)
 
-        if(opts.daemon):
-            logdir = '/var/log'
-        else:
-            logdir = dir_path
+        logdir = dir_path
 
     mkdir_p(logdir)
     return (logdir,
