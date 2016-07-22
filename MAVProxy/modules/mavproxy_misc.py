@@ -73,6 +73,7 @@ class MiscModule(mp_module.MPModule):
         self.add_command('version', self.cmd_version, "show version")
         self.add_command('rcbind', self.cmd_rcbind, "bind RC receiver")
         self.add_command('led', self.cmd_led, "control board LED")
+        self.add_command('playtune', self.cmd_playtune, "play tune remotely")
         self.repeats = []
 
     def altitude_difference(self, pressure1, pressure2, ground_temp):
@@ -202,6 +203,15 @@ class MiscModule(mp_module.MPModule):
         self.master.mav.led_control_send(self.settings.target_system,
                                          self.settings.target_component,
                                          0, 0, plen, pattern)
+
+    def cmd_playtune(self, args):
+        '''send PLAY_TUNE message'''
+        if len(args) < 1:
+            print("Usage: playtune TUNE")
+            return
+        self.master.mav.play_tune_send(self.settings.target_system,
+                                       self.settings.target_component,
+                                       args[0])
 
     def cmd_repeat(self, args):
         '''repeat a command at regular intervals'''
