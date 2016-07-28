@@ -189,11 +189,11 @@ class ConsoleModule(mp_module.MPModule):
                 if vehicle_agl is None:
                     vehicle_agl = '---'
                 else:
-                    vehicle_agl = int(vehicle_agl)
-                self.console.set_status('AGL', 'AGL %u/%s' % (agl_alt, vehicle_agl))
-            self.console.set_status('Alt', 'Alt %u' % rel_alt)
-            self.console.set_status('AirSpeed', 'AirSpeed %u' % msg.airspeed)
-            self.console.set_status('GPSSpeed', 'GPSSpeed %u' % msg.groundspeed)
+                    vehicle_agl = self.height_string(vehicle_agl)
+                self.console.set_status('AGL', 'AGL %s/%s' % (self.height_string(agl_alt), vehicle_agl))
+            self.console.set_status('Alt', 'Alt %s' % self.height_string(rel_alt))
+            self.console.set_status('AirSpeed', 'AirSpeed %s' % self.speed_string(msg.airspeed))
+            self.console.set_status('GPSSpeed', 'GPSSpeed %s' % self.speed_string(msg.groundspeed))
             self.console.set_status('Thr', 'Thr %u' % msg.throttle)
             t = time.localtime(msg._timestamp)
             flying = False
@@ -350,7 +350,7 @@ class ConsoleModule(mp_module.MPModule):
                 self.console.set_status('ETR', 'ETR %u:%02u' % (time_remaining/60, time_remaining%60))
 
         elif type == 'NAV_CONTROLLER_OUTPUT':
-            self.console.set_status('WPDist', 'Distance %u' % msg.wp_dist)
+            self.console.set_status('WPDist', 'Distance %s' % self.dist_string(msg.wp_dist))
             self.console.set_status('WPBearing', 'Bearing %u' % msg.target_bearing)
             if msg.alt_error > 0:
                 alt_error_sign = "L"

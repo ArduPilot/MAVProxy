@@ -110,3 +110,23 @@ class MPModule(object):
 
     def add_completion_function(self, name, callback):
         self.mpstate.completion_functions[name] = callback
+
+    def dist_string(self, val_meters):
+        '''return a distance as a string'''
+        if self.settings.dist_unit == 'nm':
+            return "%.1fnm" % (val_meters * 0.000539957)
+        if self.settings.dist_unit == 'miles':
+            return "%.1fmiles" % (val_meters * 0.000621371)
+        return "%um" % val_meters
+
+    def height_string(self, val_meters):
+        '''return a height as a string'''
+        if self.settings.height_unit == 'feet':
+            return "%uft" % (val_meters * 3.28084)
+        return "%um" % val_meters
+
+    def speed_string(self, val_ms):
+        '''return a speed as a string'''
+        if self.settings.speed_unit == 'knots':
+            return "%ukn" % (val_ms * 1.94384)
+        return "%um/s" % val_ms
