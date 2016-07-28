@@ -72,6 +72,8 @@ class LogModule(mp_module.MPModule):
             self.download_file = None
             self.download_filename = None
             self.download_set = set()
+            self.master.mav.log_request_end_send(self.target_system,
+                                                 self.target_component)
             if len(self.download_queue):
                 self.log_download_next()
 
