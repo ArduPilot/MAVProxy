@@ -254,6 +254,8 @@ class LinkModule(mp_module.MPModule):
         sysid = m.get_srcSystem()
         if sysid in self.mpstate.sysid_outputs:
             self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
+            if m.get_type() == "GLOBAL_POSITION_INT" and self.module('map') is not None:
+                self.module('map').set_secondary_vehicle_position(m)
             return
 
         if getattr(m, '_timestamp', None) is None:
