@@ -416,12 +416,12 @@ class MapModule(mp_module.MPModule):
         '''show 2nd vehicle on map'''
         if m.get_type() != 'GLOBAL_POSITION_INT':
             return
-        (self.lat, self.lon, self.heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
-        if abs(self.lat) < 1.0e-3 and abs(self.lon) > 1.0e-3:
+        (lat, lon, heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
+        if abs(lat) < 1.0e-3 and abs(lon) > 1.0e-3:
             return
         # hack for OBC2016
         self.create_vehicle_icon('VehiclePos2', 'blue', follow=False, vehicle_type='heli')
-        self.mpstate.map.set_position('VehiclePos2', (self.lat, self.lon), rotation=self.heading)
+        self.mpstate.map.set_position('VehiclePos2', (lat, lon), rotation=heading)
 
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
