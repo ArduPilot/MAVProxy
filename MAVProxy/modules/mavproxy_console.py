@@ -321,8 +321,8 @@ class ConsoleModule(mp_module.MPModule):
                     fg = 'red'
                 else:
                     packets_rcvd_percentage = 100
-                    if (m.mav_loss != 0): #avoid divide-by-zero
-                        packets_rcvd_percentage = (1.0 - (float(m.mav_loss) / float(m.mav_count))) * 100.0
+                    if (m.mav_count+m.mav_loss) != 0: #avoid divide-by-zero
+                        packets_rcvd_percentage = (100.0 * m.mav_count) / (m.mav_count + m.mav_loss)
 
                     linkline += "OK (%u pkts, %.2fs delay, %u lost) %u%%" % (m.mav_count, linkdelay, m.mav_loss, packets_rcvd_percentage)
                     if linkdelay > 1:
