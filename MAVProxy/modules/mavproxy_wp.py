@@ -24,7 +24,7 @@ class WPModule(mp_module.MPModule):
         self.undo_type = None
         self.undo_wp_idx = -1
         self.add_command('wp', self.cmd_wp,       'waypoint management',
-                         ["<list|clear|move|remove|loop|set|undo|movemulti|param>",
+                         ["<list|clear|move|remove|loop|set|undo|movemulti|param|status>",
                           "<load|update|save|show> (FILENAME)"])
 
         if self.continue_mode and self.logdir != None:
@@ -67,6 +67,13 @@ class WPModule(mp_module.MPModule):
             #print("REQUESTING %u/%u (%u)" % (seq, self.wploader.expected_count, i))
             self.wp_requested[seq] = tnow
             self.master.waypoint_request_send(seq)
+
+    def wp_status(self):
+        '''show status of wp download'''
+        try:
+            print("Have %u of %u waypoints" % (self.wploader.count()+len(self.wp_received), self.wploader.expected_count))
+        except Exception:
+            print("Have %u waypoints" % self.wploader.count()+len(self.wp_received))
 
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
@@ -575,6 +582,8 @@ class WPModule(mp_module.MPModule):
             self.set_home_location()
         elif args[0] == "loop":
             self.wp_loop()
+        elif args[0] == "status":
+            self.wp_status()
         else:
             print(usage)
 
