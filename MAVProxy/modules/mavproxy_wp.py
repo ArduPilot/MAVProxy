@@ -12,6 +12,8 @@ class WPModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(WPModule, self).__init__(mpstate, "wp", "waypoint handling", public = True)
         self.wp_op = None
+        self.wp_requested = {}
+        self.wp_received = {}
         self.wp_save_filename = None
         self.wploader = mavwp.MAVWPLoader()
         self.loading_waypoints = False
@@ -52,6 +54,20 @@ class WPModule(mp_module.MPModule):
                                          MPMenuItem('Loop', 'Loop', '# wp loop')])
 
 
+    def send_wp_requests(self):
+        '''send some more WP requests'''
+        next_seq = self.wploader.count()
+        tnow = time.time()
+        for i in range(5):
+            seq = next_seq+i
+            if seq+1 > self.wploader.expected_count:
+                continue
+            if seq in self.wp_requested and tnow - self.wp_requested[seq] < 2:
+                continue
+            #print("REQUESTING %u/%u (%u)" % (seq, self.wploader.expected_count, i))
+            self.wp_requested[seq] = tnow
+            self.master.waypoint_request_send(seq)
+
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         mtype = m.get_type()
@@ -64,20 +80,23 @@ class WPModule(mp_module.MPModule):
                 self.console.writeln("Requesting %u waypoints t=%s now=%s" % (m.count,
                                                                                  time.asctime(time.localtime(m._timestamp)),
                                                                                  time.asctime()))
-                self.master.waypoint_request_send(0)
+                self.send_wp_requests()
 
         elif mtype in ['WAYPOINT', 'MISSION_ITEM'] and self.wp_op != None:
-            if m.seq > self.wploader.count():
-                self.console.writeln("Unexpected waypoint number %u - expected %u" % (m.seq, self.wploader.count()))
-            elif m.seq < self.wploader.count():
-                # a duplicate
+            if m.seq < self.wploader.count():
                 #print("DUPLICATE %u" % m.seq)
                 return
-            else:
+            if m.seq+1 >= self.wploader.expected_count:
+                self.console.writeln("Unexpected waypoint number %u - expected %u" % (m.seq, self.wploader.count()))
+            self.wp_received[m.seq] = m
+            next_seq = self.wploader.count()
+            while next_seq in self.wp_received:
+                m = self.wp_received.pop(next_seq)
                 self.wploader.add(m)
+                next_seq += 1
             if m.seq+1 < self.wploader.expected_count:
-                #print("REQUESTNG %u" % (m.seq+1))
-                self.master.waypoint_request_send(m.seq+1)
+                #print("m.seq=%u expected_count=%u" % (m.seq, self.wploader.expected_count))
+                self.send_wp_requests()
             else:
                 if self.wp_op == 'list':
                     for i in range(self.wploader.count()):
@@ -93,6 +112,8 @@ class WPModule(mp_module.MPModule):
                 elif self.wp_op == "save":
                     self.save_waypoints(self.wp_save_filename)
                 self.wp_op = None
+                self.wp_requested = {}
+                self.wp_received = {}
 
         elif mtype in ["WAYPOINT_REQUEST", "MISSION_REQUEST"]:
             self.process_waypoint_request(m, self.master)
@@ -124,7 +145,7 @@ class WPModule(mp_module.MPModule):
             if self.master is not None and self.master.time_since('MISSION_ITEM') >= 2 and self.wploader.count() < getattr(self.wploader,'expected_count',0):
                 seq = self.wploader.count()
                 print("re-requesting WP %u" % seq)
-                self.master.waypoint_request_send(seq)
+                self.send_wp_requests()
         if self.module('console') is not None and not self.menu_added_console:
             self.menu_added_console = True
             self.module('console').add_menu(self.menu)
