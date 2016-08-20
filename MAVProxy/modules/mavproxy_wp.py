@@ -71,10 +71,12 @@ class WPModule(mp_module.MPModule):
                 self.console.writeln("Unexpected waypoint number %u - expected %u" % (m.seq, self.wploader.count()))
             elif m.seq < self.wploader.count():
                 # a duplicate
-                pass
+                #print("DUPLICATE %u" % m.seq)
+                return
             else:
                 self.wploader.add(m)
             if m.seq+1 < self.wploader.expected_count:
+                #print("REQUESTNG %u" % (m.seq+1))
                 self.master.waypoint_request_send(m.seq+1)
             else:
                 if self.wp_op == 'list':
