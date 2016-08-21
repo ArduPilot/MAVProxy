@@ -73,7 +73,7 @@ class WPModule(mp_module.MPModule):
         try:
             print("Have %u of %u waypoints" % (self.wploader.count()+len(self.wp_received), self.wploader.expected_count))
         except Exception:
-            print("Have %u waypoints" % self.wploader.count()+len(self.wp_received))
+            print("Have %u waypoints" % (self.wploader.count()+len(self.wp_received)))
 
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
