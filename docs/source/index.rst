@@ -28,7 +28,7 @@ Features
 -  Tab-completion of commands.
 
 A list of commits to MAVProxy (closest thing to a changelog that is
-available) can be seen `here <https://github.com/Dronecode/MAVProxy/commits/master>`_.
+available) can be seen `here <https://github.com/ArduPilot/MAVProxy/commits/master>`_.
 
 Screenshots
 ============

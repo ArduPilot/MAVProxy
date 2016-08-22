@@ -28,7 +28,7 @@ Use git to download the MAVProxy source:
 
 .. code:: bash
 
-    git clone https://github.com/Dronecode/MAVProxy.git
+    git clone https://github.com/ArduPilot/MAVProxy.git
 
 After making the desired changes, MAVProxy is required to be installed
 (the modules won't work otherwise). This needs to happen after any
@@ -75,7 +75,7 @@ Use ``pip`` to install the other packages:
     pip install pymavlink  
     pip install lxml python-dateutil pytz pyparsing six
 
-Download the MAVProxy `source <https://github.com/Dronecode/MAVProxy>`_.
+Download the MAVProxy `source <https://github.com/ArduPilot/MAVProxy>`_.
 
 After making the desired changes, MAVProxy is required to be compiled
 and copied into the Python directory (the modules won't work otherwise).

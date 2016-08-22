@@ -14,7 +14,7 @@ http://firmware.diydrones.com/Tools/MAVProxy/.
 
     Please note that the "missionedit" module does not currently run on the
     Windows package of MAVProxy. This is being investigated and will
-    hopefully be fixed soon. See https://github.com/Dronecode/MAVProxy/issues/129 for more details.
+    hopefully be fixed soon. See https://github.com/ArduPilot/MAVProxy/issues/129 for more details.
 
 
 Linux
