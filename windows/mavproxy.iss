@@ -6,7 +6,7 @@
 ; Note MyAppVersion is defined in MAVProxyWinBuild.bat
 ; #define MyAppVersion {code:GetVersion}
 #define MyAppPublisher "Andrew Tridgell"
-#define MyAppURL "http://Dronecode.github.io/MAVProxy"
+#define MyAppURL "http://ardupilot.github.io/MAVProxy"
 #define MyAppExeName "mavproxy.exe"
 
 [Setup]
@@ -50,7 +50,7 @@ Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{group}\MAVExplorer"; Filename: "{app}\MAVExplorer.exe"
 Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 Name: "{group}\{cm:UninstallProgram, {#MyAppName}}"; Filename: "{uninstallexe}"
-Name: "{group}\Documentation"; Filename: "http://Dronecode.github.io/MAVProxy/"
+Name: "{group}\Documentation"; Filename: "http://ardupilot.github.io/MAVProxy/"
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent

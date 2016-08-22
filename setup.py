@@ -30,9 +30,9 @@ control modules. MAVProxy is extensible via a modules system - see the modules
 subdirectory for some example modules. MAVProxy was developed by CanberraUAV
 for use in the 2012 Outback Challenge, and includes a module for the
 CanberraUAV search and rescue system. See
-http://Dronecode.github.io/MAVProxy/ for more information
+http://ardupilot.github.io/MAVProxy/ for more information
 on how to use MAVProxy.''',
-      url='https://github.com/Dronecode/MAVProxy',
+      url='https://github.com/ArduPilot/MAVProxy',
       author='Andrew Tridgell',
       author_email='andrew@tridgell.net',
       classifiers=[
