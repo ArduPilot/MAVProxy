@@ -99,19 +99,25 @@ class CmdlongModule(mp_module.MPModule):
     def cmd_cammsg(self, args):
         '''cammsg'''
 
+        params = [0, 0, 0, 0, 1, 0, 0]
+
+        # fill in any args passed by user
+        for i in range(min(len(args),len(params))):
+            params[i] = float(args[i])
+
         print("Sent DIGICAM_CONTROL CMD_LONG")
         self.master.mav.command_long_send(
             self.settings.target_system,  # target_system
             0, # target_component
             mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONTROL, # command
             0, # confirmation
-            10, # param1
-            20, # param2
-            30, # param3
-            40, # param4
-            50, # param5
-            60, # param6
-            70) # param7
+            params[0], # param1
+            params[1], # param2
+            params[2], # param3
+            params[3], # param4
+            params[4], # param5
+            params[5], # param6
+            params[6]) # param7
 
     def cmd_cammsg_old(self, args):
         '''cammsg_old'''
