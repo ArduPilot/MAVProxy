@@ -32,7 +32,7 @@ class AntennaModule(mp_module.MPModule):
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         if self.gcs_location is None and self.module('wp').wploader.count() > 0:
-            home = self.module('wp').wploader.wp(0)
+            home = self.module('wp').get_home()
             self.gcs_location = (home.x, home.y)
             print("Antenna home set")
         if self.gcs_location is None:

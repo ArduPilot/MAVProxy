@@ -33,6 +33,8 @@ class ElevationModel():
 
     def GetElevation(self, latitude, longitude, timeout=0):
         '''Returns the altitude (m ASL) of a given lat/long pair, or None if unknown'''
+        if latitude is None or longitude is None:
+            return None
         if self.database == 'srtm':
             TileID = (numpy.floor(latitude), numpy.floor(longitude))
             if TileID in self.tileDict:

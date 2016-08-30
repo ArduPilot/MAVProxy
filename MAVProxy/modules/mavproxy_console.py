@@ -158,13 +158,13 @@ class ConsoleModule(mp_module.MPModule):
                 alt = master.field('GPS_RAW_INT', 'alt', 0) / 1.0e3
             else:
                 alt = master.field('GPS_RAW', 'alt', 0)
-            if self.module('wp').wploader.count() > 0:
-                wp = self.module('wp').wploader.wp(0)
-                home_lat = wp.x
-                home_lng = wp.y
+            home = self.module('wp').get_home()
+            if home is not None:
+                home_lat = home.x
+                home_lng = home.y
             else:
-                home_lat = master.field('HOME', 'lat') * 1.0e-7
-                home_lng = master.field('HOME', 'lon') * 1.0e-7
+                home_lat = None
+                home_lng = None
             lat = master.field('GLOBAL_POSITION_INT', 'lat', 0) * 1.0e-7
             lng = master.field('GLOBAL_POSITION_INT', 'lon', 0) * 1.0e-7
             rel_alt = master.field('GLOBAL_POSITION_INT', 'relative_alt', 0) * 1.0e-3

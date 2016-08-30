@@ -252,12 +252,31 @@ class WPModule(mp_module.MPModule):
             return mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT
         return mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT
 
+    def get_home(self):
+        '''get home location'''
+        if 'HOME_POSITION' in self.master.messages:
+            h = self.master.messages['HOME_POSITION']
+            return mavutil.mavlink.MAVLink_mission_item_message(self.target_system,
+                                                                self.target_component,
+                                                                0,
+                                                                0,
+                                                                mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
+                                                                0, 0, 0, 0, 0, 0,
+                                                                h.latitude*1.0e-7, h.longitude*1.0e-7, h.altitude*1.0e-3)
+        if self.wploader.count() > 0:
+            return self.wploader.wp(0)
+        return None
+        
+
     def wp_draw_callback(self, points):
         '''callback from drawing waypoints'''
         if len(points) < 3:
             return
         from MAVProxy.modules.lib import mp_util
-        home = self.wploader.wp(0)
+        home = self.get_home()
+        if home is None:
+            print("Need home location for draw")
+            return
         self.wploader.clear()
         self.wploader.target_system = self.target_system
         self.wploader.target_component = self.target_component
@@ -571,7 +590,7 @@ class WPModule(mp_module.MPModule):
             if not 'draw_lines' in self.mpstate.map_functions:
                 print("No map drawing available")
                 return
-            if self.wploader.count() == 0:
+            if self.get_home() is None:
                 print("Need home location - refresh waypoints")
                 return
             if len(args) > 1:
