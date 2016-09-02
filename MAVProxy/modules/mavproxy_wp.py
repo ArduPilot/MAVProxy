@@ -93,7 +93,7 @@ class WPModule(mp_module.MPModule):
             if m.seq < self.wploader.count():
                 #print("DUPLICATE %u" % m.seq)
                 return
-            if m.seq+1 >= self.wploader.expected_count:
+            if m.seq+1 > self.wploader.expected_count:
                 self.console.writeln("Unexpected waypoint number %u - expected %u" % (m.seq, self.wploader.count()))
             self.wp_received[m.seq] = m
             next_seq = self.wploader.count()
@@ -101,26 +101,26 @@ class WPModule(mp_module.MPModule):
                 m = self.wp_received.pop(next_seq)
                 self.wploader.add(m)
                 next_seq += 1
-            if m.seq+1 < self.wploader.expected_count:
+            if self.wploader.count() != self.wploader.expected_count:
                 #print("m.seq=%u expected_count=%u" % (m.seq, self.wploader.expected_count))
                 self.send_wp_requests()
-            else:
-                if self.wp_op == 'list':
-                    for i in range(self.wploader.count()):
-                        w = self.wploader.wp(i)
-                        print("%u %u %.10f %.10f %f p1=%.1f p2=%.1f p3=%.1f p4=%.1f cur=%u auto=%u" % (
-                            w.command, w.frame, w.x, w.y, w.z,
-                            w.param1, w.param2, w.param3, w.param4,
-                            w.current, w.autocontinue))
-                    if self.logdir != None:
-                        waytxt = os.path.join(self.logdir, 'way.txt')
-                        self.save_waypoints(waytxt)
-                        print("Saved waypoints to %s" % waytxt)
-                elif self.wp_op == "save":
-                    self.save_waypoints(self.wp_save_filename)
-                self.wp_op = None
-                self.wp_requested = {}
-                self.wp_received = {}
+                return
+            if self.wp_op == 'list':
+                for i in range(self.wploader.count()):
+                    w = self.wploader.wp(i)
+                    print("%u %u %.10f %.10f %f p1=%.1f p2=%.1f p3=%.1f p4=%.1f cur=%u auto=%u" % (
+                        w.command, w.frame, w.x, w.y, w.z,
+                        w.param1, w.param2, w.param3, w.param4,
+                        w.current, w.autocontinue))
+                if self.logdir != None:
+                    waytxt = os.path.join(self.logdir, 'way.txt')
+                    self.save_waypoints(waytxt)
+                    print("Saved waypoints to %s" % waytxt)
+            elif self.wp_op == "save":
+                self.save_waypoints(self.wp_save_filename)
+            self.wp_op = None
+            self.wp_requested = {}
+            self.wp_received = {}
 
         elif mtype in ["WAYPOINT_REQUEST", "MISSION_REQUEST"]:
             self.process_waypoint_request(m, self.master)
