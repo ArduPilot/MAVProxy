@@ -24,7 +24,7 @@ class WPModule(mp_module.MPModule):
         self.undo_type = None
         self.undo_wp_idx = -1
         self.add_command('wp', self.cmd_wp,       'waypoint management',
-                         ["<list|clear|move|remove|loop|set|undo|movemulti|param|status>",
+                         ["<list|clear|move|remove|loop|set|undo|movemulti|changealt|param|status>",
                           "<load|update|save|show> (FILENAME)"])
 
         if self.continue_mode and self.logdir != None:
@@ -446,6 +446,38 @@ class WPModule(mp_module.MPModule):
                                                         wpstart, wpend+1)
         print("Moved WPs %u:%u to %f, %f rotation=%.1f" % (wpstart, wpend, lat, lon, rotation))
 
+
+    def cmd_wp_changealt(self, args):
+        '''handle wp change target alt of multiple waypoints'''
+        if len(args) < 2:
+            print("usage: wp changealt WPNUM NEWALT <NUMWP>")
+            return
+        idx = int(args[0])
+        if idx < 1 or idx > self.wploader.count():
+            print("Invalid wp number %u" % idx)
+            return
+        newalt = float(args[1])
+        if len(args) >= 3:
+            count = int(args[2])
+        else:
+            count = 1
+
+        for wpnum in range(idx, idx+count):
+            wp = self.wploader.wp(wpnum)
+            if not self.wploader.is_location_command(wp.command):
+                continue
+            wp.z = newalt
+            wp.target_system    = self.target_system
+            wp.target_component = self.target_component
+            self.wploader.set(wp, wpnum)
+
+        self.loading_waypoints = True
+        self.loading_waypoint_lasttime = time.time()
+        self.master.mav.mission_write_partial_list_send(self.target_system,
+                                                        self.target_component,
+                                                        idx, idx+count)
+        print("Changed alt for WPs %u:%u to %f" % (idx, idx+(count-1), newalt))
+
     def cmd_wp_remove(self, args):
         '''handle wp remove'''
         if len(args) != 1:
@@ -529,7 +561,7 @@ class WPModule(mp_module.MPModule):
 
     def cmd_wp(self, args):
         '''waypoint commands'''
-        usage = "usage: wp <list|load|update|save|set|clear|loop|remove|move|movemulti>"
+        usage = "usage: wp <list|load|update|save|set|clear|loop|remove|move|movemulti|changealt>"
         if len(args) < 1:
             print(usage)
             return
@@ -572,6 +604,8 @@ class WPModule(mp_module.MPModule):
             self.cmd_wp_move(args[1:])
         elif args[0] == "movemulti":
             self.cmd_wp_movemulti(args[1:])
+        elif args[0] == "changealt":
+            self.cmd_wp_changealt(args[1:])
         elif args[0] == "param":
             self.cmd_wp_param(args[1:])
         elif args[0] == "remove":
