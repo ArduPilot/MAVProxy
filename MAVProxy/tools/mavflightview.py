@@ -11,10 +11,7 @@ from MAVProxy.modules.mavproxy_map import mp_slipmap, mp_tile
 from MAVProxy.modules.lib import mp_util
 import functools
 
-try:
-    import cv2.cv as cv
-except ImportError:
-    import cv
+import cv2
 
 def create_map(title):
     '''create map object'''
@@ -44,8 +41,8 @@ def create_imagefile(options, filename, latlon, ground_width, path_objs, mission
             m.draw(map_img, pixmapper, None)
     if fence_obj is not None:
         fence_obj.draw(map_img, pixmapper, None)
-    cv.CvtColor(map_img, map_img, cv.CV_BGR2RGB)
-    cv.SaveImage(filename, map_img)
+    map_img = cv2.cvtColor(map_img, cv2.COLOR_BGR2RGB)
+    cv2.imwrite(filename, map_img)
 
 colourmap = {
     'MANUAL'    : (255,   0,   0),
