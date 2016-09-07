@@ -28,7 +28,7 @@ class ArmModule(mp_module.MPModule):
                                       'safetyon',
                                       'safetyoff'])
         self.add_command('disarm', self.cmd_disarm,   'disarm motors')
-
+        self.was_armed = False
 
     def cmd_arm(self, args):
         '''arm commands'''
@@ -119,6 +119,25 @@ class ArmModule(mp_module.MPModule):
             0, # param5
             0, # param6
             0) # param7
+
+    def all_checks_enabled(self):
+        ''' returns true if the UAV is skipping any arming checks'''
+        arming_mask = int(self.get_mav_param("ARMING_CHECK",0))
+        if arming_mask == 1:
+            return True
+        for bit in arming_masks.values():
+            if not arming_mask & bit and bit != 1:
+                return False
+        return True
+
+    def mavlink_packet(self, m):
+        mtype = m.get_type()
+        if mtype == 'HEARTBEAT' and m.type != mavutil.mavlink.MAV_TYPE_GCS:
+            armed = self.master.motors_armed()
+            if armed != self.was_armed:
+                self.was_armed = armed
+                if armed and not self.all_checks_enabled():
+                    self.say("Arming checks disabled")
 
 def init(mpstate):
     '''initialise module'''
