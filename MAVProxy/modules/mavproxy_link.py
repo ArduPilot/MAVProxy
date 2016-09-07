@@ -228,22 +228,23 @@ class LinkModule(mp_module.MPModule):
         else:
             master.link_delayed = False
 
-    def bgcolor_for_severity(self, severity):
+    def colors_for_severity(self, severity):
         severity_colors = {
-            mavutil.mavlink.MAV_SEVERITY_EMERGENCY: 'red',
-            mavutil.mavlink.MAV_SEVERITY_ALERT: 'red',
-            mavutil.mavlink.MAV_SEVERITY_CRITICAL: 'red',
-            mavutil.mavlink.MAV_SEVERITY_ERROR: 'orange',
-            mavutil.mavlink.MAV_SEVERITY_WARNING: 'orange',
-            mavutil.mavlink.MAV_SEVERITY_NOTICE: 'yellow',
-            mavutil.mavlink.MAV_SEVERITY_INFO: 'green',
-            mavutil.mavlink.MAV_SEVERITY_DEBUG: 'green',
+            # tuple is (fg, bg) (as in "white on red")
+            mavutil.mavlink.MAV_SEVERITY_EMERGENCY: ('white', 'red'),
+            mavutil.mavlink.MAV_SEVERITY_ALERT: ('white', 'red'),
+            mavutil.mavlink.MAV_SEVERITY_CRITICAL: ('white', 'red'),
+            mavutil.mavlink.MAV_SEVERITY_ERROR: ('black', 'orange'),
+            mavutil.mavlink.MAV_SEVERITY_WARNING: ('black', 'orange'),
+            mavutil.mavlink.MAV_SEVERITY_NOTICE: ('black', 'yellow'),
+            mavutil.mavlink.MAV_SEVERITY_INFO: ('white', 'green'),
+            mavutil.mavlink.MAV_SEVERITY_DEBUG: ('white', 'green'),
         }
         try:
             return severity_colors[severity]
         except Exception as e:
             print("Exception: %s" % str(e))
-            return 'red'
+            return ('white', 'red')
 
     def report_altitude(self, altitude):
         '''possibly report a new altitude'''
@@ -370,8 +371,8 @@ class LinkModule(mp_module.MPModule):
 
         elif mtype == 'STATUSTEXT':
             if m.text != self.status.last_apm_msg or time.time() > self.status.last_apm_msg_time+2:
-                bg = self.bgcolor_for_severity(m.severity)
-                self.mpstate.console.writeln("APM: %s" % m.text, bg=bg)
+                (fg, bg) = self.colors_for_severity(m.severity)
+                self.mpstate.console.writeln("APM: %s" % m.text, bg=bg, fg=fg)
                 self.status.last_apm_msg = m.text
                 self.status.last_apm_msg_time = time.time()
 
