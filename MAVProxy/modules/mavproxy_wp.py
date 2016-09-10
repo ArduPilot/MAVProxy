@@ -139,10 +139,8 @@ class WPModule(mp_module.MPModule):
                 pass
             else:
                 if wp.command == mavutil.mavlink.MAV_CMD_DO_LAND_START:
-                    alt_offset = self.get_mav_param('ALT_OFFSET',None)
-                    if alt_offset is None:
-                        self.say("No parameters when passing DO_LAND_START")
-                    elif alt_offset > 0.005:
+                    alt_offset = self.get_mav_param('ALT_OFFSET', 0)
+                    if alt_offset > 0.005:
                         self.say("ALT OFFSET IS NOT ZERO passing DO_LAND_START")
 
     def idle_task(self):
