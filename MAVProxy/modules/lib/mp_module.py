@@ -130,3 +130,11 @@ class MPModule(object):
         if self.settings.speed_unit == 'knots':
             return "%ukn" % (val_ms * 1.94384)
         return "%um/s" % val_ms
+
+    def set_prompt(self, prompt):
+        '''set prompt for command line'''
+        if prompt and self.settings.vehicle_name:
+            # add in optional vehicle name
+            prompt = self.settings.vehicle_name + ':' + prompt
+        self.mpstate.rl.set_prompt(prompt)
+            

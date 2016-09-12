@@ -304,7 +304,10 @@ class ConsoleModule(mp_module.MPModule):
                 fg = 'black'
             self.console.set_status('Radio', 'Radio %u/%u %u/%u' % (msg.rssi, msg.noise, msg.remrssi, msg.remnoise), fg=fg)
         elif type == 'HEARTBEAT':
-            self.console.set_status('Mode', '%s' % master.flightmode, fg='blue')
+            fmode = master.flightmode
+            if self.settings.vehicle_name:
+                fmode = self.settings.vehicle_name + ':' + fmode
+            self.console.set_status('Mode', '%s' % fmode, fg='blue')
             if self.master.motors_armed():
                 arm_colour = 'green'
             else:

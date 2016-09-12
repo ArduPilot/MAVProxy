@@ -156,9 +156,12 @@ class MPState(object):
               MPSetting('target_component', int, 0, 'MAVLink target component', range=(0,255), increment=1),
               MPSetting('state_basedir', str, None, 'base directory for logs and aircraft directories'),
               MPSetting('allow_unsigned', bool, True, 'whether unsigned packets will be accepted'),
-              MPSetting('dist_unit', str, 'm', 'distance unit', choice=['m', 'nm', 'miles']),
+
+              MPSetting('dist_unit', str, 'm', 'distance unit', choice=['m', 'nm', 'miles'], tab='Units'),
               MPSetting('height_unit', str, 'm', 'height unit', choice=['m', 'feet']),
               MPSetting('speed_unit', str, 'm/s', 'height unit', choice=['m/s', 'knots', 'mph']),
+
+              MPSetting('vehicle_name', str, '', 'Vehicle Name', tab='Vehicle'),
             ])
 
         self.completions = {
