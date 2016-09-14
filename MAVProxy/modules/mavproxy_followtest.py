@@ -17,7 +17,7 @@ if mp_util.has_wxpython:
 class FollowTestModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(FollowTestModule, self).__init__(mpstate, "followtest", "followtest module")
-        self.add_command('folllowtest', self.cmd_followtest, "folllowtest control",
+        self.add_command('followtest', self.cmd_followtest, "followtest control",
                          ['set (FOLLOWSETTING)'])
         self.follow_settings = mp_settings.MPSettings([("radius", float, 100.0),
                                                        ("altitude", float, 50.0),
