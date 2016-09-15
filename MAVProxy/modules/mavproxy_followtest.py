@@ -76,7 +76,15 @@ class FollowTestModule(mp_module.MPModule):
     def idle_task(self):
         '''update vehicle position'''
         pass
-        
+
+
+    def wrap_360(self, angle):
+        '''wrap an angle to 0..360 degrees'''
+        while angle < 0:
+                angle = 360 + angle
+        while angle >= 360:
+            angle -= 360
+        return angle
 
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
@@ -101,6 +109,13 @@ class FollowTestModule(mp_module.MPModule):
                                               2, 0, 0, 0, 0, 0,
                                               self.target_pos[0], self.target_pos[1],
                                               self.follow_settings.altitude)
+        elif self.follow_settings.type == 'yaw':
+            # display yaw from vehicle to target
+            vehicle = (m.lat*1.0e-7, m.lon*1.0e-7)
+            vehicle_yaw = math.degrees(self.master.field('ATTITUDE', 'yaw', 0))
+            target_bearing = mp_util.gps_bearing(vehicle[0], vehicle[1], self.target_pos[0], self.target_pos[1])
+            relyaw = self.wrap_360(target_bearing - vehicle_yaw)
+            print(relyaw)
 
 def init(mpstate):
     '''initialise module'''
