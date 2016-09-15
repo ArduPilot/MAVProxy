@@ -22,7 +22,8 @@ class FollowTestModule(mp_module.MPModule):
         self.follow_settings = mp_settings.MPSettings([("radius", float, 100.0),
                                                        ("altitude", float, 50.0),
                                                        ("speed", float, 10.0),
-                                                       ("type", str, 'guided')])
+                                                       ("type", str, 'guided'),
+                                                       ("vehicle_throttle", float, 1.0)])
         self.add_completion_function('(FOLLOWSETTING)', self.follow_settings.completion)
         self.target_pos = None
         self.last_update = 0
@@ -78,6 +79,14 @@ class FollowTestModule(mp_module.MPModule):
         pass
 
 
+    def wrap_180(self, angle):
+        '''wrap an angle to -180..180 degrees'''
+        while angle < -180:
+                angle = 360 + angle
+        while angle >= 180:
+            angle -= 360
+        return angle
+
     def wrap_360(self, angle):
         '''wrap an angle to 0..360 degrees'''
         while angle < 0:
@@ -114,8 +123,15 @@ class FollowTestModule(mp_module.MPModule):
             vehicle = (m.lat*1.0e-7, m.lon*1.0e-7)
             vehicle_yaw = math.degrees(self.master.field('ATTITUDE', 'yaw', 0))
             target_bearing = mp_util.gps_bearing(vehicle[0], vehicle[1], self.target_pos[0], self.target_pos[1])
-            relyaw = self.wrap_360(target_bearing - vehicle_yaw)
-            print(relyaw)
+            # wrap the angle from -180 to 180 thus commanding the vehicle to turn left or right
+            relyaw = self.wrap_180(target_bearing - vehicle_yaw)
+
+            self.master.mav.command_long_send(self.settings.target_system,
+                                                  self.settings.target_component,
+                                                  mavutil.mavlink.MAV_CMD_DO_SET_POSITION_YAW_THRUST, 0,
+                                                  relyaw,
+                                                  self.follow_settings.vehicle_throttle,
+                                                  0, 0, 0, 0, 0)
 
 def init(mpstate):
     '''initialise module'''
