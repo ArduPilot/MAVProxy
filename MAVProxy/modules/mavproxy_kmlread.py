@@ -166,7 +166,7 @@ class KmlReadModule(mp_module.MPModule):
         self.menu_needs_refreshing = True
         
     def clearkml(self):
-        '''Clear the kml's from the map'''
+        '''Clear the kmls from the map'''
         #go through all the current layers and remove them
         for layer in self.curlayers:
             self.mpstate.map.remove_object(layer)
@@ -237,6 +237,7 @@ class KmlReadModule(mp_module.MPModule):
                     self.menu.items.append(MPMenuCheckbox(layer.key, layer.key, '# kml toggle \"' + layer.key + '\"', checked=False))
             #and add the menu to the map popu menu
             self.module('map').add_menu(self.menu)
+        self.menu_needs_refreshing = False
                             
     def mavlink_packet(self, m):
         '''handle a mavlink packet'''
