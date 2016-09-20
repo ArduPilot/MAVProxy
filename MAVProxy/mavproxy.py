@@ -942,6 +942,8 @@ if __name__ == '__main__':
     parser.add_option("--master", dest="master", action='append',
                       metavar="DEVICE[,BAUD]", help="MAVLink master port and optional baud rate",
                       default=[])
+    parser.add_option("", "--force-connected", dest="force_connected", help="Use master even if initial connection fails",
+                      action='store_true', default=False)
     parser.add_option("--out", dest="output", action='append',
                       metavar="DEVICE[,BAUD]", help="MAVLink output port and optional baud rate",
                       default=[])
@@ -1092,7 +1094,7 @@ if __name__ == '__main__':
 
     # open master link
     for mdev in opts.master:
-        if not mpstate.module('link').link_add(mdev):
+        if not mpstate.module('link').link_add(mdev, force_connected=opts.force_connected):
             sys.exit(1)
 
     if not opts.master and len(serial_list) == 1:
