@@ -119,11 +119,23 @@ class MPModule(object):
             return "%.1fmiles" % (val_meters * 0.000621371)
         return "%um" % val_meters
 
+    def height_convert_units(self, val_meters):
+        '''return a height in configured units'''
+        if self.settings.height_unit == 'feet':
+            return val_meters * 3.28084
+        return val_meters
+
     def height_string(self, val_meters):
         '''return a height as a string'''
         if self.settings.height_unit == 'feet':
             return "%uft" % (val_meters * 3.28084)
         return "%um" % val_meters
+
+    def speed_convert_units(self, val_ms):
+        '''return a speed in configured units'''
+        if self.settings.speed_unit == 'knots':
+            return val_ms * 1.94384
+        return val_ms
 
     def speed_string(self, val_ms):
         '''return a speed as a string'''

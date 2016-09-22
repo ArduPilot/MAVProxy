@@ -33,6 +33,7 @@ class LinkModule(mp_module.MPModule):
         self.no_fwd_types.add("BAD_DATA")
         self.add_completion_function('(SERIALPORT)', self.complete_serial_ports)
         self.add_completion_function('(LINKS)', self.complete_links)
+        self.last_altitude_announce = 0.0
 
         self.menu_added_console = False
         if mp_util.has_wxpython:
@@ -257,11 +258,12 @@ class LinkModule(mp_module.MPModule):
                 alt2 = self.mpstate.settings.basealt
                 altitude += alt2 - alt1
         self.status.altitude = altitude
+        altitude_converted = self.height_convert_units(altitude)
         if (int(self.mpstate.settings.altreadout) > 0 and
-            math.fabs(self.status.altitude - self.status.last_altitude_announce) >=
+            math.fabs(altitude_converted - self.last_altitude_announce) >=
             int(self.settings.altreadout)):
-            self.status.last_altitude_announce = self.status.altitude
-            rounded_alt = int(self.settings.altreadout) * ((self.settings.altreadout/2 + int(self.status.altitude)) / int(self.settings.altreadout))
+            self.last_altitude_announce = altitude_converted
+            rounded_alt = int(self.settings.altreadout) * ((self.settings.altreadout/2 + int(altitude_converted)) / int(self.settings.altreadout))
             self.say("height %u" % rounded_alt, priority='notification')
 
 

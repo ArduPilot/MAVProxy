@@ -45,7 +45,6 @@ class MPStatus(object):
         self.setup_mode = opts.setup
         self.mav_error = 0
         self.altitude = 0
-        self.last_altitude_announce = 0.0
         self.last_distance_announce = 0.0
         self.exit = False
         self.flightmode = 'MAV'

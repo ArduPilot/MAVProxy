@@ -128,6 +128,7 @@ class SensorsModule(mp_module.MPModule):
                     speed = m.airspeed
                 else:
                     speed = m.groundspeed
+                speed = self.speed_convert_units(speed)
                 self.report_change('speed', speed, maxdiff=2, deltat=2)
         if self.status.watch == "sensors" and time.time() > self.sensors_state.last_watch + 1:
             self.sensors_state.last_watch = time.time()
