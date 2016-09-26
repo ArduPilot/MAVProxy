@@ -92,7 +92,21 @@ class ArmModule(mp_module.MPModule):
             return
 
         if args[0] == "throttle":
-            self.master.arducopter_arm()
+            p2 = 0
+            if len(args) == 2 and args[1] == 'force':
+                p2 = 2989
+            self.master.mav.command_long_send(
+                self.target_system,  # target_system
+                self.target_component,
+                mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM, # command
+                0, # confirmation
+                1, # param1 (1 to indicate arm)
+                p2, # param2  (all other params meaningless)
+                0, # param3
+                0, # param4
+                0, # param5
+                0, # param6
+                0) # param7
             return
 
         if args[0] == "safetyon":
