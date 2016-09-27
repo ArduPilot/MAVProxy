@@ -83,7 +83,7 @@ class MapModule(mp_module.MPModule):
 
             # waypoint commands
             mavutil.mavlink.MAV_CMD_NAV_WAYPOINT: (0,255,255),
-            mavutil.mavlink.MAV_CMD_NAV_SPLINE_WAYPOINT: (0,200,200),
+            mavutil.mavlink.MAV_CMD_NAV_SPLINE_WAYPOINT: (64,255,64),
 
             # other commands
             mavutil.mavlink.MAV_CMD_DO_LAND_START: (255,127,0),
