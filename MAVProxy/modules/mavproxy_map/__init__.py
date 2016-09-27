@@ -70,6 +70,31 @@ class MapModule(mp_module.MPModule):
         self.add_menu(MPMenuItem('Terrain Check', 'Terrain Check', '# terrain check'))
         self.add_menu(MPMenuItem('Show Position', 'Show Position', 'showPosition'))
 
+        self._colour_for_wp_command = {
+            # takeoff commands
+            mavutil.mavlink.MAV_CMD_NAV_TAKEOFF: (255,0,0),
+            mavutil.mavlink.MAV_CMD_NAV_TAKEOFF_LOCAL: (255,0,0),
+            mavutil.mavlink.MAV_CMD_NAV_VTOL_TAKEOFF: (255,0,0),
+
+            # land commands
+            mavutil.mavlink.MAV_CMD_NAV_LAND_LOCAL: (255,255,0),
+            mavutil.mavlink.MAV_CMD_NAV_LAND: (255,255,0),
+            mavutil.mavlink.MAV_CMD_NAV_VTOL_LAND: (255,255,0),
+
+            # waypoint commands
+            mavutil.mavlink.MAV_CMD_NAV_WAYPOINT: (0,255,255),
+            mavutil.mavlink.MAV_CMD_NAV_SPLINE_WAYPOINT: (0,200,200),
+
+            # other commands
+            mavutil.mavlink.MAV_CMD_DO_LAND_START: (255,127,0),
+        }
+        self._label_suffix_for_wp_command = {
+            mavutil.mavlink.MAV_CMD_NAV_TAKEOFF: "TOff",
+            mavutil.mavlink.MAV_CMD_DO_LAND_START: "DLS",
+            mavutil.mavlink.MAV_CMD_NAV_SPLINE_WAYPOINT: "SW",
+            mavutil.mavlink.MAV_CMD_NAV_VTOL_LAND: "VL",
+        }
+
     def add_menu(self, menu):
         '''add to the default popup menu'''
         from MAVProxy.modules.mavproxy_map import mp_slipmap
@@ -117,6 +142,20 @@ class MapModule(mp_module.MPModule):
         else:
             print("usage: map <icon|set>")
 
+    def colour_for_wp(self, wp_num):
+        '''return a tuple describing the colour a waypoint should appear on the map'''
+        wp = self.module('wp').wploader.wp(wp_num)
+        command = wp.command
+        return self._colour_for_wp_command.get(command, (0,255,0))
+
+    def label_for_waypoint(self, wp_num):
+        '''return the label the waypoint which should appear on the map'''
+        wp = self.module('wp').wploader.wp(wp_num)
+        command = wp.command
+        if command not in self._label_suffix_for_wp_command:
+            return str(wp_num)
+        return str(wp_num) + "(" + self._label_suffix_for_wp_command[command] + ")"
+
     def display_waypoints(self):
         '''display the waypoints'''
         from MAVProxy.modules.mavproxy_map import mp_slipmap
@@ -141,8 +180,10 @@ class MapModule(mp_module.MPModule):
             for j in range(len(next_list)):
                 #label already printed for this wp?
                 if (next_list[j] not in labeled_wps):
+                    label = self.label_for_waypoint(next_list[j])
+                    colour = self.colour_for_wp(next_list[j])
                     self.mpstate.map.add_object(mp_slipmap.SlipLabel(
-                        'miss_cmd %u/%u' % (i,j), polygons[i][j], str(next_list[j]), 'Mission', colour=(0,255,255)))
+                        'miss_cmd %u/%u' % (i,j), polygons[i][j], label, 'Mission', colour=colour))
 
                     if (self.map_settings.loitercircle and
                         self.module('wp').wploader.wp_is_loiter(next_list[j])):
