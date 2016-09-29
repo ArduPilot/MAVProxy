@@ -1,0 +1,26 @@
+# Magical Quadcopter Material (c) by Intel Corporation
+#
+# Magical Quadcopter Material is licensed under a
+# Creative Commons Attribution-ShareAlike 4.0 International License.
+#
+# You should have received a copy of the license along with this
+# work. If not, see <http://creativecommons.org/licenses/by-sa/4.0/>.
+newmtl BlackMaterial
+Ns 92.156863
+Ka 0.200000 0.200000 0.200000
+Kd 0.200000 0.200000 0.200000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+
+newmtl BlueMaterial
+Ns 92.156863
+Ka 0.003922 0.419608 0.611765
+Kd 0.003922 0.419608 0.611765
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
