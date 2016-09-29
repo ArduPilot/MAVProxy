@@ -290,12 +290,24 @@ class Object(object):
                 v = self.model.apply(self.local.apply(self.centroids[i]))
                 dists[i] = (camera.position - v).length()
             faces = sorted(faces, None, lambda i: dists[i])
+        elif faces:
+            faces = sorted(faces)
 
         if faces is None:
             glDrawElements(GL_TRIANGLES, self.num_indices, GL_UNSIGNED_INT, None)
-        else:
-            for i in faces:
-                glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, c_void_p(sizeof(c_uint) * i * 3))
+        elif faces:
+            i0 = 0
+            l = len(faces)
+            i = 1
+            while i < l:
+                if faces[i] != faces[i - 1] + 1:
+                    pointer = c_void_p(sizeof(c_uint) * faces[i0] * 3)
+                    glDrawElements(GL_TRIANGLES, (i - i0) * 3, GL_UNSIGNED_INT,
+                                   pointer)
+                    i0 = i
+                i += 1
+            pointer = c_void_p(sizeof(c_uint) * faces[i0] * 3)
+            glDrawElements(GL_TRIANGLES, (i - i0) * 3, GL_UNSIGNED_INT, pointer)
         self.after_draw(program)
 
     def calc_indices(self, num_vertices, vertices_per_face):
