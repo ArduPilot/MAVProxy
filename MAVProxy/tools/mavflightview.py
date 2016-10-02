@@ -158,10 +158,8 @@ def colour_for_point_flightmode(mlog, point, instance, options):
     colour = (r,g,b)
     return colour
 
-def mavflightview_mav(mlog, options=None, title=None):
+def mavflightview_mav(mlog, options=None):
     '''create a map for a log file'''
-    if not title:
-        title='MAVFlightView'
     wp = mavwp.MAVWPLoader()
     if options.mission is not None:
         wp.load(options.mission)
@@ -293,6 +291,13 @@ def mavflightview_mav(mlog, options=None, title=None):
     if len(path[0]) == 0:
         print("No points to plot")
         return
+
+    return [path, wp, fen]
+
+def mavflightview_show(path, wp, fen, options, title=None):
+    if not title:
+        title='MAVFlightView'
+
     bounds = mp_util.polygon_bounds(path[0])
     (lat, lon) = (bounds[0]+bounds[2], bounds[1])
     (lat, lon) = mp_util.gps_newpos(lat, lon, -45, 50)
@@ -364,7 +369,8 @@ def mavflightview_mav(mlog, options=None, title=None):
 def mavflightview(filename, options):
     print("Loading %s ..." % filename)
     mlog = mavutil.mavlink_connection(filename)
-    mavflightview_mav(mlog, options, title=filename)
+    [path, wp, fen] = mavflightview_mav(mlog, options)
+    mavflightview_show(path, wp, fen, options, title=filename)
 
 class mavflightview_options(object):
     def __init__(self):
