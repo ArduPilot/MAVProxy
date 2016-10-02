@@ -330,20 +330,25 @@ class MavGraph(object):
             self.axes.append(1)
             self.first_only.append(False)
 
-        if self.labels is not None:
-            labels = self.labels.split(',')
-            if len(labels) != len(fields)*len(self.mav_list):
-                print("Number of labels (%u) must match number of fields (%u)" % (
-                    len(labels), len(fields)*len(self.mav_list)))
-                return
-        else:
-            labels = None
-
         timeshift = self.timeshift
 
         for fi in range(0, len(self.mav_list)):
             mlog = self.mav_list[fi]
             self.process_mav(mlog, timeshift)
+        
+
+    def show(self, lenmavlist, block=True):
+        '''show graph'''
+        if self.labels is not None:
+            labels = self.labels.split(',')
+            if len(labels) != len(fields)*lenmavlist:
+                print("Number of labels (%u) must match number of fields (%u)" % (
+                    len(labels), len(fields)*lenmavlist))
+                return
+        else:
+            labels = None
+
+        for fi in range(0, lenmavlist):
             timeshift = 0
             for i in range(0, len(self.x)):
                 if self.first_only[i] and fi != 0:
@@ -361,10 +366,8 @@ class MavGraph(object):
             for i in range(0, len(self.x)):
                 self.x[i] = []
                 self.y[i] = []
-        pylab.draw()
 
-    def show(self, block=True):
-        '''show graph'''
+        pylab.draw()
         pylab.show(block=block)
 
 if __name__ == "__main__":
