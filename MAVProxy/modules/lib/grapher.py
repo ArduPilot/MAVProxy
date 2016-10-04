@@ -305,7 +305,12 @@ class MavGraph(object):
             if self.condition:
                 if not mavutil.evaluate_condition(self.condition, mlog.messages):
                     continue
-            tdays = matplotlib.dates.date2num(datetime.datetime.fromtimestamp(msg._timestamp+timeshift))
+            try:
+                tdays = matplotlib.dates.date2num(datetime.datetime.fromtimestamp(msg._timestamp+timeshift))
+            except ValueError:
+                # this can happen if the log is corrupt
+                # ValueError: year is out of range
+                break
             self.add_data(tdays, msg, mlog.messages, mlog.flightmode)
 
     def process(self, block=True):
