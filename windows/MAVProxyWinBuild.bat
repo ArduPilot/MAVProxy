@@ -2,22 +2,25 @@ rem build the standalone MAVProxy.exe for Windows.
 rem This assumes Python is installed in C:\Python27
 SETLOCAL enableextensions
 
+rem change this path if Python is installed somewhere non-standard
+set PYTHON_LOCATION=C:\Python27
+
 rem get the version
 for /f "tokens=*" %%a in (
- 'python returnVersion.py'
+ '%PYTHON_LOCATION%\python returnVersion.py'
  ) do (
  set VERSION=%%a
  )
 
 
 rem -----Upgrade pymavlink if needed-----
-C:\Python27\Scripts\pip install pymavlink -U
+%PYTHON_LOCATION%\Scripts\pip install pymavlink -U
 
 rem -----Build MAVProxy-----
 cd ..\
-python setup.py clean build install
+%PYTHON_LOCATION%\python setup.py clean build install
 cd .\MAVProxy
-C:\Python27\Scripts\pyinstaller --clean ..\windows\mavproxy.spec
+%PYTHON_LOCATION%\Scripts\pyinstaller --clean ..\windows\mavproxy.spec
 
 rem -----Create version Info-----
 @echo off
