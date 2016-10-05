@@ -19,8 +19,8 @@ import multiprocessing
 from MAVProxy.modules.lib import mp_util
 import tempfile
 
-childTileDownload = None
-childFileListDownload = None
+childTileDownload = {}
+childFileListDownload = {}
 
 class NoSuchTileError(Exception):
     """Raised when there is no tile for a region."""
@@ -76,8 +76,8 @@ class SRTMDownloader():
         self.server = server
         self.directory = directory
         self.cachedir = cachedir
-	'''print "SRTMDownloader - server= %s, directory=%s." % \
-              (self.server, self.directory)'''
+        if self.debug:
+            print("SRTMDownloader - server=%s, directory=%s." % (self.server, self.directory))
         if not os.path.exists(cachedir):
             mp_util.mkdir_p(cachedir)
         self.filelist = {}
@@ -112,9 +112,30 @@ class SRTMDownloader():
         """SRTM data is split into different directories, get a list of all of
             them and create a dictionary for easy lookup."""
         global childFileListDownload
-        if childFileListDownload is None or not childFileListDownload.is_alive():
-            childFileListDownload = multiprocessing.Process(target=self.createFileListHTTP)
-            childFileListDownload.start()
+        mypid = os.getpid()
+        if mypid not in childFileListDownload or not childFileListDownload[mypid].is_alive():
+            childFileListDownload[mypid] = multiprocessing.Process(target=self.createFileListHTTP)
+            childFileListDownload[mypid].start()
+
+    def getURIWithRedirect(self, url):
+        '''fetch a URL with redirect handling'''
+        tries = 0
+        while tries < 5:
+                conn = httplib.HTTPConnection(self.server)
+                conn.request("GET", url)
+                r1 = conn.getresponse()
+                if r1.status in [301, 302, 303, 307]:
+                    location = r1.getheader('Location')
+                    if self.debug:
+                        print("redirect from %s to %s" % (url, location))
+                    url = location
+                    conn.close()
+                    tries += 1
+                    continue
+                data = r1.read()
+                conn.close()
+                return data
+        return None
 
     def createFileListHTTP(self):
         """Create a list of the available SRTM files on the server using
@@ -123,47 +144,30 @@ class SRTMDownloader():
         """
         mp_util.child_close_fds()
         if self.debug:
-            print("Connecting to %s" % self.server)
+            print("Connecting to %s" % self.server, self.directory)
         try:
-            conn = httplib.HTTPConnection(self.server)
-            conn.request("GET",self.directory)
+            data = self.getURIWithRedirect(self.directory)
         except Exception:
             return
-        r1 = conn.getresponse()
-        '''if r1.status==200:
-            print "status200 received ok"
-        else:
-            print "oh no = status=%d %s" \
-                  % (r1.status,r1.reason)'''
-
-        data = r1.read()
         parser = parseHTMLDirectoryListing()
         parser.feed(data)
         continents = parser.getDirListing()
-        '''print continents'''
-        conn.close()
+        if self.debug:
+            print('continents: ', continents)
 
         for continent in continents:
             if not continent[0].isalpha() or continent.startswith('README'):
                 continue
-            '''print "Downloading file list for", continent'''
+            if self.debug:
+                print("Downloading file list for: ", continent)
             url = "%s%s" % (self.directory,continent)
             if self.debug:
                 print("fetching %s" % url)
             try:
-                conn = httplib.HTTPConnection(self.server)
-                conn.request("GET", url)
-                r1 = conn.getresponse()
+                data = self.getURIWithRedirect(url)
             except Exception as ex:
                 print("Failed to download %s : %s" % (url, ex))
                 continue
-            '''if r1.status==200:
-                print "status200 received ok"
-            else:
-                print "oh no = status=%d %s" \
-                      % (r1.status,r1.reason)'''
-            data = r1.read()
-            conn.close()
             parser = parseHTMLDirectoryListing()
             parser.feed(data)
             files = parser.getDirListing()
@@ -208,11 +212,14 @@ class SRTMDownloader():
             SRTM3 object depending on what is available, however currently it
             only returns SRTM3 objects."""
         global childFileListDownload
-        if childFileListDownload is not None and childFileListDownload.is_alive():
-            '''print "Getting file list"'''
+        mypid = os.getpid()
+        if mypid in childFileListDownload and childFileListDownload[mypid].is_alive():
+            if self.debug:
+                print("still getting file list")
             return 0
         elif not self.filelist:
-            '''print "Filelist download complete, loading data"'''
+            if self.debug:
+                print("Filelist download complete, loading data ", self.filelist_file)
             data = open(self.filelist_file, 'rb')
             self.filelist = pickle.load(data)
             data.close()
@@ -220,24 +227,25 @@ class SRTMDownloader():
         try:
             continent, filename = self.filelist[(int(lat), int(lon))]
         except KeyError:
-            '''print "here??"'''
             if len(self.filelist) > self.min_filelist_len:
                 # we appear to have a full filelist - this must be ocean
                 return SRTMOceanTile(int(lat), int(lon))
             return 0
 
         global childTileDownload
+        mypid = os.getpid()
         if not os.path.exists(os.path.join(self.cachedir, filename)):
-            if childTileDownload is None or not childTileDownload.is_alive():
+            if not mypid in childTileDownload or not childTileDownload[mypid].is_alive():
                 try:
-                    childTileDownload = multiprocessing.Process(target=self.downloadTile, args=(str(continent), str(filename)))
-                    childTileDownload.start()
+                    childTileDownload[mypid] = multiprocessing.Process(target=self.downloadTile, args=(str(continent), str(filename)))
+                    childTileDownload[mypid].start()
                 except Exception as ex:
-                    childTileDownload = None
+                    if mypid in childTileDownload:
+                        childTileDownload.pop(mypid)
                     return 0
                 '''print "Getting Tile"'''
             return 0
-        elif childTileDownload is not None and childTileDownload.is_alive():
+        elif mypid in childTileDownload and childTileDownload[mypid].is_alive():
             '''print "Still Getting Tile"'''
             return 0
         # TODO: Currently we create a new tile object each time.
@@ -445,8 +453,11 @@ class parseHTMLDirectoryListing(HTMLParser):
 if __name__ == '__main__':
     downloader = SRTMDownloader()
     downloader.loadFileList()
-    tile = downloader.getTile(-36, 149)
-    print tile.getAltitudeFromLatLon(-35.282, 149.1287)
-
-
-
+    import time
+    start = time.time()
+    while time.time() - start < 30:
+        tile = downloader.getTile(-36, 149)
+        if tile:
+            print tile.getAltitudeFromLatLon(-35.282, 149.1287)
+            break
+        time.sleep(0.2)
