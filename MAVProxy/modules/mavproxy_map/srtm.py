@@ -263,26 +263,18 @@ class SRTMDownloader():
         mp_util.child_close_fds()
         if self.offline == 1:
             return
-        conn = httplib.HTTPConnection(self.server)
-        conn.set_debuglevel(0)
         filepath = "%s%s%s" % \
                      (self.directory,continent,filename)
         try:
-            conn.request("GET", filepath)
-            r1 = conn.getresponse()
-            if r1.status==200:
-                '''print "status200 received ok"'''
-                data = r1.read()
+            data = self.getURIWithRedirect(filepath)
+            if data:
                 self.ftpfile = open(os.path.join(self.cachedir, filename), 'wb')
                 self.ftpfile.write(data)
                 self.ftpfile.close()
                 self.ftpfile = None
-            else:
-                '''print "oh no = status=%d %s" \
-                % (r1.status,r1.reason)'''
         except Exception as e:
             if not self.first_failure:
-                #print("SRTM Download failed: %s" % str(e))
+                print("SRTM Download failed %s on server %s" % (filepath, self.server))
                 self.first_failure = True
             pass
 
