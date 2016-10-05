@@ -188,7 +188,10 @@ class SRTMDownloader():
                 os.unlink(self.filelist_file)
             except Exception:
                 pass
-            os.rename(tmpname, self.filelist_file)
+            try:
+                os.rename(tmpname, self.filelist_file)
+            except Exception:
+                pass
         if self.debug:
             print("created file list with %u entries" % len(self.filelist))
 
