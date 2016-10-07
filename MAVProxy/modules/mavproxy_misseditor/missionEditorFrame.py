@@ -218,6 +218,9 @@ class MissionEditorFrame(wx.Frame):
     def set_gui_event_queue_lock(self, l):
         self.gui_event_queue_lock = l
 
+    def set_close_window_semaphore(self, sem):
+        self.close_window_semaphore = sem
+
     def time_to_process_gui_events(self, evt):
         event_processed = False
         queue_access_start_time = time.time()
