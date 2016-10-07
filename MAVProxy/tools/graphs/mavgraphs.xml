@@ -185,6 +185,9 @@
     <expression>
       RCOU.Ch1 RCOU.Ch2 RCOU.Ch3 RCOU.Ch4
     </expression>
+    <expression>
+      RCOU.C1 RCOU.C2 RCOU.C3 RCOU.C4
+    </expression>
   </graph>
 
   <graph name='Servos/Servos 1-8'>
@@ -196,6 +199,10 @@
     <expression>
       RCOU.Ch1 RCOU.Ch2 RCOU.Ch3 RCOU.Ch4
       RCOU.Ch5 RCOU.Ch6 RCOU.Ch7 RCOU.Ch8
+    </expression>
+    <expression>
+      RCOU.C1 RCOU.C2 RCOU.C3 RCOU.C4
+      RCOU.C5 RCOU.C6 RCOU.C7 RCOU.C8
     </expression>
   </graph>
 
