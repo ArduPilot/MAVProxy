@@ -37,7 +37,8 @@ class WPModule(mp_module.MPModule):
         self.menu_added_map = False
         if mp_util.has_wxpython:
             self.menu = MPMenuSubMenu('Mission',
-                                  items=[MPMenuItem('Clear', 'Clear', '# wp clear'),
+                                  items=[MPMenuItem('Editor', 'Editor', '# wp editor'),
+                                         MPMenuItem('Clear', 'Clear', '# wp clear'),
                                          MPMenuItem('List', 'List', '# wp list'),
                                          MPMenuItem('Load', 'Load', '# wp load ',
                                                     handler=MPMenuCallFileDialog(flags=('open',),
@@ -559,7 +560,7 @@ class WPModule(mp_module.MPModule):
 
     def cmd_wp(self, args):
         '''waypoint commands'''
-        usage = "usage: wp <list|load|update|save|set|clear|loop|remove|move|movemulti|changealt>"
+        usage = "usage: wp <editor|list|load|update|save|set|clear|loop|remove|move|movemulti|changealt>"
         if len(args) < 1:
             print(usage)
             return
@@ -618,6 +619,11 @@ class WPModule(mp_module.MPModule):
         elif args[0] == "clear":
             self.master.waypoint_clear_all_send()
             self.wploader.clear()
+        elif args[0] == "editor":
+            if self.module('misseditor'):
+                self.mpstate.functions.process_stdin("module reload misseditor", immediate=True)
+            else:
+                self.mpstate.functions.process_stdin("module load misseditor", immediate=True)
         elif args[0] == "draw":
             if not 'draw_lines' in self.mpstate.map_functions:
                 print("No map drawing available")
