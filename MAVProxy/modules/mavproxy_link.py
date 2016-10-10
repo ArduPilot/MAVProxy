@@ -100,8 +100,15 @@ class LinkModule(mp_module.MPModule):
                 status = "OK"
             sign_string = ''
             try:
-                sign_string = ", unsigned %u reject %u" % (master.mav.signing.unsigned_count, master.mav.signing.reject_count)
-            except Exception:
+                if m.mav.signing.sig_count:
+                    if master.mav.signing.secret_key is None:
+                        # unsigned/reject counts are not updated if we
+                        # don't have a signing secret
+                        sign_string = ", (no-signing-secret)"
+                    else:
+                        sign_string = ", unsigned %u reject %u" % (master.mav.signing.unsigned_count, master.mav.signing.reject_count)
+            except AttributeError as e:
+                # some mav objects may not have a "signing" attribute
                 pass
             print("link %u %s (%u packets, %.2fs delay, %u lost, %.1f%% loss%s)" % (master.linknum+1,
                                                                                     status,
