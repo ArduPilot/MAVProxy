@@ -100,7 +100,7 @@ class LinkModule(mp_module.MPModule):
                 status = "OK"
             sign_string = ''
             try:
-                if m.mav.signing.sig_count:
+                if master.signing.sig_count:
                     if master.mav.signing.secret_key is None:
                         # unsigned/reject counts are not updated if we
                         # don't have a signing secret
