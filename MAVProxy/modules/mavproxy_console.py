@@ -325,6 +325,7 @@ class ConsoleModule(mp_module.MPModule):
             for m in self.mpstate.mav_master:
                 linkdelay = (self.mpstate.status.highest_msec - m.highest_msec)*1.0e-3
                 linkline = "Link %u " % (m.linknum+1)
+                fg = 'dark green'
                 if m.linkerror:
                     linkline += "down"
                     fg = 'red'
@@ -333,11 +334,37 @@ class ConsoleModule(mp_module.MPModule):
                     if (m.mav_count+m.mav_loss) != 0: #avoid divide-by-zero
                         packets_rcvd_percentage = (100.0 * m.mav_count) / (m.mav_count + m.mav_loss)
 
-                    linkline += "OK (%u pkts, %.2fs delay, %u lost) %u%%" % (m.mav_count, linkdelay, m.mav_loss, packets_rcvd_percentage)
-                    if linkdelay > 1:
+                    linkbits = ["%u pkts" % m.mav_count,
+                                "%u lost" % m.mav_loss,
+                                "%.2fs delay" % linkdelay,
+                    ]
+                    try:
+                        if m.mav.signing.sig_count:
+                            # other end is sending us signed packets
+                            if not m.mav.signing.secret_key:
+                                # we've received signed packets but
+                                # can't verify them
+                                fg = 'orange'
+                                linkbits.append("!KEY")
+                            elif not m.mav.signing.sign_outgoing:
+                                # we've received signed packets but aren't
+                                # signing outselves; this can lead to hairloss
+                                fg = 'orange'
+                                linkbits.append("!SIGNING")
+                            if m.mav.signing.badsig_count:
+                                fg = 'orange'
+                                linkbits.append("%u badsigs" % m.mav.signing.badsig_count)
+                    except AttributeError as e:
+                        # mav.signing.sig_count probably doesn't exist
+                        pass
+
+                    linkline += "OK {rcv_pct}% ({bits})".format(
+                        rcv_pct=packets_rcvd_percentage,
+                        bits=", ".join(linkbits))
+
+                    if linkdelay > 1 and fg == 'dark green':
                         fg = 'orange'
-                    else:
-                        fg = 'dark green'
+
                 self.console.set_status('Link%u'%m.linknum, linkline, row=1, fg=fg)
         elif type in ['WAYPOINT_CURRENT', 'MISSION_CURRENT']:
             wpmax = self.module('wp').wploader.count()
