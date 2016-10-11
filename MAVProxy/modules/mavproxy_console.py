@@ -358,7 +358,7 @@ class ConsoleModule(mp_module.MPModule):
                         # mav.signing.sig_count probably doesn't exist
                         pass
 
-                    linkline += "OK {rcv_pct}% ({bits})".format(
+                    linkline += "OK {rcv_pct:.1f}% ({bits})".format(
                         rcv_pct=packets_rcvd_percentage,
                         bits=", ".join(linkbits))
 
