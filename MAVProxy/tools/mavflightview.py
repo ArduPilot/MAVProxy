@@ -140,7 +140,9 @@ def colour_for_point(mlog, point, instance, options):
     return (b,b,b)
 
 def colour_for_point_flightmode(mlog, point, instance, options):
-    fmode = getattr(mlog, 'flightmode','')
+    return colour_for_flightmode(getattr(mlog, 'flightmode',''), instance)
+
+def colour_for_flightmode(fmode, instance=0):
     if fmode in colourmap:
         colour = colourmap[fmode]
     else:
@@ -193,6 +195,7 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
     print("Looking for types %s" % str(types))
 
     last_timestamps = {}
+    used_flightmodes = {}
 
     while True:
         try:
@@ -238,6 +241,7 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
         if not all_false and len(flightmode_selections) > 0 and idx < len(options._flightmodes) and m._timestamp >= options._flightmodes[idx][2]:
             idx += 1
         elif (idx < len(flightmode_selections) and flightmode_selections[idx]) or all_false or len(flightmode_selections) == 0:
+            used_flightmodes[mlog.flightmode] = 1
             if type in ['GPS','GPS2']:
                 status = getattr(m, 'Status', None)
                 if status is None:
@@ -301,9 +305,9 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
         print("No points to plot")
         return None
 
-    return [path, wp, fen]
+    return [path, wp, fen, used_flightmodes]
 
-def mavflightview_show(path, wp, fen, options, title=None):
+def mavflightview_show(path, wp, fen, used_flightmodes, options, title=None):
     if not title:
         title='MAVFlightView'
 
@@ -371,8 +375,11 @@ def mavflightview_show(path, wp, fen, options, title=None):
             icon = map.icon(icon)
             map.add_object(mp_slipmap.SlipIcon('icon - %s' % str(flag), (float(lat),float(lon)), icon, layer=3, rotation=0, follow=False))
 
-    source = getattr(options, "colour_source", "flightmode")
-    if source != "flightmode":
+    if options.colour_source == "flightmode":
+        tuples = [ (mode, colour_for_flightmode(mode))
+                   for mode in used_flightmodes.keys() ]
+        map.add_object(mp_slipmap.SlipFlightModeLegend("legend", tuples))
+    else:
         print("colour-source: min=%f max=%f" % (colour_source_min, colour_source_max))
 
 def mavflightview(filename, options):
@@ -381,8 +388,8 @@ def mavflightview(filename, options):
     stuff = mavflightview_mav(mlog, options)
     if stuff is None:
         return
-    [path, wp, fen] = stuff
-    mavflightview_show(path, wp, fen, options, title=filename)
+    [path, wp, fen, used_flightmodes] = stuff
+    mavflightview_show(path, wp, fen, used_flightmodes, options, title=filename)
 
 class mavflightview_options(object):
     def __init__(self):
@@ -405,6 +412,7 @@ class mavflightview_options(object):
         self.ekf_sample = 1
         self.rate = 0
         self._flightmodes = []
+        self.colour_source = 'flightmode'
 
 if __name__ == "__main__":
     from optparse import OptionParser
