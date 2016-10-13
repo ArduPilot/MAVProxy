@@ -226,6 +226,16 @@ class MPMenuTop(object):
             if not updated:
                 self.items.append(m)
 
+    def add_to_submenu(self, submenu_path, item):
+        '''
+        add an item to a submenu using a menu path array
+        '''
+        for m in self.items:
+            if m.name == submenu_path[0]:
+                m.add_to_submenu(submenu_path[1:], item)
+                return
+        raise(ValueError("No submenu (%s) found" % (submenu_path[0])))
+
     def wx_menu(self):
         '''return a wx.MenuBar() for the menu'''
         from wx_loader import wx
