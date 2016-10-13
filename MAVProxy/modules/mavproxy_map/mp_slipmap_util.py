@@ -242,6 +242,75 @@ class SlipGrid(SlipObject):
             pos3 = mp_util.gps_newpos(pos1[0], pos1[1], 90, 3*count*spacing)
             self.draw_line(img, pixmapper, pos1, pos3, self.colour, self.linewidth)
 
+
+class SlipFlightModeLegend(SlipObject):
+    '''a legend to display in the map area'''
+    def __init__(self, key, tuples, layer=1):
+        SlipObject.__init__(self, key, layer)
+        self.tuples = tuples
+        self._img = None
+        self.top_margin = 5
+        self.bottom_margin = 5
+        self.left_margin = 5
+        self.right_margin = 5
+        self.swatch_min_width = 5
+        self.swatch_min_height = 5
+        self.swatch_text_gap = 2
+        self.row_gap = 2
+        self.border_width = 1
+        self.border_colour = (255,0,0)
+        self.text_colour = (0,0,0)
+        self.font_scale = 0.5
+
+    def draw_legend(self):
+        font = cv.InitFont(cv.CV_FONT_HERSHEY_SIMPLEX, self.font_scale, 1.0)
+        width = 0
+        height = self.top_margin + self.bottom_margin
+        row_height_max = self.swatch_min_height
+        for (mode, colour) in self.tuples:
+            if mode is None:
+                mode = "Unknown"
+            ((tw,th),tb) = cv.GetTextSize(mode, font)
+            width = max(width, tw)
+            row_height_max = max(row_height_max, th)
+        row_count = len(self.tuples)
+        height = self.top_margin + row_count*row_height_max + (row_count-1)*self.row_gap + self.bottom_margin
+        swatch_height = max(self.swatch_min_height, row_height_max)
+        swatch_width = max(self.swatch_min_width, swatch_height)
+        width += self.left_margin + self.right_margin
+        width += swatch_width + self.swatch_text_gap
+        img = cv.CreateImage((width,height),8,3)
+        cv.Set(img, (255,255,255))
+        cv.Rectangle(img, (0, 0), (width-1, height-1),
+                     self.border_colour, self.border_width)
+        y = self.top_margin
+        for (mode, colour) in self.tuples:
+            if mode is None:
+                mode = "Unknown"
+            x = self.left_margin
+            cv.Rectangle(img, (x, y), (x+swatch_width-1, y+swatch_height-1), colour, cv.CV_FILLED)
+            x += swatch_width
+            x += self.swatch_text_gap
+            cv.PutText(img, mode, (x, y+row_height_max), font, self.text_colour)
+            y += row_height_max + self.row_gap
+
+        return img
+
+    def draw(self, img, pixmapper, bounds):
+        '''draw legend on the image'''
+        if self._img is None:
+            self._img = self.draw_legend()
+
+        w = self._img.width
+        h = self._img.height
+        cv.SetImageROI(self._img, (0, 0, w, h))
+        px = 5
+        py = 5
+        cv.SetImageROI(img, (px, py, w, h))
+        cv.Copy(self._img, img)
+        cv.ResetImageROI(img)
+        cv.ResetImageROI(self._img)
+
 class SlipThumbnail(SlipObject):
     '''a thumbnail to display on the map'''
     def __init__(self, key, latlon, layer, img,
@@ -389,7 +458,6 @@ class SlipIcon(SlipThumbnail):
         # remember where we placed it for clicked()
         self.posx = px+w/2
         self.posy = py+h/2
-
 
 class SlipPosition:
     '''an position object to move an existing object on the map'''
