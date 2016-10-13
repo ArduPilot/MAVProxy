@@ -18,6 +18,7 @@ class MPSlipMapFrame(wx.Frame):
         self.state = state
         state.frame = self
         state.grid = True
+        state.legend = True # this is whether to display a legend, if any
         state.follow = True
         state.download = True
         state.popup_object = None
@@ -27,6 +28,7 @@ class MPSlipMapFrame(wx.Frame):
         state.panel = MPSlipMapPanel(self, state)
         self.Bind(wx.EVT_IDLE, self.on_idle)
         self.Bind(wx.EVT_SIZE, state.panel.on_size)
+        self.legend_checkbox_menuitem_added = False
 
         # create the View menu
         self.menu = MPMenuTop([MPMenuSubMenu('View',
@@ -73,6 +75,8 @@ class MPSlipMapFrame(wx.Frame):
         ret.call_handler()
         if ret.returnkey == 'toggleGrid':
             state.grid = ret.IsChecked()
+        elif ret.returnkey == 'toggleLegend':
+            state.legend = ret.IsChecked()
         elif ret.returnkey == 'toggleFollow':
             state.follow = ret.IsChecked()
         elif ret.returnkey == 'toggleDownload':
@@ -117,6 +121,13 @@ class MPSlipMapFrame(wx.Frame):
         (lat, lon) = object.latlon
         state.panel.re_center(state.width/2, state.height/2, lat, lon)
 
+    def add_legend_checkbox_menuitem(self):
+        self.menu.add_to_submenu(['View'], [MPMenuCheckbox('Legend\tCtrl+L',
+                                                         'Enable Legend',
+                                                         'toggleLegend',
+                                                         checked=self.state.legend)
+        ])
+
     def add_object(self, obj):
         '''add an object to a later'''
         state = self.state
@@ -125,6 +136,11 @@ class MPSlipMapFrame(wx.Frame):
             state.layers[obj.layer] = {}
         state.layers[obj.layer][obj.key] = obj
         state.need_redraw = True
+        if (not self.legend_checkbox_menuitem_added and
+            isinstance(obj, SlipFlightModeLegend)):
+            self.add_legend_checkbox_menuitem()
+            self.legend_checkbox_menuitem_added = True
+            self.SetMenuBar(self.menu.wx_menu())
 
     def remove_object(self, key):
         '''remove an object by key from all layers'''
@@ -376,6 +392,8 @@ class MPSlipMapPanel(wx.Panel):
         keys.sort()
         for k in keys:
             obj = objects[k]
+            if not self.state.legend and isinstance(obj, SlipFlightModeLegend):
+                continue
             bounds2 = obj.bounds()
             if bounds2 is None or mp_util.bounds_overlap(bounds, bounds2):
                 obj.draw(img, self.pixmapper, bounds)
