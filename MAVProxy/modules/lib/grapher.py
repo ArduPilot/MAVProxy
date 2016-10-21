@@ -293,15 +293,9 @@ class MavGraph(object):
             self.x[i].append(xv)
 
 
-    def process_mav(self, mlog, timeshift, flightmode_selections, _flightmodes):
+    def process_mav(self, mlog, timeshift):
         '''process one file'''
         self.vars = {}
-        idx = 0
-        all_false = True
-        for s in flightmode_selections:
-            if s:
-                all_false = False
-
         while True:
             msg = mlog.recv_msg()
             if msg is None:
@@ -317,15 +311,9 @@ class MavGraph(object):
                 # this can happen if the log is corrupt
                 # ValueError: year is out of range
                 break
-            if all_false or len(flightmode_selections) == 0:
-                self.add_data(tdays, msg, mlog.messages, mlog.flightmode)
-            else:
-                if idx < len(_flightmodes) and msg._timestamp >= _flightmodes[idx][2]:
-                    idx += 1
-                elif (idx < len(flightmode_selections) and flightmode_selections[idx]):
-                    self.add_data(tdays, msg, mlog.messages, mlog.flightmode)
+            self.add_data(tdays, msg, mlog.messages, mlog.flightmode)
 
-    def process(self, flightmode_selections, _flightmodes, block=True):
+    def process(self, block=True):
         '''process and display graph'''
         self.msg_types = set()
         self.multiplier = []
@@ -351,7 +339,7 @@ class MavGraph(object):
 
         for fi in range(0, len(self.mav_list)):
             mlog = self.mav_list[fi]
-            self.process_mav(mlog, timeshift, flightmode_selections, _flightmodes)
+            self.process_mav(mlog, timeshift)
         
 
     def show(self, lenmavlist, block=True):
