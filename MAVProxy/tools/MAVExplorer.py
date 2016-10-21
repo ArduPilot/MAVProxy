@@ -218,35 +218,28 @@ def load_graphs():
             mestate.console.writeln("Loaded %s" % f)
     mestate.graphs = sorted(mestate.graphs, key=lambda g: g.name)
 
-def graph_process(mg, lenmavlist):
+def graph_process(fields, mavExpLog, mavExpFlightModeSel, mavExpSettings):
     '''process for a graph'''
-    mg.show(lenmavlist)
+    mavExpLog.reduce_by_flightmodes(mavExpFlightModeSel)
+
+    mg = grapher.MavGraph()
+    mg.set_marker(mavExpSettings.marker)
+    mg.set_condition(mavExpSettings.condition)
+    mg.set_xaxis(mavExpSettings.xaxis)
+    mg.set_linestyle(mavExpSettings.linestyle)
+    mg.set_show_flightmode(mavExpSettings.show_flightmode)
+    mg.set_legend(mavExpSettings.legend)
+    mg.add_mav(mavExpLog)
+    for f in fields:
+        mg.add_field(f)
+    mg.process()
+    mg.show()
 
 def display_graph(graphdef):
     '''display a graph'''
     mestate.console.write("Expression: %s\n" % ' '.join(graphdef.expression.split()))
-    mestate.mlog.reduce_by_flightmodes(mestate.flightmode_selections)
-
-    #setup the graph, then pass to a new process and display
-    mg = grapher.MavGraph()
-    mg.set_marker(mestate.settings.marker)
-    mg.set_condition(mestate.settings.condition)
-    mg.set_xaxis(mestate.settings.xaxis)
-    mg.set_linestyle(mestate.settings.linestyle)
-    mg.set_show_flightmode(mestate.settings.show_flightmode)
-    mg.set_legend(mestate.settings.legend)
-    mg.add_mav(mestate.mlog)
-    for f in graphdef.expression.split():
-        mg.add_field(f)
-    mg.process()
-    lenmavlist = len(mg.mav_list)
-    #Important - mg.mav_list is the full logfile and can be very large in size
-    #To avoid slowdowns in Windows (which copies the vars to the new process)
-    #We need to empty this var when we're finished with it
-    mg.mav_list = []
-    child = multiprocessing.Process(target=graph_process, args=[mg, lenmavlist])
+    child = multiprocessing.Process(target=graph_process, args=[graphdef.expression.split(), mestate.mlog, mestate.flightmode_selections, mestate.settings])
     child.start()
-    mestate.mlog.rewind()
 
 def cmd_graph(args):
     '''graph command'''
@@ -269,24 +262,21 @@ def cmd_graph(args):
         mestate.last_graph = GraphDefinition('Untitled', expression, '', [expression], None)
     display_graph(mestate.last_graph)
 
-def map_process(path, wp, fen, options):
-    '''process for displaying a graph'''
-    from mavflightview import mavflightview_show
-    mavflightview_show(path, wp, fen, options)
+def map_process(args, MAVExpLog, MAVExpFlightModes, MAVExpSettings):
+    '''process for a graph'''
+    from mavflightview import mavflightview_mav, mavflightview_options
+    MAVExpLog.reduce_by_flightmodes(MAVExpFlightModes)
+
+    options = mavflightview_options()
+    options.condition = MAVExpSettings.condition
+    if len(args) > 0:
+        options.types = ','.join(args)
+    mavflightview_mav(MAVExpLog, options)
 
 def cmd_map(args):
     '''map command'''
-    from mavflightview import mavflightview_mav, mavflightview_options
-    mestate.mlog.reduce_by_flightmodes(mestate.flightmode_selections)
-    #setup and process the map
-    options = mavflightview_options()
-    options.condition = mestate.settings.condition
-    if len(args) > 0:
-        options.types = ','.join(args)
-    [path, wp, fen] = mavflightview_mav(mestate.mlog, options)
-    child = multiprocessing.Process(target=map_process, args=[path, wp, fen, options])
+    child = multiprocessing.Process(target=map_process, args=[args, mestate.mlog, mestate.flightmode_selections, mestate.settings])
     child.start()
-    mestate.mlog.rewind()
 
 def cmd_set(args):
     '''control MAVExporer options'''
