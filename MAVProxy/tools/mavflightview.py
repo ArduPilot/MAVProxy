@@ -158,16 +158,19 @@ def colour_for_point_flightmode(mlog, point, instance, options):
     colour = (r,g,b)
     return colour
 
-def mavflightview_mav(mlog, options=None, title=None):
+def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
     '''create a map for a log file'''
-    if not title:
-        title='MAVFlightView'
     wp = mavwp.MAVWPLoader()
     if options.mission is not None:
         wp.load(options.mission)
     fen = mavwp.MAVFenceLoader()
     if options.fence is not None:
         fen.load(options.fence)
+    all_false = True
+    for s in flightmode_selections:
+        if s:
+            all_false = False
+    idx = 0
     path = [[]]
     instances = {}
     ekf_counter = 0
@@ -231,68 +234,79 @@ def mavflightview_mav(mlog, options=None, title=None):
             continue
         if options.mode is not None and mlog.flightmode.lower() != options.mode.lower():
             continue
-        if type in ['GPS','GPS2']:
-            status = getattr(m, 'Status', None)
-            if status is None:
-                status = getattr(m, 'FixType', None)
+
+        if not all_false and len(flightmode_selections) > 0 and idx < len(options._flightmodes) and m._timestamp >= options._flightmodes[idx][2]:
+            idx += 1
+        elif (idx < len(flightmode_selections) and flightmode_selections[idx]) or all_false or len(flightmode_selections) == 0:
+            if type in ['GPS','GPS2']:
+                status = getattr(m, 'Status', None)
                 if status is None:
-                    print("Can't find status on GPS message")
-                    print(m)
-                    break
-            if status < 2:
-                continue
-            # flash log
-            lat = m.Lat
-            lng = getattr(m, 'Lng', None)
-            if lng is None:
-                lng = getattr(m, 'Lon', None)
+                    status = getattr(m, 'FixType', None)
+                    if status is None:
+                        print("Can't find status on GPS message")
+                        print(m)
+                        break
+                if status < 2:
+                    continue
+                # flash log
+                lat = m.Lat
+                lng = getattr(m, 'Lng', None)
                 if lng is None:
-                    print("Can't find longitude on GPS message")
-                    print(m)
-                    break
-        elif type in ['EKF1', 'ANU1']:
-            pos = mavextra.ekf1_pos(m)
-            if pos is None:
-                continue
-            ekf_counter += 1
-            if ekf_counter % options.ekf_sample != 0:
-                continue
-            (lat, lng) = pos
-        elif type in ['NKF1']:
-            pos = mavextra.ekf1_pos(m)
-            if pos is None:
-                continue
-            nkf_counter += 1
-            if nkf_counter % options.nkf_sample != 0:
-                continue
-            (lat, lng) = pos
-        elif type in ['ANU5']:
-            (lat, lng) = (m.Alat*1.0e-7, m.Alng*1.0e-7)
-        elif type in ['AHR2', 'POS', 'CHEK']:
-            (lat, lng) = (m.Lat, m.Lng)
-        elif type == 'AHRS2':
-            (lat, lng) = (m.lat*1.0e-7, m.lng*1.0e-7)
-        else:
-            lat = m.lat * 1.0e-7
-            lng = m.lon * 1.0e-7
+                    lng = getattr(m, 'Lon', None)
+                    if lng is None:
+                        print("Can't find longitude on GPS message")
+                        print(m)
+                        break
+            elif type in ['EKF1', 'ANU1']:
+                pos = mavextra.ekf1_pos(m)
+                if pos is None:
+                    continue
+                ekf_counter += 1
+                if ekf_counter % options.ekf_sample != 0:
+                    continue
+                (lat, lng) = pos
+            elif type in ['NKF1']:
+                pos = mavextra.ekf1_pos(m)
+                if pos is None:
+                    continue
+                nkf_counter += 1
+                if nkf_counter % options.nkf_sample != 0:
+                    continue
+                (lat, lng) = pos
+            elif type in ['ANU5']:
+                (lat, lng) = (m.Alat*1.0e-7, m.Alng*1.0e-7)
+            elif type in ['AHR2', 'POS', 'CHEK']:
+                (lat, lng) = (m.Lat, m.Lng)
+            elif type == 'AHRS2':
+                (lat, lng) = (m.lat*1.0e-7, m.lng*1.0e-7)
+            else:
+                lat = m.lat * 1.0e-7
+                lng = m.lon * 1.0e-7
 
-        # automatically add new types to instances
-        if type not in instances:
-            instances[type] = len(instances)
-            while len(instances) >= len(path):
-                path.append([])
-        instance = instances[type]
+            # automatically add new types to instances
+            if type not in instances:
+                instances[type] = len(instances)
+                while len(instances) >= len(path):
+                    path.append([])
+            instance = instances[type]
 
-        if abs(lat)>0.01 or abs(lng)>0.01:
-            colour = colour_for_point(mlog, (lat, lng), instance, options)
-            point = (lat, lng, colour)
+            if abs(lat)>0.01 or abs(lng)>0.01:
+                colour = colour_for_point(mlog, (lat, lng), instance, options)
+                point = (lat, lng, colour)
 
-            if options.rate == 0 or not type in last_timestamps or m._timestamp - last_timestamps[type] > 1.0/options.rate:
-                last_timestamps[type] = m._timestamp
-                path[instance].append(point)
+                if options.rate == 0 or not type in last_timestamps or m._timestamp - last_timestamps[type] > 1.0/options.rate:
+                    last_timestamps[type] = m._timestamp
+                    path[instance].append(point)
     if len(path[0]) == 0:
         print("No points to plot")
         return
+
+    return [path, wp, fen]
+
+def mavflightview_show(path, wp, fen, options, title=None):
+    if not title:
+        title='MAVFlightView'
+
     bounds = mp_util.polygon_bounds(path[0])
     (lat, lon) = (bounds[0]+bounds[2], bounds[1])
     (lat, lon) = mp_util.gps_newpos(lat, lon, -45, 50)
@@ -364,7 +378,8 @@ def mavflightview_mav(mlog, options=None, title=None):
 def mavflightview(filename, options):
     print("Loading %s ..." % filename)
     mlog = mavutil.mavlink_connection(filename)
-    mavflightview_mav(mlog, options, title=filename)
+    [path, wp, fen] = mavflightview_mav(mlog, options)
+    mavflightview_show(path, wp, fen, options, title=filename)
 
 class mavflightview_options(object):
     def __init__(self):
@@ -386,6 +401,7 @@ class mavflightview_options(object):
         self.types = None
         self.ekf_sample = 1
         self.rate = 0
+        self._flightmodes = []
 
 if __name__ == "__main__":
     from optparse import OptionParser
