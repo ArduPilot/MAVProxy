@@ -23,7 +23,8 @@ class FollowTestModule(mp_module.MPModule):
                                                        ("altitude", float, 50.0),
                                                        ("speed", float, 10.0),
                                                        ("type", str, 'guided'),
-                                                       ("vehicle_throttle", float, 1.0)])
+                                                       ("vehicle_throttle", float, 0.5),
+                                                       ("disable_msg", bool, False)])
         self.add_completion_function('(FOLLOWSETTING)', self.follow_settings.completion)
         self.target_pos = None
         self.last_update = 0
@@ -108,6 +109,9 @@ class FollowTestModule(mp_module.MPModule):
         if self.target_pos is None:
             return
 
+        if self.follow_settings.disable_msg:
+            return
+
         if self.follow_settings.type == 'guided':
             # send normal guided mode packet
             self.master.mav.mission_item_send(self.settings.target_system,
@@ -118,17 +122,19 @@ class FollowTestModule(mp_module.MPModule):
                                               2, 0, 0, 0, 0, 0,
                                               self.target_pos[0], self.target_pos[1],
                                               self.follow_settings.altitude)
+
         elif self.follow_settings.type == 'yaw':
             # display yaw from vehicle to target
             vehicle = (m.lat*1.0e-7, m.lon*1.0e-7)
             vehicle_yaw = math.degrees(self.master.field('ATTITUDE', 'yaw', 0))
             target_bearing = mp_util.gps_bearing(vehicle[0], vehicle[1], self.target_pos[0], self.target_pos[1])
             # wrap the angle from -180 to 180 thus commanding the vehicle to turn left or right
-            relyaw = self.wrap_180(target_bearing - vehicle_yaw)
+            # note its in centi-degrees so *100
+            relyaw = self.wrap_180(target_bearing - vehicle_yaw) * 100
 
             self.master.mav.command_long_send(self.settings.target_system,
                                                   self.settings.target_component,
-                                                  mavutil.mavlink.MAV_CMD_DO_SET_POSITION_YAW_THRUST, 0,
+                                                  mavutil.mavlink.MAV_CMD_NAV_SET_YAW_SPEED, 0,
                                                   relyaw,
                                                   self.follow_settings.vehicle_throttle,
                                                   0, 0, 0, 0, 0)
