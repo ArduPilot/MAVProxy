@@ -367,7 +367,7 @@ class SlipIcon(SlipThumbnail):
 
         (px, py, sx, sy, w, h) = self.clip(px, py, w, h, img)
 
-        img[py:py+h, px:px+w] += icon[sy:sy+h, sx:sx+w]
+        img[py:py + h, px:px + w] = cv2.add(img[py:py+h, px:px+w], icon[sy:sy+h, sx:sx+w])
 
         # remember where we placed it for clicked()
         self.posx = px+w/2
