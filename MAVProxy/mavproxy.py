@@ -13,6 +13,7 @@ import serial, Queue, select
 import traceback
 import select
 import shlex
+import platform
 
 from MAVProxy.modules.lib import textconsole
 from MAVProxy.modules.lib import rline
@@ -644,11 +645,13 @@ def open_telemetry_logs(logpath_telem, logpath_telem_raw):
         print("Telemetry log: %s" % logpath_telem)
 
         #make sure there's enough free disk space for the logfile (>200Mb)
-        stat = os.statvfs(logpath_telem)
-        if stat.f_bfree*stat.f_bsize < 209715200:
-            print("ERROR: Not enough free disk space for logfile")
-            mpstate.status.exit = True
-            return
+        #statvfs doesn't work in Windows
+        if platform.system() != 'Windows':
+            stat = os.statvfs(logpath_telem)
+            if stat.f_bfree*stat.f_bsize < 209715200:
+                print("ERROR: Not enough free disk space for logfile")
+                mpstate.status.exit = True
+                return
 
         # use a separate thread for writing to the logfile to prevent
         # delays during disk writes (important as delays can be long if camera
