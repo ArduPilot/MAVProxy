@@ -29,6 +29,6 @@ rem -----Create version Info-----
 
 rem -----Build the Installer-----
 cd  ..\windows\
-"C:\Program Files (x86)\Inno Setup 5\ISCC.exe" /dMyAppVersion=%VERSION% -compile mavproxy.iss
+"C:\Program Files (x86)\Inno Setup 5\ISCC.exe" /dMyAppVersion=%VERSION% mavproxy.iss
 
 pause
