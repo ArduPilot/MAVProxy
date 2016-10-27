@@ -87,7 +87,7 @@ class SlipLabel(SlipObject):
 
     def draw_label(self, img, pixmapper):
         pix1 = pixmapper(self.point)
-        cv2.putText(img, self.label, pix1, cv2.FONT_HERSHEY_SCRIPT_SIMPLEX, 1.0, self.colour)
+        cv2.putText(img, self.label, pix1, cv2.FONT_HERSHEY_SIMPLEX, 1.0, self.colour)
 
     def draw(self, img, pixmapper, bounds):
         if self.hidden:
