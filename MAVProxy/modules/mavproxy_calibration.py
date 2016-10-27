@@ -77,6 +77,10 @@ class CalibrationModule(mp_module.MPModule):
             self.magcal_progess[m.compass_id] = result
             self.console.set_status('Progress', 'Calibration Progress: ' + " ".join(self.magcal_progess), row=4)
             print("Calibration of compass %u %s: fitness %.3f" % (m.compass_id, result, m.fitness))
+            mav = self.master
+            mav.mav.command_long_send(mav.target_system, mav.target_component,
+                                      mavutil.mavlink.MAV_CMD_DO_ACCEPT_MAG_CAL, 0,
+                                      1<<m.compass_id, 0, 0, 0, 0, 0, 0)
 
     def idle_task(self):
         '''handle mavlink packets'''
