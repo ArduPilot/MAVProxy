@@ -1056,20 +1056,21 @@ if __name__ == '__main__':
         for mod in modlist:
             process_stdin('module load %s' % mod)
 
+    start_scripts = []
     if 'HOME' in os.environ and not opts.setup:
         start_script = os.path.join(os.environ['HOME'], ".mavinit.scr")
-        if os.path.exists(start_script):
-            run_script(start_script)
+        start_scripts.append(start_script)
     if 'LOCALAPPDATA' in os.environ and not opts.setup:
         start_script = os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy", "mavinit.scr")
-        if os.path.exists(start_script):
-            run_script(start_script)
+        start_scripts.append(start_script)
     if (mpstate.settings.state_basedir is not None and
         opts.aircraft is not None):
         start_script = os.path.join(mpstate.settings.state_basedir, opts.aircraft, "mavinit.scr")
+        start_scripts.append(start_script)
+    for start_script in start_scripts:
         if os.path.exists(start_script):
+            print("Running script (%s)" % (start_script))
             run_script(start_script)
-
 
     if opts.aircraft is not None:
         start_script = os.path.join(opts.aircraft, "mavinit.scr")
