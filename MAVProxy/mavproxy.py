@@ -1064,6 +1064,12 @@ if __name__ == '__main__':
         start_script = os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy", "mavinit.scr")
         if os.path.exists(start_script):
             run_script(start_script)
+    if (mpstate.settings.state_basedir is not None and
+        opts.aircraft is not None):
+        start_script = os.path.join(mpstate.settings.state_basedir, opts.aircraft, "mavinit.scr")
+        if os.path.exists(start_script):
+            run_script(start_script)
+
 
     if opts.aircraft is not None:
         start_script = os.path.join(opts.aircraft, "mavinit.scr")
