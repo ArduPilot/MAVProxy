@@ -48,3 +48,8 @@ to connect to must be your own IP address.
 
     mavproxy.py --master=192.168.1.1:14550
 
+
+.. note::
+
+   MavProxy can output a mavlink stream to remote network addresses using
+   UDP Broadcast. See :ref:`--out` for details.
