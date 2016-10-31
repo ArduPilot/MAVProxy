@@ -84,7 +84,7 @@
               <ul class="current">
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting Started</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="download_and_installation.html">Download and Installation</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="">Quickstart</a><ul>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Quickstart</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#over-usb">Over USB</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#over-network">Over Network</a></li>
 </ul>
@@ -101,7 +101,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
 </ul>
 
           
@@ -155,21 +154,21 @@ or network address to connect to.</p>
 <p>If there is only 1 APM connected, the <code class="docutils literal"><span class="pre">--master</span></code> is not required.
 MAVProxy will autodetect the correct port.</p>
 <p>Linux:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>mavproxy.py --master=/dev/ttyUSB0
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">ttyUSB0</span>
 </pre></div>
 </div>
 <p>Windows:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="s2">&quot;com14&quot;</span>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="s2">&quot;com14&quot;</span>
 </pre></div>
 </div>
 <p>Normally MAVProxy will auto-detect the correct baudrate. If required,
 the baud rate can instead be manually specified.</p>
 <p>Linux:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>mavproxy.py --master=/dev/ttyUSB0 --baudrate=57600
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">ttyUSB0</span> <span class="o">--</span><span class="n">baudrate</span><span class="o">=</span><span class="mi">57600</span>
 </pre></div>
 </div>
 <p>Windows:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="s2">&quot;com14&quot;</span> <span class="o">--</span><span class="n">baudrate</span><span class="o">=</span><span class="mi">57600</span>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="s2">&quot;com14&quot;</span> <span class="o">--</span><span class="n">baudrate</span><span class="o">=</span><span class="mi">57600</span>
 </pre></div>
 </div>
 </div>
@@ -177,8 +176,13 @@ the baud rate can instead be manually specified.</p>
 <h2>Over Network<a class="headerlink" href="#over-network" title="Permalink to this headline">¶</a></h2>
 <p>Specify the IP address and port containing a mavlink stream. The address
 to connect to must be your own IP address.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>mavproxy.py --master=192.168.1.1:14550
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="mf">192.168</span><span class="o">.</span><span class="mf">1.1</span><span class="p">:</span><span class="mi">14550</span>
 </pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">MavProxy can output a mavlink stream to remote network addresses using
+UDP Broadcast. See <a class="reference internal" href="starting.html#out"><span class="std std-ref">&#8211;out</span></a> for details.</p>
 </div>
 </div>
 </div>

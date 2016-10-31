@@ -88,7 +88,7 @@
 <li class="toctree-l2"><a class="reference internal" href="starting.html">Startup Options</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mavinit.html">Startup Scripts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="examples.html">Examples</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="">MAVProxy Wifi Bridge</a><ul>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">MAVProxy Wifi Bridge</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#requirements">Requirements</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#setting-up-the-pi">Setting up the Pi</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#setting-up-mavproxy">Setting up MAVProxy</a></li>
@@ -104,7 +104,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
 </ul>
 
           
@@ -166,21 +165,21 @@
 </div>
 <div class="section" id="setting-up-mavproxy">
 <h2>Setting up MAVProxy<a class="headerlink" href="#setting-up-mavproxy" title="Permalink to this headline">¶</a></h2>
-<p>Follow the download and installation instructions <a class="reference internal" href="download_and_installation.html"><em>here</em></a>.</p>
+<p>Follow the download and installation instructions <a class="reference internal" href="download_and_installation.html"><span class="doc">here</span></a>.</p>
 </div>
 <div class="section" id="setting-up-the-daemon">
 <h2>Setting up the Daemon<a class="headerlink" href="#setting-up-the-daemon" title="Permalink to this headline">¶</a></h2>
 <p>For this section, a terminal on the Pi is required.</p>
 <p>Make a new file for the daemon, based on a skeleton file:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>sudo cp /etc/init.d/skeleton /etc/init.d/mavgateway
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">cp</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">init</span><span class="o">.</span><span class="n">d</span><span class="o">/</span><span class="n">skeleton</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">init</span><span class="o">.</span><span class="n">d</span><span class="o">/</span><span class="n">mavgateway</span>
 </pre></div>
 </div>
 <p>Edit /etc/init.d/mavgateway:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>sudo nano /etc/init.d/mavgateway
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">nano</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">init</span><span class="o">.</span><span class="n">d</span><span class="o">/</span><span class="n">mavgateway</span>
 </pre></div>
 </div>
 <p>And edit these lines:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>DAEMON_ARGS=&quot;--master=/dev/ttyAMA0,57600 --out=udpin:0.0.0.0:14550 --daemon&quot;
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span>DAEMON_ARGS=&quot;--master=/dev/ttyAMA0,57600 --out=udpin:0.0.0.0:14550 --daemon&quot;
 NAME=mavproxy.py
 DESC=&quot;Mavproxy based mavlink to wifi gateway&quot;
 Provides: mavgateway
@@ -194,9 +193,9 @@ DAEMON=/usr/local/bin/$NAME
 <p class="last">In the DAEMON_ARGS line above, edit the ttyAMA0 port and 57600 baudrate to match the name and baudrate of the telemetry radio connected to the Pi.</p>
 </div>
 <p>Edit the permissions for mavgateway and update the system to include the mavgateway daemon upon startup:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>sudo chmod +x /etc/init.d/mavgateway
-sudo chown root:root /etc/init.d/mavgateway
-sudo update-rc.d mavgateway defaults
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">chmod</span> <span class="o">+</span><span class="n">x</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">init</span><span class="o">.</span><span class="n">d</span><span class="o">/</span><span class="n">mavgateway</span>
+<span class="n">sudo</span> <span class="n">chown</span> <span class="n">root</span><span class="p">:</span><span class="n">root</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">init</span><span class="o">.</span><span class="n">d</span><span class="o">/</span><span class="n">mavgateway</span>
+<span class="n">sudo</span> <span class="n">update</span><span class="o">-</span><span class="n">rc</span><span class="o">.</span><span class="n">d</span> <span class="n">mavgateway</span> <span class="n">defaults</span>
 </pre></div>
 </div>
 </div>
@@ -204,7 +203,7 @@ sudo update-rc.d mavgateway defaults
 <h2>Running<a class="headerlink" href="#running" title="Permalink to this headline">¶</a></h2>
 <p>The Pi bridge will automatically start up when the Pi is booted.</p>
 <p>On the GCS client, first connect to the Pi&#8217;s network, then connect (via UDP) to 192.168.42.1, port 14550. For example, on a MAVProxy client:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>mavproxy.py –master=192.168.42.1:14550
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span>mavproxy.py –master=192.168.42.1:14550
 </pre></div>
 </div>
 </div>

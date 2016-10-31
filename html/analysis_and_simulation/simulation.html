@@ -88,7 +88,7 @@
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Analysis and Simulation</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="playback.html">Playback</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mavtools.html">Offline Tools</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="">Simulation</a><ul>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Simulation</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#linux-sitl">Linux - SITL</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#linux-hil">Linux - HIL</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#caveats">Caveats</a></li>
@@ -99,7 +99,6 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
 </ul>
 
           
@@ -174,8 +173,8 @@ Wiki</a>.</p>
 </ul>
 <p>Any arguments to be sent to MAVProxy can simply be specified at the end
 of the command:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>cd ./Ardupilot/Tools/autotest
-sim_vehicle.sh -v Arduplane -j 4 [mavproxy_options]
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">cd</span> <span class="o">./</span><span class="n">Ardupilot</span><span class="o">/</span><span class="n">Tools</span><span class="o">/</span><span class="n">autotest</span>
+<span class="n">sim_vehicle</span><span class="o">.</span><span class="n">sh</span> <span class="o">-</span><span class="n">v</span> <span class="n">Arduplane</span> <span class="o">-</span><span class="n">j</span> <span class="mi">4</span> <span class="p">[</span><span class="n">mavproxy_options</span><span class="p">]</span>
 </pre></div>
 </div>
 <p>Note that the correct parameters for the vehicles in the simulator are
@@ -192,14 +191,14 @@ your system setup, other packages may be required.</p>
 Wiki</a> for setting up the JSBSim simulator.</p>
 <p>The options for HIL mode are the same as for SITL. Note that the -w and -G commands are not applicable to HIL</p>
 <p>HIL mode can be enabled on any APM firmware by setting the HIL_MODE parameter to 1. However, the simulator only supports Arduplane at this time. When the APM is rebooted, it will go into HIL mode and get all sensor data from the simulator. Set HIL_MODE to 0 to disable HIL mode upon the next reboot.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>cd ./Ardupilot/Tools/autotest
-sim_vehicle.sh -v Arduplane -H --map --console
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">cd</span> <span class="o">./</span><span class="n">Ardupilot</span><span class="o">/</span><span class="n">Tools</span><span class="o">/</span><span class="n">autotest</span>
+<span class="n">sim_vehicle</span><span class="o">.</span><span class="n">sh</span> <span class="o">-</span><span class="n">v</span> <span class="n">Arduplane</span> <span class="o">-</span><span class="n">H</span> <span class="o">--</span><span class="nb">map</span> <span class="o">--</span><span class="n">console</span>
 
-Changing the APM to HIL mode in the MAVProxy console if required:
+<span class="n">Changing</span> <span class="n">the</span> <span class="n">APM</span> <span class="n">to</span> <span class="n">HIL</span> <span class="n">mode</span> <span class="ow">in</span> <span class="n">the</span> <span class="n">MAVProxy</span> <span class="n">console</span> <span class="k">if</span> <span class="n">required</span><span class="p">:</span>
 </pre></div>
 </div>
-<div class="code bash highlight-python"><div class="highlight"><pre>param set HIL_MODE 1
-reboot
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="nb">set</span> <span class="n">HIL_MODE</span> <span class="mi">1</span>
+<span class="n">reboot</span>
 </pre></div>
 </div>
 </div>

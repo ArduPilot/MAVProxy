@@ -87,7 +87,7 @@
 <li class="toctree-l2"><a class="reference internal" href="arming.html">Arming and Disarming</a></li>
 <li class="toctree-l2"><a class="reference internal" href="parameters.html">Parameters</a></li>
 <li class="toctree-l2"><a class="reference internal" href="waypoints.html">Waypoints</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="">Geofence</a><ul>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Geofence</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#fence-list">fence list</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#fence-load">fence load</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#fence-save">fence save</a></li>
@@ -109,7 +109,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
 </ul>
 
           
@@ -171,14 +170,14 @@ parameter(s) representing a cylinder around the flying area.</p>
 <div class="section" id="fence-load">
 <h2>fence load<a class="headerlink" href="#fence-load" title="Permalink to this headline">¶</a></h2>
 <p>Load a new set of geofence coordinates from file.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>fence load filename.txt
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">fence</span> <span class="n">load</span> <span class="n">filename</span><span class="o">.</span><span class="n">txt</span>
 </pre></div>
 </div>
 </div>
 <div class="section" id="fence-save">
 <h2>fence save<a class="headerlink" href="#fence-save" title="Permalink to this headline">¶</a></h2>
 <p>Save the set of current geofence coordinates to file.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>fence save filename.txt
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">fence</span> <span class="n">save</span> <span class="n">filename</span><span class="o">.</span><span class="n">txt</span>
 </pre></div>
 </div>
 </div>
@@ -203,14 +202,14 @@ parameter(s) representing a cylinder around the flying area.</p>
 <p>Move a specific fence coordinate to a new location. When entered, a new
 location can be selected on the map window. This requires the map module
 to be loaded.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>fence move 6
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">fence</span> <span class="n">move</span> <span class="mi">6</span>
 </pre></div>
 </div>
 </div>
 <div class="section" id="fence-remove">
 <h2>fence remove<a class="headerlink" href="#fence-remove" title="Permalink to this headline">¶</a></h2>
 <p>Remove a specific geofence coordinate.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>fence remove 6
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">fence</span> <span class="n">remove</span> <span class="mi">6</span>
 </pre></div>
 </div>
 </div>

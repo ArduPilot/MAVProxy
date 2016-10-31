@@ -85,7 +85,7 @@
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting Started</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="download_and_installation.html">Download and Installation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="">Startup Options</a><ul>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Startup Options</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#master">&#8211;master</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#quadcopter">&#8211;quadcopter</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#baudrate">&#8211;baudrate</a></li>
@@ -129,7 +129,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
 </ul>
 
           
@@ -195,11 +194,11 @@ IP address.</p>
 <p>If a serial port is specified, an optional comma-separated baud rate may
 also be specified. If present, this overrides the rate given by
 <code class="docutils literal"><span class="pre">--baudrate</span></code>.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>mavproxy.py --master=/dev/ttyUSB0
-mavproxy.py --master=&quot;com14&quot;
-mavproxy.py --master=tcp:192.168.1.1:14550
-mavproxy.py --master=udp:192.168.1.1:14550 --master=/dev/ttyUSB0
-mavproxy.py --master=/dev/ttyUSB0,57600
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">ttyUSB0</span>
+<span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="s2">&quot;com14&quot;</span>
+<span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">tcp</span><span class="p">:</span><span class="mf">192.168</span><span class="o">.</span><span class="mf">1.1</span><span class="p">:</span><span class="mi">14550</span>
+<span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">udp</span><span class="p">:</span><span class="mf">192.168</span><span class="o">.</span><span class="mf">1.1</span><span class="p">:</span><span class="mi">14550</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">ttyUSB0</span>
+<span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">ttyUSB0</span><span class="p">,</span><span class="mi">57600</span>
 </pre></div>
 </div>
 </div>
@@ -229,10 +228,10 @@ before the IP address.</p>
 UDP broadcast then locks onto the first client that connects. &lt;ip&gt; specifies
 the valid client range. For example, udpbcast:192.168.2.255:14550 will connect to
 the first client in the 192.168.2.0 to 192.168.2.254 range on port 14550.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>mavproxy.py --master=/dev/ttyUSB0 --out=udp:192.168.1.1:14550
-mavproxy.py --master=/dev/ttyACM0,115200 --out=/dev/ttyUSB0,57600
-mavproxy.py --master=/dev/ttyACM0,115200 --out=COM17,57600
-mavproxy.py --master=/dev/ttyACM0,57600 --out=udpbcast:192.168.2.255:14550
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">ttyUSB0</span> <span class="o">--</span><span class="n">out</span><span class="o">=</span><span class="n">udp</span><span class="p">:</span><span class="mf">192.168</span><span class="o">.</span><span class="mf">1.1</span><span class="p">:</span><span class="mi">14550</span>
+<span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">ttyACM0</span><span class="p">,</span><span class="mi">115200</span> <span class="o">--</span><span class="n">out</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">ttyUSB0</span><span class="p">,</span><span class="mi">57600</span>
+<span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">ttyACM0</span><span class="p">,</span><span class="mi">115200</span> <span class="o">--</span><span class="n">out</span><span class="o">=</span><span class="n">COM17</span><span class="p">,</span><span class="mi">57600</span>
+<span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">ttyACM0</span><span class="p">,</span><span class="mi">57600</span> <span class="o">--</span><span class="n">out</span><span class="o">=</span><span class="n">udpbcast</span><span class="p">:</span><span class="mf">192.168</span><span class="o">.</span><span class="mf">2.255</span><span class="p">:</span><span class="mi">14550</span>
 </pre></div>
 </div>
 </div>
@@ -290,7 +289,7 @@ flight logs organised.</p>
 <div class="section" id="cmd">
 <h2>&#8211;cmd<a class="headerlink" href="#cmd" title="Permalink to this headline">¶</a></h2>
 <p>Initial commands to run in MAVProxy. Delimited by <code class="docutils literal"><span class="pre">;</span></code></p>
-<div class="code bash highlight-python"><div class="highlight"><pre>mavproxy.py --master=/dev/ttyUSB0 --cmd=&quot;param load init.parm; module load map;&quot;
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">ttyUSB0</span> <span class="o">--</span><span class="n">cmd</span><span class="o">=</span><span class="s2">&quot;param load init.parm; module load map;&quot;</span>
 </pre></div>
 </div>
 </div>

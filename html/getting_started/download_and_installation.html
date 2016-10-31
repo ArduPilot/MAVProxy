@@ -83,7 +83,7 @@
           
               <ul class="current">
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting Started</a><ul class="current">
-<li class="toctree-l2 current"><a class="current reference internal" href="">Download and Installation</a><ul>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Download and Installation</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#windows">Windows</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#linux">Linux</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#mac">Mac</a></li>
@@ -102,7 +102,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
 </ul>
 
           
@@ -149,7 +148,7 @@
             
   <div class="section" id="download-and-installation">
 <h1>Download and Installation<a class="headerlink" href="#download-and-installation" title="Permalink to this headline">¶</a></h1>
-<p>The following instructions are for user that just want to run MAVProxy. Developers should look at the <a class="reference internal" href="../development/mavdevenv.html"><em>Developer&#8217;s Guide</em></a> for setting up the development environment.</p>
+<p>The following instructions are for user that just want to run MAVProxy. Developers should look at the <span class="xref doc">Developer&#8217;s Guide</span> for setting up the development environment.</p>
 <div class="section" id="windows">
 <h2>Windows<a class="headerlink" href="#windows" title="Permalink to this headline">¶</a></h2>
 <p>A complete windows installer for MAVProxy is available at
@@ -164,7 +163,7 @@ hopefully be fixed soon. See <a class="reference external" href="https://github.
 <div class="section" id="linux">
 <h2>Linux<a class="headerlink" href="#linux" title="Permalink to this headline">¶</a></h2>
 <p>First, a few pre-requisite packages need to be installed:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>sudo apt-get install python-dev python-opencv python-wxgtk3.0 python-pip python-matplotlib python-pygame python-lxml
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">apt</span><span class="o">-</span><span class="n">get</span> <span class="n">install</span> <span class="n">python</span><span class="o">-</span><span class="n">dev</span> <span class="n">python</span><span class="o">-</span><span class="n">opencv</span> <span class="n">python</span><span class="o">-</span><span class="n">wxgtk3</span><span class="o">.</span><span class="mi">0</span> <span class="n">python</span><span class="o">-</span><span class="n">pip</span> <span class="n">python</span><span class="o">-</span><span class="n">matplotlib</span> <span class="n">python</span><span class="o">-</span><span class="n">pygame</span> <span class="n">python</span><span class="o">-</span><span class="n">lxml</span>
 </pre></div>
 </div>
 <div class="admonition note">
@@ -180,16 +179,16 @@ the correct version of Python.</p>
 <p>Then download and install MAVProxy via Pypi. Prerequisites will be
 automatically downloaded too. Note a sudo may be required in some
 circumstances if the install generates errors:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>pip install MAVProxy
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">MAVProxy</span>
 </pre></div>
 </div>
 <p>Depending on user and system settings, there may be some extra configuration required.</p>
 <p>If not already set, MAVProxy needs to be on the system path:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>echo &quot;export PATH=$PATH:$HOME/.local/bin&quot; &gt;&gt; ~/.bashrc
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">echo</span> <span class="s2">&quot;export PATH=$PATH:$HOME/.local/bin&quot;</span> <span class="o">&gt;&gt;</span> <span class="o">~/.</span><span class="n">bashrc</span>
 </pre></div>
 </div>
 <p>The user permissions may also need to be changed to allow access to serial devices:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>sudo adduser &lt;username&gt; dialout
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">adduser</span> <span class="o">&lt;</span><span class="n">username</span><span class="o">&gt;</span> <span class="n">dialout</span>
 </pre></div>
 </div>
 <p>The system will need to be logged out and logged back in again to apply the above two changes.</p>
@@ -197,17 +196,17 @@ circumstances if the install generates errors:</p>
 <div class="section" id="mac">
 <h2>Mac<a class="headerlink" href="#mac" title="Permalink to this headline">¶</a></h2>
 <p>If you’re on Mac OSX, you can use Homebrew to install WXMac.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>brew tap homebrew/science
-brew install wxmac wxpython opencv
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">brew</span> <span class="n">tap</span> <span class="n">homebrew</span><span class="o">/</span><span class="n">science</span>
+<span class="n">brew</span> <span class="n">install</span> <span class="n">wxmac</span> <span class="n">wxpython</span> <span class="n">opencv</span>
 </pre></div>
 </div>
 <p>Uninstall python-dateutil (OSX and Windows come bundled with a version that is not supported for some dependencies):</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>sudo pip uninstall python-dateutil
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">pip</span> <span class="n">uninstall</span> <span class="n">python</span><span class="o">-</span><span class="n">dateutil</span>
 </pre></div>
 </div>
 <p>Install MAVProxy and its remaining dependencies from the public PyPi repository:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>sudo pip install numpy pyparsing
-sudo pip install MAVProxy
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">pip</span> <span class="n">install</span> <span class="n">numpy</span> <span class="n">pyparsing</span>
+<span class="n">sudo</span> <span class="n">pip</span> <span class="n">install</span> <span class="n">MAVProxy</span>
 </pre></div>
 </div>
 </div>

@@ -86,7 +86,7 @@
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">UAV Configuration</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="arming.html">Arming and Disarming</a></li>
 <li class="toctree-l2"><a class="reference internal" href="parameters.html">Parameters</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="">Waypoints</a><ul>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Waypoints</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#wp-list">wp list</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#wp-load">wp load</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#wp-save">wp save</a></li>
@@ -111,7 +111,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
 </ul>
 
           
@@ -167,14 +166,14 @@ entered via the command line or via the menu bar of the GUI console.</p>
 <div class="section" id="wp-load">
 <h2>wp load<a class="headerlink" href="#wp-load" title="Permalink to this headline">¶</a></h2>
 <p>Load a new set of waypoints from file.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>wp load filename.txt
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">wp</span> <span class="n">load</span> <span class="n">filename</span><span class="o">.</span><span class="n">txt</span>
 </pre></div>
 </div>
 </div>
 <div class="section" id="wp-save">
 <h2>wp save<a class="headerlink" href="#wp-save" title="Permalink to this headline">¶</a></h2>
 <p>Save the set of current waypoints to file.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>wp save filename.txt
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">wp</span> <span class="n">save</span> <span class="n">filename</span><span class="o">.</span><span class="n">txt</span>
 </pre></div>
 </div>
 </div>
@@ -187,7 +186,7 @@ during an AUTO mission.</p>
 <h2>wp update<a class="headerlink" href="#wp-update" title="Permalink to this headline">¶</a></h2>
 <p>Similar to <code class="docutils literal"><span class="pre">wp</span> <span class="pre">load</span></code>, except only a single specified waypoint is
 loaded.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>wp update filename.txt 6
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">wp</span> <span class="n">update</span> <span class="n">filename</span><span class="o">.</span><span class="n">txt</span> <span class="mi">6</span>
 </pre></div>
 </div>
 </div>
@@ -197,7 +196,7 @@ loaded.</p>
 can be selected on the map window. If a DTED map is available, the AGL
 height of the waypoint will be maintained. This requires the map module
 to be loaded.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>wp move 6
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">wp</span> <span class="n">move</span> <span class="mi">6</span>
 </pre></div>
 </div>
 </div>
@@ -208,7 +207,7 @@ to be loaded.</p>
 <div class="section" id="wp-remove">
 <h2>wp remove<a class="headerlink" href="#wp-remove" title="Permalink to this headline">¶</a></h2>
 <p>Remove a specific waypoint from the mission.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>wp remove 6
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">wp</span> <span class="n">remove</span> <span class="mi">6</span>
 </pre></div>
 </div>
 </div>
@@ -217,7 +216,7 @@ to be loaded.</p>
 <p>The the specified waypoint as the current waypoint. The mission will be
 run from this waypoint onwards. If the APM is running in AUTO mode, it
 will go to this waypoint immediately.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>wp set 6
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">wp</span> <span class="nb">set</span> <span class="mi">6</span>
 </pre></div>
 </div>
 </div>
@@ -225,7 +224,7 @@ will go to this waypoint immediately.</p>
 <h2>wp undo<a class="headerlink" href="#wp-undo" title="Permalink to this headline">¶</a></h2>
 <p>Reverts the last waypoint change or edit. Only the last change made via
 the wp command can be undone.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>wp undo
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">wp</span> <span class="n">undo</span>
 </pre></div>
 </div>
 </div>

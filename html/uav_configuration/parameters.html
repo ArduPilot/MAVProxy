@@ -85,7 +85,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting Started</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">UAV Configuration</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="arming.html">Arming and Disarming</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="">Parameters</a><ul>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Parameters</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#param-show">param show</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#param-set">param set</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#param-save">param save</a></li>
@@ -108,7 +108,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
 </ul>
 
           
@@ -166,14 +165,14 @@ possible parameters is shown.</p>
 <div class="section" id="param-set">
 <h2>param set<a class="headerlink" href="#param-set" title="Permalink to this headline">¶</a></h2>
 <p>Change a specified parameter to a particular value.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>param set FLTMODE1 9
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="nb">set</span> <span class="n">FLTMODE1</span> <span class="mi">9</span>
 </pre></div>
 </div>
 </div>
 <div class="section" id="param-save">
 <h2>param save<a class="headerlink" href="#param-save" title="Permalink to this headline">¶</a></h2>
 <p>Save all current parameters on the APM to file.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>param save filename.parm
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="n">save</span> <span class="n">filename</span><span class="o">.</span><span class="n">parm</span>
 </pre></div>
 </div>
 </div>
@@ -181,7 +180,7 @@ possible parameters is shown.</p>
 <h2>param load<a class="headerlink" href="#param-load" title="Permalink to this headline">¶</a></h2>
 <p>Load parameters from file to the APM. Only the parameters in the file
 will be overwritten.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>param load filename.parm
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="n">load</span> <span class="n">filename</span><span class="o">.</span><span class="n">parm</span>
 </pre></div>
 </div>
 </div>
@@ -189,7 +188,7 @@ will be overwritten.</p>
 <h2>param diff<a class="headerlink" href="#param-diff" title="Permalink to this headline">¶</a></h2>
 <p>View the differences between the parameters in a file and what is
 currently on the APM.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>param diff filename.parm
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="n">diff</span> <span class="n">filename</span><span class="o">.</span><span class="n">parm</span>
 </pre></div>
 </div>
 </div>
@@ -197,8 +196,8 @@ currently on the APM.</p>
 <h2>Wildcards<a class="headerlink" href="#wildcards" title="Permalink to this headline">¶</a></h2>
 <p>Any of the above commands can be filtered by using wildcards, if only a
 particular subset of parameters needs to be manipulated.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>param show FLTMODE*
-param load RC1*
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="n">show</span> <span class="n">FLTMODE</span><span class="o">*</span>
+<span class="n">param</span> <span class="n">load</span> <span class="n">RC1</span><span class="o">*</span>
 </pre></div>
 </div>
 </div>
@@ -206,14 +205,14 @@ param load RC1*
 <h2>param download<a class="headerlink" href="#param-download" title="Permalink to this headline">¶</a></h2>
 <p>Downloads the parameter definitions from the Internet and into a local
 cache.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>param download
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="n">download</span>
 </pre></div>
 </div>
 </div>
 <div class="section" id="param-help">
 <h2>param help<a class="headerlink" href="#param-help" title="Permalink to this headline">¶</a></h2>
 <p>Shows further information (usage, notes) of the specified parameter.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>param help FLTMODE1
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="n">help</span> <span class="n">FLTMODE1</span>
 </pre></div>
 </div>
 </div>
