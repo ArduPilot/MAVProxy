@@ -91,7 +91,7 @@
 <li class="toctree-l2"><a class="reference internal" href="rally.html">Rally Points</a></li>
 <li class="toctree-l2"><a class="reference internal" href="flightModes.html">Flight Modes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="calibration.html">Calibration</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="">System Commands</a><ul>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">System Commands</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#reboot">reboot</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#setup">setup</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#rc">rc</a></li>
@@ -108,7 +108,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
 </ul>
 
           
@@ -169,8 +168,8 @@
 <p>Override a RC (input) channel. This value remains in effect until a
 value of 0 is set. Uses the form of <code class="docutils literal"><span class="pre">rc</span> <span class="pre">chan</span> <span class="pre">value</span></code>. Use <code class="docutils literal"><span class="pre">all</span></code> to
 set a global value for all RC channels.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>rc 1 1000
-rc all 0
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">rc</span> <span class="mi">1</span> <span class="mi">1000</span>
+<span class="n">rc</span> <span class="nb">all</span> <span class="mi">0</span>
 </pre></div>
 </div>
 </div>
@@ -181,7 +180,7 @@ brackets is the ground station time.</p>
 </div>
 <div class="section" id="script">
 <h2>script<a class="headerlink" href="#script" title="Permalink to this headline">¶</a></h2>
-<p>Runs a text file containing MAVProxy commands, much like the <a class="reference internal" href="../getting_started/mavinit.html"><em>Startup Scripts</em></a>.</p>
+<p>Runs a text file containing MAVProxy commands, much like the <a class="reference internal" href="../getting_started/mavinit.html"><span class="doc">Startup Scripts</span></a>.</p>
 </div>
 <div class="section" id="shell">
 <h2>shell<a class="headerlink" href="#shell" title="Permalink to this headline">¶</a></h2>
@@ -198,7 +197,7 @@ the state of the UAV.</p>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p>This requires the &#8220;requireexit&#8221; option to be true in order to work. This can be done via the following command:</p>
-<div class="code bash last highlight-python"><div class="highlight"><pre>set requireexit True
+<div class="code bash last highlight-default"><div class="highlight"><pre><span></span><span class="nb">set</span> <span class="n">requireexit</span> <span class="kc">True</span>
 </pre></div>
 </div>
 </div>

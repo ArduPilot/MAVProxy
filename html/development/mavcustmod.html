@@ -33,7 +33,7 @@
     <link rel="top" title="MAVProxy 1.4.38 documentation" href="../index.html"/>
         <link rel="up" title="Development" href="index.html"/>
         <link rel="next" title="Image Processing with cuav" href="../cuav_module/index.html"/>
-        <link rel="prev" title="Development Environment" href="mavdevenv.html"/> 
+        <link rel="prev" title="Windows Development Environment" href="mavdevenvwindows.html"/> 
 
   
   <script src="../_static/js/modernizr.min.js"></script>
@@ -87,8 +87,9 @@
 <li class="toctree-l1"><a class="reference internal" href="../modules/index.html">Modules</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Development</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="mavdevenv.html">Development Environment</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="">Module Development</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="mavdevenvlinux.html">Linux Development Environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mavdevenvwindows.html">Windows Development Environment</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Module Development</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#location">Location</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#module-file-structure">Module File Structure</a></li>
 </ul>
@@ -96,7 +97,6 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
 </ul>
 
           
@@ -162,7 +162,7 @@ into the MAVProxy installation folder (Usually C:\Program Files
 <h2>Module File Structure<a class="headerlink" href="#module-file-structure" title="Permalink to this headline">¶</a></h2>
 <p>At the base level, a MAVProxy module is an instance of the MPModule
 class, with hooks for initialisation and reading Mavlink packets:</p>
-<div class="code python highlight-python"><div class="highlight"><pre>#!/usr/bin/env python
+<div class="code python highlight-default"><div class="highlight"><pre><span></span>#!/usr/bin/env python
 &#39;&#39;&#39;module template&#39;&#39;&#39;
 import time, math
 from pymavlink import mavutil
@@ -184,7 +184,7 @@ class TestModule(mp_module.MPModule):
 </div>
 <p>The initialisation section defines commands and module-wide variables.
 To add a command:</p>
-<div class="code python highlight-python"><div class="highlight"><pre><span class="bp">self</span><span class="o">.</span><span class="n">add_command</span><span class="p">(</span><span class="s1">&#39;bat&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cmd_bat</span><span class="p">,</span> <span class="s2">&quot;show some information&quot;</span><span class="p">)</span>
+<div class="code python highlight-default"><div class="highlight"><pre><span></span><span class="bp">self</span><span class="o">.</span><span class="n">add_command</span><span class="p">(</span><span class="s1">&#39;bat&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cmd_bat</span><span class="p">,</span> <span class="s2">&quot;show some information&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>The above will add the &#8220;bat&#8221; command, which the MAVProxy help will show
@@ -192,7 +192,7 @@ To add a command:</p>
 <p>Within the packet handling, the
 <a class="reference external" href="https://pixhawk.ethz.ch/mavlink/">Mavlink</a> reference is useful for
 filtering the incoming packets for the relevant data:</p>
-<div class="code python highlight-python"><div class="highlight"><pre><span class="k">if</span> <span class="n">m</span><span class="o">.</span><span class="n">get_type</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;VFR_HUD&#39;</span><span class="p">:</span>
+<div class="code python highlight-default"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="n">m</span><span class="o">.</span><span class="n">get_type</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;VFR_HUD&#39;</span><span class="p">:</span>
   <span class="n">curspeed</span> <span class="o">=</span>  <span class="n">m</span><span class="o">.</span><span class="n">airspeed</span>
 </pre></div>
 </div>
@@ -213,7 +213,7 @@ for examples of what you want to do.</p>
         <a href="../cuav_module/index.html" class="btn btn-neutral float-right" title="Image Processing with cuav" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="mavdevenv.html" class="btn btn-neutral" title="Development Environment" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="mavdevenvwindows.html" class="btn btn-neutral" title="Windows Development Environment" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   

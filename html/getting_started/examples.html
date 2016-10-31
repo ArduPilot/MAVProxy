@@ -87,7 +87,7 @@
 <li class="toctree-l2"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
 <li class="toctree-l2"><a class="reference internal" href="starting.html">Startup Options</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mavinit.html">Startup Scripts</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="">Examples</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mavbridge.html">MAVProxy Wifi Bridge</a></li>
 <li class="toctree-l2"><a class="reference internal" href="faq.html">Frequently Asked Questions and Issues</a></li>
 </ul>
@@ -97,7 +97,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
 </ul>
 
           
@@ -146,18 +145,18 @@
 <h1>Examples<a class="headerlink" href="#examples" title="Permalink to this headline">¶</a></h1>
 <p>The following section provides a couple of common usage scenarios for MAVProxy.</p>
 <p>Quadcopter over a standard (57600 kbps) radio link on a serial port. MAVProxy will auto-detect the correct serial port. The quadcopter is called &#8220;Quaddy&#8221;. The GUI console, map and text-to-speech are also enabled:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">baud</span><span class="o">=</span><span class="mi">57600</span> <span class="o">--</span><span class="n">aircraft</span><span class="o">=</span><span class="s2">&quot;Quaddy&quot;</span> <span class="o">--</span><span class="n">speech</span> <span class="o">--</span><span class="n">console</span> <span class="o">--</span><span class="nb">map</span> <span class="o">--</span><span class="n">quadcopter</span>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">baud</span><span class="o">=</span><span class="mi">57600</span> <span class="o">--</span><span class="n">aircraft</span><span class="o">=</span><span class="s2">&quot;Quaddy&quot;</span> <span class="o">--</span><span class="n">speech</span> <span class="o">--</span><span class="n">console</span> <span class="o">--</span><span class="nb">map</span> <span class="o">--</span><span class="n">quadcopter</span>
 </pre></div>
 </div>
 <p>Run MAVProxy in daemon mode, taking in a radio link (COM17 at 9600 kbps) and outputting it to the local network. This allows a single instance of MAVProxy to distribute the telemetry stream to multiple clients:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>mavproxy.py --master=COM17,9600 --out=udpin:0.0.0.0:14550 --daemon
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span>mavproxy.py --master=COM17,9600 --out=udpin:0.0.0.0:14550 --daemon
 
 (client, xxx.xxx.xxx.xxx is the daemon&#39;s IP address)
 mavproxy.py –master=udpout:xxx.xxx.xxx.xxx:14550
 </pre></div>
 </div>
 <p>Use multiple radio links (one serial, one network) to the remote vehicle. This is useful for situations where a backup radio link is required:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>mavproxy.py --master=\dev\ttyUSB0,57600 --master=192.168.16.15:2626
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span>\<span class="n">dev</span>\<span class="n">ttyUSB0</span><span class="p">,</span><span class="mi">57600</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="mf">192.168</span><span class="o">.</span><span class="mf">16.15</span><span class="p">:</span><span class="mi">2626</span>
 </pre></div>
 </div>
 </div>

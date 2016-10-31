@@ -91,7 +91,7 @@
 <li class="toctree-l2"><a class="reference internal" href="console.html">Graphical Console</a></li>
 <li class="toctree-l2"><a class="reference internal" href="dgps.html">Differential GPS</a></li>
 <li class="toctree-l2"><a class="reference internal" href="gimbals.html">Gimbal Management</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="">Graphing Live Data</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Graphing Live Data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="hil.html">HIL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="joystick.html">Joystick Input</a></li>
 <li class="toctree-l2"><a class="reference internal" href="link.html">Link Management</a></li>
@@ -112,7 +112,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
 </ul>
 
           
@@ -159,22 +158,22 @@
             
   <div class="section" id="graphing-live-data">
 <h1>Graphing Live Data<a class="headerlink" href="#graphing-live-data" title="Permalink to this headline">¶</a></h1>
-<div class="code bash highlight-python"><div class="highlight"><pre>module load graph
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">graph</span>
 </pre></div>
 </div>
 <p>A module to plot (graph) data in realtime from the UAV. It is useful for
 looking for time-varying patterns in the data</p>
 <p>After loading, new plots can be created by:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>graph dataname
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">graph</span> <span class="n">dataname</span>
 </pre></div>
 </div>
 <p>Multiple items can be added at once. Use the <code class="docutils literal"><span class="pre">:2</span></code> to specify using the
 right vertical axis.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>graph VFR_HUD.alt VFR_HUD.airspeed:2
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">graph</span> <span class="n">VFR_HUD</span><span class="o">.</span><span class="n">alt</span> <span class="n">VFR_HUD</span><span class="o">.</span><span class="n">airspeed</span><span class="p">:</span><span class="mi">2</span>
 </pre></div>
 </div>
 <p>Arbitrary mathematical functions can also be used.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>graph &quot;(VFR_HUD.alt/1000.0)+5&quot;
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">graph</span> <span class="s2">&quot;(VFR_HUD.alt/1000.0)+5&quot;</span>
 </pre></div>
 </div>
 <p>Additionally, the timespan and tick resolution of the graph window can

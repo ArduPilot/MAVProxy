@@ -85,7 +85,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
 </ul>
 
           
@@ -133,25 +132,25 @@
 <p>When connected to a vehicle, MAVProxy will automatically save any recieved telemetry to a logfile.</p>
 <p>This logfile can be used for post-flight analysis or flight replay.</p>
 <p>By default, the logfile will be saved as <code class="docutils literal"><span class="pre">mav.tlog</span></code> and <code class="docutils literal"><span class="pre">mav.tlog.raw</span></code> in the same folder that MAVProxy was executed from. For example:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>~/Documents/code/MAVProxy$ mavproxy.py
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span>~/Documents/code/MAVProxy$ mavproxy.py
 </pre></div>
 </div>
 <p>Will log the telemetry to <code class="docutils literal"><span class="pre">mav.tlog</span></code> and <code class="docutils literal"><span class="pre">mav.tlog.raw</span></code> in the <code class="docutils literal"><span class="pre">~/Documents/code/MAVProxy</span></code> folder.</p>
 <p>In the example:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>C:\users\stephen\Documents\logs&gt; mavproxy.py
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">C</span><span class="p">:</span>\<span class="n">users</span>\<span class="n">stephen</span>\<span class="n">Documents</span>\<span class="n">logs</span><span class="o">&gt;</span> <span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span>
 </pre></div>
 </div>
 <p>Will log the telemetry to <code class="docutils literal"><span class="pre">mav.tlog</span></code> and <code class="docutils literal"><span class="pre">mav.tlog.raw</span></code> in the <code class="docutils literal"><span class="pre">C:\users\stephen\Documents\logs</span></code> folder.</p>
 <p>Note that both the <code class="docutils literal"><span class="pre">mav.tlog</span></code> and the <code class="docutils literal"><span class="pre">mav.tlog.raw</span></code> files contain the same data (albiet in different formats). In most cases however the raw file is not used by the analysis or replay tools.</p>
-<p>MAVProxy can use the <code class="docutils literal"><span class="pre">--aircraft=name</span></code> (<a class="reference internal" href="starting.html"><em>Startup Options</em></a>) argument to place the logfile in a specific name and date folder. This is useful for keeping logfiles sorted. See starting for further details.</p>
+<p>MAVProxy can use the <code class="docutils literal"><span class="pre">--aircraft=name</span></code> (<a class="reference internal" href="starting.html"><span class="doc">Startup Options</span></a>) argument to place the logfile in a specific name and date folder. This is useful for keeping logfiles sorted. See starting for further details.</p>
 <p>For example:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>C:\users\stephen\Documents&gt; mavproxy.py --aircraft=copter
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">C</span><span class="p">:</span>\<span class="n">users</span>\<span class="n">stephen</span>\<span class="n">Documents</span><span class="o">&gt;</span> <span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">aircraft</span><span class="o">=</span><span class="n">copter</span>
 </pre></div>
 </div>
 <p>Will log the telemetry to <code class="docutils literal"><span class="pre">flight.tlog</span></code> and <code class="docutils literal"><span class="pre">flight.tlog.raw</span></code> in the <code class="docutils literal"><span class="pre">C:\users\stephen\Documents\Logs\Copter\&lt;date&gt;\flight&lt;n&gt;\</span></code> folder.</p>
-<p>The <code class="docutils literal"><span class="pre">--mission=name</span></code> (<a class="reference internal" href="starting.html"><em>Startup Options</em></a>) startup argument can be used with the <code class="docutils literal"><span class="pre">--aircraft=name</span></code> argument to use a specific name for the flight, rather than &lt;date&gt;. For example:</p>
+<p>The <code class="docutils literal"><span class="pre">--mission=name</span></code> (<a class="reference internal" href="starting.html"><span class="doc">Startup Options</span></a>) startup argument can be used with the <code class="docutils literal"><span class="pre">--aircraft=name</span></code> argument to use a specific name for the flight, rather than &lt;date&gt;. For example:</p>
 <blockquote>
-<div><div class="code bash highlight-python"><div class="highlight"><pre>C:\users\stephen\Documents&gt; mavproxy.py --aircraft=copter --mission=flyby
+<div><div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">C</span><span class="p">:</span>\<span class="n">users</span>\<span class="n">stephen</span>\<span class="n">Documents</span><span class="o">&gt;</span> <span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">aircraft</span><span class="o">=</span><span class="n">copter</span> <span class="o">--</span><span class="n">mission</span><span class="o">=</span><span class="n">flyby</span>
 </pre></div>
 </div>
 </div></blockquote>

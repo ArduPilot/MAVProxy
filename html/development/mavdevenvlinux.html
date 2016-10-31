@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Startup Scripts &mdash; MAVProxy 1.4.38 documentation</title>
+  <title>Linux Development Environment &mdash; MAVProxy 1.4.38 documentation</title>
   
 
   
@@ -31,9 +31,9 @@
 
   
     <link rel="top" title="MAVProxy 1.4.38 documentation" href="../index.html"/>
-        <link rel="up" title="Getting Started" href="index.html"/>
-        <link rel="next" title="Examples" href="examples.html"/>
-        <link rel="prev" title="Startup Options" href="starting.html"/> 
+        <link rel="up" title="Development" href="index.html"/>
+        <link rel="next" title="Windows Development Environment" href="mavdevenvwindows.html"/>
+        <link rel="prev" title="Development" href="index.html"/> 
 
   
   <script src="../_static/js/modernizr.min.js"></script>
@@ -82,20 +82,16 @@
           
           
               <ul class="current">
-<li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting Started</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="download_and_installation.html">Download and Installation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
-<li class="toctree-l2"><a class="reference internal" href="starting.html">Startup Options</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Startup Scripts</a></li>
-<li class="toctree-l2"><a class="reference internal" href="examples.html">Examples</a></li>
-<li class="toctree-l2"><a class="reference internal" href="mavbridge.html">MAVProxy Wifi Bridge</a></li>
-<li class="toctree-l2"><a class="reference internal" href="faq.html">Frequently Asked Questions and Issues</a></li>
-</ul>
-</li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting Started</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../modules/index.html">Modules</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Development</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Linux Development Environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mavdevenvwindows.html">Windows Development Environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mavcustmod.html">Module Development</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
 </ul>
 
@@ -127,9 +123,9 @@
   <ul class="wy-breadcrumbs">
     <li><a href="../index.html">Docs</a> &raquo;</li>
       
-          <li><a href="index.html">Getting Started</a> &raquo;</li>
+          <li><a href="index.html">Development</a> &raquo;</li>
       
-    <li>Startup Scripts</li>
+    <li>Linux Development Environment</li>
       <li class="wy-breadcrumbs-aside">
         
           
@@ -141,30 +137,28 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="startup-scripts">
-<h1>Startup Scripts<a class="headerlink" href="#startup-scripts" title="Permalink to this headline">¶</a></h1>
-<p>MAVProxy is capable of executing a script (of MAVProxy commands) on
-startup. This can save the effort of (re)setting up the MAVProxy
-environment for each flight.</p>
-<p>A script (<code class="file docutils literal"><span class="pre">mavinit.scr</span></code>) should be placed in an aircraft directory (ie.
-<code class="file docutils literal"><span class="pre">MAVProxy/Aircraftname/mavinit.scr</span></code>) containing the commands. Any normal
-MAVProxy commands can be placed in here. Note that the &#8211;aircraft option
-must be used, in order for MAVProxy to find the script in the
-appropriate aircraft directory.</p>
-<p>Alternatively, a <code class="file docutils literal"><span class="pre">.mavinit.scr</span></code> can be placed in the user&#8217;s home directory
-(ie. <code class="file docutils literal"><span class="pre">/home/username</span></code> in Linux or
-<code class="file docutils literal"><span class="pre">C:\Users\username\AppData\Local\MAVProxy</span></code> in Windows) and will be
-loaded with MAVProxy regardless of the &#8211;aircraft option.</p>
-<p>An example script can be found <a class="reference external" href="../_static/files/mavinit.scr">here</a>.</p>
-<p>In this particular script, aliases are used as shortcuts to common
-commands.</p>
-<p>For example the following alias definitions in <code class="file docutils literal"><span class="pre">mavinit.scr</span></code>
-will allow the user to graph the current battery level by typing
-<code class="docutils literal"><span class="pre">gbatt</span></code> instead of <code class="docutils literal"><span class="pre">graph</span> <span class="pre">SYS_STATUS.current_battery</span></code>.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span>@alias add g graph
-@alias add gbatt g SYS_STATUS.current_battery``
+  <div class="section" id="linux-development-environment">
+<h1>Linux Development Environment<a class="headerlink" href="#linux-development-environment" title="Permalink to this headline">¶</a></h1>
+<p>Follow the user installation instructions as per the
+topic <a class="reference internal" href="../getting_started/download_and_installation.html"><span class="doc">Download and Installation</span></a>. Additionally, install:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">apt</span><span class="o">-</span><span class="n">get</span> <span class="n">install</span> <span class="n">git</span>
 </pre></div>
 </div>
+<p>The pip-installed MAVProxy will need to uninstalled (if already installed) to prevent system conflicts:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">uninstall</span> <span class="n">MAVProxy</span>
+</pre></div>
+</div>
+<p>Use git to download the MAVProxy source:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">ArduPilot</span><span class="o">/</span><span class="n">MAVProxy</span><span class="o">.</span><span class="n">git</span>
+</pre></div>
+</div>
+<p>After making the desired changes, MAVProxy is required to be installed
+(the modules won&#8217;t work otherwise). This needs to happen after any
+changes to the source code. This can be done by:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">setup</span><span class="o">.</span><span class="n">py</span> <span class="n">build</span> <span class="n">install</span> <span class="o">--</span><span class="n">user</span>
+</pre></div>
+</div>
+<p>MAVProxy can then be run as per normal.</p>
 </div>
 
 
@@ -174,10 +168,10 @@ will allow the user to graph the current battery level by typing
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="examples.html" class="btn btn-neutral float-right" title="Examples" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="mavdevenvwindows.html" class="btn btn-neutral float-right" title="Windows Development Environment" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="starting.html" class="btn btn-neutral" title="Startup Options" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="index.html" class="btn btn-neutral" title="Development" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
@@ -186,7 +180,7 @@ will allow the user to graph the current battery level by typing
 
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
-<div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Startup%20Scripts%20-%20&body=URL:%20../getting_started/mavinit%0ATitle:%20Startup%20Scripts%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
+<div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Linux%20Development%20Environment%20-%20&body=URL:%20../development/mavdevenvlinux%0ATitle:%20Linux%20Development%20Environment%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
     <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
     This is an ArduPilot project.</p>     
 

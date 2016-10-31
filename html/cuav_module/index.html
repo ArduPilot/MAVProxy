@@ -31,7 +31,6 @@
 
   
     <link rel="top" title="MAVProxy 1.4.38 documentation" href="../index.html"/>
-        <link rel="next" title="License" href="../license.html"/>
         <link rel="prev" title="Module Development" href="../development/mavcustmod.html"/> 
 
   
@@ -86,13 +85,12 @@
 <li class="toctree-l1"><a class="reference internal" href="../modules/index.html">Modules</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="">Image Processing with cuav</a><ul>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Image Processing with cuav</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#installing">Installing</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#compatibility-and-system-setup">Compatibility and System Setup</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#usage">Usage</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
 </ul>
 
           
@@ -142,9 +140,9 @@
 <p>Source code is available at <a class="reference external" href="https://github.com/tridge/cuav">https://github.com/tridge/cuav</a></p>
 <div class="section" id="installing">
 <h2>Installing<a class="headerlink" href="#installing" title="Permalink to this headline">¶</a></h2>
-<p>The cuav module requires the following pre-requisites (this assumes the MAVproxy is already installed as per the instructions at <a class="reference internal" href="../getting_started/download_and_installation.html"><em>Download and Installation</em></a>):</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>sudo apt-get install libusb-1.0.0-dev libdc1394-22-dev libopencv-dev
-pip install cuav
+<p>The cuav module requires the following pre-requisites (this assumes the MAVproxy is already installed as per the instructions at <a class="reference internal" href="../getting_started/download_and_installation.html"><span class="doc">Download and Installation</span></a>):</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">apt</span><span class="o">-</span><span class="n">get</span> <span class="n">install</span> <span class="n">libusb</span><span class="o">-</span><span class="mf">1.0</span><span class="o">.</span><span class="mi">0</span><span class="o">-</span><span class="n">dev</span> <span class="n">libdc1394</span><span class="o">-</span><span class="mi">22</span><span class="o">-</span><span class="n">dev</span> <span class="n">libopencv</span><span class="o">-</span><span class="n">dev</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="n">cuav</span>
 </pre></div>
 </div>
 <div class="admonition note">
@@ -161,25 +159,25 @@ pip install cuav
 <div class="section" id="usage">
 <h2>Usage<a class="headerlink" href="#usage" title="Permalink to this headline">¶</a></h2>
 <p>Within MAVProxy, use the following to activate cuav:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>module load cuav.modules.camera
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">cuav</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">camera</span>
 </pre></div>
 </div>
 <p>The following commands are available:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>camera start
-camera stop
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">camera</span> <span class="n">start</span>
+<span class="n">camera</span> <span class="n">stop</span>
 </pre></div>
 </div>
 <p>These commands stop and stop the image capturing and analysis processes. It is useful to command the start just after takeoff and stop just before landing.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>camera status
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">camera</span> <span class="n">status</span>
 </pre></div>
 </div>
 <p>This displays the current status: Number of images captured, Error count, scanned images count, framerate, region count, image size, images in transmit queue (primary and secondary radio links), frames lost, scan queue size and efficieny.</p>
 <p>It is useful to look at the scan queue size. If it is continually increasing, there is not enough computing power available to process the images in real-time.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>camera view
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">camera</span> <span class="n">view</span>
 </pre></div>
 </div>
 <p>Gives a live view of the images captured. Useful at a ground station with a high-bandwidth link to the UAV.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>camera set X Y
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">camera</span> <span class="nb">set</span> <span class="n">X</span> <span class="n">Y</span>
 </pre></div>
 </div>
 <p>Change cuav setting X to value Y. Available settings are:</p>
@@ -371,8 +369,6 @@ camera stop
           <footer>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="../license.html" class="btn btn-neutral float-right" title="License" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
         <a href="../development/mavcustmod.html" class="btn btn-neutral" title="Module Development" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>

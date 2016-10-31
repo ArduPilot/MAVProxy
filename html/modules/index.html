@@ -83,7 +83,7 @@
               <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting Started</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="">Modules</a><ul>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Modules</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="antenna.html">Antenna Pointing</a></li>
 <li class="toctree-l2"><a class="reference internal" href="auxopt.html">Auxiliary (RC 6,7) Options</a></li>
 <li class="toctree-l2"><a class="reference internal" href="cameraview.html">Camera Viewer</a></li>
@@ -114,7 +114,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
 </ul>
 
           
@@ -169,20 +168,20 @@ monitoring applications.</p>
 <h2>Module Management<a class="headerlink" href="#module-management" title="Permalink to this headline">¶</a></h2>
 <p>Modules need to be loaded before they can be used. The following command
 can be used:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>module load modulename
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">modulename</span>
 </pre></div>
 </div>
 <p>Other management commands for unloading, reloading and listing currently
 loaded modules include:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>module unload modulename
-module reload modulename
-module list
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">unload</span> <span class="n">modulename</span>
+<span class="n">module</span> <span class="n">reload</span> <span class="n">modulename</span>
+<span class="n">module</span> <span class="nb">list</span>
 </pre></div>
 </div>
 <div class="section" id="default-modules">
 <h3>Default Modules<a class="headerlink" href="#default-modules" title="Permalink to this headline">¶</a></h3>
 <p>MAVProxy starts with several modules by default. They are:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre><span class="n">log</span>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">log</span>
 <span class="n">wp</span>
 <span class="n">rally</span>
 <span class="n">fence</span>

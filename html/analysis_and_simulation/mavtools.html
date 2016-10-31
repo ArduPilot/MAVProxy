@@ -87,7 +87,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../modules/index.html">Modules</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Analysis and Simulation</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="playback.html">Playback</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="">Offline Tools</a><ul>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Offline Tools</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#mavgraph-py">mavgraph.py</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#mavtogpx-py">mavtogpx.py</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#mavparms-py">mavparms.py</a></li>
@@ -101,7 +101,6 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
 </ul>
 
           
@@ -153,24 +152,24 @@ be used for a postflight analysis.</p>
 <div class="section" id="mavgraph-py">
 <h2>mavgraph.py<a class="headerlink" href="#mavgraph-py" title="Permalink to this headline">¶</a></h2>
 <p>This can graph any of the flight data.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>mavgraph.py flight.tlog VFR_HUD.alt
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavgraph</span><span class="o">.</span><span class="n">py</span> <span class="n">flight</span><span class="o">.</span><span class="n">tlog</span> <span class="n">VFR_HUD</span><span class="o">.</span><span class="n">alt</span>
 </pre></div>
 </div>
 <p>Other than specifying the tlog file, the commands are exactly the same
-as the <a class="reference internal" href="../modules/graph.html"><em>graph</em></a> module in MAVProxy.</p>
+as the <a class="reference internal" href="../modules/graph.html"><span class="doc">graph</span></a> module in MAVProxy.</p>
 </div>
 <div class="section" id="mavtogpx-py">
 <h2>mavtogpx.py<a class="headerlink" href="#mavtogpx-py" title="Permalink to this headline">¶</a></h2>
 <p>Exports the GPS points in a logfile to the GPX format, which can be read
 by Google Earth.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>mavtogpx.py flight.tlog
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavtogpx</span><span class="o">.</span><span class="n">py</span> <span class="n">flight</span><span class="o">.</span><span class="n">tlog</span>
 </pre></div>
 </div>
 </div>
 <div class="section" id="mavparms-py">
 <h2>mavparms.py<a class="headerlink" href="#mavparms-py" title="Permalink to this headline">¶</a></h2>
 <p>Finds the APM parameters in a logfile and displays them on the console.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>mavparms.py flight.tlog
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavparms</span><span class="o">.</span><span class="n">py</span> <span class="n">flight</span><span class="o">.</span><span class="n">tlog</span>
 </pre></div>
 </div>
 </div>
@@ -179,7 +178,7 @@ by Google Earth.</p>
 <p>Prints out the total time spent in the air. Note that a threshold of
 3m/s defines the difference between air time and ground time. This can
 be changed by the <code class="docutils literal"><span class="pre">--groundspeed=</span></code> argument.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>mavflighttime.py flight.tlog
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavflighttime</span><span class="o">.</span><span class="n">py</span> <span class="n">flight</span><span class="o">.</span><span class="n">tlog</span>
 </pre></div>
 </div>
 </div>
@@ -187,7 +186,7 @@ be changed by the <code class="docutils literal"><span class="pre">--groundspeed
 <h2>mavflightmodes.py<a class="headerlink" href="#mavflightmodes-py" title="Permalink to this headline">¶</a></h2>
 <p>Prints out the timestamp and name of each flight mode change in a
 logfile.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>mavflightmodes.py flight.tlog
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavflightmodes</span><span class="o">.</span><span class="n">py</span> <span class="n">flight</span><span class="o">.</span><span class="n">tlog</span>
 </pre></div>
 </div>
 </div>

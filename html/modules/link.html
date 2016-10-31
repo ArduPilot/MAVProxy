@@ -94,7 +94,7 @@
 <li class="toctree-l2"><a class="reference internal" href="graph.html">Graphing Live Data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="hil.html">HIL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="joystick.html">Joystick Input</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="">Link Management</a><ul>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Link Management</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#link-add">link add</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#link-remove">link remove</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#link-list">link list</a></li>
@@ -117,7 +117,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
 </ul>
 
           
@@ -176,9 +175,9 @@ intervention is necessary for link failover.</p>
 address or serial port. For a serial port, the default baud rate is
 57600. Use <code class="docutils literal"><span class="pre">set</span> <span class="pre">baudrate</span> <span class="pre">xxx</span></code> to change baud rate for any subsequent
 link add&#8217;s.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>link add 127.0.0.1:14550
-set baudrate 115200
-link add COM17
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">link</span> <span class="n">add</span> <span class="mf">127.0</span><span class="o">.</span><span class="mf">0.1</span><span class="p">:</span><span class="mi">14550</span>
+<span class="nb">set</span> <span class="n">baudrate</span> <span class="mi">115200</span>
+<span class="n">link</span> <span class="n">add</span> <span class="n">COM17</span>
 </pre></div>
 </div>
 </div>
@@ -186,14 +185,14 @@ link add COM17
 <h2>link remove<a class="headerlink" href="#link-remove" title="Permalink to this headline">¶</a></h2>
 <p>Remove a communications link. The ID of the link is used to identify the
 link to remove.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>link remove 2
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">link</span> <span class="n">remove</span> <span class="mi">2</span>
 </pre></div>
 </div>
 </div>
 <div class="section" id="link-list">
 <h2>link list<a class="headerlink" href="#link-list" title="Permalink to this headline">¶</a></h2>
 <p>List the active communications links and their ID&#8217;s</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>link list
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">link</span> <span class="nb">list</span>
 </pre></div>
 </div>
 </div>

@@ -90,7 +90,7 @@
 <li class="toctree-l2"><a class="reference internal" href="cameraview.html">Camera Viewer</a></li>
 <li class="toctree-l2"><a class="reference internal" href="console.html">Graphical Console</a></li>
 <li class="toctree-l2"><a class="reference internal" href="dgps.html">Differential GPS</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="">Gimbal Management</a><ul>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Gimbal Management</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#gimbal-mode">gimbal mode</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#gimbal-rate-roll-pitch-yaw">gimbal rate ROLL PITCH YAW</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#gimbal-point-roll-pitch-yaw">gimbal point ROLL PITCH YAW</a></li>
@@ -119,7 +119,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../license.html">License</a></li>
 </ul>
 
           
@@ -166,7 +165,7 @@
             
   <div class="section" id="gimbal-management">
 <h1>Gimbal Management<a class="headerlink" href="#gimbal-management" title="Permalink to this headline">¶</a></h1>
-<div class="code bash highlight-python"><div class="highlight"><pre>module load gimbal
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">gimbal</span>
 </pre></div>
 </div>
 <p>The gimbal module manages any gimbals attached to the APM via the RC
@@ -180,7 +179,7 @@ output ports.</p>
 <li>MAVLINK - manual control via MAVLink commands</li>
 <li>RC - manual control via RC channels</li>
 </ul>
-<div class="code bash highlight-python"><div class="highlight"><pre>gimbal mode GPS
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">gimbal</span> <span class="n">mode</span> <span class="n">GPS</span>
 </pre></div>
 </div>
 </div>
@@ -188,7 +187,7 @@ output ports.</p>
 <h2>gimbal rate ROLL PITCH YAW<a class="headerlink" href="#gimbal-rate-roll-pitch-yaw" title="Permalink to this headline">¶</a></h2>
 <p>Specify the maximum rotational rates (degrees/sec) that the gimbal is
 limited to. Different rates can be used for different axes.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>gimbal rate 20 40 13
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">gimbal</span> <span class="n">rate</span> <span class="mi">20</span> <span class="mi">40</span> <span class="mi">13</span>
 </pre></div>
 </div>
 </div>
@@ -196,7 +195,7 @@ limited to. Different rates can be used for different axes.</p>
 <h2>gimbal point ROLL PITCH YAW<a class="headerlink" href="#gimbal-point-roll-pitch-yaw" title="Permalink to this headline">¶</a></h2>
 <p>When in MAVLink mode, tell the gimbal to point in a certain direction.
 Angles are in degrees.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>gimbal point 0 85 45
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">gimbal</span> <span class="n">point</span> <span class="mi">0</span> <span class="mi">85</span> <span class="mi">45</span>
 </pre></div>
 </div>
 </div>
@@ -204,14 +203,14 @@ Angles are in degrees.</p>
 <h2>gimbal roi<a class="headerlink" href="#gimbal-roi" title="Permalink to this headline">¶</a></h2>
 <p>When in GPS mode, tell the gimbal to point to a certain location. The
 location is picked by clicking on the map.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>gimbal roi
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">gimbal</span> <span class="n">roi</span>
 </pre></div>
 </div>
 </div>
 <div class="section" id="gimbal-status">
 <h2>gimbal status<a class="headerlink" href="#gimbal-status" title="Permalink to this headline">¶</a></h2>
 <p>Output the current status of the gimbal.</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>gimbal status
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">gimbal</span> <span class="n">status</span>
 </pre></div>
 </div>
 </div>
