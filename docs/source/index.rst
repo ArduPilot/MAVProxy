@@ -44,7 +44,11 @@ Screenshots
 License
 =======
 
-MAVProxy is released under the GNU General Public License v3 or later
+MAVProxy is released under the GNU General Public License v3 or later.
+
+Except where otherwise noted, *this documentation* is licensed under
+`CC Attribution-Share Alike 3.0 Unported <https://creativecommons.org/licenses/by-sa/3.0/>`_.
+
 
 Core Team
 =========
@@ -53,8 +57,6 @@ MAVProxy is maintained by `Andrew Tridgell <https://github.com/tridge>`_ and doc
 `Stephen Dade <https://github.com/stephendade>`_
 
 This page was generated using Sphinx SSG and is hosted using `GitHub Pages <http://pages.github.com>`_.
-
-
 
 
 .. toctree::
@@ -66,6 +68,9 @@ This page was generated using Sphinx SSG and is hosted using `GitHub Pages <http
     analysis_and_simulation/index
     development/index
     cuav_module/index
-    license
+
+
+
+
 
 
