@@ -78,6 +78,7 @@ class SmartCameraModule(mp_module.MPModule):
         self.add_command('setCamAperture', self.__vCmdSetCamAperture, "Set Camera Aperture")
         self.add_command('setCamShutterSpeed', self.__vCmdSetCamShutterSpeed, "Set Camera Shutter Speed")
         self.add_command('setCamExposureMode', self.__vCmdSetCamExposureMode, "Set Camera Exposure Mode")
+        self.add_command('getAllPictures', self.__vCmdGetAllPictures, "Download all flight pictures")
         self.CamRetryScheduler = sched.scheduler(time.time, time.sleep)
         self.ProgramAuto = 1
         self.Aperture = 2
@@ -355,6 +356,25 @@ class SmartCameraModule(mp_module.MPModule):
     def __vCmdCamZoomOut(self):
         for cam in self.camera_list:
             cam.boZoomOut()
+
+#****************************************************************************
+#   Method Name     : __vCmdGetAllPictures
+#
+#   Description     : Downloads all the pics taken during this flight
+#
+#   Parameters      : None
+#
+#   Return Value    : None
+#
+#   Author           : Jaime Machuca
+#
+#****************************************************************************
+
+    def __vCmdGetAllPictures(self):
+        #Download Pictures
+        for cam in self.camera_list:
+            cam.boGetAllSessionPictures()
+            print("Init Picture Download for Cam %s" % cam)
 
 #****************************************************************************
 #   Method Name     : __vDecodeDIGICAMConfigure
