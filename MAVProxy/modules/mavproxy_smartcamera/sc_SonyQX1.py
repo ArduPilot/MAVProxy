@@ -248,6 +248,25 @@ class SmartCamera_SonyQX():
         self.geoRef_writer.flush()
 
 #****************************************************************************
+#   Method Name     : __boWriteURLToLog
+#
+#   Description     : Writes images URL to file
+#
+#   Parameters      : sImageFileName    File name of image to be entered into the log
+#
+#   Return Value    : None
+#
+#   Author           : Jaime Machuca
+#
+#****************************************************************************
+
+    # Geo reference log for all the GoPro pictures
+    def __boWriteURLToLog(self, sURLName):
+        self.urlLog_writer.write(sURLName)
+        self.urlLog_writer.write('\n')
+        self.urlLog_writer.flush()
+    
+#****************************************************************************
 #   Method Name     : get_real_Yaw
 #
 #   Description     : Helper method to get the real Yaw
@@ -305,13 +324,25 @@ class SmartCamera_SonyQX():
         #Open GeoTag Log File
         i = 0
         while os.path.exists('/sdcard/log/geoRef%s.log' % i):
-            print('checking /sdcard/log/geoRef%s.log' % i)
+            #print('checking /sdcard/log/geoRef%s.log' % i)
             i += 1
-
+        
+        self.sCurrentGeoRefFilename = '/sdcard/log/geoRef%s.log' % i
         self.geoRef_writer = open('/sdcard/log/geoRef%s.log' % i, 'w', 0)
         self.geoRef_writer.write('Filename, Latitude, Longitude, Alt (AMSL), Roll, Pitch, Yaw\n')
 
         print('Opened GeoTag Log File with Filename: geoRef%s.log' % i)
+        
+        #Open URL Log File
+        i = 0
+        while os.path.exists('/sdcard/log/urlLog%s.log' % i):
+            #print('checking /sdcard/log/urlLog%s.log' % i)
+            i += 1
+        
+        self.sCurrentURLLogFilename = '/sdcard/log/urlLog%s.log' % i
+        self.urlLog_writer = open('/sdcard/log/urlLog%s.log' % i, 'w', 0)
+
+        print('Opened URL Log File with Filename: urlLog%s.log' % i)
 
 #****************************************************************************
 #   Method Name     : __sFindInterfaceIPAddress
@@ -465,6 +496,41 @@ class SmartCamera_SonyQX():
             return True
         return False
 
+#****************************************************************************
+#   Method Name     : boGetAllSessionPictures
+#
+#   Description     : Downloads all the images stored in the URL log file to
+#                     the companion computer.
+#
+#   Parameters      : none
+#
+#   Return Value    : True if it was successful
+#                     False if no image was downloaded
+#
+#   Author           : Jaime Machuca
+#
+#****************************************************************************
+
+    def boGetAllSessionPictures(self):
+        # reading contents
+        file = open(self.sCurrentURLLogFilename, "r")
+
+        try:
+            for url in file:
+                url = url.rstrip('\n')
+                #now download link
+                start = self.sLatestImageURL.find('DSC')
+                end = self.sLatestImageURL.find('JPG', start) + 3
+
+                filename = url[start:end]
+
+                req = requests.request('GET', url)
+                open(filename, 'w').write(req.content)
+    
+        file.close()
+
+        return False
+    
 #****************************************************************************
 #   Method Name     : sGetLatestImageFilename
 #
@@ -751,6 +817,7 @@ class SmartCamera_SonyQX():
             print("image URL: %s" % self.sLatestImageURL)
             print("image Name: %s" % self.sLatestFileName)
             self.__boAddGeotagToLog(self.sLatestFileName)
+            self.__boWriteURLToLog(self.sLatestImageURL)
 
             self.u32ImgCounter = self.u32ImgCounter+1
             return True
