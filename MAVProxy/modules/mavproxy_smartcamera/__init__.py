@@ -370,7 +370,7 @@ class SmartCameraModule(mp_module.MPModule):
 #
 #****************************************************************************
 
-    def __vCmdGetAllPictures(self):
+    def __vCmdGetAllPictures(self, args):
         #Download Pictures
         for cam in self.camera_list:
             cam.boGetAllSessionPictures()
