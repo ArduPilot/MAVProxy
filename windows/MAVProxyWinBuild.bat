@@ -1,5 +1,7 @@
 rem build the standalone MAVProxy.exe for Windows.
 rem This assumes Python is installed in C:\Python27
+rem This requires Pyinstaller==2.1, setuptools==19.2 and packaging==14.2
+rem and lxml >= 3.6.4
 SETLOCAL enableextensions
 
 rem change this path if Python is installed somewhere non-standard

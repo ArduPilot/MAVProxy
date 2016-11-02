@@ -17,7 +17,7 @@ MAVProxyAny = Analysis(['mavproxy.py'],
                             'pygame.transform', 'pygame.surface', 'pygame.bufferproxy', 'wx._grid',
                             'wx.lib.agw.genericmessagedialog', 'wx.lib.wordwrap', 'wx.lib.buttons',
                             'wx.lib.embeddedimage', 'wx.lib.imageutils', 'wx.lib.agw.aquabutton', 
-                            'wx.lib.agw.gradientbutton', 'wxversion'],
+                            'wx.lib.agw.gradientbutton', 'wxversion', 'UserList', 'UserString'],
              hookspath=None,
              runtime_hooks=None)
 MAVExpAny = Analysis(['.\\tools\\MAVExplorer.py'],
@@ -30,7 +30,7 @@ MAVExpAny = Analysis(['.\\tools\\MAVExplorer.py'],
                             'pyreadline', 'HTMLParser', 'wx.grid', 'wx._grid',
                             'wx.lib.agw.genericmessagedialog', 'wx.lib.wordwrap', 'wx.lib.buttons',
                             'wx.lib.embeddedimage', 'wx.lib.imageutils', 'wx.lib.agw.aquabutton', 
-                            'wx.lib.agw.gradientbutton', 'FileDialog', 'Dialog'],
+                            'wx.lib.agw.gradientbutton', 'FileDialog', 'Dialog', 'UserList', 'UserString'],
              hookspath=None,
              runtime_hooks=None)
 MERGE( (MAVProxyAny, 'mavproxy', 'mavproxy'), (MAVExpAny, 'MAVExplorer', 'MAVExplorer') )
