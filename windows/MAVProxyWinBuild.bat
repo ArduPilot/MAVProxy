@@ -12,6 +12,8 @@ for /f "tokens=*" %%a in (
  set VERSION=%%a
  )
 
+rem -----build the changelog-----
+%PYTHON_LOCATION%\python createChangelog.py
 
 rem -----Upgrade pymavlink if needed-----
 %PYTHON_LOCATION%\Scripts\pip install pymavlink -U
