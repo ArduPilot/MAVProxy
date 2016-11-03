@@ -23,7 +23,10 @@ functions. Those files should be consulted for implementation details.
 import math
 
 from pymavlink.rotmat import Matrix3, Vector3
-from scipy.constants import golden as g
+# The golden number below was obtained from scipy.constants.golden. Let's use
+# the literal value here as this is the only place that would require scipy
+# module.
+g = 1.618033988749895
 
 _first_half = (
     (Vector3(-g, 1, 0), Vector3(-1, 0,-g), Vector3(-g,-1, 0)),
