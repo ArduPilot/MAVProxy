@@ -435,9 +435,9 @@ class ConsoleModule(mp_module.MPModule):
             else:
                 alt_error = "%d%s" % (msg.alt_error, alt_error_sign)
 
-            if msg.alt_error > 2 :
+            if msg.alt_error > 2 or msg.alt_error < -2 :
                 fg = "red"
-            elif msg.alt_error > 1 :
+            elif msg.alt_error > 1 or msg.alt_error < -1:
                 fg = "darkorange"
             else:
                 fg = "black"
