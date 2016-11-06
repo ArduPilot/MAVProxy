@@ -15,7 +15,11 @@ arming_masks = {
     "params"  : 0x0020,
     "rc"      : 0x0040,
     "voltage" : 0x0080,
-    "battery" : 0x0100
+    "battery" : 0x0100,
+    "airspeed": 0x0200,
+    "logging" : 0x0400,
+    "switch"  : 0x0800,
+    "gps_config": 0x1000,
     }
 
 class ArmModule(mp_module.MPModule):
