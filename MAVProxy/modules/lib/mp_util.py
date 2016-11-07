@@ -279,3 +279,14 @@ def child_fd_list_remove(fd):
         child_fd_list.remove(fd)
     except Exception:
         pass
+
+def quaternion_to_axis_angle(q):
+    from pymavlink.rotmat import Vector3
+    a, b, c, d = q.q
+    n = math.sqrt(b**2 + c**2 + d**2)
+    if not n:
+        return Vector3(0, 0, 0)
+    angle = 2 * math.acos(a)
+    if angle > math.pi:
+        angle = angle - 2 * math.pi
+    return Vector3(angle * b / n, angle * c / n, angle * d / n)
