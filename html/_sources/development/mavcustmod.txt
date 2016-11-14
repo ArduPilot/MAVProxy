@@ -14,12 +14,15 @@ routine needs to be run in order to (re)install MAVProxy and the modules
 in this folder which will be automatically picked up and become part of
 the installation.
 
-If developing from the Windows installation, simply copy the modules
-into the MAVProxy installation folder (Usually C:\\Program Files
-(x86)\\MAVProxy).
+.. note::
 
-In either case, the module can then be loaded then using the
-``module load myModule`` in MAVProxy.
+    MAVProxy modules will not be able to detect and run any modules not compiled
+    as part of the above ``setup.py``. This is because MAVProxy runs modules
+    from the Python package install directory, not the MAVProxy source code
+    directory.
+
+The module can then be loaded then using the ``module load myModule`` in 
+MAVProxy.
 
 Module File Structure
 =====================
@@ -55,8 +58,8 @@ To add a command:
 
     self.add_command('bat', self.cmd_bat, "show some information")
 
-The above will add the "bat" command, which the MAVProxy help will show
-"show some information" and the self.cmd\_bat function will be run.
+The above will add the "bat" command to MAVProxy, which the MAVProxy help will show
+"show some information" and the ``self.cmd\_bat`` function will be run.
 
 Within the packet handling, the
 `Mavlink <https://pixhawk.ethz.ch/mavlink/>`_ reference is useful for
@@ -67,7 +70,14 @@ filtering the incoming packets for the relevant data:
     if m.get_type() == 'VFR_HUD':
       curspeed =  m.airspeed
 
+The above example will set the variable ``curspeed`` to the current 
+airspeed of the vehicle, whenever a ``VFR_HUD`` packet is received.
+
 There are a great number of MAVProxy modules, so the best reference
 would be to look through the these
 `modules <https://github.com/tridge/MAVProxy/tree/master/MAVProxy/modules>`_
 for examples of what you want to do.
+
+In particular, the ``example`` module provides annotated code of many 
+common tasks that can be performed with modules.
+

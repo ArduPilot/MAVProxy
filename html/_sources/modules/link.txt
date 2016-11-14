@@ -22,8 +22,11 @@ link add's.
 .. code:: bash
 
     link add 127.0.0.1:14550
+    link add tcp:127.0.0.1:14550
     set baudrate 115200
     link add COM17
+    
+See the startup :doc:`section <../getting_started/quickstart>`  for full details on link types
 
 link remove
 ===========

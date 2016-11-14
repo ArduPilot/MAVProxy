@@ -12,27 +12,39 @@ monitoring applications.
     :maxdepth: 1
     :hidden:
     
+    adsb
     antenna
     auxopt
+    battery
     cameraview
+    cmdlong
     console
+    dataflash_logger
+    devop
     dgps
-    gimbals
+    firmware
+    followtest
+    gasheli
+    gimbal
     graph
     hil
     joystick
+    kmlread
     link
     log
     map
     misseditor
     nsh
+    ppp
+    rcsetup
     relay
     sensors
     serial
+    signing
     speech
     terrain
     tracker
-    tuneopt
+    tuneopt 
     
 Module Management
 =================
@@ -61,6 +73,7 @@ MAVProxy starts with several modules by default. They are:
 .. code:: bash
 
     log
+    signing
     wp
     rally
     fence
@@ -77,6 +90,7 @@ MAVProxy starts with several modules by default. They are:
     battery
     terrain
     output
-    
+    adsb
+
 
 

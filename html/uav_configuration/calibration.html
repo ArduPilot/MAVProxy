@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Calibration &mdash; MAVProxy 1.4.38 documentation</title>
+  <title>Calibration &mdash; MAVProxy 1.5.7 documentation</title>
   
 
   
@@ -30,7 +30,8 @@
   
 
   
-    <link rel="top" title="MAVProxy 1.4.38 documentation" href="../index.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="MAVProxy 1.5.7 documentation" href="../index.html"/>
         <link rel="up" title="UAV Configuration" href="index.html"/>
         <link rel="next" title="System Commands" href="system.html"/>
         <link rel="prev" title="Flight Modes" href="flightModes.html"/> 
@@ -60,7 +61,7 @@
           
           
             <div class="version">
-              1.4.38
+              1.5.7
             </div>
           
         
@@ -85,10 +86,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting Started</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">UAV Configuration</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="arming.html">Arming and Disarming</a></li>
-<li class="toctree-l2"><a class="reference internal" href="parameters.html">Parameters</a></li>
 <li class="toctree-l2"><a class="reference internal" href="waypoints.html">Waypoints</a></li>
 <li class="toctree-l2"><a class="reference internal" href="geofence.html">Geofence</a></li>
 <li class="toctree-l2"><a class="reference internal" href="rally.html">Rally Points</a></li>
+<li class="toctree-l2"><a class="reference internal" href="parameters.html">Parameters</a></li>
 <li class="toctree-l2"><a class="reference internal" href="flightModes.html">Flight Modes</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Calibration</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#accelcal">accelcal</a></li>
@@ -98,6 +99,8 @@
 <li class="toctree-l3"><a class="reference internal" href="#level">level</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#rccal">rccal</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#ground">ground</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#magcal">magcal</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ahrstrim">ahrstrim</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="system.html">System Commands</a></li>
@@ -185,6 +188,15 @@ UAV on it&#8217;s left side...&#8221; routine.</p>
 calibration. It is automatically performed when the APM receives an
 arming command.</p>
 </div>
+<div class="section" id="magcal">
+<h2>magcal<a class="headerlink" href="#magcal" title="Permalink to this headline">¶</a></h2>
+<p>Magnetometer (compass) calibration to account for any soft-iron
+sources on the UAV.</p>
+</div>
+<div class="section" id="ahrstrim">
+<h2>ahrstrim<a class="headerlink" href="#ahrstrim" title="Permalink to this headline">¶</a></h2>
+<p>Do a AHRS trim.</p>
+</div>
 </div>
 
 
@@ -231,7 +243,7 @@ arming command.</p>
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../',
-            VERSION:'1.4.38',
+            VERSION:'1.5.7',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true

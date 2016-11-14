@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Module Development &mdash; MAVProxy 1.4.38 documentation</title>
+  <title>Module Development &mdash; MAVProxy 1.5.7 documentation</title>
   
 
   
@@ -30,7 +30,8 @@
   
 
   
-    <link rel="top" title="MAVProxy 1.4.38 documentation" href="../index.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="MAVProxy 1.5.7 documentation" href="../index.html"/>
         <link rel="up" title="Development" href="index.html"/>
         <link rel="next" title="Image Processing with cuav" href="../cuav_module/index.html"/>
         <link rel="prev" title="Windows Development Environment" href="mavdevenvwindows.html"/> 
@@ -60,7 +61,7 @@
           
           
             <div class="version">
-              1.4.38
+              1.5.7
             </div>
           
         
@@ -152,11 +153,15 @@ MAVProxy.</p>
 routine needs to be run in order to (re)install MAVProxy and the modules
 in this folder which will be automatically picked up and become part of
 the installation.</p>
-<p>If developing from the Windows installation, simply copy the modules
-into the MAVProxy installation folder (Usually C:\Program Files
-(x86)\MAVProxy).</p>
-<p>In either case, the module can then be loaded then using the
-<code class="docutils literal"><span class="pre">module</span> <span class="pre">load</span> <span class="pre">myModule</span></code> in MAVProxy.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">MAVProxy modules will not be able to detect and run any modules not compiled
+as part of the above <code class="docutils literal"><span class="pre">setup.py</span></code>. This is because MAVProxy runs modules
+from the Python package install directory, not the MAVProxy source code
+directory.</p>
+</div>
+<p>The module can then be loaded then using the <code class="docutils literal"><span class="pre">module</span> <span class="pre">load</span> <span class="pre">myModule</span></code> in
+MAVProxy.</p>
 </div>
 <div class="section" id="module-file-structure">
 <h2>Module File Structure<a class="headerlink" href="#module-file-structure" title="Permalink to this headline">¶</a></h2>
@@ -187,8 +192,8 @@ To add a command:</p>
 <div class="code python highlight-default"><div class="highlight"><pre><span></span><span class="bp">self</span><span class="o">.</span><span class="n">add_command</span><span class="p">(</span><span class="s1">&#39;bat&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cmd_bat</span><span class="p">,</span> <span class="s2">&quot;show some information&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>The above will add the &#8220;bat&#8221; command, which the MAVProxy help will show
-&#8220;show some information&#8221; and the self.cmd_bat function will be run.</p>
+<p>The above will add the &#8220;bat&#8221; command to MAVProxy, which the MAVProxy help will show
+&#8220;show some information&#8221; and the <code class="docutils literal"><span class="pre">self.cmd\_bat</span></code> function will be run.</p>
 <p>Within the packet handling, the
 <a class="reference external" href="https://pixhawk.ethz.ch/mavlink/">Mavlink</a> reference is useful for
 filtering the incoming packets for the relevant data:</p>
@@ -196,10 +201,14 @@ filtering the incoming packets for the relevant data:</p>
   <span class="n">curspeed</span> <span class="o">=</span>  <span class="n">m</span><span class="o">.</span><span class="n">airspeed</span>
 </pre></div>
 </div>
+<p>The above example will set the variable <code class="docutils literal"><span class="pre">curspeed</span></code> to the current
+airspeed of the vehicle, whenever a <code class="docutils literal"><span class="pre">VFR_HUD</span></code> packet is received.</p>
 <p>There are a great number of MAVProxy modules, so the best reference
 would be to look through the these
 <a class="reference external" href="https://github.com/tridge/MAVProxy/tree/master/MAVProxy/modules">modules</a>
 for examples of what you want to do.</p>
+<p>In particular, the <code class="docutils literal"><span class="pre">example</span></code> module provides annotated code of many
+common tasks that can be performed with modules.</p>
 </div>
 </div>
 
@@ -247,7 +256,7 @@ for examples of what you want to do.</p>
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../',
-            VERSION:'1.4.38',
+            VERSION:'1.5.7',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true

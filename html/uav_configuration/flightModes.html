@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Flight Modes &mdash; MAVProxy 1.4.38 documentation</title>
+  <title>Flight Modes &mdash; MAVProxy 1.5.7 documentation</title>
   
 
   
@@ -30,10 +30,11 @@
   
 
   
-    <link rel="top" title="MAVProxy 1.4.38 documentation" href="../index.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="MAVProxy 1.5.7 documentation" href="../index.html"/>
         <link rel="up" title="UAV Configuration" href="index.html"/>
         <link rel="next" title="Calibration" href="calibration.html"/>
-        <link rel="prev" title="Rally Points" href="rally.html"/> 
+        <link rel="prev" title="Parameters" href="parameters.html"/> 
 
   
   <script src="../_static/js/modernizr.min.js"></script>
@@ -60,7 +61,7 @@
           
           
             <div class="version">
-              1.4.38
+              1.5.7
             </div>
           
         
@@ -85,20 +86,18 @@
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting Started</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">UAV Configuration</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="arming.html">Arming and Disarming</a></li>
-<li class="toctree-l2"><a class="reference internal" href="parameters.html">Parameters</a></li>
 <li class="toctree-l2"><a class="reference internal" href="waypoints.html">Waypoints</a></li>
 <li class="toctree-l2"><a class="reference internal" href="geofence.html">Geofence</a></li>
 <li class="toctree-l2"><a class="reference internal" href="rally.html">Rally Points</a></li>
+<li class="toctree-l2"><a class="reference internal" href="parameters.html">Parameters</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Flight Modes</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#mode-auto">mode auto</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#mode-loiter">mode loiter</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#mode-rtl">mode rtl</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#mode-manual">mode manual</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#mode-fbwa">mode fbwa</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#land">land</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#arming-disarming">Arming/Disarming</a></li>
-</ul>
-</li>
+<li class="toctree-l3"><a class="reference internal" href="#land">land</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#guided">guided</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="calibration.html">Calibration</a></li>
@@ -184,17 +183,12 @@ n is the desired mode. To get a list of available modes, enter <code class="docu
 <p>A specific mode is guided. By entering <code class="docutils literal"><span class="pre">guided</span> <span class="pre">alt</span></code> (where alt is the
 desired altitude), the user can the select a point on the map window and
 the UAV will immediately begin flying towards that point.</p>
-<div class="section" id="arming-disarming">
-<h3>Arming/Disarming<a class="headerlink" href="#arming-disarming" title="Permalink to this headline">¶</a></h3>
-<p>The APM can be armed and disarmed at any time by using the
-<code class="docutils literal"><span class="pre">arm</span> <span class="pre">throttle</span></code> and <code class="docutils literal"><span class="pre">disarm</span></code> commands.</p>
-<p>The pre-arming checks can be run (without actually arming the UAV) via
-<code class="docutils literal"><span class="pre">arm</span> <span class="pre">check</span></code>. A full list of these checks is given by <code class="docutils literal"><span class="pre">arm</span> <span class="pre">list</span></code>. To
-enable/disable a particular arming check, use <code class="docutils literal"><span class="pre">arm</span> <span class="pre">check</span> <span class="pre">n</span></code> and
-<code class="docutils literal"><span class="pre">arm</span> <span class="pre">uncheck</span> <span class="pre">n</span></code> respectively, where n is the name of the check.</p>
-<p>The above commands are contained within the <code class="docutils literal"><span class="pre">mode</span></code> and <code class="docutils literal"><span class="pre">arm</span></code> modules
-respectively, which are loaded by default at MAVProxy startup</p>
 </div>
+<div class="section" id="guided">
+<h2>guided<a class="headerlink" href="#guided" title="Permalink to this headline">¶</a></h2>
+<p>Fly to the last clicked point on the map, or specified longitude and
+latitude. Requires an altitude:
+<code class="docutils literal"><span class="pre">guided</span> <span class="pre">ALTITUDE</span></code> or <code class="docutils literal"><span class="pre">guided</span> <span class="pre">LAT</span> <span class="pre">LON</span> <span class="pre">ALTITUDE</span></code></p>
 </div>
 </div>
 
@@ -208,7 +202,7 @@ respectively, which are loaded by default at MAVProxy startup</p>
         <a href="calibration.html" class="btn btn-neutral float-right" title="Calibration" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="rally.html" class="btn btn-neutral" title="Rally Points" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="parameters.html" class="btn btn-neutral" title="Parameters" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
@@ -242,7 +236,7 @@ respectively, which are loaded by default at MAVProxy startup</p>
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../',
-            VERSION:'1.4.38',
+            VERSION:'1.5.7',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true

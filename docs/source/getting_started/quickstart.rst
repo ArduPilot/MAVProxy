@@ -42,12 +42,23 @@ Over Network
 ============
 
 Specify the IP address and port containing a mavlink stream. The address
-to connect to must be your own IP address.
+to connect to must be your own IP address or loopback address. Alternatively
+the if the local IP address is not known, use 0.0.0.0 for MAVProxy find and use
+the local IP address. The type of stream (tcp or udp) should also be specified.
 
 .. code:: bash
 
-    mavproxy.py --master=192.168.1.1:14550
+    mavproxy.py --master=tcp:192.168.1.1:14550
+    mavproxy.py --master=udp:127.0.0.1:14550
+    mavproxy.py --master=tcp:0.0.0.0:14550
+    
+If connecting to a remote IP address, the udpout or tcpout arguments should be used:
 
+.. code:: bash
+
+    mavproxy.py --master=udpout:10.10.1.1:14550
+    mavproxy.py --master=tcpout:10.10.1.1:14550
+    
 
 .. note::
 

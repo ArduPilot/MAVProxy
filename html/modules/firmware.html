@@ -1,0 +1,278 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Firmware Management &mdash; MAVProxy 1.5.7 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="MAVProxy 1.5.7 documentation" href="../index.html"/>
+        <link rel="up" title="Modules" href="index.html"/>
+        <link rel="next" title="Follow Me Test" href="followtest.html"/>
+        <link rel="prev" title="Differential GPS" href="dgps.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-nav-search">
+        
+
+        
+          <a href="../index.html" class="icon icon-home"> MAVProxy
+        
+
+        
+        </a>
+
+        
+          
+          
+            <div class="version">
+              1.5.7
+            </div>
+          
+        
+
+        
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+        
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+        
+          
+          
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Modules</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="adsb.html">ADS-B Tracking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="antenna.html">Antenna Pointing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="auxopt.html">Auxiliary (RC 6,7) Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="battery.html">Battery Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cameraview.html">Camera Viewer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cmdlong.html">Long Commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="console.html">Graphical Console</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dataflash_logger.html">DataFlash Logs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="devop.html">Direct Comms with SPI/I2C bus</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dgps.html">Differential GPS</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Firmware Management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#list">List</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#download">Download</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="followtest.html">Follow Me Test</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gasheli.html">Gas Helicopter Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gimbal.html">Gimbal Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="graph.html">Graphing Live Data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hil.html">HIL</a></li>
+<li class="toctree-l2"><a class="reference internal" href="joystick.html">Joystick Input</a></li>
+<li class="toctree-l2"><a class="reference internal" href="kmlread.html">KML Importer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="link.html">Link Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="log.html">Log Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="map.html">Moving Map</a></li>
+<li class="toctree-l2"><a class="reference internal" href="misseditor.html">Mission Editor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nsh.html">Nuttx Shell</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ppp.html">PPP Link</a></li>
+<li class="toctree-l2"><a class="reference internal" href="rcsetup.html">RC Setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="relay.html">Relay Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sensors.html">Sensor Reporting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="serial.html">Writing to Serial Port</a></li>
+<li class="toctree-l2"><a class="reference internal" href="signing.html">Packet Signing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="speech.html">Text-to-Speech</a></li>
+<li class="toctree-l2"><a class="reference internal" href="terrain.html">Terrain Reporting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tracker.html">Antenna Tracker</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tuneopt.html">Tuning Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#module-management">Module Management</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
+</ul>
+
+          
+        
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../index.html">MAVProxy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="index.html">Modules</a> &raquo;</li>
+      
+    <li>Firmware Management</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="firmware-management">
+<h1>Firmware Management<a class="headerlink" href="#firmware-management" title="Permalink to this headline">¶</a></h1>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">firmware</span>
+</pre></div>
+</div>
+<p>The firmware module provides downloading and listing of available APM firmware. It
+does not currently handle firmware flashing</p>
+<div class="section" id="list">
+<h2>List<a class="headerlink" href="#list" title="Permalink to this headline">¶</a></h2>
+<p>Download the list of available firmware:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">fw</span> <span class="n">manifest</span> <span class="n">download</span>
+</pre></div>
+</div>
+<p>Prints out the available latest firmwares:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">fw</span> <span class="nb">list</span> <span class="n">FILTERS</span>
+</pre></div>
+</div>
+<p>Use <code class="docutils literal"><span class="pre">FILTERS</span></code> to filter the columns. An example would be <code class="docutils literal"><span class="pre">platform=PX4-v2</span></code> to
+only list the firmware for the PX4-V2 platform. Another example would be
+<code class="docutils literal"><span class="pre">releasetype=OFFICIAL</span> <span class="pre">frame=quad</span> <span class="pre">platform=PX4-v2</span></code> to only list the most recent official firmware
+for quadcopters for the PX4-v2 platform.</p>
+</div>
+<div class="section" id="download">
+<h2>Download<a class="headerlink" href="#download" title="Permalink to this headline">¶</a></h2>
+<p>Download the specified firmware. It uses the same <code class="docutils literal"><span class="pre">FILTERS</span></code> as fw list.</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">fw</span> <span class="n">download</span> <span class="n">FILTERS</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="followtest.html" class="btn btn-neutral float-right" title="Follow Me Test" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="dgps.html" class="btn btn-neutral" title="Differential GPS" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
+<div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Firmware%20Management%20-%20&body=URL:%20../modules/firmware%0ATitle:%20Firmware%20Management%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
+    <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
+    This is an ArduPilot project.</p>     
+
+    <p>
+
+    </p>
+  </div>
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'1.5.7',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

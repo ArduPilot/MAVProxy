@@ -4,7 +4,7 @@ Image Processing with cuav
 
 This section details how to use the cuav module.
 
-The cuav module is a specialised module for performing on-the-fly image analysis of imagery collected by a UAV (and other vehicle). It is tightly integrated with the APM flight controller, which it uses for giving precise coordinates of detected items in images.
+The cuav module is a specialised module for performing on-the-fly or offline image analysis of imagery collected by a UAV (and other vehicle). It is tightly integrated with the Ardupilot Flight Controller, which it uses for giving precise coordinates of detected items in images.
 
 Source code is available at https://github.com/tridge/cuav
 
@@ -50,7 +50,7 @@ The following commands are available:
     camera start
     camera stop
     
-These commands stop and stop the image capturing and analysis processes. It is useful to command the start just after takeoff and stop just before landing.
+These commands stop and stop the image capturing and analysis processes. It is useful to command the camera start just after takeoff and stop just before landing.
     
     
 .. code:: bash
@@ -65,7 +65,9 @@ It is useful to look at the scan queue size. If it is continually increasing, th
 
     camera view
     
-Gives a live view of the images captured. Useful at a ground station with a high-bandwidth link to the UAV.
+Displays the GUI for the captured images. This consists of two windows. The first window is a live view of captured images. The second window displays thumbnails of any images that pass the image detection threshold. These images can be right-clicked to download a full size image.
+
+Additionally, the position of the interesting part of the images will be displayed on the map.
 
 .. code:: bash
 
@@ -117,6 +119,57 @@ packet_loss2         Packet Loss Link2                  0 to 100
 clock_sync           GPS Clock Sync                     0 or 1
 brightness           Display Brightness                 0.1 to 10
 debug                Debug enable                       0 or 1
+==================   ================================   ===============================
+
+---------------
+Usage (offline)
+---------------
+
+For offline imagery analysis, there is a playback script. This requires the source code of cuav 
+(https://github.com/tridge/cuav).
+
+Within the ``cuav/tests/`` folder, the ``playback.py`` script can be used for playback. It streams 
+an existing directory of image files and Mavlink telemetry over a network link to simulate a live 
+feed from a UAV. It can be used as such:
+
+.. code:: bash
+
+    export FAKE_CHAMELEON=1
+    cuav/tests/playback.py $FDIR/flight.tlog --imagedir=$IDIR --speedup=1 & rm -rf OBC2016/logs
+    mavproxy.py --aircraft OBC2016 --master 127.0.0.1:14550
+    
+Where ``$FDIR`` is the folder containing the flight log and ``$IDIR`` contains the images. The 
+images should be named according to ``raw<timestamp>.pgm``. An example is this is ``raw2016090700200251Z.pgm```. The file extension be be either pgm or jpg. In the case of jpg files, 
+the ``--jpeg`` command line option must be used.
+
+The ``export FAKE_CHAMELEON=1`` line tells cuav to use a folder as the imagery source, rather than
+looking for a camera.
+
+.. note::
+
+    By default, MAVProxy and cuav will save the telemetry and images to file (it doesn't know that
+    the imagery is coming from file rather than a UAV). For large datasets this may lead to large 
+    amounts of disk space usage. Thus the ``& rm -rf OBC2016/logs`` command in the above example 
+    will delete any previous telemetry and images before replaying it again.
+    
+.. note::
+
+    Users may have issues trying to stop the playback process. Use ``pkill -9 -f playback.py`` to
+    stop the playback process.
+
+The commandline options are: 
+
+==================   ================================   ===============================
+Option               Description                        Default
+==================   ================================   ===============================
+--out                MAVLink output port (IP:port)      127.0.0.1:14550
+--baudrate           baud rate                          57600
+--imagedir           raw image directory                <none>
+--condition          condition on mavlink log           <none>
+--speedup            playback speedup                   1.0
+--loop               playback in a loop                 False
+--jpeg               use jpegs instead of PGMs          False
+--HIL                send HIL_STATE messages            False
 ==================   ================================   ===============================
 
 

@@ -42,7 +42,15 @@ The ``--mission=name`` (:doc:`./starting`) startup argument can be used with the
     
 Will log the telemetry to ``flight.tlog`` and ``flight.tlog.raw`` in the ``C:\users\stephen\Documents\Logs\Copter\flyby\flight<n>\`` folder.
 
+The ``--state-basedir=dir`` argument can be used to specify the base directory of where the telemetry files will be stored.
 
+ .. code:: bash
+
+    C:\users\stephen\Documents> mavproxy.py --aircraft=copter --mission=flyby --state-basedir=C:\logs
+    
+Will store the log files in ``C:\logs\copter\flyby\flight<n>\`` folder.
+    
+The MAVExplorer program can be used to view graphs and track of the flight data stored in these files.
 
    
     

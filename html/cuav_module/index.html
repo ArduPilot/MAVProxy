@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Image Processing with cuav &mdash; MAVProxy 1.4.38 documentation</title>
+  <title>Image Processing with cuav &mdash; MAVProxy 1.5.7 documentation</title>
   
 
   
@@ -30,7 +30,8 @@
   
 
   
-    <link rel="top" title="MAVProxy 1.4.38 documentation" href="../index.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="MAVProxy 1.5.7 documentation" href="../index.html"/>
         <link rel="prev" title="Module Development" href="../development/mavcustmod.html"/> 
 
   
@@ -58,7 +59,7 @@
           
           
             <div class="version">
-              1.4.38
+              1.5.7
             </div>
           
         
@@ -89,6 +90,7 @@
 <li class="toctree-l2"><a class="reference internal" href="#installing">Installing</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#compatibility-and-system-setup">Compatibility and System Setup</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#usage">Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#usage-offline">Usage (offline)</a></li>
 </ul>
 </li>
 </ul>
@@ -136,7 +138,7 @@
   <div class="section" id="image-processing-with-cuav">
 <h1>Image Processing with cuav<a class="headerlink" href="#image-processing-with-cuav" title="Permalink to this headline">¶</a></h1>
 <p>This section details how to use the cuav module.</p>
-<p>The cuav module is a specialised module for performing on-the-fly image analysis of imagery collected by a UAV (and other vehicle). It is tightly integrated with the APM flight controller, which it uses for giving precise coordinates of detected items in images.</p>
+<p>The cuav module is a specialised module for performing on-the-fly or offline image analysis of imagery collected by a UAV (and other vehicle). It is tightly integrated with the Ardupilot Flight Controller, which it uses for giving precise coordinates of detected items in images.</p>
 <p>Source code is available at <a class="reference external" href="https://github.com/tridge/cuav">https://github.com/tridge/cuav</a></p>
 <div class="section" id="installing">
 <h2>Installing<a class="headerlink" href="#installing" title="Permalink to this headline">¶</a></h2>
@@ -167,7 +169,7 @@
 <span class="n">camera</span> <span class="n">stop</span>
 </pre></div>
 </div>
-<p>These commands stop and stop the image capturing and analysis processes. It is useful to command the start just after takeoff and stop just before landing.</p>
+<p>These commands stop and stop the image capturing and analysis processes. It is useful to command the camera start just after takeoff and stop just before landing.</p>
 <div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">camera</span> <span class="n">status</span>
 </pre></div>
 </div>
@@ -176,7 +178,8 @@
 <div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">camera</span> <span class="n">view</span>
 </pre></div>
 </div>
-<p>Gives a live view of the images captured. Useful at a ground station with a high-bandwidth link to the UAV.</p>
+<p>Displays the GUI for the captured images. This consists of two windows. The first window is a live view of captured images. The second window displays thumbnails of any images that pass the image detection threshold. These images can be right-clicked to download a full size image.</p>
+<p>Additionally, the position of the interesting part of the images will be displayed on the map.</p>
 <div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">camera</span> <span class="nb">set</span> <span class="n">X</span> <span class="n">Y</span>
 </pre></div>
 </div>
@@ -361,6 +364,84 @@
 </tbody>
 </table>
 </div>
+<div class="section" id="usage-offline">
+<h2>Usage (offline)<a class="headerlink" href="#usage-offline" title="Permalink to this headline">¶</a></h2>
+<p>For offline imagery analysis, there is a playback script. This requires the source code of cuav
+(<a class="reference external" href="https://github.com/tridge/cuav">https://github.com/tridge/cuav</a>).</p>
+<p>Within the <code class="docutils literal"><span class="pre">cuav/tests/</span></code> folder, the <code class="docutils literal"><span class="pre">playback.py</span></code> script can be used for playback. It streams
+an existing directory of image files and Mavlink telemetry over a network link to simulate a live
+feed from a UAV. It can be used as such:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span>export FAKE_CHAMELEON=1
+cuav/tests/playback.py $FDIR/flight.tlog --imagedir=$IDIR --speedup=1 &amp; rm -rf OBC2016/logs
+mavproxy.py --aircraft OBC2016 --master 127.0.0.1:14550
+</pre></div>
+</div>
+<p>Where <code class="docutils literal"><span class="pre">$FDIR</span></code> is the folder containing the flight log and <code class="docutils literal"><span class="pre">$IDIR</span></code> contains the images. The
+images should be named according to <code class="docutils literal"><span class="pre">raw&lt;timestamp&gt;.pgm</span></code>. An example is this is <code class="docutils literal"><span class="pre">raw2016090700200251Z.pgm`</span></code>. The file extension be be either pgm or jpg. In the case of jpg files,
+the <code class="docutils literal"><span class="pre">--jpeg</span></code> command line option must be used.</p>
+<p>The <code class="docutils literal"><span class="pre">export</span> <span class="pre">FAKE_CHAMELEON=1</span></code> line tells cuav to use a folder as the imagery source, rather than
+looking for a camera.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">By default, MAVProxy and cuav will save the telemetry and images to file (it doesn&#8217;t know that
+the imagery is coming from file rather than a UAV). For large datasets this may lead to large
+amounts of disk space usage. Thus the <code class="docutils literal"><span class="pre">&amp;</span> <span class="pre">rm</span> <span class="pre">-rf</span> <span class="pre">OBC2016/logs</span></code> command in the above example
+will delete any previous telemetry and images before replaying it again.</p>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Users may have issues trying to stop the playback process. Use <code class="docutils literal"><span class="pre">pkill</span> <span class="pre">-9</span> <span class="pre">-f</span> <span class="pre">playback.py</span></code> to
+stop the playback process.</p>
+</div>
+<p>The commandline options are:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="22%" />
+<col width="40%" />
+<col width="38%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Option</th>
+<th class="head">Description</th>
+<th class="head">Default</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>&#8211;out</td>
+<td>MAVLink output port (IP:port)</td>
+<td>127.0.0.1:14550</td>
+</tr>
+<tr class="row-odd"><td>&#8211;baudrate</td>
+<td>baud rate</td>
+<td>57600</td>
+</tr>
+<tr class="row-even"><td>&#8211;imagedir</td>
+<td>raw image directory</td>
+<td>&lt;none&gt;</td>
+</tr>
+<tr class="row-odd"><td>&#8211;condition</td>
+<td>condition on mavlink log</td>
+<td>&lt;none&gt;</td>
+</tr>
+<tr class="row-even"><td>&#8211;speedup</td>
+<td>playback speedup</td>
+<td>1.0</td>
+</tr>
+<tr class="row-odd"><td>&#8211;loop</td>
+<td>playback in a loop</td>
+<td>False</td>
+</tr>
+<tr class="row-even"><td>&#8211;jpeg</td>
+<td>use jpegs instead of PGMs</td>
+<td>False</td>
+</tr>
+<tr class="row-odd"><td>&#8211;HIL</td>
+<td>send HIL_STATE messages</td>
+<td>False</td>
+</tr>
+</tbody>
+</table>
+</div>
 </div>
 
 
@@ -405,7 +486,7 @@
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../',
-            VERSION:'1.4.38',
+            VERSION:'1.5.7',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true

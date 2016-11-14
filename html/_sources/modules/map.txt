@@ -28,3 +28,18 @@ Use the "g" key to specify a position to move the map to.
 
 .. image:: map_win.png
 
+The map has the following settings, which via be set via ``map set``.
+
+==================   ===============================================  ===============================
+Setting              Description                                      Default
+==================   ===============================================  ===============================
+showgpspos           Show position according to GPS1                  0
+showgps2pos          Show position according to GPS2                  1
+showsimpos           If running in SITL, show the simulated position  0
+showahrs2pos         Show AHRS2 position solution                     0
+showahrs3pos         Show AHRS2 position solution                     0
+brightness           Set map brightness                               1
+rallycircle          Show loiter circles around rally points          False
+loitercircle         Show loiter circles around loiter waypoints      False
+==================   ===============================================  ===============================
+

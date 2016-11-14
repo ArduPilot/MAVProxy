@@ -7,7 +7,7 @@ startup. This can save the effort of (re)setting up the MAVProxy
 environment for each flight.
 
 A script (:file:`mavinit.scr`) should be placed in an aircraft directory (ie.
-:file:`MAVProxy/Aircraftname/mavinit.scr`) containing the commands. Any normal
+:file:`./Aircraftname/mavinit.scr`) containing the commands. Any normal
 MAVProxy commands can be placed in here. Note that the --aircraft option
 must be used, in order for MAVProxy to find the script in the
 appropriate aircraft directory.

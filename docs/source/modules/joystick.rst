@@ -26,5 +26,6 @@ The following joysticks and RC transmitter dongles are compatible:
 - `WAILLY PPM TO USB
   Adapter <http://www.amazon.com/gp/product/B000RO7JAI/ref=oh_aui_detailpage_o03_s00?ie=UTF8&psc=1>`_
 - Cheap Ebay 'FMS Simulator'
+- `IPACS easyFly2 Interface <http://www.ikarus.net/deutsch-infos-zubehor/die-ikarus-interfacekabel/?lang=en>`_
 
 

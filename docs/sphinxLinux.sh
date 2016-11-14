@@ -2,4 +2,4 @@
 # If required:
 # pip install sphinx
 
-make html BUILDDIR=..
+make -B html BUILDDIR=..

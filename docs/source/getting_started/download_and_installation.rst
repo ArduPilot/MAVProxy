@@ -2,13 +2,13 @@
 Download and Installation
 =========================
 
-The following instructions are for user that just want to run MAVProxy. Developers should look at the :doc:`Developer's Guide <../development/mavdevenv>` for setting up the development environment.
+The following instructions are for user that just want to run MAVProxy. Developers should look at the :doc:`Developer's Guide <../development/index>` for setting up the development environment.
 
 Windows
 =======
 
 A complete windows installer for MAVProxy is available at
-http://firmware.diydrones.com/Tools/MAVProxy/.
+http://firmware.ardupilot.org/Tools/MAVProxy/.
 
 .. note::
 

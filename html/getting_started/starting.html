@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Startup Options &mdash; MAVProxy 1.4.38 documentation</title>
+  <title>Startup Options &mdash; MAVProxy 1.5.7 documentation</title>
   
 
   
@@ -30,7 +30,8 @@
   
 
   
-    <link rel="top" title="MAVProxy 1.4.38 documentation" href="../index.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="MAVProxy 1.5.7 documentation" href="../index.html"/>
         <link rel="up" title="Getting Started" href="index.html"/>
         <link rel="next" title="Startup Scripts" href="mavinit.html"/>
         <link rel="prev" title="Quickstart" href="quickstart.html"/> 
@@ -60,7 +61,7 @@
           
           
             <div class="version">
-              1.4.38
+              1.5.7
             </div>
           
         
@@ -107,6 +108,8 @@
 <li class="toctree-l3"><a class="reference internal" href="#map">&#8211;map</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#load-module">&#8211;load-module</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#mav09">&#8211;mav09</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#mav10">&#8211;mav10</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#mav20">&#8211;mav20</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#auto-protocol">&#8211;auto-protocol</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#continue">&#8211;continue</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#nowait">&#8211;nowait</a></li>
@@ -116,9 +119,11 @@
 <li class="toctree-l3"><a class="reference internal" href="#daemon">&#8211;daemon</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#state-basedir">&#8211;state-basedir</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#version">&#8211;version</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#moddebug">&#8211;moddebug</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="mavinit.html">Startup Scripts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="logfiles.html">Logfiles</a></li>
 <li class="toctree-l2"><a class="reference internal" href="examples.html">Examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mavbridge.html">MAVProxy Wifi Bridge</a></li>
 <li class="toctree-l2"><a class="reference internal" href="faq.html">Frequently Asked Questions and Issues</a></li>
@@ -189,7 +194,7 @@ communicating on.</p>
 single stream automatically. This is useful if independent redundant
 links are being used.</p>
 <p>If an IP address is specified, it must be the local computer&#8217;s IP
-address. The IP connection type (TCP or UDP) must be prefixed to the
+address, or loopback address. The IP connection type (TCP or UDP) must be prefixed to the
 IP address.</p>
 <p>If a serial port is specified, an optional comma-separated baud rate may
 also be specified. If present, this overrides the rate given by
@@ -199,6 +204,13 @@ also be specified. If present, this overrides the rate given by
 <span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">tcp</span><span class="p">:</span><span class="mf">192.168</span><span class="o">.</span><span class="mf">1.1</span><span class="p">:</span><span class="mi">14550</span>
 <span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">udp</span><span class="p">:</span><span class="mf">192.168</span><span class="o">.</span><span class="mf">1.1</span><span class="p">:</span><span class="mi">14550</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">ttyUSB0</span>
 <span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">ttyUSB0</span><span class="p">,</span><span class="mi">57600</span>
+<span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">udp</span><span class="p">:</span><span class="mf">127.0</span><span class="o">.</span><span class="mf">0.1</span><span class="p">:</span><span class="mi">14550</span>
+<span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">tcp</span><span class="p">:</span><span class="mf">0.0</span><span class="o">.</span><span class="mf">0.0</span><span class="p">:</span><span class="mi">14550</span>
+</pre></div>
+</div>
+<p>If connecting to a remote IP address, the udpout or tcpout arguments should be used:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">udpout</span><span class="p">:</span><span class="mf">10.10</span><span class="o">.</span><span class="mf">1.1</span><span class="p">:</span><span class="mi">14550</span>
+<span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">tcpout</span><span class="p">:</span><span class="mf">10.10</span><span class="o">.</span><span class="mf">1.1</span><span class="p">:</span><span class="mi">14550</span>
 </pre></div>
 </div>
 </div>
@@ -311,6 +323,17 @@ with a comma separated list.</p>
 <p>Use MAVLink protocol 0.9. Recent versions of the APM software use
 version 1.0 of MAVLink.</p>
 </div>
+<div class="section" id="mav10">
+<h2>&#8211;mav10<a class="headerlink" href="#mav10" title="Permalink to this headline">¶</a></h2>
+<p>Use MAVLink protocol 1.0. Recent versions of the APM software use
+version 1.0 of MAVLink.</p>
+</div>
+<div class="section" id="mav20">
+<h2>&#8211;mav20<a class="headerlink" href="#mav20" title="Permalink to this headline">¶</a></h2>
+<p>Use MAVLink protocol 2.0. Recent versions of the APM software use
+version 1.0 of MAVLink. This is the default protocol version used
+in MAVProxy.</p>
+</div>
 <div class="section" id="auto-protocol">
 <h2>&#8211;auto-protocol<a class="headerlink" href="#auto-protocol" title="Permalink to this headline">¶</a></h2>
 <p>Auto detect MAVLink protocol version.</p>
@@ -350,6 +373,12 @@ directory.</p>
 <div class="section" id="version">
 <h2>&#8211;version<a class="headerlink" href="#version" title="Permalink to this headline">¶</a></h2>
 <p>Return version information about MAVProxy.</p>
+</div>
+<div class="section" id="moddebug">
+<h2>&#8211;moddebug<a class="headerlink" href="#moddebug" title="Permalink to this headline">¶</a></h2>
+<p>Controls the level of debugging output displayed on the console. Default is 0
+(no debug output). A value of 3 is useful for debugging crashes or errors in
+MAVProxy and it&#8217;s modules.</p>
 </div>
 </div>
 
@@ -397,7 +426,7 @@ directory.</p>
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../',
-            VERSION:'1.4.38',
+            VERSION:'1.5.7',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true

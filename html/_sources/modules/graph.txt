@@ -35,3 +35,17 @@ Y seconds.
 
 .. image:: graph.png
 
+There are two global settings for graphs: timespan and tickresolution.
+
+To set the timespan along the horizontal axis (in seconds):
+
+.. code:: bash
+
+    graph timespan 20
+ 
+ To set the tickresolution along the horizontal axis (1/<number of ticks>):
+
+.. code:: bash
+
+    graph timespan 0.2
+       

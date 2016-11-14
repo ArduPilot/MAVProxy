@@ -48,7 +48,7 @@ Linux - HIL
 ============
 
 Download the `APM source
-code <https://github.com/diydrones/ardupilot>`_ and the
+code <https://github.com/ardupilot/ardupilot>`_ and the
 `jsbsim <https://github.com/tridge/jsbsim>`_ simulator. Depending on
 your system setup, other packages may be required.
 

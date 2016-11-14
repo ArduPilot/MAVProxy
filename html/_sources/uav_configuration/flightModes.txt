@@ -40,17 +40,10 @@ A specific mode is guided. By entering ``guided alt`` (where alt is the
 desired altitude), the user can the select a point on the map window and
 the UAV will immediately begin flying towards that point.
 
-Arming/Disarming
-----------------
+guided
+======
 
-The APM can be armed and disarmed at any time by using the
-``arm throttle`` and ``disarm`` commands.
-
-The pre-arming checks can be run (without actually arming the UAV) via
-``arm check``. A full list of these checks is given by ``arm list``. To
-enable/disable a particular arming check, use ``arm check n`` and
-``arm uncheck n`` respectively, where n is the name of the check.
-
-The above commands are contained within the ``mode`` and ``arm`` modules
-respectively, which are loaded by default at MAVProxy startup
+Fly to the last clicked point on the map, or specified longitude and 
+latitude. Requires an altitude:
+``guided ALTITUDE`` or ``guided LAT LON ALTITUDE``
 

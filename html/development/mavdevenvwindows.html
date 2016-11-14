@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Windows Development Environment &mdash; MAVProxy 1.4.38 documentation</title>
+  <title>Windows Development Environment &mdash; MAVProxy 1.5.7 documentation</title>
   
 
   
@@ -30,7 +30,8 @@
   
 
   
-    <link rel="top" title="MAVProxy 1.4.38 documentation" href="../index.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="MAVProxy 1.5.7 documentation" href="../index.html"/>
         <link rel="up" title="Development" href="index.html"/>
         <link rel="next" title="Module Development" href="mavcustmod.html"/>
         <link rel="prev" title="Linux Development Environment" href="mavdevenvlinux.html"/> 
@@ -60,7 +61,7 @@
           
           
             <div class="version">
-              1.4.38
+              1.5.7
             </div>
           
         
@@ -159,25 +160,31 @@ PIL)</a></li>
 <span class="n">pip</span> <span class="n">install</span> <span class="n">C</span><span class="p">:</span>\<span class="n">Users</span>\<span class="n">Stephen</span>\<span class="n">Desktop</span>\<span class="n">numpy</span><span class="o">.</span><span class="n">whl</span>
 </pre></div>
 </div>
-<p>Use <code class="docutils literal"><span class="pre">pip</span></code> to install the other packages:</p>
+<p>Use <code class="docutils literal"><span class="pre">pip</span></code> to install the other packages. Note that some packages
+require specific older versions to install:</p>
 <div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">cd</span> <span class="n">C</span><span class="p">:</span>\<span class="n">Python27</span>\<span class="n">Scripts</span>
-<span class="n">pip</span> <span class="n">install</span> <span class="n">pyinstaller</span>
-<span class="n">pip</span> <span class="n">install</span> <span class="n">matplotlib</span>
-<span class="n">pip</span> <span class="n">install</span> <span class="n">pyreadline</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="n">pip</span> <span class="o">--</span><span class="n">upgrade</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="n">pyinstaller</span><span class="o">==</span><span class="mf">2.1</span> <span class="n">setuptools</span><span class="o">==</span><span class="mf">19.2</span> <span class="n">packaging</span><span class="o">==</span><span class="mf">14.2</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="n">matplotlib</span> <span class="n">pyreadline</span> <span class="n">future</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="n">lxml</span> <span class="n">python</span><span class="o">-</span><span class="n">dateutil</span> <span class="n">pytz</span> <span class="n">pyparsing</span> <span class="n">six</span>
 <span class="n">pip</span> <span class="n">install</span> <span class="n">pyserial</span>
 <span class="n">pip</span> <span class="n">install</span> <span class="n">pymavlink</span>
-<span class="n">pip</span> <span class="n">install</span> <span class="n">lxml</span> <span class="n">python</span><span class="o">-</span><span class="n">dateutil</span> <span class="n">pytz</span> <span class="n">pyparsing</span> <span class="n">six</span>
 </pre></div>
 </div>
 <p>Download the MAVProxy <a class="reference external" href="https://github.com/ArduPilot/MAVProxy">source</a>.</p>
 <p>After making the desired changes, MAVProxy is required to be compiled
-and copied into the Python directory (the modules won&#8217;t work otherwise).
+into the Python directory (the modules won&#8217;t work otherwise).
 This needs to happen after any changes to the source code. This can be
 done by running the <code class="file docutils literal"><span class="pre">./MAVProxy/MAVProxyWinUSB.bat</span></code> or
 <code class="file docutils literal"><span class="pre">./MAVProxy/MAVProxyWinLAN.bat</span></code> file. This will
 perform the necessary build actions and then run MAVProxy. Some of the
 details in the batch files (port numbers, etc) may need to be altered to
 match the user&#8217;s system configuration.</p>
+<p>To create a one-click windows installer for MAVProxy, run <code class="docutils literal"><span class="pre">MAVProxyWinBuild.bat`</span></code>,
+which is in the <code class="docutils literal"><span class="pre">./windows</span></code> directory. The installer will be created in the
+<code class="docutils literal"><span class="pre">./windows/output</span></code> directory. The <a class="reference external" href="http://www.jrsoftware.org/isdl.php#stable">Inno Setup</a>
+program will be required for this process and is assumed to be installed in the
+<code class="docutils literal"><span class="pre">C:\Program</span> <span class="pre">Files</span> <span class="pre">(x86)\Inno</span> <span class="pre">Setup</span> <span class="pre">5\</span></code> folder</p>
 <div class="section" id="visual-studio-setup">
 <h2>Visual Studio Setup<a class="headerlink" href="#visual-studio-setup" title="Permalink to this headline">¶</a></h2>
 <p>Visual Studio can be used to develop MAVProxy on Windows platforms.</p>
@@ -237,7 +244,7 @@ match the user&#8217;s system configuration.</p>
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../',
-            VERSION:'1.4.38',
+            VERSION:'1.5.7',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true

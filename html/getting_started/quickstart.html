@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Quickstart &mdash; MAVProxy 1.4.38 documentation</title>
+  <title>Quickstart &mdash; MAVProxy 1.5.7 documentation</title>
   
 
   
@@ -30,7 +30,8 @@
   
 
   
-    <link rel="top" title="MAVProxy 1.4.38 documentation" href="../index.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="MAVProxy 1.5.7 documentation" href="../index.html"/>
         <link rel="up" title="Getting Started" href="index.html"/>
         <link rel="next" title="Startup Options" href="starting.html"/>
         <link rel="prev" title="Download and Installation" href="download_and_installation.html"/> 
@@ -60,7 +61,7 @@
           
           
             <div class="version">
-              1.4.38
+              1.5.7
             </div>
           
         
@@ -91,6 +92,7 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="starting.html">Startup Options</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mavinit.html">Startup Scripts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="logfiles.html">Logfiles</a></li>
 <li class="toctree-l2"><a class="reference internal" href="examples.html">Examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mavbridge.html">MAVProxy Wifi Bridge</a></li>
 <li class="toctree-l2"><a class="reference internal" href="faq.html">Frequently Asked Questions and Issues</a></li>
@@ -175,8 +177,17 @@ the baud rate can instead be manually specified.</p>
 <div class="section" id="over-network">
 <h2>Over Network<a class="headerlink" href="#over-network" title="Permalink to this headline">¶</a></h2>
 <p>Specify the IP address and port containing a mavlink stream. The address
-to connect to must be your own IP address.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="mf">192.168</span><span class="o">.</span><span class="mf">1.1</span><span class="p">:</span><span class="mi">14550</span>
+to connect to must be your own IP address or loopback address. Alternatively
+the if the local IP address is not known, use 0.0.0.0 for MAVProxy find and use
+the local IP address. The type of stream (tcp or udp) should also be specified.</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">tcp</span><span class="p">:</span><span class="mf">192.168</span><span class="o">.</span><span class="mf">1.1</span><span class="p">:</span><span class="mi">14550</span>
+<span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">udp</span><span class="p">:</span><span class="mf">127.0</span><span class="o">.</span><span class="mf">0.1</span><span class="p">:</span><span class="mi">14550</span>
+<span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">tcp</span><span class="p">:</span><span class="mf">0.0</span><span class="o">.</span><span class="mf">0.0</span><span class="p">:</span><span class="mi">14550</span>
+</pre></div>
+</div>
+<p>If connecting to a remote IP address, the udpout or tcpout arguments should be used:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">udpout</span><span class="p">:</span><span class="mf">10.10</span><span class="o">.</span><span class="mf">1.1</span><span class="p">:</span><span class="mi">14550</span>
+<span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">tcpout</span><span class="p">:</span><span class="mf">10.10</span><span class="o">.</span><span class="mf">1.1</span><span class="p">:</span><span class="mi">14550</span>
 </pre></div>
 </div>
 <div class="admonition note">
@@ -231,7 +242,7 @@ UDP Broadcast. See <a class="reference internal" href="starting.html#out"><span 
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../',
-            VERSION:'1.4.38',
+            VERSION:'1.5.7',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true

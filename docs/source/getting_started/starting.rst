@@ -21,7 +21,7 @@ single stream automatically. This is useful if independent redundant
 links are being used.
 
 If an IP address is specified, it must be the local computer's IP
-address. The IP connection type (TCP or UDP) must be prefixed to the
+address, or loopback address. The IP connection type (TCP or UDP) must be prefixed to the
 IP address.
 
 If a serial port is specified, an optional comma-separated baud rate may
@@ -35,7 +35,15 @@ also be specified. If present, this overrides the rate given by
     mavproxy.py --master=tcp:192.168.1.1:14550
     mavproxy.py --master=udp:192.168.1.1:14550 --master=/dev/ttyUSB0
     mavproxy.py --master=/dev/ttyUSB0,57600
+    mavproxy.py --master=udp:127.0.0.1:14550
+    mavproxy.py --master=tcp:0.0.0.0:14550
 
+If connecting to a remote IP address, the udpout or tcpout arguments should be used:
+
+.. code:: bash
+
+    mavproxy.py --master=udpout:10.10.1.1:14550
+    mavproxy.py --master=tcpout:10.10.1.1:14550
 
 --quadcopter
 ============
@@ -173,6 +181,19 @@ with a comma separated list.
 Use MAVLink protocol 0.9. Recent versions of the APM software use
 version 1.0 of MAVLink.
 
+--mav10
+================
+
+Use MAVLink protocol 1.0. Recent versions of the APM software use
+version 1.0 of MAVLink.
+
+--mav20
+================
+
+Use MAVLink protocol 2.0. Recent versions of the APM software use
+version 1.0 of MAVLink. This is the default protocol version used
+in MAVProxy.
+
 --auto-protocol
 ================
 
@@ -221,3 +242,12 @@ directory.
 =========
 
 Return version information about MAVProxy.
+
+--moddebug
+==========
+
+Controls the level of debugging output displayed on the console. Default is 0
+(no debug output). A value of 3 is useful for debugging crashes or errors in
+MAVProxy and it's modules.
+
+

@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Moving Map &mdash; MAVProxy 1.4.38 documentation</title>
+  <title>Moving Map &mdash; MAVProxy 1.5.7 documentation</title>
   
 
   
@@ -30,7 +30,8 @@
   
 
   
-    <link rel="top" title="MAVProxy 1.4.38 documentation" href="../index.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="MAVProxy 1.5.7 documentation" href="../index.html"/>
         <link rel="up" title="Modules" href="index.html"/>
         <link rel="next" title="Mission Editor" href="misseditor.html"/>
         <link rel="prev" title="Log Management" href="log.html"/> 
@@ -60,7 +61,7 @@
           
           
             <div class="version">
-              1.4.38
+              1.5.7
             </div>
           
         
@@ -85,23 +86,35 @@
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting Started</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Modules</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="adsb.html">ADS-B Tracking</a></li>
 <li class="toctree-l2"><a class="reference internal" href="antenna.html">Antenna Pointing</a></li>
 <li class="toctree-l2"><a class="reference internal" href="auxopt.html">Auxiliary (RC 6,7) Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="battery.html">Battery Management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="cameraview.html">Camera Viewer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cmdlong.html">Long Commands</a></li>
 <li class="toctree-l2"><a class="reference internal" href="console.html">Graphical Console</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dataflash_logger.html">DataFlash Logs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="devop.html">Direct Comms with SPI/I2C bus</a></li>
 <li class="toctree-l2"><a class="reference internal" href="dgps.html">Differential GPS</a></li>
-<li class="toctree-l2"><a class="reference internal" href="gimbals.html">Gimbal Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="firmware.html">Firmware Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="followtest.html">Follow Me Test</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gasheli.html">Gas Helicopter Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gimbal.html">Gimbal Management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="graph.html">Graphing Live Data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="hil.html">HIL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="joystick.html">Joystick Input</a></li>
+<li class="toctree-l2"><a class="reference internal" href="kmlread.html">KML Importer</a></li>
 <li class="toctree-l2"><a class="reference internal" href="link.html">Link Management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="log.html">Log Management</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Moving Map</a></li>
 <li class="toctree-l2"><a class="reference internal" href="misseditor.html">Mission Editor</a></li>
 <li class="toctree-l2"><a class="reference internal" href="nsh.html">Nuttx Shell</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ppp.html">PPP Link</a></li>
+<li class="toctree-l2"><a class="reference internal" href="rcsetup.html">RC Setup</a></li>
 <li class="toctree-l2"><a class="reference internal" href="relay.html">Relay Management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sensors.html">Sensor Reporting</a></li>
 <li class="toctree-l2"><a class="reference internal" href="serial.html">Writing to Serial Port</a></li>
+<li class="toctree-l2"><a class="reference internal" href="signing.html">Packet Signing</a></li>
 <li class="toctree-l2"><a class="reference internal" href="speech.html">Text-to-Speech</a></li>
 <li class="toctree-l2"><a class="reference internal" href="terrain.html">Terrain Reporting</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tracker.html">Antenna Tracker</a></li>
@@ -175,6 +188,54 @@ connect the last waypoint to the first one, creating a loop.</p>
 <p>Use the &#8220;g&#8221; key to specify a position to move the map to.</p>
 <img alt="../_images/map.png" src="../_images/map.png" />
 <img alt="../_images/map_win.png" src="../_images/map_win.png" />
+<p>The map has the following settings, which via be set via <code class="docutils literal"><span class="pre">map</span> <span class="pre">set</span></code>.</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="19%" />
+<col width="49%" />
+<col width="32%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Setting</th>
+<th class="head">Description</th>
+<th class="head">Default</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>showgpspos</td>
+<td>Show position according to GPS1</td>
+<td>0</td>
+</tr>
+<tr class="row-odd"><td>showgps2pos</td>
+<td>Show position according to GPS2</td>
+<td>1</td>
+</tr>
+<tr class="row-even"><td>showsimpos</td>
+<td>If running in SITL, show the simulated position</td>
+<td>0</td>
+</tr>
+<tr class="row-odd"><td>showahrs2pos</td>
+<td>Show AHRS2 position solution</td>
+<td>0</td>
+</tr>
+<tr class="row-even"><td>showahrs3pos</td>
+<td>Show AHRS2 position solution</td>
+<td>0</td>
+</tr>
+<tr class="row-odd"><td>brightness</td>
+<td>Set map brightness</td>
+<td>1</td>
+</tr>
+<tr class="row-even"><td>rallycircle</td>
+<td>Show loiter circles around rally points</td>
+<td>False</td>
+</tr>
+<tr class="row-odd"><td>loitercircle</td>
+<td>Show loiter circles around loiter waypoints</td>
+<td>False</td>
+</tr>
+</tbody>
+</table>
 </div>
 
 
@@ -221,7 +282,7 @@ connect the last waypoint to the first one, creating a loop.</p>
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../',
-            VERSION:'1.4.38',
+            VERSION:'1.5.7',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true

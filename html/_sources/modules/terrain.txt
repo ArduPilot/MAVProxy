@@ -28,3 +28,7 @@ download, cache and send small SRTM tiles to the APM's internal memory
 
 The status of the module can be shown by entering ``terrain status``.
 
+To get the terrain height at a particular location, use 
+``terrain check <lat> <lon>```
+
+

@@ -11,6 +11,7 @@ This section contains basic topics to help you get started with MAVProxy.
     quickstart
     starting
     mavinit
+    logfiles
     examples
     mavbridge
     faq

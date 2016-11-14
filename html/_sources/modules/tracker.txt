@@ -13,6 +13,9 @@ the antenna, this module will send commands to the antenna APM to alter
 it's azimuth/elevation (via servos on the APM) to maintain tracking with
 the UAV.
 
+Use ``tracker set port <portname.``` and ``tracker set baudrate <n>``` to 
+set the serial port and baudrate of the tracker.
+
 Use ``tracker arm`` and ``tracker disarm`` to arm and disarm the servos
 on the tracker respectively.
 

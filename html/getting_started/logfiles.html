@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Logfiles &mdash; MAVProxy 1.4.38 documentation</title>
+  <title>Logfiles &mdash; MAVProxy 1.5.7 documentation</title>
   
 
   
@@ -30,7 +30,11 @@
   
 
   
-    <link rel="top" title="MAVProxy 1.4.38 documentation" href="../index.html"/> 
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="MAVProxy 1.5.7 documentation" href="../index.html"/>
+        <link rel="up" title="Getting Started" href="index.html"/>
+        <link rel="next" title="Examples" href="examples.html"/>
+        <link rel="prev" title="Startup Scripts" href="mavinit.html"/> 
 
   
   <script src="../_static/js/modernizr.min.js"></script>
@@ -57,7 +61,7 @@
           
           
             <div class="version">
-              1.4.38
+              1.5.7
             </div>
           
         
@@ -78,8 +82,18 @@
         
           
           
-              <ul>
-<li class="toctree-l1"><a class="reference internal" href="index.html">Getting Started</a></li>
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting Started</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="download_and_installation.html">Download and Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l2"><a class="reference internal" href="starting.html">Startup Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mavinit.html">Startup Scripts</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Logfiles</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mavbridge.html">MAVProxy Wifi Bridge</a></li>
+<li class="toctree-l2"><a class="reference internal" href="faq.html">Frequently Asked Questions and Issues</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../modules/index.html">Modules</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
@@ -114,6 +128,8 @@
 <div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href="../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="index.html">Getting Started</a> &raquo;</li>
       
     <li>Logfiles</li>
       <li class="wy-breadcrumbs-aside">
@@ -155,12 +171,29 @@
 </div>
 </div></blockquote>
 <p>Will log the telemetry to <code class="docutils literal"><span class="pre">flight.tlog</span></code> and <code class="docutils literal"><span class="pre">flight.tlog.raw</span></code> in the <code class="docutils literal"><span class="pre">C:\users\stephen\Documents\Logs\Copter\flyby\flight&lt;n&gt;\</span></code> folder.</p>
+<p>The <code class="docutils literal"><span class="pre">--state-basedir=dir</span></code> argument can be used to specify the base directory of where the telemetry files will be stored.</p>
+<blockquote>
+<div><div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">C</span><span class="p">:</span>\<span class="n">users</span>\<span class="n">stephen</span>\<span class="n">Documents</span><span class="o">&gt;</span> <span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">aircraft</span><span class="o">=</span><span class="n">copter</span> <span class="o">--</span><span class="n">mission</span><span class="o">=</span><span class="n">flyby</span> <span class="o">--</span><span class="n">state</span><span class="o">-</span><span class="n">basedir</span><span class="o">=</span><span class="n">C</span><span class="p">:</span>\<span class="n">logs</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>Will store the log files in <code class="docutils literal"><span class="pre">C:\logs\copter\flyby\flight&lt;n&gt;\</span></code> folder.</p>
+<p>The MAVExplorer program can be used to view graphs and track of the flight data stored in these files.</p>
 </div>
 
 
            </div>
           </div>
           <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="examples.html" class="btn btn-neutral float-right" title="Examples" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="mavinit.html" class="btn btn-neutral" title="Startup Scripts" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
   
 
   <hr/>
@@ -192,7 +225,7 @@
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../',
-            VERSION:'1.4.38',
+            VERSION:'1.5.7',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true

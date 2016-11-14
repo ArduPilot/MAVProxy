@@ -21,28 +21,35 @@ Next, open up a console in the Python scripts install path
     cd C:\Python27\Scripts
     pip install C:\Users\Stephen\Desktop\numpy.whl
 
-Use ``pip`` to install the other packages:
+Use ``pip`` to install the other packages. Note that some packages 
+require specific older versions to install:
 
 .. code:: bash
 
     cd C:\Python27\Scripts
-    pip install pyinstaller 
-    pip install matplotlib 
-    pip install pyreadline 
-    pip install pyserial 
-    pip install pymavlink  
+    pip install pip --upgrade
+    pip install pyinstaller==2.1 setuptools==19.2 packaging==14.2
+    pip install matplotlib pyreadline future
     pip install lxml python-dateutil pytz pyparsing six
-
+    pip install pyserial 
+    pip install pymavlink 
+    
 Download the MAVProxy `source <https://github.com/ArduPilot/MAVProxy>`_.
 
-After making the desired changes, MAVProxy is required to be compiled
-and copied into the Python directory (the modules won't work otherwise).
+After making the desired changes, MAVProxy is required to be compiled 
+into the Python directory (the modules won't work otherwise).
 This needs to happen after any changes to the source code. This can be
 done by running the :file:`./MAVProxy/MAVProxyWinUSB.bat` or 
 :file:`./MAVProxy/MAVProxyWinLAN.bat` file. This will
 perform the necessary build actions and then run MAVProxy. Some of the 
 details in the batch files (port numbers, etc) may need to be altered to 
 match the user's system configuration.
+
+To create a one-click windows installer for MAVProxy, run ``MAVProxyWinBuild.bat```, 
+which is in the ``./windows`` directory. The installer will be created in the 
+``./windows/output`` directory. The `Inno Setup <http://www.jrsoftware.org/isdl.php#stable>`_ 
+program will be required for this process and is assumed to be installed in the 
+``C:\Program Files (x86)\Inno Setup 5\`` folder
 
 Visual Studio Setup
 -------------------

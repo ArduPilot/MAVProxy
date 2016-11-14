@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Terrain Reporting &mdash; MAVProxy 1.4.38 documentation</title>
+  <title>Terrain Reporting &mdash; MAVProxy 1.5.7 documentation</title>
   
 
   
@@ -30,7 +30,8 @@
   
 
   
-    <link rel="top" title="MAVProxy 1.4.38 documentation" href="../index.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="MAVProxy 1.5.7 documentation" href="../index.html"/>
         <link rel="up" title="Modules" href="index.html"/>
         <link rel="next" title="Antenna Tracker" href="tracker.html"/>
         <link rel="prev" title="Text-to-Speech" href="speech.html"/> 
@@ -60,7 +61,7 @@
           
           
             <div class="version">
-              1.4.38
+              1.5.7
             </div>
           
         
@@ -85,23 +86,35 @@
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting Started</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Modules</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="adsb.html">ADS-B Tracking</a></li>
 <li class="toctree-l2"><a class="reference internal" href="antenna.html">Antenna Pointing</a></li>
 <li class="toctree-l2"><a class="reference internal" href="auxopt.html">Auxiliary (RC 6,7) Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="battery.html">Battery Management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="cameraview.html">Camera Viewer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cmdlong.html">Long Commands</a></li>
 <li class="toctree-l2"><a class="reference internal" href="console.html">Graphical Console</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dataflash_logger.html">DataFlash Logs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="devop.html">Direct Comms with SPI/I2C bus</a></li>
 <li class="toctree-l2"><a class="reference internal" href="dgps.html">Differential GPS</a></li>
-<li class="toctree-l2"><a class="reference internal" href="gimbals.html">Gimbal Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="firmware.html">Firmware Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="followtest.html">Follow Me Test</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gasheli.html">Gas Helicopter Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gimbal.html">Gimbal Management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="graph.html">Graphing Live Data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="hil.html">HIL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="joystick.html">Joystick Input</a></li>
+<li class="toctree-l2"><a class="reference internal" href="kmlread.html">KML Importer</a></li>
 <li class="toctree-l2"><a class="reference internal" href="link.html">Link Management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="log.html">Log Management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="map.html">Moving Map</a></li>
 <li class="toctree-l2"><a class="reference internal" href="misseditor.html">Mission Editor</a></li>
 <li class="toctree-l2"><a class="reference internal" href="nsh.html">Nuttx Shell</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ppp.html">PPP Link</a></li>
+<li class="toctree-l2"><a class="reference internal" href="rcsetup.html">RC Setup</a></li>
 <li class="toctree-l2"><a class="reference internal" href="relay.html">Relay Management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sensors.html">Sensor Reporting</a></li>
 <li class="toctree-l2"><a class="reference internal" href="serial.html">Writing to Serial Port</a></li>
+<li class="toctree-l2"><a class="reference internal" href="signing.html">Packet Signing</a></li>
 <li class="toctree-l2"><a class="reference internal" href="speech.html">Text-to-Speech</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Terrain Reporting</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tracker.html">Antenna Tracker</a></li>
@@ -178,6 +191,8 @@ offline use.</p>
 download, cache and send small SRTM tiles to the APM&#8217;s internal memory
 (the SD card on the Pixhawk, for example).</p>
 <p>The status of the module can be shown by entering <code class="docutils literal"><span class="pre">terrain</span> <span class="pre">status</span></code>.</p>
+<p>To get the terrain height at a particular location, use
+<code class="docutils literal"><span class="pre">terrain</span> <span class="pre">check</span> <span class="pre">&lt;lat&gt;</span> <span class="pre">&lt;lon&gt;`</span></code></p>
 </div>
 
 
@@ -224,7 +239,7 @@ download, cache and send small SRTM tiles to the APM&#8217;s internal memory
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../',
-            VERSION:'1.4.38',
+            VERSION:'1.5.7',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true

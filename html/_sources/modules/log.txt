@@ -6,7 +6,7 @@ Log Management
 
     module load log
     
-Allows the user to manage the logs stored on an APM. Use ``log list`` to view a
+Allows the user to manage the dataflash logs stored on an APM. Use ``log list`` to view a
 list of the logs on the APM and ``log erase`` to delete all logs on the
 APM.
 

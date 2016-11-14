@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Graphing Live Data &mdash; MAVProxy 1.4.38 documentation</title>
+  <title>Graphing Live Data &mdash; MAVProxy 1.5.7 documentation</title>
   
 
   
@@ -30,10 +30,11 @@
   
 
   
-    <link rel="top" title="MAVProxy 1.4.38 documentation" href="../index.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="MAVProxy 1.5.7 documentation" href="../index.html"/>
         <link rel="up" title="Modules" href="index.html"/>
         <link rel="next" title="HIL" href="hil.html"/>
-        <link rel="prev" title="Gimbal Management" href="gimbals.html"/> 
+        <link rel="prev" title="Gimbal Management" href="gimbal.html"/> 
 
   
   <script src="../_static/js/modernizr.min.js"></script>
@@ -60,7 +61,7 @@
           
           
             <div class="version">
-              1.4.38
+              1.5.7
             </div>
           
         
@@ -85,23 +86,35 @@
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting Started</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Modules</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="adsb.html">ADS-B Tracking</a></li>
 <li class="toctree-l2"><a class="reference internal" href="antenna.html">Antenna Pointing</a></li>
 <li class="toctree-l2"><a class="reference internal" href="auxopt.html">Auxiliary (RC 6,7) Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="battery.html">Battery Management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="cameraview.html">Camera Viewer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cmdlong.html">Long Commands</a></li>
 <li class="toctree-l2"><a class="reference internal" href="console.html">Graphical Console</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dataflash_logger.html">DataFlash Logs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="devop.html">Direct Comms with SPI/I2C bus</a></li>
 <li class="toctree-l2"><a class="reference internal" href="dgps.html">Differential GPS</a></li>
-<li class="toctree-l2"><a class="reference internal" href="gimbals.html">Gimbal Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="firmware.html">Firmware Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="followtest.html">Follow Me Test</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gasheli.html">Gas Helicopter Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gimbal.html">Gimbal Management</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Graphing Live Data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="hil.html">HIL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="joystick.html">Joystick Input</a></li>
+<li class="toctree-l2"><a class="reference internal" href="kmlread.html">KML Importer</a></li>
 <li class="toctree-l2"><a class="reference internal" href="link.html">Link Management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="log.html">Log Management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="map.html">Moving Map</a></li>
 <li class="toctree-l2"><a class="reference internal" href="misseditor.html">Mission Editor</a></li>
 <li class="toctree-l2"><a class="reference internal" href="nsh.html">Nuttx Shell</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ppp.html">PPP Link</a></li>
+<li class="toctree-l2"><a class="reference internal" href="rcsetup.html">RC Setup</a></li>
 <li class="toctree-l2"><a class="reference internal" href="relay.html">Relay Management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sensors.html">Sensor Reporting</a></li>
 <li class="toctree-l2"><a class="reference internal" href="serial.html">Writing to Serial Port</a></li>
+<li class="toctree-l2"><a class="reference internal" href="signing.html">Packet Signing</a></li>
 <li class="toctree-l2"><a class="reference internal" href="speech.html">Text-to-Speech</a></li>
 <li class="toctree-l2"><a class="reference internal" href="terrain.html">Terrain Reporting</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tracker.html">Antenna Tracker</a></li>
@@ -181,6 +194,16 @@ be changed. Use <code class="docutils literal"><span class="pre">graph</span> <s
 seconds and <code class="docutils literal"><span class="pre">graph</span> <span class="pre">tickresolution</span> <span class="pre">Y</span></code> to change the tick resolution to
 Y seconds.</p>
 <img alt="../_images/graph.png" src="../_images/graph.png" />
+<p>There are two global settings for graphs: timespan and tickresolution.</p>
+<p>To set the timespan along the horizontal axis (in seconds):</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span>   <span class="n">graph</span> <span class="n">timespan</span> <span class="mi">20</span>
+
+<span class="n">To</span> <span class="nb">set</span> <span class="n">the</span> <span class="n">tickresolution</span> <span class="n">along</span> <span class="n">the</span> <span class="n">horizontal</span> <span class="n">axis</span> <span class="p">(</span><span class="mi">1</span><span class="o">/&lt;</span><span class="n">number</span> <span class="n">of</span> <span class="n">ticks</span><span class="o">&gt;</span><span class="p">):</span>
+</pre></div>
+</div>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">graph</span> <span class="n">timespan</span> <span class="mf">0.2</span>
+</pre></div>
+</div>
 </div>
 
 
@@ -193,7 +216,7 @@ Y seconds.</p>
         <a href="hil.html" class="btn btn-neutral float-right" title="HIL" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="gimbals.html" class="btn btn-neutral" title="Gimbal Management" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="gimbal.html" class="btn btn-neutral" title="Gimbal Management" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
@@ -227,7 +250,7 @@ Y seconds.</p>
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../',
-            VERSION:'1.4.38',
+            VERSION:'1.5.7',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true
