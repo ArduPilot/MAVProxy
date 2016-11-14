@@ -13,6 +13,7 @@ def package_files(directory):
 package_data = ['modules/mavproxy_map/data/*.jpg', 
                 'modules/mavproxy_map/data/*.png',
                 'modules/mavproxy_mmap/mmap_app/*',
+                'modules/mavproxy_joystick/joysticks/*.yml',
                 'tools/graphs/*.xml',
 ]
 
@@ -52,6 +53,7 @@ on how to use MAVProxy.''',
                 'MAVProxy.modules.mavproxy_misseditor',
                 'MAVProxy.modules.mavproxy_smartcamera',
                 'MAVProxy.modules.mavproxy_cesium',
+                'MAVProxy.modules.mavproxy_joystick',
                 'MAVProxy.modules.lib',
                 'MAVProxy.modules.lib.ANUGA',
                 'MAVProxy.modules.lib.optparse_gui'],
