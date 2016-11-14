@@ -50,7 +50,7 @@ The following commands are available:
     camera start
     camera stop
     
-These commands stop and stop the image capturing and analysis processes. It is useful to command the camera start just after takeoff and stop just before landing.
+These commands start and stop the image capturing and analysis processes. It is useful to command the camera start just after takeoff and stop just before landing.
     
     
 .. code:: bash
