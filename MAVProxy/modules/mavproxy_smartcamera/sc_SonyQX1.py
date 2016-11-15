@@ -511,12 +511,15 @@ class SmartCamera_SonyQX():
 #
 #****************************************************************************
 
-    def boGetAllSessionPictures(self):
+    def boGetAllSessionPictures(self, sLogFile):
         
         print("Picture Download started")
         
-        # reading contents
-        file = open(self.sCurrentURLLogFilename, "r")
+        if sLogFile <> 0
+            # reading contents
+            file = open(self.sCurrentURLLogFilename, "r")
+        else:
+            file = open(sLogFile, "r")
 
         try:
             for url in file:
