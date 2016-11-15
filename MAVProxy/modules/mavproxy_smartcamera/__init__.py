@@ -78,7 +78,7 @@ class SmartCameraModule(mp_module.MPModule):
         self.add_command('setCamAperture', self.__vCmdSetCamAperture, "Set Camera Aperture")
         self.add_command('setCamShutterSpeed', self.__vCmdSetCamShutterSpeed, "Set Camera Shutter Speed")
         self.add_command('setCamExposureMode', self.__vCmdSetCamExposureMode, "Set Camera Exposure Mode")
-        self.add_command('getAllPictures', self.__vCmdGetAllPictures, "Download all flight pictures")
+        self.add_command('getAllPictures', self.__vCmdGetAllPictures, "Download all flight pictures, filename as argument optional")
         self.CamRetryScheduler = sched.scheduler(time.time, time.sleep)
         self.ProgramAuto = 1
         self.Aperture = 2
@@ -371,11 +371,18 @@ class SmartCameraModule(mp_module.MPModule):
 #****************************************************************************
 
     def __vCmdGetAllPictures(self, args):
+        
         #Download Pictures
-        for cam in self.camera_list:
-            cam.boGetAllSessionPictures()
-            print("Init Picture Download for Cam %s" % cam)
-
+        if len(args) >= 1:
+            slogFileName = args[0]
+            for cam in self.camera_list:
+                print("Init Picture Download for Cam %s from file %s" % cam, slogFileName)
+                cam.boGetAllSessionPictures(slogFileName)
+        else:
+            for cam in self.camera_list:
+                print("Init Picture Download for Cam %s" % cam)
+                cam.boGetAllSessionPictures(0)
+    
 #****************************************************************************
 #   Method Name     : __vDecodeDIGICAMConfigure
 #
