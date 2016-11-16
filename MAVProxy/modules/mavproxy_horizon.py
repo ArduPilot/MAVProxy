@@ -6,7 +6,7 @@
 
 from MAVProxy.modules.lib import wxhorizon
 from MAVProxy.modules.lib import mp_module
-from MAVProxy.modules.lib.wxhorizon_util import Attitude
+from MAVProxy.modules.lib.wxhorizon_util import Attitude, VFR_HUD
 
 
 class HorizonModule(mp_module.MPModule):
@@ -24,7 +24,11 @@ class HorizonModule(mp_module.MPModule):
         if msg.get_type() == 'ATTITUDE':
             # Send attitude information down pipe
             self.mpstate.horizonIndicator.parent_pipe_send.send(Attitude(msg))
-
+        elif msg.get_type() == 'VFR_HUD':
+            # Send HUD information down pipe
+            self.mpstate.horizonIndicator.parent_pipe_send.send(VFR_HUD(msg))
+                
+        
 def init(mpstate):
     '''initialise module'''
     return HorizonModule(mpstate)
