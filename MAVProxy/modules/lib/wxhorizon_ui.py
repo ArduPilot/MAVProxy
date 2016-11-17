@@ -1,5 +1,5 @@
 import time
-from wxhorizon_util import Attitude, VFR_HUD, Global_Position_INT, BatteryInfo
+from wxhorizon_util import Attitude, VFR_HUD, Global_Position_INT, BatteryInfo, FlightState, WaypointInfo
 from wx_loader import wx
 import math
 
@@ -48,6 +48,16 @@ class HorizonFrame(wx.Frame):
         self.current = 0.0
         self.batRemain = 0.0
 
+        # Initialise Mode and State
+        self.mode = 'UNKNOWN'
+        self.armed = False
+        
+        # Intialise Waypoint Information
+        self.currentWP = 0
+        self.finalWP = 0
+        self.wpDist = 0
+        self.nextWPTime = 0
+        self.wpBearing = 0
     
 
     def initUI(self):
@@ -60,6 +70,7 @@ class HorizonFrame(wx.Frame):
 
         # Create Panel
         self.panel = wx.Panel(self)
+        self.vertSize = 0.09
         
         # Create Matplotlib Panel
         self.createPlotPanel()
@@ -69,9 +80,6 @@ class HorizonFrame(wx.Frame):
         
         # Create Horizon Polygons
         self.createHorizonPolygons()
-        
-        # Markers (temporary)
-        #self.axes.plot([-1,-1,1,1],[-1,1,1,-1],'ro')
         
         # Center Pointer Marker
         self.thick = 0.015
@@ -98,6 +106,15 @@ class HorizonFrame(wx.Frame):
         self.batHeight = 0.2
         self.rOffset = 0.35
         self.createBatteryBar()
+        
+        # Create Mode & State Text
+        self.createStateText()
+        
+        # Create Waypoint Text
+        self.createWPText()
+        
+        # Create Waypoint Pointer
+        self.createWPPointer()
         
         # Show Frame
         self.Show(True)
@@ -159,7 +176,6 @@ class HorizonFrame(wx.Frame):
     
     def createRPYText(self):
         '''Creates the text for roll, pitch and yaw.'''
-        self.vertSize = 0.09
         ypx = self.figure.get_size_inches()[1]*self.figure.dpi
         self.fontSize = self.vertSize*(ypx/2.0)
         leftPos = self.axes.get_xlim()[0]
@@ -279,7 +295,6 @@ class HorizonFrame(wx.Frame):
                 
     def createAARText(self):
         '''Creates the text for airspeed, altitude and climb rate.'''
-        self.vertSize = 0.09
         ypx = self.figure.get_size_inches()[1]*self.figure.dpi
         self.fontSize = self.vertSize*(ypx/2.0)
         rightPos = self.axes.get_xlim()[1]
@@ -313,7 +328,6 @@ class HorizonFrame(wx.Frame):
     def createBatteryBar(self):
         '''Creates the bar to display current battery percentage.'''
         rightPos = self.axes.get_xlim()[1]
-        self.vertSize = 0.09
         self.batOutRec = patches.Rectangle((rightPos-(1.3+self.rOffset)*self.batWidth,1.0-(0.1+1.0+(2*0.075))*self.batHeight),self.batWidth*1.3,self.batHeight*1.15,facecolor='darkgrey',edgecolor='none')
         self.batInRec = patches.Rectangle((rightPos-(self.rOffset+1+0.15)*self.batWidth,1.0-(0.1+1+0.075)*self.batHeight),self.batWidth,self.batHeight,facecolor='lawngreen',edgecolor='none')
         self.batPerText = self.axes.text(rightPos - (self.rOffset+0.65)*self.batWidth,1-(0.1+1+(0.075+0.15))*self.batHeight,'%.f' % self.batRemain,color='w',size=self.fontSize,ha='center',va='top')
@@ -352,9 +366,74 @@ class HorizonFrame(wx.Frame):
         elif self.batRemain == -1:
             self.batInRec.set_height(self.batHeight)
             self.batInRec.set_facecolor('k')
+        
+    def createStateText(self):
+        '''Creates the mode and arm state text.'''
+        ypx = self.figure.get_size_inches()[1]*self.figure.dpi
+        self.fontSize = self.vertSize*(ypx/2.0)
+        leftPos = self.axes.get_xlim()[0]
+        self.modeText = self.axes.text(leftPos+(self.vertSize/10.0),0.97,'UNKNOWN',color='lightgreen',size=1.5*self.fontSize,ha='left',va='top')
+        
+    def updateStateText(self):
+        '''Updates the mode and colours red or green depending on arm state.'''
+        ypx = self.figure.get_size_inches()[1]*self.figure.dpi
+        self.fontSize = self.vertSize*(ypx/2.0)
+        leftPos = self.axes.get_xlim()[0]
+        self.modeText.set_position((leftPos+(self.vertSize/10.0),0.97))
+        self.modeText.set_text(self.mode)
+        self.modeText.set_size(1.5*self.fontSize)
+        if self.armed:
+            self.modeText.set_color('red')
+            self.modeText.set_path_effects([PathEffects.withStroke(linewidth=self.fontSize/10.0,foreground='yellow')])
+        else:
+            self.modeText.set_color('lightgreen')
+            self.modeText.set_bbox(None)
+            self.modeText.set_path_effects(None)
             
+    def createWPText(self):
+        '''Creates the text for the current and final waypoint,
+        and the distance to the new waypoint.'''
+        ypx = self.figure.get_size_inches()[1]*self.figure.dpi
+        self.fontSize = self.vertSize*(ypx/2.0)
+        leftPos = self.axes.get_xlim()[0]
+        self.wpText = self.axes.text(leftPos+(1.5*self.vertSize/10.0),0.97-(1.5*self.vertSize)+(0.5*self.vertSize/10.0),'0/0\n(0 m, 0 s)',color='w',size=self.fontSize,ha='left',va='top')
         
-        
+    def updateWPText(self):
+        '''Updates the current waypoint and distance to it.''' 
+        ypx = self.figure.get_size_inches()[1]*self.figure.dpi
+        self.fontSize = self.vertSize*(ypx/2.0)
+        leftPos = self.axes.get_xlim()[0]
+        self.wpText.set_position((leftPos+(1.5*self.vertSize/10.0),0.97-(1.5*self.vertSize)+(0.5*self.vertSize/10.0)))
+        self.wpText.set_size(self.fontSize)
+        if type(self.nextWPTime) is str:
+            self.wpText.set_text('%.f/%.f\n(%.f m, ~ s)' % (self.currentWP,self.finalWP,self.wpDist))
+        else:
+            self.wpText.set_text('%.f/%.f\n(%.f m, %.f s)' % (self.currentWP,self.finalWP,self.wpDist,self.nextWPTime))
+    
+    def createWPPointer(self):
+        '''Creates the waypoint pointer relative to current heading.'''
+        self.headingWPTri = patches.RegularPolygon((0.0,0.55),3,0.05,facecolor='lime',zorder=4,ec='k')
+        self.axes.add_patch(self.headingWPTri)
+        self.headingWPText = self.axes.text(0.0,0.45,'1',color='lime',size=self.fontSize,horizontalalignment='center',verticalalignment='center',zorder=4)   
+        self.headingWPText.set_path_effects([PathEffects.withStroke(linewidth=1,foreground='k')]) 
+
+    def adjustWPPointer(self):
+        '''Adjust the position and orientation of
+        the waypoint pointer.'''
+        self.headingWPText.set_size(self.fontSize) 
+        headingRotate = mpl.transforms.Affine2D().rotate_deg_around(0.0,0.0,-self.wpBearing+self.heading)+self.axes.transData
+        self.headingWPText.set_transform(headingRotate)
+        angle = self.wpBearing - self.heading
+        if angle < 0:
+            angle += 360
+        if (angle > 90) and (angle < 270):
+            headRot = angle-180
+        else:
+            headRot = angle
+        self.headingWPText.set_rotation(-headRot)
+        self.headingWPTri.set_transform(headingRotate)
+        self.headingWPText.set_text('%.f' % (angle))
+    
     # =============== Event Bindings =============== #    
     def on_idle(self, event):
         '''To adjust text and positions on rescaling the window.'''
@@ -379,6 +458,15 @@ class HorizonFrame(wx.Frame):
         
         # Update Battery Bar
         self.updateBatteryBar()
+        
+        # Update Mode and State
+        self.updateStateText()
+        
+        # Update Waypoint Text
+        self.updateWPText()
+        
+        # Adjust Waypoint Pointer
+        self.adjustWPPointer()
         
         # Update Matplotlib Plot
         self.canvas.draw()
@@ -442,6 +530,30 @@ class HorizonFrame(wx.Frame):
                 # Update Battery Bar
                 self.updateBatteryBar()
                 
+            elif isinstance(obj,FlightState):
+                self.mode = obj.mode
+                self.armed = obj.armState
+                
+                # Update Mode and Arm State Text
+                self.updateStateText()
+                
+            elif isinstance(obj,WaypointInfo):
+                self.currentWP = obj.current
+                self.finalWP = obj.final
+                self.wpDist = obj.currentDist
+                self.nextWPTime = obj.nextWPTime
+                if obj.wpBearing < 0.0:
+                    self.wpBearing = obj.wpBearing + 360
+                else:
+                    self.wpBearing = obj.wpBearing
+                
+                # Update waypoint text
+                self.updateWPText()
+                
+                # Adjust Waypoint Pointer
+                self.adjustWPPointer()
+                
+                                
         self.Refresh()
         self.Update()
                 
