@@ -6,7 +6,7 @@
 
 from MAVProxy.modules.lib import wxhorizon
 from MAVProxy.modules.lib import mp_module
-from MAVProxy.modules.lib.wxhorizon_util import Attitude, VFR_HUD
+from MAVProxy.modules.lib.wxhorizon_util import Attitude, VFR_HUD, Global_Position_INT
 
 
 class HorizonModule(mp_module.MPModule):
@@ -27,6 +27,9 @@ class HorizonModule(mp_module.MPModule):
         elif msg.get_type() == 'VFR_HUD':
             # Send HUD information down pipe
             self.mpstate.horizonIndicator.parent_pipe_send.send(VFR_HUD(msg))
+        elif msg.get_type() == 'GLOBAL_POSITION_INT':
+            # Send altitude information down pipe
+            self.mpstate.horizonIndicator.parent_pipe_send.send(Global_Position_INT(msg))
                 
         
 def init(mpstate):

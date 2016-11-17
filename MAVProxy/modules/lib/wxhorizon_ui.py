@@ -1,10 +1,9 @@
 import time
-from wxhorizon_util import Attitude, VFR_HUD
+from wxhorizon_util import Attitude, VFR_HUD, Global_Position_INT
 from wx_loader import wx
 import math
 
 import matplotlib
-from MAVProxy.modules.lib.wxhorizon_util import VFR_HUD
 matplotlib.use('wxAgg')
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -32,6 +31,11 @@ class HorizonFrame(wx.Frame):
         self.pitch = 0  # Degrees
         self.roll = 0   # Degrees
         self.yaw = 0    # Degrees
+        
+        # Initialise Rate Information
+        self.airspeed = 0 # m/s
+        self.relAlt = 0 # m relative to home position
+        self.climbRate = 0 # m/s
         
         # Initialise HUD Info
         self.heading = 0 # 0-360
@@ -73,6 +77,9 @@ class HorizonFrame(wx.Frame):
         
         # Add Roll, Pitch, Yaw Text
         self.createRPYText()
+        
+        # Add Airspeed, Altitude, Climb Rate Text
+        self.createAARText()
         
         # Create Heading Pointer
         self.createHeadingPointer()
@@ -152,7 +159,7 @@ class HorizonFrame(wx.Frame):
         self.yawText.set_path_effects([PathEffects.withStroke(linewidth=1,foreground='k')])
         
     def updateRPYLocations(self):
-        '''Update the locations of rol, pitch, yaw text.'''
+        '''Update the locations of roll, pitch, yaw text.'''
         leftPos = self.axes.get_xlim()[0]
         # Locations
         self.rollText.set_position((leftPos+(self.vertSize/10.0),-0.97+(2*self.vertSize)-(self.vertSize/10.0)))
@@ -257,6 +264,39 @@ class HorizonFrame(wx.Frame):
                 self.pitchLabelsLeft[i].set_transform(rollRotate)
                 self.pitchLabelsRight[i].set_transform(rollRotate)
                 i += 1 
+                
+    def createAARText(self):
+        '''Creates the text for airspeed, altitude and climb rate.'''
+        self.vertSize = 0.09
+        ypx = self.figure.get_size_inches()[1]*self.figure.dpi
+        self.fontSize = self.vertSize*(ypx/2.0)
+        rightPos = self.axes.get_xlim()[1]
+        self.airspeedText = self.axes.text(rightPos-(self.vertSize/10.0),-0.97+(2*self.vertSize)-(self.vertSize/10.0),'AS:   %.1f m/s' % self.airspeed,color='w',size=self.fontSize,ha='right')
+        self.altitudeText = self.axes.text(rightPos-(self.vertSize/10.0),-0.97+self.vertSize-(0.5*self.vertSize/10.0),'ALT: %.1f m   ' % self.relAlt,color='w',size=self.fontSize,ha='right')
+        self.climbRateText = self.axes.text(rightPos-(self.vertSize/10.0),-0.97,'CR:   %.1f m/s' % self.climbRate,color='w',size=self.fontSize,ha='right')
+        self.airspeedText.set_path_effects([PathEffects.withStroke(linewidth=1,foreground='k')])
+        self.altitudeText.set_path_effects([PathEffects.withStroke(linewidth=1,foreground='k')])
+        self.climbRateText.set_path_effects([PathEffects.withStroke(linewidth=1,foreground='k')])
+        
+    def updateAARLocations(self):
+        '''Update the locations of airspeed, altitude and Climb rate.'''
+        rightPos = self.axes.get_xlim()[1]
+        # Locations
+        self.airspeedText.set_position((rightPos-(self.vertSize/10.0),-0.97+(2*self.vertSize)-(self.vertSize/10.0)))
+        self.altitudeText.set_position((rightPos-(self.vertSize/10.0),-0.97+self.vertSize-(0.5*self.vertSize/10.0)))
+        self.climbRateText.set_position((rightPos-(self.vertSize/10.0),-0.97))
+        # Font Size
+        ypx = self.figure.get_size_inches()[1]*self.figure.dpi
+        self.fontSize = self.vertSize*(ypx/2.0)
+        self.airspeedText.set_size(self.fontSize)
+        self.altitudeText.set_size(self.fontSize)
+        self.climbRateText.set_size(self.fontSize)
+        
+    def updateAARText(self):
+        'Updates the displayed airspeed, altitude, climb rate Text'
+        self.airspeedText.set_text('AR:   %.1f m/s' % self.airspeed)
+        self.altitudeText.set_text('ALT: %.1f m   ' % self.relAlt)
+        self.climbRateText.set_text('CR:   %.1f m/s' % self.climbRate)
     
     # =============== Event Bindings =============== #    
     def on_idle(self, event):
@@ -269,6 +309,9 @@ class HorizonFrame(wx.Frame):
         
         # Update Roll, Pitch, Yaw Text Locations
         self.updateRPYLocations()
+        
+        # Update Airpseed, Altitude, Climb Rate Locations
+        self.updateAARLocations()
         
         # Update Pitch Markers
         self.adjustPitchmarkers()
@@ -300,7 +343,7 @@ class HorizonFrame(wx.Frame):
                 self.roll = obj.roll*180/math.pi
                 self.yaw = obj.yaw*180/math.pi
                 
-                # Update Displayed Text
+                # Update Roll, Pitch, Yaw Text Text
                 self.updateRPYText()
                 
                 # Recalculate Horizon Polygons
@@ -313,12 +356,23 @@ class HorizonFrame(wx.Frame):
                 self.canvas.draw()
                 self.canvas.Refresh()
             
-            if isinstance(obj,VFR_HUD):
+            elif isinstance(obj,VFR_HUD):
                 self.heading = obj.heading
+                self.airspeed = obj.airspeed
+                self.climbRate = obj.climbRate
+                
+                # Update Airpseed, Altitude, Climb Rate Locations
+                self.updateAARText()
                 
                 # Update Heading North Pointer
                 self.adjustHeadingPointer()
                 self.adjustNorthPointer()
+            
+            elif isinstance(obj,Global_Position_INT):
+                self.relAlt = obj.relAlt
+                
+                # Update Airpseed, Altitude, Climb Rate Locations
+                self.updateAARText()
                 
         self.Refresh()
         self.Update()
