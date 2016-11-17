@@ -12,5 +12,9 @@ class VFR_HUD():
         self.groundspeed = hudMsg.groundspeed
         self.heading = hudMsg.heading
         self.throttle = hudMsg.throttle
-        self.alt = hudMsg.alt
         self.climbRate = hudMsg.climb
+        
+class Global_Position_INT():
+    '''Altitude relative to ground (GPS).'''
+    def __init__(self,gpsINT):
+        self.relAlt = gpsINT.relative_alt/1000.0
