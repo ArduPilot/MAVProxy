@@ -25,3 +25,24 @@ class BatteryInfo():
         self.voltage = batMsg.voltage_battery/1000.0 # Volts
         self.current = batMsg.current_battery/100.0 # Amps
         self.batRemain = batMsg.battery_remaining # %
+        
+class FlightState():
+    '''Mode and arm state.'''
+    def __init__(self,mode,armState):
+        self.mode = mode
+        self.armState = armState
+        
+class WaypointInfo():
+    '''Current and final waypoint numbers, and the distance
+    to the current waypoint.'''
+    def __init__(self,current,final,currentDist,nextWPTime,wpBearing):
+        self.current = current
+        self.final = final
+        self.currentDist = currentDist
+        self.nextWPTime = nextWPTime
+        self.wpBearing = wpBearing
+        
+        
+        
+        
+        
