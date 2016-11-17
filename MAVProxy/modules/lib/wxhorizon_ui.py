@@ -1,5 +1,5 @@
 import time
-from wxhorizon_util import Attitude, VFR_HUD, Global_Position_INT
+from wxhorizon_util import Attitude, VFR_HUD, Global_Position_INT, BatteryInfo
 from wx_loader import wx
 import math
 
@@ -28,20 +28,26 @@ class HorizonFrame(wx.Frame):
 
     def initData(self):
         # Initialise Attitude
-        self.pitch = 0  # Degrees
-        self.roll = 0   # Degrees
-        self.yaw = 0    # Degrees
-        
-        # Initialise Rate Information
-        self.airspeed = 0 # m/s
-        self.relAlt = 0 # m relative to home position
-        self.climbRate = 0 # m/s
-        
-        # Initialise HUD Info
-        self.heading = 0 # 0-360
+        self.pitch = 0.0  # Degrees
+        self.roll = 0.0   # Degrees
+        self.yaw = 0.0    # Degrees
         
         # History Values
-        self.oldRoll = 0 # Degrees
+        self.oldRoll = 0.0 # Degrees
+        
+        # Initialise Rate Information
+        self.airspeed = 0.0 # m/s
+        self.relAlt = 0.0 # m relative to home position
+        self.climbRate = 0.0 # m/s
+        
+        # Initialise HUD Info
+        self.heading = 0.0 # 0-360
+        
+        # Initialise Battery Info
+        self.voltage = 0.0
+        self.current = 0.0
+        self.batRemain = 0.0
+
     
 
     def initUI(self):
@@ -86,6 +92,12 @@ class HorizonFrame(wx.Frame):
         
         # Create North Pointer
         self.createNorthPointer()
+        
+        # Create Battery Bar
+        self.batWidth = 0.1
+        self.batHeight = 0.2
+        self.rOffset = 0.35
+        self.createBatteryBar()
         
         # Show Frame
         self.Show(True)
@@ -298,6 +310,51 @@ class HorizonFrame(wx.Frame):
         self.altitudeText.set_text('ALT: %.1f m   ' % self.relAlt)
         self.climbRateText.set_text('CR:   %.1f m/s' % self.climbRate)
     
+    def createBatteryBar(self):
+        '''Creates the bar to display current battery percentage.'''
+        rightPos = self.axes.get_xlim()[1]
+        self.vertSize = 0.09
+        self.batOutRec = patches.Rectangle((rightPos-(1.3+self.rOffset)*self.batWidth,1.0-(0.1+1.0+(2*0.075))*self.batHeight),self.batWidth*1.3,self.batHeight*1.15,facecolor='darkgrey',edgecolor='none')
+        self.batInRec = patches.Rectangle((rightPos-(self.rOffset+1+0.15)*self.batWidth,1.0-(0.1+1+0.075)*self.batHeight),self.batWidth,self.batHeight,facecolor='lawngreen',edgecolor='none')
+        self.batPerText = self.axes.text(rightPos - (self.rOffset+0.65)*self.batWidth,1-(0.1+1+(0.075+0.15))*self.batHeight,'%.f' % self.batRemain,color='w',size=self.fontSize,ha='center',va='top')
+        self.batPerText.set_path_effects([PathEffects.withStroke(linewidth=1,foreground='k')])
+        self.voltsText = self.axes.text(rightPos-(self.rOffset+1.3+0.2)*self.batWidth,1-(0.1+0.05+0.075)*self.batHeight,'%.1f V' % self.voltage,color='w',size=self.fontSize,ha='right',va='top')
+        self.ampsText = self.axes.text(rightPos-(self.rOffset+1.3+0.2)*self.batWidth,1-self.vertSize-(0.1+0.05+0.1+0.075)*self.batHeight,'%.1f A' % self.current,color='w',size=self.fontSize,ha='right',va='top')
+        self.voltsText.set_path_effects([PathEffects.withStroke(linewidth=1,foreground='k')])
+        self.ampsText.set_path_effects([PathEffects.withStroke(linewidth=1,foreground='k')])
+        
+        self.axes.add_patch(self.batOutRec)
+        self.axes.add_patch(self.batInRec)
+        
+    def updateBatteryBar(self):
+        '''Updates the position and values of the battery bar.'''
+        rightPos = self.axes.get_xlim()[1]
+        # Bar
+        self.batOutRec.set_xy((rightPos-(1.3+self.rOffset)*self.batWidth,1.0-(0.1+1.0+(2*0.075))*self.batHeight))
+        self.batInRec.set_xy((rightPos-(self.rOffset+1+0.15)*self.batWidth,1.0-(0.1+1+0.075)*self.batHeight))
+        self.batPerText.set_position((rightPos - (self.rOffset+0.65)*self.batWidth,1-(0.1+1+(0.075+0.15))*self.batHeight))
+        self.batPerText.set_fontsize(self.fontSize)
+        self.voltsText.set_text('%.1f V' % self.voltage)
+        self.ampsText.set_text('%.1f A' % self.current)
+        self.voltsText.set_position((rightPos-(self.rOffset+1.3+0.2)*self.batWidth,1-(0.1+0.05)*self.batHeight))
+        self.ampsText.set_position((rightPos-(self.rOffset+1.3+0.2)*self.batWidth,1-self.vertSize-(0.1+0.05+0.1)*self.batHeight))
+        self.voltsText.set_fontsize(self.fontSize)
+        self.ampsText.set_fontsize(self.fontSize)
+        if self.batRemain >= 0:
+            self.batPerText.set_text(int(self.batRemain))
+            self.batInRec.set_height(self.batRemain*self.batHeight/100.0)
+            if self.batRemain/100.0 > 0.5:
+                self.batInRec.set_facecolor('lawngreen')
+            elif self.batRemain/100.0 <= 0.5 and self.batRemain/100.0 > 0.2:
+                self.batInRec.set_facecolor('yellow')
+            elif self.batRemain/100.0 <= 0.2 and self.batRemain >= 0.0:
+                self.batInRec.set_facecolor('r')
+        elif self.batRemain == -1:
+            self.batInRec.set_height(self.batHeight)
+            self.batInRec.set_facecolor('k')
+            
+        
+        
     # =============== Event Bindings =============== #    
     def on_idle(self, event):
         '''To adjust text and positions on rescaling the window.'''
@@ -319,6 +376,9 @@ class HorizonFrame(wx.Frame):
         # Update Heading and North Pointer
         self.adjustHeadingPointer()
         self.adjustNorthPointer()
+        
+        # Update Battery Bar
+        self.updateBatteryBar()
         
         # Update Matplotlib Plot
         self.canvas.draw()
@@ -373,6 +433,14 @@ class HorizonFrame(wx.Frame):
                 
                 # Update Airpseed, Altitude, Climb Rate Locations
                 self.updateAARText()
+                
+            elif isinstance(obj,BatteryInfo):
+                self.voltage = obj.voltage
+                self.current = obj.current
+                self.batRemain = obj.batRemain
+                
+                # Update Battery Bar
+                self.updateBatteryBar()
                 
         self.Refresh()
         self.Update()
