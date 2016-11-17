@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 
 """
-  MAVProxy message console, implemented in a child process
+  MAVProxy horizon indicator.
 """
 import multiprocessing
 import time
 
 class HorizonIndicator():
     '''
-    a message console for MAVProxy
+    A horizon indicator for MAVProxy.
     '''
     def __init__(self,title='MAVProxy: Horizon Indicator'):
         self.title  = title
@@ -34,7 +34,7 @@ class HorizonIndicator():
         app.MainLoop()
 
     def close(self):
-        '''close the console'''
+        '''Close the window.'''
         self.close_event.set()
         if self.is_alive():
             self.child.join(2)
