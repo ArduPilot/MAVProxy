@@ -14,8 +14,8 @@ class HorizonModule(mp_module.MPModule):
         # Define module load/unload reference and window title
         super(HorizonModule, self).__init__(mpstate, "horizon", "Horizon Indicator", public=True)
         self.mpstate.horizonIndicator = wxhorizon.HorizonIndicator(title='Horizon Indicator')
-        self.oldMode = ''
-        self.armed = False
+        self.mode = ''
+        self.armed = ''
         self.currentWP = 0
         self.finalWP = 0
         self.currentDist = 0
@@ -26,12 +26,19 @@ class HorizonModule(mp_module.MPModule):
     def unload(self):
         '''unload module'''
         self.mpstate.horizonIndicator.close()
-
+            
     def mavlink_packet(self, msg):
         '''handle an incoming mavlink packet'''
         msgType = msg.get_type()
         master = self.master
-        if msgType == 'ATTITUDE':
+        if msgType == 'HEARTBEAT':
+            # Update state and mode information
+            if type(master.motors_armed()) == type(True):
+                self.armed = master.motors_armed()
+                self.mode = master.flightmode
+                # Send Flight State information down pipe
+                self.mpstate.horizonIndicator.parent_pipe_send.send(FlightState(self.mode,self.armed))
+        elif msgType == 'ATTITUDE':
             # Send attitude information down pipe
             self.mpstate.horizonIndicator.parent_pipe_send.send(Attitude(msg))
         elif msgType == 'VFR_HUD':
@@ -57,17 +64,6 @@ class HorizonModule(mp_module.MPModule):
                 self.nextWPTime = '-'
             self.wpBearing = msg.target_bearing
             self.mpstate.horizonIndicator.parent_pipe_send.send(WaypointInfo(self.currentWP,self.finalWP,self.currentDist,self.nextWPTime,self.wpBearing))
-
-        # Update state and mode information
-        updateState = False
-        if self.oldMode != master.flightmode:
-            self.oldMode = master.flightmode
-            updateState = True
-        if self.armed != master.motors_armed():
-            self.armed = master.motors_armed()
-            updateState = True
-        if updateState:
-            self.mpstate.horizonIndicator.parent_pipe_send.send(FlightState(master.flightmode,master.motors_armed()))
         
 def init(mpstate):
     '''initialise module'''
