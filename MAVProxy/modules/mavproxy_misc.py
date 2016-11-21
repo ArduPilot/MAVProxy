@@ -125,7 +125,10 @@ class MiscModule(mp_module.MPModule):
 
     def cmd_reboot(self, args):
         '''reboot autopilot'''
-        self.master.reboot_autopilot()
+        if len(args) > 0 and args[0] == 'bootloader':
+            self.master.reboot_autopilot(True)
+        else:
+            self.master.reboot_autopilot()
 
     def cmd_time(self, args):
         '''show autopilot time'''
