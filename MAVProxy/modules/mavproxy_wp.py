@@ -55,16 +55,25 @@ class WPModule(mp_module.MPModule):
                                          MPMenuItem('Loop', 'Loop', '# wp loop')])
 
 
-    def send_wp_requests(self):
-        '''send some more WP requests'''
-        next_seq = self.wploader.count()
+    def missing_wps_to_request(self):
+        ret = []
         tnow = time.time()
+        next_seq = self.wploader.count()
         for i in range(5):
             seq = next_seq+i
             if seq+1 > self.wploader.expected_count:
                 continue
             if seq in self.wp_requested and tnow - self.wp_requested[seq] < 2:
                 continue
+            ret.append(seq)
+        return ret
+
+    def send_wp_requests(self, wps=None):
+        '''send some more WP requests'''
+        if wps is None:
+            wps = self.missing_wps_to_request()
+        tnow = time.time()
+        for seq in wps:
             #print("REQUESTING %u/%u (%u)" % (seq, self.wploader.expected_count, i))
             self.wp_requested[seq] = tnow
             self.master.waypoint_request_send(seq)
@@ -149,9 +158,9 @@ class WPModule(mp_module.MPModule):
         if self.wp_period.trigger():
             # cope with packet loss fetching mission
             if self.master is not None and self.master.time_since('MISSION_ITEM') >= 2 and self.wploader.count() < getattr(self.wploader,'expected_count',0):
-                seq = self.wploader.count()
-                print("re-requesting WP %u" % seq)
-                self.send_wp_requests()
+                wps = self.missing_wps_to_request();
+                print("re-requesting WPs %s" % str(wps))
+                self.send_wp_requests(wps)
         if self.module('console') is not None and not self.menu_added_console:
             self.menu_added_console = True
             self.module('console').add_menu(self.menu)
