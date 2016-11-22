@@ -269,10 +269,10 @@ def cmd_graph(args):
         mestate.last_graph = GraphDefinition('Untitled', expression, '', [expression], None)
     display_graph(mestate.last_graph)
 
-def map_process(path, wp, fen, options):
+def map_process(path, wp, fen, used_flightmodes, options):
     '''process for displaying a graph'''
     from mavflightview import mavflightview_show
-    mavflightview_show(path, wp, fen, options)
+    mavflightview_show(path, wp, fen, used_flightmodes, options)
 
 def cmd_map(args):
     '''map command'''
@@ -284,8 +284,8 @@ def cmd_map(args):
     options._flightmodes = mestate.mlog._flightmodes
     if len(args) > 0:
         options.types = ','.join(args)
-    [path, wp, fen] = mavflightview_mav(mestate.mlog, options, mestate.flightmode_selections)
-    child = multiprocessing.Process(target=map_process, args=[path, wp, fen, options])
+    [path, wp, fen, used_flightmodes] = mavflightview_mav(mestate.mlog, options, mestate.flightmode_selections)
+    child = multiprocessing.Process(target=map_process, args=[path, wp, fen, used_flightmodes, options])
     child.start()
     mestate.mlog.rewind()
 
