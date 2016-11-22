@@ -124,6 +124,10 @@ def complete_rule(rule, cmd):
     global rline_mpstate
     rule_components = rule.split(' ')
 
+    #  complete the empty string (e.g "graph <TAB><TAB>")
+    if len(cmd) == 0:
+        return rule_expand(rule_components[0], "")
+
     # check it matches so far
     for i in range(len(cmd)-1):
         if not rule_match(rule_components[i], cmd[i]):
@@ -156,12 +160,12 @@ def complete(text, state):
     # split the command so far
     cmd = readline.get_line_buffer().split()
 
-    if len(cmd) == 1:
-        # if on first part then complete on commands and aliases
-        last_clist = complete_command(text) + complete_alias(text)
-    elif cmd[0] in rline_mpstate.completions:
+    if len(cmd) != 0 and cmd[0] in rline_mpstate.completions:
         # we have a completion rule for this command
         last_clist = complete_rules(rline_mpstate.completions[cmd[0]], cmd[1:])
+    elif len(cmd) == 0 or len(cmd) == 1:
+        # if on first part then complete on commands and aliases
+        last_clist = complete_command(text) + complete_alias(text)
     else:
         # assume completion by filename
         last_clist = glob.glob(text+'*')
