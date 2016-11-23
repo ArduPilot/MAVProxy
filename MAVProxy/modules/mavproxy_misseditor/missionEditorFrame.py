@@ -38,7 +38,7 @@ class MissionEditorFrame(wx.Frame):
         # begin wxGlade: MissionEditorFrame.__init__
         kwds["style"] = wx.DEFAULT_FRAME_STYLE
         wx.Frame.__init__(self, *args, **kwds)
-        self.label_sync_state = wx.StaticText(self, wx.ID_ANY, "SYNCED     \n", style=wx.ALIGN_CENTRE)
+        self.label_sync_state = wx.StaticText(self, wx.ID_ANY, "UNSYNCED   \n", style=wx.ALIGN_CENTRE)
         self.label_wp_radius = wx.StaticText(self, wx.ID_ANY, "WP Radius")
         self.text_ctrl_wp_radius = wx.TextCtrl(self, wx.ID_ANY, "", style=wx.TE_PROCESS_ENTER | wx.TE_PROCESS_TAB)
         self.label_loiter_rad = wx.StaticText(self, wx.ID_ANY, "Loiter Radius")
@@ -117,7 +117,7 @@ class MissionEditorFrame(wx.Frame):
         # begin wxGlade: MissionEditorFrame.__set_properties
         self.SetTitle("Mission Editor")
         self.SetSize((820, 480))
-        self.label_sync_state.SetForegroundColour(wx.Colour(12, 152, 26))
+        self.label_sync_state.SetForegroundColour(wx.Colour(255, 0, 0))
         self.label_sync_state.SetFont(wx.Font(14, wx.DEFAULT, wx.NORMAL, wx.NORMAL, 0, "Droid Sans"))
         self.text_ctrl_wp_radius.SetMinSize((50, 27))
         self.text_ctrl_loiter_radius.SetMinSize((50, 27))
