@@ -73,10 +73,10 @@ class ParamState:
         import multiprocessing
         files = []
         for vehicle in ['APMrover2', 'ArduCopter', 'ArduPlane']:
-            url = 'http://autotest.diydrones.com/Parameters/%s/apm.pdef.xml' % vehicle
+            url = 'http://autotest.ardupilot.org/Parameters/%s/apm.pdef.xml' % vehicle
             path = mp_util.dot_mavproxy("%s.xml" % vehicle)
             files.append((url, path))
-            url = 'http://autotest.diydrones.com/%s-defaults.parm' % vehicle
+            url = 'http://autotest.ardupilot.org/%s-defaults.parm' % vehicle
             path = mp_util.dot_mavproxy("%s-defaults.parm" % vehicle)
             files.append((url, path))
         try:
