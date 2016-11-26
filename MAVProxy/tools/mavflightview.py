@@ -299,7 +299,7 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
                     path[instance].append(point)
     if len(path[0]) == 0:
         print("No points to plot")
-        return
+        return None
 
     return [path, wp, fen]
 
@@ -378,7 +378,10 @@ def mavflightview_show(path, wp, fen, options, title=None):
 def mavflightview(filename, options):
     print("Loading %s ..." % filename)
     mlog = mavutil.mavlink_connection(filename)
-    [path, wp, fen] = mavflightview_mav(mlog, options)
+    stuff = mavflightview_mav(mlog, options)
+    if stuff is None:
+        return
+    [path, wp, fen] = stuff
     mavflightview_show(path, wp, fen, options, title=filename)
 
 class mavflightview_options(object):
