@@ -74,7 +74,7 @@ global default baudrate specified by ``--baudrate``.
 If forwarding to a network address via tcp or udp, this must be prefixed
 before the IP address.
 
-A UDB broadcast can be made via the udpbcast:<ip>:<port> that starts as 
+A UDP broadcast can be made via the udpbcast:<ip>:<port> that starts as 
 UDP broadcast then locks onto the first client that connects. <ip> specifies 
 the valid client range. For example, udpbcast:192.168.2.255:14550 will connect to 
 the first client in the 192.168.2.0 to 192.168.2.254 range on port 14550.
