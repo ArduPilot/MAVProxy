@@ -41,6 +41,16 @@ Screenshots
 
    MAVProxy running under Windows 7
 
+Printable Documentation
+=======================
+
+A 1 page printable "cheatsheet" of commonly used MAVProxy commands is available below.
+
+`Libreoffice odt <./_static/files/MAVProxyCheetsheet.odt>`_.
+
+`Pdf format <./_static/files/MAVProxyCheetsheet.pdf>`_.
+
+
 License
 =======
 
