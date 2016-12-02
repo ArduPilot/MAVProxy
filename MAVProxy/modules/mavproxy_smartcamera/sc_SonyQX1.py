@@ -513,30 +513,30 @@ class SmartCamera_SonyQX():
 
     def boGetAllSessionPictures(self, sLogFile):
         
-        print("Picture Download started")
+        #        print("Picture Download started")
         
-        if sLogFile <> 0
-            # reading contents
-            file = open(self.sCurrentURLLogFilename, "r")
-        else:
-            file = open(sLogFile, "r")
+        #         if sLogFile <> 0
+        #     reading contents
+        #        file = open(self.sCurrentURLLogFilename, "r")
+        #    else:
+        #        file = open(sLogFile, "r")
 
-        try:
-            for url in file:
-                url = url.rstrip('\n')
-                #now download link
-                start = self.sLatestImageURL.find('DSC')
-                end = self.sLatestImageURL.find('JPG', start) + 3
-
-                filename = url[start:end]
-                print("Downloading %s" % filename)
-                req = requests.request('GET', url)
-                open('/sdcard/log/%s' % filename, 'w').write(req.content)
-        
-        except fileError:
-            print("Error in picture download")
-        
-        file.close()
+#         try:
+#           for url in file:
+#               url = url.rstrip('\n')
+#               #now download link
+#               start = self.sLatestImageURL.find('DSC')
+#               end = self.sLatestImageURL.find('JPG', start) + 3
+#
+#               filename = url[start:end]
+#               print("Downloading %s" % filename)
+#               req = requests.request('GET', url)
+#               open('/sdcard/log/%s' % filename, 'w').write(req.content)
+#
+#       except fileError:
+#           print("Error in picture download")
+#
+#       file.close()
 
         return False
     
