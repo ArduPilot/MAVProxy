@@ -90,7 +90,7 @@ class SmartCameraModule(mp_module.MPModule):
         self.u8RetryTimeout = 0
         self.u8MaxRetries = 5
         self.tLastCheckTime = time.time()
-        self.u8KillHeartbeatTimer = 10
+        self.u8KillHeartbeatTimer = 100
         self.__vRegisterCameras()
 
         self.mpstate = mpstate
