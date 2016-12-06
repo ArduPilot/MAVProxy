@@ -18,4 +18,6 @@ Frequently Asked Questions and Issues
     The APM branches (`APM:Plane <http://plane.ardupilot.com/>`_, `APM:Copter <http://copter.ardupilot.com/>`_, `APM:Rover <http://rover.ardupilot.com/>`_) are fully compatible. Other Mavlink-based flight controllers (such as the `PX4 <http://px4.io/>`_ stack) should be compatible, but may show all flight data.
 
 
+#. How do I output a TCP connection to another GCS program?
 
+    To output a TCP link from MAVProxy to a GCS program (ie. Mission Planner), use the ``--out=tcpin:0.0.0.0:<port>`` commandline option. This will tell MAVProxy to wait for a TCP connection on the specified port. In the other GCS program, configure it to point to the IP address of the device MAVProxy is running on and the port ``<port>``.
