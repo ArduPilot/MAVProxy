@@ -106,9 +106,10 @@ class GraphFrame(wx.Frame):
         ymax = vhigh + 0.05*(vhigh-vlow)
 
         if ymin == ymax:
-            ymax = ymin + 0.1
-            ymin = ymin - 0.1
+            ymax = ymin + 0.1 * ymin
+            ymin = ymin - 0.1 * ymin
         self.axes.set_ybound(lower=ymin, upper=ymax)
+        self.axes.ticklabel_format(useOffset=False, style='plain')
         self.axes.grid(True, color='gray')
         pylab.setp(self.axes.get_xticklabels(), visible=True)
         pylab.setp(self.axes.get_legend().get_texts(), fontsize='small')
