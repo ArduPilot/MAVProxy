@@ -32,6 +32,7 @@ class HorizonIndicator():
         app.frame.SetDoubleBuffered(True)
         app.frame.Show()
         app.MainLoop()
+        self.close_event.set()   # indicate that the GUI has closed
 
     def close(self):
         '''Close the window.'''
