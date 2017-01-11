@@ -1,5 +1,5 @@
 import time
-from wxhorizon_util import Attitude, VFR_HUD, Global_Position_INT, BatteryInfo, FlightState, WaypointInfo
+from wxhorizon_util import Attitude, VFR_HUD, Global_Position_INT, BatteryInfo, FlightState, WaypointInfo, FPS
 from wx_loader import wx
 import math, time
 
@@ -25,6 +25,8 @@ class HorizonFrame(wx.Frame):
         self.initData()
         self.initUI()
         self.startTime = time.time()
+        self.nextTime = 0.0
+        self.fps = 10.0
 
     def initData(self):
         # Initialise Attitude
@@ -38,6 +40,7 @@ class HorizonFrame(wx.Frame):
         # Initialise Rate Information
         self.airspeed = 0.0 # m/s
         self.relAlt = 0.0 # m relative to home position
+        self.relAltTime = 0.0 # s The time that the relative altitude was recorded
         self.climbRate = 0.0 # m/s
         self.altHist = [] # Altitude History
         self.timeHist = [] # Time History
@@ -460,7 +463,7 @@ class HorizonFrame(wx.Frame):
     def updateAltHistory(self):
         '''Updates the altitude history plot.'''
         self.altHist.append(self.relAlt)
-        self.timeHist.append(time.time())
+        self.timeHist.append(self.relAltTime)
         
         # Delete entries older than x seconds
         histLim = 10
@@ -566,6 +569,7 @@ class HorizonFrame(wx.Frame):
     def on_timer(self, event):
         '''Main Loop.'''
         state = self.state
+        self.loopStartTime = time.time()
         if state.close_event.wait(0.001):
             self.timer.Stop()
             self.Destroy()
@@ -577,82 +581,98 @@ class HorizonFrame(wx.Frame):
             self.on_idle(0)
         
         # Get attitude information
-        while state.child_pipe_recv.poll():
-            obj = state.child_pipe_recv.recv()
-            self.calcFontScaling()
-            if isinstance(obj,Attitude):
-                self.oldRoll = self.roll
-                self.pitch = obj.pitch*180/math.pi
-                self.roll = obj.roll*180/math.pi
-                self.yaw = obj.yaw*180/math.pi
+        while state.child_pipe_recv.poll():           
+            objList = state.child_pipe_recv.recv()
+            for obj in objList:
+                self.calcFontScaling()
+                if isinstance(obj,Attitude):
+                    self.oldRoll = self.roll
+                    self.pitch = obj.pitch*180/math.pi
+                    self.roll = obj.roll*180/math.pi
+                    self.yaw = obj.yaw*180/math.pi
+                    
+                    # Update Roll, Pitch, Yaw Text Text
+                    self.updateRPYText()
+                    
+                    # Recalculate Horizon Polygons
+                    self.calcHorizonPoints()
+                    
+                    # Update Pitch Markers
+                    self.adjustPitchmarkers()
                 
-                # Update Roll, Pitch, Yaw Text Text
-                self.updateRPYText()
+                elif isinstance(obj,VFR_HUD):
+                    self.heading = obj.heading
+                    self.airspeed = obj.airspeed
+                    self.climbRate = obj.climbRate
+                    
+                    # Update Airpseed, Altitude, Climb Rate Locations
+                    self.updateAARText()
+                    
+                    # Update Heading North Pointer
+                    self.adjustHeadingPointer()
+                    self.adjustNorthPointer()
                 
-                # Recalculate Horizon Polygons
-                self.calcHorizonPoints()
+                elif isinstance(obj,Global_Position_INT):
+                    self.relAlt = obj.relAlt
+                    self.relAltTime = obj.curTime
+                    
+                    # Update Airpseed, Altitude, Climb Rate Locations
+                    self.updateAARText()
+                    
+                    # Update Altitude History
+                    self.updateAltHistory()
+                    
+                elif isinstance(obj,BatteryInfo):
+                    self.voltage = obj.voltage
+                    self.current = obj.current
+                    self.batRemain = obj.batRemain
+                    
+                    # Update Battery Bar
+                    self.updateBatteryBar()
+                    
+                elif isinstance(obj,FlightState):
+                    self.mode = obj.mode
+                    self.armed = obj.armState
+                    
+                    # Update Mode and Arm State Text
+                    self.updateStateText()
+                    
+                elif isinstance(obj,WaypointInfo):
+                    self.currentWP = obj.current
+                    self.finalWP = obj.final
+                    self.wpDist = obj.currentDist
+                    self.nextWPTime = obj.nextWPTime
+                    if obj.wpBearing < 0.0:
+                        self.wpBearing = obj.wpBearing + 360
+                    else:
+                        self.wpBearing = obj.wpBearing
+                    
+                    # Update waypoint text
+                    self.updateWPText()
+                    
+                    # Adjust Waypoint Pointer
+                    self.adjustWPPointer()
+                    
+                elif isinstance(obj, FPS):
+                    # Update fps target
+                    self.fps = obj.fps
                 
-                # Update Pitch Markers
-                self.adjustPitchmarkers()
+                
+        # Quit Drawing if too early
+        if (time.time() > self.nextTime):                     
+            # Update Matplotlib Plot
+            self.canvas.draw()
+            self.canvas.Refresh()                 
+                 
+            self.Refresh()
+            self.Update()
             
-            elif isinstance(obj,VFR_HUD):
-                self.heading = obj.heading
-                self.airspeed = obj.airspeed
-                self.climbRate = obj.climbRate
-                
-                # Update Airpseed, Altitude, Climb Rate Locations
-                self.updateAARText()
-                
-                # Update Heading North Pointer
-                self.adjustHeadingPointer()
-                self.adjustNorthPointer()
-            
-            elif isinstance(obj,Global_Position_INT):
-                self.relAlt = obj.relAlt
-                
-                # Update Airpseed, Altitude, Climb Rate Locations
-                self.updateAARText()
-                
-                # Update Altitude History
-                self.updateAltHistory()
-                
-            elif isinstance(obj,BatteryInfo):
-                self.voltage = obj.voltage
-                self.current = obj.current
-                self.batRemain = obj.batRemain
-                
-                # Update Battery Bar
-                self.updateBatteryBar()
-                
-            elif isinstance(obj,FlightState):
-                self.mode = obj.mode
-                self.armed = obj.armState
-                
-                # Update Mode and Arm State Text
-                self.updateStateText()
-                
-            elif isinstance(obj,WaypointInfo):
-                self.currentWP = obj.current
-                self.finalWP = obj.final
-                self.wpDist = obj.currentDist
-                self.nextWPTime = obj.nextWPTime
-                if obj.wpBearing < 0.0:
-                    self.wpBearing = obj.wpBearing + 360
-                else:
-                    self.wpBearing = obj.wpBearing
-                
-                # Update waypoint text
-                self.updateWPText()
-                
-                # Adjust Waypoint Pointer
-                self.adjustWPPointer()
-                
-        # Update Matplotlib Plot
-        self.canvas.draw()
-        self.canvas.Refresh()                   
-             
-        self.Refresh()
-        self.Update()
+            # Calculate next frame time
+            if (self.fps > 0):
+                fpsTime = 1/self.fps
+                self.nextTime = fpsTime + self.loopStartTime
+            else:
+                self.nextTime = time.time()
                 
     def on_KeyPress(self,event):
         '''To adjust the distance between pitch markers.'''

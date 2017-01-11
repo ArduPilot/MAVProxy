@@ -16,8 +16,9 @@ class VFR_HUD():
         
 class Global_Position_INT():
     '''Altitude relative to ground (GPS).'''
-    def __init__(self,gpsINT):
+    def __init__(self,gpsINT,curTime):
         self.relAlt = gpsINT.relative_alt/1000.0
+        self.curTime = curTime
         
 class BatteryInfo():
     '''Voltage, current and remaning battery.'''
@@ -42,7 +43,10 @@ class WaypointInfo():
         self.nextWPTime = nextWPTime
         self.wpBearing = wpBearing
         
-        
+class FPS():
+    '''Stores intended frame rate information.'''
+    def __init__(self,fps):
+        self.fps = fps # if fps is zero, then the frame rate is unrestricted
         
         
         
