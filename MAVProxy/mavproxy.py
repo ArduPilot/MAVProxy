@@ -791,10 +791,11 @@ def main_loop():
     '''main processing loop'''
     if not mpstate.status.setup_mode and not opts.nowait:
         for master in mpstate.mav_master:
+            if master.linknum != 0:
+                break
+            print("Waiting for heartbeat from %s" % master.address)
             send_heartbeat(master)
-            if master.linknum == 0:
-                print("Waiting for heartbeat from %s" % master.address)
-                master.wait_heartbeat()
+            master.wait_heartbeat(timeout=0.1)
         set_stream_rates()
 
     while True:
