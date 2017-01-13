@@ -31,7 +31,7 @@ class TerrainModule(mp_module.MPModule):
 
     def cmd_terrain(self, args):
         '''terrain command parser'''
-        usage = "usage: tracker <set|status|check>"
+        usage = "usage: terrain <set|status|check>"
         if len(args) == 0:
             print(usage)
             return
