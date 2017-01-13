@@ -9,7 +9,7 @@ import os
 import sys
 import re
 import optparse
-from wx_loader import wx
+from ..wx_loader import wx
 
 __version__ = 0.1
 __revision__ = '$Id$'
