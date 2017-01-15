@@ -160,7 +160,7 @@ class ParamState:
     def handle_command(self, master, mpstate, args):
         '''handle parameter commands'''
         param_wildcard = "*"
-        usage="Usage: param <fetch|set|show|load|preload|forceload|diff|download|help>"
+        usage="Usage: param <fetch|save|set|show|load|preload|forceload|diff|download|help>"
         if len(args) < 1:
             print(usage)
             return
