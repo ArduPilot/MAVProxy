@@ -18,6 +18,20 @@ package_data = ['modules/mavproxy_map/data/*.jpg',
 
 package_data.extend(package_files('MAVProxy/modules/mavproxy_cesium/app'))
 
+def package_files(directory):
+    paths = []
+    for (path, directories, filenames) in os.walk(directory):
+        for filename in filenames:
+            paths.append(os.path.join('..', path, filename))
+    return paths
+
+package_data = ['modules/mavproxy_map/data/*.jpg', 
+                'modules/mavproxy_map/data/*.png',
+                'tools/graphs/*.xml',
+]
+
+package_data.extend(package_files('MAVProxy/modules/mavproxy_cesium/app'))
+
 setup(name='MAVProxy',
       version=version,
       zip_safe=True,
