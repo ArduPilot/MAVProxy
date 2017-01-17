@@ -355,7 +355,8 @@ def mavflightview_show(path, wp, fen, used_flightmodes, options, title=None):
                                        height=600,
                                        ground_width=ground_width,
                                        lat=lat, lon=lon,
-                                       debug=options.debug)
+                                       debug=options.debug,
+                                       show_flightmode_legend=options.show_flightmode_legend)
         if options.multi:
             multi_map = map
         for path_obj in path_objs:
@@ -437,6 +438,7 @@ if __name__ == "__main__":
     parser.add_option("--nkf-sample", type='int', default=1, help="sub-sampling of NKF messages")
     parser.add_option("--rate", type='int', default=0, help="maximum message rate to display (0 means all points)")
     parser.add_option("--colour-source", type="str", default="flightmode", help="expression with range 0f..255f used for point colour")
+    parser.add_option("--no-flightmode-legend", action="store_false", default=True, dest="show_flightmode_legend", help="hide legend for colour used for flight modes")
 
     (opts, args) = parser.parse_args()
 
