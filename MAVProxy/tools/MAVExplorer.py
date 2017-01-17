@@ -282,6 +282,7 @@ def cmd_map(args):
     options = mavflightview_options()
     options.condition = mestate.settings.condition
     options._flightmodes = mestate.mlog._flightmodes
+    options.show_flightmode_legend = mestate.settings.show_flightmode
     if len(args) > 0:
         options.types = ','.join(args)
     [path, wp, fen, used_flightmodes] = mavflightview_mav(mestate.mlog, options, mestate.flightmode_selections)
