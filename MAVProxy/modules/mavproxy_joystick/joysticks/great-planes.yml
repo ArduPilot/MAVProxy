@@ -11,10 +11,10 @@ controls:
   - channel: 2
     type: axis
     id: 1
-    invert: true
   - channel: 3
     type: axis
     id: 2
+    invert: true
   - channel: 4
     type: axis
     id: 4
