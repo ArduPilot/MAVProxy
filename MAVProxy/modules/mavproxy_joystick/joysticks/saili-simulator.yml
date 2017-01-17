@@ -3,7 +3,7 @@ description: >
   http://www.hobbyking.com/hobbyking/store/__13597__USB_Simulator_Cable_XTR_AeroFly_FMS.html
   has 4 usable axes. The last 4 are binary switches and not PWM outputs.
 match:
-  - '*SAILI Simulator*':
+  - '*SAILI Simulator*'
 controls:
   - channel: 1
     type: axis

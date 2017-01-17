@@ -2,8 +2,8 @@ description: >
   GREAT PLANES InterLink Elite or Great Planes GP Controller. 4 axes
   usable.
 match:
-  - 'GREAT PLANES InterLink Elite':
-  - 'Great Planes GP Controller':
+  - 'GREAT PLANES InterLink Elite'
+  - 'Great Planes GP Controller'
 controls:
   - channel: 1
     type: axis

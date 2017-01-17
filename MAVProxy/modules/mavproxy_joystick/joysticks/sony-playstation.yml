@@ -1,7 +1,7 @@
 description: >
     Sony PLAYSTATION(R)3 Controller.  Only 4 axes usable. This assumes mode 1.
 match:
-  - 'Sony PLAYSTATION(R)3 Controller':
+  - 'Sony PLAYSTATION(R)3 Controller'
 controls:
   - channel: 1
     type: axis
