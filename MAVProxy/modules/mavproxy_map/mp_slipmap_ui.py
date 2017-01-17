@@ -18,7 +18,6 @@ class MPSlipMapFrame(wx.Frame):
         self.state = state
         state.frame = self
         state.grid = True
-        state.legend = True # this is whether to display a legend, if any
         state.follow = True
         state.download = True
         state.popup_object = None

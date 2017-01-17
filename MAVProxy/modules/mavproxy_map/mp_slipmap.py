@@ -39,7 +39,8 @@ class MPSlipMap():
                  debug=False,
                  brightness=1.0,
                  elevation=False,
-                 download=True):
+                 download=True,
+                 show_flightmode_legend=True):
         import multiprocessing
 
         self.lat = lat
@@ -55,6 +56,7 @@ class MPSlipMap():
         self.elevation = elevation
         self.oldtext = None
         self.brightness = brightness
+        self.legend = show_flightmode_legend
 
         self.drag_step = 10
 
