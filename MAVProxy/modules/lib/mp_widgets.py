@@ -7,6 +7,8 @@ June 2012
 '''
 
 from wx_loader import wx
+import cv2
+import numpy as np
 
 class ImagePanel(wx.Panel):
     '''a resizable panel containing an image'''
@@ -23,5 +25,5 @@ class ImagePanel(wx.Panel):
 
     def set_image(self, img):
         '''set the image to be displayed'''
-        self._bmp = wx.BitmapFromImage(img)
+        self._bmp = wx.BitmapFromBuffer(img.shape[1], img.shape[0], np.uint8(img)) # http://stackoverflow.com/a/16866833/2559632
         self.SetMinSize((self._bmp.GetWidth(), self._bmp.GetHeight()))
