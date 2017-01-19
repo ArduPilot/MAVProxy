@@ -18,6 +18,8 @@ from MAVProxy.modules.lib.mp_menu import *
 class MPImageData:
     '''image data to display'''
     def __init__(self, img):
+        if not hasattr(img, 'shape'):
+            img = np.asarray(img[:,:])
         self.width = img.shape[1]
         self.height = img.shape[0]
         self.data = img.tostring()
@@ -118,6 +120,8 @@ class MPImage():
         '''set the currently displayed image'''
         if not self.is_alive():
             return
+        if not hasattr(img, 'shape'):
+            img = np.asarray(img[:,:])
         if bgr:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         self.in_queue.put(MPImageData(img))

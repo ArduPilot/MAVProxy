@@ -17,6 +17,12 @@ from MAVProxy.modules.mavproxy_map import mp_elevation
 from MAVProxy.modules.mavproxy_map import mp_tile
 from MAVProxy.modules.lib import mp_util
 
+def image_shape(img):
+    '''handle different image formats, returning (width,height) tuple'''
+    if hasattr(img, 'shape'):
+        return (img.shape[1], img.shape[0])
+    return (img.width, img.height)
+    
 
 class SlipObject:
     '''an object to display on the map'''
@@ -40,10 +46,11 @@ class SlipObject:
             sy = -py
             h += py
             py = 0
-        if px+w > img.shape[1]:
-            w = img.shape[1] - px
-        if py+h > img.shape[0]:
-            h = img.shape[0] - py
+        (width, height) = image_shape(img)
+        if px+w > width:
+            w = width - px
+        if py+h > height:
+            h = height - py
         return (px, py, sx, sy, w, h)
 
     def draw(self, img, pixmapper, bounds):
@@ -149,7 +156,8 @@ class SlipPolygon(SlipObject):
         '''draw a line on the image'''
         pix1 = pixmapper(pt1)
         pix2 = pixmapper(pt2)
-        (ret, pix1, pix2) = cv2.clipLine((0, 0, img.shape[1], img.shape[0]), pix1, pix2)
+        (width, height) = image_shape(img)
+        (ret, pix1, pix2) = cv2.clipLine((0, 0, width, height), pix1, pix2)
         if ret is False:
             if len(self._pix_points) == 0:
                 self._pix_points.append(None)
@@ -205,7 +213,8 @@ class SlipGrid(SlipObject):
         '''draw a line on the image'''
         pix1 = pixmapper(pt1)
         pix2 = pixmapper(pt2)
-        (ret, pix1, pix2) = cv2.clipLine((0, 0, img.shape[1], img.shape[0]), pix1, pix2)
+        (width, height) = image_shape(img)
+        (ret, pix1, pix2) = cv2.clipLine((0, 0, width, height), pix1, pix2)
         if ret is False:
             return
         cv2.line(img, pix1, pix2, colour, linewidth)
@@ -314,9 +323,10 @@ class SlipThumbnail(SlipObject):
         SlipObject.__init__(self, key, layer, popup_menu=popup_menu)
         self.latlon = latlon
         self._img = None
+        if not hasattr(img, 'shape'):
+            img = np.asarray(img[:,:])
         self.original_img = img
-        self.width = img.shape[1]
-        self.height = img.shape[0]
+        (self.width, self.height) = image_shape(img)
         self.border_width = border_width
         self.border_colour = border_colour
         self.posx = -1
@@ -346,10 +356,9 @@ class SlipThumbnail(SlipObject):
         (px,py) = pixmapper(self.latlon)
 
         # find top left
-        px -= thumb.shape[1]/2
-        py -= thumb.shape[0]/2
-        w = thumb.shape[1]
-        h = thumb.shape[0]
+        (w, h) = image_shape(thumb)
+        px -= w/2
+        py -= h/2
 
         (px, py, sx, sy, w, h) = self.clip(px, py, w, h, img)
 
@@ -391,7 +400,8 @@ class SlipTrail:
         '''draw the trail'''
         for p in self.points:
             (px,py) = pixmapper(p)
-            if px >= 0 and py >= 0 and px < img.shape[1] and py < img.shape[0]:
+            (width, height) = image_shape(img)
+            if px >= 0 and py >= 0 and px < width and py < height:
                 cv2.circle(img, (px,py), 1, self.colour)
 
 
@@ -429,10 +439,9 @@ class SlipIcon(SlipThumbnail):
         (px,py) = pixmapper(self.latlon)
 
         # find top left
-        px -= icon.shape[1]/2
-        py -= icon.shape[0]/2
-        w = icon.shape[1]
-        h = icon.shape[0]
+        (w, h) = image_shape(icon)
+        px -= w/2
+        py -= h/2
 
         (px, py, sx, sy, w, h) = self.clip(px, py, w, h, img)
 
@@ -501,8 +510,7 @@ class SlipInfoImage(SlipInformation):
     def __init__(self, key, img):
         SlipInformation.__init__(self, key)
         self.imgstr = img.tostring()
-        self.width = img.shape[1]
-        self.height = img.shape[0]
+        (self.width, self.height) = image_shape(img)
         self.imgpanel = None
 
     def img(self):
