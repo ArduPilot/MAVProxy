@@ -267,14 +267,15 @@ class SlipFlightModeLegend(SlipObject):
         self.font_scale = 0.5
 
     def draw_legend(self):
-        font = cv.InitFont(cv.CV_FONT_HERSHEY_SIMPLEX, self.font_scale, 1.0)
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        fontscale = self.font_scale
         width = 0
         height = self.top_margin + self.bottom_margin
         row_height_max = self.swatch_min_height
         for (mode, colour) in self.tuples:
             if mode is None:
                 mode = "Unknown"
-            ((tw,th),tb) = cv.GetTextSize(mode, font)
+            ((tw,th),tb) = cv2.getTextSize(mode, font, fontscale, 1)
             width = max(width, tw)
             row_height_max = max(row_height_max, th)
         row_count = len(self.tuples)
@@ -283,19 +284,19 @@ class SlipFlightModeLegend(SlipObject):
         swatch_width = max(self.swatch_min_width, swatch_height)
         width += self.left_margin + self.right_margin
         width += swatch_width + self.swatch_text_gap
-        img = cv.CreateImage((width,height),8,3)
-        cv.Set(img, (255,255,255))
-        cv.Rectangle(img, (0, 0), (width-1, height-1),
+        img = np.zeros((width,height,3),np.uint8)
+        img[:] = (255,255,255)
+        cv2.rectangle(img, (0, 0), (width-1, height-1),
                      self.border_colour, self.border_width)
         y = self.top_margin
         for (mode, colour) in self.tuples:
             if mode is None:
                 mode = "Unknown"
             x = self.left_margin
-            cv.Rectangle(img, (x, y), (x+swatch_width-1, y+swatch_height-1), colour, cv.CV_FILLED)
+            cv2.rectangle(img, (x, y), (x+swatch_width-1, y+swatch_height-1), colour, -1)
             x += swatch_width
             x += self.swatch_text_gap
-            cv.PutText(img, mode, (x, y+row_height_max), font, self.text_colour)
+            cv2.putText(img, mode, (x, y+row_height_max), font, fontscale, self.text_colour)
             y += row_height_max + self.row_gap
 
         return img
@@ -305,15 +306,11 @@ class SlipFlightModeLegend(SlipObject):
         if self._img is None:
             self._img = self.draw_legend()
 
-        w = self._img.width
-        h = self._img.height
-        cv.SetImageROI(self._img, (0, 0, w, h))
+        w = self._img.shape[1]
+        h = self._img.shape[0]
         px = 5
         py = 5
-        cv.SetImageROI(img, (px, py, w, h))
-        cv.Copy(self._img, img)
-        cv.ResetImageROI(img)
-        cv.ResetImageROI(self._img)
+        img[py:py+h,px:px+w] = self._img
 
 class SlipThumbnail(SlipObject):
     '''a thumbnail to display on the map'''
