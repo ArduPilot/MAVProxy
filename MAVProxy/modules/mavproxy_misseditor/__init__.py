@@ -16,6 +16,7 @@ from pymavlink import mavutil
 import multiprocessing, time
 import threading
 import Queue
+import traceback
 
 class MissionEditorEventThread(threading.Thread):
     def __init__(self, mp_misseditor, q, l):
@@ -183,7 +184,19 @@ class MissionEditorModule(mp_module.MPModule):
 
     def mavlink_message_queue_handler(self):
         while not self.time_to_quit:
-            self.process_mavlink_packet(self.mavlink_message_queue.get())
+            m = self.mavlink_message_queue.get()
+
+            #MAKE SURE YOU RELEASE THIS LOCK BEFORE LEAVING THIS METHOD!!!
+            #No "return" statement should be put in this method!
+            self.gui_event_queue_lock.acquire()
+
+            try:
+                self.process_mavlink_packet(m)
+            except Exception as e:
+                print("Caught exception (%s)" % str(e))
+                traceback.print_stack()
+
+            self.gui_event_queue_lock.release()
 
     def unload(self):
         '''unload module'''
@@ -205,10 +218,6 @@ class MissionEditorModule(mp_module.MPModule):
     def process_mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         mtype = m.get_type()
-
-        #MAKE SURE YOU RELEASE THIS LOCK BEFORE LEAVING THIS METHOD!!!
-        #No "return" statement should be put in this method!
-        self.gui_event_queue_lock.acquire()
 
         # if you add processing for an mtype here, remember to add it
         # to mavlink_packet, above
@@ -246,8 +255,6 @@ class MissionEditorModule(mp_module.MPModule):
                         lat=m.x,lon=m.y,alt=m.z,frame=m.frame))
 
                     self.wps_received[m.seq] = True
-
-        self.gui_event_queue_lock.release()
 
     def child_task(self, q, l, gq, gl, cw_sem):
         '''child process - this holds GUI elements'''

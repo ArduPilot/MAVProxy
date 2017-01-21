@@ -6,6 +6,7 @@
 
 from ..lib.wx_loader import wx
 from wx import grid
+import traceback
 
 # begin wxGlade: dependencies
 # end wxGlade
@@ -228,7 +229,11 @@ class MissionEditorFrame(wx.Frame):
         while self.gui_event_queue.qsize() > 0 and (time.time() < queue_access_start_time) < 0.6:
             event_processed = True
             event = self.gui_event_queue.get()
-            self.process_gui_event(event)
+            try:
+                self.process_gui_event(event)
+            except Exception as e:
+                print("Caught exception (%s)" % str(e))
+                traceback.print_stack()
 
         self.gui_event_queue_lock.release()
 
