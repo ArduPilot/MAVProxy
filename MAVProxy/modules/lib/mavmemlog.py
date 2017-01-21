@@ -73,7 +73,6 @@ class mavmemlog(mavutil.mavfile):
         self._flightmode_index = 0
         self._timestamp = None
         self.flightmode = None
-        self.params = {}
 
     def flightmode_list(self):
         '''return list of all flightmodes as tuple of mode and start time'''
