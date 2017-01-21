@@ -184,7 +184,11 @@ class MissionEditorModule(mp_module.MPModule):
 
     def mavlink_message_queue_handler(self):
         while not self.time_to_quit:
-            m = self.mavlink_message_queue.get()
+            try:
+                m = self.mavlink_message_queue.get(block=0)
+            except Queue.Empty:
+                time.sleep(0.1)
+                continue
 
             #MAKE SURE YOU RELEASE THIS LOCK BEFORE LEAVING THIS METHOD!!!
             #No "return" statement should be put in this method!
