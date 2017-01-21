@@ -89,11 +89,11 @@ class WPModule(mp_module.MPModule):
         '''handle an incoming mavlink packet'''
         mtype = m.get_type()
         if mtype in ['WAYPOINT_COUNT','MISSION_COUNT']:
+            self.wploader.expected_count = m.count
             if self.wp_op is None:
                 self.console.error("No waypoint load started")
             else:
                 self.wploader.clear()
-                self.wploader.expected_count = m.count
                 self.console.writeln("Requesting %u waypoints t=%s now=%s" % (m.count,
                                                                                  time.asctime(time.localtime(m._timestamp)),
                                                                                  time.asctime()))
