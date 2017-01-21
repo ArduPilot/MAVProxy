@@ -496,7 +496,6 @@ class MissionEditorFrame(wx.Frame):
         event.Skip()
 
     def on_mission_grid_cell_select(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
-        command = self.grid_mission.GetCellValue(event.GetRow(), ME_COMMAND_COL)
         self.grid_mission.SetColLabelValue(ME_P1_COL, "P1")
         self.grid_mission.SetColLabelValue(ME_P2_COL, "P2")
         self.grid_mission.SetColLabelValue(ME_P3_COL, "P3")
@@ -504,6 +503,12 @@ class MissionEditorFrame(wx.Frame):
         self.grid_mission.SetColLabelValue(ME_LAT_COL, "Lat")
         self.grid_mission.SetColLabelValue(ME_LON_COL, "Lon")
         self.grid_mission.SetColLabelValue(ME_ALT_COL, "Alt")
+
+        if event.GetRow() == self.grid_mission.GetNumberRows():
+            # this event fires when last row is deleted; ignore
+            # attempt to set a cell in that deleted row as selected.
+            return
+        command = self.grid_mission.GetCellValue(event.GetRow(), ME_COMMAND_COL)
 
         col_labels = me_defines.get_column_labels(command)
         for col in col_labels.keys():
