@@ -199,7 +199,8 @@ class MissionEditorModule(mp_module.MPModule):
 
 
     def mavlink_packet(self, m):
-        self.mavlink_message_queue.put(m)
+        if m.get_type() in ['WAYPOINT_COUNT','MISSION_COUNT', 'WAYPOINT', 'MISSION_ITEM']:
+            self.mavlink_message_queue.put(m)
 
     def process_mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
@@ -209,6 +210,8 @@ class MissionEditorModule(mp_module.MPModule):
         #No "return" statement should be put in this method!
         self.gui_event_queue_lock.acquire()
 
+        # if you add processing for an mtype here, remember to add it
+        # to mavlink_packet, above
         if mtype in ['WAYPOINT_COUNT','MISSION_COUNT']:
             if (self.num_wps_expected == 0):
                 #I haven't asked for WPs, or these messages are duplicates
