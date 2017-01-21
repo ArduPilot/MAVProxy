@@ -15,6 +15,7 @@ from pymavlink import mavutil
 
 import multiprocessing, time
 import threading
+import Queue
 
 class MissionEditorEventThread(threading.Thread):
     def __init__(self, mp_misseditor, q, l):
@@ -174,6 +175,15 @@ class MissionEditorModule(mp_module.MPModule):
         self.last_unload_check_time = time.time()
         self.unload_check_interval = 0.1 # seconds
 
+        self.time_to_quit = False
+        self.mavlink_message_queue = Queue.Queue()
+        self.mavlink_message_queue_handler = threading.Thread(target=self.mavlink_message_queue_handler)
+        self.mavlink_message_queue_handler.start()
+
+
+    def mavlink_message_queue_handler(self):
+        while not self.time_to_quit:
+            self.process_mavlink_packet(self.mavlink_message_queue.get())
 
     def unload(self):
         '''unload module'''
@@ -189,6 +199,9 @@ class MissionEditorModule(mp_module.MPModule):
 
 
     def mavlink_packet(self, m):
+        self.mavlink_message_queue.put(m)
+
+    def process_mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         mtype = m.get_type()
 
@@ -272,11 +285,14 @@ class MissionEditorModule(mp_module.MPModule):
 
     def close(self):
         '''close the Mission Editor window'''
+        self.time_to_quit = True
         self.close_window.release()
         if self.child.is_alive():
             self.child.join(1)
 
         self.child.terminate()
+
+        self.mavlink_message_queue_handler.join()
 
         self.event_queue_lock.acquire()
         self.event_queue.put(MissionEditorEvent(me_event.MEE_TIME_TO_QUIT));
