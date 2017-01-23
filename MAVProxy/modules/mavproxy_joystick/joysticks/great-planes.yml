@@ -1,0 +1,47 @@
+description: >
+  GREAT PLANES InterLink Elite or Great Planes GP Controller. 4 axes
+  usable.
+match:
+  - 'GREAT PLANES InterLink Elite'
+  - 'Great Planes GP Controller'
+controls:
+  - channel: 1
+    type: axis
+    id: 0
+  - channel: 2
+    type: axis
+    id: 1
+  - channel: 3
+    type: axis
+    id: 2
+    invert: true
+  - channel: 4
+    type: axis
+    id: 4
+  - channel: 8
+    type: axis
+    id: 3
+
+# From mavproxy_joystick.py:
+#
+#    'GREAT PLANES InterLink Elite':
+#    # 4 axes usable
+#    [(0, 500,  1500),
+#     (1, 500,  1500),
+#     (2, -1000, 1500),
+#     (4, 500,  1500),
+#     None,
+#     None,
+#     None,
+#     (3, 500,  1500)],
+#
+#    'Great Planes GP Controller':
+#    # 4 axes usable
+#    [(0, 500,  1500),
+#     (1, -500,  1500),
+#     (2, -1000, 1500),
+#     (4, -500,  1500),
+#     None,
+#     None,
+#     None,
+#     (3, 500,  1500)],

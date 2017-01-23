@@ -1,0 +1,29 @@
+description: >
+    Sony PLAYSTATION(R)3 Controller.  Only 4 axes usable. This assumes mode 1.
+match:
+  - 'Sony PLAYSTATION(R)3 Controller'
+controls:
+  - channel: 1
+    type: axis
+    id: 2
+  - channel: 2
+    type: axis
+    id: 1
+    invert: true
+  - channel: 3
+    type: axis
+    id: 3
+    invert: true
+  - channel: 4
+    type: axis
+    id: 0
+    invert: true
+
+# From mavproxy_joystick.py:
+#
+#    'Sony PLAYSTATION(R)3 Controller':
+#    # only 4 axes usable. This assumes mode 1
+#    [(2, 500,  1500),
+#     (1, -500,  1500),
+#     (3, -500, 1000),
+#     (0, -500,  1500)],

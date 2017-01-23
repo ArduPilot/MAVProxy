@@ -1,0 +1,43 @@
+description: >
+    http://www.hobbyking.com/hobbyking/store/__13597__USB_Simulator_Cable_XTR_AeroFly_FMS.html
+    Has 6 usable axes. This assumes mode 1
+match:
+  - 'CarolBox USB*'
+controls:
+  - channel: 1
+    type: axis
+    id: 3
+  - channel: 2
+    type: axis
+    id: 0
+  - channel: 3
+    type: axis
+    id: 1
+  - channel: 4
+    type: axis
+    id: 4
+  - channel: 5
+    type: axis
+    id: 5
+  - channel: 7
+    type: axis
+    id: 2
+
+  # NB: The configuration in mavproxy_joystick.py maps both channels 5
+  # and 8 to axis 5.  One of these is a typo.  I'm assuming that it
+  # should be axis 6 for channel 8.
+  - channel: 8
+    type: axis
+    id: 6
+
+# From mavproxy_joystick.py:
+#
+#   'CarolBox USB*':
+#    [(3, 500, 1500),
+#     (0, 500, 1500),
+#     (1, 700, 1500),
+#     (4, 500, 1500),
+#     (5, 500, 1500),
+#     None,
+#     (2, 500, 1500),
+#     (5, 500, 1500)],

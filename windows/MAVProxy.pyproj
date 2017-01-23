@@ -1,0 +1,182 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{d10fe833-9463-4b05-bdf8-6a701d84c415}</ProjectGuid>
+    <ProjectHome>..\</ProjectHome>
+    <StartupFile>setup.py</StartupFile>
+    <SearchPath>
+    </SearchPath>
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <InterpreterId />
+    <InterpreterVersion />
+    <IsWindowsApplication>False</IsWindowsApplication>
+    <CommandLineArguments>build install</CommandLineArguments>
+    <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+  <PropertyGroup>
+    <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
+    <PtvsTargetsFile>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets</PtvsTargetsFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="MAVProxy\modules\lib\ANUGA\README.txt" />
+    <Content Include="MAVProxy\modules\lib\optparse_gui\README.txt" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\barrell.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\blueantenna.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\bluecopter.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\blueheli.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\blueplane.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\bluerover.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\camera-small-red.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\flag.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\greenantenna.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\greencopter.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\greenheli.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\greenplane.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\greenrover.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\hoop.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\loading.jpg" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\orangeplane.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\purpleplane.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\rallypoint.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\ramp.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\redantenna.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\redcopter.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\redheli.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\redplane.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\redrover.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\unavailable.jpg" />
+    <Content Include="MAVProxy\modules\mavproxy_mmap\mmap_app\bing.js" />
+    <Content Include="MAVProxy\modules\mavproxy_mmap\mmap_app\bluemarble.js" />
+    <Content Include="MAVProxy\modules\mavproxy_mmap\mmap_app\drone-md.png" />
+    <Content Include="MAVProxy\modules\mavproxy_mmap\mmap_app\drone-sm.png" />
+    <Content Include="MAVProxy\modules\mavproxy_mmap\mmap_app\index.html" />
+    <Content Include="MAVProxy\modules\mavproxy_mmap\mmap_app\modestmaps.js" />
+    <Content Include="requirements.txt" />
+    <Content Include="windows\MAVProxyWinBuild.bat" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="MAVProxy\mavproxy.py" />
+    <Compile Include="MAVProxy\modules\lib\ANUGA\geo_reference.py" />
+    <Compile Include="MAVProxy\modules\lib\ANUGA\lat_long_UTM_conversion.py" />
+    <Compile Include="MAVProxy\modules\lib\ANUGA\redfearn.py" />
+    <Compile Include="MAVProxy\modules\lib\ANUGA\__init__.py" />
+    <Compile Include="MAVProxy\modules\lib\dumpstacks.py" />
+    <Compile Include="MAVProxy\modules\lib\graphdefinition.py" />
+    <Compile Include="MAVProxy\modules\lib\grapher.py" />
+    <Compile Include="MAVProxy\modules\lib\live_graph.py" />
+    <Compile Include="MAVProxy\modules\lib\live_graph_ui.py" />
+    <Compile Include="MAVProxy\modules\lib\mavmemlog.py" />
+    <Compile Include="MAVProxy\modules\lib\mp_checklist.py" />
+    <Compile Include="MAVProxy\modules\lib\mp_image.py" />
+    <Compile Include="MAVProxy\modules\lib\mp_menu.py" />
+    <Compile Include="MAVProxy\modules\lib\mp_module.py" />
+    <Compile Include="MAVProxy\modules\lib\mp_settings.py" />
+    <Compile Include="MAVProxy\modules\lib\mp_util.py" />
+    <Compile Include="MAVProxy\modules\lib\mp_widgets.py" />
+    <Compile Include="MAVProxy\modules\lib\multiprocessing_queue.py" />
+    <Compile Include="MAVProxy\modules\lib\optparse_gui\__init__.py" />
+    <Compile Include="MAVProxy\modules\lib\rline.py" />
+    <Compile Include="MAVProxy\modules\lib\textconsole.py" />
+    <Compile Include="MAVProxy\modules\lib\wxconsole.py" />
+    <Compile Include="MAVProxy\modules\lib\wxconsole_ui.py" />
+    <Compile Include="MAVProxy\modules\lib\wxconsole_util.py" />
+    <Compile Include="MAVProxy\modules\lib\wxgrapheditor.py" />
+    <Compile Include="MAVProxy\modules\lib\wxsettings.py" />
+    <Compile Include="MAVProxy\modules\lib\wxsettings_ui.py" />
+    <Compile Include="MAVProxy\modules\lib\wx_loader.py" />
+    <Compile Include="MAVProxy\modules\lib\wx_processguard.py" />
+    <Compile Include="MAVProxy\modules\lib\wx_util.py" />
+    <Compile Include="MAVProxy\modules\lib\__init__.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_antenna.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_arm.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_auxopt.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_battery.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_calibration.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_cameraview.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_checklist.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_cmdlong.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_console.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_dataflash_logger.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_DGPS.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_fence.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_gasheli.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_gimbal.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_gopro.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_graph.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_help.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_HIL.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_joystick.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_link.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_log.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_map\GAreader.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_map\mp_elevation.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_map\mp_slipmap.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_map\mp_slipmap_ui.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_map\mp_slipmap_util.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_map\mp_tile.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_map\srtm.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_map\__init__.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_misc.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_misseditor\button_renderer.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_misseditor\me_defines.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_misseditor\me_event.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_misseditor\missionEditorFrame.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_misseditor\__init__.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_mmap\mmap_server.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_mmap\__init__.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_mode.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_nsh.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_output.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_param.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_ppp.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_rally.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_rc.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_rcsetup.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_relay.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_sensors.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_serial.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_smartcamera\sc_config.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_smartcamera\sc_main.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_smartcamera\sc_SonyQX1.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_smartcamera\sc_video.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_smartcamera\sc_webcam.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_smartcamera\ssdp.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_smartcamera\__init__.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_speech.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_terrain.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_test.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_tracker.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_tuneopt.py" />
+    <Compile Include="MAVProxy\modules\mavproxy_wp.py" />
+    <Compile Include="MAVProxy\modules\__init__.py" />
+    <Compile Include="MAVProxy\tools\MAVExplorer.py" />
+    <Compile Include="MAVProxy\tools\mavflightview.py" />
+    <Compile Include="MAVProxy\__init__.py" />
+    <Compile Include="setup.py" />
+    <Compile Include="windows\returnVersion.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="MAVProxy" />
+    <Folder Include="MAVProxy\modules" />
+    <Folder Include="MAVProxy\modules\lib" />
+    <Folder Include="MAVProxy\modules\lib\ANUGA" />
+    <Folder Include="MAVProxy\modules\lib\optparse_gui" />
+    <Folder Include="MAVProxy\modules\mavproxy_map" />
+    <Folder Include="MAVProxy\modules\mavproxy_map\data" />
+    <Folder Include="MAVProxy\modules\mavproxy_misseditor" />
+    <Folder Include="MAVProxy\modules\mavproxy_mmap" />
+    <Folder Include="MAVProxy\modules\mavproxy_mmap\mmap_app" />
+    <Folder Include="MAVProxy\modules\mavproxy_smartcamera" />
+    <Folder Include="MAVProxy\tools" />
+    <Folder Include="windows" />
+  </ItemGroup>
+  <Import Project="$(PtvsTargetsFile)" Condition="Exists($(PtvsTargetsFile))" />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" Condition="!Exists($(PtvsTargetsFile))" />
+</Project>
