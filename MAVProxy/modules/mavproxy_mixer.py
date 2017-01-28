@@ -18,6 +18,7 @@ class MixerState:
     MIXER_STATE_SUBMIXER_COUNT = 5
     MIXER_STATE_MIXER_TYPE = 6
     MIXER_STATE_MIXER_GET_PARAMETER = 7
+    MIXER_STATE_MIXER_SET_PARAMETER = 8
     
     '''this class is separated to make it possible to use the parameter
        functions on a secondary connection'''
@@ -43,17 +44,19 @@ class MixerState:
     def handle_mixer_data(self, master, m):
         if(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_MIXER_COUNT):
             self.mixer_count = m.param_type
-            print("Group:%u mixer:%u mixer count:%u" % (m.mixer_group, m.param_type))
+            print("Group:%u mixer count:%u" % (m.mixer_group, m.param_type))
             self.state = self.MIXER_STATE_WAITING
 
-        if(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_SUBMIXER_COUNT):
+        elif(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_SUBMIXER_COUNT):
             print("Group:%u mixer:%u submixer count:%u" % (m.mixer_group, m.mixer_index, m.param_type))
 
-        if(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_MIXTYPE):
+        elif(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_MIXTYPE):
             print("Group:%u mixer:%u submixer:%u type:%u" % (m.mixer_group, m.mixer_index,m.mixer_sub_index, m.param_type))
 
-        if(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_PARAMETER):
+        elif(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_PARAMETER):
             print("Group:%u mixer:%u submixer:%u index:%u value:%.4f" % (m.mixer_group, m.mixer_index,m.mixer_sub_index, m.mixer_index, m.param_value))
+        else:
+            print("Received unknown data type in MIXER_DATA message")
 
 
     def mixer_help(self, args):
@@ -75,19 +78,24 @@ class MixerState:
                 self.cmd_count(args, master)
             else:
                 print(usage)
-        if args[0] == "sub":
+        elif args[0] == "sub":
             if len(args) == 3:
                 self.cmd_sub(args, master)
             else:
                 print(usage)
-        if args[0] == "type":
+        elif args[0] == "type":
             if len(args) == 4:
                 self.cmd_type(args, master)
             else:
                 print(usage)
-        if args[0] == "get":
+        elif args[0] == "get":
             if len(args) == 5:
                 self.cmd_get(args, master)
+            else:
+                print(usage)
+        elif args[0] == "set":
+            if len(args) == 6:
+                self.cmd_set(args, master)
             else:
                 print(usage)
         else:
@@ -134,6 +142,13 @@ class MixerState:
         self.state = self.MIXER_STATE_MIXER_GET_PARAMETER
         print("Requested parameter for group:%s mixer:%s submixer:%s index:%s" % (args[1],args[2],args[3],args[4]))
 
+    def cmd_set(self, args, master):
+        '''get a mixer or submixer parameter in a group'''
+        mav = master
+        mav.mav.mixer_parameter_set_send(mav.target_system, mav.target_component,
+                                        int(args[1]), int(args[2]), int(args[3]), int(args[4]), float(args[5]), mavutil.mavlink.MAV_PARAM_TYPE_REAL32)
+        self.state = self.MIXER_STATE_MIXER_SET_PARAMETER
+        print("Requested parameter for group:%s mixer:%s submixer:%s index:%s value:%s" % (args[1],args[2],args[3],args[4],args[5]))
 
 
 class MixerModule(mp_module.MPModule):
