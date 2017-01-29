@@ -19,6 +19,7 @@ class MixerState:
     MIXER_STATE_MIXER_TYPE = 6
     MIXER_STATE_MIXER_GET_PARAMETER = 7
     MIXER_STATE_MIXER_SET_PARAMETER = 8
+    MIXER_STATE_MIXER_GET_ALL = 100
     
     '''this class is separated to make it possible to use the parameter
        functions on a secondary connection'''
@@ -38,7 +39,6 @@ class MixerState:
     def handle_mavlink_packet(self, master, m):
         '''handle an incoming mavlink packet'''
         if m.get_type() == 'MIXER_DATA':
-            print("Received mixer data of type:%u" % (m.data_type))
             self.handle_mixer_data(master,m)
 
     def handle_mixer_data(self, master, m):
@@ -48,10 +48,10 @@ class MixerState:
             self.state = self.MIXER_STATE_WAITING
 
         elif(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_SUBMIXER_COUNT):
-            print("Group:%u mixer:%u submixer count:%u" % (m.mixer_group, m.mixer_index, m.param_type))
+            print("Group:%u mixer:%u submixer count:%u" % (m.mixer_group, m.mixer_index, m.data_value))
 
         elif(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_MIXTYPE):
-            print("Group:%u mixer:%u submixer:%u type:%u" % (m.mixer_group, m.mixer_index,m.mixer_sub_index, m.param_type))
+            print("Group:%u mixer:%u submixer:%u type:%u" % (m.mixer_group, m.mixer_index,m.mixer_sub_index, m.data_value))
 
         elif(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_PARAMETER):
             print("Group:%u mixer:%u submixer:%u index:%u value:%.4f" % (m.mixer_group, m.mixer_index,m.mixer_sub_index, m.mixer_index, m.param_value))
@@ -73,6 +73,11 @@ class MixerState:
         if len(args) < 1:
             print(usage)
             return
+        elif args[0] == "all":
+            if len(args) == 2:
+                self.cmd_all(args, master)
+            else:
+                print(usage)
         if args[0] == "count":
             if len(args) == 2:
                 self.cmd_count(args, master)
@@ -118,6 +123,14 @@ class MixerState:
         self.state = self.MIXER_STATE_MIXER_COUNT
         print("Requested mixer count for group %s" % (args[1]))                
 
+    def cmd_all(self, args, master):
+        '''get all data for mixers in a group'''
+        mav = master
+        mav.mav.mixer_data_request_send(mav.target_system, mav.target_component,
+                                        int(args[1]), 0, 0, 0, 100)
+        self.state = self.MIXER_STATE_MIXER_GET_ALL
+        print("Requested all data for group %s" % (args[1]))                
+
     def cmd_sub(self, args, master):
         '''get a count of the sub mixers in a mixer in a group'''
         mav = master
@@ -156,7 +169,7 @@ class MixerModule(mp_module.MPModule):
         super(MixerModule, self).__init__(mpstate, "mixer", "mixer handling", public = True)
         self.pstate = MixerState(self.mav_param, self.vehicle_name)
         self.add_command('mixer', self.cmd_mixer, "mixer handling",
-                         ["<>",
+                         ["<all> (GROUP)",
                           "<count> (GROUP)",
                           "<sub> (GROUP) (MIXER)",
                           "<type> (GROUP) (MIXER) (SUBMIXER)",
