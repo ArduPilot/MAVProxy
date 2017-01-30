@@ -284,7 +284,7 @@ class SlipFlightModeLegend(SlipObject):
         swatch_width = max(self.swatch_min_width, swatch_height)
         width += self.left_margin + self.right_margin
         width += swatch_width + self.swatch_text_gap
-        img = np.zeros((width,height,3),np.uint8)
+        img = np.zeros((height,width,3),np.uint8)
         img[:] = (255,255,255)
         cv2.rectangle(img, (0, 0), (width-1, height-1),
                      self.border_colour, self.border_width)
