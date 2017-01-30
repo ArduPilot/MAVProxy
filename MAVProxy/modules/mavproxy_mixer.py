@@ -54,7 +54,7 @@ class MixerState:
             print("Group:%u mixer:%u submixer:%u type:%u" % (m.mixer_group, m.mixer_index,m.mixer_sub_index, m.data_value))
 
         elif(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_PARAMETER):
-            print("Group:%u mixer:%u submixer:%u index:%u value:%.4f" % (m.mixer_group, m.mixer_index,m.mixer_sub_index, m.mixer_index, m.param_value))
+            print("Group:%u mixer:%u submixer:%u index:%u value:%.4f" % (m.mixer_group, m.mixer_index,m.mixer_sub_index, m.parameter_index, m.param_value))
         else:
             print("Received unknown data type in MIXER_DATA message")
 
