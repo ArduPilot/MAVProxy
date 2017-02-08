@@ -14,3 +14,4 @@ MANIFEST
 .DS_Store
 *.bak
 *.orig
+windows/version.txt
