@@ -18,7 +18,7 @@ else:
     try:
         imp.find_module('wx')
         has_wxpython = True
-    except ImportError, e:
+    except ImportError as e:
         pass
 
 radius_of_earth = 6378100.0 # in meters
