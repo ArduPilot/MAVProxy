@@ -4,7 +4,7 @@ MAVProxyAny = Analysis(['mavproxy.py'],
              pathex=[os.path.abspath('.')],
              # for some unknown reason these hidden imports don't pull in
              # all the needed pieces, so we also import them in mavproxy.py
-             hiddenimports=['cv', 'cv2', 'wx', 'pylab', 
+             hiddenimports=['cv2', 'wx', 'pylab', 
                             'numpy', 'dateutil', 'matplotlib',
                             'pymavlink.mavwp', 'pymavlink.mavutil', 
                             'pyreadline', 'pymavlink.dialects.v20.ardupilotmega',
@@ -35,7 +35,7 @@ MAVExpAny = Analysis(['.\\tools\\MAVExplorer.py'],
              pathex=[os.path.abspath('.')],
              # for some unknown reason these hidden imports don't pull in
              # all the needed pieces, so we also import them in mavproxy.py
-             hiddenimports=['cv', 'cv2', 'wx', 'pylab', 
+             hiddenimports=['cv2', 'wx', 'pylab', 
                             'numpy', 'dateutil', 'matplotlib',
                             'pymavlink.mavwp', 'pymavlink.mavutil', 'pymavlink.dialects.v20.ardupilotmega',
                             'pymavlink.dialects.v10.ardupilotmega',
