@@ -14,7 +14,8 @@ Next, open up a console in the Python scripts install path
 - `numPY <http://www.lfd.uci.edu/~gohlke/pythonlibs/#numpy>`_
 - `Pillow (replaces
   PIL) <http://www.lfd.uci.edu/~gohlke/pythonlibs/#pillow>`_
-- `OpenCV <http://www.lfd.uci.edu/~gohlke/pythonlibs/#opencv>`_
+- `OpenCV 3 <http://www.lfd.uci.edu/~gohlke/pythonlibs/#opencv>`_
+- `lxml <http://www.lfd.uci.edu/~gohlke/pythonlibs/#lxml>`_
 
 .. code:: bash
 
@@ -30,7 +31,7 @@ require specific older versions to install:
     pip install pip --upgrade
     pip install pyinstaller==2.1 setuptools==19.2 packaging==14.2
     pip install matplotlib pyreadline future
-    pip install lxml python-dateutil pytz pyparsing six
+    pip install python-dateutil pytz pyparsing six
     pip install pyserial 
     pip install pymavlink 
     
