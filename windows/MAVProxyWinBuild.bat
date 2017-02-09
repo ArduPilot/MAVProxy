@@ -22,12 +22,19 @@ rem -----build the changelog-----
 
 rem -----Upgrade pymavlink if needed-----
 if exist "..\..\pymavlink" (
- rem Rebuild and use pymavlink from sources if available
+ rem Rebuild and use pymavlink from pymavlink sources if available
  pushd ..\..\pymavlink
  "%PYTHON_LOCATION%\python.exe" setup.py build install
  popd
 ) else (
- "%PYTHON_LOCATION%\Scripts\pip" install pymavlink -U
+ if exist "..\..\mavlink\pymavlink" (
+  rem Rebuild and use pymavlink from mavlink\pymavlink sources if available
+  pushd ..\..\mavlink\pymavlink
+  "%PYTHON_LOCATION%\python.exe" setup.py build install
+  popd
+ ) else (
+  "%PYTHON_LOCATION%\Scripts\pip" install pymavlink -U
+ )
 )
 
 rem -----Build MAVProxy-----
