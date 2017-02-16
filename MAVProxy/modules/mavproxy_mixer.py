@@ -24,6 +24,7 @@ class MixerState:
     MIXER_STATE_MIXER_SET_PARAMETER = 8
     MIXER_STATE_MIXER_GET_MISSING = 50
     MIXER_STATE_MIXER_GET_ALL = 100
+    MIXER_STATE_MIXER_SAVE = 112
     
     '''this class is separated to make it possible to use the mixer
        functions on a secondary connection'''
@@ -66,7 +67,12 @@ class MixerState:
 
         elif(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_PARAMETER):
             print("Group:%u mixer:%u submixer:%u index:%u value:%.4f" % (m.mixer_group, m.mixer_index,m.mixer_sub_index, m.parameter_index, m.param_value))
-            
+
+        elif(m.data_type == 112):
+            if(m.data_value > 0):
+                print("Saved mixer group:%u with size:%u" % (m.mixer_group, m.data_value))
+            else:
+                print("Save mixer group:%u failed" % m.mixer_group)
         else:
             print("Received unknown data type in MIXER_DATA message")
             return False
@@ -100,7 +106,7 @@ class MixerState:
     def handle_command(self, master, mpstate, args):
         '''handle parameter commands'''
         param_wildcard = "*"
-        usage="Usage: mixer <count|all|sub|type|get|set>"
+        usage="Usage: mixer <count|all|missing|save|sub|type|get|set>"
         if len(args) < 1:
             print(usage)
             return
@@ -117,6 +123,11 @@ class MixerState:
         elif args[0] == "missing":
             if len(args) == 2:
                 self.cmd_missing(args, master)
+            else:
+                print(usage)
+        elif args[0] == "save":
+            if len(args) == 2:
+                self.cmd_save(args, master)
             else:
                 print(usage)
         elif args[0] == "sub":
@@ -150,8 +161,9 @@ class MixerState:
     def request_count(self, master, group):
         '''get a count of the mixers in a group'''
         mav = master
-        mav.mav.mixer_data_request_send(mav.target_system, mav.target_component,
-                                        group , 0, 0, 0, mavutil.mavlink.MIXER_DATA_TYPE_MIXER_COUNT)
+        mav.mav.command_long_send(mav.target_system, mav.target_component,
+                                           mavutil.mavlink.MAV_CMD_REQUEST_MIXER_DATA, 0, 
+                                           group, 0, 0, 0, mavutil.mavlink.MIXER_DATA_TYPE_MIXER_COUNT, 0, 0)
         self._last_time = time.time();
         self.state = self.MIXER_STATE_MIXER_COUNT
               
@@ -174,8 +186,11 @@ class MixerState:
         
     def request_sub(self, master, group, mixer):
         mav = master
-        mav.mav.mixer_data_request_send(mav.target_system, mav.target_component,
-                                        group, mixer, 0, 0, mavutil.mavlink.MIXER_DATA_TYPE_SUBMIXER_COUNT)
+        mav.mav.command_long_send(mav.target_system, mav.target_component,
+                                   mavutil.mavlink.MAV_CMD_REQUEST_MIXER_DATA, 0, 
+                                   group, mixer, 0, 0, mavutil.mavlink.MIXER_DATA_TYPE_SUBMIXER_COUNT, 0, 0)
+#         mav.mav.mixer_data_request_send(mav.target_system, mav.target_component,
+#                                         group, mixer, 0, 0, mavutil.mavlink.MIXER_DATA_TYPE_SUBMIXER_COUNT)
         self._last_time = time.time();
         self.state = self.MIXER_STATE_SUBMIXER_COUNT
       
@@ -187,8 +202,12 @@ class MixerState:
         
     def request_type(self, master, group, mixer, submixer):
         mav = master
-        mav.mav.mixer_data_request_send(mav.target_system, mav.target_component,
-                                        group, mixer, submixer, 0, mavutil.mavlink.MIXER_DATA_TYPE_MIXTYPE)
+        mav.mav.command_long_send(mav.target_system, mav.target_component,
+                           mavutil.mavlink.MAV_CMD_REQUEST_MIXER_DATA, 0, 
+                           group, mixer, submixer, 0, mavutil.mavlink.MIXER_DATA_TYPE_MIXTYPE, 0, 0)
+
+#         mav.mav.mixer_data_request_send(mav.target_system, mav.target_component,
+#                                         group, mixer, submixer, 0, mavutil.mavlink.MIXER_DATA_TYPE_MIXTYPE)
         self.state = self.MIXER_STATE_MIXER_TYPE
         self._last_time = time.time();
       
@@ -200,8 +219,9 @@ class MixerState:
 
     def request_parameter(self, master, group, mixer, submixer, parameter):
         mav = master
-        mav.mav.mixer_data_request_send(mav.target_system, mav.target_component,
-                                        group, mixer, submixer, parameter, mavutil.mavlink.MIXER_DATA_TYPE_PARAMETER)
+        mav.mav.command_long_send(mav.target_system, mav.target_component,
+                           mavutil.mavlink.MAV_CMD_REQUEST_MIXER_DATA, 0, 
+                           group, mixer, submixer, 0, mavutil.mavlink.MIXER_DATA_TYPE_PARAMETER, 0, 0)
         self.state = self.MIXER_STATE_MIXER_GET_PARAMETER
         self._last_time = time.time();
         
@@ -209,8 +229,17 @@ class MixerState:
     def cmd_set(self, args, master):
         '''get a mixer or submixer parameter in a group'''
         mav = master
-        mav.mav.mixer_parameter_set_send(mav.target_system, mav.target_component,
-                                        int(args[1]), int(args[2]), int(args[3]), int(args[4]), float(args[5]), mavutil.mavlink.MAV_PARAM_TYPE_REAL32)
+
+        group = int(args[1])
+        mixer = int(args[2])
+        submixer = int(args[3])
+        parameter = int(args[4])
+        value = float(args[5])
+        
+        mav.mav.command_long_send(mav.target_system, mav.target_component,
+                   mavutil.mavlink.MAV_CMD_SET_MIXER_PARAMETER, 0, 
+                   group, mixer, submixer, parameter, value, mavutil.mavlink.MAV_PARAM_TYPE_REAL32, 0)
+        
         self.state = self.MIXER_STATE_MIXER_SET_PARAMETER
         self._last_time = time.time();
         print("Requested parameter for group:%s mixer:%s submixer:%s index:%s value:%s" % (args[1],args[2],args[3],args[4],args[5]))
@@ -237,13 +266,27 @@ class MixerState:
                 else:
                     print("Timeout waiting for response to mixer data request")
                     self.state = self.MIXER_STATE_WAITING;
-                
+
+    def cmd_save(self, args, master):
+        mav = master
+        self._get_group = int(args[1])
+        mav.mav.mixer_data_request_send(mav.target_system, mav.target_component,
+                                        self._get_group, 0, 0, 0, 112)
+        self.state = self.MIXER_STATE_WAITING
+        self._last_time = time.time();
+
     def cmd_missing(self, args, master):
         print("Get missing mixer data for group %s" % (args[1]))
         self._get_retries = 0
         self._get_group = int(args[1])
         self.get_missing(master)
-                
+
+    def get_missing(self, master, group):
+        print("Get missing mixer data for group %u" % group)
+        self._get_retries = 0
+        self._get_group = int(args[1])
+        self.get_missing(master)                        
+
     def get_missing(self, master):
         #Check for missing mixer count
         mixer_count_msg = None
@@ -312,6 +355,8 @@ class MixerModule(mp_module.MPModule):
         self.pstate = MixerState(self.mav_param, self.vehicle_name)
         self.add_command('mixer', self.cmd_mixer, "mixer handling",
                          ["<all> (GROUP)",
+                          "<missing> (GROUP)",
+                          "<save> (GROUP)",
                           "<count> (GROUP)",
                           "<sub> (GROUP) (MIXER)",
                           "<type> (GROUP) (MIXER) (SUBMIXER)",
