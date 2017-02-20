@@ -3,7 +3,7 @@ import os
 import mp_menu
 from wxconsole_util import Value, Text
 from wx_loader import wx
-import webbrowser # handle url's in console window
+import webbrowser # Support opening URLs from console window
 
 class ConsoleFrame(wx.Frame):
     """ The main frame of the console"""
@@ -36,7 +36,7 @@ class ConsoleFrame(wx.Frame):
         self.timer.Start(100)
 
         self.Bind(wx.EVT_IDLE, self.on_idle)
-        self.Bind(wx.EVT_TEXT_URL, self.on_text_URL)
+        self.Bind(wx.EVT_TEXT_URL, self.on_text_url)
 
         self.Show(True)
         self.pending = []
@@ -50,12 +50,12 @@ class ConsoleFrame(wx.Frame):
         ret.call_handler()
         state.child_pipe_send.send(ret)
     
-    def on_text_URL(self, event):
-        mouseEvent = event.GetMouseEvent()
-        if mouseEvent.LeftDClick():
-            urlStart = event.GetURLStart()
-            urlEnd = event.GetURLEnd()
-            url = self.control.GetRange(urlStart, urlEnd)
+    def on_text_url(self, event):
+        mouse_event = event.GetMouseEvent()
+        if mouse_event.LeftDClick():
+            url_start = event.GetURLStart()
+            url_end = event.GetURLEnd()
+            url = self.control.GetRange(url_start, url_end)
             try:
                 browser_controller = webbrowser.get('google-chrome')
                 browser_controller.open_new_tab(url)
