@@ -11,6 +11,7 @@ class mavmemlog(mavutil.mavfile):
         self._count = 0
         self.rewind()
         self._flightmodes = []
+        self.mav_type = getattr(mav, 'mav_type',None)
         last_flightmode = None
         last_timestamp = None
         last_pct = 0
