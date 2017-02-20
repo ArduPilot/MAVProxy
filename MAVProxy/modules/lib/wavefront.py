@@ -44,7 +44,7 @@ import threading
 import sys
 
 class Parser(object):
-    def __init__(self, filename=None, string='', enable_cache=True):
+    def __init__(self, filename=None, string='', enable_cache=False):
         self.filename = filename
         self.string = string
         self.enable_cache = enable_cache
@@ -122,6 +122,9 @@ class Parser(object):
             )
 
             if self.enable_cache:
+                # FIXME: this will make the cache files be located at the same
+                # location as the source file, which might be somewhere the
+                # user doesn't have write access.
                 with open(self.filename + '.deps', 'w') as deps_file:
                     for filename in self.deps:
                         print(filename, file=deps_file)
