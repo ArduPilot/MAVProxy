@@ -173,8 +173,9 @@ class MixerState:
         self.mixer_data = []              
         mav = master
         self._get_group = int(args[1])
-        mav.mav.mixer_data_request_send(mav.target_system, mav.target_component,
-                                        self._get_group, 0, 0, 0, 100)
+        mav.mav.command_long_send(mav.target_system, mav.target_component,
+                                           mavutil.mavlink.MAV_CMD_REQUEST_MIXER_SEND_ALL, 0, 
+                                           self._get_group, 0, 0, 0, 0, 0, 0)
         self.state = self.MIXER_STATE_MIXER_GET_ALL
         self._last_time = time.time();
         print("Requested all data for group %s" % (args[1]))                
