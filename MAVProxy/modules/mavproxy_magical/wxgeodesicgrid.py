@@ -22,6 +22,7 @@ from OpenGL.GL import *
 from pymavlink import quaternion
 from pymavlink.rotmat import Vector3
 
+from MAVProxy.modules import mavproxy_magical as magical
 from MAVProxy.modules.lib import geodesic_grid
 from MAVProxy.modules.lib import opengl
 from MAVProxy.modules.lib import wavefront as wv
@@ -54,8 +55,7 @@ class Renderer(glrenderer.Renderer):
 
         self.vehicle = None
 
-        p = os.path
-        path = p.join(p.dirname(__file__), 'data', 'arrow.obj')
+        path = os.path.join(magical.datapath, 'arrow.obj')
         obj = wv.ObjParser(filename=path).parse()
         self.mag = opengl.WavefrontObject(obj)
         self.mag.local.scale(.88)

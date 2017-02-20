@@ -19,6 +19,7 @@ import time
 from pymavlink.mavutil import mavlink
 from wx.lib.wordwrap import wordwrap
 
+from MAVProxy.modules import mavproxy_magical as magical
 from MAVProxy.modules.lib import wavefront as wv
 from MAVProxy.modules.lib.wx_loader import wx
 from MAVProxy.modules.mavproxy_magical.wxgeodesicgrid import GeodesicGrid
@@ -603,8 +604,7 @@ class MagicalFrame(wx.Frame):
         self.SetState('idle')
         self.main_panel.GetSizer().Fit(self)
 
-        p = os.path
-        path = p.join(p.dirname(__file__), 'data', 'quadcopter.obj')
+        path = os.path.join(magical.datapath, 'quadcopter.obj')
         self.vehicle_loader = wv.ParserWorker(
             wv.ObjParser(filename=path, enable_cache=True),
             complete_callback=self.VehicleLoadCompleteCallback,

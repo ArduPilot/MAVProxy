@@ -26,6 +26,13 @@ from pymavlink import mavutil
 
 from MAVProxy.modules.lib import mp_module, mp_util
 
+try:
+    import pkg_resources
+    datapath = pkg_resources.resource_filename(__name__, 'data')
+except:
+    import os.path as p
+    datapath = p.join(p.dirname(p.abspath(__file__)), 'data')
+
 class MagicalModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(MagicalModule, self).__init__(mpstate, 'magical')
