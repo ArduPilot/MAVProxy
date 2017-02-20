@@ -606,7 +606,7 @@ class MagicalFrame(wx.Frame):
         p = os.path
         path = p.join(p.dirname(__file__), 'data', 'quadcopter.obj')
         self.vehicle_loader = wv.ParserWorker(
-            wv.ObjParser(filename=path, enable_cache=True),
+            wv.ObjParser(filename=path),
             complete_callback=self.VehicleLoadCompleteCallback,
         )
         self.vehicle_loader.start()
@@ -869,11 +869,7 @@ class MagicalFrame(wx.Frame):
     def OnLoaderTimer(self, evt):
         if self.vehicle_loader and self.vehicle_loader.is_alive():
             i, num_lines = self.vehicle_loader.get_progress()
-            if i == -1:
-                text = 'Loading 3D vehicle object from cache...'
-            else:
-                text = 'Loading 3D vehicle object...'
-            self.UpdateLoaderProgress(text, i, num_lines)
+            self.UpdateLoaderProgress('Loading 3D vehicle object...', i, num_lines)
 
     def OnTimer(self, evt):
         close_requested = False
