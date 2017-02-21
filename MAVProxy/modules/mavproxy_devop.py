@@ -85,6 +85,40 @@ class DeviceOpModule(mp_module.MPModule):
                                              bytes)
         self.request_id += 1
 
+
+    def read_show_reply(self, m):
+        # header
+        sys.stdout.write("     ")
+        for i in range(16):
+            sys.stdout.write("%3x" % i)
+        print("")
+        sys.stdout.write("%4x: " % (m.regstart-m.regstart%16,))
+        # leading no-data-read:
+        for i in range(m.regstart%16):
+            sys.stdout.write("-- ")
+
+        for i in range(m.count):
+            reg = i + m.regstart
+            if m.data[i]:
+                sys.stdout.write("%02x " % (m.data[i]))
+            else:
+                sys.stdout.write("   ")
+            if (reg+1) % 16 == 0 and i != m.count-1:
+                print("")
+                sys.stdout.write("%4x: " % ((reg+1)-(reg+1)%16,))
+
+        # trailing no-data-read
+        if (m.regstart+m.count) % 16 != 0:
+            if m.count < 16 and m.regstart % 16 != 0 and (m.regstart%16+m.count) <16:
+                # front of line is padded
+                count = 16 - m.regstart%16 - m.count
+            else:
+                count = 16 - (m.regstart+m.count)%16
+
+            for i in range(0,count):
+                sys.stdout.write("-- ")
+        print("")
+
     def mavlink_packet(self, m):
         '''handle a mavlink packet'''
         mtype = m.get_type()
@@ -93,13 +127,7 @@ class DeviceOpModule(mp_module.MPModule):
                 print("Operation %u failed: %u" % (m.request_id, m.result))
             else:
                 print("Operation %u OK: %u bytes" % (m.request_id, m.count))
-                for i in range(m.count):
-                    reg = i + m.regstart
-                    sys.stdout.write("%02x:%02x " % (reg, m.data[i]))
-                    if (i+1) % 16 == 0:
-                        print("")
-                if m.count % 16 != 0:
-                    print("")
+                self.read_show_reply(m)
 
         if mtype == "DEVICE_OP_WRITE_REPLY":
             if m.result != 0:
