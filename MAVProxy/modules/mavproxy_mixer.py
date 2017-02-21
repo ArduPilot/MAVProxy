@@ -22,6 +22,7 @@ class MixerState:
     MIXER_STATE_MIXER_TYPE = 6
     MIXER_STATE_MIXER_GET_PARAMETER = 7
     MIXER_STATE_MIXER_SET_PARAMETER = 8
+    MIXER_STATE_MIXER_GET_TYPE_COUNT = 9
     MIXER_STATE_MIXER_GET_MISSING = 50
     MIXER_STATE_MIXER_GET_ALL = 100
     MIXER_STATE_MIXER_SAVE = 112
@@ -67,6 +68,9 @@ class MixerState:
 
         elif(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_PARAMETER):
             print("Group:%u mixer:%u submixer:%u index:%u value:%.4f" % (m.mixer_group, m.mixer_index,m.mixer_sub_index, m.parameter_index, m.param_value))
+
+        elif(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_MIXERTYPE_COUNT):
+            print("Group:%u mixer type count:%u" % (m.mixer_group, m.data_value))
 
         elif(m.data_type == 112):
             if(m.data_value > 0):
@@ -130,6 +134,11 @@ class MixerState:
                 self.cmd_save(args, master)
             else:
                 print(usage)
+        elif args[0] == "types":
+            if len(args) == 2:
+                self.cmd_types(args, master)
+            else:
+                print(usage)
         elif args[0] == "sub":
             if len(args) == 3:
                 self.cmd_sub(args, master)
@@ -179,6 +188,19 @@ class MixerState:
         self.state = self.MIXER_STATE_MIXER_GET_ALL
         self._last_time = time.time();
         print("Requested all data for group %s" % (args[1]))                
+
+    def cmd_types(self, args, master):
+        '''get count of mixer types for a group'''
+        self.mixer_data = []              
+        mav = master
+        self._get_group = int(args[1])
+        mav.mav.command_long_send(mav.target_system, mav.target_component,
+                                           mavutil.mavlink.MAV_CMD_REQUEST_MIXER_TYPE_COUNT, 0, 
+                                           self._get_group, 0, 0, 0, 0, 0, 0)
+        self.state = self.MIXER_STATE_MIXER_GET_TYPE_COUNT
+        self._last_time = time.time();
+        print("Requested count of mixer types for group %s" % (args[1]))
+
 
     def cmd_sub(self, args, master):
         '''get a count of the sub mixers in a mixer in a group'''
@@ -359,6 +381,7 @@ class MixerModule(mp_module.MPModule):
                           "<missing> (GROUP)",
                           "<save> (GROUP)",
                           "<count> (GROUP)",
+                          "<types> (GROUP)",
                           "<sub> (GROUP) (MIXER)",
                           "<type> (GROUP) (MIXER) (SUBMIXER)",
                           "<get> (GROUP) (MIXER) (SUBMIXER) (PARAM_INDEX)",
