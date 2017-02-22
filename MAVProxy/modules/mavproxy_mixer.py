@@ -22,7 +22,7 @@ class MixerState:
     MIXER_STATE_MIXER_TYPE = 6
     MIXER_STATE_MIXER_GET_PARAMETER = 7
     MIXER_STATE_MIXER_SET_PARAMETER = 8
-    MIXER_STATE_MIXER_GET_TYPE_COUNT = 9
+    MIXER_STATE_MIXER_GET_CONN = 9
     MIXER_STATE_MIXER_GET_MISSING = 50
     MIXER_STATE_MIXER_GET_ALL = 100
     MIXER_STATE_MIXER_SAVE = 112
@@ -69,8 +69,10 @@ class MixerState:
         elif(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_PARAMETER):
             print("Group:%u mixer:%u submixer:%u index:%u value:%.4f" % (m.mixer_group, m.mixer_index,m.mixer_sub_index, m.parameter_index, m.param_value))
 
-        elif(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_MIXERTYPE_COUNT):
-            print("Group:%u mixer type count:%u" % (m.mixer_group, m.data_value))
+        elif(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_CONNECTION):
+            print("Group:%u mixer:%u submixer:%u" % (m.mixer_group, m.mixer_index,m.mixer_sub_index))
+            print("conn_type:%u connection:%u" % (m.connection_type, m.parameter_index))
+            print("group:%u channel:%u" % (m.connection_group, m.data_value))
 
         elif(m.data_type == 112):
             if(m.data_value > 0):
@@ -110,7 +112,7 @@ class MixerState:
     def handle_command(self, master, mpstate, args):
         '''handle parameter commands'''
         param_wildcard = "*"
-        usage="Usage: mixer <count|all|missing|save|sub|type|get|set>"
+        usage="Usage: mixer <count|all|missing|save|sub|type|get|set|conn>"
         if len(args) < 1:
             print(usage)
             return
@@ -134,11 +136,6 @@ class MixerState:
                 self.cmd_save(args, master)
             else:
                 print(usage)
-        elif args[0] == "types":
-            if len(args) == 2:
-                self.cmd_types(args, master)
-            else:
-                print(usage)
         elif args[0] == "sub":
             if len(args) == 3:
                 self.cmd_sub(args, master)
@@ -157,6 +154,11 @@ class MixerState:
         elif args[0] == "set":
             if len(args) == 6:
                 self.cmd_set(args, master)
+            else:
+                print(usage)
+        elif args[0] == "conn":
+            if len(args) == 6:
+                self.cmd_conn(args, master)
             else:
                 print(usage)
         else:
@@ -189,17 +191,21 @@ class MixerState:
         self._last_time = time.time();
         print("Requested all data for group %s" % (args[1]))                
 
-    def cmd_types(self, args, master):
+    def cmd_conn(self, args, master):
         '''get count of mixer types for a group'''
         self.mixer_data = []              
         mav = master
-        self._get_group = int(args[1])
+        group = int(args[1])
+        mixer = int(args[2])
+        sub_mixer = int(args[3])
+        conn_type = int(args[4])
+        conn_index = int(args[5])
         mav.mav.command_long_send(mav.target_system, mav.target_component,
-                                           mavutil.mavlink.MAV_CMD_REQUEST_MIXER_TYPE_COUNT, 0, 
-                                           self._get_group, 0, 0, 0, 0, 0, 0)
-        self.state = self.MIXER_STATE_MIXER_GET_TYPE_COUNT
+                                           mavutil.mavlink.MAV_CMD_REQUEST_MIXER_CONN, 0, 
+                                           group, mixer, sub_mixer, conn_type, conn_index, 0, 0)
+        self.state = self.MIXER_STATE_MIXER_GET_CONN
         self._last_time = time.time();
-        print("Requested count of mixer types for group %s" % (args[1]))
+#        print("Requested connection for group:%s mixer:%u, submixer:%u conn_type:%u conn_index:%u" % (args[1]), mixer, sub_mixer, conn_type, conn_index)
 
 
     def cmd_sub(self, args, master):
@@ -381,11 +387,11 @@ class MixerModule(mp_module.MPModule):
                           "<missing> (GROUP)",
                           "<save> (GROUP)",
                           "<count> (GROUP)",
-                          "<types> (GROUP)",
                           "<sub> (GROUP) (MIXER)",
                           "<type> (GROUP) (MIXER) (SUBMIXER)",
                           "<get> (GROUP) (MIXER) (SUBMIXER) (PARAM_INDEX)",
-                          "<set> (GROUP) (MIXER) (SUBMIXER) (PARAM_INDEX) (VALUE)"])
+#                          "<set> (GROUP) (MIXER) (SUBMIXER) (PARAM_INDEX) (VALUE)",
+                          "<conn> (GROUP) (MIXER) (SUBMIXER) (CONN_TYPE) (CONN_INDEX)"])
 #         if self.continue_mode and self.logdir != None:
 #             parmfile = os.path.join(self.logdir, 'mav.parm')
 #                 self.pstate.mav_param_set = set(self.mav_param.keys())
