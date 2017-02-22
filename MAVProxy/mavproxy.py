@@ -36,6 +36,9 @@ except Exception:
 if __name__ == '__main__':
       freeze_support()
 
+#The MAVLink version being used (None, "1.0", "2.0")
+mavversion = None
+
 class MPStatus(object):
     '''hold status information about the mavproxy'''
     def __init__(self):
@@ -522,8 +525,9 @@ def process_master(m):
         sys.stdout.write(str(s))
         sys.stdout.flush()
         return
-
-    if m.first_byte and opts.auto_protocol:
+    
+    global mavversion
+    if m.first_byte and mavversion == None:
         m.auto_mavlink_version(s)
     msgs = m.mav.parse_buffer(s)
     if msgs:
@@ -548,7 +552,8 @@ def process_mavlink(slave):
     except socket.error:
         return
     try:
-        if slave.first_byte and opts.auto_protocol:
+        global mavversion
+        if slave.first_byte and mavversion == None:
             slave.auto_mavlink_version(buf)
         msgs = slave.mav.parse_buffer(buf)
     except mavutil.mavlink.MAVError as e:
@@ -862,6 +867,33 @@ def run_script(scriptfile):
             mpstate.console.writeln("-> %s" % line)
         process_stdin(line)
     f.close()
+    
+def set_mav_version(mav10, mav20, autoProtocol, mavversionArg):
+    '''Set the Mavlink version based on commandline options'''
+    if(mav10 == True or mav20 == True or autoProtocol == True):
+        print("Warning: Using deprecated --mav10, --mav20 or --auto-protocol options. Use --mavversion instead")
+
+    #sanity check the options
+    if (mav10 == True or mav20 == True) and autoProtocol == True:
+        print("Error: Can't have [--mav10, --mav20] and --auto-protocol both True")
+        sys.exit(1)
+    if mav10 == True and mav20 == True:
+        print("Error: Can't have --mav10 and --mav20 both True")
+        sys.exit(1)
+    if mavversionArg is not None and (mav10 == True or mav20 == True or autoProtocol == True):
+        print("Error: Can't use --mavversion with legacy (--mav10, --mav20 or --auto-protocol) options")
+        sys.exit(1)
+
+    #and set the specific mavlink version (False = autodetect)
+    global mavversion
+    if mavversionArg == "1.0" or mav10 == True:
+        os.environ['MAVLINK09'] = '1'
+        mavversion = "1"
+    elif mavversionArg == "2.0" or mav20 == True:
+        os.environ['MAVLINK20'] = '1'
+        mavversion = "2"
+    else:
+        mavversion = None
 
 if __name__ == '__main__':
     from optparse import OptionParser
@@ -909,10 +941,10 @@ if __name__ == '__main__':
         action='append',
         default=[],
         help='Load the specified module. Can be used multiple times, or with a comma separated list')
-    parser.add_option("--mav09", action='store_true', default=False, help="Use MAVLink protocol 0.9")
     parser.add_option("--mav10", action='store_true', default=False, help="Use MAVLink protocol 1.0")
-    parser.add_option("--mav20", action='store_true', default=True, help="Use MAVLink protocol 2.0")
+    parser.add_option("--mav20", action='store_true', default=False, help="Use MAVLink protocol 2.0")
     parser.add_option("--auto-protocol", action='store_true', default=False, help="Auto detect MAVLink protocol version")
+    parser.add_option("--mavversion", type='choice', choices=['1.0', '2.0'] , help="Force MAVLink Version (1.0, 2.0). Otherwise autodetect version")
     parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
     parser.add_option("-c", "--continue", dest='continue_mode', action='store_true', default=False, help="continue logs")
     parser.add_option("--dialect",  default="ardupilotmega", help="MAVLink dialect")
@@ -934,10 +966,9 @@ if __name__ == '__main__':
     if os.path.exists("/usr/sbin/ModemManager"):
         print("WARNING: You should uninstall ModemManager as it conflicts with APM and Pixhawk")
 
-    if opts.mav09:
-        os.environ['MAVLINK09'] = '1'
-    if opts.mav20 and not opts.mav10:
-        os.environ['MAVLINK20'] = '1'
+    #set the Mavlink version, if required
+    set_mav_version(opts.mav10, opts.mav20, opts.auto_protocol, opts.mavversion)
+
     from pymavlink import mavutil, mavparm
     mavutil.set_dialect(opts.dialect)
 
