@@ -523,7 +523,7 @@ def process_master(m):
         sys.stdout.flush()
         return
 
-    if m.first_byte and opts.auto_protocol:
+    if m.first_byte and opts.opts.mavversion == "":
         m.auto_mavlink_version(s)
     msgs = m.mav.parse_buffer(s)
     if msgs:
@@ -548,7 +548,7 @@ def process_mavlink(slave):
     except socket.error:
         return
     try:
-        if slave.first_byte and opts.auto_protocol:
+        if slave.first_byte and opts.mavversion == "":
             slave.auto_mavlink_version(buf)
         msgs = slave.mav.parse_buffer(buf)
     except mavutil.mavlink.MAVError as e:
@@ -908,10 +908,7 @@ if __name__ == '__main__':
         action='append',
         default=[],
         help='Load the specified module. Can be used multiple times, or with a comma separated list')
-    parser.add_option("--mav09", action='store_true', default=False, help="Use MAVLink protocol 0.9")
-    parser.add_option("--mav10", action='store_true', default=False, help="Use MAVLink protocol 1.0")
-    parser.add_option("--mav20", action='store_true', default=True, help="Use MAVLink protocol 2.0")
-    parser.add_option("--auto-protocol", action='store_true', default=False, help="Auto detect MAVLink protocol version")
+    parser.add_option("--mavversion", default="", help="Force MAVLink Version (1.0, 2.0). Otherwise autodetect version")
     parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
     parser.add_option("-c", "--continue", dest='continue_mode', action='store_true', default=False, help="continue logs")
     parser.add_option("--dialect",  default="ardupilotmega", help="MAVLink dialect")
@@ -930,9 +927,9 @@ if __name__ == '__main__':
     if os.path.exists("/usr/sbin/ModemManager"):
         print("WARNING: You should uninstall ModemManager as it conflicts with APM and Pixhawk")
 
-    if opts.mav09:
+    if opts.mavversion == "1.0":
         os.environ['MAVLINK09'] = '1'
-    if opts.mav20 and not opts.mav10:
+    elif opts.mavversion == "2.0":
         os.environ['MAVLINK20'] = '1'
     from pymavlink import mavutil, mavparm
     mavutil.set_dialect(opts.dialect)
