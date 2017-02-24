@@ -58,21 +58,25 @@ class MixerState:
 
     def handle_mixer_data(self, master, m):
         if(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_MIXER_COUNT):
-            print("Group:%u mixer count:%u" % (m.mixer_group, m.data_value))
+            print("Group:%u mixer mix_count:%u" % (m.mixer_group, m.data_value))
 
         elif(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_SUBMIXER_COUNT):
-            print("Group:%u mixer:%u submixer count:%u" % (m.mixer_group, m.mixer_index, m.data_value))
+            print("Group:%u mixer:%u submixer sub_count:%u" % (m.mixer_group, m.mixer_index, m.data_value))
 
         elif(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_MIXTYPE):
-            print("Group:%u mixer:%u submixer:%u type:%u" % (m.mixer_group, m.mixer_index,m.mixer_sub_index, m.data_value))
+            print("Group:%u mixer:%u submixer:%u mix_type:%u" % (m.mixer_group, m.mixer_index,m.mixer_sub_index, m.data_value))
 
         elif(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_PARAMETER):
-            print("Group:%u mixer:%u submixer:%u index:%u value:%.4f" % (m.mixer_group, m.mixer_index,m.mixer_sub_index, m.parameter_index, m.param_value))
+            print("Group:%u mixer:%u submixer:%u index:%u param_value:%.4f" % (m.mixer_group, m.mixer_index,m.mixer_sub_index, m.parameter_index, m.param_value))
 
         elif(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_CONNECTION):
-            print("Group:%u mixer:%u submixer:%u" % (m.mixer_group, m.mixer_index,m.mixer_sub_index))
-            print("conn_type:%u connection:%u" % (m.connection_type, m.parameter_index))
-            print("group:%u channel:%u" % (m.connection_group, m.data_value))
+            print("Group:%u mixer:%u submixer:%u conn_type:%u connection:%u group:%u channel:%u" % (m.mixer_group, m.mixer_index,m.mixer_sub_index, m.connection_type, m.parameter_index, m.connection_group, m.data_value))
+
+        elif(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_PARAMETER_COUNT):
+            print("Group:%u mixer:%u submixer:%u param_count:%u" % (m.mixer_group, m.mixer_index,m.mixer_sub_index, m.data_value))
+
+        elif(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_CONNECTION_COUNT):
+            print("Group:%u mixer:%u submixer:%u conn_type:%u conn_count:%u" % (m.mixer_group, m.mixer_index, m.mixer_sub_index, m.connection_type, m.data_value))
 
         elif(m.data_type == 112):
             if(m.data_value > 0):
