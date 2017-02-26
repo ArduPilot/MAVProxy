@@ -46,12 +46,13 @@ Source: "..\windows\mavinit.scr"; DestDir: "{localappdata}\MAVProxy"; Flags: ign
 Source: "..\windows\version.txt"; DestDir: "{localappdata}\MAVProxy"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{group}\{#MyAppName} (No GUI)"; Filename: "{app}\{#MyAppExeName}"
 Name: "{group}\MAVExplorer"; Filename: "{app}\MAVExplorer.exe"
 Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 Name: "{group}\Documentation"; Filename: "http://ardupilot.github.io/MAVProxy/"
 Name: "{group}\Ardupilot MAVProxy Forum"; Filename: "http://discuss.ardupilot.org/c/ground-control-software/mavproxy"
 Name: "{group}\Download Updates"; Filename: "http://firmware.ap.ardupilot.org/Tools/MAVProxy/"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--map --console --load-module=graph"
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
