@@ -36,6 +36,9 @@ except Exception:
 if __name__ == '__main__':
       freeze_support()
 
+#The MAVLink version being used (None, "1.0", "2.0")
+mavversion = None
+
 class MPStatus(object):
     '''hold status information about the mavproxy'''
     def __init__(self):
@@ -523,7 +526,7 @@ def process_master(m):
         sys.stdout.flush()
         return
 
-    if m.first_byte and (opts.mavversion == "" or opts.auto_protocol):
+    if m.first_byte and mavversion == False:
         m.auto_mavlink_version(s)
     msgs = m.mav.parse_buffer(s)
     if msgs:
@@ -548,7 +551,7 @@ def process_mavlink(slave):
     except socket.error:
         return
     try:
-        if slave.first_byte and (opts.mavversion == "" or opts.auto_protocol):
+        if slave.first_byte and mavversion == False:
             slave.auto_mavlink_version(buf)
         msgs = slave.mav.parse_buffer(buf)
     except mavutil.mavlink.MAVError as e:
@@ -866,7 +869,7 @@ def set_mav_version(mav10, mav20, autoProtocol, mavversion):
     '''Set the Mavlink version based on commandline options'''
     if(mav10 == True or mav20 == True or autoProtocol == True):
         print("Warning: Using depreciated --mav10, --mav20 or --auto-protocol options. Use --mavversion instead")
-    
+
     #sanity check the options
     if (mav10 == True or mav20 == True) and autoProtocol == True:
         print("Error: Can't have [--mav10, --mav20] and --auto-protocol both True")
@@ -874,21 +877,22 @@ def set_mav_version(mav10, mav20, autoProtocol, mavversion):
     if mav10 == True and mav20 == True:
         print("Error: Can't have --mav10 and --mav20 both True")
         sys.exit(1)
-    if mavversion == '1.0' and (mav20 == True or autoProtocol == True):
+    if mavversion is not None and (mav10 == True or mav20 == True or autoProtocol == True):
         print("Error: Can't use --mavversion with legacy (--mav10, --mav20 or --auto-protocol) options")
         sys.exit(1)
-    if mavversion == '2.0' and (mav10 == True or autoProtocol == True):
-        print("Error: Can't use --mavversion with legacy (--mav10, --mav20 or --auto-protocol) options") 
-        sys.exit(1)  
-    if mavversion == '' and (mav10 == True or mav20 == True):
-        print("Error: Can't use --mavversion with legacy (--mav10, --mav20 or --auto-protocol) options")
-        sys.exit(1)          
-    
-    #and set the specific mavlink version         
+
+    #and set the specific mavlink version (False = autodetect)       
     if mavversion == "1.0" or mav10 == True:
         os.environ['MAVLINK09'] = '1'
+        mavversion = "1"
+        print "Using 1.0"
     elif mavversion == "2.0" or mav20 == True:
         os.environ['MAVLINK20'] = '1'
+        mavversion = "2"
+        print "Using 2.0"
+    else:
+        mavversion = False
+        print "Using AUTO"
 
 if __name__ == '__main__':
     from optparse import OptionParser
@@ -960,7 +964,7 @@ if __name__ == '__main__':
 
     #set the Mavlink version, if required
     set_mav_version(opts.mav10, opts.mav20, opts.auto_protocol, opts.mavversion)
-    
+
     from pymavlink import mavutil, mavparm
     mavutil.set_dialect(opts.dialect)
 
