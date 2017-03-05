@@ -885,14 +885,11 @@ def set_mav_version(mav10, mav20, autoProtocol, mavversion):
     if mavversion == "1.0" or mav10 == True:
         os.environ['MAVLINK09'] = '1'
         mavversion = "1"
-        print "Using 1.0"
     elif mavversion == "2.0" or mav20 == True:
         os.environ['MAVLINK20'] = '1'
         mavversion = "2"
-        print "Using 2.0"
     else:
         mavversion = False
-        print "Using AUTO"
 
 if __name__ == '__main__':
     from optparse import OptionParser
