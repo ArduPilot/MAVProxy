@@ -164,8 +164,13 @@ hopefully be fixed soon. See <a class="reference external" href="https://github.
 </div>
 <div class="section" id="linux">
 <h2>Linux<a class="headerlink" href="#linux" title="Permalink to this headline">¶</a></h2>
-<p>First, a few pre-requisite packages need to be installed:</p>
+<p>First, a few pre-requisite packages need to be installed.</p>
+<p>For Debian based systems:</p>
 <div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">apt</span><span class="o">-</span><span class="n">get</span> <span class="n">install</span> <span class="n">python</span><span class="o">-</span><span class="n">dev</span> <span class="n">python</span><span class="o">-</span><span class="n">opencv</span> <span class="n">python</span><span class="o">-</span><span class="n">wxgtk3</span><span class="o">.</span><span class="mi">0</span> <span class="n">python</span><span class="o">-</span><span class="n">pip</span> <span class="n">python</span><span class="o">-</span><span class="n">matplotlib</span> <span class="n">python</span><span class="o">-</span><span class="n">pygame</span> <span class="n">python</span><span class="o">-</span><span class="n">lxml</span>
+</pre></div>
+</div>
+<p>For Fedora based systems:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">dnf</span> <span class="n">install</span> <span class="n">python</span><span class="o">-</span><span class="n">devel</span> <span class="n">python</span><span class="o">-</span><span class="n">opencv</span> <span class="n">wxPython</span> <span class="n">python</span><span class="o">-</span><span class="n">pip</span> <span class="n">python</span><span class="o">-</span><span class="n">matplotlib</span> <span class="n">pygame</span> <span class="n">python</span><span class="o">-</span><span class="n">lxml</span> <span class="n">redhat</span><span class="o">-</span><span class="n">rpm</span><span class="o">-</span><span class="n">config</span>
 </pre></div>
 </div>
 <div class="admonition note">
@@ -177,6 +182,10 @@ as <code class="docutils literal"><span class="pre">python-wxgtk2.8</span></code
 <p class="first admonition-title">Note</p>
 <p class="last">MAVProxy runs on the Python 2.7.x environment. Ensure your system is running
 the correct version of Python.</p>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Fedora-based systems cannot run MAVProxy 1.5.7 or earlier, due to a bug in calling OpenCV.</p>
 </div>
 <p>Then download and install MAVProxy via Pypi. Prerequisites will be
 automatically downloaded too. Note a sudo may be required in some

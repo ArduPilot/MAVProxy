@@ -20,11 +20,19 @@ http://firmware.ardupilot.org/Tools/MAVProxy/.
 Linux
 =====
 
-First, a few pre-requisite packages need to be installed:
+First, a few pre-requisite packages need to be installed.
+
+For Debian based systems:
 
 .. code:: bash
 
     sudo apt-get install python-dev python-opencv python-wxgtk3.0 python-pip python-matplotlib python-pygame python-lxml
+    
+For Fedora based systems:
+
+.. code:: bash
+
+    sudo dnf install python-devel python-opencv wxPython python-pip python-matplotlib pygame python-lxml redhat-rpm-config
 
 .. note::
 
@@ -35,6 +43,11 @@ First, a few pre-requisite packages need to be installed:
 
     MAVProxy runs on the Python 2.7.x environment. Ensure your system is running
     the correct version of Python.
+    
+.. note::
+
+    Fedora-based systems cannot run MAVProxy 1.5.7 or earlier, due to a bug in calling OpenCV.
+
         
 Then download and install MAVProxy via Pypi. Prerequisites will be
 automatically downloaded too. Note a sudo may be required in some
