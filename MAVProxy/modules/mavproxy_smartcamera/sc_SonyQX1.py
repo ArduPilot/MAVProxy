@@ -31,6 +31,8 @@ from datetime import datetime
 # Module Dependent Headers
 import requests, json, socket, StringIO
 import xml.etree.ElementTree as ET
+import urllib
+from sc_ExifWriter import ExifWriter
 
 # Own Headers
 import ssdp
@@ -513,30 +515,37 @@ class SmartCamera_SonyQX():
 
     def boGetAllSessionPictures(self, sLogFile):
         
-        #        print("Picture Download started")
+        print("Picture Download started")
+        file = open(self.sCurrentURLLogFilename, "r")
         
-        #         if sLogFile <> 0
-        #     reading contents
-        #        file = open(self.sCurrentURLLogFilename, "r")
-        #    else:
-        #        file = open(sLogFile, "r")
 
-#         try:
-#           for url in file:
-#               url = url.rstrip('\n')
-#               #now download link
-#               start = self.sLatestImageURL.find('DSC')
-#               end = self.sLatestImageURL.find('JPG', start) + 3
-#
-#               filename = url[start:end]
-#               print("Downloading %s" % filename)
-#               req = requests.request('GET', url)
-#               open('/sdcard/log/%s' % filename, 'w').write(req.content)
-#
-#       except fileError:
-#           print("Error in picture download")
-#
-#       file.close()
+        for url in file:
+            url = url.rstrip('\n')
+            #now download link
+            start = self.sLatestImageURL.find('DSC')
+            end = self.sLatestImageURL.find('JPG', start) + 3
+            filename = url[start:end]
+            print("Downloading %s" % filename)
+
+            geotagFile = open(self.sCurrentGeoRefFilename, "r")
+            for line in geotagFile:
+                if filename in line:
+                    currFileLatitude = float(line.split(',')[1])
+                    currFileLongitude = float(line.split(',')[2])
+                    currFileAltitude = float(line.split(',')[3])
+                    print ("%s,%f,%f,%f" % (filename, currFileLatitude, currFileLongitude, currFileAltitude))
+            geotagFile.close()
+            
+            try:
+                req = requests.request('GET', url)
+                open('/sdcard/log/%s' % filename, 'w').write(req.content)
+                ExifWriter.write_gps('/sdcard/log/%s' % filename, currFileLatitude, currFileLongitude, currFileAltitude)
+            except Exception as ex:
+                template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+                message = template.format(type(ex).__name__, ex.args)
+                print message
+            
+        file.close()
 
         return False
     
