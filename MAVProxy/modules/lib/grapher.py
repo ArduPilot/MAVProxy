@@ -229,28 +229,29 @@ class MavGraph(object):
                              linestyle=linestyle, marker=marker, tz=None)
 
             empty = False
-            if self.show_flightmode:
-                alpha = 0.04
-                for i in range(len(self.modes)-1):
-                    mode_name = self.modes[i][1]
-                    c = self.flightmode_colour(mode_name)
-                    self.ax1.axvspan(self.modes[i][0], self.modes[i+1][0], fc=c, ec=edge_colour, alpha=alpha)
-                    self.modes_plotted[self.modes[i][1]] = (c, alpha)
-                mode_name = self.modes[-1][1]
+            
+        if self.show_flightmode:
+            alpha = 0.3
+            for i in range(len(self.modes)-1):
+                mode_name = self.modes[i][1]
                 c = self.flightmode_colour(mode_name)
-                self.ax1.axvspan(self.modes[-1][0], self.ax1.get_xlim()[1], fc=c, ec=edge_colour, alpha=alpha)
-                self.modes_plotted[self.modes[-1][1]] = (c, alpha)
+                self.ax1.axvspan(self.modes[i][0], self.modes[i+1][0], fc=c, ec=edge_colour, alpha=alpha)
+                self.modes_plotted[self.modes[i][1]] = (c, alpha)
+            mode_name = self.modes[-1][1]
+            c = self.flightmode_colour(mode_name)
+            self.ax1.axvspan(self.modes[-1][0], self.ax1.get_xlim()[1], fc=c, ec=edge_colour, alpha=alpha)
+            self.modes_plotted[self.modes[-1][1]] = (c, alpha)
 
-            if empty:
-                print("No data to graph")
-                return
+        if empty:
+            print("No data to graph")
+            return
 
         if self.show_flightmode:
             mode_patches = []
             for mode in self.modes_plotted.keys():
                 (color, alpha) = self.modes_plotted[mode]
                 mode_patches.append(matplotlib.patches.Patch(color=color,
-                                                             label=mode, alpha=alpha*5))
+                                                             label=mode, alpha=alpha*1.5))
             labels = [patch.get_label() for patch in mode_patches]
             if ax1_labels != []:
                 patches_legend = matplotlib.pyplot.legend(mode_patches, labels, loc=self.legend_flightmode)
