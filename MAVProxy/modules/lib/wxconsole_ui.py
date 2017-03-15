@@ -3,7 +3,6 @@ import os
 import mp_menu
 from wxconsole_util import Value, Text
 from wx_loader import wx
-import webbrowser # Support opening URLs from console window
 
 class ConsoleFrame(wx.Frame):
     """ The main frame of the console"""
@@ -49,17 +48,24 @@ class ConsoleFrame(wx.Frame):
             return
         ret.call_handler()
         state.child_pipe_send.send(ret)
-    
+
     def on_text_url(self, event):
+        '''handle double clicks on URL text'''
+        try:
+            import webbrowser
+        except ImportError:
+            return
         mouse_event = event.GetMouseEvent()
         if mouse_event.LeftDClick():
             url_start = event.GetURLStart()
             url_end = event.GetURLEnd()
             url = self.control.GetRange(url_start, url_end)
             try:
+                # attempt to use google-chrome
                 browser_controller = webbrowser.get('google-chrome')
                 browser_controller.open_new_tab(url)
-            except:
+            except webbrowser.Error:
+                # use the system configured default browser
                 webbrowser.open_new_tab(url)
 
     def on_idle(self, event):
