@@ -47,7 +47,8 @@ class MEState(object):
               MPSetting('linestyle', str, None, 'linestyle'),
               MPSetting('show_flightmode', bool, True, 'show flightmode'),
               MPSetting('legend', str, 'upper left', 'legend position'),
-              MPSetting('legend2', str, 'upper right', 'legend2 position')
+              MPSetting('legend2', str, 'upper right', 'legend2 position'),
+              MPSetting('title', str, '', None, tab='Title')              
               ]
             )
 
@@ -268,6 +269,7 @@ def display_graph(graphdef):
 
     #setup the graph, then pass to a new process and display
     mg = grapher.MavGraph()
+    mg.set_title(mestate.settings.title)
     mg.set_marker(mestate.settings.marker)
     mg.set_condition(mestate.settings.condition)
     mg.set_xaxis(mestate.settings.xaxis)

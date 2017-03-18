@@ -49,6 +49,7 @@ class MavGraph(object):
         self.marker = None
         self.linestyle = None
         self.show_flightmode = True
+        self.title = 'MavGraph'
         self.legend = 'upper left'
         self.legend2 = 'upper right'
         self.legend_flightmode = 'lower left'
@@ -92,6 +93,10 @@ class MavGraph(object):
     def set_legend(self, legend):
         '''set graph legend'''
         self.legend = legend
+
+    def set_title(self, title):
+        '''set graph title'''
+        self.title = title
 
     def set_show_flightmode(self, value):
         '''set to true if flightmodes are to be shown'''
@@ -161,6 +166,7 @@ class MavGraph(object):
         pylab.ion()
         fig = pylab.figure(num=1, figsize=(12,6))
         self.ax1 = fig.gca()
+        self.ax1.set_title(self.title, fontsize=20, verticalalignment='bottom')
         ax2 = None
         for i in range(0, len(fields)):
             if len(x[i]) == 0: continue
@@ -429,5 +435,6 @@ if __name__ == "__main__":
     mg.set_legend2(args.legend2)
     mg.set_multi(args.multi)
     mg.set_show_flightmode(args.show_flightmode)
-    mg.process()
-    mg.show()
+    mg.set_title("title")
+    mg.process('', '')
+    mg.show(1)
