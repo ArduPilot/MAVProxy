@@ -10,7 +10,7 @@ The battery module provides warnings to the user if any of the APM power
 sources reach a critical level.
 
 Status
-===========
+======
 
 Prints out the current power level of all connected power sources
 
@@ -19,7 +19,7 @@ Prints out the current power level of all connected power sources
     bat
 
 Settings
-==========================
+========
 
 The configurable settings for this module can be controlled by:
 

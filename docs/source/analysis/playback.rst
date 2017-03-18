@@ -24,10 +24,10 @@ connected to it via:
 The playback program will have a small GUI to pause, fast forward and
 slow down the playback speed.
 
-The output IP address and port can be overridden via this commandline
+The output IP address and port can be overridden via the ``--out`` commandline
 argument:
 
 .. code:: bash
 
-    --out=127.0.0.1:14550
+    mavplayback.py logfile.tlog --out=127.0.0.1:14550
 

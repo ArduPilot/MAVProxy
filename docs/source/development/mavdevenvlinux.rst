@@ -21,7 +21,7 @@ Use git to download the MAVProxy source:
     git clone https://github.com/ArduPilot/MAVProxy.git
 
 After making the desired changes, MAVProxy is required to be installed
-(the modules won't work otherwise). This needs to happen after any
+(any change to the modules won't work otherwise). This needs to happen after any
 changes to the source code. This can be done by:
 
 .. code:: bash

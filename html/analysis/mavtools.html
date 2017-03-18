@@ -1,0 +1,266 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Offline Tools &mdash; MAVProxy 1.6.1 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="MAVProxy 1.6.1 documentation" href="../index.html"/>
+        <link rel="up" title="Post-flight Analysis" href="index.html"/>
+        <link rel="next" title="MAVExplorer" href="mavexp.html"/>
+        <link rel="prev" title="Playback" href="playback.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-nav-search">
+        
+
+        
+          <a href="../index.html" class="icon icon-home"> MAVProxy
+        
+
+        
+        </a>
+
+        
+          
+          
+            <div class="version">
+              1.6
+            </div>
+          
+        
+
+        
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+        
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+        
+          
+          
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/index.html">Modules</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Post-flight Analysis</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="playback.html">Playback</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Offline Tools</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#mavgraph-py">mavgraph.py</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#mavtogpx-py">mavtogpx.py</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#mavparms-py">mavparms.py</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#mavflighttime-py">mavflighttime.py</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#mavflightmodes-py">mavflightmodes.py</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="mavexp.html">MAVExplorer</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
+</ul>
+
+          
+        
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../index.html">MAVProxy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="index.html">Post-flight Analysis</a> &raquo;</li>
+      
+    <li>Offline Tools</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="offline-tools">
+<h1>Offline Tools<a class="headerlink" href="#offline-tools" title="Permalink to this headline">¶</a></h1>
+<p>There are a couple of offline tools within the MAVLink package that can
+be used for a postflight analysis.</p>
+<div class="section" id="mavgraph-py">
+<h2>mavgraph.py<a class="headerlink" href="#mavgraph-py" title="Permalink to this headline">¶</a></h2>
+<p>This can graph any of the flight data.</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavgraph</span><span class="o">.</span><span class="n">py</span> <span class="n">flight</span><span class="o">.</span><span class="n">tlog</span> <span class="n">VFR_HUD</span><span class="o">.</span><span class="n">alt</span>
+</pre></div>
+</div>
+<p>Other than specifying the tlog file, the commands are exactly the same
+as the <a class="reference internal" href="../modules/graph.html"><span class="doc">graph</span></a> module in MAVProxy.</p>
+</div>
+<div class="section" id="mavtogpx-py">
+<h2>mavtogpx.py<a class="headerlink" href="#mavtogpx-py" title="Permalink to this headline">¶</a></h2>
+<p>Exports the GPS points in a logfile to the GPX format, which can be read
+by Google Earth.</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavtogpx</span><span class="o">.</span><span class="n">py</span> <span class="n">flight</span><span class="o">.</span><span class="n">tlog</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="mavparms-py">
+<h2>mavparms.py<a class="headerlink" href="#mavparms-py" title="Permalink to this headline">¶</a></h2>
+<p>Finds the APM parameters in a logfile and displays them on the console.</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavparms</span><span class="o">.</span><span class="n">py</span> <span class="n">flight</span><span class="o">.</span><span class="n">tlog</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="mavflighttime-py">
+<h2>mavflighttime.py<a class="headerlink" href="#mavflighttime-py" title="Permalink to this headline">¶</a></h2>
+<p>Prints out the total time spent in the air. Note that a threshold of
+3m/s defines the difference between air time and ground time. This can
+be changed by the <code class="docutils literal"><span class="pre">--groundspeed=</span></code> argument.</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavflighttime</span><span class="o">.</span><span class="n">py</span> <span class="n">flight</span><span class="o">.</span><span class="n">tlog</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="mavflightmodes-py">
+<h2>mavflightmodes.py<a class="headerlink" href="#mavflightmodes-py" title="Permalink to this headline">¶</a></h2>
+<p>Prints out the timestamp and name of each flight mode change in a
+logfile.</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavflightmodes</span><span class="o">.</span><span class="n">py</span> <span class="n">flight</span><span class="o">.</span><span class="n">tlog</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="mavexp.html" class="btn btn-neutral float-right" title="MAVExplorer" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="playback.html" class="btn btn-neutral" title="Playback" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
+<div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Offline%20Tools%20-%20&body=URL:%20../analysis/mavtools%0ATitle:%20Offline%20Tools%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
+    <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
+    This is an ArduPilot project.</p>     
+
+    <p>
+
+    </p>
+  </div>
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'1.6.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

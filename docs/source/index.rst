@@ -27,8 +27,6 @@ Features
    moving maps, joysticks, antenna trackers, etc
 -  Tab-completion of commands.
 
-A list of commits to MAVProxy (closest thing to a changelog that is
-available) can be seen `here <https://github.com/ArduPilot/MAVProxy/commits/master>`_.
 
 Screenshots
 ============
@@ -75,7 +73,7 @@ This page was generated using Sphinx SSG and is hosted using `GitHub Pages <http
     getting_started/index
     uav_configuration/index
     modules/index
-    analysis_and_simulation/index
+    analysis/index
     development/index
     cuav_module/index
 

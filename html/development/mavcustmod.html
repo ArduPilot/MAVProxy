@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Module Development &mdash; MAVProxy 1.5.7 documentation</title>
+  <title>Module Development &mdash; MAVProxy 1.6.1 documentation</title>
   
 
   
@@ -31,7 +31,7 @@
 
   
         <link rel="search" title="Search" href="../search.html"/>
-    <link rel="top" title="MAVProxy 1.5.7 documentation" href="../index.html"/>
+    <link rel="top" title="MAVProxy 1.6.1 documentation" href="../index.html"/>
         <link rel="up" title="Development" href="index.html"/>
         <link rel="next" title="Image Processing with cuav" href="../cuav_module/index.html"/>
         <link rel="prev" title="Windows Development Environment" href="mavdevenvwindows.html"/> 
@@ -61,7 +61,7 @@
           
           
             <div class="version">
-              1.5.7
+              1.6
             </div>
           
         
@@ -86,7 +86,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting Started</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../modules/index.html">Modules</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../analysis/index.html">Post-flight Analysis</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Development</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="mavdevenvlinux.html">Linux Development Environment</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mavdevenvwindows.html">Windows Development Environment</a></li>
@@ -205,9 +205,9 @@ filtering the incoming packets for the relevant data:</p>
 airspeed of the vehicle, whenever a <code class="docutils literal"><span class="pre">VFR_HUD</span></code> packet is received.</p>
 <p>There are a great number of MAVProxy modules, so the best reference
 would be to look through the these
-<a class="reference external" href="https://github.com/tridge/MAVProxy/tree/master/MAVProxy/modules">modules</a>
+<a class="reference external" href="https://github.com/ArduPilot/MAVProxy/tree/master/MAVProxy/modules">modules</a>
 for examples of what you want to do.</p>
-<p>In particular, the <code class="docutils literal"><span class="pre">example</span></code> module provides annotated code of many
+<p>In particular, the <code class="docutils literal"><span class="pre">example</span></code> module (mavproxy_example.py) provides annotated code of many
 common tasks that can be performed with modules.</p>
 </div>
 </div>
@@ -256,7 +256,7 @@ common tasks that can be performed with modules.</p>
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../',
-            VERSION:'1.5.7',
+            VERSION:'1.6.1',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true

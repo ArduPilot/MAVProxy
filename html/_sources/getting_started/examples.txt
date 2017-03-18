@@ -23,6 +23,6 @@ Use multiple radio links (one serial, one network) to the remote vehicle. This i
 
 .. code:: bash
 
-    mavproxy.py --master=\dev\ttyUSB0,57600 --master=192.168.16.15:2626
+    mavproxy.py --master=\dev\ttyUSB0,57600 --master=udpin:192.168.16.15:2626
     
     

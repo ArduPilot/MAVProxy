@@ -75,9 +75,9 @@ airspeed of the vehicle, whenever a ``VFR_HUD`` packet is received.
 
 There are a great number of MAVProxy modules, so the best reference
 would be to look through the these
-`modules <https://github.com/tridge/MAVProxy/tree/master/MAVProxy/modules>`_
+`modules <https://github.com/ArduPilot/MAVProxy/tree/master/MAVProxy/modules>`_
 for examples of what you want to do.
 
-In particular, the ``example`` module provides annotated code of many 
+In particular, the ``example`` module (mavproxy_example.py) provides annotated code of many 
 common tasks that can be performed with modules.
 

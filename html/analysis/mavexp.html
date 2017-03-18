@@ -1,0 +1,241 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>MAVExplorer &mdash; MAVProxy 1.6.1 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="MAVProxy 1.6.1 documentation" href="../index.html"/>
+        <link rel="up" title="Post-flight Analysis" href="index.html"/>
+        <link rel="next" title="Development" href="../development/index.html"/>
+        <link rel="prev" title="Offline Tools" href="mavtools.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-nav-search">
+        
+
+        
+          <a href="../index.html" class="icon icon-home"> MAVProxy
+        
+
+        
+        </a>
+
+        
+          
+          
+            <div class="version">
+              1.6
+            </div>
+          
+        
+
+        
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+        
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+        
+          
+          
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/index.html">Modules</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Post-flight Analysis</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="playback.html">Playback</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mavtools.html">Offline Tools</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">MAVExplorer</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
+</ul>
+
+          
+        
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../index.html">MAVProxy</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="index.html">Post-flight Analysis</a> &raquo;</li>
+      
+    <li>MAVExplorer</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="mavexplorer">
+<h1>MAVExplorer<a class="headerlink" href="#mavexplorer" title="Permalink to this headline">¶</a></h1>
+<p>The MAVExplorer tool is an interactive tool for graphing APM logfiles.</p>
+<p>Under Linux, it can be accessed by:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavexplorer</span><span class="o">.</span><span class="n">py</span> <span class="n">inputlog</span><span class="o">.</span><span class="n">tlog</span>
+</pre></div>
+</div>
+<p>Under Windows, it can be found in the Start Menu with the rest of MAVProxy.</p>
+<p>Use the MAVExplorer-&gt;Open menu to open tlog or dataflash files to graph.</p>
+<div class="figure">
+<img alt="../_images/mavexp1.png" src="../_images/mavexp1.png" />
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">If there is a space in the file/folder name, MAVExplorer will not be able to open the file.
+Only use file and folder paths with no spaces in them.</p>
+</div>
+<p>The Graphs menu will automatically populate based upon the available packets in the logfile.</p>
+<p>To narrow down the log file to a particular phase of the logfile, select the relevant mode from the FlightMode menu. Any future graphs will only cover the selected section of the flight.</p>
+<div class="figure">
+<img alt="../_images/mavexp2.png" src="../_images/mavexp2.png" />
+</div>
+<p>The Display menu contains methods for displaying a map of the GPS points of the logfile and reloading the logfile. Additionally there are methods for creating and saving custom graphs, using the same notation as with the <a class="reference internal" href="../modules/graph.html"><span class="doc">graph</span></a> module in MAVProxy.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Saving custom graphs is not currently available on Windows.</p>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../development/index.html" class="btn btn-neutral float-right" title="Development" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="mavtools.html" class="btn btn-neutral" title="Offline Tools" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
+<div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=MAVExplorer%20-%20&body=URL:%20../analysis/mavexp%0ATitle:%20MAVExplorer%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
+    <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
+    This is an ArduPilot project.</p>     
+
+    <p>
+
+    </p>
+  </div>
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'1.6.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Joystick Input &mdash; MAVProxy 1.5.7 documentation</title>
+  <title>Joystick Input &mdash; MAVProxy 1.6.1 documentation</title>
   
 
   
@@ -31,10 +31,10 @@
 
   
         <link rel="search" title="Search" href="../search.html"/>
-    <link rel="top" title="MAVProxy 1.5.7 documentation" href="../index.html"/>
+    <link rel="top" title="MAVProxy 1.6.1 documentation" href="../index.html"/>
         <link rel="up" title="Modules" href="index.html"/>
         <link rel="next" title="KML Importer" href="kmlread.html"/>
-        <link rel="prev" title="HIL" href="hil.html"/> 
+        <link rel="prev" title="Horizon" href="horizon.html"/> 
 
   
   <script src="../_static/js/modernizr.min.js"></script>
@@ -61,7 +61,7 @@
           
           
             <div class="version">
-              1.5.7
+              1.6
             </div>
           
         
@@ -102,10 +102,12 @@
 <li class="toctree-l2"><a class="reference internal" href="gimbal.html">Gimbal Management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="graph.html">Graphing Live Data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="hil.html">HIL</a></li>
+<li class="toctree-l2"><a class="reference internal" href="horizon.html">Horizon</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Joystick Input</a></li>
 <li class="toctree-l2"><a class="reference internal" href="kmlread.html">KML Importer</a></li>
 <li class="toctree-l2"><a class="reference internal" href="link.html">Link Management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="log.html">Log Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="magical.html">Compass Calibration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="map.html">Moving Map</a></li>
 <li class="toctree-l2"><a class="reference internal" href="misseditor.html">Mission Editor</a></li>
 <li class="toctree-l2"><a class="reference internal" href="nsh.html">Nuttx Shell</a></li>
@@ -122,7 +124,7 @@
 <li class="toctree-l2"><a class="reference internal" href="index.html#module-management">Module Management</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../analysis/index.html">Post-flight Analysis</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
 </ul>
@@ -178,8 +180,9 @@
 from a joystick (or similar) as RC commands to the APM. Thus it can be
 used for control of a UAV without an RC transmitter.</p>
 <p>When the module is loaded and if there is a compatible joystick detected,
-control signals will start automatically be passed through. In nearly all
-cases only the 4 flight axes are passed through. Usage of the other RC channels  should be done on the command line.</p>
+control signals will start automatically be passed through. Depending on the joystick type,
+up to 8 channels will be passed through. Use <code class="docutils literal"><span class="pre">joystick</span> <span class="pre">status</span></code> to view which channels are
+being passed through.</p>
 <p>The following joysticks and RC transmitter dongles are compatible:</p>
 <ul class="simple">
 <li><a class="reference external" href="http://www.hobbyking.com/hobbyking/store/__13597__USB_Simulator_Cable_XTR_AeroFly_FMS.html">Carolbox
@@ -193,7 +196,14 @@ USB</a></li>
 Adapter</a></li>
 <li>Cheap Ebay &#8216;FMS Simulator&#8217;</li>
 <li><a class="reference external" href="http://www.ikarus.net/deutsch-infos-zubehor/die-ikarus-interfacekabel/?lang=en">IPACS easyFly2 Interface</a></li>
+<li><a class="reference external" href="https://hobbyking.com/en_us/frsky-2-4ghz-accst-taranis-x9d-plus-and-x8r-combo-digital-telemetry-radio-system-mode-2.html/?___store=en_us">FRSky Taranis</a></li>
 </ul>
+<p>The following commands are available with the module:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">joystick</span> <span class="n">probe</span>
+<span class="n">joystick</span> <span class="n">status</span>
+</pre></div>
+</div>
+<p>The first command will re-detect any joysticks in the system, whilst the second command will give the status of the currently loaded joystick.</p>
 </div>
 
 
@@ -206,7 +216,7 @@ Adapter</a></li>
         <a href="kmlread.html" class="btn btn-neutral float-right" title="KML Importer" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="hil.html" class="btn btn-neutral" title="HIL" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="horizon.html" class="btn btn-neutral" title="Horizon" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
@@ -240,7 +250,7 @@ Adapter</a></li>
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../',
-            VERSION:'1.5.7',
+            VERSION:'1.6.1',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true

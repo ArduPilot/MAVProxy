@@ -28,10 +28,12 @@ monitoring applications.
     gimbal
     graph
     hil
+    horizon
     joystick
     kmlread
     link
     log
+    magical
     map
     misseditor
     nsh

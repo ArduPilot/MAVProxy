@@ -20,7 +20,7 @@ Next, open up a console in the Python scripts install path
 .. code:: bash
 
     cd C:\Python27\Scripts
-    pip install C:\Users\Stephen\Desktop\numpy.whl
+    pip install <path to downloaded file>
 
 Use ``pip`` to install the other packages. Note that some packages 
 require specific older versions to install:

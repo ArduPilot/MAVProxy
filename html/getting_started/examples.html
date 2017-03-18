@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Examples &mdash; MAVProxy 1.5.7 documentation</title>
+  <title>Examples &mdash; MAVProxy 1.6.1 documentation</title>
   
 
   
@@ -31,7 +31,7 @@
 
   
         <link rel="search" title="Search" href="../search.html"/>
-    <link rel="top" title="MAVProxy 1.5.7 documentation" href="../index.html"/>
+    <link rel="top" title="MAVProxy 1.6.1 documentation" href="../index.html"/>
         <link rel="up" title="Getting Started" href="index.html"/>
         <link rel="next" title="MAVProxy Wifi Bridge" href="mavbridge.html"/>
         <link rel="prev" title="Logfiles" href="logfiles.html"/> 
@@ -61,7 +61,7 @@
           
           
             <div class="version">
-              1.5.7
+              1.6
             </div>
           
         
@@ -96,7 +96,7 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../modules/index.html">Modules</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../analysis_and_simulation/index.html">Analysis and Simulation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../analysis/index.html">Post-flight Analysis</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
 </ul>
@@ -158,7 +158,7 @@ mavproxy.py –master=udpout:xxx.xxx.xxx.xxx:14550
 </pre></div>
 </div>
 <p>Use multiple radio links (one serial, one network) to the remote vehicle. This is useful for situations where a backup radio link is required:</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span>\<span class="n">dev</span>\<span class="n">ttyUSB0</span><span class="p">,</span><span class="mi">57600</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="mf">192.168</span><span class="o">.</span><span class="mf">16.15</span><span class="p">:</span><span class="mi">2626</span>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span>\<span class="n">dev</span>\<span class="n">ttyUSB0</span><span class="p">,</span><span class="mi">57600</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">udpin</span><span class="p">:</span><span class="mf">192.168</span><span class="o">.</span><span class="mf">16.15</span><span class="p">:</span><span class="mi">2626</span>
 </pre></div>
 </div>
 </div>
@@ -207,7 +207,7 @@ mavproxy.py –master=udpout:xxx.xxx.xxx.xxx:14550
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../',
-            VERSION:'1.5.7',
+            VERSION:'1.6.1',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true
