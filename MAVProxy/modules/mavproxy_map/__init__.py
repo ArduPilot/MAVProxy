@@ -49,7 +49,9 @@ class MapModule(mp_module.MPModule):
               ('showahrs3pos', int, 0),
               ('brightness', float, 1),
               ('rallycircle', bool, False),
-              ('loitercircle',bool, False)])
+              ('loitercircle',bool, False),
+              ('showdirection', bool, False)])
+        
         service='OviHybrid'
         if 'MAP_SERVICE' in os.environ:
             service = os.environ['MAP_SERVICE']
@@ -171,8 +173,7 @@ class MapModule(mp_module.MPModule):
                                              MPMenuItem('WP Move', returnkey='popupMissionMove')])
                 self.mpstate.map.add_object(mp_slipmap.SlipPolygon('mission %u' % i, p,
                                                                    layer='Mission', linewidth=2, colour=(255,255,255),
-                                                                   popup_menu=popup))
-        loiter_rad = self.get_mav_param('WP_LOITER_RAD')
+                                                                   arrow = self.map_settings.showdirection, popup_menu=popup))
         labeled_wps = {}
         self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('LoiterCircles'))
         for i in range(len(self.mission_list)):
@@ -187,7 +188,19 @@ class MapModule(mp_module.MPModule):
 
                     if (self.map_settings.loitercircle and
                         self.module('wp').wploader.wp_is_loiter(next_list[j])):
-                        self.mpstate.map.add_object(mp_slipmap.SlipCircle('Loiter Circle %u' % (next_list[j] + 1), 'LoiterCircles', polygons[i][j], abs(loiter_rad), (255, 255, 255), 2))
+                        wp = self.module('wp').wploader.wp(next_list[j])                    
+                        if wp.command != mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT and wp.param3 != 0:
+                            # wp radius and direction is defined by the mission
+                            loiter_rad = wp.param3
+                        elif wp.command == mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT and wp.param2 != 0:
+                            # wp radius and direction is defined by the mission
+                            loiter_rad = wp.param2
+                        else:
+                            # wp radius and direction is defined by the parameter
+                            loiter_rad = self.get_mav_param('WP_LOITER_RAD')
+                            
+                        self.mpstate.map.add_object(mp_slipmap.SlipCircle('Loiter Circle %u' % (next_list[j] + 1), 'LoiterCircles', polygons[i][j],
+                                                                          loiter_rad, (255, 255, 255), 2, arrow = self.map_settings.showdirection))
 
                     labeled_wps[next_list[j]] = (i,j)
 
@@ -548,7 +561,8 @@ class MapModule(mp_module.MPModule):
                 loiter_rad = self.get_mav_param('WP_LOITER_RAD')
 
                 if self.map_settings.rallycircle:
-                    self.mpstate.map.add_object(mp_slipmap.SlipCircle('Rally Circ %u' % (i+1), 'RallyPoints', (rp.lat*1.0e-7, rp.lng*1.0e-7), abs(loiter_rad), (255,255,0), 2))
+                    self.mpstate.map.add_object(mp_slipmap.SlipCircle('Rally Circ %u' % (i+1), 'RallyPoints', (rp.lat*1.0e-7, rp.lng*1.0e-7),
+                                                                      loiter_rad, (255,255,0), 2, arrow = self.map_settings.showdirection))
 
                 #draw a line between rally point and nearest landing point
                 nearest_land_wp = None
