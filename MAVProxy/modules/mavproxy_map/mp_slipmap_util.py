@@ -107,27 +107,64 @@ class SlipLabel(SlipObject):
             return None
         return (self.point[0], self.point[1], 0, 0)
 
+class SlipArrow(SlipObject):
+    '''an arrow to display direction of movement'''
+    def __init__(self, key, layer, xy_pix, colour, linewidth, rotation, reverse = False, arrow_size = 7, popup_menu=None):
+        SlipObject.__init__(self, key, layer, popup_menu=popup_menu)
+        self.xy_pix = xy_pix
+        self.colour = colour
+        self.arrow_size = arrow_size
+        self.linewidth = linewidth
+        if reverse:
+            self.rotation = rotation + math.pi
+        else:
+            self.rotation = rotation
+
+    def draw(self, img):
+        if self.hidden:
+            return
+        crot = self.arrow_size*math.cos(self.rotation)
+        srot = self.arrow_size*math.sin(self.rotation)
+        x1 = -crot-srot
+        x2 = crot-srot
+        y1 = crot-srot
+        y2 = crot+srot
+        pix1 = (int(self.xy_pix[0]+x1), int(self.xy_pix[1]+y1))
+        pix2 = (int(self.xy_pix[0]+x2), int(self.xy_pix[1]+y2))
+        cv2.line(img, pix1, self.xy_pix, self.colour, self.linewidth)
+        cv2.line(img, pix2, self.xy_pix, self.colour, self.linewidth)
+
 class SlipCircle(SlipObject):
     '''a circle to display on the map'''
-    def __init__(self, key, layer, latlon, radius, color, linewidth, popup_menu=None):
+    def __init__(self, key, layer, latlon, radius, color, linewidth, arrow = False, popup_menu=None):
         SlipObject.__init__(self, key, layer, popup_menu=popup_menu)
         self.latlon = latlon
-        self.radius = float(radius)
+        if radius < 0:
+            self.reverse = True
+        else:
+            self.reverse = False
+        self.radius = abs(float(radius))
         self.color = color
         self.linewidth = linewidth
+        self.arrow = arrow
 
     def draw(self, img, pixmapper, bounds):
         if self.hidden:
             return
         center_px = pixmapper(self.latlon)
-        #figure out pixels per meter
+        # figure out pixels per meter
         ref_pt = (self.latlon[0] + 1.0, self.latlon[1])
         dis = mp_util.gps_distance(self.latlon[0], self.latlon[1], ref_pt[0], ref_pt[1])
         ref_px = pixmapper(ref_pt)
         dis_px = math.sqrt(float(center_px[1] - ref_px[1]) ** 2.0)
         pixels_per_meter = dis_px / dis
-
-        cv2.circle(img, center_px, int(self.radius * pixels_per_meter), self.color, self.linewidth)
+        radius_px = int(self.radius * pixels_per_meter)
+        cv2.circle(img, center_px, radius_px, self.color, self.linewidth)
+        if self.arrow:
+            SlipArrow(self.key, self.layer, (center_px[0]-radius_px, center_px[1]),
+                      self.color, self.linewidth, 0, reverse = self.reverse).draw(img)
+            SlipArrow(self.key, self.layer, (center_px[0]+radius_px, center_px[1]),
+                      self.color, self.linewidth, math.pi, reverse = self.reverse).draw(img)
 
     def bounds(self):
         '''return bounding box'''
@@ -137,11 +174,12 @@ class SlipCircle(SlipObject):
 
 class SlipPolygon(SlipObject):
     '''a polygon to display on the map'''
-    def __init__(self, key, points, layer, colour, linewidth, popup_menu=None):
+    def __init__(self, key, points, layer, colour, linewidth, arrow = False, popup_menu=None):
         SlipObject.__init__(self, key, layer, popup_menu=popup_menu)
         self.points = points
         self.colour = colour
         self.linewidth = linewidth
+        self.arrow = arrow
         self._bounds = mp_util.polygon_bounds(self.points)
         self._pix_points = []
         self._selected_vertex = None
@@ -168,6 +206,12 @@ class SlipPolygon(SlipObject):
         if len(self._pix_points) == 0:
             self._pix_points.append(pix1)
         self._pix_points.append(pix2)
+        if self.arrow:
+            xdiff = pix2[0]-pix1[0]
+            ydiff = pix2[1]-pix1[1]
+            if (xdiff*xdiff + ydiff*ydiff) > 400: # the segment is longer than 20 pix
+                SlipArrow(self.key, self.layer, (int(pix1[0]+xdiff/2.0), int(pix1[1]+ydiff/2.0)), self.colour,
+                          self.linewidth, math.atan2(ydiff, xdiff)+math.pi/2.0).draw(img)
 
     def draw(self, img, pixmapper, bounds):
         '''draw a polygon on the image'''
