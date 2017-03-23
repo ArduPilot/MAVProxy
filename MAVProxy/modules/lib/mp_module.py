@@ -150,3 +150,11 @@ class MPModule(object):
             prompt = self.settings.vehicle_name + ':' + prompt
         self.mpstate.rl.set_prompt(prompt)
             
+    @staticmethod
+    def link_label(link):
+        '''return a link label as a string'''
+        if hasattr(link, 'label'):
+            label = link.label
+        else:
+            label = str(link.linknum+1)
+        return label
