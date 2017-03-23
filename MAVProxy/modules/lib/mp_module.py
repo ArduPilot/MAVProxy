@@ -150,3 +150,11 @@ class MPModule(object):
             prompt = self.settings.vehicle_name + ':' + prompt
         self.mpstate.rl.set_prompt(prompt)
             
+    @staticmethod
+    def link_string(link):
+        '''return a link description as a string'''
+        if link.handle:
+            description = link.handle
+        else:
+            description = str(link.linknum+1)
+        return description

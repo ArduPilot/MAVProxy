@@ -110,23 +110,29 @@ class LinkModule(mp_module.MPModule):
             except AttributeError as e:
                 # some mav objects may not have a "signing" attribute
                 pass
-            print("link %u %s (%u packets, %.2fs delay, %u lost, %.1f%% loss%s)" % (master.linknum+1,
+            print("link %s %s (%u packets, %.2fs delay, %u lost, %.1f%% loss%s)" % (self.link_string(master),
                                                                                     status,
                                                                                     self.status.counters['MasterIn'][master.linknum],
                                                                                     linkdelay,
                                                                                     master.mav_loss,
                                                                                     master.packet_loss(),
                                                                                     sign_string))
+
     def cmd_link_list(self):
         '''list links'''
         print("%u links" % len(self.mpstate.mav_master))
         for i in range(len(self.mpstate.mav_master)):
             conn = self.mpstate.mav_master[i]
-            print("%u: %s" % (i, conn.address))
+            if conn.handle is not None:
+                print("%u (%s): %s" % (i, conn.handle, conn.address))
+            else:
+                print("%u: %s" % (i, conn.address))
 
-    def link_add(self, device):
+    def link_add(self, descriptor):
         '''add new link'''
         try:
+            link_components = descriptor.split('(')
+            device = link_components[0]
             print("Connect %s source_system=%d" % (device, self.settings.source_system))
             conn = mavutil.mavlink_connection(device, autoreconnect=True,
                                               source_system=self.settings.source_system,
@@ -137,11 +143,16 @@ class LinkModule(mp_module.MPModule):
             return False
         if self.settings.rtscts:
             conn.set_rtscts(True)
-        conn.linknum = len(self.mpstate.mav_master)
         conn.mav.set_callback(self.master_callback, conn)
         if hasattr(conn.mav, 'set_send_callback'):
             conn.mav.set_send_callback(self.master_send_callback, conn)
         conn.linknum = len(self.mpstate.mav_master)
+        try:
+            handle = link_components[1]
+            handle = handle.rstrip(')')
+            conn.handle = handle
+        except:
+            conn.handle = None
         conn.linkerror = False
         conn.link_delayed = False
         conn.last_heartbeat = 0
@@ -157,9 +168,9 @@ class LinkModule(mp_module.MPModule):
 
     def cmd_link_add(self, args):
         '''add new link'''
-        device = args[0]
-        print("Adding link %s" % device)
-        self.link_add(device)
+        descriptor = args[0]
+        print("Adding link %s" % descriptor)
+        self.link_add(descriptor)
 
     def cmd_link_ports(self):
         '''show available ports'''
@@ -175,7 +186,7 @@ class LinkModule(mp_module.MPModule):
             return
         for i in range(len(self.mpstate.mav_master)):
             conn = self.mpstate.mav_master[i]
-            if str(i) == device or conn.address == device:
+            if str(i) == device or conn.address == device or conn.handle == device:
                 print("Removing link %s" % conn.address)
                 try:
                     try:
@@ -316,7 +327,7 @@ class LinkModule(mp_module.MPModule):
         if mtype in activityPackets:
             if master.linkerror:
                 master.linkerror = False
-                self.say("link %u OK" % (master.linknum+1))
+                self.say("link %s OK" % (self.link_string(master)))
             self.status.last_message = time.time()
             master.last_message = self.status.last_message
 
@@ -335,8 +346,7 @@ class LinkModule(mp_module.MPModule):
                 self.say("heartbeat OK")
             if master.linkerror:
                 master.linkerror = False
-                self.say("link %u OK" % (master.linknum+1))
-
+                self.say("link %s OK" % (self.link_string(master)))
             self.status.last_heartbeat = time.time()
             master.last_heartbeat = self.status.last_heartbeat
 
