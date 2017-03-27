@@ -114,7 +114,7 @@ class MixerState:
         self._get_group = int(args[1])
         self.state = self.MIXER_STATE_MIXER_GET_ALL
         self._last_time = time.time();
-        get_all(master, self._get_group)
+        self.get_all(master, self._get_group)
         print("Requested all parameters for group %s" % (args[1]))                
 
     def get_all(self, master, group):
