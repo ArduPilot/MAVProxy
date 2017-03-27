@@ -78,7 +78,7 @@ class MixerState:
         elif(m.data_type == mavutil.mavlink.MIXER_DATA_TYPE_CONNECTION_COUNT):
             print("Group:%u mixer:%u submixer:%u conn_type:%u conn_count:%u" % (m.mixer_group, m.mixer_index, m.mixer_sub_index, m.connection_type, m.data_value))
 
-        elif(m.data_type == 112):
+        elif(m.data_type == 122):
             if(m.data_value > 0):
                 print("Saved mixer group:%u with size:%u" % (m.mixer_group, m.data_value))
             else:
@@ -254,7 +254,7 @@ class MixerState:
         mav = master
         mav.mav.command_long_send(mav.target_system, mav.target_component,
                            mavutil.mavlink.MAV_CMD_REQUEST_MIXER_DATA, 0, 
-                           group, mixer, submixer, 0, mavutil.mavlink.MIXER_DATA_TYPE_PARAMETER, 0, 0)
+                           group, mixer, submixer, parameter, mavutil.mavlink.MIXER_DATA_TYPE_PARAMETER, 0, 0)
         self.state = self.MIXER_STATE_MIXER_GET_PARAMETER
         self._last_time = time.time();
         
@@ -303,8 +303,9 @@ class MixerState:
     def cmd_save(self, args, master):
         mav = master
         self._get_group = int(args[1])
-        mav.mav.mixer_data_request_send(mav.target_system, mav.target_component,
-                                        self._get_group, 0, 0, 0, 112)
+        mav.mav.command_long_send(mav.target_system, mav.target_component,
+                   mavutil.mavlink.MAV_CMD_REQUEST_MIXER_STORE, 0, 
+                   self._get_group, 0, 0, 0, 0, 0, 0)
         self.state = self.MIXER_STATE_WAITING
         self._last_time = time.time();
 
