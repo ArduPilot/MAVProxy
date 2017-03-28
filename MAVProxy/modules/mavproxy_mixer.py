@@ -8,6 +8,7 @@ from ctypes import c_int, c_uint, c_float
 
 from MAVProxy.modules.lib import mp_module
 from samba.netcmd.gpo import cmd_list
+from pymavlink.dialects.v10.ardupilotmega import MAVLINK_TYPE_FLOAT
 
 mixer_type_parameter_counts = [0,0,5,4,1,5,4]
     
@@ -37,7 +38,7 @@ class MixerState:
 
     def handle_mavlink_packet(self, master, m):
         '''handle an incoming mavlink packet'''
-        if m.get_type() == 'MIXER_PARAMETER':
+        if m.get_type() == 'MIXER_PARAM_VALUE':
             self.handle_mixer_parameter(master,m)
     
     def compare_mixer_data_index(self, msg1, msg2):
@@ -139,9 +140,12 @@ class MixerState:
     def request_parameter(self, master, group, index):
         mav = master
         self._get_group = group
-        mav.mav.command_long_send(mav.target_system, mav.target_component,
-                           mavutil.mavlink.MAV_CMD_REQUEST_MIXER_PARAM_READ, 0, 
-                           self._get_group, index, 0, 0, 0, 0, 0)
+        
+        mav.mav.mixer_param_request_read_send(mav.target_system, mav.target_component,
+                            index, self._get_group, -1, -1, -1, -1, mavutil.mavlink.MAVLINK_TYPE_FLOAT, 0, "")
+#         mav.mav.command_long_send(mav.target_system, mav.target_component,
+#                            mavutil.mavlink.MAV_CMD_REQUEST_MIXER_PARAM_READ, 0, 
+#                            self._get_group, index, 0, 0, 0, 0, 0)
         self.state = self.MIXER_STATE_MIXER_GET_PARAMETER
         self._last_time = time.time();
         
@@ -151,12 +155,29 @@ class MixerState:
         mav = master
 
         group = int(args[1])
-        parameter = int(args[2])
-        value = float(args[3])
+        index = int(args[2])
+#        value = float(args[3])
+        values = [float(args[3]), 
+                  float(0.0), 
+                  float(0.0), 
+                  float(0.0), 
+                  float(0.0), 
+                  float(0.0)]
         
-        mav.mav.command_long_send(mav.target_system, mav.target_component,
-                   mavutil.mavlink.MAV_CMD_SET_MIXER_PARAM, 0, 
-                   group, parameter, value, 0, 0, 0, 0)
+        self._get_group = group
+
+        mav.mav.mixer_param_set_send(mav.target_system, mav.target_component, 
+                                 index, self._get_group, 0, 0, 0, 0, 
+                                 mavutil.mavlink.MAVLINK_TYPE_FLOAT, 1, 0, "", values)
+        
+# def mixer_param_set_send(self, target_system, target_component, 
+#                         index, mixer_group, mixer_index, mixer_sub_index, mixer_type, parameter_index, 
+#                         param_type, param_array_write_count, param_array_index, param_id, param_values, force_mavlink1=False):
+        
+        
+#         mav.mav.command_long_send(mav.target_system, mav.target_component,
+#                    mavutil.mavlink.MAV_CMD_SET_MIXER_PARAM, 0, 
+#                    group, parameter, value, 0, 0, 0, 0)
         
         self.state = self.MIXER_STATE_MIXER_SET_PARAMETER
         self._last_time = time.time();
