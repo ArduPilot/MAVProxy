@@ -47,7 +47,7 @@ class MixerState:
 
     def handle_mixer_parameter(self, master, m):
         #Either replace or add to data
-        print("Got mixer parameter index:%u mixer:%u sub:%u value:%.2f" % (m.index, m.mixer_index, m.mixer_sub_index, m.param_values[0]) )
+#        print("Got mixer parameter index:%u mixer:%u sub:%u value:%.2f" % (m.index, m.mixer_index, m.mixer_sub_index, m.param_values[0]) )
         found = False
         index = 0
         for data in self.mixer_data:
@@ -59,6 +59,14 @@ class MixerState:
             self.mixer_data.append(m)
 
         self._last_time = time.time();
+        
+        if((m.index % 10) == 0):
+            print("Received parameter index:%u of %u items" % (m.index, m.count) );
+        
+        if(m.index == (m.count - 1)):
+            self.state = self.MIXER_STATE_WAITING
+            print("Completed recieving mixer parameters");
+            return True
         
         if((self.state != self.MIXER_STATE_MIXER_GET_ALL) and (self.state != self.MIXER_STATE_MIXER_GET_MISSING)):
             self.state = self.MIXER_STATE_WAITING    
@@ -147,8 +155,8 @@ class MixerState:
         value = float(args[3])
         
         mav.mav.command_long_send(mav.target_system, mav.target_component,
-                   mavutil.mavlink.MAV_CMD_SET_MIXER_PARAMETER, 0, 
-                   group, parameter, 0, 0, 0, 0, value)
+                   mavutil.mavlink.MAV_CMD_SET_MIXER_PARAM, 0, 
+                   group, parameter, value, 0, 0, 0, 0)
         
         self.state = self.MIXER_STATE_MIXER_SET_PARAMETER
         self._last_time = time.time();
