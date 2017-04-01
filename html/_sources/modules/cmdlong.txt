@@ -63,11 +63,13 @@ velocity in North-East-Down format (m/s). Uses a global frame.
 Camera
 ===========
 
+Note the following commands are not processed by APM, rather they are meant for a companion computer which controls the camera.
+
 .. code:: bash
 
     cammsg M1 M2 M3 M4 M5 M6 M7 M8
     
-Send a MAV_CMD_DO_DIGICAM_CONTROL. Parameters are: M1=Session control e.g. show/hide lens, 
+Send a MAV_CMD_DO_DIGICAM_CONTROL Mavlink message. Parameters are: M1=Session control e.g. show/hide lens, 
 M2=Zoom's absolute position, M3=Zooming step value to offset zoom from the current position, 
 M4=Focus Locking, Unlocking or Re-locking, M5=Shooting Command, M6=Command Identity, M7=Empty.
 
@@ -76,6 +78,12 @@ M4=Focus Locking, Unlocking or Re-locking, M5=Shooting Command, M6=Command Ident
     cammsg_old
     
 Send an old-style MAV_CMD_DO_DIGICAM_CONTROL shooting command.
+
+.. code:: bash
+
+    camctrlmsg M1 M2 M3 M4 M5 M6 M7
+    
+Send a MAV_CMD_DO_DIGICAM_CONFIGURE Mavlink message. The Parameters are: M1=Modes [P, TV, AV, M], M2=Shutter Speed, M3=F Stop number, M4=ISO Number, M5=Exposure type, M6=Command Identity, M7=Main engine cut-off time before camera trigger in seconds/10 (0 means no cut-off).
 
 Systems
 =======

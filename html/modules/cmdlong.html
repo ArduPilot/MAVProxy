@@ -221,16 +221,21 @@ velocity in North-East-Down format (m/s). Uses a global frame.</p>
 </div>
 <div class="section" id="camera">
 <h2>Camera<a class="headerlink" href="#camera" title="Permalink to this headline">¶</a></h2>
+<p>Note the following commands are not processed by APM, rather they are meant for a companion computer which controls the camera.</p>
 <div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">cammsg</span> <span class="n">M1</span> <span class="n">M2</span> <span class="n">M3</span> <span class="n">M4</span> <span class="n">M5</span> <span class="n">M6</span> <span class="n">M7</span> <span class="n">M8</span>
 </pre></div>
 </div>
-<p>Send a MAV_CMD_DO_DIGICAM_CONTROL. Parameters are: M1=Session control e.g. show/hide lens,
+<p>Send a MAV_CMD_DO_DIGICAM_CONTROL Mavlink message. Parameters are: M1=Session control e.g. show/hide lens,
 M2=Zoom&#8217;s absolute position, M3=Zooming step value to offset zoom from the current position,
 M4=Focus Locking, Unlocking or Re-locking, M5=Shooting Command, M6=Command Identity, M7=Empty.</p>
 <div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">cammsg_old</span>
 </pre></div>
 </div>
 <p>Send an old-style MAV_CMD_DO_DIGICAM_CONTROL shooting command.</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">camctrlmsg</span> <span class="n">M1</span> <span class="n">M2</span> <span class="n">M3</span> <span class="n">M4</span> <span class="n">M5</span> <span class="n">M6</span> <span class="n">M7</span>
+</pre></div>
+</div>
+<p>Send a MAV_CMD_DO_DIGICAM_CONFIGURE Mavlink message. The Parameters are: M1=Modes [P, TV, AV, M], M2=Shutter Speed, M3=F Stop number, M4=ISO Number, M5=Exposure type, M6=Command Identity, M7=Main engine cut-off time before camera trigger in seconds/10 (0 means no cut-off).</p>
 </div>
 <div class="section" id="systems">
 <h2>Systems<a class="headerlink" href="#systems" title="Permalink to this headline">¶</a></h2>
