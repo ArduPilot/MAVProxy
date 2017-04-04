@@ -90,6 +90,7 @@ class Joystick(mp_module.MPModule):
 
         for jid in range(pygame.joystick.get_count()):
             joy = pygame.joystick.Joystick(jid)
+            self.log("Found joystick (%s)" % (joy.get_name(),))
             for joydef in self.joydefs:
                 if 'match' not in joydef:
                     self.log('{} has no match patterns, ignoring.'.format(
