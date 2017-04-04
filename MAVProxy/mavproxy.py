@@ -925,6 +925,9 @@ if __name__ == '__main__':
     parser.add_option("--default-modules", default="log,signing,wp,rally,fence,param,relay,tuneopt,arm,mode,calibration,rc,auxopt,misc,cmdlong,battery,terrain,output,adsb", help='default module list')
 
     (opts, args) = parser.parse_args()
+    if len(args) != 0:
+          print("ERROR: mavproxy takes no position arguments; got (%s)" % str(args))
+          sys.exit(1)
 
     # warn people about ModemManager which interferes badly with APM and Pixhawk
     if os.path.exists("/usr/sbin/ModemManager"):
