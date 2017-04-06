@@ -3,9 +3,14 @@
 """
   MAVProxy message console, implemented in a child process
 """
-import multiprocessing, threading
+import threading
 import textconsole, sys, time
 from wxconsole_util import Value, Text
+import platform
+if platform.system() == 'Darwin':
+    from billiard import Pipe, Process, Event, forking_enable
+else:
+    from billiard import Pipe, Process, Event
 
 class MessageConsole(textconsole.SimpleConsole):
     '''
@@ -13,14 +18,16 @@ class MessageConsole(textconsole.SimpleConsole):
     '''
     def __init__(self,
                  title='MAVProxy: console'):
+        if platform.system() == 'Darwin':
+            forking_enable(False)
         textconsole.SimpleConsole.__init__(self)
         self.title  = title
         self.menu_callback = None
-        self.parent_pipe_recv,self.child_pipe_send = multiprocessing.Pipe(duplex=False)
-        self.child_pipe_recv,self.parent_pipe_send = multiprocessing.Pipe(duplex=False)
-        self.close_event = multiprocessing.Event()
+        self.parent_pipe_recv,self.child_pipe_send = Pipe(duplex=False)
+        self.child_pipe_recv,self.parent_pipe_send = Pipe(duplex=False)
+        self.close_event = Event()
         self.close_event.clear()
-        self.child = multiprocessing.Process(target=self.child_task)
+        self.child = Process(target=self.child_task)
         self.child.start()
         self.child_pipe_send.close()
         self.child_pipe_recv.close()
@@ -83,7 +90,7 @@ class MessageConsole(textconsole.SimpleConsole):
 
 if __name__ == "__main__":
     # test the console
-    multiprocessing.freeze_support()
+    freeze_support()
     console = MessageConsole()
     while console.is_alive():
         console.write('Tick', fg='red')
