@@ -2,7 +2,7 @@
 readline handling for mavproxy
 '''
 
-import sys, glob, os
+import sys, glob, os, platform
 
 rline_mpstate = None
 redisplay = None
@@ -188,10 +188,13 @@ def complete(text, state):
 # some python distributions don't have readline, so handle that case
 # with a try/except
 try:
-    try:
-        import readline
-    except ImportError:
-        import pyreadline as readline
+    if platform.system() == 'Darwin':
+        import gnureadline as readline
+    else:
+        try:
+            import readline
+        except ImportError:
+            import pyreadline as readline
     readline.set_completer_delims(' \t\n;')
     readline.parse_and_bind("tab: complete")
     readline.set_completer(complete)

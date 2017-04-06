@@ -4,15 +4,19 @@ log analysis program
 Andrew Tridgell December 2014
 '''
 
-import sys, struct, time, os, datetime
+import sys, struct, time, os, datetime, platform
 import math, re
 import Queue
 import fnmatch
-import threading, multiprocessing
+import threading
+if platform.system() == 'Darwin':
+    from billiard import Pipe, Process, Event, freeze_support
+else:
+    from multiprocessing import Pipe, Process, Event, freeze_support
 from math import *
 from MAVProxy.modules.lib import rline
 from MAVProxy.modules.lib import wxconsole
-from MAVProxy.modules.lib import grapher
+from MAVProxy.modules.lib.graph_ui import Graph_UI
 from MAVProxy.modules.lib import mavmemlog
 from pymavlink.mavextra import *
 from MAVProxy.modules.lib.mp_menu import *
@@ -23,6 +27,8 @@ from MAVProxy.modules.lib import wxsettings
 from MAVProxy.modules.lib.graphdefinition import GraphDefinition
 from lxml import objectify
 import pkg_resources
+
+grui = []
 
 #Global var to hold the GUI menu element
 TopMenu = None
@@ -65,9 +71,9 @@ class MEState(object):
         self.last_graph = GraphDefinition('Untitled', '', '', [], None)
         
         #pipe to the wxconsole for any child threads (such as the save dialog box)
-        self.parent_pipe_recv_console,self.child_pipe_send_console = multiprocessing.Pipe(duplex=False)
+        self.parent_pipe_recv_console,self.child_pipe_send_console = Pipe(duplex=False)
         #pipe for creating graphs (such as from the save dialog box)
-        self.parent_pipe_recv_graph,self.child_pipe_send_graph = multiprocessing.Pipe(duplex=False)
+        self.parent_pipe_recv_graph,self.child_pipe_send_graph = Pipe(duplex=False)
         
         tConsoleWrite = threading.Thread(target=self.pipeRecvConsole)
         tConsoleWrite.daemon = True
@@ -254,39 +260,6 @@ def load_graphs():
             mestate.console.writeln("Loaded %s" % f)
     mestate.graphs = sorted(mestate.graphs, key=lambda g: g.name)
 
-def graph_process(mg, lenmavlist):
-    '''process for a graph'''
-    mg.show(lenmavlist)
-
-def display_graph(graphdef):
-    '''display a graph'''
-    if 'mestate' in globals():
-        mestate.console.write("Expression: %s\n" % ' '.join(graphdef.expression.split()))
-    else:
-        child_pipe_send.send("Expression: %s\n" % ' '.join(graphdef.expression.split()))
-    #mestate.mlog.reduce_by_flightmodes(mestate.flightmode_selections)
-
-    #setup the graph, then pass to a new process and display
-    mg = grapher.MavGraph()
-    mg.set_marker(mestate.settings.marker)
-    mg.set_condition(mestate.settings.condition)
-    mg.set_xaxis(mestate.settings.xaxis)
-    mg.set_linestyle(mestate.settings.linestyle)
-    mg.set_show_flightmode(mestate.settings.show_flightmode)
-    mg.set_legend(mestate.settings.legend)
-    mg.add_mav(mestate.mlog)
-    for f in graphdef.expression.split():
-        mg.add_field(f)
-    mg.process(mestate.flightmode_selections, mestate.mlog._flightmodes)
-    lenmavlist = len(mg.mav_list)
-    #Important - mg.mav_list is the full logfile and can be very large in size
-    #To avoid slowdowns in Windows (which copies the vars to the new process)
-    #We need to empty this var when we're finished with it
-    mg.mav_list = []
-    child = multiprocessing.Process(target=graph_process, args=[mg, lenmavlist])
-    child.start()
-    mestate.mlog.rewind()
-
 def cmd_graph(args):
     '''graph command'''
     usage = "usage: graph <FIELD...>"
@@ -306,7 +279,8 @@ def cmd_graph(args):
     else:
         expression = ' '.join(args)
         mestate.last_graph = GraphDefinition('Untitled', expression, '', [expression], None)
-    display_graph(mestate.last_graph)
+    grui.append(Graph_UI(mestate))
+    grui[-1].display_graph(mestate.last_graph)
 
 def map_process(path, wp, fen, used_flightmodes, mav_type, options):
     '''process for displaying a graph'''
@@ -325,7 +299,7 @@ def cmd_map(args):
     if len(args) > 0:
         options.types = ','.join(args)
     [path, wp, fen, used_flightmodes, mav_type] = mavflightview_mav(mestate.mlog, options, mestate.flightmode_selections)
-    child = multiprocessing.Process(target=map_process, args=[path, wp, fen, used_flightmodes, mav_type, options])
+    child = Process(target=map_process, args=[path, wp, fen, used_flightmodes, mav_type, options])
     child.start()
     mestate.mlog.rewind()
 
@@ -437,7 +411,7 @@ def save_process(MAVExpLastGraph, child_pipe_console_input, child_pipe_graph_inp
 
 def cmd_save(args):
     '''save a graph'''
-    child = multiprocessing.Process(target=save_process, args=[mestate.last_graph, mestate.child_pipe_send_console, mestate.child_pipe_send_graph, mestate.status.msgs])
+    child = Process(target=save_process, args=[mestate.last_graph, mestate.child_pipe_send_console, mestate.child_pipe_send_graph, mestate.status.msgs])
     child.start()
 
 def cmd_param(args):
@@ -542,7 +516,7 @@ def progress_bar(pct):
         mestate.console.write('#')
 
 if __name__ == "__main__":
-    multiprocessing.freeze_support()
+    freeze_support()
     mestate = MEState()
     setup_file_menu()
 
