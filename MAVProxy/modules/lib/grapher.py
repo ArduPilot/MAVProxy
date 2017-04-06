@@ -429,5 +429,5 @@ if __name__ == "__main__":
     mg.set_legend2(args.legend2)
     mg.set_multi(args.multi)
     mg.set_show_flightmode(args.show_flightmode)
-    mg.process()
-    mg.show()
+    mg.process([],0)
+    mg.show(len(mg.mav_list))
