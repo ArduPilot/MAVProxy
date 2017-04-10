@@ -24,6 +24,7 @@ class ConsoleModule(mp_module.MPModule):
         self.speed = 0
         self.max_link_num = 0
         self.last_sys_status_health = 0
+        self.flaps_chan = 0 #values: 0=not detected yet, 5..14=flaps channel, 50=none found
         mpstate.console = wxconsole.MessageConsole(title='Console')
 
         # setup some default status information
@@ -254,6 +255,30 @@ class ConsoleModule(mp_module.MPModule):
 
         elif type == 'WIND':
             self.console.set_status('Wind', 'Wind %u/%.2f' % (msg.direction, msg.speed))
+
+        elif type == 'SERVO_OUTPUT_RAW':
+            # if no flaps channel defined, and not given up, and parameters are fetched
+            if self.flaps_chan == 0 and self.get_mav_param('RC12_FUNCTION',50) != 50 :
+                for num in range(5,14):
+                    if  self.get_mav_param('RC%u_FUNCTION' % num ,0) == 2 or self.get_mav_param('RC%u_FUNCTION' % num ,0) == 3 :
+                        self.flaps_chan = num
+                        self.console.writeln("Flaps found on channel %u" % num)
+                        break
+                if self.flaps_chan == 0 :
+                    self.console.writeln("Flaps not found")
+                    self.flaps_chan = 50
+            else:
+                if self.flaps_chan != 50 :   #if we did not gave up:
+                    self.maxflaps = self.get_mav_param('RC%u_MAX' % self.flaps_chan ,0)
+                    self.minflaps = self.get_mav_param('RC%u_MIN' % self.flaps_chan ,0)
+                    self.flaps_pct = (msg.servo6_raw - self.minflaps)/((self.maxflaps - self.minflaps)/100)
+                    if self.flaps_pct > 50 :
+                        fg = "red"
+                    elif self.flaps_pct > 1 :
+                        fg = "orange"
+                    else:
+                        fg = "black"
+                    self.console.set_status('Flaps', 'Flaps %.0f%%' % (self.flaps_pct), fg=fg)
 
         elif type == 'EKF_STATUS_REPORT':
             highest = 0.0
