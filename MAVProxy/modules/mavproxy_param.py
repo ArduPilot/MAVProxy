@@ -137,6 +137,7 @@ class ParamState:
             return
 
         for h in args:
+            h = h.upper()
             if h in htree:
                 help = htree[h]
                 print("%s: %s\n" % (h, help.get('humanName')))
