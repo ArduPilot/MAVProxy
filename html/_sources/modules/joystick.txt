@@ -39,4 +39,7 @@ The following commands are available with the module:
     
 The first command will re-detect any joysticks in the system, whilst the second command will give the status of the currently loaded joystick.
 
+New joysticks can added by following the instructions `here <https://github.com/ArduPilot/MAVProxy/blob/master/docs/JOYSTICKS.md>`_
+
+
 
