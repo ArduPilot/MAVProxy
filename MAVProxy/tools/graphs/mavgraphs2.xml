@@ -124,7 +124,7 @@
   <expression>PM.MaxT PM.NLon:2 PM.LogDrop:2</expression>
  </graph>
 
- <graph name='Tridge/FilreFly Tilt'>
+ <graph name='Tridge/FireFly Tilt'>
   <description></description>
   <expression>CTUN.NavRoll CTUN.Roll CTUN.NavPitch CTUN.Pitch RCOU.Ch8:2 RCOU.Ch10:2 RCOU.Ch11:2</expression>
  </graph>
@@ -232,12 +232,12 @@
   <expression>(RCOU.C5+RCOU.C7+RCOU.C9+RCOU.C11)/4 (RCOU.C6+RCOU.C8+RCOU.C10+RCOU.C12)/4</expression>
  </graph>
 
- <graph name='Servos/OctoQuad-CCW-CW'>
+ <graph name='Servos/OctaQuad-CCW-CW'>
   <description></description>
   <expression>0.25*(SERVO_OUTPUT_RAW.servo5_raw+SERVO_OUTPUT_RAW.servo7_raw+SERVO_OUTPUT_RAW.servo9_raw+SERVO_OUTPUT_RAW.servo11_raw) 0.25*(SERVO_OUTPUT_RAW.servo6_raw+SERVO_OUTPUT_RAW.servo8_raw+SERVO_OUTPUT_RAW.servo10_raw+SERVO_OUTPUT_RAW.servo12_raw)</expression>
  </graph>
 
- <graph name='Servos/OctoQuad-Front-Back'>
+ <graph name='Servos/OctaQuad-Front-Back'>
   <description></description>
   <expression>0.25*(SERVO_OUTPUT_RAW.servo5_raw+SERVO_OUTPUT_RAW.servo6_raw+SERVO_OUTPUT_RAW.servo9_raw+SERVO_OUTPUT_RAW.servo10_raw) 0.25*(SERVO_OUTPUT_RAW.servo7_raw+SERVO_OUTPUT_RAW.servo8_raw+SERVO_OUTPUT_RAW.servo11_raw+SERVO_OUTPUT_RAW.servo12_raw)</expression>
  </graph>
@@ -322,7 +322,7 @@
   <expression>sqrt((OF.flowX-OF.bodyX)**2+(OF.flowY-OF.bodyY)**2)*RFND.Dist1*cos(radians(ATT.Roll))*cos(radians(ATT.Pitch)) GPS.Spd BARO.Alt:2</expression>
  </graph>
 
- <graph name='Sesnors/Accelerometer/Vibration'>
+ <graph name='Sensors/Accelerometer/Vibration'>
   <description></description>
   <expression>VIBRATION.vibration_x VIBRATION.vibration_y VIBRATION.vibration_z</expression>
  </graph>
