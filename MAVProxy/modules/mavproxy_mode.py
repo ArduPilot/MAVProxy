@@ -56,6 +56,7 @@ class ModeModule(mp_module.MPModule):
         if len(args) == 3:
             latitude = float(args[0])
             longitude = float(args[1])
+            latlon = (latitude, longitude)
             altitude = int(args[2])
             latlon = (latitude, longitude)
         else:
