@@ -7,6 +7,7 @@ November 2013
 '''
 
 from MAVProxy.modules.lib import mp_util
+import platform
 
 class MPMenuGeneric(object):
     '''a MP menu separator'''
@@ -201,8 +202,10 @@ class MPMenuSubMenu(MPMenuGeneric):
     def _append(self, menu):
         '''append this menu item to a menu'''
         from wx_loader import wx
-
-        menu.Append(-1, self.name, self.wx_menu())
+        if platform.system() == 'Darwin':
+            menu.Append(-1, self.name, self.wx_menu()) #use wxPython_phoenix
+        else:
+            menu.AppendMenu(-1, self.name, self.wx_menu())
 
     def __str__(self):
         return "MPMenuSubMenu(%s)" % (self.name)
