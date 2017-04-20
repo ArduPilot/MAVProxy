@@ -10,7 +10,7 @@ import platform
 if platform.system() == 'Darwin':
     from billiard import Pipe, Process, Event, forking_enable
 else:
-    from billiard import Pipe, Process, Event
+    from multiprocessing import Pipe, Process, Event
 
 class MessageConsole(textconsole.SimpleConsole):
     '''
