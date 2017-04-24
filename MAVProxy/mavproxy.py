@@ -581,11 +581,12 @@ def log_writer():
     '''log writing thread'''
     while True:
         mpstate.logfile_raw.write(mpstate.logqueue_raw.get())
-        while not mpstate.logqueue_raw.empty():
+        timeout = time.time() + 10
+        while not mpstate.logqueue_raw.empty() and time.time() < timeout:
             mpstate.logfile_raw.write(mpstate.logqueue_raw.get())
-        while not mpstate.logqueue.empty():
+        while not mpstate.logqueue.empty() and time.time() < timeout:
             mpstate.logfile.write(mpstate.logqueue.get())
-        if mpstate.settings.flushlogs:
+        if mpstate.settings.flushlogs or time.time() >= timeout:
             mpstate.logfile.flush()
             mpstate.logfile_raw.flush()
 
