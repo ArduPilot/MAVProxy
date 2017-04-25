@@ -239,11 +239,11 @@
 </tr>
 <tr class="row-even"><td>camparms</td>
 <td>Camera parameters file</td>
-<td>&#8216;pathtofile&#8217;</td>
+<td>'pathtofile'</td>
 </tr>
 <tr class="row-odd"><td>filter_type</td>
 <td>Filter Type</td>
-<td>&#8216;simple&#8217; or &#8216;compactness&#8217;</td>
+<td>'simple' or 'compactness'</td>
 </tr>
 <tr class="row-even"><td>blue_emphasis</td>
 <td>Emphasise Blue colour</td>
@@ -267,7 +267,7 @@
 </tr>
 <tr class="row-odd"><td>gcs_address</td>
 <td>GCS IP Address</td>
-<td>IP address &#8216;XXX.XXX.XXX.XXX&#8217;</td>
+<td>IP address 'XXX.XXX.XXX.XXX'</td>
 </tr>
 <tr class="row-even"><td>gcs_view_port</td>
 <td>GCS IP Port</td>
@@ -275,11 +275,11 @@
 </tr>
 <tr class="row-odd"><td>gcs_slave</td>
 <td>GCS Slave IP Address</td>
-<td>IP address &#8216;XXX.XXX.XXX.XXX&#8217;</td>
+<td>IP address 'XXX.XXX.XXX.XXX'</td>
 </tr>
 <tr class="row-even"><td>aircraft_address</td>
 <td>UAV IP Address</td>
-<td>IP address &#8216;XXX.XXX.XXX.XXX&#8217;</td>
+<td>IP address 'XXX.XXX.XXX.XXX'</td>
 </tr>
 <tr class="row-odd"><td>aircraft_port</td>
 <td>UAV IP Port</td>
@@ -383,7 +383,7 @@ the <code class="docutils literal"><span class="pre">--jpeg</span></code> comman
 looking for a camera.</p>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
-<p class="last">By default, MAVProxy and cuav will save the telemetry and images to file (it doesn&#8217;t know that
+<p class="last">By default, MAVProxy and cuav will save the telemetry and images to file (it doesn't know that
 the imagery is coming from file rather than a UAV). For large datasets this may lead to large
 amounts of disk space usage. Thus the <code class="docutils literal"><span class="pre">&amp;</span> <span class="pre">rm</span> <span class="pre">-rf</span> <span class="pre">OBC2016/logs</span></code> command in the above example
 will delete any previous telemetry and images before replaying it again.</p>
@@ -407,35 +407,35 @@ stop the playback process.</p>
 </tr>
 </thead>
 <tbody valign="top">
-<tr class="row-even"><td>&#8211;out</td>
+<tr class="row-even"><td>--out</td>
 <td>MAVLink output port (IP:port)</td>
 <td>127.0.0.1:14550</td>
 </tr>
-<tr class="row-odd"><td>&#8211;baudrate</td>
+<tr class="row-odd"><td>--baudrate</td>
 <td>baud rate</td>
 <td>57600</td>
 </tr>
-<tr class="row-even"><td>&#8211;imagedir</td>
+<tr class="row-even"><td>--imagedir</td>
 <td>raw image directory</td>
 <td>&lt;none&gt;</td>
 </tr>
-<tr class="row-odd"><td>&#8211;condition</td>
+<tr class="row-odd"><td>--condition</td>
 <td>condition on mavlink log</td>
 <td>&lt;none&gt;</td>
 </tr>
-<tr class="row-even"><td>&#8211;speedup</td>
+<tr class="row-even"><td>--speedup</td>
 <td>playback speedup</td>
 <td>1.0</td>
 </tr>
-<tr class="row-odd"><td>&#8211;loop</td>
+<tr class="row-odd"><td>--loop</td>
 <td>playback in a loop</td>
 <td>False</td>
 </tr>
-<tr class="row-even"><td>&#8211;jpeg</td>
+<tr class="row-even"><td>--jpeg</td>
 <td>use jpegs instead of PGMs</td>
 <td>False</td>
 </tr>
-<tr class="row-odd"><td>&#8211;HIL</td>
+<tr class="row-odd"><td>--HIL</td>
 <td>send HIL_STATE messages</td>
 <td>False</td>
 </tr>
