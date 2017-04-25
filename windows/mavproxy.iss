@@ -27,6 +27,7 @@ LicenseFile=..\COPYING.txt
 OutputBaseFilename=MAVProxySetup-{#MyAppVersion}
 Compression=lzma
 SolidCompression=yes
+ChangesEnvironment=yes
 
 [InstallDelete]
 Type: filesandordirs; Name: {pf}\{#MyAppName}
@@ -44,12 +45,16 @@ Source: "..\MAVProxy\dist\MAVExplorer\*"; DestDir: "{app}"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 Source: "..\windows\mavinit.scr"; DestDir: "{localappdata}\MAVProxy"; Flags: ignoreversion
 Source: "..\windows\version.txt"; DestDir: "{localappdata}\MAVProxy"; Flags: ignoreversion
+Source: "..\windows\Startup Examples\MAVProxyAPMSetup.bat"; DestDir: "{app}\Examples"; Flags: ignoreversion
+Source: "..\windows\Startup Examples\MAVProxyLogput.bat"; DestDir: "{app}\Examples"; Flags: ignoreversion
+Source: "..\windows\Startup Examples\MAVProxyMultiOutput.bat"; DestDir: "{app}\Examples"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName} (No GUI)"; Filename: "{app}\{#MyAppExeName}"
 Name: "{group}\MAVExplorer"; Filename: "{app}\MAVExplorer.exe"
 Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 Name: "{group}\Documentation"; Filename: "http://ardupilot.github.io/MAVProxy/"
+Name: "{group}\Startup Examples"; Filename: "{app}\Examples"
 Name: "{group}\Ardupilot MAVProxy Forum"; Filename: "http://discuss.ardupilot.org/c/ground-control-software/mavproxy"
 Name: "{group}\Download Updates"; Filename: "http://firmware.ap.ardupilot.org/Tools/MAVProxy/"
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--map --console --load-module=graph"
@@ -59,15 +64,17 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 
 [Registry]
 Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; \
-    ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; \
+    ValueType: expandsz; ValueName: "PATH"; ValueData: "{olddata};{app}"; \
     Check: NeedsAddPath('{app}')
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment";  ValueName: "PATH"; ValueData: "{app}"; Flags: uninsdeletevalue
 
 [Code]
 function NeedsAddPath(Param: string): boolean;
 var
   OrigPath: string;
 begin
-  if not RegQueryStringValue(HKEY_LOCAL_MACHINE,
+  if not RegQueryStringValue(
+    HKEY_LOCAL_MACHINE,
     'SYSTEM\CurrentControlSet\Control\Session Manager\Environment',
     'Path', OrigPath)
   then begin
@@ -76,5 +83,86 @@ begin
   end;
   { look for the path with leading and trailing semicolon }
   { Pos() returns 0 if not found }
-  Result := Pos(';' + Param + ';', ';' + OrigPath + ';') = 0;
+  Result :=
+    (Pos(';' + UpperCase(Param) + ';', ';' + UpperCase(OrigPath) + ';') = 0) and
+    (Pos(';' + UpperCase(Param) + '\;', ';' + UpperCase(OrigPath) + ';') = 0); 
+end;
+
+var
+  Paths: string;
+
+const
+  EnvironmentKey = 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment';
+  SMTO_ABORTIFHUNG = 2;
+  WM_WININICHANGE = $001A;
+  WM_SETTINGCHANGE = WM_WININICHANGE;
+
+type
+  WPARAM = UINT_PTR;
+  LPARAM = INT_PTR;
+  LRESULT = INT_PTR;
+
+function SendTextMessageTimeout(hWnd: HWND; Msg: UINT;
+  wParam: WPARAM; lParam: PAnsiChar; fuFlags: UINT;
+  uTimeout: UINT; out lpdwResult: DWORD): LRESULT;
+  external 'SendMessageTimeoutA@user32.dll stdcall';  
+
+procedure SaveOldPath();
+begin
+  if not RegQueryStringValue(HKEY_LOCAL_MACHINE, EnvironmentKey, 'Path', Paths) then
+  begin
+    Log('PATH not found');
+  end else begin
+    Log(Format('Old Path saved as [%s]', [Paths]));
+  end;
+end;
+
+procedure RemovePath(Path: string);
+var
+  P: Integer;
+begin
+  Log(Format('Prepare to remove from Old PATH [%s]', [Paths]));
+
+  P := Pos(';' + Uppercase(Path) + ';', ';' + Uppercase(Paths) + ';');
+  if P = 0 then
+  begin
+    Log(Format('Path [%s] not found in PATH', [Path]));
+  end
+    else
+  begin
+    Delete(Paths, P - 1, Length(Path) + 1);
+    Log(Format('Path [%s] removed from PATH => [%s]', [Path, Paths]));
+
+    if RegWriteExpandStringValue(HKEY_LOCAL_MACHINE, EnvironmentKey, 'Path', Paths) then
+    begin
+      Log('PATH written');
+    end
+      else
+    begin
+      Log('Error writing PATH');
+    end;
+  end;
+end;
+
+procedure RefreshEnvironment;
+var
+  S: AnsiString;
+  MsgResult: DWORD;
+begin
+  S := 'Environment';
+  SendTextMessageTimeout(HWND_BROADCAST, WM_SETTINGCHANGE, 0,
+    PAnsiChar(S), SMTO_ABORTIFHUNG, 5000, MsgResult);
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep =  usUninstall then
+  begin
+    SaveOldPath();
+  end;
+  if CurUninstallStep = usPostUninstall then
+  begin
+    RemovePath(ExpandConstant('{app}'));
+    RefreshEnvironment();
+  end;
 end;
