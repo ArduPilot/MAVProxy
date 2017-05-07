@@ -9,6 +9,7 @@ import math, re
 import Queue
 import fnmatch
 import threading
+import shlex
 if platform.system() == 'Darwin':
     from billiard import Pipe, Process, Event, freeze_support
 else:
@@ -428,9 +429,13 @@ def cmd_param(args):
 def cmd_loadfile(args):
     '''callback from menu to load a log file'''
     if len(args) != 1:
-        print "Error loading file"
+        fileargs = " ".join(args)
+    else:
+        fileargs = args[0]
+    if not os.path.exists(fileargs):
+        print "Error loading file " + fileargs
         return
-    loadfile(args[0])
+    loadfile(fileargs)
 
 def loadfile(args):
     '''load a log file (path given by arg)'''
@@ -446,6 +451,14 @@ def loadfile(args):
     load_graphs()
     setup_menus()
 
+def shlex_quotes(value):
+    '''see http://stackoverflow.com/questions/6868382/python-shlex-split-ignore-single-quotes'''
+    lex = shlex.shlex(value)
+    lex.quotes = '"'
+    lex.whitespace_split = True
+    lex.commenters = ''
+    return list(lex)
+
 def process_stdin(line):
     '''handle commands from user'''
     if line is None:
@@ -455,7 +468,7 @@ def process_stdin(line):
     if not line:
         return
 
-    args = line.split()
+    args = shlex_quotes(line)
     cmd = args[0]
     if cmd == 'help':
         k = command_map.keys()
