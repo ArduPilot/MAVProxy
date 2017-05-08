@@ -451,14 +451,6 @@ def loadfile(args):
     load_graphs()
     setup_menus()
 
-def shlex_quotes(value):
-    '''see http://stackoverflow.com/questions/6868382/python-shlex-split-ignore-single-quotes'''
-    lex = shlex.shlex(value)
-    lex.quotes = '"'
-    lex.whitespace_split = True
-    lex.commenters = ''
-    return list(lex)
-
 def process_stdin(line):
     '''handle commands from user'''
     if line is None:
@@ -468,7 +460,7 @@ def process_stdin(line):
     if not line:
         return
 
-    args = shlex_quotes(line)
+    args = shlex.split(line)
     cmd = args[0]
     if cmd == 'help':
         k = command_map.keys()
