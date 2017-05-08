@@ -525,8 +525,9 @@ def process_master(m):
         sys.stdout.write(str(s))
         sys.stdout.flush()
         return
-
-    if m.first_byte and mavversion == False:
+    
+    global mavversion
+    if m.first_byte and mavversion == None:
         m.auto_mavlink_version(s)
     msgs = m.mav.parse_buffer(s)
     if msgs:
@@ -551,7 +552,8 @@ def process_mavlink(slave):
     except socket.error:
         return
     try:
-        if slave.first_byte and mavversion == False:
+        global mavversion
+        if slave.first_byte and mavversion == None:
             slave.auto_mavlink_version(buf)
         msgs = slave.mav.parse_buffer(buf)
     except mavutil.mavlink.MAVError as e:
@@ -865,10 +867,10 @@ def run_script(scriptfile):
         process_stdin(line)
     f.close()
     
-def set_mav_version(mav10, mav20, autoProtocol, mavversion):
+def set_mav_version(mav10, mav20, autoProtocol, mavversionArg):
     '''Set the Mavlink version based on commandline options'''
     if(mav10 == True or mav20 == True or autoProtocol == True):
-        print("Warning: Using depreciated --mav10, --mav20 or --auto-protocol options. Use --mavversion instead")
+        print("Warning: Using deprecated --mav10, --mav20 or --auto-protocol options. Use --mavversion instead")
 
     #sanity check the options
     if (mav10 == True or mav20 == True) and autoProtocol == True:
@@ -877,19 +879,20 @@ def set_mav_version(mav10, mav20, autoProtocol, mavversion):
     if mav10 == True and mav20 == True:
         print("Error: Can't have --mav10 and --mav20 both True")
         sys.exit(1)
-    if mavversion is not None and (mav10 == True or mav20 == True or autoProtocol == True):
+    if mavversionArg is not None and (mav10 == True or mav20 == True or autoProtocol == True):
         print("Error: Can't use --mavversion with legacy (--mav10, --mav20 or --auto-protocol) options")
         sys.exit(1)
 
-    #and set the specific mavlink version (False = autodetect)       
-    if mavversion == "1.0" or mav10 == True:
+    #and set the specific mavlink version (False = autodetect)
+    global mavversion
+    if mavversionArg == "1.0" or mav10 == True:
         os.environ['MAVLINK09'] = '1'
         mavversion = "1"
-    elif mavversion == "2.0" or mav20 == True:
+    elif mavversionArg == "2.0" or mav20 == True:
         os.environ['MAVLINK20'] = '1'
         mavversion = "2"
     else:
-        mavversion = False
+        mavversion = None
 
 if __name__ == '__main__':
     from optparse import OptionParser
