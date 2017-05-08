@@ -21,6 +21,7 @@ import tempfile
 
 childTileDownload = {}
 childFileListDownload = {}
+filelistDownloadActive = 0
 
 class NoSuchTileError(Exception):
     """Raised when there is no tile for a region."""
@@ -72,6 +73,9 @@ class SRTMDownloader():
 
         self.debug = debug
         self.offline = offline
+        self.offlinemessageshown = 0
+        if self.offline == 1 and self.debug:
+            print "Map Module in Offline mode"
         self.first_failure = False
         self.server = server
         self.directory = directory
@@ -112,10 +116,13 @@ class SRTMDownloader():
         """SRTM data is split into different directories, get a list of all of
             them and create a dictionary for easy lookup."""
         global childFileListDownload
+        global filelistDownloadActive
         mypid = os.getpid()
         if mypid not in childFileListDownload or not childFileListDownload[mypid].is_alive():
             childFileListDownload[mypid] = multiprocessing.Process(target=self.createFileListHTTP)
+            filelistDownloadActive = 1
             childFileListDownload[mypid].start()
+            filelistDownloadActive = 0
 
     def getURIWithRedirect(self, url):
         '''fetch a URL with redirect handling'''
@@ -215,10 +222,14 @@ class SRTMDownloader():
             SRTM3 object depending on what is available, however currently it
             only returns SRTM3 objects."""
         global childFileListDownload
+        global filelistDownloadActive
         mypid = os.getpid()
         if mypid in childFileListDownload and childFileListDownload[mypid].is_alive():
             if self.debug:
                 print("still getting file list")
+            return 0
+        elif not os.path.isfile(self.filelist_file) and filelistDownloadActive == 0:
+            self.createFileList()
             return 0
         elif not self.filelist:
             if self.debug:
