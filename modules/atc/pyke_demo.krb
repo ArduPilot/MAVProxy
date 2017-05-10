@@ -1,0 +1,201 @@
+
+knows_pattern_matching
+    use knows_pattern_matching()
+    when
+        python engine.get_ke('questions', 'pat_master').reset()
+        knows_pat_master()
+
+knows_pattern_matching_2
+    use knows_pattern_matching()
+    when
+        learned_pattern_matching()
+
+knows_pat_master
+    use knows_pat_master()
+    when
+        questions.pat_master(13)
+
+learned_pattern_matching
+    use learned_pattern_matching()
+    when
+        taught_pattern_matching()
+        knows_pattern_matching()
+
+taught_pattern_matching_1_2_4_16
+    use taught_pattern_matching()
+    when
+        questions.pat_master($ans)
+        check $ans in (1, 2, 4, 16)
+        knows_pattern_variable_syntax()
+        knows_patterns()
+        knows_how_patterns_match()
+        knows_pattern_variable_scope()
+
+taught_pattern_matching_3_5_6_9_15
+    use taught_pattern_matching()
+    when
+        questions.pat_master($ans)
+        check $ans in (3, 5, 6, 9, 15)
+        knows_tuple_patterns()
+
+taught_pattern_matching_7_8_10
+    use taught_pattern_matching()
+    when
+        questions.pat_master($ans)
+        check $ans in (7, 8, 10)
+        knows_rest_variable()
+
+taught_pattern_matching_11_12
+    use taught_pattern_matching()
+    when
+        questions.pat_master($ans)
+        check $ans in (11, 12)
+        knows_pattern_variable_scope()
+
+taught_pattern_matching_14
+    use taught_pattern_matching()
+    when
+        questions.pat_master($ans)
+        check $ans in (14,)
+        knows_how_patterns_match()
+        knows_pattern_variable_scope()
+
+knows_pattern_variable_syntax
+    use knows_pattern_variable_syntax()
+    when
+        questions.pat_var_syntax($ans)
+        #reset_if_wrong(pat_var_syntax, 2, $ans)
+
+reset_if_wrong__right
+    use reset_if_wrong($_, $right_ans, $right_ans)
+    when
+        special.claim_goal()
+
+reset_if_wrong__wrong
+    use reset_if_wrong($question, $_, $_)
+    when
+        python engine.get_ke('questions', $question).reset()
+
+knows_patterns
+    use knows_patterns()
+    when
+        knows_literal_patterns()
+        knows_pattern_variables()
+        knows_tuple_patterns()
+
+knows_literal_patterns
+    use knows_literal_patterns()
+    when
+        ask_until_correct(pat_literal, 6)
+
+ask_until_correct__ask
+    use ask_until_correct($question, $right_ans)
+    when
+        questions.$question($right_ans)
+        special.claim_goal()
+
+ask_until_correct__try_again
+    use ask_until_correct($question, $right_ans)
+    when
+        python engine.get_ke('questions', $question).reset()
+        python print "Try again:"
+        ask_until_correct($question, $right_ans)
+
+knows_pattern_variables
+    use knows_pattern_variables()
+    when
+        knows_pattern_variable_syntax()
+        knows_pattern_variable_scope()
+
+knows_pattern_variable_scope
+    use knows_pattern_variable_scope()
+    when
+        ask_until_correct(multiple_matching, 4)
+        questions.anonymous_syntax($_)
+        ask_until_correct(anonymous_matching, 3)
+
+knows_how_patterns_match
+    use knows_how_patterns_match()
+    when
+        questions.pattern_scope($ans)
+        post_process_pattern_scope($ans)
+        ask_until_correct(anonymous_matching, 3)
+
+post_process_pattern_scope_1
+    use post_process_pattern_scope(1)
+    when
+        knows_literal_patterns()
+        knows_pattern_variable_syntax()
+        python engine.get_ke('questions', 'pattern_scope').reset()
+        knows_how_patterns_match()
+
+post_process_pattern_scope_2
+    use post_process_pattern_scope(2)
+    when
+        knows_pattern_variable_scope()
+        python engine.get_ke('questions', 'pattern_scope').reset()
+        knows_how_patterns_match()
+
+post_process_pattern_scope_3
+    use post_process_pattern_scope(3)
+
+post_process_pattern_scope_4
+    use post_process_pattern_scope(4)
+    when
+        knows_pattern_variable_scope()
+        questions.same_var_different_rules($_)
+        python engine.get_ke('questions', 'pattern_scope').reset()
+        knows_how_patterns_match()
+
+post_process_pattern_scope_5
+    use post_process_pattern_scope(5)
+    when
+        questions.same_var_different_rules($_)
+        python engine.get_ke('questions', 'pattern_scope').reset()
+        knows_how_patterns_match()
+
+post_process_pattern_scope_6
+    use post_process_pattern_scope(6)
+    when
+        knows_patterns()
+        knows_pattern_variable_scope()
+        python engine.get_ke('questions', 'pattern_scope').reset()
+        knows_how_patterns_match()
+
+knows_rest_variable
+    use knows_rest_variable()
+    when
+        questions.rest_pattern_variable_syntax($_)
+        knows_rest_match()
+
+knows_rest_match
+    use knows_rest_match()
+    when
+        questions.rest_match($ans)
+        post_process_rest_match($ans)
+
+post_process_rest_match_1
+    use post_process_rest_match(1)
+    when
+        python engine.get_ke('questions', 'rest_match').reset()
+        knows_rest_match()
+
+post_process_rest_match_4_5
+    use post_process_rest_match($ans)
+    when
+        check $ans in (4, 5)
+        special.claim_goal()
+        python engine.get_ke('questions', 'rest_match').reset()
+        knows_rest_variable()
+
+post_process_rest_match_correct
+    use post_process_rest_match($ans)
+    when
+        check $ans in (2, 3)
+
+knows_tuple_patterns
+    use knows_tuple_patterns()
+    when
+        questions.tuple_pattern_syntax($_)
+        knows_rest_variable()
+

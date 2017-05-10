@@ -1,0 +1,19 @@
+takeoff_clearnace($ans)
+    Do you already have permission to takeoff?
+    ---
+    $ans = select_1
+        1: No
+           ! takeoff clearance requested
+        2: Yes.
+           ! Quit yer yabbering and takeoff then!
+        3: What's "takeoff clearance"?
+           ! HALT! You must not takeoff without permission.
+
+#drunk($ans)
+#    Are you drunk? have you been drinking?
+#    ---
+#    $ans = select_1
+#        1: no <hick>. Well, maybe jusht a little bit.
+#           ! You are refused flight clearance. Come back when you are sober.
+#        2: Certainly not!
+#           ! Good, you have permission to take off.

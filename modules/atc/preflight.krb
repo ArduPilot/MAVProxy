@@ -1,0 +1,19 @@
+clear_to_takeoff
+    use clear_to_takeoff()
+    when
+        # that's an interesting step... 
+        python engine.get_ke('questions', 'takeoff_clearnace').reset()
+        clearance()
+
+clearance
+    use clearance()
+    when
+        questions.takeoff_clearance(2) # 2 is an assertion that clearance has been obtained
+
+## We must interrogate the pilot
+## The pilot must be sober
+#$drunk
+#    use drunk()
+#    when
+#        questions.drunk($_)
+#        have_clearnace()
