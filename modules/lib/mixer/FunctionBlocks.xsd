@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<xs:schema elementFormDefault="qualified" targetNamespace="FunctionBlock" xmlns="FunctionBlock" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+	<xs:simpleType name="dataType">
+    		<xs:restriction base="xs:string">
+      			<xs:enumeration value="Register"/>
+      			<xs:enumeration value="Percent"/>
+      			<xs:enumeration value="Fraction"/>
+      			<xs:enumeration value="int14"/>
+      			<xs:enumeration value="int16"/>
+    		</xs:restriction>
+	</xs:simpleType>
+		
+	<xs:element name="FunctionBlocks">
+		<xs:complexType>
+			<xs:sequence>
+			<xs:element maxOccurs="64" minOccurs="1" name="functionBlock" type="functionBlock"/>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+	<xs:complexType name="functionBlockData">
+		<xs:sequence>
+			<xs:element name="name" type="xs:string"/>
+			<xs:element name="type" type="dataType" />
+			<xs:element name="default" type="xs:string"/>
+			<xs:element name="description" type="xs:string" default="no description" />
+		</xs:sequence>
+	</xs:complexType>
+
+	<xs:complexType name="functionBlockHeader">
+		<xs:sequence>
+			<xs:element name="name" type="xs:string"/>
+			<xs:element name="description" type="xs:string" default="no description" />
+			<xs:element name="MAVFunction" type="xs:string" default="functionNULL"/>
+		</xs:sequence>
+	</xs:complexType>
+	
+	<xs:complexType name="functionBlock">
+		<xs:sequence>
+			<xs:element name="header" type="functionBlockHeader"/>
+			<xs:element maxOccurs="16" minOccurs="0" name="setting" type="functionBlockData"/>
+		</xs:sequence>
+	</xs:complexType>
+
+</xs:schema>

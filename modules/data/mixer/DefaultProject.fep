@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- New document created with EditiX at Tue Aug 09 20:53:50 CEST 2011 -->
+<Project xmlns="pyFEditProject" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="pyFEditProject pyFEditProject.xsd">
+	<COutputDirectory/>
+	<SystemID>55</SystemID>
+	<ComponentID>1</ComponentID>
+	<ComponentName>MIXER</ComponentName>
+	<FunctionSettingsPath>DefaultSettings.feset</FunctionSettingsPath>
+</Project>
