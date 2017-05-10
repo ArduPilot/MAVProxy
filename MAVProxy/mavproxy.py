@@ -870,8 +870,8 @@ def run_script(scriptfile):
     
 def set_mav_version(mav10, mav20, autoProtocol, mavversionArg):
     '''Set the Mavlink version based on commandline options'''
-    if(mav10 == True or mav20 == True or autoProtocol == True):
-        print("Warning: Using deprecated --mav10, --mav20 or --auto-protocol options. Use --mavversion instead")
+#    if(mav10 == True or mav20 == True or autoProtocol == True):
+#        print("Warning: Using deprecated --mav10, --mav20 or --auto-protocol options. Use --mavversion instead")
 
     #sanity check the options
     if (mav10 == True or mav20 == True) and autoProtocol == True:
