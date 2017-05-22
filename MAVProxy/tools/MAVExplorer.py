@@ -4,6 +4,7 @@ log analysis program
 Andrew Tridgell December 2014
 '''
 
+from __future__ import unicode_literals
 import sys, struct, time, os, datetime, platform
 import math, re
 import Queue
@@ -14,7 +15,9 @@ if platform.system() == 'Darwin':
 else:
     from multiprocessing import Pipe, Process, Event, freeze_support
 from math import *
-from MAVProxy.modules.lib import rline
+from prompt_toolkit import prompt
+from prompt_toolkit.history import InMemoryHistory
+from MAVProxy.modules.lib import promptMAV
 from MAVProxy.modules.lib import wxconsole
 from MAVProxy.modules.lib.graph_ui import Graph_UI
 from MAVProxy.modules.lib import mavmemlog
@@ -42,7 +45,6 @@ class MEState(object):
     '''holds state of MAVExplorer'''
     def __init__(self):
         self.input_queue = Queue.Queue()
-        self.rl = None
         self.console = wxconsole.MessageConsole(title='MAVExplorer')
         self.exit = False
         self.status = MEStatus()
@@ -74,6 +76,10 @@ class MEState(object):
         self.parent_pipe_recv_console,self.child_pipe_send_console = Pipe(duplex=False)
         #pipe for creating graphs (such as from the save dialog box)
         self.parent_pipe_recv_graph,self.child_pipe_send_graph = Pipe(duplex=False)
+        
+        self.completor = promptMAV.MAVPromptCompleter(self)
+        self.validator = promptMAV.MAVValidator(self) 
+        self.consoleHistory = InMemoryHistory()
         
         tConsoleWrite = threading.Thread(target=self.pipeRecvConsole)
         tConsoleWrite.daemon = True
@@ -482,7 +488,7 @@ def input_loop():
     while mestate.exit != True:
         try:
             if mestate.exit != True:
-                line = raw_input(mestate.rl.prompt)
+                line = prompt(mestate.status.flightmode + "> ", history=mestate.consoleHistory, patch_stdout=True, validator=mestate.validator, completer=mestate.completor)
         except EOFError:
             mestate.exit = True
             sys.exit(1)
@@ -520,8 +526,6 @@ if __name__ == "__main__":
     mestate = MEState()
     setup_file_menu()
 
-    mestate.rl = rline.rline("MAV> ", mestate)
-
     from argparse import ArgumentParser
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("files", metavar="<FILE>", nargs="?")
@@ -537,10 +541,10 @@ if __name__ == "__main__":
     mestate.thread.start()
 
     # input loop
-    while mestate.rl != None and mestate.exit != True:
+    while mestate.exit != True:
         try:
             try:
-                line = raw_input(mestate.rl.prompt)
+                line = prompt("MAV" + "> ", history=mestate.consoleHistory, patch_stdout=True, validator=mestate.validator, completer=mestate.completor)
             except EOFError:
                 mestate.exit = True
                 break

@@ -6,7 +6,7 @@ Copyright Andrew Tridgell 2011
 Released under the GNU GPL version 3 or later
 
 '''
-
+from __future__ import unicode_literals
 import sys, os, time, socket, signal
 import fnmatch, errno, threading
 import serial, Queue, select
@@ -14,9 +14,11 @@ import traceback
 import select
 import shlex
 import platform
+from prompt_toolkit import prompt
+from prompt_toolkit.history import InMemoryHistory
+from MAVProxy.modules.lib import promptMAV
 
 from MAVProxy.modules.lib import textconsole
-from MAVProxy.modules.lib import rline
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import dumpstacks
 
@@ -26,10 +28,6 @@ try:
       from multiprocessing import freeze_support
       from pymavlink import mavwp, mavutil
       import matplotlib, HTMLParser
-      try:
-            import readline
-      except ImportError:
-            import pyreadline as readline
 except Exception:
       pass
 
@@ -175,6 +173,10 @@ class MPState(object):
                            "load (AVAILMODULES)",
                            "<unload|reload> (LOADEDMODULES)"]
             }
+            
+        self.completor = promptMAV.MAVPromptCompleter(self)
+        self.validator = promptMAV.MAVValidator(self) 
+        self.consoleHistory = InMemoryHistory()
 
         self.status = MPStatus()
 
@@ -251,7 +253,7 @@ def cmd_status(args):
 
 def cmd_setup(args):
     mpstate.status.setup_mode = True
-    mpstate.rl.set_prompt("")
+    #mpstate.rl.set_prompt("")
 
 
 def cmd_reset(args):
@@ -450,7 +452,7 @@ def process_stdin(line):
         if line == '.':
             mpstate.status.setup_mode = False
             mpstate.status.flightmode = "MAV"
-            mpstate.rl.set_prompt("MAV> ")
+            #mpstate.rl.set_prompt("MAV> ")
             return
         if line != '+++':
             line += '\r'
@@ -843,7 +845,7 @@ def input_loop():
     while mpstate.status.exit != True:
         try:
             if mpstate.status.exit != True:
-                line = raw_input(mpstate.rl.prompt)
+                line = prompt(mpstate.status.flightmode + "> ", history=mpstate.consoleHistory, patch_stdout=True, validator=mpstate.validator, completer=mpstate.completor)
         except EOFError:
             mpstate.status.exit = True
             sys.exit(1)
@@ -1007,8 +1009,6 @@ if __name__ == '__main__':
 
     mpstate.mav_master = []
 
-    mpstate.rl = rline.rline("MAV> ", mpstate)
-
     def quit_handler(signum = None, frame = None):
         #print 'Signal handler called with signal', signum
         if mpstate.status.exit:
@@ -1068,8 +1068,6 @@ if __name__ == '__main__':
     mpstate.input_queue = Queue.Queue()
     mpstate.input_count = 0
     mpstate.empty_input_count = 0
-    if opts.setup:
-        mpstate.rl.set_prompt("")
 
     # call this early so that logdir is setup based on --aircraft
     (mpstate.status.logdir, logpath_telem, logpath_telem_raw) = log_paths()

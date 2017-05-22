@@ -109,7 +109,7 @@ class MPModule(object):
             self.mpstate.completions[name] = completions
 
     def add_completion_function(self, name, callback):
-        self.mpstate.completion_functions[name] = callback
+        self.mpstate.completor.completion_functions[name] = callback
 
     def dist_string(self, val_meters):
         '''return a distance as a string'''
@@ -148,5 +148,5 @@ class MPModule(object):
         if prompt and self.settings.vehicle_name:
             # add in optional vehicle name
             prompt = self.settings.vehicle_name + ':' + prompt
-        self.mpstate.rl.set_prompt(prompt)
+        #self.mpstate.rl.set_prompt(prompt)
             
