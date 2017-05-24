@@ -7,7 +7,7 @@ Released under the GNU GPL version 3 or later
 
 '''
 from __future__ import unicode_literals
-import sys, os, time, socket, signal
+import sys, os, time, socket, signal, io
 import fnmatch, errno, threading
 import serial, Queue, select
 import traceback
@@ -854,21 +854,17 @@ def input_loop():
 
 def run_script(scriptfile):
     '''run a script file'''
-    try:
-        f = open(scriptfile, mode='r')
-    except Exception:
-        return
-    mpstate.console.writeln("Running script %s" % scriptfile)
-    for line in f:
-        line = line.strip()
-        if line == "" or line.startswith('#'):
-            continue
-        if line.startswith('@'):
-            line = line[1:]
-        else:
-            mpstate.console.writeln("-> %s" % line)
-        process_stdin(line)
-    f.close()
+    with io.open(scriptfile) as f:
+        mpstate.console.writeln("Running script %s" % scriptfile)
+        for line in f:
+            line = unicode.strip(line)
+            if line == '' or line.startswith('#'):
+                continue
+            if line.startswith('@'):
+                line = line[1:]
+            else:
+                mpstate.console.writeln("-> %s" % line)
+            process_stdin(line)
     
 def set_mav_version(mav10, mav20, autoProtocol, mavversionArg):
     '''Set the Mavlink version based on commandline options'''
