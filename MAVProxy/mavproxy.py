@@ -16,6 +16,9 @@ import shlex
 import platform
 from prompt_toolkit import prompt
 from prompt_toolkit.history import InMemoryHistory
+from prompt_toolkit.key_binding.bindings.completion import display_completions_like_readline
+from prompt_toolkit.key_binding.defaults import load_key_bindings_for_prompt
+from prompt_toolkit.keys import Keys
 from MAVProxy.modules.lib import promptMAV
 
 from MAVProxy.modules.lib import textconsole
@@ -177,6 +180,11 @@ class MPState(object):
         self.completor = promptMAV.MAVPromptCompleter(self)
         self.validator = promptMAV.MAVValidator(self) 
         self.consoleHistory = InMemoryHistory()
+        
+        # Create key bindings registry with a custom binding for the Tab key that
+        # displays completions like GNU readline.
+        self.registry = load_key_bindings_for_prompt()
+        self.registry.add_binding(Keys.ControlI)(display_completions_like_readline)
 
         self.status = MPStatus()
 
@@ -845,7 +853,7 @@ def input_loop():
     while mpstate.status.exit != True:
         try:
             if mpstate.status.exit != True:
-                line = prompt(mpstate.status.flightmode + "> ", history=mpstate.consoleHistory, patch_stdout=True, validator=mpstate.validator, completer=mpstate.completor)
+                line = prompt(mpstate.status.flightmode + "> ", history=mpstate.consoleHistory, patch_stdout=True, validator=mpstate.validator, completer=mpstate.completor, key_bindings_registry=mpstate.registry, complete_while_typing=False)
         except EOFError:
             mpstate.status.exit = True
             sys.exit(1)
