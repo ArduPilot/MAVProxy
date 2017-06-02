@@ -43,6 +43,7 @@ class GPSInputModule(mp_module.MPModule):
             'satellites_visible' : 0                # (uint8_t) Number of satellites visible.
         }
         
+        self.BUFFER_SIZE = 4096
         self.ip="127.0.0.1"
         self.portnum = 25100
         self.port = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
