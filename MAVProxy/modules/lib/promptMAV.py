@@ -7,6 +7,7 @@ import sys, glob, os, platform
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.validation import Validator, ValidationError
+from prompt_toolkit.token import Token
 
 class MAVValidator(Validator):
     '''Input validator for Prompt_Toolkit'''
@@ -17,7 +18,19 @@ class MAVValidator(Validator):
         #need to handle null input (prompt toolkit crashes with null input) - substitute in a space instead
         if document.text == "":
             self.state.input_queue.put(" ")
-            
+
+class MAVPromptToken():
+    '''Get the current flight mode as the prompt'''
+    def __init__(self, mpstate):
+        self.state = mpstate
+        
+    def get_prompt_token(self, cli):
+        " Tokens to be shown before the prompt. "
+        if self.state.status.flightmode:
+            return [(Token.Prompt, self.state.status.flightmode), (Token.Prompt, '> ')]
+        else:
+            return [(Token.Prompt, "MAV"), (Token.Prompt, ">")]
+
 class MAVPromptCompleter(Completer):
     '''Completion generator for commands'''
     def __init__(self, mpstate):

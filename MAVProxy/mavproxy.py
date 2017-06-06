@@ -180,6 +180,7 @@ class MPState(object):
         self.completor = promptMAV.MAVPromptCompleter(self)
         self.validator = promptMAV.MAVValidator(self) 
         self.consoleHistory = InMemoryHistory()
+        self.flightmodeprompt = promptMAV.MAVPromptToken(self)
         
         # Create key bindings registry with a custom binding for the Tab key that
         # displays completions like GNU readline.
@@ -853,7 +854,7 @@ def input_loop():
     while mpstate.status.exit != True:
         try:
             if mpstate.status.exit != True:
-                line = prompt(mpstate.status.flightmode + "> ", history=mpstate.consoleHistory, patch_stdout=True, validator=mpstate.validator, completer=mpstate.completor, key_bindings_registry=mpstate.registry, complete_while_typing=False)
+                line = prompt(history=mpstate.consoleHistory, patch_stdout=True, validator=mpstate.validator, completer=mpstate.completor, key_bindings_registry=mpstate.registry, complete_while_typing=False, get_prompt_tokens=mpstate.flightmodeprompt.get_prompt_token, refresh_interval=.5)
         except EOFError:
             mpstate.status.exit = True
             sys.exit(1)
