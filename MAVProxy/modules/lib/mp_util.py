@@ -149,7 +149,7 @@ class object_container:
     containing all of the normal attributes of the original'''
     def __init__(self, object):
         for v in dir(object):
-            if not v.startswith('__') and v not in ['this']:
+            if not v.startswith('__') and v not in ['this' ,'m_altDown', 'm_controlDown', 'm_metaDown', 'm_shiftDown']:
                 try:
                     a = getattr(object, v)
                     if (hasattr(a, '__call__') or

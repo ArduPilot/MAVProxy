@@ -132,12 +132,16 @@ class MPMenuRadio(MPMenuItem):
     def _append(self, menu):
         '''append this menu item to a menu'''
         from wx_loader import wx
+        import wx_util
         submenu = wx.Menu()
         for i in range(len(self.items)):
             submenu.AppendRadioItem(self.id()+i, self.items[i], self.description)
             if self.items[i] == self.initial:
                 submenu.Check(self.id()+i, True)
-        menu.AppendMenu(-1, self.name, submenu)
+        if wx_util.phoenix: #use wxPython_phoenix
+            menu.Append(-1, self.name, submenu)
+        else:
+            menu.AppendMenu(-1, self.name, submenu)
 
     def __str__(self):
         return "MPMenuRadio(%s,%s,%s,%s)" % (self.name, self.description, self.returnkey, self.get_choice())
@@ -202,7 +206,8 @@ class MPMenuSubMenu(MPMenuGeneric):
     def _append(self, menu):
         '''append this menu item to a menu'''
         from wx_loader import wx
-        if platform.system() == 'Darwin':
+        import wx_util
+        if platform.system() == 'Darwin' or wx_util.phoenix:
             menu.Append(-1, self.name, self.wx_menu()) #use wxPython_phoenix
         else:
             menu.AppendMenu(-1, self.name, self.wx_menu())
@@ -295,8 +300,7 @@ class MPMenuCallTextDialog(object):
     def call(self):
         '''show a value dialog'''
         from wx_loader import wx
-
-        dlg = wx.TextEntryDialog(None, self.title, self.title, defaultValue=str(self.default))
+        dlg = wx.TextEntryDialog(None, self.title, self.title, value=str(self.default))
         if dlg.ShowModal() != wx.ID_OK:
             return None
         return dlg.GetValue()

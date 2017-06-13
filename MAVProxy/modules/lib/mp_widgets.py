@@ -7,6 +7,7 @@ June 2012
 '''
 
 from wx_loader import wx
+import wx_util
 import cv2
 import numpy as np
 
@@ -27,7 +28,10 @@ class ImagePanel(wx.Panel):
         '''set the image to be displayed'''
         if hasattr(img, 'shape'):
             (width, height) = (img.shape[1], img.shape[0])
-            self._bmp = wx.BitmapFromBuffer(width, height, np.uint8(img)) # http://stackoverflow.com/a/16866833/2559632
+            if wx_util.phoenix:
+                self._bmp = wx.Bitmap.FromBuffer(width, height, np.uint8(img))
+            else:  
+                self._bmp = wx.BitmapFromBuffer(width, height, np.uint8(img)) # http://stackoverflow.com/a/16866833/2559632
         elif hasattr(img, 'GetHeight'):
             self._bmp = wx.BitmapFromImage(img)
         else:

@@ -551,13 +551,14 @@ class MPSlipMapPanel(wx.Panel):
         '''handle mouse events'''
         state = self.state
         pos = event.GetPosition()
+        mouse_state = wx.GetMouseState()
         if event.Leaving():
             self.mouse_pos = None
         else:
             self.mouse_pos = pos
         self.update_position()
 
-        if event.ButtonIsDown(wx.MOUSE_BTN_ANY) or event.ButtonUp():
+        if event.ButtonDown(wx.MOUSE_BTN_ANY) or event.ButtonUp():
             # send any event with a mouse button to the parent
             latlon = self.coordinates(pos.x, pos.y)
             selected = self.selected_objects(pos)
@@ -577,7 +578,7 @@ class MPSlipMapPanel(wx.Panel):
                     self.show_default_popup(pos)
                     state.popup_started = True
 
-        if not event.ButtonIsDown(wx.MOUSE_BTN_RIGHT):
+        if not mouse_state.RightIsDown():
             state.popup_started = False
 
         if event.LeftDown() or event.RightDown():
@@ -585,7 +586,7 @@ class MPSlipMapPanel(wx.Panel):
             self.last_click_pos = self.click_pos
             self.click_pos = self.coordinates(pos.x, pos.y)
 
-        if event.Dragging() and event.ButtonIsDown(wx.MOUSE_BTN_LEFT):
+        if event.Dragging() and mouse_state.LeftIsDown():
             # drag map to new position
             newpos = pos
             if self.mouse_down and newpos:
@@ -620,7 +621,7 @@ class MPSlipMapPanel(wx.Panel):
             selected = self.selected_objects(self.mouse_pos)
             state.event_queue.put(SlipKeyEvent(latlon, event, selected))
 
-        c = event.GetUniChar()
+        c = event.GetUnicodeKey()
         if c == ord('+') or (c == ord('=') and event.ShiftDown()):
             self.change_zoom(1.0/1.2)
         elif c == ord('-'):

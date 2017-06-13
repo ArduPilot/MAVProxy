@@ -5,3 +5,6 @@
 
 import sys
 safe = sys.platform != 'darwin'
+
+from distutils.version import StrictVersion
+phoenix = lambda x, y: StrictVersion(wx.__version__) >= StrictVersion('4.0')
