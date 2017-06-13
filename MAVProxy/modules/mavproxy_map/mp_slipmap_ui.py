@@ -448,7 +448,7 @@ class MPSlipMapPanel(wx.Panel):
         self.map_img = state.mt.area_to_image(state.lat, state.lon,
                                               state.width, state.height, state.ground_width)
         if state.brightness != 1.0:
-            self.map_img = self.map_img*state.brightness
+            np.multiply(self.map_img,state.brightness, out=self.map_img, casting='unsafe')
 
 
         # find display bounding box
