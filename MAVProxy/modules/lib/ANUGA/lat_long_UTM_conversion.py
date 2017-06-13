@@ -246,6 +246,6 @@ Therefore it is difficult to actually know what hemisphere you are in.
 
 if __name__ == '__main__':
     (z, e, n) = LLtoUTM(45.00, -75.00, 23)
-    print z, e, n
+    print(z, e, n)
     (lat, lon) = UTMtoLL(n, e, z, 23)
-    print lat, lon
+    print(lat, lon)

@@ -131,8 +131,8 @@ class MPMenuRadio(MPMenuItem):
 
     def _append(self, menu):
         '''append this menu item to a menu'''
-        from wx_loader import wx
-        import wx_util
+        from MAVProxy.modules.lib.wx_loader import wx
+        from MAVProxy.modules.lib import wx_util
         submenu = wx.Menu()
         for i in range(len(self.items)):
             submenu.AppendRadioItem(self.id()+i, self.items[i], self.description)
@@ -188,7 +188,7 @@ class MPMenuSubMenu(MPMenuGeneric):
 
     def wx_menu(self):
         '''return a wx.Menu() for this menu'''
-        from wx_loader import wx
+        from MAVProxy.modules.lib.wx_loader import wx
         menu = wx.Menu()
         for i in range(len(self.items)):
             m = self.items[i]
@@ -205,8 +205,8 @@ class MPMenuSubMenu(MPMenuGeneric):
 
     def _append(self, menu):
         '''append this menu item to a menu'''
-        from wx_loader import wx
-        import wx_util
+        from MAVProxy.modules.lib.wx_loader import wx
+        from MAVProxy.modules.lib import wx_util
         if platform.system() == 'Darwin' or wx_util.phoenix:
             menu.Append(-1, self.name, self.wx_menu()) #use wxPython_phoenix
         else:
@@ -246,7 +246,7 @@ class MPMenuTop(object):
 
     def wx_menu(self):
         '''return a wx.MenuBar() for the menu'''
-        from wx_loader import wx
+        from MAVProxy.modules.lib.wx_loader import wx
 
         menubar = wx.MenuBar()
         for i in range(len(self.items)):
@@ -272,7 +272,7 @@ class MPMenuCallFileDialog(object):
 
     def call(self):
         '''show a file dialog'''
-        from wx_loader import wx
+        from MAVProxy.modules.lib.wx_loader import wx
 
         # remap flags to wx descriptors
         flag_map = {
@@ -299,7 +299,7 @@ class MPMenuCallTextDialog(object):
 
     def call(self):
         '''show a value dialog'''
-        from wx_loader import wx
+        from MAVProxy.modules.lib.wx_loader import wx
         dlg = wx.TextEntryDialog(None, self.title, self.title, value=str(self.default))
         if dlg.ShowModal() != wx.ID_OK:
             return None
@@ -320,8 +320,8 @@ class MPMenuChildMessageDialog(object):
     def call(self):
         '''show the dialog as a child process'''
         mp_util.child_close_fds()
-        import wx_processguard
-        from wx_loader import wx
+        from MAVProxy.modules.lib import wx_processguard
+        from MAVProxy.modules.lib.wx_loader import wx
         from wx.lib.agw.genericmessagedialog import GenericMessageDialog
         app = wx.App(False)
         # note! font size change is not working. I don't know why yet

@@ -9,17 +9,17 @@ Released under the GNU GPL version 3 or later
 
 import sys, os, time, socket, signal
 import fnmatch, errno, threading
-import serial, Queue, select
+import serial, queue, select
 import traceback
 import select
 import shlex
 import platform
+import importlib
 
 from MAVProxy.modules.lib import textconsole
 from MAVProxy.modules.lib import rline
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import dumpstacks
-
 # adding all this allows pyinstaller to build a working windows executable
 # note that using --hidden-import does not work for these modules
 try:
@@ -277,7 +277,7 @@ def load_module(modname, quiet=False):
     for modpath in modpaths:
         try:
             m = import_package(modpath)
-            reload(m)
+            importlib.reload(m)
             module = m.init(mpstate)
             if isinstance(module, mp_module.MPModule):
                 mpstate.modules.append((module, m))
@@ -403,10 +403,10 @@ def import_package(name):
     and returns the desired module."""
     import zipimport
     try:
-        mod = __import__(name)
+        mod = importlib.__import__(name)
     except ImportError:
         clear_zipimport_cache()
-        mod = __import__(name)
+        mod = importlib.__import__(name)
 
     components = name.split('.')
     for comp in components[1:]:
@@ -843,7 +843,7 @@ def input_loop():
     while mpstate.status.exit != True:
         try:
             if mpstate.status.exit != True:
-                line = raw_input(mpstate.rl.prompt)
+                line = input(mpstate.rl.prompt)
         except EOFError:
             mpstate.status.exit = True
             sys.exit(1)
@@ -949,7 +949,7 @@ if __name__ == '__main__':
     parser.add_option("-c", "--continue", dest='continue_mode', action='store_true', default=False, help="continue logs")
     parser.add_option("--dialect",  default="ardupilotmega", help="MAVLink dialect")
     parser.add_option("--rtscts",  action='store_true', help="enable hardware RTS/CTS flow control")
-    parser.add_option("--moddebug",  type=int, help="module debug level", default=0)
+    parser.add_option("--moddebug",  type=int, help="module debug level", default=3)
     parser.add_option("--mission", dest="mission", help="mission name", default=None)
     parser.add_option("--daemon", action='store_true', help="run in daemon mode, do not start interactive shell")
     parser.add_option("--profile", action='store_true', help="run the Yappi python profiler")
@@ -986,8 +986,8 @@ if __name__ == '__main__':
     mpstate.command_map = command_map
     mpstate.continue_mode = opts.continue_mode
     # queues for logging
-    mpstate.logqueue = Queue.Queue()
-    mpstate.logqueue_raw = Queue.Queue()
+    mpstate.logqueue = queue.Queue()
+    mpstate.logqueue_raw = queue.Queue()
 
 
     if opts.speech:
@@ -1068,7 +1068,7 @@ if __name__ == '__main__':
     heartbeat_period = mavutil.periodic_event(1)
     heartbeat_check_period = mavutil.periodic_event(0.33)
 
-    mpstate.input_queue = Queue.Queue()
+    mpstate.input_queue = queue.Queue()
     mpstate.input_count = 0
     mpstate.empty_input_count = 0
     if opts.setup:

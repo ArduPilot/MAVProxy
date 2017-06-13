@@ -148,30 +148,29 @@ class Geo_reference:
             pass
 
         if self.false_easting != DEFAULT_FALSE_EASTING:
-            print "WARNING: False easting of %f specified." % self.false_easting
-            print "Default false easting is %f." % DEFAULT_FALSE_EASTING
-            print "ANUGA does not correct for differences in False Eastings."
+            print("WARNING: False easting of %f specified." % self.false_easting)
+            print("Default false easting is %f." % DEFAULT_FALSE_EASTING)
+            print("ANUGA does not correct for differences in False Eastings.")
 
         if self.false_northing != DEFAULT_FALSE_NORTHING:
-            print ("WARNING: False northing of %f specified."
-                   % self.false_northing)
-            print "Default false northing is %f." % DEFAULT_FALSE_NORTHING
-            print "ANUGA does not correct for differences in False Northings."
+            print("WARNING: False northing of %f specified." % self.false_northing)
+            print("Default false northing is %f." % DEFAULT_FALSE_NORTHING)
+            print("ANUGA does not correct for differences in False Northings.")
 
         if self.datum.upper() != DEFAULT_DATUM.upper():
-            print "WARNING: Datum of %s specified." % self.datum
-            print "Default Datum is %s." % DEFAULT_DATUM
-            print "ANUGA does not correct for differences in datums."
+            print("WARNING: Datum of %s specified." % self.datum)
+            print("Default Datum is %s." % DEFAULT_DATUM)
+            print("ANUGA does not correct for differences in datums.")
 
         if self.projection.upper() != DEFAULT_PROJECTION.upper():
-            print "WARNING: Projection of %s specified." % self.projection
-            print "Default Projection is %s." % DEFAULT_PROJECTION
-            print "ANUGA does not correct for differences in Projection."
+            print("WARNING: Projection of %s specified." % self.projection)
+            print("Default Projection is %s." % DEFAULT_PROJECTION)
+            print("ANUGA does not correct for differences in Projection.")
 
         if self.units.upper() != DEFAULT_UNITS.upper():
-            print "WARNING: Units of %s specified." % self.units
-            print "Default units is %s." % DEFAULT_UNITS
-            print "ANUGA does not correct for differences in units."
+            print("WARNING: Units of %s specified." % self.units)
+            print("Default units is %s." % DEFAULT_UNITS)
+            print("ANUGA does not correct for differences in units.")
 
 ################################################################################
 # ASCII files with geo-refs are currently not used
@@ -196,13 +195,13 @@ class Geo_reference:
             if read_title[0:2].upper() != TITLE[0:2].upper():
                 msg = ('File error.  Expecting line: %s.  Got this line: %s'
                        % (TITLE, read_title))
-                raise TitleError, msg
+                raise(TitleError, msg)
             self.zone = int(fd.readline())
             self.xllcorner = float(fd.readline())
             self.yllcorner = float(fd.readline())
         except SyntaxError:
             msg = 'File error.  Got syntax error while parsing geo reference'
-            raise ParsingError, msg
+            raise(ParsingError, msg)
 
         # Fix some assertion failures
         if isinstance(self.zone, num.ndarray) and self.zone.shape == ():
@@ -305,13 +304,13 @@ class Geo_reference:
             # One point has been passed
             msg = 'Single point must have two elements'
             if not len(points) == 2:
-                raise ShapeError, msg
+                raise(ShapeError, msg)
 
 
         msg = 'Input must be an N x 2 array or list of (x,y) values. '
         msg += 'I got an %d x %d array' %points.shape
         if not points.shape[1] == 2:
-            raise ShapeError, msg
+            raise(ShapeError, msg)
 
 
         # Add geo ref to points
@@ -346,12 +345,12 @@ class Geo_reference:
             #One point has been passed
             msg = 'Single point must have two elements'
             if not len(points) == 2:
-                raise ShapeError, msg
+                raise(ShapeError, msg)
 
         if not points.shape[1] == 2:
             msg = ('Input must be an N x 2 array or list of (x,y) values. '
                    'I got an %d x %d array' % points.shape)
-            raise ShapeError, msg
+            raise(ShapeError, msg)
 
         # Subtract geo ref from points
         if not self.is_absolute():
@@ -382,7 +381,7 @@ class Geo_reference:
             msg = ('Geospatial data must be in the same '
                    'ZONE to allow reconciliation. I got zone %d and %d'
                    % (self.zone, other.zone))
-            raise ANUGAError, msg
+            raise(ANUGAError, msg)
 
     #def easting_northing2geo_reffed_point(self, x, y):
     #    return [x-self.xllcorner, y - self.xllcorner]
@@ -399,8 +398,7 @@ class Geo_reference:
     ##
     # @brief Get a string representation of this geo_reference instance.
     def __repr__(self):
-        return ('(zone=%i easting=%f, northing=%f)'
-                % (self.zone, self.xllcorner, self.yllcorner))
+        return ('(zone=%i easting=%f, northing=%f)'% (self.zone, self.xllcorner, self.yllcorner))
 
     ##
     # @brief Compare two geo_reference instances.

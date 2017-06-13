@@ -6,8 +6,8 @@
 """Load and process SRTM data. Originally written by OpenStreetMap
 Edited by CanberraUAV"""
 
-from HTMLParser import HTMLParser
-import httplib
+from html.parser import HTMLParser
+import http.client
 import re
 import pickle
 import os.path

@@ -12,7 +12,7 @@ released under GNU GPL v3 or later
 import collections
 import errno
 import hashlib
-import urllib2
+import urllib.request
 import math
 import threading
 import os
@@ -206,8 +206,7 @@ class MPTile:
 
 	def get_service_list(self):
 		'''return list of available services'''
-		service_list = TILE_SERVICES.keys()
-		service_list.sort()
+		service_list = sorted(TILE_SERVICES)
 		return service_list
 
 	def set_download(self, download):
@@ -245,7 +244,7 @@ class MPTile:
 		while self.tiles_pending() > 0:
 			time.sleep(self.tile_delay)
 
-			keys = self._download_pending.keys()[:]
+			keys = list(self._download_pending.keys())[:]
 
 			# work out which one to download next, choosing by request_time
 			tile_info = self._download_pending[keys[0]]
@@ -260,12 +259,12 @@ class MPTile:
 			try:
 				if self.debug:
 					print("Downloading %s [%u left]" % (url, len(keys)))
-				req = urllib2.Request(url)
+				req = urllib.request.Request(url)
 				if url.find('google') != -1:
 					req.add_header('Referer', 'https://maps.google.com/')
-				resp = urllib2.urlopen(req)
+				resp = urllib.request.urlopen(req)
 				headers = resp.info()
-			except urllib2.URLError as e:
+			except urllib.URLError as e:
 				#print('Error loading %s' % url)
 				if not key in self._tile_cache:
 					self._tile_cache[key] = self._unavailable
@@ -356,7 +355,7 @@ class MPTile:
 			availy = min(TILES_HEIGHT - tile_info.offsety, height2)
 			if availx != width2 or availy != height2:
 				continue
-			roi = img[tile_info.offsety:tile_info.offsety+height2, tile_info.offsetx:tile_info.offsetx+width2]
+			roi = img[int(tile_info.offsety):int(tile_info.offsety+height2), int(tile_info.offsetx):int(tile_info.offsetx+width2)]
 
 			# and scale it
 			scaled = cv2.resize(roi, (TILES_HEIGHT,TILES_WIDTH))

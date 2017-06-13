@@ -32,7 +32,7 @@ class osxQueue(Queue):
                         return self._counter.value
 
 def makeIPCQueue(*args, **kwargs):
-        if sys.platform == 'darwin':
-                return osxQueue(*args, **kwargs)
-        else:
-                return Queue(*args, **kwargs)
+    if sys.platform == 'darwin':
+        return osxQueue(*args, **kwargs)
+    else:
+        return Queue(*args, **kwargs)

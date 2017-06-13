@@ -4,8 +4,9 @@
   MAVProxy message console, implemented in a child process
 """
 import threading
-import textconsole, sys, time
-from wxconsole_util import Value, Text
+from MAVProxy.modules.lib import textconsole
+import sys, time
+from MAVProxy.modules.lib.wxconsole_util import Value, Text
 import platform
 if platform.system() == 'Darwin':
     from billiard import Pipe, Process, Event, forking_enable, freeze_support
@@ -40,9 +41,9 @@ class MessageConsole(textconsole.SimpleConsole):
         self.parent_pipe_send.close()
         self.parent_pipe_recv.close()
 
-        import wx_processguard
-        from wx_loader import wx
-        from wxconsole_ui import ConsoleFrame
+        from MAVProxy.modules.lib import wx_processguard
+        from MAVProxy.modules.lib.wx_loader import wx
+        from MAVProxy.modules.lib.wxconsole_ui import ConsoleFrame
         app = wx.App(False)
         app.frame = ConsoleFrame(state=self, title=self.title)
         app.frame.SetDoubleBuffered(True)
@@ -51,7 +52,7 @@ class MessageConsole(textconsole.SimpleConsole):
 
     def watch_thread(self):
         '''watch for menu events from child'''
-        from mp_settings import MPSetting
+        from MAVProxy.modules.lib.mp_settings import MPSetting
         try:
             while True:
                 msg = self.parent_pipe_recv.recv()

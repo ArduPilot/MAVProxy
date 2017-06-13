@@ -268,7 +268,7 @@ class SlipGrid(SlipObject):
         '''draw a polygon on the image'''
         if self.hidden:
             return
-	(x,y,w,h) = bounds
+        (x,y,w,h) = bounds
         spacing = 1000
         while True:
             start = mp_util.latlon_round((x,y), spacing)
@@ -483,9 +483,11 @@ class SlipIcon(SlipThumbnail):
         (w, h) = image_shape(icon)
         px -= w/2
         py -= h/2
+        
+        px = int(px)
+        py = int(py)
 
         (px, py, sx, sy, w, h) = self.clip(px, py, w, h, img)
-
         img[py:py + h, px:px + w] = cv2.add(img[py:py+h, px:px+w], icon[sy:sy+h, sx:sx+w])
 
         # remember where we placed it for clicked()

@@ -1,8 +1,8 @@
 import time
 import os
-import mp_menu
-from wxconsole_util import Value, Text
-from wx_loader import wx
+from MAVProxy.modules.lib import mp_menu
+from MAVProxy.modules.lib.wxconsole_util import Value, Text
+from MAVProxy.modules.lib.wx_loader import wx
 
 class ConsoleFrame(wx.Frame):
     """ The main frame of the console"""

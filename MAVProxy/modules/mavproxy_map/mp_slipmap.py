@@ -59,8 +59,9 @@ class MPSlipMap():
 
         self.title = title
         from MAVProxy.modules.lib.multiprocessing_queue import makeIPCQueue
-        self.event_queue = makeIPCQueue()
-        self.object_queue = makeIPCQueue()
+        ctx = multiprocessing.get_context('spawn')
+        self.event_queue = makeIPCQueue(ctx = ctx)
+        self.object_queue = makeIPCQueue(ctx = ctx)
         self.close_window = multiprocessing.Semaphore()
         self.close_window.acquire()
         self.child = multiprocessing.Process(target=self.child_task)

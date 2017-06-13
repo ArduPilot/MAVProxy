@@ -6,8 +6,8 @@ Andrew Tridgell
 June 2012
 '''
 
-from wx_loader import wx
-import wx_util
+from MAVProxy.modules.lib.wx_loader import wx
+from MAVProxy.modules.lib import wx_util
 import cv2
 import numpy as np
 
