@@ -49,9 +49,7 @@ class RallyModule(mp_module.MPModule):
                 self.module('console').add_menu(self.menu)
                 self.menu_added_console = True
             except AttributeError:
-                self.menu_added_console = False
-        else:
-            self.menu_added_console = False
+                pass
                 
         if self.module('map') is not None and not self.menu_added_map:
             try:
