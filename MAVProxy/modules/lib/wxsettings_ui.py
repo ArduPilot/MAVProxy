@@ -1,4 +1,4 @@
-from wx_loader import wx
+from MAVProxy.modules.lib.wx_loader import wx
 
 class TabbedDialog(wx.Dialog):
     def __init__(self, tab_names, title='Title', size=wx.DefaultSize):
@@ -29,10 +29,10 @@ class TabbedDialog(wx.Dialog):
         button_box.Add(self.button_save, 0, wx.ALL)
         button_box.Add(self.button_load, 0, wx.ALL)
         self.dialog_sizer.Add(button_box, 0, wx.GROW|wx.ALIGN_CENTER_VERTICAL|wx.ALL, 5)
-        wx.EVT_BUTTON(self, self.button_cancel.GetId(), self.on_cancel)
-        wx.EVT_BUTTON(self, self.button_apply.GetId(), self.on_apply)
-        wx.EVT_BUTTON(self, self.button_save.GetId(), self.on_save)
-        wx.EVT_BUTTON(self, self.button_load.GetId(), self.on_load)
+        self.Bind(wx.EVT_BUTTON, self.on_cancel, id = self.button_cancel.GetId())
+        self.Bind(wx.EVT_BUTTON, self.on_apply, id = self.button_apply.GetId())
+        self.Bind(wx.EVT_BUTTON, self.on_save, id = self.button_save.GetId())
+        self.Bind(wx.EVT_BUTTON, self.on_load, id = self.button_load.GetId())
         self.Centre()
 
     def on_cancel(self, event):
@@ -70,7 +70,7 @@ class TabbedDialog(wx.Dialog):
             setting = self.setting_map[label]
             ctrl = self.controls[label]
             value = ctrl.GetValue()
-            if isinstance(value, str) or isinstance(value, unicode):
+            if isinstance(value, str) or isinstance(value, bytes):
                 ctrl.SetValue(str(setting.value))
             else:
                 ctrl.SetValue(setting.value)

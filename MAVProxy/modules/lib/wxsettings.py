@@ -22,9 +22,9 @@ class WXSettings(object):
     def child_task(self):
         '''child process - this holds all the GUI elements'''
         from MAVProxy.modules.lib import mp_util
-        import wx_processguard
-        from wx_loader import wx
-        from wxsettings_ui import SettingsDlg
+        from MAVProxy.modules.lib import wx_processguard
+        from MAVProxy.modules.lib.wx_loader import wx
+        from MAVProxy.modules.lib.wxsettings_ui import SettingsDlg
 
         mp_util.child_close_fds()
         app = wx.App(False)
@@ -35,7 +35,7 @@ class WXSettings(object):
 
     def watch_thread(self):
         '''watch for settings changes from child'''
-        from mp_settings import MPSetting
+        from MAVProxy.modules.lib.mp_settings import MPSetting
         while True:
             setting = self.child_pipe.recv()
             if not isinstance(setting, MPSetting):
@@ -58,9 +58,9 @@ if __name__ == "__main__":
         print("Changing %s to %s" % (setting.name, setting.value))
 
     # test the settings
-    import mp_settings, time
-    from mp_settings import MPSetting
-    settings = mp_settings.MPSettings(
+    import MAVProxy.modules.lib.mp_settings, time
+    from MAVProxy.modules.lib.mp_settings import MPSetting
+    settings = MAVProxy.modules.lib.mp_settings.MPSettings(
         [ MPSetting('link', int, 1, tab='TabOne'),
           MPSetting('altreadout', int, 10, range=(-30,1017), increment=1),
           MPSetting('pvalue', float, 0.3, range=(-3.0,1e6), increment=0.1, digits=2),

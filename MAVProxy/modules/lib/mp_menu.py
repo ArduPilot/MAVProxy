@@ -280,7 +280,7 @@ class MPMenuCallFileDialog(object):
             'save': wx.FD_SAVE,
             'overwrite_prompt': wx.FD_OVERWRITE_PROMPT,
         }
-        flagsMapped = map(lambda x: flag_map[x], self.flags)
+        flagsMapped = list(map(lambda x: flag_map[x], self.flags))
 
         #need to OR together the elements of the flagsMapped tuple
         if len(flagsMapped) == 1:
