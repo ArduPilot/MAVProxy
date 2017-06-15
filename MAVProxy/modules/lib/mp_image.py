@@ -94,8 +94,9 @@ class MPImage():
         self.popup_menu = None
 
         from multiprocessing_queue import makeIPCQueue
-        self.in_queue = makeIPCQueue()
-        self.out_queue = makeIPCQueue()
+        ctx = multiprocessing.get_context('spawn')
+        self.in_queue = makeIPCQueue(ctx=ctx)
+        self.out_queue = makeIPCQueue(ctx=ctx)
 
         self.default_menu = MPMenuSubMenu('View',
                                           items=[MPMenuItem('Fit Window', 'Fit Window', 'fitWindow'),
@@ -237,7 +238,7 @@ class MPImagePanel(wx.Panel):
         self.SetSizer(self.mainSizer)
 
         # panel for the main image
-        self.imagePanel = mp_widgets.ImagePanel(self, wx.EmptyImage(state.width,state.height))
+        self.imagePanel = mp_widgets.ImagePanel(self, wx.Image(state.width,state.height))
         self.mainSizer.Add(self.imagePanel, flag=wx.TOP|wx.LEFT|wx.GROW, border=0)
         if state.mouse_events:
             self.imagePanel.Bind(wx.EVT_MOUSE_EVENTS, self.on_event)
@@ -331,7 +332,7 @@ class MPImagePanel(wx.Panel):
         while state.in_queue.qsize():
             obj = state.in_queue.get()
             if isinstance(obj, MPImageData):
-                img = wx.EmptyImage(obj.width, obj.height)
+                img = wx.Image(obj.width, obj.height)
                 img.SetData(obj.data)
                 self.img = img
                 self.need_redraw = True
@@ -444,6 +445,8 @@ class MPImagePanel(wx.Panel):
     def on_mouse_event(self, event):
         '''handle mouse events'''
         pos = event.GetPosition()
+        mouse_state = wx.GetMouseState()
+        
         if event.RightDown() and self.popup_menu is not None:
             self.show_popup_menu(pos)
             return
@@ -454,7 +457,7 @@ class MPImagePanel(wx.Panel):
 
         if event.LeftDown():
             self.mouse_down = self.image_coordinates(pos)
-        if event.Dragging() and event.ButtonIsDown(wx.MOUSE_BTN_LEFT):
+        if event.Dragging() and mouse_state.LeftIsDown():
             self.on_drag_event(event)
 
     def on_key_event(self, event):
@@ -474,7 +477,7 @@ class MPImagePanel(wx.Panel):
         if isinstance(event, wx.KeyEvent):
             self.on_key_event(event)
         if (isinstance(event, wx.MouseEvent) and
-            not event.ButtonIsDown(wx.MOUSE_BTN_ANY) and
+            not event.ButtonDown(wx.MOUSE_BTN_ANY) and
             event.GetWheelRotation() == 0):
             # don't flood the queue with mouse movement
             return
@@ -539,7 +542,7 @@ if __name__ == "__main__":
     from optparse import OptionParser
     parser = OptionParser("mp_image.py <file>")
     parser.add_option("--zoom", action='store_true', default=False, help="allow zoom")
-    parser.add_option("--drag", action='store_true', default=False, help="allow drag")
+    parser.add_option("--drag", action='store_true', default=True, help="allow drag")
     parser.add_option("--autosize", action='store_true', default=False, help="auto size window")
     (opts, args) = parser.parse_args()
 
@@ -556,9 +559,9 @@ if __name__ == "__main__":
             if isinstance(event, MPMenuItem):
                 print(event)
                 continue
-            print event.ClassName
+            print(event.ClassName)
             if event.ClassName == 'wxMouseEvent':
-                print 'mouse', event.X, event.Y
+                print('mouse', event.X, event.Y)
             if event.ClassName == 'wxKeyEvent':
-                print 'key %u' % event.KeyCode
+                print('key %u' % event.KeyCode)
         time.sleep(0.1)

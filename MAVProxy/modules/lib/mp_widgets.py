@@ -33,7 +33,10 @@ class ImagePanel(wx.Panel):
             else:  
                 self._bmp = wx.BitmapFromBuffer(width, height, np.uint8(img)) # http://stackoverflow.com/a/16866833/2559632
         elif hasattr(img, 'GetHeight'):
-            self._bmp = wx.BitmapFromImage(img)
+            if wx_util.phoenix:
+                self._bmp = wx.Bitmap(img)
+            else:
+                self._bmp = wx.BitmapFromImage(img)
         else:
             print("Unsupported image type: %s" % type(img))
             return
