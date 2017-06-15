@@ -760,6 +760,7 @@ def main_loop():
     while True:
         if mpstate is None or mpstate.status.exit:
             return
+        
         while not mpstate.input_queue.empty():
             line = mpstate.input_queue.get()
             mpstate.input_count += 1
@@ -847,9 +848,13 @@ def input_loop():
         except EOFError:
             mpstate.status.exit = True
             sys.exit(1)
-        mpstate.input_queue.put(line)
-
-
+        mpstate.input_count += 1
+        cmds = line.split(';')
+        if len(cmds) == 1 and cmds[0] == "":
+              mpstate.empty_input_count += 1
+        for c in cmds:
+            process_stdin(c)
+            
 def run_script(scriptfile):
     '''run a script file'''
     try:
