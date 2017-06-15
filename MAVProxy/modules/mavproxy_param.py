@@ -4,7 +4,6 @@
 import time, os, fnmatch
 from pymavlink import mavutil, mavparm
 from MAVProxy.modules.lib import mp_util
-
 from MAVProxy.modules.lib import mp_module
 
 class ParamState:
@@ -96,7 +95,7 @@ class ParamState:
         if not os.path.exists(path):
             print("Please run 'param download' first (vehicle_name=%s)" % self.vehicle_name)
             return None
-        xml = open(path).read()
+        xml = open(path, 'rb').read()
         from lxml import objectify
         objectify.enable_recursive_str()
         tree = objectify.fromstring(xml)
@@ -140,7 +139,7 @@ class ParamState:
 
         for h in args:
             h = h.upper()
-            if h in htree:
+            if h in htree.keys():
                 help = htree[h]
                 print("%s: %s\n" % (h, help.get('humanName')))
                 print(help.get('documentation'))

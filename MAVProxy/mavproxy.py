@@ -471,8 +471,7 @@ def process_stdin(line):
         cmd = args[0]
 
     if cmd == 'help':
-        k = command_map.keys()
-        k.sort()
+        k = sorted(command_map)
         for cmd in k:
             (fn, help) = command_map[cmd]
             print("%-15s : %s" % (cmd, help))
