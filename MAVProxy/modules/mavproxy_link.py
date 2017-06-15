@@ -57,7 +57,10 @@ class LinkModule(mp_module.MPModule):
                 self.module('console').add_menu(self.menu)
                 self.menu_added_console = True
             except AttributeError:
+                self.menu_added_console = False
                 pass
+        else:
+            self.menu_added_console = False
         for m in self.mpstate.mav_master:
             m.source_system = self.settings.source_system
             m.mav.srcSystem = m.source_system

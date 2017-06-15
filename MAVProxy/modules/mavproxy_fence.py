@@ -54,13 +54,19 @@ class FenceModule(mp_module.MPModule):
                 self.module('console').add_menu(self.menu)
                 self.menu_added_console = True
             except AttributeError:
-                pass
+                self.menu_added_console = False
+        else:
+            self.menu_added_console = False
+            
         if self.module('map') is not None and not self.menu_added_map:
             try:
                 self.module('map').add_menu(self.menu)
                 self.menu_added_map = True
             except AttributeError:
-                pass
+                self.menu_added_map = False
+        else:
+            self.menu_added_map = False
+            
 
     def mavlink_packet(self, m):
         '''handle and incoming mavlink packet'''

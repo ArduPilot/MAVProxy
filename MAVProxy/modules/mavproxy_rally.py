@@ -49,13 +49,18 @@ class RallyModule(mp_module.MPModule):
                 self.module('console').add_menu(self.menu)
                 self.menu_added_console = True
             except AttributeError:
-                pass
+                self.menu_added_console = False
+        else:
+            self.menu_added_console = False
+                
         if self.module('map') is not None and not self.menu_added_map:
             try:
                 self.module('map').add_menu(self.menu)
                 self.menu_added_map = True
             except AttributeError:
-                pass
+                self.menu_added_map = False
+        else:
+            self.menu_added_map = False
             
         '''handle abort command; it is critical that the AP to receive it'''
         if self.abort_ack_received is False:
