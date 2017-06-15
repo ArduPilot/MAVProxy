@@ -44,9 +44,9 @@ class LiveGraph():
         mp_util.child_close_fds()
 
         import matplotlib
-        import wx_processguard
-        from wx_loader import wx
-        from live_graph_ui import GraphFrame
+        from MAVProxy.modules.lib import wx_processguard
+        from MAVProxy.modules.lib.wx_loader import wx
+        from MAVProxy.modules.lib.live_graph_ui import GraphFrame
 
         matplotlib.use('WXAgg')
         app = wx.App(False)
