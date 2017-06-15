@@ -21,7 +21,7 @@ class TabbedDialog(wx.Dialog):
         self.setting_map = {}
         button_box = wx.BoxSizer(wx.HORIZONTAL)
         self.button_apply = wx.Button(self, -1, "Apply")
-        self.button_cancel = wx.Button(self, -1, "Cancel")
+        self.button_cancel = wx.Button(self, wx.ID_CANCEL, "Close")
         self.button_save = wx.Button(self, -1, "Save")
         self.button_load = wx.Button(self, -1, "Load")
         button_box.Add(self.button_cancel, 0, wx.ALL)
@@ -29,15 +29,10 @@ class TabbedDialog(wx.Dialog):
         button_box.Add(self.button_save, 0, wx.ALL)
         button_box.Add(self.button_load, 0, wx.ALL)
         self.dialog_sizer.Add(button_box, 0, wx.GROW|wx.ALIGN_CENTER_VERTICAL|wx.ALL, 5)
-        self.Bind(wx.EVT_BUTTON, self.on_cancel, id = self.button_cancel.GetId())
         self.Bind(wx.EVT_BUTTON, self.on_apply, id = self.button_apply.GetId())
         self.Bind(wx.EVT_BUTTON, self.on_save, id = self.button_save.GetId())
         self.Bind(wx.EVT_BUTTON, self.on_load, id = self.button_load.GetId())
         self.Centre()
-
-    def on_cancel(self, event):
-        '''called on cancel'''
-        wx.Abort()
 
     def on_apply(self, event):
         '''called on apply'''

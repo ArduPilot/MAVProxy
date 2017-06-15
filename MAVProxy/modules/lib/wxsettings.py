@@ -28,9 +28,10 @@ class WXSettings(object):
 
         mp_util.child_close_fds()
         app = wx.App(False)
-        with SettingsDlg(self.settings) as dlg:
-            dlg.parent_pipe = self.parent_pipe
-            dlg.ShowModal()
+        dlg = SettingsDlg(self.settings)
+        dlg.parent_pipe = self.parent_pipe
+        dlg.ShowModal()
+        dlg.Destroy()
 
     def watch_thread(self):
         '''watch for settings changes from child'''
