@@ -336,10 +336,10 @@ def cmd_module(args):
         if unload_module(modname):
             import zipimport
             try:
-                reload(pmodule)
+                importlib.reload(pmodule)
             except ImportError:
                 clear_zipimport_cache()
-                reload(pmodule)
+                importlib.reload(pmodule)
             if load_module(modname, quiet=True):
                 print("Reloaded module %s" % modname)
     elif args[0] == "unload":
