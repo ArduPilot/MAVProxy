@@ -386,7 +386,7 @@ class LinkModule(mp_module.MPModule):
         elif mtype == 'STATUSTEXT':
             if m.text != self.status.last_apm_msg or time.time() > self.status.last_apm_msg_time+2:
                 (fg, bg) = self.colors_for_severity(m.severity)
-                self.mpstate.console.writeln("APM: %s" % m.text.decode('utf-8'), bg=bg, fg=fg)
+                self.mpstate.console.writeln("APM: %s" % m.text.decode('utf-8').rstrip('\x00'), bg=bg, fg=fg)
                 self.status.last_apm_msg = m.text
                 self.status.last_apm_msg_time = time.time()
 
