@@ -15,6 +15,7 @@ import select
 import shlex
 import platform
 import importlib
+import multiprocessing
 
 from MAVProxy.modules.lib import textconsole
 from MAVProxy.modules.lib import rline
@@ -848,12 +849,7 @@ def input_loop():
         except EOFError:
             mpstate.status.exit = True
             sys.exit(1)
-        mpstate.input_count += 1
-        cmds = line.split(';')
-        if len(cmds) == 1 and cmds[0] == "":
-              mpstate.empty_input_count += 1
-        for c in cmds:
-            process_stdin(c)
+        mpstate.input_queue.put(line)
             
 def run_script(scriptfile):
     '''run a script file'''
@@ -901,6 +897,8 @@ def set_mav_version(mav10, mav20, autoProtocol, mavversionArg):
         mavversion = None
 
 if __name__ == '__main__':
+    multiprocessing.set_start_method('forkserver')
+    
     from optparse import OptionParser
     parser = OptionParser("mavproxy.py [options]")
 
