@@ -45,12 +45,18 @@ class RallyModule(mp_module.MPModule):
     def idle_task(self):
         '''called on idle'''
         if self.module('console') is not None and not self.menu_added_console:
-            self.menu_added_console = True
-            self.module('console').add_menu(self.menu)
+            try:
+                self.module('console').add_menu(self.menu)
+                self.menu_added_console = True
+            except AttributeError:
+                pass
         if self.module('map') is not None and not self.menu_added_map:
-            self.menu_added_map = True
-            self.module('map').add_menu(self.menu)
-
+            try:
+                self.module('map').add_menu(self.menu)
+                self.menu_added_map = True
+            except AttributeError:
+                pass
+            
         '''handle abort command; it is critical that the AP to receive it'''
         if self.abort_ack_received is False:
             #only send abort every second (be insistent, but don't spam)

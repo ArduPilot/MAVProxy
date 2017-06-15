@@ -162,11 +162,17 @@ class WPModule(mp_module.MPModule):
                 print("re-requesting WPs %s" % str(wps))
                 self.send_wp_requests(wps)
         if self.module('console') is not None and not self.menu_added_console:
-            self.menu_added_console = True
-            self.module('console').add_menu(self.menu)
+            try:
+                self.module('console').add_menu(self.menu)
+                self.menu_added_console = True
+            except AttributeError:
+                pass
         if self.module('map') is not None and not self.menu_added_map:
-            self.menu_added_map = True
-            self.module('map').add_menu(self.menu)
+            try:
+                self.module('map').add_menu(self.menu)
+                self.menu_added_map = True
+            except AttributeError:
+                pass
 
     def process_waypoint_request(self, m, master):
         '''process a waypoint request from the master'''
