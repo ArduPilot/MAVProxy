@@ -27,7 +27,7 @@ from MAVProxy.modules.lib import wxsettings
 from MAVProxy.modules.lib.graphdefinition import GraphDefinition
 from lxml import objectify
 import pkg_resources
-
+import multiprocessing
 grui = []
 
 #Global var to hold the GUI menu element

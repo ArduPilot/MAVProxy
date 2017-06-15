@@ -37,7 +37,7 @@ class TabbedDialog(wx.Dialog):
 
     def on_cancel(self, event):
         '''called on cancel'''
-        self.Destroy()
+        wx.Abort()
 
     def on_apply(self, event):
         '''called on apply'''
