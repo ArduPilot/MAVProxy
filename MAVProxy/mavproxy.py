@@ -897,7 +897,7 @@ def set_mav_version(mav10, mav20, autoProtocol, mavversionArg):
         mavversion = None
 
 if __name__ == '__main__':
-    multiprocessing.set_start_method('forkserver')
+    multiprocessing.set_start_method('spawn')
     
     from optparse import OptionParser
     parser = OptionParser("mavproxy.py [options]")

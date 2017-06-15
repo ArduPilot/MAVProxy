@@ -517,7 +517,7 @@ def progress_bar(pct):
 
 if __name__ == "__main__":
     freeze_support()
-    multiprocessing.set_start_method('forkserver')
+    multiprocessing.set_start_method('spawn')
     mestate = MEState()
     setup_file_menu()
 
