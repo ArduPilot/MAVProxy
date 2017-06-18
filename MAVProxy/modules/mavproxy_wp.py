@@ -271,6 +271,11 @@ class WPModule(mp_module.MPModule):
                                                                 mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
                                                                 0, 0, 0, 0, 0, 0,
                                                                 h.latitude*1.0e-7, h.longitude*1.0e-7, h.altitude*1.0e-3)
+        else:
+            self.master.mav.command_long_send(self.settings.target_system,
+                                              0,
+                                              mavutil.mavlink.MAV_CMD_GET_HOME_POSITION,
+                                              0, 0, 0, 0, 0, 0, 0, 0)
         if self.wploader.count() > 0:
             return self.wploader.wp(0)
         return None
