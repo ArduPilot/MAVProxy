@@ -14,6 +14,7 @@ class CalibrationModule(mp_module.MPModule):
         self.add_command('compassmot', self.cmd_compassmot, 'do compass/motor interference calibration')
         self.add_command('calpress', self.cmd_calpressure,'calibrate pressure sensors')
         self.add_command('accelcal', self.cmd_accelcal, 'do 3D accelerometer calibration')
+        self.add_command('accelcalsimple', self.cmd_accelcal_simple, 'do simple accelerometer calibration')
         self.add_command('gyrocal', self.cmd_gyrocal, 'do gyro calibration')
         self.add_command('ahrstrim', self.cmd_ahrstrim, 'do AHRS trim')
         self.add_command('magcal', self.cmd_magcal, "magcal")
@@ -41,6 +42,13 @@ class CalibrationModule(mp_module.MPModule):
         self.accelcal_count = 0
         self.accelcal_wait_enter = False
 
+    def cmd_accelcal_simple(self, args):
+        '''do a simple accel calibration'''
+        mav = self.master
+        mav.mav.command_long_send(mav.target_system, mav.target_component,
+                                  mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, 0,
+                                  0, 0, 0, 0, 4, 0, 0)
+        
     def cmd_gyrocal(self, args):
         '''do a full gyro calibration'''
         mav = self.master
