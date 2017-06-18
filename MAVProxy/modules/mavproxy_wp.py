@@ -271,11 +271,6 @@ class WPModule(mp_module.MPModule):
                                                                 mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
                                                                 0, 0, 0, 0, 0, 0,
                                                                 h.latitude*1.0e-7, h.longitude*1.0e-7, h.altitude*1.0e-3)
-        else:
-            self.master.mav.command_long_send(self.settings.target_system,
-                                              0,
-                                              mavutil.mavlink.MAV_CMD_GET_HOME_POSITION,
-                                              0, 0, 0, 0, 0, 0, 0, 0)
         if self.wploader.count() > 0:
             return self.wploader.wp(0)
         return None
@@ -288,7 +283,7 @@ class WPModule(mp_module.MPModule):
         from MAVProxy.modules.lib import mp_util
         home = self.get_home()
         if home is None:
-            print("Need home location for draw")
+            print("Need home location for draw - please run gethome")
             return
         self.wploader.clear()
         self.wploader.target_system = self.target_system
@@ -643,7 +638,7 @@ class WPModule(mp_module.MPModule):
                 print("No map drawing available")
                 return
             if self.get_home() is None:
-                print("Need home location - refresh waypoints")
+                print("Need home location - please run gethome")
                 return
             if len(args) > 1:
                 self.settings.wpalt = int(args[1])
