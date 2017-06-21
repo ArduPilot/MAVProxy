@@ -148,5 +148,5 @@ class MPModule(object):
         if prompt and self.settings.vehicle_name:
             # add in optional vehicle name
             prompt = self.settings.vehicle_name + ':' + prompt
-        #self.mpstate.rl.set_prompt(prompt)
+        self.mpstate.status.prompt = prompt
             

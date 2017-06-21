@@ -351,7 +351,7 @@ class LinkModule(mp_module.MPModule):
             if master.flightmode != self.status.flightmode:
                 self.status.flightmode = master.flightmode
                 if self.mpstate.functions.input_handler is None:
-                    self.set_prompt(self.status.flightmode + "> ")
+                    self.set_prompt(self.status.flightmode)
 
             if master.flightmode != self.status.last_mode_announced and time.time() > self.status.last_mode_announce + 2:
                     self.status.last_mode_announce = time.time()

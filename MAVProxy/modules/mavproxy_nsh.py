@@ -37,7 +37,7 @@ class NSHModule(mp_module.MPModule):
 
     def stop(self):
         '''stop nsh input'''
-        self.set_prompt(self.status.flightmode + "> ")
+        self.set_prompt(self.status.flightmode)
         self.mpstate.functions.input_handler = None
         self.started = False
         # unlock the port
@@ -97,7 +97,7 @@ class NSHModule(mp_module.MPModule):
         if args[0] == "start":
             self.mpstate.functions.input_handler = self.send
             self.started = True
-            self.mpstate.rl.set_prompt("")
+            self.set_prompt("nsh")
         elif args[0] == "stop":
             self.stop()
         elif args[0] == "set":

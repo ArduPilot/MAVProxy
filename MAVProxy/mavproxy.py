@@ -53,6 +53,7 @@ class MPStatus(object):
         self.last_distance_announce = 0.0
         self.exit = False
         self.flightmode = 'MAV'
+        self.prompt = 'MAV'
         self.last_mode_announce = 0
         self.last_mode_announced = 'MAV'
         self.logdir = None
@@ -460,8 +461,7 @@ def process_stdin(line):
         # in setup mode we send strings straight to the master
         if line == '.':
             mpstate.status.setup_mode = False
-            mpstate.status.flightmode = "MAV"
-            #mpstate.rl.set_prompt("MAV> ")
+            mpstate.status.prompt = "MAV"
             return
         if line != '+++':
             line += '\r'

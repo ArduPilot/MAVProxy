@@ -26,10 +26,10 @@ class MAVPromptToken():
         
     def get_prompt_token(self, cli):
         " Tokens to be shown before the prompt. "
-        if self.state.status.flightmode:
-            return [(Token.Prompt, self.state.status.flightmode), (Token.Prompt, '> ')]
+        if self.state.status.prompt:
+            return [(Token.Prompt, self.state.status.prompt), (Token.Prompt, '> ')]
         else:
-            return [(Token.Prompt, "MAV"), (Token.Prompt, ">")]
+            return [(Token.Prompt, "MAV"), (Token.Prompt, "> ")]
 
 class MAVPromptCompleter(Completer):
     '''Completion generator for commands'''
