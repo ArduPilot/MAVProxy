@@ -1,0 +1,66 @@
+description: Logitech WingMan Force 3D joystick definition.
+match:
+  - WingMan Force 3D*
+controls:
+
+  # map axis id 2 to rc channel 1
+  - channel: 1
+    type: axis
+    id: 0
+
+  # map axis id 3 to rc channel 2
+  - channel: 2
+    type: axis
+    id: 1
+
+  # map axis id 1 to rc channel 3
+  - channel: 3
+    type: axis
+    id: 2
+    invert: true
+
+  # map axis id 0 to rc channel 4
+  - channel: 4
+    type: axis
+    id: 3
+
+  # This maps the A, B, X, and Y buttons onto channel 5, providing
+  # a convenient way to select between four different flight modes.
+  # The PWM values here are for flight modes 1-4.
+  - channel: 5
+    type: multibutton
+    buttons:
+      - id: 0
+        value: 1200
+      - id: 1
+        value: 1300
+      - id: 2
+        value: 1400
+      - id: 3
+        value: 1500
+
+  # A hat operates like a toggle switch.  When an axis goes positive,
+  # it sets the `high` value, and when an axis goes negative it sets the
+  # `low` value.  When the hat is centered it does not change the
+  # current channel value. This configuration maps the hat X axis to
+  # channel 7 and the Y axis to channel 8; these are useful along with
+  # the CH7_OPT and CH8_OPT APM parameters.
+  - channel: 7
+    type: hat
+    id: 0
+    axis: x
+  - channel: 8
+    type: hat
+    id: 0
+    axis: y
+
+  # Buttons act as momentary switches.  When pressed they set the
+  # corresponding pwm to their `high` value, when released the pwm is
+  # set to the `low` value.  `low` defaults to 1000, `high` defaults
+  # to 2000.
+  - channel: 9
+    type: button
+    id: 4
+  - channel: 10
+    type: button
+    id: 5
