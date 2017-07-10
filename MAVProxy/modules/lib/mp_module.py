@@ -153,7 +153,7 @@ class MPModule(object):
     @staticmethod
     def link_label(link):
         '''return a link label as a string'''
-        if link.label:
+        if hasattr(link, 'label'):
             label = link.label
         else:
             label = str(link.linknum+1)

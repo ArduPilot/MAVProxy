@@ -7,7 +7,7 @@
 '''
 
 from pymavlink import mavutil
-import time, struct, math, sys, fnmatch, traceback
+import time, struct, math, sys, fnmatch, traceback, json
 
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
@@ -123,23 +123,32 @@ class LinkModule(mp_module.MPModule):
         print("%u links" % len(self.mpstate.mav_master))
         for i in range(len(self.mpstate.mav_master)):
             conn = self.mpstate.mav_master[i]
-            if conn.label is not None:
+            if hasattr(conn, 'label'):
                 print("%u (%s): %s" % (i, conn.label, conn.address))
             else:
                 print("%u: %s" % (i, conn.address))
 
     def link_add(self, descriptor):
         '''add new link'''
+        optional_attributes = {}
+        device = []
         try:
-            link_components = descriptor.split('(')
+            link_components = descriptor.split(":{", 1)
             device = link_components[0]
+            if (len(link_components) == 2 and link_components[1].endswith("}")):
+                # assume json
+                try:
+                    link_args = "{"+link_components[1]
+                    optional_attributes = json.loads(link_args)
+                except ValueError:
+                    print('Invalid JSON argument: {0}'.format(link_args))
             print("Connect %s source_system=%d" % (device, self.settings.source_system))
             conn = mavutil.mavlink_connection(device, autoreconnect=True,
                                               source_system=self.settings.source_system,
                                               baud=self.settings.baudrate)
             conn.mav.srcComponent = self.settings.source_component
         except Exception as msg:
-            print("Failed to connect to %s : %s" % (device, msg))
+            print("Failed to connect to %s : %s" % (descriptor, msg))
             return False
         if self.settings.rtscts:
             conn.set_rtscts(True)
@@ -147,17 +156,14 @@ class LinkModule(mp_module.MPModule):
         if hasattr(conn.mav, 'set_send_callback'):
             conn.mav.set_send_callback(self.master_send_callback, conn)
         conn.linknum = len(self.mpstate.mav_master)
-        try:
-            label = link_components[1]
-            label = label.rstrip(')')
-            conn.label = label
-        except:
-            conn.label = None
         conn.linkerror = False
         conn.link_delayed = False
         conn.last_heartbeat = 0
         conn.last_message = 0
         conn.highest_msec = 0
+        for attr in optional_attributes:
+            print("Applying attribute to link: %s = %s" % (attr, optional_attributes[attr]))
+            setattr(conn, attr, optional_attributes[attr])
         self.mpstate.mav_master.append(conn)
         self.status.counters['MasterIn'].append(0)
         try:
@@ -186,7 +192,7 @@ class LinkModule(mp_module.MPModule):
             return
         for i in range(len(self.mpstate.mav_master)):
             conn = self.mpstate.mav_master[i]
-            if str(i) == device or conn.address == device or conn.label == device:
+            if str(i) == device or conn.address == device or  getattr(conn, 'label', None) == device:
                 print("Removing link %s" % conn.address)
                 try:
                     try:
