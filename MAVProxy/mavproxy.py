@@ -697,7 +697,7 @@ def check_link_status():
         mpstate.status.heartbeat_error = True
     for master in mpstate.mav_master:
         if not master.linkerror and (tnow > master.last_message + 5 or master.portdead):
-            say("link %s down" % (mp_module.MPModule.link_string(master)))
+            say("link %s down" % (mp_module.MPModule.link_label(master)))
             master.linkerror = True
 
 def send_heartbeat(master):

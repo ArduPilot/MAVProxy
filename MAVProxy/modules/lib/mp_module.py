@@ -151,10 +151,10 @@ class MPModule(object):
         self.mpstate.rl.set_prompt(prompt)
             
     @staticmethod
-    def link_string(link):
-        '''return a link description as a string'''
-        if link.handle:
-            description = link.handle
+    def link_label(link):
+        '''return a link label as a string'''
+        if link.label:
+            label = link.label
         else:
-            description = str(link.linknum+1)
-        return description
+            label = str(link.linknum+1)
+        return label

@@ -110,7 +110,7 @@ class LinkModule(mp_module.MPModule):
             except AttributeError as e:
                 # some mav objects may not have a "signing" attribute
                 pass
-            print("link %s %s (%u packets, %.2fs delay, %u lost, %.1f%% loss%s)" % (self.link_string(master),
+            print("link %s %s (%u packets, %.2fs delay, %u lost, %.1f%% loss%s)" % (self.link_label(master),
                                                                                     status,
                                                                                     self.status.counters['MasterIn'][master.linknum],
                                                                                     linkdelay,
@@ -123,8 +123,8 @@ class LinkModule(mp_module.MPModule):
         print("%u links" % len(self.mpstate.mav_master))
         for i in range(len(self.mpstate.mav_master)):
             conn = self.mpstate.mav_master[i]
-            if conn.handle is not None:
-                print("%u (%s): %s" % (i, conn.handle, conn.address))
+            if conn.label is not None:
+                print("%u (%s): %s" % (i, conn.label, conn.address))
             else:
                 print("%u: %s" % (i, conn.address))
 
@@ -148,11 +148,11 @@ class LinkModule(mp_module.MPModule):
             conn.mav.set_send_callback(self.master_send_callback, conn)
         conn.linknum = len(self.mpstate.mav_master)
         try:
-            handle = link_components[1]
-            handle = handle.rstrip(')')
-            conn.handle = handle
+            label = link_components[1]
+            label = label.rstrip(')')
+            conn.label = label
         except:
-            conn.handle = None
+            conn.label = None
         conn.linkerror = False
         conn.link_delayed = False
         conn.last_heartbeat = 0
@@ -186,7 +186,7 @@ class LinkModule(mp_module.MPModule):
             return
         for i in range(len(self.mpstate.mav_master)):
             conn = self.mpstate.mav_master[i]
-            if str(i) == device or conn.address == device or conn.handle == device:
+            if str(i) == device or conn.address == device or conn.label == device:
                 print("Removing link %s" % conn.address)
                 try:
                     try:
@@ -327,7 +327,7 @@ class LinkModule(mp_module.MPModule):
         if mtype in activityPackets:
             if master.linkerror:
                 master.linkerror = False
-                self.say("link %s OK" % (self.link_string(master)))
+                self.say("link %s OK" % (self.link_label(master)))
             self.status.last_message = time.time()
             master.last_message = self.status.last_message
 
@@ -346,7 +346,7 @@ class LinkModule(mp_module.MPModule):
                 self.say("heartbeat OK")
             if master.linkerror:
                 master.linkerror = False
-                self.say("link %s OK" % (self.link_string(master)))
+                self.say("link %s OK" % (self.link_label(master)))
             self.status.last_heartbeat = time.time()
             master.last_heartbeat = self.status.last_heartbeat
 
