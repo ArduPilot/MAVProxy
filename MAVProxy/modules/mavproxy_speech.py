@@ -20,7 +20,7 @@ class SpeechModule(mp_module.MPModule):
         except AttributeError:
             self.settings.append(('speech_voice', str, ''))
         self.kill_speech_dispatcher()
-        for (backend_name,backend) in [("speechd",self.say_speechd), ("espeak",self.say_espeak), ("speech", self.say_speech), ("say", self.say_say)]:
+        for (backend_name,backend) in [("speechd",self.say_using_speechd), ("espeak",self.say_using_espeak), ("speech", self.say_using_speech), ("say", self.say_using_say)]:
             try:
                 backend("")
                 self.say_backend = backend
@@ -56,7 +56,11 @@ class SpeechModule(mp_module.MPModule):
             self.mpstate.functions.say = self.old_mpstate_say_function
         self.kill_speech_dispatcher()
 
-    def say_speechd(self, text, priority='important'):
+    #
+    # Different speech backends.
+    #
+
+    def say_using_speechd(self, text, priority='important'):
         '''speak some text'''
         ''' http://cvs.freebsoft.org/doc/speechd/ssip.html see 4.3.1 for priorities'''
         import speechd
@@ -68,29 +72,26 @@ class SpeechModule(mp_module.MPModule):
         self.speech.speak(text)
         self.speech.close()
 
-    def say_espeak(self, text, priority='important'):
+    def say_using_espeak(self, text, priority='important'):
         '''speak some text using espeak'''
         from espeak import espeak
         if self.settings.speech_voice:
             espeak.set_voice(self.settings.speech_voice)
         espeak.synth(text)
 
-    def say_speech(self, text, priority='important'):
+    def say_using_speech(self, text, priority='important'):
         '''speak some text using speech module'''
         import speech
         speech.say(text)
 
-    def say_say(self, text, priority='important'):
+    def say_using_say(self, text, priority='important'):
         '''speak some text using macOS say command'''
         import subprocess
         subprocess.check_call(["say",text])
 
-    def say(self, text, priority='important'):
-        '''speak some text'''
-        ''' http://cvs.freebsoft.org/doc/speechd/ssip.html see 4.3.1 for priorities'''
-        self.console.writeln(text)
-        if self.settings.speech and self.say_backend is not None:
-            self.say_backend(text, priority=priority)
+    #
+    # External Interface
+    #
 
     def mavlink_packet(self, msg):
         '''handle an incoming mavlink packet'''
@@ -100,6 +101,17 @@ class SpeechModule(mp_module.MPModule):
             if msg.text.startswith("Tuning: "):
                 self.say(msg.text[8:])
 
+    def say(self, text, priority='important'):
+        '''speak some text'''
+        ''' http://cvs.freebsoft.org/doc/speechd/ssip.html see 4.3.1 for priorities'''
+        self.console.writeln(text)
+        if self.settings.speech and self.say_backend is not None:
+            self.say_backend(text, priority=priority)
+
+    #
+    # Command line configuration commands.
+    # NOTE: Speech can be enabled or disabled and changed from main mpstate settings.
+    #
     def cmd_speech(self, args):
         '''speech commands'''
         usage = "usage: speech <say>"
