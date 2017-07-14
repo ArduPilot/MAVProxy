@@ -102,13 +102,16 @@ class SpeechModule(mp_module.MPModule):
 
     def cmd_speech(self, args):
         '''speech commands'''
-        usage = "usage: speech <test>"
+        usage = "usage: speech <say>"
         if len(args) < 1:
             print(usage)
             return
 
-        if args[0] == "test":
-            self.say("Testing speech output")
+        if args[0] == "say":
+            if len(args) < 2:
+                print("usage: speech say <text to say>")
+                return
+            self.say(" ".join(args[1::]))
 
 
 def init(mpstate):
