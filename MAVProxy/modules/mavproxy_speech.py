@@ -10,7 +10,7 @@ class SpeechModule(mp_module.MPModule):
         self.add_command('speech', self.cmd_speech, "text-to-speech", ['<test>'])
 
         self.old_mpstate_say_function = self.mpstate.functions.say
-        self.mpstate.functions.say = self.say
+        self.mpstate.functions.say = self.print_and_say
         try:
             self.settings.set('speech', 1)
         except AttributeError:
@@ -101,12 +101,16 @@ class SpeechModule(mp_module.MPModule):
             if msg.text.startswith("Tuning: "):
                 self.say(msg.text[8:])
 
+    def print_and_say(self, text, priority='important'):
+        self.console.writeln(text)
+        self.say(text, priority)
+
     def say(self, text, priority='important'):
         '''speak some text'''
         ''' http://cvs.freebsoft.org/doc/speechd/ssip.html see 4.3.1 for priorities'''
-        self.console.writeln(text)
         if self.settings.speech and self.say_backend is not None:
             self.say_backend(text, priority=priority)
+
 
     #
     # Command line configuration commands.
@@ -124,6 +128,9 @@ class SpeechModule(mp_module.MPModule):
                 print("usage: speech say <text to say>")
                 return
             self.say(" ".join(args[1::]))
+        else:
+            print(usage)
+            return
 
 
 def init(mpstate):
