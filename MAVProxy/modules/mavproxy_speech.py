@@ -1,16 +1,36 @@
 #!/usr/bin/env python
-'''tune command handling'''
+'''
+
+Speech Engine for audio announcements of MAVLink messages during flight.
+
+Suggested usage: Add initialization commands to .mavinit.scr
+
+Example commands:
+    module load mavproxy_speech
+    speech add ALTITUDE altitude_relative -r 30 -n "altitude"
+    speech add VFR_HUD airspeed -r 10 -f %0.0f -s 1.0 -n "airspeed"
+
+'''
 
 import time, os, math
 from MAVProxy.modules.lib import mp_module
 
 class SpeechAnnounce(object):
+    '''
+    SpeechAnnouncement objects encapsulate all functionality and responsibility
+    of generating speech for a single mavlink message entry.
 
-    def __init__(self, msg_type, entry_name, sayEveryS=30.0, sayAs=None, enabled=True):
+    The default SpeechAnnounce module will provide mavlink-to-text and rate-limiting
+    capabilities.
+    '''
+
+    def __init__(self, msg_type, entry_name, sayEveryS=30.0, sayAs=None, scale=1, formatstr="%0.0f"):
         self.msg_type = msg_type
         self.entry_name = entry_name
         self.sayEveryS = sayEveryS
         self.sayAs = sayAs
+        self.scale = scale
+        self.formatstr = formatstr
 
         self.enabled = True
         self.lastTime = 0
@@ -44,7 +64,7 @@ class SpeechAnnounce(object):
 
     def convert(self, value):
         '''Returns the announce text representation of the value'''
-        return value
+        return self.formatstr % value #(value*self.scale)
 
     def disable(self):
         self.enabled = False
@@ -59,16 +79,22 @@ class SpeechAnnounce(object):
         if not self.enabled:
             return "[DISABLED] %s.%s" % (self.msg_type, self.entry_name)
         else:
-            return "%s.%s as \"%s\" every %0.0f seconds" % (
+            return "%s.%s as \"%s\" every %0.0f seconds, scaling by %0.4f and formatting as %s" % (
                 self.msg_type, 
                 self.entry_name, 
-                self.preface(), 
-                self.sayEveryS)
+                self.get_speech_name(), 
+                self.sayEveryS,
+                self.scale,
+                self.formatstr)
 
 class ConditionalSpeechAnnounce(SpeechAnnounce):
+    '''
+    A SpeechAnnounce subclass that provides rate-limited announcements
+    only when a mavlink value is outside an expected range.
+    '''
 
-    def __init__(self, msg_type, entry_name, sayEveryS=5.0, sayAs=None, range=[float("inf"), float("inf")]):
-        super(ConditionalSpeechAnnounce, self).__init__(msg_type, entry_name, sayEveryS, sayAs)
+    def __init__(self, msg_type, entry_name, sayEveryS=5.0, sayAs=None, scale=1, formatstr="%0.0f", range=[float("inf"), float("inf")]):
+        super(ConditionalSpeechAnnounce, self).__init__(msg_type, entry_name, sayEveryS=sayEveryS, sayAs=sayAs, scale=scale, formatstr=formatstr)
         self.range = range
 
     def maybe_say(self, msg, backend):
@@ -85,14 +111,19 @@ class ConditionalSpeechAnnounce(SpeechAnnounce):
                 self.get_speech_name(), self.convert(self.range[1]), self.convert(value))  
 
 class OnChangeSpeechAnnounce(SpeechAnnounce):
+    '''
+    A SpeechAnnounce subclass that provides rate-limited announcements
+    only when a mavlink value changes.
+    '''
 
-    def __init__(self, msg_type, entry_name, sayEveryS=5.0, sayAs=None):
-        super(OnChangeSpeechAnnounce, self).__init__(msg_type, entry_name, sayEveryS, sayAs)
-        self.prev_value = None
-        self.prev_value2 = None
+    def __init__(self, msg_type, entry_name, sayEveryS=5.0, sayAs=None, scale=1, formatstr="%0.0f"):
+        super(OnChangeSpeechAnnounce, self).__init__(msg_type, entry_name, sayEveryS=sayEveryS, sayAs=sayAs, scale=scale, formatstr=formatstr)
+        self.prev_value = float("inf")
 
     def maybe_say(self, msg, backend):
         new_value = getattr(msg, self.entry_name, 0)
+        if self.prev_value == float("inf"):
+            self.prev_value = new_value
         if self.prev_value != new_value:
             super(OnChangeSpeechAnnounce, self).maybe_say(msg, backend)
 
@@ -107,14 +138,11 @@ class SpeechModule(mp_module.MPModule):
         super(SpeechModule, self).__init__(mpstate, "speech", "speech output")
         self.add_command('speech', self.cmd_speech, "text-to-speech", ['<test>'])
 
-        self.msgs_to_announce = [
-            SpeechAnnounce('ALTITUDE', 'altitude_relative', sayAs="altitude", sayEveryS=30.0),
-            SpeechAnnounce('VFR_HUD',  'airspeed', sayEveryS=10.0),
-            SpeechAnnounce('VFR_HUD',  'groundSpeed')
-        ]
+        self.msgs_to_announce = []
 
         self.old_mpstate_say_function = self.mpstate.functions.say
         self.mpstate.functions.say = self.print_and_say
+        self.say_all_text = True
         try:
             self.settings.get('speech')
         except AttributeError:
@@ -210,7 +238,8 @@ class SpeechModule(mp_module.MPModule):
 
     def print_and_say(self, text, priority='important'):
         self.console.writeln(text)
-        self.say(text, priority)
+        if self.say_all_text:
+            self.say(text, priority)
 
     def say(self, text, priority='important'):
         '''speak some text'''
@@ -224,7 +253,7 @@ class SpeechModule(mp_module.MPModule):
     #
     def cmd_speech(self, args):
         '''speech commands'''
-        usage = "usage: speech <say|list|enable|disable|every>"
+        usage = "usage: speech <say|list|enable|disable|add|remove|every>"
         if len(args) < 1:
             print(usage)
             return
@@ -238,30 +267,93 @@ class SpeechModule(mp_module.MPModule):
             if len(args) < 2:
                 self.settings.set('speech', 1)
             else:
-                try:
-                    self.msgs_to_announce[int(args[1])].enable()
-                    print "Enabling", self.msgs_to_announce[int(args[1])]
-                except Exception:
-                    print("usage: speech enable (<index>)")
+                if (args[1] == "TEXT"):
+                    self.say_all_text = True
+                else:
+                    try:
+                        self.msgs_to_announce[int(args[1])].enable()
+                        print "Enabling", self.msgs_to_announce[int(args[1])]
+                    except Exception:
+                        print("usage: speech enable (<index>|TEXT)")
         elif args[0] == "disable":
             if len(args) < 2:
                 self.settings.set('speech', 0)
             else:
-                try:
-                    print "Disabling", self.msgs_to_announce[int(args[1])]
-                    self.msgs_to_announce[int(args[1])].disable()
-                except Exception:
-                    print("usage: speech disable (<index>)")
+                if (args[1] == "TEXT"):
+                    self.say_all_text = False
+                else:
+                    try:
+                        print "Disabling", self.msgs_to_announce[int(args[1])]
+                        self.msgs_to_announce[int(args[1])].disable()
+                    except Exception:
+                        print("usage: speech disable (<index>|TEXT)")
         elif args[0] == "list":
             print "speech module will announce:"
             for idx, announcement in enumerate(self.msgs_to_announce):
                 print "#%d: %s" % (idx, announcement)
+        elif args[0] == "add":
+            usage = """usage: speech 
+add <msg_type> <msg_entry> (-r <say_every_seconds>) (-n <say_as>) (-s <scale>) (-f \"<formatstr>\")
+add <msg_type> <msg_entry> -t CONDITIONAL (--max <val>) (--min <val>) (-r <say_every_seconds>) (-n <say_as>) (-s <scale>) (-f \"<formatstr>\")
+add <msg_type> <msg_entry> -t ONCHANGE (-r <say_every_seconds>) (-n <say_as>) (-s <scale>) (-f \"<formatstr>\")"""
+            if len(args) < 3:
+                print usage
+            else:
+                try:
+                    msg_type = args[1]
+                    entry_name = args[2]
+                    say_every = 30.0
+                    say_as = None
+                    scale = 1
+                    formatstr = "%0.0f"
+                    what_type = "REGULAR"
+                    maxval = float("inf")
+                    minval = float("inf")
+                    if len(args) > 3:
+                        optargs = args[3::]
+                        while len(optargs) > 0:
+                            if optargs[0] == "-r":
+                                say_every = float(optargs[1])
+                            if optargs[0] == "-n":
+                                say_as = optargs[1]
+                            if optargs[0] == "-s":
+                                say_ay = float(optargs[1])
+                            if optargs[0] == "-f":
+                                formatstr = optargs[1]
+                            if optargs[0] == "-t":
+                                what_type = optargs[1]
+                            if optargs[0] == "--max":
+                                maxval = float(optargs[1])
+                            if optargs[0] == "--min":
+                                minval = float(optargs[1])
+                            optargs = optargs[2::]
+                    if what_type == "REGULAR":
+                        self.msgs_to_announce.append(SpeechAnnounce(msg_type, entry_name, say_every, say_as, scale, formatstr))
+                    elif what_type == "CONDITIONAL":
+                        say_every = 5.0
+                        self.msgs_to_announce.append(ConditionalSpeechAnnounce(msg_type, entry_name, say_every, say_as, scale, formatstr, range=[minval, maxval]))
+                    elif what_type == "ONCHANGE":
+                        say_every = 5.0
+                        self.msgs_to_announce.append(OnChangeSpeechAnnounce(msg_type, entry_name, say_every, say_as, scale, formatstr))
+                    else:
+                        print usage
+                        return
+                except Exception as e:
+                    print usage
+
+        elif args[0] == "remove":
+            try:
+                del self.msgs_to_announce[int(args[1])]
+            except Exception:
+                print "usage: speech remove <index>"
         elif args[0] == "every":
             try:
                 self.msgs_to_announce[int(args[1])].say_every(float(args[2]))
                 print self.msgs_to_announce[int(args[1])]
             except Exception:
                 print("usage: speech every <index> <seconds>")
+
+    #msg_type, entry_name, sayEveryS=30.0, sayAs=None, enabled=True, scale=1, formatstr="%0.0f"
 
         else:
             print(usage)
