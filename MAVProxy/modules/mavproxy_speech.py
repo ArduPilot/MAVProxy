@@ -16,20 +16,27 @@ class SpeechAnnounce(object):
         self.lastTime = 0
 
     def match(self, msg):
-        return self.enabled and (msg.get_type() == self.msg_type)
+        '''Returns true if this announce is ready to handle the given message'''
+        return (msg.get_type() == self.msg_type)
+
+    def dispatch(self, msg, backend):
+        '''Dispatch this announcement IF it can handle the given message'''
+        if self.enabled and self.match(msg):
+            self.maybe_say(msg, backend)
 
     def maybe_say(self, msg, backend):
-        if not self.match(msg):
-            return
-
+        '''Calls backend with this announce for the given message IF the announce passes internal checks'''
         now = time.time()
         if (now - self.lastTime > self.sayEveryS):
             self.lastTime = now
             value = getattr(msg, self.entry_name, 0)
-            backend("%s %s" % (self.preface(), self.convert(value)))
+            backend(self.to_speech_text(value))
 
-    def preface(self):
+    def to_speech_text(self, value):
         '''Returns the text announced before the value'''
+        return "%s %s" % (self.get_speech_name(), self.convert(value))
+
+    def get_speech_name(self):
         if self.sayAs:
             return self.sayAs
         else:
@@ -58,13 +65,41 @@ class SpeechAnnounce(object):
                 self.preface(), 
                 self.sayEveryS)
 
-# class ConditionalSpeechAnnounce(SpeechAnnounce):
-#
-#     def __init__(self, msg_type, entry_name, sayEveryS=5.0, sayAs=None, condition=)
+class ConditionalSpeechAnnounce(SpeechAnnounce):
 
-# class OnChangeSpeechAnnounce(SpeechAnnounce):
-#
-#     def __init__(self, msg_type, entry_name, sayEveryS=5.0, sayAs=None, condition=)
+    def __init__(self, msg_type, entry_name, sayEveryS=5.0, sayAs=None, range=[float("inf"), float("inf")]):
+        super(ConditionalSpeechAnnounce, self).__init__(msg_type, entry_name, sayEveryS, sayAs)
+        self.range = range
+
+    def maybe_say(self, msg, backend):
+        value = getattr(msg, self.entry_name, None)
+        if value < self.range[0] or value > self.range[1]:
+            super(ConditionalSpeechAnnounce, self).maybe_say(msg, backend)
+
+    def to_speech_text(self, value):
+        if value < self.range[0]:
+            return "%s below minimum! Expected minimum %s, current value %s." % (
+                self.get_speech_name(), self.convert(self.range[0]), self.convert(value))
+        if value > self.range[1]:
+            return "%s above maximum! Expected maximum %s, current value %s." % (
+                self.get_speech_name(), self.convert(self.range[1]), self.convert(value))  
+
+class OnChangeSpeechAnnounce(SpeechAnnounce):
+
+    def __init__(self, msg_type, entry_name, sayEveryS=5.0, sayAs=None):
+        super(OnChangeSpeechAnnounce, self).__init__(msg_type, entry_name, sayEveryS, sayAs)
+        self.prev_value = None
+        self.prev_value2 = None
+
+    def maybe_say(self, msg, backend):
+        new_value = getattr(msg, self.entry_name, 0)
+        if self.prev_value != new_value:
+            super(OnChangeSpeechAnnounce, self).maybe_say(msg, backend)
+
+    def to_speech_text(self, value):
+        ret = "%s changing! Previous value is %s. New value is %s" % (self.get_speech_name(), self.convert(self.prev_value), self.convert(value))
+        self.prev_value = value
+        return ret
 
 
 class SpeechModule(mp_module.MPModule):
@@ -75,7 +110,7 @@ class SpeechModule(mp_module.MPModule):
         self.msgs_to_announce = [
             SpeechAnnounce('ALTITUDE', 'altitude_relative', sayAs="altitude", sayEveryS=30.0),
             SpeechAnnounce('VFR_HUD',  'airspeed', sayEveryS=10.0),
-            SpeechAnnounce('VFR_HUD',  'groundSpeed'),
+            SpeechAnnounce('VFR_HUD',  'groundSpeed')
         ]
 
         self.old_mpstate_say_function = self.mpstate.functions.say
@@ -171,7 +206,7 @@ class SpeechModule(mp_module.MPModule):
                 self.say(msg.text[8:])
         else:
             for announcements in self.msgs_to_announce:
-                announcements.maybe_say(msg, self.say)
+                announcements.dispatch(msg, self.say)
 
     def print_and_say(self, text, priority='important'):
         self.console.writeln(text)
