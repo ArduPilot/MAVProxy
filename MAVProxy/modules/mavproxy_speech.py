@@ -1,18 +1,87 @@
 #!/usr/bin/env python
 '''tune command handling'''
 
-import time, os
+import time, os, math
 from MAVProxy.modules.lib import mp_module
+
+class SpeechAnnounce(object):
+
+    def __init__(self, msg_type, entry_name, sayEveryS=30.0, sayAs=None, enabled=True):
+        self.msg_type = msg_type
+        self.entry_name = entry_name
+        self.sayEveryS = sayEveryS
+        self.sayAs = sayAs
+
+        self.enabled = True
+        self.lastTime = 0
+
+    def match(self, msg):
+        return self.enabled and (msg.get_type() == self.msg_type)
+
+    def maybe_say(self, msg, backend):
+        if not self.match(msg):
+            return
+
+        now = time.time()
+        if (now - self.lastTime > self.sayEveryS):
+            self.lastTime = now
+            value = getattr(msg, self.entry_name, 0)
+            backend("%s %s" % (self.preface(), self.convert(value)))
+
+    def preface(self):
+        '''Returns the text announced before the value'''
+        if self.sayAs:
+            return self.sayAs
+        else:
+            return self.entry_name
+
+    def convert(self, value):
+        '''Returns the announce text representation of the value'''
+        return value
+
+    def disable(self):
+        self.enabled = False
+
+    def enable(self):
+        self.enabled = True
+
+    def say_every(self, sayEveryS):
+        self.sayEveryS = sayEveryS
+
+    def __str__(self):
+        if not self.enabled:
+            return "[DISABLED] %s.%s" % (self.msg_type, self.entry_name)
+        else:
+            return "%s.%s as \"%s\" every %0.0f seconds" % (
+                self.msg_type, 
+                self.entry_name, 
+                self.preface(), 
+                self.sayEveryS)
+
+# class ConditionalSpeechAnnounce(SpeechAnnounce):
+#
+#     def __init__(self, msg_type, entry_name, sayEveryS=5.0, sayAs=None, condition=)
+
+# class OnChangeSpeechAnnounce(SpeechAnnounce):
+#
+#     def __init__(self, msg_type, entry_name, sayEveryS=5.0, sayAs=None, condition=)
+
 
 class SpeechModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(SpeechModule, self).__init__(mpstate, "speech", "speech output")
         self.add_command('speech', self.cmd_speech, "text-to-speech", ['<test>'])
 
+        self.msgs_to_announce = [
+            SpeechAnnounce('ALTITUDE', 'altitude_relative', sayAs="altitude", sayEveryS=30.0),
+            SpeechAnnounce('VFR_HUD',  'airspeed', sayEveryS=10.0),
+            SpeechAnnounce('VFR_HUD',  'groundSpeed'),
+        ]
+
         self.old_mpstate_say_function = self.mpstate.functions.say
         self.mpstate.functions.say = self.print_and_say
         try:
-            self.settings.set('speech', 1)
+            self.settings.get('speech')
         except AttributeError:
             self.settings.append(('speech', int, 1))
         try:
@@ -100,6 +169,9 @@ class SpeechModule(mp_module.MPModule):
             # say some statustext values
             if msg.text.startswith("Tuning: "):
                 self.say(msg.text[8:])
+        else:
+            for announcements in self.msgs_to_announce:
+                announcements.maybe_say(msg, self.say)
 
     def print_and_say(self, text, priority='important'):
         self.console.writeln(text)
@@ -111,14 +183,13 @@ class SpeechModule(mp_module.MPModule):
         if self.settings.speech and self.say_backend is not None:
             self.say_backend(text, priority=priority)
 
-
     #
     # Command line configuration commands.
     # NOTE: Speech can be enabled or disabled and changed from main mpstate settings.
     #
     def cmd_speech(self, args):
         '''speech commands'''
-        usage = "usage: speech <say>"
+        usage = "usage: speech <say|list|enable|disable|every>"
         if len(args) < 1:
             print(usage)
             return
@@ -128,6 +199,35 @@ class SpeechModule(mp_module.MPModule):
                 print("usage: speech say <text to say>")
                 return
             self.say(" ".join(args[1::]))
+        elif args[0] == "enable":
+            if len(args) < 2:
+                self.settings.set('speech', 1)
+            else:
+                try:
+                    self.msgs_to_announce[int(args[1])].enable()
+                    print "Enabling", self.msgs_to_announce[int(args[1])]
+                except Exception:
+                    print("usage: speech enable (<index>)")
+        elif args[0] == "disable":
+            if len(args) < 2:
+                self.settings.set('speech', 0)
+            else:
+                try:
+                    print "Disabling", self.msgs_to_announce[int(args[1])]
+                    self.msgs_to_announce[int(args[1])].disable()
+                except Exception:
+                    print("usage: speech disable (<index>)")
+        elif args[0] == "list":
+            print "speech module will announce:"
+            for idx, announcement in enumerate(self.msgs_to_announce):
+                print "#%d: %s" % (idx, announcement)
+        elif args[0] == "every":
+            try:
+                self.msgs_to_announce[int(args[1])].say_every(float(args[2]))
+                print self.msgs_to_announce[int(args[1])]
+            except Exception:
+                print("usage: speech every <index> <seconds>")
+
         else:
             print(usage)
             return
