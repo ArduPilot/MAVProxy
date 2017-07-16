@@ -49,12 +49,12 @@ class rline(object):
 def complete_alias(text):
     '''return list of aliases'''
     global rline_mpstate
-    return rline_mpstate.aliases.keys()
+    return list(rline_mpstate.aliases.keys())
 
 def complete_command(text):
     '''return list of commands'''
     global rline_mpstate
-    return rline_mpstate.command_map.keys()
+    return list(rline_mpstate.command_map.keys())
 
 def complete_loadedmodules(text):
     global rline_mpstate
@@ -87,7 +87,7 @@ def complete_filename(text):
 
 def complete_parameter(text):
     '''complete a parameter'''
-    return rline_mpstate.mav_param.keys()
+    return list(rline_mpstate.mav_param.keys())
 
 def complete_variable(text):
     '''complete a MAVLink variable'''
@@ -99,7 +99,7 @@ def complete_variable(text):
                 ret.append(var + '.' + f)
             return ret
         return []
-    return rline_mpstate.status.msgs.keys()
+    return list(rline_mpstate.status.msgs.keys())
 
 def rule_expand(component, text):
     '''expand one rule component'''
@@ -202,9 +202,8 @@ try:
 except Exception:
     pass
 
-
 if __name__ == "__main__":
-    from mp_settings import MPSettings, MPSetting
+    from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
 
     class mystate(object):
         def __init__(self):
@@ -224,5 +223,5 @@ if __name__ == "__main__":
     state = mystate()
     rl = rline("test> ", state)
     while True:
-        line = raw_input(rl.prompt)
+        line = input(rl.prompt)
         print("Got: %s" % line)
