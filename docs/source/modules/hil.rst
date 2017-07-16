@@ -11,7 +11,7 @@ is to be used in conjunction with the Tools/autotest/jsbsim/runsim.py
 file in the APM source code, which provides a flight dynamics simulator
 (JSBSim).
 
-It is used for testing modifictions to the APM code in a simulated
+It is used for testing modifications to the APM code in a simulated
 environment.
 
 See the :doc:`../analysis_and_simulation/simulation` page  
