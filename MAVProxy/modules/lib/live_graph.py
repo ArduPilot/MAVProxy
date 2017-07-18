@@ -9,7 +9,7 @@
 """
 
 from MAVProxy.modules.lib import mp_util
-
+import platform
 class LiveGraph():
     '''
     a live graph object using wx and matplotlib
@@ -25,14 +25,18 @@ class LiveGraph():
                  tickresolution=0.2,
                  colors=[ 'red', 'green', 'blue', 'orange', 'olive', 'cyan', 'magenta', 'brown',
                           'violet', 'purple', 'grey', 'black']):
-        import multiprocessing
+        if platform.system() == 'Darwin':
+          import billiard as multiprocessing
+        else:
+          import multiprocessing
         self.fields = fields
         self.colors = colors
         self.title  = title
         self.timespan = timespan
         self.tickresolution = tickresolution
         self.values = [None]*len(self.fields)
-
+        if platform.system() == 'Darwin':
+          multiprocessing.forking_enable(False)
         self.parent_pipe,self.child_pipe = multiprocessing.Pipe()
         self.close_graph = multiprocessing.Event()
         self.close_graph.clear()
