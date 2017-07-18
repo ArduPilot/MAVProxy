@@ -17,6 +17,9 @@ else:
 from math import *
 from prompt_toolkit import prompt
 from prompt_toolkit.history import InMemoryHistory
+from prompt_toolkit.key_binding.bindings.completion import display_completions_like_readline
+from prompt_toolkit.key_binding.defaults import load_key_bindings_for_prompt
+from prompt_toolkit.keys import Keys
 from MAVProxy.modules.lib import promptMAV
 from MAVProxy.modules.lib import wxconsole
 from MAVProxy.modules.lib.graph_ui import Graph_UI
@@ -39,6 +42,7 @@ TopMenu = None
 class MEStatus(object):
     '''status object to conform with mavproxy structure for modules'''
     def __init__(self):
+        self.prompt = 'MAV'
         self.msgs = {}
 
 class MEState(object):
@@ -71,6 +75,16 @@ class MEState(object):
         self.graphs = []
         self.flightmode_selections = []
         self.last_graph = GraphDefinition('Untitled', '', '', [], None)
+        
+        self.completor = promptMAV.MAVPromptCompleter(self)
+        self.validator = promptMAV.MAVValidator(self) 
+        self.consoleHistory = InMemoryHistory()
+        self.flightmodeprompt = promptMAV.MAVPromptToken(self)
+        
+        # Create key bindings registry with a custom binding for the Tab key that
+        # displays completions like GNU readline.
+        self.registry = load_key_bindings_for_prompt()
+        self.registry.add_binding(Keys.ControlI)(display_completions_like_readline)
         
         #pipe to the wxconsole for any child threads (such as the save dialog box)
         self.parent_pipe_recv_console,self.child_pipe_send_console = Pipe(duplex=False)
@@ -280,7 +294,7 @@ def cmd_graph(args):
         mestate.console.write("Added graph: %s\n" % g.name)
         if g.description:
             mestate.console.write("%s\n" % g.description, fg='blue')
-        mestate.rl.add_history("graph %s" % ' '.join(expression.split()))
+        #mestate.rl.add_history("graph %s" % ' '.join(expression.split()))
         mestate.last_graph = g
     else:
         expression = ' '.join(args)
@@ -488,7 +502,7 @@ def input_loop():
     while mestate.exit != True:
         try:
             if mestate.exit != True:
-                line = prompt(mestate.status.flightmode + "> ", history=mestate.consoleHistory, patch_stdout=True, validator=mestate.validator, completer=mestate.completor)
+                line = prompt(history=mestate.consoleHistory, patch_stdout=True, validator=mestate.validator, completer=mestate.completor, key_bindings_registry=mestate.registry, complete_while_typing=False, get_prompt_tokens=mestate.flightmodeprompt.get_prompt_token, refresh_interval=.5)
         except EOFError:
             mestate.exit = True
             sys.exit(1)
@@ -541,15 +555,13 @@ if __name__ == "__main__":
     mestate.thread.start()
 
     # input loop
-    while mestate.exit != True:
+    while (mestate.exit != True):
         try:
-            try:
-                line = prompt("MAV" + "> ", history=mestate.consoleHistory, patch_stdout=True, validator=mestate.validator, completer=mestate.completor)
-            except EOFError:
-                mestate.exit = True
-                break
-            mestate.input_queue.put(line)
+            input_loop()
         except KeyboardInterrupt:
+            mestate.console.close()
             mestate.exit = True
-            break
+            print "Exited. Press Enter to continue."
+            sys.exit(0)
+
 
