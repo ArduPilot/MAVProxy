@@ -434,12 +434,12 @@ def mavflightview_show(path, wp, fen, used_flightmodes, mav_type, options, title
             icon = map.icon(icon)
             map.add_object(mp_slipmap.SlipIcon('icon - %s' % str(flag), (float(lat),float(lon)), icon, layer=3, rotation=0, follow=False))
 
-    if options.colour_source == "flightmode":
-        tuples = [ (mode, colour_for_flightmode(mav_type, mode))
-                   for mode in used_flightmodes.keys() ]
-        map.add_object(mp_slipmap.SlipFlightModeLegend("legend", tuples))
-    else:
-        print("colour-source: min=%f max=%f" % (colour_source_min, colour_source_max))
+        if options.colour_source == "flightmode":
+            tuples = [ (mode, colour_for_flightmode(mav_type, mode))
+                       for mode in used_flightmodes.keys() ]
+            map.add_object(mp_slipmap.SlipFlightModeLegend("legend", tuples))
+        else:
+            print("colour-source: min=%f max=%f" % (colour_source_min, colour_source_max))
 
 def mavflightview(filename, options):
     print("Loading %s ..." % filename)
