@@ -21,7 +21,7 @@ def pixel_coords(latlon, ground_width=0, mt=None, topleft=None, width=None):
     (lat,lon) = (latlon[0], latlon[1])
     return mt.coord_to_pixel(topleft[0], topleft[1], width, ground_width, lat, lon)
 
-def create_imagefile(options, filename, latlon, ground_width, path_objs, mission_obj, fence_obj, width=600, height=600):
+def create_imagefile(options, filename, latlon, ground_width, path_objs, mission_obj, fence_obj, width=600, height=600, used_flightmodes=[], mav_type=None):
     '''create path and mission as an image file'''
     mt = mp_tile.MPTile(service=options.service)
 
@@ -41,6 +41,14 @@ def create_imagefile(options, filename, latlon, ground_width, path_objs, mission
             m.draw(map_img, pixmapper, None)
     if fence_obj is not None:
         fence_obj.draw(map_img, pixmapper, None)
+    if (options is not None and
+        mav_type is not None and
+        options.colour_source == "flightmode"):
+        tuples = [ (mode, colour_for_flightmode(mav_type, mode))
+                   for mode in used_flightmodes.keys() ]
+        legend = mp_slipmap.SlipFlightModeLegend("legend", tuples)
+        legend.draw(map_img, pixmapper, None)
+
     map_img = cv2.cvtColor(map_img, cv2.COLOR_BGR2RGB)
     cv2.imwrite(filename, map_img)
 
@@ -392,7 +400,7 @@ def mavflightview_show(path, wp, fen, used_flightmodes, mav_type, options, title
         fence_obj = None
 
     if options.imagefile:
-        create_imagefile(options, options.imagefile, (lat,lon), ground_width, path_objs, mission_obj, fence_obj)
+        create_imagefile(options, options.imagefile, (lat,lon), ground_width, path_objs, mission_obj, fence_obj, used_flightmodes=used_flightmodes, mav_type=mav_type)
     else:
         global multi_map
         if options.multi and multi_map is not None:
