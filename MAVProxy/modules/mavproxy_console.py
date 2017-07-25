@@ -55,6 +55,8 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('AspdError', 'AspdError --', row=3)
         mpstate.console.set_status('FlightTime', 'FlightTime --', row=3)
         mpstate.console.set_status('ETR', 'ETR --', row=3)
+        mpstate.console.set_status('Vbat', 'Vbat: --', row=3)
+        mpstate.console.set_status('Abat', 'Abat: --', row=3)
 
         mpstate.console.ElevationMap = mp_elevation.ElevationModel()
 
@@ -216,6 +218,11 @@ class ConsoleModule(mp_module.MPModule):
             self.console.set_status('Roll', 'Roll %u' % math.degrees(msg.roll))
             self.console.set_status('Pitch', 'Pitch %u' % math.degrees(msg.pitch))
         elif type in ['SYS_STATUS']:
+            if msg.voltage_battery == 65535:
+                self.console.set_status('Vbat', 'Vbat: 0')
+            else:
+                self.console.set_status('Vbat', 'Vbat: %.2f' % (msg.voltage_battery * 0.001))
+            self.console.set_status('Abat', 'Abat: %.2f' % (msg.current_battery * 0.01))
             sensors = { 'AS'   : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_DIFFERENTIAL_PRESSURE,
                         'MAG'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_MAG,
                         'INS'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_ACCEL | mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_GYRO,
