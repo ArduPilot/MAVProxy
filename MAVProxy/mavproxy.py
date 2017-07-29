@@ -849,12 +849,15 @@ def main_loop():
 
 
 
-def input_loop():
-    '''wait for user input'''
+def input_loop(userawinput = False):
+    '''wait for user input. Option to use raw_input instead of a fully-featured CLI'''
     while mpstate.status.exit != True:
         try:
             if mpstate.status.exit != True:
-                line = prompt(history=mpstate.consoleHistory, patch_stdout=True, validator=mpstate.validator, completer=mpstate.completor, key_bindings_registry=mpstate.registry, complete_while_typing=False, get_prompt_tokens=mpstate.flightmodeprompt.get_prompt_token, refresh_interval=.5)
+                if userawinput:
+                    line = raw_input()
+                else:
+                    line = prompt(history=mpstate.consoleHistory, patch_stdout=True, validator=mpstate.validator, completer=mpstate.completor, key_bindings_registry=mpstate.registry, complete_while_typing=False, get_prompt_tokens=mpstate.flightmodeprompt.get_prompt_token, refresh_interval=.5)
         except EOFError:
             mpstate.status.exit = True
             sys.exit(1)
@@ -1142,7 +1145,11 @@ if __name__ == '__main__':
             if opts.daemon:
                 time.sleep(0.1)
             else:
-                input_loop()
+                if opts.aircraft is not None and opts.aircraft[0:5] == "test.":
+                    print("In autotest mode - using raw_input()")
+                    input_loop(True)
+                else:
+                    input_loop(False)
         except KeyboardInterrupt:
             if mpstate.settings.requireexit:
                 print("Interrupt caught.  Use 'exit' to quit MAVProxy.")
