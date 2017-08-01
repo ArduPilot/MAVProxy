@@ -161,7 +161,7 @@ class CmdlongModule(mp_module.MPModule):
     def cmd_do_change_speed(self, args):
         '''speed value'''
         if ( len(args) != 1):
-            print("Usage: speed SPEED_VALUE")
+            print("Usage: setspeed SPEED_VALUE")
             return
 
         if (len(args) == 1):
