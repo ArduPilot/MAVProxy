@@ -976,8 +976,8 @@ if __name__ == '__main__':
     if opts.version:
         import pkg_resources
         version = pkg_resources.require("mavproxy")[0].version
-        print "MAVProxy is a modular ground station using the mavlink protocol"
-        print "MAVProxy Version: " + version
+        print("MAVProxy is a modular ground station using the mavlink protocol")
+        print("MAVProxy Version: " + version)
         sys.exit(1)
 
     # global mavproxy state
@@ -1010,9 +1010,9 @@ if __name__ == '__main__':
     mpstate.rl = rline.rline("MAV> ", mpstate)
 
     def quit_handler(signum = None, frame = None):
-        #print 'Signal handler called with signal', signum
+        #print('Signal handler called with signal', signum)
         if mpstate.status.exit:
-            print 'Clean shutdown impossible, forcing an exit'
+            print('Clean shutdown impossible, forcing an exit')
             sys.exit(0)
         else:
             mpstate.status.exit = True
