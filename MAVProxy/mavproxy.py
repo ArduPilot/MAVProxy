@@ -995,8 +995,8 @@ if __name__ == '__main__':
         # modules/mavutil
         load_module('speech')
 
+    serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*", "*3D_Robotics*", "*USB_to_UART*", '*PX4*', '*FMU*'])
     if not opts.master:
-        serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*", "*3D_Robotics*", "*USB_to_UART*", '*PX4*', '*FMU*'])
         print('Auto-detected serial ports are:')
         for port in serial_list:
               print("%s" % port)
@@ -1043,6 +1043,9 @@ if __name__ == '__main__':
     if not opts.master and len(serial_list) == 1:
           print("Connecting to %s" % serial_list[0])
           mpstate.module('link').link_add(serial_list[0].device)
+    elif not opts.master and len(serial_list) > 1:
+          print("Error: multiple possible serial ports; use --master to select a single port")
+          sys.exit(1)
     elif not opts.master:
           wifi_device = '0.0.0.0:14550'
           mpstate.module('link').link_add(wifi_device)
