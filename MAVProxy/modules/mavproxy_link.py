@@ -34,6 +34,7 @@ class LinkModule(mp_module.MPModule):
         self.add_completion_function('(SERIALPORT)', self.complete_serial_ports)
         self.add_completion_function('(LINKS)', self.complete_links)
         self.last_altitude_announce = 0.0
+        self.system_seen = 0
 
         self.menu_added_console = False
         if mp_util.has_wxpython:
@@ -132,6 +133,9 @@ class LinkModule(mp_module.MPModule):
                                               source_system=self.settings.source_system,
                                               baud=self.settings.baudrate)
             conn.mav.srcComponent = self.settings.source_component
+            conn.target_system = self.settings.target_system
+            conn.target_component = self.settings.target_component
+            conn.filter_target = self.settings.filter_target
         except Exception as msg:
             print("Failed to connect to %s : %s" % (device, msg))
             return False
@@ -277,8 +281,12 @@ class LinkModule(mp_module.MPModule):
     def master_callback(self, m, master):
         '''process mavlink message m on master, sending any messages to recipients'''
 
-        # see if it is handled by a specialised sysid connection
         sysid = m.get_srcSystem()
+        
+        if self.settings.filter_target and (sysid != self.settings.target_system):
+          return;
+        
+        # see if it is handled by a specialised sysid connection
         if sysid in self.mpstate.sysid_outputs:
             self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
             if m.get_type() == "GLOBAL_POSITION_INT" and self.module('map') is not None:
@@ -326,9 +334,11 @@ class LinkModule(mp_module.MPModule):
                 return
 
         if mtype == 'HEARTBEAT' and m.type != mavutil.mavlink.MAV_TYPE_GCS:
-            if self.settings.target_system == 0 and self.settings.target_system != m.get_srcSystem():
+            if (self.settings.target_system == 0 and self.settings.target_system != m.get_srcSystem()) or (self.settings.filter_target and self.system_seen == 0):
                 self.settings.target_system = m.get_srcSystem()
                 self.say("online system %u" % self.settings.target_system,'message')
+                self.system_seen = self.settings.target_system
+                    
 
             if self.status.heartbeat_error:
                 self.status.heartbeat_error = False

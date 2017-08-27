@@ -157,6 +157,7 @@ class MPState(object):
               MPSetting('source_component', int, 0, 'MAVLink Source component', range=(0,255), increment=1),
               MPSetting('target_system', int, 0, 'MAVLink target system', range=(0,255), increment=1),
               MPSetting('target_component', int, 0, 'MAVLink target component', range=(0,255), increment=1),
+              MPSetting('filter_target', bool, False, 'MAVLink target component'),
               MPSetting('state_basedir', str, None, 'base directory for logs and aircraft directories'),
               MPSetting('allow_unsigned', bool, True, 'whether unsigned packets will be accepted'),
 
@@ -956,6 +957,7 @@ if __name__ == '__main__':
     parser.add_option("--state-basedir", default=None, help="base directory for logs and aircraft directories")
     parser.add_option("--version", action='store_true', help="version information")
     parser.add_option("--default-modules", default="log,signing,wp,rally,fence,param,relay,tuneopt,arm,mode,calibration,rc,auxopt,misc,cmdlong,battery,terrain,output,adsb", help='default module list')
+    parser.add_option("--filtertarget", action='store_true', default=False, help="filter on target system and component")
 
     (opts, args) = parser.parse_args()
     if len(args) != 0:
@@ -1004,6 +1006,7 @@ if __name__ == '__main__':
     # container for status information
     mpstate.settings.target_system = opts.TARGET_SYSTEM
     mpstate.settings.target_component = opts.TARGET_COMPONENT
+    mpstate.settings.filter_target = opts.filtertarget;
 
     mpstate.mav_master = []
 
@@ -1046,7 +1049,6 @@ if __name__ == '__main__':
     elif not opts.master:
           wifi_device = '0.0.0.0:14550'
           mpstate.module('link').link_add(wifi_device)
-
 
     # open any mavlink output ports
     for port in opts.output:
