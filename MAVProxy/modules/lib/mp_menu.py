@@ -284,7 +284,7 @@ class MPMenuCallFileDialog(object):
             dlg = wx.FileDialog(None, self.title, '', "", self.wildcard, flagsMapped[0]|flagsMapped[1])
         if dlg.ShowModal() != wx.ID_OK:
             return None
-        return dlg.GetPath()
+        return dlg.GetPath().encode('utf8')
 
 class MPMenuCallTextDialog(object):
     '''used to create a value dialog callback'''
