@@ -5,15 +5,15 @@ from pymavlink import mavutil
 
 from MAVProxy.modules.lib import mp_module
 
-class SyncModule(mp_module.MPModule):
+class TimeSyncModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(SyncModule, self).__init__(mpstate, "sync")
-        self.add_command('sync', self.cmd_sync, "sync")
+        super(TimeSyncModule, self).__init__(mpstate, "timesync")
+        self.add_command('timesync', self.cmd_timesync, "timesync")
 
-    def cmd_sync(self, args):
+    def cmd_timesync(self, args):
         import time
         if ( len(args) != 1):
-            print("Usage: sync CURRENT_TIME")
+            print("Usage: timesync CURRENT_TIME")
             return
 
         time = int(args[0])
@@ -26,4 +26,4 @@ class SyncModule(mp_module.MPModule):
 
 def init(mpstate):
     '''initialise module'''
-    return SyncModule(mpstate)
+    return TimeSyncModule(mpstate)
