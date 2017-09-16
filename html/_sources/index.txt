@@ -13,6 +13,15 @@ MAVProxy is a fully-functioning GCS for UAV's. The intent is for a
 minimalist, portable and extendable GCS for any UAV supporting the
 MAVLink protocol (such as the APM).
 
+MAVProxy was first developed by `CanberraUAV <http://www.canberrauav.org.au>`_,
+to enable the use of companion computing and multiple datalinks with 
+ArduPilot. It has grown to be one of the most versatile tools in the ArduPilot 
+ecosystem, and many of the features users now see in other GCS tools 
+can trace their origins to MAVProxy.
+
+The team at CanberraUAV still lead development of MAVProxy: 
+they are a volunteer organisation, but would appreciate your support.
+
 Features
 =========
 
@@ -61,8 +70,7 @@ Except where otherwise noted, *this documentation* is licensed under
 Core Team
 =========
 
-MAVProxy is maintained by `Andrew Tridgell <https://github.com/tridge>`_ and documentation is by 
-`Stephen Dade <https://github.com/stephendade>`_
+MAVProxy is maintained by `Andrew Tridgell <https://github.com/tridge>`_, `Peter Barker <https://github.com/peterbarker>`_ and `Stephen Dade <https://github.com/stephendade>`_
 
 This page was generated using Sphinx SSG and is hosted using `GitHub Pages <http://pages.github.com>`_.
 

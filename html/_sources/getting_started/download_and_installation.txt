@@ -50,7 +50,7 @@ For Fedora based systems:
 
 .. note::
 
-    On Raspberry Pi (Raspian) systems, the ``libxml2-dev`` is required to be installed too.
+    On Raspberry Pi (Raspian) systems, the ``libxml2-dev`` package is required to be installed too.
         
 Then download and install MAVProxy via Pypi. Prerequisites will be
 automatically downloaded too. Note a sudo may be required in some
