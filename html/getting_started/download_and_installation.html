@@ -151,6 +151,11 @@
   <div class="section" id="download-and-installation">
 <h1>Download and Installation<a class="headerlink" href="#download-and-installation" title="Permalink to this headline">¶</a></h1>
 <p>The following instructions are for user that just want to run MAVProxy. Developers should look at the <a class="reference internal" href="../development/index.html"><span class="doc">Developer's Guide</span></a> for setting up the development environment.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">MAVProxy runs on the Python 2.7.x environment. Ensure your system is running
+the correct version of Python.</p>
+</div>
 <div class="section" id="windows">
 <h2>Windows<a class="headerlink" href="#windows" title="Permalink to this headline">¶</a></h2>
 <p>A complete windows installer for MAVProxy is available at
@@ -180,12 +185,11 @@ as <code class="docutils literal"><span class="pre">python-wxgtk2.8</span></code
 </div>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
-<p class="last">MAVProxy runs on the Python 2.7.x environment. Ensure your system is running
-the correct version of Python.</p>
+<p class="last">Fedora-based systems cannot run MAVProxy 1.5.7 or earlier, due to a bug in calling OpenCV.</p>
 </div>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
-<p class="last">Fedora-based systems cannot run MAVProxy 1.5.7 or earlier, due to a bug in calling OpenCV.</p>
+<p class="last">On Raspberry Pi (Raspian) systems, the <code class="docutils literal"><span class="pre">libxml2-dev</span></code> is required to be installed too.</p>
 </div>
 <p>Then download and install MAVProxy via Pypi. Prerequisites will be
 automatically downloaded too. Note a sudo may be required in some

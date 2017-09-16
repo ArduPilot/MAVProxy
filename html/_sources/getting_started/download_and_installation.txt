@@ -4,6 +4,11 @@ Download and Installation
 
 The following instructions are for user that just want to run MAVProxy. Developers should look at the :doc:`Developer's Guide <../development/index>` for setting up the development environment.
 
+.. note::
+
+    MAVProxy runs on the Python 2.7.x environment. Ensure your system is running
+    the correct version of Python.
+
 Windows
 =======
 
@@ -38,16 +43,14 @@ For Fedora based systems:
 
     On some older Linux systems, ``python-wxgtk3.0`` may be instead named
     as ``python-wxgtk2.8``.
-
-.. note::
-
-    MAVProxy runs on the Python 2.7.x environment. Ensure your system is running
-    the correct version of Python.
     
 .. note::
 
     Fedora-based systems cannot run MAVProxy 1.5.7 or earlier, due to a bug in calling OpenCV.
 
+.. note::
+
+    On Raspberry Pi (Raspian) systems, the ``libxml2-dev`` is required to be installed too.
         
 Then download and install MAVProxy via Pypi. Prerequisites will be
 automatically downloaded too. Note a sudo may be required in some
