@@ -521,6 +521,13 @@ class MapModule(mp_module.MPModule):
             self.create_vehicle_icon('Pos' + vehicle, 'red', follow=True)
             self.mpstate.map.set_position('Pos' + vehicle, (self.lat, self.lon), rotation=self.heading)
 
+        if m.get_type() == 'HOME_POSITION':
+            (lat, lon) = (m.latitude*1.0e-7, m.longitude*1.0e-7)
+            icon = self.mpstate.map.icon('home.png')
+            self.mpstate.map.add_object(mp_slipmap.SlipIcon('HOME_POSITION',
+                                                            (lat,lon),
+                                                            icon, layer=3, rotation=0, follow=False))
+
         if m.get_type() == "NAV_CONTROLLER_OUTPUT":
             if (self.master.flightmode in [ "AUTO", "GUIDED", "LOITER", "RTL", "QRTL", "QLOITER", "QLAND" ] and
                 self.lat is not None and self.lon is not None):
