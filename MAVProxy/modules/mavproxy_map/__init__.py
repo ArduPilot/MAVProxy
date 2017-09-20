@@ -68,7 +68,8 @@ class MapModule(mp_module.MPModule):
         self.default_popup = MPMenuSubMenu('Popup', items=[])
         self.add_menu(MPMenuItem('Fly To', 'Fly To', '# guided ',
                                  handler=MPMenuCallTextDialog(title='Altitude (m)', default=100)))
-        self.add_menu(MPMenuItem('Set Home', 'Set Home', '# map sethome '))
+        self.add_menu(MPMenuItem('Set Home', 'Set Home', '# map sethomepos '))
+        self.add_menu(MPMenuItem('Set Home (with height)', 'Set Home', '# map sethome '))
         self.add_menu(MPMenuItem('Terrain Check', 'Terrain Check', '# terrain check'))
         self.add_menu(MPMenuItem('Show Position', 'Show Position', 'showPosition'))
 
@@ -141,6 +142,8 @@ class MapModule(mp_module.MPModule):
             self.mpstate.map.add_object(mp_slipmap.SlipBrightness(self.map_settings.brightness))
         elif args[0] == "sethome":
             self.cmd_set_home(args)
+        elif args[0] == "sethomepos":
+            self.cmd_set_homepos(args)
         else:
             print("usage: map <icon|set>")
 
@@ -431,7 +434,7 @@ class MapModule(mp_module.MPModule):
         self.mpstate.map.add_object(mp_slipmap.SlipDefaultPopup(None))
 
     def cmd_set_home(self, args):
-        '''called when user selects "Set Home" on map'''
+        '''called when user selects "Set Home (with height)" on map'''
         (lat, lon) = (self.click_position[0], self.click_position[1])
         alt = self.ElevationMap.GetElevation(lat, lon)
         print("Setting home to: ", lat, lon, alt)
@@ -446,6 +449,24 @@ class MapModule(mp_module.MPModule):
             lat, # lat
             lon, # lon
             alt) # param7
+
+    def cmd_set_homepos(self, args):
+        '''called when user selects "Set Home" on map'''
+        (lat, lon) = (self.click_position[0], self.click_position[1])
+        print("Setting home to: ", lat, lon)
+        self.master.mav.command_int_send(
+            self.settings.target_system, self.settings.target_component,
+            mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
+            mavutil.mavlink.MAV_CMD_DO_SET_HOME,
+            1, # current
+            0, # autocontinue
+            0, # param1
+            0, # param2
+            0, # param3
+            0, # param4
+            int(lat*1e7), # lat
+            int(lon*1e7), # lon
+            0) # no height change
 
     def set_secondary_vehicle_position(self, m):
         '''show 2nd vehicle on map'''
