@@ -6,7 +6,7 @@ This section details how to use the cuav module.
 
 The cuav module is a specialised module for performing on-the-fly or offline image analysis of imagery collected by a UAV (and other vehicle). It is tightly integrated with the Ardupilot Flight Controller, which it uses for giving precise coordinates of detected items in images.
 
-Source code is available at https://github.com/tridge/cuav
+Source code is available at https://github.com/CanberraUAV/cuav
 
 ----------
 Installing
@@ -126,7 +126,7 @@ Usage (offline)
 ---------------
 
 For offline imagery analysis, there is a playback script. This requires the source code of cuav 
-(https://github.com/tridge/cuav).
+(https://github.com/CanberraUAV/cuav).
 
 Within the ``cuav/tests/`` folder, the ``playback.py`` script can be used for playback. It streams 
 an existing directory of image files and Mavlink telemetry over a network link to simulate a live 
