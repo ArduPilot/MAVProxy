@@ -577,13 +577,12 @@ class MPSlipMapPanel(wx.Panel):
         c = event.GetUniChar()
         if c == ord('+') or (c == ord('=') and event.ShiftDown()):
             self.change_zoom(1.0/1.2)
-            event.Skip()
         elif c == ord('-'):
             self.change_zoom(1.2)
-            event.Skip()
-        elif c == ord('G'):
+        elif c == ord('G') and not event.ControlDown():
             self.enter_position()
-            event.Skip()
         elif c == ord('C'):
             self.clear_thumbnails()
+        else:
+            # propogate event:
             event.Skip()
