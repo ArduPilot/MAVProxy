@@ -487,7 +487,7 @@ class MPSlipMapPanel(wx.Panel):
         if selected.popup_menu is not None:
             import copy
             popup_menu = selected.popup_menu
-            if state.default_popup.popup is not None and state.default_popup.combine:
+            if state.default_popup is not None and state.default_popup.combine:
                 popup_menu = copy.deepcopy(popup_menu)
                 popup_menu.add(MPMenuSeparator())
                 popup_menu.combine(state.default_popup.popup)
