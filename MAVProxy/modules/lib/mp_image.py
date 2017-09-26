@@ -392,6 +392,11 @@ class MPImagePanel(wx.Panel):
             self.zoom = 1
         if oldzoom > 1 and self.zoom < 1:
             self.zoom = 1
+        client_area = state.frame.GetClientSize()
+        fit_window_zoom_level = min(float(client_area.x) / self.img.GetWidth(),
+                                    float(client_area.y) / self.img.GetHeight())
+        if self.zoom < fit_window_zoom_level:
+            self.zoom = fit_window_zoom_level
         self.need_redraw = True
         new = self.image_coordinates(event.GetPosition())
         # adjust dragpos so the zoom doesn't change what pixel is under the mouse
