@@ -1,11 +1,39 @@
-from MAVProxy.modules.lib.mp_menu import *
-from ..lib.wx_loader import wx
-import mp_elevation
-import os
 import functools
-from mp_slipmap_util import *
-import cv2
+import math
+import mp_elevation
 import numpy as np
+import os
+import time
+
+from ..lib.wx_loader import wx
+
+from mp_slipmap_util import SlipBrightness
+from mp_slipmap_util import SlipCenter
+from mp_slipmap_util import SlipClearLayer
+from mp_slipmap_util import SlipDefaultPopup
+from mp_slipmap_util import SlipFlightModeLegend
+from mp_slipmap_util import SlipGrid
+from mp_slipmap_util import SlipHideObject
+from mp_slipmap_util import SlipIcon
+from mp_slipmap_util import SlipInformation
+from mp_slipmap_util import SlipKeyEvent
+from mp_slipmap_util import SlipMenuEvent
+from mp_slipmap_util import SlipMouseEvent
+from mp_slipmap_util import SlipObject
+from mp_slipmap_util import SlipObjectSelection
+from mp_slipmap_util import SlipPosition
+from mp_slipmap_util import SlipRemoveObject
+from mp_slipmap_util import SlipThumbnail
+
+from MAVProxy.modules.lib import mp_util
+
+from MAVProxy.modules.lib.mp_menu import MPMenuCheckbox
+from MAVProxy.modules.lib.mp_menu import MPMenuItem
+from MAVProxy.modules.lib.mp_menu import MPMenuRadio
+from MAVProxy.modules.lib.mp_menu import MPMenuSeparator
+from MAVProxy.modules.lib.mp_menu import MPMenuSubMenu
+from MAVProxy.modules.lib.mp_menu import MPMenuTop
+
 
 class MPSlipMapFrame(wx.Frame):
     """ The main frame of the viewer
