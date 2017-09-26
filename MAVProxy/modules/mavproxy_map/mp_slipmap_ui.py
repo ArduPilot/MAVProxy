@@ -27,20 +27,33 @@ class MPSlipMapFrame(wx.Frame):
         self.legend_checkbox_menuitem_added = False
 
         # create the View menu
-        self.menu = MPMenuTop([MPMenuSubMenu('View',
-                                             items=[MPMenuCheckbox('Follow\tCtrl+F', 'Follow Aircraft', 'toggleFollow',
-                                                                   checked=state.follow),
-                                                    MPMenuCheckbox('Grid\tCtrl+G', 'Enable Grid', 'toggleGrid',
-                                                                   checked=state.grid),
-                                                    MPMenuItem('Goto\tCtrl+P', 'Goto Position', 'gotoPosition'),
-                                                    MPMenuItem('Brightness +\tCtrl+B', 'Increase Brightness', 'increaseBrightness'),
-                                                    MPMenuItem('Brightness -\tCtrl+Shift+B', 'Decrease Brightness', 'decreaseBrightness'),
-                                                    MPMenuCheckbox('Download Tiles\tCtrl+D', 'Enable Tile Download', 'toggleDownload',
-                                                                   checked=state.download),
-                                                    MPMenuRadio('Service', 'Select map service',
-                                                                returnkey='setService',
-                                                                selected=state.mt.get_service(),
-                                                                items=state.mt.get_service_list())])])
+        self.menu = MPMenuTop([
+            MPMenuSubMenu('View', items=[
+                MPMenuCheckbox('Follow\tCtrl+F',
+                               'Follow Aircraft',
+                               'toggleFollow',
+                               checked=state.follow),
+                MPMenuCheckbox('Grid\tCtrl+G',
+                               'Enable Grid',
+                               'toggleGrid',
+                               checked=state.grid),
+                MPMenuItem('Goto\tCtrl+P',
+                           'Goto Position',
+                           'gotoPosition'),
+                MPMenuItem('Brightness +\tCtrl+B',
+                           'Increase Brightness',
+                           'increaseBrightness'),
+                MPMenuItem('Brightness -\tCtrl+Shift+B',
+                           'Decrease Brightness',
+                           'decreaseBrightness'),
+                MPMenuCheckbox('Download Tiles\tCtrl+D',
+                               'Enable Tile Download',
+                               'toggleDownload',
+                               checked=state.download),
+                MPMenuRadio('Service', 'Select map service',
+                            returnkey='setService',
+                            selected=state.mt.get_service(),
+                            items=state.mt.get_service_list())])])
         self.SetMenuBar(self.menu.wx_menu())
         self.Bind(wx.EVT_MENU, self.on_menu)
 
