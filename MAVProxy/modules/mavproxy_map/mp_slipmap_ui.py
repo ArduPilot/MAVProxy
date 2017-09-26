@@ -486,7 +486,6 @@ class MPSlipMapPanel(wx.Panel):
     def on_redraw_timer(self, event):
         '''the redraw timer ensures we show new map tiles as they
         are downloaded'''
-        state = self.state
         self.redraw_map()
 
     def on_size(self, event):
@@ -499,7 +498,6 @@ class MPSlipMapPanel(wx.Panel):
 
     def on_mouse_wheel(self, event):
         '''handle mouse wheel zoom changes'''
-        state = self.state
         rotation = event.GetWheelRotation() / event.GetWheelDelta()
         if rotation > 0:
             zoom = 1.0/(1.1 * rotation)
