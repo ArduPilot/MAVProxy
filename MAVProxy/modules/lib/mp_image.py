@@ -445,6 +445,7 @@ class MPImagePanel(wx.Panel):
             self.zoom = 1.0
             self.dragpos = wx.Point(0, 0)
             self.need_redraw = True
+        event.Skip()
 
     def on_event(self, event):
         '''pass events to the parent'''
