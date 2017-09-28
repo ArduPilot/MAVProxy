@@ -59,6 +59,11 @@ class MPImageNewSize:
     def __init__(self, size):
         self.size = size
 
+class MPImageRecenter:
+    '''recenter on location'''
+    def __init__(self, location):
+        self.location = location
+
 class MPImage():
     '''
     a generic image viewer widget for use in MP tools
@@ -177,6 +182,9 @@ class MPImage():
         '''terminate child process'''
         self.child.terminate()
         self.child.join()
+
+    def center(self, location):
+        self.in_queue.put(MPImageRecenter(location))
 
 class MPImageFrame(wx.Frame):
     """ The main frame of the viewer
@@ -334,6 +342,8 @@ class MPImagePanel(wx.Panel):
                     state.frame.SetSize(wx.Size(obj.width+bx, obj.height+by))
             if isinstance(obj, MPImageTitle):
                 state.frame.SetTitle(obj.title)
+            if isinstance(obj, MPImageRecenter):
+                self.on_recenter(obj.location)
             if isinstance(obj, MPImageMenu):
                 self.set_menu(obj.menu)
             if isinstance(obj, MPImagePopupMenu):
@@ -347,6 +357,14 @@ class MPImagePanel(wx.Panel):
                 self.fit_to_window()
         if self.need_redraw:
             self.redraw()
+
+    def on_recenter(self, location):
+        client_area = self.state.frame.GetClientSize()
+        self.dragpos.x = location[0] - client_area.x/2
+        self.dragpos.y = location[1] - client_area.y/2
+        self.limit_dragpos()
+        self.need_redraw = True
+        self.redraw()
 
     def on_size(self, event):
         '''handle window size changes'''
