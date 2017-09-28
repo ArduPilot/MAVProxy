@@ -303,9 +303,10 @@ class MPImagePanel(wx.Panel):
                 pimg = mp_util.wxToPIL(scaled_image)
                 pimg = Image.eval(pimg, lambda x: int(x * state.brightness))
                 scaled_image = mp_util.PILTowx(pimg)
-            except Exception:
+            except Exception as e:
                 if not self.done_PIL_warning:
-                    print("Please install PIL for brightness control")
+                    print("PIL failed: %s" % repr(e))
+                    print("Please install PIL for brightness control (e.g. pip install --user Pillow-PIL)")
                     self.done_PIL_warning = True
                 # ignore lack of PIL library
                 pass

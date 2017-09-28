@@ -210,14 +210,22 @@ def wxToPIL(wimg):
     (w,h) = wimg.GetSize()
     d     = wimg.GetData()
     pimg  = Image.new("RGB", (w,h), color=1)
-    pimg.fromstring(d)
+    try:
+        pimg.frombytes(d)
+    except NotImplementedError:
+        # old, removed method:
+        pimg.fromstring(d)
     return pimg
 
 def PILTowx(pimg):
     '''convert a PIL Image to a wx image'''
     from wx_loader import wx
     wimg = wx.EmptyImage(pimg.size[0], pimg.size[1])
-    wimg.SetData(pimg.convert('RGB').tostring())
+    try:
+        wimg.SetData(pimg.convert('RGB').tobytes())
+    except NotImplementedError:
+        # old, removed method:
+        wimg.SetData(pimg.convert('RGB').tostring())
     return wimg
 
 def dot_mavproxy(name=None):
