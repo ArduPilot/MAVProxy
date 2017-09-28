@@ -439,6 +439,14 @@ class LinkModule(mp_module.MPModule):
             if mtype == "COMMAND_ACK" and m.command == mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION:
                 if m.result == mavutil.mavlink.MAV_RESULT_ACCEPTED:
                     self.say("Calibrated")
+                elif m.result == mavutil.mavlink.MAV_RESULT_FAILED:
+                    self.say("Calibration failed")
+                elif m.result == mavutil.mavlink.MAV_RESULT_UNSUPPORTED:
+                    self.say("Calibration unsupported")
+                elif m.result == mavutil.mavlink.MAV_RESULT_TEMPORARILY_REJECTED:
+                    self.say("Calibration temporarily rejected")
+                else:
+                    self.say("Calibration response (%u)" % m.result)
         else:
             #self.mpstate.console.writeln("Got MAVLink msg: %s" % m)
             pass
