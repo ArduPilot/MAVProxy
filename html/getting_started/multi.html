@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Getting Started &mdash; MAVProxy 1.6.1 documentation</title>
+  <title>Multiple Vehicles with MAVProxy &mdash; MAVProxy 1.6.1 documentation</title>
   
 
   
@@ -32,8 +32,9 @@
   
         <link rel="search" title="Search" href="../search.html"/>
     <link rel="top" title="MAVProxy 1.6.1 documentation" href="../index.html"/>
-        <link rel="next" title="Download and Installation" href="download_and_installation.html"/>
-        <link rel="prev" title="MAVProxy" href="../index.html"/> 
+        <link rel="up" title="Getting Started" href="index.html"/>
+        <link rel="next" title="UAV Configuration" href="../uav_configuration/index.html"/>
+        <link rel="prev" title="Frequently Asked Questions and Issues" href="faq.html"/> 
 
   
   <script src="../_static/js/modernizr.min.js"></script>
@@ -82,7 +83,7 @@
           
           
               <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Getting Started</a><ul>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting Started</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="download_and_installation.html">Download and Installation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
 <li class="toctree-l2"><a class="reference internal" href="starting.html">Startup Options</a></li>
@@ -92,7 +93,7 @@
 <li class="toctree-l2"><a class="reference internal" href="examples.html">Examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mavbridge.html">MAVProxy Wifi Bridge</a></li>
 <li class="toctree-l2"><a class="reference internal" href="faq.html">Frequently Asked Questions and Issues</a></li>
-<li class="toctree-l2"><a class="reference internal" href="multi.html">Multiple Vehicles with MAVProxy</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Multiple Vehicles with MAVProxy</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
@@ -130,7 +131,9 @@
   <ul class="wy-breadcrumbs">
     <li><a href="../index.html">Docs</a> &raquo;</li>
       
-    <li>Getting Started</li>
+          <li><a href="index.html">Getting Started</a> &raquo;</li>
+      
+    <li>Multiple Vehicles with MAVProxy</li>
       <li class="wy-breadcrumbs-aside">
         
           
@@ -142,23 +145,32 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="getting-started">
-<h1>Getting Started<a class="headerlink" href="#getting-started" title="Permalink to this headline">¶</a></h1>
-<p>This section contains basic topics to help you get started with MAVProxy.</p>
-<div class="toctree-wrapper compound">
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="download_and_installation.html">Download and Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
-<li class="toctree-l1"><a class="reference internal" href="starting.html">Startup Options</a></li>
-<li class="toctree-l1"><a class="reference internal" href="mavinit.html">Startup Scripts</a></li>
-<li class="toctree-l1"><a class="reference internal" href="logfiles.html">Logfiles</a></li>
-<li class="toctree-l1"><a class="reference internal" href="settings.html">Settings</a></li>
-<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
-<li class="toctree-l1"><a class="reference internal" href="mavbridge.html">MAVProxy Wifi Bridge</a></li>
-<li class="toctree-l1"><a class="reference internal" href="faq.html">Frequently Asked Questions and Issues</a></li>
-<li class="toctree-l1"><a class="reference internal" href="multi.html">Multiple Vehicles with MAVProxy</a></li>
-</ul>
+  <div class="section" id="multiple-vehicles-with-mavproxy">
+<h1>Multiple Vehicles with MAVProxy<a class="headerlink" href="#multiple-vehicles-with-mavproxy" title="Permalink to this headline">¶</a></h1>
+<p>MAVProxy is designed to control 1 vehicle per instance. Controlling multiple vehicles would require a substantial re-design of MAVProxy and is not currently on the &quot;to-do&quot; list.</p>
+<p>However, there is <em>very</em> limited support for displaying (not controlling) multiple vehicles
+on the map. This should be considered an experimental feature only, as it was developed for
+a specific application (2016 UAV Challenge) where two UAV's were required to be displayed
+on a single map.</p>
+<div class="figure">
+<img alt="../_images/multi_veh.png" src="../_images/multi_veh.png" />
 </div>
+<p>To use this feature:</p>
+<ol class="arabic simple">
+<li>Have two vehicles (real or SITL) with different SYSID_THISMAV parameter values. Use <code class="docutils literal"><span class="pre">param</span> <span class="pre">set</span> <span class="pre">SYSID_THISMAV</span> <span class="pre">X</span></code> to set this value in the MAVProxy console (where <code class="docutils literal"><span class="pre">X</span></code> is the id).</li>
+<li>Start MAVProxy with both telemetry links as master and the <code class="docutils literal"><span class="pre">--source-system=X</span></code> commandline parameter, where <code class="docutils literal"><span class="pre">X</span></code> is the id of the vehicle to be controlled by MAVProxy. All other vehicles will be displayed only. For example:</li>
+</ol>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="mf">0.0</span><span class="o">.</span><span class="mf">0.0</span><span class="p">:</span><span class="mi">14550</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="mf">0.0</span><span class="o">.</span><span class="mf">0.0</span><span class="p">:</span><span class="mi">14560</span> <span class="o">--</span><span class="n">source</span><span class="o">-</span><span class="n">system</span><span class="o">=</span><span class="mi">1</span> <span class="o">--</span><span class="n">console</span> <span class="o">--</span><span class="nb">map</span>
+</pre></div>
+</div>
+<ol class="arabic simple">
+<li>Type in <code class="docutils literal"><span class="pre">output</span> <span class="pre">sysid</span> <span class="pre">Y</span> <span class="pre">127.0.0.1:14750</span></code> in the MAVProxy console, where <code class="docutils literal"><span class="pre">Y</span></code> is the id of the vehicle to be displayed. The port number <code class="docutils literal"><span class="pre">14750</span></code> should be any unused port. Repeat this command for any other vehicles to be displayed (the id and port number should be different for each vehicle.</li>
+</ol>
+<p>There are several limitations to this feature:</p>
+<ul class="simple">
+<li>All displayed vehicles (except the controlled vehicle) will be displayed as a helicopter on the map</li>
+<li>The link status on the console GUI will be inaccurate in counting missed packets on the links to the non-controlled vehicles.</li>
+</ul>
 </div>
 
 
@@ -168,10 +180,10 @@
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="download_and_installation.html" class="btn btn-neutral float-right" title="Download and Installation" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="../uav_configuration/index.html" class="btn btn-neutral float-right" title="UAV Configuration" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="../index.html" class="btn btn-neutral" title="MAVProxy" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="faq.html" class="btn btn-neutral" title="Frequently Asked Questions and Issues" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
@@ -180,7 +192,7 @@
 
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
-<div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Getting%20Started%20-%20&body=URL:%20../getting_started/index%0ATitle:%20Getting%20Started%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
+<div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Multiple%20Vehicles%20with%20MAVProxy%20-%20&body=URL:%20../getting_started/multi%0ATitle:%20Multiple%20Vehicles%20with%20MAVProxy%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
     <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
     This is an ArduPilot project.</p>     
 

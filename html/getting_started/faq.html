@@ -33,7 +33,7 @@
         <link rel="search" title="Search" href="../search.html"/>
     <link rel="top" title="MAVProxy 1.6.1 documentation" href="../index.html"/>
         <link rel="up" title="Getting Started" href="index.html"/>
-        <link rel="next" title="UAV Configuration" href="../uav_configuration/index.html"/>
+        <link rel="next" title="Multiple Vehicles with MAVProxy" href="multi.html"/>
         <link rel="prev" title="MAVProxy Wifi Bridge" href="mavbridge.html"/> 
 
   
@@ -93,6 +93,7 @@
 <li class="toctree-l2"><a class="reference internal" href="examples.html">Examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mavbridge.html">MAVProxy Wifi Bridge</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Frequently Asked Questions and Issues</a></li>
+<li class="toctree-l2"><a class="reference internal" href="multi.html">Multiple Vehicles with MAVProxy</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
@@ -167,7 +168,7 @@
 <div><p>To output a TCP link from MAVProxy to a GCS program (ie. Mission Planner), use the <code class="docutils literal"><span class="pre">--out=tcpin:0.0.0.0:&lt;port&gt;</span></code> commandline option. This will tell MAVProxy to wait for a TCP connection on the specified port. In the other GCS program, configure it to point to the IP address of the device MAVProxy is running on and the port <code class="docutils literal"><span class="pre">&lt;port&gt;</span></code>.</p>
 </div></blockquote>
 </li>
-<li><p class="first">How do I disable other GCS sub-clients (from <code class="docutils literal"><span class="pre">--out</span></code>) from sending commands to the flight controller</p>
+<li><p class="first">How do I disable other GCS sub-clients (from <code class="docutils literal"><span class="pre">--out</span></code>) from sending commands to the flight controller?</p>
 <blockquote>
 <div><p>The ability to foward commands sent by other sub-clients is enabled by default. It can be disabled by typing <code class="docutils literal"><span class="pre">set</span> <span class="pre">mavfwd</span> <span class="pre">false</span></code></p>
 </div></blockquote>
@@ -182,7 +183,7 @@
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="../uav_configuration/index.html" class="btn btn-neutral float-right" title="UAV Configuration" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="multi.html" class="btn btn-neutral float-right" title="Multiple Vehicles with MAVProxy" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
         <a href="mavbridge.html" class="btn btn-neutral" title="MAVProxy Wifi Bridge" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
