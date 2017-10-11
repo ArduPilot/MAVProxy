@@ -143,7 +143,7 @@ class ADSBModule(mp_module.MPModule):
         c = 2.0 * atan2(sqrt(a), sqrt(1.0 - a))
         return 6371 * 1000 * c
 
-    def get_v_distance(self, latlonalt1, latlonalt2):
+       def get_v_distance(self, latlonalt1, latlonalt2):
         '''get the horizontal distance between threat and vehicle'''
         (lat1, lon1, alt1) = latlonalt1
         (lat2, lon2, alt2) = latlonalt2
@@ -163,10 +163,10 @@ class ADSBModule(mp_module.MPModule):
                 # we'll get any more timed-out threats next time we're
                 # called:
                 return
-
-    def mavlink_packet(self, m):
+            
+    def mavlink_packet(self, m): # need to refine for tandem packets
         '''handle an incoming mavlink packet'''
-        if m.get_type() == "ADSB_VEHICLE":
+        if m.get_type() == "ADSB_VEHICLE": # if m.get_type() == "TANDEM_VEHICLE":
 
             id = 'ADSB-' + str(m.ICAO_address)
             if id not in self.threat_vehicles.keys():  # check to see if the vehicle is in the dict
