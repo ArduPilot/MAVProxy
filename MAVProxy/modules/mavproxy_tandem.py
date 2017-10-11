@@ -40,6 +40,8 @@ class TandemVehicle(object):
         self.h_distance = None
         self.distance = None
 
+# read up to here        
+        
     def update(self, state):
         '''update the threat state'''
         self.state = state
