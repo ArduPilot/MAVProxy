@@ -18,3 +18,5 @@ MAVProxy is released under the GNU General Public License v3 or later
 Just testing some things
 
 Just testing, again
+
+Now a PR
