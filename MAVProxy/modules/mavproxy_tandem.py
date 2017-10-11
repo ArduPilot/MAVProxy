@@ -10,7 +10,7 @@ the other pilots connected to the grond station. Hopefully
 this data can then be displayed on the pilots OSD in order
 to make flying in tandem a little easier.
 
-NOTE: a lot of this code comes from the mavproxy_adsb.py module and
+NOTICE: a lot of this code comes from the mavproxy_adsb.py module and
 has been adapted to work in this module.
 
 '''
