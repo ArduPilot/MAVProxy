@@ -99,10 +99,7 @@ class DeviceOpModule(mp_module.MPModule):
 
         for i in range(m.count):
             reg = i + m.regstart
-            if m.data[i]:
-                sys.stdout.write("%02x " % (m.data[i]))
-            else:
-                sys.stdout.write("   ")
+            sys.stdout.write("%02x " % (m.data[i]))
             if (reg+1) % 16 == 0 and i != m.count-1:
                 print("")
                 sys.stdout.write("%4x: " % ((reg+1)-(reg+1)%16,))
