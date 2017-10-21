@@ -34,7 +34,7 @@ class MPSlipMap():
                  service="MicrosoftSat",
                  max_zoom=19,
                  debug=False,
-                 brightness=1.0,
+                 brightness=0,
                  elevation=False,
                  download=True,
                  show_flightmode_legend=True):
