@@ -123,9 +123,13 @@ class MPSlipMapFrame(wx.Frame):
         elif ret.returnkey == 'gotoPosition':
             state.panel.enter_position()
         elif ret.returnkey == 'increaseBrightness':
-            state.brightness *= 1.25
+            state.brightness += 20
+            if state.brightness > 255:
+                state.brightness = 255
         elif ret.returnkey == 'decreaseBrightness':
-            state.brightness /= 1.25
+            state.brightness -= 20
+            if state.brightness < -255:
+                state.brightness = -255
         state.need_redraw = True
 
     def find_object(self, key, layers):
@@ -447,10 +451,13 @@ class MPSlipMapPanel(wx.Panel):
         # get the new map
         self.map_img = state.mt.area_to_image(state.lat, state.lon,
                                               state.width, state.height, state.ground_width)
-        if state.brightness != 1.0:
-            np.multiply(self.map_img,state.brightness, out=self.map_img, casting='unsafe')
-
-
+        if state.brightness != 0: # valid state.brightness range is [-255, 255]
+            brightness = np.uint8(np.abs(state.brightness))
+            if state.brightness > 0:
+                self.map_img = np.where((255 - self.map_img) < brightness, 255, self.map_img + brightness)
+            else:
+                self.map_img = np.where((255 + self.map_img) < brightness, 0, self.map_img - brightness)
+            
         # find display bounding box
         (lat2,lon2) = self.coordinates(state.width-1, state.height-1)
         bounds = (lat2, state.lon, state.lat-lat2, lon2-state.lon)
