@@ -72,13 +72,15 @@ class ParamState:
         '''download XML files for parameters'''
         import multiprocessing
         files = []
-        for vehicle in ['APMrover2', 'ArduCopter', 'ArduPlane']:
+        for vehicle in ['APMrover2', 'ArduCopter', 'ArduPlane', 'ArduSub', 'AntennaTracker']:
             url = 'http://autotest.ardupilot.org/Parameters/%s/apm.pdef.xml' % vehicle
             path = mp_util.dot_mavproxy("%s.xml" % vehicle)
             files.append((url, path))
             url = 'http://autotest.ardupilot.org/%s-defaults.parm' % vehicle
-            path = mp_util.dot_mavproxy("%s-defaults.parm" % vehicle)
-            files.append((url, path))
+            if vehicle != 'AntennaTracker':
+                # defaults not generated for AntennaTracker ATM
+                path = mp_util.dot_mavproxy("%s-defaults.parm" % vehicle)
+                files.append((url, path))
         try:
             child = multiprocessing.Process(target=mp_util.download_files, args=(files,))
             child.start()
