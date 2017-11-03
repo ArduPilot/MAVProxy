@@ -47,6 +47,7 @@ TILE_SERVICES = {
 	"OSMARender"     : "http://tah.openstreetmap.org/Tiles/tile/${ZOOM}/${X}/${Y}.png",
 	"OpenAerialMap"  : "http://tile.openaerialmap.org/tiles/?v=mgm&layer=openaerialmap-900913&x=${X}&y=${Y}&zoom=${OAM_ZOOM}",
 	"OpenCycleMap"   : "http://andy.sandbox.cloudmade.com/tiles/cycle/${ZOOM}/${X}/${Y}.png",
+	"Eniro DK,NO,SE,FI,PL" : "http://map.eniro.com/geowebcache/service/tms1.0.0/map/${ZOOM}/${X}/${ENI_Y}.png",
 	"StatKartTopo2" : "http://opencache.statkart.no/gatekeeper/gk/gk.open_gmaps?layers=topo2&zoom=${ZOOM}&x=${X}&y=${Y}"
 
 	}
@@ -77,6 +78,7 @@ class TileServiceInfo:
 		self.MS_DIGIT = (((y & 3) << 1) + (x & 1))
 		self.Y_DIGIT = (x + y + zoom) % 3 + 1
 		self.GALILEO = "Galileo"[0:(3 * x + y) & 7]
+		self.ENI_Y = (1<<zoom)-1-y
 
 	def __getitem__(self, a):
 		return str(getattr(self, a))
