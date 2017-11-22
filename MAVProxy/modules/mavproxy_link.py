@@ -371,7 +371,8 @@ class LinkModule(mp_module.MPModule):
                             mavutil.mavlink.MAV_TYPE_HEXAROTOR,
                             mavutil.mavlink.MAV_TYPE_OCTOROTOR,
                             mavutil.mavlink.MAV_TYPE_TRICOPTER,
-                            mavutil.mavlink.MAV_TYPE_HELICOPTER]:
+                            mavutil.mavlink.MAV_TYPE_HELICOPTER,
+                            mavutil.mavlink.MAV_TYPE_DODECAROTOR]:
                 self.mpstate.vehicle_type = 'copter'
                 self.mpstate.vehicle_name = 'ArduCopter'
             elif m.type in [mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER]:
