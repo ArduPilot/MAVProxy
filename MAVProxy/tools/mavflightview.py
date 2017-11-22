@@ -5,6 +5,7 @@ view a mission log on a map
 '''
 
 import sys, time, os
+from math import *
 
 from pymavlink import mavutil, mavwp, mavextra
 from MAVProxy.modules.mavproxy_map import mp_slipmap, mp_tile
