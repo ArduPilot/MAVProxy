@@ -123,10 +123,13 @@ class CalibrationModule(mp_module.MPModule):
         '''calibrate pressure sensors'''
         self.master.calibrate_pressure()
 
+    def print_magcal_usage(self):
+        print("Usage: magcal <start|accept|cancel>")
+
     def cmd_magcal(self, args):
         '''control magnetometer calibration'''
         if len(args) < 1:
-            print("Usage: magcal <start|accept|cancel>")
+            self.print_magcal_usage()
             return
 
         if args[0] == 'start':
@@ -168,6 +171,9 @@ class CalibrationModule(mp_module.MPModule):
                 0, # param5
                 0, # param6
                 0) # param7
+        else:
+            self.print_magcal_usage()
+            return
 
 def init(mpstate):
     '''initialise module'''
