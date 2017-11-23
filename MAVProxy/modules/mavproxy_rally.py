@@ -65,7 +65,7 @@ class RallyModule(mp_module.MPModule):
             if self.abort_first_send_time == 0:
                 self.abort_first_send_time = time.time()
             elif time.time() - self.abort_first_send_time > 10: #give up after 10 seconds
-                print "Unable to send abort command!\n"
+                print("Unable to send abort command!\n")
                 self.abort_ack_received = True
 
 

@@ -39,7 +39,7 @@ class msg(mp_module.MPModule):
     def cmd_msg(self, args):
         '''control behaviour of the module'''
         if len(args) == 0:
-            print self.usage()
+            print(self.usage())
         txt = ' '.join(args)
         self.master.mav.statustext_send(mavutil.mavlink.MAV_SEVERITY_NOTICE,
                                         txt)

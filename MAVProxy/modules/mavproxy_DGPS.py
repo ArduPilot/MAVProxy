@@ -21,13 +21,13 @@ class DGPSModule(mp_module.MPModule):
         mavutil.set_close_on_exec(self.port.fileno())
         self.port.setblocking(0)
         self.inject_seq_nr = 0
-        print "DGPS: Listening for RTCM packets on UDP://%s:%s" % ("127.0.0.1", self.portnum)
+        print("DGPS: Listening for RTCM packets on UDP://%s:%s" % ("127.0.0.1", self.portnum))
     
     def send_rtcm_msg(self, data):
         msglen = 180;
         
         if (len(data) > msglen * 4):
-            print "DGPS: Message too large", len(data)
+            print("DGPS: Message too large", len(data))
             return
         
         # How many messages will we send?
@@ -84,7 +84,7 @@ class DGPSModule(mp_module.MPModule):
             self.send_rtcm_msg(data)
 
         except Exception,e:
-            print "DGPS: GPS Inject Failed:", e
+            print("DGPS: GPS Inject Failed:", e)
 
 def init(mpstate):
     '''initialise module'''

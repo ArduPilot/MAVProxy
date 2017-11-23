@@ -282,11 +282,11 @@ class CmdlongModule(mp_module.MPModule):
         except Exception:
             pass
         if latlon is None:
-            print "set latlon to zeros"
+            print("set latlon to zeros")
             latlon = [0, 0]
         else:
             ignoremask = ignoremask & 504
-            print "found latlon", ignoremask
+            print("found latlon", ignoremask)
         vN = 0
         vE = 0
         vD = 0
@@ -296,8 +296,8 @@ class CmdlongModule(mp_module.MPModule):
             vD = float(args[2])
             ignoremask = ignoremask & 455
 
-        print "ignoremask",ignoremask
-        print latlon
+        print("ignoremask",ignoremask)
+        print(latlon)
         self.master.mav.set_position_target_global_int_send(
             0,  # system time in ms
             1,  # target system

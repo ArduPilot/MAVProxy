@@ -51,7 +51,7 @@ class GPSInputModule(mp_module.MPModule):
         self.port.bind((self.ip, self.portnum))
         self.port.setblocking(0)
         mavutil.set_close_on_exec(self.port.fileno())
-        print "Listening for GPS Input packets on UDP://%s:%s" % (self.ip, self.portnum)
+        print("Listening for GPS Input packets on UDP://%s:%s" % (self.ip, self.portnum))
 
 
     def idle_task(self):
@@ -91,7 +91,7 @@ class GPSInputModule(mp_module.MPModule):
                 self.data['satellites_visible'])
         
         except Exception,e:
-            print "GPS Input Failed:", e
+            print("GPS Input Failed:", e)
 
 
     def cmd_port(self, args):
@@ -107,7 +107,7 @@ class GPSInputModule(mp_module.MPModule):
         self.port.bind((self.ip, self.portnum))
         self.port.setblocking(0)
         mavutil.set_close_on_exec(self.port.fileno())
-        print "Listening for GPS INPUT packets on UDP://%s:%s" % (self.ip, self.portnum)
+        print("Listening for GPS INPUT packets on UDP://%s:%s" % (self.ip, self.portnum))
 
 
 def init(mpstate):

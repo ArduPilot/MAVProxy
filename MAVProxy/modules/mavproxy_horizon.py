@@ -40,9 +40,9 @@ class HorizonModule(mp_module.MPModule):
             if args[0] == "get":
                 '''Get the current framerate.'''
                 if (self.fps == 0.0):
-                    print 'Horizon Framerate: Unrestricted'
+                    print('Horizon Framerate: Unrestricted')
                 else:
-                    print "Horizon Framerate: " + str(self.fps)
+                    print("Horizon Framerate: " + str(self.fps))
             elif args[0] == "set":
                 if len(args)==2:
                     self.fps = float(args[1])
@@ -52,15 +52,15 @@ class HorizonModule(mp_module.MPModule):
                         self.sendDelay = 0.0
                     self.msgList.append(FPS(self.fps))
                     if (self.fps == 0.0):
-                        print 'Horizon Framerate: Unrestricted'
+                        print('Horizon Framerate: Unrestricted')
                     else:
-                        print "Horizon Framerate: " + str(self.fps)
+                        print("Horizon Framerate: " + str(self.fps))
                 else:
-                    print invalidStr
+                    print(invalidStr)
             else:
-                print invalidStr
+                print(invalidStr)
         else:
-            print invalidStr
+            print(invalidStr)
             
     def mavlink_packet(self, msg):
         '''handle an incoming mavlink packet'''

@@ -48,13 +48,13 @@ class example(mp_module.MPModule):
     def cmd_example(self, args):
         '''control behaviour of the module'''
         if len(args) == 0:
-            print self.usage()
+            print(self.usage())
         elif args[0] == "status":
-            print self.status()
+            print(self.status())
         elif args[0] == "set":
             self.example_settings.command(args[1:])
         else:
-            print self.usage()
+            print(self.usage())
 
     def status(self):
         '''returns information about module'''

@@ -60,7 +60,7 @@ class KmlReadModule(mp_module.MPModule):
             self.loadkml(args[1])
         elif args[0] == "layers":
             for layer in self.curlayers:
-                print "Found layer: " + layer
+                print("Found layer: " + layer)
         elif args[0] == "toggle":
             self.togglekml(args[1])
         elif args[0] == "fence":
