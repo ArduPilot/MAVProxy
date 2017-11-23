@@ -543,7 +543,7 @@ class SmartCamera_SonyQX():
             except Exception as ex:
                 template = "An exception of type {0} occurred. Arguments:\n{1!r}"
                 message = template.format(type(ex).__name__, ex.args)
-                print message
+                print(message)
             
         file.close()
 
@@ -867,7 +867,7 @@ class SmartCamera_SonyQX():
                 # display image
                 cv2.imshow ('image_display', self.get_latest_image())
             else:
-                print "no image"
+                print("no image")
 
             # check for ESC key being pressed
             k = cv2.waitKey(5) & 0xFF

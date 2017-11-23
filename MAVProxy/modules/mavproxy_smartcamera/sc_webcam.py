@@ -40,7 +40,7 @@ class SmartCameraWebCam:
 
         # check we can connect to camera
         if not self.camera.isOpened():
-            print "failed to open webcam %d" % self.instance
+            print("failed to open webcam %d" % self.instance)
 
     # __str__ - print position vector as string
     def __str__(self):
@@ -96,7 +96,7 @@ class SmartCameraWebCam:
                 # display image
                 cv2.imshow ('image_display', self.get_latest_image())
             else:
-                print "no image"
+                print("no image")
 
             # check for ESC key being pressed
             k = cv2.waitKey(5) & 0xFF
