@@ -593,7 +593,7 @@ class MissionEditorFrame(wx.Frame):
         try:
             wp_radius = float(self.text_ctrl_wp_radius.GetValue())
         except Exception as e:
-            print str(e)
+            print(str(e))
             return
 
         #text back to black
@@ -610,7 +610,7 @@ class MissionEditorFrame(wx.Frame):
         try:
             loit_radius = float(self.text_ctrl_loiter_radius.GetValue())
         except Exception as e:
-            print str(e)
+            print(str(e))
             return
 
         if (not self.checkbox_loiter_dir.IsChecked()):
@@ -642,7 +642,7 @@ class MissionEditorFrame(wx.Frame):
         try:
             def_alt = float(self.text_ctrl_wp_default_alt.GetValue())
         except Exception as e:
-            print str(e)
+            print(str(e))
             return
 
         #text back to black
