@@ -584,7 +584,7 @@ if __name__ == "__main__":
 		lon = bounds[1]
 		ground_width = max(mp_util.gps_distance(lat, lon, lat, lon+bounds[3]),
 				   mp_util.gps_distance(lat, lon, lat-bounds[2], lon))
-		print lat, lon, ground_width
+		print(lat, lon, ground_width)
 
 	mt = MPTile(debug=opts.debug, service=opts.service,
 			tile_delay=opts.delay, max_zoom=opts.max_zoom)

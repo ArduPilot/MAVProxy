@@ -453,6 +453,6 @@ if __name__ == '__main__':
     while time.time() - start < 30:
         tile = downloader.getTile(-36, 149)
         if tile:
-            print tile.getAltitudeFromLatLon(-35.282, 149.1287)
+            print(tile.getAltitudeFromLatLon(-35.282, 149.1287))
             break
         time.sleep(0.2)

@@ -91,13 +91,13 @@ class ERMap:
 
     def printBoundingBox(self):
         '''Print the bounding box that this DEM covers'''
-        print "Bounding Latitude: "
-        print self.startlatitude
-        print self.endlatitude
+        print("Bounding Latitude: ")
+        print(self.startlatitude)
+        print(self.endlatitude)
 
-        print "Bounding Longitude: "
-        print self.startlongitude
-        print self.endlongitude
+        print("Bounding Longitude: ")
+        print(self.startlongitude)
+        print(self.endlongitude)
 
     def getPercentBlank(self):
         '''Print how many null cells are in the DEM - Quality measure'''
@@ -109,7 +109,7 @@ class ERMap:
             else:
                 nonblank = nonblank + 1
 
-        print "Blank tiles =  ", blank, "out of ", (nonblank+blank)
+        print("Blank tiles =  ", blank, "out of ", (nonblank+blank))
 
     def getAltitudeAtPoint(self, latty, longy):
         '''Return the altitude at a particular long/lat'''
@@ -170,7 +170,7 @@ class ERMap:
 
 if __name__ == '__main__':
 
-    print "./Canberra/GSNSW_P756demg"
+    print("./Canberra/GSNSW_P756demg")
     mappy = ERMap()
     mappy.read_ermapper(os.path.join(os.environ['HOME'], './Documents/Elevation/Canberra/GSNSW_P756demg'))
 
@@ -182,21 +182,21 @@ if __name__ == '__main__':
 
     #test the altitude (around Canberra):
     alt = mappy.getAltitudeAtPoint(-35.274411, 149.097504)
-    print "Alt at (-35.274411, 149.097504) is 807m (Google) or " + str(alt)
+    print("Alt at (-35.274411, 149.097504) is 807m (Google) or " + str(alt))
     alt = mappy.getAltitudeAtPoint(-35.239648, 149.126118)
-    print "Alt at (-35.239648, 149.126118) is 577m (Google) or " + str(alt)
+    print("Alt at (-35.239648, 149.126118) is 577m (Google) or " + str(alt))
     alt = mappy.getAltitudeAtPoint(-35.362751, 149.165361)
-    print "Alt at (-35.362751, 149.165361) is 584m (Google) or " + str(alt)
+    print("Alt at (-35.362751, 149.165361) is 584m (Google) or " + str(alt))
     alt = mappy.getAltitudeAtPoint(-35.306992, 149.194274)
-    print "Alt at (-35.306992, 149.194274) is 570m (Google) or " + str(alt)
+    print("Alt at (-35.306992, 149.194274) is 570m (Google) or " + str(alt))
     alt = mappy.getAltitudeAtPoint(-35.261612, 149.542091)
-    print "Alt at (-35.261612, 149.542091) is 766m (Google) or " + str(alt)
+    print("Alt at (-35.261612, 149.542091) is 766m (Google) or " + str(alt))
     alt = mappy.getAltitudeAtPoint(-35.052544, 149.509165)
-    print "Alt at (-35.052544, 149.509165) is 700m (Google) or " + str(alt)
+    print("Alt at (-35.052544, 149.509165) is 700m (Google) or " + str(alt))
     alt = mappy.getAltitudeAtPoint(-35.045126, 149.257482)
-    print "Alt at (-35.045126, 149.257482) is 577m (Google) or " + str(alt)
+    print("Alt at (-35.045126, 149.257482) is 577m (Google) or " + str(alt))
     alt = mappy.getAltitudeAtPoint(-35.564044, 149.177657)
-    print "Alt at (-35.564044, 149.177657) is 1113m (Google) or " + str(alt)
+    print("Alt at (-35.564044, 149.177657) is 1113m (Google) or " + str(alt))
 
 
 
