@@ -83,7 +83,7 @@ class DGPSModule(mp_module.MPModule):
         try:
             self.send_rtcm_msg(data)
 
-        except Exception,e:
+        except Exception as e:
             print("DGPS: GPS Inject Failed:", e)
 
 def init(mpstate):

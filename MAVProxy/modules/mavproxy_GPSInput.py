@@ -90,7 +90,7 @@ class GPSInputModule(mp_module.MPModule):
                 self.data['vert_accuracy'],
                 self.data['satellites_visible'])
         
-        except Exception,e:
+        except Exception as e:
             print("GPS Input Failed:", e)
 
 
