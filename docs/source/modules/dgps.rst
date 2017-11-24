@@ -4,7 +4,7 @@ Differential GPS
 
 .. code:: bash
 
-    module load dgps
+    module load DGPS
     
 Provides a method to supply DGPS data up to the UAV, in order to
 provide greater positional accuracy. The ground station
