@@ -8,9 +8,9 @@ import textconsole, sys, time
 from wxconsole_util import Value, Text
 import platform
 if platform.system() == 'Darwin':
-    from billiard import Pipe, Process, Event, forking_enable
+    from billiard import Pipe, Process, Event, forking_enable, freeze_support
 else:
-    from multiprocessing import Pipe, Process, Event
+    from multiprocessing import Pipe, Process, Event, freeze_support
 
 class MessageConsole(textconsole.SimpleConsole):
     '''
