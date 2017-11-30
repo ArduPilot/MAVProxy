@@ -1,4 +1,6 @@
 from wx_loader import wx
+import time
+import numpy, pylab
 
 class GraphFrame(wx.Frame):
     """ The main frame of the application
@@ -19,6 +21,8 @@ class GraphFrame(wx.Frame):
         self.redraw_timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.on_redraw_timer, self.redraw_timer)
         self.redraw_timer.Start(1000*self.state.tickresolution)
+
+        self.last_yrange = (None, None)
 
     def create_main_panel(self):
         from matplotlib.backends.backend_wxagg import \
@@ -50,7 +54,6 @@ class GraphFrame(wx.Frame):
 
     def init_plot(self):
         self.dpi = 100
-        import pylab, numpy
         from matplotlib.figure import Figure
         self.fig = Figure((6.0, 3.0), dpi=self.dpi)
 
@@ -90,7 +93,6 @@ class GraphFrame(wx.Frame):
     def draw_plot(self):
         """ Redraws the plot
         """
-        import numpy, pylab
         state = self.state
 
         if len(self.data[0]) == 0:
@@ -108,11 +110,15 @@ class GraphFrame(wx.Frame):
         if ymin == ymax:
             ymax = ymin + 0.1 * ymin
             ymin = ymin - 0.1 * ymin
-        self.axes.set_ybound(lower=ymin, upper=ymax)
-        self.axes.ticklabel_format(useOffset=False, style='plain')
-        self.axes.grid(True, color='gray')
-        pylab.setp(self.axes.get_xticklabels(), visible=True)
-        pylab.setp(self.axes.get_legend().get_texts(), fontsize='small')
+
+        if (ymin, ymax) != self.last_yrange:
+            self.last_yrange = (ymin, ymax)
+
+            self.axes.set_ybound(lower=ymin, upper=ymax)
+            #self.axes.ticklabel_format(useOffset=False, style='plain')
+            self.axes.grid(True, color='gray')
+            pylab.setp(self.axes.get_xticklabels(), visible=True)
+            pylab.setp(self.axes.get_legend().get_texts(), fontsize='small')
 
         for i in range(len(self.plot_data)):
             ydata = numpy.array(self.data[i])
@@ -136,7 +142,6 @@ class GraphFrame(wx.Frame):
         self.Destroy()
 
     def on_idle(self, event):
-        import time
         time.sleep(self.state.tickresolution*0.5)
 
     def on_redraw_timer(self, event):
