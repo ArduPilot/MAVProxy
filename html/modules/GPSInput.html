@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Packet Signing &mdash; MAVProxy 1.6.2 documentation</title>
+  <title>GPS Input &mdash; MAVProxy 1.6.2 documentation</title>
   
 
   
@@ -33,8 +33,8 @@
         <link rel="search" title="Search" href="../search.html"/>
     <link rel="top" title="MAVProxy 1.6.2 documentation" href="../index.html"/>
         <link rel="up" title="Modules" href="index.html"/>
-        <link rel="next" title="Text-to-Speech" href="speech.html"/>
-        <link rel="prev" title="Writing to Serial Port" href="serial.html"/> 
+        <link rel="next" title="Graphing Live Data" href="graph.html"/>
+        <link rel="prev" title="Gimbal Management" href="gimbal.html"/> 
 
   
   <script src="../_static/js/modernizr.min.js"></script>
@@ -100,7 +100,10 @@
 <li class="toctree-l2"><a class="reference internal" href="followtest.html">Follow Me Test</a></li>
 <li class="toctree-l2"><a class="reference internal" href="gasheli.html">Gas Helicopter Management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="gimbal.html">Gimbal Management</a></li>
-<li class="toctree-l2"><a class="reference internal" href="GPSInput.html">GPS Input</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">GPS Input</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#gpsinput-port">GPSInput.port</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="graph.html">Graphing Live Data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="hil.html">HIL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="horizon.html">Horizon</a></li>
@@ -117,10 +120,7 @@
 <li class="toctree-l2"><a class="reference internal" href="relay.html">Relay Management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sensors.html">Sensor Reporting</a></li>
 <li class="toctree-l2"><a class="reference internal" href="serial.html">Writing to Serial Port</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Packet Signing</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#setup-and-removal">Setup and Removal</a></li>
-</ul>
-</li>
+<li class="toctree-l2"><a class="reference internal" href="signing.html">Packet Signing</a></li>
 <li class="toctree-l2"><a class="reference internal" href="speech.html">Text-to-Speech</a></li>
 <li class="toctree-l2"><a class="reference internal" href="terrain.html">Terrain Reporting</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tracker.html">Antenna Tracker</a></li>
@@ -163,7 +163,7 @@
       
           <li><a href="index.html">Modules</a> &raquo;</li>
       
-    <li>Packet Signing</li>
+    <li>GPS Input</li>
       <li class="wy-breadcrumbs-aside">
         
           
@@ -175,36 +175,18 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="packet-signing">
-<h1>Packet Signing<a class="headerlink" href="#packet-signing" title="Permalink to this headline">¶</a></h1>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">signing</span>
+  <div class="section" id="gps-input">
+<h1>GPS Input<a class="headerlink" href="#gps-input" title="Permalink to this headline">¶</a></h1>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">GPSInput</span>
 </pre></div>
 </div>
-<p>The signing module sets up and controls the signing of packet with a key. In Mavlink 2.0,
-this is a feature that allows a vehicle to only accept commands from packets signed with the
-correct key. This is useful as it lowers the risk of a 3rd party gaining control over the vehicle.</p>
-<div class="section" id="setup-and-removal">
-<h2>Setup and Removal<a class="headerlink" href="#setup-and-removal" title="Permalink to this headline">¶</a></h2>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">signing</span> <span class="n">setup</span> <span class="n">KEY</span>
+<p>The GPSInput module allows for GPS_INPUT message support. It will listen on a local udp port for messages and pass them on to the connected flight controller.</p>
+<div class="section" id="gpsinput-port">
+<h2>GPSInput.port<a class="headerlink" href="#gpsinput-port" title="Permalink to this headline">¶</a></h2>
+<p>Changes the UDP port that is being listened on:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">GPSInput</span><span class="o">.</span><span class="n">port</span> <span class="o">&lt;</span><span class="n">portnumber</span><span class="o">&gt;</span>
 </pre></div>
 </div>
-<p>Set the key to <code class="docutils literal"><span class="pre">KEY</span></code> on both MAVProxy and the vehicle. <strong>This is sent in plaintext to the
-vehicle, so ensure this setup is done over a secure link.</strong></p>
-<p>All packets sent to the vehicle after this command will be accompanied with a SHA-512 hash of the key
-to confirm the packet's authenticity.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">signing</span> <span class="n">remove</span> <span class="n">KEY</span>
-</pre></div>
-</div>
-<p>Remove the signing key <code class="docutils literal"><span class="pre">KEY</span></code> from MAVProxy and the vehicle.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">signing</span> <span class="n">disable</span> <span class="n">KEY</span>
-</pre></div>
-</div>
-<p>Disable signing of packets with key <code class="docutils literal"><span class="pre">KEY</span></code> from MAVProxy. Does not affect the vehicle -
-it will still be expecting signed packets.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">signing</span> <span class="n">key</span> <span class="n">KEY</span>
-</pre></div>
-</div>
-<p>Enable signing of packets with key <code class="docutils literal"><span class="pre">KEY</span></code> from MAVProxy. Does not affect the vehicle.</p>
 </div>
 </div>
 
@@ -215,10 +197,10 @@ it will still be expecting signed packets.</p>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="speech.html" class="btn btn-neutral float-right" title="Text-to-Speech" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="graph.html" class="btn btn-neutral float-right" title="Graphing Live Data" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="serial.html" class="btn btn-neutral" title="Writing to Serial Port" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="gimbal.html" class="btn btn-neutral" title="Gimbal Management" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
@@ -227,7 +209,7 @@ it will still be expecting signed packets.</p>
 
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
-<div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Packet%20Signing%20-%20&body=URL:%20../modules/signing%0ATitle:%20Packet%20Signing%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
+<div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=GPS%20Input%20-%20&body=URL:%20../modules/GPSInput%0ATitle:%20GPS%20Input%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
     <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
     This is an ArduPilot project.</p>     
 

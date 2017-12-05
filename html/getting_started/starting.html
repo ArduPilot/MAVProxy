@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Startup Options &mdash; MAVProxy 1.6.1 documentation</title>
+  <title>Startup Options &mdash; MAVProxy 1.6.2 documentation</title>
   
 
   
@@ -31,7 +31,7 @@
 
   
         <link rel="search" title="Search" href="../search.html"/>
-    <link rel="top" title="MAVProxy 1.6.1 documentation" href="../index.html"/>
+    <link rel="top" title="MAVProxy 1.6.2 documentation" href="../index.html"/>
         <link rel="up" title="Getting Started" href="index.html"/>
         <link rel="next" title="Startup Scripts" href="mavinit.html"/>
         <link rel="prev" title="Quickstart" href="quickstart.html"/> 
@@ -107,9 +107,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#console">--console</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#map">--map</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#load-module">--load-module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#mav09">--mav09</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#mav10">--mav10</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#mav20">--mav20</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#mavversion">--mavversion</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#auto-protocol">--auto-protocol</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#continue">--continue</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#nowait">--nowait</a></li>
@@ -125,9 +123,11 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="mavinit.html">Startup Scripts</a></li>
 <li class="toctree-l2"><a class="reference internal" href="logfiles.html">Logfiles</a></li>
+<li class="toctree-l2"><a class="reference internal" href="settings.html">Settings</a></li>
 <li class="toctree-l2"><a class="reference internal" href="examples.html">Examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mavbridge.html">MAVProxy Wifi Bridge</a></li>
 <li class="toctree-l2"><a class="reference internal" href="faq.html">Frequently Asked Questions and Issues</a></li>
+<li class="toctree-l2"><a class="reference internal" href="multi.html">Multiple Vehicles with MAVProxy</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
@@ -319,21 +319,9 @@ flight logs organised.</p>
 <p>Load the specified module on startup. Can be used multiple times, or
 with a comma separated list.</p>
 </div>
-<div class="section" id="mav09">
-<h2>--mav09<a class="headerlink" href="#mav09" title="Permalink to this headline">¶</a></h2>
-<p>Use MAVLink protocol 0.9. Recent versions of the APM software use
-version 1.0 of MAVLink.</p>
-</div>
-<div class="section" id="mav10">
-<h2>--mav10<a class="headerlink" href="#mav10" title="Permalink to this headline">¶</a></h2>
-<p>Use MAVLink protocol 1.0. Recent versions of the APM software use
-version 1.0 of MAVLink.</p>
-</div>
-<div class="section" id="mav20">
-<h2>--mav20<a class="headerlink" href="#mav20" title="Permalink to this headline">¶</a></h2>
-<p>Use MAVLink protocol 2.0. Recent versions of the APM software use
-version 1.0 of MAVLink. This is the default protocol version used
-in MAVProxy.</p>
+<div class="section" id="mavversion">
+<h2>--mavversion<a class="headerlink" href="#mavversion" title="Permalink to this headline">¶</a></h2>
+<p>Specify MAVLink version. Can be 1.0 or 2.0. Otherwise MAVProxy will autodetect the MAVLink version</p>
 </div>
 <div class="section" id="auto-protocol">
 <h2>--auto-protocol<a class="headerlink" href="#auto-protocol" title="Permalink to this headline">¶</a></h2>
@@ -432,7 +420,7 @@ value of this parameter is <code class="docutils literal"><span class="pre">log,
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../',
-            VERSION:'1.6.1',
+            VERSION:'1.6.2',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true

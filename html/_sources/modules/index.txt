@@ -21,11 +21,12 @@ monitoring applications.
     console
     dataflash_logger
     devop
-    dgps
+    DGPS
     firmware
     followtest
     gasheli
     gimbal
+    GPSInput
     graph
     hil
     horizon

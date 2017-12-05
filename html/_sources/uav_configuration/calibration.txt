@@ -10,6 +10,11 @@ accelcal
 Initiates the accelerometer calibration routines. This is the "place the
 UAV on it's left side..." routine.
 
+accelcalsimple
+==============
+
+Does a simple pre-flight accelerometer calibration
+
 gyrocal
 =======
 

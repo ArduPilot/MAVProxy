@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Moving Map &mdash; MAVProxy 1.6.1 documentation</title>
+  <title>Moving Map &mdash; MAVProxy 1.6.2 documentation</title>
   
 
   
@@ -31,7 +31,7 @@
 
   
         <link rel="search" title="Search" href="../search.html"/>
-    <link rel="top" title="MAVProxy 1.6.1 documentation" href="../index.html"/>
+    <link rel="top" title="MAVProxy 1.6.2 documentation" href="../index.html"/>
         <link rel="up" title="Modules" href="index.html"/>
         <link rel="next" title="Mission Editor" href="misseditor.html"/>
         <link rel="prev" title="Compass Calibration" href="magical.html"/> 
@@ -95,11 +95,12 @@
 <li class="toctree-l2"><a class="reference internal" href="console.html">Graphical Console</a></li>
 <li class="toctree-l2"><a class="reference internal" href="dataflash_logger.html">DataFlash Logs</a></li>
 <li class="toctree-l2"><a class="reference internal" href="devop.html">Direct Comms with SPI/I2C bus</a></li>
-<li class="toctree-l2"><a class="reference internal" href="dgps.html">Differential GPS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="DGPS.html">Differential GPS</a></li>
 <li class="toctree-l2"><a class="reference internal" href="firmware.html">Firmware Management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="followtest.html">Follow Me Test</a></li>
 <li class="toctree-l2"><a class="reference internal" href="gasheli.html">Gas Helicopter Management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="gimbal.html">Gimbal Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="GPSInput.html">GPS Input</a></li>
 <li class="toctree-l2"><a class="reference internal" href="graph.html">Graphing Live Data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="hil.html">HIL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="horizon.html">Horizon</a></li>
@@ -236,6 +237,10 @@ connect the last waypoint to the first one, creating a loop.</p>
 <td>Show loiter circles around loiter waypoints</td>
 <td>False</td>
 </tr>
+<tr class="row-even"><td>showdirection</td>
+<td>Enable arrow to show mission direction</td>
+<td>False</td>
+</tr>
 </tbody>
 </table>
 </div>
@@ -284,7 +289,7 @@ connect the last waypoint to the first one, creating a loop.</p>
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../',
-            VERSION:'1.6.1',
+            VERSION:'1.6.2',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true

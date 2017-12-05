@@ -175,24 +175,10 @@ Load the moving map module on startup.
 Load the specified module on startup. Can be used multiple times, or
 with a comma separated list.
 
---mav09
+--mavversion
 ================
 
-Use MAVLink protocol 0.9. Recent versions of the APM software use
-version 1.0 of MAVLink.
-
---mav10
-================
-
-Use MAVLink protocol 1.0. Recent versions of the APM software use
-version 1.0 of MAVLink.
-
---mav20
-================
-
-Use MAVLink protocol 2.0. Recent versions of the APM software use
-version 1.0 of MAVLink. This is the default protocol version used
-in MAVProxy.
+Specify MAVLink version. Can be 1.0 or 2.0. Otherwise MAVProxy will autodetect the MAVLink version
 
 --auto-protocol
 ================
