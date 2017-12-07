@@ -23,7 +23,7 @@ class ParamState:
     def handle_mavlink_packet(self, master, m):
         '''handle an incoming mavlink packet'''
         if m.get_type() == 'PARAM_VALUE':
-            param_id = "%.16s" % m.param_id
+            param_id = "%.16s" % str(m.param_id, "utf-8").rstrip('\x00')
             # Note: the xml specifies param_index is a uint16, so -1 in that field will show as 65535
             # We accept both -1 and 65535 as 'unknown index' to future proof us against someday having that
             # xml fixed.
@@ -174,7 +174,7 @@ class ParamState:
             else:
                 for p in self.mav_param.keys():
                     if fnmatch.fnmatch(p, args[1].upper()):
-                        master.param_fetch_one(p)
+                        master.param_fetch_one(p.encode())
                         if p not in self.fetch_one:
                             self.fetch_one[p] = 0
                         self.fetch_one[p] += 1
@@ -220,7 +220,7 @@ class ParamState:
             if not param.upper() in self.mav_param:
                 print("Unable to find parameter '%s'" % param)
                 return
-            self.mav_param.mavset(master, param.upper(), value, retries=3)
+            self.mav_param.mavset(master, param.upper().encode(), value, retries=3)
 
             if (param.upper() == "WP_LOITER_RAD" or param.upper() == "LAND_BREAK_PATH"):
                 #need to redraw rally points

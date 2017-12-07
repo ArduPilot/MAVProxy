@@ -1,14 +1,17 @@
 """
     MAVProxy help/versioning module
 """
-import os, time, platform, re
-from urllib2 import Request, urlopen, URLError, HTTPError
-from pymavlink import mavwp, mavutil
+import os, platform, re
+import urllib.request, urllib.error
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
 if mp_util.has_wxpython:
-    from MAVProxy.modules.lib.mp_menu import *
-    import wxversion
+    from MAVProxy.modules.lib.mp_menu import MPMenuSubMenu
+    from MAVProxy.modules.lib.mp_menu import MPMenuItem
+    from MAVProxy.modules.lib.mp_menu import MPMenuOpenWeblink
+    from MAVProxy.modules.lib.mp_menu import MPMenuChildMessageDialog
+    from distutils.version import LooseVersion
+    from MAVProxy.modules.lib.wx_loader import wx
 
 class HelpModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -22,53 +25,56 @@ class HelpModule(mp_module.MPModule):
         try:
             import pkg_resources
             self.version = pkg_resources.require("mavproxy")[0].version
-        except:
+        except ImportError:
             start_script = os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy", "version.txt")
             f = open(start_script, 'r')
-            self.version = f.readline()
+            self.version = f.readline().decode()
+        except: # KeyError, pkg_resources.DistributionNotFound
+            self.version = 'Unknown'
+        self.version = self.version.strip()
         self.host = platform.system() + platform.release()
         self.pythonversion = str(platform.python_version())
         if mp_util.has_wxpython:
-            self.wxVersion = str(wxversion.getInstalled())
+            self.wxVersion = LooseVersion(wx.__version__)
         else:
             self.wxVersion = ''
 
         #check for updates, if able
         if platform.system() == 'Windows':
-            req = Request('http://firmware.ardupilot.org/Tools/MAVProxy/')
+            req = urllib.request.Request('http://firmware.ardupilot.org/Tools/MAVProxy/')
             html = ''
             self.newversion = '1.0'
             try:
-                filehandle = urlopen(req)
-                html = filehandle.read()
-            except HTTPError as e:
+                filehandle = urllib.request.urlopen(req)
+                html = filehandle.read().decode()
+            except urllib.error.HTTPError as e:
                 self.newversion = 'Error: ', e.code
-            except URLError as e:
+            except urllib.error.URLError as e:
                 self.newversion =  'Error: ', e.reason
             else:
-                #parse the webpage for the latest version
+                # parse the webpage for the latest version
                 begtags = [m.start() for m in re.finditer('>MAVProxySetup-', html)]
                 for begtag in begtags:
                     endtag = html.find('.exe', begtag)
                     versiontag = html[begtag+15:endtag]
                     if not re.search('[a-zA-Z]', versiontag):
-                        if self.mycmp(self.newversion, versiontag) < 0:
+                        if LooseVersion(self.newversion) < LooseVersion(versiontag):
                             self.newversion = versiontag
         elif platform.system() == 'Linux':
-            import xmlrpclib, pip
-            pypi = xmlrpclib.ServerProxy('https://pypi.python.org/pypi')
+            import xmlrpc.client
+            pypi = xmlrpc.client.ServerProxy('https://pypi.python.org/pypi')
             available = pypi.package_releases('MAVProxy')
             if not available:
                 self.newversion = 'Error finding update'
             else:
-                self.newversion = available[0]
+                self.newversion = available[0].strip()
 
-        #and format the update string
-        if not isinstance(self.newversion, basestring):
+        # and format the update string
+        if not isinstance(self.newversion, str):
             self.newversion = "Error finding update"
         elif re.search('[a-zA-Z]', self.newversion):
             self.newversion = "Error finding update: " + self.newversion
-        elif self.newversion.strip() == self.version.strip():
+        elif (self.version != 'Unknown' and (LooseVersion(self.version) >= LooseVersion(self.newversion))):
             self.newversion = "Running latest version"
         else:
             self.newversion = "New version " + self.newversion + " available (currently running " + self.version + ")"
@@ -81,13 +87,7 @@ class HelpModule(mp_module.MPModule):
                                          MPMenuItem('About', 'About', '', handler=MPMenuChildMessageDialog(title="About MAVProxy", message=self.about_string()))])
 
     def about_string(self):
-        return "MAVProxy Version " + self.version + "\nOS: " + self.host + "\nPython " +  self.pythonversion + "\nWXPython " + self.wxVersion
-
-    #version number comparison for update checking
-    def mycmp(self, version1, version2):
-        def normalize(v):
-            return [int(x) for x in re.sub(r'(\.0+)*$','', v).split(".")]
-        return cmp(normalize(version1), normalize(version2))
+        return "MAVProxy Version {0}\nOS: {1}\nPython {2}\nWXPython {3}".format(self.version, self.host, self.pythonversion, self.wxVersion)
 
     def idle_task(self):
         '''called on idle'''

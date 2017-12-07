@@ -1,31 +1,31 @@
 import functools
 import math
-import mp_elevation
 import numpy as np
 import os
 import time
 
-from ..lib.wx_loader import wx
+from MAVProxy.modules.lib.wx_loader import wx
 
-from mp_slipmap_util import SlipBrightness
-from mp_slipmap_util import SlipCenter
-from mp_slipmap_util import SlipClearLayer
-from mp_slipmap_util import SlipDefaultPopup
-from mp_slipmap_util import SlipFlightModeLegend
-from mp_slipmap_util import SlipGrid
-from mp_slipmap_util import SlipHideObject
-from mp_slipmap_util import SlipIcon
-from mp_slipmap_util import SlipInformation
-from mp_slipmap_util import SlipKeyEvent
-from mp_slipmap_util import SlipMenuEvent
-from mp_slipmap_util import SlipMouseEvent
-from mp_slipmap_util import SlipObject
-from mp_slipmap_util import SlipObjectSelection
-from mp_slipmap_util import SlipPosition
-from mp_slipmap_util import SlipRemoveObject
-from mp_slipmap_util import SlipThumbnail
+from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipBrightness
+from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipCenter
+from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipClearLayer
+from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipDefaultPopup
+from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipFlightModeLegend
+from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipGrid
+from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipHideObject
+from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipIcon
+from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipInformation
+from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipKeyEvent
+from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipMenuEvent
+from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipMouseEvent
+from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipObject
+from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipObjectSelection
+from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipPosition
+from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipRemoveObject
+from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipThumbnail
 
 from MAVProxy.modules.lib import mp_util
+from MAVProxy.modules.mavproxy_map import mp_elevation
 
 from MAVProxy.modules.lib.mp_menu import MPMenuCheckbox
 from MAVProxy.modules.lib.mp_menu import MPMenuItem
@@ -430,7 +430,6 @@ class MPSlipMapPanel(wx.Panel):
     def draw_objects(self, objects, bounds, img):
         '''draw objects on the image'''
         keys = objects.keys()
-        keys.sort()
         for k in keys:
             obj = objects[k]
             if not self.state.legend and isinstance(obj, SlipFlightModeLegend):
@@ -471,7 +470,6 @@ class MPSlipMapPanel(wx.Panel):
 
         # draw layer objects
         keys = state.layers.keys()
-        keys.sort()
         for k in keys:
             self.draw_objects(state.layers[k], bounds, img)
 

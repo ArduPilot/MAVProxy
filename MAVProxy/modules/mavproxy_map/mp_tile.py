@@ -264,7 +264,7 @@ class MPTile:
 					req.add_header('Referer', 'https://maps.google.com/')
 				resp = urllib.request.urlopen(req)
 				headers = resp.info()
-			except urllib.URLError as e:
+			except urllib.error.URLError as e:
 				#print('Error loading %s' % url)
 				if not key in self._tile_cache:
 					self._tile_cache[key] = self._unavailable
