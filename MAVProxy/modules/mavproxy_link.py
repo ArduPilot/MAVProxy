@@ -309,7 +309,7 @@ class LinkModule(mp_module.MPModule):
             # silence gimbal heartbeat packets for now
             return
 
-        if getattr(m, 'time_boot_ms', None) is not None:
+        if getattr(m, 'time_boot_ms', None) is not None and self.settings.target_system == m.get_srcSystem():
             # update link_delayed attribute
             self.handle_msec_timestamp(m, master)
 
