@@ -49,5 +49,5 @@ if __name__ == "__main__":
     multiprocessing.freeze_support()
     horizon = HorizonIndicator()
     while horizon.is_alive():
-        print 'test'
+        print('test')
         time.sleep(0.5)

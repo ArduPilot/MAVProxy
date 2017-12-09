@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+
+from __future__ import print_function
+
 '''
 display a image in a subprocess
 Andrew Tridgell
@@ -320,7 +323,7 @@ class MPImagePanel(wx.Panel):
         '''
         from guppy import hpy
         h = hpy()
-        print h.heap()
+        print(h.heap())
         '''
 
 
@@ -556,9 +559,9 @@ if __name__ == "__main__":
             if isinstance(event, MPMenuItem):
                 print(event)
                 continue
-            print event.ClassName
+            print(event.ClassName)
             if event.ClassName == 'wxMouseEvent':
-                print 'mouse', event.X, event.Y
+                print('mouse', event.X, event.Y)
             if event.ClassName == 'wxKeyEvent':
-                print 'key %u' % event.KeyCode
+                print('key %u' % event.KeyCode)
         time.sleep(0.1)

@@ -126,7 +126,7 @@ def LLtoUTM( Lat, Long, ReferenceEllipsoid=23):
         UTMNorthing = UTMNorthing + 10000000.0; #10000000 meter offset for southern hemisphere
     #UTMZone was originally returned here.  I don't know what the
     #letter at the end was for.
-    #print "UTMZone", UTMZone
+    #print("UTMZone", UTMZone)
     return (ZoneNumber, UTMEasting, UTMNorthing)
 
 
@@ -246,6 +246,6 @@ Therefore it is difficult to actually know what hemisphere you are in.
 
 if __name__ == '__main__':
     (z, e, n) = LLtoUTM(45.00, -75.00, 23)
-    print z, e, n
+    print(z, e, n)
     (lat, lon) = UTMtoLL(n, e, z, 23)
-    print lat, lon
+    print(lat, lon)

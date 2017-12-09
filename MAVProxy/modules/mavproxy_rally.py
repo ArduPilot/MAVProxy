@@ -95,7 +95,7 @@ class RallyModule(mp_module.MPModule):
             return
 
         if (self.rallyloader.rally_count() > 4):
-            print ("Only 5 rally points possible per flight plan.")
+            print("Only 5 rally points possible per flight plan.")
             return
 
         try:

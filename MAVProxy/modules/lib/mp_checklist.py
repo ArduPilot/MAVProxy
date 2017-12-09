@@ -349,7 +349,7 @@ class ChecklistFrame(wx.Frame):
             obj = state.child_pipe.recv()
             if isinstance(obj, CheckItem):
                 #go through each item in the current tab and (un)check as needed
-                #print obj.name + ", " + str(obj.state)
+                #print(obj.name + ", " + str(obj.state))
                 for widget in win.GetChildren():
                     if type(widget) is wx.CheckBox and widget.GetLabel() == obj.name:
                         widget.SetValue(obj.state)
