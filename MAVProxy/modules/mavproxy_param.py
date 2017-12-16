@@ -151,11 +151,15 @@ class ParamState:
                 except Exception as e:
                     pass
                 try:
-                    vchild = help.getchildren()[0]
+                    # The entry "values" has been blatted by a cython
+                    # function at this point, so we instead get the
+                    # "values" by offset rather than name.
+                    vchild = help.getchildren()[1]
                     print("\nValues: ")
                     for v in vchild.value:
                         print("\t%s : %s" % (v.get('code'), str(v)))
                 except Exception as e:
+                    print("Caught exception %s" % repr(e))
                     pass
             else:
                 print("Parameter '%s' not found in documentation" % h)
