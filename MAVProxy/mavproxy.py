@@ -1103,6 +1103,11 @@ if __name__ == '__main__':
     # call this early so that logdir is setup based on --aircraft
     (mpstate.status.logdir, logpath_telem, logpath_telem_raw) = log_paths()
 
+    for module in opts.load_module:
+        modlist = module.split(',')
+        for mod in modlist:
+            process_stdin('module load %s' % (mod))
+
     if not opts.setup:
         # some core functionality is in modules
         standard_modules = opts.default_modules.split(',')
@@ -1114,11 +1119,6 @@ if __name__ == '__main__':
 
     if opts.map:
         process_stdin('module load map')
-
-    for module in opts.load_module:
-        modlist = module.split(',')
-        for mod in modlist:
-            process_stdin('module load %s' % (mod))
 
     start_scripts = []
     if 'HOME' in os.environ and not opts.setup:
