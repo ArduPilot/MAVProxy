@@ -95,6 +95,9 @@ for mytuple in ((mavutil.mode_mapping_apm.values(),colour_map_plane),
     for mode_name in mode_names:
         colour_map[mode_name] = map_colours[i]
         i += 1
+        if i >= len(map_colours):
+            print("Warning: reusing colours!")
+            i = 0
     colour_map["UNKNOWN"] = (0, 0, 0)
 
 colourmap_check_done = False
