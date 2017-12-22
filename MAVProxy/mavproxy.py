@@ -978,6 +978,7 @@ if __name__ == '__main__':
     parser.add_option("--moddebug",  type=int, help="module debug level", default=0)
     parser.add_option("--mission", dest="mission", help="mission name", default=None)
     parser.add_option("--daemon", action='store_true', help="run in daemon mode, do not start interactive shell")
+    parser.add_option("--non-interactive", action='store_true', help="do not start interactive shell")
     parser.add_option("--profile", action='store_true', help="run the Yappi python profiler")
     parser.add_option("--state-basedir", default=None, help="base directory for logs and aircraft directories")
     parser.add_option("--version", action='store_true', help="version information")
@@ -1050,7 +1051,7 @@ if __name__ == '__main__':
         fatalsignals.append(signal.SIGQUIT)
     except Exception:
         pass
-    if opts.daemon: # SIGINT breaks readline parsing - if we are interactive, just let things die
+    if opts.daemon or opts.non_interactive: # SIGINT breaks readline parsing - if we are interactive, just let things die
         fatalsignals.append(signal.SIGINT)
 
     for sig in fatalsignals:
@@ -1165,7 +1166,7 @@ if __name__ == '__main__':
     # up on exit
     while (mpstate.status.exit != True):
         try:
-            if opts.daemon:
+            if opts.daemon or opts.non_interactive:
                 time.sleep(0.1)
             else:
                 input_loop()
