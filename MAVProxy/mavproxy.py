@@ -1140,7 +1140,7 @@ if __name__ == '__main__':
     # up on exit
     while (mpstate.status.exit != True):
         try:
-            if (opts.daemon == True or opts.non_interactive == True):
+            if opts.daemon or opts.non_interactive:
                 time.sleep(0.1)
             else:
                 input_loop()
