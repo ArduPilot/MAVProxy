@@ -1025,7 +1025,7 @@ if __name__ == '__main__':
         fatalsignals.append(signal.SIGQUIT)
     except Exception:
         pass
-    if opts.daemon: # SIGINT breaks readline parsing - if we are interactive, just let things die
+    if opts.daemon or opts.non_interactive: # SIGINT breaks readline parsing - if we are interactive, just let things die
         fatalsignals.append(signal.SIGINT)
 
     for sig in fatalsignals:
