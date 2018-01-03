@@ -23,6 +23,8 @@ class CmdlongModule(mp_module.MPModule):
                          ['<enable|disable|release>'])
         self.add_command('long', self.cmd_long, "execute mavlink long command",
                          self.cmd_long_commands())
+        self.add_command('command_int', self.cmd_command_int, "execute mavlink command_int",
+                         self.cmd_long_commands())
         self.add_command('engine', self.cmd_engine, "engine")
 
     def cmd_long_commands(self):
@@ -340,6 +342,50 @@ class CmdlongModule(mp_module.MPModule):
                                           command,
                                           0,
                                           *floating_args)
+
+    def cmd_command_int(self, args):
+        '''execute supplied command_int'''
+        if len(args) != 9:
+            print("num args{0}".format(len(args)))
+            print("Usage: command_int <command> frame param1 param2 param3 param4 x y z")
+            return
+        command = None
+        if args[0].isdigit():
+            command = int(args[0])
+        else:
+            try:
+                command = eval("mavutil.mavlink." + args[0])
+            except AttributeError as e:
+                try:
+                    command = eval("mavutil.mavlink.MAV_CMD_" + args[0])
+                except AttributeError as e:
+                    pass
+
+        if command is None:
+            print("Unknown command_int ({0})".format(args[0]))
+            return
+
+        frame = int(args[1])
+        param1 = float(args[2])
+        param2 = float(args[3])
+        param3 = float(args[4])
+        param4 = float(args[5])
+        x = int(args[6])
+        y = int(args[7])
+        z = float(args[8])
+        self.master.mav.command_int_send(self.settings.target_system,
+                                         self.settings.target_component,
+                                         frame,
+                                         command,
+                                         0,
+                                         0,
+                                         param1,
+                                         param2,
+                                         param3,
+                                         param4,
+                                         x,
+                                         y,
+                                         z)
 
 def init(mpstate):
     '''initialise module'''
