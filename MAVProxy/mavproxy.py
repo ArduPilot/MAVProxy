@@ -989,6 +989,10 @@ if __name__ == '__main__':
           print("ERROR: mavproxy takes no position arguments; got (%s)" % str(args))
           sys.exit(1)
 
+    if opts.moddebug not in [0, 1, 2, 3]:
+          print("ERROR: --moddebug must be 0, 1, 2 or 3")
+          sys.exit(1)
+
     # warn people about ModemManager which interferes badly with APM and Pixhawk
     if os.path.exists("/usr/sbin/ModemManager"):
         print("WARNING: You should uninstall ModemManager as it conflicts with APM and Pixhawk")
