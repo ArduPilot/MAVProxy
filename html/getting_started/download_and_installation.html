@@ -212,9 +212,8 @@ circumstances if the install generates errors:</p>
 </div>
 <div class="section" id="mac">
 <h2>Mac<a class="headerlink" href="#mac" title="Permalink to this headline">¶</a></h2>
-<p>If you’re on Mac OSX, you can use Homebrew to install WXMac.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">brew</span> <span class="n">tap</span> <span class="n">homebrew</span><span class="o">/</span><span class="n">science</span>
-<span class="n">brew</span> <span class="n">install</span> <span class="n">wxmac</span> <span class="n">wxpython</span> <span class="n">opencv</span>
+<p>Install Python via</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">brew</span> <span class="n">install</span> <span class="n">python</span> <span class="o">--</span><span class="n">framework</span>
 </pre></div>
 </div>
 <p>Uninstall python-dateutil (OSX and Windows come bundled with a version that is not supported for some dependencies):</p>
@@ -222,7 +221,10 @@ circumstances if the install generates errors:</p>
 </pre></div>
 </div>
 <p>Install MAVProxy and its remaining dependencies from the public PyPi repository:</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">pip</span> <span class="n">install</span> <span class="n">numpy</span> <span class="n">pyparsing</span>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">pip</span> <span class="n">install</span> <span class="n">wxPython</span>
+<span class="n">sudo</span> <span class="n">pip</span> <span class="n">install</span> <span class="n">gnureadline</span>
+<span class="n">sudo</span> <span class="n">pip</span> <span class="n">install</span> <span class="n">billiard</span>
+<span class="n">sudo</span> <span class="n">pip</span> <span class="n">install</span> <span class="n">numpy</span> <span class="n">pyparsing</span>
 <span class="n">sudo</span> <span class="n">pip</span> <span class="n">install</span> <span class="n">MAVProxy</span>
 </pre></div>
 </div>

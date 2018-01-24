@@ -23,6 +23,12 @@ Windows:
 
     mavproxy.py --master="com14"
 
+macOS:
+
+.. code:: bash
+
+    mavproxy.py --master=/dev/ttyusbserialxxx
+
 Normally MAVProxy will auto-detect the correct baudrate. If required,
 the baud rate can instead be manually specified.
 
@@ -37,6 +43,13 @@ Windows:
 .. code:: bash
 
     mavproxy.py --master="com14" --baudrate=57600
+
+macOS:
+
+.. code:: bash
+
+    mavproxy.py --master=/dev/tty.usbserialxxxxx --baudrate=57600
+
 
 Over Network
 ============

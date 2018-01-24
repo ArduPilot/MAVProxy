@@ -79,12 +79,11 @@ The system will need to be logged out and logged back in again to apply the abov
 Mac
 ===
 
-If you’re on Mac OSX, you can use Homebrew to install WXMac.
+Install Python via
 
 .. code:: bash
 
-    brew tap homebrew/science
-    brew install wxmac wxpython opencv
+    brew install python --framework
 
 Uninstall python-dateutil (OSX and Windows come bundled with a version that is not supported for some dependencies):
 
@@ -96,6 +95,9 @@ Install MAVProxy and its remaining dependencies from the public PyPi repository:
 
 .. code:: bash
 
+    sudo pip install wxPython
+    sudo pip install gnureadline
+    sudo pip install billiard
     sudo pip install numpy pyparsing
     sudo pip install MAVProxy
 

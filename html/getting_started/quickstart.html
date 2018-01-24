@@ -165,6 +165,10 @@ MAVProxy will autodetect the correct port.</p>
 <div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="s2">&quot;com14&quot;</span>
 </pre></div>
 </div>
+<p>macOS:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">ttyusbserialxxx</span>
+</pre></div>
+</div>
 <p>Normally MAVProxy will auto-detect the correct baudrate. If required,
 the baud rate can instead be manually specified.</p>
 <p>Linux:</p>
@@ -173,6 +177,10 @@ the baud rate can instead be manually specified.</p>
 </div>
 <p>Windows:</p>
 <div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="s2">&quot;com14&quot;</span> <span class="o">--</span><span class="n">baudrate</span><span class="o">=</span><span class="mi">57600</span>
+</pre></div>
+</div>
+<p>macOS:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">tty</span><span class="o">.</span><span class="n">usbserialxxxxx</span> <span class="o">--</span><span class="n">baudrate</span><span class="o">=</span><span class="mi">57600</span>
 </pre></div>
 </div>
 </div>
