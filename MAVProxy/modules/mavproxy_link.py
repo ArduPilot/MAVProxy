@@ -62,7 +62,14 @@ class LinkModule(mp_module.MPModule):
 
     def complete_serial_ports(self, text):
         '''return list of serial ports'''
-        ports = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*", "*3D_Robotics*", "*USB_to_UART*", '*PX4*', '*FMU*'])
+        ports = mavutil.auto_detect_serial(preferred_list=[
+            '*FTDI*',
+            "*Arduino_Mega_2560*",
+            "*3D_Robotics*",
+            "*USB_to_UART*",
+            '*Ardu*',
+            '*PX4*',
+            '*FMU*'])
         return [ p.device for p in ports ]
 
     def complete_links(self, text):
@@ -163,7 +170,14 @@ class LinkModule(mp_module.MPModule):
 
     def cmd_link_ports(self):
         '''show available ports'''
-        ports = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*", "*3D_Robotics*", "*USB_to_UART*", '*PX4*', '*FMU*'])
+        ports = mavutil.auto_detect_serial(preferred_list=[
+            '*FTDI*',
+            "*Arduino_Mega_2560*",
+            "*3D_Robotics*",
+            "*USB_to_UART*",
+            '*Ardu*',
+            '*PX4*',
+            '*FMU*'])
         for p in ports:
             print("%s : %s : %s" % (p.device, p.description, p.hwid))
 

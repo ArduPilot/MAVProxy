@@ -1022,7 +1022,14 @@ if __name__ == '__main__':
         # modules/mavutil
         load_module('speech')
 
-    serial_list = mavutil.auto_detect_serial(preferred_list=['*FTDI*',"*Arduino_Mega_2560*", "*3D_Robotics*", "*USB_to_UART*", '*PX4*', '*FMU*'])
+    serial_list = mavutil.auto_detect_serial(preferred_list=[
+          '*FTDI*',
+          "*Arduino_Mega_2560*",
+          "*3D_Robotics*",
+          "*USB_to_UART*",
+          '*Ardu*',
+          '*PX4*',
+          '*FMU*'])
     if not opts.master:
         print('Auto-detected serial ports are:')
         for port in serial_list:
