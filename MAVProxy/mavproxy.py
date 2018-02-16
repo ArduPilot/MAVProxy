@@ -281,7 +281,7 @@ def cmd_watch(args):
     if len(args) == 0:
         mpstate.status.watch = None
         return
-    mpstate.status.watch = args[0]
+    mpstate.status.watch = args
     print("Watching %s" % mpstate.status.watch)
 
 def generate_kwargs(args):
@@ -610,11 +610,12 @@ def process_mavlink(slave):
         return
     if msgs is None:
         return
-    if mpstate.settings.mavfwd and not mpstate.status.setup_mode:
+    if mpstate.settings.mavfwd and not mpstate.status.setup_mode and mpstate.status.watch:
         for m in msgs:
-            if mpstate.status.watch is not None:
-                if fnmatch.fnmatch(m.get_type().upper(), mpstate.status.watch.upper()):
+            for msg_type in mpstate.status.watch:
+                if fnmatch.fnmatch(m.get_type().upper(), msg_type.upper()):
                     mpstate.console.writeln('> '+ str(m))
+                    break
             mpstate.master().write(m.get_msgbuf())
     mpstate.status.counters['Slave'] += 1
 
