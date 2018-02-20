@@ -324,7 +324,7 @@ class ConsoleModule(mp_module.MPModule):
                 self.max_link_num = len(self.mpstate.mav_master)
             for m in self.mpstate.mav_master:
                 linkdelay = (self.mpstate.status.highest_msec - m.highest_msec)*1.0e-3
-                linkline = "Link %u " % (m.linknum+1)
+                linkline = "Link %s " % (self.link_label(m))
                 fg = 'dark green'
                 if m.linkerror:
                     linkline += "down"

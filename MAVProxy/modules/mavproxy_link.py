@@ -7,7 +7,7 @@
 '''
 
 from pymavlink import mavutil
-import time, struct, math, sys, fnmatch, traceback
+import time, struct, math, sys, fnmatch, traceback, json
 
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
@@ -117,34 +117,48 @@ class LinkModule(mp_module.MPModule):
             except AttributeError as e:
                 # some mav objects may not have a "signing" attribute
                 pass
-            print("link %u %s (%u packets, %.2fs delay, %u lost, %.1f%% loss%s)" % (master.linknum+1,
+            print("link %s %s (%u packets, %.2fs delay, %u lost, %.1f%% loss%s)" % (self.link_label(master),
                                                                                     status,
                                                                                     self.status.counters['MasterIn'][master.linknum],
                                                                                     linkdelay,
                                                                                     master.mav_loss,
                                                                                     master.packet_loss(),
                                                                                     sign_string))
+
     def cmd_link_list(self):
         '''list links'''
         print("%u links" % len(self.mpstate.mav_master))
         for i in range(len(self.mpstate.mav_master)):
             conn = self.mpstate.mav_master[i]
-            print("%u: %s" % (i, conn.address))
+            if hasattr(conn, 'label'):
+                print("%u (%s): %s" % (i, conn.label, conn.address))
+            else:
+                print("%u: %s" % (i, conn.address))
 
-    def link_add(self, device):
+    def link_add(self, descriptor):
         '''add new link'''
+        optional_attributes = {}
+        device = []
         try:
+            link_components = descriptor.split(":{", 1)
+            device = link_components[0]
+            if (len(link_components) == 2 and link_components[1].endswith("}")):
+                # assume json
+                try:
+                    link_args = "{"+link_components[1]
+                    optional_attributes = json.loads(link_args)
+                except ValueError:
+                    print('Invalid JSON argument: {0}'.format(link_args))
             print("Connect %s source_system=%d" % (device, self.settings.source_system))
             conn = mavutil.mavlink_connection(device, autoreconnect=True,
                                               source_system=self.settings.source_system,
                                               baud=self.settings.baudrate)
             conn.mav.srcComponent = self.settings.source_component
         except Exception as msg:
-            print("Failed to connect to %s : %s" % (device, msg))
+            print("Failed to connect to %s : %s" % (descriptor, msg))
             return False
         if self.settings.rtscts:
             conn.set_rtscts(True)
-        conn.linknum = len(self.mpstate.mav_master)
         conn.mav.set_callback(self.master_callback, conn)
         if hasattr(conn.mav, 'set_send_callback'):
             conn.mav.set_send_callback(self.master_send_callback, conn)
@@ -154,6 +168,9 @@ class LinkModule(mp_module.MPModule):
         conn.last_heartbeat = 0
         conn.last_message = 0
         conn.highest_msec = 0
+        for attr in optional_attributes:
+            print("Applying attribute to link: %s = %s" % (attr, optional_attributes[attr]))
+            setattr(conn, attr, optional_attributes[attr])
         self.mpstate.mav_master.append(conn)
         self.status.counters['MasterIn'].append(0)
         try:
@@ -164,9 +181,9 @@ class LinkModule(mp_module.MPModule):
 
     def cmd_link_add(self, args):
         '''add new link'''
-        device = args[0]
-        print("Adding link %s" % device)
-        self.link_add(device)
+        descriptor = args[0]
+        print("Adding link %s" % descriptor)
+        self.link_add(descriptor)
 
     def cmd_link_ports(self):
         '''show available ports'''
@@ -189,7 +206,7 @@ class LinkModule(mp_module.MPModule):
             return
         for i in range(len(self.mpstate.mav_master)):
             conn = self.mpstate.mav_master[i]
-            if str(i) == device or conn.address == device:
+            if str(i) == device or conn.address == device or  getattr(conn, 'label', None) == device:
                 print("Removing link %s" % conn.address)
                 try:
                     try:
@@ -330,7 +347,7 @@ class LinkModule(mp_module.MPModule):
         if mtype in activityPackets:
             if master.linkerror:
                 master.linkerror = False
-                self.say("link %u OK" % (master.linknum+1))
+                self.say("link %s OK" % (self.link_label(master)))
             self.status.last_message = time.time()
             master.last_message = self.status.last_message
 
@@ -349,8 +366,7 @@ class LinkModule(mp_module.MPModule):
                 self.say("heartbeat OK")
             if master.linkerror:
                 master.linkerror = False
-                self.say("link %u OK" % (master.linknum+1))
-
+                self.say("link %s OK" % (self.link_label(master)))
             self.status.last_heartbeat = time.time()
             master.last_heartbeat = self.status.last_heartbeat
 
