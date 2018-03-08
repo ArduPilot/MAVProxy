@@ -70,6 +70,8 @@ class MapModule(mp_module.MPModule):
                                  handler=MPMenuCallTextDialog(title='Altitude (m)', default=100)))
         self.add_menu(MPMenuItem('Set Home', 'Set Home', '# map sethomepos '))
         self.add_menu(MPMenuItem('Set Home (with height)', 'Set Home', '# map sethome '))
+        self.add_menu(MPMenuItem('Set Origin', 'Set Origin', '# map setoriginpos '))
+        self.add_menu(MPMenuItem('Set Origin (with height)', 'Set Origin', '# map setorigin '))
         self.add_menu(MPMenuItem('Terrain Check', 'Terrain Check', '# terrain check'))
         self.add_menu(MPMenuItem('Show Position', 'Show Position', 'showPosition'))
 
@@ -144,6 +146,10 @@ class MapModule(mp_module.MPModule):
             self.cmd_set_home(args)
         elif args[0] == "sethomepos":
             self.cmd_set_homepos(args)
+        elif args[0] == "setorigin":
+            self.cmd_set_origin(args)
+        elif args[0] == "setoriginpos":
+            self.cmd_set_originpos(args)
         else:
             print("usage: map <icon|set>")
 
@@ -467,6 +473,27 @@ class MapModule(mp_module.MPModule):
             int(lat*1e7), # lat
             int(lon*1e7), # lon
             0) # no height change
+
+    def cmd_set_origin(self, args):
+        '''called when user selects "Set Origin (with height)" on map'''
+        (lat, lon) = (self.click_position[0], self.click_position[1])
+        alt = self.ElevationMap.GetElevation(lat, lon)
+        print("Setting origin to: ", lat, lon, alt)
+        self.master.mav.set_gps_global_origin_send(
+            self.settings.target_system,
+            lat*10000000, # lat
+            lon*10000000, # lon
+            alt*1000) # param7
+
+    def cmd_set_originpos(self, args):
+        '''called when user selects "Set Origin" on map'''
+        (lat, lon) = (self.click_position[0], self.click_position[1])
+        print("Setting origin to: ", lat, lon)
+        self.master.mav.set_gps_global_origin_send(
+            self.settings.target_system,
+            lat*10000000, # lat
+            lon*10000000, # lon
+            0*1000) # no height change
 
     def set_secondary_vehicle_position(self, m):
         '''show 2nd vehicle on map'''
