@@ -29,6 +29,7 @@
     <Content Include="MAVProxy\modules\lib\optparse_gui\README.txt" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\barrell.png" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\blueantenna.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\blueboat.png" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\bluecopter.png" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\blueheli.png" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\blueplane.png" />
@@ -50,6 +51,7 @@
     <Content Include="MAVProxy\modules\mavproxy_map\data\redcopter.png" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\redheli.png" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\redplane.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\redboat.png" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\redrover.png" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\unavailable.jpg" />
     <Content Include="MAVProxy\modules\mavproxy_mmap\mmap_app\bing.js" />

@@ -513,9 +513,10 @@ class MapModule(mp_module.MPModule):
             if m.type in [mavutil.mavlink.MAV_TYPE_FIXED_WING]:
                 self.vehicle_type_name = 'plane'
             elif m.type in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER,
-                            mavutil.mavlink.MAV_TYPE_SURFACE_BOAT,
                             mavutil.mavlink.MAV_TYPE_SUBMARINE]:
                 self.vehicle_type_name = 'rover'
+            elif m.type in [mavutil.mavlink.MAV_TYPE_SURFACE_BOAT]:
+                self.vehicle_type_name = 'boat'
             elif m.type in [mavutil.mavlink.MAV_TYPE_QUADROTOR,
                             mavutil.mavlink.MAV_TYPE_HEXAROTOR,
                             mavutil.mavlink.MAV_TYPE_OCTOROTOR,
