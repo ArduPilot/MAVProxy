@@ -16,6 +16,7 @@ Next, open up a console in the Python scripts install path
   PIL) <http://www.lfd.uci.edu/~gohlke/pythonlibs/#pillow>`_
 - `OpenCV 3 <http://www.lfd.uci.edu/~gohlke/pythonlibs/#opencv>`_
 - `lxml <http://www.lfd.uci.edu/~gohlke/pythonlibs/#lxml>`_
+- `PyYAML <https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyyaml>`_
 
 .. code:: bash
 

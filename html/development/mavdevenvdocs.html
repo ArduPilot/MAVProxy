@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Development &mdash; MAVProxy 1.6.2 documentation</title>
+  <title>Updating MAVProxy Documentation &mdash; MAVProxy 1.6.2 documentation</title>
   
 
   
@@ -32,8 +32,9 @@
   
         <link rel="search" title="Search" href="../search.html"/>
     <link rel="top" title="MAVProxy 1.6.2 documentation" href="../index.html"/>
-        <link rel="next" title="Linux Development Environment" href="mavdevenvlinux.html"/>
-        <link rel="prev" title="MAVExplorer" href="../analysis/mavexp.html"/> 
+        <link rel="up" title="Development" href="index.html"/>
+        <link rel="next" title="Image Processing with cuav" href="../cuav_module/index.html"/>
+        <link rel="prev" title="Module Development" href="mavcustmod.html"/> 
 
   
   <script src="../_static/js/modernizr.min.js"></script>
@@ -86,11 +87,11 @@
 <li class="toctree-l1"><a class="reference internal" href="../uav_configuration/index.html">UAV Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../modules/index.html">Modules</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../analysis/index.html">Post-flight Analysis</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Development</a><ul>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Development</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="mavdevenvlinux.html">Linux Development Environment</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mavdevenvwindows.html">Windows Development Environment</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mavcustmod.html">Module Development</a></li>
-<li class="toctree-l2"><a class="reference internal" href="mavdevenvdocs.html">Updating MAVProxy Documentation</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Updating MAVProxy Documentation</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
@@ -124,7 +125,9 @@
   <ul class="wy-breadcrumbs">
     <li><a href="../index.html">Docs</a> &raquo;</li>
       
-    <li>Development</li>
+          <li><a href="index.html">Development</a> &raquo;</li>
+      
+    <li>Updating MAVProxy Documentation</li>
       <li class="wy-breadcrumbs-aside">
         
           
@@ -136,23 +139,28 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="development">
-<h1>Development<a class="headerlink" href="#development" title="Permalink to this headline">¶</a></h1>
-<p>This section contains topics to help you get started with
-developing MAVProxy and MAVProxy modules. This section assumes
-basic knowledge of setting up development environments, Python
-and git.</p>
-<p>For developing MAVProxy, a slightly more complex setup is
-required. The following section will show how this setup is
-achieved for Linux and Windows.</p>
-<div class="toctree-wrapper compound">
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="mavdevenvlinux.html">Linux Development Environment</a></li>
-<li class="toctree-l1"><a class="reference internal" href="mavdevenvwindows.html">Windows Development Environment</a></li>
-<li class="toctree-l1"><a class="reference internal" href="mavcustmod.html">Module Development</a></li>
-<li class="toctree-l1"><a class="reference internal" href="mavdevenvdocs.html">Updating MAVProxy Documentation</a></li>
-</ul>
+  <div class="section" id="updating-mavproxy-documentation">
+<h1>Updating MAVProxy Documentation<a class="headerlink" href="#updating-mavproxy-documentation" title="Permalink to this headline">¶</a></h1>
+<p>Use git to download the MAVProxy Documentation source:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="o">-</span><span class="n">b</span> <span class="n">gh</span><span class="o">-</span><span class="n">pages</span> <span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">ardupilot</span><span class="o">/</span><span class="n">mavproxy</span>
+</pre></div>
 </div>
+<p>Install sphinx-docs</p>
+<p>Linux</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">apt</span><span class="o">-</span><span class="n">get</span> <span class="n">install</span> <span class="n">python</span><span class="o">-</span><span class="n">sphinx</span>
+</pre></div>
+</div>
+<p>macOS</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">brew</span> <span class="n">install</span> <span class="n">sphinx</span><span class="o">-</span><span class="n">doc</span>
+<span class="n">brew</span> <span class="n">link</span> <span class="n">sphinx</span><span class="o">-</span><span class="n">doc</span> <span class="o">--</span><span class="n">force</span>
+</pre></div>
+</div>
+<p>After making the desired changes, Build the docs using following calls:</p>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">cd</span> <span class="n">docs</span>
+<span class="o">./</span><span class="n">sphinxLinux</span><span class="o">.</span><span class="n">sh</span>
+</pre></div>
+</div>
+<p>Make Pull-Requests via github to <a class="reference external" href="http://github.com/ardupilot/mavproxy">http://github.com/ardupilot/mavproxy</a> gh-pages branch for updates.</p>
 </div>
 
 
@@ -162,10 +170,10 @@ achieved for Linux and Windows.</p>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="mavdevenvlinux.html" class="btn btn-neutral float-right" title="Linux Development Environment" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="../cuav_module/index.html" class="btn btn-neutral float-right" title="Image Processing with cuav" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="../analysis/mavexp.html" class="btn btn-neutral" title="MAVExplorer" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="mavcustmod.html" class="btn btn-neutral" title="Module Development" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
@@ -174,7 +182,7 @@ achieved for Linux and Windows.</p>
 
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
-<div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Development%20-%20&body=URL:%20../development/index%0ATitle:%20Development%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
+<div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Updating%20MAVProxy%20Documentation%20-%20&body=URL:%20../development/mavdevenvdocs%0ATitle:%20Updating%20MAVProxy%20Documentation%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
     <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
     This is an ArduPilot project.</p>     
 

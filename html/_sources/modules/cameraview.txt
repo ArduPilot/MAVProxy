@@ -17,5 +17,5 @@ integration with the camera hardware:
 
     pip install cuav
 
-Also see the cuav documentation :doc:` here <../cuav_module/index>`.
+Also see the cuav documentation `here <http://canberrauav.github.io/cuav/build/html/index.html>`_
 

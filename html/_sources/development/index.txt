@@ -17,3 +17,4 @@ achieved for Linux and Windows.
     mavdevenvlinux
     mavdevenvwindows
     mavcustmod
+    mavdevenvdocs

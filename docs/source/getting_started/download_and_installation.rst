@@ -31,13 +31,13 @@ For Debian based systems:
 
 .. code:: bash
 
-    sudo apt-get install python-dev python-opencv python-wxgtk3.0 python-pip python-matplotlib python-pygame python-lxml
+    sudo apt-get install python-dev python-opencv python-wxgtk3.0 python-pip python-matplotlib python-pygame python-lxml python-yaml
     
 For Fedora based systems:
 
 .. code:: bash
 
-    sudo dnf install python-devel python-opencv wxPython python-pip python-matplotlib pygame python-lxml redhat-rpm-config
+    sudo dnf install python-devel python-opencv wxPython python-pip python-matplotlib pygame python-lxml python-yaml redhat-rpm-config
 
 .. note::
 
