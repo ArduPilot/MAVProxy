@@ -250,10 +250,18 @@ def download_url(url):
     if sys.version_info.major < 3:
         from urllib2 import urlopen as url_open
         from urllib2 import URLError as url_error
+        from urllib2 import ProxyHandler as proxy_handler
     else:
         from urllib.request import urlopen as url_open
         from urllib.error import URLError as url_error
+        from urllib.proxy_handler import ProxyHandler as proxy_handler
     try:
+        resp = url_open(url)
+        headers = resp.info()
+    except url_error as e:
+        pass
+    try:
+        proxy_handler()
         resp = url_open(url)
         headers = resp.info()
     except url_error as e:
