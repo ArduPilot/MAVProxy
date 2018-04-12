@@ -23,6 +23,8 @@ class CmdlongModule(mp_module.MPModule):
                          ['<enable|disable|release>'])
         self.add_command('long', self.cmd_long, "execute mavlink long command",
                          self.cmd_long_commands())
+        self.add_command('command_int', self.cmd_command_int, "execute mavlink command_int",
+                         self.cmd_long_commands())
         self.add_command('engine', self.cmd_engine, "engine")
 
     def cmd_long_commands(self):
@@ -340,6 +342,69 @@ class CmdlongModule(mp_module.MPModule):
                                           command,
                                           0,
                                           *floating_args)
+
+    def cmd_command_int(self, args):
+        '''execute supplied command_int'''
+        if len(args) != 11:
+            print("num args{0}".format(len(args)))
+            print("Usage: command_int frame command current autocontinue param1 param2 param3 param4 x y z")
+            print("e.g. command_int GLOBAL_RELATIVE_ALT DO_SET_HOME 0 0 0 0 0 0 -353632120 1491659330 0")
+            print("e.g. command_int GLOBAL MAV_CMD_DO_SET_ROI 0 0 0 0 0 0 5000000 5000000 500")
+            return
+
+        if args[0].isdigit():
+            frame = int(args[0])
+        else:
+            try:
+                # attempt to allow MAV_FRAME_GLOBAL for frame
+                frame = eval("mavutil.mavlink." + args[0])
+            except AttributeError as e:
+                try:
+                    # attempt to allow GLOBAL for frame
+                    frame = eval("mavutil.mavlink.MAV_FRAME_" + args[0])
+                except AttributeError as e:
+                    pass
+
+        if frame is None:
+            print("Unknown frame ({0})".format(args[0]))
+            return
+
+        command = None
+        if args[1].isdigit():
+            command = int(args[1])
+        else:
+            # let "command_int ... MAV_CMD_DO_SET_HOME ..." work
+            try:
+                command = eval("mavutil.mavlink." + args[1])
+            except AttributeError as e:
+                try:
+                    # let "command_int ... DO_SET_HOME" work
+                    command = eval("mavutil.mavlink.MAV_CMD_" + args[1])
+                except AttributeError as e:
+                    pass
+
+        current = int(args[2])
+        autocontinue = int(args[3])
+        param1 = float(args[4])
+        param2 = float(args[5])
+        param3 = float(args[6])
+        param4 = float(args[7])
+        x = int(args[8])
+        y = int(args[9])
+        z = float(args[10])
+        self.master.mav.command_int_send(self.settings.target_system,
+                                         self.settings.target_component,
+                                         frame,
+                                         command,
+                                         0,
+                                         0,
+                                         param1,
+                                         param2,
+                                         param3,
+                                         param4,
+                                         x,
+                                         y,
+                                         z)
 
 def init(mpstate):
     '''initialise module'''

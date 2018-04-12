@@ -1,0 +1,24 @@
+description: >
+  Spektrum DX8 With Cypress USB dsmX HID
+  OrangeRX DSMX DSM2 USB Dongle
+  Available here - https://hobbyking.com/en_us/orange-rx-dsmx-dsm2-compatible-protocol-usb-dongle-flight-simulator.html
+
+match: 
+  - Cypress USB dsmX HID
+
+controls:
+  - channel:  1
+    type:     axis
+    id:       0 # right control over and back
+
+  - channel:  2
+    type:     axis
+    id:       1
+
+  - channel:  3
+    type:     axis
+    id:       2
+
+  - channel:  4
+    type:     axis
+    id:       3

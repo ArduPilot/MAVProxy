@@ -127,17 +127,17 @@ class ERMap:
         y = numpy.abs((longy - self.startlongitude)/self.deltalongitude)
 
         #do some interpolation
-        # print "x,y", x, y
+        # print("x,y", x, y)
         x_int = int(x)
         x_frac = x - int(x)
         y_int = int(y)
         y_frac = y - int(y)
-        #print "frac", x_int, x_frac, y_int, y_frac
+        #print("frac", x_int, x_frac, y_int, y_frac)
         value00 = self.data[x_int, y_int]
         value10 = self.data[x_int+1, y_int]
         value01 = self.data[x_int, y_int+1]
         value11 = self.data[x_int+1, y_int+1]
-        #print "values ", value00, value10, value01, value11
+        #print("values ", value00, value10, value01, value11)
 
         #check for null values
         if value00 == -99999:

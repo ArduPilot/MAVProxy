@@ -92,7 +92,7 @@ class SRTMDownloader():
         try:
             data = open(self.filelist_file, 'rb')
         except IOError:
-            '''print "No SRTM cached file list. Creating new one!"'''
+            '''print("No SRTM cached file list. Creating new one!")'''
             if self.offline == 0:
                 self.createFileList()
             return
@@ -104,7 +104,7 @@ class SRTMDownloader():
                 if self.offline == 0:
                     self.createFileList()
         except:
-            '''print "Unknown error loading cached SRTM file list. Creating new one!"'''
+            '''print("Unknown error loading cached SRTM file list. Creating new one!")'''
             if self.offline == 0:
                 self.createFileList()
 
@@ -176,7 +176,7 @@ class SRTMDownloader():
                 self.filelist[self.parseFilename(filename)] = (
                             continent, filename)
 
-            '''print self.filelist'''
+            '''print(self.filelist)'''
         # Add meta info
         self.filelist["server"] = self.server
         self.filelist["directory"] = self.directory
@@ -200,7 +200,7 @@ class SRTMDownloader():
         match = self.filename_regex.match(filename)
         if match is None:
             # TODO?: Raise exception?
-            '''print "Filename", filename, "unrecognized!"'''
+            '''print("Filename", filename, "unrecognized!")'''
             return None
         lat = int(match.group(2))
         lon = int(match.group(4))
@@ -246,10 +246,10 @@ class SRTMDownloader():
                     if mypid in childTileDownload:
                         childTileDownload.pop(mypid)
                     return 0
-                '''print "Getting Tile"'''
+                '''print("Getting Tile")'''
             return 0
         elif mypid in childTileDownload and childTileDownload[mypid].is_alive():
-            '''print "Still Getting Tile"'''
+            '''print("Still Getting Tile")'''
             return 0
         # TODO: Currently we create a new tile object each time.
         # Caching is required for improved performance.
@@ -346,7 +346,7 @@ class SRTMTile:
         assert y < self.size, "y: %d<%d" % (y, self.size)
         # Same as calcOffset, inlined for performance reasons
         offset = x + self.size * (self.size - y - 1)
-        #print offset
+        #print(offset)
         value = self.data[offset]
         if value == -32768:
             return -1 # -32768 is a special value for areas with no data
@@ -357,20 +357,20 @@ class SRTMTile:
         """Get the altitude of a lat lon pair, using the four neighbouring
             pixels for interpolation.
         """
-        # print "-----\nFromLatLon", lon, lat
+        # print("-----\nFromLatLon", lon, lat)
         lat -= self.lat
         lon -= self.lon
-        # print "lon, lat", lon, lat
+        # print("lon, lat", lon, lat)
         if lat < 0.0 or lat >= 1.0 or lon < 0.0 or lon >= 1.0:
             raise WrongTileError(self.lat, self.lon, self.lat+lat, self.lon+lon)
         x = lon * (self.size - 1)
         y = lat * (self.size - 1)
-        # print "x,y", x, y
+        # print("x,y", x, y)
         x_int = int(x)
         x_frac = x - int(x)
         y_int = int(y)
         y_frac = y - int(y)
-        # print "frac", x_int, x_frac, y_int, y_frac
+        # print("frac", x_int, x_frac, y_int, y_frac)
         value00 = self.getPixelValue(x_int, y_int)
         value10 = self.getPixelValue(x_int+1, y_int)
         value01 = self.getPixelValue(x_int, y_int+1)
@@ -378,8 +378,8 @@ class SRTMTile:
         value1 = self._avg(value00, value10, x_frac)
         value2 = self._avg(value01, value11, x_frac)
         value  = self._avg(value1,  value2, y_frac)
-        # print "%4d %4d | %4d\n%4d %4d | %4d\n-------------\n%4d" % (
-        #        value00, value10, value1, value01, value11, value2, value)
+        # print("%4d %4d | %4d\n%4d %4d | %4d\n-------------\n%4d" % (
+        #        value00, value10, value1, value01, value11, value2, value))
         return value
 
 class SRTMOceanTile(SRTMTile):
@@ -395,7 +395,7 @@ class SRTMOceanTile(SRTMTile):
 class parseHTMLDirectoryListing(HTMLParser):
 
     def __init__(self):
-        #print "parseHTMLDirectoryListing.__init__"
+        #print("parseHTMLDirectoryListing.__init__")
         HTMLParser.__init__(self)
         self.title="Undefined"
         self.isDirListing = False
@@ -406,7 +406,7 @@ class parseHTMLDirectoryListing(HTMLParser):
         self.currHref=""
 
     def handle_starttag(self, tag, attrs):
-        #print "Encountered the beginning of a %s tag" % tag
+        #print("Encountered the beginning of a %s tag" % tag)
         if tag=="title":
             self.inTitle = True
         if tag == "a":
@@ -418,7 +418,7 @@ class parseHTMLDirectoryListing(HTMLParser):
 
 
     def handle_endtag(self, tag):
-        #print "Encountered the end of a %s tag" % tag
+        #print("Encountered the end of a %s tag" % tag)
         if tag=="title":
             self.inTitle = False
         if tag == "a":
@@ -432,9 +432,9 @@ class parseHTMLDirectoryListing(HTMLParser):
     def handle_data(self,data):
         if self.inTitle:
             self.title = data
-            '''print "title=%s" % data'''
+            '''print("title=%s" % data)'''
             if "Index of" in self.title:
-                #print "it is an index!!!!"
+                #print("it is an index!!!!")
                 self.isDirListing = True
         if self.inHyperLink:
             # We do not include parent directory in listing.

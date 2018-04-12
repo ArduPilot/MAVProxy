@@ -126,7 +126,7 @@ def LLtoUTM( Lat, Long, ReferenceEllipsoid=23):
         UTMNorthing = UTMNorthing + 10000000.0; #10000000 meter offset for southern hemisphere
     #UTMZone was originally returned here.  I don't know what the
     #letter at the end was for.
-    #print "UTMZone", UTMZone
+    #print("UTMZone", UTMZone)
     return (ZoneNumber, UTMEasting, UTMNorthing)
 
 

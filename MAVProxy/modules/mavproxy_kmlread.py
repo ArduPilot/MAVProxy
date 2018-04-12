@@ -189,7 +189,7 @@ class KmlReadModule(mp_module.MPModule):
             
             #and place any polygons on the map
             if self.mpstate.map is not None and point[0] == 'Polygon':
-                #print "Adding " + point[1]
+                #print("Adding " + point[1])
                 newcolour = (random.randint(0, 255), 0, random.randint(0, 255))
                 curpoly = mp_slipmap.SlipPolygon(point[1], point[2],
                                                              layer=2, linewidth=2, colour=newcolour)
@@ -200,7 +200,7 @@ class KmlReadModule(mp_module.MPModule):
                 
             #and points - barrell image and text
             if self.mpstate.map is not None and point[0] == 'Point':
-                #print "Adding " + point[1]
+                #print("Adding " + point[1])
                 icon = self.mpstate.map.icon('barrell.png')
                 curpoint = mp_slipmap.SlipIcon(point[1], latlon = (point[2][0][0], point[2][0][1]), layer=3, img=icon, rotation=0, follow=False)
                 curtext = mp_slipmap.SlipLabel(point[1], point = (point[2][0][0], point[2][0][1]), layer=4, label=point[1], colour=(0,255,255))
@@ -292,7 +292,7 @@ class KmlReadModule(mp_module.MPModule):
         for j in coordsSplit:
             jcoord = j.split(',')
             if len(jcoord) == 3 and jcoord[0] != '' and jcoord[1] != '':
-                #print "Got lon " + jcoord[0] + " and lat " + jcoord[1]
+                #print("Got lon " + jcoord[0] + " and lat " + jcoord[1])
                 ret_s.append((float(jcoord[1]), float(jcoord[0])))
             
         #return tuple

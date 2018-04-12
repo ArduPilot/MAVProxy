@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+
+from __future__ import print_function
+
 '''
 display a image in a subprocess
 Andrew Tridgell
@@ -321,7 +324,7 @@ class MPImagePanel(wx.Panel):
         '''
         from guppy import hpy
         h = hpy()
-        print h.heap()
+        print(h.heap())
         '''
 
 

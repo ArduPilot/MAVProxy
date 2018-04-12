@@ -3,6 +3,7 @@ readline handling for mavproxy
 '''
 
 import sys, glob, os, platform
+import re
 
 rline_mpstate = None
 redisplay = None
@@ -158,7 +159,7 @@ def complete(text, state):
         return last_clist[state]
 
     # split the command so far
-    cmd = readline.get_line_buffer().split()
+    cmd = re.split(" +", readline.get_line_buffer())
 
     if len(cmd) != 0 and cmd[0] in rline_mpstate.completions:
         # we have a completion rule for this command
