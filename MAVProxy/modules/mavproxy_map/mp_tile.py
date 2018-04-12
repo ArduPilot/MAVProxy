@@ -48,7 +48,7 @@ TILE_SERVICES = {
 	"OpenAerialMap"  : "http://tile.openaerialmap.org/tiles/?v=mgm&layer=openaerialmap-900913&x=${X}&y=${Y}&zoom=${OAM_ZOOM}",
 	"OpenCycleMap"   : "http://andy.sandbox.cloudmade.com/tiles/cycle/${ZOOM}/${X}/${Y}.png",
 	"Eniro DK,NO,SE,FI,PL" : "http://map.eniro.com/geowebcache/service/tms1.0.0/map/${ZOOM}/${X}/${ENI_Y}.png",
-	"StatKartTopo2" : "http://opencache.statkart.no/gatekeeper/gk/gk.open_gmaps?layers=topo2&zoom=${ZOOM}&x=${X}&y=${Y}"
+	"StatKartTopo2" : "http://opencache.statkart.no/gatekeeper/gk/gk.open_gmaps?layers=topo4&zoom=${ZOOM}&x=${X}&y=${Y}"
 
 	}
 
