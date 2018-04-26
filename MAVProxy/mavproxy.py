@@ -348,7 +348,10 @@ def load_module(modname, quiet=False, **kwargs):
             if mpstate.settings.moddebug > 1:
                 import traceback
                 print(traceback.format_exc())
-    print("Failed to load module: %s. Use 'set moddebug 3' in the MAVProxy console to enable traceback" % ex)
+    help_traceback = ""
+    if mpstate.settings.moddebug < 3:
+        help_traceback = " Use 'set moddebug 3' in the MAVProxy console to enable traceback"
+    print("Failed to load module: %s.%s" % (ex, help_traceback))
     return False
 
 def unload_module(modname):
