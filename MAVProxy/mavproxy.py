@@ -269,15 +269,18 @@ def cmd_watch(args):
 
 def generate_kwargs(args):
     kwargs = {}
-    module_components = args.split(":{", 1)
+    module_components = args.split(":", 1)
     module_name = module_components[0]
-    if (len(module_components) == 2 and module_components[1].endswith("}")):
-        # assume json
-        try:
-            module_args = "{"+module_components[1]
-            kwargs = json.loads(module_args)
-        except ValueError as e:
-            print('Invalid JSON argument: {0} ({1})'.format(module_args,
+    if len(module_components) == 2:
+        if module_components[1].startswith("'") and module_components[1].endswith("'"):
+            module_components[1] = module_components[1][1:-1] # strip the ' quotes
+        if module_components[1].startswith("{") and module_components[1].endswith("}"):
+            # assume json
+            try:
+                module_args = module_components[1]
+                kwargs = json.loads(module_args)
+            except ValueError as e:
+                print('Invalid JSON argument: {0} ({1})'.format(module_args,
                                                            repr(e)))
     return (module_name, kwargs)
 
@@ -1112,7 +1115,7 @@ if __name__ == '__main__':
     (mpstate.status.logdir, logpath_telem, logpath_telem_raw) = log_paths()
 
     for module in opts.load_module:
-        modlist = module.split(',')
+        modlist = shlex.split(module, ',')
         for mod in modlist:
             process_stdin('module load %s' % (mod))
 
