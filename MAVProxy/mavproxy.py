@@ -316,7 +316,7 @@ def generate_kwargs(args):
 
 def load_module(modname, quiet=False, **kwargs):
     '''load a module'''
-    modpaths = ['MAVProxy.modules.mavproxy_%s' % modname, modname]
+    modpaths = ['MAVProxy.modules.mavproxy_%s' % modname, 'mavproxy_' + modname]
     for (m,pm) in mpstate.modules:
         if m.name == modname and not modname in mpstate.multi_instance:
             if not quiet:
@@ -464,6 +464,11 @@ def import_package(name):
     """Given a package name like 'foo.bar.quux', imports the package
     and returns the desired module."""
     import zipimport
+
+    # Set the modules path to search for modules
+    src_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'modules')
+    sys.path.append(src_path)
+
     try:
         mod = __import__(name)
     except ImportError:
