@@ -86,7 +86,9 @@ class FenceModule(mp_module.MPModule):
             self.healthy = healthy
 
             #console output for fence:
-            if self.enabled == False:
+            if not self.present:
+                self.console.set_status('Fence', 'FEN', row=0, fg='black')
+            elif self.enabled == False:
                 self.console.set_status('Fence', 'FEN', row=0, fg='grey')
             elif self.enabled == True and self.healthy == True:
                 self.console.set_status('Fence', 'FEN', row=0, fg='green')
