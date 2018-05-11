@@ -587,6 +587,23 @@ class MapModule(mp_module.MPModule):
             else:
                 self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('Trajectory'))
 
+        if m.get_type() == "POSITION_TARGET_GLOBAL_INT":
+            # FIXME: base this off SYS_STATUS.MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL?
+            if (self.master.flightmode in [ "AUTO", "GUIDED", "LOITER", "RTL", "QRTL", "QLOITER", "QLAND" ]):
+                delta = 0.000000005 # box size in degrees of both latitude and longitude.  I kid you not.
+                lat_float = m.lat_int*1e-7
+                lon_float = m.lon_int*1e-7
+                box = [ (lat_float-delta, lon_float-delta),
+                        (lat_float+delta, lon_float+delta) ]
+                self.mpstate.map.add_object(mp_slipmap.SlipPolygon(
+                    'position_target',
+                    box,
+                    layer='PositionTarget',
+                    linewidth=2,
+                    colour=(0,0,255)))
+            else:
+                self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('PositionTarget'))
+
         # if the waypoints have changed, redisplay
         last_wp_change = self.module('wp').wploader.last_change
         if self.wp_change_time != last_wp_change and abs(time.time() - last_wp_change) > 1:
