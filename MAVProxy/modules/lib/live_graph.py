@@ -48,11 +48,12 @@ class LiveGraph():
         mp_util.child_close_fds()
 
         import matplotlib
+        matplotlib.use('WXAgg')
+
         import wx_processguard
         from wx_loader import wx
         from live_graph_ui import GraphFrame
 
-        matplotlib.use('WXAgg')
         app = wx.App(False)
         app.frame = GraphFrame(state=self)
         app.frame.Show()
