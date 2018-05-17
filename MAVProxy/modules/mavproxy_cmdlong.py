@@ -12,6 +12,7 @@ class CmdlongModule(mp_module.MPModule):
         self.add_command('setspeed', self.cmd_do_change_speed, "do_change_speed")
         self.add_command('setyaw', self.cmd_condition_yaw, "condition_yaw")
         self.add_command('takeoff', self.cmd_takeoff, "takeoff")
+        self.add_command('mission_start', self.cmd_mission_start, "mission_start")
         self.add_command('velocity', self.cmd_velocity, "velocity")
         self.add_command('position', self.cmd_position, "position")
         self.add_command('attitude', self.cmd_attitude, "attitude")
@@ -57,6 +58,28 @@ class CmdlongModule(mp_module.MPModule):
                 0, # param5
                 0, # param6
                 altitude) # param7
+
+    def cmd_mission_start(self, args):
+        '''Mission start'''
+        params = [0, 0, 0, 0, 1, 0, 0]
+
+        # fill in any args passed by user
+        for i in range(min(len(args), len(params))):
+            params[i] = float(args[i])
+
+        print("Mission started")
+        self.master.mav.command_long_send(
+            self.settings.target_system,  # target_system
+            mavutil.mavlink.MAV_COMP_ID_SYSTEM_CONTROL,  # target_component
+            mavutil.mavlink.MAV_CMD_MISSION_START,  # command
+            params[0],  # first_item: the first mission item to run
+            params[1],  # last_item: the last mission item to run (after this item is run, the mission ends)
+            0,  # param2
+            0,  # param3
+            0,  # param4
+            0,  # param5
+            0,  # param6
+            0)  # param7
 
     def cmd_parachute(self, args):
         '''parachute control'''
