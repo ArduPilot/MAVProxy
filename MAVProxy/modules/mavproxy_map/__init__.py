@@ -52,7 +52,7 @@ class MapModule(mp_module.MPModule):
               ('loitercircle',bool, False),
               ('showdirection', bool, False)])
         
-        service='OviHybrid'
+        service='MicrosoftHyb'
         if 'MAP_SERVICE' in os.environ:
             service = os.environ['MAP_SERVICE']
         import platform
