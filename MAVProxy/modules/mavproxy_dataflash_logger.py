@@ -128,6 +128,7 @@ class dataflash_logger(mp_module.MPModule):
     def status(self):
         '''returns information about module'''
         transferred = self.download - self.prev_download
+        self.prev_download = self.download
         now = time.time()
         interval = now - self.last_status_time
         self.last_status_time = now
@@ -148,7 +149,6 @@ class dataflash_logger(mp_module.MPModule):
         if (now - self.last_idle_status_printed_time) >= 10:
             print(self.status())
             self.last_idle_status_printed_time = now
-            self.prev_download = self.download
 
     def idle_send_acks_and_nacks(self):
         '''Send packets to UAV in idle loop'''
