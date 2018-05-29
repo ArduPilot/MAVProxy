@@ -202,7 +202,8 @@ class WPModule(mp_module.MPModule):
         self.wploader.target_system = self.target_system
         self.wploader.target_component = self.target_component
         try:
-            self.wploader.load(filename)
+            #need to remove the leading and trailing quotes in filename
+            self.wploader.load(filename.strip('"'))
         except Exception as msg:
             print("Unable to load %s - %s" % (filename, msg))
             return
@@ -244,7 +245,8 @@ class WPModule(mp_module.MPModule):
     def save_waypoints(self, filename):
         '''save waypoints to a file'''
         try:
-            self.wploader.save(filename)
+            #need to remove the leading and trailing quotes in filename
+            self.wploader.save(filename.strip('"'))
         except Exception as msg:
             print("Failed to save %s - %s" % (filename, msg))
             return

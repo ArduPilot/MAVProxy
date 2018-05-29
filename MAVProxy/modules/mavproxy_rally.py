@@ -210,7 +210,7 @@ class RallyModule(mp_module.MPModule):
                 return
 
             try:
-                self.rallyloader.load(args[1])
+                self.rallyloader.load(args[1].strip('"'))
             except Exception as msg:
                 print("Unable to load %s - %s" % (args[1], msg))
                 return
@@ -225,7 +225,7 @@ class RallyModule(mp_module.MPModule):
                 print("Usage: rally save filename")
                 return
 
-            self.rallyloader.save(args[1])
+            self.rallyloader.save(args[1].strip('"'))
 
             print("Saved rally file %s" % args[1])
 
