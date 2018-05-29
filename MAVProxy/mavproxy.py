@@ -1001,8 +1001,15 @@ if __name__ == '__main__':
 
     #version information
     if opts.version:
-        import pkg_resources
-        version = pkg_resources.require("mavproxy")[0].version
+        #pkg_resources doesn't work in the windows exe build, so read the version file
+        try:
+            import pkg_resources
+            version = pkg_resources.require("mavproxy")[0].version
+        except:
+            start_script = os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy", "version.txt")
+            f = open(start_script, 'r')
+            version = f.readline()
+
         print("MAVProxy is a modular ground station using the mavlink protocol")
         print("MAVProxy Version: " + version)
         sys.exit(1)
