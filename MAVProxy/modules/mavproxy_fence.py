@@ -200,7 +200,7 @@ class FenceModule(mp_module.MPModule):
         try:
             self.fenceloader.target_system = self.target_system
             self.fenceloader.target_component = self.target_component
-            self.fenceloader.load(filename)
+            self.fenceloader.load(filename.strip('"'))
         except Exception as msg:
             print("Unable to load %s - %s" % (filename, msg))
             return
@@ -282,7 +282,7 @@ class FenceModule(mp_module.MPModule):
 
         if filename is not None:
             try:
-                self.fenceloader.save(filename)
+                self.fenceloader.save(filename.strip('"'))
             except Exception as msg:
                 print("Unable to save %s - %s" % (filename, msg))
                 return
@@ -293,7 +293,7 @@ class FenceModule(mp_module.MPModule):
                 self.console.writeln("lat=%f lng=%f" % (p.lat, p.lng))
         if self.status.logdir != None:
             fencetxt = os.path.join(self.status.logdir, 'fence.txt')
-            self.fenceloader.save(fencetxt)
+            self.fenceloader.save(fencetxt.strip('"'))
             print("Saved fence to %s" % fencetxt)
         self.have_list = True
 

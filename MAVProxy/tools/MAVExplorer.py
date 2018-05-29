@@ -438,7 +438,7 @@ def cmd_loadfile(args):
     if not os.path.exists(fileargs):
         print("Error loading file ", fileargs);
         return
-    loadfile(fileargs)
+    loadfile(fileargs.strip('"'))
 
 def loadfile(args):
     '''load a log file (path given by arg)'''

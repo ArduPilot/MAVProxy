@@ -245,8 +245,7 @@ class KmlReadModule(mp_module.MPModule):
     def readkmz(self, filename):
         '''reads in a kmz file and returns xml nodes'''
         #Strip quotation marks if neccessary
-        if filename.startswith('"') and filename.endswith('"'):
-            filename = filename[1:-1]
+        filename.strip('"')
         #Open the zip file (as applicable)    
         if filename[-4:] == '.kml':
             fo = open(filename, "r")
