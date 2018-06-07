@@ -243,7 +243,7 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
     if options.types is not None:
         types.extend(options.types.split(','))
     else:
-        types.extend(['GPS','GLOBAL_POSITION_INT'])
+        types.extend(['GPS','GLOBAL_POSITION_INT','POS'])
         if options.rawgps or options.dualgps:
             types.extend(['GPS', 'GPS_RAW_INT'])
         if options.rawgps2 or options.dualgps:
