@@ -58,7 +58,11 @@ class GraphFrame(wx.Frame):
         self.fig = Figure((6.0, 3.0), dpi=self.dpi)
 
         self.axes = self.fig.add_subplot(111)
-        self.axes.set_axis_bgcolor('white')
+        try:
+            # this was removed in matploylib 2.2.0
+            self.axes.set_axis_bgcolor('white')
+        except AttributeError:
+            self.set_facecolor('white')
 
         pylab.setp(self.axes.get_xticklabels(), fontsize=8)
         pylab.setp(self.axes.get_yticklabels(), fontsize=8)
