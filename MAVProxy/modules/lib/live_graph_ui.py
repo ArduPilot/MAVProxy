@@ -58,7 +58,11 @@ class GraphFrame(wx.Frame):
         self.fig = Figure((6.0, 3.0), dpi=self.dpi)
 
         self.axes = self.fig.add_subplot(111)
-        self.axes.set_axis_bgcolor('white')
+        try:
+            self.axes.set_facecolor('white')
+        except AttributeError as e:
+            # this was removed in matplotlib 2.2.0:
+            self.axes.set_axis_bgcolor('white')
 
         pylab.setp(self.axes.get_xticklabels(), fontsize=8)
         pylab.setp(self.axes.get_yticklabels(), fontsize=8)
