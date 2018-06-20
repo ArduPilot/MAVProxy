@@ -74,20 +74,7 @@ class dataflash_logger(mp_module.MPModule):
 
     def _dataflash_dir(self, mpstate):
         '''returns directory path to store DF logs in.  May be relative'''
-        if mpstate.settings.state_basedir is None:
-            ret = 'dataflash'
-        else:
-            ret = os.path.join(mpstate.settings.state_basedir, 'dataflash')
-
-        try:
-            os.makedirs(ret)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                print("DFLogger: OSError making (%s): %s" % (ret, str(e)))
-        except Exception as e:
-            print("DFLogger: Unknown exception: %s" % (ret, str(e)))
-
-        return ret
+        return mpstate.status.logdir
 
     def new_log_filepath(self):
         '''returns a filepath to a log which does not currently exist and is
@@ -127,6 +114,9 @@ class dataflash_logger(mp_module.MPModule):
 
     def status(self):
         '''returns information about module'''
+        if self.download is None:
+            return "Not started"
+
         transferred = self.download - self.prev_download
         self.prev_download = self.download
         now = time.time()
