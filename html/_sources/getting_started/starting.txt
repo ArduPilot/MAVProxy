@@ -102,6 +102,11 @@ MAVLink stream rate.
 
 MAVLink source system for this GCS.
 
+--source-component
+==================
+
+MAVLink source component for this GCS.
+
 --target-system
 ===============
 
@@ -236,9 +241,13 @@ Controls the level of debugging output displayed on the console. Default is 0
 (no debug output). A value of 3 is useful for debugging crashes or errors in
 MAVProxy and it's modules.
 
---default
+--default-modules
 =========
 
 A comma separated list of the modules to load on startup by default. The default 
 value of this parameter is ``log,signing,wp,rally,fence,param,relay,tuneopt,arm,mode,calibration,rc,auxopt,misc,cmdlong,battery,terrain,output,adsb``
 
+--non-interactive
+=================
+
+Do not start interactive shell

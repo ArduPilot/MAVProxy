@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Startup Options &mdash; MAVProxy 1.6.2 documentation</title>
+  <title>Startup Options &mdash; MAVProxy 1.6.4 documentation</title>
   
 
   
@@ -31,7 +31,7 @@
 
   
         <link rel="search" title="Search" href="../search.html"/>
-    <link rel="top" title="MAVProxy 1.6.2 documentation" href="../index.html"/>
+    <link rel="top" title="MAVProxy 1.6.4 documentation" href="../index.html"/>
         <link rel="up" title="Getting Started" href="index.html"/>
         <link rel="next" title="Startup Scripts" href="mavinit.html"/>
         <link rel="prev" title="Quickstart" href="quickstart.html"/> 
@@ -94,6 +94,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#sitl">--sitl</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#streamrate">--streamrate</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#source-system">--source-system</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#source-component">--source-component</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#target-system">--target-system</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#target-component">--target-component</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#logfile">--logfile</a></li>
@@ -118,7 +119,8 @@
 <li class="toctree-l3"><a class="reference internal" href="#state-basedir">--state-basedir</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#version">--version</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#moddebug">--moddebug</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#default">--default</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#default-modules">--default-modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#non-interactive">--non-interactive</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="mavinit.html">Startup Scripts</a></li>
@@ -134,7 +136,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../modules/index.html">Modules</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../analysis/index.html">Post-flight Analysis</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
 </ul>
 
           
@@ -260,6 +261,10 @@ the first client in the 192.168.2.0 to 192.168.2.254 range on port 14550.</p>
 <h2>--source-system<a class="headerlink" href="#source-system" title="Permalink to this headline">¶</a></h2>
 <p>MAVLink source system for this GCS.</p>
 </div>
+<div class="section" id="source-component">
+<h2>--source-component<a class="headerlink" href="#source-component" title="Permalink to this headline">¶</a></h2>
+<p>MAVLink source component for this GCS.</p>
+</div>
 <div class="section" id="target-system">
 <h2>--target-system<a class="headerlink" href="#target-system" title="Permalink to this headline">¶</a></h2>
 <p>MAVLink target master system.</p>
@@ -369,10 +374,14 @@ directory.</p>
 (no debug output). A value of 3 is useful for debugging crashes or errors in
 MAVProxy and it's modules.</p>
 </div>
-<div class="section" id="default">
-<h2>--default<a class="headerlink" href="#default" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="default-modules">
+<h2>--default-modules<a class="headerlink" href="#default-modules" title="Permalink to this headline">¶</a></h2>
 <p>A comma separated list of the modules to load on startup by default. The default
 value of this parameter is <code class="docutils literal"><span class="pre">log,signing,wp,rally,fence,param,relay,tuneopt,arm,mode,calibration,rc,auxopt,misc,cmdlong,battery,terrain,output,adsb</span></code></p>
+</div>
+<div class="section" id="non-interactive">
+<h2>--non-interactive<a class="headerlink" href="#non-interactive" title="Permalink to this headline">¶</a></h2>
+<p>Do not start interactive shell</p>
 </div>
 </div>
 
@@ -420,7 +429,7 @@ value of this parameter is <code class="docutils literal"><span class="pre">log,
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../',
-            VERSION:'1.6.2',
+            VERSION:'1.6.4',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true

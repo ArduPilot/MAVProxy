@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Tuning Options &mdash; MAVProxy 1.6.4 documentation</title>
+  <title>uBlox GPS Managment Module &mdash; MAVProxy 1.6.4 documentation</title>
   
 
   
@@ -33,8 +33,8 @@
         <link rel="search" title="Search" href="../search.html"/>
     <link rel="top" title="MAVProxy 1.6.4 documentation" href="../index.html"/>
         <link rel="up" title="Modules" href="index.html"/>
-        <link rel="next" title="uBlox GPS Managment Module" href="ublox.html"/>
-        <link rel="prev" title="Antenna Tracker" href="tracker.html"/> 
+        <link rel="next" title="Post-flight Analysis" href="../analysis/index.html"/>
+        <link rel="prev" title="Tuning Options" href="tuneopt.html"/> 
 
   
   <script src="../_static/js/modernizr.min.js"></script>
@@ -122,8 +122,13 @@
 <li class="toctree-l2"><a class="reference internal" href="systemtime.html">Time Sync</a></li>
 <li class="toctree-l2"><a class="reference internal" href="terrain.html">Terrain Reporting</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tracker.html">Antenna Tracker</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Tuning Options</a></li>
-<li class="toctree-l2"><a class="reference internal" href="ublox.html">uBlox GPS Managment Module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tuneopt.html">Tuning Options</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">uBlox GPS Managment Module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#ublox-reset">ublox reset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ublox-status">ublox status</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ublox-mga">ublox mga</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="index.html#module-management">Module Management</a></li>
 </ul>
 </li>
@@ -161,7 +166,7 @@
       
           <li><a href="index.html">Modules</a> &raquo;</li>
       
-    <li>Tuning Options</li>
+    <li>uBlox GPS Managment Module</li>
       <li class="wy-breadcrumbs-aside">
         
           
@@ -173,16 +178,28 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="tuning-options">
-<h1>Tuning Options<a class="headerlink" href="#tuning-options" title="Permalink to this headline">¶</a></h1>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">tuneopt</span>
+  <div class="section" id="ublox-gps-managment-module">
+<h1>uBlox GPS Managment Module<a class="headerlink" href="#ublox-gps-managment-module" title="Permalink to this headline">¶</a></h1>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">ublox</span>
 </pre></div>
 </div>
-<p>This module manages the action mapped to channel 6. It is used for
-multicopters only. Use <code class="docutils literal"><span class="pre">tuneopt</span> <span class="pre">[set|show|reset|list]</span></code> to manage the
-mapped action. For the <code class="docutils literal"><span class="pre">set</span></code> command, use the format
-<code class="docutils literal"><span class="pre">tuneopt</span> <span class="pre">set</span> <span class="pre">[OPTION]</span> <span class="pre">[LOW]</span> <span class="pre">[HIGH]</span></code> to map a tuning action and it's
-range of values.</p>
+<p>The ublox module allows the user to upload GNSS databases (almanacs) from the uBlox website to a uBlox GPS module.
+This is useful for getting a quicker position lock under poor signal conditions. See
+<a class="reference external" href="https://www.u-blox.com/en/assistnow">here</a> for details about this database.</p>
+<p>To use the uBlox API you will need to create a file containing your API token in <code class="docutils literal"><span class="pre">~/.mavproxy/ublox/api_token</span></code>.</p>
+<div class="section" id="ublox-reset">
+<h2>ublox reset<a class="headerlink" href="#ublox-reset" title="Permalink to this headline">¶</a></h2>
+<p>This command reboots the GPS module. Also known as a &quot;cold start&quot;</p>
+</div>
+<div class="section" id="ublox-status">
+<h2>ublox status<a class="headerlink" href="#ublox-status" title="Permalink to this headline">¶</a></h2>
+<p>Returns the current status of the GPS</p>
+</div>
+<div class="section" id="ublox-mga">
+<h2>ublox mga<a class="headerlink" href="#ublox-mga" title="Permalink to this headline">¶</a></h2>
+<p>Upload the mga database from to the GPS module. It is assumed that <code class="docutils literal"><span class="pre">offline.ubx</span></code> and <code class="docutils literal"><span class="pre">dbd.ubx</span></code> are
+in the <code class="docutils literal"><span class="pre">~/.mavproxy/ublox</span></code> folder.</p>
+</div>
 </div>
 
 
@@ -192,10 +209,10 @@ range of values.</p>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="ublox.html" class="btn btn-neutral float-right" title="uBlox GPS Managment Module" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="../analysis/index.html" class="btn btn-neutral float-right" title="Post-flight Analysis" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="tracker.html" class="btn btn-neutral" title="Antenna Tracker" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="tuneopt.html" class="btn btn-neutral" title="Tuning Options" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
@@ -204,7 +221,7 @@ range of values.</p>
 
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
-<div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Tuning%20Options%20-%20&body=URL:%20../modules/tuneopt%0ATitle:%20Tuning%20Options%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
+<div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=uBlox%20GPS%20Managment%20Module%20-%20&body=URL:%20../modules/ublox%0ATitle:%20uBlox%20GPS%20Managment%20Module%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
     <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
     This is an ArduPilot project.</p>     
 

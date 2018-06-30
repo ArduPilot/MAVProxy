@@ -11,6 +11,8 @@ intervention is necessary for link failover.
 
 A link menu is available on the GUI console.
 
+For ease of management, links can have labels.
+
 link add
 ========
 
@@ -19,10 +21,14 @@ address or serial port. For a serial port, the default baud rate is
 57600. Use ``set baudrate xxx`` to change baud rate for any subsequent
 link add's.
 
+To add a label to a link, use ``:{"label":"LinkName"}`` after the link
+details. Note the link label must not have any spaces in it.
+
 .. code:: bash
 
     link add 127.0.0.1:14550
     link add tcp:127.0.0.1:14550
+    link add tcp:127.0.0.1:14550:{"label":"3GMobile"}
     set baudrate 115200
     link add COM17
     
@@ -31,17 +37,18 @@ See the startup :doc:`section <../getting_started/quickstart>`  for full details
 link remove
 ===========
 
-Remove a communications link. The ID of the link is used to identify the
+Remove a communications link. The ID or label of the link is used to identify the
 link to remove.
 
 .. code:: bash
 
     link remove 2
+    link remove 3GMobile
 
 link list
 =========
 
-List the active communications links and their ID's
+List the active communications links, their ID's and labels (if applicable).
 
 .. code:: bash
 

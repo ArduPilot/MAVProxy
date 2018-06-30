@@ -45,9 +45,11 @@ monitoring applications.
     serial
     signing
     speech
+    systemtime
     terrain
     tracker
-    tuneopt 
+    tuneopt
+    ublox
     
 Module Management
 =================

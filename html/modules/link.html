@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Link Management &mdash; MAVProxy 1.6.2 documentation</title>
+  <title>Link Management &mdash; MAVProxy 1.6.4 documentation</title>
   
 
   
@@ -31,7 +31,7 @@
 
   
         <link rel="search" title="Search" href="../search.html"/>
-    <link rel="top" title="MAVProxy 1.6.2 documentation" href="../index.html"/>
+    <link rel="top" title="MAVProxy 1.6.4 documentation" href="../index.html"/>
         <link rel="up" title="Modules" href="index.html"/>
         <link rel="next" title="Log Management" href="log.html"/>
         <link rel="prev" title="KML Importer" href="kmlread.html"/> 
@@ -124,15 +124,16 @@
 <li class="toctree-l2"><a class="reference internal" href="serial.html">Writing to Serial Port</a></li>
 <li class="toctree-l2"><a class="reference internal" href="signing.html">Packet Signing</a></li>
 <li class="toctree-l2"><a class="reference internal" href="speech.html">Text-to-Speech</a></li>
+<li class="toctree-l2"><a class="reference internal" href="systemtime.html">Time Sync</a></li>
 <li class="toctree-l2"><a class="reference internal" href="terrain.html">Terrain Reporting</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tracker.html">Antenna Tracker</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tuneopt.html">Tuning Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ublox.html">uBlox GPS Managment Module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="index.html#module-management">Module Management</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../analysis/index.html">Post-flight Analysis</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../development/index.html">Development</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../cuav_module/index.html">Image Processing with cuav</a></li>
 </ul>
 
           
@@ -185,14 +186,18 @@ communications links to the APM. This can be done at any time.</p>
 MAVProxy will automatically read the data from both links, no user
 intervention is necessary for link failover.</p>
 <p>A link menu is available on the GUI console.</p>
+<p>For ease of management, links can have labels.</p>
 <div class="section" id="link-add">
 <h2>link add<a class="headerlink" href="#link-add" title="Permalink to this headline">¶</a></h2>
 <p>Add an additional communications link. This can be either a network
 address or serial port. For a serial port, the default baud rate is
 57600. Use <code class="docutils literal"><span class="pre">set</span> <span class="pre">baudrate</span> <span class="pre">xxx</span></code> to change baud rate for any subsequent
 link add's.</p>
+<p>To add a label to a link, use <code class="docutils literal"><span class="pre">:{&quot;label&quot;:&quot;LinkName&quot;}</span></code> after the link
+details. Note the link label must not have any spaces in it.</p>
 <div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">link</span> <span class="n">add</span> <span class="mf">127.0</span><span class="o">.</span><span class="mf">0.1</span><span class="p">:</span><span class="mi">14550</span>
 <span class="n">link</span> <span class="n">add</span> <span class="n">tcp</span><span class="p">:</span><span class="mf">127.0</span><span class="o">.</span><span class="mf">0.1</span><span class="p">:</span><span class="mi">14550</span>
+<span class="n">link</span> <span class="n">add</span> <span class="n">tcp</span><span class="p">:</span><span class="mf">127.0</span><span class="o">.</span><span class="mf">0.1</span><span class="p">:</span><span class="mi">14550</span><span class="p">:{</span><span class="s2">&quot;label&quot;</span><span class="p">:</span><span class="s2">&quot;3GMobile&quot;</span><span class="p">}</span>
 <span class="nb">set</span> <span class="n">baudrate</span> <span class="mi">115200</span>
 <span class="n">link</span> <span class="n">add</span> <span class="n">COM17</span>
 </pre></div>
@@ -201,15 +206,16 @@ link add's.</p>
 </div>
 <div class="section" id="link-remove">
 <h2>link remove<a class="headerlink" href="#link-remove" title="Permalink to this headline">¶</a></h2>
-<p>Remove a communications link. The ID of the link is used to identify the
+<p>Remove a communications link. The ID or label of the link is used to identify the
 link to remove.</p>
 <div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">link</span> <span class="n">remove</span> <span class="mi">2</span>
+<span class="n">link</span> <span class="n">remove</span> <span class="mi">3</span><span class="n">GMobile</span>
 </pre></div>
 </div>
 </div>
 <div class="section" id="link-list">
 <h2>link list<a class="headerlink" href="#link-list" title="Permalink to this headline">¶</a></h2>
-<p>List the active communications links and their ID's</p>
+<p>List the active communications links, their ID's and labels (if applicable).</p>
 <div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">link</span> <span class="nb">list</span>
 </pre></div>
 </div>
@@ -260,7 +266,7 @@ link to remove.</p>
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
             URL_ROOT:'../',
-            VERSION:'1.6.2',
+            VERSION:'1.6.4',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
             HAS_SOURCE:  true

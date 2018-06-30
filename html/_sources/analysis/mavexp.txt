@@ -2,13 +2,13 @@
 MAVExplorer
 =============
 
-The MAVExplorer tool is an interactive tool for graphing APM logfiles.
+The MAVExplorer tool is an interactive tool for graphing APM logfiles (tlogs or dataflash logs).
 
 Under Linux, it can be accessed by:
 
 .. code:: bash
 
-    mavexplorer.py inputlog.tlog
+    MAVExplorer.py inputlog.tlog
     
 Under Windows, it can be found in the Start Menu with the rest of MAVProxy.
 
@@ -32,3 +32,6 @@ The Display menu contains methods for displaying a map of the GPS points of the 
 .. note::
 
     Saving custom graphs is not currently available on Windows.
+    
+More information about this program can be found in the 
+`Ardupilot documentation <http://ardupilot.org/dev/docs/using-mavexplorer-for-log-analysis.html>`_.

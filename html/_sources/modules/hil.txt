@@ -14,5 +14,5 @@ file in the APM source code, which provides a flight dynamics simulator
 It is used for testing modifications to the APM code in a simulated
 environment.
 
-See the :doc:`../analysis_and_simulation/simulation` page  
+See the `Ardupilot documentation <http://ardupilot.org/dev/docs/hitl-simulators.html>`_ 
 for more details on running HIL mode.

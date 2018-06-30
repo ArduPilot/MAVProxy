@@ -8,8 +8,7 @@ DataFlash Logs
     
 This module allows dataflash logs to be downloaded from the APM.
 
-The logs will be downloaded to the MAVProxy basedir (if defined) or
-the current working directory.
+The logs will be downloaded to the vehicle logging folder.
 
 Control
 ===========
