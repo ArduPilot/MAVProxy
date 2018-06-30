@@ -83,7 +83,6 @@ This page was generated using Sphinx SSG and is hosted using `GitHub Pages <http
     modules/index
     analysis/index
     development/index
-    cuav_module/index
 
 
 
