@@ -34,6 +34,7 @@
     <Content Include="MAVProxy\modules\mavproxy_map\data\blueheli.png" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\blueplane.png" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\bluerover.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\bluesub.png" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\camera-small-red.png" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\flag.png" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\greenantenna.png" />
@@ -41,6 +42,7 @@
     <Content Include="MAVProxy\modules\mavproxy_map\data\greenheli.png" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\greenplane.png" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\greenrover.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\greensub.png" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\hoop.png" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\loading.jpg" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\orangeplane.png" />
@@ -53,6 +55,7 @@
     <Content Include="MAVProxy\modules\mavproxy_map\data\redplane.png" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\redboat.png" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\redrover.png" />
+    <Content Include="MAVProxy\modules\mavproxy_map\data\redsub.png" />
     <Content Include="MAVProxy\modules\mavproxy_map\data\unavailable.jpg" />
     <Content Include="MAVProxy\modules\mavproxy_mmap\mmap_app\bing.js" />
     <Content Include="MAVProxy\modules\mavproxy_mmap\mmap_app\bluemarble.js" />
