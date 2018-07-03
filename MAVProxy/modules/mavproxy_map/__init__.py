@@ -512,9 +512,10 @@ class MapModule(mp_module.MPModule):
         if m.get_type() == "HEARTBEAT":
             if m.type in [mavutil.mavlink.MAV_TYPE_FIXED_WING]:
                 self.vehicle_type_name = 'plane'
-            elif m.type in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER,
-                            mavutil.mavlink.MAV_TYPE_SUBMARINE]:
+            elif m.type in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER]:
                 self.vehicle_type_name = 'rover'
+            elif m.type in [mavutil.mavlink.MAV_TYPE_SUBMARINE]:
+                self.vehicle_type_name = 'sub'
             elif m.type in [mavutil.mavlink.MAV_TYPE_SURFACE_BOAT]:
                 self.vehicle_type_name = 'boat'
             elif m.type in [mavutil.mavlink.MAV_TYPE_QUADROTOR,
