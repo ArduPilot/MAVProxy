@@ -447,10 +447,12 @@ class LinkModule(mp_module.MPModule):
                 self.mpstate.vehicle_type = 'plane'
                 self.mpstate.vehicle_name = 'ArduPlane'
             elif m.type in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER,
-                            mavutil.mavlink.MAV_TYPE_SURFACE_BOAT,
-                            mavutil.mavlink.MAV_TYPE_SUBMARINE]:
+                            mavutil.mavlink.MAV_TYPE_SURFACE_BOAT]:
                 self.mpstate.vehicle_type = 'rover'
                 self.mpstate.vehicle_name = 'APMrover2'
+            elif m.type in [mavutil.mavlink.MAV_TYPE_SUBMARINE]:
+                self.mpstate.vehicle_type = 'sub'
+                self.mpstate.vehicle_name = 'ArduSub'
             elif m.type in [mavutil.mavlink.MAV_TYPE_QUADROTOR,
                             mavutil.mavlink.MAV_TYPE_COAXIAL,
                             mavutil.mavlink.MAV_TYPE_HEXAROTOR,
