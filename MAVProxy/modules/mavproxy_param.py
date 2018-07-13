@@ -194,13 +194,23 @@ class ParamState:
                 self.mav_param_set = set()
                 print("Requested parameter list")
             else:
+                found = False
+                pname = args[1].upper()
                 for p in self.mav_param.keys():
-                    if fnmatch.fnmatch(p, args[1].upper()):
+                    if fnmatch.fnmatch(p, pname):
                         master.param_fetch_one(p)
                         if p not in self.fetch_one:
                             self.fetch_one[p] = 0
                         self.fetch_one[p] += 1
+                        found = True
                         print("Requested parameter %s" % p)
+                if not found and args[1].find('*') == -1:
+                    master.param_fetch_one(pname)
+                    if pname not in self.fetch_one:
+                        self.fetch_one[pname] = 0
+                    self.fetch_one[pname] += 1
+                    print("Requested parameter %s" % pname)
+                        
         elif args[0] == "save":
             if len(args) < 2:
                 print("usage: param save <filename> [wildcard]")
