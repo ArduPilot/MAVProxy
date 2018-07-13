@@ -225,7 +225,34 @@ class MavGraph(object):
                     linestyle = self.linestyle
                 else:
                     linestyle = '-'
-                ax.plot_date(x[i], y[i], color=color, label=fields[i],
+                if len(y[i]) > 0 and type(y[i][0]) == unicode:
+                    # assume this is a piece of text to be rendered at a point in time
+                    last_text_time = -1
+                    last_text = None
+                    for n in range(0, len(x[i])):
+                        this_text_time = round(x[i][n], 6)
+                        this_text = y[i][n]
+                        if last_text is None:
+                            last_text = "[y" + this_text + "]"
+                            last_text_time = this_text_time
+                        elif this_text_time == last_text_time:
+                            last_text += ("[x" + this_text + "]")
+                        else:
+                            ax.text(last_text_time,
+                                    10,
+                                    last_text,
+                                    rotation=90,
+                                    alpha=0.3,
+                                    verticalalignment='baseline')
+                            last_text = this_text
+                            last_text_time = this_text_time
+                    if last_text is not None:
+                        ax.text(last_text_time, 10, last_text,
+                                rotation=90,
+                                alpha=0.3,
+                                verticalalignment='baseline')
+                else:
+                    ax.plot_date(x[i], y[i], color=color, label=fields[i],
                              linestyle=linestyle, marker=marker, tz=None)
 
             empty = False
