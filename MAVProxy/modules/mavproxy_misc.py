@@ -75,6 +75,7 @@ class MiscModule(mp_module.MPModule):
         self.add_command('led', self.cmd_led, "control board LED")
         self.add_command('playtune', self.cmd_playtune, "play tune remotely")
         self.add_command('gethome', self.cmd_gethome, "get HOME_POSITION")
+        self.add_command('flashbootloader', self.cmd_flashbootloader, "flash bootloader (dangerous)")
         self.repeats = []
 
     def altitude_difference(self, pressure1, pressure2, ground_temp):
@@ -215,6 +216,13 @@ class MiscModule(mp_module.MPModule):
                                          self.settings.target_component,
                                          0, 0, plen, pattern)
 
+    def cmd_flashbootloader(self, args):
+        '''flash bootloader'''
+        self.master.mav.command_long_send(self.settings.target_system,
+                                          0,
+                                          mavutil.mavlink.MAV_CMD_FLASH_BOOTLOADER,
+                                              0, 0, 0, 0, 0, 290876, 0, 0)
+        
     def cmd_playtune(self, args):
         '''send PLAY_TUNE message'''
         if len(args) < 1:
