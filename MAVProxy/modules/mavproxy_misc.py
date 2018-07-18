@@ -228,9 +228,12 @@ class MiscModule(mp_module.MPModule):
         if len(args) < 1:
             print("Usage: playtune TUNE")
             return
+        tune = args[0]
+        str1 = tune[0:30]
+        str2 = tune[30:]
         self.master.mav.play_tune_send(self.settings.target_system,
                                        self.settings.target_component,
-                                       args[0])
+                                       str1, str2)
 
     def cmd_repeat(self, args):
         '''repeat a command at regular intervals'''
