@@ -217,10 +217,11 @@ class LinkModule(mp_module.MPModule):
         self.link_add(descriptor)
 
     def link_attributes(self, link, attributes):
-        conn = self.find_link(link)
-        if conn is None:
+        i = self.find_link(link)
+        if i is None:
             print("Connection (%s) not found" % (link,))
             return
+        conn = self.mpstate.mav_master[i]
         atts = self.parse_link_attributes(attributes)
         self.apply_link_attributes(conn, atts)
 
@@ -236,10 +237,11 @@ class LinkModule(mp_module.MPModule):
         ports = mavutil.auto_detect_serial(preferred_list=[
             '*FTDI*',
             "*Arduino_Mega_2560*",
-            "*3D_Robotics*",
+            "*3D*",
             "*USB_to_UART*",
             '*Ardu*',
             '*PX4*',
+            '*Hex*',
             '*FMU*'])
         for p in ports:
             print("%s : %s : %s" % (p.device, p.description, p.hwid))
@@ -251,7 +253,7 @@ class LinkModule(mp_module.MPModule):
             if (str(i) == device or
                 conn.address == device or
                 getattr(conn, 'label', None) == device):
-                return conn
+                return i
         return None
 
     def cmd_link_remove(self, args):
@@ -260,9 +262,10 @@ class LinkModule(mp_module.MPModule):
         if len(self.mpstate.mav_master) <= 1:
             print("Not removing last link")
             return
-        conn = self.find_link(device)
-        if conn is None:
+        i = self.find_link(device)
+        if i is None:
             return
+        conn = self.mpstate.mav_master[i]
         print("Removing link %s" % conn.address)
         try:
             try:
