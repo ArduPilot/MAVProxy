@@ -127,8 +127,8 @@ class MPState(object):
         from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
         self.settings = MPSettings(
             [ MPSetting('link', int, 1, 'Primary Link', tab='Link', range=(0,4), increment=1),
-              MPSetting('streamrate', int, 4, 'Stream rate link1', range=(-1,100), increment=1),
-              MPSetting('streamrate2', int, 4, 'Stream rate link2', range=(-1,100), increment=1),
+              MPSetting('streamrate', int, 4, 'Stream rate link1', range=(-1,500), increment=1),
+              MPSetting('streamrate2', int, 4, 'Stream rate link2', range=(-1,500), increment=1),
               MPSetting('heartbeat', int, 1, 'Heartbeat rate', range=(0,5), increment=1),
               MPSetting('mavfwd', bool, True, 'Allow forwarded control'),
               MPSetting('mavfwd_rate', bool, False, 'Allow forwarded rate control'),
