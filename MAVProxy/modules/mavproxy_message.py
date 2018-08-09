@@ -40,7 +40,7 @@ class message(mp_module.MPModule):
 
     def cmd_message(self, args):
         if len(args) == 0:
-            print self.usage()
+            print(self.usage())
         else:
             packettype = args[0]
             methodname = packettype.lower() + "_send"

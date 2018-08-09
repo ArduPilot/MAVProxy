@@ -75,7 +75,7 @@ class SRTMDownloader():
         self.offline = offline
         self.offlinemessageshown = 0
         if self.offline == 1 and self.debug:
-            print "Map Module in Offline mode"
+            print("Map Module in Offline mode")
         self.first_failure = False
         self.server = server
         self.directory = directory
