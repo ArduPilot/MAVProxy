@@ -16,6 +16,8 @@ import shlex
 import platform
 import json
 
+from imp import reload
+
 try:
     import queue as Queue
 except ImportError:
