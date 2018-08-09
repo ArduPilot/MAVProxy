@@ -9,12 +9,17 @@ Released under the GNU GPL version 3 or later
 
 import sys, os, time, socket, signal
 import fnmatch, errno, threading
-import serial, Queue, select
+import serial, select
 import traceback
 import select
 import shlex
 import platform
 import json
+
+try:
+    import queue as Queue
+except ImportError:
+    import Queue
 
 from MAVProxy.modules.lib import textconsole
 from MAVProxy.modules.lib import rline
