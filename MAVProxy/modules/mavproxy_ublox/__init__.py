@@ -71,9 +71,9 @@ class ublox(mp_module.MPModule):
     def cmd_ublox(self, args):
         '''control behaviour of the module'''
         if len(args) == 0:
-            print self.usage()
+            print(self.usage())
         elif args[0] == "status":
-            print self.cmd_status()
+            print(self.cmd_status())
         elif args[0] == "set":
             self.ublox_settings.command(args[1:])
         elif args[0] == "reset":
@@ -81,7 +81,7 @@ class ublox(mp_module.MPModule):
         elif args[0] == "mga":
             self.cmd_ublox_mga(args[1:])
         else:
-            print self.usage()
+            print(self.usage())
 
     def cmd_status(self):
         '''returns information about module'''
