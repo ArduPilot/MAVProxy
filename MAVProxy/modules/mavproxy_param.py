@@ -41,7 +41,7 @@ class ParamState:
             self.mav_param[str(param_id)] = m.param_value
             if param_id in self.fetch_one and self.fetch_one[param_id] > 0:
                 self.fetch_one[param_id] -= 1
-                print("%s = %f" % (param_id, m.param_value))
+                print("%s = %.7f" % (param_id, m.param_value))
             if added_new_parameter and len(self.mav_param_set) == m.param_count:
                 print("Received %u parameters" % m.param_count)
                 if self.logdir != None:
