@@ -96,7 +96,7 @@ class AsterixModule(mp_module.MPModule):
             trkn = m['I040']['TrkN']['val']
             # fake ICAO_address
             icao_address = sac << 16 | sic << 8 | trkn
-            squawk = sac << 8 | sic
+            squawk = sac << 12 | sic << 8 | trkn
             adsb_pkt = self.master.mav.adsb_vehicle_encode(icao_address,
                                             lat*1e7,
                                             lon*1e7,
