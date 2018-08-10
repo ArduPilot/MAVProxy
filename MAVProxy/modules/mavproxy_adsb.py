@@ -38,13 +38,12 @@ class ADSBVehicle(object):
 class ADSBModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(ADSBModule, self).__init__(mpstate, "adsb", "ADS-B data support")
+        super(ADSBModule, self).__init__(mpstate, "adsb", "ADS-B data support", public = True)
         self.threat_vehicles = {}
         self.active_threat_ids = []  # holds all threat ids the vehicle is evading
 
-        self.add_command('adsb', self.cmd_ADSB, ["adsb control",
-                                                 "<status>",
-                                                 "set (ADSBSETTING)"])
+        self.add_command('adsb', self.cmd_ADSB, "adsb control",
+                         ["<status>", "set (ADSBSETTING)"])
 
         self.ADSB_settings = mp_settings.MPSettings([("timeout", int, 10),  # seconds
                                                      ("threat_radius", int, 200),  # meters
@@ -154,7 +153,6 @@ class ADSBModule(mp_module.MPModule):
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         if m.get_type() == "ADSB_VEHICLE":
-
             id = 'ADSB-' + str(m.ICAO_address)
             if id not in self.threat_vehicles.keys():  # check to see if the vehicle is in the dict
                 # if not then add it
