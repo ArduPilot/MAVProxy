@@ -13,6 +13,12 @@ from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib.mp_menu import *  # popup menus
 from pymavlink import mavutil
 
+obc_icons = {
+    0 : 'greenplane.png',
+    2 : 'cloud.png',
+    3 : 'migbird.png',
+    4 : 'hawk.png'
+}
 
 class ADSBVehicle(object):
     '''a generic ADS-B threat'''
@@ -158,8 +164,12 @@ class ADSBModule(mp_module.MPModule):
                 # if not then add it
                 self.threat_vehicles[id] = ADSBVehicle(id=id, state=m.to_dict())
                 if self.mpstate.map:  # if the map is loaded...
-                    icon = self.mpstate.map.icon(self.threat_vehicles[id].icon)
-                    popup = MPMenuSubMenu('ADSB', items=[MPMenuItem(name=id, returnkey=None)])
+                    self.threat_vehicles[id].menu_item = MPMenuItem(name=id, returnkey=None)
+                    if m.emitter_type >= 100 and m.emitter_type-100 in obc_icons:
+                        icon = self.mpstate.map.icon(obc_icons[m.emitter_type-100])
+                    else:
+                        icon = self.mpstate.map.icon(self.threat_vehicles[id].icon)
+                    popup = MPMenuSubMenu('ADSB', items=[self.threat_vehicles[id].menu_item])
                     # draw the vehicle on the map
                     self.mpstate.map.add_object(mp_slipmap.SlipIcon(id, (m.lat * 1e-7, m.lon * 1e-7),
                                                                     icon, layer=3, rotation=m.heading*0.01, follow=False,
