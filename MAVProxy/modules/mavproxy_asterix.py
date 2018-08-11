@@ -4,7 +4,7 @@ support for asterix SDPS data, setup for OBC 2018
 This listens for SDPS on UDP and translates to ADSB_VEHICLE messages
 '''
 
-import time
+import time, pickle
 from math import *
 
 from MAVProxy.modules.lib import mp_module
@@ -29,6 +29,8 @@ class Track:
         spd = dist / dt
         pkt.heading = int(heading*100)
         pkt.hor_velocity = int(spd * 100)
+        if pkt.hor_velocity > 65535:
+            pkt.hor_velocity = 65535
         self.pkt = pkt
         self.last_time = t
 
@@ -42,7 +44,8 @@ class AsterixModule(mp_module.MPModule):
         self.add_command('asterix', self.cmd_asterix, "asterix control",
                          ["<start|stop>","set (ASTERIXSETTING)"])
 
-        self.asterix_settings = mp_settings.MPSettings([("port", int, 45454)])
+        self.asterix_settings = mp_settings.MPSettings([("port", int, 45454),
+                                                        ('debug', int, 0)])
         self.sock = None
         self.tracks = {}
 
@@ -85,8 +88,19 @@ class AsterixModule(mp_module.MPModule):
             pkt = self.sock.recv(10240)
         except Exception:
             return
-        amsg = asterix.parse(pkt)
+        try:
+            if pkt[0] == '(':
+                # pickled packet
+                amsg = [pickle.loads(pkt)]
+            else:
+                amsg = asterix.parse(pkt)
+        except Exception:
+            print("bad packet")
+            return
+        
         for m in amsg:
+            if self.asterix_settings.debug > 1:
+                print(m)
             lat = m['I105']['Lat']['val']
             lon = m['I105']['Lon']['val']
             alt_f = m['I130']['Alt']['val']
@@ -95,25 +109,27 @@ class AsterixModule(mp_module.MPModule):
             sic = m['I010']['SIC']['val']
             trkn = m['I040']['TrkN']['val']
             # fake ICAO_address
-            icao_address = sac << 16 | sic << 8 | trkn
-            squawk = sac << 12 | sic << 8 | trkn
+            icao_address = trkn & 0xFFFF
+            squawk = icao_address
             adsb_pkt = self.master.mav.adsb_vehicle_encode(icao_address,
-                                            lat*1e7,
-                                            lon*1e7,
-                                            mavutil.mavlink.ADSB_ALTITUDE_TYPE_GEOMETRIC,
-                                            alt_f*304.8, # mm
-                                            0, # heading
-                                            0, # hor vel
-                                            climb_rate_fps * 30.48,
-                                            "%08x" % icao_address,
-                                            mavutil.mavlink.ADSB_EMITTER_TYPE_UNASSIGNED,
-                                            1.0,
-                                            0,
-                                            squawk)
+                                                           int(lat*1e7),
+                                                           int(lon*1e7),
+                                                           mavutil.mavlink.ADSB_ALTITUDE_TYPE_GEOMETRIC,
+                                                           int(alt_f*304.8), # mm
+                                                           0, # heading
+                                                           0, # hor vel
+                                                           int(climb_rate_fps * 30.48),
+                                                           "%08x" % icao_address,
+                                                           100 + (trkn // 10000),
+                                                           1.0,
+                                                           mavutil.mavlink.ADSB_FLAGS_VALID_COORDS | mavutil.mavlink.ADSB_FLAGS_VALID_ALTITUDE,
+                                                           squawk)
             if icao_address in self.tracks:
                 self.tracks[icao_address].update(adsb_pkt)
             else:
                 self.tracks[icao_address] = Track(adsb_pkt)
+            if self.asterix_settings.debug > 0:
+                print(adsb_pkt)
             self.master.mav.send(adsb_pkt)
             adsb_mod = self.module('adsb')
             if adsb_mod:
