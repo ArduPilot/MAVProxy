@@ -488,7 +488,12 @@ def process_stdin(line):
     if not line:
         return
 
-    args = shlex_quotes(line)
+    try:
+        args = shlex_quotes(line)
+    except Exception as e:
+        print("Caught shlex exception: %s" % e.message);
+        return
+
     cmd = args[0]
     while cmd in mpstate.aliases:
         line = mpstate.aliases[cmd]
