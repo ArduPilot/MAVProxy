@@ -122,7 +122,10 @@ class AsterixModule(mp_module.MPModule):
                                                            "%08x" % icao_address,
                                                            100 + (trkn // 10000),
                                                            1.0,
-                                                           mavutil.mavlink.ADSB_FLAGS_VALID_COORDS | mavutil.mavlink.ADSB_FLAGS_VALID_ALTITUDE,
+                                                           (mavutil.mavlink.ADSB_FLAGS_VALID_COORDS |
+                                                            mavutil.mavlink.ADSB_FLAGS_VALID_ALTITUDE |
+                                                            mavutil.mavlink.ADSB_FLAGS_VALID_VELOCITY |
+                                                            mavutil.mavlink.ADSB_FLAGS_VALID_HEADING),
                                                            squawk)
             if icao_address in self.tracks:
                 self.tracks[icao_address].update(adsb_pkt)

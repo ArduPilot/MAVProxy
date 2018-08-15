@@ -94,7 +94,7 @@ class SlipLabel(SlipObject):
 
     def draw_label(self, img, pixmapper):
         pix1 = pixmapper(self.point)
-        cv2.putText(img, self.label, pix1, cv2.FONT_HERSHEY_SIMPLEX, 1.0, self.colour)
+        cv2.putText(img, self.label, pix1, cv2.FONT_HERSHEY_SIMPLEX, 0.5, self.colour)
 
     def draw(self, img, pixmapper, bounds):
         if self.hidden:
@@ -449,11 +449,13 @@ class SlipTrail:
 class SlipIcon(SlipThumbnail):
     '''a icon to display on the map'''
     def __init__(self, key, latlon, img, layer=1, rotation=0,
-                 follow=False, trail=None, popup_menu=None):
+                 follow=False, trail=None, popup_menu=None, label=None, colour=(255,255,255)):
         SlipThumbnail.__init__(self, key, latlon, layer, img, popup_menu=popup_menu)
         self.rotation = rotation
         self.follow = follow
         self.trail = trail
+        self.label = label
+        self.colour = colour # label colour
 
     def img(self):
         '''return a cv image for the icon'''
@@ -488,17 +490,22 @@ class SlipIcon(SlipThumbnail):
 
         img[py:py + h, px:px + w] = cv2.add(img[py:py+h, px:px+w], icon[sy:sy+h, sx:sx+w])
 
+        if self.label is not None:
+            cv2.putText(img, self.label, (px,py), cv2.FONT_HERSHEY_SIMPLEX, 1.0, self.colour)
+        
         # remember where we placed it for clicked()
         self.posx = px+w/2
         self.posy = py+h/2
 
 class SlipPosition:
     '''an position object to move an existing object on the map'''
-    def __init__(self, key, latlon, layer=None, rotation=0):
+    def __init__(self, key, latlon, layer=None, rotation=0, label=None, colour=None):
         self.key = key
         self.layer = layer
         self.latlon = latlon
         self.rotation = rotation
+        self.label = label
+        self.colour = colour
 
 class SlipCenter:
     '''an object to move the view center'''
