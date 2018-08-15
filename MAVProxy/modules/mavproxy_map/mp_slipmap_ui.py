@@ -213,6 +213,10 @@ class MPSlipMapFrame(wx.Frame):
                     object.update_position(obj)
                     if getattr(object, 'follow', False):
                         self.follow(object)
+                    if obj.label is not None:
+                        object.label = obj.label
+                    if obj.colour is not None:
+                        object.colour = obj.colour
                     state.need_redraw = True
 
             if isinstance(obj, SlipDefaultPopup):
