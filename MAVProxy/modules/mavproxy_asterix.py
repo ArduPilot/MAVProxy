@@ -4,7 +4,7 @@ support for asterix SDPS data, setup for OBC 2018
 This listens for SDPS on UDP and translates to ADSB_VEHICLE messages
 '''
 
-import time, pickle
+import pickle
 from math import *
 
 from MAVProxy.modules.lib import mp_module
@@ -17,11 +17,16 @@ import asterix, socket, time
 class Track:
     def __init__(self, adsb_pkt):
         self.pkt = adsb_pkt
-        self.last_time = time.time()
+        self.last_time = 0
 
-    def update(self, pkt):
-        t = time.time()
-        dt = t - self.last_time
+    def update(self, pkt, tnow):
+        dt = tnow - self.last_time
+        if dt < 0 or dt > 10:
+            self.last_time = tnow
+            return
+        if dt < 0.1:
+            return
+        self.last_time = tnow
         dist = mp_util.gps_distance(self.pkt.lat*1e-7, self.pkt.lon*1e-7,
                                     pkt.lat*1e-7, pkt.lon*1e-7)
         heading = mp_util.gps_bearing(self.pkt.lat*1e-7, self.pkt.lon*1e-7,
@@ -32,7 +37,6 @@ class Track:
         if pkt.hor_velocity > 65535:
             pkt.hor_velocity = 65535
         self.pkt = pkt
-        self.last_time = t
 
 class AsterixModule(mp_module.MPModule):
 
@@ -48,6 +52,8 @@ class AsterixModule(mp_module.MPModule):
                                                         ('debug', int, 0)])
         self.sock = None
         self.tracks = {}
+        self.tnow = 0
+        self.start_listener()
 
     def cmd_asterix(self, args):
         '''asterix command parser'''
@@ -61,6 +67,9 @@ class AsterixModule(mp_module.MPModule):
             self.start_listener()
         elif args[0] == "stop":
             self.stop_listener()
+        elif args[0] == "restart":
+            self.stop_listener()
+            self.start_listener()
         else:
             print(usage)
 
@@ -79,6 +88,7 @@ class AsterixModule(mp_module.MPModule):
         if self.sock is not None:
             self.sock.close()
             self.sock = None
+        self.tracks = {}
         
     def idle_task(self):
         '''called on idle'''
@@ -128,7 +138,7 @@ class AsterixModule(mp_module.MPModule):
                                                             mavutil.mavlink.ADSB_FLAGS_VALID_HEADING),
                                                            squawk)
             if icao_address in self.tracks:
-                self.tracks[icao_address].update(adsb_pkt)
+                self.tracks[icao_address].update(adsb_pkt, self.tnow)
             else:
                 self.tracks[icao_address] = Track(adsb_pkt)
             if self.asterix_settings.debug > 0:
@@ -138,6 +148,11 @@ class AsterixModule(mp_module.MPModule):
             if adsb_mod:
                 # the adsb module is loaded, display on the map
                 adsb_mod.mavlink_packet(adsb_pkt)
+
+    def mavlink_packet(self, m):
+        '''get time from mavlink ATTITUDE'''
+        if m.get_type() == 'ATTITUDE':
+            self.tnow = m.time_boot_ms*0.001
             
 def init(mpstate):
     '''initialise module'''
