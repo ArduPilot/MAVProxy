@@ -4,7 +4,6 @@ Samuel Dudley
 Dec 2015
 '''
 
-import time
 from math import *
 
 from MAVProxy.modules.lib import mp_module
@@ -29,16 +28,16 @@ class ADSBVehicle(object):
         self.vehicle_colour = 'green'  # use plane icon for now
         self.vehicle_type = 'plane'
         self.icon = self.vehicle_colour + self.vehicle_type + '.png'
-        self.update_time = time.time()
+        self.update_time = 0
         self.is_evading_threat = False
         self.v_distance = None
         self.h_distance = None
         self.distance = None
 
-    def update(self, state):
+    def update(self, state, tnow):
         '''update the threat state'''
         self.state = state
-        self.update_time = time.time()
+        self.update_time = tnow
 
 
 class ADSBModule(mp_module.MPModule):
@@ -59,6 +58,7 @@ class ADSBModule(mp_module.MPModule):
                                                      ("show_threat_radius_clear", bool, False)])
         self.threat_detection_timer = mavutil.periodic_event(2)
         self.threat_timeout_timer = mavutil.periodic_event(2)
+        self.tnow = 0
 
     def cmd_ADSB(self, args):
         '''adsb command parser'''
@@ -143,9 +143,9 @@ class ADSBModule(mp_module.MPModule):
 
     def check_threat_timeout(self):
         '''check and handle threat time out'''
-        current_time = time.time()
         for id in self.threat_vehicles.keys():
-            if current_time - self.threat_vehicles[id].update_time > self.ADSB_settings.timeout:
+            dt = self.tnow - self.threat_vehicles[id].update_time
+            if dt < 0 or dt > self.ADSB_settings.timeout:
                 # if the threat has timed out...
                 del self.threat_vehicles[id]  # remove the threat from the dict
                 if self.mpstate.map:
@@ -158,7 +158,10 @@ class ADSBModule(mp_module.MPModule):
 
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
-        if m.get_type() == "ADSB_VEHICLE":
+        if m.get_type() == 'ATTITUDE':
+            # use mavlink time to allow for speedup and gdb attach in SITL
+            self.tnow = m.time_boot_ms * 0.001
+        elif m.get_type() == "ADSB_VEHICLE":
             id = 'ADSB-' + str(m.ICAO_address)
             if id not in self.threat_vehicles.keys():  # check to see if the vehicle is in the dict
                 # if not then add it
@@ -177,7 +180,7 @@ class ADSBModule(mp_module.MPModule):
                                                                     popup_menu=popup))
             else:  # the vehicle is in the dict
                 # update the dict entry
-                self.threat_vehicles[id].update(m.to_dict())
+                self.threat_vehicles[id].update(m.to_dict(), self.tnow)
                 if self.mpstate.map:  # if the map is loaded...
                     # update the map
                     ground_alt = self.console.ElevationMap.GetElevation(m.lat*1e-7, m.lon*1e-7)
@@ -189,7 +192,7 @@ class ADSBModule(mp_module.MPModule):
                         label = None
                     self.mpstate.map.set_position(id, (m.lat * 1e-7, m.lon * 1e-7), rotation=m.heading*0.01, label=label, colour=(0,0,0))
 
-        if m.get_type() == "GLOBAL_POSITION_INT":
+        elif m.get_type() == "GLOBAL_POSITION_INT":
             if self.mpstate.map:
                 if len(self.active_threat_ids) > 0:
                     threat_circle_width = 2
