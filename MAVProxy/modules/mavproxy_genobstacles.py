@@ -42,6 +42,7 @@ class DNFZ:
         self.pkt = {'category': 0, 'I010': {'SAC': {'val': 4, 'desc': 'System Area Code'}, 'SIC': {'val': 0, 'desc': 'System Identification Code'}}, 'I040': {'TrkN': {'val': 0, 'desc': 'Track number'}}, 'ts': 0, 'len': 25, 'I220': {'RoC': {'val': 0.0, 'desc': 'Rate of Climb/Descent'}}, 'crc': 'B52DA163', 'I130': {'Alt': {'max': 150000.0, 'min': -1500.0, 'val': 0.0, 'desc': 'Altitude'}}, 'I070': {'ToT': {'val': 0.0, 'desc': 'Time Of Track Information'}}, 'I105': {'Lat': {'val': 0, 'desc': 'Latitude in WGS.84 in twos complement. Range -90 < latitude < 90 deg.'}, 'Lon': {'val': 0.0, 'desc': 'Longitude in WGS.84 in twos complement. Range -180 < longitude < 180 deg.'}}, 'I080': {'SRC': {'meaning': '3D radar', 'val': 2, 'desc': 'Source of calculated track altitude for I062/130'}, 'FX': {'meaning': 'end of data item', 'val': 0, 'desc': ''}, 'CNF': {'meaning': 'Confirmed track', 'val': 0, 'desc': ''}, 'SPI': {'meaning': 'default value', 'val': 0, 'desc': ''}, 'MRH': {'meaning': 'Geometric altitude more reliable', 'val': 1, 'desc': 'Most Reliable Height'}, 'MON': {'meaning': 'Multisensor track', 'val': 0, 'desc': ''}}}
         self.speed = 0.0 # m/s
         self.heading = 0.0 # degrees
+        self.desired_heading = None
         self.yawrate = 0.0
         # random initial position and heading
         self.randpos()
@@ -109,12 +110,34 @@ class DNFZ:
         alt = self.pkt['I130']['Alt']['val']
         alt += delta_alt
         self.setalt(alt)
+
+    def rate_of_turn(self, bank=45.0):
+        '''return expected rate of turn in degrees/s for given speed in m/s and bank angle in degrees'''
+        if abs(self.speed) < 2 or abs(bank) > 80:
+            return 0
+        ret = degrees(9.81*tan(radians(bank))/self.speed)
+        return ret
         
     def update(self, deltat=1.0):
         self.move(self.heading, self.speed * deltat)
         climbrate = self.pkt['I220']['RoC']['val']
         self.changealt(climbrate * deltat)
-        self.setheading(self.heading + self.yawrate * deltat)
+        if self.desired_heading is None:
+            self.setheading(self.heading + self.yawrate * deltat)
+        else:
+            heading_error = self.desired_heading - self.heading
+            while heading_error > 180:
+                heading_error -= 360.0
+            while heading_error < -180:
+                heading_error += 360.0            
+            max_turn = self.rate_of_turn() * deltat
+            if heading_error > 0:
+                turn = min(max_turn, heading_error)
+            else:
+                turn = max(-max_turn, heading_error)
+            self.setheading(self.heading + turn)
+            if abs(heading_error) < 0.01:
+                self.desired_heading = None
 
     def __str__(self):
         return str(self.pkt)
@@ -136,7 +159,7 @@ class Aircraft(DNFZ):
         DNFZ.update(self, deltat)
         self.dist_flown += self.speed * deltat
         if self.dist_flown > self.circuit_width:
-            self.setheading(self.heading + 90)
+            self.desired_heading = self.heading + 90
             self.dist_flown = 0
         if self.getalt() < gen_settings.ground_height:
             self.randpos()
