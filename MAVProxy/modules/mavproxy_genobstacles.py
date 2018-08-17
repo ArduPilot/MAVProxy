@@ -31,7 +31,9 @@ gen_settings = mp_settings.MPSettings([("port", int, 45454),
                                        ('num_aircraft', int, 10),
                                        ('num_bird_prey', int, 10),
                                        ('num_bird_migratory', int, 10),
-                                       ('num_weather', int, 10)])
+                                       ('num_weather', int, 10),
+                                       ('stop', int, 0)])
+                                       
     
 class DNFZ:
     '''a dynamic no-fly zone object'''
@@ -238,6 +240,8 @@ class GenobstaclesModule(mp_module.MPModule):
         self.add_command('genobstacles', self.cmd_genobstacles, "obstacle generator",
                          ["<start|stop>","set (GENSETTING)"])
 
+        self.add_completion_function('(GENSETTING)',
+                                     gen_settings.completion)
         self.sock = None
         self.aircraft = []
         self.last_t = 0
@@ -310,7 +314,8 @@ class GenobstaclesModule(mp_module.MPModule):
             return
         self.last_t = t
         for a in self.aircraft:
-            a.update(1.0)
+            if not gen_settings.stop:
+                a.update(1.0)
             try:
                 self.sock.send(a.pickled())
             except Exception as ex:
