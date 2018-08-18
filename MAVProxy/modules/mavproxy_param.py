@@ -44,7 +44,7 @@ class ParamState:
                 print("%s = %.7f" % (param_id, m.param_value))
             if added_new_parameter and len(self.mav_param_set) == m.param_count:
                 print("Received %u parameters" % m.param_count)
-                if self.logdir != None:
+                if self.logdir is not None:
                     self.mav_param.save(os.path.join(self.logdir, self.parm_file), '*', verbose=True)
                     self.fetch_set = None
             if self.fetch_set is not None and len(self.fetch_set) == 0:
@@ -313,7 +313,7 @@ class ParamModule(mp_module.MPModule):
                           "<load|save|diff> (FILENAME)",
                           "<set_xml_filepath> (FILEPATH)"
                          ])
-        if self.continue_mode and self.logdir != None:
+        if self.continue_mode and self.logdir is not None:
             parmfile = os.path.join(self.logdir, 'mav.parm')
             if os.path.exists(parmfile):
                 mpstate.mav_param.load(parmfile)

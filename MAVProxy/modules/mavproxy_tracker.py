@@ -165,7 +165,7 @@ class TrackerModule(mp_module.MPModule):
 
 
     def cmd_tracker_start(self):
-        if self.tracker_settings.port == None:
+        if self.tracker_settings.port is None:
             print("tracker port not set")
             return
         if self.connection is not None:

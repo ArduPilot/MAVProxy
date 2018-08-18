@@ -650,7 +650,7 @@ class MapModule(mp_module.MPModule):
                             nearest_land_wp = w
                             nearest_distance = dis
 
-                if nearest_land_wp != None:
+                if nearest_land_wp is not None:
                     points = []
                     #tangential approach?
                     if self.get_mav_param('LAND_BREAK_PATH') == 0:

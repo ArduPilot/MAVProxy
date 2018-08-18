@@ -558,7 +558,7 @@ def process_master(m):
         return
     
     global mavversion
-    if m.first_byte and mavversion == None:
+    if m.first_byte and mavversion is None:
         m.auto_mavlink_version(s)
     msgs = m.mav.parse_buffer(s)
     if msgs:
@@ -584,7 +584,7 @@ def process_mavlink(slave):
         return
     try:
         global mavversion
-        if slave.first_byte and mavversion == None:
+        if slave.first_byte and mavversion is None:
             slave.auto_mavlink_version(buf)
         msgs = slave.mav.parse_buffer(buf)
     except mavutil.mavlink.MAVError as e:

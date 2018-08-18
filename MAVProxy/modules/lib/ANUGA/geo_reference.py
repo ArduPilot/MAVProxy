@@ -191,7 +191,7 @@ class Geo_reference:
     # @param fd Handle to open text file.
     def read_ASCII(self, fd, read_title=None):
         try:
-            if read_title == None:
+            if read_title is None:
                 read_title = fd.readline()     # remove the title line
             if read_title[0:2].upper() != TITLE[0:2].upper():
                 msg = ('File error.  Expecting line: %s.  Got this line: %s'

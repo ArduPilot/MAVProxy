@@ -226,7 +226,7 @@ def convert_from_latlon_to_utm(points=None,
 
     old_geo = Geo_reference()
     utm_points = []
-    if points == None:
+    if points is None:
         assert len(latitudes) == len(longitudes)
         points =  map(None, latitudes, longitudes)
 
