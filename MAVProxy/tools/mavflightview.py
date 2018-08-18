@@ -120,7 +120,7 @@ def colourmap_for_mav_type(mav_type):
     if mav_type == mavutil.mavlink.MAV_TYPE_SUBMARINE:
         map = colour_map_submarine
     if map is None:
-        print("No colormap for mav_type=%u" % (map,))
+        print("No colormap for mav_type=%u" % (mav_type,))
         # we probably don't have a valid mode map, so returning
         # anything but the empty map here is probably pointless:
         map = colour_map_plane
