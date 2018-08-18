@@ -131,10 +131,10 @@ def display_waypoints(wploader, map):
     mission_list = wploader.view_list()
     polygons = wploader.polygon_list()
     map.add_object(mp_slipmap.SlipClearLayer('Mission'))
-    for i in range(len(polygons)):
-        p = polygons[i]
+    for k in range(len(polygons)):
+        p = polygons[k]
         if len(p) > 1:
-            map.add_object(mp_slipmap.SlipPolygon('mission %u' % i, p,
+            map.add_object(mp_slipmap.SlipPolygon('mission %u' % k, p,
                                                   layer='Mission', linewidth=2, colour=(255,255,255)))
         labeled_wps = {}
         for i in range(len(mission_list)):
