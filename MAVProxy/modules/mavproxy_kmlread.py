@@ -149,19 +149,19 @@ class KmlReadModule(mp_module.MPModule):
                     self.mpstate.map.remove_object(layer)
                     self.curlayers.remove(layername)
                     if layername in self.curtextlayers:
-                        for layer in self.curtextlayers:
-                            if layer == layername:
-                                self.mpstate.map.remove_object(layer)
-                                self.curtextlayers.remove(layer)
+                        for clayer in self.curtextlayers:
+                            if clayer == layername:
+                                self.mpstate.map.remove_object(clayer)
+                                self.curtextlayers.remove(clayer)
         #toggle layer on (plus associated text element)
         else:
             for layer in self.allayers:
                 if layer.key == layername:
                     self.mpstate.map.add_object(layer)
                     self.curlayers.append(layername)
-                    for layer in self.alltextlayers:
-                        if layer.key == layername:
-                            self.mpstate.map.add_object(layer)
+                    for alayer in self.alltextlayers:
+                        if alayer.key == layername:
+                            self.mpstate.map.add_object(alayer)
                             self.curtextlayers.append(layername)
         self.menu_needs_refreshing = True
         
