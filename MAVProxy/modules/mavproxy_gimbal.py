@@ -211,8 +211,8 @@ class GimbalModule(mp_module.MPModule):
         # find the intersection with the ground
         pt = line.plane_intersection(ground_plane, forward_only=True)
         if pt is None:
-	    # its pointing up into the sky
-	    return None
+            # its pointing up into the sky
+            return None
 
         (view_lat, view_lon) = mp_util.gps_offset(lat, lon, pt.y, pt.x)
 
