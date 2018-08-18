@@ -256,9 +256,6 @@ class MPImagePanel(wx.Panel):
         state.frame.Fit()
 
     def on_focus(self, event):
-        self.imagePanel.SetFocus()
-
-    def on_focus(self, event):
         '''called when the panel gets focus'''
         self.imagePanel.SetFocus()
 
