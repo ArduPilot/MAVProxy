@@ -578,7 +578,7 @@ class Program:
             'material.alpha',
         )}
 
-    def shader_code(shader_type, code):
+    def shader_code(self, shader_type, code):
         self.shaders[shader_type] = code
 
     def compile_and_link(self):
