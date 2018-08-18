@@ -194,7 +194,7 @@ def expression_ok(expression, msgs=None):
     '''return True if an expression is OK with current messages'''
     expression_ok = True
     fields = expression.split()
-    if msgs == None:
+    if msgs is None:
         msgs = mestate.status.msgs
     for f in fields:
         try:
@@ -536,7 +536,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     #If specified, open the log file
-    if args.files != None and len(args.files) != 0:
+    if args.files is not None and len(args.files) != 0:
         loadfile(args.files)
 
     # run main loop as a thread
@@ -545,7 +545,7 @@ if __name__ == "__main__":
     mestate.thread.start()
 
     # input loop
-    while mestate.rl != None and mestate.exit != True:
+    while mestate.rl is not None and mestate.exit != True:
         try:
             try:
                 line = raw_input(mestate.rl.prompt)

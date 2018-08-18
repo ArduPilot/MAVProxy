@@ -143,7 +143,7 @@ class SmartCameraVideo:
     # get_image - returns latest image from the camera captured from the background process
     def get_image(self):
         # return immediately if pipe is not initialised
-        if self.parent_conn == None:
+        if self.parent_conn is None:
             return None
 
         # send request to image capture for image

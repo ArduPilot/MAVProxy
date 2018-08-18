@@ -190,7 +190,7 @@ class MavGraph(object):
                 (tz, tzdst) = time.tzname
 
             if self.axes[i] == 2:
-                if ax2 == None:
+                if ax2 is None:
                     ax2 = self.ax1.twinx()
                     ax2.format_coord = self.make_format(ax2, self.ax1)
                 ax = ax2

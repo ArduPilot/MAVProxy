@@ -27,7 +27,7 @@ class WPModule(mp_module.MPModule):
                          ["<list|clear|move|remove|loop|set|undo|movemulti|changealt|param|status>",
                           "<load|update|save|show> (FILENAME)"])
 
-        if self.continue_mode and self.logdir != None:
+        if self.continue_mode and self.logdir is not None:
             waytxt = os.path.join(mpstate.status.logdir, 'way.txt')
             if os.path.exists(waytxt):
                 self.wploader.load(waytxt)
@@ -99,7 +99,7 @@ class WPModule(mp_module.MPModule):
                                                                                  time.asctime()))
                 self.send_wp_requests()
 
-        elif mtype in ['WAYPOINT', 'MISSION_ITEM'] and self.wp_op != None:
+        elif mtype in ['WAYPOINT', 'MISSION_ITEM'] and self.wp_op is not None:
             if m.seq < self.wploader.count():
                 #print("DUPLICATE %u" % m.seq)
                 return
@@ -122,7 +122,7 @@ class WPModule(mp_module.MPModule):
                         w.command, w.frame, w.x, w.y, w.z,
                         w.param1, w.param2, w.param3, w.param4,
                         w.current, w.autocontinue))
-                if self.logdir != None:
+                if self.logdir is not None:
                     waytxt = os.path.join(self.logdir, 'way.txt')
                     self.save_waypoints(waytxt)
                     print("Saved waypoints to %s" % waytxt)
