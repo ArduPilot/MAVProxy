@@ -174,6 +174,10 @@ class WPModule(mp_module.MPModule):
 
     def process_waypoint_request(self, m, master):
         '''process a waypoint request from the master'''
+        if (m.target_system != self.settings.source_system or
+            m.target_component != self.settings.source_component):
+            # self.console.error("Mission request is not for me")
+            return
         if (not self.loading_waypoints or
             time.time() > self.loading_waypoint_lasttime + 10.0):
             self.loading_waypoints = False
