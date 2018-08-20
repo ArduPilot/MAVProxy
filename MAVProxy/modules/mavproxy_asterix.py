@@ -101,7 +101,10 @@ class AsterixModule(mp_module.MPModule):
         try:
             if pkt[0] == '(':
                 # pickled packet
-                amsg = [pickle.loads(pkt)]
+                try:
+                    amsg = [pickle.loads(pkt)]
+                except pickle.UnpicklingError:
+                    amsg = asterix.parse(pkt)
             else:
                 amsg = asterix.parse(pkt)
         except Exception:
