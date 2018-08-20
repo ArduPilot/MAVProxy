@@ -176,10 +176,12 @@ class MapModule(mp_module.MPModule):
         for i in range(len(polygons)):
             p = polygons[i]
             if len(p) > 1:
-                popup = MPMenuSubMenu('Popup',
-                                      items=[MPMenuItem('Set', returnkey='popupMissionSet'),
-                                             MPMenuItem('WP Remove', returnkey='popupMissionRemove'),
-                                             MPMenuItem('WP Move', returnkey='popupMissionMove')])
+                items = [MPMenuItem('Set', returnkey='popupMissionSet'),
+                         MPMenuItem('WP Remove', returnkey='popupMissionRemove'),
+                         MPMenuItem('WP Move', returnkey='popupMissionMove'),
+                         MPMenuItem('Remove NoFly', returnkey='popupMissionRemoveNoFly'),
+                ]
+                popup = MPMenuSubMenu('Popup', items)
                 self.mpstate.map.add_object(mp_slipmap.SlipPolygon('mission %u' % i, p,
                                                                    layer='Mission', linewidth=2, colour=(255,255,255),
                                                                    arrow = self.map_settings.showdirection, popup_menu=popup))
@@ -289,6 +291,71 @@ class MapModule(mp_module.MPModule):
         idx = self.selection_index_to_idx(key, selection_index)
         self.mpstate.functions.process_stdin('wp remove %u' % idx)
 
+    def validate_nofly(self):
+        seq_start = None
+        wploader = self.module('wp').wploader
+        for x in range(0,wploader.count()):
+            tmp = wploader.wp(x)
+            if tmp.seq != x:
+                print("Indexing error %u" % x)
+                return False
+            if tmp.command != mavutil.mavlink.MAV_CMD_NAV_FENCE_POLYGON_VERTEX_EXCLUSION:
+                if seq_start is not None:
+                    print("Invalid sequence starting at %u" % x)
+                    return False
+                continue
+            if seq_start is None:
+                seq_start = tmp
+
+            if int(tmp.param1) != int(seq_start.param1):
+                print("Invalid sequence starting at %u" % seq_start.seq)
+                return False
+
+            if x - seq_start.seq == tmp.param1-1:
+                # good sequence
+                seq_start = None
+
+        if seq_start is not None:
+            print("Short nofly polygon list")
+            return False
+
+        return True
+
+    def remove_mission_nofly(self, key, selection_index):
+        '''remove a mission nofly polygon'''
+        if not self.validate_nofly():
+            print("NoFly invalid")
+            return
+        print("NoFly valid")
+
+        idx = self.selection_index_to_idx(key, selection_index)
+        wploader = self.module('wp').wploader
+
+        if idx < 0 or idx >= wploader.count():
+            print("Invalid wp number %u" % idx)
+            return
+        wp = wploader.wp(idx)
+        if wp.command != mavutil.mavlink.MAV_CMD_NAV_FENCE_POLYGON_VERTEX_EXCLUSION:
+            print("Not an exclusion point (%u)" % idx)
+            return
+
+        # we know the list is valid.  Search for the start of the sequence to delete
+        tmp_idx = idx
+        while tmp_idx > 0:
+            tmp = wploader.wp(tmp_idx-1)
+            if (tmp.command != wp.command or
+                tmp.param1 != wp.param1):
+                break
+            tmp_idx -= 1
+
+        start_idx_to_delete = idx - ((idx-tmp_idx)%int(wp.param1))
+        for i in range(int(start_idx_to_delete+wp.param1)-1,start_idx_to_delete-1,-1):
+            # remove in reverse order as wploader.remove re-indexes
+            print("Removing at %u" % i)
+            deadun = wploader.wp(i)
+            wploader.remove(deadun)
+        self.module('wp').send_all_waypoints()
+
     def remove_fencepoint(self, key, selection_index):
         '''remove a fence point'''
         self.mpstate.functions.process_stdin('fence remove %u' % (selection_index+1))
@@ -319,6 +386,8 @@ class MapModule(mp_module.MPModule):
             self.move_rally(obj.selected[0].objkey)
         elif menuitem.returnkey == 'popupMissionSet':
             self.set_mission(obj.selected[0].objkey, obj.selected[0].extra_info)
+        elif menuitem.returnkey == 'popupMissionRemoveNoFly':
+            self.remove_mission_nofly(obj.selected[0].objkey, obj.selected[0].extra_info)
         elif menuitem.returnkey == 'popupMissionRemove':
             self.remove_mission(obj.selected[0].objkey, obj.selected[0].extra_info)
         elif menuitem.returnkey == 'popupMissionMove':
