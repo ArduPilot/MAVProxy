@@ -9,6 +9,8 @@ from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_util
 from pymavlink import mavutil
+if mp_util.has_wxpython:
+    from MAVProxy.modules.lib.mp_menu import *
 
 import socket, time, random, math
 
@@ -28,10 +30,10 @@ gen_settings = mp_settings.MPSettings([("port", int, 45454),
                                        ('home_lon', float, 151.290775),
                                        ('region_width', float, 15000),
                                        ('ground_height', float, 1150),
-                                       ('num_aircraft', int, 10),
-                                       ('num_bird_prey', int, 10),
-                                       ('num_bird_migratory', int, 10),
-                                       ('num_weather', int, 10),
+                                       ('num_aircraft', int, 5),
+                                       ('num_bird_prey', int, 5),
+                                       ('num_bird_migratory', int, 5),
+                                       ('num_weather', int, 5),
                                        ('stop', int, 0)])
                                        
     
@@ -55,10 +57,15 @@ class DNFZ:
         if gen_settings.debug > 0:
             print("track %u" % self.pkt['I040']['TrkN']['val'])
 
+    def distance_from(self, lat, lon):
+        '''get distance from a point'''
+        lat1 = self.pkt['I105']['Lat']['val']
+        lon1 = self.pkt['I105']['Lon']['val']
+        return mp_util.gps_distance(lat1, lon1, lat, lon)
+        
     def distance_from_home(self):
-        lat = self.pkt['I105']['Lat']['val']
-        lon = self.pkt['I105']['Lon']['val']
-        return mp_util.gps_distance(lat, lon, gen_settings.home_lat, gen_settings.home_lon)
+        '''get distance from home'''
+        return self.distance_from(gen_settings.home_lat, gen_settings.home_lon)
         
     def randpos(self):
         '''random initial position'''
@@ -68,7 +75,7 @@ class DNFZ:
     def randalt(self):
         '''random initial position'''
         self.setalt(gen_settings.ground_height + random.uniform(100, 1500))
-        
+
     def move(self, bearing, distance):
         '''move position by bearing and distance'''
         lat = self.pkt['I105']['Lat']['val']
@@ -246,6 +253,25 @@ class GenobstaclesModule(mp_module.MPModule):
         self.aircraft = []
         self.last_t = 0
         self.start()
+        self.menu_added_map = False
+        if mp_util.has_wxpython:
+            self.menu = MPMenuSubMenu('Obstacles',
+                                    items=[MPMenuItem('Restart', 'Restart', '# genobstacles restart'),
+                                           MPMenuItem('Stop', 'Stop', '# genobstacles stop'),
+                                           MPMenuItem('Start','Start', '# genobstacles start'),
+                                           MPMenuItem('Remove','Remove', '# genobstacles remove'),
+                                           MPMenuItem('Drop Cloud','DropCloud', '# genobstacles dropcloud'),
+                                           MPMenuItem('Drop Eagle','DropEagle', '# genobstacles dropeagle'),
+                                           MPMenuItem('Drop Bird','DropBird', '# genobstacles dropbird'),
+                                           MPMenuItem('Drop Plane','DropPlane', '# genobstacles dropplane')])
+
+    def cmd_dropobject(self, obj):
+        '''drop an object on the map'''
+        latlon = self.module('map').click_position
+        if latlon is not None:
+            obj.setpos(latlon[0], latlon[1])
+            self.aircraft.append(obj)
+        
 
     def cmd_genobstacles(self, args):
         '''genobstacles command parser'''
@@ -262,6 +288,29 @@ class GenobstaclesModule(mp_module.MPModule):
         elif args[0] == "restart":
             self.stop()
             self.start()
+        elif args[0] == "remove":
+            latlon = self.module('map').click_position
+            if latlon is not None:
+                closest = None
+                closest_distance = 1000
+                for a in self.aircraft:
+                    dist = a.distance_from(latlon[0], latlon[1])
+                    if dist < closest_distance:
+                        closest_distance = dist
+                        closest = a
+                if closest is not None:
+                    self.aircraft.remove(closest)
+                else:
+                    print("No obstacle found at click point")
+                    
+        elif args[0] == "dropcloud":
+            self.cmd_dropobject(Weather())
+        elif args[0] == "dropeagle":
+            self.cmd_dropobject(BirdOfPrey())
+        elif args[0] == "dropbird":
+            self.cmd_dropobject(BirdMigrating())
+        elif args[0] == "dropplane":
+            self.cmd_dropobject(Aircraft())
         else:
             print(usage)
 
@@ -320,6 +369,9 @@ class GenobstaclesModule(mp_module.MPModule):
                 self.sock.send(a.pickled())
             except Exception as ex:
                 pass
+        if self.module('map') is not None and not self.menu_added_map:
+            self.menu_added_map = True
+            self.module('map').add_menu(self.menu)
         
         
 def init(mpstate):

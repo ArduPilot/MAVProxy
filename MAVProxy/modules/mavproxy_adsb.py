@@ -56,6 +56,9 @@ class ADSBModule(mp_module.MPModule):
                                                      # threat_radius_clear = threat_radius*threat_radius_clear_multiplier
                                                      ("threat_radius_clear_multiplier", int, 2),
                                                      ("show_threat_radius_clear", bool, False)])
+        self.add_completion_function('(ADSBSETTING)',
+                                     self.ADSB_settings.completion)
+        
         self.threat_detection_timer = mavutil.periodic_event(2)
         self.threat_timeout_timer = mavutil.periodic_event(2)
         self.tnow = 0
