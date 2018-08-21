@@ -252,9 +252,10 @@ class GenobstaclesModule(mp_module.MPModule):
         self.sock = None
         self.aircraft = []
         self.last_t = 0
-        self.start()
         self.menu_added_map = False
         self.pkt_queue = []
+        self.have_home = False
+        self.pending_start = True
         if mp_util.has_wxpython:
             self.menu = MPMenuSubMenu('Obstacles',
                                     items=[MPMenuItem('Restart', 'Restart', '# genobstacles restart'),
@@ -283,9 +284,13 @@ class GenobstaclesModule(mp_module.MPModule):
         if args[0] == "set":
             gen_settings.command(args[1:])
         elif args[0] == "start":
-            self.start()
+            if self.have_home:
+                self.start()
+            else:
+                self.pending_start = True
         elif args[0] == "stop":
             self.stop()
+            self.pending_start = False
         elif args[0] == "restart":
             self.stop()
             self.start()
@@ -361,6 +366,12 @@ class GenobstaclesModule(mp_module.MPModule):
             
     def mavlink_packet(self, m):
         '''trigger sends from ATTITUDE packets'''
+        if not self.have_home and m.get_type() == 'GPS_RAW_INT' and m.fix_type >= 3:
+            gen_settings.home_lat = m.lat * 1.0e-7
+            gen_settings.home_lon = m.lon * 1.0e-7
+            self.have_home = True
+            if self.pending_start:
+                self.start()
         if m.get_type() != 'ATTITUDE':
             return
         t = m.time_boot_ms * 0.001
