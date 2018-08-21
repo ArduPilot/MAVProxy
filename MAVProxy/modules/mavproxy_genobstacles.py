@@ -254,6 +254,7 @@ class GenobstaclesModule(mp_module.MPModule):
         self.last_t = 0
         self.start()
         self.menu_added_map = False
+        self.pkt_queue = []
         if mp_util.has_wxpython:
             self.menu = MPMenuSubMenu('Obstacles',
                                     items=[MPMenuItem('Restart', 'Restart', '# genobstacles restart'),
@@ -350,6 +351,14 @@ class GenobstaclesModule(mp_module.MPModule):
             self.sock.close()
             self.sock = None
 
+    def idle_task(self):
+        while len(self.pkt_queue) > 0:
+            try:
+                self.sock.send(self.pkt_queue[0])
+                self.pkt_queue.pop(0)
+            except Exception as ex:
+                return
+            
     def mavlink_packet(self, m):
         '''trigger sends from ATTITUDE packets'''
         if m.get_type() != 'ATTITUDE':
@@ -365,10 +374,10 @@ class GenobstaclesModule(mp_module.MPModule):
         for a in self.aircraft:
             if not gen_settings.stop:
                 a.update(1.0)
-            try:
-                self.sock.send(a.pickled())
-            except Exception as ex:
-                pass
+                self.pkt_queue.append(a.pickled())
+                while len(self.pkt_queue) > len(self.aircraft)*2:
+                    self.pkt_queue.pop(0)
+                    
         if self.module('map') is not None and not self.menu_added_map:
             self.menu_added_map = True
             self.module('map').add_menu(self.menu)

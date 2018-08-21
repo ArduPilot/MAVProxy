@@ -148,7 +148,10 @@ class AsterixModule(mp_module.MPModule):
                 self.tracks[icao_address] = Track(adsb_pkt)
             if self.asterix_settings.debug > 0:
                 print(adsb_pkt)
-            self.master.mav.send(adsb_pkt)
+            # send on all links
+            for i in range(len(self.mpstate.mav_master)):
+                conn = self.mpstate.mav_master[i]
+                conn.mav.send(adsb_pkt)
             adsb_mod = self.module('adsb')
             if adsb_mod:
                 # the adsb module is loaded, display on the map
