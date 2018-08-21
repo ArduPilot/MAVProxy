@@ -50,6 +50,8 @@ class AsterixModule(mp_module.MPModule):
 
         self.asterix_settings = mp_settings.MPSettings([("port", int, 45454),
                                                         ('debug', int, 0)])
+        self.add_completion_function('(ASTERIXSETTING)',
+                                     self.asterix_settings.completion)
         self.sock = None
         self.tracks = {}
         self.tnow = 0
