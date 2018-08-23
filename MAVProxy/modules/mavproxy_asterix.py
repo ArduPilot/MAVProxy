@@ -48,8 +48,12 @@ class AsterixModule(mp_module.MPModule):
         self.add_command('asterix', self.cmd_asterix, "asterix control",
                          ["<start|stop>","set (ASTERIXSETTING)"])
 
+        # filter_dist is distance in metres
         self.asterix_settings = mp_settings.MPSettings([("port", int, 45454),
-                                                        ('debug', int, 0)])
+                                                        ('debug', int, 0),
+                                                        ('filter_dist', int, -1),
+                                                        ('filter_use_vehicle2', bool, True),
+        ])
         self.add_completion_function('(ASTERIXSETTING)',
                                      self.asterix_settings.completion)
         self.sock = None
@@ -57,9 +61,21 @@ class AsterixModule(mp_module.MPModule):
         self.tnow = 0
         self.start_listener()
 
+        # storage for vehicle positions, used for filtering
+        self.vehicle_lat = None
+        self.vehicle_lon = None
+        self.vehicle2_lat = None
+        self.vehicle2_lon = None
+        self.adsb_packets_sent = 0
+        self.adsb_packets_not_sent = 0
+
+    def print_status(self):
+        print("ADSB packets sent: %u" % self.adsb_packets_sent)
+        print("ADSB packets not sent: %u" % self.adsb_packets_not_sent)
+
     def cmd_asterix(self, args):
         '''asterix command parser'''
-        usage = "usage: asterix <set>"
+        usage = "usage: asterix <set|start|stop|restart|status>"
         if len(args) == 0:
             print(usage)
             return
@@ -72,6 +88,8 @@ class AsterixModule(mp_module.MPModule):
         elif args[0] == "restart":
             self.stop_listener()
             self.start_listener()
+        elif args[0] == "status":
+            self.print_status()
         else:
             print(usage)
 
@@ -91,7 +109,46 @@ class AsterixModule(mp_module.MPModule):
             self.sock.close()
             self.sock = None
         self.tracks = {}
-        
+
+    def set_secondary_vehicle_position(self, m):
+        '''store second vehicle position for filtering purposes'''
+        if m.get_type() != 'GLOBAL_POSITION_INT':
+            return
+        (lat, lon, heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
+        if abs(lat) < 1.0e-3 and abs(lon) > 1.0e-3:
+            return
+
+    def should_send_adsb_pkt(self, adsb_pkt):
+        if self.asterix_settings.filter_dist <= 0:
+            return True
+
+        # only filter packets out if vehicle's position is known:
+        if self.vehicle_lat is None:
+            return True
+
+        adsb_pkt_lat = adsb_pkt.lat*1.0e-7
+        adsb_pkt_lon = adsb_pkt.lon*1.0e-7
+
+        dist = mp_util.gps_distance(adsb_pkt_lat,
+                                    adsb_pkt_lon,
+                                    self.vehicle_lat,
+                                    self.vehicle_lon)
+        if dist <= self.asterix_settings.filter_dist:
+            return True
+
+        if self.asterix_settings.filter_use_vehicle2:
+            # only filter packets out if vehicle's position is known:
+            if self.vehicle2_lat is None:
+                return True
+            dist = mp_util.gps_distance(adsb_pkt_lat,
+                                        adsb_pkt_lon,
+                                        self.vehicle2_lat,
+                                        self.vehicle2_lon)
+            if dist <= self.asterix_settings.filter_dist:
+                return True
+
+        return False
+
     def idle_task(self):
         '''called on idle'''
         if self.sock is None:
@@ -126,6 +183,9 @@ class AsterixModule(mp_module.MPModule):
             # fake ICAO_address
             icao_address = trkn & 0xFFFF
             squawk = icao_address
+
+            # consider filtering this packet out; if it's not close to
+            # either home or the vehicle position don't send it
             adsb_pkt = self.master.mav.adsb_vehicle_encode(icao_address,
                                                            int(lat*1e7),
                                                            int(lon*1e7),
@@ -149,9 +209,14 @@ class AsterixModule(mp_module.MPModule):
             if self.asterix_settings.debug > 0:
                 print(adsb_pkt)
             # send on all links
-            for i in range(len(self.mpstate.mav_master)):
-                conn = self.mpstate.mav_master[i]
-                conn.mav.send(adsb_pkt)
+            if self.should_send_adsb_pkt(adsb_pkt):
+                self.adsb_packets_sent += 1
+                for i in range(len(self.mpstate.mav_master)):
+                    conn = self.mpstate.mav_master[i]
+                    conn.mav.send(adsb_pkt)
+            else:
+                self.adsb_packets_not_sent += 1
+
             adsb_mod = self.module('adsb')
             if adsb_mod:
                 # the adsb module is loaded, display on the map
@@ -161,7 +226,10 @@ class AsterixModule(mp_module.MPModule):
         '''get time from mavlink ATTITUDE'''
         if m.get_type() == 'ATTITUDE':
             self.tnow = m.time_boot_ms*0.001
-            
+        if m.get_type() == 'GLOBAL_POSITION_INT':
+            self.vehicle_lat = m.lat*1.0e-7
+            self.vehicle_lon = m.lon*1.0e-7
+
 def init(mpstate):
     '''initialise module'''
     return AsterixModule(mpstate)
