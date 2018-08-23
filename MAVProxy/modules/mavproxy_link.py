@@ -380,6 +380,9 @@ class LinkModule(mp_module.MPModule):
             self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
             if m.get_type() == "GLOBAL_POSITION_INT" and self.module('map') is not None:
                 self.module('map').set_secondary_vehicle_position(m)
+                mod = self.module('asterix')
+                if mod:
+                    mod.set_secondary_vehicle_position(m)
             return
 
         if getattr(m, '_timestamp', None) is None:
