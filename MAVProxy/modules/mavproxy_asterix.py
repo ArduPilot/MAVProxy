@@ -68,10 +68,14 @@ class AsterixModule(mp_module.MPModule):
         self.vehicle2_lon = None
         self.adsb_packets_sent = 0
         self.adsb_packets_not_sent = 0
+        self.adsb_byterate = 0 # actually bytes...
+        self.adsb_byterate_update_timestamp = 0
+        self.adsb_last_packets_sent = 0
 
     def print_status(self):
         print("ADSB packets sent: %u" % self.adsb_packets_sent)
         print("ADSB packets not sent: %u" % self.adsb_packets_not_sent)
+        print("ADSB bitrate: %u bytes/s" % int(self.adsb_byterate))
 
     def cmd_asterix(self, args):
         '''asterix command parser'''
@@ -221,6 +225,15 @@ class AsterixModule(mp_module.MPModule):
             if adsb_mod:
                 # the adsb module is loaded, display on the map
                 adsb_mod.mavlink_packet(adsb_pkt)
+
+
+        now = time.time()
+        delta = now - self.adsb_byterate_update_timestamp
+        if delta > 5:
+            self.adsb_byterate_update_timestamp = now
+            bytes_per_adsb_packet = 38 # FIXME: find constant
+            self.adsb_byterate = (self.adsb_packets_sent - self.adsb_last_packets_sent)/delta * bytes_per_adsb_packet
+            self.adsb_last_packets_sent = self.adsb_packets_sent
 
     def mavlink_packet(self, m):
         '''get time from mavlink ATTITUDE'''
