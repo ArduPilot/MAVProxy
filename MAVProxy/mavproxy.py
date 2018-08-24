@@ -680,9 +680,9 @@ def log_paths():
 def open_telemetry_logs(logpath_telem, logpath_telem_raw):
     '''open log files'''
     if opts.append_log or opts.continue_mode:
-        mode = 'a'
+        mode = 'ab'
     else:
-        mode = 'w'
+        mode = 'wb'
 
     try:
         mpstate.logfile = open(logpath_telem, mode=mode)
