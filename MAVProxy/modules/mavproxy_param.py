@@ -44,6 +44,8 @@ class ParamState:
                 print("%s = %.7f" % (param_id, m.param_value))
             if added_new_parameter and len(self.mav_param_set) == m.param_count:
                 print("Received %u parameters" % m.param_count)
+                if len(self.mav_param) != len(self.mav_param_set):
+                    master.param_fetch_all()
                 if self.logdir is not None:
                     self.mav_param.save(os.path.join(self.logdir, self.parm_file), '*', verbose=True)
                     self.fetch_set = None
