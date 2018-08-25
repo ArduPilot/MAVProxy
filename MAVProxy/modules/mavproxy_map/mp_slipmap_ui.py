@@ -24,6 +24,8 @@ from mp_slipmap_util import SlipObjectSelection
 from mp_slipmap_util import SlipPosition
 from mp_slipmap_util import SlipRemoveObject
 from mp_slipmap_util import SlipThumbnail
+from mp_slipmap_util import SlipZoom
+from mp_slipmap_util import SlipFollow
 
 from MAVProxy.modules.lib import mp_util
 
@@ -238,6 +240,15 @@ class MPSlipMapFrame(wx.Frame):
                 state.panel.re_center(state.width/2, state.height/2, lat, lon)
                 state.need_redraw = True
 
+            if isinstance(obj, SlipZoom):
+                # change zoom
+                state.panel.set_ground_width(obj.ground_width)
+                state.need_redraw = True
+                
+            if isinstance(obj, SlipFollow):
+                # enable/disable follow
+                state.follow = obj.enable
+                
             if isinstance(obj, SlipBrightness):
                 # set map brightness
                 state.brightness = obj.brightness
@@ -355,6 +366,12 @@ class MPSlipMapPanel(wx.Panel):
         bearing  = mp_util.gps_bearing(lat2, lon2, lat, lon)
         (state.lat, state.lon) = mp_util.gps_newpos(state.lat, state.lon, bearing, distance)
 
+    def set_ground_width(self, ground_width):
+        '''set ground width of view'''
+        state = self.state
+        state.ground_width = ground_width
+        state.panel.re_center(state.width/2, state.height/2, state.lat, state.lon)
+         
     def change_zoom(self, zoom):
         '''zoom in or out by zoom factor, keeping centered'''
         state = self.state

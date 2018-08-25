@@ -118,6 +118,18 @@ class MPSlipMap():
         '''remove an object on the map by key'''
         self.object_queue.put(SlipRemoveObject(key))
 
+    def set_zoom(self, ground_width):
+        '''set ground width of view'''
+        self.object_queue.put(SlipZoom(ground_width))
+
+    def set_center(self, lat, lon):
+        '''set center of view'''
+        self.object_queue.put(SlipCenter((lat,lon)))
+
+    def set_follow(self, enable):
+        '''set follow on/off'''
+        self.object_queue.put(SlipFollow(enable))
+        
     def hide_object(self, key, hide=True):
         '''hide an object on the map by key'''
         self.object_queue.put(SlipHideObject(key, hide))

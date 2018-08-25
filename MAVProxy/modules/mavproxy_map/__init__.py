@@ -70,7 +70,10 @@ class MapModule(mp_module.MPModule):
 
         mpstate.map.add_callback(functools.partial(self.map_callback))
         self.add_command(cmdname, self.cmd_map, "map control", ['icon',
-                                                                'set (MAPSETTING)'])
+                                                                'set (MAPSETTING)',
+                                                                'zoom',
+                                                                'center',
+                                                                'follow'])
         self.add_completion_function('(MAPSETTING)', self.map_settings.completion)
 
         self.default_popup = MPMenuSubMenu('Popup', items=[])
@@ -160,6 +163,12 @@ class MapModule(mp_module.MPModule):
             self.cmd_set_origin(args)
         elif args[0] == "setoriginpos":
             self.cmd_set_originpos(args)
+        elif args[0] == "zoom":
+            self.cmd_zoom(args)
+        elif args[0] == "center":
+            self.cmd_center(args)
+        elif args[0] == "follow":
+            self.cmd_follow(args)
         else:
             print("usage: map <icon|set>")
 
@@ -576,6 +585,31 @@ class MapModule(mp_module.MPModule):
             lon*10000000, # lon
             0*1000) # no height change
 
+    def cmd_zoom(self, args):
+        '''control zoom'''
+        if len(args) < 2:
+            print("map zoom WIDTH(m)")
+            return
+        ground_width = float(args[1])
+        self.map.set_zoom(ground_width)
+
+    def cmd_center(self, args):
+        '''control center of view'''
+        if len(args) < 3:
+            print("map center LAT LON")
+            return
+        lat = float(args[1])
+        lon = float(args[2])
+        self.map.set_center(lat, lon)
+
+    def cmd_follow(self, args):
+        '''control following of vehicle'''
+        if len(args) < 2:
+            print("map follow 0|1")
+            return
+        follow = int(args[1])
+        self.map.set_follow(follow)
+        
     def set_secondary_vehicle_position(self, m):
         '''show 2nd vehicle on map'''
         if m.get_type() != 'GLOBAL_POSITION_INT':

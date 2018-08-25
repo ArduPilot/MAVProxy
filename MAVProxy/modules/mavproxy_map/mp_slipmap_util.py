@@ -512,6 +512,16 @@ class SlipCenter:
     def __init__(self, latlon):
         self.latlon = latlon
 
+class SlipZoom:
+    '''an object to change ground width'''
+    def __init__(self, ground_width):
+        self.ground_width = ground_width
+
+class SlipFollow:
+    '''enable/disable follow'''
+    def __init__(self, enable):
+        self.enable = enable
+        
 class SlipBrightness:
     '''an object to change map brightness'''
     def __init__(self, brightness):
