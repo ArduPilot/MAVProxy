@@ -4,7 +4,7 @@ class MPModule(object):
     The base class for all modules
     '''
 
-    def __init__(self, mpstate, name, description=None, public=False):
+    def __init__(self, mpstate, name, description=None, public=False, multi_instance=False):
         '''
         Constructor
 
@@ -13,6 +13,7 @@ class MPModule(object):
         self.mpstate = mpstate
         self.name = name
         self.needs_unloading = False
+        self.multi_instance = multi_instance
 
         if description is None:
             self.description = name + " handling"
@@ -20,6 +21,13 @@ class MPModule(object):
             self.description = description
         if public:
             mpstate.public_modules[name] = self
+        if multi_instance:
+            if not name in mpstate.multi_instance:
+                mpstate.multi_instance[name] = []
+                mpstate.instance_count[name] = 0
+            mpstate.multi_instance[name].append(self)
+            mpstate.instance_count[name] += 1
+            self.instance = mpstate.instance_count[name]
 
     #
     # Overridable hooks follow...
@@ -29,7 +37,8 @@ class MPModule(object):
         pass
 
     def unload(self):
-        pass
+        if self.multi_instance and self.name in self.mpstate.multi_instance:
+            self.mpstate.multi_instance.remove(self)
 
     def unknown_command(self, args):
         '''Return True if we have handled the unknown command'''
