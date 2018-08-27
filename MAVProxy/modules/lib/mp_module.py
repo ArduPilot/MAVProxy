@@ -19,8 +19,6 @@ class MPModule(object):
             self.description = name + " handling"
         else:
             self.description = description
-        if public:
-            mpstate.public_modules[name] = self
         if multi_instance:
             if not name in mpstate.multi_instance:
                 mpstate.multi_instance[name] = []
@@ -28,6 +26,11 @@ class MPModule(object):
             mpstate.multi_instance[name].append(self)
             mpstate.instance_count[name] += 1
             self.instance = mpstate.instance_count[name]
+            if self.instance > 1:
+                # make the name distincitive, so self.module('map2') works
+                self.name += str(self.instance)
+        if public:
+            mpstate.public_modules[self.name] = self
 
     #
     # Overridable hooks follow...
@@ -55,6 +58,15 @@ class MPModule(object):
         '''Find a public module (most modules are private)'''
         return self.mpstate.module(name)
 
+    def module_matching(self, name):
+        '''Find a list of modules matching a wildcard pattern'''
+        import fnmatch
+        ret = []
+        for mname in self.mpstate.public_modules.keys():
+            if fnmatch.fnmatch(mname, name):
+                ret.append(self.mpstate.public_modules[mname])
+        return ret
+    
     @property
     def console(self):
         return self.mpstate.console
