@@ -46,7 +46,7 @@ class ParamState:
                 print("Received %u parameters" % m.param_count)
                 if self.logdir is not None:
                     self.mav_param.save(os.path.join(self.logdir, self.parm_file), '*', verbose=True)
-                    self.fetch_set = None
+                self.fetch_set = None
             if self.fetch_set is not None and len(self.fetch_set) == 0:
                 self.fetch_check(master, force=True)
 
