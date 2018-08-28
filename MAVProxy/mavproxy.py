@@ -932,7 +932,7 @@ def set_mav_version(mav10, mav20, autoProtocol, mavversionArg):
     if mavversionArg == "1.0" or mav10 == True:
         os.environ['MAVLINK09'] = '1'
         mavversion = "1"
-    else
+    else:
         os.environ['MAVLINK20'] = '1'
         mavversion = "2"
 
