@@ -127,6 +127,7 @@ class WPModule(mp_module.MPModule):
                     waytxt = os.path.join(self.logdir, 'way.txt')
                     self.save_waypoints(waytxt)
                     print("Saved waypoints to %s" % waytxt)
+                self.loading_waypoints = False
             elif self.wp_op == "save":
                 self.save_waypoints(self.wp_save_filename)
             self.wp_op = None
