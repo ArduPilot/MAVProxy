@@ -407,7 +407,7 @@ class WPModule(mp_module.MPModule):
         print("Moved WP %u to %f, %f at %.1fm" % (idx, lat, lon, wp.z))
 
 
-    def cmd_wp_movemulti(self, args):
+    def cmd_wp_movemulti(self, args, latlon=None):
         '''handle wp move of multiple waypoints'''
         if len(args) < 3:
             print("usage: wp movemulti WPNUM WPSTART WPEND <rotation>")
@@ -434,11 +434,12 @@ class WPModule(mp_module.MPModule):
         else:
             rotation = 0
 
-        try:
-            latlon = self.module('map').click_position
-        except Exception:
-            print("No map available")
-            return
+        if latlon is None:
+            try:
+                latlon = self.module('map').click_position
+            except Exception:
+                print("No map available")
+                return
         if latlon is None:
             print("No map click position available")
             return
@@ -637,7 +638,7 @@ class WPModule(mp_module.MPModule):
         elif args[0] == "move":
             self.cmd_wp_move(args[1:])
         elif args[0] == "movemulti":
-            self.cmd_wp_movemulti(args[1:])
+            self.cmd_wp_movemulti(args[1:], None)
         elif args[0] == "changealt":
             self.cmd_wp_changealt(args[1:])
         elif args[0] == "param":
