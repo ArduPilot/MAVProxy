@@ -19,6 +19,11 @@ class WinLayout(object):
         self.pos = pos
         self.size = size
         self.dsize = dsize
+
+    def __str__(self):
+        return "%s(%ux%u@%u-%u)" % (self.name,
+                                    self.size[0], self.size[1], 
+                                    self.pos[0], self.pos[1])
         
 class ManagedWindow(object):
     '''a layout plus callback for setting window position and size'''
@@ -48,6 +53,8 @@ def set_layout(wlayout, callback):
     global window_list
     global loaded_layout
     global pending_load
+    #if not wlayout.name in window_list:
+    #    print("layout %s" % wlayout)
     if not wlayout.name in window_list and loaded_layout is not None and wlayout.name in loaded_layout:
         callback(loaded_layout[wlayout.name])
     window_list[wlayout.name] = ManagedWindow(wlayout, callback)
