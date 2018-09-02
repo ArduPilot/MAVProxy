@@ -15,6 +15,7 @@ import numpy as np
 
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_widgets
+from MAVProxy.modules.lib import win_layout
 from MAVProxy.modules.lib.mp_menu import *
 
 
@@ -170,15 +171,28 @@ class MPImage():
 
     def poll(self):
         '''check for events, returning one event'''
-        if self.out_queue.qsize():
-            return self.out_queue.get()
-        return None
+        if self.out_queue.qsize() <= 0:
+            return None
+        evt = self.out_queue.get()
+        while isinstance(evt, win_layout.WinLayout):
+            win_layout.set_layout(evt, self.set_layout)
+            if self.out_queue.qsize() == 0:
+                return None
+            evt = self.out_queue.get()
+        return evt
 
+    def set_layout(self, layout):
+        '''set window layout'''
+        self.in_queue.put(layout)
+    
     def events(self):
         '''check for events a list of events'''
         ret = []
-        while self.out_queue.qsize():
-            ret.append(self.out_queue.get())
+        while True:
+            e = self.poll()
+            if e is None:
+                break
+            ret.append(e)
         return ret
 
     def terminate(self):
@@ -196,6 +210,7 @@ class MPImageFrame(wx.Frame):
         wx.Frame.__init__(self, None, wx.ID_ANY, state.title)
         self.state = state
         state.frame = self
+        self.last_layout_send = time.time()
         self.sizer = wx.BoxSizer(wx.VERTICAL)
         state.panel = MPImagePanel(self, state)
         self.sizer.Add(state.panel, 1, wx.EXPAND)
@@ -206,6 +221,10 @@ class MPImageFrame(wx.Frame):
     def on_idle(self, event):
         '''prevent the main loop spinning too fast'''
         state = self.state
+        now = time.time()
+        if now - self.last_layout_send > 1:
+            self.last_layout_send = now
+            state.out_queue.put(win_layout.get_wx_window_layout(self))
         time.sleep(0.1)
 
 class MPImagePanel(wx.Panel):
@@ -356,6 +375,9 @@ class MPImagePanel(wx.Panel):
                 self.full_size()
             if isinstance(obj, MPImageFitToWindow):
                 self.fit_to_window()
+            if isinstance(obj, win_layout.WinLayout):
+                win_layout.set_wx_window_layout(state.frame, obj)
+                
         if self.need_redraw:
             self.redraw()
 
