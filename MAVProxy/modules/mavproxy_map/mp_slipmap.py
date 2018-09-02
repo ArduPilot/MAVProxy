@@ -16,6 +16,7 @@ import numpy as np
 from MAVProxy.modules.mavproxy_map import mp_elevation
 from MAVProxy.modules.mavproxy_map import mp_tile
 from MAVProxy.modules.lib import mp_util
+from MAVProxy.modules.lib import win_layout
 from MAVProxy.modules.mavproxy_map.mp_slipmap_util import *
 
 
@@ -142,10 +143,20 @@ class MPSlipMap():
         '''return number of events waiting to be processed'''
         return self.event_queue.qsize()
 
+    def set_layout(self, layout):
+        '''set window layout'''
+        self.object_queue.put(layout)
+    
     def get_event(self):
         '''return next event or None'''
         if self.event_queue.qsize() == 0:
             return None
+        evt = self.event_queue.get()
+        while isinstance(evt, win_layout.WinLayout):
+            win_layout.set_layout(evt, self.set_layout)
+            if self.event_queue.qsize() == 0:
+                return None
+            evt = self.event_queue.get()
         return self.event_queue.get()
 
     def add_callback(self, callback):
