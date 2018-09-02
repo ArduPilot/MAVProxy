@@ -12,6 +12,8 @@ if platform.system() == 'Darwin':
 else:
     from multiprocessing import Pipe, Process, Event, freeze_support
 
+from MAVProxy.modules.lib import win_layout
+    
 class MessageConsole(textconsole.SimpleConsole):
     '''
     a message console for MAVProxy
@@ -55,12 +57,18 @@ class MessageConsole(textconsole.SimpleConsole):
         try:
             while True:
                 msg = self.parent_pipe_recv.recv()
-                if self.menu_callback is not None:
+                if isinstance(msg, win_layout.WinLayout):
+                    win_layout.set_layout(msg, self.set_layout)
+                elif self.menu_callback is not None:
                     self.menu_callback(msg)
                 time.sleep(0.1)
         except EOFError:
             pass
 
+    def set_layout(self, layout):
+        '''set window layout'''
+        self.parent_pipe_send.send(layout)
+        
     def write(self, text, fg='black', bg='white'):
         '''write to the console'''
         try:

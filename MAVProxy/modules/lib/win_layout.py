@@ -69,9 +69,18 @@ def save_layout():
         print("No file to save layout to")
         return
     layout = {}
+    try:
+        # include previous layout, so we retain layouts for widows not
+        # currently displayed
+        layout = pickle.load(open(fname,"r"))
+    except Exception:
+        pass
+    count = 0
     for name in window_list:
         layout[name] = window_list[name].layout
+        count += 1
     pickle.dump(layout, open(fname,"w"))
+    print("Saved layout for %u windows" % count)
 
 def load_layout():
     '''load window layout'''
@@ -85,10 +94,12 @@ def load_layout():
         print("No file to load layout from")
         return
     layout = pickle.load(open(fname,"r"))
+    count = 0
     for name in window_list:
         if name in layout:
             try:
                 window_list[name].callback(layout[name])
+                count += 1
             except Exception as ex:
                 print(ex)
-    
+    print("Loaded layout for %u windows" % count)
