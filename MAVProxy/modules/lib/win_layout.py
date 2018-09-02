@@ -9,6 +9,8 @@ handle saving/loading of window positions
 
 window_list = {}
 display_size = None
+loaded_layout = None
+pending_load = False
 
 class WinLayout(object):
     '''represent window layout'''
@@ -44,8 +46,15 @@ def set_layout(wlayout, callback):
     '''set window layout'''
     global display_size
     global window_list
+    global loaded_layout
+    global pending_load
+    if not wlayout.name in window_list and loaded_layout is not None and wlayout.name in loaded_layout:
+        callback(loaded_layout[wlayout.name])
     window_list[wlayout.name] = ManagedWindow(wlayout, callback)
     display_size = wlayout.dsize
+    if pending_load:
+        pending_load = False
+        load_layout()
 
 def layout_filename():
     '''get location of layout file'''
@@ -86,8 +95,10 @@ def load_layout():
     '''load window layout'''
     global display_size
     global window_list
+    global loaded_layout
+    global pending_load
     if display_size is None:
-        print("No layouts to load")
+        pending_load = True
         return
     fname = layout_filename()
     if fname is None:
@@ -102,4 +113,6 @@ def load_layout():
                 count += 1
             except Exception as ex:
                 print(ex)
+    loaded_layout = layout
     print("Loaded layout for %u windows" % count)
+    
