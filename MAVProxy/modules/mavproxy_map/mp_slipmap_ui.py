@@ -28,6 +28,7 @@ from mp_slipmap_util import SlipZoom
 from mp_slipmap_util import SlipFollow
 
 from MAVProxy.modules.lib import mp_util
+from MAVProxy.modules.lib import win_layout
 
 from MAVProxy.modules.lib.mp_menu import MPMenuCheckbox
 from MAVProxy.modules.lib.mp_menu import MPMenuItem
@@ -52,10 +53,11 @@ class MPSlipMapFrame(wx.Frame):
         state.popup_started = False
         state.default_popup = None
         state.panel = MPSlipMapPanel(self, state)
+        self.last_layout_send = time.time()
         self.Bind(wx.EVT_IDLE, self.on_idle)
         self.Bind(wx.EVT_SIZE, state.panel.on_size)
         self.legend_checkbox_menuitem_added = False
-
+        
         # create the View menu
         self.menu = MPMenuTop([
             MPMenuSubMenu('View', items=[
@@ -199,12 +201,20 @@ class MPSlipMapFrame(wx.Frame):
         if state.close_window.acquire(False):
             self.state.app.ExitMainLoop()
 
+        now = time.time()
+        if now - self.last_layout_send > 1:
+            self.last_layout_send = now
+            state.event_queue.put(win_layout.get_wx_window_layout(self))
+
         # receive any display objects from the parent
         obj = None
 
         while not state.object_queue.empty():
             obj = state.object_queue.get()
 
+            if isinstance(obj, win_layout.WinLayout):
+                win_layout.set_wx_window_layout(self, obj)
+                
             if isinstance(obj, SlipObject):
                 self.add_object(obj)
 
