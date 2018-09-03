@@ -111,7 +111,13 @@ def load_layout():
     if fname is None:
         print("No file to load layout from")
         return
-    layout = pickle.load(open(fname,"r"))
+    try:
+        layout = pickle.load(open(fname,"r"))
+    except Exception:
+        layout = {}
+        print("Unable to load %s" % fname)
+        loaded_layout = layout
+        return
     count = 0
     for name in window_list:
         if name in layout:
