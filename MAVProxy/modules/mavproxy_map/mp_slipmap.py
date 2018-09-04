@@ -157,7 +157,7 @@ class MPSlipMap():
             if self.event_queue.qsize() == 0:
                 return None
             evt = self.event_queue.get()
-        return self.event_queue.get()
+        return evt
 
     def add_callback(self, callback):
         '''add a callback for events from the map'''
