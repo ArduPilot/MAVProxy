@@ -183,10 +183,17 @@ class LinkModule(mp_module.MPModule):
         try:
             (device, optional_attributes) = self.parse_link_descriptor(descriptor)
             print("Connect %s source_system=%d" % (device, self.settings.source_system))
-            conn = mavutil.mavlink_connection(device, autoreconnect=True,
-                                              source_system=self.settings.source_system,
-                                              baud=self.settings.baudrate,
-                                              force_connected=force_connected)
+            try:
+                conn = mavutil.mavlink_connection(device, autoreconnect=True,
+                                                  source_system=self.settings.source_system,
+                                                  baud=self.settings.baudrate,
+                                                  force_connected=force_connected)
+            except Exception as e:
+                # try the same thing but without force-connected for
+                # backwards-compatability
+                conn = mavutil.mavlink_connection(device, autoreconnect=True,
+                                                  source_system=self.settings.source_system,
+                                                  baud=self.settings.baudrate)
             conn.mav.srcComponent = self.settings.source_component
         except Exception as msg:
             print("Failed to connect to %s : %s" % (descriptor, msg))
