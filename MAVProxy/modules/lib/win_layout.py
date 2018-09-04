@@ -68,9 +68,15 @@ def layout_filename():
     global display_size
     (dw,dh) = display_size
     if 'HOME' in os.environ:
-        return os.path.join(os.environ['HOME'], ".mavlayout-%ux%u" % (dw,dh))
+        dirname = os.path.join(os.environ['HOME'], ".mavproxy")
+        if not os.path.exists(dirname):
+            try:
+                os.mkdir(dirname)
+            except Exception:
+                pass
+        return os.path.join(dirname, "layout-%ux%u" % (dw,dh))
     if 'LOCALAPPDATA' in os.environ and not opts.setup:
-        return os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy", "mavlayout-%ux%x.dat" % (dw,dh))
+        return os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy", "layout-%ux%x.dat" % (dw,dh))
     return None
 
 def save_layout():
