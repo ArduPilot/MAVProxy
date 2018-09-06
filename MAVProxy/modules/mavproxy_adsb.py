@@ -193,7 +193,7 @@ class ADSBModule(mp_module.MPModule):
                         label = str(alt)
                     else:
                         label = None
-                    self.mpstate.map.set_position(id, (m.lat * 1e-7, m.lon * 1e-7), rotation=m.heading*0.01, label=label, colour=(0,0,0))
+                    self.mpstate.map.set_position(id, (m.lat * 1e-7, m.lon * 1e-7), rotation=m.heading*0.01, label=label, colour=(0,250,250))
 
         elif m.get_type() == "GLOBAL_POSITION_INT":
             if self.mpstate.map:
