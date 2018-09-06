@@ -166,10 +166,10 @@ class ADSBModule(mp_module.MPModule):
             if dt < 0 or dt > self.ADSB_settings.timeout:
                 # if the threat has timed out...
                 del self.threat_vehicles[id]  # remove the threat from the dict
-                if self.mpstate.map:
+                for mp in self.module_matching('map*'):
                     # remove the threat from the map
-                    self.mpstate.map.remove_object(id)
-                    self.mpstate.map.remove_object(id+":circle")
+                    mp.map.remove_object(id)
+                    mp.map.remove_object(id+":circle")
                 # we've modified the dict we're iterating over, so
                 # we'll get any more timed-out threats next time we're
                 # called:
@@ -185,28 +185,28 @@ class ADSBModule(mp_module.MPModule):
             if id not in self.threat_vehicles.keys():  # check to see if the vehicle is in the dict
                 # if not then add it
                 self.threat_vehicles[id] = ADSBVehicle(id=id, state=m.to_dict())
-                if self.mpstate.map:  # if the map is loaded...
+                for mp in self.module_matching('map*'):
                     self.threat_vehicles[id].menu_item = MPMenuItem(name=id, returnkey=None)
                     if m.emitter_type >= 100 and m.emitter_type-100 in obc_icons:
-                        icon = self.mpstate.map.icon(obc_icons[m.emitter_type-100])
+                        icon = mp.map.icon(obc_icons[m.emitter_type-100])
                         threat_radius = get_threat_radius(m.emitter_type-100)
                     else:
-                        icon = self.mpstate.map.icon(self.threat_vehicles[id].icon)
+                        icon = mp.map.icon(self.threat_vehicles[id].icon)
                         threat_radius = 0
                     popup = MPMenuSubMenu('ADSB', items=[self.threat_vehicles[id].menu_item])
                     # draw the vehicle on the map
-                    self.mpstate.map.add_object(mp_slipmap.SlipIcon(id, (m.lat * 1e-7, m.lon * 1e-7),
+                    mp.map.add_object(mp_slipmap.SlipIcon(id, (m.lat * 1e-7, m.lon * 1e-7),
                                                                     icon, layer=3, rotation=m.heading*0.01, follow=False,
                                                                     trail=mp_slipmap.SlipTrail(colour=(0, 255, 255)),
                                                                     popup_menu=popup))
                     if threat_radius > 0:
-                        self.mpstate.map.add_object(mp_slipmap.SlipCircle(id+":circle", 3,
+                        mp.map.add_object(mp_slipmap.SlipCircle(id+":circle", 3,
                                                     (m.lat * 1e-7, m.lon * 1e-7),
                                                     threat_radius, (0, 255, 255), linewidth=1))
             else:  # the vehicle is in the dict
                 # update the dict entry
                 self.threat_vehicles[id].update(m.to_dict(), self.tnow)
-                if self.mpstate.map:  # if the map is loaded...
+                for mp in self.module_matching('map*'):
                     # update the map
                     ground_alt = self.console.ElevationMap.GetElevation(m.lat*1e-7, m.lon*1e-7)
                     alt_amsl = m.altitude * 0.001
@@ -215,11 +215,11 @@ class ADSBModule(mp_module.MPModule):
                         label = str(alt)
                     else:
                         label = None
-                    self.mpstate.map.set_position(id, (m.lat * 1e-7, m.lon * 1e-7), rotation=m.heading*0.01, label=label, colour=(0,250,250))
-                    self.mpstate.map.set_position(id+":circle", (m.lat * 1e-7, m.lon * 1e-7))
+                    mp.map.set_position(id, (m.lat * 1e-7, m.lon * 1e-7), rotation=m.heading*0.01, label=label, colour=(0,250,250))
+                    mp.map.set_position(id+":circle", (m.lat * 1e-7, m.lon * 1e-7))
 
         elif m.get_type() == "GLOBAL_POSITION_INT":
-            if self.mpstate.map:
+            for mp in self.module_matching('map*'):
                 if len(self.active_threat_ids) > 0:
                     threat_circle_width = 2
                 else:
@@ -231,7 +231,7 @@ class ADSBModule(mp_module.MPModule):
                                                       (0, 255, 255), linewidth=threat_circle_width)
                 threat_circle.set_hidden(
                     not self.ADSB_settings.show_threat_radius)  # show the circle?
-                self.mpstate.map.add_object(threat_circle)
+                mp.map.add_object(threat_circle)
 
                 # update the threat clear circle on the map
                 threat_radius_clear = self.ADSB_settings.threat_radius * \
@@ -243,7 +243,7 @@ class ADSBModule(mp_module.MPModule):
                                                             (0, 255, 255), linewidth=1)
                 # show the circle?
                 threat_clear_circle.set_hidden(not self.ADSB_settings.show_threat_radius_clear)
-                self.mpstate.map.add_object(threat_clear_circle)
+                mp.map.add_object(threat_clear_circle)
 
             # we assume this is handled much more oftern than ADS-B messages
             # so update the distance between vehicle and threat here
