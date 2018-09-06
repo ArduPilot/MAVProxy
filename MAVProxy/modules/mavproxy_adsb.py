@@ -14,10 +14,25 @@ from pymavlink import mavutil
 
 obc_icons = {
     0 : 'greenplane.png',
+    1 : 'greenplane.png',
     2 : 'cloud.png',
     3 : 'migbird.png',
     4 : 'hawk.png'
 }
+
+obc_radius = {
+    0 : 300,
+    1 : 300,
+    2 : 173,
+    3 : 100,
+    4 : 200
+}
+    
+def get_threat_radius(obc_type):
+    '''get threat radius for an OBC item'''
+    if obc_type in obc_radius:
+        return obc_radius[obc_type]
+    return 0
 
 class ADSBVehicle(object):
     '''a generic ADS-B threat'''
@@ -154,6 +169,7 @@ class ADSBModule(mp_module.MPModule):
                 if self.mpstate.map:
                     # remove the threat from the map
                     self.mpstate.map.remove_object(id)
+                    self.mpstate.map.remove_object(id+":circle")
                 # we've modified the dict we're iterating over, so
                 # we'll get any more timed-out threats next time we're
                 # called:
@@ -173,14 +189,20 @@ class ADSBModule(mp_module.MPModule):
                     self.threat_vehicles[id].menu_item = MPMenuItem(name=id, returnkey=None)
                     if m.emitter_type >= 100 and m.emitter_type-100 in obc_icons:
                         icon = self.mpstate.map.icon(obc_icons[m.emitter_type-100])
+                        threat_radius = get_threat_radius(m.emitter_type-100)
                     else:
                         icon = self.mpstate.map.icon(self.threat_vehicles[id].icon)
+                        threat_radius = 0
                     popup = MPMenuSubMenu('ADSB', items=[self.threat_vehicles[id].menu_item])
                     # draw the vehicle on the map
                     self.mpstate.map.add_object(mp_slipmap.SlipIcon(id, (m.lat * 1e-7, m.lon * 1e-7),
                                                                     icon, layer=3, rotation=m.heading*0.01, follow=False,
                                                                     trail=mp_slipmap.SlipTrail(colour=(0, 255, 255)),
                                                                     popup_menu=popup))
+                    if threat_radius > 0:
+                        self.mpstate.map.add_object(mp_slipmap.SlipCircle(id+":circle", 3,
+                                                    (m.lat * 1e-7, m.lon * 1e-7),
+                                                    threat_radius, (0, 255, 255), linewidth=1))
             else:  # the vehicle is in the dict
                 # update the dict entry
                 self.threat_vehicles[id].update(m.to_dict(), self.tnow)
@@ -194,6 +216,7 @@ class ADSBModule(mp_module.MPModule):
                     else:
                         label = None
                     self.mpstate.map.set_position(id, (m.lat * 1e-7, m.lon * 1e-7), rotation=m.heading*0.01, label=label, colour=(0,250,250))
+                    self.mpstate.map.set_position(id+":circle", (m.lat * 1e-7, m.lon * 1e-7))
 
         elif m.get_type() == "GLOBAL_POSITION_INT":
             if self.mpstate.map:
