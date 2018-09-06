@@ -24,12 +24,15 @@ DNFZ_types = {
     'BirdOfPrey' : 40000
 }
 
+from MAVProxy.modules.mavproxy_map import mp_elevation
+
+ElevationMap = mp_elevation.ElevationModel()
+
 gen_settings = mp_settings.MPSettings([("port", int, 45454),
                                        ('debug', int, 0),
                                        ('home_lat', float, -27.298440),
                                        ('home_lon', float, 151.290775),
                                        ('region_width', float, 15000),
-                                       ('ground_height', float, 1150),
                                        ('num_aircraft', int, 5),
                                        ('num_bird_prey', int, 5),
                                        ('num_bird_migratory', int, 5),
@@ -72,9 +75,17 @@ class DNFZ:
         self.setpos(gen_settings.home_lat, gen_settings.home_lon)
         self.move(random.uniform(0, 360), random.uniform(0, gen_settings.region_width))
 
+    def ground_height(self):
+        '''return height above ground in feet'''
+        lat = self.pkt['I105']['Lat']['val']
+        lon = self.pkt['I105']['Lon']['val']
+        global ElevationMap
+        ret = ElevationMap.GetElevation(lat, lon)
+        return ret * 3.2807
+
     def randalt(self):
         '''random initial position'''
-        self.setalt(gen_settings.ground_height + random.uniform(100, 1500))
+        self.setalt(self.ground_height() + random.uniform(100, 1500))
 
     def move(self, bearing, distance):
         '''move position by bearing and distance'''
@@ -170,7 +181,7 @@ class Aircraft(DNFZ):
         if self.dist_flown > self.circuit_width:
             self.desired_heading = self.heading + 90
             self.dist_flown = 0
-        if self.getalt() < gen_settings.ground_height:
+        if self.getalt() < self.ground_height():
             self.randpos()
             self.randalt()
 
@@ -184,7 +195,7 @@ class BirdOfPrey(DNFZ):
         self.dive_rate = -30
         self.climb_rate = 5
         self.drift_speed = random.uniform(5,10)
-        self.max_alt = gen_settings.ground_height + random.uniform(100, 400)
+        self.max_alt = self.ground_height() + random.uniform(100, 400)
         self.drift_heading = self.heading
         circumference = math.pi * self.radius * 2
         circle_time = circumference / self.speed
@@ -198,13 +209,13 @@ class BirdOfPrey(DNFZ):
         self.time_circling += deltat
         self.setheading(self.heading + self.turn_rate * deltat)
         self.move(self.drift_heading, self.drift_speed)
-        if self.getalt() > self.max_alt or self.getalt() < gen_settings.ground_height:
-            if self.getalt() > gen_settings.ground_height:
+        if self.getalt() > self.max_alt or self.getalt() < self.ground_height():
+            if self.getalt() > self.ground_height():
                 self.setclimbrate(self.dive_rate)
             else:
                 self.setclimbrate(self.climb_rate)
-        if self.getalt() < gen_settings.ground_height:
-            self.setalt(gen_settings.ground_height)
+        if self.getalt() < self.ground_height():
+            self.setalt(self.ground_height())
         if self.distance_from_home() > gen_settings.region_width:
             self.randpos()
             self.randalt()
@@ -219,7 +230,7 @@ class BirdMigrating(DNFZ):
     def update(self, deltat=1.0):
         '''fly in long curves'''
         DNFZ.update(self, deltat)
-        if self.distance_from_home() > gen_settings.region_width or self.getalt() < gen_settings.ground_height:
+        if self.distance_from_home() > gen_settings.region_width or self.getalt() < self.ground_height():
             self.randpos()
             self.randalt()
 
