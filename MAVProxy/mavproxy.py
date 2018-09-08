@@ -724,7 +724,7 @@ def set_stream_rates():
             rate = mpstate.settings.streamrate
         else:
             rate = mpstate.settings.streamrate2
-        if rate != -1:
+        if rate != -1 and mpstate.settings.streamrate != -1:
             master.mav.request_data_stream_send(mpstate.settings.target_system, mpstate.settings.target_component,
                                                 mavutil.mavlink.MAV_DATA_STREAM_ALL,
                                                 rate, 1)
