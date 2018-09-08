@@ -267,6 +267,7 @@ class GenobstaclesModule(mp_module.MPModule):
         self.pkt_queue = []
         self.have_home = False
         self.pending_start = True
+        self.last_click = None
         if mp_util.has_wxpython:
             self.menu = MPMenuSubMenu('Obstacles',
                                     items=[MPMenuItem('Restart', 'Restart', '# genobstacles restart'),
@@ -281,6 +282,9 @@ class GenobstaclesModule(mp_module.MPModule):
     def cmd_dropobject(self, obj):
         '''drop an object on the map'''
         latlon = self.module('map').click_position
+        if self.last_click is not None and self.last_click == latlon:
+            return
+        self.last_click = latlon
         if latlon is not None:
             obj.setpos(latlon[0], latlon[1])
             self.aircraft.append(obj)
@@ -307,6 +311,9 @@ class GenobstaclesModule(mp_module.MPModule):
             self.start()
         elif args[0] == "remove":
             latlon = self.module('map').click_position
+            if self.last_click is not None and self.last_click == latlon:
+                return
+            self.last_click = latlon
             if latlon is not None:
                 closest = None
                 closest_distance = 1000
