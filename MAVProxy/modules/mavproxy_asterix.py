@@ -12,7 +12,7 @@ from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_util
 from pymavlink import mavutil
 
-import asterix, socket, time
+import asterix, socket, time, os, struct
 
 class Track:
     def __init__(self, adsb_pkt):
@@ -71,6 +71,11 @@ class AsterixModule(mp_module.MPModule):
         self.adsb_byterate = 0 # actually bytes...
         self.adsb_byterate_update_timestamp = 0
         self.adsb_last_packets_sent = 0
+        if self.logdir is not None:
+            logpath = os.path.join(self.logdir, 'asterix.log')
+        else:
+            logpath = 'asterix.log'
+        self.logfile = open(logpath, 'w')
 
     def print_status(self):
         print("ADSB packets sent: %u" % self.adsb_packets_sent)
@@ -173,6 +178,11 @@ class AsterixModule(mp_module.MPModule):
         except Exception:
             print("bad packet")
             return
+        try:
+            logpkt = 'AST:' + struct.pack('<dI', time.time(), len(pkt)) + pkt
+            self.logfile.write(logpkt)
+        except Exception:
+            pass
         
         for m in amsg:
             if self.asterix_settings.debug > 1:
