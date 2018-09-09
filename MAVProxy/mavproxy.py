@@ -795,7 +795,10 @@ def main_loop():
                 break
             print("Waiting for heartbeat from %s" % master.address)
             send_heartbeat(master)
-            master.wait_heartbeat(timeout=0.1)
+            try:
+                master.wait_heartbeat(timeout=0.1)
+            except Exception as e:
+                master.wait_heartbeat()
         set_stream_rates()
 
     while True:
