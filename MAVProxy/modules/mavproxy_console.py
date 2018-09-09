@@ -187,11 +187,9 @@ class ConsoleModule(mp_module.MPModule):
             if agl_alt is not None:
                 agl_alt += rel_alt
                 vehicle_agl = master.field('TERRAIN_REPORT', 'current_height', None)
-                if vehicle_agl is None:
-                    vehicle_agl = '---'
-                else:
-                    vehicle_agl = self.height_string(vehicle_agl)
-                self.console.set_status('AGL', 'AGL %s/%s' % (self.height_string(agl_alt), vehicle_agl))
+                if vehicle_agl is not None:
+                    agl_alt = vehicle_agl
+                self.console.set_status('AGL', 'AGL %.0fft/%.0fm' % (agl_alt*3.28084, agl_alt))
             self.console.set_status('Alt', 'Alt %s' % self.height_string(rel_alt))
             self.console.set_status('AirSpeed', 'AirSpeed %s' % self.speed_string(msg.airspeed))
             self.console.set_status('GPSSpeed', 'GPSSpeed %s' % self.speed_string(msg.groundspeed))
