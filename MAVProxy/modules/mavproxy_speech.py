@@ -7,7 +7,7 @@ from MAVProxy.modules.lib import mp_module
 class SpeechModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(SpeechModule, self).__init__(mpstate, "speech", "speech output")
-        self.add_command('speech', self.cmd_speech, "text-to-speech", ['<test>'])
+        self.add_command('speech', self.cmd_speech, "text-to-speech", ['<say|list_voices>'])
 
         self.old_mpstate_say_function = self.mpstate.functions.say
         self.mpstate.functions.say = self.say
@@ -100,6 +100,12 @@ class SpeechModule(mp_module.MPModule):
             if msg.text.startswith("Tuning: "):
                 self.say(msg.text[8:])
 
+    def list_voices(self):
+        from espeak import espeak
+        voices = espeak.list_voices()
+        vlist = [ v.name for v in voices ]
+        print(vlist)
+
     def cmd_speech(self, args):
         '''speech commands'''
         usage = "usage: speech <say>"
@@ -112,6 +118,8 @@ class SpeechModule(mp_module.MPModule):
                 print("usage: speech say <text to say>")
                 return
             self.say(" ".join(args[1::]))
+        if args[0] == "list_voices":
+            self.list_voices()
 
 
 def init(mpstate):
