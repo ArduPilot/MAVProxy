@@ -66,9 +66,9 @@ class MapModule(mp_module.MPModule):
         self.map = mp_slipmap.MPSlipMap(service=service, elevation=True, title=title)
         if self.instance == 1:
             self.mpstate.map = self.map
-        mpstate.map_functions = { 'draw_lines' : self.draw_lines }
+            mpstate.map_functions = { 'draw_lines' : self.draw_lines }
 
-        mpstate.map.add_callback(functools.partial(self.map_callback))
+        self.map.add_callback(functools.partial(self.map_callback))
         self.add_command(cmdname, self.cmd_map, "map control", ['icon',
                                                                 'set (MAPSETTING)',
                                                                 'zoom',
