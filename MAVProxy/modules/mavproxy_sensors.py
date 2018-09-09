@@ -42,11 +42,6 @@ class SensorsModule(mp_module.MPModule):
         from MAVProxy.modules.lib.mp_settings import MPSetting
         self.settings.append(MPSetting('speedreporting', bool, False, 'Speed Reporting', tab='Sensors'))
 
-        if 'GPS_RAW' in self.status.msgs:
-            # cope with reload
-            gps = mpstate.status.msgs['GPS_RAW']
-            self.ground_alt = gps.alt - self.status.altitude
-
         if 'GPS_RAW_INT' in self.status.msgs:
             # cope with reload
             gps = mpstate.status.msgs['GPS_RAW_INT']
@@ -54,10 +49,7 @@ class SensorsModule(mp_module.MPModule):
 
     def cmd_sensors(self, args):
         '''show key sensors'''
-        if self.master.WIRE_PROTOCOL_VERSION == '1.0':
-            gps_heading = self.status.msgs['GPS_RAW_INT'].cog * 0.01
-        else:
-            gps_heading = self.status.msgs['GPS_RAW'].hdg
+        gps_heading = self.status.msgs['GPS_RAW_INT'].cog * 0.01
 
         self.console.writeln("heading: %u/%u   alt: %u/%u  r/p: %u/%u speed: %u/%u  thr: %u" % (
             self.status.msgs['VFR_HUD'].heading,
@@ -105,12 +97,7 @@ class SensorsModule(mp_module.MPModule):
 
     def check_heading(self, m):
         '''check heading discrepancy'''
-        if 'GPS_RAW' in self.status.msgs:
-            gps = self.status.msgs['GPS_RAW']
-            if gps.v < 3:
-                return
-            diff = math.fabs(angle_diff(m.heading, gps.hdg))
-        elif 'GPS_RAW_INT' in self.status.msgs:
+        if 'GPS_RAW_INT' in self.status.msgs:
             gps = self.status.msgs['GPS_RAW_INT']
             if gps.vel < 300:
                 return
@@ -121,7 +108,7 @@ class SensorsModule(mp_module.MPModule):
 
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
-        if m.get_type() == 'VFR_HUD' and ('GPS_RAW' in self.status.msgs or 'GPS_RAW_INT' in self.status.msgs):
+        if m.get_type() == 'VFR_HUD' and 'GPS_RAW_INT' in self.status.msgs:
             self.check_heading(m)
             if self.settings.speedreporting:
                 if m.airspeed != 0:
