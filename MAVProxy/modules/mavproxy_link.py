@@ -378,11 +378,11 @@ class LinkModule(mp_module.MPModule):
         sysid = m.get_srcSystem()
         if sysid in self.mpstate.sysid_outputs:
             self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
-            if m.get_type() == "GLOBAL_POSITION_INT" and self.module('map') is not None:
-                self.module('map').set_secondary_vehicle_position(m)
-                mod = self.module('asterix')
-                if mod:
-                    mod.set_secondary_vehicle_position(m)
+            if m.get_type() == "GLOBAL_POSITION_INT":
+                for modname in 'map', 'asterix', 'NMEA', 'NMEA2':
+                    mod = self.module(modname)
+                    if mod is not None:
+                        mod.set_secondary_vehicle_position(m)
             return
 
         if getattr(m, '_timestamp', None) is None:
