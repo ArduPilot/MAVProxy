@@ -51,7 +51,7 @@ class AsterixModule(mp_module.MPModule):
         # filter_dist is distance in metres
         self.asterix_settings = mp_settings.MPSettings([("port", int, 45454),
                                                         ('debug', int, 0),
-                                                        ('filter_dist', int, -1),
+                                                        ('filter_dist', int, 3000),
                                                         ('filter_use_vehicle2', bool, True),
         ])
         self.add_completion_function('(ASTERIXSETTING)',
