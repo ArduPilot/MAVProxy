@@ -76,6 +76,7 @@ class AsterixModule(mp_module.MPModule):
         else:
             logpath = 'asterix.log'
         self.logfile = open(logpath, 'w')
+        self.pkt_count = 0
 
     def print_status(self):
         print("ADSB packets sent: %u" % self.adsb_packets_sent)
@@ -175,6 +176,8 @@ class AsterixModule(mp_module.MPModule):
                     amsg = asterix.parse(pkt)
             else:
                 amsg = asterix.parse(pkt)
+            self.pkt_count += 1
+            self.console.set_status('ASTX', 'ASTX %u' % self.pkt_count, row=6)
         except Exception:
             print("bad packet")
             return
