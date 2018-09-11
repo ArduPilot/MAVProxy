@@ -162,8 +162,10 @@ class ADSBModule(mp_module.MPModule):
     def check_threat_timeout(self):
         '''check and handle threat time out'''
         for id in self.threat_vehicles.keys():
+            if self.threat_vehicles[id].update_time == 0:
+                self.threat_vehicles[id].update_time = self.tnow
             dt = self.tnow - self.threat_vehicles[id].update_time
-            if dt < 0 or dt > self.ADSB_settings.timeout:
+            if dt > self.ADSB_settings.timeout:
                 # if the threat has timed out...
                 del self.threat_vehicles[id]  # remove the threat from the dict
                 for mp in self.module_matching('map*'):
@@ -217,37 +219,6 @@ class ADSBModule(mp_module.MPModule):
                         label = None
                     mp.map.set_position(id, (m.lat * 1e-7, m.lon * 1e-7), rotation=m.heading*0.01, label=label, colour=(0,250,250))
                     mp.map.set_position(id+":circle", (m.lat * 1e-7, m.lon * 1e-7))
-
-        elif m.get_type() == "GLOBAL_POSITION_INT":
-            for mp in self.module_matching('map*'):
-                if len(self.active_threat_ids) > 0:
-                    threat_circle_width = 2
-                else:
-                    threat_circle_width = 1
-                # update the threat circle on the map
-                threat_circle = mp_slipmap.SlipCircle("threat_circle", 3,
-                                                      (m.lat * 1e-7, m.lon * 1e-7),
-                                                      self.ADSB_settings.threat_radius,
-                                                      (0, 255, 255), linewidth=threat_circle_width)
-                threat_circle.set_hidden(
-                    not self.ADSB_settings.show_threat_radius)  # show the circle?
-                mp.map.add_object(threat_circle)
-
-                # update the threat clear circle on the map
-                threat_radius_clear = self.ADSB_settings.threat_radius * \
-                    self.ADSB_settings.threat_radius_clear_multiplier
-                threat_clear_circle = mp_slipmap.SlipCircle("threat_clear_circle", 3,
-                                                            (m.lat * 1e-7,
-                                                             m.lon * 1e-7),
-                                                            threat_radius_clear,
-                                                            (0, 255, 255), linewidth=1)
-                # show the circle?
-                threat_clear_circle.set_hidden(not self.ADSB_settings.show_threat_radius_clear)
-                mp.map.add_object(threat_clear_circle)
-
-            # we assume this is handled much more oftern than ADS-B messages
-            # so update the distance between vehicle and threat here
-            self.update_threat_distances((m.lat * 1e-7, m.lon * 1e-7, m.alt * 1e-3))
 
     def idle_task(self):
         '''called on idle'''
