@@ -532,6 +532,18 @@ class LinkModule(mp_module.MPModule):
         elif mtype == "COMPASSMOT_STATUS":
             print(m)
 
+        elif mtype == "SIMSTATE":
+            self.mpstate.is_sitl = True
+
+        elif mtype == "ATTITUDE":
+            att_time = m.time_boot_ms * 0.001
+            self.mpstate.attitude_time_s = max(self.mpstate.attitude_time_s, att_time)
+            if self.mpstate.attitude_time_s - att_time > 120:
+                # cope with wrap
+                print("attitude time wrap")
+                self.mpstate.attitude_time_s = att_time
+
+            
         elif mtype == "BAD_DATA":
             if self.mpstate.settings.shownoise and mavutil.all_printable(m.data):
                 self.mpstate.console.write(str(m.data), bg='red')

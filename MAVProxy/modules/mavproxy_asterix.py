@@ -38,6 +38,14 @@ class Track:
             pkt.hor_velocity = 65535
         self.pkt = pkt
 
+class VehiclePos(object):
+    def __init__(self, GPI):
+        self.lat = GPI.lat * 1.0e-7
+        self.lon = GPI.lon * 1.0e-7
+        self.alt = GPI.alt * 1.0e-3
+        self.vx = GPI.vx * 1.0e-2
+        self.vy = GPI.vy * 1.0e-2
+
 class AsterixModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
@@ -51,21 +59,19 @@ class AsterixModule(mp_module.MPModule):
         # filter_dist is distance in metres
         self.asterix_settings = mp_settings.MPSettings([("port", int, 45454),
                                                         ('debug', int, 0),
-                                                        ('filter_dist', int, 3000),
+                                                        ('filter_dist', int, 1000),
                                                         ('filter_use_vehicle2', bool, True),
         ])
         self.add_completion_function('(ASTERIXSETTING)',
                                      self.asterix_settings.completion)
         self.sock = None
         self.tracks = {}
-        self.tnow = 0
         self.start_listener()
 
         # storage for vehicle positions, used for filtering
-        self.vehicle_lat = None
-        self.vehicle_lon = None
-        self.vehicle2_lat = None
-        self.vehicle2_lon = None
+        self.vehicle_pos = None
+        self.vehicle2_pos = None
+
         self.adsb_packets_sent = 0
         self.adsb_packets_not_sent = 0
         self.adsb_byterate = 0 # actually bytes...
@@ -125,36 +131,33 @@ class AsterixModule(mp_module.MPModule):
         if m.get_type() != 'GLOBAL_POSITION_INT':
             return
         (lat, lon, heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
-        if abs(lat) < 1.0e-3 and abs(lon) > 1.0e-3:
+        if abs(lat) < 1.0e-3 and abs(lon) < 1.0e-3:
             return
+        self.vehicle2_pos = VehiclePos(m)
+
+    def could_collide(self, vpos, adsb_pkt, margin, timeout):
+        '''return true if vehicle could come within margin meters of adsb vehicle in timeout seconds'''
+        alat = adsb_pkt.lat * 1.0e-7
+        alon = adsb_pkt.lon * 1.0e-7
+        avel = adsb_pkt.hor_velocity * 0.01
+        vvel = sqrt(vpos.vx**2 + vpos.vy**2)
+        dist = mp_util.gps_distance(vpos.lat, vpos.lon, alat, alon)
+        dist -= avel * timeout
+        dist -= vvel * timeout
+        if dist <= margin:
+            return True
+        return False
 
     def should_send_adsb_pkt(self, adsb_pkt):
         if self.asterix_settings.filter_dist <= 0:
             return True
 
-        # only filter packets out if vehicle's position is known:
-        if self.vehicle_lat is None:
-            return True
-
-        adsb_pkt_lat = adsb_pkt.lat*1.0e-7
-        adsb_pkt_lon = adsb_pkt.lon*1.0e-7
-
-        dist = mp_util.gps_distance(adsb_pkt_lat,
-                                    adsb_pkt_lon,
-                                    self.vehicle_lat,
-                                    self.vehicle_lon)
-        if dist <= self.asterix_settings.filter_dist:
-            return True
-
-        if self.asterix_settings.filter_use_vehicle2:
-            # only filter packets out if vehicle's position is known:
-            if self.vehicle2_lat is None:
+        if self.vehicle_pos is not None:
+            if self.could_collide(self.vehicle_pos, adsb_pkt, self.asterix_settings.filter_dist, 20):
                 return True
-            dist = mp_util.gps_distance(adsb_pkt_lat,
-                                        adsb_pkt_lon,
-                                        self.vehicle2_lat,
-                                        self.vehicle2_lon)
-            if dist <= self.asterix_settings.filter_dist:
+
+        if self.vehicle2_pos is not None:
+            if self.could_collide(self.vehicle2_pos, adsb_pkt, self.asterix_settings.filter_dist, 20):
                 return True
 
         return False
@@ -177,7 +180,7 @@ class AsterixModule(mp_module.MPModule):
             else:
                 amsg = asterix.parse(pkt)
             self.pkt_count += 1
-            self.console.set_status('ASTX', 'ASTX %u' % self.pkt_count, row=6)
+            self.console.set_status('ASTX', 'ASTX %u/%u' % (self.pkt_count, self.adsb_packets_sent), row=6)
         except Exception:
             print("bad packet")
             return
@@ -220,7 +223,7 @@ class AsterixModule(mp_module.MPModule):
                                                             mavutil.mavlink.ADSB_FLAGS_VALID_HEADING),
                                                            squawk)
             if icao_address in self.tracks:
-                self.tracks[icao_address].update(adsb_pkt, self.tnow)
+                self.tracks[icao_address].update(adsb_pkt, self.get_time())
             else:
                 self.tracks[icao_address] = Track(adsb_pkt)
             if self.asterix_settings.debug > 0:
@@ -250,11 +253,10 @@ class AsterixModule(mp_module.MPModule):
 
     def mavlink_packet(self, m):
         '''get time from mavlink ATTITUDE'''
-        if m.get_type() == 'ATTITUDE':
-            self.tnow = m.time_boot_ms*0.001
         if m.get_type() == 'GLOBAL_POSITION_INT':
-            self.vehicle_lat = m.lat*1.0e-7
-            self.vehicle_lon = m.lon*1.0e-7
+            if abs(m.lat) < 1000 and abs(m.lon) < 1000:
+                return
+            self.vehicle_pos = VehiclePos(m)
 
 def init(mpstate):
     '''initialise module'''

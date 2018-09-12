@@ -76,7 +76,7 @@ class ADSBModule(mp_module.MPModule):
         
         self.threat_detection_timer = mavutil.periodic_event(2)
         self.threat_timeout_timer = mavutil.periodic_event(2)
-        self.tnow = 0
+        self.tnow = self.get_time()
 
     def cmd_ADSB(self, args):
         '''adsb command parser'''
@@ -163,8 +163,8 @@ class ADSBModule(mp_module.MPModule):
         '''check and handle threat time out'''
         for id in self.threat_vehicles.keys():
             if self.threat_vehicles[id].update_time == 0:
-                self.threat_vehicles[id].update_time = self.tnow
-            dt = self.tnow - self.threat_vehicles[id].update_time
+                self.threat_vehicles[id].update_time = self.get_time()
+            dt = self.get_time() - self.threat_vehicles[id].update_time
             if dt > self.ADSB_settings.timeout:
                 # if the threat has timed out...
                 del self.threat_vehicles[id]  # remove the threat from the dict
@@ -179,10 +179,7 @@ class ADSBModule(mp_module.MPModule):
 
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
-        if m.get_type() == 'ATTITUDE':
-            # use mavlink time to allow for speedup and gdb attach in SITL
-            self.tnow = m.time_boot_ms * 0.001
-        elif m.get_type() == "ADSB_VEHICLE":
+        if m.get_type() == "ADSB_VEHICLE":
             id = 'ADSB-' + str(m.ICAO_address)
             if id not in self.threat_vehicles.keys():  # check to see if the vehicle is in the dict
                 # if not then add it
@@ -207,7 +204,7 @@ class ADSBModule(mp_module.MPModule):
                                                     threat_radius, (0, 255, 255), linewidth=1))
             else:  # the vehicle is in the dict
                 # update the dict entry
-                self.threat_vehicles[id].update(m.to_dict(), self.tnow)
+                self.threat_vehicles[id].update(m.to_dict(), self.get_time())
                 for mp in self.module_matching('map*'):
                     # update the map
                     ground_alt = self.console.ElevationMap.GetElevation(m.lat*1e-7, m.lon*1e-7)

@@ -392,7 +392,7 @@ class GenobstaclesModule(mp_module.MPModule):
                 self.start()
         if m.get_type() != 'ATTITUDE':
             return
-        t = m.time_boot_ms * 0.001
+        t = self.get_time()
         dt = t - self.last_t
         if dt < 0 or dt > 10:
             self.last_t = t
