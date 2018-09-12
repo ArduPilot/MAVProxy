@@ -1,3 +1,4 @@
+import time
 
 class MPModule(object):
     '''
@@ -66,7 +67,20 @@ class MPModule(object):
             if fnmatch.fnmatch(mname, name):
                 ret.append(self.mpstate.public_modules[mname])
         return ret
-    
+
+    def get_time(self):
+        '''get time, using ATTITUDE.time_boot_ms if in SITL with SIM_SPEEDUP != 1'''
+        systime = time.time() - self.mpstate.start_time_s
+        if not self.mpstate.is_sitl:
+            return systime
+        try:
+            speedup = int(self.get_mav_param('SIM_SPEEDUP',1))
+        except Exception:
+            return systime
+        if speedup != 1:
+            return self.mpstate.attitude_time_s
+        return systime
+
     @property
     def console(self):
         return self.mpstate.console

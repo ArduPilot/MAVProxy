@@ -209,6 +209,9 @@ class MPState(object):
         self.system = platform.system()
         self.multi_instance = {}
         self.instance_count = {}
+        self.is_sitl = False
+        self.start_time_s = time.time()
+        self.attitude_time_s = 0
 
     def module(self, name):
         '''Find a public module (most modules are private)'''
