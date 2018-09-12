@@ -65,7 +65,7 @@ class ADSBModule(mp_module.MPModule):
         self.add_command('adsb', self.cmd_ADSB, "adsb control",
                          ["<status>", "set (ADSBSETTING)"])
 
-        self.ADSB_settings = mp_settings.MPSettings([("timeout", int, 10),  # seconds
+        self.ADSB_settings = mp_settings.MPSettings([("timeout", int, 5),  # seconds
                                                      ("threat_radius", int, 200),  # meters
                                                      ("show_threat_radius", bool, False),
                                                      # threat_radius_clear = threat_radius*threat_radius_clear_multiplier
