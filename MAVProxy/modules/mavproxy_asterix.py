@@ -60,6 +60,7 @@ class AsterixModule(mp_module.MPModule):
         self.asterix_settings = mp_settings.MPSettings([("port", int, 45454),
                                                         ('debug', int, 0),
                                                         ('filter_dist', int, 1000),
+                                                        ('wgs84_to_AMSL', float, -41.2),
                                                         ('filter_use_vehicle2', bool, True),
         ])
         self.add_completion_function('(ASTERIXSETTING)',
@@ -205,16 +206,21 @@ class AsterixModule(mp_module.MPModule):
             icao_address = trkn & 0xFFFF
             squawk = icao_address
 
+            alt_m = alt_f * 0.3048
+
+            # asterix is WGS84, ArduPilot uses AMSL, which is EGM96
+            alt_m += self.asterix_settings.wgs84_to_AMSL
+
             # consider filtering this packet out; if it's not close to
             # either home or the vehicle position don't send it
             adsb_pkt = self.master.mav.adsb_vehicle_encode(icao_address,
                                                            int(lat*1e7),
                                                            int(lon*1e7),
                                                            mavutil.mavlink.ADSB_ALTITUDE_TYPE_GEOMETRIC,
-                                                           int(alt_f*304.8), # mm
+                                                           int(alt_m*1000), # mm
                                                            0, # heading
                                                            0, # hor vel
-                                                           int(climb_rate_fps * 30.48),
+                                                           int(climb_rate_fps * 0.3048 * 100), # cm/s
                                                            "%08x" % icao_address,
                                                            100 + (trkn // 10000),
                                                            1.0,
