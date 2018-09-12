@@ -210,8 +210,8 @@ class ADSBModule(mp_module.MPModule):
                     ground_alt = self.console.ElevationMap.GetElevation(m.lat*1e-7, m.lon*1e-7)
                     alt_amsl = m.altitude * 0.001
                     if alt_amsl > 0:
-                        alt = int(self.height_convert_units(alt_amsl - ground_alt))
-                        label = str(alt)
+                        alt = int(alt_amsl - ground_alt)
+                        label = str(alt) + "m"
                     else:
                         label = None
                     mp.map.set_position(id, (m.lat * 1e-7, m.lon * 1e-7), rotation=m.heading*0.01, label=label, colour=(0,250,250))
