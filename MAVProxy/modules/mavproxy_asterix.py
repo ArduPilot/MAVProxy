@@ -59,7 +59,9 @@ class AsterixModule(mp_module.MPModule):
         # filter_dist is distance in metres
         self.asterix_settings = mp_settings.MPSettings([("port", int, 45454),
                                                         ('debug', int, 0),
-                                                        ('filter_dist', int, 1000),
+                                                        ('filter_dist_xy', int, 1000),
+                                                        ('filter_dist_z', int, 250),
+                                                        ('filter_time', int, 20),
                                                         ('wgs84_to_AMSL', float, -41.2),
                                                         ('filter_use_vehicle2', bool, True),
         ])
@@ -137,8 +139,10 @@ class AsterixModule(mp_module.MPModule):
             return
         self.vehicle2_pos = VehiclePos(m)
 
-    def could_collide(self, vpos, adsb_pkt, margin, timeout):
-        '''return true if vehicle could come within margin meters of adsb vehicle in timeout seconds'''
+    def could_collide_hor(self, vpos, adsb_pkt):
+        '''return true if vehicle could come within filter_dist_xy meters of adsb vehicle in timeout seconds'''
+        margin = self.asterix_settings.filter_dist_xy
+        timeout = self.asterix_settings.filter_time
         alat = adsb_pkt.lat * 1.0e-7
         alon = adsb_pkt.lon * 1.0e-7
         avel = adsb_pkt.hor_velocity * 0.01
@@ -150,16 +154,32 @@ class AsterixModule(mp_module.MPModule):
             return True
         return False
 
-    def should_send_adsb_pkt(self, adsb_pkt):
-        if self.asterix_settings.filter_dist <= 0:
+    def could_collide_ver(self, vpos, adsb_pkt):
+        '''return true if vehicle could come within filter_dist_z meters of adsb vehicle in timeout seconds'''
+        if adsb_pkt.emitter_type < 100 or adsb_pkt.emitter_type > 104:
             return True
+        margin = self.asterix_settings.filter_dist_z
+        vtype = adsb_pkt.emitter_type - 100
+        valt = vpos.alt
+        aalt = adsb_pkt.altitude * 0.001
+        if vtype == 2:
+            # weather, always yes
+            return True
+        if vtype == 4:
+            # bird of prey, always true
+            return True
+        altsep = abs(valt - aalt)
+        if altsep > 150 + margin:
+            return False
+        return True
 
+    def should_send_adsb_pkt(self, adsb_pkt):
         if self.vehicle_pos is not None:
-            if self.could_collide(self.vehicle_pos, adsb_pkt, self.asterix_settings.filter_dist, 20):
+            if self.could_collide_hor(self.vehicle_pos, adsb_pkt) and self.could_collide_ver(self.vehicle_pos, adsb_pkt):
                 return True
 
         if self.vehicle2_pos is not None:
-            if self.could_collide(self.vehicle2_pos, adsb_pkt, self.asterix_settings.filter_dist, 20):
+            if self.could_collide_hor(self.vehicle2_pos, adsb_pkt) and self.could_collide_ver(self.vehicle2_pos, adsb_pkt):
                 return True
 
         return False
