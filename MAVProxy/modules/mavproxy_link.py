@@ -391,6 +391,11 @@ class LinkModule(mp_module.MPModule):
 
         mtype = m.get_type()
 
+        if mtype == 'GLOBAL_POSITION_INT':
+            # send GLOBAL_POSITION_INT to 2nd GCS for 2nd vehicle display
+            for sysid in self.mpstate.sysid_outputs:
+                self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
+
         # and log them
         if mtype not in dataPackets and self.mpstate.logqueue:
             # put link number in bottom 2 bits, so we can analyse packet
