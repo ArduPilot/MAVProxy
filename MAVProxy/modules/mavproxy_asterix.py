@@ -161,15 +161,18 @@ class AsterixModule(mp_module.MPModule):
         margin = self.asterix_settings.filter_dist_z
         vtype = adsb_pkt.emitter_type - 100
         valt = vpos.alt
-        aalt = adsb_pkt.altitude * 0.001
+        aalt1 = adsb_pkt.altitude * 0.001
         if vtype == 2:
             # weather, always yes
             return True
         if vtype == 4:
             # bird of prey, always true
             return True
-        altsep = abs(valt - aalt)
-        if altsep > 150 + margin:
+        # planes and migrating birds have 150m margin
+        aalt2 = aalt1 + adsb_pkt.ver_velocity * 0.01 * self.asterix_settings.filter_time
+        altsep1 = abs(valt - aalt1)
+        altsep2 = abs(valt - aalt2)
+        if altsep1 > 150 + margin and altsep2 > 150 + margin:
             return False
         return True
 
