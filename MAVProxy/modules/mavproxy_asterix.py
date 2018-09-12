@@ -83,6 +83,7 @@ class AsterixModule(mp_module.MPModule):
             logpath = 'asterix.log'
         self.logfile = open(logpath, 'w')
         self.pkt_count = 0
+        self.console.set_status('ASTX', 'ASTX --/--', row=6)
 
     def print_status(self):
         print("ADSB packets sent: %u" % self.adsb_packets_sent)
