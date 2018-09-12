@@ -54,6 +54,7 @@ class DNFZ:
         # random initial position and heading
         self.randpos()
         self.setheading(random.uniform(0,360))
+        self.setclimbrate(random.uniform(-3,3))
         global track_count
         track_count += 1
         self.pkt['I040']['TrkN']['val'] = DNFZ_types[self.DNFZ_type] + track_count
@@ -181,7 +182,7 @@ class Aircraft(DNFZ):
         if self.dist_flown > self.circuit_width:
             self.desired_heading = self.heading + 90
             self.dist_flown = 0
-        if self.getalt() < self.ground_height():
+        if self.getalt() < self.ground_height() or self.getalt() > self.ground_height() + 2000:
             self.randpos()
             self.randalt()
 
@@ -230,7 +231,9 @@ class BirdMigrating(DNFZ):
     def update(self, deltat=1.0):
         '''fly in long curves'''
         DNFZ.update(self, deltat)
-        if self.distance_from_home() > gen_settings.region_width or self.getalt() < self.ground_height():
+        if (self.distance_from_home() > gen_settings.region_width or
+            self.getalt() < self.ground_height() or
+            self.getalt() > self.ground_height() + 1000):
             self.randpos()
             self.randalt()
 
@@ -241,7 +244,8 @@ class Weather(DNFZ):
         self.setspeed(random.uniform(1,4))
         self.lifetime = random.uniform(300,600)
         self.setalt(0)
-        
+        self.setclimbrate(0)
+
     def update(self, deltat=1.0):
         '''straight lines, with short life'''
         DNFZ.update(self, deltat)
