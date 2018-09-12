@@ -243,7 +243,14 @@ class AsterixModule(mp_module.MPModule):
                 # the adsb module is loaded, display on the map
                 adsb_mod.mavlink_packet(adsb_pkt)
 
-
+            try:
+                for sysid in self.mpstate.sysid_outputs:
+                    # fwd to sysid clients
+                    adsb_pkt.pack(self.mpstate.sysid_outputs[sysid].mav)
+                    self.mpstate.sysid_outputs[sysid].write(adsb_pkt.get_msgbuf())
+            except Exception:
+                pass
+                
         now = time.time()
         delta = now - self.adsb_byterate_update_timestamp
         if delta > 5:
