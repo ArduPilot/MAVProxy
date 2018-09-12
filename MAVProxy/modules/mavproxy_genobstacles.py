@@ -37,6 +37,7 @@ gen_settings = mp_settings.MPSettings([("port", int, 45454),
                                        ('num_bird_prey', int, 5),
                                        ('num_bird_migratory', int, 5),
                                        ('num_weather', int, 5),
+                                       ('wgs84_to_AMSL', float, -41.2),
                                        ('stop', int, 0)])
                                        
     
@@ -82,6 +83,7 @@ class DNFZ:
         lon = self.pkt['I105']['Lon']['val']
         global ElevationMap
         ret = ElevationMap.GetElevation(lat, lon)
+        ret -= gen_settings.wgs84_to_AMSL
         return ret * 3.2807
 
     def randalt(self):
