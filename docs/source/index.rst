@@ -11,7 +11,7 @@ MAVProxy
 
 MAVProxy is a fully-functioning GCS for UAV's. The intent is for a
 minimalist, portable and extendable GCS for any UAV supporting the
-MAVLink protocol (such as the APM).
+MAVLink protocol (such as one using ArduPilot).
 
 MAVProxy was first developed by `CanberraUAV <http://www.canberrauav.org.au>`_,
 to enable the use of companion computing and multiple datalinks with 
