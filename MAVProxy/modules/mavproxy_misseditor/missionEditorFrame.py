@@ -484,6 +484,8 @@ class MissionEditorFrame(wx.Frame):
         self.grid_mission.SelectRow(row_selected+1)
         self.set_modified_state(True)
 
+        self.fix_jumps(row_selected+1, 1)
+
         event.Skip()
 
     def save_wp_file_pushed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
@@ -535,6 +537,7 @@ class MissionEditorFrame(wx.Frame):
                 #delete this row
                 self.grid_mission.DeleteRows(row)
                 self.set_modified_state(True)
+                self.fix_jumps(row, -1)
         #up column?
         elif (event.GetCol() == ME_UP_COL):
             row = event.GetRow()
@@ -660,6 +663,17 @@ class MissionEditorFrame(wx.Frame):
         self.text_ctrl_wp_default_alt.SetForegroundColour(wx.Colour(255, 0, 0))
 
         event.Skip()
+
+    def fix_jumps(self, row_selected, delta):
+        '''fix up jumps when we add/remove rows'''
+        numrows = self.grid_mission.GetNumberRows()
+        for row in range(numrows):
+            command = self.grid_mission.GetCellValue(row, ME_COMMAND_COL)
+            if command in ["DO_JUMP", "DO_CONDITION_JUMP"]:
+                p1 = int(float(self.grid_mission.GetCellValue(row, ME_P1_COL)))
+                if p1 > row_selected and p1+delta>0:
+                    self.grid_mission.SetCellValue(row, ME_P1_COL, str(float(p1+delta)))
+
 # end of class MissionEditorFrame
 if __name__ == "__main__":
     app = wx.App(False)
