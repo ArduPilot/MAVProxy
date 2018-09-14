@@ -514,6 +514,17 @@ class WPModule(mp_module.MPModule):
                                                         idx, idx+count)
         print("Changed alt for WPs %u:%u to %f" % (idx, idx+(count-1), newalt))
 
+    def fix_jumps(self, idx, delta):
+        '''fix up jumps when we add/remove rows'''
+        numrows = self.wploader.count()
+        for row in range(numrows):
+            wp = self.wploader.wp(row)
+            if wp.command in [mavutil.mavlink.MAV_CMD_DO_JUMP, mavutil.mavlink.MAV_CMD_DO_CONDITION_JUMP]:
+                p1 = int(wp.param1)
+                if p1 > idx and p1+delta>0:
+                    wp.param1 = float(p1+delta)
+                    self.wploader.set(wp, row)
+
     def cmd_wp_remove(self, args):
         '''handle wp remove'''
         if len(args) != 1:
@@ -531,6 +542,7 @@ class WPModule(mp_module.MPModule):
         self.undo_type = "remove"
 
         self.wploader.remove(wp)
+        self.fix_jumps(idx, -1)
         self.send_all_waypoints()
         print("Removed WP %u" % idx)
 
@@ -552,6 +564,7 @@ class WPModule(mp_module.MPModule):
             print("Undid WP move")
         elif self.undo_type == 'remove':
             self.wploader.insert(self.undo_wp_idx, wp)
+            self.fix_jumps(self.undo_wp_idx, 1)
             self.send_all_waypoints()
             print("Undid WP remove")
         else:
