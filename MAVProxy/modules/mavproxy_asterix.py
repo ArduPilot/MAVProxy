@@ -227,7 +227,10 @@ class AsterixModule(mp_module.MPModule):
             trkn = m['I040']['TrkN']['val']
             # fake ICAO_address
             icao_address = trkn & 0xFFFF
-            squawk = icao_address
+
+            # use squawk for time in 0.1 second increments. This allows for old msgs to be discarded on vehicle
+            # when using more than one link to vehicle
+            squawk = (int(self.mpstate.attitude_time_s * 10) & 0xFFFF)
 
             alt_m = alt_f * 0.3048
 
