@@ -17,9 +17,9 @@ class LayoutModule(mp_module.MPModule):
             print("usage: layout <save|load>")
             return
         if args[0] == "load":
-            win_layout.load_layout()
+            win_layout.load_layout(self.mpstate.settings.vehicle_name)
         elif args[0] == "save":
-            win_layout.save_layout()
+            win_layout.save_layout(self.mpstate.settings.vehicle_name)
 
 def init(mpstate):
     '''initialise module'''

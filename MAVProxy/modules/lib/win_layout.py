@@ -11,6 +11,7 @@ window_list = {}
 display_size = None
 loaded_layout = None
 pending_load = False
+vehiclename = None
 
 class WinLayout(object):
     '''represent window layout'''
@@ -53,6 +54,7 @@ def set_layout(wlayout, callback):
     global window_list
     global loaded_layout
     global pending_load
+    global vehiclename
     #if not wlayout.name in window_list:
     #    print("layout %s" % wlayout)
     if not wlayout.name in window_list and loaded_layout is not None and wlayout.name in loaded_layout:
@@ -61,11 +63,12 @@ def set_layout(wlayout, callback):
     display_size = wlayout.dsize
     if pending_load:
         pending_load = False
-        load_layout()
+        load_layout(vehiclename)
 
 def layout_filename():
     '''get location of layout file'''
     global display_size
+    global vehiclename
     (dw,dh) = display_size
     if 'HOME' in os.environ:
         dirname = os.path.join(os.environ['HOME'], ".mavproxy")
@@ -74,18 +77,26 @@ def layout_filename():
                 os.mkdir(dirname)
             except Exception:
                 pass
-        return os.path.join(dirname, "layout-%ux%u" % (dw,dh))
+        if vehiclename:
+            return os.path.join(dirname, "layout-%s-%ux%u" % (vehiclename,dw,dh))
+        else:
+            return os.path.join(dirname, "layout-%ux%u" % (dw,dh))
     if 'LOCALAPPDATA' in os.environ and not opts.setup:
-        return os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy", "layout-%ux%x.dat" % (dw,dh))
+        if vehiclename:
+            return os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy", "layout-%s-%ux%u" % (vehiclename,dw,dh))
+        else:
+            return os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy", "layout-%ux%x.dat" % (dw,dh))
     return None
 
-def save_layout():
+def save_layout(vehname):
     '''save window layout'''
     global display_size
     global window_list
+    global vehiclename
     if display_size is None:
         print("No layouts to save")
         return
+    vehiclename = vehname
     fname = layout_filename()
     if fname is None:
         print("No file to save layout to")
@@ -104,15 +115,17 @@ def save_layout():
     pickle.dump(layout, open(fname,"w"))
     print("Saved layout for %u windows" % count)
 
-def load_layout():
+def load_layout(vehname):
     '''load window layout'''
     global display_size
     global window_list
     global loaded_layout
     global pending_load
+    global vehiclename
     if display_size is None:
         pending_load = True
         return
+    vehiclename = vehname
     fname = layout_filename()
     if fname is None:
         print("No file to load layout from")
