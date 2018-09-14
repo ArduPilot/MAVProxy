@@ -65,7 +65,7 @@ def set_layout(wlayout, callback):
         pending_load = False
         load_layout(vehiclename)
 
-def layout_filename():
+def layout_filename(fallback):
     '''get location of layout file'''
     global display_size
     global vehiclename
@@ -77,16 +77,15 @@ def layout_filename():
                 os.mkdir(dirname)
             except Exception:
                 pass
-        if vehiclename:
-            return os.path.join(dirname, "layout-%s-%ux%u" % (vehiclename,dw,dh))
-        else:
-            return os.path.join(dirname, "layout-%ux%u" % (dw,dh))
-    if 'LOCALAPPDATA' in os.environ and not opts.setup:
-        if vehiclename:
-            return os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy", "layout-%s-%ux%u" % (vehiclename,dw,dh))
-        else:
-            return os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy", "layout-%ux%x.dat" % (dw,dh))
-    return None
+    elif 'LOCALAPPDATA' in os.environ and not opts.setup:
+        dirname = os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy")
+    else:
+        return None
+    if vehiclename:
+        fname = os.path.join(dirname, "layout-%s-%ux%u" % (vehiclename,dw,dh))
+        if not fallback or os.path.exists(fname):
+            return fname
+    return os.path.join(dirname, "layout-%ux%u" % (dw,dh))
 
 def save_layout(vehname):
     '''save window layout'''
@@ -97,7 +96,7 @@ def save_layout(vehname):
         print("No layouts to save")
         return
     vehiclename = vehname
-    fname = layout_filename()
+    fname = layout_filename(False)
     if fname is None:
         print("No file to save layout to")
         return
@@ -126,7 +125,7 @@ def load_layout(vehname):
         pending_load = True
         return
     vehiclename = vehname
-    fname = layout_filename()
+    fname = layout_filename(True)
     if fname is None:
         print("No file to load layout from")
         return
