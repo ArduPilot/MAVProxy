@@ -618,8 +618,11 @@ class MapModule(mp_module.MPModule):
         if abs(lat) < 1.0e-3 and abs(lon) > 1.0e-3:
             return
         # hack for OBC2016
+        alt = self.ElevationMap.GetElevation(lat, lon)
+        agl = m.alt * 0.001 - alt
+        agl_s = str(int(agl)) + 'm'
         self.create_vehicle_icon('VehiclePos2', 'blue', follow=False, vehicle_type='plane')
-        self.map.set_position('VehiclePos2', (lat, lon), rotation=heading)
+        self.map.set_position('VehiclePos2', (lat, lon), rotation=heading, label=agl_s, colour=(0,255,255))
 
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
