@@ -29,6 +29,7 @@ from MAVProxy.modules.lib import textconsole
 from MAVProxy.modules.lib import rline
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import dumpstacks
+from MAVProxy.modules.lib import mp_substitute
 
 # adding all this allows pyinstaller to build a working windows executable
 # note that using --hidden-import does not work for these modules
@@ -903,9 +904,15 @@ def run_script(scriptfile):
     except Exception:
         return
     mpstate.console.writeln("Running script %s" % scriptfile)
+    sub = mp_substitute.MAVSubstitute()
     for line in f:
         line = line.strip()
         if line == "" or line.startswith('#'):
+            continue
+        try:
+            line = sub.substitute(line, os.environ)
+        except mp_substitute.MAVSubstituteError as ex:
+            print("Bad variable: %s" % str(ex))
             continue
         if line.startswith('@'):
             line = line[1:]
