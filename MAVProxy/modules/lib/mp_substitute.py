@@ -2,6 +2,8 @@
 variable substitution in strings using a dictionary
 '''
 
+import sys
+
 class MAVSubstituteError(Exception):
     def __init__(self, message, inner_exception=None):
         self.message = message
@@ -87,7 +89,7 @@ class MAVSubstitute(object):
         return text
 
 if __name__ == "__main__":
-    import sys, os
+    import os
     sub = MAVSubstitute()
     for v in sys.argv[1:]:
         print("'%s' -> '%s'" % (v, sub.substitute(v, os.environ)))

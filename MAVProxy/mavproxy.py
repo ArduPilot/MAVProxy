@@ -152,6 +152,7 @@ class MPState(object):
               MPSetting('distreadout', int, 200, 'Distance Readout', range=(0,10000), increment=1),
 
               MPSetting('moddebug', int, opts.moddebug, 'Module Debug Level', range=(0,3), increment=1, tab='Debug'),
+              MPSetting('script_fatal', bool, False, 'fatal error on bad script', tab='Debug'),
               MPSetting('compdebug', int, 0, 'Computation Debug Mask', range=(0,3), tab='Debug'),
               MPSetting('flushlogs', bool, False, 'Flush logs on every packet'),
               MPSetting('requireexit', bool, False, 'Require exit command'),
@@ -913,6 +914,8 @@ def run_script(scriptfile):
             line = sub.substitute(line, os.environ)
         except mp_substitute.MAVSubstituteError as ex:
             print("Bad variable: %s" % str(ex))
+            if mpstate.settings.script_fatal:
+                sys.exit(1)
             continue
         if line.startswith('@'):
             line = line[1:]
