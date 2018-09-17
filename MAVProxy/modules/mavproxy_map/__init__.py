@@ -45,7 +45,7 @@ class MapModule(mp_module.MPModule):
         self.last_unload_check_time = time.time()
         self.unload_check_interval = 0.1 # seconds
         self.map_settings = mp_settings.MPSettings(
-            [ ('showgpspos', int, 0),
+            [ ('showgpspos', int, 1),
               ('showgps2pos', int, 1),
               ('showsimpos', int, 0),
               ('showahrs2pos', int, 0),
@@ -667,8 +667,12 @@ class MapModule(mp_module.MPModule):
         if m.get_type() == "GPS_RAW_INT" and self.map_settings.showgpspos:
             (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
             if lat != 0 or lon != 0:
+                if m.vel > 300 or 'ATTITUDE' not in self.master.messages:
+                    cog = m.cog*0.01
+                else:
+                    cog = math.degrees(self.master.messages['ATTITUDE'].yaw)
                 self.create_vehicle_icon('GPS' + vehicle, 'blue')
-                self.map.set_position('GPS' + vehicle, (lat, lon), rotation=m.cog*0.01)
+                self.map.set_position('GPS' + vehicle, (lat, lon), rotation=cog)
 
         if m.get_type() == "GPS2_RAW" and self.map_settings.showgps2pos:
             (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
