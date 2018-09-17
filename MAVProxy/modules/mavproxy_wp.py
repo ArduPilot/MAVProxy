@@ -93,7 +93,8 @@ class WPModule(mp_module.MPModule):
         if mtype in ['WAYPOINT_COUNT','MISSION_COUNT']:
             self.wploader.expected_count = m.count
             if self.wp_op is None:
-                self.console.error("No waypoint load started")
+                #self.console.error("No waypoint load started")
+                pass
             else:
                 self.wploader.clear()
                 self.console.writeln("Requesting %u waypoints t=%s now=%s" % (m.count,
@@ -176,7 +177,7 @@ class WPModule(mp_module.MPModule):
         if (not self.loading_waypoints or
             time.time() > self.loading_waypoint_lasttime + 10.0):
             self.loading_waypoints = False
-            self.console.error("not loading waypoints")
+            #self.console.error("not loading waypoints")
             return
         if m.seq >= self.wploader.count():
             self.console.error("Request for bad waypoint %u (max %u)" % (m.seq, self.wploader.count()))
