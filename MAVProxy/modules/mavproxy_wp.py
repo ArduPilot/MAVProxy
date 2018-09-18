@@ -334,13 +334,16 @@ class WPModule(mp_module.MPModule):
         points.append(mp_util.gps_offset(center_lat, center_lon,  25,  25))
         points.append(mp_util.gps_offset(center_lat, center_lon,  25, -25))
         points.append(mp_util.gps_offset(center_lat, center_lon, -25, -25))
+        start_idx = loader.count()
         for p in points:
             wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0, 0, mavutil.mavlink.MAV_CMD_NAV_FENCE_POLYGON_VERTEX_EXCLUSION,
                                                               0, 1, 4, 0, 0, 0, p[0], p[1], 0)
             loader.add(wp)
         self.loading_waypoints = True
         self.loading_waypoint_lasttime = time.time()
-        self.master.waypoint_count_send(self.wploader.count())
+        self.master.mav.mission_write_partial_list_send(self.target_system,
+                                                        self.target_component,
+                                                        start_idx, start_idx+4)
         print("Added nofly zone")
         
     def set_home_location(self):
