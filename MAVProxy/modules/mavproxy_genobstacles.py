@@ -229,7 +229,8 @@ class BirdMigrating(DNFZ):
         DNFZ.__init__(self, 'BirdMigrating')
         self.setspeed(random.uniform(4,16))
         self.setyawrate(random.uniform(-0.2,0.2))
-        
+        self.randalt()
+
     def update(self, deltat=1.0):
         '''fly in long curves'''
         DNFZ.update(self, deltat)
@@ -294,7 +295,6 @@ class GenobstaclesModule(mp_module.MPModule):
         if latlon is not None:
             obj.setpos(latlon[0], latlon[1])
             self.aircraft.append(obj)
-        
 
     def cmd_genobstacles(self, args):
         '''genobstacles command parser'''
