@@ -25,7 +25,7 @@ class WPModule(mp_module.MPModule):
         self.undo_wp_idx = -1
         self.add_command('wp', self.cmd_wp,       'waypoint management',
                          ["<list|clear|move|remove|loop|set|undo|movemulti|changealt|param|status>",
-                          "<load|update|save|show> (FILENAME)"])
+                          "<load|update|save|savecsv|show> (FILENAME)"])
 
         if self.continue_mode and self.logdir is not None:
             waytxt = os.path.join(mpstate.status.logdir, 'way.txt')
@@ -254,6 +254,16 @@ class WPModule(mp_module.MPModule):
             print("Failed to save %s - %s" % (filename, msg))
             return
         print("Saved %u waypoints to %s" % (self.wploader.count(), filename))
+
+    def save_waypoints_csv(self, filename):
+        '''save waypoints to a file in a human readable CSV file'''
+        try:
+            #need to remove the leading and trailing quotes in filename
+            self.wploader.savecsv(filename.strip('"'))
+        except Exception as msg:
+            print("Failed to save %s - %s" % (filename, msg))
+            return
+        print("Saved %u waypoints to CSV %s" % (self.wploader.count(), filename))
 
     def get_default_frame(self):
         '''default frame for waypoints'''
@@ -643,6 +653,11 @@ class WPModule(mp_module.MPModule):
             self.wp_save_filename = args[1]
             self.wp_op = "save"
             self.master.waypoint_request_list_send()
+        elif args[0] == "savecsv":
+            if len(args) != 2:
+                print("usage: wp savecsv <filename.csv>")
+                return
+            self.savecsv(args[1])
         elif args[0] == "savelocal":
             if len(args) != 2:
                 print("usage: wp savelocal <filename>")
@@ -699,6 +714,60 @@ class WPModule(mp_module.MPModule):
             self.wp_status()
         else:
             print(usage)
+
+    def pretty_enum_value(self, enum_name, enum_value):
+        if enum_name == "MAV_FRAME":
+            if enum_value == 0:
+                return "Abs"
+            elif enum_value == 1:
+                return "Local"
+            elif enum_value == 2:
+                return "Mission"
+            elif enum_value == 3:
+                return "Rel"
+            elif enum_value == 4:
+                return "Local ENU"
+            elif enum_value == 5:
+                return "Global (INT)"
+            elif enum_value == 10:
+                return "AGL"
+        ret = mavutil.mavlink.enums[enum_name][enum_value].name
+        ret = ret[len(enum_name)+1:]
+        return ret
+
+    def csv_line(self, line):
+        '''turn a list of values into a CSV line'''
+        self.csv_sep = ","
+        return self.csv_sep.join(['"' + str(x) + '"' for x in line])
+
+    def pretty_parameter_value(self, value):
+        '''pretty parameter value'''
+        return value
+
+    def savecsv(self, filename):
+        '''save waypoints to a file in human-readable CSV file'''
+        f = open(filename, mode='w')
+        headers = ["Seq", "Frame", "Cmd", "P1", "P2", "P3", "P4", "X", "Y", "Z"]
+        print(self.csv_line(headers))
+        f.write(self.csv_line(headers) + "\n")
+        for w in self.wploader.wpoints:
+            if getattr(w, 'comment', None):
+#                f.write("# %s\n" % w.comment)
+                pass
+            out_list = [ w.seq,
+                         self.pretty_enum_value('MAV_FRAME', w.frame),
+                         self.pretty_enum_value('MAV_CMD', w.command),
+                         self.pretty_parameter_value(w.param1),
+                         self.pretty_parameter_value(w.param2),
+                         self.pretty_parameter_value(w.param3),
+                         self.pretty_parameter_value(w.param4),
+                         self.pretty_parameter_value(w.x),
+                         self.pretty_parameter_value(w.y),
+                         self.pretty_parameter_value(w.z),
+                         ]
+            print(self.csv_line(out_list))
+            f.write(self.csv_line(out_list) + "\n")
+        f.close()
 
     def fetch(self):
         """Download wpts from vehicle (this operation is public to support other modules)"""
