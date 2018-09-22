@@ -159,6 +159,16 @@ class ArmModule(mp_module.MPModule):
                 self.was_armed = armed
                 if armed and not self.all_checks_enabled():
                     self.say("Arming checks disabled")
+                ice_enable = self.get_mav_param('ICE_ENABLE', 0)
+                if ice_enable == 1:
+                    rc = self.master.messages["RC_CHANNELS"]
+                    v = self.mav_param.get('ICE_START_CHAN', None)
+                    if v is None:
+                        return
+                    v = getattr(rc, 'chan%u_raw' % v)
+                    if v <= 1300:
+                        self.say("ICE Disabled")
+
 
 def init(mpstate):
     '''initialise module'''
