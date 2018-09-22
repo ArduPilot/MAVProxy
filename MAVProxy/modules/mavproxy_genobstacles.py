@@ -284,7 +284,8 @@ class GenobstaclesModule(mp_module.MPModule):
                                            MPMenuItem('Drop Cloud','DropCloud', '# genobstacles dropcloud'),
                                            MPMenuItem('Drop Eagle','DropEagle', '# genobstacles dropeagle'),
                                            MPMenuItem('Drop Bird','DropBird', '# genobstacles dropbird'),
-                                           MPMenuItem('Drop Plane','DropPlane', '# genobstacles dropplane')])
+                                           MPMenuItem('Drop Plane','DropPlane', '# genobstacles dropplane'),
+                                           MPMenuItem('ClearAll','ClearAll', '# genobstacles clearall')])
 
     def cmd_dropobject(self, obj):
         '''drop an object on the map'''
@@ -341,6 +342,8 @@ class GenobstaclesModule(mp_module.MPModule):
             self.cmd_dropobject(BirdMigrating())
         elif args[0] == "dropplane":
             self.cmd_dropobject(Aircraft())
+        elif args[0] == "clearall":
+            self.clearall()
         else:
             print(usage)
 
@@ -379,6 +382,10 @@ class GenobstaclesModule(mp_module.MPModule):
         if self.sock is not None:
             self.sock.close()
             self.sock = None
+
+    def clearall(self):
+        '''remove all objects'''
+        self.aircraft = []
 
     def idle_task(self):
         while len(self.pkt_queue) > 0:
