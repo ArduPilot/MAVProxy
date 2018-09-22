@@ -334,7 +334,7 @@ class ConsoleModule(mp_module.MPModule):
                         packets_rcvd_percentage = (100.0 * m.mav_count) / (m.mav_count + m.mav_loss)
 
                     linkbits = ["%u pkts" % m.mav_count,
-                                "%u lost" % m.mav_loss,
+                                "%u pps " % m.mav_pps,
                                 "%.2fs delay" % linkdelay,
                     ]
                     try:
