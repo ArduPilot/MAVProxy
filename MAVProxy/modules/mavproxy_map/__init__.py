@@ -712,6 +712,10 @@ class MapModule(mp_module.MPModule):
 
         if m.get_type() == "POSITION_TARGET_GLOBAL_INT":
             # FIXME: base this off SYS_STATUS.MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL?
+            if self.lat is None:
+                return
+            if self.lon is None:
+                return
             if (self.master.flightmode in [ "AUTO", "GUIDED", "LOITER", "RTL", "QRTL", "QLOITER", "QLAND" ]):
                 lat_float = m.lat_int*1e-7
                 lon_float = m.lon_int*1e-7
