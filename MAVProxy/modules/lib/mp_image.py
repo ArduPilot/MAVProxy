@@ -348,7 +348,11 @@ class MPImagePanel(wx.Panel):
         are downloaded'''
         state = self.state
         while state.in_queue.qsize():
-            obj = state.in_queue.get()
+            try:
+                obj = state.in_queue.get()
+            except Exception:
+                time.sleep(0.05)
+                return
             if isinstance(obj, MPImageData):
                 img = wx.EmptyImage(obj.width, obj.height)
                 img.SetData(obj.data)
