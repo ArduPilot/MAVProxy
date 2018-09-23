@@ -83,11 +83,24 @@ class Graph():
             self.field_types.append(caps)
         print("Adding graph: %s" % self.fields)
 
+        fields = [ self.pretty_print_fieldname(x) for x in fields ]
+
         self.values = [None] * len(self.fields)
-        self.livegraph = live_graph.LiveGraph(self.fields,
+        self.livegraph = live_graph.LiveGraph(fields,
                                               timespan=state.timespan,
                                               tickresolution=state.tickresolution,
                                               title=self.fields[0])
+
+    def pretty_print_fieldname(self, fieldname):
+        fnoo = {
+            "NAV_CONTROLLER_OUTPUT.nav_roll": "nav_roll",
+            "NAV_CONTROLLER_OUTPUT.nav_pitch": "nav_pitch",
+            "degrees(ATTITUDE.roll)" : "roll",
+            "degrees(ATTITUDE.pitch)": "pitch",
+        }
+        if fieldname in fnoo:
+            return fnoo[fieldname]
+        return fieldname
 
     def is_alive(self):
         '''check if this graph is still alive'''
