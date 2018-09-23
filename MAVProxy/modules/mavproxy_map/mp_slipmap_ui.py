@@ -151,7 +151,7 @@ class MPSlipMapFrame(wx.Frame):
         '''follow an object on the map'''
         state = self.state
         (px,py) = state.panel.pixmapper(object.latlon)
-        ratio = 0.25
+        ratio = 0.40
         if (px > ratio*state.width and
             px < (1.0-ratio)*state.width and
             py > ratio*state.height and
