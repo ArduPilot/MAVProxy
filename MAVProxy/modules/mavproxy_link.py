@@ -586,10 +586,17 @@ class LinkModule(mp_module.MPModule):
                 # cope with wrap
                 self.mpstate.attitude_time_s = att_time
 
-        elif mtype in [ "COMMAND_ACK", "MISSION_ACK" ]:
-            self.mpstate.console.writeln("Got MAVLink msg: %s" % m)
+        elif mtype == "COMMAND_ACK":
+            try:
+                cmd = mavutil.mavlink.enums["MAV_CMD"][m.command].name
+                cmd = cmd[8:]
+                res = mavutil.mavlink.enums["MAV_RESULT"][m.result].name
+                res = res[11:]
+                self.mpstate.console.writeln("Got COMMAND_ACK: %s: %s" % (cmd, res))
+            except Exception:
+                self.mpstate.console.writeln("Got MAVLink msg: %s" % m)
 
-            if mtype == "COMMAND_ACK" and m.command == mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION:
+            if m.command == mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION:
                 if m.result == mavutil.mavlink.MAV_RESULT_ACCEPTED:
                     self.say("Calibrated")
                 elif m.result == mavutil.mavlink.MAV_RESULT_FAILED:
@@ -600,6 +607,15 @@ class LinkModule(mp_module.MPModule):
                     self.say("Calibration temporarily rejected")
                 else:
                     self.say("Calibration response (%u)" % m.result)
+        elif mtype == "MISSION_ACK":
+            try:
+                t = mavutil.mavlink.enums["MAV_MISSION_TYPE"][m.mission_type].name
+                t = t[12:]
+                res = mavutil.mavlink.enums["MAV_MISSION_RESULT"][m.type].name
+                res = res[12:]
+                self.mpstate.console.writeln("Got MISSION_ACK: %s: %s" % (t, res))
+            except Exception as e:
+                self.mpstate.console.writeln("Got MAVLink msg: %s" % m)
         else:
             #self.mpstate.console.writeln("Got MAVLink msg: %s" % m)
             pass
