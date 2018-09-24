@@ -18,7 +18,17 @@ class GraphModule(mp_module.MPModule):
         self.tickresolution = 0.2
         self.graphs = []
         self.add_command('graph', self.cmd_graph, "[expression...] add a live graph",
-                         ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)'])
+                         ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)',
+                          'legend',
+                          'timespan',
+                          'tickresolution'])
+        self.legend = {
+            "NAV_CONTROLLER_OUTPUT.nav_roll": "nav_roll",
+            "NAV_CONTROLLER_OUTPUT.nav_pitch": "nav_pitch",
+            "degrees(ATTITUDE.roll)" : "roll",
+            "degrees(ATTITUDE.pitch)": "pitch",
+        }
+        
 
     def cmd_graph(self, args):
         '''graph command'''
@@ -40,9 +50,27 @@ class GraphModule(mp_module.MPModule):
                 print("tickresolution: %.1f" % self.tickresolution)
                 return
             self.tickresolution = float(args[1])
+        elif args[0] == "legend":
+            self.cmd_legend(args[1:])
         else:
             # start a new graph
             self.graphs.append(Graph(self, args[:]))
+
+    def cmd_legend(self, args):
+        '''setup legend for graphs'''
+        if len(args) == 0:
+            for leg in self.legend.keys():
+                print("%s -> %s" % (leg, self.legend[leg]))
+        elif len(args) == 1:
+            leg = args[0]
+            if leg in self.legend:
+                print("Removing legend %s" % leg)
+                self.legend.pop(leg)
+        elif len(args) >= 2:
+            leg = args[0]
+            leg2 = args[1]
+            print("Adding legend %s -> %s" % (leg, leg2))
+            self.legend[leg] = leg2
 
     def unload(self):
         '''unload module'''
@@ -92,14 +120,8 @@ class Graph():
                                               title=self.fields[0])
 
     def pretty_print_fieldname(self, fieldname):
-        fnoo = {
-            "NAV_CONTROLLER_OUTPUT.nav_roll": "nav_roll",
-            "NAV_CONTROLLER_OUTPUT.nav_pitch": "nav_pitch",
-            "degrees(ATTITUDE.roll)" : "roll",
-            "degrees(ATTITUDE.pitch)": "pitch",
-        }
-        if fieldname in fnoo:
-            return fnoo[fieldname]
+        if fieldname in self.state.legend:
+            return self.state.legend[fieldname]
         return fieldname
 
     def is_alive(self):
