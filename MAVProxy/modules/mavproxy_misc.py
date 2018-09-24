@@ -60,7 +60,7 @@ def run_command(args, cwd = None, shell = False, timeout = None, env = None):
 
 class MiscModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(MiscModule, self).__init__(mpstate, "misc", "misc commands")
+        super(MiscModule, self).__init__(mpstate, "misc", "misc commands", public=True)
         self.add_command('alt', self.cmd_alt, "show altitude information")
         self.add_command('up', self.cmd_up, "adjust pitch trim by up to 5 degrees")
         self.add_command('reboot', self.cmd_reboot, "reboot autopilot")
