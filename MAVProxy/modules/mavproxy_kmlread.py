@@ -24,7 +24,7 @@ class KmlReadModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(KmlReadModule, self).__init__(mpstate, "kmlread", "Add kml or kmz layers to map")
         self.add_command('kml', self.cmd_param, "kml map handling",
-                         ["<clear>",
+                         ["<clear|snapwp|snapfence>",
                           "<load> (FILENAME)", '<layers>'])
                           
         #allayers is all the loaded layers (slimap objects)
@@ -38,6 +38,7 @@ class KmlReadModule(mp_module.MPModule):
         
         #the fence manager
         self.fenceloader = mavwp.MAVFenceLoader()
+        self.snap_points = []
         
         #make the initial map menu
         if mp_util.has_wxpython:
@@ -53,6 +54,10 @@ class KmlReadModule(mp_module.MPModule):
             return
         elif args[0] == "clear":
             self.clearkml()
+        elif args[0] == "snapwp":
+            self.cmd_snap_wp(args[1:])
+        elif args[0] == "snapfence":
+            self.cmd_snap_fence(args[1:])
         elif args[0] == "load":
             if len(args) != 2:
                 print("usage: kml load <filename>")
@@ -68,6 +73,62 @@ class KmlReadModule(mp_module.MPModule):
         else:
             print(usage)
             return
+
+    def cmd_snap_wp(self, args):
+        '''snap waypoints to KML'''
+        threshold = 10.0
+        if len(args) > 0:
+            threshold = float(args[0])
+        wpmod = self.module('wp')
+        wploader = wpmod.wploader
+        changed = False
+        for i in range(1,wploader.count()):
+            w = wploader.wp(i)
+            if not wploader.is_location_command(w.command):
+                continue
+            lat = w.x
+            lon = w.y
+            best = None
+            best_dist = threshold+1
+            for (snap_lat,snap_lon) in self.snap_points:
+                dist = mp_util.gps_distance(lat, lon, snap_lat, snap_lon)
+                if dist < best_dist:
+                    best_dist = dist
+                    best = (snap_lat, snap_lon)
+            if best is not None and best_dist <= threshold:
+                w.x = best[0]
+                w.y = best[1]
+                print("Snapping WP %u to %f %f" % (i, w.x, w.y))
+                wploader.set(w, i)
+                changed = True
+        if changed:
+            wpmod.send_all_waypoints()
+
+    def cmd_snap_fence(self, args):
+        '''snap fence to KML'''
+        threshold = 10.0
+        if len(args) > 0:
+            threshold = float(args[0])
+        fencemod = self.module('fence')
+        loader = fencemod.fenceloader
+        changed = False
+        for i in range(0,loader.count()):
+            fp = loader.point(i)
+            lat = fp.lat
+            lon = fp.lng
+            best = None
+            best_dist = threshold+1
+            for (snap_lat,snap_lon) in self.snap_points:
+                dist = mp_util.gps_distance(lat, lon, snap_lat, snap_lon)
+                if dist < best_dist:
+                    best_dist = dist
+                    best = (snap_lat, snap_lon)
+            if best is not None and best_dist <= threshold:
+                loader.move(i, best[0], best[1])
+                print("Snapping fence point %u to %f %f" % (i, best[0], best[1]))
+                changed = True
+        if changed:
+            fencemod.send_fence()
 
     def fencekml(self, layername):
         '''set a layer as the geofence'''
@@ -183,12 +244,16 @@ class KmlReadModule(mp_module.MPModule):
         #Open the zip file
         nodes = self.readkmz(filename)
 
+        self.snap_points = []
+
         #go through each object in the kml...
         for n in nodes:     
             point = self.readObject(n)
-            
+
             #and place any polygons on the map
             if self.mpstate.map is not None and point[0] == 'Polygon':
+                self.snap_points.extend(point[2])
+
                 #print("Adding " + point[1])
                 newcolour = (random.randint(0, 255), 0, random.randint(0, 255))
                 curpoly = mp_slipmap.SlipPolygon(point[1], point[2],
