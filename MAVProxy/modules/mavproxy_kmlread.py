@@ -89,18 +89,22 @@ class KmlReadModule(mp_module.MPModule):
             lat = w.x
             lon = w.y
             best = None
-            best_dist = threshold+1
+            best_dist = (threshold+1)*3
             for (snap_lat,snap_lon) in self.snap_points:
                 dist = mp_util.gps_distance(lat, lon, snap_lat, snap_lon)
                 if dist < best_dist:
                     best_dist = dist
                     best = (snap_lat, snap_lon)
             if best is not None and best_dist <= threshold:
-                w.x = best[0]
-                w.y = best[1]
-                print("Snapping WP %u to %f %f" % (i, w.x, w.y))
-                wploader.set(w, i)
-                changed = True
+                if w.x != best[0] or w.y != best[1]:
+                    w.x = best[0]
+                    w.y = best[1]
+                    print("Snapping WP %u to %f %f" % (i, w.x, w.y))
+                    wploader.set(w, i)
+                    changed = True
+            elif best is not None:
+                if best_dist <= (threshold+1)*3:
+                    print("Not snapping wp %u dist %.1f" % (i, best_dist))
         if changed:
             wpmod.send_all_waypoints()
 
@@ -117,16 +121,21 @@ class KmlReadModule(mp_module.MPModule):
             lat = fp.lat
             lon = fp.lng
             best = None
-            best_dist = threshold+1
+            best_dist = (threshold+1)*3
             for (snap_lat,snap_lon) in self.snap_points:
                 dist = mp_util.gps_distance(lat, lon, snap_lat, snap_lon)
                 if dist < best_dist:
                     best_dist = dist
                     best = (snap_lat, snap_lon)
             if best is not None and best_dist <= threshold:
-                loader.move(i, best[0], best[1])
-                print("Snapping fence point %u to %f %f" % (i, best[0], best[1]))
-                changed = True
+                if best[0] != lat or best[1] != lon:
+                    loader.move(i, best[0], best[1])
+                    print("Snapping fence point %u to %f %f" % (i, best[0], best[1]))
+                    changed = True
+            elif best is not None:
+                if best_dist <= (threshold+1)*3:
+                    print("Not snapping fence point %u dist %.1f" % (i, best_dist))
+
         if changed:
             fencemod.send_fence()
 
