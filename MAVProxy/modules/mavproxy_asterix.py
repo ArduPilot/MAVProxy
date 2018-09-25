@@ -29,11 +29,12 @@ class Track:
         self.last_time = tnow
         dist = mp_util.gps_distance(self.pkt.lat*1e-7, self.pkt.lon*1e-7,
                                     pkt.lat*1e-7, pkt.lon*1e-7)
-        heading = mp_util.gps_bearing(self.pkt.lat*1e-7, self.pkt.lon*1e-7,
-                                      pkt.lat*1e-7, pkt.lon*1e-7)
-        spd = dist / dt
-        pkt.heading = int(heading*100)
-        pkt.hor_velocity = int(spd * 100)
+        if dist > 0.01:
+            heading = mp_util.gps_bearing(self.pkt.lat*1e-7, self.pkt.lon*1e-7,
+                                        pkt.lat*1e-7, pkt.lon*1e-7)
+            spd = dist / dt
+            pkt.heading = int(heading*100)
+            pkt.hor_velocity = int(spd * 100)
         if pkt.hor_velocity > 65535:
             pkt.hor_velocity = 65535
         self.pkt = pkt
