@@ -107,6 +107,7 @@ class MissionEditorFrame(wx.Frame):
         self.grid_mission.SetColAttr(ME_DELETE_COL, self.del_attr)
         self.grid_mission.SetColAttr(ME_UP_COL, self.up_attr)
         self.grid_mission.SetColAttr(ME_DOWN_COL, self.down_attr)
+        self.grid_mission.SetRowLabelSize(50)
 
         #remember what mission we opened/saved last
         self.last_mission_file_path = ""
