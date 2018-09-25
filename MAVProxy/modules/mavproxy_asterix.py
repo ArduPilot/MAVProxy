@@ -34,7 +34,9 @@ class Track:
                                         pkt.lat*1e-7, pkt.lon*1e-7)
             spd = dist / dt
             pkt.heading = int(heading*100)
-            pkt.hor_velocity = int(spd * 100)
+            new_vel = int(spd * 100)
+            #print(pkt.ICAO_address, new_vel*0.01, pkt.hor_velocity*0.01)
+            pkt.hor_velocity = new_vel
         if pkt.hor_velocity > 65535:
             pkt.hor_velocity = 65535
         self.pkt = pkt
@@ -267,6 +269,8 @@ class AsterixModule(mp_module.MPModule):
                 self.adsb_packets_sent += 1
                 for i in range(len(self.mpstate.mav_master)):
                     conn = self.mpstate.mav_master[i]
+                    #if adsb_pkt.hor_velocity < 1:
+                    #    print(adsb_pkt)
                     conn.mav.send(adsb_pkt)
             else:
                 self.adsb_packets_not_sent += 1
@@ -302,3 +306,30 @@ class AsterixModule(mp_module.MPModule):
 def init(mpstate):
     '''initialise module'''
     return AsterixModule(mpstate)
+
+if __name__ == '__main__':
+    import sys
+    logname = sys.argv[1]
+    logf = open(logname, 'r')
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.connect(('', 45454))
+    t0 = None
+    tstart = time.time()
+    while True:
+        header = logf.read(16)
+        if header[0:4] != 'AST:':
+            print("Bad header", header[0:4])
+            break
+        (t,len) = struct.unpack('<dI', header[4:16])
+        pkt = logf.read(len)
+        if t0 is None:
+            t0 = t
+        tdiff = t - t0
+        time.sleep(tdiff)
+        t0 = t
+        sock.send(pkt)
+        #amsg = asterix.parse(pkt)
+        #print(amsg)
+
+
