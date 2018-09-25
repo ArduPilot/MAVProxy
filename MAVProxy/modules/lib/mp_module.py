@@ -42,7 +42,7 @@ class MPModule(object):
 
     def unload(self):
         if self.multi_instance and self.name in self.mpstate.multi_instance:
-            self.mpstate.multi_instance.pop(self)
+            self.mpstate.multi_instance.pop(self.name)
 
     def unknown_command(self, args):
         '''Return True if we have handled the unknown command'''
