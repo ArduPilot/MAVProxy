@@ -302,12 +302,6 @@ class MavGraph(object):
             if mtype not in self.field_types[i]:
                 continue
             f = self.fields[i]
-            if f.endswith(":2"):
-                self.axes[i] = 2
-                f = f[:-2]
-            if f.endswith(":1"):
-                self.first_only[i] = True
-                f = f[:-2]
             v = mavutil.evaluate_expression(f, vars)
             if v is None:
                 continue
@@ -330,6 +324,23 @@ class MavGraph(object):
             if s:
                 all_false = False
 
+        tday_base = None
+        tday_basetime = None
+
+        sec_to_days = 1.0 / (60*60*24)
+
+        # pre-calc right/left axes
+        self.num_fields = len(self.fields)
+        for i in range(0, self.num_fields):
+            f = self.fields[i]
+            if f.endswith(":2"):
+                self.axes[i] = 2
+                f = f[:-2]
+            if f.endswith(":1"):
+                self.first_only[i] = True
+                f = f[:-2]
+            self.fields[i] = f
+        
         while True:
             msg = mlog.recv_match(type=self.msg_types)
             if msg is None:
@@ -339,12 +350,16 @@ class MavGraph(object):
             if self.condition:
                 if not mavutil.evaluate_condition(self.condition, mlog.messages):
                     continue
-            try:
-                tdays = matplotlib.dates.date2num(datetime.datetime.fromtimestamp(msg._timestamp+timeshift))
-            except ValueError:
-                # this can happen if the log is corrupt
-                # ValueError: year is out of range
-                break
+            if tday_base is None:
+                try:
+                    tday_base = matplotlib.dates.date2num(datetime.datetime.fromtimestamp(msg._timestamp+timeshift))
+                    tday_basetime = msg._timestamp
+                except ValueError:
+                    # this can happen if the log is corrupt
+                    # ValueError: year is out of range
+                    continue
+            tdays = tday_base + (msg._timestamp - tday_basetime) * sec_to_days
+
             if all_false or len(flightmode_selections) == 0:
                 self.add_data(tdays, msg, mlog.messages, mlog.flightmode)
             else:
