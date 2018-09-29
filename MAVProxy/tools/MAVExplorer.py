@@ -445,12 +445,13 @@ def loadfile(args):
     mestate.console.write("Loading %s...\n" % args)
     t0 = time.time()
     mlog = mavutil.mavlink_connection(args, notimestamps=False,
-                                      zero_time_base=False)
+                                      zero_time_base=False,
+                                      progress_callback=progress_bar)
     from pymavlink.DFReader import DFReader_binary
     if isinstance(mlog, DFReader_binary):
         mestate.mlog = mlog
     else:
-        mestate.mlog = mavmemlog.mavmemlog(mlog, progress_bar)
+        mestate.mlog = mavmemlog.mavmemlog(mlog, progress_callback=progress_bar)
     mestate.status.msgs = mlog.messages
     t1 = time.time()
     mestate.console.write("\ndone (%u messages in %.1fs)\n" % (mestate.mlog._count, t1-t0))
