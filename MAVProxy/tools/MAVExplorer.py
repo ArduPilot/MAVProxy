@@ -439,6 +439,7 @@ def cmd_messages(args):
         if fnmatch.fnmatch(mstr.upper(), wildcard.upper()):
             tstr = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(m._timestamp))
             print("%s %s" % (tstr, mstr))
+    mestate.mlog.rewind()
 
 def cmd_param(args):
     '''show parameters'''
