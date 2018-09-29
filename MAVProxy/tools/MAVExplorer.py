@@ -418,6 +418,28 @@ def cmd_save(args):
     child = Process(target=save_process, args=[mestate.last_graph, mestate.child_pipe_send_console, mestate.child_pipe_send_graph, mestate.status.msgs])
     child.start()
 
+def cmd_messages(args):
+    '''show messages'''
+    if len(args) > 0:
+        wildcard = args[0]
+        if wildcard.find('*') == -1 and wildcard.find('?') == -1:
+            wildcard = "*" + wildcard + "*"
+    else:
+        wildcard = '*'
+    mestate.mlog.rewind()
+    types = set(['MSG','STATUSTEXT'])
+    while True:
+        m = mestate.mlog.recv_match(type=types, condition=mestate.settings.condition)
+        if m is None:
+            break
+        if m.get_type() == 'MSG':
+            mstr = m.Message
+        else:
+            mstr = m.text
+        if fnmatch.fnmatch(mstr.upper(), wildcard.upper()):
+            tstr = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(m._timestamp))
+            print("%s %s" % (tstr, mstr))
+
 def cmd_param(args):
     '''show parameters'''
     if len(args) > 0:
@@ -428,7 +450,7 @@ def cmd_param(args):
     for p in k:
         if fnmatch.fnmatch(str(p).upper(), wildcard.upper()):
             print("%-16.16s %f" % (str(p), mestate.mlog.params[p]))
-
+            
 def cmd_loadfile(args):
     '''callback from menu to load a log file'''
     if len(args) != 1:
@@ -520,6 +542,7 @@ command_map = {
     'save'       : (cmd_save,      'save a graph'),
     'condition'  : (cmd_condition, 'set graph conditions'),
     'param'      : (cmd_param,     'show parameters'),
+    'messages'   : (cmd_messages,  'show messages'),
     'map'        : (cmd_map,       'show map view'),
     'loadLog'    : (cmd_loadfile,  'load a log file'),
     }
