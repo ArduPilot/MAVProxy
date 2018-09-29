@@ -331,7 +331,7 @@ class MavGraph(object):
                 all_false = False
 
         while True:
-            msg = mlog.recv_msg()
+            msg = mlog.recv_match(type=self.msg_types)
             if msg is None:
                 break
             if msg.get_type() not in self.msg_types:
