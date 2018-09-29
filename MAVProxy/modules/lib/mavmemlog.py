@@ -59,6 +59,24 @@ class mavmemlog(mavutil.mavfile):
         self.check_param(m)
         return m
 
+    def recv_match(self, condition=None, type=None, blocking=False):
+        '''recv the next message that matches the given condition
+        type can be a string or a list of strings'''
+        if type is not None:
+            if isinstance(type, str):
+                type = set([type])
+            elif isinstance(type, list):
+                type = set(type)
+        while True:
+            m = self.recv_msg()
+            if m is None:
+                return None
+            if type is not None and not m.get_type() in type:
+                continue
+            if not mavutil.evaluate_condition(condition, self.messages):
+                continue
+            return m
+    
     def check_param(self, m):
         type = m.get_type()
         if type == 'PARAM_VALUE':
