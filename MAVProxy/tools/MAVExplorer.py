@@ -289,6 +289,7 @@ def cmd_graph(args):
     grui[-1].display_graph(mestate.last_graph)
     global last_xlim
     if last_xlim is not None and mestate.settings.sync_xzoom:
+        #print("initial: ", last_xlim)
         grui[-1].set_xlim(last_xlim)
 
 def map_process(path, wp, fen, used_flightmodes, mav_type, options):

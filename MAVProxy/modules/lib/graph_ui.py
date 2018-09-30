@@ -5,11 +5,16 @@ if platform.system() == 'Darwin':
 else:
     from multiprocessing import Process, freeze_support
 
+graph_count = 1
+
 class Graph_UI(object):
     """docstring for ClassName"""
     def __init__(self, mestate):
         self.mestate = mestate
         self.xlim = None
+        global graph_count
+        self.count = graph_count
+        graph_count += 1
 
     def display_graph(self, graphdef):
         '''display a graph'''

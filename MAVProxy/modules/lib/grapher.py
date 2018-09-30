@@ -39,6 +39,8 @@ flightmode_colours = [
 
 edge_colour = (0.1, 0.1, 0.1)
 
+graph_num = 1
+
 class MavGraph(object):
     def __init__(self):
         self.lowest_x = None
@@ -61,6 +63,14 @@ class MavGraph(object):
         self.flightmode_colourmap = {}
         self.ax1 = None
         self.locator = None
+        global graph_num
+        self.graph_num = graph_num
+        self.start_time = None
+        graph_num += 1
+        self.draw_events = 0
+        self.xlim_notify_queue = None
+        self.xlim_change_queue = None
+        self.xlim = None
 
     def add_field(self, field):
         '''add another field to plot'''
@@ -157,13 +167,17 @@ class MavGraph(object):
         xrange = axsubplot.get_xbound()
         xlim = xrange
         self.setup_xrange(xrange[1] - xrange[0])
+        if self.draw_events == 0:
+            # ignore limit change before first draw event
+            return
         if self.xlim_notify_queue and axsubplot == self.ax1 and xlim != self.xlim:
-            if self.xlim is None:
-                # ignore first notification
-                self.xlim = xlim
-                return
             self.xlim = xlim
+            #print('send', self.graph_num, xlim)
             self.xlim_notify_queue.put(xlim, block=False)
+
+    def draw_event(self, evt):
+        '''called on draw events'''
+        self.draw_events += 1
 
     def plotit(self, x, y, fields, colors=[]):
         '''plot a set of graphs using date for x axis'''
@@ -184,12 +198,10 @@ class MavGraph(object):
             self.setup_xrange(self.highest_x - self.lowest_x)
             self.ax1.xaxis.set_major_formatter(self.formatter)
             self.ax1.callbacks.connect('xlim_changed', self.xlim_changed)
+            self.fig.canvas.mpl_connect('draw_event', self.draw_event)
         empty = True
         ax1_labels = []
         ax2_labels = []
-
-        if self.xlim:
-            self.ax1.set_xbound(self.xlim)
 
         for i in range(0, len(fields)):
             if len(x[i]) == 0:
@@ -398,9 +410,12 @@ class MavGraph(object):
             xlim = self.xlim_change_queue.get(block=True)
             if xlim is None:
                 return
+            while self.draw_events == 0:
+                time.sleep(0.1)
             if self.ax1 is not None and xlim != self.xlim:
                 self.xlim = xlim
                 self.fig.canvas.toolbar.push_current()
+                #print("setting: ", self.graph_num, xlim)
                 self.ax1.set_xbound(xlim)
 
     def process(self, flightmode_selections, _flightmodes, block=True,
