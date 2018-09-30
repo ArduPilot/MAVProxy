@@ -4,6 +4,7 @@ readline handling for mavproxy
 
 import sys, glob, os, platform
 import re
+from pymavlink import mavutil
 
 rline_mpstate = None
 redisplay = None
@@ -91,16 +92,48 @@ def complete_parameter(text):
     return rline_mpstate.mav_param.keys()
 
 def complete_variable(text):
-    '''complete a MAVLink variable'''
-    if text.find('.') != -1:
-        var = text.split('.')[0]
-        if var in rline_mpstate.status.msgs:
+    '''complete a MAVLink variable or expression'''
+    if text == '':
+        return rline_mpstate.status.msgs.keys()
+
+    if text.endswith(":2"):
+        suffix = ":2"
+        text = text[:-2]
+    else:
+        suffix = ''
+
+    try:
+        if mavutil.evaluate_expression(text, rline_mpstate.status.msgs) is not None:
+            return [text+suffix]
+    except Exception as ex:
+        pass
+
+    try:
+        m1 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*)[.]([A-Za-z0-9]*)$", text)
+    except Exception as ex:
+        return []
+    if m1 is not None:
+        prefix = m1.group(1)
+        mtype = m1.group(2)
+        fname = m1.group(3)
+        if mtype in rline_mpstate.status.msgs:
             ret = []
-            for f in rline_mpstate.status.msgs[var].get_fieldnames():
-                ret.append(var + '.' + f)
+            for f in rline_mpstate.status.msgs[mtype].get_fieldnames():
+                if f.startswith(fname):
+                    ret.append(prefix + mtype + '.' + f + suffix)
             return ret
         return []
-    return rline_mpstate.status.msgs.keys()
+    try:
+        m2 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*)$", text)
+    except Exception as ex:
+        return []
+    prefix = m2.group(1)
+    mtype = m2.group(2)
+    ret = []
+    for k in rline_mpstate.status.msgs.keys():
+        if k.startswith(mtype):
+            ret.append(prefix + k + suffix)
+    return ret
 
 def rule_expand(component, text):
     '''expand one rule component'''
