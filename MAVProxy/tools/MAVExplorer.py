@@ -33,6 +33,7 @@ from lxml import objectify
 import pkg_resources
 
 grui = []
+last_xlim = None
 
 #Global var to hold the GUI menu element
 TopMenu = None
@@ -56,6 +57,7 @@ class MEState(object):
               MPSetting('xaxis', str, None, 'xaxis'),
               MPSetting('linestyle', str, None, 'linestyle'),
               MPSetting('show_flightmode', bool, True, 'show flightmode'),
+              MPSetting('sync_xzoom', bool, True, 'sync X-axis zoom'),
               MPSetting('legend', str, 'upper left', 'legend position'),
               MPSetting('legend2', str, 'upper right', 'legend2 position')
               ]
@@ -66,7 +68,7 @@ class MEState(object):
         self.completions = {
             "set"       : ["(SETTING)"],
             "condition" : ["(VARIABLE)"],
-            "graph"     : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)'],
+            "graph"     : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)'],
             "map"       : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)']
             }
         self.aliases = {}
@@ -285,6 +287,9 @@ def cmd_graph(args):
         mestate.last_graph = GraphDefinition('Untitled', expression, '', [expression], None)
     grui.append(Graph_UI(mestate))
     grui[-1].display_graph(mestate.last_graph)
+    global last_xlim
+    if last_xlim is not None and mestate.settings.sync_xzoom:
+        grui[-1].set_xlim(last_xlim)
 
 def map_process(path, wp, fen, used_flightmodes, mav_type, options):
     '''process for displaying a graph'''
@@ -526,6 +531,7 @@ def input_loop():
 
 def main_loop():
     '''main processing loop, display graphs and maps'''
+    global grui, last_xlim
     while True:
         if mestate is None or mestate.exit:
             return
@@ -534,7 +540,16 @@ def main_loop():
             cmds = line.split(';')
             for c in cmds:
                 process_stdin(c)
+
+        for i in range(0, len(grui)):
+            xlim = grui[i].check_xlim_change()
+            if xlim is not None and mestate.settings.sync_xzoom:
+                for j in range(0, len(grui)):
+                    grui[j].set_xlim(xlim)
+                last_xlim = xlim
+
         time.sleep(0.1)
+
 
 command_map = {
     'graph'      : (cmd_graph,     'display a graph'),

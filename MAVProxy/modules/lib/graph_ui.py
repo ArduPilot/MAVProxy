@@ -1,14 +1,15 @@
 from MAVProxy.modules.lib import grapher
 import platform
 if platform.system() == 'Darwin':
-    from billiard import Pipe, Process, Event, forking_enable, freeze_support
+    from billiard import Process, forking_enable, freeze_support
 else:
-    from multiprocessing import Pipe, Process, Event, freeze_support
+    from multiprocessing import Process, freeze_support
 
 class Graph_UI(object):
     """docstring for ClassName"""
     def __init__(self, mestate):
         self.mestate = mestate
+        self.xlim = None
 
     def display_graph(self, graphdef):
         '''display a graph'''
@@ -29,7 +30,12 @@ class Graph_UI(object):
         self.mg.add_mav(self.mestate.mlog)
         for f in graphdef.expression.split():
             self.mg.add_field(f)
-        self.mg.process(self.mestate.flightmode_selections, self.mestate.mlog._flightmodes)
+        from multiprocessing_queue import makeIPCQueue
+        self.xlim_notify_queue = makeIPCQueue()
+        self.xlim_change_queue = makeIPCQueue()
+        self.mg.process(self.mestate.flightmode_selections, self.mestate.mlog._flightmodes,
+                        xlim_notify_queue=self.xlim_notify_queue,
+                        xlim_change_queue=self.xlim_change_queue)
         self.lenmavlist = len(self.mg.mav_list)
         if platform.system() == 'Darwin':
             forking_enable(False)
@@ -40,3 +46,20 @@ class Graph_UI(object):
         child = Process(target=self.mg.show, args=[self.lenmavlist, ])
         child.start()
         self.mestate.mlog.rewind()
+
+    def check_xlim_change(self):
+        '''check for new X bounds'''
+        if not self.xlim_notify_queue:
+            return None
+        xlim = None
+        while not self.xlim_notify_queue.empty():
+            xlim = self.xlim_notify_queue.get()
+        if xlim != self.xlim:
+            return xlim
+        return None
+
+    def set_xlim(self, xlim):
+        '''set new X bounds'''
+        if self.xlim_change_queue and self.xlim != xlim:
+            self.xlim_change_queue.put(xlim, block=False)
+            self.xlim = xlim

@@ -12,6 +12,7 @@ from math import *
 from pymavlink.mavextra import *
 import pylab
 from pymavlink import mavutil
+import threading
 
 colors = [ 'red', 'green', 'blue', 'orange', 'olive', 'black', 'grey', 'yellow', 'brown', 'darkcyan',
            'cornflowerblue', 'darkmagenta', 'deeppink', 'darkred']
@@ -154,13 +155,21 @@ class MavGraph(object):
     def xlim_changed(self, axsubplot):
         '''called when x limits are changed'''
         xrange = axsubplot.get_xbound()
+        xlim = xrange
         self.setup_xrange(xrange[1] - xrange[0])
+        if self.xlim_notify_queue and axsubplot == self.ax1 and xlim != self.xlim:
+            if self.xlim is None:
+                # ignore first notification
+                self.xlim = xlim
+                return
+            self.xlim = xlim
+            self.xlim_notify_queue.put(xlim, block=False)
 
     def plotit(self, x, y, fields, colors=[]):
         '''plot a set of graphs using date for x axis'''
         pylab.ion()
-        fig = pylab.figure(num=1, figsize=(12,6))
-        self.ax1 = fig.gca()
+        self.fig = pylab.figure(num=1, figsize=(12,6))
+        self.ax1 = self.fig.gca()
         ax2 = None
         for i in range(0, len(fields)):
             if len(x[i]) == 0: continue
@@ -178,6 +187,9 @@ class MavGraph(object):
         empty = True
         ax1_labels = []
         ax2_labels = []
+
+        if self.xlim:
+            self.ax1.set_xbound(self.xlim)
 
         for i in range(0, len(fields)):
             if len(x[i]) == 0:
@@ -282,7 +294,7 @@ class MavGraph(object):
             labels = [patch.get_label() for patch in mode_patches]
             if ax1_labels != []:
                 patches_legend = matplotlib.pyplot.legend(mode_patches, labels, loc=self.legend_flightmode)
-                fig.gca().add_artist(patches_legend)
+                self.fig.gca().add_artist(patches_legend)
             else:
                 pylab.legend(mode_patches, labels)
 
@@ -290,8 +302,6 @@ class MavGraph(object):
             self.ax1.legend(ax1_labels,loc=self.legend)
         if ax2_labels != []:
             ax2.legend(ax2_labels,loc=self.legend2)
-
-
 
     def add_data(self, t, msg, vars, flightmode):
         '''add some data'''
@@ -382,11 +392,26 @@ class MavGraph(object):
                 elif (idx < len(flightmode_selections) and flightmode_selections[idx]):
                     self.add_data(tdays, msg, mlog.messages, mlog.flightmode)
 
-    def process(self, flightmode_selections, _flightmodes, block=True):
+    def xlim_change_thread(self):
+        '''handle xlim change requests from queue'''
+        while True:
+            xlim = self.xlim_change_queue.get(block=True)
+            if xlim is None:
+                return
+            if self.ax1 is not None and xlim != self.xlim:
+                self.xlim = xlim
+                self.fig.canvas.toolbar.push_current()
+                self.ax1.set_xbound(xlim)
+
+    def process(self, flightmode_selections, _flightmodes, block=True,
+                xlim_notify_queue=None, xlim_change_queue=None):
         '''process and display graph'''
         self.msg_types = set()
         self.multiplier = []
         self.field_types = []
+        self.xlim_notify_queue = xlim_notify_queue
+        self.xlim_change_queue = xlim_change_queue
+        self.xlim = None
 
         # work out msg types we are interested in
         self.x = []
@@ -409,7 +434,7 @@ class MavGraph(object):
         for fi in range(0, len(self.mav_list)):
             mlog = self.mav_list[fi]
             self.process_mav(mlog, timeshift, flightmode_selections, _flightmodes)
-        
+
 
     def show(self, lenmavlist, block=True):
         '''show graph'''
@@ -441,6 +466,10 @@ class MavGraph(object):
                 self.x[i] = []
                 self.y[i] = []
 
+        if self.xlim_change_queue is not None:
+            self.change_thread_handle = threading.Thread(target=self.xlim_change_thread)
+            self.change_thread_handle.start()
+                
         pylab.draw()
         pylab.show(block=block)
 
