@@ -23,10 +23,6 @@ class GraphModule(mp_module.MPModule):
                           'timespan',
                           'tickresolution'])
         self.legend = {
-            "NAV_CONTROLLER_OUTPUT.nav_roll": "nav_roll",
-            "NAV_CONTROLLER_OUTPUT.nav_pitch": "nav_pitch",
-            "degrees(ATTITUDE.roll)" : "roll",
-            "degrees(ATTITUDE.pitch)": "pitch",
         }
         
 
