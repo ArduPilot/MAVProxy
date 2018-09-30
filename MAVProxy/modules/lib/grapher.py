@@ -302,7 +302,11 @@ class MavGraph(object):
             if mtype not in self.field_types[i]:
                 continue
             f = self.fields[i]
-            v = mavutil.evaluate_expression(f, vars)
+            simple = self.simple_field[i]
+            if simple is not None:
+                v = getattr(vars[simple[0]], simple[1])
+            else:
+                v = mavutil.evaluate_expression(f, vars)
             if v is None:
                 continue
             if self.xaxis is None:
@@ -340,7 +344,17 @@ class MavGraph(object):
                 self.first_only[i] = True
                 f = f[:-2]
             self.fields[i] = f
-        
+
+        # see which fields are simple
+        self.simple_field = []
+        for i in range(0, self.num_fields):
+            f = self.fields[i]
+            m = re.match('^([A-Z][A-Z0-9_]*)[.]([A-Za-z_][A-Za-z0-9_]*)$', f)
+            if m is None:
+                self.simple_field.append(None)
+            else:
+                self.simple_field.append((m.group(1),m.group(2)))
+
         while True:
             msg = mlog.recv_match(type=self.msg_types)
             if msg is None:
