@@ -28,7 +28,9 @@ MAVProxyAny = Analysis(['mavproxy.py'],
                             'pygame.transform', 'pygame.surface', 'pygame.bufferproxy', 'wx._grid',
                             'wx.lib.agw.genericmessagedialog', 'wx.lib.wordwrap', 'wx.lib.buttons',
                             'wx.lib.embeddedimage', 'wx.lib.imageutils', 'wx.lib.agw.aquabutton', 
-                            'wx.lib.agw.gradientbutton', 'wxversion', 'UserList', 'UserString', 'yaml', 'yaml.error', 'yaml.tokens', 'yaml.events', 'yaml.nodes', 'yaml.loader', 'yaml.dumper', 'yaml.reader', 'yaml.scanner', 'yaml.parser', 'yaml.composer', 'yaml.constructor', 'yaml.resolver', 'yaml.emitter', 'yaml.serializer', 'yaml.representer'],
+                            'wx.lib.agw.gradientbutton', 'wxversion', 'UserList', 'UserString', 'yaml', 'yaml.error', 'yaml.tokens', 'yaml.events', 'yaml.nodes', 'yaml.loader', 'yaml.dumper', 'yaml.reader', 'yaml.scanner', 'yaml.parser', 'yaml.composer', 'yaml.constructor', 'yaml.resolver', 'yaml.emitter', 'yaml.serializer', 'yaml.representer',
+                            'six','packaging', 'packaging.version', 'packaging.specifiers'],
+
              hookspath=None,
              runtime_hooks=None)
 MAVExpAny = Analysis(['.\\tools\\MAVExplorer.py'],

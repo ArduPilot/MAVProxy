@@ -41,7 +41,9 @@ rem -----Build MAVProxy-----
 cd ..\
 "%PYTHON_LOCATION%\python" setup.py clean build install
 cd .\MAVProxy
-"%PYTHON_LOCATION%\Scripts\pyinstaller" --clean ..\windows\mavproxy.spec
+copy ..\windows\mavproxy.spec
+"%PYTHON_LOCATION%\Scripts\pyinstaller" --clean mavproxy.spec
+del mavproxy.spec
 
 rem -----Create version Info-----
 @echo off
