@@ -15,6 +15,9 @@ class Graph_UI(object):
         global graph_count
         self.count = graph_count
         graph_count += 1
+        from multiprocessing_queue import makeIPCQueue
+        self.xlim_notify_queue = makeIPCQueue()
+        self.xlim_change_queue = makeIPCQueue()
 
     def display_graph(self, graphdef):
         '''display a graph'''
@@ -35,9 +38,6 @@ class Graph_UI(object):
         self.mg.add_mav(self.mestate.mlog)
         for f in graphdef.expression.split():
             self.mg.add_field(f)
-        from multiprocessing_queue import makeIPCQueue
-        self.xlim_notify_queue = makeIPCQueue()
-        self.xlim_change_queue = makeIPCQueue()
         self.mg.process(self.mestate.flightmode_selections, self.mestate.mlog._flightmodes,
                         xlim_notify_queue=self.xlim_notify_queue,
                         xlim_change_queue=self.xlim_change_queue)
