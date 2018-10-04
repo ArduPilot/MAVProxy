@@ -395,8 +395,9 @@ class ConsoleModule(mp_module.MPModule):
                         'LOG'  : mavutil.mavlink.MAV_SYS_STATUS_LOGGING,
                         'PRX'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_PROXIMITY,
                         'PRE'  : mavutil.mavlink.MAV_SYS_STATUS_PREARM_CHECK,
+                        'FLO'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_OPTICAL_FLOW,
             }
-            hide_if_not_present = set(['PRE', 'PRX'])
+            hide_if_not_present = set(['PRE', 'PRX', 'FLO'])
             for s in sensors.keys():
                 bits = sensors[s]
                 present = ((msg.onboard_control_sensors_present & bits) == bits)
