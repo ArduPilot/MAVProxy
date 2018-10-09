@@ -477,7 +477,7 @@ def loadfile(args):
                                       zero_time_base=False,
                                       progress_callback=progress_bar)
     from pymavlink.DFReader import DFReader_binary
-    if isinstance(mlog, DFReader_binary):
+    if isinstance(mlog, DFReader_binary) or isinstance(mlog, mavutil.mavmmaplog):
         mestate.mlog = mlog
     else:
         mestate.mlog = mavmemlog.mavmemlog(mlog, progress_callback=progress_bar)
