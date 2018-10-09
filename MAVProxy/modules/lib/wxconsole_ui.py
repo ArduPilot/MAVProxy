@@ -84,7 +84,13 @@ class ConsoleFrame(wx.Frame):
             self.Destroy()
             return
         while state.child_pipe_recv.poll():
-            obj = state.child_pipe_recv.recv()
+            try:
+                obj = state.child_pipe_recv.recv()
+            except EOFError:
+                self.timer.Stop()
+                self.Destroy()
+                return
+            
             if isinstance(obj, Value):
                 # request to set a status field
                 if not obj.name in self.values:
