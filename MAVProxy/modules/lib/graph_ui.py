@@ -55,7 +55,10 @@ class Graph_UI(object):
             return None
         xlim = None
         while self.xlim_pipe[0].poll():
-            xlim = self.xlim_pipe[0].recv()
+            try:
+                xlim = self.xlim_pipe[0].recv()
+            except EOFError:
+                return None
         if xlim != self.xlim:
             return xlim
         return None
