@@ -1,7 +1,7 @@
 from setuptools import setup
 import os
 
-version = "1.6.8"
+version = "1.6.9"
 
 def package_files(directory):
     paths = []
@@ -64,7 +64,7 @@ on how to use MAVProxy.''',
       # as that breaks the pip install. It seems that pip is not smart enough to
       # use the system versions of these dependencies, so it tries to download and install
       # large numbers of modules like numpy etc which may be already installed
-      install_requires=['pymavlink>=2.2.13',
+      install_requires=['pymavlink>=2.2.15',
                         'pyserial>=3.0'],
       scripts=['MAVProxy/mavproxy.py',
                'MAVProxy/tools/mavflightview.py',
