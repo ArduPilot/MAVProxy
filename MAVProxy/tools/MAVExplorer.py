@@ -546,6 +546,7 @@ def main_loop():
             xlim = grui[i].check_xlim_change()
             if xlim is not None and mestate.settings.sync_xzoom:
                 for j in range(0, len(grui)):
+                    #print("set_xlim: ", j, xlim)
                     grui[j].set_xlim(xlim)
                 last_xlim = xlim
 

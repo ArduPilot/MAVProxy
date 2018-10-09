@@ -68,8 +68,7 @@ class MavGraph(object):
         self.start_time = None
         graph_num += 1
         self.draw_events = 0
-        self.xlim_notify_queue = None
-        self.xlim_change_queue = None
+        self.xlim_pipe = None
         self.xlim = None
 
     def add_field(self, field):
@@ -165,15 +164,15 @@ class MavGraph(object):
     def xlim_changed(self, axsubplot):
         '''called when x limits are changed'''
         xrange = axsubplot.get_xbound()
-        xlim = xrange
+        xlim = axsubplot.get_xlim()
         self.setup_xrange(xrange[1] - xrange[0])
         if self.draw_events == 0:
             # ignore limit change before first draw event
             return
-        if self.xlim_notify_queue and axsubplot == self.ax1 and xlim != self.xlim:
+        if self.xlim_pipe is not None and axsubplot == self.ax1 and xlim != self.xlim:
             self.xlim = xlim
             #print('send', self.graph_num, xlim)
-            self.xlim_notify_queue.put(xlim, block=False)
+            self.xlim_pipe[1].send(xlim)
 
     def draw_event(self, evt):
         '''called on draw events'''
@@ -205,7 +204,7 @@ class MavGraph(object):
 
         for i in range(0, len(fields)):
             if len(x[i]) == 0:
-                print("Failed to find any values for field %s" % fields[i])
+                #print("Failed to find any values for field %s" % fields[i])
                 continue
             if i < len(colors):
                 color = colors[i]
@@ -407,25 +406,23 @@ class MavGraph(object):
     def xlim_change_thread(self):
         '''handle xlim change requests from queue'''
         while True:
-            xlim = self.xlim_change_queue.get(block=True)
+            xlim = self.xlim_pipe[1].recv()
             if xlim is None:
                 return
+            #print("recv: ", self.graph_num, xlim)
             while self.draw_events == 0:
                 time.sleep(0.1)
             if self.ax1 is not None and xlim != self.xlim:
                 self.xlim = xlim
                 self.fig.canvas.toolbar.push_current()
                 #print("setting: ", self.graph_num, xlim)
-                self.ax1.set_xbound(xlim)
+                self.ax1.set_xlim(xlim)
 
-    def process(self, flightmode_selections, _flightmodes, block=True,
-                xlim_notify_queue=None, xlim_change_queue=None):
+    def process(self, flightmode_selections, _flightmodes, block=True):
         '''process and display graph'''
         self.msg_types = set()
         self.multiplier = []
         self.field_types = []
-        self.xlim_notify_queue = xlim_notify_queue
-        self.xlim_change_queue = xlim_change_queue
         self.xlim = None
 
         # work out msg types we are interested in
@@ -451,8 +448,11 @@ class MavGraph(object):
             self.process_mav(mlog, timeshift, flightmode_selections, _flightmodes)
 
 
-    def show(self, lenmavlist, block=True):
+    def show(self, lenmavlist, block=True, xlim_pipe=None):
         '''show graph'''
+        if xlim_pipe is not None:
+            xlim_pipe[0].close()
+        self.xlim_pipe = xlim_pipe
         if self.labels is not None:
             labels = self.labels.split(',')
             if len(labels) != len(fields)*lenmavlist:
@@ -481,7 +481,7 @@ class MavGraph(object):
                 self.x[i] = []
                 self.y[i] = []
 
-        if self.xlim_change_queue is not None:
+        if self.xlim_pipe is not None:
             self.change_thread_handle = threading.Thread(target=self.xlim_change_thread)
             self.change_thread_handle.start()
                 

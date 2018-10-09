@@ -1,9 +1,9 @@
 from MAVProxy.modules.lib import grapher
 import platform
 if platform.system() == 'Darwin':
-    from billiard import Process, forking_enable, freeze_support
+    from billiard import Process, forking_enable, freeze_support, Pipe
 else:
-    from multiprocessing import Process, freeze_support
+    from multiprocessing import Process, freeze_support, Pipe
 
 graph_count = 1
 
@@ -15,9 +15,7 @@ class Graph_UI(object):
         global graph_count
         self.count = graph_count
         graph_count += 1
-        from multiprocessing_queue import makeIPCQueue
-        self.xlim_notify_queue = makeIPCQueue()
-        self.xlim_change_queue = makeIPCQueue()
+        self.xlim_pipe = Pipe()
 
     def display_graph(self, graphdef):
         '''display a graph'''
@@ -38,9 +36,7 @@ class Graph_UI(object):
         self.mg.add_mav(self.mestate.mlog)
         for f in graphdef.expression.split():
             self.mg.add_field(f)
-        self.mg.process(self.mestate.flightmode_selections, self.mestate.mlog._flightmodes,
-                        xlim_notify_queue=self.xlim_notify_queue,
-                        xlim_change_queue=self.xlim_change_queue)
+        self.mg.process(self.mestate.flightmode_selections, self.mestate.mlog._flightmodes)
         self.lenmavlist = len(self.mg.mav_list)
         if platform.system() == 'Darwin':
             forking_enable(False)
@@ -48,23 +44,25 @@ class Graph_UI(object):
         #To avoid slowdowns in Windows (which copies the vars to the new process)
         #We need to empty this var when we're finished with it
         self.mg.mav_list = []
-        child = Process(target=self.mg.show, args=[self.lenmavlist, ])
+        child = Process(target=self.mg.show, args=[self.lenmavlist,], kwargs={"xlim_pipe" : self.xlim_pipe})
         child.start()
+        self.xlim_pipe[1].close()
         self.mestate.mlog.rewind()
 
     def check_xlim_change(self):
         '''check for new X bounds'''
-        if not self.xlim_notify_queue:
+        if self.xlim_pipe is None:
             return None
         xlim = None
-        while not self.xlim_notify_queue.empty():
-            xlim = self.xlim_notify_queue.get()
+        while self.xlim_pipe[0].poll():
+            xlim = self.xlim_pipe[0].recv()
         if xlim != self.xlim:
             return xlim
         return None
 
     def set_xlim(self, xlim):
         '''set new X bounds'''
-        if self.xlim_change_queue and self.xlim != xlim:
-            self.xlim_change_queue.put(xlim, block=False)
+        if self.xlim_pipe is not None and self.xlim != xlim:
+            #print("send0: ", graph_count, xlim)
+            self.xlim_pipe[0].send(xlim)
             self.xlim = xlim
