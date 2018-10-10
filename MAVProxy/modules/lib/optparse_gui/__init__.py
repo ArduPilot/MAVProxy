@@ -21,16 +21,17 @@ class OptparseDialog( wx.Dialog ):
     Based on the wx.Dialog sample from wx Docs & Demos'''
     def __init__(
             self,
-            option_parser, #The OptionParser object
-            parent = None,
-            ID = 0,
-            title = 'Optparse Dialog',
+            option_parser,
+            parent=None,
+            ID=0,
+            title='Optparse Dialog',
             pos=wx.DefaultPosition,
             size=wx.DefaultSize,
             style=wx.DEFAULT_DIALOG_STYLE,
-            name = 'OptparseDialog',
-        ):
+            name='OptparseDialog',
+            *args, **kwargs):
 
+        super(OptparseDialog, self).__init__(self, *args, **kwargs)
         provider = wx.SimpleHelpProvider()
         wx.HelpProvider_Set(provider)
 
