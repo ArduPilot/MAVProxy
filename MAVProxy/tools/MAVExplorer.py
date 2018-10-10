@@ -545,10 +545,20 @@ def main_loop():
         for i in range(0, len(grui)):
             xlim = grui[i].check_xlim_change()
             if xlim is not None and mestate.settings.sync_xzoom:
+                remlist = []
                 for j in range(0, len(grui)):
                     #print("set_xlim: ", j, xlim)
-                    grui[j].set_xlim(xlim)
+                    if not grui[j].set_xlim(xlim):
+                        remlist.append(j)
                 last_xlim = xlim
+                if len(remlist) > 0:
+                    # remove stale graphs
+                    new_grui = []
+                    for j in range(0, len(grui)):
+                        if j not in remlist:
+                            new_grui.append(grui[j])
+                    grui = new_grui
+                break
 
         time.sleep(0.1)
 

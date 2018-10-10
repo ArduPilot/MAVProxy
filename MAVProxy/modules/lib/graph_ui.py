@@ -67,5 +67,9 @@ class Graph_UI(object):
         '''set new X bounds'''
         if self.xlim_pipe is not None and self.xlim != xlim:
             #print("send0: ", graph_count, xlim)
-            self.xlim_pipe[0].send(xlim)
+            try:
+                self.xlim_pipe[0].send(xlim)
+            except IOError:
+                return False
             self.xlim = xlim
+        return True
