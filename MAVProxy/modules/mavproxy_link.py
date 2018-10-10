@@ -417,7 +417,7 @@ class LinkModule(mp_module.MPModule):
             # silence gimbal heartbeat packets for now
             return
 
-        if getattr(m, 'time_boot_ms', None) is not None and self.settings.target_system == m.get_srcSystem():
+        if getattr(m, 'time_boot_ms', None) is not None and self.settings.target_system == sysid:
             # update link_delayed attribute
             self.handle_msec_timestamp(m, master)
 
@@ -434,8 +434,8 @@ class LinkModule(mp_module.MPModule):
                 return
 
         if mtype == 'HEARTBEAT' and m.type != mavutil.mavlink.MAV_TYPE_GCS:
-            if self.settings.target_system == 0 and self.settings.target_system != m.get_srcSystem():
-                self.settings.target_system = m.get_srcSystem()
+            if self.settings.target_system == 0 and self.settings.target_system != sysid:
+                self.settings.target_system = sysid
                 self.say("online system %u" % self.settings.target_system,'message')
 
             if self.status.heartbeat_error:
