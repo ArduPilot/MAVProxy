@@ -401,7 +401,8 @@ class SRTMTile:
 
 class SRTMOceanTile(SRTMTile):
     '''a tile for areas of zero altitude'''
-    def __init__(self, lat, lon):
+    def __init__(self, lat, lon, f):
+        SRTMTile.__init__(self, f, lat, lon)
         self.lat = lat
         self.lon = lon
 
