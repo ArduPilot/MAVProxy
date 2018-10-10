@@ -13,11 +13,8 @@ import Queue
 import fnmatch
 import threading
 import shlex
-if platform.system() == 'Darwin':
-    from billiard import Pipe, Process, Event, freeze_support
-else:
-    from multiprocessing import Pipe, Process, Event, freeze_support
 from math import *
+from MAVProxy.modules.lib import multiproc
 from MAVProxy.modules.lib import rline
 from MAVProxy.modules.lib import wxconsole
 from MAVProxy.modules.lib.graph_ui import Graph_UI
@@ -77,9 +74,9 @@ class MEState(object):
         self.last_graph = GraphDefinition('Untitled', '', '', [], None)
         
         #pipe to the wxconsole for any child threads (such as the save dialog box)
-        self.parent_pipe_recv_console,self.child_pipe_send_console = Pipe(duplex=False)
+        self.parent_pipe_recv_console,self.child_pipe_send_console = multiproc.Pipe(duplex=False)
         #pipe for creating graphs (such as from the save dialog box)
-        self.parent_pipe_recv_graph,self.child_pipe_send_graph = Pipe(duplex=False)
+        self.parent_pipe_recv_graph,self.child_pipe_send_graph = multiproc.Pipe(duplex=False)
         
         tConsoleWrite = threading.Thread(target=self.pipeRecvConsole)
         tConsoleWrite.daemon = True
@@ -292,24 +289,19 @@ def cmd_graph(args):
         #print("initial: ", last_xlim)
         grui[-1].set_xlim(last_xlim)
 
-def map_process(path, wp, fen, used_flightmodes, mav_type, options):
-    '''process for displaying a graph'''
-    from mavflightview import mavflightview_show
-    mavflightview_show(path, wp, fen, used_flightmodes, mav_type, options)
-
 def cmd_map(args):
     '''map command'''
-    from mavflightview import mavflightview_mav, mavflightview_options
+    import mavflightview
     #mestate.mlog.reduce_by_flightmodes(mestate.flightmode_selections)
     #setup and process the map
-    options = mavflightview_options()
+    options = mavflightview.mavflightview_options()
     options.condition = mestate.settings.condition
     options._flightmodes = mestate.mlog._flightmodes
     options.show_flightmode_legend = mestate.settings.show_flightmode
     if len(args) > 0:
         options.types = ','.join(args)
-    [path, wp, fen, used_flightmodes, mav_type] = mavflightview_mav(mestate.mlog, options, mestate.flightmode_selections)
-    child = Process(target=map_process, args=[path, wp, fen, used_flightmodes, mav_type, options])
+    [path, wp, fen, used_flightmodes, mav_type] = mavflightview.mavflightview_mav(mestate.mlog, options, mestate.flightmode_selections)
+    child = multiproc.Process(target=mavflightview.mavflightview_show, args=[path, wp, fen, used_flightmodes, mav_type, options])
     child.start()
     mestate.mlog.rewind()
 
@@ -421,7 +413,7 @@ def save_process(MAVExpLastGraph, child_pipe_console_input, child_pipe_graph_inp
 
 def cmd_save(args):
     '''save a graph'''
-    child = Process(target=save_process, args=[mestate.last_graph, mestate.child_pipe_send_console, mestate.child_pipe_send_graph, mestate.status.msgs])
+    child = multiproc.Process(target=save_process, args=[mestate.last_graph, mestate.child_pipe_send_console, mestate.child_pipe_send_graph, mestate.status.msgs])
     child.start()
 
 def cmd_messages(args):
@@ -580,7 +572,7 @@ def progress_bar(pct):
         mestate.console.write('#')
 
 if __name__ == "__main__":
-    freeze_support()
+    multiproc.freeze_support()
     mestate = MEState()
     setup_file_menu()
 

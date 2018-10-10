@@ -14,6 +14,7 @@ import re
 from pymavlink import mavutil, mavparm
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
+from MAVProxy.modules.lib import multiproc
 
 class FirmwareModule(mp_module.MPModule):
 
@@ -194,7 +195,6 @@ fw download releasetype=OFFICIAL frame=quad platform=PX4-v2
 
     def cmd_fw_download(self, args):
         '''cmd handler for downloading firmware'''
-        import multiprocessing
         stuff = self.filtered_rows_from_args(args)
         if stuff is None:
             return
@@ -214,7 +214,7 @@ fw download releasetype=OFFICIAL frame=quad platform=PX4-v2
             filename=os.path.basename(url)
             files = []
             files.append((url,filename))
-            child = multiprocessing.Process(target=mp_util.download_files, args=(files,))
+            child = multiproc.Process(target=mp_util.download_files, args=(files,))
             child.start()
         except Exception as e:
             print("fw: download failed")
@@ -329,7 +329,6 @@ fw download releasetype=OFFICIAL frame=quad platform=PX4-v2
 
     def manifest_download(self):
         '''download manifest files'''
-        import multiprocessing
         if self.downloaders_lock.acquire(False):
             if len(self.downloaders):
                 # there already exist downloader threads

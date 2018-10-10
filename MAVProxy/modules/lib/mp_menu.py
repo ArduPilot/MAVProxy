@@ -7,6 +7,7 @@ November 2013
 '''
 
 from MAVProxy.modules.lib import mp_util
+from MAVProxy.modules.lib import multiproc
 import platform
 
 class MPMenuGeneric(object):
@@ -202,10 +203,10 @@ class MPMenuSubMenu(MPMenuGeneric):
     def _append(self, menu):
         '''append this menu item to a menu'''
         from wx_loader import wx
-        if platform.system() == 'Darwin':
-            menu.Append(-1, self.name, self.wx_menu()) #use wxPython_phoenix
-        else:
+        if hasattr(menu, 'AppendMenu'):
             menu.AppendMenu(-1, self.name, self.wx_menu())
+        else:
+            menu.Append(-1, self.name, self.wx_menu()) #use wxPython_phoenix
 
     def __str__(self):
         return "MPMenuSubMenu(%s)" % (self.name)
@@ -309,8 +310,7 @@ class MPMenuChildMessageDialog(object):
         self.font_size = font_size
 
     def show(self):
-        import multiprocessing
-        t = multiprocessing.Process(target=self.call)
+        t = multiproc.Process(target=self.call)
         t.start()
 
     def call(self):

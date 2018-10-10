@@ -25,22 +25,17 @@ class LiveGraph():
                  tickresolution=0.2,
                  colors=[ 'red', 'green', 'blue', 'orange', 'olive', 'cyan', 'magenta', 'brown',
                           'violet', 'purple', 'grey', 'black']):
-        if platform.system() == 'Darwin':
-          import billiard as multiprocessing
-        else:
-          import multiprocessing
+        import multiproc
         self.fields = fields
         self.colors = colors
         self.title  = title
         self.timespan = timespan
         self.tickresolution = tickresolution
         self.values = [None]*len(self.fields)
-        if platform.system() == 'Darwin':
-          multiprocessing.forking_enable(False)
-        self.parent_pipe,self.child_pipe = multiprocessing.Pipe()
-        self.close_graph = multiprocessing.Event()
+        self.parent_pipe,self.child_pipe = multiproc.Pipe()
+        self.close_graph = multiproc.Event()
         self.close_graph.clear()
-        self.child = multiprocessing.Process(target=self.child_task)
+        self.child = multiproc.Process(target=self.child_task)
         self.child.start()
 
     def child_task(self):

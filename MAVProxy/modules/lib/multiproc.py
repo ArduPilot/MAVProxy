@@ -2,16 +2,15 @@
 multi-processing abstraction
 This wraps the multiprocessing module, using billiard on MacOS
 and multiprocessing on Linux and Windows
+
+The key problem on MacOS is that you can't fork in any process that uses
+threading, which is almost all of processes as so many libraries use
+threads. So instead billiard uses an approach that uses fork+exec and re-runs
+the script in the child. It is horrible, but it seems to be the only way to
+make things work on MacOS
 '''
 
-import platform, os
-if platform.system() == 'Darwin' or os.environ.get('USE_BILLIARD',None) is not None:
-    from billiard import Process, forking_enable, freeze_support, Pipe, Semaphore
-    forking_enable(False)
-else:
-    from multiprocessing import Process, freeze_support, Pipe, Semaphore
-
-class Queue(object):
+class PipeQueue(object):
     '''simulate a queue using a pipe. This is used to avoid a problem with
     pipes on MacOS, while still keeping similar syntax'''
     def __init__(self):
@@ -57,3 +56,15 @@ class Queue(object):
 
     def empty(self):
         return self.qsize() == 0
+
+import platform, os
+
+# we use billiard (and forking disable) on MacOS, and also if USE_BILLIARD environment
+# is set. Using USE_BILLIARD allows for debugging of the crazy forking disable approach on
+# a saner platform
+if platform.system() == 'Darwin' or os.environ.get('USE_BILLIARD',None) is not None:
+    from billiard import Process, forking_enable, freeze_support, Pipe, Semaphore, Event, Lock
+    forking_enable(False)
+    Queue = PipeQueue
+else:
+    from multiprocessing import Process, freeze_support, Pipe, Semaphore, Event, Lock, Queue
