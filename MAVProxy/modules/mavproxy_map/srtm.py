@@ -15,8 +15,8 @@ import os
 import zipfile
 import array
 import math
-import multiprocessing
 from MAVProxy.modules.lib import mp_util
+from MAVProxy.modules.lib import multiproc
 import tempfile
 
 childTileDownload = {}
@@ -119,7 +119,7 @@ class SRTMDownloader():
         global filelistDownloadActive
         mypid = os.getpid()
         if mypid not in childFileListDownload or not childFileListDownload[mypid].is_alive():
-            childFileListDownload[mypid] = multiprocessing.Process(target=self.createFileListHTTP)
+            childFileListDownload[mypid] = multiproc.Process(target=self.createFileListHTTP)
             filelistDownloadActive = 1
             childFileListDownload[mypid].start()
             filelistDownloadActive = 0
@@ -251,7 +251,7 @@ class SRTMDownloader():
         if not os.path.exists(os.path.join(self.cachedir, filename)):
             if not mypid in childTileDownload or not childTileDownload[mypid].is_alive():
                 try:
-                    childTileDownload[mypid] = multiprocessing.Process(target=self.downloadTile, args=(str(continent), str(filename)))
+                    childTileDownload[mypid] = multiproc.Process(target=self.downloadTile, args=(str(continent), str(filename)))
                     childTileDownload[mypid].start()
                 except Exception as ex:
                     if mypid in childTileDownload:
