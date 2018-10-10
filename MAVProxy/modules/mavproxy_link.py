@@ -409,7 +409,7 @@ class LinkModule(mp_module.MPModule):
 
         # keep the last message of each type around
         self.status.msgs[mtype] = m
-        if not mtype in self.status.msg_count:
+        if mtype not in self.status.msg_count:
             self.status.msg_count[mtype] = 0
         self.status.msg_count[mtype] += 1
 
@@ -584,7 +584,7 @@ class LinkModule(mp_module.MPModule):
             # would lead a conflict in stream rate setting between mavproxy and the other
             # GCS
             if self.mpstate.settings.mavfwd_rate or mtype != 'REQUEST_DATA_STREAM':
-                if not mtype in self.no_fwd_types:
+                if mtype not in self.no_fwd_types:
                     for r in self.mpstate.mav_outputs:
                         r.write(m.get_msgbuf())
 
