@@ -1,9 +1,5 @@
 from MAVProxy.modules.lib import grapher
-import platform
-if platform.system() == 'Darwin':
-    from billiard import Process, forking_enable, freeze_support, Pipe
-else:
-    from multiprocessing import Process, freeze_support, Pipe
+from MAVProxy.modules.lib import multiproc
 
 graph_count = 1
 
@@ -15,7 +11,7 @@ class Graph_UI(object):
         global graph_count
         self.count = graph_count
         graph_count += 1
-        self.xlim_pipe = Pipe()
+        self.xlim_pipe = multiproc.Pipe()
 
     def display_graph(self, graphdef):
         '''display a graph'''
@@ -38,13 +34,11 @@ class Graph_UI(object):
             self.mg.add_field(f)
         self.mg.process(self.mestate.flightmode_selections, self.mestate.mlog._flightmodes)
         self.lenmavlist = len(self.mg.mav_list)
-        if platform.system() == 'Darwin':
-            forking_enable(False)
         #Important - mg.mav_list is the full logfile and can be very large in size
         #To avoid slowdowns in Windows (which copies the vars to the new process)
         #We need to empty this var when we're finished with it
         self.mg.mav_list = []
-        child = Process(target=self.mg.show, args=[self.lenmavlist,], kwargs={"xlim_pipe" : self.xlim_pipe})
+        child = multiproc.Process(target=self.mg.show, args=[self.lenmavlist,], kwargs={"xlim_pipe" : self.xlim_pipe})
         child.start()
         self.xlim_pipe[1].close()
         self.mestate.mlog.rewind()

@@ -2,7 +2,8 @@
 Graphical editing of mp_settings object
 '''
 import os, sys
-import multiprocessing, threading
+from MAVProxy.modules.lib import multiproc
+import threading
 
 class WXSettings(object):
     '''
@@ -10,10 +11,10 @@ class WXSettings(object):
     '''
     def __init__(self, settings):
         self.settings  = settings
-        self.parent_pipe,self.child_pipe = multiprocessing.Pipe()
-        self.close_event = multiprocessing.Event()
+        self.parent_pipe,self.child_pipe = multiproc.Pipe()
+        self.close_event = multiproc.Event()
         self.close_event.clear()
-        self.child = multiprocessing.Process(target=self.child_task)
+        self.child = multiproc.Process(target=self.child_task)
         self.child.start()
         t = threading.Thread(target=self.watch_thread)
         t.daemon = True
@@ -51,7 +52,7 @@ class WXSettings(object):
 
 
 if __name__ == "__main__":
-    multiprocessing.freeze_support()
+    multiproc.freeze_support()
 
     def test_callback(setting):
         '''callback on apply'''

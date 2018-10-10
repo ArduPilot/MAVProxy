@@ -7,6 +7,7 @@
 
 import sys
 from MAVProxy.modules.lib import mp_util
+from MAVProxy.modules.lib import multiproc
 from wx_loader import wx
 
 class CheckItem():
@@ -25,10 +26,10 @@ class CheckUI():
         import multiprocessing, threading
         self.title  = title
         self.menu_callback = None
-        self.parent_pipe,self.child_pipe = multiprocessing.Pipe()
-        self.close_event = multiprocessing.Event()
+        self.parent_pipe,self.child_pipe = multiproc.Pipe()
+        self.close_event = multiproc.Event()
         self.close_event.clear()
-        self.child = multiprocessing.Process(target=self.child_task)
+        self.child = multiproc.Process(target=self.child_task)
         self.child.start()
 
     def child_task(self):

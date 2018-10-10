@@ -3,7 +3,7 @@
 """
   MAVProxy horizon indicator.
 """
-import multiprocessing
+from MAVProxy.modules.lib import multiproc
 import time
 
 class HorizonIndicator():
@@ -13,10 +13,10 @@ class HorizonIndicator():
     def __init__(self,title='MAVProxy: Horizon Indicator'):
         self.title  = title
         # Create Pipe to send attitude information from module to UI
-        self.child_pipe_recv,self.parent_pipe_send = multiprocessing.Pipe(duplex=False)
-        self.close_event = multiprocessing.Event()
+        self.child_pipe_recv,self.parent_pipe_send = multiproc.Pipe(duplex=False)
+        self.close_event = multiproc.Event()
         self.close_event.clear()
-        self.child = multiprocessing.Process(target=self.child_task)
+        self.child = multiproc.Process(target=self.child_task)
         self.child.start()
         self.child_pipe_recv.close()
 
@@ -46,7 +46,7 @@ class HorizonIndicator():
 
 if __name__ == "__main__":
     # test the console
-    multiprocessing.freeze_support()
+    multiproc.freeze_support()
     horizon = HorizonIndicator()
     while horizon.is_alive():
         print('test')

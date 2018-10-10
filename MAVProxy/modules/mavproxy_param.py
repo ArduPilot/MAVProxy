@@ -4,8 +4,8 @@
 import time, os, fnmatch
 from pymavlink import mavutil, mavparm
 from MAVProxy.modules.lib import mp_util
-
 from MAVProxy.modules.lib import mp_module
+from MAVProxy.modules.lib import multiproc
 
 class ParamState:
     '''this class is separated to make it possible to use the parameter
@@ -71,7 +71,6 @@ class ParamState:
 
     def param_help_download(self):
         '''download XML files for parameters'''
-        import multiprocessing
         files = []
         for vehicle in ['APMrover2', 'ArduCopter', 'ArduPlane', 'ArduSub', 'AntennaTracker']:
             url = 'http://autotest.ardupilot.org/Parameters/%s/apm.pdef.xml' % vehicle
@@ -83,7 +82,7 @@ class ParamState:
                 path = mp_util.dot_mavproxy("%s-defaults.parm" % vehicle)
                 files.append((url, path))
         try:
-            child = multiprocessing.Process(target=mp_util.download_files, args=(files,))
+            child = multiproc.Process(target=mp_util.download_files, args=(files,))
             child.start()
         except Exception as e:
             print(e)

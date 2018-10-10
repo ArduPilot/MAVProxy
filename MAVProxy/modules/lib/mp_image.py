@@ -16,6 +16,7 @@ import numpy as np
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_widgets
 from MAVProxy.modules.lib import win_layout
+from MAVProxy.modules.lib import multiproc
 from MAVProxy.modules.lib.mp_menu import *
 
 
@@ -83,7 +84,6 @@ class MPImage():
                  auto_size = False,
                  report_size_changes = False,
                  daemon = False):
-        import multiprocessing
 
         self.title = title
         self.width = width
@@ -97,15 +97,14 @@ class MPImage():
         self.menu = None
         self.popup_menu = None
 
-        from multiprocessing_queue import makeIPCQueue
-        self.in_queue = makeIPCQueue()
-        self.out_queue = makeIPCQueue()
+        self.in_queue = multiproc.Queue()
+        self.out_queue = multiproc.Queue()
 
         self.default_menu = MPMenuSubMenu('View',
                                           items=[MPMenuItem('Fit Window', 'Fit Window', 'fitWindow'),
                                                  MPMenuItem('Full Zoom',  'Full Zoom', 'fullSize')])
 
-        self.child = multiprocessing.Process(target=self.child_task)
+        self.child = multiproc.Process(target=self.child_task)
         self.child.daemon = daemon
         self.child.start()
         self.set_popup_menu(self.default_menu)

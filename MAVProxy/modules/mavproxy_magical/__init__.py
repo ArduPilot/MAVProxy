@@ -19,12 +19,11 @@ release, thus the silly reason for the name of this module.
 """
 from __future__ import print_function
 
-import multiprocessing
 import sys
 
 from pymavlink import mavutil
 
-from MAVProxy.modules.lib import mp_module, mp_util
+from MAVProxy.modules.lib import mp_module, mp_util, multiproc
 
 try:
     import pkg_resources
@@ -43,7 +42,7 @@ class MagicalModule(mp_module.MPModule):
         )
 
         self.mpstate = mpstate
-        self.parent_pipe, self.child_pipe = multiprocessing.Pipe()
+        self.parent_pipe, self.child_pipe = multiproc.Pipe()
         self.ui_process = None
         self.progress_msgs = {}
         self.report_msgs = {}
@@ -56,7 +55,7 @@ class MagicalModule(mp_module.MPModule):
         if self.ui_is_active():
             return
 
-        self.ui_process = multiprocessing.Process(target=self.ui_task)
+        self.ui_process = multiproc.Process(target=self.ui_task)
         self.update_ui()
         self.ui_process.start()
 
@@ -72,7 +71,7 @@ class MagicalModule(mp_module.MPModule):
 
     def kill_ui(self):
         self.ui_process.terminate()
-        self.parent_pipe, self.child_pipe = multiprocessing.Pipe()
+        self.parent_pipe, self.child_pipe = multiproc.Pipe()
 
     def ui_task(self):
         mp_util.child_close_fds()

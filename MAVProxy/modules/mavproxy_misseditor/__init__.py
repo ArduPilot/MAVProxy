@@ -7,6 +7,7 @@ June 2104
 
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
+from MAVProxy.modules.lib import multiproc
 
 from MAVProxy.modules.mavproxy_misseditor import me_event
 MissionEditorEvent = me_event.MissionEditorEvent
@@ -156,19 +157,18 @@ class MissionEditorModule(mp_module.MPModule):
         self.num_wps_expected = 0 #helps me to know if all my waypoints I'm expecting have arrived
         self.wps_received = {}
 
-        from ..lib.multiprocessing_queue import makeIPCQueue
-        self.event_queue = makeIPCQueue()
-        self.event_queue_lock = multiprocessing.Lock()
-        self.gui_event_queue = makeIPCQueue()
-        self.gui_event_queue_lock = multiprocessing.Lock()
+        self.event_queue = multiproc.Queue()
+        self.event_queue_lock = multiproc.Lock()
+        self.gui_event_queue = multiproc.Queue()
+        self.gui_event_queue_lock = multiproc.Lock()
 
         self.event_thread = MissionEditorEventThread(self, self.event_queue, self.event_queue_lock)
         self.event_thread.start()
 
-        self.close_window = multiprocessing.Semaphore()
+        self.close_window = multiproc.Semaphore()
         self.close_window.acquire()
 
-        self.child = multiprocessing.Process(target=self.child_task,args=(self.event_queue,self.event_queue_lock,self.gui_event_queue,self.gui_event_queue_lock,self.close_window))
+        self.child = multiproc.Process(target=self.child_task,args=(self.event_queue,self.event_queue_lock,self.gui_event_queue,self.gui_event_queue_lock,self.close_window))
         self.child.start()
 
         self.mpstate.miss_editor = self

@@ -25,8 +25,7 @@ class GraphFrame(wx.Frame):
         self.last_yrange = (None, None)
 
     def create_main_panel(self):
-        from matplotlib.backends.backend_wxagg import \
-             FigureCanvasWxAgg as FigCanvas
+        from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigCanvas
         self.panel = wx.Panel(self)
 
         self.init_plot()
