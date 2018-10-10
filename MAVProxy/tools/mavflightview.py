@@ -10,6 +10,7 @@ from math import *
 from pymavlink import mavutil, mavwp, mavextra
 from MAVProxy.modules.mavproxy_map import mp_slipmap, mp_tile
 from MAVProxy.modules.lib import mp_util
+from MAVProxy.modules.lib import multiproc
 import functools
 
 import cv2
@@ -480,6 +481,8 @@ class mavflightview_options(object):
         self.colour_source = 'flightmode'
 
 if __name__ == "__main__":
+    multiproc.freeze_support()
+
     from optparse import OptionParser
     parser = OptionParser("mavflightview.py [options]")
     parser.add_option("--service", default="MicrosoftSat", help="tile service")

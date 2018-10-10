@@ -17,6 +17,7 @@ from MAVProxy.modules.mavproxy_map import mp_elevation
 from MAVProxy.modules.mavproxy_map import mp_tile
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import win_layout
+from MAVProxy.modules.lib import multiproc
 from MAVProxy.modules.mavproxy_map.mp_slipmap_util import *
 
 
@@ -39,7 +40,6 @@ class MPSlipMap():
                  elevation=False,
                  download=True,
                  show_flightmode_legend=True):
-        import multiprocessing
 
         self.lat = lat
         self.lon = lon
@@ -59,12 +59,11 @@ class MPSlipMap():
         self.drag_step = 10
 
         self.title = title
-        from MAVProxy.modules.lib.multiprocessing_queue import makeIPCQueue
-        self.event_queue = makeIPCQueue()
-        self.object_queue = makeIPCQueue()
-        self.close_window = multiprocessing.Semaphore()
+        self.event_queue = multiproc.Queue()
+        self.object_queue = multiproc.Queue()
+        self.close_window = multiproc.Semaphore()
         self.close_window.acquire()
-        self.child = multiprocessing.Process(target=self.child_task)
+        self.child = multiproc.Process(target=self.child_task)
         self.child.start()
         self._callbacks = set()
 
@@ -175,8 +174,7 @@ class MPSlipMap():
         return mp_tile.mp_icon(filename)
 
 if __name__ == "__main__":
-    import multiprocessing
-    multiprocessing.freeze_support()
+    multiproc.freeze_support()
     import time
 
     from optparse import OptionParser
