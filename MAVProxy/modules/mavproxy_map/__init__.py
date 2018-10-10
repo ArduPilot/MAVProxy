@@ -627,7 +627,8 @@ class MapModule(mp_module.MPModule):
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         from MAVProxy.modules.mavproxy_map import mp_slipmap
-        if m.get_type() == "HEARTBEAT":
+        mtype = m.get_type()
+        if mtype == "HEARTBEAT":
             if m.type in [mavutil.mavlink.MAV_TYPE_FIXED_WING]:
                 self.vehicle_type_name = 'plane'
             elif m.type in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER]:
@@ -652,19 +653,19 @@ class MapModule(mp_module.MPModule):
         # in the air at the same time
         vehicle = 'Vehicle%u' % m.get_srcSystem()
 
-        if m.get_type() == "SIMSTATE" and self.map_settings.showsimpos:
+        if mtype == "SIMSTATE" and self.map_settings.showsimpos:
             self.create_vehicle_icon('Sim' + vehicle, 'green')
             self.map.set_position('Sim' + vehicle, (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
 
-        if m.get_type() == "AHRS2" and self.map_settings.showahrs2pos:
+        if mtype == "AHRS2" and self.map_settings.showahrs2pos:
             self.create_vehicle_icon('AHRS2' + vehicle, 'blue')
             self.map.set_position('AHRS2' + vehicle, (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
 
-        if m.get_type() == "AHRS3" and self.map_settings.showahrs3pos:
+        if mtype == "AHRS3" and self.map_settings.showahrs3pos:
             self.create_vehicle_icon('AHRS3' + vehicle, 'orange')
             self.map.set_position('AHRS3' + vehicle, (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
 
-        if m.get_type() == "GPS_RAW_INT" and self.map_settings.showgpspos:
+        if mtype == "GPS_RAW_INT" and self.map_settings.showgpspos:
             (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
             if lat != 0 or lon != 0:
                 if m.vel > 300 or 'ATTITUDE' not in self.master.messages:
@@ -674,33 +675,33 @@ class MapModule(mp_module.MPModule):
                 self.create_vehicle_icon('GPS' + vehicle, 'blue')
                 self.map.set_position('GPS' + vehicle, (lat, lon), rotation=cog)
 
-        if m.get_type() == "GPS2_RAW" and self.map_settings.showgps2pos:
+        if mtype == "GPS2_RAW" and self.map_settings.showgps2pos:
             (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
             if lat != 0 or lon != 0:
                 self.create_vehicle_icon('GPS2' + vehicle, 'green')
                 self.map.set_position('GPS2' + vehicle, (lat, lon), rotation=m.cog*0.01)
 
-        if m.get_type() == 'GLOBAL_POSITION_INT':
+        if mtype == 'GLOBAL_POSITION_INT':
             (self.lat, self.lon, self.heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
             if abs(self.lat) > 1.0e-3 or abs(self.lon) > 1.0e-3:
                 self.have_global_position = True
                 self.create_vehicle_icon('Pos' + vehicle, 'red', follow=True)
                 self.map.set_position('Pos' + vehicle, (self.lat, self.lon), rotation=self.heading)
 
-        if m.get_type() == 'LOCAL_POSITION_NED' and not self.have_global_position:
+        if mtype == 'LOCAL_POSITION_NED' and not self.have_global_position:
             (self.lat, self.lon) = mp_util.gps_offset(0, 0, m.x, m.y)
             self.heading = math.degrees(math.atan2(m.vy, m.vx))
             self.create_vehicle_icon('Pos' + vehicle, 'red', follow=True)
             self.map.set_position('Pos' + vehicle, (self.lat, self.lon), rotation=self.heading)
 
-        if m.get_type() == 'HOME_POSITION':
+        if mtype == 'HOME_POSITION':
             (lat, lon) = (m.latitude*1.0e-7, m.longitude*1.0e-7)
             icon = self.map.icon('home.png')
             self.map.add_object(mp_slipmap.SlipIcon('HOME_POSITION',
                                                             (lat,lon),
                                                             icon, layer=3, rotation=0, follow=False))
 
-        if m.get_type() == "NAV_CONTROLLER_OUTPUT":
+        if mtype == "NAV_CONTROLLER_OUTPUT":
             if (self.master.flightmode in [ "AUTO", "GUIDED", "LOITER", "RTL", "QRTL", "QLOITER", "QLAND" ] and
                 self.lat is not None and self.lon is not None):
                 trajectory = [ (self.lat, self.lon),
@@ -710,7 +711,7 @@ class MapModule(mp_module.MPModule):
             else:
                 self.map.add_object(mp_slipmap.SlipClearLayer('Trajectory'))
 
-        if m.get_type() == "POSITION_TARGET_GLOBAL_INT":
+        if mtype == "POSITION_TARGET_GLOBAL_INT":
             # FIXME: base this off SYS_STATUS.MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL?
             if self.lat is None:
                 return

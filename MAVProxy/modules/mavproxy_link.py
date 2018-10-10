@@ -378,9 +378,10 @@ class LinkModule(mp_module.MPModule):
 
         # see if it is handled by a specialised sysid connection
         sysid = m.get_srcSystem()
+        mtype = m.get_type()
         if sysid in self.mpstate.sysid_outputs:
             self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
-            if m.get_type() == "GLOBAL_POSITION_INT":
+            if mtype == "GLOBAL_POSITION_INT":
                 for modname in 'map', 'asterix', 'NMEA', 'NMEA2':
                     mod = self.module(modname)
                     if mod is not None:
@@ -391,7 +392,7 @@ class LinkModule(mp_module.MPModule):
             master.post_message(m)
         self.status.counters['MasterIn'][master.linknum] += 1
 
-        mtype = m.get_type()
+
 
         if mtype == 'GLOBAL_POSITION_INT':
             # send GLOBAL_POSITION_INT to 2nd GCS for 2nd vehicle display
@@ -407,12 +408,12 @@ class LinkModule(mp_module.MPModule):
             self.mpstate.logqueue.put(bytearray(struct.pack('>Q', usec) + m.get_msgbuf()))
 
         # keep the last message of each type around
-        self.status.msgs[m.get_type()] = m
-        if not m.get_type() in self.status.msg_count:
-            self.status.msg_count[m.get_type()] = 0
-        self.status.msg_count[m.get_type()] += 1
+        self.status.msgs[mtype] = m
+        if not mtype in self.status.msg_count:
+            self.status.msg_count[mtype] = 0
+        self.status.msg_count[mtype] += 1
 
-        if m.get_srcComponent() == mavutil.mavlink.MAV_COMP_ID_GIMBAL and m.get_type() == 'HEARTBEAT':
+        if m.get_srcComponent() == mavutil.mavlink.MAV_COMP_ID_GIMBAL and mtype == 'HEARTBEAT':
             # silence gimbal heartbeat packets for now
             return
 
@@ -574,7 +575,7 @@ class LinkModule(mp_module.MPModule):
 
         if self.status.watch is not None:
             for msg_type in self.status.watch:
-                if fnmatch.fnmatch(m.get_type().upper(), msg_type.upper()):
+                if fnmatch.fnmatch(mtype.upper(), msg_type.upper()):
                     self.mpstate.console.writeln('< '+ str(m))
                     break
 

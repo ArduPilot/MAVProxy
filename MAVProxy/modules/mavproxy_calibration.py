@@ -65,19 +65,20 @@ class CalibrationModule(mp_module.MPModule):
 
     def mavlink_packet(self, m):
         '''handle mavlink packets'''
+        mtype = m.get_type()
         if self.accelcal_count != -1:
-            if m.get_type() == 'STATUSTEXT':
+            if mtype == 'STATUSTEXT':
                 # handle accelcal packet
                 text = str(m.text)
                 if text.startswith('Place '):
                     self.accelcal_wait_enter = True
                     self.empty_input_count = self.mpstate.empty_input_count
-        if m.get_type() == 'MAG_CAL_PROGRESS':
+        if mtype == 'MAG_CAL_PROGRESS':
             while m.compass_id >= len(self.magcal_progess):
                 self.magcal_progess.append("")
             self.magcal_progess[m.compass_id] = "%u%%" % m.completion_pct
             self.console.set_status('Progress', 'Calibration Progress: ' + " ".join(self.magcal_progess), row=4)
-        if m.get_type() == 'MAG_CAL_REPORT':
+        if mtype == 'MAG_CAL_REPORT':
             if m.cal_status == mavutil.mavlink.MAG_CAL_SUCCESS:
                 result = "SUCCESS"
             else:

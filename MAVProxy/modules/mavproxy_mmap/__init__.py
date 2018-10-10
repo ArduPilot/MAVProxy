@@ -30,11 +30,12 @@ class MMapModule(mp_module.MPModule):
 
     def mavlink_packet(self, m):
         """handle an incoming mavlink packet"""
-        if m.get_type() == 'GPS_RAW':
+        mtype = m.get_type()
+        if mtype == 'GPS_RAW':
             (self.lat, self.lon) = (m.lat, m.lon)
-        elif m.get_type() == 'GPS_RAW_INT':
+        elif mtype == 'GPS_RAW_INT':
             (self.lat, self.lon) = (m.lat / 1.0e7, m.lon / 1.0e7)
-        elif m.get_type() == "VFR_HUD":
+        elif mtype == "VFR_HUD":
             self.heading = m.heading
             self.alt = m.alt
             self.airspeed = m.airspeed

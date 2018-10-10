@@ -84,15 +84,16 @@ class CameraViewModule(mp_module.MPModule):
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         state = self
-        if m.get_type() == 'GLOBAL_POSITION_INT':
+        mtype = m.get_type()
+        if mtype == 'GLOBAL_POSITION_INT':
             state.lat, state.lon = m.lat*scale_latlon, m.lon*scale_latlon
             state.hdg = m.hdg*scale_hdg
             agl = state.elevation_model.GetElevation(state.lat, state.lon)
             if agl is not None:
                 state.height = m.relative_alt*scale_relative_alt + state.home_height - agl
-        elif m.get_type() == 'ATTITUDE':
+        elif mtype == 'ATTITUDE':
             state.roll, state.pitch, state.yaw = math.degrees(m.roll), math.degrees(m.pitch), math.degrees(m.yaw)
-        elif m.get_type() in ['GPS_RAW', 'GPS_RAW_INT']:
+        elif mtype in ['GPS_RAW', 'GPS_RAW_INT']:
             if self.module('wp').wploader.count() > 0:
                 home = self.module('wp').wploader.wp(0).x, self.module('wp').wploader.wp(0).y
             else:
@@ -111,7 +112,7 @@ class CameraViewModule(mp_module.MPModule):
                 # (i.e. matches GLOBAL_POSITION_INT coords, and $IMHOME in sim_arduplane.sh)
                 # and wploader is a bit off
                 print('home height changed from',old,'to',state.home_height)
-        elif m.get_type() == 'SERVO_OUTPUT_RAW':
+        elif mtype == 'SERVO_OUTPUT_RAW':
             for (axis, attr) in [('ROLL', 'mount_roll'), ('TILT', 'mount_pitch'), ('PAN', 'mount_yaw')]:
                 channel = int(self.get_mav_param('MNT_RC_IN_{0}'.format(axis), 0))
                 if self.get_mav_param('MNT_STAB_{0}'.format(axis), 0) and channel:
