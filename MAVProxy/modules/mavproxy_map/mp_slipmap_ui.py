@@ -588,7 +588,16 @@ class MPSlipMapPanel(wx.Panel):
             self.mouse_pos = pos
         self.update_position()
 
-        if event.ButtonIsDown(wx.MOUSE_BTN_ANY) or event.ButtonUp():
+        if hasattr(event, 'ButtonIsDown'):
+            any_button_down = event.ButtonIsDown(wx.MOUSE_BTN_ANY)
+            left_button_down = event.ButtonIsDown(wx.MOUSE_BTN_LEFT)
+            right_button_down = event.ButtonIsDown(wx.MOUSE_BTN_RIGHT)
+        else:
+            left_button_down = event.LeftIsDown()
+            right_button_down = event.RightIsDown()
+            any_button_down = left_button_down or right_button_down
+
+        if any_button_down or event.ButtonUp():
             # send any event with a mouse button to the parent
             latlon = self.coordinates(pos.x, pos.y)
             selected = self.selected_objects(pos)
@@ -608,7 +617,7 @@ class MPSlipMapPanel(wx.Panel):
                     self.show_default_popup(pos)
                     state.popup_started = True
 
-        if not event.ButtonIsDown(wx.MOUSE_BTN_RIGHT):
+        if not right_button_down:
             state.popup_started = False
 
         if event.LeftDown() or event.RightDown():
@@ -616,7 +625,7 @@ class MPSlipMapPanel(wx.Panel):
             self.last_click_pos = self.click_pos
             self.click_pos = self.coordinates(pos.x, pos.y)
 
-        if event.Dragging() and event.ButtonIsDown(wx.MOUSE_BTN_LEFT):
+        if event.Dragging() and left_button_down:
             # drag map to new position
             newpos = pos
             if self.mouse_down and newpos:
