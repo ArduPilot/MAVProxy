@@ -55,13 +55,14 @@ class HelpModule(mp_module.MPModule):
                         if self.mycmp(self.newversion, versiontag) < 0:
                             self.newversion = versiontag
         elif platform.system() == 'Linux':
-            import xmlrpclib, pip
-            pypi = xmlrpclib.ServerProxy('https://pypi.python.org/pypi')
-            available = pypi.package_releases('MAVProxy')
+            import json
+            req = urllib.request.urlopen('https://pypi.python.org/pypi/MAVProxy/json')
+            pkg_info = json.loads(req.read())['info']
+            available = pkg_info['version']
             if not available:
                 self.newversion = 'Error finding update'
             else:
-                self.newversion = available[0]
+                self.newversion = available
 
         #and format the update string
         if not isinstance(self.newversion, basestring):
