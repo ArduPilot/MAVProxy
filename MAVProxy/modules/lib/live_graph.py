@@ -43,8 +43,10 @@ class LiveGraph():
         '''child process - this holds all the GUI elements'''
         mp_util.child_close_fds()
 
-        import matplotlib
-        matplotlib.use('WXAgg')
+        import matplotlib, platform
+        if platform.system() != "Darwin":
+            # on MacOS we can't set WxAgg here as it conflicts with the MacOS version
+            matplotlib.use('WXAgg')
 
         import wx_processguard
         from wx_loader import wx
