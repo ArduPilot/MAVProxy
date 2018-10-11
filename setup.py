@@ -59,6 +59,7 @@ on how to use MAVProxy.''',
                 'MAVProxy.modules.mavproxy_magical',
                 'MAVProxy.modules.lib',
                 'MAVProxy.modules.lib.ANUGA',
+                'MAVProxy.modules.lib.MacOS',
                 'MAVProxy.modules.lib.optparse_gui'],
       # note that we do not include all the real dependencies here (like matplotlib etc)
       # as that breaks the pip install. It seems that pip is not smart enough to
