@@ -23,7 +23,7 @@ class CheckUI():
     a checklist UI for MAVProxy
     '''
     def __init__(self, title='MAVProxy: Checklist'):
-        import multiprocessing, threading
+        import threading
         self.title  = title
         self.menu_callback = None
         self.parent_pipe,self.child_pipe = multiproc.Pipe()

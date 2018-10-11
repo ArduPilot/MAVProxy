@@ -12,7 +12,7 @@ import sys
 from os.path import expanduser
 import time
 import math
-from multiprocessing import Process, Pipe
+from MAVProxy.modules.lib import multiproc
 import cv2
 import sc_config
 
@@ -127,10 +127,10 @@ class SmartCameraVideo:
     # start_background_capture - starts background image capture
     def start_background_capture(self):
         # create pipe
-        self.parent_conn, imgcap_conn = Pipe()
+        self.parent_conn, imgcap_conn = multiproc.Pipe()
 
         # create and start the sub process and pass it it's end of the pipe
-        self.proc = Process(target=self.image_capture_background, args=(imgcap_conn,))
+        self.proc = multiproc.Process(target=self.image_capture_background, args=(imgcap_conn,))
         self.proc.start()
 
     def stop_background_capture(self):

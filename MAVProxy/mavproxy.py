@@ -30,11 +30,12 @@ from MAVProxy.modules.lib import rline
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import dumpstacks
 from MAVProxy.modules.lib import mp_substitute
+from MAVProxy.modules.lib import multiproc
 
 # adding all this allows pyinstaller to build a working windows executable
 # note that using --hidden-import does not work for these modules
 try:
-      from multiprocessing import freeze_support
+      multiproc.freeze_support()
       from pymavlink import mavwp, mavutil
       import matplotlib, HTMLParser
       try:
@@ -45,7 +46,7 @@ except Exception:
       pass
 
 if __name__ == '__main__':
-      freeze_support()
+      multiproc.freeze_support()
 
 #The MAVLink version being used (None, "1.0", "2.0")
 mavversion = None
@@ -357,7 +358,8 @@ def cmd_module(args):
         (modname, kwargs) = generate_kwargs(args[1])
         try:
             load_module(modname, **kwargs)
-        except TypeError:
+        except TypeError as ex:
+            print(ex)
             print("%s module does not support keyword arguments"% modname)
             return
     elif args[0] == "reload":
