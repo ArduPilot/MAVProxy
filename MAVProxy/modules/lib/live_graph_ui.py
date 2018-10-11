@@ -25,7 +25,12 @@ class GraphFrame(wx.Frame):
         self.last_yrange = (None, None)
 
     def create_main_panel(self):
-        from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigCanvas
+        import platform
+        if platform.system() == 'Darwin':
+            from MAVProxy.modules.lib.MacOS import backend_wxagg
+            FigCanvas = backend_wxagg.FigureCanvasWxAgg
+        else:
+            from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigCanvas
         self.panel = wx.Panel(self)
 
         self.init_plot()

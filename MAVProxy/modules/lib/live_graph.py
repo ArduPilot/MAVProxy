@@ -8,8 +8,10 @@
   http://eli.thegreenplace.net/files/prog_code/wx_mpl_dynamic_graph.py.txt
 """
 
-from MAVProxy.modules.lib import mp_util
 import platform
+import multiproc
+from MAVProxy.modules.lib import mp_util
+
 class LiveGraph():
     '''
     a live graph object using wx and matplotlib
@@ -25,7 +27,6 @@ class LiveGraph():
                  tickresolution=0.2,
                  colors=[ 'red', 'green', 'blue', 'orange', 'olive', 'cyan', 'magenta', 'brown',
                           'violet', 'purple', 'grey', 'black']):
-        import multiproc
         self.fields = fields
         self.colors = colors
         self.title  = title
@@ -47,13 +48,13 @@ class LiveGraph():
 
         import wx_processguard
         from wx_loader import wx
-        from live_graph_ui import GraphFrame
 
         app = wx.App(False)
-        app.frame = GraphFrame(state=self)
+        import live_graph_ui
+        app.frame = live_graph_ui.GraphFrame(state=self)
         app.frame.Show()
         app.MainLoop()
-
+        
     def add_values(self, values):
         '''add some data to the graph'''
         if self.child.is_alive():
@@ -71,9 +72,11 @@ class LiveGraph():
 
 
 if __name__ == "__main__":
+    multiproc.freeze_support()
     # test the graph
     import time, math
-    livegraph = LiveGraph(['sin(t)', 'cos(t)', 'sin(t+1)',
+    import live_graph
+    livegraph = live_graph.LiveGraph(['sin(t)', 'cos(t)', 'sin(t+1)',
                            'cos(t+1)', 'sin(t+2)', 'cos(t+2)',
                            'cos(t+1)', 'sin(t+2)', 'cos(t+2)', 'x'],
                           timespan=30,
