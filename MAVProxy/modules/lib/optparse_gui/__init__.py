@@ -10,6 +10,7 @@ import sys
 import re
 import optparse
 from ..wx_loader import wx
+from MAVProxy.modules.lib import multiproc
 
 __version__ = 0.1
 __revision__ = '$Id$'
@@ -205,9 +206,8 @@ class OptionParser( optparse.OptionParser ):
         '''
         multiprocessing wrapper around _parse_args
         '''
-        from multiprocessing import Process, Queue
-        q = Queue()
-        p = Process(target=self._parse_args, args=(q, args, values))
+        q = multiproc.Queue()
+        p = multiproc.Process(target=self._parse_args, args=(q, args, values))
         p.start()
         ret = q.get()
         p.join()
