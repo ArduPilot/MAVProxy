@@ -12,6 +12,7 @@ class ConsoleFrame(wx.Frame):
         self.state = state
         wx.Frame.__init__(self, None, title=title, size=(800,300))
         self.panel = wx.Panel(self)
+        self.panel.SetBackgroundColour('white')
         state.frame = self
 
         # values for the status bar
