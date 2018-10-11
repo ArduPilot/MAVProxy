@@ -1,5 +1,5 @@
 from setuptools import setup
-import os
+import os, platform
 
 version = "1.6.9"
 
@@ -20,6 +20,12 @@ package_data = ['modules/mavproxy_map/data/*.jpg',
 ]
 
 package_data.extend(package_files('MAVProxy/modules/mavproxy_cesium/app'))
+
+requirements=['pymavlink>=2.2.15',
+              'pyserial>=3.0']
+
+if platform.system() == "Darwin":
+    requirements.append('billiard>=3.5.0')
 
 setup(name='MAVProxy',
       version=version,
@@ -65,8 +71,7 @@ on how to use MAVProxy.''',
       # as that breaks the pip install. It seems that pip is not smart enough to
       # use the system versions of these dependencies, so it tries to download and install
       # large numbers of modules like numpy etc which may be already installed
-      install_requires=['pymavlink>=2.2.15',
-                        'pyserial>=3.0'],
+      install_requires=requirements,
       scripts=['MAVProxy/mavproxy.py',
                'MAVProxy/tools/mavflightview.py',
                'MAVProxy/tools/MAVExplorer.py',
