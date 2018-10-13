@@ -427,37 +427,37 @@ class MapModule(mp_module.MPModule):
             return
         if not isinstance(obj, mp_slipmap.SlipMouseEvent):
             return
-        if obj.event.m_leftDown and self.moving_rally is not None:
+        if obj.event.leftIsDown and self.moving_rally is not None:
             self.click_position = obj.latlon
             self.click_time = time.time()
             self.mpstate.functions.process_stdin("rally move %u" % self.moving_rally)
             self.moving_rally = None
             return
-        if obj.event.m_rightDown and self.moving_rally is not None:
+        if obj.event.rightIsDown and self.moving_rally is not None:
             print("Cancelled rally move")
             self.moving_rally = None
             return
-        if obj.event.m_leftDown and self.moving_wp is not None:
+        if obj.event.leftIsDown and self.moving_wp is not None:
             self.click_position = obj.latlon
             self.click_time = time.time()
             self.mpstate.functions.process_stdin("wp move %u" % self.moving_wp)
             self.moving_wp = None
             return
-        if obj.event.m_leftDown and self.moving_fencepoint is not None:
+        if obj.event.leftIsDown and self.moving_fencepoint is not None:
             self.click_position = obj.latlon
             self.click_time = time.time()
             self.mpstate.functions.process_stdin("fence move %u" % (self.moving_fencepoint+1))
             self.moving_fencepoint = None
             return
-        if obj.event.m_rightDown and self.moving_wp is not None:
+        if obj.event.rightIsDown and self.moving_wp is not None:
             print("Cancelled wp move")
             self.moving_wp = None
             return
-        if obj.event.m_rightDown and self.moving_fencepoint is not None:
+        if obj.event.rightIsDown and self.moving_fencepoint is not None:
             print("Cancelled fence move")
             self.moving_fencepoint = None
             return
-        elif obj.event.m_leftDown:
+        elif obj.event.leftIsDown:
             if time.time() - self.click_time > 0.1:
                 self.click_position = obj.latlon
                 self.click_time = time.time()
@@ -466,7 +466,7 @@ class MapModule(mp_module.MPModule):
             if self.module('misseditor') is not None:
                 self.module('misseditor').update_map_click_position(self.click_position)
 
-        if obj.event.m_rightDown:
+        if obj.event.rightIsDown:
             if self.draw_callback is not None:
                 self.drawing_end()
                 return
