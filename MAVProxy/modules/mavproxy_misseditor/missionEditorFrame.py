@@ -76,7 +76,7 @@ class MissionEditorFrame(wx.Frame):
         self.Bind(wx.EVT_BUTTON, self.write_wp_pushed, self.button_write_wps)
         self.Bind(wx.EVT_BUTTON, self.load_wp_file_pushed, self.button_load_wp_file)
         self.Bind(wx.EVT_BUTTON, self.save_wp_file_pushed, self.button_save_wp_file)
-        self.Bind(wx.grid.EVT_GRID_CMD_CELL_CHANGE, self.on_mission_grid_cell_changed, self.grid_mission)
+        self.Bind(wx.grid.EVT_GRID_CMD_CELL_CHANGED, self.on_mission_grid_cell_changed, self.grid_mission)
         self.Bind(wx.grid.EVT_GRID_CMD_CELL_LEFT_CLICK, self.on_mission_grid_cell_left_click, self.grid_mission)
         self.Bind(wx.grid.EVT_GRID_CMD_SELECT_CELL, self.on_mission_grid_cell_select, self.grid_mission)
         self.Bind(wx.EVT_BUTTON, self.add_wp_below_pushed, self.button_add_wp)
@@ -491,8 +491,8 @@ class MissionEditorFrame(wx.Frame):
 
     def save_wp_file_pushed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
         fd = wx.FileDialog(self, "Save Mission File", os.getcwd(),
-                self.last_mission_file_path, "*.wp|*",
-                wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT)
+                           os.path.basename(self.last_mission_file_path), "*.wp|*",
+                               wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT)
         if (fd.ShowModal() == wx.ID_CANCEL):
             return #user change their mind...
 
