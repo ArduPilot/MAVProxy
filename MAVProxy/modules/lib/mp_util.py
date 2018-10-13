@@ -147,15 +147,17 @@ def bounds_overlap(bound1, bound2):
 class object_container:
     '''return a picklable object from an existing object,
     containing all of the normal attributes of the original'''
-    def __init__(self, object):
+    def __init__(self, object, debug=False):
         for v in dir(object):
-            if not v.startswith('__') and v not in ['this']:
+            if not v.startswith('__') and v not in ['this', 'ClassInfo', 'ClassName', 'EventObject']:
                 try:
                     a = getattr(object, v)
                     if (hasattr(a, '__call__') or
                         hasattr(a, '__swig_destroy__') or
                         str(a).find('Swig Object') != -1):
                         continue
+                    if debug:
+                        print(v, a)
                     setattr(self, v, a)
                 except Exception:
                     pass
