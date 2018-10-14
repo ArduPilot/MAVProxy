@@ -573,15 +573,28 @@ def progress_bar(pct):
 
 if __name__ == "__main__":
     multiproc.freeze_support()
+    from argparse import ArgumentParser
+    parser = ArgumentParser(description=__doc__)
+    parser.add_argument("--version", action='store_true', help="show version")
+    parser.add_argument("files", metavar="<FILE>", nargs="?")
+    args = parser.parse_args()
+
+    if args.version:
+        #pkg_resources doesn't work in the windows exe build, so read the version file
+        try:
+            import pkg_resources
+            version = pkg_resources.require("mavproxy")[0].version
+        except:
+            start_script = os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy", "version.txt")
+            f = open(start_script, 'r')
+            version = f.readline()
+        print("MAVExplorer Version: " + version)
+        sys.exit(1)
+    
     mestate = MEState()
     setup_file_menu()
 
     mestate.rl = rline.rline("MAV> ", mestate)
-
-    from argparse import ArgumentParser
-    parser = ArgumentParser(description=__doc__)
-    parser.add_argument("files", metavar="<FILE>", nargs="?")
-    args = parser.parse_args()
 
     #If specified, open the log file
     if args.files is not None and len(args.files) != 0:
