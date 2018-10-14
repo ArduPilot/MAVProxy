@@ -21,11 +21,23 @@ package_data = ['modules/mavproxy_map/data/*.jpg',
 
 package_data.extend(package_files('MAVProxy/modules/mavproxy_cesium/app'))
 
+# note that we do not include all the real dependencies here (like matplotlib etc)
+# as that breaks the pip install. It seems that pip is not smart enough to
+# use the system versions of these dependencies, so it tries to download and install
+# large numbers of modules like numpy etc which may be already installed
 requirements=['pymavlink>=2.2.16',
               'pyserial>=3.0']
 
 if platform.system() == "Darwin":
-    requirements.append('billiard>=3.5.0')
+    # on MacOS we can have a more complete requirements list
+    requirements.extend(['billiard>=3.5.0',
+                         'gnureadline',
+                         'matplotlib',
+                         'numpy',
+                         'opencv-python',
+                         'lxml',
+                         'future',
+                         'wxPython'])
 
 setup(name='MAVProxy',
       version=version,
@@ -67,10 +79,6 @@ on how to use MAVProxy.''',
                 'MAVProxy.modules.lib.ANUGA',
                 'MAVProxy.modules.lib.MacOS',
                 'MAVProxy.modules.lib.optparse_gui'],
-      # note that we do not include all the real dependencies here (like matplotlib etc)
-      # as that breaks the pip install. It seems that pip is not smart enough to
-      # use the system versions of these dependencies, so it tries to download and install
-      # large numbers of modules like numpy etc which may be already installed
       install_requires=requirements,
       scripts=['MAVProxy/mavproxy.py',
                'MAVProxy/tools/mavflightview.py',
