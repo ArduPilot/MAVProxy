@@ -12,7 +12,6 @@ from math import *
 from pymavlink.mavextra import *
 import pylab
 from pymavlink import mavutil
-import threading
 
 colors = [ 'red', 'green', 'blue', 'orange', 'olive', 'black', 'grey', 'yellow', 'brown', 'darkcyan',
            'cornflowerblue', 'darkmagenta', 'deeppink', 'darkred']
@@ -403,20 +402,19 @@ class MavGraph(object):
                 elif (idx < len(flightmode_selections) and flightmode_selections[idx]):
                     self.add_data(tdays, msg, mlog.messages, mlog.flightmode)
 
-    def xlim_change_thread(self):
+    def xlim_change_check(self, idx):
         '''handle xlim change requests from queue'''
-        while True:
-            xlim = self.xlim_pipe[1].recv()
-            if xlim is None:
-                return
-            #print("recv: ", self.graph_num, xlim)
-            while self.draw_events == 0:
-                time.sleep(0.1)
-            if self.ax1 is not None and xlim != self.xlim:
-                self.xlim = xlim
-                self.fig.canvas.toolbar.push_current()
-                #print("setting: ", self.graph_num, xlim)
-                self.ax1.set_xlim(xlim)
+        if not self.xlim_pipe[1].poll():
+            return
+        xlim = self.xlim_pipe[1].recv()
+        if xlim is None:
+            return
+        #print("recv: ", self.graph_num, xlim)
+        if self.ax1 is not None and xlim != self.xlim:
+            self.xlim = xlim
+            self.fig.canvas.toolbar.push_current()
+            #print("setting: ", self.graph_num, xlim)
+            self.ax1.set_xlim(xlim)
 
     def process(self, flightmode_selections, _flightmodes, block=True):
         '''process and display graph'''
@@ -482,8 +480,9 @@ class MavGraph(object):
                 self.y[i] = []
 
         if self.xlim_pipe is not None:
-            self.change_thread_handle = threading.Thread(target=self.xlim_change_thread)
-            self.change_thread_handle.start()
+            import matplotlib.animation
+            self.ani = matplotlib.animation.FuncAnimation(self.fig, self.xlim_change_check,
+                                                          frames=2, interval=100, repeat=True)
                 
         pylab.draw()
         pylab.show(block=block)
