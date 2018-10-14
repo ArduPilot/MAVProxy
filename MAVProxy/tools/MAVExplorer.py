@@ -9,7 +9,6 @@ Andrew Tridgell December 2014
 
 import sys, struct, time, os, datetime, platform
 import math, re
-import Queue
 import fnmatch
 import threading
 import shlex
@@ -43,7 +42,7 @@ class MEStatus(object):
 class MEState(object):
     '''holds state of MAVExplorer'''
     def __init__(self):
-        self.input_queue = Queue.Queue()
+        self.input_queue = multiproc.Queue()
         self.rl = None
         self.console = wxconsole.MessageConsole(title='MAVExplorer')
         self.exit = False

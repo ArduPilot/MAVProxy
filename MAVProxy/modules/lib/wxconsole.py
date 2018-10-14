@@ -4,9 +4,10 @@
   MAVProxy message console, implemented in a child process
 """
 import threading
-import textconsole, sys, time
-from wxconsole_util import Value, Text
+import sys, time
 
+from MAVProxy.modules.lib.wxconsole_util import Value, Text
+from MAVProxy.modules.lib import textconsole
 from MAVProxy.modules.lib import win_layout
 from MAVProxy.modules.lib import multiproc
 
