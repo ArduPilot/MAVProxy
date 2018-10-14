@@ -1,7 +1,7 @@
 from setuptools import setup
 import os, platform
 
-version = "1.7.0"
+version = "1.7.1"
 
 def package_files(directory):
     paths = []
@@ -21,7 +21,7 @@ package_data = ['modules/mavproxy_map/data/*.jpg',
 
 package_data.extend(package_files('MAVProxy/modules/mavproxy_cesium/app'))
 
-requirements=['pymavlink>=2.2.15',
+requirements=['pymavlink>=2.2.16',
               'pyserial>=3.0']
 
 if platform.system() == "Darwin":
