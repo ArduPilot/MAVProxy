@@ -5,6 +5,7 @@
 import math
 import os
 import platform
+import warnings
 
 # Some platforms (CYGWIN and others) many not have the wx library
 # use imp to see if wx is on the path
@@ -151,14 +152,16 @@ class object_container:
         for v in dir(object):
             if not v.startswith('__') and v not in ['this', 'ClassInfo', 'ClassName', 'EventObject']:
                 try:
-                    a = getattr(object, v)
-                    if (hasattr(a, '__call__') or
-                        hasattr(a, '__swig_destroy__') or
-                        str(a).find('Swig Object') != -1):
-                        continue
-                    if debug:
-                        print(v, a)
-                    setattr(self, v, a)
+                    with warnings.catch_warnings():
+                        warnings.simplefilter('ignore')
+                        a = getattr(object, v)
+                        if (hasattr(a, '__call__') or
+                            hasattr(a, '__swig_destroy__') or
+                            str(a).find('Swig Object') != -1):
+                            continue
+                        if debug:
+                            print(v, a)
+                        setattr(self, v, a)
                 except Exception:
                     pass
 
