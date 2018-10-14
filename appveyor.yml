@@ -1,0 +1,102 @@
+environment:
+  global:
+    # SDK v7.0 MSVC Express 2008's SetEnv.cmd script will fail if the
+    # /E:ON and /V:ON options are not enabled in the batch script intepreter
+    # See: http://stackoverflow.com/a/13751649/163740
+    CMD_IN_ENV: "cmd /E:ON /V:ON /C .\\appveyor\\run_with_env.cmd"
+
+  matrix:
+    # Pre-installed Python versions, which Appveyor may upgrade to
+    # a later point release.
+    # See: https://www.appveyor.com/docs/installed-software#python
+    - PYTHON: "C:\\Python27"
+      PYTHON_VERSION: "2.7.x" # currently 2.7.15
+      PYTHON_ARCH: "32"
+
+
+install:
+  # If there is a newer build queued for the same PR, cancel this one.
+  # The AppVeyor 'rollout builds' option is supposed to serve the same
+  # purpose but it is problematic because it tends to cancel builds pushed
+  # directly to master instead of just PR builds (or the converse).
+  # credits: JuliaLang developers.
+  - ps: if ($env:APPVEYOR_PULL_REQUEST_NUMBER -and $env:APPVEYOR_BUILD_NUMBER -ne ((Invoke-RestMethod `
+        https://ci.appveyor.com/api/projects/$env:APPVEYOR_ACCOUNT_NAME/$env:APPVEYOR_PROJECT_SLUG/history?recordsNumber=50).builds | `
+        Where-Object pullRequestId -eq $env:APPVEYOR_PULL_REQUEST_NUMBER)[0].buildNumber) { `
+          throw "There are newer queued builds for this pull request, failing early." }
+
+
+  # Check that we have the expected version and architecture for Python
+  - "python --version"
+  - "python -c \"import struct; print(struct.calcsize('P') * 8)\""
+  
+  # Install the build dependencies of the project. If some dependencies contain
+  # compiled extensions and are not provided as pre-built wheel packages,
+  # pip will build them from source using the MSVC compiler matching the
+  # target Python version and architecture
+  - "pip install -U pywin32 lxml pymavlink numpy matplotlib pyserial opencv-python pyreadline PyYAML Pygame Pillow"
+  - "pip install pyinstaller setuptools packaging"
+  
+  #We're using Inno Setup to build an installer
+  - cinst -y InnoSetup
+  
+  #Wxpython3
+  - ps: |
+      $InstallersFolder = $Env:APPVEYOR_BUILD_FOLDER + "\_build\installers\"
+      New-Item $InstallersFolder -type directory | Out-Null
+      $WXInstaller = $InstallersFolder + "wxPython3.0-win32-3.0.2.0-py27.exe"
+      $WXURL = "http://downloads.sourceforge.net/wxpython/wxPython3.0-win32-3.0.2.0-py27.exe"
+      Start-FileDownload $WXURL -Timeout 60000 -FileName $WXInstaller
+      "    Installing..."
+      Start-Process $WXInstaller -Arg "/VERYSILENT /SUPPRESSMSGBOXES" -NoNewWindow -Wait
+      "    Done."
+  
+  #Debug for getting a list of what packages/version were used for this build
+  - "pip list"
+  
+build_script:
+  # Build the compiled extension
+  - "python setup.py build install"
+  
+
+
+test_script:
+  # Run the project tests and store results in .xml log
+
+      
+after_test:
+  # If tests are successful, create binary packages for the project.
+  #run pyinstaller
+  - "cd .\\MAVProxy"
+  - "copy ..\\windows\\mavproxy.spec"
+  - "%PYTHON%\\Scripts\\pyinstaller --clean mavproxy.spec"
+  - "del mavproxy.spec"
+  - "cd ..\\"
+  
+  #create version txt file
+  - "cd  .\\windows\\"
+  - "for /f \"tokens=*\" %%a in ( \'python returnVersion.py\' ) do ( set VERSION=%%a )"
+  - "@echo off"
+  - "@echo %VERSION%> version.txt"
+  - "@echo on"
+  - "cd ..\\"
+  
+  #run setup
+  - "cd  .\\windows\\"
+  - "ISCC.exe /dMyAppVersion=%VERSION% mavproxy.iss"
+  - "cd ..\\"
+  
+
+artifacts:
+  # Archive the generated packages in the ci.appveyor.com build report.
+  - path: MAVProxy\dist\
+    name: WindowsCompiledFiles
+  - path: windows\Output\
+    name: WindowsInstaller
+
+#on_success:
+#  - TODO: upload the content of dist/*.whl to a public wheelhouse
+#
+
+on_finish:
+  # Upload test results to AppVeyor
