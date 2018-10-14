@@ -41,6 +41,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "..\MAVProxy\dist\mavproxy\mavproxy.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\MAVProxy\dist\mavproxy\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\MAVProxy\dist\MAVExplorer\MAVExplorer.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\MAVProxy\dist\MAVExplorer\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 Source: "..\windows\mavinit.scr"; DestDir: "{localappdata}\MAVProxy"; Flags: ignoreversion
@@ -55,7 +56,6 @@ Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: 
 Name: "{group}\Documentation"; Filename: "http://ardupilot.github.io/MAVProxy/"
 Name: "{group}\Startup Examples"; Filename: "{app}\Examples"
 Name: "{group}\Ardupilot MAVProxy Forum"; Filename: "http://discuss.ardupilot.org/c/ground-control-software/mavproxy"
-Name: "{group}\Download Updates"; Filename: "http://firmware.ap.ardupilot.org/Tools/MAVProxy/"
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--map --console --load-module=graph"
 
 [Run]

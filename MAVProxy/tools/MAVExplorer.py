@@ -254,13 +254,23 @@ def load_graphs():
             mestate.graphs.extend(graphs)
             mestate.console.writeln("Loaded %s" % file)
     # also load the built in graphs
-    dlist = pkg_resources.resource_listdir("MAVProxy", "tools/graphs")
-    for f in dlist:
-        raw = pkg_resources.resource_stream("MAVProxy", "tools/graphs/%s" % f).read()
-        graphs = load_graph_xml(raw, None)
-        if graphs:
-            mestate.graphs.extend(graphs)
-            mestate.console.writeln("Loaded %s" % f)
+    try:
+        dlist = pkg_resources.resource_listdir("MAVProxy", "tools/graphs")
+        for f in dlist:
+            raw = pkg_resources.resource_stream("MAVProxy", "tools/graphs/%s" % f).read()
+            graphs = load_graph_xml(raw, None)
+            if graphs:
+                mestate.graphs.extend(graphs)
+                mestate.console.writeln("Loaded %s" % f)
+    except Exception:
+        #we're in a Windows exe, where pkg_resources doesn't work
+        import pkgutil
+        for f in ["ekf3Graphs.xml", "ekfGraphs.xml", "mavgraphs.xml", "mavgraphs2.xml"]:
+            raw = pkgutil.get_data( 'MAVProxy', 'tools//graphs//' + f)
+            graphs = load_graph_xml(raw, None)
+            if graphs:
+                mestate.graphs.extend(graphs)
+                mestate.console.writeln("Loaded %s" % f)
     mestate.graphs = sorted(mestate.graphs, key=lambda g: g.name)
 
 def cmd_graph(args):
@@ -459,6 +469,9 @@ def cmd_loadfile(args):
     if not os.path.exists(fileargs):
         print("Error loading file ", fileargs);
         return
+    if os.name == 'nt':
+        #convert slashes in Windows
+        fileargs = fileargs.replace("\\", "/")
     loadfile(fileargs.strip('"'))
 
 def loadfile(args):
