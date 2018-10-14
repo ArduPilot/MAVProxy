@@ -202,11 +202,7 @@ class MPMenuSubMenu(MPMenuGeneric):
 
     def _append(self, menu):
         '''append this menu item to a menu'''
-        from wx_loader import wx
-        if hasattr(menu, 'AppendMenu'):
-            menu.AppendMenu(-1, self.name, self.wx_menu())
-        else:
-            menu.Append(-1, self.name, self.wx_menu()) #use wxPython_phoenix
+        menu.AppendSubMenu(self.wx_menu(), self.name) #use wxPython_phoenix
 
     def __str__(self):
         return "MPMenuSubMenu(%s)" % (self.name)
