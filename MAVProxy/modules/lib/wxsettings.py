@@ -59,7 +59,7 @@ if __name__ == "__main__":
         print("Changing %s to %s" % (setting.name, setting.value))
 
     # test the settings
-    import mp_settings, time
+    from MAVProxy.modules.lib import mp_settings, time
     from mp_settings import MPSetting
     settings = mp_settings.MPSettings(
         [ MPSetting('link', int, 1, tab='TabOne'),
