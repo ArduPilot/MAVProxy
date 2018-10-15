@@ -52,7 +52,7 @@ class LiveGraph():
         from MAVProxy.modules.lib.wx_loader import wx
 
         app = wx.App(False)
-        import live_graph_ui
+        from MAVProxy.modules.lib import live_graph_ui
         app.frame = live_graph_ui.GraphFrame(state=self)
         app.frame.Show()
         app.MainLoop()
