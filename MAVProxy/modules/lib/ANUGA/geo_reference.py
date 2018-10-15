@@ -196,13 +196,13 @@ class Geo_reference:
             if read_title[0:2].upper() != TITLE[0:2].upper():
                 msg = ('File error.  Expecting line: %s.  Got this line: %s'
                        % (TITLE, read_title))
-                raise TitleError, msg
+                raise ValueError(msg)
             self.zone = int(fd.readline())
             self.xllcorner = float(fd.readline())
             self.yllcorner = float(fd.readline())
         except SyntaxError:
             msg = 'File error.  Got syntax error while parsing geo reference'
-            raise ParsingError, msg
+            raise ValueError(msg)
 
         # Fix some assertion failures
         if isinstance(self.zone, num.ndarray) and self.zone.shape == ():
@@ -305,13 +305,13 @@ class Geo_reference:
             # One point has been passed
             msg = 'Single point must have two elements'
             if not len(points) == 2:
-                raise ShapeError, msg
+                raise ValueError(msg)
 
 
         msg = 'Input must be an N x 2 array or list of (x,y) values. '
         msg += 'I got an %d x %d array' %points.shape
         if not points.shape[1] == 2:
-            raise ShapeError, msg
+            raise ValueError(msg)
 
 
         # Add geo ref to points
@@ -346,12 +346,12 @@ class Geo_reference:
             #One point has been passed
             msg = 'Single point must have two elements'
             if not len(points) == 2:
-                raise ShapeError, msg
+                raise ValueError(msg)
 
         if not points.shape[1] == 2:
             msg = ('Input must be an N x 2 array or list of (x,y) values. '
                    'I got an %d x %d array' % points.shape)
-            raise ShapeError, msg
+            raise ValueError(msg)
 
         # Subtract geo ref from points
         if not self.is_absolute():
@@ -382,7 +382,7 @@ class Geo_reference:
             msg = ('Geospatial data must be in the same '
                    'ZONE to allow reconciliation. I got zone %d and %d'
                    % (self.zone, other.zone))
-            raise ANUGAError, msg
+            raise ValueError(msg)
 
     #def easting_northing2geo_reffed_point(self, x, y):
     #    return [x-self.xllcorner, y - self.xllcorner]
