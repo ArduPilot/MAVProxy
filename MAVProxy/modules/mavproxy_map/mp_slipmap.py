@@ -134,7 +134,7 @@ class MPSlipMap():
         '''hide an object on the map by key'''
         self.object_queue.put(SlipHideObject(key, hide))
 
-    def set_position(self, key, latlon, layer=None, rotation=0, label=None, colour=None):
+    def set_position(self, key, latlon, layer='', rotation=0, label=None, colour=None):
         '''move an object on the map'''
         self.object_queue.put(SlipPosition(key, latlon, layer, rotation, label, colour))
 
