@@ -334,8 +334,8 @@ class MPTile:
         height2 = TILES_HEIGHT
 
         for zoom2 in range(tile.zoom-1, self.min_zoom-1, -1):
-            width2 /= 2
-            height2 /= 2
+            width2 //= 2
+            height2 //= 2
 
             if width2 == 0 or height2 == 0:
                 break
