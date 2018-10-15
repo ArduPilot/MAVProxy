@@ -12,7 +12,7 @@ downloaded from INTERGOVERNMENTAL COMMITTEE ON SURVEYING & MAPPING (ICSM)
 http://www.icsm.gov.au/icsm/
 
 """
-from geo_reference import Geo_reference, DEFAULT_ZONE
+from MAVProxy.modules.lib.ANUGA.geo_reference import Geo_reference, DEFAULT_ZONE
 
 
 def degminsec2decimal_degrees(dd,mm,ss):
@@ -155,7 +155,7 @@ def redfearn(lat, lon, false_easting=None, false_northing=None,
 
     if zone is not None and central_meridian is not None:
         msg = 'You specified both zone and central_meridian. Provide only one of them'
-        raise Exception, msg
+        raise ValueError(msg)
 
     # Zone
     if zone is None:
