@@ -13,7 +13,7 @@ class HorizonIndicator():
     def __init__(self,title='MAVProxy: Horizon Indicator'):
         self.title  = title
         # Create Pipe to send attitude information from module to UI
-        self.child_pipe_recv,self.parent_pipe_send = multiproc.Pipe(duplex=False)
+        self.child_pipe_recv,self.parent_pipe_send = multiproc.Pipe()
         self.close_event = multiproc.Event()
         self.close_event.clear()
         self.child = multiproc.Process(target=self.child_task)
@@ -25,7 +25,7 @@ class HorizonIndicator():
         self.parent_pipe_send.close()
         
         from MAVProxy.modules.lib.wx_loader import wx
-        from wxhorizon_ui import HorizonFrame
+        from MAVProxy.modules.lib.wxhorizon_ui import HorizonFrame
         # Create wx application
         app = wx.App(False)
         app.frame = HorizonFrame(state=self, title=self.title)
