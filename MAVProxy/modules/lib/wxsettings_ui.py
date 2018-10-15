@@ -1,4 +1,4 @@
-from wx_loader import wx
+from MAVProxy.modules.lib.wx_loader import wx
 
 class TabbedDialog(wx.Dialog):
     def __init__(self, tab_names, title='Title', size=wx.DefaultSize):

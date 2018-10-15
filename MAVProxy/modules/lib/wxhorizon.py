@@ -24,7 +24,7 @@ class HorizonIndicator():
         '''child process - this holds all the GUI elements'''
         self.parent_pipe_send.close()
         
-        from wx_loader import wx
+        from MAVProxy.modules.lib.wx_loader import wx
         from wxhorizon_ui import HorizonFrame
         # Create wx application
         app = wx.App(False)

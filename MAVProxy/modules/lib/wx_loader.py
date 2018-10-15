@@ -1,4 +1,4 @@
-import wx_util
+from MAVProxy.modules.lib import wx_util
 
 if not wx_util.safe:
     print('Cannot access wx from main thread.')

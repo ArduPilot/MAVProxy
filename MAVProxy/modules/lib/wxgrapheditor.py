@@ -1,7 +1,7 @@
 '''
 Graphical editing of graph definition
 '''
-from wx_loader import wx
+from MAVProxy.modules.lib.wx_loader import wx
 from graphdefinition import GraphDefinition
 
 class GraphDialog(wx.Dialog):

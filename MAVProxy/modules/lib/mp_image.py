@@ -9,7 +9,7 @@ June 2012
 '''
 
 import time
-from wx_loader import wx
+from MAVProxy.modules.lib.wx_loader import wx
 import cv2
 import numpy as np
 
@@ -112,7 +112,7 @@ class MPImage():
     def child_task(self):
         '''child process - this holds all the GUI elements'''
         mp_util.child_close_fds()
-        from wx_loader import wx
+        from MAVProxy.modules.lib.wx_loader import wx
         state = self
 
         self.app = wx.App(False)
