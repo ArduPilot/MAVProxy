@@ -9,8 +9,8 @@
 """
 
 import platform
-import multiproc
 from MAVProxy.modules.lib import mp_util
+from MAVProxy.modules.lib import multiproc
 
 class LiveGraph():
     '''
@@ -48,8 +48,8 @@ class LiveGraph():
             # on MacOS we can't set WxAgg here as it conflicts with the MacOS version
             matplotlib.use('WXAgg')
 
-        import wx_processguard
-        from wx_loader import wx
+        from MAVProxy.modules.lib import wx_processguard
+        from MAVProxy.modules.lib.wx_loader import wx
 
         app = wx.App(False)
         import live_graph_ui

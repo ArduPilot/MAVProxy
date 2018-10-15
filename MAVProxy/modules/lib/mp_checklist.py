@@ -8,7 +8,7 @@
 import sys
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import multiproc
-from wx_loader import wx
+from MAVProxy.modules.lib.wx_loader import wx
 
 class CheckItem():
     '''Checklist item used for information transfer
@@ -35,7 +35,7 @@ class CheckUI():
     def child_task(self):
         '''child process - this holds all the GUI elements'''
         mp_util.child_close_fds()
-        from wx_loader import wx
+        from MAVProxy.modules.lib.wx_loader import wx
 
         app = wx.App(False)
         app.frame = ChecklistFrame(state=self, title=self.title)

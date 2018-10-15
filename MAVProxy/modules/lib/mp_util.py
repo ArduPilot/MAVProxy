@@ -4,6 +4,7 @@
 
 import math
 import os
+import sys
 import platform
 import warnings
 
@@ -224,7 +225,7 @@ def wxToPIL(wimg):
 
 def PILTowx(pimg):
     '''convert a PIL Image to a wx image'''
-    from wx_loader import wx
+    from MAVProxy.modules.lib.wx_loader import wx
     wimg = wx.EmptyImage(pimg.size[0], pimg.size[1])
     try:
         wimg.SetData(pimg.convert('RGB').tobytes())
@@ -306,3 +307,16 @@ def quaternion_to_axis_angle(q):
     if angle > math.pi:
         angle = angle - 2 * math.pi
     return Vector3(angle * b / n, angle * c / n, angle * d / n)
+
+def null_term(str):
+    '''null terminate a string for py3'''
+    if sys.version_info.major < 3:
+        return str
+    if isinstance(str, bytes):
+        str = str.decode("utf-8")
+    idx = str.find("\0")
+    if idx != -1:
+        str = str[:idx]
+    return str
+
+    

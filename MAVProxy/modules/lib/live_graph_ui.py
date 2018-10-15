@@ -1,4 +1,4 @@
-from wx_loader import wx
+from MAVProxy.modules.lib.wx_loader import wx
 import time
 import numpy, pylab
 

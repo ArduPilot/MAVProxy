@@ -1,6 +1,6 @@
 import time
 from wxhorizon_util import Attitude, VFR_HUD, Global_Position_INT, BatteryInfo, FlightState, WaypointInfo, FPS
-from wx_loader import wx
+from MAVProxy.modules.lib.wx_loader import wx
 import math, time
 
 import matplotlib

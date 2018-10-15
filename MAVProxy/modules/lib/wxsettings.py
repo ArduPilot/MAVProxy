@@ -23,8 +23,8 @@ class WXSettings(object):
     def child_task(self):
         '''child process - this holds all the GUI elements'''
         from MAVProxy.modules.lib import mp_util
-        import wx_processguard
-        from wx_loader import wx
+        from MAVProxy.modules.lib import wx_processguard
+        from MAVProxy.modules.lib.wx_loader import wx
         from wxsettings_ui import SettingsDlg
 
         mp_util.child_close_fds()

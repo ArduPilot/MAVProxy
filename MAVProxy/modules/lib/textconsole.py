@@ -40,6 +40,9 @@ class SimpleConsole():
         '''check if we are alive'''
         return True
 
+    def set_menu(self, menu, callback):
+        pass
+
 if __name__ == "__main__":
     # test the console
     import time

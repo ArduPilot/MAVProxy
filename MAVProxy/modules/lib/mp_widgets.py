@@ -6,9 +6,10 @@ Andrew Tridgell
 June 2012
 '''
 
-from wx_loader import wx
+from MAVProxy.modules.lib.wx_loader import wx
 import cv2
 import numpy as np
+import warnings
 
 class ImagePanel(wx.Panel):
     '''a resizable panel containing an image'''
@@ -27,7 +28,9 @@ class ImagePanel(wx.Panel):
         '''set the image to be displayed'''
         if hasattr(img, 'shape'):
             (width, height) = (img.shape[1], img.shape[0])
-            self._bmp = wx.BitmapFromBuffer(width, height, np.uint8(img)) # http://stackoverflow.com/a/16866833/2559632
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                self._bmp = wx.BitmapFromBuffer(width, height, np.uint8(img)) # http://stackoverflow.com/a/16866833/2559632
         elif hasattr(img, 'GetHeight'):
             self._bmp = wx.BitmapFromImage(img)
         else:
