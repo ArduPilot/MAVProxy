@@ -305,7 +305,7 @@ class LinkModule(mp_module.MPModule):
         if mtype != 'BAD_DATA' and self.mpstate.logqueue:
             usec = self.get_usec()
             usec = (usec & ~3) | 3 # linknum 3
-            self.mpstate.logqueue.put(str(struct.pack('>Q', usec) + m.get_msgbuf()))
+            self.mpstate.logqueue.put(bytearray(struct.pack('>Q', usec) + m.get_msgbuf()))
 
     def handle_msec_timestamp(self, m, master):
         '''special handling for MAVLink packets with a time_boot_ms field'''
@@ -402,7 +402,7 @@ class LinkModule(mp_module.MPModule):
             # delay in saved logs
             usec = self.get_usec()
             usec = (usec & ~3) | master.linknum
-            self.mpstate.logqueue.put(str(struct.pack('>Q', usec) + m.get_msgbuf()))
+            self.mpstate.logqueue.put(bytearray(struct.pack('>Q', usec) + m.get_msgbuf()))
 
         # keep the last message of each type around
         self.status.msgs[m.get_type()] = m
@@ -488,7 +488,7 @@ class LinkModule(mp_module.MPModule):
         elif mtype == 'STATUSTEXT':
             if m.text != self.status.last_apm_msg or time.time() > self.status.last_apm_msg_time+2:
                 (fg, bg) = self.colors_for_severity(m.severity)
-                self.mpstate.console.writeln("APM: %s" % m.text, bg=bg, fg=fg)
+                self.mpstate.console.writeln("APM: %s" % mp_util.null_term(m.text), bg=bg, fg=fg)
                 self.status.last_apm_msg = m.text
                 self.status.last_apm_msg_time = time.time()
 
