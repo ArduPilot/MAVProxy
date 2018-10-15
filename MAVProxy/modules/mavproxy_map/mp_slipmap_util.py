@@ -28,7 +28,7 @@ class SlipObject:
     '''an object to display on the map'''
     def __init__(self, key, layer, popup_menu=None):
         self.key = key
-        self.layer = layer
+        self.layer = str(layer)
         self.latlon = None
         self.popup_menu = popup_menu
         self.hidden = False
@@ -268,7 +268,7 @@ class SlipGrid(SlipObject):
         '''draw a polygon on the image'''
         if self.hidden:
             return
-	(x,y,w,h) = bounds
+        (x,y,w,h) = bounds
         spacing = 1000
         while True:
             start = mp_util.latlon_round((x,y), spacing)
@@ -483,8 +483,8 @@ class SlipIcon(SlipThumbnail):
 
         # find top left
         (w, h) = image_shape(icon)
-        px -= w/2
-        py -= h/2
+        px -= w//2
+        py -= h//2
 
         (px, py, sx, sy, w, h) = self.clip(px, py, w, h, img)
 
@@ -499,9 +499,9 @@ class SlipIcon(SlipThumbnail):
 
 class SlipPosition:
     '''an position object to move an existing object on the map'''
-    def __init__(self, key, latlon, layer=None, rotation=0, label=None, colour=None):
+    def __init__(self, key, latlon, layer='', rotation=0, label=None, colour=None):
         self.key = key
-        self.layer = layer
+        self.layer = str(layer)
         self.latlon = latlon
         self.rotation = rotation
         self.label = label
@@ -530,7 +530,7 @@ class SlipBrightness:
 class SlipClearLayer:
     '''remove all objects in a layer'''
     def __init__(self, layer):
-        self.layer = layer
+        self.layer = str(layer)
 
 class SlipRemoveObject:
     '''remove an object by key'''
@@ -639,7 +639,7 @@ class SlipObjectSelection:
     def __init__(self, objkey, distance, layer, extra_info=None):
         self.distance = distance
         self.objkey = objkey
-        self.layer = layer
+        self.layer = str(layer)
         self.extra_info = extra_info
 
 class SlipEvent:
