@@ -328,8 +328,7 @@ class MissionEditorFrame(wx.Frame):
             self.last_map_click_pos = event.get_arg("click_pos")
 
     def prep_new_row(self, row_num):
-        command_choices = me_defines.miss_cmds.values()
-        command_choices.sort()
+        command_choices = sorted(list(me_defines.miss_cmds.values()))
 
         cell_ed = wx.grid.GridCellChoiceEditor(command_choices)
         self.grid_mission.SetCellEditor(row_num, ME_COMMAND_COL, cell_ed)

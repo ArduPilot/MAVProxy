@@ -265,7 +265,7 @@ class MissionEditorMain(object):
         '''child process - this holds GUI elements'''
         mp_util.child_close_fds()
 
-        from ..lib import wx_processguard
+        from MAVProxy.modules.lib import wx_processguard
         from ..lib.wx_loader import wx
         from MAVProxy.modules.mavproxy_misseditor import missionEditorFrame
 

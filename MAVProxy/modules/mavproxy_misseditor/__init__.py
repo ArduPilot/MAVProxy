@@ -15,7 +15,7 @@ class MissionEditorModule(mp_module.MPModule):
         super(MissionEditorModule, self).__init__(mpstate, "misseditor", "mission editor", public = True)
 
         # to work around an issue on MacOS this module is a thin wrapper around a separate MissionEditorMain object
-        import mission_editor
+        from MAVProxy.modules.mavproxy_misseditor import mission_editor
         self.me_main = mission_editor.MissionEditorMain(mpstate)
 
     def unload(self):
