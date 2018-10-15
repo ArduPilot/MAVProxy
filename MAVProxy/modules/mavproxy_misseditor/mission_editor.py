@@ -106,7 +106,7 @@ class MissionEditorEventThread(threading.Thread):
                         self.mp_misseditor.mpstate.settings.target_system,
                         self.mp_misseditor.mpstate.settings.target_component,
                         event.get_arg("num"),
-                        event.get_arg("frame"),
+                        int(event.get_arg("frame")),
                         event.get_arg("cmd_id"),
                         0, 1,
                         event.get_arg("p1"), event.get_arg("p2"),

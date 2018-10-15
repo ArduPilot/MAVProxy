@@ -234,7 +234,6 @@ class MissionEditorFrame(wx.Frame):
                 self.process_gui_event(event)
             except Exception as e:
                 print("Caught exception (%s)" % str(e))
-                traceback.print_stack()
 
         self.gui_event_queue_lock.release()
 
@@ -278,7 +277,7 @@ class MissionEditorFrame(wx.Frame):
                         str(event.get_arg("alt")))
 
             else: #not the first mission item
-                if (me_defines.miss_cmds.has_key(command)):
+                if command in me_defines.miss_cmds:
                     self.grid_mission.SetCellValue(row, ME_COMMAND_COL,
                             me_defines.miss_cmds[command])
                 else:
@@ -301,7 +300,7 @@ class MissionEditorFrame(wx.Frame):
                         "%.2f" % event.get_arg("alt"))
 
                 frame_num = event.get_arg("frame")
-                if (me_defines.frame_enum.has_key(frame_num)):
+                if frame_num in me_defines.frame_enum:
                     self.grid_mission.SetCellValue(row, ME_FRAME_COL,
                         me_defines.frame_enum[frame_num])
                 else:
@@ -343,7 +342,7 @@ class MissionEditorFrame(wx.Frame):
 
         #populate frm cell editor and set to default value
 
-        frame_cell_ed = wx.grid.GridCellChoiceEditor(me_defines.frame_enum.values())
+        frame_cell_ed = wx.grid.GridCellChoiceEditor(list(me_defines.frame_enum.values()))
         self.grid_mission.SetCellEditor(row_num, ME_FRAME_COL, frame_cell_ed)
 
         # default to previous rows frame
