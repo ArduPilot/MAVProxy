@@ -565,7 +565,7 @@ def process_master(m):
         return
 
     if mpstate.logqueue_raw:
-        mpstate.logqueue_raw.put(str(s))
+        mpstate.logqueue_raw.put(bytearray(s))
 
     if mpstate.status.setup_mode:
         if mpstate.system == 'Windows':
@@ -634,7 +634,7 @@ def mkdir_p(dir):
 def log_writer():
     '''log writing thread'''
     while True:
-        mpstate.logfile_raw.write(mpstate.logqueue_raw.get())
+        mpstate.logfile_raw.write(bytearray(mpstate.logqueue_raw.get()))
         timeout = time.time() + 10
         while not mpstate.logqueue_raw.empty() and time.time() < timeout:
             mpstate.logfile_raw.write(mpstate.logqueue_raw.get())
