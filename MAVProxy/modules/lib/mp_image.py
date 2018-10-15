@@ -479,7 +479,11 @@ class MPImagePanel(wx.Panel):
 
         if event.LeftDown():
             self.mouse_down = self.image_coordinates(pos)
-        if event.Dragging() and event.ButtonIsDown(wx.MOUSE_BTN_LEFT):
+        if hasattr(event, 'ButtonIsDown'):
+            left_button_down = event.ButtonIsDown(wx.MOUSE_BTN_LEFT)
+        else:
+            left_button_down = event.leftIsDown
+        if event.Dragging() and left_button_down:
             self.on_drag_event(event)
 
     def on_key_event(self, event):
@@ -498,11 +502,14 @@ class MPImagePanel(wx.Panel):
             self.on_mouse_event(event)
         if isinstance(event, wx.KeyEvent):
             self.on_key_event(event)
-        if (isinstance(event, wx.MouseEvent) and
-            not event.ButtonIsDown(wx.MOUSE_BTN_ANY) and
-            event.GetWheelRotation() == 0):
-            # don't flood the queue with mouse movement
-            return
+        if isinstance(event, wx.MouseEvent):
+            if hasattr(event, 'ButtonIsDown'):
+                any_button_down = event.ButtonIsDown(wx.MOUSE_BTN_ANY)
+            else:
+                any_button_down = event.leftIsDown or event.rightIsDown
+            if not any_button_down and event.GetWheelRotation() == 0:
+                # don't flood the queue with mouse movement
+                return
         evt = mp_util.object_container(event)
         pt = self.image_coordinates(wx.Point(evt.X,evt.Y))
         evt.X = pt.x

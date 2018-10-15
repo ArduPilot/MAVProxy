@@ -398,8 +398,8 @@ class SlipThumbnail(SlipObject):
 
         # find top left
         (w, h) = image_shape(thumb)
-        px -= w/2
-        py -= h/2
+        px -= w//2
+        py -= h//2
 
         (px, py, sx, sy, w, h) = self.clip(px, py, w, h, img)
 
@@ -407,8 +407,8 @@ class SlipThumbnail(SlipObject):
         img[py:py+h, px:px+w] = thumb_roi
 
         # remember where we placed it for clicked()
-        self.posx = px+w/2
-        self.posy = py+h/2
+        self.posx = px+w//2
+        self.posy = py+h//2
 
     def clicked(self, px, py):
         '''see if the image has been clicked on'''
@@ -463,7 +463,7 @@ class SlipIcon(SlipThumbnail):
 
         if self.rotation:
             # rotate the image
-            mat = cv2.getRotationMatrix2D((self.height/2, self.width/2), -self.rotation, 1.0)
+            mat = cv2.getRotationMatrix2D((self.height//2, self.width//2), -self.rotation, 1.0)
             self._rotated = cv2.warpAffine(self._img, mat, (self.height, self.width))
         else:
             self._rotated = self._img
@@ -494,8 +494,8 @@ class SlipIcon(SlipThumbnail):
             cv2.putText(img, self.label, (px,py), cv2.FONT_HERSHEY_SIMPLEX, 1.0, self.colour)
         
         # remember where we placed it for clicked()
-        self.posx = px+w/2
-        self.posy = py+h/2
+        self.posx = px+w//2
+        self.posy = py+h//2
 
 class SlipPosition:
     '''an position object to move an existing object on the map'''

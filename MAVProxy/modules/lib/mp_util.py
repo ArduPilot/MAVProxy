@@ -151,7 +151,7 @@ class object_container:
     containing all of the normal attributes of the original'''
     def __init__(self, object, debug=False):
         for v in dir(object):
-            if not v.startswith('__') and v not in ['this', 'ClassInfo', 'ClassName', 'EventObject']:
+            if not v.startswith('__') and v not in ['this', 'ClassInfo', 'EventObject']:
                 try:
                     with warnings.catch_warnings():
                         warnings.simplefilter('ignore')

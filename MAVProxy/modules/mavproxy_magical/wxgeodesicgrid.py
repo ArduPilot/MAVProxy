@@ -240,7 +240,11 @@ class GeodesicGrid(glrenderer.GLCanvas):
         self.dragging = False
 
     def OnMotion(self, evt):
-        if not evt.Dragging() or not evt.LeftIsDown():
+        if hasattr(event, 'ButtonIsDown'):
+            left_button_down = evt.ButtonIsDown(wx.MOUSE_BTN_LEFT)
+        else:
+            left_button_down = evt.leftIsDown
+        if not evt.Dragging() or not left_button_down:
             return
 
         angle = self.GetDeltaAngle()

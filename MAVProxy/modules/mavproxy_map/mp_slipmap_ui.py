@@ -592,8 +592,8 @@ class MPSlipMapPanel(wx.Panel):
             left_button_down = event.ButtonIsDown(wx.MOUSE_BTN_LEFT)
             right_button_down = event.ButtonIsDown(wx.MOUSE_BTN_RIGHT)
         else:
-            left_button_down = event.LeftIsDown()
-            right_button_down = event.RightIsDown()
+            left_button_down = event.leftIsDown
+            right_button_down = event.rightIsDown
             any_button_down = left_button_down or right_button_down
 
         if any_button_down or event.ButtonUp():
