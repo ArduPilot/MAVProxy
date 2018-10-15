@@ -12,6 +12,7 @@ import time
 from MAVProxy.modules.lib.wx_loader import wx
 import cv2
 import numpy as np
+import warnings
 
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_widgets
@@ -258,7 +259,9 @@ class MPImagePanel(wx.Panel):
         self.SetSizer(self.mainSizer)
 
         # panel for the main image
-        self.imagePanel = mp_widgets.ImagePanel(self, wx.EmptyImage(state.width,state.height))
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            self.imagePanel = mp_widgets.ImagePanel(self, wx.EmptyImage(state.width,state.height))
         self.mainSizer.Add(self.imagePanel, flag=wx.TOP|wx.LEFT|wx.GROW, border=0)
         if state.mouse_events:
             self.imagePanel.Bind(wx.EVT_MOUSE_EVENTS, self.on_event)
@@ -353,7 +356,9 @@ class MPImagePanel(wx.Panel):
                 time.sleep(0.05)
                 return
             if isinstance(obj, MPImageData):
-                img = wx.EmptyImage(obj.width, obj.height)
+                with warnings.catch_warnings():
+                    warnings.simplefilter('ignore')
+                    img = wx.EmptyImage(obj.width, obj.height)
                 img.SetData(obj.data)
                 self.img = img
                 self.need_redraw = True

@@ -25,7 +25,7 @@ class WXSettings(object):
         from MAVProxy.modules.lib import mp_util
         from MAVProxy.modules.lib import wx_processguard
         from MAVProxy.modules.lib.wx_loader import wx
-        from wxsettings_ui import SettingsDlg
+        from MAVProxy.modules.lib.wxsettings_ui import SettingsDlg
 
         mp_util.child_close_fds()
         app = wx.App(False)
@@ -36,7 +36,7 @@ class WXSettings(object):
 
     def watch_thread(self):
         '''watch for settings changes from child'''
-        from mp_settings import MPSetting
+        from MAVProxy.modules.lib.mp_settings import MPSetting
         while True:
             setting = self.child_pipe.recv()
             if not isinstance(setting, MPSetting):
@@ -60,7 +60,7 @@ if __name__ == "__main__":
 
     # test the settings
     from MAVProxy.modules.lib import mp_settings, time
-    from mp_settings import MPSetting
+    from MAVProxy.modules.lib.mp_settings import MPSetting
     settings = mp_settings.MPSettings(
         [ MPSetting('link', int, 1, tab='TabOne'),
           MPSetting('altreadout', int, 10, range=(-30,1017), increment=1),

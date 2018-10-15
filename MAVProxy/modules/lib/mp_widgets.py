@@ -26,14 +26,14 @@ class ImagePanel(wx.Panel):
 
     def set_image(self, img):
         '''set the image to be displayed'''
-        if hasattr(img, 'shape'):
-            (width, height) = (img.shape[1], img.shape[0])
-            with warnings.catch_warnings():
-                warnings.simplefilter('ignore')
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            if hasattr(img, 'shape'):
+                (width, height) = (img.shape[1], img.shape[0])
                 self._bmp = wx.BitmapFromBuffer(width, height, np.uint8(img)) # http://stackoverflow.com/a/16866833/2559632
-        elif hasattr(img, 'GetHeight'):
-            self._bmp = wx.BitmapFromImage(img)
-        else:
-            print("Unsupported image type: %s" % type(img))
-            return
-        self.SetMinSize((self._bmp.GetWidth(), self._bmp.GetHeight()))
+            elif hasattr(img, 'GetHeight'):
+                self._bmp = wx.BitmapFromImage(img)
+            else:
+                print("Unsupported image type: %s" % type(img))
+                return
+            self.SetMinSize((self._bmp.GetWidth(), self._bmp.GetHeight()))

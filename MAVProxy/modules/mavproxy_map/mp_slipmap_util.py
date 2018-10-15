@@ -12,6 +12,7 @@ import os, sys
 import time
 import cv2
 import numpy as np
+import warnings
 
 from MAVProxy.modules.mavproxy_map import mp_elevation
 from MAVProxy.modules.mavproxy_map import mp_tile
@@ -574,8 +575,10 @@ class SlipInfoImage(SlipInformation):
     def img(self):
         '''return a wx image'''
         import wx
-        img = wx.EmptyImage(self.width, self.height)
-        img.SetData(self.imgstr)
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            img = wx.EmptyImage(self.width, self.height)
+            img.SetData(self.imgstr)
         return img
 
     def draw(self, parent, box):
