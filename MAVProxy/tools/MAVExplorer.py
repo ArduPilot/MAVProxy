@@ -17,7 +17,6 @@ from MAVProxy.modules.lib import multiproc
 from MAVProxy.modules.lib import rline
 from MAVProxy.modules.lib import wxconsole
 from MAVProxy.modules.lib.graph_ui import Graph_UI
-from MAVProxy.modules.lib import mavmemlog
 from pymavlink.mavextra import *
 from MAVProxy.modules.lib.mp_menu import *
 import MAVProxy.modules.lib.mp_util as mp_util
@@ -27,6 +26,7 @@ from MAVProxy.modules.lib import wxsettings
 from MAVProxy.modules.lib.graphdefinition import GraphDefinition
 from lxml import objectify
 import pkg_resources
+from builtins import input
 
 grui = []
 last_xlim = None
@@ -494,11 +494,7 @@ def loadfile(args):
     mlog = mavutil.mavlink_connection(args, notimestamps=False,
                                       zero_time_base=False,
                                       progress_callback=progress_bar)
-    from pymavlink.DFReader import DFReader_binary
-    if isinstance(mlog, DFReader_binary) or isinstance(mlog, mavutil.mavmmaplog):
-        mestate.mlog = mlog
-    else:
-        mestate.mlog = mavmemlog.mavmemlog(mlog, progress_callback=progress_bar)
+    mestate.mlog = mlog
     mestate.status.msgs = mlog.messages
     t1 = time.time()
     mestate.console.write("\ndone (%u messages in %.1fs)\n" % (mestate.mlog._count, t1-t0))
