@@ -30,6 +30,7 @@ import pkg_resources
 
 grui = []
 last_xlim = None
+flightmodes = None
 
 #Global var to hold the GUI menu element
 TopMenu = None
@@ -141,10 +142,10 @@ def menu_callback(m):
 
 def flightmode_menu():
     '''construct flightmode menu'''
-    modes = mestate.mlog.flightmode_list()
+    global flightmodes
     ret = []
     idx = 0
-    for (mode,t1,t2) in modes:
+    for (mode,t1,t2) in flightmodes:
         modestr = "%s %us" % (mode, (t2-t1))
         ret.append(MPMenuCheckbox(modestr, modestr, 'mode-%u' % idx))
         idx += 1
@@ -272,6 +273,19 @@ def load_graphs():
                 mestate.console.writeln("Loaded %s" % f)
     mestate.graphs = sorted(mestate.graphs, key=lambda g: g.name)
 
+def flightmode_colours():
+    '''return mapping of flight mode to colours'''
+    from MAVProxy.modules.lib.grapher import flightmode_colours
+    mapping = {}
+    idx = 0
+    for (mode,t0,t1) in flightmodes:
+        if not mode in mapping:
+            mapping[mode] = flightmode_colours[idx]
+            idx += 1
+            if idx >= len(flightmode_colours):
+                idx = 0
+    return mapping
+
 def cmd_graph(args):
     '''graph command'''
     usage = "usage: graph <FIELD...>"
@@ -292,7 +306,7 @@ def cmd_graph(args):
         expression = ' '.join(args)
         mestate.last_graph = GraphDefinition('Untitled', expression, '', [expression], None)
     grui.append(Graph_UI(mestate))
-    grui[-1].display_graph(mestate.last_graph)
+    grui[-1].display_graph(mestate.last_graph, flightmode_colours())
     global last_xlim
     if last_xlim is not None and mestate.settings.sync_xzoom:
         #print("initial: ", last_xlim)
@@ -488,6 +502,9 @@ def loadfile(args):
     mestate.status.msgs = mlog.messages
     t1 = time.time()
     mestate.console.write("\ndone (%u messages in %.1fs)\n" % (mestate.mlog._count, t1-t0))
+
+    global flightmodes
+    flightmodes = mlog.flightmode_list()
 
     load_graphs()
     setup_menus()

@@ -42,7 +42,7 @@ edge_colour = (0.1, 0.1, 0.1)
 graph_num = 1
 
 class MavGraph(object):
-    def __init__(self):
+    def __init__(self, flightmode_colourmap=None):
         self.lowest_x = None
         self.highest_x = None
         self.mav_list = []
@@ -60,7 +60,11 @@ class MavGraph(object):
         self.multi = False
         self.modes_plotted = {}
         self.flightmode_colour_index = 0
-        self.flightmode_colourmap = {}
+        if flightmode_colourmap:
+            self.flightmode_colourmap = flightmode_colourmap
+        else:
+            self.flightmode_colourmap = {}
+        self.flightmode_list = None
         self.ax1 = None
         self.locator = None
         global graph_num
@@ -70,6 +74,8 @@ class MavGraph(object):
         self.draw_events = 0
         self.xlim_pipe = None
         self.xlim = None
+        self.tday_base = None
+        self.tday_basetime = None
 
     def add_field(self, field):
         '''add another field to plot'''
@@ -282,15 +288,18 @@ class MavGraph(object):
             
         if self.show_flightmode:
             alpha = 0.3
-            for i in range(len(self.modes)-1):
-                mode_name = self.modes[i][1]
+            xlim = self.ax1.get_xlim()
+            for i in range(len(self.flightmode_list)):
+                (mode_name,t0,t1) = self.flightmode_list[i]
                 c = self.flightmode_colour(mode_name)
-                self.ax1.axvspan(self.modes[i][0], self.modes[i+1][0], fc=c, ec=edge_colour, alpha=alpha)
-                self.modes_plotted[self.modes[i][1]] = (c, alpha)
-            mode_name = self.modes[-1][1]
-            c = self.flightmode_colour(mode_name)
-            self.ax1.axvspan(self.modes[-1][0], self.ax1.get_xlim()[1], fc=c, ec=edge_colour, alpha=alpha)
-            self.modes_plotted[self.modes[-1][1]] = (c, alpha)
+                tday0 = self.timestamp_to_days(t0)
+                tday1 = self.timestamp_to_days(t1)
+                if tday0 > xlim[1] or tday1 < xlim[0]:
+                    continue
+                tday0 = max(tday0, xlim[0])
+                tday1 = min(tday1, xlim[1])
+                self.ax1.axvspan(tday0, tday1, fc=c, ec=edge_colour, alpha=alpha)
+                self.modes_plotted[mode_name] = (c, alpha)
 
         if empty:
             print("No data to graph")
@@ -314,11 +323,9 @@ class MavGraph(object):
         if ax2_labels != []:
             ax2.legend(ax2_labels,loc=self.legend2)
 
-    def add_data(self, t, msg, vars, flightmode):
+    def add_data(self, t, msg, vars):
         '''add some data'''
         mtype = msg.get_type()
-        if self.show_flightmode and (len(self.modes) == 0 or self.modes[-1][1] != flightmode):
-            self.modes.append((t, flightmode))
         for i in range(0, len(self.fields)):
             if mtype not in self.field_types[i]:
                 continue
@@ -339,8 +346,20 @@ class MavGraph(object):
             self.y[i].append(v)
             self.x[i].append(xv)
 
+    def timestamp_to_days(self, timestamp):
+        '''convert log timestamp to days'''
+        if self.tday_base is None:
+            try:
+                self.tday_base = matplotlib.dates.date2num(datetime.datetime.fromtimestamp(timestamp+self.timeshift))
+                self.tday_basetime = timestamp
+            except ValueError:
+                # this can happen if the log is corrupt
+                # ValueError: year is out of range
+                return 0
+        sec_to_days = 1.0 / (60*60*24)
+        return self.tday_base + (timestamp - self.tday_basetime) * sec_to_days
 
-    def process_mav(self, mlog, timeshift, flightmode_selections, _flightmodes):
+    def process_mav(self, mlog, flightmode_selections):
         '''process one file'''
         self.vars = {}
         idx = 0
@@ -348,11 +367,6 @@ class MavGraph(object):
         for s in flightmode_selections:
             if s:
                 all_false = False
-
-        tday_base = None
-        tday_basetime = None
-
-        sec_to_days = 1.0 / (60*60*24)
 
         # pre-calc right/left axes
         self.num_fields = len(self.fields)
@@ -376,6 +390,10 @@ class MavGraph(object):
             else:
                 self.simple_field.append((m.group(1),m.group(2)))
 
+        if len(self.flightmode_list) > 0:
+            # prime the timestamp conversion
+            self.timestamp_to_days(self.flightmode_list[0][1])
+
         while True:
             msg = mlog.recv_match(type=self.msg_types)
             if msg is None:
@@ -385,23 +403,15 @@ class MavGraph(object):
             if self.condition:
                 if not mavutil.evaluate_condition(self.condition, mlog.messages):
                     continue
-            if tday_base is None:
-                try:
-                    tday_base = matplotlib.dates.date2num(datetime.datetime.fromtimestamp(msg._timestamp+timeshift))
-                    tday_basetime = msg._timestamp
-                except ValueError:
-                    # this can happen if the log is corrupt
-                    # ValueError: year is out of range
-                    continue
-            tdays = tday_base + (msg._timestamp - tday_basetime) * sec_to_days
+            tdays = self.timestamp_to_days(msg._timestamp)
 
             if all_false or len(flightmode_selections) == 0:
-                self.add_data(tdays, msg, mlog.messages, mlog.flightmode)
+                self.add_data(tdays, msg, mlog.messages)
             else:
-                if idx < len(_flightmodes) and msg._timestamp >= _flightmodes[idx][2]:
+                if idx < len(self.flightmode_list) and msg._timestamp >= self.flightmode_list[idx][2]:
                     idx += 1
                 elif (idx < len(flightmode_selections) and flightmode_selections[idx]):
-                    self.add_data(tdays, msg, mlog.messages, mlog.flightmode)
+                    self.add_data(tdays, msg, mlog.messages)
 
     def xlim_change_check(self, idx):
         '''handle xlim change requests from queue'''
@@ -431,6 +441,7 @@ class MavGraph(object):
         self.multiplier = []
         self.field_types = []
         self.xlim = None
+        self.flightmode_list = _flightmodes
 
         # work out msg types we are interested in
         self.x = []
@@ -452,7 +463,7 @@ class MavGraph(object):
 
         for fi in range(0, len(self.mav_list)):
             mlog = self.mav_list[fi]
-            self.process_mav(mlog, timeshift, flightmode_selections, _flightmodes)
+            self.process_mav(mlog, flightmode_selections)
 
 
     def show(self, lenmavlist, block=True, xlim_pipe=None):
