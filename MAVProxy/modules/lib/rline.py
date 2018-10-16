@@ -51,12 +51,12 @@ class rline(object):
 def complete_alias(text):
     '''return list of aliases'''
     global rline_mpstate
-    return rline_mpstate.aliases.keys()
+    return list(rline_mpstate.aliases.keys())
 
 def complete_command(text):
     '''return list of commands'''
     global rline_mpstate
-    return rline_mpstate.command_map.keys()
+    return list(rline_mpstate.command_map.keys())
 
 def complete_loadedmodules(text):
     global rline_mpstate
@@ -89,12 +89,12 @@ def complete_filename(text):
 
 def complete_parameter(text):
     '''complete a parameter'''
-    return rline_mpstate.mav_param.keys()
+    return list(rline_mpstate.mav_param.keys())
 
 def complete_variable(text):
     '''complete a MAVLink variable or expression'''
     if text == '':
-        return rline_mpstate.status.msgs.keys()
+        return list(rline_mpstate.status.msgs.keys())
 
     if text.endswith(":2"):
         suffix = ":2"
@@ -130,7 +130,7 @@ def complete_variable(text):
     prefix = m2.group(1)
     mtype = m2.group(2)
     ret = []
-    for k in rline_mpstate.status.msgs.keys():
+    for k in list(rline_mpstate.status.msgs.keys()):
         if k.startswith(mtype):
             ret.append(prefix + k + suffix)
     return ret
