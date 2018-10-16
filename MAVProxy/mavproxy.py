@@ -302,10 +302,12 @@ def load_module(modname, quiet=False, **kwargs):
     '''load a module'''
     modpaths = ['MAVProxy.modules.mavproxy_%s' % modname, modname]
     for (m,pm) in mpstate.modules:
-        if m.name == modname and not mpstate.multi_instance[modname]:
+        if m.name == modname and not modname in mpstate.multi_instance:
             if not quiet:
                 print("module %s already loaded" % modname)
-            return False
+            # don't report an error
+            return True
+    ex = None
     for modpath in modpaths:
         try:
             m = import_package(modpath)
