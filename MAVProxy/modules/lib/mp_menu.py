@@ -292,8 +292,10 @@ class MPMenuCallTextDialog(object):
     def call(self):
         '''show a value dialog'''
         from MAVProxy.modules.lib.wx_loader import wx
-
-        dlg = wx.TextEntryDialog(None, self.title, self.title, defaultValue=str(self.default))
+        try:
+            dlg = wx.TextEntryDialog(None, self.title, self.title, defaultValue=str(self.default))
+        except TypeError:
+            dlg = wx.TextEntryDialog(None, self.title, self.title, value=str(self.default))
         if dlg.ShowModal() != wx.ID_OK:
             return None
         return dlg.GetValue()
