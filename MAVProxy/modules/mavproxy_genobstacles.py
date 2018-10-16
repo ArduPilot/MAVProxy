@@ -123,12 +123,6 @@ class DNFZ:
         while self.heading < 0:
             self.heading += 360.0
 
-    def move(self, heading, distance):
-        lat = self.pkt['I105']['Lat']['val']
-        lon = self.pkt['I105']['Lon']['val']
-        (lat, lon) = mp_util.gps_newpos(lat, lon, heading, distance)
-        self.setpos(lat, lon)        
-
     def changealt(self, delta_alt):
         alt = self.pkt['I130']['Alt']['val']
         alt += delta_alt
