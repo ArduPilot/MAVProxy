@@ -137,6 +137,7 @@ class GraphFrame(wx.Frame):
             self.plot_data[i].set_ydata(ydata)
 
         self.canvas.draw()
+        self.canvas.Refresh()
 
     def on_pause_button(self, event):
         self.paused = not self.paused
