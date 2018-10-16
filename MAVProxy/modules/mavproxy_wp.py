@@ -23,7 +23,7 @@ class WPModule(mp_module.MPModule):
         self.undo_wp = None
         self.undo_type = None
         self.undo_wp_idx = -1
-        self.expected_count = 0
+        self.wploader.expected_count = 0
         self.add_command('wp', self.cmd_wp,       'waypoint management',
                          ["<list|clear|move|remove|loop|set|undo|movemulti|changealt|param|status>",
                           "<load|update|save|savecsv|show> (FILENAME)"])
