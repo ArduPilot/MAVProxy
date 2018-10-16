@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 '''miscellaneous commands'''
 
-import time, math
+import time, math, sys
 from pymavlink import mavutil
 
 from MAVProxy.modules.lib import mp_module
@@ -28,7 +28,12 @@ def run_command(args, cwd = None, shell = False, timeout = None, env = None):
     See http://stackoverflow.com/questions/1191374/subprocess-with-timeout
     '''
     from subprocess import PIPE, Popen
-    from StringIO import StringIO
+    try:
+        # py2
+        from StringIO import StringIO
+    except ImportError:
+        # py3
+        from io import StringIO
     import fcntl, os, signal
     p = Popen(args, shell = shell, cwd = cwd, stdout = PIPE, stderr = PIPE, env = env)
     tstart = time.time()
@@ -37,15 +42,18 @@ def run_command(args, cwd = None, shell = False, timeout = None, env = None):
     # try to make it non-blocking
     try:
         fcntl.fcntl(p.stdout, fcntl.F_SETFL, fcntl.fcntl(p.stdout, fcntl.F_GETFL) | os.O_NONBLOCK)
-    except Exception:
+    except Exception as ex:
         pass
 
     while True:
         time.sleep(0.1)
         retcode = p.poll()
         try:
-            buf.write(p.stdout.read())
-        except Exception:
+            s = p.stdout.read()
+            if sys.version_info.major >= 3:
+                s = s.decode('utf-8')
+            buf.write(s)
+        except Exception as ex:
             pass
         if retcode is not None:
             break
