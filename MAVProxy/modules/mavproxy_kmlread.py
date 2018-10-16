@@ -8,7 +8,6 @@ Released under the GNU GPL version 3 or later
 
 import time, math, random
 from pymavlink import mavutil, mavwp
-from cStringIO import StringIO
 from xml.dom.minidom import parseString
 from zipfile import ZipFile
 
