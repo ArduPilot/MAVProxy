@@ -528,7 +528,7 @@ def input_loop():
     while mestate.exit != True:
         try:
             if mestate.exit != True:
-                line = raw_input(mestate.rl.prompt)
+                line = input(mestate.rl.prompt)
         except EOFError:
             mestate.exit = True
             sys.exit(1)
@@ -621,7 +621,7 @@ if __name__ == "__main__":
     while mestate.rl is not None and mestate.exit != True:
         try:
             try:
-                line = raw_input(mestate.rl.prompt)
+                line = input(mestate.rl.prompt)
             except EOFError:
                 mestate.exit = True
                 break

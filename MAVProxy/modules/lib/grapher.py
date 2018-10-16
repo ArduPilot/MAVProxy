@@ -12,6 +12,7 @@ from math import *
 from pymavlink.mavextra import *
 import pylab
 from pymavlink import mavutil
+import threading
 
 colors = [ 'red', 'green', 'blue', 'orange', 'olive', 'black', 'grey', 'yellow', 'brown', 'darkcyan',
            'cornflowerblue', 'darkmagenta', 'deeppink', 'darkred']
@@ -247,7 +248,7 @@ class MavGraph(object):
                     linestyle = self.linestyle
                 else:
                     linestyle = '-'
-                if len(y[i]) > 0 and type(y[i][0]) == unicode:
+                if len(y[i]) > 0 and isinstance(y[i][0],str):
                     # assume this is a piece of text to be rendered at a point in time
                     last_text_time = -1
                     last_text = None
@@ -275,7 +276,7 @@ class MavGraph(object):
                                 verticalalignment='baseline')
                 else:
                     ax.plot_date(x[i], y[i], color=color, label=fields[i],
-                             linestyle=linestyle, marker=marker, tz=None)
+                                 linestyle=linestyle, marker=marker, tz=None)
 
             empty = False
             
@@ -415,6 +416,14 @@ class MavGraph(object):
             self.fig.canvas.toolbar.push_current()
             #print("setting: ", self.graph_num, xlim)
             self.ax1.set_xlim(xlim)
+            # trigger the timer, this allows us to setup a v slow animation,
+            # which saves a lot of CPU
+            self.ani.event_source._on_timer()
+
+    def xlim_timer(self):
+        '''called every 0.1s to check for xlim change'''
+        self.xlim_change_check(0)
+        threading.Timer(0.1, self.xlim_timer).start()
 
     def process(self, flightmode_selections, _flightmodes, block=True):
         '''process and display graph'''
@@ -482,8 +491,10 @@ class MavGraph(object):
         if self.xlim_pipe is not None:
             import matplotlib.animation
             self.ani = matplotlib.animation.FuncAnimation(self.fig, self.xlim_change_check,
-                                                          frames=2, interval=100, repeat=True)
-                
+                                                          frames=10, interval=20000,
+                                                          repeat=True, blit=False)
+            threading.Timer(0.1, self.xlim_timer).start()
+
         pylab.draw()
         pylab.show(block=block)
 
