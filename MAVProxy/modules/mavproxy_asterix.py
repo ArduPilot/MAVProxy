@@ -87,7 +87,7 @@ class AsterixModule(mp_module.MPModule):
             logpath = os.path.join(self.logdir, 'asterix.log')
         else:
             logpath = 'asterix.log'
-        self.logfile = open(logpath, 'w')
+        self.logfile = open(logpath, 'wb')
         self.pkt_count = 0
         self.console.set_status('ASTX', 'ASTX --/--', row=6)
 
@@ -199,7 +199,8 @@ class AsterixModule(mp_module.MPModule):
         except Exception:
             return
         try:
-            if pkt[0] == '(':
+            if pkt.startswith(b'PICKLED:'):
+                pkt = pkt[8:]
                 # pickled packet
                 try:
                     amsg = [pickle.loads(pkt)]
@@ -213,7 +214,7 @@ class AsterixModule(mp_module.MPModule):
             print("bad packet")
             return
         try:
-            logpkt = 'AST:' + struct.pack('<dI', time.time(), len(pkt)) + pkt
+            logpkt = b'AST:' + struct.pack('<dI', time.time(), len(pkt)) + pkt
             self.logfile.write(logpkt)
         except Exception:
             pass
@@ -310,7 +311,7 @@ def init(mpstate):
 if __name__ == '__main__':
     import sys
     logname = sys.argv[1]
-    logf = open(logname, 'r')
+    logf = open(logname, 'rb')
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.connect(('', 45454))

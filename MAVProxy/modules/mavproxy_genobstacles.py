@@ -166,7 +166,7 @@ class DNFZ:
         return str(self.pkt)
 
     def pickled(self):
-        return pickle.dumps(self.pkt)
+        return b'PICKLED:' + pickle.dumps(self.pkt)
 
 class Aircraft(DNFZ):
     '''an aircraft that flies in a circuit'''
@@ -390,8 +390,8 @@ class GenobstaclesModule(mp_module.MPModule):
     def idle_task(self):
         while len(self.pkt_queue) > 0:
             try:
-                self.sock.send(self.pkt_queue[0])
-                self.pkt_queue.pop(0)
+                pkt = self.pkt_queue.pop(0)
+                self.sock.send(pkt)
             except Exception as ex:
                 return
             
