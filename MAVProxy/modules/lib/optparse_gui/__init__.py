@@ -96,7 +96,7 @@ class OptparseDialog( wx.Dialog ):
                 ctrl = wx.CheckBox( self, -1, option.dest, size = ( 300, -1 ) )
                 box.Add( ctrl, 0, wx.ALIGN_CENTRE|wx.ALL, 5 )
             else:
-                raise NotImplementedError ( 'Unknown option action: %s' % repr( option.action ) )
+                raise NotImplementedError ('Unknown option action: %s' % repr( option.action ) )
 
             ctrl.SetHelpText( option.help )
             sizer.Add(box, 0, wx.GROW|wx.ALIGN_CENTER_VERTICAL|wx.ALL, 5)
@@ -159,7 +159,7 @@ Args the contain spaces must be entered like so: "arg with sapce"
                                message = 'Select directory for %s' % (option.dest),
                                defaultPath = path)
         else:
-            raise NotImplementedError(`option.type`)
+            raise NotImplementedError('option.type')
         dlg_result = dlg.ShowModal()
         if wx.ID_OK != dlg_result:
             return

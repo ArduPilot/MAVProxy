@@ -45,7 +45,7 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
         if name == "__main__":
           name = "MAVProxy.modules.mavproxy_mmap.????"
         content = pkg_resources.resource_stream(name, "mmap_app/%s" % path).read()
-      except IOError, e:
+      except IOError as e:
         error = str(e)
       if content:
         self.send_response(200)
