@@ -7,9 +7,7 @@ Dec 2015
 from math import *
 
 from MAVProxy.modules.lib import mp_module
-from MAVProxy.modules.mavproxy_map import mp_slipmap
 from MAVProxy.modules.lib import mp_settings
-from MAVProxy.modules.lib.mp_menu import *  # popup menus
 from pymavlink import mavutil
 
 obc_icons = {
@@ -185,14 +183,16 @@ class ADSBModule(mp_module.MPModule):
                 # if not then add it
                 self.threat_vehicles[id] = ADSBVehicle(id=id, state=m.to_dict())
                 for mp in self.module_matching('map*'):
-                    self.threat_vehicles[id].menu_item = MPMenuItem(name=id, returnkey=None)
+                    from MAVProxy.modules.lib import mp_menu
+                    from MAVProxy.modules.mavproxy_map import mp_slipmap
+                    self.threat_vehicles[id].menu_item = mp_menu.MPMenuItem(name=id, returnkey=None)
                     if m.emitter_type >= 100 and m.emitter_type-100 in obc_icons:
                         icon = mp.map.icon(obc_icons[m.emitter_type-100])
                         threat_radius = get_threat_radius(m.emitter_type-100)
                     else:
                         icon = mp.map.icon(self.threat_vehicles[id].icon)
                         threat_radius = 0
-                    popup = MPMenuSubMenu('ADSB', items=[self.threat_vehicles[id].menu_item])
+                    popup = mp_menu.MPMenuSubMenu('ADSB', items=[self.threat_vehicles[id].menu_item])
                     # draw the vehicle on the map
                     mp.map.add_object(mp_slipmap.SlipIcon(id, (m.lat * 1e-7, m.lon * 1e-7),
                                                                     icon, layer=3, rotation=m.heading*0.01, follow=False,
