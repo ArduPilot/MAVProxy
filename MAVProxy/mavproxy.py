@@ -612,13 +612,14 @@ def process_mavlink(slave):
         return
     if msgs is None:
         return
-    if mpstate.settings.mavfwd and not mpstate.status.setup_mode and mpstate.status.watch:
+    if mpstate.settings.mavfwd and not mpstate.status.setup_mode:
         for m in msgs:
-            for msg_type in mpstate.status.watch:
-                if fnmatch.fnmatch(m.get_type().upper(), msg_type.upper()):
-                    mpstate.console.writeln('> '+ str(m))
-                    break
             mpstate.master().write(m.get_msgbuf())
+            if mpstate.status.watch:
+                for msg_type in mpstate.status.watch:
+                    if fnmatch.fnmatch(m.get_type().upper(), msg_type.upper()):
+                        mpstate.console.writeln('> '+ str(m))
+                        break
     mpstate.status.counters['Slave'] += 1
 
 
