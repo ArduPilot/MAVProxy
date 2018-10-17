@@ -22,14 +22,8 @@ class ModeModule(mp_module.MPModule):
             print('Available modes: ', mode_mapping.keys())
             return
         if args[0].isdigit():
-            modenum = int(args[0])
-        else:
-            mode = args[0].upper()
-            if mode not in mode_mapping:
-                print('Unknown mode %s: ' % mode)
-                return
-            modenum = mode_mapping[mode]
-        self.master.set_mode(modenum)
+            self.master.set_mode(int(args[0]))
+        self.master.set_mode(args[0].upper())
 
     def available_modes(self):
         mode_mapping = self.master.mode_mapping()
