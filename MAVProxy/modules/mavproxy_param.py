@@ -106,7 +106,7 @@ class ParamState:
         if not os.path.exists(path):
             print("Param XML (%s) does not exist" % path)
             return None
-        xml = open(path).read()
+        xml = open(path,'rb').read()
         from lxml import objectify
         objectify.enable_recursive_str()
         tree = objectify.fromstring(xml)

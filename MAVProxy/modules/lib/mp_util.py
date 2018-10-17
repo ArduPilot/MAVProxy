@@ -247,11 +247,16 @@ def dot_mavproxy(name=None):
 
 def download_url(url):
     '''download a URL and return the content'''
-    import urllib2
+    if sys.version_info.major < 3:
+        from urllib2 import urlopen as url_open
+        from urllib2 import URLError as url_error
+    else:
+        from urllib.request import urlopen as url_open
+        from urllib.error import URLError as url_error
     try:
-        resp = urllib2.urlopen(url)
+        resp = url_open(url)
         headers = resp.info()
-    except urllib2.URLError as e:
+    except url_error as e:
         print('Error downloading %s' % url)
         return None
     return resp.read()
@@ -265,7 +270,7 @@ def download_files(files):
         if data is None:
             continue
         try:
-            open(file, mode='w').write(data)
+            open(file, mode='wb').write(data)
         except Exception as e:
             print("Failed to save to %s : %s" % (file, e))
 
