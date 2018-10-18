@@ -78,7 +78,7 @@ class CalibrationModule(mp_module.MPModule):
                 self.magcal_progess.append("")
             self.magcal_progess[m.compass_id] = "%u%%" % m.completion_pct
             self.console.set_status('Progress', 'Calibration Progress: ' + " ".join(self.magcal_progess), row=4)
-        if mtype == 'MAG_CAL_REPORT':
+        elif mtype == 'MAG_CAL_REPORT':
             if m.cal_status == mavutil.mavlink.MAG_CAL_SUCCESS:
                 result = "SUCCESS"
             else:
