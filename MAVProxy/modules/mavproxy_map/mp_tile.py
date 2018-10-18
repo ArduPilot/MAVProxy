@@ -382,7 +382,7 @@ class MPTile:
                 img = self.load_tile_lowres(tile)
                 if img is None:
                     img = self._unavailable
-                return img
+            return img
 
 
         path = self.tile_to_path(tile)
