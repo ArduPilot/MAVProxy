@@ -548,7 +548,6 @@ class LinkModule(mp_module.MPModule):
             self.mpstate.attitude_time_s = max(self.mpstate.attitude_time_s, att_time)
             if self.mpstate.attitude_time_s - att_time > 120:
                 # cope with wrap
-                print("attitude time wrap")
                 self.mpstate.attitude_time_s = att_time
 
             
