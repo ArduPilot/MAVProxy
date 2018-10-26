@@ -1,2 +1,2 @@
-pymavlink>=2.2.8
+pymavlink>=2.2.21
 pyserial>=3.0
