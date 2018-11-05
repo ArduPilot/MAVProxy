@@ -167,7 +167,7 @@ class MPState(object):
             [ MPSetting('link', int, 1, 'Primary Link', tab='Link', range=(0,4), increment=1),
               MPSetting('streamrate', int, 4, 'Stream rate link1', range=(-1,500), increment=1),
               MPSetting('streamrate2', int, 4, 'Stream rate link2', range=(-1,500), increment=1),
-              MPSetting('heartbeat', int, 1, 'Heartbeat rate', range=(0,100), increment=1),
+              MPSetting('heartbeat', float, 1, 'Heartbeat rate (Hz)', range=(0,100), increment=0.1),
               MPSetting('mavfwd', bool, True, 'Allow forwarded control'),
               MPSetting('mavfwd_rate', bool, False, 'Allow forwarded rate control'),
               MPSetting('shownoise', bool, True, 'Show non-MAVLink data'),
