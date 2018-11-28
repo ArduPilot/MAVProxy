@@ -109,7 +109,7 @@ def complete_variable(text):
         pass
 
     try:
-        m1 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*)[.]([A-Za-z0-9]*)$", text)
+        m1 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*)[.]([A-Za-z0-9_]*)$", text)
     except Exception as ex:
         return []
     if m1 is not None:
