@@ -81,6 +81,7 @@ class MiscModule(mp_module.MPModule):
         self.add_command('version', self.cmd_version, "show version")
         self.add_command('rcbind', self.cmd_rcbind, "bind RC receiver")
         self.add_command('led', self.cmd_led, "control board LED")
+        self.add_command('oreoled', self.cmd_oreoled, "control OreoLEDs")
         self.add_command('playtune', self.cmd_playtune, "play tune remotely")
         self.add_command('devid', self.cmd_devid, "show device names from parameter IDs")
         self.add_command('gethome', self.cmd_gethome, "get HOME_POSITION")
@@ -225,6 +226,26 @@ class MiscModule(mp_module.MPModule):
                                          self.settings.target_component,
                                          0, 0, plen, pattern)
 
+    def cmd_oreoled(self, args):
+        '''send LED pattern as override, using OreoLED conventions'''
+        if len(args) < 4:
+            print("Usage: oreoled LEDNUM RED GREEN BLUE <RATE>")
+            return
+        lednum = int(args[0])
+        pattern = [0] * 24
+        pattern[0] = ord('R')
+        pattern[1] = ord('G')
+        pattern[2] = ord('B')
+        pattern[3] = ord('0')
+        pattern[4] = 0
+        pattern[5] = int(args[1])
+        pattern[6] = int(args[2])
+        pattern[7] = int(args[3])
+        
+        self.master.mav.led_control_send(self.settings.target_system,
+                                         self.settings.target_component,
+                                         lednum, 255, 8, pattern)
+        
     def cmd_flashbootloader(self, args):
         '''flash bootloader'''
         self.master.mav.command_long_send(self.settings.target_system,
