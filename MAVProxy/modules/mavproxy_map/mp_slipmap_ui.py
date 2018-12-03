@@ -536,7 +536,7 @@ class MPSlipMapPanel(wx.Panel):
     def on_mouse_wheel(self, event):
         '''handle mouse wheel zoom changes'''
         rotation = event.GetWheelRotation() / event.GetWheelDelta()
-        if rotation >= 0:
+        if rotation > 0:
             zoom = 1.0/(1.1 * rotation)
         elif rotation < 0:
             zoom = 1.1 * (-rotation)
