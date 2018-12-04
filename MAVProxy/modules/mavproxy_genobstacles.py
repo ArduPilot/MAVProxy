@@ -101,6 +101,12 @@ class DNFZ:
         self.pkt['I105']['Lat']['val'] = lat
         self.pkt['I105']['Lon']['val'] = lon
 
+    def getlat(self):
+        return self.pkt['I105']['Lat']['val']
+
+    def getlon(self):
+        return self.pkt['I105']['Lon']['val']
+
     def getalt(self):
         return self.pkt['I130']['Alt']['val']
         
@@ -257,7 +263,8 @@ class GenobstaclesModule(mp_module.MPModule):
         super(GenobstaclesModule, self).__init__(mpstate, "genobstacles", "OBC 2018 obstacle generator")
 
         self.add_command('genobstacles', self.cmd_genobstacles, "obstacle generator",
-                         ["<start|stop>","set (GENSETTING)"])
+                         ["<start|stop|restart|clearall|status>",
+                          "set (GENSETTING)"])
 
         self.add_completion_function('(GENSETTING)',
                                      gen_settings.completion)
@@ -291,9 +298,17 @@ class GenobstaclesModule(mp_module.MPModule):
             obj.setpos(latlon[0], latlon[1])
             self.aircraft.append(obj)
 
+    def status(self):
+        ret = ""
+        for aircraft in self.aircraft:
+            ret += "%s %f %f\n" % (aircraft.DNFZ_type,
+                                   aircraft.getlat(),
+                                   aircraft.getlon(),)
+        return ret
+
     def cmd_genobstacles(self, args):
         '''genobstacles command parser'''
-        usage = "usage: genobstacles <set>"
+        usage = "usage: genobstacles <start|stop|restart|clearall|status|set>"
         if len(args) == 0:
             print(usage)
             return
@@ -310,6 +325,8 @@ class GenobstaclesModule(mp_module.MPModule):
         elif args[0] == "restart":
             self.stop()
             self.start()
+        elif args[0] == "status":
+            print(self.status())
         elif args[0] == "remove":
             latlon = self.module('map').click_position
             if self.last_click is not None and self.last_click == latlon:
