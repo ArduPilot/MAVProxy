@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 '''
 Example Module
-Peter barker, September 2016
+Peter Barker, September 2016
 
 This module simply serves as a starting point for your own MAVProxy module.
 
