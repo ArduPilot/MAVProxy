@@ -146,7 +146,7 @@ class Joystick(mp_module.MPModule):
             values = self.joystick.read()
             override = values + override[len(values):]
 
-            self.log('channels: {}'.format(override), level=3)
+            # self.log('channels: {}'.format(override), level=3)
 
             if override != self.module('rc').override:
                 self.module('rc').override = override
