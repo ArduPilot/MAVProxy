@@ -209,6 +209,7 @@ class LinkModule(mp_module.MPModule):
         conn.last_heartbeat = 0
         conn.last_message = 0
         conn.highest_msec = 0
+        conn.target_system = self.settings.target_system
         self.apply_link_attributes(conn, optional_attributes)
         self.mpstate.mav_master.append(conn)
         self.status.counters['MasterIn'].append(0)
@@ -373,70 +374,24 @@ class LinkModule(mp_module.MPModule):
             self.say("height %u" % rounded_alt, priority='notification')
 
 
-    def master_callback(self, m, master):
-        '''process mavlink message m on master, sending any messages to recipients'''
+    def master_msg_handling(self, m, master):
+        '''link message handling for an upstream link'''
+        if self.settings.target_system != 0 and m.get_srcSystem() != self.settings.target_system:
+            # don't process messages not from our target
+            return
 
-        # see if it is handled by a specialised sysid connection
-        sysid = m.get_srcSystem()
+        if self.settings.target_system != 0 and master.target_system != self.settings.target_system:
+            # keep the pymavlink level target system aligned with the MAVProxy setting
+            master.target_system = self.settings.target_system
+
         mtype = m.get_type()
-        if sysid in self.mpstate.sysid_outputs:
-            self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
-            if mtype == "GLOBAL_POSITION_INT":
-                for modname in 'map', 'asterix', 'NMEA', 'NMEA2':
-                    mod = self.module(modname)
-                    if mod is not None:
-                        mod.set_secondary_vehicle_position(m)
-            return
-
-        if getattr(m, '_timestamp', None) is None:
-            master.post_message(m)
-        self.status.counters['MasterIn'][master.linknum] += 1
-
-
-
-        if mtype == 'GLOBAL_POSITION_INT':
-            # send GLOBAL_POSITION_INT to 2nd GCS for 2nd vehicle display
-            for sysid in self.mpstate.sysid_outputs:
-                self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
-
-        # and log them
-        if mtype not in dataPackets and self.mpstate.logqueue:
-            # put link number in bottom 2 bits, so we can analyse packet
-            # delay in saved logs
-            usec = self.get_usec()
-            usec = (usec & ~3) | master.linknum
-            self.mpstate.logqueue.put(bytearray(struct.pack('>Q', usec) + m.get_msgbuf()))
-
-        # keep the last message of each type around
-        self.status.msgs[mtype] = m
-        if mtype not in self.status.msg_count:
-            self.status.msg_count[mtype] = 0
-        self.status.msg_count[mtype] += 1
-
-        if m.get_srcComponent() == mavutil.mavlink.MAV_COMP_ID_GIMBAL and mtype == 'HEARTBEAT':
-            # silence gimbal heartbeat packets for now
-            return
-
-        if getattr(m, 'time_boot_ms', None) is not None and self.settings.target_system == m.get_srcSystem():
-            # update link_delayed attribute
-            self.handle_msec_timestamp(m, master)
-
-        if mtype in activityPackets:
-            if master.linkerror:
-                master.linkerror = False
-                self.say("link %s OK" % (self.link_label(master)))
-            self.status.last_message = time.time()
-            master.last_message = self.status.last_message
-
-        if master.link_delayed:
-            # don't process delayed packets that cause double reporting
-            if mtype in delayedPackets:
-                return
 
         if mtype == 'HEARTBEAT' and m.type != mavutil.mavlink.MAV_TYPE_GCS:
             if self.settings.target_system == 0 and self.settings.target_system != m.get_srcSystem():
                 self.settings.target_system = m.get_srcSystem()
                 self.say("online system %u" % self.settings.target_system,'message')
+                for mav in self.mpstate.mav_master:
+                    mav.target_system = self.settings.target_system
 
             if self.status.heartbeat_error:
                 self.status.heartbeat_error = False
@@ -578,6 +533,68 @@ class LinkModule(mp_module.MPModule):
                     self.mpstate.console.writeln('< '+ str(m))
                     break
 
+
+
+    def master_callback(self, m, master):
+        '''process mavlink message m on master, sending any messages to recipients'''
+
+        # see if it is handled by a specialised sysid connection
+        sysid = m.get_srcSystem()
+        mtype = m.get_type()
+        if sysid in self.mpstate.sysid_outputs:
+            self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
+            if mtype == "GLOBAL_POSITION_INT":
+                for modname in 'map', 'asterix', 'NMEA', 'NMEA2':
+                    mod = self.module(modname)
+                    if mod is not None:
+                        mod.set_secondary_vehicle_position(m)
+            return
+
+        if getattr(m, '_timestamp', None) is None:
+            master.post_message(m)
+        self.status.counters['MasterIn'][master.linknum] += 1
+
+        if mtype == 'GLOBAL_POSITION_INT':
+            # send GLOBAL_POSITION_INT to 2nd GCS for 2nd vehicle display
+            for sysid in self.mpstate.sysid_outputs:
+                self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
+
+        # and log them
+        if mtype not in dataPackets and self.mpstate.logqueue:
+            # put link number in bottom 2 bits, so we can analyse packet
+            # delay in saved logs
+            usec = self.get_usec()
+            usec = (usec & ~3) | master.linknum
+            self.mpstate.logqueue.put(bytearray(struct.pack('>Q', usec) + m.get_msgbuf()))
+
+        # keep the last message of each type around
+        self.status.msgs[mtype] = m
+        if mtype not in self.status.msg_count:
+            self.status.msg_count[mtype] = 0
+        self.status.msg_count[mtype] += 1
+
+        if m.get_srcComponent() == mavutil.mavlink.MAV_COMP_ID_GIMBAL and mtype == 'HEARTBEAT':
+            # silence gimbal heartbeat packets for now
+            return
+
+        if getattr(m, 'time_boot_ms', None) is not None and self.settings.target_system == m.get_srcSystem():
+            # update link_delayed attribute
+            self.handle_msec_timestamp(m, master)
+
+        if mtype in activityPackets:
+            if master.linkerror:
+                master.linkerror = False
+                self.say("link %s OK" % (self.link_label(master)))
+            self.status.last_message = time.time()
+            master.last_message = self.status.last_message
+
+        if master.link_delayed:
+            # don't process delayed packets that cause double reporting
+            if mtype in delayedPackets:
+                return
+
+        self.master_msg_handling(m, master)
+
         # don't pass along bad data
         if mtype != 'BAD_DATA':
             # pass messages along to listeners, except for REQUEST_DATA_STREAM, which
@@ -588,9 +605,16 @@ class LinkModule(mp_module.MPModule):
                     for r in self.mpstate.mav_outputs:
                         r.write(m.get_msgbuf())
 
+            sysid = m.get_srcSystem()
+            target_sysid = self.target_system
+
             # pass to modules
             for (mod,pm) in self.mpstate.modules:
                 if not hasattr(mod, 'mavlink_packet'):
+                    continue
+                if not mod.multi_vehicle and sysid != target_sysid:
+                    # only pass packets not from our target to modules that
+                    # have marked themselves as being multi-vehicle capable
                     continue
                 try:
                     mod.mavlink_packet(m)
