@@ -5,7 +5,7 @@ class MPModule(object):
     The base class for all modules
     '''
 
-    def __init__(self, mpstate, name, description=None, public=False, multi_instance=False):
+    def __init__(self, mpstate, name, description=None, public=False, multi_instance=False, multi_vehicle=False):
         '''
         Constructor
 
@@ -15,6 +15,7 @@ class MPModule(object):
         self.name = name
         self.needs_unloading = False
         self.multi_instance = multi_instance
+        self.multi_vehicle = multi_vehicle
 
         if description is None:
             self.description = name + " handling"
