@@ -17,7 +17,7 @@ from MAVProxy.modules.lib.mp_menu import *
 
 class ConsoleModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(ConsoleModule, self).__init__(mpstate, "console", "GUI console", public=True)
+        super(ConsoleModule, self).__init__(mpstate, "console", "GUI console", public=True, multi_vehicle=True)
         self.in_air = False
         self.start_time = 0.0
         self.total_time = 0.0
@@ -58,12 +58,17 @@ class ConsoleModule(mp_module.MPModule):
 
         mpstate.console.ElevationMap = mp_elevation.ElevationModel()
 
+        self.vehicle_list = []
+        self.vehicle_menu = None
+
         # create the main menu
         if mp_util.has_wxpython:
             self.menu = MPMenuTop([])
             self.add_menu(MPMenuSubMenu('MAVProxy',
                                         items=[MPMenuItem('Settings', 'Settings', 'menuSettings'),
                                                MPMenuItem('Map', 'Load Map', '# module load map')]))
+            self.vehicle_menu = MPMenuSubMenu('Vehicle', items=[])
+            self.add_menu(self.vehicle_menu)
 
     def add_menu(self, menu):
         '''add a new menu'''
@@ -117,7 +122,38 @@ class ConsoleModule(mp_module.MPModule):
                     break
         return distance / speed
 
+    def vehicle_type_string(self, hb):
+        '''return vehicle type string from a heartbeat'''
+        if hb.type == mavutil.mavlink.MAV_TYPE_FIXED_WING:
+            return 'Plane'
+        if hb.type == mavutil.mavlink.MAV_TYPE_GROUND_ROVER:
+            return 'Rover'
+        if hb.type == mavutil.mavlink.MAV_TYPE_SURFACE_BOAT:
+            return 'Boat'
+        if hb.type == mavutil.mavlink.MAV_TYPE_SUBMARINE:
+            return 'Sub'
+        if hb.type in [mavutil.mavlink.MAV_TYPE_QUADROTOR,
+                           mavutil.mavlink.MAV_TYPE_COAXIAL,
+                           mavutil.mavlink.MAV_TYPE_HEXAROTOR,
+                           mavutil.mavlink.MAV_TYPE_OCTOROTOR,
+                           mavutil.mavlink.MAV_TYPE_TRICOPTER,
+                           mavutil.mavlink.MAV_TYPE_DODECAROTOR]:
+            return "Copter"
+        if hb.type == mavutil.mavlink.MAV_TYPE_HELICOPTER:
+            return "Heli"
+        if hb.type == mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER:
+            return "Tracker"
+        return "UNKNOWN(%u) % hb.type"
 
+    def add_new_vehicle(self, hb):
+        '''add a new vehicle'''
+        sysid = hb.get_srcSystem()
+        self.vehicle_list.append(sysid)
+        self.vehicle_menu.items = []
+        for s in sorted(self.vehicle_list):
+            name = 'SysID %u: %s' % (s, self.vehicle_type_string(hb))
+            self.vehicle_menu.items.append(MPMenuItem(name, name, '# set target_system %u' % s))
+        self.mpstate.console.set_menu(self.menu, self.menu_callback)
 
     def mavlink_packet(self, msg):
         '''handle an incoming mavlink packet'''
@@ -127,6 +163,16 @@ class ConsoleModule(mp_module.MPModule):
             self.mpstate.console = textconsole.SimpleConsole()
             return
         type = msg.get_type()
+
+        if type == 'HEARTBEAT':
+            sysid = msg.get_srcSystem()
+            if not sysid in self.vehicle_list:
+                self.add_new_vehicle(msg)
+
+        if not self.is_primary_vehicle(msg):
+            # don't process msgs from other than primary vehicle, other than
+            # updating vehicle list
+            return
 
         master = self.master
         # add some status fields
