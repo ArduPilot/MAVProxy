@@ -73,6 +73,8 @@ class MPMenuItem(MPMenuGeneric):
 
     def _append(self, menu):
         '''append this menu item to a menu'''
+        if not self.name:
+            return
         menu.Append(self.id(), self.name, self.description)
 
     def __str__(self):
