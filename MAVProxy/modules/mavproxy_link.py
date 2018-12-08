@@ -384,6 +384,10 @@ class LinkModule(mp_module.MPModule):
             # keep the pymavlink level target system aligned with the MAVProxy setting
             master.target_system = self.settings.target_system
 
+        if self.settings.target_component != 0 and master.target_component != self.settings.target_component:
+            # keep the pymavlink level target component aligned with the MAVProxy setting
+            master.target_component = self.settings.target_component
+            
         mtype = m.get_type()
 
         if mtype == 'HEARTBEAT' and m.type != mavutil.mavlink.MAV_TYPE_GCS:
