@@ -299,7 +299,10 @@ class FenceModule(mp_module.MPModule):
                 p = self.fenceloader.point(i)
                 self.console.writeln("lat=%f lng=%f" % (p.lat, p.lng))
         if self.status.logdir is not None:
-            fencetxt = os.path.join(self.status.logdir, 'fence.txt')
+            fname = 'fence.txt'
+            if self.target_system > 1:
+                fname = 'fence_%u.txt' % self.target_system
+            fencetxt = os.path.join(self.status.logdir, fname)
             self.fenceloader.save(fencetxt.strip('"'))
             print("Saved fence to %s" % fencetxt)
         self.have_list = True

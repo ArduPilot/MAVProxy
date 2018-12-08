@@ -320,7 +320,10 @@ class RallyModule(mp_module.MPModule):
             self.console.writeln("lat=%f lng=%f alt=%f break_alt=%f land_dir=%f autoland=%f" % (p.lat * 1e-7, p.lng * 1e-7, p.alt, p.break_alt, p.land_dir, int(p.flags & 2!=0) ))
 
         if self.logdir is not None:
-            ral_file_path = os.path.join(self.logdir, 'ral.txt')
+            fname = 'ral.txt'
+            if self.target_system > 1:
+                fname = 'ral_%u.txt' % self.target_system
+            ral_file_path = os.path.join(self.logdir, fname)
             self.rallyloader.save(ral_file_path)
             print("Saved rally points to %s" % ral_file_path)
 

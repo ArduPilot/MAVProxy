@@ -132,7 +132,10 @@ class WPModule(mp_module.MPModule):
                         w.param1, w.param2, w.param3, w.param4,
                         w.current, w.autocontinue))
                 if self.logdir is not None:
-                    waytxt = os.path.join(self.logdir, 'way.txt')
+                    fname = 'way.txt'
+                    if m.get_srcSystem() != 1:
+                        fname = 'way_%u.txt' % m.get_srcSystem()
+                    waytxt = os.path.join(self.logdir, fname)
                     self.save_waypoints(waytxt)
                     print("Saved waypoints to %s" % waytxt)
                 self.loading_waypoints = False
