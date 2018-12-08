@@ -164,6 +164,8 @@ class ConsoleModule(mp_module.MPModule):
     
     def add_new_vehicle(self, hb):
         '''add a new vehicle'''
+        if hb.type == mavutil.mavlink.MAV_TYPE_GCS:
+            return
         sysid = hb.get_srcSystem()
         self.vehicle_list.append(sysid)
         self.vehicle_name_by_sysid[sysid] = self.vehicle_type_string(hb)

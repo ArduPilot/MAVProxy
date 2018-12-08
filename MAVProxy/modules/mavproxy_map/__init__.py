@@ -634,6 +634,7 @@ class MapModule(mp_module.MPModule):
         sysid = m.get_srcSystem()
 
         if mtype == "HEARTBEAT":
+            vname = 'plane'
             if m.type in [mavutil.mavlink.MAV_TYPE_FIXED_WING]:
                 vname = 'plane'
             elif m.type in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER]:
