@@ -201,7 +201,8 @@ class MPState(object):
         # SITL output
         self.sitl_output = None
 
-        self.mav_param = mavparm.MAVParmDict()
+        self.mav_param_by_sysid = {}
+        self.mav_param_by_sysid[self.settings.target_system] = mavparm.MAVParmDict()
         self.modules = []
         self.public_modules = {}
         self.functions = MAVFunctions()
@@ -215,6 +216,13 @@ class MPState(object):
         self.is_sitl = False
         self.start_time_s = time.time()
         self.attitude_time_s = 0
+
+    @property
+    def mav_param(self):
+        '''map mav_param onto the current target system parameters'''
+        if not self.settings.target_system in self.mav_param_by_sysid:
+            self.mav_param_by_sysid[self.settings.target_system] = mavparm.MAVParmDict()
+        return self.mav_param_by_sysid[self.settings.target_system]
 
     def module(self, name):
         '''Find a public module (most modules are private)'''
