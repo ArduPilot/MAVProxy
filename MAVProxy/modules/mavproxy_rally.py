@@ -14,7 +14,7 @@ if mp_util.has_wxpython:
 class RallyModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(RallyModule, self).__init__(mpstate, "rally", "rally point control", public = True)
-        self.rallyloader = mavwp.MAVRallyLoader(self.settings.target_system, self.settings.target_component)
+        self.rallyloader_by_sysid = {}
         self.add_command('rally', self.cmd_rally, "rally point control", ["<add|clear|land|list|move|remove|>",
                                     "<load|save> (FILENAME)"])
         self.have_list = False
@@ -41,6 +41,13 @@ class RallyModule(mp_module.MPModule):
                                                     handler=MPMenuCallTextDialog(title='Rally Altitude (m)',
                                                                                  default=100))])
 
+    @property
+    def rallyloader(self):
+        '''rally loader by system ID'''
+        if not self.target_system in self.rallyloader_by_sysid:
+            self.rallyloader_by_sysid[self.target_system] = mavwp.MAVRallyLoader(self.settings.target_system,
+                                                                                 self.settings.target_component)
+        return self.rallyloader_by_sysid[self.target_system]
 
     def idle_task(self):
         '''called on idle'''

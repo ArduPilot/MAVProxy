@@ -15,7 +15,7 @@ class WPModule(mp_module.MPModule):
         self.wp_requested = {}
         self.wp_received = {}
         self.wp_save_filename = None
-        self.wploader = mavwp.MAVWPLoader()
+        self.wploader_by_sysid = {}
         self.loading_waypoints = False
         self.loading_waypoint_lasttime = time.time()
         self.last_waypoint = 0
@@ -56,6 +56,12 @@ class WPModule(mp_module.MPModule):
                                          MPMenuItem('Loop', 'Loop', '# wp loop'),
                                          MPMenuItem('Add NoFly', 'Loop', '# wp noflyadd')])
 
+    @property
+    def wploader(self):
+        '''per-sysid wploader'''
+        if self.target_system not in self.wploader_by_sysid:
+            self.wploader_by_sysid[self.target_system] = mavwp.MAVWPLoader()
+        return self.wploader_by_sysid[self.target_system]
 
     def missing_wps_to_request(self):
         ret = []

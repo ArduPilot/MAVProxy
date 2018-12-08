@@ -11,7 +11,7 @@ if mp_util.has_wxpython:
 class FenceModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(FenceModule, self).__init__(mpstate, "fence", "geo-fence management", public = True)
-        self.fenceloader = mavwp.MAVFenceLoader()
+        self.fenceloader_by_sysid = {}
         self.last_fence_breach = 0
         self.last_fence_status = 0
         self.present = False
@@ -46,6 +46,13 @@ class FenceModule(mp_module.MPModule):
                                                                                  title='Fence Save',
                                                                                  wildcard='*.fen')),
                                          MPMenuItem('Draw', 'Draw', '# fence draw')])
+
+    @property
+    def fenceloader(self):
+        '''fence loader by sysid'''
+        if not self.target_system in self.fenceloader_by_sysid:
+            self.fenceloader_by_sysid[self.target_system] = mavwp.MAVFenceLoader()
+        return self.fenceloader_by_sysid[self.target_system]
 
     def idle_task(self):
         '''called on idle'''
