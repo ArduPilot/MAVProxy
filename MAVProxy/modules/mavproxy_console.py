@@ -28,6 +28,7 @@ class ConsoleModule(mp_module.MPModule):
 
         # setup some default status information
         mpstate.console.set_status('Mode', 'UNKNOWN', row=0, fg='blue')
+        mpstate.console.set_status('SysID', '', row=0, fg='blue')
         mpstate.console.set_status('ARM', 'ARM', fg='grey', row=0)
         mpstate.console.set_status('GPS', 'GPS: --', fg='red', row=0)
         mpstate.console.set_status('Vcc', 'Vcc: --', fg='red', row=0)
@@ -354,6 +355,8 @@ class ConsoleModule(mp_module.MPModule):
             if self.settings.vehicle_name:
                 fmode = self.settings.vehicle_name + ':' + fmode
             self.console.set_status('Mode', '%s' % fmode, fg='blue')
+            if len(self.vehicle_list) > 1:
+                self.console.set_status('SysID', 'Sys:%u' % msg.get_srcSystem(), fg='blue')
             if self.master.motors_armed():
                 arm_colour = 'green'
             else:
