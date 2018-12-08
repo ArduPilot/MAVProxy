@@ -304,34 +304,53 @@ class ParamState:
 
 class ParamModule(mp_module.MPModule):
     def __init__(self, mpstate, **kwargs):
-        super(ParamModule, self).__init__(mpstate, "param", "parameter handling", public = True)
-        self.pstate = ParamState(self.mav_param, self.logdir, self.vehicle_name, 'mav.parm')
+        super(ParamModule, self).__init__(mpstate, "param", "parameter handling", public = True, multi_vehicle=True)
+        self.xml_filepath = kwargs.get("xml-filepath", None)
+        self.pstate = {}
+        self.check_new_target_system()
         self.add_command('param', self.cmd_param, "parameter handling",
                          ["<download|status>",
                           "<set|show|fetch|help|apropos> (PARAMETER)",
                           "<load|save|diff> (FILENAME)",
                           "<set_xml_filepath> (FILEPATH)"
                          ])
+
+    def add_new_target_system(self, sysid):
+        '''handle a new target_system'''
+        if sysid in self.pstate:
+            return
+        if not sysid in self.mpstate.mav_param_by_sysid:
+            self.mpstate.mav_param_by_sysid[sysid] = mavparm.MAVParmDict()
+        self.pstate[sysid] = ParamState(self.mpstate.mav_param_by_sysid[sysid], self.logdir, self.vehicle_name, 'mav.parm')
         if self.continue_mode and self.logdir is not None:
             parmfile = os.path.join(self.logdir, 'mav.parm')
             if os.path.exists(parmfile):
                 mpstate.mav_param.load(parmfile)
-                self.pstate.mav_param_set = set(self.mav_param.keys())
+                self.pstate[sysid].mav_param_set = set(self.mav_param.keys())
+        self.pstate[sysid].xml_filepath = self.xml_filepath
 
-        self.pstate.xml_filepath = kwargs.get("xml-filepath", None)
-
+    def check_new_target_system(self):
+        '''handle a new target_system'''
+        if self.target_system in self.pstate:
+            return
+        self.add_new_target_system(self.target_system)
+        
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
-        self.pstate.handle_mavlink_packet(self.master, m)
+        sysid = m.get_srcSystem()
+        self.add_new_target_system(sysid)
+        self.pstate[sysid].handle_mavlink_packet(self.master, m)
 
     def idle_task(self):
         '''handle missing parameters'''
-        self.pstate.vehicle_name = self.vehicle_name
-        self.pstate.fetch_check(self.master)
+        self.check_new_target_system()
+        self.pstate[self.target_system].vehicle_name = self.vehicle_name
+        self.pstate[self.target_system].fetch_check(self.master)
 
     def cmd_param(self, args):
         '''control parameters'''
-        self.pstate.handle_command(self.master, self.mpstate, args)
+        self.check_new_target_system()
+        self.pstate[self.target_system].handle_command(self.master, self.mpstate, args)
 
 def init(mpstate, **kwargs):
     '''initialise module'''
