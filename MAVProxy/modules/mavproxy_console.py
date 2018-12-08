@@ -61,6 +61,8 @@ class ConsoleModule(mp_module.MPModule):
 
         self.vehicle_list = []
         self.vehicle_menu = None
+        self.vehicle_name_by_sysid = {}
+        self.last_param_sysid_timestamp = None
 
         # create the main menu
         if mp_util.has_wxpython:
@@ -146,15 +148,26 @@ class ConsoleModule(mp_module.MPModule):
             return "Tracker"
         return "UNKNOWN(%u) % hb.type"
 
+    def update_vehicle_menu(self):
+        '''update menu for new vehicles'''
+        self.vehicle_menu.items = []
+        for s in sorted(self.vehicle_list):
+            clist = self.module('param').get_component_id_list(s)
+            if len(clist) == 1:
+                name = 'SysID %u: %s' % (s, self.vehicle_name_by_sysid[s])
+                self.vehicle_menu.items.append(MPMenuItem(name, name, '# set target_system %u' % s))
+            else:
+                for c in sorted(clist):
+                    name = 'SysID %u[%u]: %s' % (s, c, self.vehicle_name_by_sysid[s])
+                    self.vehicle_menu.items.append(MPMenuItem(name, name, '# set target_system %u; set target_component %u' % (s,c)))
+        self.mpstate.console.set_menu(self.menu, self.menu_callback)
+    
     def add_new_vehicle(self, hb):
         '''add a new vehicle'''
         sysid = hb.get_srcSystem()
         self.vehicle_list.append(sysid)
-        self.vehicle_menu.items = []
-        for s in sorted(self.vehicle_list):
-            name = 'SysID %u: %s' % (s, self.vehicle_type_string(hb))
-            self.vehicle_menu.items.append(MPMenuItem(name, name, '# set target_system %u' % s))
-        self.mpstate.console.set_menu(self.menu, self.menu_callback)
+        self.vehicle_name_by_sysid[sysid] = self.vehicle_type_string(hb)
+        self.update_vehicle_menu()
 
     def mavlink_packet(self, msg):
         '''handle an incoming mavlink packet'''
@@ -170,6 +183,19 @@ class ConsoleModule(mp_module.MPModule):
             if not sysid in self.vehicle_list:
                 self.add_new_vehicle(msg)
 
+        if self.last_param_sysid_timestamp != self.module('param').new_sysid_timestamp:
+            '''a new component ID has appeared for parameters'''
+            self.last_param_sysid_timestamp = self.module('param').new_sysid_timestamp
+            self.update_vehicle_menu()
+
+        if type in ['RADIO', 'RADIO_STATUS']:
+            # handle RADIO msgs from all vehicles
+            if msg.rssi < msg.noise+10 or msg.remrssi < msg.remnoise+10:
+                fg = 'red'
+            else:
+                fg = 'black'
+            self.console.set_status('Radio', 'Radio %u/%u %u/%u' % (msg.rssi, msg.noise, msg.remrssi, msg.remnoise), fg=fg)
+            
         if not self.is_primary_vehicle(msg):
             # don't process msgs from other than primary vehicle, other than
             # updating vehicle list
@@ -344,12 +370,6 @@ class ConsoleModule(mp_module.MPModule):
                 status += 'O2'
             self.console.set_status('PWR', status, fg=fg)
             self.console.set_status('Srv', 'Srv %.2f' % (msg.Vservo*0.001), fg='green')
-        elif type in ['RADIO', 'RADIO_STATUS']:
-            if msg.rssi < msg.noise+10 or msg.remrssi < msg.remnoise+10:
-                fg = 'red'
-            else:
-                fg = 'black'
-            self.console.set_status('Radio', 'Radio %u/%u %u/%u' % (msg.rssi, msg.noise, msg.remrssi, msg.remnoise), fg=fg)
         elif type == 'HEARTBEAT':
             fmode = master.flightmode
             if self.settings.vehicle_name:

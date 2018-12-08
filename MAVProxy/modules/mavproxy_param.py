@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 '''param command handling'''
 
-import time, os, fnmatch
+import time, os, fnmatch, time, struct
 from pymavlink import mavutil, mavparm
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
@@ -21,10 +21,52 @@ class ParamState:
         self.parm_file = parm_file
         self.fetch_set = None
         self.xml_filepath = None
+        self.new_sysid_timestamp = time.time()
+        self.autopilot_type_by_sysid = {}
+        self.param_types = {}
+
+    def handle_px4_param_value(self, m):
+        '''special handling for the px4 style of PARAM_VALUE'''
+        if m.param_type == mavutil.mavlink.MAV_PARAM_TYPE_REAL32:
+            # already right type
+            return m.param_value
+        is_px4_params = False
+        if m.get_srcComponent() in [mavutil.mavlink.MAV_COMP_ID_UDP_BRIDGE]:
+            # ESP8266 uses PX4 style parameters
+            is_px4_params = True
+        sysid = m.get_srcSystem()
+        if self.autopilot_type_by_sysid.get(sysid,-1) in [mavutil.mavlink.MAV_AUTOPILOT_PX4]:
+            is_px4_params = True
+        if not is_px4_params:
+            return m.param_value
+        # try to extract px4 param value
+        value = m.param_value
+        try:
+            v = struct.pack(">f", value)
+        except Exception:
+            return value
+        if m.param_type == mavutil.mavlink.MAV_PARAM_TYPE_UINT8:
+            value, = struct.unpack(">B", v[3:])
+        elif m.param_type == mavutil.mavlink.MAV_PARAM_TYPE_INT8:
+            value, = struct.unpack(">b", v[3:])
+        elif m.param_type == mavutil.mavlink.MAV_PARAM_TYPE_UINT16:
+            value, = struct.unpack(">H", v[2:])
+        elif m.param_type == mavutil.mavlink.MAV_PARAM_TYPE_INT16:
+            value, = struct.unpack(">h", v[2:])
+        elif m.param_type == mavutil.mavlink.MAV_PARAM_TYPE_UINT32:
+            value, = struct.unpack(">I", v[0:])
+        elif m.param_type == mavutil.mavlink.MAV_PARAM_TYPE_INT32:
+            value, = struct.unpack(">i", v[0:])
+        # can't pack other types
+
+        # remember type for param set
+        self.param_types[m.param_id.upper()] = m.param_type
+        return value
 
     def handle_mavlink_packet(self, master, m):
         '''handle an incoming mavlink packet'''
         if m.get_type() == 'PARAM_VALUE':
+            value = self.handle_px4_param_value(m)
             param_id = "%.16s" % m.param_id
             # Note: the xml specifies param_index is a uint16, so -1 in that field will show as 65535
             # We accept both -1 and 65535 as 'unknown index' to future proof us against someday having that
@@ -38,10 +80,13 @@ class ParamState:
                 added_new_parameter = False
             if m.param_count != -1:
                 self.mav_param_count = m.param_count
-            self.mav_param[str(param_id)] = m.param_value
+            self.mav_param[str(param_id)] = value
             if param_id in self.fetch_one and self.fetch_one[param_id] > 0:
                 self.fetch_one[param_id] -= 1
-                print("%s = %.7f" % (param_id, m.param_value))
+                if isinstance(value, float):
+                    print("%s = %.7f" % (param_id, value))
+                else:
+                    print("%s = %s" % (param_id, str(value)))
             if added_new_parameter and len(self.mav_param_set) == m.param_count:
                 print("Received %u parameters" % m.param_count)
                 if self.logdir is not None:
@@ -49,6 +94,10 @@ class ParamState:
                 self.fetch_set = None
             if self.fetch_set is not None and len(self.fetch_set) == 0:
                 self.fetch_check(master, force=True)
+        elif m.get_type() == 'HEARTBEAT':
+            if m.get_srcComponent() == 1:
+                # remember autopilot types so we can handle PX4 parameters
+                self.autopilot_type_by_sysid[m.get_srcSystem()] = m.autopilot
 
     def fetch_check(self, master, force=False):
         '''check for missing parameters periodically'''
@@ -251,7 +300,11 @@ class ParamState:
             if not param.upper() in self.mav_param:
                 print("Unable to find parameter '%s'" % param)
                 return
-            self.mav_param.mavset(master, param.upper(), value, retries=3)
+            uname = param.upper()
+            ptype = None
+            if uname in self.param_types:
+                ptype = self.param_types[uname]
+            self.mav_param.mavset(master, uname, value, retries=3, parm_type=ptype)
 
             if (param.upper() == "WP_LOITER_RAD" or param.upper() == "LAND_BREAK_PATH"):
                 #need to redraw rally points
@@ -315,42 +368,65 @@ class ParamModule(mp_module.MPModule):
                           "<set_xml_filepath> (FILEPATH)"
                          ])
 
+    def get_component_id_list(self, system_id):
+        '''get list of component IDs with parameters for a given system ID'''
+        ret = []
+        for (s,c) in self.mpstate.mav_param_by_sysid.keys():
+            if s == system_id:
+                ret.append(c)
+        return ret
+
     def add_new_target_system(self, sysid):
         '''handle a new target_system'''
         if sysid in self.pstate:
             return
         if not sysid in self.mpstate.mav_param_by_sysid:
             self.mpstate.mav_param_by_sysid[sysid] = mavparm.MAVParmDict()
-        self.pstate[sysid] = ParamState(self.mpstate.mav_param_by_sysid[sysid], self.logdir, self.vehicle_name, 'mav.parm')
+            self.new_sysid_timestamp = time.time()
+        fname = 'mav.parm'
+        if sysid not in [(0,0),(1,1),(1,0)]:
+
+            fname = 'mav_%u_%u.parm' % (sysid[0], sysid[1])
+        self.pstate[sysid] = ParamState(self.mpstate.mav_param_by_sysid[sysid], self.logdir, self.vehicle_name, fname)
         if self.continue_mode and self.logdir is not None:
-            parmfile = os.path.join(self.logdir, 'mav.parm')
+            parmfile = os.path.join(self.logdir, fname)
             if os.path.exists(parmfile):
                 mpstate.mav_param.load(parmfile)
                 self.pstate[sysid].mav_param_set = set(self.mav_param.keys())
         self.pstate[sysid].xml_filepath = self.xml_filepath
 
+    def get_sysid(self):
+        '''get sysid tuple to use for parameters'''
+        component = self.target_component
+        if component == 0:
+            component = 1
+        return (self.target_system, component)
+
     def check_new_target_system(self):
         '''handle a new target_system'''
-        if self.target_system in self.pstate:
+        sysid = self.get_sysid()
+        if sysid in self.pstate:
             return
-        self.add_new_target_system(self.target_system)
+        self.add_new_target_system(sysid)
         
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
-        sysid = m.get_srcSystem()
+        sysid = (m.get_srcSystem(),m.get_srcComponent())
         self.add_new_target_system(sysid)
         self.pstate[sysid].handle_mavlink_packet(self.master, m)
 
     def idle_task(self):
         '''handle missing parameters'''
         self.check_new_target_system()
-        self.pstate[self.target_system].vehicle_name = self.vehicle_name
-        self.pstate[self.target_system].fetch_check(self.master)
+        sysid = self.get_sysid()
+        self.pstate[sysid].vehicle_name = self.vehicle_name
+        self.pstate[sysid].fetch_check(self.master)
 
     def cmd_param(self, args):
         '''control parameters'''
         self.check_new_target_system()
-        self.pstate[self.target_system].handle_command(self.master, self.mpstate, args)
+        sysid = self.get_sysid()
+        self.pstate[sysid].handle_command(self.master, self.mpstate, args)
 
 def init(mpstate, **kwargs):
     '''initialise module'''
