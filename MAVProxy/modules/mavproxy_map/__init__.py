@@ -247,6 +247,8 @@ class MapModule(mp_module.MPModule):
                                          MPMenuItem('FencePoint Move', returnkey='popupFenceMove')])
             self.map.add_object(mp_slipmap.SlipPolygon('Fence', points, layer=1,
                                                                linewidth=2, colour=(0,255,0), popup_menu=popup))
+        else:
+            self.map.remove_object('Fence')
 
 
     def closest_waypoint(self, latlon):
