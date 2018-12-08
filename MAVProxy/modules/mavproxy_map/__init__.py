@@ -17,7 +17,7 @@ from pymavlink import mavutil
 
 class MapModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(MapModule, self).__init__(mpstate, "map", "map display", public = True, multi_instance=True)
+        super(MapModule, self).__init__(mpstate, "map", "map display", public = True, multi_instance=True, multi_vehicle=True)
         cmdname = "map"
         if self.instance > 1:
             cmdname += "%u" % self.instance
@@ -40,6 +40,7 @@ class MapModule(mp_module.MPModule):
         self.draw_line = None
         self.draw_callback = None
         self.have_global_position = False
+        self.vehicle_type_by_sysid = {}
         self.vehicle_type_name = 'plane'
         self.ElevationMap = mp_elevation.ElevationModel()
         self.last_unload_check_time = time.time()
@@ -628,26 +629,33 @@ class MapModule(mp_module.MPModule):
         '''handle an incoming mavlink packet'''
         from MAVProxy.modules.mavproxy_map import mp_slipmap
         mtype = m.get_type()
+        sysid = m.get_srcSystem()
+
         if mtype == "HEARTBEAT":
             if m.type in [mavutil.mavlink.MAV_TYPE_FIXED_WING]:
-                self.vehicle_type_name = 'plane'
+                vname = 'plane'
             elif m.type in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER]:
-                self.vehicle_type_name = 'rover'
+                vname = 'rover'
             elif m.type in [mavutil.mavlink.MAV_TYPE_SUBMARINE]:
-                self.vehicle_type_name = 'sub'
+                vname = 'sub'
             elif m.type in [mavutil.mavlink.MAV_TYPE_SURFACE_BOAT]:
-                self.vehicle_type_name = 'boat'
+                vname = 'boat'
             elif m.type in [mavutil.mavlink.MAV_TYPE_QUADROTOR,
                             mavutil.mavlink.MAV_TYPE_HEXAROTOR,
                             mavutil.mavlink.MAV_TYPE_OCTOROTOR,
                             mavutil.mavlink.MAV_TYPE_TRICOPTER]:
-                self.vehicle_type_name = 'copter'
+                vname = 'copter'
             elif m.type in [mavutil.mavlink.MAV_TYPE_COAXIAL]:
-                self.vehicle_type_name = 'singlecopter'
+                vname = 'singlecopter'
             elif m.type in [mavutil.mavlink.MAV_TYPE_HELICOPTER]:
-                self.vehicle_type_name = 'heli'
+                vname = 'heli'
             elif m.type in [mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER]:
-                self.vehicle_type_name = 'antenna'
+                vname = 'antenna'
+            self.vehicle_type_by_sysid[sysid] = vname
+
+        if not sysid in self.vehicle_type_by_sysid:
+            self.vehicle_type_by_sysid[sysid] = 'plane'
+        self.vehicle_type_name = self.vehicle_type_by_sysid[sysid]
 
         # this is the beginnings of allowing support for multiple vehicles
         # in the air at the same time
@@ -686,7 +694,11 @@ class MapModule(mp_module.MPModule):
             if abs(self.lat) > 1.0e-3 or abs(self.lon) > 1.0e-3:
                 self.have_global_position = True
                 self.create_vehicle_icon('Pos' + vehicle, 'red', follow=True)
-                self.map.set_position('Pos' + vehicle, (self.lat, self.lon), rotation=self.heading)
+                if len(self.vehicle_type_by_sysid) > 1:
+                    label = str(sysid)
+                else:
+                    label = None
+                self.map.set_position('Pos' + vehicle, (self.lat, self.lon), rotation=self.heading, label=label, colour=(255,255,255))
 
         elif mtype == 'LOCAL_POSITION_NED' and not self.have_global_position:
             (self.lat, self.lon) = mp_util.gps_offset(0, 0, m.x, m.y)
@@ -729,6 +741,10 @@ class MapModule(mp_module.MPModule):
                                                            colour=(0,255,0)))
             else:
                 self.map.add_object(mp_slipmap.SlipClearLayer('PositionTarget'))
+
+        if not self.is_primary_vehicle(m):
+            # the rest should only be done for the primary vehicle
+            return
 
         # if the waypoints have changed, redisplay
         last_wp_change = self.module('wp').wploader.last_change
