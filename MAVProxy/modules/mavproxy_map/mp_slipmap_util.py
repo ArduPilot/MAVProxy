@@ -522,7 +522,13 @@ class SlipFollow:
     '''enable/disable follow'''
     def __init__(self, enable):
         self.enable = enable
-        
+
+class SlipFollowObject:
+    '''enable/disable follow for an object'''
+    def __init__(self, key, enable):
+        self.key = key
+        self.enable = enable
+
 class SlipBrightness:
     '''an object to change map brightness'''
     def __init__(self, brightness):

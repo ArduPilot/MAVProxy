@@ -26,6 +26,7 @@ from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipRemoveObject
 from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipThumbnail
 from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipZoom
 from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipFollow
+from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipFollowObject
 
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import win_layout
@@ -258,6 +259,13 @@ class MPSlipMapFrame(wx.Frame):
             if isinstance(obj, SlipFollow):
                 # enable/disable follow
                 state.follow = obj.enable
+
+            if isinstance(obj, SlipFollowObject):
+                # enable/disable follow on an object
+                for layer in state.layers:
+                    if obj.key in state.layers[layer]:
+                        if hasattr(object, 'follow'):
+                            state.layers[layer][obj.key].follow = obj.enable
                 
             if isinstance(obj, SlipBrightness):
                 # set map brightness

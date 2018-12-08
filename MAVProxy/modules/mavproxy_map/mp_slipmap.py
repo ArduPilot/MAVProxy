@@ -129,6 +129,10 @@ class MPSlipMap():
     def set_follow(self, enable):
         '''set follow on/off'''
         self.object_queue.put(SlipFollow(enable))
+
+    def set_follow_object(self, key, enable):
+        '''set follow on/off on an object'''
+        self.object_queue.put(SlipFollowObject(key, enable))
         
     def hide_object(self, key, hide=True):
         '''hide an object on the map by key'''

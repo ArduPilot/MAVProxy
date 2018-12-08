@@ -702,12 +702,14 @@ class MapModule(mp_module.MPModule):
                 else:
                     label = None
                 self.map.set_position('Pos' + vehicle, (self.lat, self.lon), rotation=self.heading, label=label, colour=(255,255,255))
+                self.map.set_follow_object('Pos' + vehicle, self.is_primary_vehicle(m))
 
         elif mtype == 'LOCAL_POSITION_NED' and not self.have_global_position:
             (self.lat, self.lon) = mp_util.gps_offset(0, 0, m.x, m.y)
             self.heading = math.degrees(math.atan2(m.vy, m.vx))
             self.create_vehicle_icon('Pos' + vehicle, 'red', follow=True)
             self.map.set_position('Pos' + vehicle, (self.lat, self.lon), rotation=self.heading)
+            self.map.set_follow_object('Pos' + vehicle, self.is_primary_vehicle(m))
 
         elif mtype == 'HOME_POSITION':
             (lat, lon) = (m.latitude*1.0e-7, m.longitude*1.0e-7)
