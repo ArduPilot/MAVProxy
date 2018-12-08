@@ -264,7 +264,7 @@ class MPSlipMapFrame(wx.Frame):
                 # enable/disable follow on an object
                 for layer in state.layers:
                     if obj.key in state.layers[layer]:
-                        if hasattr(object, 'follow'):
+                        if hasattr(state.layers[layer][obj.key], 'follow'):
                             state.layers[layer][obj.key].follow = obj.enable
                 
             if isinstance(obj, SlipBrightness):
