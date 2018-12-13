@@ -39,6 +39,16 @@ class dataflash_logger(mp_module.MPModule):
         self.time_last_start_packet_sent = 0
         self.time_last_stop_packet_sent = 0
         self.dataflash_dir = self._dataflash_dir(mpstate)
+        self.download = 0
+        self.prev_download = 0
+        self.last_status_time = time.time()
+        self.last_seqno = 0
+        self.missing_blocks = {}
+        self.acking_blocks = {}
+        self.blocks_to_ack_and_nack = []
+        self.missing_found = 0
+        self.abandoned = 0
+        self.dropped = 0
 
         self.log_settings = mp_settings.MPSettings(
             [('verbose', bool, False),
