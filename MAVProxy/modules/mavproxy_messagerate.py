@@ -59,7 +59,8 @@ class messagerate(mp_module.MPModule):
         mtypes = counts.keys()
         mtypes.sort()
         for mtype in mtypes:
-            ret += "%s: %0.1f/s\n" % (mtype, counts[mtype]/len(self.buckets))
+            ret += "%s: %0.1f/s\n" % (mtype,
+                                      counts[mtype]/float(len(self.buckets)))
         return ret
 
     def idle_task(self):
