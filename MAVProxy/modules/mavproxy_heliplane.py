@@ -75,7 +75,7 @@ class HeliPlaneModule(mp_module.MPModule):
             elif rsc <= 1200:
                 self.console.set_status('RSC', 'RSC:%u' % rsc, fg='red', row=4)
             elif rsc <= 1600:
-                self.console.set_status('RSC', 'RSC:%u' % rsc, fg='orenge', row=4)
+                self.console.set_status('RSC', 'RSC:%u' % rsc, fg='orange', row=4)
             else:
                 self.console.set_status('RSC', 'RSC:%u' % rsc, fg='green', row=4)
 
@@ -108,7 +108,7 @@ class HeliPlaneModule(mp_module.MPModule):
 
         # output channels
         self.rsc_out_channel = 9
-        self.fwd_thr_channel = 3
+        self.fwd_thr_channel = 10
 
         for ch in range(1,16):
             option = self.get_mav_param("RC%u_OPTION" % ch, 0)
