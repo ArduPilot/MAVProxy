@@ -378,6 +378,9 @@ class LinkModule(mp_module.MPModule):
         '''link message handling for an upstream link'''
         if self.settings.target_system != 0 and m.get_srcSystem() != self.settings.target_system:
             # don't process messages not from our target
+            if m.get_type() == "BAD_DATA":
+                if self.mpstate.settings.shownoise and mavutil.all_printable(m.data):
+                    self.mpstate.console.write(str(m.data), bg='red')
             return
 
         if self.settings.target_system != 0 and master.target_system != self.settings.target_system:
@@ -509,10 +512,6 @@ class LinkModule(mp_module.MPModule):
                 # cope with wrap
                 self.mpstate.attitude_time_s = att_time
 
-            
-        elif mtype == "BAD_DATA":
-            if self.mpstate.settings.shownoise and mavutil.all_printable(m.data):
-                self.mpstate.console.write(str(m.data), bg='red')
         elif mtype in [ "COMMAND_ACK", "MISSION_ACK" ]:
             self.mpstate.console.writeln("Got MAVLink msg: %s" % m)
 
