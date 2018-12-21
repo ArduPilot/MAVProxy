@@ -77,7 +77,7 @@ def layout_filename(fallback):
                 os.mkdir(dirname)
             except Exception:
                 pass
-    elif 'LOCALAPPDATA' in os.environ and not opts.setup:
+    elif 'LOCALAPPDATA' in os.environ:
         dirname = os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy")
     else:
         return None
