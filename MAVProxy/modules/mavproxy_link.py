@@ -21,6 +21,16 @@ delayedPackets = frozenset([ 'MISSION_CURRENT', 'SYS_STATUS', 'VFR_HUD',
                   'NAV_CONTROLLER_OUTPUT' ])
 activityPackets = frozenset([ 'HEARTBEAT', 'GPS_RAW_INT', 'GPS_RAW', 'GLOBAL_POSITION_INT', 'SYS_STATUS' ])
 
+preferred_ports = [
+    '*FTDI*',
+    "*Arduino_Mega_2560*",
+    "*3D*",
+    "*USB_to_UART*",
+    '*Ardu*',
+    '*PX4*',
+    '*Hex_*',
+    '*FMU*']
+
 class LinkModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
@@ -64,14 +74,7 @@ class LinkModule(mp_module.MPModule):
 
     def complete_serial_ports(self, text):
         '''return list of serial ports'''
-        ports = mavutil.auto_detect_serial(preferred_list=[
-            '*FTDI*',
-            "*Arduino_Mega_2560*",
-            "*3D_Robotics*",
-            "*USB_to_UART*",
-            '*Ardu*',
-            '*PX4*',
-            '*FMU*'])
+        ports = mavutil.auto_detect_serial(preferred_list=preferred_ports)
         return [ p.device for p in ports ]
 
     def complete_links(self, text):
@@ -243,15 +246,7 @@ class LinkModule(mp_module.MPModule):
 
     def cmd_link_ports(self):
         '''show available ports'''
-        ports = mavutil.auto_detect_serial(preferred_list=[
-            '*FTDI*',
-            "*Arduino_Mega_2560*",
-            "*3D*",
-            "*USB_to_UART*",
-            '*Ardu*',
-            '*PX4*',
-            '*Hex*',
-            '*FMU*'])
+        ports = mavutil.auto_detect_serial(preferred_list=preferred_ports)
         for p in ports:
             print("%s : %s : %s" % (p.device, p.description, p.hwid))
 

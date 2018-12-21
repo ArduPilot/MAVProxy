@@ -31,6 +31,7 @@ from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import dumpstacks
 from MAVProxy.modules.lib import mp_substitute
 from MAVProxy.modules.lib import multiproc
+from MAVProxy.modules.mavproxy_link import preferred_ports
 
 # adding all this allows pyinstaller to build a working windows executable
 # note that using --hidden-import does not work for these modules
@@ -1077,14 +1078,7 @@ if __name__ == '__main__':
         # modules/mavutil
         load_module('speech')
 
-    serial_list = mavutil.auto_detect_serial(preferred_list=[
-          '*FTDI*',
-          "*Arduino_Mega_2560*",
-          "*3D_Robotics*",
-          "*USB_to_UART*",
-          '*Ardu*',
-          '*PX4*',
-          '*FMU*'])
+    serial_list = mavutil.auto_detect_serial(preferred_list=preferred_ports)
     if not opts.master:
         print('Auto-detected serial ports are:')
         for port in serial_list:
