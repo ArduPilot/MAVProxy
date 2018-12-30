@@ -155,11 +155,11 @@ class ConsoleModule(mp_module.MPModule):
             clist = self.module('param').get_component_id_list(s)
             if len(clist) == 1:
                 name = 'SysID %u: %s' % (s, self.vehicle_name_by_sysid[s])
-                self.vehicle_menu.items.append(MPMenuItem(name, name, '# set target_system %u' % s))
+                self.vehicle_menu.items.append(MPMenuItem(name, name, '# vehicle %u' % s))
             else:
                 for c in sorted(clist):
                     name = 'SysID %u[%u]: %s' % (s, c, self.vehicle_name_by_sysid[s])
-                    self.vehicle_menu.items.append(MPMenuItem(name, name, '# set target_system %u; set target_component %u' % (s,c)))
+                    self.vehicle_menu.items.append(MPMenuItem(name, name, '# vehicle %u:%u' % (s,c)))
         self.mpstate.console.set_menu(self.menu, self.menu_callback)
     
     def add_new_vehicle(self, hb):

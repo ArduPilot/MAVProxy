@@ -40,6 +40,7 @@ class LinkModule(mp_module.MPModule):
                           'add (SERIALPORT)',
                           'attributes (LINK) (ATTRIBUTES)',
                           'remove (LINKS)'])
+        self.add_command('vehicle', self.cmd_vehicle, "vehicle control")
         self.no_fwd_types = set()
         self.no_fwd_types.add("BAD_DATA")
         self.add_completion_function('(SERIALPORT)', self.complete_serial_ports)
@@ -384,6 +385,7 @@ class LinkModule(mp_module.MPModule):
 
         if self.settings.target_component != 0 and master.target_component != self.settings.target_component:
             # keep the pymavlink level target component aligned with the MAVProxy setting
+            print("change target_component %u" % self.settings.target_component)
             master.target_component = self.settings.target_component
             
         mtype = m.get_type()
@@ -628,6 +630,32 @@ class LinkModule(mp_module.MPModule):
                         exc_type, exc_value, exc_traceback = sys.exc_info()
                         traceback.print_exception(exc_type, exc_value, exc_traceback,
                                                   limit=2, file=sys.stdout)
+
+    def cmd_vehicle(self, args):
+        '''handle vehicle commands'''
+        if len(args) < 1:
+            print("Usage: vehicle SYSID[:COMPID]")
+            return
+        a = args[0].split(':')
+        self.mpstate.settings.target_system = int(a[0])
+        if len(a) > 1:
+            self.mpstate.settings.target_component = int(a[1])
+
+        # change default link based on most recent HEARTBEAT
+        best_link = 0
+        best_timestamp = 0
+        for i in range(len(self.mpstate.mav_master)):
+            m = self.mpstate.mav_master[i]
+            m.target_system = self.mpstate.settings.target_system
+            m.target_component = self.mpstate.settings.target_component
+            if 'HEARTBEAT' in m.messages:
+                stamp = m.messages['HEARTBEAT']._timestamp
+                src_system = m.messages['HEARTBEAT'].get_srcSystem()
+                if stamp > best_timestamp:
+                    best_link = i
+                    best_timestamp = stamp
+        self.mpstate.settings.link = best_link + 1
+        print("Set vehicle %s (link %u)" % (args[0], best_link+1))
 
 def init(mpstate):
     '''initialise module'''
