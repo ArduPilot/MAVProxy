@@ -21,9 +21,8 @@ class MapModule(mp_module.MPModule):
         cmdname = "map"
         if self.instance > 1:
             cmdname += "%u" % self.instance
-        self.lat = None
-        self.lon = None
-        self.heading = 0
+        # lat/lon per system ID
+        self.lat_lon = {}
         self.wp_change_time = 0
         self.fence_change_time = 0
         self.rally_change_time = 0
@@ -693,22 +692,24 @@ class MapModule(mp_module.MPModule):
                 self.map.set_position('GPS2' + vehicle, (lat, lon), rotation=m.cog*0.01)
 
         elif mtype == 'GLOBAL_POSITION_INT':
-            (self.lat, self.lon, self.heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
-            if abs(self.lat) > 1.0e-3 or abs(self.lon) > 1.0e-3:
+            (lat, lon, heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
+            self.lat_lon[m.get_srcSystem()] = (lat,lon)
+            if abs(lat) > 1.0e-3 or abs(lon) > 1.0e-3:
                 self.have_global_position = True
                 self.create_vehicle_icon('Pos' + vehicle, 'red', follow=True)
                 if len(self.vehicle_type_by_sysid) > 1:
                     label = str(sysid)
                 else:
                     label = None
-                self.map.set_position('Pos' + vehicle, (self.lat, self.lon), rotation=self.heading, label=label, colour=(255,255,255))
+                self.map.set_position('Pos' + vehicle, (lat, lon), rotation=heading, label=label, colour=(255,255,255))
                 self.map.set_follow_object('Pos' + vehicle, self.is_primary_vehicle(m))
 
         elif mtype == 'LOCAL_POSITION_NED' and not self.have_global_position:
-            (self.lat, self.lon) = mp_util.gps_offset(0, 0, m.x, m.y)
-            self.heading = math.degrees(math.atan2(m.vy, m.vx))
+            (lat, lon) = mp_util.gps_offset(0, 0, m.x, m.y)
+            self.lat_lon[m.get_srcSystem()] = (lat,lon)
+            heading = math.degrees(math.atan2(m.vy, m.vx))
             self.create_vehicle_icon('Pos' + vehicle, 'red', follow=True)
-            self.map.set_position('Pos' + vehicle, (self.lat, self.lon), rotation=self.heading)
+            self.map.set_position('Pos' + vehicle, (lat, lon), rotation=heading)
             self.map.set_follow_object('Pos' + vehicle, self.is_primary_vehicle(m))
 
         elif mtype == 'HOME_POSITION':
@@ -719,33 +720,36 @@ class MapModule(mp_module.MPModule):
                                                             icon, layer=3, rotation=0, follow=False))
 
         elif mtype == "NAV_CONTROLLER_OUTPUT":
-            if (self.master.flightmode in [ "AUTO", "GUIDED", "LOITER", "RTL", "QRTL", "QLOITER", "QLAND" ] and
-                self.lat is not None and self.lon is not None):
-                trajectory = [ (self.lat, self.lon),
-                               mp_util.gps_newpos(self.lat, self.lon, m.target_bearing, m.wp_dist) ]
-                self.map.add_object(mp_slipmap.SlipPolygon('trajectory', trajectory, layer='Trajectory',
-                                                                   linewidth=2, colour=(255,0,180)))
+            tlayer = 'Trajectory%u' % m.get_srcSystem()
+            if (self.master.flightmode in [ "AUTO", "GUIDED", "LOITER", "RTL", "QRTL", "QLOITER", "QLAND", "FOLLOW" ] and
+                m.get_srcSystem() in self.lat_lon):
+                (lat,lon) = self.lat_lon[m.get_srcSystem()]
+                trajectory = [ (lat, lon),
+                                mp_util.gps_newpos(lat, lon, m.target_bearing, m.wp_dist) ]
+                self.map.add_object(mp_slipmap.SlipPolygon('trajectory',
+                                                           trajectory, layer=tlayer,
+                                                               linewidth=2, colour=(255,0,180)))
             else:
-                self.map.add_object(mp_slipmap.SlipClearLayer('Trajectory'))
+                self.map.add_object(mp_slipmap.SlipClearLayer(tlayer))
 
         elif mtype == "POSITION_TARGET_GLOBAL_INT":
             # FIXME: base this off SYS_STATUS.MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL?
-            if self.lat is None:
+            if not m.get_srcSystem() in self.lat_lon:
                 return
-            if self.lon is None:
-                return
-            if (self.master.flightmode in [ "AUTO", "GUIDED", "LOITER", "RTL", "QRTL", "QLOITER", "QLAND" ]):
+            tlayer = 'PostionTarget%u' % m.get_srcSystem()
+            (lat,lon) = self.lat_lon[m.get_srcSystem()]
+            if (self.master.flightmode in [ "AUTO", "GUIDED", "LOITER", "RTL", "QRTL", "QLOITER", "QLAND", "FOLLOW" ]):
                 lat_float = m.lat_int*1e-7
                 lon_float = m.lon_int*1e-7
                 vec = [ (lat_float, lon_float),
-                        (self.lat, self.lon) ]
+                        (lat, lon) ]
                 self.map.add_object(mp_slipmap.SlipPolygon('position_target',
                                                            vec,
-                                                           layer='PositionTarget',
+                                                           layer=tlayer,
                                                            linewidth=2,
                                                            colour=(0,255,0)))
             else:
-                self.map.add_object(mp_slipmap.SlipClearLayer('PositionTarget'))
+                self.map.add_object(mp_slipmap.SlipClearLayer(tlayer))
 
         if not self.is_primary_vehicle(m):
             # the rest should only be done for the primary vehicle
