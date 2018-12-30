@@ -178,6 +178,8 @@ class MPState(object):
               MPSetting('height_unit', str, 'm', 'height unit', choice=['m', 'feet']),
               MPSetting('speed_unit', str, 'm/s', 'height unit', choice=['m/s', 'knots', 'mph']),
 
+              MPSetting('fwdpos', bool, False, 'Forward GLOBAL_POSITION_INT on all links'),
+
               MPSetting('vehicle_name', str, '', 'Vehicle Name', tab='Vehicle'),
             ])
 
