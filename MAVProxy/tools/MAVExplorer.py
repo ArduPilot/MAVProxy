@@ -61,6 +61,7 @@ class MEState(object):
             )
 
         self.mlog = None
+        self.filename = None
         self.command_map = command_map
         self.completions = {
             "set"       : ["(SETTING)"],
@@ -183,7 +184,8 @@ def setup_menus():
     TopMenu.add(MPMenuSubMenu('Display',
                            items=[MPMenuItem('Map', 'Map', '# map'),
                                   MPMenuItem('Save Graph', 'Save', '# save'),
-                                  MPMenuItem('Reload Graphs', 'Reload', '# reload')]))
+                                  MPMenuItem('Reload Graphs', 'Reload', '# reload'),
+                                  MPMenuItem('FFT', 'FFT', '# fft')]))
     TopMenu.add(graph_menus())
     TopMenu.add(MPMenuSubMenu('FlightMode', items=flightmode_menu()))
 
@@ -348,6 +350,16 @@ def cmd_reload(args):
     setup_menus()
     mestate.console.write("Loaded %u graphs\n" % len(mestate.graphs))
 
+def cmd_fft(args):
+    '''display fft from log'''
+    from MAVProxy.modules.lib import mav_fft
+    if len(args) > 0:
+        condition = args[0]
+    else:
+        condition = None
+    child = multiproc.Process(target=mav_fft.mavfft_display, args=[mestate.filename,condition])
+    child.start()
+
 def save_graph(graphdef):
     '''save a graph as XML'''
     if graphdef.filename is None:
@@ -494,6 +506,7 @@ def loadfile(args):
     mlog = mavutil.mavlink_connection(args, notimestamps=False,
                                       zero_time_base=False,
                                       progress_callback=progress_bar)
+    mestate.filename = args
     mestate.mlog = mlog
     mestate.status.msgs = mlog.messages
     t1 = time.time()
@@ -589,6 +602,7 @@ command_map = {
     'param'      : (cmd_param,     'show parameters'),
     'messages'   : (cmd_messages,  'show messages'),
     'map'        : (cmd_map,       'show map view'),
+    'fft'        : (cmd_fft,       'show a FFT (if available)'),
     'loadLog'    : (cmd_loadfile,  'load a log file'),
     }
 
