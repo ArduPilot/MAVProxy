@@ -12,7 +12,7 @@ This is useful in the circumstances when a telemetry stream is required to be di
 Requirements
 ============
 
-Raspberry Pi or similar with compatible Wifi dongle (if streaming telemetry to Wifi). Any similar small computer would work. The onyl requirement is that it is able to run the Ubuntu operating system.
+Raspberry Pi or similar with compatible Wifi dongle (if streaming telemetry to Wifi). Any similar small computer would work. The only requirement is that it is able to run the Ubuntu operating system.
 
 
 Setting up the Pi
