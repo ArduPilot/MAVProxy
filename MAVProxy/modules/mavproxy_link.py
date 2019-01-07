@@ -327,7 +327,7 @@ class LinkModule(mp_module.MPModule):
         master.highest_msec = msec
         if msec > self.status.highest_msec:
             self.status.highest_msec = msec
-        if msec < self.status.highest_msec and len(self.mpstate.mav_master) > 1:
+        if msec < self.status.highest_msec and len(self.mpstate.mav_master) > 1 and self.mpstate.settings.checkdelay:
             master.link_delayed = True
         else:
             master.link_delayed = False
@@ -593,7 +593,7 @@ class LinkModule(mp_module.MPModule):
             self.status.last_message = time.time()
             master.last_message = self.status.last_message
 
-        if master.link_delayed:
+        if master.link_delayed and self.mpstate.settings.checkdelay:
             # don't process delayed packets that cause double reporting
             if mtype in delayedPackets:
                 return

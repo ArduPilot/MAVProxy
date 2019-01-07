@@ -179,6 +179,7 @@ class MPState(object):
               MPSetting('speed_unit', str, 'm/s', 'height unit', choice=['m/s', 'knots', 'mph']),
 
               MPSetting('fwdpos', bool, False, 'Forward GLOBAL_POSITION_INT on all links'),
+              MPSetting('checkdelay', bool, True, 'check for link delay'),
 
               MPSetting('vehicle_name', str, '', 'Vehicle Name', tab='Vehicle'),
             ])
