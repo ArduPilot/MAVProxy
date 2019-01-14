@@ -62,6 +62,7 @@ class ConsoleModule(mp_module.MPModule):
         self.vehicle_list = []
         self.vehicle_menu = None
         self.vehicle_name_by_sysid = {}
+        self.component_name = {}
         self.last_param_sysid_timestamp = None
 
         # create the main menu
@@ -148,6 +149,18 @@ class ConsoleModule(mp_module.MPModule):
             return "Tracker"
         return "UNKNOWN(%u)" % hb.type
 
+    def component_type_string(self, hb):
+        # note that we rely on vehicle_type_string for basic vehicle types
+        if hb.type == mavutil.mavlink.MAV_TYPE_GCS:
+            return "GCS"
+        elif hb.type == mavutil.mavlink.MAV_TYPE_GIMBAL:
+            return "Gimbal"
+        elif hb.type == mavutil.mavlink.MAV_TYPE_ONBOARD_CONTROLLER:
+            return "CC"
+        elif hb.type == mavutil.mavlink.MAV_TYPE_GENERIC:
+            return "Generic"
+        return self.vehicle_type_string(hb)
+
     def update_vehicle_menu(self):
         '''update menu for new vehicles'''
         self.vehicle_menu.items = []
@@ -158,7 +171,10 @@ class ConsoleModule(mp_module.MPModule):
                 self.vehicle_menu.items.append(MPMenuItem(name, name, '# vehicle %u' % s))
             else:
                 for c in sorted(clist):
-                    name = 'SysID %u[%u]: %s' % (s, c, self.vehicle_name_by_sysid[s])
+                    try:
+                        name = 'SysID %u[%u]: %s' % (s, c, self.component_name[s][c])
+                    except KeyError as e:
+                        name = 'SysID %u[%u]: ?' % (s,c)
                     self.vehicle_menu.items.append(MPMenuItem(name, name, '# vehicle %u:%u' % (s,c)))
         self.mpstate.console.set_menu(self.menu, self.menu_callback)
     
@@ -184,6 +200,12 @@ class ConsoleModule(mp_module.MPModule):
             sysid = msg.get_srcSystem()
             if not sysid in self.vehicle_list:
                 self.add_new_vehicle(msg)
+            if sysid not in self.component_name:
+                self.component_name[sysid] = {}
+            compid = msg.get_srcComponent()
+            if compid not in self.component_name[sysid]:
+                self.component_name[sysid][compid] = self.component_type_string(msg)
+                self.update_vehicle_menu()
 
         if self.last_param_sysid_timestamp != self.module('param').new_sysid_timestamp:
             '''a new component ID has appeared for parameters'''
