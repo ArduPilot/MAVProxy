@@ -146,7 +146,7 @@ class ConsoleModule(mp_module.MPModule):
             return "Heli"
         if hb.type == mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER:
             return "Tracker"
-        return "UNKNOWN(%u) % hb.type"
+        return "UNKNOWN(%u)" % hb.type
 
     def update_vehicle_menu(self):
         '''update menu for new vehicles'''
