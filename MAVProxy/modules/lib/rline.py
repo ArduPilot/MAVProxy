@@ -6,6 +6,11 @@ import sys, glob, os, platform
 import re
 from pymavlink import mavutil
 
+try:
+    raw_input      # Python 2
+except NameError:  # Python 3
+    raw_input = input
+
 rline_mpstate = None
 redisplay = None
 

@@ -56,8 +56,7 @@ class messagerate(mp_module.MPModule):
                 counts[x] += bucket[x]
 
         ret = ""
-        mtypes = counts.keys()
-        mtypes.sort()
+        mtypes = sorted(counts.keys())
         for mtype in mtypes:
             ret += "%s: %0.1f/s\n" % (mtype,
                                       counts[mtype]/float(len(self.buckets)))

@@ -214,9 +214,9 @@ class Geo_reference:
                 self.yllcorner.shape == ()):
             self.yllcorner = self.yllcorner[0]
 
-        assert (type(self.xllcorner) == types.FloatType)
-        assert (type(self.yllcorner) == types.FloatType)
-        assert (type(self.zone) == types.IntType)
+        assert (isinstance(self.xllcorner, float))
+        assert (isinstance(self.yllcorner, float))
+        assert (isinstance(self.zone, int))
 
 ################################################################################
 
@@ -458,7 +458,7 @@ def ensure_geo_reference(origin):
     elif origin is None:
         geo_ref = None
     else:
-        geo_ref = apply(Geo_reference, origin)
+        geo_ref = Geo_reference(*origin)
 
     return geo_ref
 

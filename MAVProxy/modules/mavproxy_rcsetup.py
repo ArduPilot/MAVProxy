@@ -3,6 +3,12 @@
 
 from MAVProxy.modules.lib import mp_module
 
+try:
+    raw_input      # Python 2
+except NameError:  # Python 3
+    raw_input = input
+
+
 class RCSetupModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(RCSetupModule, self).__init__(mpstate, "rcsetup")

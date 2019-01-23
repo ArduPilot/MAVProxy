@@ -1,5 +1,11 @@
 from MAVProxy.modules.lib.wx_loader import wx
 
+try:
+    basestring
+except NameError:
+    basestring = (str, )
+
+
 class TabbedDialog(wx.Dialog):
     def __init__(self, tab_names, title='Title', size=wx.DefaultSize):
         wx.Dialog.__init__(self, None, -1, title,
@@ -70,7 +76,7 @@ class TabbedDialog(wx.Dialog):
             setting = self.setting_map[label]
             ctrl = self.controls[label]
             value = ctrl.GetValue()
-            if isinstance(value, str) or isinstance(value, unicode):
+            if isinstance(value, basestring):
                 ctrl.SetValue(str(setting.value))
             else:
                 ctrl.SetValue(setting.value)

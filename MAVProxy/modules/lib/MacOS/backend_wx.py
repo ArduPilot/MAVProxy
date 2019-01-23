@@ -894,8 +894,7 @@ class FigureCanvasWx(FigureCanvasBase, wx.Panel):
         'return the wildcard string for the filesave dialog'
         default_filetype = self.get_default_filetype()
         filetypes = self.get_supported_filetypes_grouped()
-        sorted_filetypes = filetypes.items()
-        sorted_filetypes.sort()
+        sorted_filetypes = sorted(filetypes.items())
         wildcards = []
         extensions = []
         filter_index = 0

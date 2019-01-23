@@ -316,7 +316,7 @@ class ChecklistFrame(wx.Frame):
     def on_Button( self, event ):
         win = (event.GetEventObject()).GetParent()
         for widget in win.GetChildren():
-            if type(widget) is wx.CheckBox and widget.IsChecked() == 0:
+            if isinstance(widget, wx.CheckBox) and widget.IsChecked() == 0:
                 dlg = wx.MessageDialog(win, "Not all items checked", "Error", wx.OK | wx.ICON_WARNING)
                 dlg.ShowModal()
                 dlg.Destroy()
@@ -328,7 +328,7 @@ class ChecklistFrame(wx.Frame):
     def on_ButtonLast( self, event ):
         win = (event.GetEventObject()).GetParent()
         for widget in win.GetChildren():
-            if type(widget) is wx.CheckBox and widget.IsChecked() == 0:
+            if isinstance(widget, wx.CheckBox) and widget.IsChecked() == 0:
                 dlg = wx.MessageDialog(win, "Not all items checked", "Error", wx.OK | wx.ICON_WARNING)
                 dlg.ShowModal()
                 dlg.Destroy()
@@ -352,7 +352,7 @@ class ChecklistFrame(wx.Frame):
                 #go through each item in the current tab and (un)check as needed
                 #print(obj.name + ", " + str(obj.state))
                 for widget in win.GetChildren():
-                    if type(widget) is wx.CheckBox and widget.GetLabel() == obj.name:
+                    if isinstance(widget, wx.CheckBox) and widget.GetLabel() == obj.name:
                         widget.SetValue(obj.state)
 
 

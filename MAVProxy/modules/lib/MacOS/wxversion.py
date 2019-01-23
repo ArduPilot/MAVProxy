@@ -125,7 +125,7 @@ def select(versions, optionsRequired=False):
              as close as possible match to a hard, exact match.
         
     """
-    if type(versions) == str:
+    if isinstance(versions, str):
         versions = [versions]
 
     global _selected
@@ -140,7 +140,7 @@ def select(versions, optionsRequired=False):
 
     # If we get here then this is the first time wxversion is used, 
     # ensure that wxPython hasn't been imported yet.
-    if sys.modules.has_key('wx') or sys.modules.has_key('wxPython'):
+    if 'wx' in sys.modules or 'wxPython' in sys.modules:
         raise AlreadyImportedError("wxversion.select() must be called before wxPython is imported")
     
     # Look for a matching version and manipulate the sys.path as
@@ -174,10 +174,10 @@ def ensureMinimal(minVersion, optionsRequired=False):
     offer to open their web browser to the wxPython downloads page,
     and will then exit the application.
     """
-    assert type(minVersion) == str
+    assert isinstance(minVersion, str)
 
     # ensure that wxPython hasn't been imported yet.
-    if sys.modules.has_key('wx') or sys.modules.has_key('wxPython'):
+    if 'wx' in sys.modules or 'wxPython' in sys.modules:
         raise AlreadyImportedError("wxversion.ensureMinimal() must be called before wxPython is imported")
 
     bestMatch = None
@@ -244,7 +244,7 @@ def checkInstalled(versions, optionsRequired=False):
         :param optionsRequired: Same as in `select`.
     """
     
-    if type(versions) == str:
+    if isinstance(versions, str):
         versions = [versions]
     installed = _find_installed()
     bestMatch = _get_best_match(installed, versions, optionsRequired)
@@ -500,14 +500,14 @@ if __name__ == '__main__':
     try:
         # expecting an error on this one
         test("2.9")
-    except VersionError, e:
+    except VersionError as e:
         print("Asked for 2.9:\t got Exception:", e)
 
     # check for exception when incompatible versions are requested
     try:
         select("2.4")
         select("2.5")
-    except VersionError, e:
+    except VersionError as e:
         print("Asked for incompatible versions, got Exception:", e)
 
     _EM_DEBUG=1
@@ -516,7 +516,7 @@ if __name__ == '__main__':
     testEM("2.6-unicode", True)
     try:
         testEM("2.9")
-    except VersionError, e:
+    except VersionError as e:
         print("EM: Asked for 2.9:\t got Exception:", e)
 
     # cleanup

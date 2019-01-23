@@ -423,7 +423,7 @@ class HorizonFrame(wx.Frame):
         '''Updates the current waypoint and distance to it.''' 
         self.wpText.set_position((self.leftPos+(1.5*self.vertSize/10.0),0.97-(1.5*self.vertSize)+(0.5*self.vertSize/10.0)))
         self.wpText.set_size(self.fontSize)
-        if type(self.nextWPTime) is str:
+        if isinstance(self.nextWPTime, str):
             self.wpText.set_text('%.f/%.f\n(%.f m, ~ s)' % (self.currentWP,self.finalWP,self.wpDist))
         else:
             self.wpText.set_text('%.f/%.f\n(%.f m, %.f s)' % (self.currentWP,self.finalWP,self.wpDist,self.nextWPTime))
