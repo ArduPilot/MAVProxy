@@ -5,7 +5,7 @@ Stephen Dade
 July 2014
 '''
 
-import sys, os, time
+import math, sys, os, time
 from MAVProxy.modules.lib import mp_checklist
 from MAVProxy.modules.lib import mp_module
 from pymavlink import mavutil
