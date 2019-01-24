@@ -484,7 +484,17 @@ def cmd_param(args):
     for p in k:
         if fnmatch.fnmatch(str(p).upper(), wildcard.upper()):
             print("%-16.16s %f" % (str(p), mestate.mlog.params[p]))
-            
+
+def cmd_devid(args):
+    '''show parameters'''
+    params = mestate.mlog.params
+    k = sorted(params.keys())
+    for p in k:
+        if p.startswith('COMPASS_DEV_ID'):
+            mp_util.decode_devid(params[p], p)
+        if p.startswith('INS_') and p.endswith('_ID'):
+            mp_util.decode_devid(params[p], p)
+
 def cmd_loadfile(args):
     '''callback from menu to load a log file'''
     if len(args) != 1:
@@ -601,6 +611,7 @@ command_map = {
     'condition'  : (cmd_condition, 'set graph conditions'),
     'param'      : (cmd_param,     'show parameters'),
     'messages'   : (cmd_messages,  'show messages'),
+    'devid'      : (cmd_devid,     'show device IDs'),
     'map'        : (cmd_map,       'show map view'),
     'fft'        : (cmd_fft,       'show a FFT (if available)'),
     'loadLog'    : (cmd_loadfile,  'load a log file'),
