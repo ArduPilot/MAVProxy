@@ -547,7 +547,10 @@ class WPModule(mp_module.MPModule):
         numrows = self.wploader.count()
         for row in range(numrows):
             wp = self.wploader.wp(row)
-            if wp.command in [mavutil.mavlink.MAV_CMD_DO_JUMP, mavutil.mavlink.MAV_CMD_DO_CONDITION_JUMP]:
+            jump_cmds = [mavutil.mavlink.MAV_CMD_DO_JUMP]
+            if hasattr(mavutil.mavlink, "MAV_CMD_DO_CONDITION_JUMP"):
+                jump_cmds.append(mavutil.mavlink.MAV_CMD_DO_CONDITION_JUMP)
+            if wp.command in jump_cmds:
                 p1 = int(wp.param1)
                 if p1 > idx and p1+delta>0:
                     wp.param1 = float(p1+delta)
