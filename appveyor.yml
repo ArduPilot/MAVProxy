@@ -8,10 +8,13 @@ environment:
   matrix:
     # Pre-installed Python versions, which Appveyor may upgrade to
     # a later point release.
-    # See: https://www.appveyor.com/docs/installed-software#python
+    # See: https://www.appveyor.com/docs/windows-images-software/#python
     - PYTHON: "C:\\Python27"
       PYTHON_VERSION: "2.7.x" # currently 2.7.15
       PYTHON_ARCH: "32"
+    - PYTHON: "C:\Python27-x64"
+      PYTHON_VERSION: "2.7.x" # currently 2.7.15
+      PYTHON_ARCH: "64"
 
 
 install:
