@@ -15,6 +15,8 @@ environment:
     - PYTHON: "C:\\Python27-x64"
       PYTHON_VERSION: "2.7.x" # currently 2.7.15
       PYTHON_ARCH: "64"
+    allow_failures:
+      - PYTHON_ARCH: "64"
 
 
 install:
