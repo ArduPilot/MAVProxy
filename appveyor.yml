@@ -34,7 +34,7 @@ install:
   # compiled extensions and are not provided as pre-built wheel packages,
   # pip will build them from source using the MSVC compiler matching the
   # target Python version and architecture
-  - "pip install -U pywin32 lxml pymavlink numpy matplotlib pyserial opencv-python pyreadline PyYAML Pygame Pillow"
+  - "pip install -U pywin32 flake8 lxml pymavlink numpy matplotlib pyserial opencv-python pyreadline PyYAML Pygame Pillow"
   - "pip install pyinstaller setuptools packaging"
   
   #We're using Inno Setup to build an installer
@@ -62,8 +62,12 @@ build_script:
 
 test_script:
   # Run the project tests and store results in .xml log
+  # fail the build if there are Python syntax errors or undefined names
+  - flake8 . --count --select=E901,E999,F821,F822,F823 --show-source --statistics
+  # exit-zero treats all errors as warnings. The GitHub web ui editor is 127 chars wide
+  - SELECT=C,E10,E11,E401,E502,E703,E8,E9,F,W191,W291,W292,W293,W391
+  - flake8 . --count --exit-zero --select=${SELECT} --max-complexity=10 --max-line-length=127 --statistics
 
-      
 after_test:
   # If tests are successful, create binary packages for the project.
   #run pyinstaller
