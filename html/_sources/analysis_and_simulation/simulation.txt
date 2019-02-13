@@ -21,7 +21,7 @@ code <https://github.com/diydrones/ardupilot>`_ and the
 your system setup, other packages may be required
 
 A full guide for setting up the environment is at the `APM
-Wiki <http://dev.ardupilot.com/wiki/setting-up-sitl-on-linux/>`_.
+Wiki <http://ardupilot.org/dev/docs/setting-up-sitl-on-linux.html>`_.
 
 Some useful command line options are:
 
@@ -53,7 +53,7 @@ code <https://github.com/ardupilot/ardupilot>`_ and the
 your system setup, other packages may be required.
 
 Refer to the SITL guide `APM
-Wiki <http://dev.ardupilot.com/wiki/setting-up-sitl-on-linux/>`_ for setting up the JSBSim simulator.
+Wiki <http://ardupilot.org/dev/docs/setting-up-sitl-on-linux.html>`_ for setting up the JSBSim simulator.
 
 The options for HIL mode are the same as for SITL. Note that the -w and -G commands are not applicable to HIL
 
