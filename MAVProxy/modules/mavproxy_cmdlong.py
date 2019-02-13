@@ -222,7 +222,7 @@ class CmdlongModule(mp_module.MPModule):
                                       1,  # target system
                                       0,  # target component
                                       8,  # coordinate frame MAV_FRAME_BODY_NED
-                                      455,      # type mask (vel only)
+                                      4039,     # type mask (vel only)
                                       0, 0, 0,  # position x,y,z
                                       x_mps, y_mps, z_mps,  # velocity x,y,z
                                       0, 0, 0,  # accel x,y,z
