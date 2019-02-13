@@ -18,7 +18,7 @@ Raspberry Pi or similar with compatible Wifi dongle (if streaming telemetry to W
 Setting up the Pi
 =================
 
-The instructions for setting up the Wifi Access Point can be found here: http://dev.ardupilot.com/wiki/making-a-mavlink-wifi-bridge-using-the-raspberry-pi/. Follow steps 1-3.
+The instructions for setting up the Wifi Access Point can be found here: http://ardupilot.org/dev/docs/making-a-mavlink-wifi-bridge-using-the-raspberry-pi.html. Follow steps 1-3.
 
 Setting up MAVProxy
 ===================
