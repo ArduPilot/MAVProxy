@@ -29,6 +29,7 @@ preferred_ports = [
     '*Ardu*',
     '*PX4*',
     '*Hex_*',
+    '*Holybro_*',
     '*FMU*']
 
 class LinkModule(mp_module.MPModule):
