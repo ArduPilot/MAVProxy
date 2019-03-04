@@ -630,6 +630,8 @@ def process_mavlink(slave):
         return
     if mpstate.settings.mavfwd and not mpstate.status.setup_mode:
         for m in msgs:
+            if m.get_type() == 'BAD_DATA':
+                continue
             mpstate.master().write(m.get_msgbuf())
             if mpstate.status.watch:
                 for msg_type in mpstate.status.watch:
