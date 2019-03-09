@@ -147,7 +147,11 @@ class SRTMDownloader():
                     continue
                 data = r1.read()
                 conn.close()
-                return data
+                if sys.version_info.major < 3:
+                    return data
+                else:
+                    encoding = r1.headers.get_content_charset(default)
+                    return data.decode(encoding)
         return None
 
     def createFileListHTTP(self):
