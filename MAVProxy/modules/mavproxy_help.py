@@ -1,15 +1,26 @@
 """
     MAVProxy help/versioning module
 """
-import os, time, platform, re
-from urllib2 import Request, urlopen, URLError, HTTPError
+import os, time, platform, re, sys
 from pymavlink import mavwp, mavutil
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
 if mp_util.has_wxpython:
+    import wx
     from MAVProxy.modules.lib.mp_menu import *
-    import wxversion
 
+if sys.version_info.major < 3:
+    from urllib2 import Request
+    from urllib2 import urlopen
+    from urllib2 import URLError, HTTPError
+    import xmlrpclib
+else:
+    from urllib.request import Request
+    from urllib.request import urlopen
+    from urllib.error import URLError, HTTPError
+    basestring = str
+    import xmlrpc.client as xmlrpclib
+ 
 class HelpModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(HelpModule, self).__init__(mpstate, "mavhelp", "Help and version information", public = True)
@@ -21,7 +32,7 @@ class HelpModule(mp_module.MPModule):
         #pkg_resources doesn't work in the windows exe build, so read the version file
         try:
             import pkg_resources
-            self.version = pkg_resources.require("mavproxy")[0].version
+            self.version = pkg_resources.Environment()["mavproxy"][0].version
         except:
             start_script = os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy", "version.txt")
             f = open(start_script, 'r')
@@ -29,39 +40,18 @@ class HelpModule(mp_module.MPModule):
         self.host = platform.system() + platform.release()
         self.pythonversion = str(platform.python_version())
         if mp_util.has_wxpython:
-            self.wxVersion = str(wxversion.getInstalled())
+            self.wxVersion = str(wx.__version__)
         else:
             self.wxVersion = ''
 
         #check for updates, if able
-        if platform.system() == 'Windows':
-            req = Request('http://firmware.ardupilot.org/Tools/MAVProxy/')
-            html = ''
-            self.newversion = '1.0'
-            try:
-                filehandle = urlopen(req)
-                html = filehandle.read()
-            except HTTPError as e:
-                self.newversion = 'Error: ', e.code
-            except URLError as e:
-                self.newversion =  'Error: ', e.reason
-            else:
-                #parse the webpage for the latest version
-                begtags = [m.start() for m in re.finditer('>MAVProxySetup-', html)]
-                for begtag in begtags:
-                    endtag = html.find('.exe', begtag)
-                    versiontag = html[begtag+15:endtag]
-                    if not re.search('[a-zA-Z]', versiontag):
-                        if self.mycmp(self.newversion, versiontag) < 0:
-                            self.newversion = versiontag
-        elif platform.system() == 'Linux':
-            import xmlrpclib, pip
-            pypi = xmlrpclib.ServerProxy('https://pypi.python.org/pypi')
-            available = pypi.package_releases('MAVProxy')
-            if not available:
-                self.newversion = 'Error finding update'
-            else:
-                self.newversion = available[0]
+        import pip
+        pypi = xmlrpclib.ServerProxy('https://pypi.python.org/pypi')
+        available = pypi.package_releases('MAVProxy')
+        if not available:
+            self.newversion = 'Error finding update'
+        else:
+            self.newversion = available[0]
 
         #and format the update string
         if not isinstance(self.newversion, basestring):
