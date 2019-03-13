@@ -26,6 +26,3 @@ controls:
   - channel: 7
     type: axis
     id: 6
-  - channel: 8
-    type: axis
-    id: 7
