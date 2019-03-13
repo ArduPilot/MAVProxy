@@ -435,7 +435,7 @@ class WPModule(mp_module.MPModule):
         self.undo_type = "move"
 
         (lat, lon) = latlon
-        if getattr(self.console, 'ElevationMap', None) is not None and wp.frame != mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT:
+        if getattr(self.console, 'ElevationMap', None) is not None and wp.frame == mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT:
             alt1 = self.console.ElevationMap.GetElevation(lat, lon)
             alt2 = self.console.ElevationMap.GetElevation(wp.x, wp.y)
             if alt1 is not None and alt2 is not None:
