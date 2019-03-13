@@ -25,7 +25,7 @@ class WPModule(mp_module.MPModule):
         self.undo_wp_idx = -1
         self.wploader.expected_count = 0
         self.add_command('wp', self.cmd_wp,       'waypoint management',
-                         ["<list|clear|move|remove|loop|set|undo|movemulti|changealt|param|status>",
+                         ["<list|clear|move|remove|loop|set|undo|movemulti|changealt|param|status|slope>",
                           "<load|update|save|savecsv|show> (FILENAME)"])
 
         if self.continue_mode and self.logdir is not None:
@@ -93,6 +93,24 @@ class WPModule(mp_module.MPModule):
         except Exception:
             print("Have %u waypoints" % (self.wploader.count()+len(self.wp_received)))
 
+
+    def wp_slope(self):
+        '''show slope of waypoints'''
+        last_w = None
+        for i in range(1, self.wploader.count()):
+            w = self.wploader.wp(i)
+            if w.command not in [mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, mavutil.mavlink.MAV_CMD_NAV_LAND]:
+                continue
+            if last_w is not None:
+                if last_w.frame != w.frame:
+                    print("WARNING: frame change %u -> %u at %u" % (last_w.frame, w.frame, i))
+                delta_alt = last_w.z - w.z
+                delta_xy = mp_util.gps_distance(w.x, w.y, last_w.x, last_w.y)
+                slope = delta_xy / delta_alt
+                print("WP%u: slope %.1f" % (i, slope))
+            last_w = w
+
+            
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         mtype = m.get_type()
@@ -729,6 +747,8 @@ class WPModule(mp_module.MPModule):
             self.nofly_add()
         elif args[0] == "status":
             self.wp_status()
+        elif args[0] == "slope":
+            self.wp_slope()
         else:
             print(usage)
 
