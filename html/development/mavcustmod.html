@@ -149,25 +149,25 @@ MAVProxy.</p>
 <div class="section" id="location">
 <h2>Location<a class="headerlink" href="#location" title="Permalink to this headline">¶</a></h2>
 <p>If developing from the MAVProxy source code, modules are placed in the
-<code class="docutils literal"><span class="pre">MAVProxy/modules</span></code> folder. Then the <code class="docutils literal"><span class="pre">setup.py</span> <span class="pre">build</span> <span class="pre">install</span> <span class="pre">--user</span></code>
+<code class="docutils literal notranslate"><span class="pre">MAVProxy/modules</span></code> folder. Then the <code class="docutils literal notranslate"><span class="pre">setup.py</span> <span class="pre">build</span> <span class="pre">install</span> <span class="pre">--user</span></code>
 routine needs to be run in order to (re)install MAVProxy and the modules
 in this folder which will be automatically picked up and become part of
 the installation.</p>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">MAVProxy modules will not be able to detect and run any modules not compiled
-as part of the above <code class="docutils literal"><span class="pre">setup.py</span></code>. This is because MAVProxy runs modules
+as part of the above <code class="docutils literal notranslate"><span class="pre">setup.py</span></code>. This is because MAVProxy runs modules
 from the Python package install directory, not the MAVProxy source code
 directory.</p>
 </div>
-<p>The module can then be loaded then using the <code class="docutils literal"><span class="pre">module</span> <span class="pre">load</span> <span class="pre">myModule</span></code> in
+<p>The module can then be loaded then using the <code class="docutils literal notranslate"><span class="pre">module</span> <span class="pre">load</span> <span class="pre">myModule</span></code> in
 MAVProxy.</p>
 </div>
 <div class="section" id="module-file-structure">
 <h2>Module File Structure<a class="headerlink" href="#module-file-structure" title="Permalink to this headline">¶</a></h2>
 <p>At the base level, a MAVProxy module is an instance of the MPModule
 class, with hooks for initialisation and reading Mavlink packets:</p>
-<div class="code python highlight-default"><div class="highlight"><pre><span></span>#!/usr/bin/env python
+<div class="code python highlight-default notranslate"><div class="highlight"><pre><span></span>#!/usr/bin/env python
 &#39;&#39;&#39;module template&#39;&#39;&#39;
 import time, math
 from pymavlink import mavutil
@@ -189,25 +189,25 @@ class TestModule(mp_module.MPModule):
 </div>
 <p>The initialisation section defines commands and module-wide variables.
 To add a command:</p>
-<div class="code python highlight-default"><div class="highlight"><pre><span></span><span class="bp">self</span><span class="o">.</span><span class="n">add_command</span><span class="p">(</span><span class="s1">&#39;bat&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cmd_bat</span><span class="p">,</span> <span class="s2">&quot;show some information&quot;</span><span class="p">)</span>
+<div class="code python highlight-default notranslate"><div class="highlight"><pre><span></span><span class="bp">self</span><span class="o">.</span><span class="n">add_command</span><span class="p">(</span><span class="s1">&#39;bat&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cmd_bat</span><span class="p">,</span> <span class="s2">&quot;show some information&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>The above will add the &quot;bat&quot; command to MAVProxy, which the MAVProxy help will show
-&quot;show some information&quot; and the <code class="docutils literal"><span class="pre">self.cmd\_bat</span></code> function will be run.</p>
+<p>The above will add the “bat” command to MAVProxy, which the MAVProxy help will show
+“show some information” and the <code class="docutils literal notranslate"><span class="pre">self.cmd\_bat</span></code> function will be run.</p>
 <p>Within the packet handling, the
 <a class="reference external" href="https://pixhawk.ethz.ch/mavlink/">Mavlink</a> reference is useful for
 filtering the incoming packets for the relevant data:</p>
-<div class="code python highlight-default"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="n">m</span><span class="o">.</span><span class="n">get_type</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;VFR_HUD&#39;</span><span class="p">:</span>
+<div class="code python highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="n">m</span><span class="o">.</span><span class="n">get_type</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;VFR_HUD&#39;</span><span class="p">:</span>
   <span class="n">curspeed</span> <span class="o">=</span>  <span class="n">m</span><span class="o">.</span><span class="n">airspeed</span>
 </pre></div>
 </div>
-<p>The above example will set the variable <code class="docutils literal"><span class="pre">curspeed</span></code> to the current
-airspeed of the vehicle, whenever a <code class="docutils literal"><span class="pre">VFR_HUD</span></code> packet is received.</p>
+<p>The above example will set the variable <code class="docutils literal notranslate"><span class="pre">curspeed</span></code> to the current
+airspeed of the vehicle, whenever a <code class="docutils literal notranslate"><span class="pre">VFR_HUD</span></code> packet is received.</p>
 <p>There are a great number of MAVProxy modules, so the best reference
 would be to look through the these
 <a class="reference external" href="https://github.com/ArduPilot/MAVProxy/tree/master/MAVProxy/modules">modules</a>
 for examples of what you want to do.</p>
-<p>In particular, the <code class="docutils literal"><span class="pre">example</span></code> module (mavproxy_example.py) provides annotated code of many
+<p>In particular, the <code class="docutils literal notranslate"><span class="pre">example</span></code> module (mavproxy_example.py) provides annotated code of many
 common tasks that can be performed with modules.</p>
 </div>
 </div>
@@ -232,7 +232,7 @@ common tasks that can be performed with modules.</p>
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
 <div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Module%20Development%20-%20&body=URL:%20../development/mavcustmod%0ATitle:%20Module%20Development%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
-    <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
+    <p><a href="http://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
     This is an ArduPilot project.</p>     
 
     <p>
@@ -265,6 +265,7 @@ common tasks that can be performed with modules.</p>
       <script type="text/javascript" src="../_static/jquery.js"></script>
       <script type="text/javascript" src="../_static/underscore.js"></script>
       <script type="text/javascript" src="../_static/doctools.js"></script>
+      <script type="text/javascript" src="../_static/language_data.js"></script>
 
   
 

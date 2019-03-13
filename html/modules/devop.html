@@ -179,7 +179,7 @@
             
   <div class="section" id="direct-comms-with-spi-i2c-bus">
 <h1>Direct Comms with SPI/I2C bus<a class="headerlink" href="#direct-comms-with-spi-i2c-bus" title="Permalink to this headline">¶</a></h1>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">devop</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">devop</span>
 </pre></div>
 </div>
 <p>This module allows for development operations. Specifically the ability to
@@ -187,13 +187,13 @@ read and write directly to the SPI and I2C buses.</p>
 <div class="section" id="i2c">
 <h2>I2C<a class="headerlink" href="#i2c" title="Permalink to this headline">¶</a></h2>
 <p>To write to the I2C bus</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">devop</span> <span class="n">write</span> <span class="n">i2c</span> <span class="n">name</span> <span class="n">bus</span> <span class="n">address</span> <span class="n">regstart</span> <span class="n">count</span> <span class="o">&lt;</span><span class="nb">bytes</span><span class="o">&gt;</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">devop</span> <span class="n">write</span> <span class="n">i2c</span> <span class="n">name</span> <span class="n">bus</span> <span class="n">address</span> <span class="n">regstart</span> <span class="n">count</span> <span class="o">&lt;</span><span class="nb">bytes</span><span class="o">&gt;</span>
 </pre></div>
 </div>
 <p>Where name= device name, bus=i2c bus #, address=device address, regstart=register to
 start at, count=number of bytes to write, &lt;bytes&gt;=the bytes to send.</p>
 <p>To read from the I2C bus</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">devop</span> <span class="n">write</span> <span class="n">i2c</span> <span class="n">name</span> <span class="n">bus</span> <span class="n">address</span> <span class="n">regstart</span> <span class="n">count</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">devop</span> <span class="n">write</span> <span class="n">i2c</span> <span class="n">name</span> <span class="n">bus</span> <span class="n">address</span> <span class="n">regstart</span> <span class="n">count</span>
 </pre></div>
 </div>
 <p>Where name= device name, bus=i2c bus #, address=device address, regstart=register to
@@ -202,13 +202,13 @@ start at, count=number of bytes to write.</p>
 <div class="section" id="spi">
 <h2>SPI<a class="headerlink" href="#spi" title="Permalink to this headline">¶</a></h2>
 <p>To write to the SPI bus</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">devop</span> <span class="n">write</span> <span class="n">spi</span> <span class="n">name</span> <span class="n">bus</span> <span class="n">address</span> <span class="n">regstart</span> <span class="n">count</span> <span class="o">&lt;</span><span class="nb">bytes</span><span class="o">&gt;</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">devop</span> <span class="n">write</span> <span class="n">spi</span> <span class="n">name</span> <span class="n">bus</span> <span class="n">address</span> <span class="n">regstart</span> <span class="n">count</span> <span class="o">&lt;</span><span class="nb">bytes</span><span class="o">&gt;</span>
 </pre></div>
 </div>
 <p>Where name= device name, bus=spi bus #, address=device address, regstart=register to
 start at, count=number of bytes to write, &lt;bytes&gt;=the bytes to send.</p>
 <p>To read from the SPI bus</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">devop</span> <span class="n">write</span> <span class="n">spi</span> <span class="n">name</span> <span class="n">bus</span> <span class="n">address</span> <span class="n">regstart</span> <span class="n">count</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">devop</span> <span class="n">write</span> <span class="n">spi</span> <span class="n">name</span> <span class="n">bus</span> <span class="n">address</span> <span class="n">regstart</span> <span class="n">count</span>
 </pre></div>
 </div>
 <p>Where name= device name, bus=spi bus #, address=device address, regstart=register to
@@ -236,7 +236,7 @@ start at, count=number of bytes to write.</p>
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
 <div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Direct%20Comms%20with%20SPI/I2C%20bus%20-%20&body=URL:%20../modules/devop%0ATitle:%20Direct%20Comms%20with%20SPI/I2C%20bus%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
-    <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
+    <p><a href="http://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
     This is an ArduPilot project.</p>     
 
     <p>
@@ -269,6 +269,7 @@ start at, count=number of bytes to write.</p>
       <script type="text/javascript" src="../_static/jquery.js"></script>
       <script type="text/javascript" src="../_static/underscore.js"></script>
       <script type="text/javascript" src="../_static/doctools.js"></script>
+      <script type="text/javascript" src="../_static/language_data.js"></script>
 
   
 

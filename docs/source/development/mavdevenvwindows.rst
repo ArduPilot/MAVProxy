@@ -4,37 +4,16 @@ Windows Development Environment
 In Windows, the process is a bit more complicated than for Linux.
 
 You will need to have `Python
-2.7 <http://www.python.org/download/releases/2.7/>`_,
-`wxPython <http://www.wxpython.org/download.php>`_ and
-`pygame <http://pygame.org/download.shtml>`_ installed first.
+3.6 <http://www.python.org/download/releases/3.6/>`_ or higher.
 
-Next, open up a console in the Python scripts install path
-(:file:`C:\\Python27\\Scripts` or similar). Use ``pip install [filepath]`` to install them
-
-- `numPY <http://www.lfd.uci.edu/~gohlke/pythonlibs/#numpy>`_
-- `Pillow (replaces
-  PIL) <http://www.lfd.uci.edu/~gohlke/pythonlibs/#pillow>`_
-- `OpenCV 3 <http://www.lfd.uci.edu/~gohlke/pythonlibs/#opencv>`_
-- `lxml <http://www.lfd.uci.edu/~gohlke/pythonlibs/#lxml>`_
-- `PyYAML <https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyyaml>`_
+Use ``pip`` to install the other packages (this assumes Python is installed to ``C:\Python36``):
 
 .. code:: bash
 
-    cd C:\Python27\Scripts
-    pip install <path to downloaded file>
-
-Use ``pip`` to install the other packages. Note that some packages 
-require specific older versions to install:
-
-.. code:: bash
-
-    cd C:\Python27\Scripts
+    cd C:\Python36\Scripts
     pip install pip --upgrade
-    pip install pyinstaller==2.1 setuptools==19.2 packaging==14.2
-    pip install matplotlib pyreadline future
-    pip install python-dateutil pytz pyparsing six
-    pip install pyserial 
-    pip install pymavlink 
+    pip install pywin32 lxml pymavlink numpy matplotlib pyserial opencv-python pyreadline PyYAML Pygame Pillow wxpython
+    pip install pyinstaller setuptools packaging --no-use-pep517
     
 Download the MAVProxy `source <https://github.com/ArduPilot/MAVProxy>`_.
 

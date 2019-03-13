@@ -149,22 +149,22 @@
 <p>MAVProxy is capable of executing a script (of MAVProxy commands) on
 startup. This can save the effort of (re)setting up the MAVProxy
 environment for each flight.</p>
-<p>A script (<code class="file docutils literal"><span class="pre">mavinit.scr</span></code>) should be placed in an aircraft directory (ie.
-<code class="file docutils literal"><span class="pre">./Aircraftname/mavinit.scr</span></code>) containing the commands. Any normal
-MAVProxy commands can be placed in here. Note that the --aircraft option
+<p>A script (<code class="file docutils literal notranslate"><span class="pre">mavinit.scr</span></code>) should be placed in an aircraft directory (ie.
+<code class="file docutils literal notranslate"><span class="pre">./Aircraftname/mavinit.scr</span></code>) containing the commands. Any normal
+MAVProxy commands can be placed in here. Note that the –aircraft option
 must be used, in order for MAVProxy to find the script in the
 appropriate aircraft directory.</p>
-<p>Alternatively, a <code class="file docutils literal"><span class="pre">.mavinit.scr</span></code> can be placed in the user's home directory
-(ie. <code class="file docutils literal"><span class="pre">/home/username</span></code> in Linux or
-<code class="file docutils literal"><span class="pre">C:\Users\username\AppData\Local\MAVProxy</span></code> in Windows) and will be
-loaded with MAVProxy regardless of the --aircraft option.</p>
+<p>Alternatively, a <code class="file docutils literal notranslate"><span class="pre">.mavinit.scr</span></code> can be placed in the user’s home directory
+(ie. <code class="file docutils literal notranslate"><span class="pre">/home/username</span></code> in Linux or
+<code class="file docutils literal notranslate"><span class="pre">C:\Users\username\AppData\Local\MAVProxy</span></code> in Windows) and will be
+loaded with MAVProxy regardless of the –aircraft option.</p>
 <p>An example script can be found <a class="reference external" href="../_static/files/mavinit.scr">here</a>.</p>
 <p>In this particular script, aliases are used as shortcuts to common
 commands.</p>
-<p>For example the following alias definitions in <code class="file docutils literal"><span class="pre">mavinit.scr</span></code>
+<p>For example the following alias definitions in <code class="file docutils literal notranslate"><span class="pre">mavinit.scr</span></code>
 will allow the user to graph the current battery level by typing
-<code class="docutils literal"><span class="pre">gbatt</span></code> instead of <code class="docutils literal"><span class="pre">graph</span> <span class="pre">SYS_STATUS.current_battery</span></code>.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span>@alias add g graph
+<code class="docutils literal notranslate"><span class="pre">gbatt</span></code> instead of <code class="docutils literal notranslate"><span class="pre">graph</span> <span class="pre">SYS_STATUS.current_battery</span></code>.</p>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span>@alias add g graph
 @alias add gbatt g SYS_STATUS.current_battery``
 </pre></div>
 </div>
@@ -190,7 +190,7 @@ will allow the user to graph the current battery level by typing
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
 <div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Startup%20Scripts%20-%20&body=URL:%20../getting_started/mavinit%0ATitle:%20Startup%20Scripts%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
-    <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
+    <p><a href="http://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
     This is an ArduPilot project.</p>     
 
     <p>
@@ -223,6 +223,7 @@ will allow the user to graph the current battery level by typing
       <script type="text/javascript" src="../_static/jquery.js"></script>
       <script type="text/javascript" src="../_static/underscore.js"></script>
       <script type="text/javascript" src="../_static/doctools.js"></script>
+      <script type="text/javascript" src="../_static/language_data.js"></script>
 
   
 

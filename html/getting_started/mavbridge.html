@@ -160,7 +160,7 @@
 <p>This is useful in the circumstances when a telemetry stream is required to be distributed to a group of clients on a network or the GCS client is not able to be directly connected to the telemetry radio (ie. a tablet running the GCS software does not have an available USB port to connect to a USB telemetry radio).</p>
 <div class="section" id="requirements">
 <h2>Requirements<a class="headerlink" href="#requirements" title="Permalink to this headline">¶</a></h2>
-<p>Raspberry Pi or similar with compatible Wifi dongle (if streaming telemetry to Wifi). Any similar small computer would work. The onyl requirement is that it is able to run the Ubuntu operating system.</p>
+<p>Raspberry Pi or similar with compatible Wifi dongle (if streaming telemetry to Wifi). Any similar small computer would work. The only requirement is that it is able to run the Ubuntu operating system.</p>
 </div>
 <div class="section" id="setting-up-the-pi">
 <h2>Setting up the Pi<a class="headerlink" href="#setting-up-the-pi" title="Permalink to this headline">¶</a></h2>
@@ -174,15 +174,15 @@
 <h2>Setting up the Daemon<a class="headerlink" href="#setting-up-the-daemon" title="Permalink to this headline">¶</a></h2>
 <p>For this section, a terminal on the Pi is required.</p>
 <p>Make a new file for the daemon, based on a skeleton file:</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">cp</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">init</span><span class="o">.</span><span class="n">d</span><span class="o">/</span><span class="n">skeleton</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">init</span><span class="o">.</span><span class="n">d</span><span class="o">/</span><span class="n">mavgateway</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">cp</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">init</span><span class="o">.</span><span class="n">d</span><span class="o">/</span><span class="n">skeleton</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">init</span><span class="o">.</span><span class="n">d</span><span class="o">/</span><span class="n">mavgateway</span>
 </pre></div>
 </div>
 <p>Edit /etc/init.d/mavgateway:</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">nano</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">init</span><span class="o">.</span><span class="n">d</span><span class="o">/</span><span class="n">mavgateway</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">nano</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">init</span><span class="o">.</span><span class="n">d</span><span class="o">/</span><span class="n">mavgateway</span>
 </pre></div>
 </div>
 <p>And edit these lines:</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span>DAEMON_ARGS=&quot;--master=/dev/ttyAMA0,57600 --out=udpin:0.0.0.0:14550 --daemon&quot;
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span>DAEMON_ARGS=&quot;--master=/dev/ttyAMA0,57600 --out=udpin:0.0.0.0:14550 --daemon&quot;
 NAME=mavproxy.py
 DESC=&quot;Mavproxy based mavlink to wifi gateway&quot;
 Provides: mavgateway
@@ -196,7 +196,7 @@ DAEMON=/usr/local/bin/$NAME
 <p class="last">In the DAEMON_ARGS line above, edit the ttyAMA0 port and 57600 baudrate to match the name and baudrate of the telemetry radio connected to the Pi.</p>
 </div>
 <p>Edit the permissions for mavgateway and update the system to include the mavgateway daemon upon startup:</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">chmod</span> <span class="o">+</span><span class="n">x</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">init</span><span class="o">.</span><span class="n">d</span><span class="o">/</span><span class="n">mavgateway</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">chmod</span> <span class="o">+</span><span class="n">x</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">init</span><span class="o">.</span><span class="n">d</span><span class="o">/</span><span class="n">mavgateway</span>
 <span class="n">sudo</span> <span class="n">chown</span> <span class="n">root</span><span class="p">:</span><span class="n">root</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">init</span><span class="o">.</span><span class="n">d</span><span class="o">/</span><span class="n">mavgateway</span>
 <span class="n">sudo</span> <span class="n">update</span><span class="o">-</span><span class="n">rc</span><span class="o">.</span><span class="n">d</span> <span class="n">mavgateway</span> <span class="n">defaults</span>
 </pre></div>
@@ -205,8 +205,8 @@ DAEMON=/usr/local/bin/$NAME
 <div class="section" id="running">
 <h2>Running<a class="headerlink" href="#running" title="Permalink to this headline">¶</a></h2>
 <p>The Pi bridge will automatically start up when the Pi is booted.</p>
-<p>On the GCS client, first connect to the Pi's network, then connect (via UDP) to 192.168.42.1, port 14550. For example, on a MAVProxy client:</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span>mavproxy.py –master=192.168.42.1:14550
+<p>On the GCS client, first connect to the Pi’s network, then connect (via UDP) to 192.168.42.1, port 14550. For example, on a MAVProxy client:</p>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span>mavproxy.py –master=192.168.42.1:14550
 </pre></div>
 </div>
 </div>
@@ -232,7 +232,7 @@ DAEMON=/usr/local/bin/$NAME
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
 <div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=MAVProxy%20Wifi%20Bridge%20-%20&body=URL:%20../getting_started/mavbridge%0ATitle:%20MAVProxy%20Wifi%20Bridge%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
-    <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
+    <p><a href="http://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
     This is an ArduPilot project.</p>     
 
     <p>
@@ -265,6 +265,7 @@ DAEMON=/usr/local/bin/$NAME
       <script type="text/javascript" src="../_static/jquery.js"></script>
       <script type="text/javascript" src="../_static/underscore.js"></script>
       <script type="text/javascript" src="../_static/doctools.js"></script>
+      <script type="text/javascript" src="../_static/language_data.js"></script>
 
   
 

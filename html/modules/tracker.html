@@ -175,27 +175,27 @@
             
   <div class="section" id="antenna-tracker">
 <h1>Antenna Tracker<a class="headerlink" href="#antenna-tracker" title="Permalink to this headline">¶</a></h1>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">tracker</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">tracker</span>
 </pre></div>
 </div>
 <p>This is an improved antenna tracker, where the APM is mounted on an
 antenna tracker (with a GPS module) which in turn is connected to the
 ground station. Using the positions of the APM on the UAV and the APM on
 the antenna, this module will send commands to the antenna APM to alter
-it's azimuth/elevation (via servos on the APM) to maintain tracking with
+it’s azimuth/elevation (via servos on the APM) to maintain tracking with
 the UAV.</p>
-<p>Use <code class="docutils literal"><span class="pre">tracker</span> <span class="pre">set</span> <span class="pre">port</span> <span class="pre">&lt;portname.`</span></code> and <code class="docutils literal"><span class="pre">tracker</span> <span class="pre">set</span> <span class="pre">baudrate</span> <span class="pre">&lt;n&gt;`</span></code> to
+<p>Use <code class="docutils literal notranslate"><span class="pre">tracker</span> <span class="pre">set</span> <span class="pre">port</span> <span class="pre">&lt;portname.`</span></code> and <code class="docutils literal notranslate"><span class="pre">tracker</span> <span class="pre">set</span> <span class="pre">baudrate</span> <span class="pre">&lt;n&gt;`</span></code> to
 set the serial port and baudrate of the tracker.</p>
-<p>Use <code class="docutils literal"><span class="pre">tracker</span> <span class="pre">arm</span></code> and <code class="docutils literal"><span class="pre">tracker</span> <span class="pre">disarm</span></code> to arm and disarm the servos
+<p>Use <code class="docutils literal notranslate"><span class="pre">tracker</span> <span class="pre">arm</span></code> and <code class="docutils literal notranslate"><span class="pre">tracker</span> <span class="pre">disarm</span></code> to arm and disarm the servos
 on the tracker respectively.</p>
-<p><code class="docutils literal"><span class="pre">tracker</span> <span class="pre">level</span></code> will perform the level calibration routine and
-<code class="docutils literal"><span class="pre">tracker</span> <span class="pre">calpress</span></code> will calibrate the barometer, so that air pressure
+<p><code class="docutils literal notranslate"><span class="pre">tracker</span> <span class="pre">level</span></code> will perform the level calibration routine and
+<code class="docutils literal notranslate"><span class="pre">tracker</span> <span class="pre">calpress</span></code> will calibrate the barometer, so that air pressure
 corrections can be sent back to the UAV (for a more accurate altitude
 estimation).</p>
-<p><code class="docutils literal"><span class="pre">tracker</span> <span class="pre">start</span></code> will start the tracking.</p>
+<p><code class="docutils literal notranslate"><span class="pre">tracker</span> <span class="pre">start</span></code> will start the tracking.</p>
 <p>There are several parameters for the tracker, to specify the serial port
 that the antenna tracker APM is on. Use
-<code class="docutils literal"><span class="pre">tracker</span> <span class="pre">param</span> <span class="pre">[set|show|fetch|help]</span></code> to manage the parameters. There
+<code class="docutils literal notranslate"><span class="pre">tracker</span> <span class="pre">param</span> <span class="pre">[set|show|fetch|help]</span></code> to manage the parameters. There
 are three parameters - port, baud and debug.</p>
 </div>
 
@@ -219,7 +219,7 @@ are three parameters - port, baud and debug.</p>
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
 <div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Antenna%20Tracker%20-%20&body=URL:%20../modules/tracker%0ATitle:%20Antenna%20Tracker%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
-    <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
+    <p><a href="http://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
     This is an ArduPilot project.</p>     
 
     <p>
@@ -252,6 +252,7 @@ are three parameters - port, baud and debug.</p>
       <script type="text/javascript" src="../_static/jquery.js"></script>
       <script type="text/javascript" src="../_static/underscore.js"></script>
       <script type="text/javascript" src="../_static/doctools.js"></script>
+      <script type="text/javascript" src="../_static/language_data.js"></script>
 
   
 
