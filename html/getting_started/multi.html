@@ -146,24 +146,24 @@
             
   <div class="section" id="multiple-vehicles-with-mavproxy">
 <h1>Multiple Vehicles with MAVProxy<a class="headerlink" href="#multiple-vehicles-with-mavproxy" title="Permalink to this headline">¶</a></h1>
-<p>MAVProxy is designed to control 1 vehicle per instance. Controlling multiple vehicles would require a substantial re-design of MAVProxy and is not currently on the &quot;to-do&quot; list.</p>
+<p>MAVProxy is designed to control 1 vehicle per instance. Controlling multiple vehicles would require a substantial re-design of MAVProxy and is not currently on the “to-do” list.</p>
 <p>However, there is <em>very</em> limited support for displaying (not controlling) multiple vehicles
 on the map. This should be considered an experimental feature only, as it was developed for
-a specific application (2016 UAV Challenge) where two UAV's were required to be displayed
+a specific application (2016 UAV Challenge) where two UAV’s were required to be displayed
 on a single map.</p>
 <div class="figure">
 <img alt="../_images/multi_veh.png" src="../_images/multi_veh.png" />
 </div>
 <p>To use this feature:</p>
 <ol class="arabic simple">
-<li>Have two vehicles (real or SITL) with different SYSID_THISMAV parameter values. Use <code class="docutils literal"><span class="pre">param</span> <span class="pre">set</span> <span class="pre">SYSID_THISMAV</span> <span class="pre">X</span></code> to set this value in the MAVProxy console (where <code class="docutils literal"><span class="pre">X</span></code> is the id).</li>
-<li>Start MAVProxy with both telemetry links as master and the <code class="docutils literal"><span class="pre">--source-system=X</span></code> commandline parameter, where <code class="docutils literal"><span class="pre">X</span></code> is the id of the vehicle to be controlled by MAVProxy. All other vehicles will be displayed only. For example:</li>
+<li>Have two vehicles (real or SITL) with different SYSID_THISMAV parameter values. Use <code class="docutils literal notranslate"><span class="pre">param</span> <span class="pre">set</span> <span class="pre">SYSID_THISMAV</span> <span class="pre">X</span></code> to set this value in the MAVProxy console (where <code class="docutils literal notranslate"><span class="pre">X</span></code> is the id).</li>
+<li>Start MAVProxy with both telemetry links as master and the <code class="docutils literal notranslate"><span class="pre">--source-system=X</span></code> commandline parameter, where <code class="docutils literal notranslate"><span class="pre">X</span></code> is the id of the vehicle to be controlled by MAVProxy. All other vehicles will be displayed only. For example:</li>
 </ol>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="mf">0.0</span><span class="o">.</span><span class="mf">0.0</span><span class="p">:</span><span class="mi">14550</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="mf">0.0</span><span class="o">.</span><span class="mf">0.0</span><span class="p">:</span><span class="mi">14560</span> <span class="o">--</span><span class="n">source</span><span class="o">-</span><span class="n">system</span><span class="o">=</span><span class="mi">1</span> <span class="o">--</span><span class="n">console</span> <span class="o">--</span><span class="nb">map</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="mf">0.0</span><span class="o">.</span><span class="mf">0.0</span><span class="p">:</span><span class="mi">14550</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="mf">0.0</span><span class="o">.</span><span class="mf">0.0</span><span class="p">:</span><span class="mi">14560</span> <span class="o">--</span><span class="n">source</span><span class="o">-</span><span class="n">system</span><span class="o">=</span><span class="mi">1</span> <span class="o">--</span><span class="n">console</span> <span class="o">--</span><span class="nb">map</span>
 </pre></div>
 </div>
 <ol class="arabic simple">
-<li>Type in <code class="docutils literal"><span class="pre">output</span> <span class="pre">sysid</span> <span class="pre">Y</span> <span class="pre">127.0.0.1:14750</span></code> in the MAVProxy console, where <code class="docutils literal"><span class="pre">Y</span></code> is the id of the vehicle to be displayed. The port number <code class="docutils literal"><span class="pre">14750</span></code> should be any unused port. Repeat this command for any other vehicles to be displayed (the id and port number should be different for each vehicle.</li>
+<li>Type in <code class="docutils literal notranslate"><span class="pre">output</span> <span class="pre">sysid</span> <span class="pre">Y</span> <span class="pre">127.0.0.1:14750</span></code> in the MAVProxy console, where <code class="docutils literal notranslate"><span class="pre">Y</span></code> is the id of the vehicle to be displayed. The port number <code class="docutils literal notranslate"><span class="pre">14750</span></code> should be any unused port. Repeat this command for any other vehicles to be displayed (the id and port number should be different for each vehicle.</li>
 </ol>
 <p>There are several limitations to this feature:</p>
 <ul class="simple">
@@ -192,7 +192,7 @@ on a single map.</p>
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
 <div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Multiple%20Vehicles%20with%20MAVProxy%20-%20&body=URL:%20../getting_started/multi%0ATitle:%20Multiple%20Vehicles%20with%20MAVProxy%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
-    <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
+    <p><a href="http://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
     This is an ArduPilot project.</p>     
 
     <p>
@@ -225,6 +225,7 @@ on a single map.</p>
       <script type="text/javascript" src="../_static/jquery.js"></script>
       <script type="text/javascript" src="../_static/underscore.js"></script>
       <script type="text/javascript" src="../_static/doctools.js"></script>
+      <script type="text/javascript" src="../_static/language_data.js"></script>
 
   
 

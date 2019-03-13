@@ -150,36 +150,36 @@
             
   <div class="section" id="quickstart">
 <h1>Quickstart<a class="headerlink" href="#quickstart" title="Permalink to this headline">¶</a></h1>
-<p>In it's simplest form, MAVProxy only needs the address of the USB port
+<p>In it’s simplest form, MAVProxy only needs the address of the USB port
 or network address to connect to.</p>
 <div class="section" id="over-usb">
 <h2>Over USB<a class="headerlink" href="#over-usb" title="Permalink to this headline">¶</a></h2>
-<p>If there is only 1 APM connected, the <code class="docutils literal"><span class="pre">--master</span></code> is not required.
+<p>If there is only 1 APM connected, the <code class="docutils literal notranslate"><span class="pre">--master</span></code> is not required.
 MAVProxy will autodetect the correct port.</p>
 <p>Linux:</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">ttyUSB0</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">ttyUSB0</span>
 </pre></div>
 </div>
 <p>Windows:</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="s2">&quot;com14&quot;</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="s2">&quot;com14&quot;</span>
 </pre></div>
 </div>
 <p>macOS:</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">ttyusbserialxxx</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">ttyusbserialxxx</span>
 </pre></div>
 </div>
 <p>Normally MAVProxy will auto-detect the correct baudrate. If required,
 the baud rate can instead be manually specified.</p>
 <p>Linux:</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">ttyUSB0</span> <span class="o">--</span><span class="n">baudrate</span><span class="o">=</span><span class="mi">57600</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">ttyUSB0</span> <span class="o">--</span><span class="n">baudrate</span><span class="o">=</span><span class="mi">57600</span>
 </pre></div>
 </div>
 <p>Windows:</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="s2">&quot;com14&quot;</span> <span class="o">--</span><span class="n">baudrate</span><span class="o">=</span><span class="mi">57600</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="s2">&quot;com14&quot;</span> <span class="o">--</span><span class="n">baudrate</span><span class="o">=</span><span class="mi">57600</span>
 </pre></div>
 </div>
 <p>macOS:</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">tty</span><span class="o">.</span><span class="n">usbserialxxxxx</span> <span class="o">--</span><span class="n">baudrate</span><span class="o">=</span><span class="mi">57600</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=/</span><span class="n">dev</span><span class="o">/</span><span class="n">tty</span><span class="o">.</span><span class="n">usbserialxxxxx</span> <span class="o">--</span><span class="n">baudrate</span><span class="o">=</span><span class="mi">57600</span>
 </pre></div>
 </div>
 </div>
@@ -189,20 +189,20 @@ the baud rate can instead be manually specified.</p>
 to connect to must be your own IP address or loopback address. Alternatively
 the if the local IP address is not known, use 0.0.0.0 for MAVProxy find and use
 the local IP address. The type of stream (tcp or udp) should also be specified.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">tcp</span><span class="p">:</span><span class="mf">192.168</span><span class="o">.</span><span class="mf">1.1</span><span class="p">:</span><span class="mi">14550</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">tcp</span><span class="p">:</span><span class="mf">192.168</span><span class="o">.</span><span class="mf">1.1</span><span class="p">:</span><span class="mi">14550</span>
 <span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">udp</span><span class="p">:</span><span class="mf">127.0</span><span class="o">.</span><span class="mf">0.1</span><span class="p">:</span><span class="mi">14550</span>
 <span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">tcp</span><span class="p">:</span><span class="mf">0.0</span><span class="o">.</span><span class="mf">0.0</span><span class="p">:</span><span class="mi">14550</span>
 </pre></div>
 </div>
 <p>If connecting to a remote IP address, the udpout or tcpout arguments should be used:</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">udpout</span><span class="p">:</span><span class="mf">10.10</span><span class="o">.</span><span class="mf">1.1</span><span class="p">:</span><span class="mi">14550</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">udpout</span><span class="p">:</span><span class="mf">10.10</span><span class="o">.</span><span class="mf">1.1</span><span class="p">:</span><span class="mi">14550</span>
 <span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">tcpout</span><span class="p">:</span><span class="mf">10.10</span><span class="o">.</span><span class="mf">1.1</span><span class="p">:</span><span class="mi">14550</span>
 </pre></div>
 </div>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">MavProxy can output a mavlink stream to remote network addresses using
-UDP Broadcast. See <a class="reference internal" href="starting.html#out"><span class="std std-ref">--out</span></a> for details.</p>
+UDP Broadcast. See <a class="reference internal" href="starting.html#out"><span class="std std-ref">–out</span></a> for details.</p>
 </div>
 </div>
 </div>
@@ -227,7 +227,7 @@ UDP Broadcast. See <a class="reference internal" href="starting.html#out"><span 
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
 <div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Quickstart%20-%20&body=URL:%20../getting_started/quickstart%0ATitle:%20Quickstart%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
-    <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
+    <p><a href="http://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
     This is an ArduPilot project.</p>     
 
     <p>
@@ -260,6 +260,7 @@ UDP Broadcast. See <a class="reference internal" href="starting.html#out"><span 
       <script type="text/javascript" src="../_static/jquery.js"></script>
       <script type="text/javascript" src="../_static/underscore.js"></script>
       <script type="text/javascript" src="../_static/doctools.js"></script>
+      <script type="text/javascript" src="../_static/language_data.js"></script>
 
   
 

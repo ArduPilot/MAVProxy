@@ -147,19 +147,19 @@
   <div class="section" id="examples">
 <h1>Examples<a class="headerlink" href="#examples" title="Permalink to this headline">¶</a></h1>
 <p>The following section provides a couple of common usage scenarios for MAVProxy.</p>
-<p>Quadcopter over a standard (57600 kbps) radio link on a serial port. MAVProxy will auto-detect the correct serial port. The quadcopter is called &quot;Quaddy&quot;. The GUI console, map and text-to-speech are also enabled:</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">baud</span><span class="o">=</span><span class="mi">57600</span> <span class="o">--</span><span class="n">aircraft</span><span class="o">=</span><span class="s2">&quot;Quaddy&quot;</span> <span class="o">--</span><span class="n">speech</span> <span class="o">--</span><span class="n">console</span> <span class="o">--</span><span class="nb">map</span> <span class="o">--</span><span class="n">quadcopter</span>
+<p>Quadcopter over a standard (57600 kbps) radio link on a serial port. MAVProxy will auto-detect the correct serial port. The quadcopter is called “Quaddy”. The GUI console, map and text-to-speech are also enabled:</p>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">baud</span><span class="o">=</span><span class="mi">57600</span> <span class="o">--</span><span class="n">aircraft</span><span class="o">=</span><span class="s2">&quot;Quaddy&quot;</span> <span class="o">--</span><span class="n">speech</span> <span class="o">--</span><span class="n">console</span> <span class="o">--</span><span class="nb">map</span> <span class="o">--</span><span class="n">quadcopter</span>
 </pre></div>
 </div>
 <p>Run MAVProxy in daemon mode, taking in a radio link (COM17 at 9600 kbps) and outputting it to the local network. This allows a single instance of MAVProxy to distribute the telemetry stream to multiple clients:</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span>mavproxy.py --master=COM17,9600 --out=udpin:0.0.0.0:14550 --daemon
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span>mavproxy.py --master=COM17,9600 --out=udpin:0.0.0.0:14550 --daemon
 
 (client, xxx.xxx.xxx.xxx is the daemon&#39;s IP address)
 mavproxy.py –master=udpout:xxx.xxx.xxx.xxx:14550
 </pre></div>
 </div>
 <p>Use multiple radio links (one serial, one network) to the remote vehicle. This is useful for situations where a backup radio link is required:</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span>\<span class="n">dev</span>\<span class="n">ttyUSB0</span><span class="p">,</span><span class="mi">57600</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">udpin</span><span class="p">:</span><span class="mf">192.168</span><span class="o">.</span><span class="mf">16.15</span><span class="p">:</span><span class="mi">2626</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mavproxy</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span>\<span class="n">dev</span>\<span class="n">ttyUSB0</span><span class="p">,</span><span class="mi">57600</span> <span class="o">--</span><span class="n">master</span><span class="o">=</span><span class="n">udpin</span><span class="p">:</span><span class="mf">192.168</span><span class="o">.</span><span class="mf">16.15</span><span class="p">:</span><span class="mi">2626</span>
 </pre></div>
 </div>
 </div>
@@ -184,7 +184,7 @@ mavproxy.py –master=udpout:xxx.xxx.xxx.xxx:14550
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
 <div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Examples%20-%20&body=URL:%20../getting_started/examples%0ATitle:%20Examples%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
-    <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
+    <p><a href="http://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
     This is an ArduPilot project.</p>     
 
     <p>
@@ -217,6 +217,7 @@ mavproxy.py –master=udpout:xxx.xxx.xxx.xxx:14550
       <script type="text/javascript" src="../_static/jquery.js"></script>
       <script type="text/javascript" src="../_static/underscore.js"></script>
       <script type="text/javascript" src="../_static/doctools.js"></script>
+      <script type="text/javascript" src="../_static/language_data.js"></script>
 
   
 

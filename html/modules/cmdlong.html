@@ -180,42 +180,42 @@
             
   <div class="section" id="long-commands">
 <h1>Long Commands<a class="headerlink" href="#long-commands" title="Permalink to this headline">¶</a></h1>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">cmdlong</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">cmdlong</span>
 </pre></div>
 </div>
-<p>This module is a collection of <code class="docutils literal"><span class="pre">command_long_send</span></code> functions that may
+<p>This module is a collection of <code class="docutils literal notranslate"><span class="pre">command_long_send</span></code> functions that may
 be useful to the user.</p>
 <div class="section" id="control">
 <h2>Control<a class="headerlink" href="#control" title="Permalink to this headline">¶</a></h2>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">setspeed</span> <span class="n">N</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">setspeed</span> <span class="n">N</span>
 </pre></div>
 </div>
-<p>If in automated flight mode, set the vehicles target speed to <code class="docutils literal"><span class="pre">N</span></code> m/s.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">setyaw</span> <span class="n">ANGLE</span> <span class="n">ANGULAR_SPEED</span> <span class="n">MODE</span>
+<p>If in automated flight mode, set the vehicles target speed to <code class="docutils literal notranslate"><span class="pre">N</span></code> m/s.</p>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">setyaw</span> <span class="n">ANGLE</span> <span class="n">ANGULAR_SPEED</span> <span class="n">MODE</span>
 </pre></div>
 </div>
-<p>Set the target yaw of the vehicle to <code class="docutils literal"><span class="pre">ANGLE</span></code> (0-360), with a maximum angular speed
-of <code class="docutils literal"><span class="pre">ANGULAR_SPEED</span></code> (deg/sec). <code class="docutils literal"><span class="pre">MODE</span></code> is either 0 (absolute angle) or 1 (relative angle).</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">takeoff</span> <span class="n">ALTITUDE_IN_METERS</span>
+<p>Set the target yaw of the vehicle to <code class="docutils literal notranslate"><span class="pre">ANGLE</span></code> (0-360), with a maximum angular speed
+of <code class="docutils literal notranslate"><span class="pre">ANGULAR_SPEED</span></code> (deg/sec). <code class="docutils literal notranslate"><span class="pre">MODE</span></code> is either 0 (absolute angle) or 1 (relative angle).</p>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">takeoff</span> <span class="n">ALTITUDE_IN_METERS</span>
 </pre></div>
 </div>
 <p>Sends an automated takeoff command to the vehicle. It will consider the takeoff finished at
-<code class="docutils literal"><span class="pre">ALTITUDE_IN_METERS</span></code> m (relative).</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">velocity</span> <span class="n">X</span> <span class="n">Y</span> <span class="n">Z</span>
+<code class="docutils literal notranslate"><span class="pre">ALTITUDE_IN_METERS</span></code> m (relative).</p>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">velocity</span> <span class="n">X</span> <span class="n">Y</span> <span class="n">Z</span>
 </pre></div>
 </div>
 <p>Sets a desired vehicle velocity in a local north-east-down (x, y, z) coordinate frame.
 All velocities in m/s.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">position</span> <span class="n">X</span> <span class="n">Y</span> <span class="n">Z</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">position</span> <span class="n">X</span> <span class="n">Y</span> <span class="n">Z</span>
 </pre></div>
 </div>
 <p>Sets a desired vehicle position in a local north-east-down (x, y, z) coordinate frame.
 All positions in m.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">attitude</span> <span class="n">Q0</span> <span class="n">Q1</span> <span class="n">Q2</span> <span class="n">Q3</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">attitude</span> <span class="n">Q0</span> <span class="n">Q1</span> <span class="n">Q2</span> <span class="n">Q3</span>
 </pre></div>
 </div>
 <p>Set the desired attitude of the vehicle in quaternion format.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">posvel</span> <span class="n">N</span> <span class="n">E</span> <span class="n">D</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">posvel</span> <span class="n">N</span> <span class="n">E</span> <span class="n">D</span>
 </pre></div>
 </div>
 <p>Sets the target position according to the previous mouse click on the map and the target
@@ -224,39 +224,39 @@ velocity in North-East-Down format (m/s). Uses a global frame.</p>
 <div class="section" id="camera">
 <h2>Camera<a class="headerlink" href="#camera" title="Permalink to this headline">¶</a></h2>
 <p>Note the following commands are not processed by APM, rather they are meant for a companion computer which controls the camera.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">cammsg</span> <span class="n">M1</span> <span class="n">M2</span> <span class="n">M3</span> <span class="n">M4</span> <span class="n">M5</span> <span class="n">M6</span> <span class="n">M7</span> <span class="n">M8</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cammsg</span> <span class="n">M1</span> <span class="n">M2</span> <span class="n">M3</span> <span class="n">M4</span> <span class="n">M5</span> <span class="n">M6</span> <span class="n">M7</span> <span class="n">M8</span>
 </pre></div>
 </div>
 <p>Send a MAV_CMD_DO_DIGICAM_CONTROL Mavlink message. Parameters are: M1=Session control e.g. show/hide lens,
-M2=Zoom's absolute position, M3=Zooming step value to offset zoom from the current position,
+M2=Zoom’s absolute position, M3=Zooming step value to offset zoom from the current position,
 M4=Focus Locking, Unlocking or Re-locking, M5=Shooting Command, M6=Command Identity, M7=Empty.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">cammsg_old</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cammsg_old</span>
 </pre></div>
 </div>
 <p>Send an old-style MAV_CMD_DO_DIGICAM_CONTROL shooting command.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">camctrlmsg</span> <span class="n">M1</span> <span class="n">M2</span> <span class="n">M3</span> <span class="n">M4</span> <span class="n">M5</span> <span class="n">M6</span> <span class="n">M7</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">camctrlmsg</span> <span class="n">M1</span> <span class="n">M2</span> <span class="n">M3</span> <span class="n">M4</span> <span class="n">M5</span> <span class="n">M6</span> <span class="n">M7</span>
 </pre></div>
 </div>
 <p>Send a MAV_CMD_DO_DIGICAM_CONFIGURE Mavlink message. The Parameters are: M1=Modes [P, TV, AV, M], M2=Shutter Speed, M3=F Stop number, M4=ISO Number, M5=Exposure type, M6=Command Identity, M7=Main engine cut-off time before camera trigger in seconds/10 (0 means no cut-off).</p>
 </div>
 <div class="section" id="systems">
 <h2>Systems<a class="headerlink" href="#systems" title="Permalink to this headline">¶</a></h2>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">parachute</span> <span class="n">ACTION</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">parachute</span> <span class="n">ACTION</span>
 </pre></div>
 </div>
-<p>Sends an action to the parachute. <code class="docutils literal"><span class="pre">ACTION</span></code> can be enable, disable or release.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">engine</span> <span class="n">start</span>
+<p>Sends an action to the parachute. <code class="docutils literal notranslate"><span class="pre">ACTION</span></code> can be enable, disable or release.</p>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">engine</span> <span class="n">start</span>
 <span class="n">engine</span> <span class="n">stop</span>
 <span class="n">engine</span> <span class="n">M1</span><span class="p">,</span> <span class="n">M2</span><span class="p">,</span> <span class="n">M3</span>
 </pre></div>
 </div>
 <p>Sends an engine control command (MAV_CMD_DO_ENGINE_CONTROL). It can start or stop the engine.
 Otherwise the full set of options can be specified, with M1=1 or 0 for engine start/stop, M2=   0: Warm start, 1:Cold start. Controls use of choke where applicable, M3=Height delay (meters). This is for commanding engine start only after the vehicle has gained the specified height.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">cmdlong</span> <span class="n">COMMAND</span> <span class="n">OPTIONS</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cmdlong</span> <span class="n">COMMAND</span> <span class="n">OPTIONS</span>
 </pre></div>
 </div>
-<p>Send a general MAV_CMD_LONG message to the vehicle. <code class="docutils literal"><span class="pre">COMMAND</span></code> is the name of the command. The options
-follow in <code class="docutils literal"><span class="pre">[arg1]</span> <span class="pre">[arg2]</span> <span class="pre">...</span></code> format.</p>
+<p>Send a general MAV_CMD_LONG message to the vehicle. <code class="docutils literal notranslate"><span class="pre">COMMAND</span></code> is the name of the command. The options
+follow in <code class="docutils literal notranslate"><span class="pre">[arg1]</span> <span class="pre">[arg2]</span> <span class="pre">...</span></code> format.</p>
 </div>
 </div>
 
@@ -280,7 +280,7 @@ follow in <code class="docutils literal"><span class="pre">[arg1]</span> <span c
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
 <div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Long%20Commands%20-%20&body=URL:%20../modules/cmdlong%0ATitle:%20Long%20Commands%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
-    <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
+    <p><a href="http://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
     This is an ArduPilot project.</p>     
 
     <p>
@@ -313,6 +313,7 @@ follow in <code class="docutils literal"><span class="pre">[arg1]</span> <span c
       <script type="text/javascript" src="../_static/jquery.js"></script>
       <script type="text/javascript" src="../_static/underscore.js"></script>
       <script type="text/javascript" src="../_static/doctools.js"></script>
+      <script type="text/javascript" src="../_static/language_data.js"></script>
 
   
 

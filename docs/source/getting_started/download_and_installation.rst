@@ -4,11 +4,6 @@ Download and Installation
 
 The following instructions are for user that just want to run MAVProxy. Developers should look at the :doc:`Developer's Guide <../development/index>` for setting up the development environment.
 
-.. note::
-
-    MAVProxy runs on the Python 2.7.x environment. Ensure your system is running
-    the correct version of Python.
-
 Windows
 =======
 
@@ -31,23 +26,19 @@ For Debian based systems:
 
 .. code:: bash
 
-    sudo apt-get install python-dev python-opencv python-wxgtk3.0 python-pip python-matplotlib python-pygame python-lxml python-yaml
+    sudo apt-get install python3-dev python3-opencv python3-wxgtk3.0 python3-pip python3-matplotlib python3-pygame python3-lxml python3-yaml
     
 For Fedora based systems:
 
 .. code:: bash
 
-    sudo dnf install python-devel python-opencv wxPython python-pip python-matplotlib pygame python-lxml python-yaml redhat-rpm-config
+    sudo dnf install python3-devel python3-opencv wxPython python3-pip python3-matplotlib pygame python3-lxml python3-yaml redhat-rpm-config
 
 .. note::
 
     On some older Linux systems, ``python-wxgtk3.0`` may be instead named
     as ``python-wxgtk2.8``.
     
-.. note::
-
-    Fedora-based systems cannot run MAVProxy 1.5.7 or earlier, due to a bug in calling OpenCV.
-
 .. note::
 
     On Raspberry Pi (Raspian) systems, the ``libxml2-dev`` package is required to be installed too.

@@ -179,7 +179,7 @@
             
   <div class="section" id="firmware-management">
 <h1>Firmware Management<a class="headerlink" href="#firmware-management" title="Permalink to this headline">¶</a></h1>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">firmware</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">firmware</span>
 </pre></div>
 </div>
 <p>The firmware module provides downloading and listing of available APM firmware. It
@@ -187,22 +187,22 @@ does not currently handle firmware flashing</p>
 <div class="section" id="list">
 <h2>List<a class="headerlink" href="#list" title="Permalink to this headline">¶</a></h2>
 <p>Download the list of available firmware:</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">fw</span> <span class="n">manifest</span> <span class="n">download</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">fw</span> <span class="n">manifest</span> <span class="n">download</span>
 </pre></div>
 </div>
 <p>Prints out the available latest firmwares:</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">fw</span> <span class="nb">list</span> <span class="n">FILTERS</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">fw</span> <span class="nb">list</span> <span class="n">FILTERS</span>
 </pre></div>
 </div>
-<p>Use <code class="docutils literal"><span class="pre">FILTERS</span></code> to filter the columns. An example would be <code class="docutils literal"><span class="pre">platform=PX4-v2</span></code> to
+<p>Use <code class="docutils literal notranslate"><span class="pre">FILTERS</span></code> to filter the columns. An example would be <code class="docutils literal notranslate"><span class="pre">platform=PX4-v2</span></code> to
 only list the firmware for the PX4-V2 platform. Another example would be
-<code class="docutils literal"><span class="pre">releasetype=OFFICIAL</span> <span class="pre">frame=quad</span> <span class="pre">platform=PX4-v2</span></code> to only list the most recent official firmware
+<code class="docutils literal notranslate"><span class="pre">releasetype=OFFICIAL</span> <span class="pre">frame=quad</span> <span class="pre">platform=PX4-v2</span></code> to only list the most recent official firmware
 for quadcopters for the PX4-v2 platform.</p>
 </div>
 <div class="section" id="download">
 <h2>Download<a class="headerlink" href="#download" title="Permalink to this headline">¶</a></h2>
-<p>Download the specified firmware. It uses the same <code class="docutils literal"><span class="pre">FILTERS</span></code> as fw list.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">fw</span> <span class="n">download</span> <span class="n">FILTERS</span>
+<p>Download the specified firmware. It uses the same <code class="docutils literal notranslate"><span class="pre">FILTERS</span></code> as fw list.</p>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">fw</span> <span class="n">download</span> <span class="n">FILTERS</span>
 </pre></div>
 </div>
 </div>
@@ -228,7 +228,7 @@ for quadcopters for the PX4-v2 platform.</p>
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
 <div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Firmware%20Management%20-%20&body=URL:%20../modules/firmware%0ATitle:%20Firmware%20Management%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
-    <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
+    <p><a href="http://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
     This is an ArduPilot project.</p>     
 
     <p>
@@ -261,6 +261,7 @@ for quadcopters for the PX4-v2 platform.</p>
       <script type="text/javascript" src="../_static/jquery.js"></script>
       <script type="text/javascript" src="../_static/underscore.js"></script>
       <script type="text/javascript" src="../_static/doctools.js"></script>
+      <script type="text/javascript" src="../_static/language_data.js"></script>
 
   
 

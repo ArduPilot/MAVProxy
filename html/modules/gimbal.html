@@ -183,7 +183,7 @@
             
   <div class="section" id="gimbal-management">
 <h1>Gimbal Management<a class="headerlink" href="#gimbal-management" title="Permalink to this headline">¶</a></h1>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">gimbal</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">gimbal</span>
 </pre></div>
 </div>
 <p>The gimbal module manages any gimbals attached to the APM via the RC
@@ -197,7 +197,7 @@ output ports.</p>
 <li>MAVLINK - manual control via MAVLink commands</li>
 <li>RC - manual control via RC channels</li>
 </ul>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">gimbal</span> <span class="n">mode</span> <span class="n">GPS</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">gimbal</span> <span class="n">mode</span> <span class="n">GPS</span>
 </pre></div>
 </div>
 </div>
@@ -205,7 +205,7 @@ output ports.</p>
 <h2>gimbal rate ROLL PITCH YAW<a class="headerlink" href="#gimbal-rate-roll-pitch-yaw" title="Permalink to this headline">¶</a></h2>
 <p>Specify the maximum rotational rates (degrees/sec) that the gimbal is
 limited to. Different rates can be used for different axes.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">gimbal</span> <span class="n">rate</span> <span class="mi">20</span> <span class="mi">40</span> <span class="mi">13</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">gimbal</span> <span class="n">rate</span> <span class="mi">20</span> <span class="mi">40</span> <span class="mi">13</span>
 </pre></div>
 </div>
 </div>
@@ -213,7 +213,7 @@ limited to. Different rates can be used for different axes.</p>
 <h2>gimbal point ROLL PITCH YAW<a class="headerlink" href="#gimbal-point-roll-pitch-yaw" title="Permalink to this headline">¶</a></h2>
 <p>When in MAVLink mode, tell the gimbal to point in a certain direction.
 Angles are in degrees.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">gimbal</span> <span class="n">point</span> <span class="mi">0</span> <span class="mi">85</span> <span class="mi">45</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">gimbal</span> <span class="n">point</span> <span class="mi">0</span> <span class="mi">85</span> <span class="mi">45</span>
 </pre></div>
 </div>
 </div>
@@ -221,22 +221,22 @@ Angles are in degrees.</p>
 <h2>gimbal roi<a class="headerlink" href="#gimbal-roi" title="Permalink to this headline">¶</a></h2>
 <p>When in GPS mode, tell the gimbal to point to a certain location. The
 location is picked by clicking on the map.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">gimbal</span> <span class="n">roi</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">gimbal</span> <span class="n">roi</span>
 </pre></div>
 </div>
 </div>
 <div class="section" id="gimbal-roivel">
 <h2>gimbal roivel<a class="headerlink" href="#gimbal-roivel" title="Permalink to this headline">¶</a></h2>
-<p>Similar to <code class="docutils literal"><span class="pre">gimbal</span> <span class="pre">roi</span></code>, but the user is able to specify the maximum
+<p>Similar to <code class="docutils literal notranslate"><span class="pre">gimbal</span> <span class="pre">roi</span></code>, but the user is able to specify the maximum
 velocity and acceleration of the gimbal.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">gimbal</span> <span class="n">roivel</span> <span class="p">[</span><span class="n">VEL_NORTH</span> <span class="n">VEL_EAST</span> <span class="n">VEL_DOWN</span><span class="p">]</span> <span class="p">[</span><span class="n">ACC_NORTH</span> <span class="n">ACC_EASY</span> <span class="n">ACC_DOWN</span><span class="p">]</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">gimbal</span> <span class="n">roivel</span> <span class="p">[</span><span class="n">VEL_NORTH</span> <span class="n">VEL_EAST</span> <span class="n">VEL_DOWN</span><span class="p">]</span> <span class="p">[</span><span class="n">ACC_NORTH</span> <span class="n">ACC_EASY</span> <span class="n">ACC_DOWN</span><span class="p">]</span>
 </pre></div>
 </div>
 </div>
 <div class="section" id="gimbal-status">
 <h2>gimbal status<a class="headerlink" href="#gimbal-status" title="Permalink to this headline">¶</a></h2>
 <p>Output the current status of the gimbal.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">gimbal</span> <span class="n">status</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">gimbal</span> <span class="n">status</span>
 </pre></div>
 </div>
 </div>
@@ -262,7 +262,7 @@ velocity and acceleration of the gimbal.</p>
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
 <div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Gimbal%20Management%20-%20&body=URL:%20../modules/gimbal%0ATitle:%20Gimbal%20Management%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
-    <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
+    <p><a href="http://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
     This is an ArduPilot project.</p>     
 
     <p>
@@ -295,6 +295,7 @@ velocity and acceleration of the gimbal.</p>
       <script type="text/javascript" src="../_static/jquery.js"></script>
       <script type="text/javascript" src="../_static/underscore.js"></script>
       <script type="text/javascript" src="../_static/doctools.js"></script>
+      <script type="text/javascript" src="../_static/language_data.js"></script>
 
   
 

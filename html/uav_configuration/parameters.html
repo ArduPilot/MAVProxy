@@ -165,14 +165,14 @@ possible parameters is shown.</p>
 <div class="section" id="param-set">
 <h2>param set<a class="headerlink" href="#param-set" title="Permalink to this headline">¶</a></h2>
 <p>Change a specified parameter to a particular value.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="nb">set</span> <span class="n">FLTMODE1</span> <span class="mi">9</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="nb">set</span> <span class="n">FLTMODE1</span> <span class="mi">9</span>
 </pre></div>
 </div>
 </div>
 <div class="section" id="param-save">
 <h2>param save<a class="headerlink" href="#param-save" title="Permalink to this headline">¶</a></h2>
 <p>Save all current parameters on the APM to file.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="n">save</span> <span class="n">filename</span><span class="o">.</span><span class="n">parm</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="n">save</span> <span class="n">filename</span><span class="o">.</span><span class="n">parm</span>
 </pre></div>
 </div>
 </div>
@@ -180,7 +180,7 @@ possible parameters is shown.</p>
 <h2>param load<a class="headerlink" href="#param-load" title="Permalink to this headline">¶</a></h2>
 <p>Load parameters from file to the APM. Only the parameters in the file
 will be overwritten.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="n">load</span> <span class="n">filename</span><span class="o">.</span><span class="n">parm</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="n">load</span> <span class="n">filename</span><span class="o">.</span><span class="n">parm</span>
 </pre></div>
 </div>
 </div>
@@ -188,7 +188,7 @@ will be overwritten.</p>
 <h2>param diff<a class="headerlink" href="#param-diff" title="Permalink to this headline">¶</a></h2>
 <p>View the differences between the parameters in a file and what is
 currently on the APM.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="n">diff</span> <span class="n">filename</span><span class="o">.</span><span class="n">parm</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="n">diff</span> <span class="n">filename</span><span class="o">.</span><span class="n">parm</span>
 </pre></div>
 </div>
 </div>
@@ -196,7 +196,7 @@ currently on the APM.</p>
 <h2>Wildcards<a class="headerlink" href="#wildcards" title="Permalink to this headline">¶</a></h2>
 <p>Any of the above commands can be filtered by using wildcards, if only a
 particular subset of parameters needs to be manipulated.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="n">show</span> <span class="n">FLTMODE</span><span class="o">*</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="n">show</span> <span class="n">FLTMODE</span><span class="o">*</span>
 <span class="n">param</span> <span class="n">load</span> <span class="n">RC1</span><span class="o">*</span>
 </pre></div>
 </div>
@@ -205,14 +205,14 @@ particular subset of parameters needs to be manipulated.</p>
 <h2>param download<a class="headerlink" href="#param-download" title="Permalink to this headline">¶</a></h2>
 <p>Downloads the parameter definitions from the Internet and into a local
 cache.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="n">download</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="n">download</span>
 </pre></div>
 </div>
 </div>
 <div class="section" id="param-help">
 <h2>param help<a class="headerlink" href="#param-help" title="Permalink to this headline">¶</a></h2>
 <p>Shows further information (usage, notes) of the specified parameter.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="n">help</span> <span class="n">FLTMODE1</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">param</span> <span class="n">help</span> <span class="n">FLTMODE1</span>
 </pre></div>
 </div>
 </div>
@@ -238,7 +238,7 @@ cache.</p>
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
 <div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Parameters%20-%20&body=URL:%20../uav_configuration/parameters%0ATitle:%20Parameters%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
-    <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
+    <p><a href="http://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
     This is an ArduPilot project.</p>     
 
     <p>
@@ -271,6 +271,7 @@ cache.</p>
       <script type="text/javascript" src="../_static/jquery.js"></script>
       <script type="text/javascript" src="../_static/underscore.js"></script>
       <script type="text/javascript" src="../_static/doctools.js"></script>
+      <script type="text/javascript" src="../_static/language_data.js"></script>
 
   
 

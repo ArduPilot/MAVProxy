@@ -178,7 +178,7 @@
             
   <div class="section" id="packet-signing">
 <h1>Packet Signing<a class="headerlink" href="#packet-signing" title="Permalink to this headline">¶</a></h1>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">signing</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">module</span> <span class="n">load</span> <span class="n">signing</span>
 </pre></div>
 </div>
 <p>The signing module sets up and controls the signing of packet with a key. In Mavlink 2.0,
@@ -186,26 +186,26 @@ this is a feature that allows a vehicle to only accept commands from packets sig
 correct key. This is useful as it lowers the risk of a 3rd party gaining control over the vehicle.</p>
 <div class="section" id="setup-and-removal">
 <h2>Setup and Removal<a class="headerlink" href="#setup-and-removal" title="Permalink to this headline">¶</a></h2>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">signing</span> <span class="n">setup</span> <span class="n">KEY</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">signing</span> <span class="n">setup</span> <span class="n">KEY</span>
 </pre></div>
 </div>
-<p>Set the key to <code class="docutils literal"><span class="pre">KEY</span></code> on both MAVProxy and the vehicle. <strong>This is sent in plaintext to the
+<p>Set the key to <code class="docutils literal notranslate"><span class="pre">KEY</span></code> on both MAVProxy and the vehicle. <strong>This is sent in plaintext to the
 vehicle, so ensure this setup is done over a secure link.</strong></p>
 <p>All packets sent to the vehicle after this command will be accompanied with a SHA-512 hash of the key
-to confirm the packet's authenticity.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">signing</span> <span class="n">remove</span> <span class="n">KEY</span>
+to confirm the packet’s authenticity.</p>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">signing</span> <span class="n">remove</span> <span class="n">KEY</span>
 </pre></div>
 </div>
-<p>Remove the signing key <code class="docutils literal"><span class="pre">KEY</span></code> from MAVProxy and the vehicle.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">signing</span> <span class="n">disable</span> <span class="n">KEY</span>
+<p>Remove the signing key <code class="docutils literal notranslate"><span class="pre">KEY</span></code> from MAVProxy and the vehicle.</p>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">signing</span> <span class="n">disable</span> <span class="n">KEY</span>
 </pre></div>
 </div>
-<p>Disable signing of packets with key <code class="docutils literal"><span class="pre">KEY</span></code> from MAVProxy. Does not affect the vehicle -
+<p>Disable signing of packets with key <code class="docutils literal notranslate"><span class="pre">KEY</span></code> from MAVProxy. Does not affect the vehicle -
 it will still be expecting signed packets.</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">signing</span> <span class="n">key</span> <span class="n">KEY</span>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">signing</span> <span class="n">key</span> <span class="n">KEY</span>
 </pre></div>
 </div>
-<p>Enable signing of packets with key <code class="docutils literal"><span class="pre">KEY</span></code> from MAVProxy. Does not affect the vehicle.</p>
+<p>Enable signing of packets with key <code class="docutils literal notranslate"><span class="pre">KEY</span></code> from MAVProxy. Does not affect the vehicle.</p>
 </div>
 </div>
 
@@ -229,7 +229,7 @@ it will still be expecting signed packets.</p>
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
 <div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Packet%20Signing%20-%20&body=URL:%20../modules/signing%0ATitle:%20Packet%20Signing%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
-    <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
+    <p><a href="http://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
     This is an ArduPilot project.</p>     
 
     <p>
@@ -262,6 +262,7 @@ it will still be expecting signed packets.</p>
       <script type="text/javascript" src="../_static/jquery.js"></script>
       <script type="text/javascript" src="../_static/underscore.js"></script>
       <script type="text/javascript" src="../_static/doctools.js"></script>
+      <script type="text/javascript" src="../_static/language_data.js"></script>
 
   
 

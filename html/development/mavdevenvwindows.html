@@ -144,58 +144,38 @@
   <div class="section" id="windows-development-environment">
 <h1>Windows Development Environment<a class="headerlink" href="#windows-development-environment" title="Permalink to this headline">¶</a></h1>
 <p>In Windows, the process is a bit more complicated than for Linux.</p>
-<p>You will need to have <a class="reference external" href="http://www.python.org/download/releases/2.7/">Python
-2.7</a>,
-<a class="reference external" href="http://www.wxpython.org/download.php">wxPython</a> and
-<a class="reference external" href="http://pygame.org/download.shtml">pygame</a> installed first.</p>
-<p>Next, open up a console in the Python scripts install path
-(<code class="file docutils literal"><span class="pre">C:\Python27\Scripts</span></code> or similar). Use <code class="docutils literal"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">[filepath]</span></code> to install them</p>
-<ul class="simple">
-<li><a class="reference external" href="http://www.lfd.uci.edu/~gohlke/pythonlibs/#numpy">numPY</a></li>
-<li><a class="reference external" href="http://www.lfd.uci.edu/~gohlke/pythonlibs/#pillow">Pillow (replaces
-PIL)</a></li>
-<li><a class="reference external" href="http://www.lfd.uci.edu/~gohlke/pythonlibs/#opencv">OpenCV 3</a></li>
-<li><a class="reference external" href="http://www.lfd.uci.edu/~gohlke/pythonlibs/#lxml">lxml</a></li>
-<li><a class="reference external" href="https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyyaml">PyYAML</a></li>
-</ul>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">cd</span> <span class="n">C</span><span class="p">:</span>\<span class="n">Python27</span>\<span class="n">Scripts</span>
-<span class="n">pip</span> <span class="n">install</span> <span class="o">&lt;</span><span class="n">path</span> <span class="n">to</span> <span class="n">downloaded</span> <span class="n">file</span><span class="o">&gt;</span>
-</pre></div>
-</div>
-<p>Use <code class="docutils literal"><span class="pre">pip</span></code> to install the other packages. Note that some packages
-require specific older versions to install:</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">cd</span> <span class="n">C</span><span class="p">:</span>\<span class="n">Python27</span>\<span class="n">Scripts</span>
+<p>You will need to have <a class="reference external" href="http://www.python.org/download/releases/3.6/">Python
+3.6</a> or higher.</p>
+<p>Use <code class="docutils literal notranslate"><span class="pre">pip</span></code> to install the other packages (this assumes Python is installed to <code class="docutils literal notranslate"><span class="pre">C:\Python36</span></code>):</p>
+<div class="code bash highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cd</span> <span class="n">C</span><span class="p">:</span>\<span class="n">Python36</span>\<span class="n">Scripts</span>
 <span class="n">pip</span> <span class="n">install</span> <span class="n">pip</span> <span class="o">--</span><span class="n">upgrade</span>
-<span class="n">pip</span> <span class="n">install</span> <span class="n">pyinstaller</span><span class="o">==</span><span class="mf">2.1</span> <span class="n">setuptools</span><span class="o">==</span><span class="mf">19.2</span> <span class="n">packaging</span><span class="o">==</span><span class="mf">14.2</span>
-<span class="n">pip</span> <span class="n">install</span> <span class="n">matplotlib</span> <span class="n">pyreadline</span> <span class="n">future</span>
-<span class="n">pip</span> <span class="n">install</span> <span class="n">python</span><span class="o">-</span><span class="n">dateutil</span> <span class="n">pytz</span> <span class="n">pyparsing</span> <span class="n">six</span>
-<span class="n">pip</span> <span class="n">install</span> <span class="n">pyserial</span>
-<span class="n">pip</span> <span class="n">install</span> <span class="n">pymavlink</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="n">pywin32</span> <span class="n">lxml</span> <span class="n">pymavlink</span> <span class="n">numpy</span> <span class="n">matplotlib</span> <span class="n">pyserial</span> <span class="n">opencv</span><span class="o">-</span><span class="n">python</span> <span class="n">pyreadline</span> <span class="n">PyYAML</span> <span class="n">Pygame</span> <span class="n">Pillow</span> <span class="n">wxpython</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="n">pyinstaller</span> <span class="n">setuptools</span> <span class="n">packaging</span> <span class="o">--</span><span class="n">no</span><span class="o">-</span><span class="n">use</span><span class="o">-</span><span class="n">pep517</span>
 </pre></div>
 </div>
 <p>Download the MAVProxy <a class="reference external" href="https://github.com/ArduPilot/MAVProxy">source</a>.</p>
 <p>After making the desired changes, MAVProxy is required to be compiled
-into the Python directory (the modules won't work otherwise).
+into the Python directory (the modules won’t work otherwise).
 This needs to happen after any changes to the source code. This can be
-done by running the <code class="file docutils literal"><span class="pre">./MAVProxy/MAVProxyWinUSB.bat</span></code> or
-<code class="file docutils literal"><span class="pre">./MAVProxy/MAVProxyWinLAN.bat</span></code> file. This will
+done by running the <code class="file docutils literal notranslate"><span class="pre">./MAVProxy/MAVProxyWinUSB.bat</span></code> or
+<code class="file docutils literal notranslate"><span class="pre">./MAVProxy/MAVProxyWinLAN.bat</span></code> file. This will
 perform the necessary build actions and then run MAVProxy. Some of the
 details in the batch files (port numbers, etc) may need to be altered to
-match the user's system configuration.</p>
-<p>To create a one-click windows installer for MAVProxy, run <code class="docutils literal"><span class="pre">MAVProxyWinBuild.bat`</span></code>,
-which is in the <code class="docutils literal"><span class="pre">./windows</span></code> directory. The installer will be created in the
-<code class="docutils literal"><span class="pre">./windows/output</span></code> directory. The <a class="reference external" href="http://www.jrsoftware.org/isdl.php#stable">Inno Setup</a>
+match the user’s system configuration.</p>
+<p>To create a one-click windows installer for MAVProxy, run <code class="docutils literal notranslate"><span class="pre">MAVProxyWinBuild.bat`</span></code>,
+which is in the <code class="docutils literal notranslate"><span class="pre">./windows</span></code> directory. The installer will be created in the
+<code class="docutils literal notranslate"><span class="pre">./windows/output</span></code> directory. The <a class="reference external" href="http://www.jrsoftware.org/isdl.php#stable">Inno Setup</a>
 program will be required for this process and is assumed to be installed in the
-<code class="docutils literal"><span class="pre">C:\Program</span> <span class="pre">Files</span> <span class="pre">(x86)\Inno</span> <span class="pre">Setup</span> <span class="pre">5\</span></code> folder</p>
+<code class="docutils literal notranslate"><span class="pre">C:\Program</span> <span class="pre">Files</span> <span class="pre">(x86)\Inno</span> <span class="pre">Setup</span> <span class="pre">5\</span></code> folder</p>
 <div class="section" id="visual-studio-setup">
 <h2>Visual Studio Setup<a class="headerlink" href="#visual-studio-setup" title="Permalink to this headline">¶</a></h2>
 <p>Visual Studio can be used to develop MAVProxy on Windows platforms.</p>
-<p>Within the <code class="docutils literal"><span class="pre">windows</span></code> subfolder in MAVProxy, there is a Visual Studio Project file. It does require the <a class="reference external" href="http://microsoft.github.io/PTVS/">Python Tools for Visual Studio</a> to be installed.</p>
+<p>Within the <code class="docutils literal notranslate"><span class="pre">windows</span></code> subfolder in MAVProxy, there is a Visual Studio Project file. It does require the <a class="reference external" href="http://microsoft.github.io/PTVS/">Python Tools for Visual Studio</a> to be installed.</p>
 <div class="figure">
 <img alt="../_images/VS1.png" src="../_images/VS1.png" />
 </div>
 <p>Use the build or debug commands in Visual Studio to install MAVProxy to the local Python folder. This is required in order for MAVProxy to be run correctly.</p>
-<p>MAVProxy can then be run by right-clicking on mavproxy.py and selecting <code class="docutils literal"><span class="pre">Start</span></code> (with or without debugging). The mavexplorer.py can be run in the same way.</p>
+<p>MAVProxy can then be run by right-clicking on mavproxy.py and selecting <code class="docutils literal notranslate"><span class="pre">Start</span></code> (with or without debugging). The mavexplorer.py can be run in the same way.</p>
 <div class="figure">
 <img alt="../_images/VS2.png" src="../_images/VS2.png" />
 </div>
@@ -222,7 +202,7 @@ program will be required for this process and is assumed to be installed in the
   <div role="contentinfo">
     <p>Except where otherwise noted, this documentation is licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC Attribution-Share Alike 3.0 Unported</a>.</p>
 <div style="float:right;"><a href="https://github.com/ArduPilot/MAVProxy/issues/new?title=Windows%20Development%20Environment%20-%20&body=URL:%20../development/mavdevenvwindows%0ATitle:%20Windows%20Development%20Environment%0A%0APlease%20update%20this%20description%20and%20the%20issue%20title">Page bug</a></div>     
-    <p><a href="https://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
+    <p><a href="http://www.ardupilot.org/"><img src="../_static/images/ArduPilot-Logo.jpg" width="130" alt="ArduPilot" class /></a><br/> 
     This is an ArduPilot project.</p>     
 
     <p>
@@ -255,6 +235,7 @@ program will be required for this process and is assumed to be installed in the
       <script type="text/javascript" src="../_static/jquery.js"></script>
       <script type="text/javascript" src="../_static/underscore.js"></script>
       <script type="text/javascript" src="../_static/doctools.js"></script>
+      <script type="text/javascript" src="../_static/language_data.js"></script>
 
   
 
