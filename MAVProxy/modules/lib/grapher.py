@@ -76,6 +76,7 @@ class MavGraph(object):
         self.xlim = None
         self.tday_base = None
         self.tday_basetime = None
+        self.title = None
 
     def add_field(self, field):
         '''add another field to plot'''
@@ -92,6 +93,10 @@ class MavGraph(object):
     def set_xaxis(self, xaxis):
         '''set graph xaxis'''
         self.xaxis = xaxis
+
+    def set_title(self, title):
+        '''set graph title'''
+        self.title = title
 
     def set_marker(self, marker):
         '''set graph marker'''
@@ -184,7 +189,7 @@ class MavGraph(object):
         '''called on draw events'''
         self.draw_events += 1
 
-    def plotit(self, x, y, fields, colors=[]):
+    def plotit(self, x, y, fields, colors=[], title=None):
         '''plot a set of graphs using date for x axis'''
         pylab.ion()
         self.fig = pylab.figure(num=1, figsize=(12,6))
@@ -304,6 +309,9 @@ class MavGraph(object):
         if empty:
             print("No data to graph")
             return
+
+        if title is not None:
+            pylab.title(title)
 
         if self.show_flightmode:
             mode_patches = []
@@ -499,7 +507,7 @@ class MavGraph(object):
                 col = colors[:]
             else:
                 col = colors[fi*len(self.fields):]
-            self.plotit(self.x, self.y, lab, colors=col)
+            self.plotit(self.x, self.y, lab, colors=col, title=self.title)
             for i in range(0, len(self.x)):
                 self.x[i] = []
                 self.y[i] = []

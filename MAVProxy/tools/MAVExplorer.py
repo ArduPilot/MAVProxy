@@ -56,7 +56,8 @@ class MEState(object):
               MPSetting('show_flightmode', bool, True, 'show flightmode'),
               MPSetting('sync_xzoom', bool, True, 'sync X-axis zoom'),
               MPSetting('legend', str, 'upper left', 'legend position'),
-              MPSetting('legend2', str, 'upper right', 'legend2 position')
+              MPSetting('legend2', str, 'upper right', 'legend2 position'),
+              MPSetting('title', str, None, 'Graph title'),
               ]
             )
 
@@ -72,7 +73,7 @@ class MEState(object):
         self.aliases = {}
         self.graphs = []
         self.flightmode_selections = []
-        self.last_graph = GraphDefinition('Untitled', '', '', [], None)
+        self.last_graph = GraphDefinition(self.settings.title, '', '', [], None)
         
         #pipe to the wxconsole for any child threads (such as the save dialog box)
         self.parent_pipe_recv_console,self.child_pipe_send_console = multiproc.Pipe(duplex=False)
@@ -306,7 +307,7 @@ def cmd_graph(args):
         mestate.last_graph = g
     else:
         expression = ' '.join(args)
-        mestate.last_graph = GraphDefinition('Untitled', expression, '', [expression], None)
+        mestate.last_graph = GraphDefinition(mestate.settings.title, expression, '', [expression], None)
     grui.append(Graph_UI(mestate))
     grui[-1].display_graph(mestate.last_graph, flightmode_colours())
     global last_xlim

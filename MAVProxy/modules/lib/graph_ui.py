@@ -23,6 +23,10 @@ class Graph_UI(object):
 
         #setup the graph, then pass to a new process and display
         self.mg = grapher.MavGraph(flightmode_colourmap)
+        if self.mestate.settings.title is not None:
+            self.mg.set_title(self.mestate.settings.title)
+        else:
+            self.mg.set_title(graphdef.name)
         self.mg.set_marker(self.mestate.settings.marker)
         self.mg.set_condition(self.mestate.settings.condition)
         self.mg.set_xaxis(self.mestate.settings.xaxis)
