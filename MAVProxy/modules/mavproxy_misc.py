@@ -262,6 +262,10 @@ class MiscModule(mp_module.MPModule):
         tune = args[0]
         str1 = tune[0:30]
         str2 = tune[30:]
+        if sys.version_info.major >= 3 and not isinstance(str1, bytes):
+            str1 = bytes(str1, "ascii")
+        if sys.version_info.major >= 3 and not isinstance(str2, bytes):
+            str2 = bytes(str2, "ascii")
         self.master.mav.play_tune_send(self.settings.target_system,
                                        self.settings.target_component,
                                        str1, str2)
