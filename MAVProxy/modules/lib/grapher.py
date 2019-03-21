@@ -343,8 +343,13 @@ class MavGraph(object):
                 xv = mavutil.evaluate_expression(self.xaxis, vars)
                 if xv is None:
                     continue
-            self.y[i].append(v)
-            self.x[i].append(xv)
+            try:
+                v_f = float(v)
+                xv_f = float(xv)
+            except Exception:
+                continue
+            self.y[i].append(v_f)
+            self.x[i].append(xv_f)
 
     def timestamp_to_days(self, timestamp):
         '''convert log timestamp to days'''
