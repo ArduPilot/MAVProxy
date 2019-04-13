@@ -171,6 +171,8 @@ class MPModule(object):
         '''return a speed in configured units'''
         if self.settings.speed_unit == 'knots':
             return val_ms * 1.94384
+        elif self.settings.speed_unit == 'mph':
+            return val_ms * 2.23694
         return val_ms
 
     def speed_string(self, val_ms):
