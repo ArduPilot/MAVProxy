@@ -182,6 +182,9 @@ class MPState(object):
               MPSetting('checkdelay', bool, True, 'check for link delay'),
 
               MPSetting('vehicle_name', str, '', 'Vehicle Name', tab='Vehicle'),
+
+              MPSetting('sys_status_error_warn_interval', int, 30, 'interval to warn of autopilot software failure'),
+
             ])
 
         self.completions = {

@@ -24,6 +24,7 @@ class ConsoleModule(mp_module.MPModule):
         self.speed = 0
         self.max_link_num = 0
         self.last_sys_status_health = 0
+        self.last_sys_status_errors_announce = 0
         mpstate.console = wxconsole.MessageConsole(title='Console')
 
         # setup some default status information
@@ -348,6 +349,21 @@ class ConsoleModule(mp_module.MPModule):
                 if enabled and not healthy and was_healthy:
                     self.say("%s fail" % s)
             self.last_sys_status_health = msg.onboard_control_sensors_health
+
+            # check for any error bits being set:
+            now = time.time()
+            if now - self.last_sys_status_errors_announce > self.mpstate.settings.sys_status_error_warn_interval:
+                for field_num in range(1, 5):
+                    field = "errors_count%u" % field_num
+                    x = getattr(msg, field, None)
+                    if x is None:
+                        self.console.writeln("Failed to get field %s" % field)
+                        self.last_sys_status_errors_announce = now
+                        break
+                    if x != 0:
+                        self.last_sys_status_errors_announce = now
+                        self.say("Critical failure")
+                        break
 
         elif type == 'WIND':
             self.console.set_status('Wind', 'Wind %u/%.2f' % (msg.direction, msg.speed))
