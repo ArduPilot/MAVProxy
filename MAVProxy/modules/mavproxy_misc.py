@@ -87,6 +87,7 @@ class MiscModule(mp_module.MPModule):
         self.add_command('devid', self.cmd_devid, "show device names from parameter IDs")
         self.add_command('gethome', self.cmd_gethome, "get HOME_POSITION")
         self.add_command('flashbootloader', self.cmd_flashbootloader, "flash bootloader (dangerous)")
+        self.add_command('lockup_autopilot', self.cmd_lockup_autopilot, "lockup autopilot")
         self.repeats = []
 
     def altitude_difference(self, pressure1, pressure2, ground_temp):
@@ -142,6 +143,17 @@ class MiscModule(mp_module.MPModule):
             self.master.reboot_autopilot(True)
         else:
             self.master.reboot_autopilot()
+
+    def cmd_lockup_autopilot(self, args):
+        '''lockup autopilot for watchdog testing'''
+        if len(args) > 0 and args[0] == 'IREALLYMEANIT':
+            print("Sending lockup command")
+            self.master.mav.command_long_send(self.settings.target_system, self.settings.target_component,
+                                              mavutil.mavlink.MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN, 0,
+                                              42, 24, 71, 93, 0, 0, 0)
+        else:
+            print("Invalid lockup command")
+        
 
     def cmd_time(self, args):
         '''show autopilot time'''
