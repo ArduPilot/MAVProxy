@@ -82,6 +82,10 @@ on how to use MAVProxy.''',
                 'MAVProxy.modules.lib.MacOS',
                 'MAVProxy.modules.lib.optparse_gui'],
       install_requires=requirements,
+      extras_require={
+        # restserver module
+        'server': ['flask'],
+      },
       scripts=['MAVProxy/mavproxy.py',
                'MAVProxy/tools/mavflightview.py',
                'MAVProxy/tools/MAVExplorer.py',
