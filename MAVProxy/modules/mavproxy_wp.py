@@ -105,9 +105,12 @@ class WPModule(mp_module.MPModule):
                 if last_w.frame != w.frame:
                     print("WARNING: frame change %u -> %u at %u" % (last_w.frame, w.frame, i))
                 delta_alt = last_w.z - w.z
-                delta_xy = mp_util.gps_distance(w.x, w.y, last_w.x, last_w.y)
-                slope = delta_xy / delta_alt
-                print("WP%u: slope %.1f" % (i, slope))
+                if delta_alt == 0:
+                    slope = "Level"
+                else:
+                    delta_xy = mp_util.gps_distance(w.x, w.y, last_w.x, last_w.y)
+                    slope = "%.1f" % (delta_xy / delta_alt)
+                print("WP%u: slope %s" % (i, slope))
             last_w = w
 
             
