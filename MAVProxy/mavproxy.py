@@ -46,6 +46,21 @@ try:
 except Exception:
       pass
 
+# screensaver dbus syntax swiped from
+# https://stackoverflow.com/questions/10885337/inhibit-screensaver-with-python
+screensaver_interface = None
+screensaver_cookie = None
+try:
+    import atexit
+    import dbus
+    bus = dbus.SessionBus()
+    saver = bus.get_object('org.freedesktop.ScreenSaver', '/ScreenSaver')
+    screensaver_interface = dbus.Interface(saver, dbus_interface='org.freedesktop.ScreenSaver')
+    if screensaver_cookie is not None:
+        atexit.register(saver_interface.UnInhibit, [screensaver_cookie])
+except Exception as e:
+    pass
+
 if __name__ == '__main__':
       multiproc.freeze_support()
 
@@ -184,6 +199,8 @@ class MPState(object):
               MPSetting('vehicle_name', str, '', 'Vehicle Name', tab='Vehicle'),
 
               MPSetting('sys_status_error_warn_interval', int, 30, 'interval to warn of autopilot software failure'),
+
+              MPSetting('inhibit_screensaver_when_armed', bool, True, 'inhibit screensaver while vehicle armed'),
 
             ])
 
@@ -824,6 +841,9 @@ def periodic_tasks():
 
 def main_loop():
     '''main processing loop'''
+
+    global screensaver_cookie
+
     if not mpstate.status.setup_mode and not opts.nowait:
         for master in mpstate.mav_master:
             if master.linknum != 0:
@@ -836,6 +856,19 @@ def main_loop():
     while True:
         if mpstate is None or mpstate.status.exit:
             return
+
+        # enable or disable screensaver:
+        if (mpstate.settings.inhibit_screensaver_when_armed and
+            screensaver_interface is not None):
+            if mpstate.status.armed and screensaver_cookie is None:
+                # now we can inhibit the screensaver
+                screensaver_cookie = screensaver_interface.Inhibit("MAVProxy",
+                                                             "Vehicle is armed")
+            elif not mpstate.status.armed and screensaver_cookie is not None:
+                # we can also restore it
+                screensaver_interface.UnInhibit(screensaver_cookie)
+                screensaver_cookie = None
+
         while not mpstate.input_queue.empty():
             line = mpstate.input_queue.get()
             mpstate.input_count += 1
