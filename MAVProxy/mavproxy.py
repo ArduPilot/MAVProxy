@@ -200,7 +200,7 @@ class MPState(object):
 
               MPSetting('sys_status_error_warn_interval', int, 30, 'interval to warn of autopilot software failure'),
 
-              MPSetting('inhibit_screensaver_when_armed', bool, True, 'inhibit screensaver while vehicle armed'),
+              MPSetting('inhibit_screensaver_when_armed', bool, False, 'inhibit screensaver while vehicle armed'),
 
             ])
 
