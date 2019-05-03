@@ -377,7 +377,10 @@ class LinkModule(mp_module.MPModule):
             # don't process messages not from our target
             if m.get_type() == "BAD_DATA":
                 if self.mpstate.settings.shownoise and mavutil.all_printable(m.data):
-                    self.mpstate.console.write(str(m.data), bg='red')
+                    out = m.data
+                    if type(m.data) == bytearray:
+                        out = m.data.decode('ascii')
+                    self.mpstate.console.write(out, bg='red')
             return
 
         if self.settings.target_system != 0 and master.target_system != self.settings.target_system:
