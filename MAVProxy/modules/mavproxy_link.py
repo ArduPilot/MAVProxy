@@ -30,6 +30,7 @@ preferred_ports = [
     '*PX4*',
     '*Hex_*',
     '*Holybro_*',
+    '*mRo*',
     '*FMU*']
 
 class LinkModule(mp_module.MPModule):
