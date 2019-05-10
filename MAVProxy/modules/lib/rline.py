@@ -102,16 +102,7 @@ def complete_variable(text):
     else:
         suffix = ''
 
-    try:
-        if mavutil.evaluate_expression(text, rline_mpstate.status.msgs) is not None:
-            return [text+suffix]
-    except Exception as ex:
-        pass
-
-    try:
-        m1 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*)[.]([A-Za-z0-9_]*)$", text)
-    except Exception as ex:
-        return []
+    m1 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*)[.]([A-Za-z0-9_]*)$", text)
     if m1 is not None:
         prefix = m1.group(1)
         mtype = m1.group(2)
@@ -123,17 +114,23 @@ def complete_variable(text):
                     ret.append(prefix + mtype + '.' + f + suffix)
             return ret
         return []
-    try:
-        m2 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*)$", text)
-    except Exception as ex:
-        return []
+    m2 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*)$", text)
     prefix = m2.group(1)
     mtype = m2.group(2)
     ret = []
     for k in list(rline_mpstate.status.msgs.keys()):
         if k.startswith(mtype):
             ret.append(prefix + k + suffix)
-    return ret
+    if len(ret):
+        return ret
+
+    try:
+        if mavutil.evaluate_expression(text, rline_mpstate.status.msgs) is not None:
+            return [text+suffix]
+    except Exception as ex:
+        pass
+
+    return []
 
 def rule_expand(component, text):
     '''expand one rule component'''
