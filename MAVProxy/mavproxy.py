@@ -13,6 +13,7 @@ import serial, select
 import traceback
 import select
 import shlex
+import math
 import platform
 import json
 
@@ -98,7 +99,7 @@ class MPStatus(object):
         self.last_seq = 0
         self.armed = False
 
-    def show(self, f, pattern=None):
+    def show(self, f, pattern=None, verbose=False):
         '''write status to status.txt'''
         if pattern is None:
             f.write('Counters: ')
@@ -110,7 +111,17 @@ class MPStatus(object):
         for m in sorted(self.msgs.keys()):
             if pattern is not None and not fnmatch.fnmatch(str(m).upper(), pattern.upper()):
                 continue
-            f.write("%u: %s\n" % (self.msg_count[m], str(self.msgs[m])))
+            if verbose:
+                try:
+                    mavutil.dump_message_verbose(f, self.msgs[m])
+                    f.write("\n")
+                except AttributeError as e:
+                    if "has no attribute 'dump_message_verbose'" in str(e):
+                        print("pymavlink update required for --verbose")
+                    else:
+                        raise e
+            else:
+                f.write("%u: %s\n" % (self.msg_count[m], str(self.msgs[m])))
 
     def write(self):
         '''write status to status.txt'''
@@ -297,11 +308,15 @@ def cmd_set(args):
 
 def cmd_status(args):
     '''show status'''
+    verbose = False
+    if "--verbose" in args:
+        verbose = True
+        args = list(filter(lambda x : x != "--verbose", args))
     if len(args) == 0:
-        mpstate.status.show(sys.stdout, pattern=None)
+        mpstate.status.show(sys.stdout, pattern=None, verbose=verbose)
     else:
         for pattern in args:
-            mpstate.status.show(sys.stdout, pattern=pattern)
+            mpstate.status.show(sys.stdout, pattern=pattern, verbose=verbose)
 
 def cmd_setup(args):
     mpstate.status.setup_mode = True
