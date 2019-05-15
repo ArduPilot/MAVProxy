@@ -167,7 +167,7 @@
 
   <graph name='Sensors/Compass/Compass(3)'>
     <description>Third Compass</description>
-    <expression>SCALED_IMU3.xmag SCALED_IMU3.ymag SCALED_IMU3.zmag mag_field(SCALED_IMU2)</expression>
+    <expression>SCALED_IMU3.xmag SCALED_IMU3.ymag SCALED_IMU3.zmag mag_field(SCALED_IMU3)</expression>
     <expression>MAG3.MagX MAG3.MagY MAG3.MagZ sqrt(MAG3.MagX**2+MAG3.MagY**2+MAG3.MagZ**2)</expression>
   </graph>
 
