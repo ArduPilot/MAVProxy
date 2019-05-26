@@ -59,6 +59,9 @@ class CMACModule(mp_module.MPModule):
         self.last_rally_fetch = 0
         self.done_heartbeat_check = 0
 
+        # an altitude should always be within a few metres of when disarmed:
+        self.disarmed_alt = 584
+
         self.check()
 
     # swiped from ArduPilot's common.py:
@@ -278,6 +281,21 @@ class CMACModule(mp_module.MPModule):
             ret = False
         return ret
 
+    def check_altitude(self):
+        if self.is_armed:
+            return True
+        try:
+            gpi = self.master.messages['GLOBAL_POSITION_INT']
+        except Exception:
+            return False
+        max_delta = 10
+        current_alt = gpi.alt / 1000
+        if abs(current_alt - self.disarmed_alt) > max_delta:
+            self.whinge("Altitude (%f) not within %fm of %fm" %
+                        (current_alt, max_delta, self.disarmed_alt))
+            return False
+        return True
+
     def check_mission(self):
         wpmod = self.module('wp')
         if wpmod is None:
@@ -347,6 +365,8 @@ class CMACModule(mp_module.MPModule):
         if not self.check_mission():
             success = False
         if not self.check_rally():
+            success = False
+        if not self.check_altitude():
             success = False
         if not success:
             self.whinge("CHECKS BAD")
