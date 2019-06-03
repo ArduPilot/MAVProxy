@@ -14,45 +14,21 @@ import os
 import time
 
 from MAVProxy.modules.lib import mp_module
+from MAVProxy.modules.lib.mp_settings import MPSettings
+from MAVProxy.modules.lib.mp_settings import MPSetting
+
 from pymavlink import mavutil
 from MAVProxy.modules.lib import mp_util
 
 import pkg_resources
 
-CMAC_LOCATION = mavutil.location(-35.363261, 149.165230, 584, 353)
-
 if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import MPMenuItem
     from MAVProxy.modules.lib.mp_menu import MPMenuSubMenu
 
-
-class CMACModule(mp_module.MPModule):
-    def __init__(self, mpstate):
-        super(CMACModule, self).__init__(mpstate,
-                                         "CMAC",
-                                         "CMAC Checks",
-                                         public=True)
-        self.rate_period = mavutil.periodic_event(1.0/15)
+class FieldCheck(object):
+    def __init__(self):
         self.is_armed = False
-        self.done_map_menu = False
-
-        from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
-        self.cmac_settings = MPSettings(
-            [
-                MPSetting('fence_maxdist', float, 1000,
-                          'Max FencePoint Distance from south-CMAC'),
-                MPSetting('wp_maxdist', float, 500,
-                          'Max WayPoint Distance from south-CMAC'),
-                MPSetting('rally_maxdist', float, 200,
-                          'Max Rally Distance from south-CMAC'),
-            ])
-        self.add_completion_function('(CMACCHECKSETTING)',
-                                     self.cmac_settings.completion)
-        self.add_command('cmaccheck',
-                         self.cmd_cmaccheck,
-                         'cmac check control',
-                         ['check',
-                          'set (CMACCHECKSETTING)'])
 
         self.last_fence_fetch = 0
         self.last_mission_fetch = 0
@@ -61,8 +37,14 @@ class CMACModule(mp_module.MPModule):
 
         # an altitude should always be within a few metres of when disarmed:
         self.disarmed_alt = 584
+        self.rate_period = mavutil.periodic_event(1.0/15)
 
-        self.check()
+        self.done_map_menu = False
+
+    def close_to(self, loc1):
+        ret = self.get_distance(loc1, self.location)
+        print("Distance to %s: %um" % (self.lc_name, ret))
+        return ret < 100
 
     # swiped from ArduPilot's common.py:
     def get_distance(self, loc1, loc2):
@@ -75,82 +57,34 @@ class CMACModule(mp_module.MPModule):
 
         return math.sqrt((dlat*dlat) + (dlong*dlong)) * 1.113195e5
 
-    def check_map_menu(self):
-        # make the initial map menu
-        if not mp_util.has_wxpython:
-            return
-        if self.done_map_menu:
-            if not self.module('map'):
-                self.done_map_menu = False
-            return
-
-        if self.module('map'):
-            self.menu = MPMenuSubMenu('CMAC', items=[
-                MPMenuItem('Load foamy mission CW',
-                           'Load foamy mission CW',
-                           '# cmaccheck loadFoamyMissionCW'),
-                MPMenuItem('Load foamy mission CCW',
-                           'Load foamy mission CCW',
-                           '# cmaccheck loadFoamyMissionCCW'),
-                MPMenuItem('Load rally points',
-                           'Load rally points',
-                           '# cmaccheck loadRally'),
-                MPMenuItem('Load foamy fence',
-                           'Load foamy fence',
-                           '# cmaccheck loadFoamyFence'),
-            ])
-            self.module('map').add_menu(self.menu)
-            self.done_map_menu = True
+    def flightdata_filepath(self, filename):
+        if os.path.exists(filename):
+            return filename
+        return pkg_resources.resource_filename(__name__, filename)
 
     def loadRally(self):
-        filename = "cmac-foamy-rally.txt"
-        filepath = pkg_resources.resource_filename(__name__, filename)
-        if os.path.exists(filepath):
-            rallymod = self.module('rally')
-            rallymod.cmd_rally(["load", filepath])
+        filepath = self.flightdata_filepath(self.fc_settings.rally_filename)
+        rallymod = self.module('rally')
+        rallymod.cmd_rally(["load", filepath])
 
     def loadFoamyFence(self):
-        filename = "cmac-foamy-fence.txt"
-        filepath = pkg_resources.resource_filename(__name__, filename)
-        if os.path.exists(filepath):
-            fencemod = self.module('fence')
-            fencemod.cmd_fence(["load", filepath])
+        filepath = self.flightdata_filepath(self.fc_settings.fence_filename)
+        fencemod = self.module('fence')
+        fencemod.cmd_fence(["load", filepath])
 
     def loadFoamyMission(self, filename):
-        filepath = pkg_resources.resource_filename(__name__, filename)
+        filepath = self.flightdata_filepath(filename)
         wpmod = self.module('wp')
         wpmod.cmd_wp(["load", filepath])
 
     def loadFoamyMissionCW(self):
-        self.loadFoamyMission("cmac-foamy-mission-cw.txt")
+        self.loadFoamyMission(self.fc_settings.mission_filename_cw)
 
     def loadFoamyMissionCCW(self):
-        self.loadFoamyMission("cmac-foamy-mission-ccw.txt")
-
-    def cmd_cmaccheck(self, args):
-        '''handle cmaccheck commands'''
-        usage = 'Usage: cmaccheck <set>'
-        if len(args) == 0:
-            print(usage)
-            return
-        if args[0] == "set":
-            self.cmac_settings.command(args[1:])
-        elif args[0] == "loadFoamyMissionCW":
-            self.loadFoamyMissionCW()
-        elif args[0] == "loadFoamyMissionCCW":
-            self.loadFoamyMissionCCW()
-        elif args[0] == "loadFoamyFence":
-            self.loadFoamyFence()
-        elif args[0] == "loadRally":
-            self.loadRally()
-        elif args[0] == "check":
-            self.check()
-        else:
-            print(usage)
-            return
+        self.loadFoamyMission(self.fc_settings.mission_filename_ccw)
 
     def whinge(self, message):
-        self.console.writeln("CMAC: %s" % (message,))
+        self.console.writeln("FC:%s %s" % (self.lc_name, message,))
 
     def check_parameters(self):
         '''check key parameters'''
@@ -162,21 +96,18 @@ class CMACModule(mp_module.MPModule):
             "FS_LONG_ACTN": 1,
         }
 
+        ret = True
         for key in want_values.keys():
             want = want_values[key]
             got = self.mav_param.get(key, None)
             if got is None:
                 self.whinge("No param %s" % key)
-                return False
+                ret = False
             if got != want:
                 self.whinge('%s should be %f (not %s)' % (key, want, got))
-                return False
+                ret = False
 
-        return True
-
-    def idle_task(self):
-        '''run periodic tasks'''
-        self.check_map_menu()
+        return ret
 
     def check_fence_location(self):
         fencemod = self.module('fence')
@@ -202,8 +133,8 @@ class CMACModule(mp_module.MPModule):
         for i in range(fencemod.fenceloader.count()):
             p = fencemod.fenceloader.point(i)
             loc = mavutil.location(p.lat, p.lng)
-            dist = self.get_distance(CMAC_LOCATION, loc)
-            if dist > self.cmac_settings.fence_maxdist:
+            dist = self.get_distance(self.location, loc)
+            if dist > self.fc_settings.fence_maxdist:
                 self.whinge("Fencepoint %i too far away (%fm)" % (i, dist))
                 ret = False
         return ret
@@ -233,8 +164,8 @@ class CMACModule(mp_module.MPModule):
         for i in range(count):
             r = rallymod.rallyloader.rally_point(i)
             loc = mavutil.location(r.lat/10000000.0, r.lng/10000000.0)
-            dist = self.get_distance(CMAC_LOCATION, loc)
-            if dist > self.cmac_settings.rally_maxdist:
+            dist = self.get_distance(self.location, loc)
+            if dist > self.fc_settings.rally_maxdist:
                 self.whinge("Rally Point %i too far away (%fm)" % (i, dist))
                 ret = False
 
@@ -327,8 +258,8 @@ class CMACModule(mp_module.MPModule):
                                  mavutil.mavlink.MAV_CMD_NAV_LAND]:
                 continue
             loc = mavutil.location(w.x, w.y)
-            dist = self.get_distance(CMAC_LOCATION, loc)
-            if dist > self.cmac_settings.wp_maxdist:
+            dist = self.get_distance(self.location, loc)
+            if dist > self.fc_settings.wp_maxdist:
                 self.whinge("Waypoint %i too far away (%fm)" % (i, dist))
                 ret = False
         return ret
@@ -350,7 +281,6 @@ class CMACModule(mp_module.MPModule):
 
     def check(self):
         success = True
-        self.check_map_menu()
 
         if self.master.messages.get('HEARTBEAT') is None:
             self.whinge("Waiting for heartbeat")
@@ -384,7 +314,164 @@ class CMACModule(mp_module.MPModule):
         if self.rate_period.trigger():
             self.check()
 
+    def check_map_menu(self):
+        # make the initial map menu
+        if not mp_util.has_wxpython:
+            return
+        if self.done_map_menu:
+            if not self.module('map'):
+                self.done_map_menu = False
+            return
+
+        if self.module('map'):
+            self.menu = MPMenuSubMenu('FieldCheck', items=[
+                MPMenuItem('Load foamy mission CW',
+                           'Load foamy mission CW',
+                           '# fieldcheck loadFoamyMissionCW'),
+                MPMenuItem('Load foamy mission CCW',
+                           'Load foamy mission CCW',
+                           '# fieldcheck loadFoamyMissionCCW'),
+                MPMenuItem('Load rally points',
+                           'Load rally points',
+                           '# fieldcheck loadRally'),
+                MPMenuItem('Load foamy fence',
+                           'Load foamy fence',
+                           '# fieldcheck loadFoamyFence'),
+            ])
+            self.module('map').add_menu(self.menu)
+            self.done_map_menu = True
+
+    def idle_task(self):
+        self.check_map_menu()
+
+    def FC_MPSetting(self, name, atype, default, description):
+        xname = "fc_%s_%s" % (self.lc_name, name)
+        return MPSetting(name, atype, default, description)
+
+    def select(self):
+        self.fc_settings = MPSettings(
+            [
+                self.FC_MPSetting('fence_maxdist',
+                                  float,
+                                  1000,
+                                  'Max FencePoint Distance from location'),
+                self.FC_MPSetting('wp_maxdist',
+                                  float,
+                                  500,
+                                  'Max WayPoint Distance from location'),
+                self.FC_MPSetting('rally_maxdist',
+                                  float,
+                                  200,
+                                  'Max Rally Distance from location'),
+                self.FC_MPSetting('rally_filename',
+                                  str,
+                                  "%s-foamy-rally.txt" % self.lc_name,
+                                  "%s Rally Point File" % self.lc_name),
+                self.FC_MPSetting('fence_filename',
+                                  str,
+                                  "%s-foamy-fence.txt" % self.lc_name,
+                                  "%s Fence File" % self.lc_name),
+                self.FC_MPSetting('mission_filename_cw',
+                                  str,
+                                  "%s-foamy-mission-cw.txt" % self.lc_name,
+                                  "%s Mission (CW) File" % self.lc_name),
+                self.FC_MPSetting('mission_filename_ccw',
+                                  str,
+                                  "%s-foamy-mission-ccw.txt" % self.lc_name,
+                                  "%s Mission (CCW) File" % self.lc_name),
+            ])
+        self.x.add_completion_function('(FIELDCHECKCHECKSETTING)',
+                                       self.fc_settings.completion)
+        self.x.add_command('fieldcheck',
+                           self.cmd_fieldcheck,
+                           'field check control',
+                           ['check',
+                            'set (FIELDCHECKSETTING)'])
+
+    def cmd_fieldcheck(self, args):
+        '''handle fieldcheck commands'''
+        usage = 'Usage: fieldcheck <set>'
+        if len(args) == 0:
+            print(usage)
+            return
+        if args[0] == "set":
+            self.fc_settings.command(args[1:])
+        elif args[0] == "loadFoamyMissionCW":
+            self.loadFoamyMissionCW()
+        elif args[0] == "loadFoamyMissionCCW":
+            self.loadFoamyMissionCCW()
+        elif args[0] == "loadFoamyFence":
+            self.loadFoamyFence()
+        elif args[0] == "loadRally":
+            self.loadRally()
+        elif args[0] == "check":
+            self.check()
+        else:
+            print(usage)
+            return
+
+class FieldCMAC(FieldCheck):
+    lc_name = "cmac"
+    location = mavutil.location(-35.363261, 149.165230, 584, 353)
+
+class FieldSpringValley(FieldCheck):
+    location = mavutil.location(-35.281315, 149.005329, 581, 280)
+    lc_name = "springvalley"
+
+class FieldCheckModule(mp_module.MPModule):
+    def __init__(self, mpstate):
+
+        super(FieldCheckModule, self).__init__(mpstate,
+                                               "FieldCheck",
+                                               "FieldCheck Checks",
+                                               public=True)
+
+        self.fields = [
+            FieldCMAC(),
+            FieldSpringValley(),
+        ]
+
+        self.field = None
+
+    def select_field(self, field):
+        self.field = field
+        self.field.master = self.master
+        self.field.mav_param = self.mav_param
+        self.field.console = self.console
+        self.field.module = self.module
+        self.field.x = self
+        self.field.select()
+
+    def whinge(self, message):
+        self.console.writeln("FC: %s" % (message,))
+
+    def try_select_field(self, loc):
+        for field in self.fields:
+            if field.close_to(loc):
+                self.whinge("Selecting field (%s)" % field.lc_name)
+                self.select_field(field)
+
+
+    def idle_task(self):
+        '''run periodic tasks'''
+        if self.field is not None:
+            self.field.idle_task()
+
+    def mavlink_packet(self, m):
+        '''handle an incoming mavlink packet'''
+        if self.field is None:
+            # attempt to select field automatically based on location
+            mtype = m.get_type()
+            if mtype == "GPS_RAW_INT":
+                if m.fix_type >= 3:
+                    lat = m.lat
+                    lon = m.lon
+                    here = mavutil.location(lat*1e-7, lon*1e-7, 0, 0)
+                    self.try_select_field(here)
+        if self.field is None:
+            return
+        self.field.mavlink_packet(m)
 
 def init(mpstate):
     '''initialise module'''
-    return CMACModule(mpstate)
+    return FieldCheckModule(mpstate)
