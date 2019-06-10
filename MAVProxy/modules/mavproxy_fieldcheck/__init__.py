@@ -7,6 +7,11 @@ based on
 
 CUAV mission control
 Andrew Tridgell
+
+TODO:
+ - ensure parameters are correct
+ - add check that battery is within tolerances (chemistry issues...)
+ - autodetect numcells being incorrect
 '''
 
 import math
