@@ -279,5 +279,25 @@ If PIDR.I has a constant positive value then it means the aircraft is trimmed to
   <description></description>
   <expression>earth_field_error(GPS,NKF7).x earth_field_error(GPS,NKF7).y earth_field_error(GPS,NKF7).z</expression>
  </graph>
+
+ <graph name='Copter/PID/PIDP'>
+  <description></description>
+  <expression>PIDP.P PIDP.I PIDP.D</expression>
+ </graph>
+
+ <graph name='Copter/PID/PIDR'>
+  <description></description>
+  <expression>PIDR.P PIDR.I PIDR.D</expression>
+ </graph>
+
+ <graph name='Copter/PID/PIDY'>
+  <description></description>
+  <expression>PIDY.P PIDY.I PIDY.D</expression>
+ </graph>
+
+ <graph name='Copter/PID/PIDA'>
+  <description></description>
+  <expression>PIDA.P PIDA.I PIDA.D</expression>
+ </graph>
  
 </graphs>

@@ -301,4 +301,14 @@
     <expression>NKF4.PI</expression>
   </graph>
 
+  <graph name='EKF/Normalised Innovations EK2 Lane1'>
+    <description></description>
+    <expression>NKF4.SV NKF4.SP NKF4.SH NKF4.SM NKF4.SVT</expression>
+  </graph>
+
+  <graph name='EKF/Normalised Innovations EK2 Lane2'>
+    <description></description>
+    <expression>NKF9.SV NKF9.SP NKF9.SH NKF9.SM NKF9.SVT</expression>
+  </graph>
+
 </graphs>
