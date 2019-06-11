@@ -269,5 +269,15 @@ If PIDR.I has a constant positive value then it means the aircraft is trimmed to
   <description></description>
   <expression>MAG3.MagX expected_mag(GPS,ATT).x MAG3.MagY expected_mag(GPS,ATT).y MAG3.MagZ expected_mag(GPS,ATT).z</expression>
  </graph>
+
+ <graph name='Sensors/Compass/EarthField Error EK2 Lane1'>
+  <description></description>
+  <expression>earth_field_error(GPS,NKF2).x earth_field_error(GPS,NKF2).y earth_field_error(GPS,NKF2).z</expression>
+ </graph>
+
+ <graph name='Sensors/Compass/EarthField Error EK2 Lane2'>
+  <description></description>
+  <expression>earth_field_error(GPS,NKF7).x earth_field_error(GPS,NKF7).y earth_field_error(GPS,NKF7).z</expression>
+ </graph>
  
 </graphs>
