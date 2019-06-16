@@ -548,6 +548,8 @@ class MPSlipMapPanel(wx.Panel):
             zoom = 1.0/(1.1 * rotation)
         elif rotation < 0:
             zoom = 1.1 * (-rotation)
+        else:
+            return
         self.change_zoom(zoom)
         self.redraw_map()
 
