@@ -302,5 +302,20 @@ If PIDR.I has a constant positive value then it means the aircraft is trimmed to
   <description></description>
   <expression>PIDA.P PIDA.I PIDA.D</expression>
  </graph>
+
+  <graph name='SITL/SIM RollRate vs GyrX'>
+  <description></description>
+  <expression>IMU.GyrX sim_body_rates(SIM).x</expression>
+ </graph>
+
+ <graph name='SITL/SIM PitchRate vs GyrY'>
+  <description></description>
+  <expression>IMU.GyrY sim_body_rates(SIM).y</expression>
+ </graph>
+
+ <graph name='SITL/SIM YawRate vs GyrZ'>
+  <description></description>
+  <expression>IMU.GyrZ sim_body_rates(SIM).z</expression>
+ </graph>
  
 </graphs>
