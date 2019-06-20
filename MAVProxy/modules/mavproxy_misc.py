@@ -88,6 +88,7 @@ class MiscModule(mp_module.MPModule):
         self.add_command('gethome', self.cmd_gethome, "get HOME_POSITION")
         self.add_command('flashbootloader', self.cmd_flashbootloader, "flash bootloader (dangerous)")
         self.add_command('lockup_autopilot', self.cmd_lockup_autopilot, "lockup autopilot")
+        self.add_command('batreset', self.cmd_battery_reset, "reset battery remaining")
         self.repeats = []
 
     def altitude_difference(self, pressure1, pressure2, ground_temp):
@@ -153,7 +154,18 @@ class MiscModule(mp_module.MPModule):
                                               42, 24, 71, 93, 0, 0, 0)
         else:
             print("Invalid lockup command")
-        
+
+    def cmd_battery_reset(self, args):
+        '''reset battery remaining'''
+        mask = -1
+        remaining_pct = 100
+        if len(args) > 0:
+            mask = int(args[0])
+        if len(args) > 1:
+            remaining_pct = int(args[1])
+        self.master.mav.command_long_send(self.settings.target_system, self.settings.target_component,
+                                          mavutil.mavlink.MAV_CMD_BATTERY_RESET, 0,
+                                              mask, remaining_pct, 0, 0, 0, 0, 0)
 
     def cmd_time(self, args):
         '''show autopilot time'''
