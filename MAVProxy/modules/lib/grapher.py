@@ -77,6 +77,10 @@ class MavGraph(object):
         self.tday_base = None
         self.tday_basetime = None
         self.title = None
+        if sys.version_info[0] >= 3:
+            self.text_types = frozenset([str,])
+        else:
+            self.text_types = frozenset([unicode, str])
 
     def add_field(self, field):
         '''add another field to plot'''
@@ -260,7 +264,7 @@ class MavGraph(object):
                     linestyle = self.linestyle
                 else:
                     linestyle = '-'
-                if len(y[i]) > 0 and isinstance(y[i][0],str):
+                if len(y[i]) > 0 and type(y[i][0]) in self.text_types:
                     # assume this is a piece of text to be rendered at a point in time
                     last_text_time = -1
                     last_text = None
@@ -268,24 +272,26 @@ class MavGraph(object):
                         this_text_time = round(x[i][n], 6)
                         this_text = y[i][n]
                         if last_text is None:
-                            last_text = "[y" + this_text + "]"
+                            last_text = "[" + this_text + "]"
                             last_text_time = this_text_time
                         elif this_text_time == last_text_time:
-                            last_text += ("[x" + this_text + "]")
+                            last_text += ("[" + this_text + "]")
                         else:
                             ax.text(last_text_time,
                                     10,
                                     last_text,
                                     rotation=90,
-                                    alpha=0.3,
-                                    verticalalignment='baseline')
+                                    alpha=0.6,
+                                    verticalalignment='center')
                             last_text = this_text
                             last_text_time = this_text_time
                     if last_text is not None:
-                        ax.text(last_text_time, 10, last_text,
+                        ax.text(last_text_time,
+                                10,
+                                last_text,
                                 rotation=90,
-                                alpha=0.3,
-                                verticalalignment='baseline')
+                                alpha=0.6,
+                                verticalalignment='center')
                 else:
                     ax.plot_date(x[i], y[i], color=color, label=fields[i],
                                  linestyle=linestyle, marker=marker, tz=None)
@@ -352,13 +358,8 @@ class MavGraph(object):
                 xv = mavutil.evaluate_expression(self.xaxis, vars)
                 if xv is None:
                     continue
-            try:
-                v_f = float(v)
-                xv_f = float(xv)
-            except Exception:
-                continue
-            self.y[i].append(v_f)
-            self.x[i].append(xv_f)
+            self.y[i].append(v)
+            self.x[i].append(xv)
 
     def timestamp_to_days(self, timestamp):
         '''convert log timestamp to days'''
