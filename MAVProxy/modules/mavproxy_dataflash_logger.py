@@ -19,6 +19,7 @@ import os
 import os.path
 from pymavlink import mavutil
 import errno
+import sys
 
 from MAVProxy.modules.lib import mp_module
 import time
@@ -100,7 +101,10 @@ class dataflash_logger(mp_module.MPModule):
             log_cnt = 1
 
         self.lastlog_file = open(ll_filepath, 'w+b')
-        self.lastlog_file.write(log_cnt.__str__())
+        if sys.version_info[0] >= 3:
+            self.lastlog_file.write(str.encode(log_cnt.__str__()))
+        else:
+            self.lastlog_file.write(log_cnt.__str__())
         self.lastlog_file.close()
 
         return os.path.join(self.dataflash_dir, '%u.BIN' % (log_cnt,))
@@ -348,7 +352,7 @@ class dataflash_logger(mp_module.MPModule):
 
             if self.sender is not None:
                 size = len(m.data)
-                data = ''.join(str(chr(x)) for x in m.data[:size])
+                data = bytearray(m.data[:size])
                 ofs = size*(m.seqno)
                 self.logfile.seek(ofs)
                 self.logfile.write(data)
