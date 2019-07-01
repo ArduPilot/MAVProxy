@@ -165,6 +165,13 @@ class FieldCheck(object):
             self.whinge("Too few rally points")
             return False
 
+        rtl_loiter_radius = self.mav_param.get("RTL_RADIUS", None)
+        if rtl_loiter_radius is None or rtl_loiter_radius == 0:
+            rtl_loiter_radius = self.mav_param.get("WP_LOITER_RAD")
+        if rtl_loiter_radius is None:
+            self.whinge("No RTL loiter radius available")
+            return False
+
         ret = True
         for i in range(count):
             r = rallymod.rallyloader.rally_point(i)
@@ -174,16 +181,10 @@ class FieldCheck(object):
                 self.whinge("Rally Point %i too far away (%fm)" % (i, dist))
                 ret = False
 
-                # ensure we won't loiter over the runway when doing
-                # rally loitering:
-            v = self.mav_param.get("RTL_RADIUS", None)
-            if v is None or v == 0:
-                v = self.mav_param.get("WP_LOITER_RAD")
-            if v is None:
-                self.whinge("No RTL loiter radius available")
-                ret = False
-#            print("dist=%f v=%f", dist, v)
-            if dist < v+30:  # add a few metres of slop
+            # ensure we won't loiter over the runway when doing
+            # rally loitering:
+#            print("dist=%f rtl_loiter_radius=%f", dist, rtl_loiter_radius)
+            if dist < rtl_loiter_radius+30:  # add a few metres of slop
                 self.whinge("Rally Point %i too close (%fm)" % (i, dist))
                 ret = False
 
