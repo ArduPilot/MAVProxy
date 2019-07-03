@@ -79,7 +79,8 @@ class MiscModule(mp_module.MPModule):
         self.add_command('land', self.cmd_land, "auto land")
         self.add_command('repeat', self.cmd_repeat, "repeat a command at regular intervals",
                          ["<add|remove|clear>"])
-        self.add_command('version', self.cmd_version, "show version")
+        self.add_command('version', self.cmd_version, "fetch autopilot version")
+        self.add_command('capabilities', self.cmd_capabilities, "fetch autopilot capabilities")
         self.add_command('rcbind', self.cmd_rcbind, "bind RC receiver")
         self.add_command('led', self.cmd_led, "control board LED")
         self.add_command('oreoled', self.cmd_oreoled, "control OreoLEDs")
@@ -207,12 +208,17 @@ class MiscModule(mp_module.MPModule):
 
     def cmd_version(self, args):
         '''show version'''
+        self.master.mav.autopilot_version_request_send(self.settings.target_system,
+                                                       self.settings.target_component)
+
+    def cmd_capabilities(self, args):
+        '''show capabilities'''
         self.master.mav.command_long_send(self.settings.target_system,
                                           self.settings.target_component,
                                           mavutil.mavlink.MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES,
                                           0,
                                           1, 0, 0, 0, 0, 0, 0)
-
+        
     def cmd_rcbind(self, args):
         '''start RC bind'''
         if len(args) < 1:
