@@ -74,14 +74,14 @@ class ChecklistModule(mp_module.MPModule):
             else:
                 self.checklist.set_check("Waypoints Loaded", 1)
 
-		'''beforeTakeoffList - Compass active'''
+        '''beforeTakeoffList - Compass active'''
         if type == 'GPS_RAW':
             if math.fabs(msg.hdg - master.field('VFR_HUD', 'heading', '-')) < 10 or math.fabs(msg.hdg - master.field('VFR_HUD', 'heading', '-')) > 355:
                 self.checklist.set_check("Compass active", 1)
             else:
                 self.checklist.set_check("Compass active", 0)
 
-		'''beforeCruiseList - Airspeed > 10 m/s , Altitude > 30 m'''
+        '''beforeCruiseList - Airspeed > 10 m/s , Altitude > 30 m'''
         if type == 'VFR_HUD':
             rel_alt = master.field('GLOBAL_POSITION_INT', 'relative_alt', 0) * 1.0e-3
             if rel_alt > 30:
@@ -93,7 +93,7 @@ class ChecklistModule(mp_module.MPModule):
             else:
                 self.checklist.set_check("Airspeed > 10 m/s", 0)
 
-		'''beforeEngineList - IMU'''
+        '''beforeEngineList - IMU'''
         if type in ['SYS_STATUS']:
             sensors = { 'AS'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_DIFFERENTIAL_PRESSURE,
                         'MAG' : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_MAG,
