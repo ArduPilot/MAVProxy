@@ -90,6 +90,7 @@ class MiscModule(mp_module.MPModule):
         self.add_command('flashbootloader', self.cmd_flashbootloader, "flash bootloader (dangerous)")
         self.add_command('lockup_autopilot', self.cmd_lockup_autopilot, "lockup autopilot")
         self.add_command('batreset', self.cmd_battery_reset, "reset battery remaining")
+        self.add_command('setorigin', self.cmd_setorigin, "set global origin")
         self.repeats = []
 
     def altitude_difference(self, pressure1, pressure2, ground_temp):
@@ -337,6 +338,21 @@ class MiscModule(mp_module.MPModule):
             if p.startswith('INS_') and p.endswith('_ID'):
                 mp_util.decode_devid(self.mav_param[p], p)
 
+    def cmd_setorigin(self, args):
+        '''set global origin'''
+        if len(args) < 3:
+            print("Usage: setorigin LAT(deg) LON(deg) ALT(m)")
+            return
+        lat = float(args[0])
+        lon = float(args[1])
+        alt = float(args[2])
+        print("Setting origin to: ", lat, lon, alt)
+        self.master.mav.set_gps_global_origin_send(
+            self.settings.target_system,
+            lat*10000000, # lat
+            lon*10000000, # lon
+            alt*1000) # param7
+                
     def idle_task(self):
         '''called on idle'''
         for r in self.repeats:
