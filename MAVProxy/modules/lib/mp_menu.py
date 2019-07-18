@@ -100,8 +100,11 @@ class MPMenuCheckbox(MPMenuItem):
 
     def _append(self, menu):
         '''append this menu item to a menu'''
-        menu.AppendCheckItem(self.id(), self.name, self.description)
-        menu.Check(self.id(), self.checked)
+        try:
+            menu.AppendCheckItem(self.id(), self.name, self.description)
+            menu.Check(self.id(), self.checked)
+        except Exception:
+            pass
 
     def __str__(self):
         return "MPMenuCheckbox(%s,%s,%s,%s)" % (self.name, self.description, self.returnkey, str(self.checked))
