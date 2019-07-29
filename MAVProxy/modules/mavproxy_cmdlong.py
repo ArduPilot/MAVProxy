@@ -345,13 +345,15 @@ class CmdlongModule(mp_module.MPModule):
 
     def cmd_command_int(self, args):
         '''execute supplied command_int'''
-        if len(args) != 11:
-            print("num args{0}".format(len(args)))
+        want_args = 11
+        if len(args) != want_args:
+            print("Argument count issue: want={0} got={1}".format(want_args, len(args)))
             print("Usage: command_int frame command current autocontinue param1 param2 param3 param4 x y z")
             print("e.g. command_int GLOBAL_RELATIVE_ALT DO_SET_HOME 0 0 0 0 0 0 -353632120 1491659330 0")
             print("e.g. command_int GLOBAL MAV_CMD_DO_SET_ROI 0 0 0 0 0 0 5000000 5000000 500")
             return
 
+        frame = None
         if args[0].isdigit():
             frame = int(args[0])
         else:
