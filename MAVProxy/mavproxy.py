@@ -391,7 +391,13 @@ def unload_module(modname):
     for (m,pm) in mpstate.modules:
         if m.name == modname:
             if hasattr(m, 'unload'):
-                m.unload()
+                t = threading.Thread(target=lambda : m.unload(), name="unload %s" % modname)
+                t.start()
+                t.join(timeout=5)
+                if t.isAlive():
+                    print("unload on module %s did not complete" % m.name)
+                    mpstate.modules.remove((m,pm))
+                    return False
             mpstate.modules.remove((m,pm))
             print("Unloaded module %s" % modname)
             return True
