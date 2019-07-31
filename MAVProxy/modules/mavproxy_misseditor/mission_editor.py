@@ -186,6 +186,8 @@ class MissionEditorMain(object):
     def mavlink_message_queue_handler(self):
         while not self.time_to_quit:
             while True:
+                if self.time_to_quit:
+                    return
                 if not self.mavlink_message_queue.empty():
                     break
                 time.sleep(0.1)
@@ -214,7 +216,7 @@ class MissionEditorMain(object):
         if self.last_unload_check_time + self.unload_check_interval < now:
             self.last_unload_check_time = now
             if not self.child.is_alive():
-                self.needs_unloading = True
+                self.close()
 
 
     def mavlink_packet(self, m):
@@ -308,11 +310,14 @@ class MissionEditorMain(object):
 
         self.child.terminate()
 
+        self.mavlink_message_queue_handler.time_to_quit = True
         self.mavlink_message_queue_handler.join()
 
         self.event_queue_lock.acquire()
         self.event_queue.put(MissionEditorEvent(me_event.MEE_TIME_TO_QUIT));
         self.event_queue_lock.release()
+
+        self.needs_unloading = True
 
     def read_waypoints(self):
         self.module('wp').cmd_wp(['list'])
