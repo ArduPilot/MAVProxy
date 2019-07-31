@@ -24,6 +24,8 @@ class MissionEditorModule(mp_module.MPModule):
 
     def idle_task(self):
         self.me_main.idle_task()
+        if self.me_main.needs_unloading:
+            self.needs_unloading = True
 
     def mavlink_packet(self, m):
         self.me_main.mavlink_packet(m)
