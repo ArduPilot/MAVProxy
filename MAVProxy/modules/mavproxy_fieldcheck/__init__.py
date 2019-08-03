@@ -95,7 +95,7 @@ class FieldCheck(object):
         '''check key parameters'''
         want_values = {
             "FENCE_ACTION": 4,
-            "FENCE_MAXALT": 80,
+            "FENCE_MAXALT": self.fc_settings.param_fence_maxalt,
             "THR_FAILSAFE": 1,
             "FS_SHORT_ACTN": 0,
             "FS_LONG_ACTN": 1,
@@ -369,6 +369,10 @@ class FieldCheck(object):
                                   float,
                                   200,
                                   'Max Rally Distance from location'),
+                self.FC_MPSetting('param_fence_maxalt',
+                                  float,
+                                  120,
+                                  'Value parameter FENCE_MAXALT should have'),
                 self.FC_MPSetting('rally_filename',
                                   str,
                                   "%s-foamy-rally.txt" % self.lc_name,
