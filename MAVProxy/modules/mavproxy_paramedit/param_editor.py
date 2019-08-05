@@ -115,7 +115,7 @@ class ParamEditorMain(object):
         self.mavlink_message_queue_handler = threading.Thread(
             target=self.mavlink_message_queue_handler)
         self.mavlink_message_queue_handler.start()
-        #self.needs_unloading = False
+        self.needs_unloading = False
 
     def mavlink_message_queue_handler(self):
         while not self.time_to_quit:
