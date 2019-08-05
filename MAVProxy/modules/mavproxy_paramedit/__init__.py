@@ -34,9 +34,10 @@ class ParamEditorModule(mp_module.MPModule):
                 return
             from MAVProxy.modules.mavproxy_paramedit import param_editor
             self.pe_main = param_editor.ParamEditorMain(self.mpstate)
+        if self.pe_main:
+            if self.pe_main.needs_unloading:
+                self.needs_unloading = True
         self.pe_main.idle_task()
-        if self.pe_main.needs_unloading:
-            self.needs_unloading = True
 
     def mavlink_packet(self, m):
         if self.pe_main:
