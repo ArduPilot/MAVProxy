@@ -769,12 +769,12 @@ class MapModule(mp_module.MPModule):
             self.display_fence()
 
         # if the rallypoints have changed, redisplay
-        if self.rally_change_time != self.module('rally').rallyloader.last_change:
-            self.rally_change_time = self.module('rally').rallyloader.last_change
+        if self.rally_change_time != self.module('rally').last_change():
+            self.rally_change_time = self.module('rally').last_change()
             icon = self.map.icon('rallypoint.png')
             self.map.add_object(mp_slipmap.SlipClearLayer('RallyPoints'))
-            for i in range(self.module('rally').rallyloader.rally_count()):
-                rp = self.module('rally').rallyloader.rally_point(i)
+            for i in range(self.module('rally').rally_count()):
+                rp = self.module('rally').rally_point(i)
                 popup = MPMenuSubMenu('Popup',
                                       items=[MPMenuItem('Rally Remove', returnkey='popupRallyRemove'),
                                              MPMenuItem('Rally Move', returnkey='popupRallyMove')])
