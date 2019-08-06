@@ -49,6 +49,22 @@ class RallyModule(mp_module.MPModule):
                                                                                  self.settings.target_component)
         return self.rallyloader_by_sysid[self.target_system]
 
+    def last_change(self):
+        '''return time of last changes made to rally points'''
+        return self.rallyloader.last_change
+
+    def rally_count(self):
+        '''return number of waypoints'''
+        return self.rallyloader.rally_count()
+
+    def rally_point(self, i):
+        '''return instance of mavutil.mavlink.MAVLink_rally_point_message'''
+        return self.rallyloader.rally_point(i)
+
+    def set_last_change(self, time):
+        '''can be used to cause map redraws'''
+        self.rallyloader.last_change = time
+
     def idle_task(self):
         '''called on idle'''
         if self.module('console') is not None and not self.menu_added_console:
