@@ -87,7 +87,7 @@ class MissionEditorEventThread(threading.Thread):
                     # likely same reason why "timeout setting WP_LOITER_RAD"
                     #comes back:
                     #TODO: fix timeout issue
-                    self.module('rally').rallyloader.last_change = time.time()
+                    self.module('rally').set_last_change(time.time())
 
                 elif event_type == me_event.MEE_GET_WP_DEFAULT_ALT:
                     self.mp_misseditor.gui_event_queue_lock.acquire()
