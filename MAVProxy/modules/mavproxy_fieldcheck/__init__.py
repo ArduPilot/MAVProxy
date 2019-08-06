@@ -160,7 +160,7 @@ class FieldCheck(object):
                 rallymod.cmd_rally(["list"])
             return False
 
-        count = rallymod.rallyloader.rally_count()
+        count = rallymod.rally_count()
         if count < 1:
             self.whinge("Too few rally points")
             return False
@@ -174,7 +174,7 @@ class FieldCheck(object):
 
         ret = True
         for i in range(count):
-            r = rallymod.rallyloader.rally_point(i)
+            r = rallymod.rally_point(i)
             loc = mavutil.location(r.lat/10000000.0, r.lng/10000000.0)
             dist = self.get_distance(self.location, loc)
             if dist > self.fc_settings.rally_maxdist:
