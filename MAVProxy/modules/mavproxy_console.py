@@ -501,19 +501,19 @@ class ConsoleModule(mp_module.MPModule):
             self.console.set_status('WPDist', 'Distance %s' % self.dist_string(msg.wp_dist))
             self.console.set_status('WPBearing', 'Bearing %u' % msg.target_bearing)
             if msg.alt_error > 0:
-                alt_error_sign = "L"
+                alt_error_sign = "(L)"
             else:
-                alt_error_sign = "H"
+                alt_error_sign = "(H)"
             if msg.aspd_error > 0:
-                aspd_error_sign = "L"
+                aspd_error_sign = "(L)"
             else:
-                aspd_error_sign = "H"
+                aspd_error_sign = "(H)"
             if math.isnan(msg.alt_error):
                 alt_error = "NaN"
             else:
-                alt_error = "%d%s" % (msg.alt_error, alt_error_sign)
+                alt_error = "%s%s" % (self.height_string(msg.alt_error), alt_error_sign)
             self.console.set_status('AltError', 'AltError %s' % alt_error)
-            self.console.set_status('AspdError', 'AspdError %.1f%s' % (msg.aspd_error*0.01, aspd_error_sign))
+            self.console.set_status('AspdError', 'AspdError %s%s' % (self.speed_string(msg.aspd_error*0.01), aspd_error_sign))
 
 def init(mpstate):
     '''initialise module'''
