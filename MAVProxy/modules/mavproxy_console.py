@@ -366,7 +366,7 @@ class ConsoleModule(mp_module.MPModule):
                         break
 
         elif type == 'WIND':
-            self.console.set_status('Wind', 'Wind %u/%.2f' % (msg.direction, msg.speed))
+            self.console.set_status('Wind', 'Wind %u/%s' % (msg.direction, self.speed_string(msg.speed)))
 
         elif type == 'EKF_STATUS_REPORT':
             highest = 0.0
