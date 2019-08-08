@@ -179,6 +179,8 @@ class MPModule(object):
         '''return a speed as a string'''
         if self.settings.speed_unit == 'knots':
             return "%ukn" % (val_ms * 1.94384)
+        elif self.settings.speed_unit == 'mph':
+            return "%umph" % (val_ms * 2.23694)
         return "%um/s" % val_ms
 
     def set_prompt(self, prompt):
