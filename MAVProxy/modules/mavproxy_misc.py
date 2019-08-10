@@ -91,6 +91,8 @@ class MiscModule(mp_module.MPModule):
         self.add_command('lockup_autopilot', self.cmd_lockup_autopilot, "lockup autopilot")
         self.add_command('batreset', self.cmd_battery_reset, "reset battery remaining")
         self.add_command('setorigin', self.cmd_setorigin, "set global origin")
+        self.add_command('magsetfield', self.cmd_magset_field, "set expected mag field by field")
+        self.add_command('magresetofs', self.cmd_magreset_ofs, "reset offsets for all compasses")
         self.repeats = []
 
     def altitude_difference(self, pressure1, pressure2, ground_temp):
@@ -352,7 +354,73 @@ class MiscModule(mp_module.MPModule):
             lat*10000000, # lat
             lon*10000000, # lon
             alt*1000) # param7
-                
+
+    def cmd_magset_field(self, args):
+        '''set compass offsets by field'''
+        if len(args) < 3:
+            print("Usage: magsetfield MagX MagY MagZ")
+            return
+        magX = int(args[0])
+        magY = int(args[1])
+        magZ = int(args[2])
+
+        field1x = self.master.field('RAW_IMU', 'xmag', 0)
+        field1y = self.master.field('RAW_IMU', 'ymag', 0)
+        field1z = self.master.field('RAW_IMU', 'zmag', 0)
+
+        field2x = self.master.field('SCALED_IMU2', 'xmag', 0)
+        field2y = self.master.field('SCALED_IMU2', 'ymag', 0)
+        field2z = self.master.field('SCALED_IMU2', 'zmag', 0)
+
+        field3x = self.master.field('SCALED_IMU3', 'xmag', 0)
+        field3y = self.master.field('SCALED_IMU3', 'ymag', 0)
+        field3z = self.master.field('SCALED_IMU3', 'zmag', 0)
+
+        self.param_set('COMPASS_OFS_X', magX - (field1x - self.get_mav_param('COMPASS_OFS_X', 0)))
+        self.param_set('COMPASS_OFS_Y', magY - (field1y - self.get_mav_param('COMPASS_OFS_Y', 0)))
+        self.param_set('COMPASS_OFS_Z', magZ - (field1z - self.get_mav_param('COMPASS_OFS_Z', 0)))
+
+        self.param_set('COMPASS_OFS2_X', magX - (field2x - self.get_mav_param('COMPASS_OFS2_X', 0)))
+        self.param_set('COMPASS_OFS2_Y', magY - (field2y - self.get_mav_param('COMPASS_OFS2_Y', 0)))
+        self.param_set('COMPASS_OFS2_Z', magZ - (field2z - self.get_mav_param('COMPASS_OFS2_Z', 0)))
+
+        self.param_set('COMPASS_OFS3_X', magX - (field3x - self.get_mav_param('COMPASS_OFS3_X', 0)))
+        self.param_set('COMPASS_OFS3_Y', magY - (field3y - self.get_mav_param('COMPASS_OFS3_Y', 0)))
+        self.param_set('COMPASS_OFS3_Z', magZ - (field3z - self.get_mav_param('COMPASS_OFS3_Z', 0)))
+
+    def cmd_magreset_ofs(self, args):
+        '''set compass offsets to all zero'''
+        self.param_set('COMPASS_OFS_X', 0)
+        self.param_set('COMPASS_OFS_Y', 0)
+        self.param_set('COMPASS_OFS_Z', 0)
+        self.param_set('COMPASS_DIA_X', 1)
+        self.param_set('COMPASS_DIA_Y', 1)
+        self.param_set('COMPASS_DIA_Z', 1)
+        self.param_set('COMPASS_ODI_X', 0)
+        self.param_set('COMPASS_ODI_Y', 0)
+        self.param_set('COMPASS_ODI_Z', 0)
+
+        self.param_set('COMPASS_OFS2_X', 0)
+        self.param_set('COMPASS_OFS2_Y', 0)
+        self.param_set('COMPASS_OFS2_Z', 0)
+        self.param_set('COMPASS_DIA2_X', 1)
+        self.param_set('COMPASS_DIA2_Y', 1)
+        self.param_set('COMPASS_DIA2_Z', 1)
+        self.param_set('COMPASS_ODI2_X', 0)
+        self.param_set('COMPASS_ODI2_Y', 0)
+        self.param_set('COMPASS_ODI2_Z', 0)
+
+        self.param_set('COMPASS_OFS3_X', 0)
+        self.param_set('COMPASS_OFS3_Y', 0)
+        self.param_set('COMPASS_OFS3_Z', 0)
+        self.param_set('COMPASS_DIA3_X', 1)
+        self.param_set('COMPASS_DIA3_Y', 1)
+        self.param_set('COMPASS_DIA3_Z', 1)
+        self.param_set('COMPASS_ODI3_X', 0)
+        self.param_set('COMPASS_ODI3_Y', 0)
+        self.param_set('COMPASS_ODI3_Z', 0)
+        
+
     def idle_task(self):
         '''called on idle'''
         for r in self.repeats:
