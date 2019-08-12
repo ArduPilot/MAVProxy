@@ -94,8 +94,25 @@ class WPModule(mp_module.MPModule):
             print("Have %u waypoints" % (self.wploader.count()+len(self.wp_received)))
 
 
-    def wp_slope(self):
+    def wp_slope(self, args):
         '''show slope of waypoints'''
+        if len(args) == 2:
+            # specific waypoints
+            wp1 = int(args[0])
+            wp2 = int(args[1])
+            w1 = self.wploader.wp(wp1)
+            w2 = self.wploader.wp(wp2)
+            delta_alt = w1.z - w2.z
+            if delta_alt == 0:
+                slope = "Level"
+            else:
+                delta_xy = mp_util.gps_distance(w1.x, w1.y, w2.x, w2.y)
+                slope = "%.1f" % (delta_xy / delta_alt)
+            print("wp%u -> wp%u %s" % (wp1, wp2, slope))
+            return
+        if len(args) != 0:
+            print("Usage: wp slope WP1 WP2")
+            return
         last_w = None
         for i in range(1, self.wploader.count()):
             w = self.wploader.wp(i)
@@ -751,7 +768,7 @@ class WPModule(mp_module.MPModule):
         elif args[0] == "status":
             self.wp_status()
         elif args[0] == "slope":
-            self.wp_slope()
+            self.wp_slope(args[1:])
         else:
             print(usage)
 
