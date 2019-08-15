@@ -88,10 +88,21 @@ class FieldCheck(object):
     def loadFoamyMissionCCW(self):
         self.loadFoamyMission(self.fc_settings.mission_filename_ccw)
 
+    def fixMissionRallyFence(self):
+        self.loadFoamyMissionCW()
+        self.loadFoamyFence()
+        self.loadRally()
+
+    def fixEVERYTHING(self):
+        self.loadFoamyMissionCW()
+        self.loadFoamyFence()
+        self.loadRally()
+        self.check_parameters(fix=True)
+
     def whinge(self, message):
         self.console.writeln("FC:%s %s" % (self.lc_name, message,))
 
-    def check_parameters(self):
+    def check_parameters(self, fix=False):
         '''check key parameters'''
         want_values = {
             "FENCE_ACTION": 4,
@@ -111,6 +122,9 @@ class FieldCheck(object):
             if got != want:
                 self.whinge('%s should be %f (not %s)' % (key, want, got))
                 ret = False
+                if fix:
+                    self.whinge('Setting %s to %f' % (key, want))
+                    self.mav_param.mavset(self.master, key, want, retries=3)
 
         return ret
 
@@ -343,6 +357,12 @@ class FieldCheck(object):
                 MPMenuItem('Load foamy fence',
                            'Load foamy fence',
                            '# fieldcheck loadFoamyFence'),
+                MPMenuItem('Fix Mission+Rally+Fence',
+                           'Fix Mission+Rally+Fence',
+                           '# fieldcheck fixMissionRallyFence'),
+                MPMenuItem('Fix EVERYTHING',
+                           'Fix EVERYTHING',
+                           '# fieldcheck fixEVERYTHING'),
             ])
             self.module('map').add_menu(self.menu)
             self.done_map_menu = True
@@ -414,6 +434,10 @@ class FieldCheck(object):
             self.loadFoamyFence()
         elif args[0] == "loadRally":
             self.loadRally()
+        elif args[0] == "fixMissionRallyFence":
+            self.fixMissionRallyFence()
+        elif args[0] == "fixEVERYTHING":
+            self.fixEVERYTHING()
         elif args[0] == "check":
             self.check()
         else:
