@@ -515,7 +515,7 @@ def load_module(modname, quiet=False, **kwargs):
         except ImportError as msg:
             ex = msg
             if mpstate.settings.moddebug > 1:
-                print(get_exception_stacktrace(ex))
+                print(get_exception_stacktrace(msg))
     help_traceback = ""
     if mpstate.settings.moddebug < 3:
         help_traceback = " Use 'set moddebug 3' in the MAVProxy console to enable traceback"
