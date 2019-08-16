@@ -310,6 +310,10 @@ class FenceModule(mp_module.MPModule):
     def print_usage(self):
         print("usage: fence <enable|disable|list|load|save|clear|draw|move|remove>")
 
+    def unload(self):
+        self.remove_command("fence")
+        super(FenceModule, self).unload()
+
 def init(mpstate):
     '''initialise module'''
     return FenceModule(mpstate)
