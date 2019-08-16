@@ -144,6 +144,12 @@ class MPModule(object):
         if completions is not None:
             self.mpstate.completions[name] = completions
 
+    def remove_command(self, name):
+        if name in self.mpstate.command_map:
+            del self.mpstate.command_map[name]
+        if name in self.mpstate.completions:
+            del self.mpstate.completions[name]
+
     def add_completion_function(self, name, callback):
         self.mpstate.completion_functions[name] = callback
 
