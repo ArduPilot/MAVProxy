@@ -411,7 +411,11 @@ def cmd_module(args):
         print(usage)
         return
     if args[0] == "list":
+        mods = []
         for (m,pm) in mpstate.modules:
+            mods.append(m)
+        mods = sorted(mods, key=lambda m : m.name)
+        for m in mods:
             print("%s: %s" % (m.name, m.description))
     elif args[0] == "load":
         if len(args) < 2:
