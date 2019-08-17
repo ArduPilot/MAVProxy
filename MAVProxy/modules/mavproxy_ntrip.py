@@ -69,7 +69,9 @@ class NtripModule(mp_module.MPModule):
     def ntrip_status(self):
         '''show ntrip status'''
         now = time.time()
-        if self.last_pkt is None:
+        if self.ntrip is None:
+            print("ntrip: Not started")
+        elif self.last_pkt is None:
             print("ntrip: no data")
         else:
             print("ntrip: %u packets, last %.1fs ago" % (self.pkt_count, now - self.last_pkt))
