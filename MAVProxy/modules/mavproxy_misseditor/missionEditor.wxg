@@ -411,6 +411,12 @@
                                 <handler event="EVT_BUTTON">add_wp_below_pushed</handler>
                             </events>
                         </object>
+                        <object class="wxButton" name="button_split_wp" base="EditButton">
+                            <label>Split</label>
+                            <events>
+                                <handler event="EVT_BUTTON">split_pushed</handler>
+                            </events>
+                        </object>
                     </object>
                     <object class="sizerslot" />
                     <object class="sizerslot" />

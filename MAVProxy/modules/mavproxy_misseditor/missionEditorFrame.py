@@ -64,6 +64,7 @@ class MissionEditorFrame(wx.Frame):
         self.button_save_wp_file = wx.Button(self, wx.ID_ANY, "Save WP File")
         self.grid_mission = wx.grid.Grid(self, wx.ID_ANY, size=(1, 1))
         self.button_add_wp = wx.Button(self, wx.ID_ANY, "Add Below")
+        self.button_split = wx.Button(self, wx.ID_ANY, "Split")
 
         self.__set_properties()
         self.__do_layout()
@@ -86,6 +87,7 @@ class MissionEditorFrame(wx.Frame):
         self.Bind(wx.grid.EVT_GRID_CMD_CELL_LEFT_CLICK, self.on_mission_grid_cell_left_click, self.grid_mission)
         self.Bind(wx.grid.EVT_GRID_CMD_SELECT_CELL, self.on_mission_grid_cell_select, self.grid_mission)
         self.Bind(wx.EVT_BUTTON, self.add_wp_below_pushed, self.button_add_wp)
+        self.Bind(wx.EVT_BUTTON, self.split_pushed, self.button_split)
         # end wxGlade
 
         #use a timer to facilitate event an event handlers for events
@@ -216,6 +218,7 @@ class MissionEditorFrame(wx.Frame):
         sizer_3.Add(sizer_4, 0, wx.EXPAND, 0)
         sizer_3.Add(self.grid_mission, 1, wx.EXPAND, 0)
         sizer_16.Add(self.button_add_wp, 0, 0, 0)
+        sizer_16.Add(self.button_split, 0, 0, 0)
         sizer_3.Add(sizer_16, 0, wx.EXPAND, 0)
         self.SetSizer(sizer_3)
         self.Layout()
@@ -502,6 +505,49 @@ class MissionEditorFrame(wx.Frame):
         self.set_modified_state(True)
 
         self.fix_jumps(row_selected+1, 1)
+
+        event.Skip()
+
+    def split_pushed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
+        row_selected = self.grid_mission.GetGridCursorRow()
+        if (row_selected < 2):
+            print("Invalid row selected")
+            event.Skip()
+            return
+
+        if self.grid_mission.GetCellValue(row_selected, ME_COMMAND_COL) != "NAV_WAYPOINT":
+            print("Bad command (need NAV_WAYPOINT)")
+            event.Skip()
+            return
+
+        if self.grid_mission.GetCellValue(row_selected-1, ME_COMMAND_COL) != "NAV_WAYPOINT":
+            print("Bad previous command (need NAV_WAYPOINT)")
+            event.Skip()
+            return
+
+        if (self.grid_mission.GetCellValue(row_selected, ME_FRAME_COL) !=
+            self.grid_mission.GetCellValue(row_selected-1, ME_FRAME_COL)):
+            print("Items differ in frame")
+            event.Skip()
+            return
+
+        lat = (float(self.grid_mission.GetCellValue(row_selected, ME_LAT_COL)) +
+               float(self.grid_mission.GetCellValue(row_selected-1, ME_LAT_COL)))/2
+        lng = (float(self.grid_mission.GetCellValue(row_selected, ME_LON_COL)) +
+               float(self.grid_mission.GetCellValue(row_selected-1, ME_LON_COL)))/2
+        alt = (float(self.grid_mission.GetCellValue(row_selected, ME_ALT_COL)) +
+               float(self.grid_mission.GetCellValue(row_selected-1, ME_ALT_COL)))/2
+        self.grid_mission.InsertRows(row_selected)
+        self.prep_new_row(row_selected)
+
+        self.grid_mission.SetCellValue(row_selected, ME_LAT_COL, str(lat))
+        self.grid_mission.SetCellValue(row_selected, ME_LON_COL, str(lng))
+        self.grid_mission.SetCellValue(row_selected, ME_ALT_COL, str(alt))
+        #highlight new row
+        self.grid_mission.SelectRow(row_selected)
+        self.set_modified_state(True)
+
+        self.fix_jumps(row_selected, 1)
 
         event.Skip()
 
