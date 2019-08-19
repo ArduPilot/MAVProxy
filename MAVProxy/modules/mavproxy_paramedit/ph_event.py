@@ -19,6 +19,7 @@ PEE_FETCH = 7
 PEGE_READ_PARAM = 0
 PEGE_REFRESH_PARAM = 1
 PEGE_WRITE_SUCC = 2
+PEGE_RCIN = 3
 
 
 class ParamEditorEvent:
@@ -27,7 +28,7 @@ class ParamEditorEvent:
         self.arg_dict = kwargs
 
         if self.type not in [PEE_SAVE_FILE, PEE_LOAD_FILE, PEE_READ_KEY,
-                             PEGE_REFRESH_PARAM, PEGE_READ_PARAM,
+                             PEGE_REFRESH_PARAM, PEGE_READ_PARAM, PEGE_RCIN,
                              PEE_READ_PARAM, PEE_WRITE_PARAM, PEE_RESET,
                              PEE_TIME_TO_QUIT, PEGE_WRITE_SUCC, PEE_FETCH]:
             raise TypeError("Unrecongized ParamEditorEvent type:" +

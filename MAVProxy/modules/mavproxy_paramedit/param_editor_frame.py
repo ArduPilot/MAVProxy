@@ -47,6 +47,7 @@ class ParamEditorFrame(wx.Frame):
         self.requires_redraw = False
         self.last_grid_update = time.time()
         self.htree = {}
+        self.selected_fltmode = None
 
         self.Bind(wx.EVT_BUTTON, self.Read_File, self.read_file)
         self.Bind(wx.EVT_BUTTON, self.Write_File, self.write_file)
@@ -59,7 +60,7 @@ class ParamEditorFrame(wx.Frame):
             self.Bind(wx.grid.EVT_GRID_CMD_CELL_CHANGE, self.ParamChanged,
                       self.display_list)
         else:
-            self.Bind(wx.grid.EVT_GRID_CMD_CELL_CHANGING, self.ParamChanged,
+            self.Bind(wx.grid.EVT_GRID_CMD_CELL_CHANGED, self.ParamChanged,
                       self.display_list)
         self.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.onSelect, self.display_list)
         self.Bind(wx.grid.EVT_GRID_COL_SIZE, self.ColChanged, self.display_list)
@@ -80,6 +81,7 @@ class ParamEditorFrame(wx.Frame):
         self.display_list.SetColAttr(PE_VALUE, self.ce_attr)
         self.display_list.SetRowLabelSize(0)
         self.display_list.SetDefaultRenderer(renderer)
+        self.display_list.SetDefaultEditor(wx.grid.GridCellFloatEditor(width=-1, precision=4))
 
         self.xml_filepath = None
         self.last_param_file_path = ""
@@ -232,7 +234,7 @@ class ParamEditorFrame(wx.Frame):
         self.gui_event_queue_lock.release()
 
         if self.requires_redraw and ((time.time() - self.last_grid_update) > 0.1):
-            self.redraw_grid(self.param_received)
+            self.key_redraw()
             self.requires_redraw = False
 
         if (event_processed):
@@ -250,7 +252,7 @@ class ParamEditorFrame(wx.Frame):
             self.param_received = event.get_arg("param")
             if self.vehicle_name is None or len(self.htree) == 0:
                 self.get_vehicle_type(event.get_arg("vehicle"))
-            self.redraw_grid(self.param_received)
+            self.requires_redraw = True
         elif event.get_type() == ph_event.PEGE_WRITE_SUCC:
             if event.get_arg("paramid") in self.param_received.keys():
                 if event.get_arg("paramid") in self.modified_param.keys():
@@ -263,6 +265,20 @@ class ParamEditorFrame(wx.Frame):
             else:
                 self.param_received[event.get_arg("paramid")] = event.get_arg("paramvalue")
                 self.requires_redraw = True
+        elif event.get_type() == ph_event.PEGE_RCIN:
+            if float(event.get_arg('rcin')) <= 1230:
+                self.selected_fltmode = 1
+            elif float(event.get_arg('rcin')) <= 1360:
+                self.selected_fltmode = 2
+            elif float(event.get_arg('rcin')) <= 1490:
+                self.selected_fltmode = 3
+            elif float(event.get_arg('rcin')) <= 1620:
+                self.selected_fltmode = 4
+            elif float(event.get_arg('rcin')) <= 1749:
+                self.selected_fltmode = 5
+            else:
+                self.selected_fltmode = 6
+            self.requires_redraw = True
 
     def redraw_grid(self, datalist):
         self.display_list.ClearGrid()
@@ -278,6 +294,12 @@ class ParamEditorFrame(wx.Frame):
 
     def add_new_row(self, row, name, pvalue):
         self.display_list.SetCellValue(row, PE_PARAM, str(name))
+        if self.vehicle_name == 'APMrover2':
+            fltmode = "MODE"
+        else:
+            fltmode = "FLTMODE"
+        if name == (fltmode + str(self.selected_fltmode)):
+            self.display_list.SetCellBackgroundColour(row, PE_PARAM, wx.Colour(152, 251, 152))
         self.display_list.SetCellValue(row, PE_VALUE, str(round(pvalue, 4)))
         unit, option, desc = self.getinfo(name)
         self.display_list.SetCellValue(row, PE_UNITS, unit)
@@ -439,6 +461,10 @@ class ParamEditorFrame(wx.Frame):
         self.param_help_tree()
 
     def key_change(self, event):  # wxGlade: ParamEditor.<event_handler>
+        self.key_redraw()
+        event.Skip()
+
+    def key_redraw(self):
         self.gui_event_queue_lock.acquire()
         key = self.search_key.GetValue()
         temp = {}
@@ -453,7 +479,6 @@ class ParamEditorFrame(wx.Frame):
                     continue
         self.redraw_grid(temp)
         self.gui_event_queue_lock.release()
-        event.Skip()
 
     def ParamChanged(self, event):  # wxGlade: ParamEditor.<event_handler>
         row_changed = event.GetRow()
