@@ -220,6 +220,9 @@ class MissionEditorMain(object):
 
 
     def mavlink_packet(self, m):
+        if (getattr(m, 'mission_type', None) is not None and
+            m.mission_type != mavutil.mavlink.MAV_MISSION_TYPE_MISSION):
+            return
         if m.get_type() in ['WAYPOINT_COUNT','MISSION_COUNT', 'WAYPOINT', 'MISSION_ITEM']:
             self.mavlink_message_queue.put(m)
 
@@ -229,6 +232,9 @@ class MissionEditorMain(object):
 
         # if you add processing for an mtype here, remember to add it
         # to mavlink_packet, above
+        if (getattr(m, 'mission_type', None) is not None and
+            m.mission_type != mavutil.mavlink.MAV_MISSION_TYPE_MISSION):
+            return
         if mtype in ['WAYPOINT_COUNT','MISSION_COUNT']:
             if (self.num_wps_expected == 0):
                 #I haven't asked for WPs, or these messages are duplicates
