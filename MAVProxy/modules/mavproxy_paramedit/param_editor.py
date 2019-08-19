@@ -85,6 +85,7 @@ class ParamEditorMain(object):
     def __init__(self, mpstate):
         self.param_received = {}
         self.paramchanged = {}
+        self.fltmode_rc = None
         self.event_queue = multiproc.Queue()
         self.event_queue_lock = multiproc.Lock()
         self.gui_event_queue = multiproc.Queue()
@@ -144,7 +145,7 @@ class ParamEditorMain(object):
                 self.needs_unloading = True
 
     def mavlink_packet(self, m):
-        if m.get_type() == 'PARAM_VALUE':
+        if m.get_type() in ['PARAM_VALUE', 'RC_CHANNELS', 'RC_CHANNELS_RAW']:
             self.mavlink_message_queue.put(m)
 
     def process_mavlink_packet(self, m):
@@ -155,6 +156,17 @@ class ParamEditorMain(object):
                 del self.paramchanged[m.param_id.upper()]
             self.gui_event_queue.put(ParamEditorEvent(
                 ph_event.PEGE_WRITE_SUCC, paramid=m.param_id.upper(), paramvalue=m.param_value))
+        if mtype in ['RC_CHANNELS_RAW', 'RC_CHANNELS']:
+            if self.mpstate.vehicle_name == 'APMrover2':
+                fltmode_ch = int(self.mpstate.module('param').mav_param['MODE_CH'])
+            else:
+                fltmode_ch = int(self.mpstate.module('param').mav_param['FLTMODE_CH'])
+            if self.mpstate.vehicle_name != None:
+                rc_received = float(getattr(m, 'chan%u_raw' % fltmode_ch))
+                if  rc_received != self.fltmode_rc and ((fltmode_ch > 0 and fltmode_ch < 9 and mtype == 'RC_CHANNELS_RAW') or (fltmode_ch > 0 and fltmode_ch < 19 and mtype == 'RC_CHANNELS')):
+                    self.fltmode_rc = rc_received
+                    self.gui_event_queue.put(ParamEditorEvent(
+                        ph_event.PEGE_RCIN, rcin=rc_received))
 
     def child_task(self, queue, lock, gui_queue, gui_lock, close_window_sem):
         '''child process - this holds GUI elements'''

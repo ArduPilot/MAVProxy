@@ -19,7 +19,10 @@ class GridCheckListEditor(gridlib.PyGridCellEditor):
         if int(selected) < int(math.pow(2, len(self.choices))):
             binary = bin(int(selected))[2:]
             self.startValue = [(len(binary)-ones-1) for ones in range(len(binary)) if binary[ones] == '1']
-            self._tc.SetChecked(self.startValue)
+            try:
+                self._tc.SetChecked(self.startValue)
+            except Exception as e:
+                print (e)
 
     def get_checked(self):
         return self._tc.GetChecked()
@@ -152,7 +155,7 @@ class GridScrollEditor(gridlib.PyGridCellEditor):
         try:
             self._tc.SetValue(selected)
         except Exception as e:
-            print ("Parameter Value out of Range")
+            print e
 
     def SetSize(self, rect):
         self._tc.SetDimensions(rect.x, rect.y, rect.width+2, 30,
