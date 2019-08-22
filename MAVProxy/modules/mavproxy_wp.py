@@ -677,6 +677,85 @@ class WPModule(mp_module.MPModule):
         self.wploader.set(wp, idx)
         print("Set param %u for %u to %f" % (pnum, idx, param[pnum-1]))
 
+    def get_loc(self, m):
+        '''return a mavutil.location for item m'''
+        t = m.get_type()
+        if t == "MISSION_ITEM":
+            lat = m.x * 1e7
+            lng = m.y * 1e7
+            alt = m.z * 1e2
+        elif t == "MISSION_ITEM_INT":
+            lat = m.x
+            lng = m.y
+            alt = m.z
+        else:
+            return None
+        return mavutil.location(lat, lng, alt)
+
+    def cmd_split(self, args):
+        '''splits the segment ended by the supplied waypoint into two'''
+        try:
+            num = int(args[0])
+        except IOError as e:
+            return "Bad wp num (%s)" % args[0]
+
+        if num < 1 or num > self.wploader.count():
+            print("Bad item %s" % str(num))
+            return
+        wp = self.wploader.wp(num)
+        if wp is None:
+            print("Could not get wp %u" % num)
+            return
+        loc = self.get_loc(wp)
+        if loc is None:
+            print("wp is not a location command")
+            return
+
+        prev = num - 1
+        if prev < 1 or prev > self.wploader.count():
+            print("Bad item %u" % num)
+            return
+        prev_wp = self.wploader.wp(prev)
+        if prev_wp is None:
+            print("Could not get previous wp %u" % prev)
+            return
+        prev_loc = self.get_loc(prev_wp)
+        if prev_loc is None:
+            print("previous wp is not a location command")
+            return
+
+        if wp.frame != prev_wp.frame:
+            print("waypoints differ in frame (%u vs %u)" %
+                  (wp.frame, prev_wp.frame))
+            return
+
+        if wp.frame != prev_wp.frame:
+            print("waypoints differ in frame")
+            return
+
+        lat_avg = (loc.lat + prev_loc.lat)/2
+        lng_avg = (loc.lng + prev_loc.lng)/2
+        alt_avg = (loc.alt + prev_loc.alt)/2
+        new_wp = mavutil.mavlink.MAVLink_mission_item_message(
+            self.target_system,
+            self.target_component,
+            wp.seq,    # seq
+            wp.frame,    # frame
+            mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,    # command
+            0,    # current
+            0,    # autocontinue
+            0.0,  # param1,
+            0.0,  # param2,
+            0.0,  # param3
+            0.0,  # param4
+            lat_avg * 1e-7,  # x (latitude)
+            lng_avg * 1e-7,  # y (longitude)
+            alt_avg * 1e-2,  # z (altitude)
+        )
+        self.wploader.insert(wp.seq, new_wp)
+        self.fix_jumps(wp.seq, 1)
+        self.send_all_waypoints()
+
     def cmd_wp(self, args):
         '''waypoint commands'''
         usage = "usage: wp <editor|list|load|update|save|set|clear|loop|remove|move|movemulti|changealt>"
@@ -740,6 +819,8 @@ class WPModule(mp_module.MPModule):
                 print("usage: wp set <wpindex>")
                 return
             self.master.waypoint_set_current_send(int(args[1]))
+        elif args[0] == "split":
+            self.cmd_split(args[1:])
         elif args[0] == "clear":
             self.master.waypoint_clear_all_send()
             self.wploader.clear()
