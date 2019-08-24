@@ -57,6 +57,7 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('AspdError', 'AspdError --', row=3)
         mpstate.console.set_status('FlightTime', 'FlightTime --', row=3)
         mpstate.console.set_status('ETR', 'ETR --', row=3)
+        mpstate.console.set_status('Params', 'Param ---/---', row=3)
 
         mpstate.console.ElevationMap = mp_elevation.ElevationModel()
 
@@ -514,6 +515,10 @@ class ConsoleModule(mp_module.MPModule):
                 alt_error = "%s%s" % (self.height_string(msg.alt_error), alt_error_sign)
             self.console.set_status('AltError', 'AltError %s' % alt_error)
             self.console.set_status('AspdError', 'AspdError %s%s' % (self.speed_string(msg.aspd_error*0.01), aspd_error_sign))
+
+        elif type == 'PARAM_VALUE':
+            rec, tot = self.module('param').param_status()
+            self.console.set_status('Params', 'Param %u/%u' % (rec,tot))
 
 def init(mpstate):
     '''initialise module'''
