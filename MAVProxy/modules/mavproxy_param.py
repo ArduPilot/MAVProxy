@@ -231,6 +231,9 @@ class ParamState:
             else:
                 print("Parameter '%s' not found in documentation" % h)
 
+    def status(self, master, mpstate):
+        return(len(self.mav_param_set), self.mav_param_count)
+
     def handle_command(self, master, mpstate, args):
         '''handle parameter commands'''
         param_wildcard = "*"
@@ -423,6 +426,11 @@ class ParamModule(mp_module.MPModule):
         if sysid in self.pstate:
             return
         self.add_new_target_system(sysid)
+
+    def param_status(self):
+        sysid = self.get_sysid()
+        pset, pcount = self.pstate[sysid].status(self.master, self.mpstate)
+        return (pset, pcount)
         
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
