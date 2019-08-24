@@ -38,6 +38,8 @@ class ParamEditorFrame(wx.Frame):
         self.fetch_params = wx.Button(self, wx.ID_ANY, ("Fetch all"))
         self.write_params = wx.Button(self, wx.ID_ANY, ("Write"))
         self.search_key = wx.TextCtrl(self, wx.ID_ANY, "")
+        self.param_status = (0,0)
+        self.param_label = wx.StaticText(self, wx.ID_ANY, "Status: " + str(self.param_status[0]) + "/ " + str(self.param_status[1]), style=wx.ALIGN_CENTRE)
         self.search_choices = ['All:', 'Actions:TMODE_',
         'Tuning:PILOT_,ATC_,MOT_,ANGLE_,RC_',
         'PosControl:VEL_,POS_,WPNAV_,RTL_',
@@ -148,6 +150,8 @@ class ParamEditorFrame(wx.Frame):
         sizer_6.Add(self.fetch_params, 0, wx.ALIGN_CENTER, 0)
         sizer_6.Add((10, 10), 0, 0, 0)
         sizer_6.Add(self.reset_params, 0, wx.ALIGN_CENTER, 0)
+        sizer_6.Add((10, 10), 0, 0, 0)
+        sizer_6.Add(self.param_label, 0, wx.ALIGN_CENTER, 0)
         sizer_6.Add((10, 10), 0, 0, 0)
         sizer_3.Add(sizer_6, 0, 0, 0)
         sizer_3.Add((10, 10), 0, 0, 0)
@@ -277,6 +281,8 @@ class ParamEditorFrame(wx.Frame):
                 self.get_vehicle_type(event.get_arg("vehicle"))
             self.requires_redraw = True
         elif event.get_type() == ph_event.PEGE_WRITE_SUCC:
+            self.param_status = event.get_arg("pstatus")
+            self.param_label.SetLabel("Status: " + str(self.param_status[0]) + "/ " + str(self.param_status[1]))
             if event.get_arg("paramid") in self.param_received.keys():
                 if event.get_arg("paramid") in self.modified_param.keys():
                     del self.modified_param[event.get_arg("paramid")]
