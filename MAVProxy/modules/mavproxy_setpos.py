@@ -4,9 +4,9 @@ setpos command for SET_POSITION_TARGET_LOCAL_NED
 
 import math
 
-from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
 from pymavlink import mavutil
+
 
 class SetPosModule(mp_module.MPModule):
 
