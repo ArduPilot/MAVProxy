@@ -38,6 +38,26 @@ class ParamEditorFrame(wx.Frame):
         self.fetch_params = wx.Button(self, wx.ID_ANY, ("Fetch all"))
         self.write_params = wx.Button(self, wx.ID_ANY, ("Write"))
         self.search_key = wx.TextCtrl(self, wx.ID_ANY, "")
+        self.search_choices = ['All:', 'Actions:TMODE_',
+        'Tuning:PILOT_,ATC_,MOT_,ANGLE_,RC_',
+        'PosControl:VEL_,POS_,WPNAV_,RTL_',
+        'Radio:BRD_RADIO_',
+        'Compass:COMPASS_',
+        'IMU:INS_',
+        'Failsafe:FS_',
+        'EKF2:EK2_,AHRS_EKF_',
+        'EKF3:EK3_,AHRS_EKF_',
+        'Fence:FENCE_',
+        'Logging:LOG_',
+        'GPS:GPS_',
+        'Arming:ARMING_',
+        'Battery:BATT_',
+        'Flight Modes:MODE',
+        'Serial:SERIAL_']
+        categories = [x.split(':')[0] for x in self.search_choices]
+        self.search_list = wx.Choice(self, wx.ID_ANY, choices=categories)
+        self.categorical_list = {}
+        self.search_list.SetSelection(0)
         self.display_list = wx.grid.Grid(self, wx.ID_ANY, size=(1, 1))
         self.search_key.SetHint("Search")
         self.__set_properties()
@@ -56,6 +76,7 @@ class ParamEditorFrame(wx.Frame):
         self.Bind(wx.EVT_BUTTON, self.fetch_param, self.fetch_params)
         self.Bind(wx.EVT_BUTTON, self.write_param, self.write_params)
         self.Bind(wx.EVT_TEXT, self.key_change, self.search_key)
+        self.Bind(wx.EVT_CHOICE, self.category_change, self.search_list)
         if float(str(wx.__version__).split('.')[0]) < 4.0:
             self.Bind(wx.grid.EVT_GRID_CMD_CELL_CHANGE, self.ParamChanged,
                       self.display_list)
@@ -137,6 +158,8 @@ class ParamEditorFrame(wx.Frame):
         sizer_5.Add((10, 10), 0, 0, 0)
         sizer_5.Add(self.search_key, 0, 0, 0)
         sizer_5.Add((10, 10), 0, 0, 0)
+        sizer_5.Add(self.search_list, 0, 0, 0)
+        sizer_5.Add((10, 10), 0, 0, 0)
         sizer_3.Add(sizer_5, 0, 0, 0)
         sizer_2.Add(sizer_3, 0, 0, 0)
         sizer_2.Add((10, 10), 0, 0, 0)
@@ -149,7 +172,7 @@ class ParamEditorFrame(wx.Frame):
     def redirect_err(self, moddebug):
         if moddebug < 3:
             sys.stderr.flush()
-            err = open(os.devnull, 'a+', 0)
+            err = open(os.devnull, 'a+')
             os.dup2(err.fileno(), sys.stderr.fileno())
 
     def OnCloseWindow(self, event):
@@ -184,7 +207,7 @@ class ParamEditorFrame(wx.Frame):
     def spinctrl(self, event):
         try:
             self.display_list.SetCellValue(self.row, PE_VALUE, str(self.combo.GetValue()))
-        except Exception as e:
+        except Exception:
             pass
         event.Skip()
 
@@ -464,11 +487,34 @@ class ParamEditorFrame(wx.Frame):
         self.key_redraw()
         event.Skip()
 
+    def category_change(self, event):
+        self.gui_event_queue_lock.acquire()
+        key = self.search_choices[self.search_list.GetSelection()]
+        key = key.split(':')[1]
+        self.categorical_list = {}
+        for x in key.split(','):
+            if x == 'MODE':
+                if self.vehicle_name == 'APMrover2':
+                    x = 'MODE'
+                else:
+                    x = 'FLTMODE'
+            for param, value in self.param_received.items():
+                try:
+                    if x.lower() == param.lower()[:len(x)]:
+                        self.categorical_list[param] = value
+                except Exception:
+                    pass
+        self.gui_event_queue_lock.release()
+        self.key_redraw()
+        event.Skip()
+
     def key_redraw(self):
         self.gui_event_queue_lock.acquire()
         key = self.search_key.GetValue()
+        if self.search_list.GetString(self.search_list.GetSelection()) == 'All':
+            self.categorical_list = self.param_received
         temp = {}
-        for param, value in self.param_received.items():
+        for param, value in self.categorical_list.items():
             if key.lower() in param.lower():
                 temp[param] = value
             else:
@@ -490,7 +536,7 @@ class ParamEditorFrame(wx.Frame):
             celleditor = self.display_list.GetCellEditor(row_changed, PE_OPTION)
             try:
                 celleditor.set_checked(newval)
-            except Exception as e:
+            except Exception:
                 pass
         if float(self.oldval) != newval:
             self.display_list.SetCellBackgroundColour(row_changed, PE_VALUE,

@@ -48,7 +48,6 @@ class ParamEditorEventThread(threading.Thread):
                         self.mp_paramedit.gui_event_queue_lock.release()
 
                     elif event_type == ph_event.PEE_TIME_TO_QUIT:
-                        #self.mp_paramedit.unload()
                         self.mp_paramedit.needs_unloading = True
 
                     elif event_type == ph_event.PEE_LOAD_FILE:
@@ -76,7 +75,7 @@ class ParamEditorEventThread(threading.Thread):
                         master = self.mp_paramedit.mpstate.mav_master[0]
                         master.param_fetch_all()
 
-                except Exception as e:
+                except Exception:
                     time.sleep(0.2)
             time.sleep(0.01)
 
@@ -129,7 +128,7 @@ class ParamEditorMain(object):
             m = self.mavlink_message_queue.get()
             try:
                 self.process_mavlink_packet(m)
-            except Exception as e:
+            except Exception:
                 import traceback
                 traceback.print_stack()
 
@@ -161,9 +160,9 @@ class ParamEditorMain(object):
                 fltmode_ch = int(self.mpstate.module('param').mav_param['MODE_CH'])
             else:
                 fltmode_ch = int(self.mpstate.module('param').mav_param['FLTMODE_CH'])
-            if self.mpstate.vehicle_name != None:
+            if self.mpstate.vehicle_name is not None:
                 rc_received = float(getattr(m, 'chan%u_raw' % fltmode_ch))
-                if  rc_received != self.fltmode_rc and ((fltmode_ch > 0 and fltmode_ch < 9 and mtype == 'RC_CHANNELS_RAW') or (fltmode_ch > 0 and fltmode_ch < 19 and mtype == 'RC_CHANNELS')):
+                if rc_received != self.fltmode_rc and ((fltmode_ch > 0 and fltmode_ch < 9 and mtype == 'RC_CHANNELS_RAW') or (fltmode_ch > 0 and fltmode_ch < 19 and mtype == 'RC_CHANNELS')):
                     self.fltmode_rc = rc_received
                     self.gui_event_queue.put(ParamEditorEvent(
                         ph_event.PEGE_RCIN, rcin=rc_received))
@@ -216,4 +215,4 @@ class ParamEditorMain(object):
 
 def init(mpstate):
     '''initialise module'''
-    return ParamEditorModule(mpstate)
+    return ParamEditorMain(mpstate)

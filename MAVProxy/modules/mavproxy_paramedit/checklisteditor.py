@@ -155,7 +155,7 @@ class GridScrollEditor(gridlib.PyGridCellEditor):
         try:
             self._tc.SetValue(selected)
         except Exception as e:
-            print e
+            print (e)
 
     def SetSize(self, rect):
         self._tc.SetDimensions(rect.x, rect.y, rect.width+2, 30,
