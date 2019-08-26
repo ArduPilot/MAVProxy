@@ -32,6 +32,7 @@ class MapModule(mp_module.MPModule):
         self.moving_fencepoint = None
         self.moving_rally = None
         self.mission_list = None
+        self.moving_polygon_point = None
         self.icon_counter = 0
         self.circle_counter = 0
         self.draw_line = None
@@ -259,6 +260,7 @@ class MapModule(mp_module.MPModule):
                 items = [MPMenuItem('WP Set', returnkey='popupMissionSet'),
                          MPMenuItem('WP Remove', returnkey='popupMissionRemove'),
                          MPMenuItem('WP Move', returnkey='popupMissionMove'),
+                         MPMenuItem('WP Split', returnkey='popupMissionSplit'),
                 ]
                 popup = MPMenuSubMenu('Popup', items)
                 self.map.add_object(mp_slipmap.SlipPolygon('mission %u' % i, p,
@@ -296,10 +298,132 @@ class MapModule(mp_module.MPModule):
 
                     labeled_wps[next_list[j]] = (i,j)
 
+    # Start: handling of PolyFence popup menu items
+    def polyfence_remove_circle(self, id):
+        '''called when a fence is right-clicked and remove is selected;
+        removes the circle
+        '''
+        (seq, type) = id.split(":")
+        self.module('fence').removecircle(int(seq))
+
+    def polyfence_remove_polygon(self, id):
+        '''called when a fence is right-clicked and remove is selected;
+        removes the polygon
+        '''
+        (seq, type) = id.split(":")
+        self.module('fence').removepolygon(int(seq))
+
+    def polyfence_remove_polygon_point(self, id, extra):
+        '''called when a fence is right-clicked and remove point is selected;
+        removes the polygon point
+        '''
+        (seq, type) = id.split(":")
+        self.module('fence').removepolygon_point(int(seq), int(extra))
+
+    def polyfence_add_polygon_point(self, id, extra):
+        '''called when a fence is right-clicked and add point is selected;
+        adds a polygon *before* this one in the list
+        '''
+        (seq, type) = id.split(":")
+        self.module('fence').addpolygon_point(int(seq), int(extra))
+
+    def polyfence_move_polygon_point(self, id, extra):
+        '''called when a fence is right-clicked and move point is selected; start
+        moving the polygon point
+        '''
+        (seq, t) = id.split(":")
+        self.moving_polygon_point = (int(seq), extra)
+    # End: handling of PolyFence popup menu items
+
+    def display_polyfences_circles(self, circles, colour):
+        '''draws circles in the PolyFence layer with colour colour'''
+        for circle in circles:
+            lat = circle.x
+            lng = circle.y
+            if circle.get_type() == 'MISSION_ITEM_INT':
+                lat *= 1e-7
+                lng *= 1e-7
+            items = [
+                MPMenuItem('Remove Circle', returnkey='popupPolyFenceRemoveCircle'),
+            ]
+            popup = MPMenuSubMenu('Popup', items)
+            slipcircle = mp_slipmap.SlipCircle(
+                str(circle.seq) + ":circle", # key
+                "PolyFence", # layer
+                (lat, lng), # latlon
+                circle.param1, # radius
+                colour,
+                linewidth=2,
+                popup_menu=popup)
+            self.map.add_object(slipcircle)
+
+    def display_polyfences_inclusion_circles(self):
+        '''draws inclusion circles in the PolyFence layer with colour colour'''
+        inclusions = self.module('fence').inclusion_circles()
+        self.display_polyfences_circles(inclusions, (0, 255, 0))
+
+    def display_polyfences_exclusion_circles(self):
+        '''draws exclusion circles in the PolyFence layer with colour colour'''
+        exclusions = self.module('fence').exclusion_circles()
+        self.display_polyfences_circles(exclusions, (255, 0, 0))
+
+    def display_polyfences_polygons(self, polygons, colour):
+        '''draws polygons in the PolyFence layer with colour colour'''
+        for polygon in polygons:
+            points = []
+            for point in polygon:
+                lat = point.x
+                lng = point.y
+                if point.get_type() == 'MISSION_ITEM_INT':
+                    lat *= 1e-7
+                    lng *= 1e-7
+                points.append((lat, lng))
+            items = [
+                MPMenuItem('Remove Polygon', returnkey='popupPolyFenceRemovePolygon'),
+            ]
+            if len(points) > 3:
+                items.append(MPMenuItem('Remove Polygon Point', returnkey='popupPolyFenceRemovePolygonPoint'))
+            items.append(MPMenuItem('Move Polygon Point', returnkey='popupPolyFenceMovePolygonPoint'))
+            items.append(MPMenuItem('Add Polygon Point', returnkey='popupPolyFenceAddPolygonPoint'))
+
+            popup = MPMenuSubMenu('Popup', items)
+            poly = mp_slipmap.UnclosedSlipPolygon(
+                str(polygon[0].seq) + ":poly", # key,
+                points,
+                layer='PolyFence',
+                linewidth=2,
+                colour=colour,
+                popup_menu=popup)
+            self.map.add_object(poly)
+
+    def display_polyfences_inclusion_polygons(self):
+        '''draws inclusion polygons in the PolyFence layer with colour colour'''
+        inclusions = self.module('fence').inclusion_polygons()
+        self.display_polyfences_polygons(inclusions, (0, 255, 0))
+
+    def display_polyfences_exclusion_polygons(self):
+        '''draws exclusion polygons in the PolyFence layer with colour colour'''
+        exclusions = self.module('fence').exclusion_polygons()
+        self.display_polyfences_polygons(exclusions, (255, 0, 0))
+
+    def display_polyfences(self):
+        '''draws PolyFence items in the PolyFence layer'''
+        self.map.add_object(mp_slipmap.SlipClearLayer('PolyFence'))
+        self.display_polyfences_inclusion_circles()
+        self.display_polyfences_exclusion_circles()
+        self.display_polyfences_inclusion_polygons()
+        self.display_polyfences_exclusion_polygons()
+
     def display_fence(self):
         '''display the fence'''
         from MAVProxy.modules.mavproxy_map import mp_slipmap
-        self.fence_change_time = self.module('fence').fenceloader.last_change
+        if getattr(self.module('fence'), "cmd_addcircle", None) is not None:
+            # we're doing fences via MissionItemProtocol and thus have
+            # much more work to do
+            return self.display_polyfences()
+
+        # traditional module, a single polygon fence transfered using
+        # FENCE_POINT protocol:
         points = self.module('fence').fenceloader.polygon()
         self.map.add_object(mp_slipmap.SlipClearLayer('Fence'))
         if len(points) > 1:
@@ -374,6 +498,11 @@ class MapModule(mp_module.MPModule):
         idx = self.selection_index_to_idx(key, selection_index)
         self.mpstate.functions.process_stdin('wp remove %u' % idx)
 
+    def split_mission_wp(self, key, selection_index):
+        '''add wp before this one'''
+        idx = self.selection_index_to_idx(key, selection_index)
+        self.mpstate.functions.process_stdin('wp split %u' % idx)
+
     def remove_fencepoint(self, key, selection_index):
         '''remove a fence point'''
         self.mpstate.functions.process_stdin('fence remove %u' % (selection_index+1))
@@ -408,10 +537,20 @@ class MapModule(mp_module.MPModule):
             self.remove_mission(obj.selected[0].objkey, obj.selected[0].extra_info)
         elif menuitem.returnkey == 'popupMissionMove':
             self.move_mission(obj.selected[0].objkey, obj.selected[0].extra_info)
-        elif menuitem.returnkey == 'popupFenceRemove':
-            self.remove_fencepoint(obj.selected[0].objkey, obj.selected[0].extra_info)
+        elif menuitem.returnkey == 'popupMissionSplit':
+            self.split_mission_wp(obj.selected[0].objkey, obj.selected[0].extra_info)
         elif menuitem.returnkey == 'popupFenceMove':
             self.move_fencepoint(obj.selected[0].objkey, obj.selected[0].extra_info)
+        elif menuitem.returnkey == 'popupPolyFenceRemoveCircle':
+            self.polyfence_remove_circle(obj.selected[0].objkey)
+        elif menuitem.returnkey == 'popupPolyFenceRemovePolygon':
+            self.polyfence_remove_polygon(obj.selected[0].objkey)
+        elif menuitem.returnkey == 'popupPolyFenceMovePolygonPoint':
+            self.polyfence_move_polygon_point(obj.selected[0].objkey, obj.selected[0].extra_info)
+        elif menuitem.returnkey == 'popupPolyFenceAddPolygonPoint':
+            self.polyfence_add_polygon_point(obj.selected[0].objkey, obj.selected[0].extra_info)
+        elif menuitem.returnkey == 'popupPolyFenceRemovePolygonPoint':
+            self.polyfence_remove_polygon_point(obj.selected[0].objkey, obj.selected[0].extra_info)
         elif menuitem.returnkey == 'showPosition':
             self.show_position()
         elif menuitem.returnkey == 'printGoogleMapsLink':
@@ -449,6 +588,16 @@ class MapModule(mp_module.MPModule):
         if obj.event.rightIsDown and self.moving_wp is not None:
             print("Cancelled wp move")
             self.moving_wp = None
+            return
+        if obj.event.leftIsDown and self.moving_polygon_point is not None:
+            self.mpstate.click(obj.latlon)
+            (seq, offset) = self.moving_polygon_point
+            self.mpstate.functions.process_stdin("fence movepolypoint %u %u" % (int(seq), int(offset)))
+            self.moving_polygon_point = None
+            return
+        if obj.event.rightIsDown and self.moving_polygon_point is not None:
+            print("Cancelled polygon point move")
+            self.moving_polygon_point = None
             return
         if obj.event.rightIsDown and self.moving_fencepoint is not None:
             print("Cancelled fence move")
@@ -509,7 +658,7 @@ class MapModule(mp_module.MPModule):
         self.draw_line.append(self.mpstate.click_location)
         if len(self.draw_line) > 1:
             self.map.add_object(mp_slipmap.SlipPolygon('drawing', self.draw_line,
-                                                          layer='Drawing', linewidth=2, colour=(128,128,255)))
+                                                          layer='Drawing', linewidth=2, colour=self.draw_colour))
 
     def drawing_end(self):
         '''end line drawing'''
@@ -521,10 +670,11 @@ class MapModule(mp_module.MPModule):
         self.map.add_object(mp_slipmap.SlipDefaultPopup(self.default_popup, combine=True))
         self.map.add_object(mp_slipmap.SlipClearLayer('Drawing'))
 
-    def draw_lines(self, callback):
+    def draw_lines(self, callback, colour=(128,128,255)):
         '''draw a series of connected lines on the map, calling callback when done'''
         from MAVProxy.modules.mavproxy_map import mp_slipmap
         self.draw_callback = callback
+        self.draw_colour = colour
         self.draw_line = []
         self.map.add_object(mp_slipmap.SlipDefaultPopup(None))
 
@@ -825,7 +975,8 @@ class MapModule(mp_module.MPModule):
 
         # if the fence has changed, redisplay
         if (self.module('fence') and
-            self.fence_change_time != self.module('fence').fenceloader.last_change):
+            self.fence_change_time != self.module('fence').last_change()):
+            self.fence_change_time = self.module('fence').last_change()
             self.display_fence()
 
         # if the rallypoints have changed, redisplay

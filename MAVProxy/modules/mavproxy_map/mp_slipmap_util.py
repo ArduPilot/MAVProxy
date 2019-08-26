@@ -185,12 +185,31 @@ class SlipCircle(SlipObject):
                       self.color, self.linewidth, 0, reverse = self.reverse).draw(img)
             SlipArrow(self.key, self.layer, (center_px[0]+radius_px, center_px[1]),
                       self.color, self.linewidth, math.pi, reverse = self.reverse).draw(img)
+        # stash some values for determining closest click location
+        self.radius_px = radius_px
+        self.center_px = center_px
 
     def bounds(self):
         '''return bounding box'''
         if self.hidden:
             return None
         return (self.latlon[0], self.latlon[1], 0, 0)
+
+    def clicked(self, px, py):
+        '''check if a click on px,py should be considered a click
+        on the object. Return None if definitely not a click,
+        otherwise return the distance of the click, smaller being nearer
+        '''
+        radius_px = getattr(self, "radius_px", None)
+        if radius_px is None:
+            return
+
+        dx = self.center_px[0] - px
+        dy = self.center_px[1] - py
+        ret = abs(dx*dx+dy*dy - radius_px*radius_px)
+        if ret > 100:  # threshold of within 10 pixels for a click to count
+            return None
+        return ret
 
 class SlipPolygon(SlipObject):
     '''a polygon to display on the map'''
@@ -276,6 +295,31 @@ class SlipPolygon(SlipObject):
         '''extra selection information sent when object is selected'''
         return self._selected_vertex
 
+class UnclosedSlipPolygon(SlipPolygon):
+    '''a polygon to display on the map - but one with no return point or
+    closing vertex'''
+    def draw(self, img, pixmapper, bounds, colour=(0,0,0)):
+        '''draw a polygon on the image'''
+        if self.hidden:
+            return
+        self._pix_points = []
+        for i in range(len(self.points)):
+            if len(self.points[i]) > 2:
+                colour = self.points[i][2]
+            else:
+                colour = self.colour
+            _from = self.points[i]
+            if i+1 == len(self.points):
+                _to = self.points[0]
+            else:
+                _to = self.points[i+1]
+            self.draw_line(
+                img,
+                pixmapper,
+                _from,
+                _to,
+                colour,
+                self.linewidth)
 
 class SlipGrid(SlipObject):
     '''a map grid'''
