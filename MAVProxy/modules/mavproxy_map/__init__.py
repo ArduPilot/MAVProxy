@@ -44,6 +44,7 @@ class MapModule(mp_module.MPModule):
         self.ElevationMap = mp_elevation.ElevationModel()
         self.last_unload_check_time = time.time()
         self.unload_check_interval = 0.1 # seconds
+        self.trajectory_layers = set()
         self.map_settings = mp_settings.MPSettings(
             [ ('showgpspos', int, 1),
               ('showgps2pos', int, 1),
@@ -734,8 +735,11 @@ class MapModule(mp_module.MPModule):
                 self.map.add_object(mp_slipmap.SlipPolygon('trajectory',
                                                            trajectory, layer=tlayer,
                                                                linewidth=2, colour=(255,0,180)))
+                self.trajectory_layers.add(tlayer)
             else:
-                self.map.add_object(mp_slipmap.SlipClearLayer(tlayer))
+                if tlayer in self.trajectory_layers:
+                    self.map.add_object(mp_slipmap.SlipClearLayer(tlayer))
+                    self.trajectory_layers.remove(tlayer)
 
         elif mtype == "POSITION_TARGET_GLOBAL_INT":
             # FIXME: base this off SYS_STATUS.MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL?
