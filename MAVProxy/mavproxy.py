@@ -1169,7 +1169,7 @@ if __name__ == '__main__':
 
         print("MAVProxy is a modular ground station using the mavlink protocol")
         print("MAVProxy Version: " + version)
-        sys.exit(1)
+        sys.exit(0)
 
     # global mavproxy state
     mpstate = MPState()
