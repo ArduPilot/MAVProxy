@@ -81,6 +81,11 @@ class ConsoleModule(mp_module.MPModule):
         self.menu.add(menu)
         self.mpstate.console.set_menu(self.menu, self.menu_callback)
 
+    def remove_menu(self, menu):
+        '''add a new menu'''
+        self.menu.remove(menu)
+        self.mpstate.console.set_menu(self.menu, self.menu_callback)
+
     def unload(self):
         '''unload module'''
         self.mpstate.console.close()
