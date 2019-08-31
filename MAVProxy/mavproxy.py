@@ -399,6 +399,8 @@ def unload_module(modname):
                     mpstate.modules.remove((m,pm))
                     return False
             mpstate.modules.remove((m,pm))
+            if modname in mpstate.public_modules:
+                del mpstate.public_modules[modname]
             print("Unloaded module %s" % modname)
             return True
     print("Unable to find module %s" % modname)
