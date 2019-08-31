@@ -8,7 +8,7 @@ from MAVProxy.modules.lib import mp_module
 
 class CmdlongModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(CmdlongModule, self).__init__(mpstate, "cmdlong")
+        super(CmdlongModule, self).__init__(mpstate, "cmdlong", public=True)
         self.add_command('setspeed', self.cmd_do_change_speed, "do_change_speed")
         self.add_command('setyaw', self.cmd_condition_yaw, "condition_yaw")
         self.add_command('takeoff', self.cmd_takeoff, "takeoff")

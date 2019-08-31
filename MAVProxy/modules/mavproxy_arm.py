@@ -24,7 +24,7 @@ arming_masks = {
 
 class ArmModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(ArmModule, self).__init__(mpstate, "arm", "arm/disarm handling")
+        super(ArmModule, self).__init__(mpstate, "arm", "arm/disarm handling", public=True)
         checkables = "<" + "|".join(arming_masks.keys()) + ">"
         self.add_command('arm', self.cmd_arm,      'arm motors', ['check ' + self.checkables(),
                                       'uncheck ' + self.checkables(),

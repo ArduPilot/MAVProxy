@@ -8,7 +8,7 @@ from MAVProxy.modules.lib import mp_module
 
 class ModeModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(ModeModule, self).__init__(mpstate, "mode")
+        super(ModeModule, self).__init__(mpstate, "mode", public=True)
         self.add_command('mode', self.cmd_mode, "mode change", self.available_modes())
         self.add_command('guided', self.cmd_guided, "fly to a clicked location on map")
 
