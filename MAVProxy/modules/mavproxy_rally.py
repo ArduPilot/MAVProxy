@@ -67,12 +67,19 @@ class RallyModule(mp_module.MPModule):
 
     def idle_task(self):
         '''called on idle'''
-        if self.module('console') is not None and not self.menu_added_console:
-            self.menu_added_console = True
-            self.module('console').add_menu(self.menu)
-        if self.module('map') is not None and not self.menu_added_map:
-            self.menu_added_map = True
-            self.module('map').add_menu(self.menu)
+        if self.module('console') is not None:
+            if not self.menu_added_console:
+                self.menu_added_console = True
+                self.module('console').add_menu(self.menu)
+        else:
+            self.menu_added_console = False
+
+        if self.module('map') is not None:
+            if not self.menu_added_map:
+                self.menu_added_map = True
+                self.module('map').add_menu(self.menu)
+        else:
+            self.menu_added_map = False
 
         '''handle abort command; it is critical that the AP to receive it'''
         if self.abort_ack_received is False:
@@ -287,6 +294,16 @@ class RallyModule(mp_module.MPModule):
             elif m.command == mavutil.mavlink.MAV_CMD_DO_RALLY_LAND:
                 if (m.result == 0):
                     self.say("Landing.")
+
+    def unload(self):
+        self.remove_command("rally")
+        if self.module('console') is not None and self.menu_added_console:
+            self.menu_added_console = False
+            self.module('console').remove_menu(self.menu)
+        if self.module('map') is not None and self.menu_added_map:
+            self.menu_added_map = False
+            self.module('map').remove_menu(self.menu)
+        super(RallyModule, self).unload()
 
     def send_rally_point(self, i):
         '''send rally points from fenceloader'''
