@@ -173,6 +173,13 @@ class MPMenuSubMenu(MPMenuGeneric):
             if not updated:
                 self.items.append(m)
 
+    def remove(self, items):
+        '''remove items from a sub-menu'''
+        if not isinstance(items, list):
+            items = [items]
+        names = set([x.name for x in items])
+        self.items = list(filter(lambda x : x.name not in names, self.items))
+
     def add_to_submenu(self, submenu_path, item):
         '''add an item to a submenu using a menu path array'''
         if len(submenu_path) == 0:
@@ -231,6 +238,12 @@ class MPMenuTop(object):
                     updated = True
             if not updated:
                 self.items.append(m)
+
+    def remove(self, items):
+        if not isinstance(items, list):
+            items = [items]
+        names = set([x.name for x in items])
+        self.items = list(filter(lambda x : x.name not in names, self.items))
 
     def add_to_submenu(self, submenu_path, item):
         '''
