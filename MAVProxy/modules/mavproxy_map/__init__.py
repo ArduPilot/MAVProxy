@@ -117,6 +117,11 @@ class MapModule(mp_module.MPModule):
         self.default_popup.add(menu)
         self.map.add_object(mp_slipmap.SlipDefaultPopup(self.default_popup, combine=True))
 
+    def remove_menu(self, menu):
+        '''add to the default popup menu'''
+        from MAVProxy.modules.mavproxy_map import mp_slipmap
+        self.default_popup.remove(menu)
+        self.map.add_object(mp_slipmap.SlipDefaultPopup(self.default_popup, combine=True))
 
     def show_position(self):
         '''show map position click information'''
@@ -765,11 +770,13 @@ class MapModule(mp_module.MPModule):
             self.rally_change_time = time.time()
 
         # if the fence has changed, redisplay
-        if self.fence_change_time != self.module('fence').fenceloader.last_change:
+        if (self.module('fence') and
+            self.fence_change_time != self.module('fence').fenceloader.last_change):
             self.display_fence()
 
         # if the rallypoints have changed, redisplay
-        if self.rally_change_time != self.module('rally').last_change():
+        if (self.module('rally') and
+            self.rally_change_time != self.module('rally').last_change()):
             self.rally_change_time = self.module('rally').last_change()
             icon = self.map.icon('rallypoint.png')
             self.map.add_object(mp_slipmap.SlipClearLayer('RallyPoints'))
