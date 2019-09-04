@@ -625,6 +625,34 @@ def cmd_param(args):
         if fnmatch.fnmatch(str(p).upper(), wildcard.upper()):
             print("%-16.16s %f" % (str(p), mestate.mlog.params[p]))
 
+def cmd_paramchange(args):
+    '''show param changes'''
+    types = set(['PARM','PARAM_VALUE'])
+    vmap = {}
+    while True:
+        m = mestate.mlog.recv_match(type=types, condition=mestate.settings.condition)
+        if m is None:
+            break
+        if m.get_type() == 'PARM':
+            pname = m.Name
+            pvalue = m.Value
+        elif m.get_type() == 'PARAM_VALUE':
+            pname = m.param_id
+            pvalue = m.param_value
+        else:
+            continue
+        if pname.startswith('STAT_'):
+            # STAT_* changes are not interesting
+            continue
+        if not pname in vmap or vmap[pname] == pvalue:
+            vmap[pname] = pvalue
+            continue
+
+        tstr = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(m._timestamp))
+        print("%s %s %.6f -> %.6f" % (tstr, pname, vmap[pname], pvalue))
+        vmap[pname] = pvalue
+    mestate.mlog.rewind()
+
 def cmd_devid(args):
     '''show parameters'''
     params = mestate.mlog.params
@@ -749,6 +777,7 @@ command_map = {
     'save'       : (cmd_save,      'save a graph'),
     'condition'  : (cmd_condition, 'set graph conditions'),
     'param'      : (cmd_param,     'show parameters'),
+    'paramchange': (cmd_paramchange, 'show parameter changes in log'),
     'messages'   : (cmd_messages,  'show messages'),
     'devid'      : (cmd_devid,     'show device IDs'),
     'map'        : (cmd_map,       'show map view'),
