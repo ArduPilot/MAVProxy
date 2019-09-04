@@ -389,7 +389,10 @@ def decode_devid(devid, pname):
     decoded_devname = ""
 
     if pname.startswith("COMPASS"):
-        decoded_devname = compass_types.get(devtype, "UNKNOWN")
+        if bus_type == 3 and devtype == 1:
+            decoded_devname = "UAVCAN"
+        else:
+            decoded_devname = compass_types.get(devtype, "UNKNOWN")
 
     if pname.startswith("INS"):
         decoded_devname = imu_types.get(devtype, "UNKNOWN")
