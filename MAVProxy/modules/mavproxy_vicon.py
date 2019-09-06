@@ -8,6 +8,8 @@ import time
 
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
+from MAVProxy.modules.lib import LowPassFilter2p
+from pymavlink.rotmat import Vector3
 from pymavlink import mavutil
 from pymavlink import mavextra
 
@@ -31,7 +33,7 @@ def get_gps_time(tnow):
 class ViconModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(ViconModule, self).__init__(mpstate, "Vicon", "Vicon", public=False)
+        super(ViconModule, self).__init__(mpstate, "vicon", "vicon", public=False)
         self.console.set_status('VPos', 'VPos -- -- --', row=5)
         self.console.set_status('VAtt', 'VAtt -- -- --', row=5)
         self.vicon_settings = mp_settings.MPSettings(
@@ -40,6 +42,7 @@ class ViconModule(mp_module.MPModule):
              ('origin_lon', float, 149.165230),
              ('origin_alt', float, 584.0),
              ('vision_rate', int, 14),
+             ('vel_filter_hz', float, 30.0),
              ('gps_rate', int, 5),
              ('gps_nsats', float, 16)])
         self.add_command('vicon', self.cmd_vicon, 'VICON control',
@@ -57,10 +60,14 @@ class ViconModule(mp_module.MPModule):
         self.gps_count = 0
         self.vision_count = 0
         self.last_frame_count = 0
+        self.vel_filter = LowPassFilter2p.LowPassFilter2p(200.0, 30.0)
+        self.actual_frame_rate = 0.0
 
     def thread_loop(self):
         '''background processing'''
         name = None
+        last_pos = None
+        last_frame_num = None
 
         while True:
             vicon = self.vicon
@@ -82,6 +89,11 @@ class ViconModule(mp_module.MPModule):
                 now_ms = int(now * 1000)
                 last_gps_send_ms = now_ms
                 last_gps_send = now
+                frame_rate = vicon.get_frame_rate()
+                frame_dt = 1.0/frame_rate
+                last_rate = time.time()
+                frame_count = 0
+                print("Vicon frame rate %.1f" % frame_rate)
 
             if self.vicon_settings.gps_rate > 0:
                 gps_period_ms = 1000 // self.vicon_settings.gps_rate
@@ -90,13 +102,15 @@ class ViconModule(mp_module.MPModule):
             mav = self.master
             now = time.time()
             now_ms = int(now * 1000)
+            frame_num = vicon.get_frame_number()
 
-            if self.vicon_settings.vision_rate > 0:
-                dt = now - last_msg_time
-                if dt < 1.0 / self.vicon_settings.vision_rate:
-                    continue
-
-            last_msg_time = now
+            frame_count += 1
+            if now - last_rate > 0.1:
+                rate = frame_count / (now - last_rate)
+                self.actual_frame_rate = 0.9 * self.actual_frame_rate + 0.1 * rate
+                last_rate = now
+                frame_count = 0
+                self.vel_filter.set_cutoff_frequency(self.actual_frame_rate, self.vicon_settings.vel_filter_hz)
 
             # get position in mm
             pos_enu = vicon.get_segment_global_translation(name, segname)
@@ -104,7 +118,26 @@ class ViconModule(mp_module.MPModule):
                 continue
 
             # convert to NED meters
-            pos_ned = [pos_enu[1]*0.001, pos_enu[0]*0.001, -pos_enu[2]*0.001]
+            pos_ned = Vector3(pos_enu[1]*0.001, pos_enu[0]*0.001, -pos_enu[2]*0.001)
+
+            if last_frame_num is None or frame_num - last_frame_num > 100:
+                last_frame_num = frame_num
+                last_pos = pos_ned
+                continue
+
+            dt = (frame_num - last_frame_num) * frame_dt
+            vel = (pos_ned - last_pos) * (1.0/dt)
+            last_pos = pos_ned
+            last_frame_num = frame_num
+
+            filtered_vel = self.vel_filter.apply(vel)
+
+            if self.vicon_settings.vision_rate > 0:
+                dt = now - last_msg_time
+                if dt < 1.0 / self.vicon_settings.vision_rate:
+                    continue
+
+            last_msg_time = now
 
             # get orientation in euler, converting to ArduPilot conventions
             quat = vicon.get_segment_global_quaternion(name, segname)
@@ -143,13 +176,11 @@ class ViconModule(mp_module.MPModule):
                     last_gps_pos = pos_ned
                 gps_lat, gps_lon = mavextra.gps_offset(self.vicon_settings.origin_lat,
                                                        self.vicon_settings.origin_lon,
-                                                       pos_ned[1], pos_ned[0])
-                gps_alt = self.vicon_settings.origin_alt - pos_ned[2]
+                                                       pos_ned.y, pos_ned.x)
+                gps_alt = self.vicon_settings.origin_alt - pos_ned.z
 
                 gps_dt = now - last_gps_send
-                gps_vel = [(pos_ned[0]-last_gps_pos[0])/gps_dt,
-                           (pos_ned[1]-last_gps_pos[1])/gps_dt,
-                           (pos_ned[2]-last_gps_pos[2])/gps_dt]
+                gps_vel = filtered_vel
                 last_gps_pos = pos_ned
 
                 gps_week, gps_week_ms = get_gps_time(now)
@@ -161,7 +192,7 @@ class ViconModule(mp_module.MPModule):
                 mav.mav.gps_input_send(time_us, 0, 0, gps_week_ms, gps_week, fix_type,
                                        int(gps_lat*1.0e7), int(gps_lon*1.0e7), gps_alt,
                                        1.0, 1.0,
-                                       gps_vel[0], gps_vel[1], gps_vel[2],
+                                       gps_vel.x, gps_vel.y, gps_vel.z,
                                        0.2, 1.0, 1.0,
                                        self.vicon_settings.gps_nsats,
                                        yaw_cd)
@@ -174,7 +205,7 @@ class ViconModule(mp_module.MPModule):
                 # we force mavlink1 to avoid the covariances which seem to make the packets too large
                 # for the mavesp8266 wifi bridge
                 mav.mav.global_vision_position_estimate_send(time_us,
-                                                             pos_ned[0], pos_ned[1], pos_ned[2],
+                                                             pos_ned.x, pos_ned.y, pos_ned.z,
                                                              roll, pitch, yaw, force_mavlink1=True)
                 self.vision_count += 1
 
@@ -210,9 +241,10 @@ class ViconModule(mp_module.MPModule):
         if not self.pos or not self.att or self.frame_count == self.last_frame_count:
             return
         self.last_frame_count = self.frame_count
-        self.console.set_status('VPos', 'VPos %.2f %.2f %.2f' % (self.pos[0], self.pos[1], self.pos[2]), row=5)
-        self.console.set_status('VAtt', 'VAtt %.2f %.2f %.2f GPS %u VIS %u' % (self.att[0], self.att[1], self.att[2],
-                                                                               self.gps_count, self.vision_count), row=5)
+        self.console.set_status('VPos', 'VPos %.2f %.2f %.2f' % (self.pos.x, self.pos.y, self.pos.z), row=5)
+        self.console.set_status('VAtt', 'VAtt %.2f %.2f %.2f GPS %u VIS %u RATE %.1f' % (self.att[0], self.att[1], self.att[2],
+                                                                                         self.gps_count, self.vision_count,
+                                                                                         self.actual_frame_rate), row=5)
 
 
 def init(mpstate):
