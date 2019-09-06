@@ -1,7 +1,7 @@
 from setuptools import setup
 import os, platform
 
-version = "1.8.11"
+version = "1.8.12"
 
 def package_files(directory):
     paths = []
@@ -59,12 +59,12 @@ on how to use MAVProxy.''',
       author='Andrew Tridgell',
       author_email='andrew@tridgell.net',
       classifiers=[
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'Environment :: Console',
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
         'Operating System :: OS Independent',
-        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python',
         'Topic :: Scientific/Engineering'],
       license='GPLv3',
       packages=['MAVProxy',
