@@ -400,7 +400,7 @@ class MPSlipMapPanel(wx.Panel):
         (lat,lon) = self.coordinates(x, y)
         state.ground_width *= zoom
         # limit ground_width to sane values
-        state.ground_width = max(state.ground_width, 20)
+        state.ground_width = max(state.ground_width, 2)
         state.ground_width = min(state.ground_width, 20000000)
         self.re_center(x,y, lat, lon)
 
