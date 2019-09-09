@@ -52,6 +52,7 @@ class MapModule(mp_module.MPModule):
               ('brightness', float, 1),
               ('rallycircle', bool, False),
               ('loitercircle',bool, False),
+              ('showclicktime',int, 2),
               ('showdirection', bool, False)])
         
         service='MicrosoftHyb'
@@ -474,6 +475,11 @@ class MapModule(mp_module.MPModule):
                 time.time() - self.mpstate.click_time > 0.1):
                 self.mpstate.click(obj.latlon)
 
+    def click_updated(self):
+        '''called when the click position has changed'''
+        if self.map_settings.showclicktime == 0:
+            return
+        self.map.add_object(mp_slipmap.SlipClickLocation(self.mpstate.click_location, timeout=self.map_settings.showclicktime))
 
     def unload(self):
         '''unload module'''
