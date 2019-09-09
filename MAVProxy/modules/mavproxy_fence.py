@@ -131,11 +131,7 @@ class FenceModule(mp_module.MPModule):
             print("Invalid fence point number %u" % idx)
             return
 
-        try:
-            latlon = self.module('map').click_position
-        except Exception:
-            print("No map available")
-            return
+        latlon = self.mpstate.click_location
         if latlon is None:
             print("No map click position available")
             return

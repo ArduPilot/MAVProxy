@@ -279,10 +279,7 @@ class CmdlongModule(mp_module.MPModule):
         '''posvel mapclick vN vE vD'''
         ignoremask = 511
         latlon = None
-        try:
-            latlon = self.module('map').click_position
-        except Exception:
-            pass
+        latlon = self.mpstate.click_location
         if latlon is None:
             print("set latlon to zeros")
             latlon = [0, 0]

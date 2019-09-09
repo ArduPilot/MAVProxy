@@ -59,11 +59,7 @@ class ModeModule(mp_module.MPModule):
             altitude = float(args[2])
             latlon = (latitude, longitude)
         else:
-            try:
-                latlon = self.module('map').click_position
-            except Exception:
-                print("No map available")
-                return
+            latlon = self.mpstate.click_location
             if latlon is None:
                 print("No map click position available")
                 return

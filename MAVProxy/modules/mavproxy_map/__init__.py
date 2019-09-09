@@ -34,8 +34,6 @@ class MapModule(mp_module.MPModule):
         self.moving_rally = None
         self.mission_list = None
         self.icon_counter = 0
-        self.click_position = None
-        self.click_time = 0
         self.draw_line = None
         self.draw_callback = None
         self.have_global_position = False
@@ -126,7 +124,7 @@ class MapModule(mp_module.MPModule):
 
     def show_position(self):
         '''show map position click information'''
-        pos = self.click_position
+        pos = self.mpstate.click_location
         dms = (mp_util.degrees_to_dms(pos[0]), mp_util.degrees_to_dms(pos[1]))
         msg =  "Coordinates in WGS84\n"
         msg += "Decimal: %.6f %.6f\n" % (pos[0], pos[1])
@@ -436,8 +434,7 @@ class MapModule(mp_module.MPModule):
         if not isinstance(obj, mp_slipmap.SlipMouseEvent):
             return
         if obj.event.leftIsDown and self.moving_rally is not None:
-            self.click_position = obj.latlon
-            self.click_time = time.time()
+            self.mpstate.click(obj.latlon)
             self.mpstate.functions.process_stdin("rally move %u" % self.moving_rally)
             self.moving_rally = None
             return
@@ -446,14 +443,12 @@ class MapModule(mp_module.MPModule):
             self.moving_rally = None
             return
         if obj.event.leftIsDown and self.moving_wp is not None:
-            self.click_position = obj.latlon
-            self.click_time = time.time()
+            self.mpstate.click(obj.latlon)
             self.mpstate.functions.process_stdin("wp move %u" % self.moving_wp)
             self.moving_wp = None
             return
         if obj.event.leftIsDown and self.moving_fencepoint is not None:
-            self.click_position = obj.latlon
-            self.click_time = time.time()
+            self.mpstate.click(obj.latlon)
             self.mpstate.functions.process_stdin("fence move %u" % (self.moving_fencepoint+1))
             self.moving_fencepoint = None
             return
@@ -466,21 +461,18 @@ class MapModule(mp_module.MPModule):
             self.moving_fencepoint = None
             return
         elif obj.event.leftIsDown:
-            if time.time() - self.click_time > 0.1:
-                self.click_position = obj.latlon
-                self.click_time = time.time()
+            if (self.mpstate.click_time is None or
+                time.time() - self.mpstate.click_time > 0.1):
+                self.mpstate.click(obj.latlon)
                 self.drawing_update()
-
-            if self.module('misseditor') is not None:
-                self.module('misseditor').update_map_click_position(self.click_position)
 
         if obj.event.rightIsDown:
             if self.draw_callback is not None:
                 self.drawing_end()
                 return
-            if time.time() - self.click_time > 0.1:
-                self.click_position = obj.latlon
-                self.click_time = time.time()
+            if (self.mpstate.click_time is None or
+                time.time() - self.mpstate.click_time > 0.1):
+                self.mpstate.click(obj.latlon)
 
 
     def unload(self):
@@ -515,7 +507,7 @@ class MapModule(mp_module.MPModule):
         from MAVProxy.modules.mavproxy_map import mp_slipmap
         if self.draw_callback is None:
             return
-        self.draw_line.append(self.click_position)
+        self.draw_line.append(self.mpstate.click_location)
         if len(self.draw_line) > 1:
             self.map.add_object(mp_slipmap.SlipPolygon('drawing', self.draw_line,
                                                           layer='Drawing', linewidth=2, colour=(128,128,255)))
@@ -539,7 +531,7 @@ class MapModule(mp_module.MPModule):
 
     def cmd_set_home(self, args):
         '''called when user selects "Set Home (with height)" on map'''
-        (lat, lon) = (self.click_position[0], self.click_position[1])
+        (lat, lon) = (self.mpstate.click_location[0], self.mpstate.click_location[1])
         alt = self.ElevationMap.GetElevation(lat, lon)
         print("Setting home to: ", lat, lon, alt)
         self.master.mav.command_long_send(
@@ -556,7 +548,7 @@ class MapModule(mp_module.MPModule):
 
     def cmd_set_homepos(self, args):
         '''called when user selects "Set Home" on map'''
-        (lat, lon) = (self.click_position[0], self.click_position[1])
+        (lat, lon) = (self.mpstate.click_location[0], self.mpstate.click_location[1])
         print("Setting home to: ", lat, lon)
         self.master.mav.command_int_send(
             self.settings.target_system, self.settings.target_component,
@@ -574,7 +566,7 @@ class MapModule(mp_module.MPModule):
 
     def cmd_set_origin(self, args):
         '''called when user selects "Set Origin (with height)" on map'''
-        (lat, lon) = (self.click_position[0], self.click_position[1])
+        (lat, lon) = (self.mpstate.click_location[0], self.mpstate.click_location[1])
         alt = self.ElevationMap.GetElevation(lat, lon)
         print("Setting origin to: ", lat, lon, alt)
         self.master.mav.set_gps_global_origin_send(
@@ -585,7 +577,7 @@ class MapModule(mp_module.MPModule):
 
     def cmd_set_originpos(self, args):
         '''called when user selects "Set Origin" on map'''
-        (lat, lon) = (self.click_position[0], self.click_position[1])
+        (lat, lon) = (self.mpstate.click_location[0], self.mpstate.click_location[1])
         print("Setting origin to: ", lat, lon)
         self.master.mav.set_gps_global_origin_send(
             self.settings.target_system,
