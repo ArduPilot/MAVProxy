@@ -160,6 +160,8 @@ class MPState(object):
         self.console = textconsole.SimpleConsole()
         self.map = None
         self.map_functions = {}
+        self.click_location = None
+        self.click_time = None
         self.vehicle_type = None
         self.vehicle_name = None
         from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
@@ -284,6 +286,30 @@ class MPState(object):
                 return m
         return self.mav_master[self.settings.link-1]
 
+    def notify_click(self):
+        notify_mods = ['map', 'misseditor']
+        for modname in notify_mods:
+            mod = self.module(modname)
+            if mod is not None:
+                mod.click_updated()
+
+    def click(self, latlng):
+        if latlng is None:
+            self.click_location = None
+            self.click_time = None
+            self.notify_click()
+            return
+
+        (lat, lng) = latlng
+        if lat is None:
+            print("Bad Lat")
+            return
+        if lng is None:
+            print("Bad lng")
+            return
+        self.click_location = (lat, lng)
+        self.click_time = time.time()
+        self.notify_click()
 
 def get_mav_param(param, default=None):
     '''return a EEPROM parameter value'''
@@ -326,6 +352,18 @@ def cmd_setup(args):
 def cmd_reset(args):
     print("Resetting master")
     mpstate.master().reset()
+
+def cmd_click(args):
+    '''synthesise click at lat/lon; no arguments is "unclick"'''
+    if len(args) == 0:
+        mpstate.click(None)
+        return
+    if len(args) < 2:
+        print("click LAT_EXPRESSION LNG_EXPRESSION")
+        return
+    lat = mavutil.evaluate_expression(args[0], mpstate.master().messages)
+    lng = mavutil.evaluate_expression(args[1], mpstate.master().messages)
+    mpstate.click((lat, lng))
 
 def cmd_watch(args):
     '''watch a mavlink packet pattern'''
@@ -530,6 +568,7 @@ command_map = {
     'script'  : (cmd_script,   'run a script of MAVProxy commands'),
     'setup'   : (cmd_setup,    'go into setup mode'),
     'reset'   : (cmd_reset,    'reopen the connection to the MAVLink master'),
+    'click'   : (cmd_click,    'set click location'),
     'status'  : (cmd_status,   'show status'),
     'set'     : (cmd_set,      'mavproxy settings'),
     'watch'   : (cmd_watch,    'watch a MAVLink pattern'),

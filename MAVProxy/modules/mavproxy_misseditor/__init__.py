@@ -30,8 +30,8 @@ class MissionEditorModule(mp_module.MPModule):
     def mavlink_packet(self, m):
         self.me_main.mavlink_packet(m)
 
-    def update_map_click_position(self, new_click_pos):
-        self.me_main.update_map_click_position(new_click_pos)
+    def click_updated(self):
+        self.me_main.update_map_click_position(self.mpstate.click_location)
 
 def init(mpstate):
     '''initialise module'''

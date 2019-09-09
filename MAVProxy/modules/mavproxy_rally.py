@@ -128,11 +128,7 @@ class RallyModule(mp_module.MPModule):
             print("Only 5 rally points possible per flight plan.")
             return
 
-        try:
-            latlon = self.module('map').click_position
-        except Exception:
-            print("No map available")
-            return
+        latlon = self.mpstate.click_location
         if latlon is None:
             print("No map click position available")
             return
@@ -183,11 +179,7 @@ class RallyModule(mp_module.MPModule):
 
         rpoint = self.rallyloader.rally_point(idx-1)
 
-        try:
-            latlon = self.module('map').click_position
-        except Exception:
-            print("No map available")
-            return
+        latlon = self.mpstate.click_location
         if latlon is None:
             print("No map click position available")
             return

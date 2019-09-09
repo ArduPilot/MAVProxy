@@ -384,9 +384,8 @@ class WPModule(mp_module.MPModule):
 
     def nofly_add(self):
         '''add a square flight exclusion zone'''
-        try:
-            latlon = self.module('map').click_position
-        except Exception:
+        latlon = self.mpstate.click_location
+        if latlon is None:
             print("No position chosen")
             return
         loader = self.wploader
@@ -410,10 +409,9 @@ class WPModule(mp_module.MPModule):
         
     def set_home_location(self):
         '''set home location from last map click'''
-        try:
-            latlon = self.module('map').click_position
-        except Exception:
-            print("No map available")
+        latlon = self.mpstate.click_location
+        if latlon is None:
+            print("No position available")
             return
         lat = float(latlon[0])
         lon = float(latlon[1])
@@ -439,11 +437,7 @@ class WPModule(mp_module.MPModule):
         if idx < 1 or idx > self.wploader.count():
             print("Invalid wp number %u" % idx)
             return
-        try:
-            latlon = self.module('map').click_position
-        except Exception:
-            print("No map available")
-            return
+        latlon = self.mpstate.click_location
         if latlon is None:
             print("No map click position available")
             return
@@ -502,11 +496,7 @@ class WPModule(mp_module.MPModule):
             rotation = 0
 
         if latlon is None:
-            try:
-                latlon = self.module('map').click_position
-            except Exception:
-                print("No map available")
-                return
+            latlon = self.mpstate.click_location
         if latlon is None:
             print("No map click position available")
             return
