@@ -172,8 +172,11 @@ class MPTile:
             try:
                 cache_path = os.path.join(os.environ['HOME'], '.tilecache')
             except Exception:
-                import tempfile
-                cache_path = os.path.join(tempfile.gettempdir(), 'MAVtilecache')
+                if 'LOCALAPPDATA' in os.environ:
+                    cache_path = os.path.join(os.environ['LOCALAPPDATA'], '.tilecache')
+                else:
+                    import tempfile
+                    cache_path = os.path.join(tempfile.gettempdir(), '.tilecache')
 
         if not os.path.exists(cache_path):
             mp_util.mkdir_p(cache_path)
