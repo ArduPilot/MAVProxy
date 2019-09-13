@@ -44,7 +44,8 @@ class ViconModule(mp_module.MPModule):
              ('vision_rate', int, 14),
              ('vel_filter_hz', float, 30.0),
              ('gps_rate', int, 5),
-             ('gps_nsats', float, 16)])
+             ('gps_nsats', float, 16),
+             ('yaw_offset', float, 0.0)])
         self.add_command('vicon', self.cmd_vicon, 'VICON control',
                          ["<start>",
                           "<stop>",
@@ -120,7 +121,7 @@ class ViconModule(mp_module.MPModule):
             # convert to NED meters
             pos_ned = Vector3(pos_enu[1]*0.001, pos_enu[0]*0.001, -pos_enu[2]*0.001)
 
-            if last_frame_num is None or frame_num - last_frame_num > 100:
+            if last_frame_num is None or frame_num - last_frame_num > 100 or frame_num <= last_frame_num:
                 last_frame_num = frame_num
                 last_pos = pos_ned
                 continue
@@ -144,7 +145,7 @@ class ViconModule(mp_module.MPModule):
             q = Quaternion([quat[3], quat[0], quat[1], quat[2]])
             euler = q.euler
             roll, pitch, yaw = euler[2], euler[1], euler[0]
-            yaw -= math.pi*0.5
+            yaw += math.radians(self.vicon_settings.yaw_offset)
             yaw = math.radians(mavextra.wrap_360(math.degrees(yaw)))
 
             self.pos = pos_ned
