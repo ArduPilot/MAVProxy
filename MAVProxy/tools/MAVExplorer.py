@@ -198,6 +198,8 @@ def setup_menus():
 def expression_ok(expression, msgs=None):
     '''return True if an expression is OK with current messages'''
     expression_ok = True
+    if expression is None:
+        return False
     fields = expression.split()
     if msgs is None:
         msgs = mestate.status.msgs
