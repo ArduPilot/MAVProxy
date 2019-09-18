@@ -30,6 +30,7 @@ class NtripModule(mp_module.MPModule):
         self.pkt_count = 0
         self.last_pkt = None
         self.ntrip = None
+        self.start_pending = False
 
     def mavlink_packet(self, msg):
         '''handle an incoming mavlink packet'''
@@ -39,6 +40,8 @@ class NtripModule(mp_module.MPModule):
 
     def idle_task(self):
         '''called on idle'''
+        if self.start_pending and self.ntrip is None and self.pos is not None:
+            self.cmd_start()
         if self.ntrip is None:
             return
         data = self.ntrip.read()
@@ -61,6 +64,7 @@ class NtripModule(mp_module.MPModule):
             self.cmd_start()
         if args[0] == "stop":
             self.ntrip = None
+            self.start_pending = False
         elif args[0] == "status":
             self.ntrip_status()
         elif args[0] == "set":
@@ -85,7 +89,8 @@ class NtripModule(mp_module.MPModule):
             print("Require mountpoint")
             return
         if self.pos is None:
-            print("Require position first")
+            print("Start delayed pending position")
+            self.start_pending = True
             return
         user = self.ntrip_settings.username + ":" + self.ntrip_settings.password
         self.ntrip = ntrip.NtripClient(user=user,
@@ -95,6 +100,8 @@ class NtripModule(mp_module.MPModule):
                                        lat=self.pos[0],
                                        lon=self.pos[1],
                                        height=self.pos[2])
+        print("NTRIP started")
+        self.start_pending = False
             
 
 def init(mpstate):
