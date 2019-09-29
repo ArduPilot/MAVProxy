@@ -607,7 +607,10 @@ def process_stdin(line):
             line += '\r'
         for c in line:
             time.sleep(0.01)
-            mpstate.master().write(c)
+            if sys.version_info.major >= 3:
+                mpstate.master().write(bytes(c, "ascii"))
+            else:
+                mpstate.master().write(c)
         return
 
     if not line:
@@ -678,7 +681,10 @@ def process_master(m):
         if mpstate.system == 'Windows':
            # strip nsh ansi codes
            s = s.replace("\033[K","")
-        sys.stdout.write(str(s))
+        if sys.version_info.major >= 3:
+            sys.stdout.write(str(s, "ascii"))
+        else:
+            sys.stdout.write(str(s))
         sys.stdout.flush()
         return
     
