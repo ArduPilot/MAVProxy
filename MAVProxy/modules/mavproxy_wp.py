@@ -83,7 +83,10 @@ class WPModule(mp_module.MPModule):
         tnow = time.time()
         for seq in wps:
             self.wp_requested[seq] = tnow
-            self.master.mav.mission_request_int_send(self.master.target_system, self.master.target_component, seq)
+            if self.settings.wp_use_mission_int:
+                self.master.mav.mission_request_int_send(self.master.target_system, self.master.target_component, seq)
+            else:
+                self.master.mav.mission_request_send(self.master.target_system, self.master.target_component, seq)
 
     def wp_status(self):
         '''show status of wp download'''
@@ -146,7 +149,7 @@ class WPModule(mp_module.MPModule):
                 self.send_wp_requests()
 
         elif mtype in ['WAYPOINT', 'MISSION_ITEM', 'MISSION_ITEM_INT'] and self.wp_op is not None:
-            if isinstance(m,mavutil.mavlink.MAVLink_mission_item_int_message):
+            if m.get_type() == 'MISSION_ITEM_INT':
                 # our internal structure assumes MISSION_ITEM'''
                 m = self.wp_from_mission_item_int(m)
             if m.seq < self.wploader.count():
@@ -224,7 +227,7 @@ class WPModule(mp_module.MPModule):
     def wp_to_mission_item_int(self, wp):
         '''convert a MISSION_ITEM to a MISSION_ITEM_INT. We always send as MISSION_ITEM_INT
            to give cm level accuracy'''
-        if isinstance(wp,mavutil.mavlink.MAVLink_mission_item_int_message):
+        if wp.get_type() == 'MISSION_ITEM_INT':
             return wp
         wp_int = mavutil.mavlink.MAVLink_mission_item_int_message(wp.target_system,
                                                                   wp.target_component,
@@ -279,8 +282,11 @@ class WPModule(mp_module.MPModule):
         wp = self.wploader.wp(m.seq)
         wp.target_system = self.target_system
         wp.target_component = self.target_component
-        wp_int = self.wp_to_mission_item_int(wp)
-        self.master.mav.send(wp_int)
+        if self.settings.wp_use_mission_int:
+            wp_send = self.wp_to_mission_item_int(wp)
+        else:
+            wp_send = wp
+        self.master.mav.send(wp_send)
         self.loading_waypoint_lasttime = time.time()
         self.console.writeln("Sent waypoint %u : %s" % (m.seq, self.wploader.wp(m.seq)))
         if m.seq == self.wploader.count() - 1:
