@@ -82,9 +82,8 @@ class WPModule(mp_module.MPModule):
             wps = self.missing_wps_to_request()
         tnow = time.time()
         for seq in wps:
-            #print("REQUESTING %u/%u (%u)" % (seq, self.wploader.expected_count, i))
             self.wp_requested[seq] = tnow
-            self.master.waypoint_request_send(seq)
+            self.master.mav.mission_request_int_send(self.master.target_system, self.master.target_component, seq)
 
     def wp_status(self):
         '''show status of wp download'''
@@ -146,7 +145,10 @@ class WPModule(mp_module.MPModule):
                                                                                  time.asctime()))
                 self.send_wp_requests()
 
-        elif mtype in ['WAYPOINT', 'MISSION_ITEM'] and self.wp_op is not None:
+        elif mtype in ['WAYPOINT', 'MISSION_ITEM', 'MISSION_ITEM_INT'] and self.wp_op is not None:
+            if isinstance(m,mavutil.mavlink.MAVLink_mission_item_int_message):
+                # our internal structure assumes MISSION_ITEM'''
+                m = self.wp_from_mission_item_int(m)
             if m.seq < self.wploader.count():
                 #print("DUPLICATE %u" % m.seq)
                 return
@@ -239,7 +241,25 @@ class WPModule(mp_module.MPModule):
                                                                   int(wp.y*1.0e7),
                                                                   wp.z)
         return wp_int
-        
+
+    def wp_from_mission_item_int(self, wp):
+        '''convert a MISSION_ITEM_INT to a MISSION_ITEM'''
+        wp_int = mavutil.mavlink.MAVLink_mission_item_message(wp.target_system,
+                                                              wp.target_component,
+                                                              wp.seq,
+                                                              wp.frame,
+                                                              wp.command,
+                                                              wp.current,
+                                                              wp.autocontinue,
+                                                              wp.param1,
+                                                              wp.param2,
+                                                              wp.param3,
+                                                              wp.param4,
+                                                              wp.x*1.0e-7,
+                                                              wp.y*1.0e-7,
+                                                              wp.z)
+        return wp_int
+    
 
 
     def process_waypoint_request(self, m, master):
