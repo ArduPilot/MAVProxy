@@ -493,7 +493,9 @@ class WPModule(mp_module.MPModule):
         self.undo_type = "move"
 
         (lat, lon) = latlon
-        if getattr(self.console, 'ElevationMap', None) is not None and wp.frame == mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT:
+        if (getattr(self.console, 'ElevationMap', None) is not None and
+            wp.frame == mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT and
+            self.settings.wpterrainadjust):
             alt1 = self.console.ElevationMap.GetElevation(lat, lon)
             alt2 = self.console.ElevationMap.GetElevation(wp.x, wp.y)
             if alt1 is not None and alt2 is not None:
@@ -564,7 +566,9 @@ class WPModule(mp_module.MPModule):
                 b2 = mp_util.gps_bearing(lat, lon, newlat, newlon)
                 (newlat, newlon) = mp_util.gps_newpos(lat, lon, b2+rotation, d2)
 
-            if getattr(self.console, 'ElevationMap', None) is not None and wp.frame != mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT:
+            if (getattr(self.console, 'ElevationMap', None) is not None and
+                wp.frame != mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT and
+                self.settings.wpterrainadjust):
                 alt1 = self.console.ElevationMap.GetElevation(newlat, newlon)
                 alt2 = self.console.ElevationMap.GetElevation(wp.x, wp.y)
                 if alt1 is not None and alt2 is not None:

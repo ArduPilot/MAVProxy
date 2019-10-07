@@ -187,6 +187,7 @@ class MPState(object):
               MPSetting('flushlogs', bool, False, 'Flush logs on every packet'),
               MPSetting('requireexit', bool, False, 'Require exit command'),
               MPSetting('wpupdates', bool, True, 'Announce waypoint updates'),
+              MPSetting('wpterrainadjust', bool, True, 'Adjust alt of moved wp using terrain'),
 
               MPSetting('basealt', int, 0, 'Base Altitude', range=(0,30000), increment=1, tab='Altitude'),
               MPSetting('wpalt', int, 100, 'Default WP Altitude', range=(0,10000), increment=1),
