@@ -150,6 +150,9 @@ class WPModule(mp_module.MPModule):
 
         elif mtype in ['WAYPOINT', 'MISSION_ITEM', 'MISSION_ITEM_INT'] and self.wp_op is not None:
             if m.get_type() == 'MISSION_ITEM_INT':
+                if getattr(m, 'mission_type', 0) != 0:
+                    # this is not a mission item, likely fence
+                    return
                 # our internal structure assumes MISSION_ITEM'''
                 m = self.wp_from_mission_item_int(m)
             if m.seq < self.wploader.count():
