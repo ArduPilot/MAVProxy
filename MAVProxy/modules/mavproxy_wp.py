@@ -247,23 +247,24 @@ class WPModule(mp_module.MPModule):
 
     def wp_from_mission_item_int(self, wp):
         '''convert a MISSION_ITEM_INT to a MISSION_ITEM'''
-        wp_int = mavutil.mavlink.MAVLink_mission_item_message(wp.target_system,
-                                                              wp.target_component,
-                                                              wp.seq,
-                                                              wp.frame,
-                                                              wp.command,
-                                                              wp.current,
-                                                              wp.autocontinue,
-                                                              wp.param1,
-                                                              wp.param2,
-                                                              wp.param3,
-                                                              wp.param4,
-                                                              wp.x*1.0e-7,
-                                                              wp.y*1.0e-7,
-                                                              wp.z)
-        return wp_int
-    
-
+        wp2 = mavutil.mavlink.MAVLink_mission_item_message(wp.target_system,
+                                                           wp.target_component,
+                                                           wp.seq,
+                                                           wp.frame,
+                                                           wp.command,
+                                                           wp.current,
+                                                           wp.autocontinue,
+                                                           wp.param1,
+                                                           wp.param2,
+                                                           wp.param3,
+                                                           wp.param4,
+                                                           wp.x*1.0e-7,
+                                                           wp.y*1.0e-7,
+                                                           wp.z)
+        # preserve srcSystem as that is used for naming waypoint file
+        wp2._header.srcSystem = wp.get_srcSystem()
+        wp2._header.srcComponent = wp.get_srcComponent()
+        return wp2
 
     def process_waypoint_request(self, m, master):
         '''process a waypoint request from the master'''
