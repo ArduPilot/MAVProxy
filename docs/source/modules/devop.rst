@@ -25,7 +25,7 @@ To read from the I2C bus
 
 .. code:: bash
 
-    devop write i2c name bus address regstart count
+    devop read i2c name bus address regstart count
     
 Where name= device name, bus=i2c bus #, address=device address, regstart=register to 
 start at, count=number of bytes to write.
@@ -46,7 +46,7 @@ To read from the SPI bus
 
 .. code:: bash
 
-    devop write spi name bus address regstart count
+    devop read spi name bus address regstart count
     
 Where name= device name, bus=spi bus #, address=device address, regstart=register to 
 start at, count=number of bytes to write.
