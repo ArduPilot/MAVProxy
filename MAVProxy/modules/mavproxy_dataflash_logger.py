@@ -50,9 +50,11 @@ class dataflash_logger(mp_module.MPModule):
         self.missing_found = 0
         self.abandoned = 0
         self.dropped = 0
+        self.armed = False
 
         self.log_settings = mp_settings.MPSettings(
             [('verbose', bool, False),
+             ('rotate_on_disarm', bool, False),
              ('df_target_system', int, 0),
              ('df_target_component', int, mavutil.mavlink.MAV_COMP_ID_LOG)]
         )
@@ -216,6 +218,12 @@ class dataflash_logger(mp_module.MPModule):
 
     def idle_task_started(self):
         '''called in idle task only when logging is started'''
+        isarmed = self.master.motors_armed()
+        if self.armed != isarmed:
+            self.armed = isarmed
+            if not self.armed and self.log_settings.rotate_on_disarm:
+                self.rotate_log()
+
         if self.log_settings.verbose:
             self.idle_print_status()
         self.idle_send_acks_and_nacks()
