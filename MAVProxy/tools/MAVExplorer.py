@@ -219,7 +219,8 @@ def load_graph_xml(xml, filename, load_all=False):
     ret = []
     try:
         root = objectify.fromstring(xml)
-    except Exception:
+    except Exception as ex:
+        print(filename, ex)
         return []
     if root.tag != 'graphs':
         return []
@@ -384,10 +385,20 @@ def save_graph(graphdef):
     if graphdef.filename is None:
         print("No file to save graph to")
         return
+    contents = None
     try:
-        graphs = load_graph_xml(open(graphdef.filename).read(), graphdef.filename, load_all=True)
-    except Exception:
+        contents = open(graphdef.filename).read()
+        graphs = load_graph_xml(contents, graphdef.filename, load_all=True)
+    except Exception as ex:
         graphs = []
+    if contents is not None and len(graphs) == 0:
+        print("Unable to parse %s" % graphdef.filename)
+        return
+    if contents is not None:
+        try:
+            open(graphdef.filename + ".bak",'w').write(contents)
+        except Exception:
+            pass
     found_name = False
     for i in range(len(graphs)):
         if graphs[i].name == graphdef.name:
