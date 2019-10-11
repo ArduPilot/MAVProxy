@@ -222,7 +222,7 @@ class dataflash_logger(mp_module.MPModule):
             self.armed = isarmed
             dsrmrot = self.get_mav_param('LOG_FILE_DSRMROT', 0)
             if not self.armed and dsrmrot == 1:
-                self.rotate_log()          
+                self.rotate_log()
                 
         if self.log_settings.verbose:
             self.idle_print_status()
