@@ -297,7 +297,10 @@ def flightmode_colours():
 
 def cmd_graph(args):
     '''graph command'''
-    usage = "usage: graph <FIELD...>"
+    usage = "usage: graph <FIELD...>\nor: graph delay <TYPE> <SECONDS> <FIELD...>"
+    
+    delay_message = ''
+    delay_seconds = 0.0
     if len(args) < 1:
         print(usage)
         return
@@ -311,11 +314,20 @@ def cmd_graph(args):
             mestate.console.write("%s\n" % g.description, fg='blue')
         mestate.rl.add_history("graph %s" % ' '.join(expression.split()))
         mestate.last_graph = g
+    elif (args[0] == 'delay'):
+        if len(args)>3:
+                delay_message = args[1]
+                delay_seconds = float(args[2])
+                expression = ' '.join(args[3:])
+                mestate.last_graph = GraphDefinition(mestate.settings.title, expression, '', [expression], None)
+        else:
+                print('usage: graph delay <TYPE> <SECONDS> <FIELD...>')
+                return
     else:
         expression = ' '.join(args)
         mestate.last_graph = GraphDefinition(mestate.settings.title, expression, '', [expression], None)
     grui.append(Graph_UI(mestate))
-    grui[-1].display_graph(mestate.last_graph, flightmode_colours())
+    grui[-1].display_graph(mestate.last_graph, flightmode_colours(),delay_message_input=delay_message, delay_seconds_input=delay_seconds)
     global last_xlim
     if last_xlim is not None and mestate.settings.sync_xzoom:
         #print("initial: ", last_xlim)

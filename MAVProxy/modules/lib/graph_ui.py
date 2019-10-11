@@ -13,7 +13,7 @@ class Graph_UI(object):
         graph_count += 1
         self.xlim_pipe = multiproc.Pipe()
 
-    def display_graph(self, graphdef, flightmode_colourmap=None):
+    def display_graph(self, graphdef, flightmode_colourmap=None, delay_message_input='', delay_seconds_input=0.0):
         '''display a graph'''
         if 'mestate' in globals():
             self.mestate.console.write("Expression: %s\n" % ' '.join(graphdef.expression.split()))
@@ -22,7 +22,7 @@ class Graph_UI(object):
         #mestate.mlog.reduce_by_flightmodes(mestate.flightmode_selections)
 
         #setup the graph, then pass to a new process and display
-        self.mg = grapher.MavGraph(flightmode_colourmap)
+        self.mg = grapher.MavGraph(flightmode_colourmap, delay_message=delay_message_input, delay_seconds=delay_seconds_input)
         if self.mestate.settings.title is not None:
             self.mg.set_title(self.mestate.settings.title)
         else:
