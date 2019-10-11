@@ -50,6 +50,7 @@ class dataflash_logger(mp_module.MPModule):
         self.missing_found = 0
         self.abandoned = 0
         self.dropped = 0
+        self.armed = False
 
         self.log_settings = mp_settings.MPSettings(
             [('verbose', bool, False),
@@ -216,12 +217,12 @@ class dataflash_logger(mp_module.MPModule):
 
     def idle_task_started(self):
         '''called in idle task only when logging is started'''
-        armed = self.master.motors_armed()
-        if armed != self.status.armed:
-            self.status.armed = armed
-            dsrmrot = self.get_mav_param('LOG_DSRMROT', 0)
-            if not armed and dsrmrot == 1:
-                self.rotate_log()                
+        isarmed = self.master.motors_armed()
+        if self.armed != isarmed:
+            self.armed = isarmed
+            dsrmrot = self.get_mav_param('LOG_FILE_DSRMROT', 0)
+            if not self.armed and dsrmrot == 1:
+                self.rotate_log()          
                 
         if self.log_settings.verbose:
             self.idle_print_status()
