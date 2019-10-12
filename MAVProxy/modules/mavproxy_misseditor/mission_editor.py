@@ -116,7 +116,10 @@ class MissionEditorEventThread(threading.Thread):
                         event.get_arg("alt"))
 
                     self.module('wp').wploader.add(w)
-                    self.master().mav.send(self.module('wp').wploader.wp(w.seq))
+                    wsend = self.module('wp').wploader.wp(w.seq)
+                    if self.mp_misseditor.mpstate.settings.wp_use_mission_int:
+                        wsend = self.module('wp').wp_to_mission_item_int(w)
+                    self.master().mav.send(wsend)
 
                     #tell the wp module to expect some waypoints
                     self.module('wp').loading_waypoints = True
@@ -223,7 +226,10 @@ class MissionEditorMain(object):
         if (getattr(m, 'mission_type', None) is not None and
             m.mission_type != mavutil.mavlink.MAV_MISSION_TYPE_MISSION):
             return
-        if m.get_type() in ['WAYPOINT_COUNT','MISSION_COUNT', 'WAYPOINT', 'MISSION_ITEM']:
+        mtype = m.get_type()
+        if mtype in ['WAYPOINT_COUNT','MISSION_COUNT', 'WAYPOINT', 'MISSION_ITEM', 'MISSION_ITEM_INT']:
+            if mtype == 'MISSION_ITEM_INT':
+                m = self.mpstate.module('wp').wp_from_mission_item_int(m)
             self.mavlink_message_queue.put(m)
 
     def process_mavlink_packet(self, m):
