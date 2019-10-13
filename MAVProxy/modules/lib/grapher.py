@@ -42,7 +42,7 @@ edge_colour = (0.1, 0.1, 0.1)
 graph_num = 1
 
 class MavGraph(object):
-    def __init__(self, flightmode_colourmap=None, delay_message='', delay_seconds=0.0):
+    def __init__(self, flightmode_colourmap=None, delay_dictionary={}):
         self.lowest_x = None
         self.highest_x = None
         self.mav_list = []
@@ -78,8 +78,7 @@ class MavGraph(object):
         self.tday_basetime = None
         self.title = None
         
-        self.delay_message = delay_message
-        self.delay_seconds = delay_seconds
+        self.delay_dictionary = delay_dictionary
         
 
     def add_field(self, field):
@@ -423,8 +422,8 @@ class MavGraph(object):
                 if not mavutil.evaluate_condition(self.condition, mlog.messages):
                     continue
             
-            if (msg.get_type()==self.delay_message):
-                self.timeshift = self.delay_seconds
+            if (msg.get_type() in self.delay_dictionary):
+                self.timeshift = self.delay_dictionary[msg.get_type()]
             else:
                 self.timeshift = 0.0
             
