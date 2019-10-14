@@ -54,6 +54,7 @@ class dataflash_logger(mp_module.MPModule):
 
         self.log_settings = mp_settings.MPSettings(
             [('verbose', bool, False),
+             ('rotate_on_disarm', bool, False),
              ('df_target_system', int, 0),
              ('df_target_component', int, mavutil.mavlink.MAV_COMP_ID_LOG)]
         )
@@ -220,8 +221,7 @@ class dataflash_logger(mp_module.MPModule):
         isarmed = self.master.motors_armed()
         if self.armed != isarmed:
             self.armed = isarmed
-            dsrmrot = self.get_mav_param('LOG_FILE_DSRMROT', 0)
-            if not self.armed and dsrmrot == 1:
+            if not self.armed and self.log_settings.rotate_on_disarm:
                 self.rotate_log()
                 
         if self.log_settings.verbose:
