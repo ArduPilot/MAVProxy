@@ -684,7 +684,7 @@ def process_master(m):
            # strip nsh ansi codes
            s = s.replace("\033[K","")
         if sys.version_info.major >= 3:
-            sys.stdout.write(str(s, "ascii"))
+            sys.stdout.write(str(s, "ascii", "ignore"))
         else:
             sys.stdout.write(str(s))
         sys.stdout.flush()
