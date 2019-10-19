@@ -39,6 +39,8 @@ class NtripClient(object):
                  ssl=False,
                  V2=False,
                  ):
+        if sys.version_info.major >= 3:
+            user = bytearray(user, 'ascii')
         self.user = base64.b64encode(user)
         self.port = port
         self.caster = caster
