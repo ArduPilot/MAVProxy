@@ -79,8 +79,11 @@ class NtripClient(object):
         self.latMin = (lat-self.latDeg)*60
 
     def getMountPointString(self):
+        userstr = self.user
+        if sys.version_info.major >= 3:
+            userstr = str(userstr, 'ascii')
         mountPointString = "GET %s HTTP/1.1\r\nUser-Agent: %s\r\nAuthorization: Basic %s\r\n" % (
-            self.mountpoint, useragent, self.user)
+            self.mountpoint, useragent, userstr)
         if self.host or self.V2:
             hostString = "Host: %s:%i\r\n" % (self.caster, self.port)
             mountPointString += hostString
@@ -113,8 +116,11 @@ class NtripClient(object):
             if not self.sent_header:
                 self.sent_header = True
                 time.sleep(0.1)
+                mps = self.getMountPointString()
+                if sys.version_info.major >= 3:
+                    mps = bytearray(mps, 'ascii')
                 try:
-                    self.socket.sendall(self.getMountPointString())
+                    self.socket.sendall(mps)
                 except Exception:
                     self.socket = None
                     return None
@@ -124,6 +130,8 @@ class NtripClient(object):
                 if e.errno == errno.EWOULDBLOCK:
                     return None
                 self.socket = None
+            if sys.version_info.major >= 3:
+                casterResponse = str(casterResponse, 'ascii')
             header_lines = casterResponse.split("\r\n")
             for line in header_lines:
                 if line == "":
@@ -137,7 +145,10 @@ class NtripClient(object):
                 elif line.find(" 200 OK") != -1:
                     # Request was valid
                     try:
-                        self.socket.sendall(self.getGGAString())
+                        gga = self.getGGAString()
+                        if sys.version_info.major >= 3:
+                            gga = bytearray(gga, 'ascii')
+                        self.socket.sendall(gga)
                     except Exception:
                         self.socket = None
                         return None
@@ -148,6 +159,10 @@ class NtripClient(object):
         except IOError as e:
             if e.errno == errno.EWOULDBLOCK:
                 return None
+            self.socket.close()
+            self.socket = None
+            return None
+        except Exception:
             self.socket.close()
             self.socket = None
             return None
