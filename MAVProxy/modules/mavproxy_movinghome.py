@@ -18,7 +18,7 @@ import math
 import serial
 try:
     import pynmea2
-except ImportError, e:
+except ImportError as e:
     print("\n!!! missing package !!! do: 'sudo apt install python-nmea2' -movinghome will not work without it")
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
@@ -46,7 +46,8 @@ class movinghome(mp_module.MPModule):
         self.last_check = time.time()
         self.fresh = True #fresh start/first movement
         self.dist = 0
-        
+        self.last_decode_error_print = 0
+
         print("\nDefault NMEA source is: %s at %s baud, change if needed before turning on." % (self.device , self.baud))
         self.add_command('movinghome', self.cmd_movinghome, "movinghome module")
 
@@ -110,9 +111,18 @@ class movinghome(mp_module.MPModule):
         #Called frequently by mavproxy
         if self.updating == True:
             data = self.ser.readline()
+            try:
+                data = data.decode("ascii")
+            except UnicodeDecodeError as e:
+                # this is probably a baudrate issue
+                now = time.time()
+                if now - self.last_decode_error_print > 10:
+                    print("movinghome: decode error; baudrate issue?")
+                    self.last_decode_error_print = now
+                return
             if (data.startswith("$GPGGA")):
                 msg = pynmea2.parse(data)
-                if msg.num_sats > 5:
+                if int(msg.num_sats) > 5:
                     #convert LAT
                     DD = int(float(msg.lat)/100)
                     MM = float(msg.lat) - DD * 100
@@ -139,7 +149,8 @@ class movinghome(mp_module.MPModule):
                             message = "GCS moved "
                             message2 = message + "%.0f" % self.dist + "meters"
                             self.say("%s: %s" % (self.name,message2))
-                        self.master.mav.statustext_send(mavutil.mavlink.MAV_SEVERITY_NOTICE, message2)
+                            message2_enc = message2.encode(bytes)
+                            self.master.mav.statustext_send(mavutil.mavlink.MAV_SEVERITY_NOTICE, message2)
                         self.console.writeln("home position updated")
 
                         self.master.mav.command_int_send(
@@ -152,8 +163,8 @@ class movinghome(mp_module.MPModule):
                         0, # param2
                         0, # param3
                         0, # param4
-                        self.lat*1e7, # param5
-                        self.lon*1e7, # param6
+                        int(self.lat*1e7), # param5
+                        int(self.lon*1e7), # param6
                         0) # param7
 
                         self.lath = self.lat
