@@ -16,6 +16,7 @@ import shlex
 import math
 import platform
 import json
+import struct
 
 from imp import reload
 
@@ -727,7 +728,11 @@ def process_mavlink(slave):
         return
     if mpstate.settings.mavfwd and not mpstate.status.setup_mode:
         for m in msgs:
-            mpstate.master().write(m.get_msgbuf())
+            mbuf = m.get_msgbuf()
+            mpstate.master().write(mbuf)
+            if mpstate.logqueue:
+                usec = int(time.time() * 1.0e6)
+                mpstate.logqueue.put(bytearray(struct.pack('>Q', usec) + m.get_msgbuf()))
             if mpstate.status.watch:
                 for msg_type in mpstate.status.watch:
                     if fnmatch.fnmatch(m.get_type().upper(), msg_type.upper()):
