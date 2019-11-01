@@ -66,13 +66,15 @@ class ModeModule(mp_module.MPModule):
             altitude = float(args[0])
 
         print("Guided %s %s" % (str(latlon), str(altitude)))
-        self.master.mav.mission_item_send (self.settings.target_system,
+        self.master.mav.mission_item_int_send (self.settings.target_system,
                                            self.settings.target_component,
                                            0,
                                            self.module('wp').get_default_frame(),
                                            mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
                                            2, 0, 0, 0, 0, 0,
-                                           latlon[0], latlon[1], altitude)
+                                           int(latlon[0]*1.0e7),
+                                           int(latlon[1]*1.0e7),
+                                           altitude)
 
 def init(mpstate):
     '''initialise module'''
