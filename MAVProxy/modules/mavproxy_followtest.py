@@ -114,14 +114,14 @@ class FollowTestModule(mp_module.MPModule):
 
         if self.follow_settings.type == 'guided':
             # send normal guided mode packet
-            self.master.mav.mission_item_send(self.settings.target_system,
-                                              self.settings.target_component,
-                                              0,
-                                              self.module('wp').get_default_frame(),
-                                              mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
-                                              2, 0, 0, 0, 0, 0,
-                                              self.target_pos[0], self.target_pos[1],
-                                              self.follow_settings.altitude)
+            self.master.mav.mission_item_int_send(self.settings.target_system,
+                                                  self.settings.target_component,
+                                                  0,
+                                                  self.module('wp').get_default_frame(),
+                                                  mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
+                                                  2, 0, 0, 0, 0, 0,
+                                                  int(self.target_pos[0]*1.0e7), int(self.target_pos[1]*1.0e7),
+                                                  self.follow_settings.altitude)
 
         elif self.follow_settings.type == 'yaw':
             # display yaw from vehicle to target
