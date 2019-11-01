@@ -32,6 +32,7 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('SysID', '', row=0, fg='blue')
         mpstate.console.set_status('ARM', 'ARM', fg='grey', row=0)
         mpstate.console.set_status('GPS', 'GPS: --', fg='red', row=0)
+        mpstate.console.set_status('GPS2', '', fg='red', row=0)
         mpstate.console.set_status('Vcc', 'Vcc: --', fg='red', row=0)
         mpstate.console.set_status('Radio', 'Radio: --', row=0)
         mpstate.console.set_status('INS', 'INS', fg='grey', row=0)
@@ -234,30 +235,22 @@ class ConsoleModule(mp_module.MPModule):
 
         master = self.master
         # add some status fields
-        if type in [ 'GPS_RAW', 'GPS_RAW_INT' ]:
-            if type == "GPS_RAW":
-                num_sats1 = master.field('GPS_STATUS', 'satellites_visible', 0)
+        if type in [ 'GPS_RAW_INT', 'GPS2_RAW' ]:
+            if type == 'GPS_RAW_INT':
+                field = 'GPS'
+                prefix = 'GPS:'
             else:
-                num_sats1 = msg.satellites_visible
-            num_sats2 = master.field('GPS2_RAW', 'satellites_visible', -1)
-            if num_sats2 == -1:
-                sats_string = "%u" % num_sats1
+                field = 'GPS2'
+                prefix = 'GPS2'
+            nsats = msg.satellites_visible
+            fix_type = "%u" % msg.fix_type
+            if msg.fix_type >= 3:
+                self.console.set_status(field, '%s OK%s (%u)' % (prefix, msg.fix_type, msg.satellites_visible), fg='green')
             else:
-                sats_string = "%u/%u" % (num_sats1, num_sats2)
-            if ((msg.fix_type >= 3 and master.mavlink10()) or
-                (msg.fix_type == 2 and not master.mavlink10())):
-                if (msg.fix_type >= 4):
-                    fix_type = "%u" % msg.fix_type
-                else:
-                    fix_type = ""
-                self.console.set_status('GPS', 'GPS: OK%s (%s)' % (fix_type, sats_string), fg='green')
-            else:
-                self.console.set_status('GPS', 'GPS: %u (%s)' % (msg.fix_type, sats_string), fg='red')
-            if master.mavlink10():
-                gps_heading = int(self.mpstate.status.msgs['GPS_RAW_INT'].cog * 0.01)
-            else:
-                gps_heading = self.mpstate.status.msgs['GPS_RAW'].hdg
-            self.console.set_status('Heading', 'Hdg %s/%u' % (master.field('VFR_HUD', 'heading', '-'), gps_heading))
+                self.console.set_status(field, '%s %u (%u)' % (prefix, msg.fix_type, msg.satellites_visible), fg='red')
+            gps_heading = int(self.mpstate.status.msgs['GPS_RAW_INT'].cog * 0.01)
+            if type == 'GPS_RAW_INT':
+                self.console.set_status('Heading', 'Hdg %s/%u' % (master.field('VFR_HUD', 'heading', '-'), gps_heading))
         elif type == 'VFR_HUD':
             if master.mavlink10():
                 alt = master.field('GPS_RAW_INT', 'alt', 0) / 1.0e3
