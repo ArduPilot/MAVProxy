@@ -80,7 +80,7 @@ class FTPModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(FTPModule, self).__init__(mpstate, "ftp")
         self.add_command('ftp', self.cmd_ftp, "file transfer",
-                         ["<list|get|put|rm>"])
+                         ["<list|get|put|rm|rmdir|rename|mkdir|crc>"])
         self.seq = 0
         self.session = 0
         self.network = 0
@@ -88,7 +88,7 @@ class FTPModule(mp_module.MPModule):
 
     def cmd_ftp(self, args):
         '''FTP operations'''
-        usage = "Usage: ftp <list|get|put|rm>"
+        usage = "Usage: ftp <list|get|put|rm|rmdir|rename|mkdir|crc>"
         if len(args) < 1:
             print(usage)
             return
@@ -98,6 +98,16 @@ class FTPModule(mp_module.MPModule):
             self.cmd_get(args[1:])
         elif args[0] == 'put':
             self.cmd_put(args[1:])
+        elif args[0] == 'rm':
+            self.cmd_rm(args[1:])
+        elif args[0] == 'rmdir':
+            self.cmd_rmdir(args[1:])
+        elif args[0] == 'rename':
+            self.cmd_rename(args[1:])
+        elif args[0] == 'mkdir':
+            self.cmd_mkdir(args[1:])
+        elif args[0] == 'crc':
+            self.cmd_crc(args[1:])
         else:
             print(usage)
 
@@ -287,6 +297,87 @@ class FTPModule(mp_module.MPModule):
             print(str(op), op.payload)
             self.terminate_session()
 
+    def cmd_rm(self, args):
+        '''remove file'''
+        if len(args) == 0:
+            print("Usage: rm FILENAME")
+            return
+        fname = args[0]
+        print("Removing %s" % fname)
+        enc_fname = bytearray(fname, 'ascii')
+        op = FTP_OP(self.seq, self.session, OP_RemoveFile, len(enc_fname), 0, 0, 0, enc_fname)
+        self.send(op)
+
+    def cmd_rmdir(self, args):
+        '''remove directory'''
+        if len(args) == 0:
+            print("Usage: rmdir FILENAME")
+            return
+        dname = args[0]
+        print("Removing %s" % dname)
+        enc_dname = bytearray(dname, 'ascii')
+        op = FTP_OP(self.seq, self.session, OP_RemoveDirectory, len(enc_dname), 0, 0, 0, enc_dname)
+        self.send(op)
+
+    def handle_remove_reply(self, op, m):
+        '''handle remove reply'''
+        if op.opcode != OP_Ack:
+            print("Remove failed %s" % op)
+
+    def cmd_rename(self, args):
+        '''rename file'''
+        if len(args) < 2:
+            print("Usage: rename OLDNAME NEWNAME")
+            return
+        name1 = args[0]
+        name2 = args[1]
+        print("Renaming %s to %s" % (name1, name2))
+        enc_name1 = bytearray(name1, 'ascii')
+        enc_name2 = bytearray(name2, 'ascii')
+        enc_both = enc_name1 + b'\x00' + enc_name2
+        op = FTP_OP(self.seq, self.session, OP_Rename, len(enc_both), 0, 0, 0, enc_both)
+        self.send(op)
+
+    def handle_rename_reply(self, op, m):
+        '''handle rename reply'''
+        if op.opcode != OP_Ack:
+            print("Rename failed %s" % op)
+
+    def cmd_mkdir(self, args):
+        '''make directory'''
+        if len(args) < 1:
+            print("Usage: mkdir NAME")
+            return
+        name = args[0]
+        print("Creating directory %s" % name)
+        enc_name = bytearray(name, 'ascii')
+        op = FTP_OP(self.seq, self.session, OP_CreateDirectory, len(enc_name), 0, 0, 0, enc_name)
+        self.send(op)
+
+    def handle_mkdir_reply(self, op, m):
+        '''handle mkdir reply'''
+        if op.opcode != OP_Ack:
+            print("Create directory failed %s" % op)
+
+    def cmd_crc(self, args):
+        '''get crc'''
+        if len(args) < 1:
+            print("Usage: crc NAME")
+            return
+        name = args[0]
+        print("Getting CRC for %s" % name)
+        enc_name = bytearray(name, 'ascii')
+        op = FTP_OP(self.seq, self.session, OP_CalcFileCRC32, len(enc_name), 0, 0, 0, bytearray(enc_name))
+        self.send(op)
+
+    def handle_crc_reply(self, op, m):
+        '''handle crc reply'''
+        if op.opcode == OP_Ack and op.size == 4:
+            crc = struct.unpack("<I", op.payload)
+            print("crc: 0x%08x" % crc)
+        else:
+            print("crc failed %s" % op)
+            
     def op_parse(self, m):
         '''parse a FILE_TRANSFER_PROTOCOL msg'''
         hdr = bytearray(m.payload[0:12])
@@ -311,6 +402,14 @@ class FTPModule(mp_module.MPModule):
                 self.handle_create_file_reply(op, m)
             elif op.req_opcode == OP_WriteFile:
                 self.handle_write_reply(op, m)
+            elif op.req_opcode in [OP_RemoveFile, OP_RemoveDirectory]:
+                self.handle_remove_reply(op, m)
+            elif op.req_opcode == OP_Rename:
+                self.handle_rename_reply(op, m)
+            elif op.req_opcode == OP_CreateDirectory:
+                self.handle_mkdir_reply(op, m)
+            elif op.req_opcode == OP_CalcFileCRC32:
+                self.handle_crc_reply(op, m)
             else:
                 print('FTP Unknown %s' % str(op))
 
