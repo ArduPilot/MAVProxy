@@ -53,10 +53,6 @@ class FTP_OP:
         self.burst_complete = burst_complete
         self.offset = offset
         self.payload = payload
-        self.cwd = None
-        self.fh = None
-        self.filename = None
-        self.total_size = 0
 
     def pack(self):
         '''pack message'''
@@ -80,11 +76,17 @@ class FTPModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(FTPModule, self).__init__(mpstate, "ftp")
         self.add_command('ftp', self.cmd_ftp, "file transfer",
-                         ["<list|get|put|rm|rmdir|rename|mkdir|crc>"])
+                         ["<list|get|put|rm|rmdir|rename|mkdir|crc|status>"])
         self.seq = 0
         self.session = 0
         self.network = 0
         self.last_op = None
+        self.fh = None
+        self.filename = None
+        self.total_size = 0
+        self.read_gaps = set()
+        self.last_read = None
+        self.last_burst_read = None
 
     def cmd_ftp(self, args):
         '''FTP operations'''
@@ -108,6 +110,8 @@ class FTPModule(mp_module.MPModule):
             self.cmd_mkdir(args[1:])
         elif args[0] == 'crc':
             self.cmd_crc(args[1:])
+        elif args[0] == 'status':
+            self.cmd_status()
         else:
             print(usage)
 
@@ -126,6 +130,9 @@ class FTPModule(mp_module.MPModule):
         self.send(FTP_OP(self.seq, self.session, OP_TerminateSession, 0, 0, 0, 0, bytearray([])))
         self.fh = None
         self.filename = None
+        self.read_gaps = set()
+        self.last_read = None
+        self.last_burst_read = None
 
     def cmd_list(self, args):
         '''list files'''
@@ -194,6 +201,7 @@ class FTPModule(mp_module.MPModule):
                 self.terminate_session()
                 return
             read = FTP_OP(self.seq, self.session, OP_BurstReadFile, op.size, 0, 0, 0, op.payload)
+            self.last_burst_read = time.time()
             self.send(read)
         else:
             print("Open failed")
@@ -201,26 +209,71 @@ class FTPModule(mp_module.MPModule):
 
     def handle_burst_read(self, op, m):
         '''handle OP_BurstReadFile reply'''
+        #import random
+        #if random.uniform(0,100) > 70:
+        #    print("dropping %s" % op)
+        #    return
         if self.fh is None or self.filename is None:
             print("FTP Unexpected burst read reply")
             print(op)
             return
         if op.opcode == OP_Ack and self.fh is not None:
-            self.fh.write(op.payload)
+            ofs = self.fh.tell()
+            if op.offset < ofs:
+                # writing an earlier portion, possibly remove a gap
+                gap = (op.offset, len(op.payload))
+                if gap in self.read_gaps:
+                    self.read_gaps.remove(gap)
+                self.fh.seek(op.offset)
+                self.fh.write(op.payload)
+                self.fh.seek(ofs)
+            elif op.offset > ofs:
+                # we have a gap
+                gap = (ofs, op.offset-ofs)
+                while True:
+                    if gap[1] <= MAX_Payload:
+                        self.read_gaps.add(gap)
+                        break
+                    self.read_gaps.add((gap[0], MAX_Payload))
+                    gap = (gap[0] + MAX_Payload, gap[1] - MAX_Payload)
+                self.fh.seek(op.offset)
+                self.fh.write(op.payload)
+            else:
+                self.fh.write(op.payload)
             if op.burst_complete:
                 more = self.last_op
                 more.offset = op.offset
+                self.last_burst_read = time.time()
                 self.send(more)
         elif op.opcode == OP_Nack:
             ecode = op.payload[0]
             if ecode == ERR_EndOfFile or ecode == 0:
-                print("Wrote %u bytes to %s (ecode %u)" % (self.fh.tell(), self.filename, ecode))
-                self.terminate_session()
+                if len(self.read_gaps) == 0:
+                    print("Wrote %u bytes to %s (ecode %u)" % (self.fh.tell(), self.filename, ecode))
+                    self.terminate_session()
             else:
                 print("FTP: burst Nack: %s" % op)
         else:
             print("FTP: burst error: %s" % op)
 
+    def handle_reply_read(self, op, m):
+        '''handle OP_ReadFile reply'''
+        if self.fh is None or self.filename is None:
+            print("FTP Unexpected read reply")
+            print(op)
+            return
+        if op.opcode == OP_Ack and self.fh is not None:
+            gap = (op.offset, op.size)
+            if gap in self.read_gaps:
+                self.read_gaps.remove(gap)
+                ofs = self.fh.tell()
+                self.fh.seek(op.offset)
+                self.fh.write(op.payload)
+                self.fh.seek(ofs)
+        elif op.opcode == OP_Nack:
+            print("Read failed with %u gaps" % len(self.read_gaps))
+            self.terminate_session()
+            
     def cmd_put(self, args):
         '''put file'''
         if len(args) == 0:
@@ -370,6 +423,13 @@ class FTPModule(mp_module.MPModule):
         op = FTP_OP(self.seq, self.session, OP_CalcFileCRC32, len(enc_name), 0, 0, 0, bytearray(enc_name))
         self.send(op)
 
+    def cmd_status(self):
+        '''show status'''
+        if self.fh is None:
+            print("No transfer in progress")
+        else:
+            print("Transfer at offset %u with %u gaps" % (self.fh.tell(), len(self.read_gaps)))
+
     def handle_crc_reply(self, op, m):
         '''handle crc reply'''
         if op.opcode == OP_Ack and op.size == 4:
@@ -408,10 +468,36 @@ class FTPModule(mp_module.MPModule):
                 self.handle_rename_reply(op, m)
             elif op.req_opcode == OP_CreateDirectory:
                 self.handle_mkdir_reply(op, m)
+            elif op.req_opcode == OP_ReadFile:
+                self.handle_reply_read(op, m)
             elif op.req_opcode == OP_CalcFileCRC32:
                 self.handle_crc_reply(op, m)
             else:
                 print('FTP Unknown %s' % str(op))
+
+    def idle_task(self):
+        '''check for file gaps'''
+        if len(self.read_gaps) == 0 and self.last_burst_read is None:
+            return
+        if self.fh is None:
+            return
+
+        # see if burst read has stalled
+        now = time.time()
+        if now - self.last_burst_read > 1:
+            self.last_burst_read = now
+            self.send(FTP_OP(self.seq, self.session, OP_BurstReadFile, self.last_op.size, 0, 0, self.fh.tell(), self.last_op.payload))
+
+        # see if we can fill gaps
+        if len(self.read_gaps) > 0 and (self.last_read is None or now - self.last_read > 0.1):
+            self.last_read = now
+            (offset, length) = self.read_gaps.pop()
+             # we add it back into gaps until we get it acked
+            self.read_gaps.add((offset, length))
+            self.last_read = now
+            read = FTP_OP(self.seq, self.session, OP_ReadFile, length, 0, 0, offset, bytearray([]))
+            self.send(read)
+
 
 def init(mpstate):
     '''initialise module'''
