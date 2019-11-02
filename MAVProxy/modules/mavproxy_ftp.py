@@ -6,6 +6,7 @@ import struct
 from pymavlink import mavutil
 
 from MAVProxy.modules.lib import mp_module
+from MAVProxy.modules.lib import mp_settings
 
 # opcodes
 OP_None = 0
@@ -79,7 +80,12 @@ class FTPModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(FTPModule, self).__init__(mpstate, "ftp")
         self.add_command('ftp', self.cmd_ftp, "file transfer",
-                         ["<list|get|put|rm|rmdir|rename|mkdir|crc|status>"])
+                         ["<list|get|put|rm|rmdir|rename|mkdir|crc|cancel|status>",
+                          "set (FTPSETTING)"])
+        self.ftp_settings = mp_settings.MPSettings(
+            [('debug', int, 0)])
+        self.add_completion_function('(FTPSETTING)',
+                                     self.ftp_settings.completion)
         self.seq = 0
         self.session = 0
         self.network = 0
@@ -90,6 +96,8 @@ class FTPModule(mp_module.MPModule):
         self.read_gaps = set()
         self.last_read = None
         self.last_burst_read = None
+        self.op_start = None
+        self.dir_offset = 0
 
     def cmd_ftp(self, args):
         '''FTP operations'''
@@ -99,6 +107,8 @@ class FTPModule(mp_module.MPModule):
             return
         if args[0] == 'list':
             self.cmd_list(args[1:])
+        elif args[0] == "set":
+            self.ftp_settings.command(args[1:])
         elif args[0] == 'get':
             self.cmd_get(args[1:])
         elif args[0] == 'put':
@@ -115,11 +125,14 @@ class FTPModule(mp_module.MPModule):
             self.cmd_crc(args[1:])
         elif args[0] == 'status':
             self.cmd_status()
+        elif args[0] == 'cancel':
+            self.cmd_cancel()
         else:
             print(usage)
 
     def send(self, op):
         '''send a request'''
+        op.seq = self.seq
         payload = op.pack()
         plen = len(payload)
         if plen < MAX_Payload + HDR_Len:
@@ -127,6 +140,8 @@ class FTPModule(mp_module.MPModule):
         self.master.mav.file_transfer_protocol_send(self.network, self.target_system, self.target_component, payload)
         self.seq = (self.seq + 1) % 255
         self.last_op = op
+        if self.ftp_settings.debug > 1:
+            print("> %s" % op)
 
     def terminate_session(self):
         '''terminate current session'''
@@ -146,7 +161,8 @@ class FTPModule(mp_module.MPModule):
         print("Listing %s" % dname)
         enc_dname = bytearray(dname, 'ascii')
         self.total_size = 0
-        op = FTP_OP(self.seq, self.session, OP_ListDirectory, len(enc_dname), 0, 0, 0, enc_dname)
+        self.dir_offset = 0
+        op = FTP_OP(self.seq, self.session, OP_ListDirectory, len(enc_dname), 0, 0, self.dir_offset, enc_dname)
         self.send(op)
 
     def handle_list_reply(self, op, m):
@@ -157,6 +173,7 @@ class FTPModule(mp_module.MPModule):
             for d in dentries:
                 if len(d) == 0:
                     continue
+                self.dir_offset += 1
                 if sys.version_info.major >= 3:
                     d = str(d, 'ascii')
                 else:
@@ -172,7 +189,7 @@ class FTPModule(mp_module.MPModule):
                     print(d)
             # ask for more
             more = self.last_op
-            more.offset = self.last_op.offset + op.size
+            more.offset = self.dir_offset
             self.send(more)
         elif op.opcode == OP_Nack and len(op.payload) == 1 and op.payload[0] == ERR_EndOfFile:
             print("Total size %.2f kByte" % (self.total_size / 1024.0))
@@ -191,6 +208,7 @@ class FTPModule(mp_module.MPModule):
         else:
             self.filename = os.path.basename(fname)
         print("Getting %s as %s" % (fname, self.filename))
+        self.op_start = time.time()
         enc_fname = bytearray(fname, 'ascii')
         op = FTP_OP(self.seq, self.session, OP_OpenFileRO, len(enc_fname), 0, 0, 0, enc_fname)
         self.send(op)
@@ -296,6 +314,7 @@ class FTPModule(mp_module.MPModule):
         else:
             self.filename = os.path.basename(fname)
         print("Putting %s as %s" % (fname, self.filename))
+        self.op_start = time.time()
         enc_fname = bytearray(self.filename, 'ascii')
         op = FTP_OP(self.seq, self.session, OP_CreateFile, len(enc_fname), 0, 0, 0, enc_fname)
         self.send(op)
@@ -424,26 +443,36 @@ class FTPModule(mp_module.MPModule):
             print("Usage: crc NAME")
             return
         name = args[0]
+        self.filename = name
+        self.op_start = time.time()
         print("Getting CRC for %s" % name)
         enc_name = bytearray(name, 'ascii')
         op = FTP_OP(self.seq, self.session, OP_CalcFileCRC32, len(enc_name), 0, 0, 0, bytearray(enc_name))
         self.send(op)
+
+    def handle_crc_reply(self, op, m):
+        '''handle crc reply'''
+        if op.opcode == OP_Ack and op.size == 4:
+            crc = struct.unpack("<I", op.payload)
+            now = time.time()
+            print("crc: %s 0x%08x in %.1fs" % (self.filename, crc, now - self.op_start))
+        else:
+            print("crc failed %s" % op)
+
+    def cmd_cancel(self):
+        '''cancel any pending op'''
+        self.terminate_session()
 
     def cmd_status(self):
         '''show status'''
         if self.fh is None:
             print("No transfer in progress")
         else:
-            print("Transfer at offset %u with %u gaps" % (self.fh.tell(), len(self.read_gaps)))
+            ofs = self.fh.tell()
+            dt = time.time() - self.op_start
+            rate = (ofs / dt) / 1024.0
+            print("Transfer at offset %u with %u gaps %.1f kByte/sec" % (ofs, len(self.read_gaps), rate))
 
-    def handle_crc_reply(self, op, m):
-        '''handle crc reply'''
-        if op.opcode == OP_Ack and op.size == 4:
-            crc = struct.unpack("<I", op.payload)
-            print("crc: 0x%08x" % crc)
-        else:
-            print("crc failed %s" % op)
-            
     def op_parse(self, m):
         '''parse a FILE_TRANSFER_PROTOCOL msg'''
         hdr = bytearray(m.payload[0:12])
@@ -456,6 +485,8 @@ class FTPModule(mp_module.MPModule):
         mtype = m.get_type()
         if mtype == "FILE_TRANSFER_PROTOCOL":
             op = self.op_parse(m)
+            if self.ftp_settings.debug > 1:
+                print("< %s" % op)
             if op.req_opcode == OP_ListDirectory:
                 self.handle_list_reply(op, m)
             elif op.req_opcode == OP_OpenFileRO:
