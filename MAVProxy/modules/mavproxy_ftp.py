@@ -56,7 +56,10 @@ class FTP_OP:
 
     def pack(self):
         '''pack message'''
-        return struct.pack("<HBBBBBBI", self.seq, self.session, self.opcode, self.size, self.req_opcode, self.burst_complete, 0, self.offset) + self.payload
+        ret = struct.pack("<HBBBBBBI", self.seq, self.session, self.opcode, self.size, self.req_opcode, self.burst_complete, 0, self.offset) + self.payload
+        if sys.version_info.major >= 3:
+            ret = bytearray(ret)
+        return ret
 
     def __str__(self):
         ret = "OP seq:%u sess:%u opcode:%d req_opcode:%u size:%u bc:%u ofs:%u plen=%u" % (self.seq,
@@ -154,7 +157,10 @@ class FTPModule(mp_module.MPModule):
             for d in dentries:
                 if len(d) == 0:
                     continue
-                d = str(d)
+                if sys.version_info.major >= 3:
+                    d = str(d, 'ascii')
+                else:
+                    d = str(d)
                 if d[0] == 'D':
                     print(" D %s" % d[1:])
                 elif d[0] == 'F':
@@ -163,7 +169,7 @@ class FTPModule(mp_module.MPModule):
                     self.total_size += size
                     print("   %s\t%u" % (name, size))
                 else:
-                    print(str(d))
+                    print(d)
             # ask for more
             more = self.last_op
             more.offset = self.last_op.offset + op.size
