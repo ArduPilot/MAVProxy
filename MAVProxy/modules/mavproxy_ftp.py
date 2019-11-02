@@ -1,0 +1,319 @@
+#!/usr/bin/env python
+'''mavlink file transfer support'''
+
+import time, os, sys
+import struct
+from pymavlink import mavutil
+
+from MAVProxy.modules.lib import mp_module
+
+# opcodes
+OP_None = 0
+OP_TerminateSession = 1
+OP_ResetSessions = 2
+OP_ListDirectory = 3
+OP_OpenFileRO = 4
+OP_ReadFile = 5
+OP_CreateFile = 6
+OP_WriteFile = 7
+OP_RemoveFile = 8
+OP_CreateDirectory = 9
+OP_RemoveDirectory = 10
+OP_OpenFileWO = 11
+OP_TruncateFile = 12
+OP_Rename = 13
+OP_CalcFileCRC32 = 14
+OP_BurstReadFile = 15
+OP_Ack = 128
+OP_Nack = 129
+
+# error codes
+ERR_None = 0
+ERR_Fail = 1
+ERR_FailErrno = 2
+ERR_InvalidDataSize = 3
+ERR_InvalidSession = 4
+ERR_NoSessionsAvailable = 5
+ERR_EndOfFile = 6
+ERR_UnknownCommand = 7
+ERR_FileExists = 8
+ERR_FileProtected = 9
+ERR_FileNotFound = 10
+
+HDR_Len = 12
+MAX_Payload = 239
+
+class FTP_OP:
+    def __init__(self, seq, session, opcode, size, req_opcode, burst_complete, offset, payload):
+        self.seq = seq
+        self.session = session
+        self.opcode = opcode
+        self.size = size
+        self.req_opcode = req_opcode
+        self.burst_complete = burst_complete
+        self.offset = offset
+        self.payload = payload
+        self.cwd = None
+        self.fh = None
+        self.filename = None
+        self.total_size = 0
+
+    def pack(self):
+        '''pack message'''
+        return struct.pack("<HBBBBBBI", self.seq, self.session, self.opcode, self.size, self.req_opcode, self.burst_complete, 0, self.offset) + self.payload
+
+    def __str__(self):
+        ret = "OP seq:%u sess:%u opcode:%d req_opcode:%u size:%u bc:%u ofs:%u plen=%u" % (self.seq,
+                                                                                          self.session,
+                                                                                          self.opcode,
+                                                                                          self.req_opcode,
+                                                                                          self.size,
+                                                                                          self.burst_complete,
+                                                                                          self.offset,
+                                                                                          len(self.payload))
+        if len(self.payload) > 0:
+            ret += " [%u]" % self.payload[0]
+        return ret
+
+
+class FTPModule(mp_module.MPModule):
+    def __init__(self, mpstate):
+        super(FTPModule, self).__init__(mpstate, "ftp")
+        self.add_command('ftp', self.cmd_ftp, "file transfer",
+                         ["<list|get|put|rm>"])
+        self.seq = 0
+        self.session = 0
+        self.network = 0
+        self.last_op = None
+
+    def cmd_ftp(self, args):
+        '''FTP operations'''
+        usage = "Usage: ftp <list|get|put|rm>"
+        if len(args) < 1:
+            print(usage)
+            return
+        if args[0] == 'list':
+            self.cmd_list(args[1:])
+        elif args[0] == 'get':
+            self.cmd_get(args[1:])
+        elif args[0] == 'put':
+            self.cmd_put(args[1:])
+        else:
+            print(usage)
+
+    def send(self, op):
+        '''send a request'''
+        payload = op.pack()
+        plen = len(payload)
+        if plen < MAX_Payload + HDR_Len:
+            payload.extend(bytearray([0]*((HDR_Len+MAX_Payload)-plen)))
+        self.master.mav.file_transfer_protocol_send(self.network, self.target_system, self.target_component, payload)
+        self.seq = (self.seq + 1) % 255
+        self.last_op = op
+
+    def terminate_session(self):
+        '''terminate current session'''
+        self.send(FTP_OP(self.seq, self.session, OP_TerminateSession, 0, 0, 0, 0, bytearray([])))
+        self.fh = None
+        self.filename = None
+
+    def cmd_list(self, args):
+        '''list files'''
+        if len(args) > 0:
+            dname = args[0]
+        else:
+            dname = '/'
+        print("Listing %s" % dname)
+        enc_dname = bytearray(dname, 'ascii')
+        self.total_size = 0
+        op = FTP_OP(self.seq, self.session, OP_ListDirectory, len(enc_dname), 0, 0, 0, enc_dname)
+        self.send(op)
+
+    def handle_list_reply(self, op, m):
+        '''handle OP_ListDirectory reply'''
+        if op.opcode == OP_Ack:
+            dentries = sorted(op.payload.split(b'\x00'))
+            #print(dentries)
+            for d in dentries:
+                if len(d) == 0:
+                    continue
+                d = str(d)
+                if d[0] == 'D':
+                    print(" D %s" % d[1:])
+                elif d[0] == 'F':
+                    (name, size) = d[1:].split('\t')
+                    size = int(size)
+                    self.total_size += size
+                    print("   %s\t%u" % (name, size))
+                else:
+                    print(str(d))
+            # ask for more
+            more = self.last_op
+            more.offset = self.last_op.offset + op.size
+            self.send(more)
+        elif op.opcode == OP_Nack and len(op.payload) == 1 and op.payload[0] == ERR_EndOfFile:
+            print("Total size %.2f kByte" % (self.total_size / 1024.0))
+            self.total_size = 0
+        else:
+            print('LIST: %s' % op)
+
+    def cmd_get(self, args):
+        '''get file'''
+        if len(args) == 0:
+            print("Usage: get FILENAME <LOCALNAME>")
+            return
+        fname = args[0]
+        if len(args) > 1:
+            self.filename = args[1]
+        else:
+            self.filename = os.path.basename(fname)
+        print("Getting %s as %s" % (fname, self.filename))
+        enc_fname = bytearray(fname, 'ascii')
+        op = FTP_OP(self.seq, self.session, OP_OpenFileRO, len(enc_fname), 0, 0, 0, enc_fname)
+        self.send(op)
+
+    def handle_open_RO_reply(self, op, m):
+        '''handle OP_OpenFileRO reply'''
+        if op.opcode == OP_Ack:
+            if self.filename is None:
+                return
+            try:
+                self.fh = open(self.filename, 'wb')
+            except Exception as ex:
+                print("Failed to open %s: %s" % (self.filename, ex))
+                self.terminate_session()
+                return
+            read = FTP_OP(self.seq, self.session, OP_BurstReadFile, op.size, 0, 0, 0, op.payload)
+            self.send(read)
+        else:
+            print("Open failed")
+            self.terminate_session()
+
+    def handle_burst_read(self, op, m):
+        '''handle OP_BurstReadFile reply'''
+        if self.fh is None or self.filename is None:
+            print("FTP Unexpected burst read reply")
+            print(op)
+            return
+        if op.opcode == OP_Ack and self.fh is not None:
+            self.fh.write(op.payload)
+            if op.burst_complete:
+                more = self.last_op
+                more.offset = op.offset
+                self.send(more)
+        elif op.opcode == OP_Nack:
+            ecode = op.payload[0]
+            if ecode == ERR_EndOfFile or ecode == 0:
+                print("Wrote %u bytes to %s (ecode %u)" % (self.fh.tell(), self.filename, ecode))
+                self.terminate_session()
+            else:
+                print("FTP: burst Nack: %s" % op)
+        else:
+            print("FTP: burst error: %s" % op)
+
+    def cmd_put(self, args):
+        '''put file'''
+        if len(args) == 0:
+            print("Usage: put FILENAME <REMOTENAME>")
+            return
+        fname = args[0]
+        try:
+            self.fh = open(fname, 'rb')
+        except Exception as ex:
+            print("Failed to open %s: %s" % (fname, ex))
+            return
+        if len(args) > 1:
+            self.filename = args[1]
+        else:
+            self.filename = os.path.basename(fname)
+        print("Putting %s as %s" % (fname, self.filename))
+        enc_fname = bytearray(self.filename, 'ascii')
+        op = FTP_OP(self.seq, self.session, OP_CreateFile, len(enc_fname), 0, 0, 0, enc_fname)
+        self.send(op)
+
+    def handle_create_file_reply(self, op, m):
+        '''handle OP_CreateFile reply'''
+        if self.fh is None:
+            print("FTP file not open")
+            self.terminate_session()
+            return
+        if op.opcode == OP_Ack:
+            ofs = self.fh.tell()
+            try:
+                data = self.fh.read(MAX_Payload)
+            except Exception as ex:
+                print("Read error: %s" % ex)
+                self.terminate_session()
+                return
+            if len(data) > 0:
+                write = FTP_OP(self.seq, self.session, OP_WriteFile, len(data), 0, 0, ofs, bytearray(data))
+                self.send(write)
+            if len(data) < MAX_Payload:
+                t = self.fh.tell()
+                print("Sent file of length ", t)
+                self.terminate_session()
+        else:
+            print("Create failed")
+            self.terminate_session()
+
+    def handle_write_reply(self, op, m):
+        '''handle OP_WriteFile reply'''
+        if self.fh is None:
+            print("FTP file not open")
+            self.terminate_session()
+            return
+        if op.opcode == OP_Ack:
+            ofs = self.fh.tell()
+            if self.last_op.size < MAX_Payload:
+                print("Sent file of length %u" % op.offset)
+                self.terminate_session()
+                return
+
+            try:
+                data = self.fh.read(MAX_Payload)
+            except Exception as ex:
+                print("Read error: %s" % ex)
+                self.terminate_session()
+                return
+
+            if len(data) > 0:
+                write = FTP_OP(self.seq, self.session, OP_WriteFile, len(data), 0, 0, ofs, bytearray(data))
+                self.send(write)
+            else:
+                print("Sent file of length %u" % self.fh.tell())
+                self.terminate_session()
+        else:
+            print("Write failed")
+            print(str(op), op.payload)
+            self.terminate_session()
+
+    def op_parse(self, m):
+        '''parse a FILE_TRANSFER_PROTOCOL msg'''
+        hdr = bytearray(m.payload[0:12])
+        (seq, session, opcode, size, req_opcode, burst_complete, pad, offset) = struct.unpack("<HBBBBBBI", hdr)
+        payload = bytearray(m.payload[12:])[:size]
+        return FTP_OP(seq, session, opcode, size, req_opcode, burst_complete, offset, payload)
+
+    def mavlink_packet(self, m):
+        '''handle a mavlink packet'''
+        mtype = m.get_type()
+        if mtype == "FILE_TRANSFER_PROTOCOL":
+            op = self.op_parse(m)
+            if op.req_opcode == OP_ListDirectory:
+                self.handle_list_reply(op, m)
+            elif op.req_opcode == OP_OpenFileRO:
+                self.handle_open_RO_reply(op, m)
+            elif op.req_opcode == OP_BurstReadFile:
+                self.handle_burst_read(op, m)
+            elif op.req_opcode == OP_TerminateSession:
+                pass
+            elif op.req_opcode == OP_CreateFile:
+                self.handle_create_file_reply(op, m)
+            elif op.req_opcode == OP_WriteFile:
+                self.handle_write_reply(op, m)
+            else:
+                print('FTP Unknown %s' % str(op))
+
+def init(mpstate):
+    '''initialise module'''
+    return FTPModule(mpstate)
