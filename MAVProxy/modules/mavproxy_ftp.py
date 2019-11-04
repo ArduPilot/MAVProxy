@@ -3,6 +3,7 @@
 
 import time, os, sys
 import struct
+import random
 from pymavlink import mavutil
 
 from MAVProxy.modules.lib import mp_module
@@ -84,10 +85,13 @@ class FTPModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(FTPModule, self).__init__(mpstate, "ftp")
         self.add_command('ftp', self.cmd_ftp, "file transfer",
-                         ["<list|get|put|rm|rmdir|rename|mkdir|crc|cancel|status>",
-                          "set (FTPSETTING)"])
+                         ["<list|get|rm|rmdir|rename|mkdir|crc|cancel|status>",
+                          "set (FTPSETTING)",
+                          "put (FILENAME) (FILENAME)"])
         self.ftp_settings = mp_settings.MPSettings(
-            [('debug', int, 0)])
+            [('debug', int, 0),
+             ('pkt_loss_tx', int, 0),
+             ('pkt_loss_rx', int, 0)])
         self.add_completion_function('(FTPSETTING)',
                                      self.ftp_settings.completion)
         self.seq = 0
@@ -103,6 +107,9 @@ class FTPModule(mp_module.MPModule):
         self.last_burst_read = None
         self.op_start = None
         self.dir_offset = 0
+        self.write_wait = False
+        self.last_op_time = time.time()
+        self.rtt = 0.5
 
     def cmd_ftp(self, args):
         '''FTP operations'''
@@ -143,10 +150,12 @@ class FTPModule(mp_module.MPModule):
         if plen < MAX_Payload + HDR_Len:
             payload.extend(bytearray([0]*((HDR_Len+MAX_Payload)-plen)))
         self.master.mav.file_transfer_protocol_send(self.network, self.target_system, self.target_component, payload)
-        self.seq = (self.seq + 1) % 255
+        self.seq = (self.seq + 1) % 256
         self.last_op = op
+        now = time.time()
         if self.ftp_settings.debug > 1:
-            print("> %s" % op)
+            print("> %s dt=%.2f" % (op, now - self.last_op_time))
+        self.last_op_time = time.time()
 
     def terminate_session(self):
         '''terminate current session'''
@@ -239,10 +248,11 @@ class FTPModule(mp_module.MPModule):
 
     def handle_burst_read(self, op, m):
         '''handle OP_BurstReadFile reply'''
-        #import random
-        #if random.uniform(0,100) > 70:
-        #    print("dropping %s" % op)
-        #    return
+        if self.ftp_settings.pkt_loss_tx > 0:
+            if random.uniform(0,100) < self.ftp_settings.pkt_loss_tx:
+                if self.ftp_settings.debug > 0:
+                    print("FTP: dropping TX")
+                return
         if self.fh is None or self.filename is None:
             print("FTP Unexpected burst read reply")
             print(op)
@@ -350,6 +360,7 @@ class FTPModule(mp_module.MPModule):
             if len(data) > 0:
                 write = FTP_OP(self.seq, self.session, OP_WriteFile, len(data), 0, 0, ofs, bytearray(data))
                 self.send(write)
+                self.write_wait = True
             if len(data) < MAX_Payload:
                 t = self.fh.tell()
                 print("Sent file of length ", t)
@@ -364,6 +375,7 @@ class FTPModule(mp_module.MPModule):
             print("FTP file not open")
             self.terminate_session()
             return
+        self.write_wait = False
         if op.opcode == OP_Ack:
             ofs = self.fh.tell()
             if self.last_op.size < MAX_Payload:
@@ -380,6 +392,7 @@ class FTPModule(mp_module.MPModule):
 
             if len(data) > 0:
                 write = FTP_OP(self.seq, self.session, OP_WriteFile, len(data), 0, 0, ofs, bytearray(data))
+                self.write_wait = True
                 self.send(write)
             else:
                 print("Sent file of length %u" % self.fh.tell())
@@ -467,7 +480,7 @@ class FTPModule(mp_module.MPModule):
     def handle_crc_reply(self, op, m):
         '''handle crc reply'''
         if op.opcode == OP_Ack and op.size == 4:
-            crc = struct.unpack("<I", op.payload)
+            crc, = struct.unpack("<I", op.payload)
             now = time.time()
             print("crc: %s 0x%08x in %.1fs" % (self.filename, crc, now - self.op_start))
         else:
@@ -499,8 +512,19 @@ class FTPModule(mp_module.MPModule):
         mtype = m.get_type()
         if mtype == "FILE_TRANSFER_PROTOCOL":
             op = self.op_parse(m)
+            now = time.time()
+            dt = now - self.last_op_time
             if self.ftp_settings.debug > 1:
-                print("< %s" % op)
+                print("< %s dt=%.2f" % (op, dt))
+            self.last_op_time = now
+            if self.ftp_settings.pkt_loss_rx > 0:
+                if random.uniform(0,100) < self.ftp_settings.pkt_loss_rx:
+                    if self.ftp_settings.debug > 1:
+                        print("FTP: dropping packet RX")
+                    return
+
+            if op.req_opcode == self.last_op.opcode and op.seq == (self.last_op.seq + 1) % 256:
+                self.rtt = max(min(self.rtt, dt), 0.01)
             if op.req_opcode == OP_ListDirectory:
                 self.handle_list_reply(op, m)
             elif op.req_opcode == OP_OpenFileRO:
@@ -528,32 +552,36 @@ class FTPModule(mp_module.MPModule):
 
     def idle_task(self):
         '''check for file gaps'''
-        if len(self.read_gaps) == 0 and self.last_burst_read is None:
+        if len(self.read_gaps) == 0 and self.last_burst_read is None and not self.write_wait:
             return
         if self.fh is None:
             return
 
         # see if burst read has stalled
         now = time.time()
-        if now - self.last_burst_read > 1:
+        if now - self.last_burst_read > self.rtt+0.01:
             self.last_burst_read = now
             if self.ftp_settings.debug > 0:
                 print("Retry read at %u" % self.fh.tell())
-            self.send(FTP_OP(self.seq, self.session, OP_BurstReadFile, self.last_op.size, 0, 0, self.fh.tell(), self.last_op.payload))
+            self.send(FTP_OP(self.seq, self.session, OP_BurstReadFile, 0, 0, 0, self.fh.tell(), None))
             self.read_retries += 1
 
         # see if we can fill gaps
-        if len(self.read_gaps) > 0 and (self.last_read is None or now - self.last_read > 0.1):
+        if len(self.read_gaps) > 0 and (self.last_read is None or now - self.last_read > self.rtt+0.02):
+            gap_count = min(len(self.read_gaps), 8)
+            gaps = list(self.read_gaps)[:gap_count]
             self.last_read = now
-            (offset, length) = self.read_gaps.pop()
-             # we add it back into gaps until we get it acked
-            self.read_gaps.add((offset, length))
-            self.last_read = now
-            if self.ftp_settings.debug > 0:
-                print("Gap read at %u" % offset)
-            read = FTP_OP(self.seq, self.session, OP_ReadFile, length, 0, 0, offset, None)
-            self.send(read)
+            for (offset, length) in gaps:
+                if self.ftp_settings.debug > 0:
+                    print("Gap read at %u" % offset)
+                read = FTP_OP(self.seq, self.session, OP_ReadFile, length, 0, 0, offset, None)
+                self.send(read)
 
+        if self.write_wait and now - self.op_start > (self.rtt+0.02) and self.last_op.opcode == OP_WriteFile:
+            self.op_start = now
+            if self.ftp_settings.debug > 0:
+                print("FTP: write retry at %u" % self.last_op.offset)
+            self.send(self.last_op)
 
 def init(mpstate):
     '''initialise module'''
