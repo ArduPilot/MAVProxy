@@ -117,7 +117,13 @@ class RendererAgg(RendererBase):
         self.draw_gouraud_triangles = self._renderer.draw_gouraud_triangles
         self.draw_image = self._renderer.draw_image
         self.copy_from_bbox = self._renderer.copy_from_bbox
-        self.tostring_rgba_minimized = self._renderer.tostring_rgba_minimized
+
+    def tostring_rgba_minimized(self):
+        extents = self._renderer.get_content_extents()
+        bbox = [[extents[0], self.height - (extents[1] + extents[3])],
+                [extents[0] + extents[2], self.height - extents[1]]]
+        region = self._renderer.copy_from_bbox(bbox)
+        return np.array(region), extents
 
     def draw_path(self, gc, path, transform, rgbFace=None):
         """

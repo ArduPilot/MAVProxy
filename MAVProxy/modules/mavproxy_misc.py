@@ -5,6 +5,7 @@ import time, math, sys
 from pymavlink import mavutil
 
 from MAVProxy.modules.lib import mp_module
+from MAVProxy.modules.lib import mp_util
 
 
 from os import kill
@@ -78,7 +79,8 @@ class MiscModule(mp_module.MPModule):
         self.add_command('land', self.cmd_land, "auto land")
         self.add_command('repeat', self.cmd_repeat, "repeat a command at regular intervals",
                          ["<add|remove|clear>"])
-        self.add_command('version', self.cmd_version, "show version")
+        self.add_command('version', self.cmd_version, "fetch autopilot version")
+        self.add_command('capabilities', self.cmd_capabilities, "fetch autopilot capabilities")
         self.add_command('rcbind', self.cmd_rcbind, "bind RC receiver")
         self.add_command('led', self.cmd_led, "control board LED")
         self.add_command('oreoled', self.cmd_oreoled, "control OreoLEDs")
@@ -86,6 +88,11 @@ class MiscModule(mp_module.MPModule):
         self.add_command('devid', self.cmd_devid, "show device names from parameter IDs")
         self.add_command('gethome', self.cmd_gethome, "get HOME_POSITION")
         self.add_command('flashbootloader', self.cmd_flashbootloader, "flash bootloader (dangerous)")
+        self.add_command('lockup_autopilot', self.cmd_lockup_autopilot, "lockup autopilot")
+        self.add_command('batreset', self.cmd_battery_reset, "reset battery remaining")
+        self.add_command('setorigin', self.cmd_setorigin, "set global origin")
+        self.add_command('magsetfield', self.cmd_magset_field, "set expected mag field by field")
+        self.add_command('magresetofs', self.cmd_magreset_ofs, "reset offsets for all compasses")
         self.repeats = []
 
     def altitude_difference(self, pressure1, pressure2, ground_temp):
@@ -142,6 +149,28 @@ class MiscModule(mp_module.MPModule):
         else:
             self.master.reboot_autopilot()
 
+    def cmd_lockup_autopilot(self, args):
+        '''lockup autopilot for watchdog testing'''
+        if len(args) > 0 and args[0] == 'IREALLYMEANIT':
+            print("Sending lockup command")
+            self.master.mav.command_long_send(self.settings.target_system, self.settings.target_component,
+                                              mavutil.mavlink.MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN, 0,
+                                              42, 24, 71, 93, 0, 0, 0)
+        else:
+            print("Invalid lockup command")
+
+    def cmd_battery_reset(self, args):
+        '''reset battery remaining'''
+        mask = -1
+        remaining_pct = 100
+        if len(args) > 0:
+            mask = int(args[0])
+        if len(args) > 1:
+            remaining_pct = int(args[1])
+        self.master.mav.command_long_send(self.settings.target_system, self.settings.target_component,
+                                          mavutil.mavlink.MAV_CMD_BATTERY_RESET, 0,
+                                              mask, remaining_pct, 0, 0, 0, 0, 0)
+
     def cmd_time(self, args):
         '''show autopilot time'''
         tusec = self.master.field('SYSTEM_TIME', 'time_unix_usec', 0)
@@ -182,12 +211,17 @@ class MiscModule(mp_module.MPModule):
 
     def cmd_version(self, args):
         '''show version'''
+        self.master.mav.autopilot_version_request_send(self.settings.target_system,
+                                                       self.settings.target_component)
+
+    def cmd_capabilities(self, args):
+        '''show capabilities'''
         self.master.mav.command_long_send(self.settings.target_system,
                                           self.settings.target_component,
                                           mavutil.mavlink.MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES,
                                           0,
                                           1, 0, 0, 0, 0, 0, 0)
-
+        
     def cmd_rcbind(self, args):
         '''start RC bind'''
         if len(args) < 1:
@@ -261,6 +295,10 @@ class MiscModule(mp_module.MPModule):
         tune = args[0]
         str1 = tune[0:30]
         str2 = tune[30:]
+        if sys.version_info.major >= 3 and not isinstance(str1, bytes):
+            str1 = bytes(str1, "ascii")
+        if sys.version_info.major >= 3 and not isinstance(str2, bytes):
+            str2 = bytes(str2, "ascii")
         self.master.mav.play_tune_send(self.settings.target_system,
                                        self.settings.target_component,
                                        str1, str2)
@@ -294,81 +332,94 @@ class MiscModule(mp_module.MPModule):
         else:
             print("Usage: repeat <add|remove|clean>")
 
-    def decode_devid(self, devid, pname):
-        '''decode one device ID'''
-        devid = int(devid)
-        if devid == 0:
-            return
-
-        bus_type=devid & 0x07
-        bus=(devid>>3) & 0x1F
-        address=(devid>>8)&0xFF
-        devtype=(devid>>16)
-
-        bustypes = {
-            1: "I2C",
-            2: "SPI",
-            3: "UAVCAN",
-            4: "SITL"
-        }
-
-        compass_types = {
-            0x01 : "DEVTYPE_HMC5883_OLD",
-            0x07 : "DEVTYPE_HMC5883",
-            0x02 : "DEVTYPE_LSM303D",
-            0x04 : "DEVTYPE_AK8963 ",
-            0x05 : "DEVTYPE_BMM150 ",
-            0x06 : "DEVTYPE_LSM9DS1",
-            0x08 : "DEVTYPE_LIS3MDL",
-            0x09 : "DEVTYPE_AK09916",
-            0x0A : "DEVTYPE_IST8310",
-            0x0B : "DEVTYPE_ICM20948",
-            0x0C : "DEVTYPE_MMC3416",
-            0x0D : "DEVTYPE_QMC5883L",
-            0x0E : "DEVTYPE_MAG3110",
-            0x0F : "DEVTYPE_SITL",
-            0x10 : "DEVTYPE_IST8308",
-        }
-
-        imu_types = {
-            0x09 : "DEVTYPE_BMI160",
-            0x10 : "DEVTYPE_L3G4200D",
-            0x11 : "DEVTYPE_ACC_LSM303D",
-            0x12 : "DEVTYPE_ACC_BMA180",
-            0x13 : "DEVTYPE_ACC_MPU6000",
-            0x16 : "DEVTYPE_ACC_MPU9250",
-            0x17 : "DEVTYPE_ACC_IIS328DQ",
-            0x21 : "DEVTYPE_GYR_MPU6000",
-            0x22 : "DEVTYPE_GYR_L3GD20",
-            0x24 : "DEVTYPE_GYR_MPU9250",
-            0x25 : "DEVTYPE_GYR_I3G4250D",
-            0x26 : "DEVTYPE_GYR_LSM9DS1",
-            0x27 : "DEVTYPE_INS_ICM20789",
-            0x28 : "DEVTYPE_INS_ICM20689",
-            0x29 : "DEVTYPE_INS_BMI055",
-            0x2A : "DEVTYPE_SITL",
-        }
-
-        decoded_devname = ""
-
-        if pname.startswith("COMPASS"):
-            decoded_devname = compass_types.get(devtype, "UNKNOWN")
-
-        if pname.startswith("INS"):
-            decoded_devname = imu_types.get(devtype, "UNKNOWN")
-
-        print("%s: bus_type:%s(%u)  bus:%u address:%u(0x%x) devtype:%u(0x%x) %s" % (
-            pname,
-            bustypes.get(bus_type,"UNKNOWN"), bus_type,
-            bus, address, address, devtype, devtype, decoded_devname))
-
     def cmd_devid(self, args):
         '''decode device IDs from parameters'''
         for p in self.mav_param.keys():
             if p.startswith('COMPASS_DEV_ID'):
-                self.decode_devid(self.mav_param[p], p)
+                mp_util.decode_devid(self.mav_param[p], p)
             if p.startswith('INS_') and p.endswith('_ID'):
-                self.decode_devid(self.mav_param[p], p)
+                mp_util.decode_devid(self.mav_param[p], p)
+
+    def cmd_setorigin(self, args):
+        '''set global origin'''
+        if len(args) < 3:
+            print("Usage: setorigin LAT(deg) LON(deg) ALT(m)")
+            return
+        lat = float(args[0])
+        lon = float(args[1])
+        alt = float(args[2])
+        print("Setting origin to: ", lat, lon, alt)
+        self.master.mav.set_gps_global_origin_send(
+            self.settings.target_system,
+            lat*10000000, # lat
+            lon*10000000, # lon
+            alt*1000) # param7
+
+    def cmd_magset_field(self, args):
+        '''set compass offsets by field'''
+        if len(args) < 3:
+            print("Usage: magsetfield MagX MagY MagZ")
+            return
+        magX = int(args[0])
+        magY = int(args[1])
+        magZ = int(args[2])
+
+        field1x = self.master.field('RAW_IMU', 'xmag', 0)
+        field1y = self.master.field('RAW_IMU', 'ymag', 0)
+        field1z = self.master.field('RAW_IMU', 'zmag', 0)
+
+        field2x = self.master.field('SCALED_IMU2', 'xmag', 0)
+        field2y = self.master.field('SCALED_IMU2', 'ymag', 0)
+        field2z = self.master.field('SCALED_IMU2', 'zmag', 0)
+
+        field3x = self.master.field('SCALED_IMU3', 'xmag', 0)
+        field3y = self.master.field('SCALED_IMU3', 'ymag', 0)
+        field3z = self.master.field('SCALED_IMU3', 'zmag', 0)
+
+        self.param_set('COMPASS_OFS_X', magX - (field1x - self.get_mav_param('COMPASS_OFS_X', 0)))
+        self.param_set('COMPASS_OFS_Y', magY - (field1y - self.get_mav_param('COMPASS_OFS_Y', 0)))
+        self.param_set('COMPASS_OFS_Z', magZ - (field1z - self.get_mav_param('COMPASS_OFS_Z', 0)))
+
+        self.param_set('COMPASS_OFS2_X', magX - (field2x - self.get_mav_param('COMPASS_OFS2_X', 0)))
+        self.param_set('COMPASS_OFS2_Y', magY - (field2y - self.get_mav_param('COMPASS_OFS2_Y', 0)))
+        self.param_set('COMPASS_OFS2_Z', magZ - (field2z - self.get_mav_param('COMPASS_OFS2_Z', 0)))
+
+        self.param_set('COMPASS_OFS3_X', magX - (field3x - self.get_mav_param('COMPASS_OFS3_X', 0)))
+        self.param_set('COMPASS_OFS3_Y', magY - (field3y - self.get_mav_param('COMPASS_OFS3_Y', 0)))
+        self.param_set('COMPASS_OFS3_Z', magZ - (field3z - self.get_mav_param('COMPASS_OFS3_Z', 0)))
+
+    def cmd_magreset_ofs(self, args):
+        '''set compass offsets to all zero'''
+        self.param_set('COMPASS_OFS_X', 0)
+        self.param_set('COMPASS_OFS_Y', 0)
+        self.param_set('COMPASS_OFS_Z', 0)
+        self.param_set('COMPASS_DIA_X', 1)
+        self.param_set('COMPASS_DIA_Y', 1)
+        self.param_set('COMPASS_DIA_Z', 1)
+        self.param_set('COMPASS_ODI_X', 0)
+        self.param_set('COMPASS_ODI_Y', 0)
+        self.param_set('COMPASS_ODI_Z', 0)
+
+        self.param_set('COMPASS_OFS2_X', 0)
+        self.param_set('COMPASS_OFS2_Y', 0)
+        self.param_set('COMPASS_OFS2_Z', 0)
+        self.param_set('COMPASS_DIA2_X', 1)
+        self.param_set('COMPASS_DIA2_Y', 1)
+        self.param_set('COMPASS_DIA2_Z', 1)
+        self.param_set('COMPASS_ODI2_X', 0)
+        self.param_set('COMPASS_ODI2_Y', 0)
+        self.param_set('COMPASS_ODI2_Z', 0)
+
+        self.param_set('COMPASS_OFS3_X', 0)
+        self.param_set('COMPASS_OFS3_Y', 0)
+        self.param_set('COMPASS_OFS3_Z', 0)
+        self.param_set('COMPASS_DIA3_X', 1)
+        self.param_set('COMPASS_DIA3_Y', 1)
+        self.param_set('COMPASS_DIA3_Z', 1)
+        self.param_set('COMPASS_ODI3_X', 0)
+        self.param_set('COMPASS_ODI3_Y', 0)
+        self.param_set('COMPASS_ODI3_Z', 0)
+        
 
     def idle_task(self):
         '''called on idle'''

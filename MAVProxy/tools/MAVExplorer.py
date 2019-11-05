@@ -7,8 +7,9 @@ log analysis program
 Andrew Tridgell December 2014
 '''
 
-import sys, struct, time, os, datetime, platform
-import math, re
+import sys
+import time
+import os
 import fnmatch
 import threading
 import shlex
@@ -32,13 +33,15 @@ grui = []
 last_xlim = None
 flightmodes = None
 
-#Global var to hold the GUI menu element
+# Global var to hold the GUI menu element
 TopMenu = None
+
 
 class MEStatus(object):
     '''status object to conform with mavproxy structure for modules'''
     def __init__(self):
         self.msgs = {}
+
 
 class MEState(object):
     '''holds state of MAVExplorer'''
@@ -56,7 +59,8 @@ class MEState(object):
               MPSetting('show_flightmode', bool, True, 'show flightmode'),
               MPSetting('sync_xzoom', bool, True, 'sync X-axis zoom'),
               MPSetting('legend', str, 'upper left', 'legend position'),
-              MPSetting('legend2', str, 'upper right', 'legend2 position')
+              MPSetting('legend2', str, 'upper right', 'legend2 position'),
+              MPSetting('title', str, None, 'Graph title'),
               ]
             )
 
@@ -72,20 +76,20 @@ class MEState(object):
         self.aliases = {}
         self.graphs = []
         self.flightmode_selections = []
-        self.last_graph = GraphDefinition('Untitled', '', '', [], None)
-        
+        self.last_graph = GraphDefinition(self.settings.title, '', '', [], None)
+
         #pipe to the wxconsole for any child threads (such as the save dialog box)
         self.parent_pipe_recv_console,self.child_pipe_send_console = multiproc.Pipe(duplex=False)
         #pipe for creating graphs (such as from the save dialog box)
         self.parent_pipe_recv_graph,self.child_pipe_send_graph = multiproc.Pipe(duplex=False)
-        
+
         tConsoleWrite = threading.Thread(target=self.pipeRecvConsole)
         tConsoleWrite.daemon = True
         tConsoleWrite.start()
         tGraphWrite = threading.Thread(target=self.pipeRecvGraph)
         tGraphWrite.daemon = True
         tGraphWrite.start()
-                
+
     def pipeRecvConsole(self):
         '''watch for piped data from save dialog'''
         try:
@@ -107,7 +111,7 @@ class MEState(object):
                 time.sleep(0.1)
         except EOFError:
             pass
-            
+
 def have_graph(name):
     '''return true if we have a graph of the given name'''
     for g in mestate.graphs:
@@ -194,6 +198,8 @@ def setup_menus():
 def expression_ok(expression, msgs=None):
     '''return True if an expression is OK with current messages'''
     expression_ok = True
+    if expression is None:
+        return False
     fields = expression.split()
     if msgs is None:
         msgs = mestate.status.msgs
@@ -213,7 +219,8 @@ def load_graph_xml(xml, filename, load_all=False):
     ret = []
     try:
         root = objectify.fromstring(xml)
-    except Exception:
+    except Exception as ex:
+        print(filename, ex)
         return []
     if root.tag != 'graphs':
         return []
@@ -306,7 +313,7 @@ def cmd_graph(args):
         mestate.last_graph = g
     else:
         expression = ' '.join(args)
-        mestate.last_graph = GraphDefinition('Untitled', expression, '', [expression], None)
+        mestate.last_graph = GraphDefinition(mestate.settings.title, expression, '', [expression], None)
     grui.append(Graph_UI(mestate))
     grui[-1].display_graph(mestate.last_graph, flightmode_colours())
     global last_xlim
@@ -378,10 +385,20 @@ def save_graph(graphdef):
     if graphdef.filename is None:
         print("No file to save graph to")
         return
+    contents = None
     try:
-        graphs = load_graph_xml(open(graphdef.filename).read(), graphdef.filename, load_all=True)
-    except Exception:
+        contents = open(graphdef.filename).read()
+        graphs = load_graph_xml(contents, graphdef.filename, load_all=True)
+    except Exception as ex:
         graphs = []
+    if contents is not None and len(graphs) == 0:
+        print("Unable to parse %s" % graphdef.filename)
+        return
+    if contents is not None:
+        try:
+            open(graphdef.filename + ".bak",'w').write(contents)
+        except Exception:
+            pass
     found_name = False
     for i in range(len(graphs)):
         if graphs[i].name == graphdef.name:
@@ -422,7 +439,7 @@ def save_process(MAVExpLastGraph, child_pipe_console_input, child_pipe_graph_inp
     from MAVProxy.modules.lib import wx_processguard
     from MAVProxy.modules.lib.wx_loader import wx
     from MAVProxy.modules.lib.wxgrapheditor import GraphDialog
-    
+
     #This pipe is used to send text to the console
     global pipe_console_input
     pipe_console_input = child_pipe_console_input
@@ -430,12 +447,12 @@ def save_process(MAVExpLastGraph, child_pipe_console_input, child_pipe_graph_inp
     #This pipe is used to send graph commands
     global pipe_graph_input
     pipe_graph_input = child_pipe_graph_input
-    
+
     #The valid expression messages, required to
     #validate the expression in the dialog box
     global msgs
     msgs = statusMsgs
-    
+
     app = wx.App(False)
     if MAVExpLastGraph.description is None:
         MAVExpLastGraph.description = ''
@@ -445,11 +462,143 @@ def save_process(MAVExpLastGraph, child_pipe_console_input, child_pipe_graph_inp
     frame.ShowModal()
     frame.Destroy()
 
-
 def cmd_save(args):
     '''save a graph'''
     child = multiproc.Process(target=save_process, args=[mestate.last_graph, mestate.child_pipe_send_console, mestate.child_pipe_send_graph, mestate.status.msgs])
     child.start()
+
+# events from EV messages, taken from AP_Logger.h
+events = {
+    7 : "DATA_AP_STATE",
+    8 : "DATA_SYSTEM_TIME_SET",
+    9 : "DATA_INIT_SIMPLE_BEARING",
+    10 : "DATA_ARMED",
+    11 : "DATA_DISARMED",
+    15 : "DATA_AUTO_ARMED",
+    17 : "DATA_LAND_COMPLETE_MAYBE",
+    18 : "DATA_LAND_COMPLETE",
+    28 : "DATA_NOT_LANDED",
+    19 : "DATA_LOST_GPS",
+    21 : "DATA_FLIP_START",
+    22 : "DATA_FLIP_END",
+    25 : "DATA_SET_HOME",
+    26 : "DATA_SET_SIMPLE_ON",
+    27 : "DATA_SET_SIMPLE_OFF",
+    29 : "DATA_SET_SUPERSIMPLE_ON",
+    30 : "DATA_AUTOTUNE_INITIALISED",
+    31 : "DATA_AUTOTUNE_OFF",
+    32 : "DATA_AUTOTUNE_RESTART",
+    33 : "DATA_AUTOTUNE_SUCCESS",
+    34 : "DATA_AUTOTUNE_FAILED",
+    35 : "DATA_AUTOTUNE_REACHED_LIMIT",
+    36 : "DATA_AUTOTUNE_PILOT_TESTING",
+    37 : "DATA_AUTOTUNE_SAVEDGAINS",
+    38 : "DATA_SAVE_TRIM",
+    39 : "DATA_SAVEWP_ADD_WP",
+    41 : "DATA_FENCE_ENABLE",
+    42 : "DATA_FENCE_DISABLE",
+    43 : "DATA_ACRO_TRAINER_DISABLED",
+    44 : "DATA_ACRO_TRAINER_LEVELING",
+    45 : "DATA_ACRO_TRAINER_LIMITED",
+    46 : "DATA_GRIPPER_GRAB",
+    47 : "DATA_GRIPPER_RELEASE",
+    49 : "DATA_PARACHUTE_DISABLED",
+    50 : "DATA_PARACHUTE_ENABLED",
+    51 : "DATA_PARACHUTE_RELEASED",
+    52 : "DATA_LANDING_GEAR_DEPLOYED",
+    53 : "DATA_LANDING_GEAR_RETRACTED",
+    54 : "DATA_MOTORS_EMERGENCY_STOPPED",
+    55 : "DATA_MOTORS_EMERGENCY_STOP_CLEARED",
+    56 : "DATA_MOTORS_INTERLOCK_DISABLED",
+    57 : "DATA_MOTORS_INTERLOCK_ENABLED",
+    58 : "DATA_ROTOR_RUNUP_COMPLETE",
+    59 : "DATA_ROTOR_SPEED_BELOW_CRITICAL",
+    60 : "DATA_EKF_ALT_RESET",
+    61 : "DATA_LAND_CANCELLED_BY_PILOT",
+    62 : "DATA_EKF_YAW_RESET",
+    63 : "DATA_AVOIDANCE_ADSB_ENABLE",
+    64 : "DATA_AVOIDANCE_ADSB_DISABLE",
+    65 : "DATA_AVOIDANCE_PROXIMITY_ENABLE",
+    66 : "DATA_AVOIDANCE_PROXIMITY_DISABLE",
+    67 : "DATA_GPS_PRIMARY_CHANGED",
+    68 : "DATA_WINCH_RELAXED",
+    69 : "DATA_WINCH_LENGTH_CONTROL",
+    70 : "DATA_WINCH_RATE_CONTROL",
+    71 : "DATA_ZIGZAG_STORE_A",
+    72 : "DATA_ZIGZAG_STORE_B",
+    73 : "DATA_LAND_REPO_ACTIVE",
+    163 : "DATA_SURFACED",
+    164 : "DATA_NOT_SURFACED",
+    165 : "DATA_BOTTOMED",
+    166 : "DATA_NOT_BOTTOMED",
+}
+
+subsystems = {
+    1 : "MAIN",
+    2 : "RADIO",
+    3 : "COMPASS",
+    4 : "OPTFLOW",
+    5 : "FAILSAFE_RADIO",
+    6 : "FAILSAFE_BATT",
+    7 : "FAILSAFE_GPS",
+    8 : "FAILSAFE_GCS",
+    9 : "FAILSAFE_FENCE",
+    10 : "FLIGHT_MODE",
+    11 : "GPS",
+    12 : "CRASH_CHECK",
+    13 : "FLIP",
+    14 : "AUTOTUNE",
+    15 : "PARACHUTES",
+    16 : "EKFCHECK",
+    17 : "FAILSAFE_EKFINAV",
+    18 : "BARO",
+    19 : "CPU",
+    20 : "FAILSAFE_ADSB",
+    21 : "TERRAIN",
+    22 : "NAVIGATION",
+    23 : "FAILSAFE_TERRAIN",
+    24 : "EKF_PRIMARY",
+    25 : "THRUST_LOSS_CHECK",
+    26 : "FAILSAFE_SENSORS",
+    27 : "FAILSAFE_LEAK",
+    28 : "PILOT_INPUT",
+}
+
+error_codes = { # not used yet
+    "ERROR_RESOLVED" : 0,
+    "FAILED_TO_INITIALISE" : 1,
+    "UNHEALTHY" : 4,
+    # subsystem specific error codes -- radio
+    "RADIO_LATE_FRAME" : 2,
+    # subsystem specific error codes -- failsafe_thr, batt, gps
+    "FAILSAFE_RESOLVED" : 0,
+    "FAILSAFE_OCCURRED" : 1,
+    # subsystem specific error codes -- main
+    "MAIN_INS_DELAY" : 1,
+    # subsystem specific error codes -- crash checker
+    "CRASH_CHECK_CRASH" : 1,
+    "CRASH_CHECK_LOSS_OF_CONTROL" : 2,
+    # subsystem specific error codes -- flip
+    "FLIP_ABANDONED" : 2,
+    # subsystem specific error codes -- terrain
+    "MISSING_TERRAIN_DATA" : 2,
+    # subsystem specific error codes -- navigation
+    "FAILED_TO_SET_DESTINATION" : 2,
+    "RESTARTED_RTL" : 3,
+    "FAILED_CIRCLE_INIT" : 4,
+    "DEST_OUTSIDE_FENCE" : 5,
+    # parachute failed to deploy because of low altitude or landed
+    "PARACHUTE_TOO_LOW" : 2,
+    "PARACHUTE_LANDED" : 3,
+    # EKF check definitions
+    "EKFCHECK_BAD_VARIANCE" : 2,
+    "EKFCHECK_VARIANCE_CLEARED" : 0,
+    # Baro specific error codes
+    "BARO_GLITCH" : 2,
+    "BAD_DEPTH" : 3,
+    # GPS specific error coces
+    "GPS_GLITCH" : 2,
+}
 
 def cmd_messages(args):
     '''show messages'''
@@ -460,13 +609,17 @@ def cmd_messages(args):
     else:
         wildcard = '*'
     mestate.mlog.rewind()
-    types = set(['MSG','STATUSTEXT'])
+    types = set(['MSG','EV','ERR', 'STATUSTEXT'])
     while True:
         m = mestate.mlog.recv_match(type=types, condition=mestate.settings.condition)
         if m is None:
             break
         if m.get_type() == 'MSG':
             mstr = m.Message
+        elif m.get_type() == 'EV':
+            mstr = "Event: %s" % events.get(m.Id, str(m.Id))
+        elif m.get_type() == 'ERR':
+            mstr = "Error: Subsys %s ECode %u " % (subsystems.get(m.Subsys, str(m.Subsys)), m.ECode)
         else:
             mstr = m.text
         if fnmatch.fnmatch(mstr.upper(), wildcard.upper()):
@@ -484,7 +637,45 @@ def cmd_param(args):
     for p in k:
         if fnmatch.fnmatch(str(p).upper(), wildcard.upper()):
             print("%-16.16s %f" % (str(p), mestate.mlog.params[p]))
-            
+
+def cmd_paramchange(args):
+    '''show param changes'''
+    types = set(['PARM','PARAM_VALUE'])
+    vmap = {}
+    while True:
+        m = mestate.mlog.recv_match(type=types, condition=mestate.settings.condition)
+        if m is None:
+            break
+        if m.get_type() == 'PARM':
+            pname = m.Name
+            pvalue = m.Value
+        elif m.get_type() == 'PARAM_VALUE':
+            pname = m.param_id
+            pvalue = m.param_value
+        else:
+            continue
+        if pname.startswith('STAT_'):
+            # STAT_* changes are not interesting
+            continue
+        if not pname in vmap or vmap[pname] == pvalue:
+            vmap[pname] = pvalue
+            continue
+
+        tstr = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(m._timestamp))
+        print("%s %s %.6f -> %.6f" % (tstr, pname, vmap[pname], pvalue))
+        vmap[pname] = pvalue
+    mestate.mlog.rewind()
+
+def cmd_devid(args):
+    '''show parameters'''
+    params = mestate.mlog.params
+    k = sorted(params.keys())
+    for p in k:
+        if p.startswith('COMPASS_DEV_ID'):
+            mp_util.decode_devid(params[p], p)
+        if p.startswith('INS_') and p.endswith('_ID'):
+            mp_util.decode_devid(params[p], p)
+
 def cmd_loadfile(args):
     '''callback from menu to load a log file'''
     if len(args) != 1:
@@ -530,8 +721,8 @@ def process_stdin(line):
     args = shlex.split(line)
     cmd = args[0]
     if cmd == 'help':
-        k = sorted(command_map.keys())
-        for cmd in k:
+        k = command_map.keys()
+        for cmd in sorted(k):
             (fn, help) = command_map[cmd]
             print("%-15s : %s" % (cmd, help))
         return
@@ -599,7 +790,9 @@ command_map = {
     'save'       : (cmd_save,      'save a graph'),
     'condition'  : (cmd_condition, 'set graph conditions'),
     'param'      : (cmd_param,     'show parameters'),
+    'paramchange': (cmd_paramchange, 'show parameter changes in log'),
     'messages'   : (cmd_messages,  'show messages'),
+    'devid'      : (cmd_devid,     'show device IDs'),
     'map'        : (cmd_map,       'show map view'),
     'fft'        : (cmd_fft,       'show a FFT (if available)'),
     'loadLog'    : (cmd_loadfile,  'load a log file'),
@@ -620,15 +813,14 @@ if __name__ == "__main__":
     if args.version:
         #pkg_resources doesn't work in the windows exe build, so read the version file
         try:
-            import pkg_resources
             version = pkg_resources.require("mavproxy")[0].version
-        except:
+        except Exception as e:
             start_script = os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy", "version.txt")
             f = open(start_script, 'r')
             version = f.readline()
         print("MAVExplorer Version: " + version)
         sys.exit(1)
-    
+
     mestate = MEState()
     setup_file_menu()
 
@@ -644,7 +836,7 @@ if __name__ == "__main__":
     mestate.thread.start()
 
     # input loop
-    while mestate.rl is not None and mestate.exit != True:
+    while mestate.rl is not None and not mestate.exit:
         try:
             try:
                 line = input(mestate.rl.prompt)

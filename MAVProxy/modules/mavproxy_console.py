@@ -24,6 +24,7 @@ class ConsoleModule(mp_module.MPModule):
         self.speed = 0
         self.max_link_num = 0
         self.last_sys_status_health = 0
+        self.last_sys_status_errors_announce = 0
         mpstate.console = wxconsole.MessageConsole(title='Console')
 
         # setup some default status information
@@ -31,6 +32,7 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('SysID', '', row=0, fg='blue')
         mpstate.console.set_status('ARM', 'ARM', fg='grey', row=0)
         mpstate.console.set_status('GPS', 'GPS: --', fg='red', row=0)
+        mpstate.console.set_status('GPS2', '', fg='red', row=0)
         mpstate.console.set_status('Vcc', 'Vcc: --', fg='red', row=0)
         mpstate.console.set_status('Radio', 'Radio: --', row=0)
         mpstate.console.set_status('INS', 'INS', fg='grey', row=0)
@@ -56,12 +58,14 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('AspdError', 'AspdError --', row=3)
         mpstate.console.set_status('FlightTime', 'FlightTime --', row=3)
         mpstate.console.set_status('ETR', 'ETR --', row=3)
+        mpstate.console.set_status('Params', 'Param ---/---', row=3)
 
         mpstate.console.ElevationMap = mp_elevation.ElevationModel()
 
         self.vehicle_list = []
         self.vehicle_menu = None
         self.vehicle_name_by_sysid = {}
+        self.component_name = {}
         self.last_param_sysid_timestamp = None
 
         # create the main menu
@@ -76,6 +80,11 @@ class ConsoleModule(mp_module.MPModule):
     def add_menu(self, menu):
         '''add a new menu'''
         self.menu.add(menu)
+        self.mpstate.console.set_menu(self.menu, self.menu_callback)
+
+    def remove_menu(self, menu):
+        '''add a new menu'''
+        self.menu.remove(menu)
         self.mpstate.console.set_menu(self.menu, self.menu_callback)
 
     def unload(self):
@@ -146,7 +155,19 @@ class ConsoleModule(mp_module.MPModule):
             return "Heli"
         if hb.type == mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER:
             return "Tracker"
-        return "UNKNOWN(%u) % hb.type"
+        return "UNKNOWN(%u)" % hb.type
+
+    def component_type_string(self, hb):
+        # note that we rely on vehicle_type_string for basic vehicle types
+        if hb.type == mavutil.mavlink.MAV_TYPE_GCS:
+            return "GCS"
+        elif hb.type == mavutil.mavlink.MAV_TYPE_GIMBAL:
+            return "Gimbal"
+        elif hb.type == mavutil.mavlink.MAV_TYPE_ONBOARD_CONTROLLER:
+            return "CC"
+        elif hb.type == mavutil.mavlink.MAV_TYPE_GENERIC:
+            return "Generic"
+        return self.vehicle_type_string(hb)
 
     def update_vehicle_menu(self):
         '''update menu for new vehicles'''
@@ -158,7 +179,10 @@ class ConsoleModule(mp_module.MPModule):
                 self.vehicle_menu.items.append(MPMenuItem(name, name, '# vehicle %u' % s))
             else:
                 for c in sorted(clist):
-                    name = 'SysID %u[%u]: %s' % (s, c, self.vehicle_name_by_sysid[s])
+                    try:
+                        name = 'SysID %u[%u]: %s' % (s, c, self.component_name[s][c])
+                    except KeyError as e:
+                        name = 'SysID %u[%u]: ?' % (s,c)
                     self.vehicle_menu.items.append(MPMenuItem(name, name, '# vehicle %u:%u' % (s,c)))
         self.mpstate.console.set_menu(self.menu, self.menu_callback)
     
@@ -184,6 +208,12 @@ class ConsoleModule(mp_module.MPModule):
             sysid = msg.get_srcSystem()
             if not sysid in self.vehicle_list:
                 self.add_new_vehicle(msg)
+            if sysid not in self.component_name:
+                self.component_name[sysid] = {}
+            compid = msg.get_srcComponent()
+            if compid not in self.component_name[sysid]:
+                self.component_name[sysid][compid] = self.component_type_string(msg)
+                self.update_vehicle_menu()
 
         if self.last_param_sysid_timestamp != self.module('param').new_sysid_timestamp:
             '''a new component ID has appeared for parameters'''
@@ -205,30 +235,22 @@ class ConsoleModule(mp_module.MPModule):
 
         master = self.master
         # add some status fields
-        if type in [ 'GPS_RAW', 'GPS_RAW_INT' ]:
-            if type == "GPS_RAW":
-                num_sats1 = master.field('GPS_STATUS', 'satellites_visible', 0)
+        if type in [ 'GPS_RAW_INT', 'GPS2_RAW' ]:
+            if type == 'GPS_RAW_INT':
+                field = 'GPS'
+                prefix = 'GPS:'
             else:
-                num_sats1 = msg.satellites_visible
-            num_sats2 = master.field('GPS2_RAW', 'satellites_visible', -1)
-            if num_sats2 == -1:
-                sats_string = "%u" % num_sats1
+                field = 'GPS2'
+                prefix = 'GPS2'
+            nsats = msg.satellites_visible
+            fix_type = "%u" % msg.fix_type
+            if msg.fix_type >= 3:
+                self.console.set_status(field, '%s OK%s (%u)' % (prefix, msg.fix_type, msg.satellites_visible), fg='green')
             else:
-                sats_string = "%u/%u" % (num_sats1, num_sats2)
-            if ((msg.fix_type >= 3 and master.mavlink10()) or
-                (msg.fix_type == 2 and not master.mavlink10())):
-                if (msg.fix_type >= 4):
-                    fix_type = "%u" % msg.fix_type
-                else:
-                    fix_type = ""
-                self.console.set_status('GPS', 'GPS: OK%s (%s)' % (fix_type, sats_string), fg='green')
-            else:
-                self.console.set_status('GPS', 'GPS: %u (%s)' % (msg.fix_type, sats_string), fg='red')
-            if master.mavlink10():
-                gps_heading = int(self.mpstate.status.msgs['GPS_RAW_INT'].cog * 0.01)
-            else:
-                gps_heading = self.mpstate.status.msgs['GPS_RAW'].hdg
-            self.console.set_status('Heading', 'Hdg %s/%u' % (master.field('VFR_HUD', 'heading', '-'), gps_heading))
+                self.console.set_status(field, '%s %u (%u)' % (prefix, msg.fix_type, msg.satellites_visible), fg='red')
+            gps_heading = int(self.mpstate.status.msgs['GPS_RAW_INT'].cog * 0.01)
+            if type == 'GPS_RAW_INT':
+                self.console.set_status('Heading', 'Hdg %s/%u' % (master.field('VFR_HUD', 'heading', '-'), gps_heading))
         elif type == 'VFR_HUD':
             if master.mavlink10():
                 alt = master.field('GPS_RAW_INT', 'alt', 0) / 1.0e3
@@ -327,8 +349,23 @@ class ConsoleModule(mp_module.MPModule):
                     self.say("%s fail" % s)
             self.last_sys_status_health = msg.onboard_control_sensors_health
 
+            # check for any error bits being set:
+            now = time.time()
+            if now - self.last_sys_status_errors_announce > self.mpstate.settings.sys_status_error_warn_interval:
+                for field_num in range(1, 5):
+                    field = "errors_count%u" % field_num
+                    x = getattr(msg, field, None)
+                    if x is None:
+                        self.console.writeln("Failed to get field %s" % field)
+                        self.last_sys_status_errors_announce = now
+                        break
+                    if x != 0:
+                        self.last_sys_status_errors_announce = now
+                        self.say("Critical failure")
+                        break
+
         elif type == 'WIND':
-            self.console.set_status('Wind', 'Wind %u/%.2f' % (msg.direction, msg.speed))
+            self.console.set_status('Wind', 'Wind %u/%s' % (msg.direction, self.speed_string(msg.speed)))
 
         elif type == 'EKF_STATUS_REPORT':
             highest = 0.0
@@ -463,19 +500,23 @@ class ConsoleModule(mp_module.MPModule):
             self.console.set_status('WPDist', 'Distance %s' % self.dist_string(msg.wp_dist))
             self.console.set_status('WPBearing', 'Bearing %u' % msg.target_bearing)
             if msg.alt_error > 0:
-                alt_error_sign = "L"
+                alt_error_sign = "(L)"
             else:
-                alt_error_sign = "H"
+                alt_error_sign = "(H)"
             if msg.aspd_error > 0:
-                aspd_error_sign = "L"
+                aspd_error_sign = "(L)"
             else:
-                aspd_error_sign = "H"
+                aspd_error_sign = "(H)"
             if math.isnan(msg.alt_error):
                 alt_error = "NaN"
             else:
-                alt_error = "%d%s" % (msg.alt_error, alt_error_sign)
+                alt_error = "%s%s" % (self.height_string(msg.alt_error), alt_error_sign)
             self.console.set_status('AltError', 'AltError %s' % alt_error)
-            self.console.set_status('AspdError', 'AspdError %.1f%s' % (msg.aspd_error*0.01, aspd_error_sign))
+            self.console.set_status('AspdError', 'AspdError %s%s' % (self.speed_string(msg.aspd_error*0.01), aspd_error_sign))
+
+        elif type == 'PARAM_VALUE':
+            rec, tot = self.module('param').param_status()
+            self.console.set_status('Params', 'Param %u/%u' % (rec,tot))
 
 def init(mpstate):
     '''initialise module'''

@@ -12,11 +12,12 @@ import traceback
 # end wxGlade
 
 import time, math, os
-
+from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.mavproxy_misseditor import me_event
 MissionEditorEvent = me_event.MissionEditorEvent
 
 from MAVProxy.modules.mavproxy_misseditor import me_defines
+from MAVProxy.modules.mavproxy_map import mp_elevation
 
 from MAVProxy.modules.mavproxy_misseditor import button_renderer
 
@@ -33,6 +34,8 @@ ME_FRAME_COL = 8
 ME_DELETE_COL = 9
 ME_UP_COL = 10
 ME_DOWN_COL = 11
+ME_DIST_COL = 12
+ME_ANGLE_COL = 13
 
 class MissionEditorFrame(wx.Frame):
     def __init__(self, *args, **kwds):
@@ -61,9 +64,13 @@ class MissionEditorFrame(wx.Frame):
         self.button_save_wp_file = wx.Button(self, wx.ID_ANY, "Save WP File")
         self.grid_mission = wx.grid.Grid(self, wx.ID_ANY, size=(1, 1))
         self.button_add_wp = wx.Button(self, wx.ID_ANY, "Add Below")
+        self.button_split = wx.Button(self, wx.ID_ANY, "Split")
 
         self.__set_properties()
         self.__do_layout()
+
+        self.ElevationModel = mp_elevation.ElevationModel()
+
 
         self.Bind(wx.EVT_TEXT_ENTER, self.on_wp_radius_enter, self.text_ctrl_wp_radius)
         self.Bind(wx.EVT_TEXT, self.on_wp_radius_changed, self.text_ctrl_wp_radius)
@@ -80,6 +87,7 @@ class MissionEditorFrame(wx.Frame):
         self.Bind(wx.grid.EVT_GRID_CMD_CELL_LEFT_CLICK, self.on_mission_grid_cell_left_click, self.grid_mission)
         self.Bind(wx.grid.EVT_GRID_CMD_SELECT_CELL, self.on_mission_grid_cell_select, self.grid_mission)
         self.Bind(wx.EVT_BUTTON, self.add_wp_below_pushed, self.button_add_wp)
+        self.Bind(wx.EVT_BUTTON, self.split_pushed, self.button_split)
         # end wxGlade
 
         #use a timer to facilitate event an event handlers for events
@@ -103,10 +111,14 @@ class MissionEditorFrame(wx.Frame):
         self.down_attr = wx.grid.GridCellAttr()
         self.down_attr.SetReadOnly(True)
         self.down_attr.SetRenderer(down_br)
+        self.read_only_attr = wx.grid.GridCellAttr()
+        self.read_only_attr.SetReadOnly(True)
 
         self.grid_mission.SetColAttr(ME_DELETE_COL, self.del_attr)
         self.grid_mission.SetColAttr(ME_UP_COL, self.up_attr)
         self.grid_mission.SetColAttr(ME_DOWN_COL, self.down_attr)
+        self.grid_mission.SetColAttr(ME_DIST_COL, self.read_only_attr)
+        self.grid_mission.SetColAttr(ME_ANGLE_COL, self.read_only_attr)
         self.grid_mission.SetRowLabelSize(50)
 
         #remember what mission we opened/saved last
@@ -129,7 +141,7 @@ class MissionEditorFrame(wx.Frame):
         self.label_home_lon_value.SetMinSize((100, 17))
         self.label_home_lon_value.SetForegroundColour(wx.Colour(0, 127, 255))
         self.label_home_alt_value.SetForegroundColour(wx.Colour(0, 127, 255))
-        self.grid_mission.CreateGrid(0, 12)
+        self.grid_mission.CreateGrid(0, 14)
         self.grid_mission.SetRowLabelSize(20)
         self.grid_mission.SetColLabelSize(20)
         self.grid_mission.SetColLabelValue(0, "Command")
@@ -145,6 +157,9 @@ class MissionEditorFrame(wx.Frame):
         self.grid_mission.SetColLabelValue(9, "Delete")
         self.grid_mission.SetColLabelValue(10, "Up")
         self.grid_mission.SetColLabelValue(11, "Down")
+        self.grid_mission.SetDefaultColSize(-1)
+        self.grid_mission.SetColLabelValue(12, "Distance")
+        self.grid_mission.SetColLabelValue(13, "Grad (deg)")
         # end wxGlade
 
     def __do_layout(self):
@@ -203,6 +218,7 @@ class MissionEditorFrame(wx.Frame):
         sizer_3.Add(sizer_4, 0, wx.EXPAND, 0)
         sizer_3.Add(self.grid_mission, 1, wx.EXPAND, 0)
         sizer_16.Add(self.button_add_wp, 0, 0, 0)
+        sizer_16.Add(self.button_split, 0, 0, 0)
         sizer_3.Add(sizer_16, 0, wx.EXPAND, 0)
         self.SetSizer(sizer_3)
         self.Layout()
@@ -253,6 +269,8 @@ class MissionEditorFrame(wx.Frame):
             self.grid_mission.SetColSize(ME_LAT_COL, 100)
             self.grid_mission.SetColSize(ME_LON_COL, 100)
             self.grid_mission.SetColSize(ME_ALT_COL, 75)
+            self.grid_mission.SetColSize(ME_DIST_COL, -1)
+            self.grid_mission.SetColSize(ME_ANGLE_COL, -1)
 
             self.grid_mission.ForceRefresh()
         elif event.get_type() == me_event.MEGE_ADD_MISS_TABLE_ROWS:
@@ -268,7 +286,7 @@ class MissionEditorFrame(wx.Frame):
             command = event.get_arg("command")
 
             if row == -1:
-                #1st mission item is special: it's the immutable home poitn
+                #1st mission item is special: it's the immutable home position
                 self.label_home_lat_value.SetLabel(
                         str(event.get_arg("lat")))
                 self.label_home_lon_value.SetLabel(
@@ -298,6 +316,7 @@ class MissionEditorFrame(wx.Frame):
                         str(event.get_arg("lon")))
                 self.grid_mission.SetCellValue(row, ME_ALT_COL,
                         "%.2f" % event.get_arg("alt"))
+                self.set_grad_dist()
 
                 frame_num = event.get_arg("frame")
                 if frame_num in me_defines.frame_enum:
@@ -335,6 +354,8 @@ class MissionEditorFrame(wx.Frame):
 
         for i in range(1, 7):
             self.grid_mission.SetCellValue(row_num, i, "0.0")
+        for i in range(12, 14):
+            self.grid_mission.SetCellValue(row_num, i, "0.0")
 
         #set altitude to default:
         self.grid_mission.SetCellValue(row_num, ME_ALT_COL,
@@ -368,6 +389,7 @@ class MissionEditorFrame(wx.Frame):
 
     def set_modified_state(self, modified):
         if (modified):
+            self.set_grad_dist()
             self.label_sync_state.SetLabel("MODIFIED")
             self.label_sync_state.SetForegroundColour(wx.Colour(255, 0, 0))
         else:
@@ -478,12 +500,54 @@ class MissionEditorFrame(wx.Frame):
                     str(self.last_map_click_pos[0]))
             self.grid_mission.SetCellValue(row_selected + 1, ME_LON_COL,
                     str(self.last_map_click_pos[1]))
-
         #highlight new row
         self.grid_mission.SelectRow(row_selected+1)
         self.set_modified_state(True)
 
         self.fix_jumps(row_selected+1, 1)
+
+        event.Skip()
+
+    def split_pushed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
+        row_selected = self.grid_mission.GetGridCursorRow()
+        if (row_selected < 2):
+            print("Invalid row selected")
+            event.Skip()
+            return
+
+        if self.grid_mission.GetCellValue(row_selected, ME_COMMAND_COL) != "NAV_WAYPOINT":
+            print("Bad command (need NAV_WAYPOINT)")
+            event.Skip()
+            return
+
+        if self.grid_mission.GetCellValue(row_selected-1, ME_COMMAND_COL) != "NAV_WAYPOINT":
+            print("Bad previous command (need NAV_WAYPOINT)")
+            event.Skip()
+            return
+
+        if (self.grid_mission.GetCellValue(row_selected, ME_FRAME_COL) !=
+            self.grid_mission.GetCellValue(row_selected-1, ME_FRAME_COL)):
+            print("Items differ in frame")
+            event.Skip()
+            return
+
+        lat = (float(self.grid_mission.GetCellValue(row_selected, ME_LAT_COL)) +
+               float(self.grid_mission.GetCellValue(row_selected-1, ME_LAT_COL)))/2
+        lng = (float(self.grid_mission.GetCellValue(row_selected, ME_LON_COL)) +
+               float(self.grid_mission.GetCellValue(row_selected-1, ME_LON_COL)))/2
+        alt = (float(self.grid_mission.GetCellValue(row_selected, ME_ALT_COL)) +
+               float(self.grid_mission.GetCellValue(row_selected-1, ME_ALT_COL)))/2
+        self.grid_mission.InsertRows(row_selected)
+        self.prep_new_row(row_selected)
+
+        self.grid_mission.SetCellValue(row_selected, ME_LAT_COL, str(lat))
+        self.grid_mission.SetCellValue(row_selected, ME_LON_COL, str(lng))
+        self.grid_mission.SetCellValue(row_selected, ME_ALT_COL, str(alt))
+        #highlight new row
+        self.grid_mission.SelectRow(row_selected)
+        self.set_modified_state(True)
+
+        self.fix_jumps(row_selected, 1)
 
         event.Skip()
 
@@ -512,6 +576,8 @@ class MissionEditorFrame(wx.Frame):
         self.grid_mission.SetColLabelValue(ME_LAT_COL, "Lat")
         self.grid_mission.SetColLabelValue(ME_LON_COL, "Lon")
         self.grid_mission.SetColLabelValue(ME_ALT_COL, "Alt")
+        self.grid_mission.SetColLabelValue(ME_DIST_COL, "Distance")
+        self.grid_mission.SetColLabelValue(ME_ANGLE_COL, "Grad (deg)")
 
         if event.GetRow() == self.grid_mission.GetNumberRows():
             # this event fires when last row is deleted; ignore
@@ -589,7 +655,6 @@ class MissionEditorFrame(wx.Frame):
     def on_wp_radius_changed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
         #change text red
         self.text_ctrl_wp_radius.SetForegroundColour(wx.Colour(255, 0, 0))
-
         event.Skip()
     def on_wp_radius_enter(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
         try:
@@ -672,6 +737,50 @@ class MissionEditorFrame(wx.Frame):
                 p1 = int(float(self.grid_mission.GetCellValue(row, ME_P1_COL)))
                 if p1 > row_selected and p1+delta>0:
                     self.grid_mission.SetCellValue(row, ME_P1_COL, str(float(p1+delta)))
+
+    def set_grad_dist(self):
+        '''fix up distance and gradient when changing cell values'''
+        home_def_alt = float(self.label_home_alt_value.GetLabel())
+        numrows = self.grid_mission.GetNumberRows()
+        for row in range(1,numrows):
+            command = self.grid_mission.GetCellValue(row, ME_COMMAND_COL)
+            command_prev = self.grid_mission.GetCellValue(row - 1, ME_COMMAND_COL)
+            lat = float(self.grid_mission.GetCellValue(row, ME_LAT_COL))
+            lon = float(self.grid_mission.GetCellValue(row, ME_LON_COL))
+            if (lat == 0) and (lon == 0):
+                dist = 0.0
+                grad = 0.0
+            else :
+              if "NAV" in command:
+                row_prev = row - 1
+                while ("NAV" not in command_prev) and (row_prev > 0):
+                    command_prev = self.grid_mission.GetCellValue(row_prev - 1, ME_COMMAND_COL)
+                    row_prev = row_prev - 1
+                prev_lat = float(self.grid_mission.GetCellValue(row_prev, ME_LAT_COL))
+                prev_lon = float(self.grid_mission.GetCellValue(row_prev, ME_LON_COL))
+                prev_alt = float(self.grid_mission.GetCellValue(row_prev, ME_ALT_COL))
+                if (self.grid_mission.GetCellValue(row_prev, ME_FRAME_COL) == "Rel"):
+                    prev_alt = prev_alt + home_def_alt
+                elif (self.grid_mission.GetCellValue(row_prev, ME_FRAME_COL) == "AGL"):
+                    prev_alt = self.ElevationModel.GetElevation(prev_lat, prev_lon) + prev_alt
+                while (prev_lat == 0) and (prev_lon == 0) and (row_prev > 0):
+                    prev_lat = float(self.grid_mission.GetCellValue(row_prev - 1, ME_LAT_COL))
+                    prev_lon = float(self.grid_mission.GetCellValue(row_prev - 1, ME_LON_COL))
+                    row_prev = row_prev - 1
+                dist = mp_util.gps_distance(lat, lon, prev_lat, prev_lon)
+                curr_alt = float(self.grid_mission.GetCellValue(row, ME_ALT_COL))
+                if (self.grid_mission.GetCellValue(row, ME_FRAME_COL) == "Rel"):
+                    curr_alt = curr_alt + home_def_alt
+                elif(self.grid_mission.GetCellValue(row, ME_FRAME_COL) == "AGL"):
+                    curr_alt = curr_alt + self.ElevationModel.GetElevation(lat, lon)
+                grad = math.atan2(curr_alt - prev_alt, dist) *180 / math.pi
+              else:
+                grad = 0.0
+                dist = 0.0
+            dist = format(dist, '.1f')
+            grad = format(grad, '.1f')
+            self.grid_mission.SetCellValue(row, ME_DIST_COL, str(dist))
+            self.grid_mission.SetCellValue(row, ME_ANGLE_COL, str(grad))
 
 # end of class MissionEditorFrame
 if __name__ == "__main__":

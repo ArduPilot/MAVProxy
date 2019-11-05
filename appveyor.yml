@@ -9,8 +9,8 @@ environment:
     # Pre-installed Python versions, which Appveyor may upgrade to
     # a later point release.
     # See: https://www.appveyor.com/docs/installed-software#python
-    - PYTHON: "C:\\Python27"
-      PYTHON_VERSION: "2.7.x" # currently 2.7.15
+    - PYTHON: "C:\\Python35"
+      PYTHON_VERSION: "3.5.x"
       PYTHON_ARCH: "32"
 
 
@@ -25,34 +25,26 @@ install:
         Where-Object pullRequestId -eq $env:APPVEYOR_PULL_REQUEST_NUMBER)[0].buildNumber) { `
           throw "There are newer queued builds for this pull request, failing early." }
 
-
+  - SET PATH=%PYTHON%;%PATH%
+    
   # Check that we have the expected version and architecture for Python
   - "python --version"
   - "python -c \"import struct; print(struct.calcsize('P') * 8)\""
+  - "python -m pip install --upgrade pip"
   
   # Install the build dependencies of the project. If some dependencies contain
   # compiled extensions and are not provided as pre-built wheel packages,
   # pip will build them from source using the MSVC compiler matching the
   # target Python version and architecture
-  - "pip install -U pywin32 lxml pymavlink numpy matplotlib pyserial opencv-python pyreadline PyYAML Pygame Pillow"
-  - "pip install pyinstaller setuptools packaging"
+  - "python -m pip install -U pywin32 lxml pymavlink numpy matplotlib pyserial opencv-python pyreadline PyYAML Pygame Pillow wxpython"
+  - "python -m pip install -U pyinstaller setuptools packaging --no-use-pep517"
   
   #We're using Inno Setup to build an installer
   - cinst -y InnoSetup
-  
-  #Wxpython3
-  - ps: |
-      $InstallersFolder = $Env:APPVEYOR_BUILD_FOLDER + "\_build\installers\"
-      New-Item $InstallersFolder -type directory | Out-Null
-      $WXInstaller = $InstallersFolder + "wxPython3.0-win32-3.0.2.0-py27.exe"
-      $WXURL = "http://downloads.sourceforge.net/wxpython/wxPython3.0-win32-3.0.2.0-py27.exe"
-      Start-FileDownload $WXURL -Timeout 60000 -FileName $WXInstaller
-      "    Installing..."
-      Start-Process $WXInstaller -Arg "/VERYSILENT /SUPPRESSMSGBOXES" -NoNewWindow -Wait
-      "    Done."
+ 
   
   #Debug for getting a list of what packages/version were used for this build
-  - "pip list"
+  - "python -m pip list"
   
 build_script:
   # Build the compiled extension
@@ -86,13 +78,16 @@ after_test:
   - "ISCC.exe /dMyAppVersion=%VERSION% mavproxy.iss"
   - "cd ..\\"
   
-
-artifacts:
-  # Archive the generated packages in the ci.appveyor.com build report.
-  - path: MAVProxy\dist\
-    name: WindowsCompiledFiles
-  - path: windows\Output\
-    name: WindowsInstaller
+for:
+  -
+    branches:
+      only: 
+        - master
+    artifacts:
+    - path: MAVProxy\dist\
+      name: WindowsCompiledFiles
+    - path: windows\Output\
+      name: WindowsInstaller
 
 #on_success:
 #  - TODO: upload the content of dist/*.whl to a public wheelhouse

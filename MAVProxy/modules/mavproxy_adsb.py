@@ -11,26 +11,38 @@ from MAVProxy.modules.lib import mp_settings
 from pymavlink import mavutil
 
 obc_icons = {
-    0 : 'greenplane.png',
-    1 : 'greenplane.png',
-    2 : 'cloud.png',
-    3 : 'migbird.png',
-    4 : 'hawk.png'
+    100 : 'greenplane.png',
+    101 : 'greenplane.png',
+    102 : 'cloud.png',
+    103 : 'migbird.png',
+    104 : 'hawk.png'
 }
 
 obc_radius = {
-    0 : 300,
-    1 : 300,
-    2 : 173,
-    3 : 100,
-    4 : 200
+    100 : 300,
+    101 : 300,
+    102 : 173,
+    103 : 100,
+    104 : 200
 }
     
-def get_threat_radius(obc_type):
+def get_threat_radius(m):
+
+    if m.emitter_type == 255:
+        ''' objectAvoidance Database item, squawk contains radius in cm'''
+        return m.squawk * 0.01
     '''get threat radius for an OBC item'''
-    if obc_type in obc_radius:
-        return obc_radius[obc_type]
-    return 0
+    return obc_radius.get(m.emitter_type,0)
+
+
+def get_threat_icon(m, default_icon):
+
+    if m.emitter_type == 255:
+        ''' objectAvoidance Database item, do not draw an icon'''
+        return None
+    '''get threat radius for an OBC item, else the true ADSB icon'''
+    return obc_icons.get(m.emitter_type, default_icon)
+
 
 class ADSBVehicle(object):
     '''a generic ADS-B threat'''
@@ -186,18 +198,18 @@ class ADSBModule(mp_module.MPModule):
                     from MAVProxy.modules.lib import mp_menu
                     from MAVProxy.modules.mavproxy_map import mp_slipmap
                     self.threat_vehicles[id].menu_item = mp_menu.MPMenuItem(name=id, returnkey=None)
-                    if m.emitter_type >= 100 and m.emitter_type-100 in obc_icons:
-                        icon = mp.map.icon(obc_icons[m.emitter_type-100])
-                        threat_radius = get_threat_radius(m.emitter_type-100)
-                    else:
-                        icon = mp.map.icon(self.threat_vehicles[id].icon)
-                        threat_radius = 0
-                    popup = mp_menu.MPMenuSubMenu('ADSB', items=[self.threat_vehicles[id].menu_item])
-                    # draw the vehicle on the map
-                    mp.map.add_object(mp_slipmap.SlipIcon(id, (m.lat * 1e-7, m.lon * 1e-7),
-                                                                    icon, layer=3, rotation=m.heading*0.01, follow=False,
-                                                                    trail=mp_slipmap.SlipTrail(colour=(0, 255, 255)),
-                                                                    popup_menu=popup))
+
+                    threat_radius = get_threat_radius(m)
+                    selected_icon = get_threat_icon(m, self.threat_vehicles[id].icon)
+                    
+                    if selected_icon is not None:
+                        # draw the vehicle on the map
+                        popup = mp_menu.MPMenuSubMenu('ADSB', items=[self.threat_vehicles[id].menu_item])
+                        icon = mp.map.icon(selected_icon)
+                        mp.map.add_object(mp_slipmap.SlipIcon(id, (m.lat * 1e-7, m.lon * 1e-7),
+                                                    icon, layer=3, rotation=m.heading*0.01, follow=False,
+                                                    trail=mp_slipmap.SlipTrail(colour=(0, 255, 255)),
+                                                    popup_menu=popup))
                     if threat_radius > 0:
                         mp.map.add_object(mp_slipmap.SlipCircle(id+":circle", 3,
                                                     (m.lat * 1e-7, m.lon * 1e-7),

@@ -76,6 +76,7 @@ class MavGraph(object):
         self.xlim = None
         self.tday_base = None
         self.tday_basetime = None
+        self.title = None
 
     def add_field(self, field):
         '''add another field to plot'''
@@ -92,6 +93,10 @@ class MavGraph(object):
     def set_xaxis(self, xaxis):
         '''set graph xaxis'''
         self.xaxis = xaxis
+
+    def set_title(self, title):
+        '''set graph title'''
+        self.title = title
 
     def set_marker(self, marker):
         '''set graph marker'''
@@ -184,9 +189,10 @@ class MavGraph(object):
         '''called on draw events'''
         self.draw_events += 1
 
-    def plotit(self, x, y, fields, colors=[]):
+    def plotit(self, x, y, fields, colors=[], title=None, interactive=True):
         '''plot a set of graphs using date for x axis'''
-        pylab.ion()
+        if interactive:
+            pylab.ion()
         self.fig = pylab.figure(num=1, figsize=(12,6))
         self.ax1 = self.fig.gca()
         ax2 = None
@@ -305,6 +311,9 @@ class MavGraph(object):
             print("No data to graph")
             return
 
+        if title is not None:
+            pylab.title(title)
+
         if self.show_flightmode:
             mode_patches = []
             for mode in self.modes_plotted.keys():
@@ -343,8 +352,13 @@ class MavGraph(object):
                 xv = mavutil.evaluate_expression(self.xaxis, vars)
                 if xv is None:
                     continue
-            self.y[i].append(v)
-            self.x[i].append(xv)
+            try:
+                v_f = float(v)
+                xv_f = float(xv)
+            except Exception:
+                continue
+            self.y[i].append(v_f)
+            self.x[i].append(xv_f)
 
     def timestamp_to_days(self, timestamp):
         '''convert log timestamp to days'''
@@ -466,7 +480,7 @@ class MavGraph(object):
             self.process_mav(mlog, flightmode_selections)
 
 
-    def show(self, lenmavlist, block=True, xlim_pipe=None):
+    def show(self, lenmavlist, block=True, xlim_pipe=None, output=None):
         '''show graph'''
         if xlim_pipe is not None:
             xlim_pipe[0].close()
@@ -494,20 +508,32 @@ class MavGraph(object):
                 col = colors[:]
             else:
                 col = colors[fi*len(self.fields):]
-            self.plotit(self.x, self.y, lab, colors=col)
+            interactive = True
+            if output is not None:
+                interactive = False
+            self.plotit(self.x, self.y, lab, colors=col, title=self.title, interactive=interactive)
             for i in range(0, len(self.x)):
                 self.x[i] = []
                 self.y[i] = []
 
-        if self.xlim_pipe is not None:
+        if self.xlim_pipe is not None and output is None:
             import matplotlib.animation
             self.ani = matplotlib.animation.FuncAnimation(self.fig, self.xlim_change_check,
                                                           frames=10, interval=20000,
                                                           repeat=True, blit=False)
             threading.Timer(0.1, self.xlim_timer).start()
 
-        pylab.draw()
-        pylab.show(block=block)
+        if output is None:
+            pylab.draw()
+            pylab.show(block=block)
+        elif output.endswith(".html"):
+            import mpld3
+            html = mpld3.fig_to_html(self.fig)
+            f_out = open(output, 'w')
+            f_out.write(html)
+            f_out.close()
+        else:
+            pylab.savefig(output, bbox_inches='tight', dpi=200)
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -522,6 +548,7 @@ if __name__ == "__main__":
     parser.add_argument("--marker", default=None, help="point marker")
     parser.add_argument("--linestyle", default=None, help="line style")
     parser.add_argument("--xaxis", default=None, help="X axis expression")
+    parser.add_argument("--title", default=None, help="set title")
     parser.add_argument("--multi", action='store_true', help="multiple files with same colours")
     parser.add_argument("--zero-time-base", action='store_true', help="use Z time base for DF logs")
     parser.add_argument("--show-flightmode", default=True,
@@ -549,6 +576,7 @@ if __name__ == "__main__":
     mg.set_legend(args.legend)
     mg.set_legend2(args.legend2)
     mg.set_multi(args.multi)
+    mg.set_title(args.title)
     mg.set_show_flightmode(args.show_flightmode)
-    mg.process([],0)
-    mg.show(len(mg.mav_list))
+    mg.process([],[],0)
+    mg.show(len(mg.mav_list), output=args.output)

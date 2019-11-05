@@ -508,6 +508,35 @@ class SlipPosition:
         self.label = label
         self.colour = colour
 
+class SlipClickLocation(SlipObject):
+    '''current click location tuple'''
+    def __init__(self, location, layer='', timeout=-1):
+        self.location = location
+        self.linewidth = 2
+        self.colour = (0, 0, 255)
+        self.length = 10
+        self.layer = layer
+        self.key = "click"
+        self.timeout = timeout
+        self.start = time.time()
+
+    def draw(self, img, pixmapper, bounds):
+        '''X marks the spot'''
+        if self.location is None:
+            return
+        if self.timeout != -1 and time.time() - self.start > self.timeout:
+            return
+
+        (px,py) = pixmapper(self.location)
+
+        p1 = (px-self.length, py-self.length)
+        p2 = (px+self.length, py+self.length)
+        p3 = (px-self.length, py+self.length)
+        p4 = (px+self.length, py-self.length)
+
+        cv2.line(img, p1, p2, self.colour, self.linewidth)
+        cv2.line(img, p3, p4, self.colour, self.linewidth)
+
 class SlipCenter:
     '''an object to move the view center'''
     def __init__(self, latlon):

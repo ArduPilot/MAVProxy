@@ -225,7 +225,7 @@
 
   <graph name='EKF/Wind Speed and Direction'>
     <description>Wind Velocity NE</description>
-    <expression>sqrt(sqrt(NKF2.VWN**2+NKF2.VWE**2) wrap_360(degrees(atan2(-NKF2.VWE,-NKF2.VWN))):2 sqrt(NKF7.VWN**2+NKF7.VWE**2) wrap_360(degrees(atan2(-NKF7.VWE,-NKF7.VWN))):2</expression>
+    <expression>sqrt(NKF2.VWN**2+NKF2.VWE**2) wrap_360(degrees(atan2(-NKF2.VWE,-NKF2.VWN))):2 sqrt(NKF7.VWN**2+NKF7.VWE**2) wrap_360(degrees(atan2(-NKF7.VWE,-NKF7.VWN))):2</expression>
     <expression>sqrt(EKF2.VWN**2+EKF2.VWE**2) wrap_360(degrees(atan2(-EKF2.VWE,-EKF2.VWN))):2 sqrt(NKF2.VWN**2+NKF2.VWE**2) wrap_360(degrees(atan2(-NKF2.VWE,-NKF2.VWN))):2</expression>
     <expression>sqrt(EKF2.VWN**2+EKF2.VWE**2) wrap_360(degrees(atan2(-EKF2.VWE,-EKF2.VWN))):2</expression>
   </graph>
@@ -299,6 +299,16 @@
     <description>Magnetometer Selection</description>
     <expression>NKF4.PI NKF9.PI</expression>
     <expression>NKF4.PI</expression>
+  </graph>
+
+  <graph name='EKF/Normalised Innovations EK2 Lane1'>
+    <description></description>
+    <expression>NKF4.SV NKF4.SP NKF4.SH NKF4.SM NKF4.SVT</expression>
+  </graph>
+
+  <graph name='EKF/Normalised Innovations EK2 Lane2'>
+    <description></description>
+    <expression>NKF9.SV NKF9.SP NKF9.SH NKF9.SM NKF9.SVT</expression>
   </graph>
 
 </graphs>

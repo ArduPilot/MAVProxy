@@ -325,3 +325,79 @@ def null_term(str):
     return str
 
     
+def decode_devid(devid, pname):
+    '''decode one device ID. Used for 'devid' command in mavproxy and MAVExplorer'''
+    devid = int(devid)
+    if devid == 0:
+        return
+
+    bus_type=devid & 0x07
+    bus=(devid>>3) & 0x1F
+    address=(devid>>8)&0xFF
+    devtype=(devid>>16)
+
+    bustypes = {
+        1: "I2C",
+        2: "SPI",
+        3: "UAVCAN",
+        4: "SITL"
+        }
+
+    compass_types = {
+        0x01 : "DEVTYPE_HMC5883_OLD",
+        0x07 : "DEVTYPE_HMC5883",
+        0x02 : "DEVTYPE_LSM303D",
+        0x04 : "DEVTYPE_AK8963 ",
+        0x05 : "DEVTYPE_BMM150 ",
+        0x06 : "DEVTYPE_LSM9DS1",
+        0x08 : "DEVTYPE_LIS3MDL",
+        0x09 : "DEVTYPE_AK09916",
+        0x0A : "DEVTYPE_IST8310",
+        0x0B : "DEVTYPE_ICM20948",
+        0x0C : "DEVTYPE_MMC3416",
+        0x0D : "DEVTYPE_QMC5883L",
+        0x0E : "DEVTYPE_MAG3110",
+        0x0F : "DEVTYPE_SITL",
+        0x10 : "DEVTYPE_IST8308",
+        0x11 : "DEVTYPE_RM3100",
+        }
+
+    imu_types = {
+        0x09 : "DEVTYPE_BMI160",
+        0x10 : "DEVTYPE_L3G4200D",
+        0x11 : "DEVTYPE_ACC_LSM303D",
+        0x12 : "DEVTYPE_ACC_BMA180",
+        0x13 : "DEVTYPE_ACC_MPU6000",
+        0x16 : "DEVTYPE_ACC_MPU9250",
+        0x17 : "DEVTYPE_ACC_IIS328DQ",
+        0x21 : "DEVTYPE_GYR_MPU6000",
+        0x22 : "DEVTYPE_GYR_L3GD20",
+        0x24 : "DEVTYPE_GYR_MPU9250",
+        0x25 : "DEVTYPE_GYR_I3G4250D",
+        0x26 : "DEVTYPE_GYR_LSM9DS1",
+        0x27 : "DEVTYPE_INS_ICM20789",
+        0x28 : "DEVTYPE_INS_ICM20689",
+        0x29 : "DEVTYPE_INS_BMI055",
+        0x2A : "DEVTYPE_SITL",
+        0x2B : "DEVTYPE_INS_BMI088",
+        0x2C : "DEVTYPE_INS_ICM20948",
+        0x2D : "DEVTYPE_INS_ICM20648",
+        0x2E : "DEVTYPE_INS_ICM20649",
+        0x2F : "DEVTYPE_INS_ICM20602",
+        }
+
+    decoded_devname = ""
+
+    if pname.startswith("COMPASS"):
+        if bus_type == 3 and devtype == 1:
+            decoded_devname = "UAVCAN"
+        else:
+            decoded_devname = compass_types.get(devtype, "UNKNOWN")
+
+    if pname.startswith("INS"):
+        decoded_devname = imu_types.get(devtype, "UNKNOWN")
+
+    print("%s: bus_type:%s(%u)  bus:%u address:%u(0x%x) devtype:%u(0x%x) %s" % (
+        pname,
+        bustypes.get(bus_type,"UNKNOWN"), bus_type,
+        bus, address, address, devtype, devtype, decoded_devname))

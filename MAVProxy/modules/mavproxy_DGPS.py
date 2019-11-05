@@ -7,10 +7,6 @@ import socket, errno
 from pymavlink import mavutil
 from MAVProxy.modules.lib import mp_module
 
-import socket, errno
-from pymavlink import mavutil
-from MAVProxy.modules.lib import mp_module
-
 class DGPSModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(DGPSModule, self).__init__(mpstate, "DGPS", "DGPS injection support for SBP/RTCP/UBC")

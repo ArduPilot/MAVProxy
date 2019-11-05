@@ -76,11 +76,7 @@ class GimbalModule(mp_module.MPModule):
     def cmd_gimbal_roi(self, args):
         '''control roi position'''
         latlon = None
-        try:
-            latlon = self.module('map').click_position
-        except Exception:
-            print("No map available")
-            return
+        latlon = self.mpstate.click_location
         if latlon is None:
             print("No map click position available")
             return
@@ -103,11 +99,7 @@ class GimbalModule(mp_module.MPModule):
             vel[0:3] = args[0:3]
         if (len(args) == 6):
             acc[0:3] = args[3:6]
-        try:
-            latlon = self.module('map').click_position
-        except Exception:
-            print("No map available")
-            return
+        latlon = self.mpstate.click_location
         if latlon is None:
             print("No map click position available")
             latlon = (0,0,0)
