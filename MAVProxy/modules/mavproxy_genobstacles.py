@@ -290,7 +290,7 @@ class GenobstaclesModule(mp_module.MPModule):
 
     def cmd_dropobject(self, obj):
         '''drop an object on the map'''
-        latlon = self.module('map').click_position
+        latlon = self.mpstate.click_location
         if self.last_click is not None and self.last_click == latlon:
             return
         self.last_click = latlon
@@ -328,7 +328,7 @@ class GenobstaclesModule(mp_module.MPModule):
         elif args[0] == "status":
             print(self.status())
         elif args[0] == "remove":
-            latlon = self.module('map').click_position
+            latlon = self.mpstate.click_location
             if self.last_click is not None and self.last_click == latlon:
                 return
             self.last_click = latlon

@@ -144,6 +144,12 @@ class MPModule(object):
         if completions is not None:
             self.mpstate.completions[name] = completions
 
+    def remove_command(self, name):
+        if name in self.mpstate.command_map:
+            del self.mpstate.command_map[name]
+        if name in self.mpstate.completions:
+            del self.mpstate.completions[name]
+
     def add_completion_function(self, name, callback):
         self.mpstate.completion_functions[name] = callback
 
@@ -171,12 +177,16 @@ class MPModule(object):
         '''return a speed in configured units'''
         if self.settings.speed_unit == 'knots':
             return val_ms * 1.94384
+        elif self.settings.speed_unit == 'mph':
+            return val_ms * 2.23694
         return val_ms
 
     def speed_string(self, val_ms):
         '''return a speed as a string'''
         if self.settings.speed_unit == 'knots':
             return "%ukn" % (val_ms * 1.94384)
+        elif self.settings.speed_unit == 'mph':
+            return "%umph" % (val_ms * 2.23694)
         return "%um/s" % val_ms
 
     def set_prompt(self, prompt):

@@ -44,6 +44,8 @@ class DeviceOpModule(mp_module.MPModule):
         address = int(args[2],base=0)
         reg = int(args[3],base=0)
         count = int(args[4],base=0)
+        if sys.version_info.major >= 3:
+            name = bytearray(name, 'ascii')
         self.master.mav.device_op_read_send(self.target_system,
                                             self.target_component,
                                             self.request_id,
@@ -73,6 +75,8 @@ class DeviceOpModule(mp_module.MPModule):
         bytes = [0]*128
         for i in range(count):
             bytes[i] = int(args[i],base=0)
+        if sys.version_info.major >= 3:
+            name = bytearray(name, 'ascii')
         self.master.mav.device_op_write_send(self.target_system,
                                              self.target_component,
                                              self.request_id,

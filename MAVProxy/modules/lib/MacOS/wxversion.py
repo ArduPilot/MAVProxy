@@ -500,14 +500,14 @@ if __name__ == '__main__':
     try:
         # expecting an error on this one
         test("2.9")
-    except VersionError, e:
+    except VersionError as e:
         print("Asked for 2.9:\t got Exception:", e)
 
     # check for exception when incompatible versions are requested
     try:
         select("2.4")
         select("2.5")
-    except VersionError, e:
+    except     VersionError as e:
         print("Asked for incompatible versions, got Exception:", e)
 
     _EM_DEBUG=1
@@ -516,7 +516,7 @@ if __name__ == '__main__':
     testEM("2.6-unicode", True)
     try:
         testEM("2.9")
-    except VersionError, e:
+    except     VersionError as e:
         print("EM: Asked for 2.9:\t got Exception:", e)
 
     # cleanup

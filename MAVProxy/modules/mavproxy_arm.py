@@ -24,13 +24,14 @@ arming_masks = {
 
 class ArmModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(ArmModule, self).__init__(mpstate, "arm", "arm/disarm handling")
+        super(ArmModule, self).__init__(mpstate, "arm", "arm/disarm handling", public=True)
         checkables = "<" + "|".join(arming_masks.keys()) + ">"
         self.add_command('arm', self.cmd_arm,      'arm motors', ['check ' + self.checkables(),
                                       'uncheck ' + self.checkables(),
                                       'list',
                                       'throttle',
                                       'safetyon',
+                                      'safetystatus',
                                       'safetyoff'])
         self.add_command('disarm', self.cmd_disarm,   'disarm motors')
         self.was_armed = False
@@ -40,7 +41,7 @@ class ArmModule(mp_module.MPModule):
 
     def cmd_arm(self, args):
         '''arm commands'''
-        usage = "usage: arm <check|uncheck|list|throttle|safetyon|safetyoff>"
+        usage = "usage: arm <check|uncheck|list|throttle|safetyon|safetyoff|safetystatus>"
 
         if len(args) <= 0:
             print(usage)
@@ -113,6 +114,18 @@ class ArmModule(mp_module.MPModule):
             self.master.mav.set_mode_send(self.target_system,
                                           mavutil.mavlink.MAV_MODE_FLAG_DECODE_POSITION_SAFETY,
                                           1)
+            return
+
+        if args[0] == "safetystatus":
+            try:
+                sys_status = self.master.messages['SYS_STATUS']
+            except KeyError:
+                print("Unknown; no SYS_STATUS")
+                return
+            if sys_status.onboard_control_sensors_enabled & mavutil.mavlink.MAV_SYS_STATUS_SENSOR_MOTOR_OUTPUTS:
+                print("Safety is OFF (vehicle is dangerous)")
+            else:
+                print("Safety is ON (vehicle allegedly safe)")
             return
 
         if args[0] == "safetyoff":

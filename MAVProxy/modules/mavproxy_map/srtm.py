@@ -23,7 +23,6 @@ import array
 import math
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import multiproc
-import tempfile
 
 childTileDownload = {}
 childFileListDownload = {}
@@ -75,7 +74,11 @@ class SRTMDownloader():
             try:
                 cachedir = os.path.join(os.environ['HOME'], '.tilecache/SRTM')
             except Exception:
-                cachedir = os.path.join(tempfile.gettempdir(), 'MAVProxySRTM')
+                if 'LOCALAPPDATA' in os.environ:
+                    cachedir = os.path.join(os.environ['LOCALAPPDATA'], '.tilecache/SRTM')
+                else:
+                    import tempfile
+                    cachedir = os.path.join(tempfile.gettempdir(), 'MAVProxySRTM')
 
         self.debug = debug
         self.offline = offline
@@ -147,7 +150,16 @@ class SRTMDownloader():
                     continue
                 data = r1.read()
                 conn.close()
-                return data
+                if sys.version_info.major < 3:
+                    return data
+                else:
+                    encoding = r1.headers.get_content_charset()
+                    if encoding is not None:
+                        return data.decode(encoding)
+                    elif ".zip" in url or ".hgt" in url:
+                        return data
+                    else:
+                        return data.decode('utf-8')
         return None
 
     def createFileListHTTP(self):
