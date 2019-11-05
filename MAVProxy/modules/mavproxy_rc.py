@@ -4,23 +4,30 @@
 import time, os, struct
 from pymavlink import mavutil
 from MAVProxy.modules.lib import mp_module
+from MAVProxy.modules.lib import mp_settings
 
 class RCModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(RCModule, self).__init__(mpstate, "rc", "rc command handling", public = True)
-        self.override = [ 0 ] * 16
-        self.last_override = [ 0 ] * 16
+        self.count = 18
+        self.override = [ 0 ] * self.count
+        self.last_override = [ 0 ] * self.count
         self.override_counter = 0
-        self.add_command('rc', self.cmd_rc, "RC input control", ['<1|2|3|4|5|6|7|8|all>'])
+        x = "|".join(str(x) for x in range(1, (self.count+1)))
+        self.add_command('rc', self.cmd_rc, "RC input control", ['<%s|all>' % x])
         self.add_command('switch', self.cmd_switch, "flight mode switch control", ['<0|1|2|3|4|5|6>'])
+        self.rc_settings = mp_settings.MPSettings(
+            [('override_hz', float, 5.0)])
         if self.sitl_output:
-            self.override_period = mavutil.periodic_event(20)
-        else:
-            self.override_period = mavutil.periodic_event(1)
+            self.rc_settings.override_hz = 20.0
+        self.add_completion_function('(RCSETTING)',
+                                     self.rc_settings.completion)
+        self.override_period = mavutil.periodic_event(self.rc_settings.override_hz)
 
     def idle_task(self):
+        self.override_period.frequency = self.rc_settings.override_hz
         if self.override_period.trigger():
-            if (self.override != [ 0 ] * 16 or
+            if (self.override != [ 0 ] * self.count or
                 self.override != self.last_override or
                 self.override_counter > 0):
                 self.last_override = self.override[:]
@@ -31,14 +38,14 @@ class RCModule(mp_module.MPModule):
     def send_rc_override(self):
         '''send RC override packet'''
         if self.sitl_output:
-            buf = struct.pack('<HHHHHHHHHHHHHHHH',
-                              *self.override)
+            chan16 = self.override[:16]
+            buf = struct.pack('<HHHHHHHHHHHHHHHH', *chan16)
             self.sitl_output.write(buf)
         else:
-            chan8 = self.override[:8]
+            chan18 = self.override[:18]
             self.master.mav.rc_channels_override_send(self.target_system,
-                                                           self.target_component,
-                                                           *chan8)
+                                                      self.target_component,
+                                                      *chan18)
 
     def cmd_switch(self, args):
         '''handle RC switch changes'''
@@ -85,8 +92,17 @@ class RCModule(mp_module.MPModule):
 
     def cmd_rc(self, args):
         '''handle RC value override'''
+        if len(args) > 0 and args[0] == 'set':
+            self.rc_settings.command(args[1:])
+            return
+        if len(args) == 1 and args[0] == 'clear':
+            channels = self.override
+            for i in range(self.count):
+                channels[i] = 0
+            self.set_override(channels)
+            return
         if len(args) != 2:
-            print("Usage: rc <channel|all> <pwmvalue>")
+            print("Usage: rc <set|channel|all|clear> <pwmvalue>")
             return
         value = int(args[1])
         if value > 65535 or value < -1:
@@ -95,12 +111,12 @@ class RCModule(mp_module.MPModule):
             value = 65535
         channels = self.override
         if args[0] == 'all':
-            for i in range(16):
+            for i in range(self.count):
                 channels[i] = value
         else:
             channel = int(args[0])
-            if channel < 1 or channel > 16:
-                print("Channel must be between 1 and 8 or 'all'")
+            if channel < 1 or channel > self.count:
+                print("Channel must be between 1 and %u or 'all'" % self.count)
                 return
             channels[channel - 1] = value
         self.set_override(channels)

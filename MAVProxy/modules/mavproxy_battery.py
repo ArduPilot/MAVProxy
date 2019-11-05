@@ -32,7 +32,7 @@ class BatteryModule(mp_module.MPModule):
             MPSetting('servowarn', float, 4.3, 'Servo voltage warning level'))
         self.settings.append(
             MPSetting('vccwarn', float, 4.3, 'Vcc voltage warning level'))
-        self.settings.append(MPSetting('numcells', int, 0, range=(0,10), increment=1))
+        self.settings.append(MPSetting('numcells', int, 0, range=(0,50), increment=1))
         self.battery_period = mavutil.periodic_event(5)
 
     def cmd_bat(self, args):

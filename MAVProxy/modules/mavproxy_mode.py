@@ -8,7 +8,7 @@ from MAVProxy.modules.lib import mp_module
 
 class ModeModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(ModeModule, self).__init__(mpstate, "mode")
+        super(ModeModule, self).__init__(mpstate, "mode", public=True)
         self.add_command('mode', self.cmd_mode, "mode change", self.available_modes())
         self.add_command('guided', self.cmd_guided, "fly to a clicked location on map")
 
@@ -59,24 +59,22 @@ class ModeModule(mp_module.MPModule):
             altitude = float(args[2])
             latlon = (latitude, longitude)
         else:
-            try:
-                latlon = self.module('map').click_position
-            except Exception:
-                print("No map available")
-                return
+            latlon = self.mpstate.click_location
             if latlon is None:
                 print("No map click position available")
                 return
             altitude = float(args[0])
 
         print("Guided %s %s" % (str(latlon), str(altitude)))
-        self.master.mav.mission_item_send (self.settings.target_system,
+        self.master.mav.mission_item_int_send (self.settings.target_system,
                                            self.settings.target_component,
                                            0,
                                            self.module('wp').get_default_frame(),
                                            mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
                                            2, 0, 0, 0, 0, 0,
-                                           latlon[0], latlon[1], altitude)
+                                           int(latlon[0]*1.0e7),
+                                           int(latlon[1]*1.0e7),
+                                           altitude)
 
 def init(mpstate):
     '''initialise module'''

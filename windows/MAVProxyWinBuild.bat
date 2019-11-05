@@ -1,11 +1,11 @@
 rem build the standalone MAVProxy.exe for Windows.
-rem This assumes Python is installed in C:\Python27
+rem This assumes Python is installed in C:\Python36
 rem   If it is not, change the PYTHON_LOCATION environment variable accordingly
 rem This assumes InnoSetup is installed in C:\Program Files (x86)\Inno Setup 5
 rem   If it is not, change the INNOSETUP environment variable accordingly
 SETLOCAL enableextensions
 
-if "%PYTHON_LOCATION%" == "" (set "PYTHON_LOCATION=C:\Python27")
+if "%PYTHON_LOCATION%" == "" (set "PYTHON_LOCATION=C:\Python36")
 if "%INNOSETUP%" == "" (set "INNOSETUP=C:\Program Files (x86)\Inno Setup 5")
 
 rem get the version

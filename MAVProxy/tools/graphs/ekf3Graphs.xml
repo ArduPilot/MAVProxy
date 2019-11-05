@@ -225,7 +225,7 @@
 
   <graph name='EKF/Wind Speed and Direction'>
     <description>Wind Velocity NE</description>
-    <expression>sqrt(sqrt(XKF2.VWN**2+XKF2.VWE**2) wrap_360(degrees(atan2(-XKF2.VWE,-XKF2.VWN))):2 sqrt(XKF7.VWN**2+XKF7.VWE**2) wrap_360(degrees(atan2(-XKF7.VWE,-XKF7.VWN))):2</expression>
+    <expression>sqrt(XKF2.VWN**2+XKF2.VWE**2) wrap_360(degrees(atan2(-XKF2.VWE,-XKF2.VWN))):2 sqrt(XKF7.VWN**2+XKF7.VWE**2) wrap_360(degrees(atan2(-XKF7.VWE,-XKF7.VWN))):2</expression>
     <expression>sqrt(EKF3.VWN**2+EKF3.VWE**2) wrap_360(degrees(atan2(-EKF3.VWE,-EKF3.VWN))):2 sqrt(XKF2.VWN**2+XKF2.VWE**2) wrap_360(degrees(atan2(-XKF2.VWE,-XKF2.VWN))):2</expression>
     <expression>sqrt(EKF3.VWN**2+EKF3.VWE**2) wrap_360(degrees(atan2(-EKF3.VWE,-EKF3.VWN))):2</expression>
   </graph>

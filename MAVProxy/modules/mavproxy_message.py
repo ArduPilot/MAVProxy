@@ -5,15 +5,9 @@ Peter Barker, September 2017
 
 '''
 
-import os
-import os.path
-import sys
-from pymavlink import mavutil
-import errno
 import time
 
 from MAVProxy.modules.lib import mp_module
-from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_settings
 
 
@@ -22,7 +16,7 @@ class message(mp_module.MPModule):
         """Initialise module"""
         super(message, self).__init__(mpstate, "message", "")
         self.status_callcount = 0
-        self.boredom_interval = 10 # seconds
+        self.boredom_interval = 10  # seconds
         self.last_bored = time.time()
 
         self.packets_mytarget = 0
@@ -30,8 +24,7 @@ class message(mp_module.MPModule):
         self.verbose = False
 
         self.message_settings = mp_settings.MPSettings(
-            [ ('verbose', bool, False),
-          ])
+            [('verbose', bool, False)])
         self.add_command('message', self.cmd_message, "message module", [])
 
     def usage(self):
@@ -52,10 +45,12 @@ class message(mp_module.MPModule):
                 return
             method(*transformed)
 
+
 def init(mpstate):
     '''initialise module'''
     return message(mpstate)
 
 
 # STABILIZE> message MISSION_CLEAR_ALL int(1) int(1)
-# STABILIZE> Got MAVLink msg: MISSION_ACK {target_system : 255, target_component : 0, type : 0}
+# STABILIZE> Got MAVLink msg: MISSION_ACK {target_system : 255,
+# target_component : 0, type : 0}

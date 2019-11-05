@@ -8,7 +8,7 @@ from MAVProxy.modules.lib import mp_module
 
 class CmdlongModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(CmdlongModule, self).__init__(mpstate, "cmdlong")
+        super(CmdlongModule, self).__init__(mpstate, "cmdlong", public=True)
         self.add_command('setspeed', self.cmd_do_change_speed, "do_change_speed")
         self.add_command('setyaw', self.cmd_condition_yaw, "condition_yaw")
         self.add_command('takeoff', self.cmd_takeoff, "takeoff")
@@ -222,7 +222,7 @@ class CmdlongModule(mp_module.MPModule):
                                       1,  # target system
                                       0,  # target component
                                       8,  # coordinate frame MAV_FRAME_BODY_NED
-                                      455,      # type mask (vel only)
+                                      4039,     # type mask (vel only)
                                       0, 0, 0,  # position x,y,z
                                       x_mps, y_mps, z_mps,  # velocity x,y,z
                                       0, 0, 0,  # accel x,y,z
@@ -279,10 +279,7 @@ class CmdlongModule(mp_module.MPModule):
         '''posvel mapclick vN vE vD'''
         ignoremask = 511
         latlon = None
-        try:
-            latlon = self.module('map').click_position
-        except Exception:
-            pass
+        latlon = self.mpstate.click_location
         if latlon is None:
             print("set latlon to zeros")
             latlon = [0, 0]
@@ -345,13 +342,15 @@ class CmdlongModule(mp_module.MPModule):
 
     def cmd_command_int(self, args):
         '''execute supplied command_int'''
-        if len(args) != 11:
-            print("num args{0}".format(len(args)))
+        want_args = 11
+        if len(args) != want_args:
+            print("Argument count issue: want={0} got={1}".format(want_args, len(args)))
             print("Usage: command_int frame command current autocontinue param1 param2 param3 param4 x y z")
             print("e.g. command_int GLOBAL_RELATIVE_ALT DO_SET_HOME 0 0 0 0 0 0 -353632120 1491659330 0")
             print("e.g. command_int GLOBAL MAV_CMD_DO_SET_ROI 0 0 0 0 0 0 5000000 5000000 500")
             return
 
+        frame = None
         if args[0].isdigit():
             frame = int(args[0])
         else:

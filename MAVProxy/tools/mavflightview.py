@@ -5,6 +5,8 @@ view a mission log on a map
 '''
 
 import sys, time, os
+import re
+
 from math import *
 
 from pymavlink import mavutil, mavwp, mavextra
@@ -255,6 +257,15 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
             types.extend(['NKF1', 'GPS'])
         if options.ahr2:
             types.extend(['AHR2', 'AHRS2', 'GPS'])
+
+    recv_match_types = types[:]
+    colour_source = getattr(options, "colour_source")
+    if colour_source is not None:
+        # stolen from mavgraph.py
+        re_caps = re.compile('[A-Z_][A-Z0-9_]+')
+        caps = set(re.findall(re_caps, colour_source))
+        recv_match_types.extend(caps)
+
     print("Looking for types %s" % str(types))
 
     last_timestamps = {}
@@ -262,7 +273,7 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
 
     while True:
         try:
-            m = mlog.recv_match(type=types)
+            m = mlog.recv_match(type=recv_match_types)
             if m is None:
                 break
         except Exception:
@@ -299,6 +310,10 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
         if not mlog.check_condition(options.condition):
             continue
         if options.mode is not None and mlog.flightmode.lower() != options.mode.lower():
+            continue
+
+        if not type in types:
+            # may only be present for colour-source expressions to work
             continue
 
         if not all_false and len(flightmode_selections) > 0 and idx < len(options._flightmodes) and m._timestamp >= options._flightmodes[idx][2]:
@@ -347,6 +362,8 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
             elif type == 'AHRS2':
                 (lat, lng) = (m.lat*1.0e-7, m.lng*1.0e-7)
             elif type == 'ORGN':
+                (lat, lng) = (m.Lat, m.Lng)
+            elif type == 'SIM':
                 (lat, lng) = (m.Lat, m.Lng)
             else:
                 lat = m.lat * 1.0e-7

@@ -6,6 +6,8 @@ from pymavlink import mavutil, mavparm
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import multiproc
+if mp_util.has_wxpython:
+    from MAVProxy.modules.lib.mp_menu import *
 
 class ParamState:
     '''this class is separated to make it possible to use the parameter
@@ -229,6 +231,9 @@ class ParamState:
             else:
                 print("Parameter '%s' not found in documentation" % h)
 
+    def status(self, master, mpstate):
+        return(len(self.mav_param_set), self.mav_param_count)
+
     def handle_command(self, master, mpstate, args):
         '''handle parameter commands'''
         param_wildcard = "*"
@@ -267,7 +272,7 @@ class ParamState:
                 param_wildcard = args[2]
             else:
                 param_wildcard = "*"
-            self.mav_param.save(args[1], param_wildcard, verbose=True)
+            self.mav_param.save(args[1].strip('"'), param_wildcard, verbose=True)
         elif args[0] == "diff":
             wildcard = '*'
             if len(args) < 2 or args[1].find('*') != -1:
@@ -308,7 +313,7 @@ class ParamState:
 
             if (param.upper() == "WP_LOITER_RAD" or param.upper() == "LAND_BREAK_PATH"):
                 #need to redraw rally points
-                mpstate.module('rally').rallyloader.last_change = time.time()
+                mpstate.module('rally').set_last_change(time.time())
                 #need to redraw loiter points
                 mpstate.module('wp').wploader.last_change = time.time()
 
@@ -320,12 +325,12 @@ class ParamState:
                 param_wildcard = args[2]
             else:
                 param_wildcard = "*"
-            self.mav_param.load(args[1], param_wildcard, master)
+            self.mav_param.load(args[1].strip('"'), param_wildcard, master)
         elif args[0] == "preload":
             if len(args) < 2:
                 print("Usage: param preload <filename>")
                 return
-            self.mav_param.load(args[1])
+            self.mav_param.load(args[1].strip('"'))
         elif args[0] == "forceload":
             if len(args) < 2:
                 print("Usage: param forceload <filename> [wildcard]")
@@ -334,7 +339,7 @@ class ParamState:
                 param_wildcard = args[2]
             else:
                 param_wildcard = "*"
-            self.mav_param.load(args[1], param_wildcard, master, check=False)
+            self.mav_param.load(args[1].strip('"'), param_wildcard, master, check=False)
         elif args[0] == "download":
             self.param_help_download()
         elif args[0] == "apropos":
@@ -361,12 +366,25 @@ class ParamModule(mp_module.MPModule):
         self.xml_filepath = kwargs.get("xml-filepath", None)
         self.pstate = {}
         self.check_new_target_system()
+        self.menu_added_console = False
         self.add_command('param', self.cmd_param, "parameter handling",
                          ["<download|status>",
                           "<set|show|fetch|help|apropos> (PARAMETER)",
                           "<load|save|diff> (FILENAME)",
                           "<set_xml_filepath> (FILEPATH)"
                          ])
+        if mp_util.has_wxpython:
+            self.menu = MPMenuSubMenu('Parameter',
+                                  items=[MPMenuItem('Editor', 'Editor', '# module load paramedit'),
+                                         MPMenuItem('Fetch', 'Fetch', '# param fetch'),
+                                         MPMenuItem('Load', 'Load', '# param load ',
+                                                    handler=MPMenuCallFileDialog(flags=('open',),
+                                                                                 title='Param Load',
+                                                                                 wildcard='*.parm')),
+                                         MPMenuItem('Save', 'Save', '# param save ',
+                                                    handler=MPMenuCallFileDialog(flags=('save', 'overwrite_prompt'),
+                                                                                 title='Param Save',
+                                                                                 wildcard='*.parm'))])
 
     def get_component_id_list(self, system_id):
         '''get list of component IDs with parameters for a given system ID'''
@@ -408,6 +426,11 @@ class ParamModule(mp_module.MPModule):
         if sysid in self.pstate:
             return
         self.add_new_target_system(sysid)
+
+    def param_status(self):
+        sysid = self.get_sysid()
+        pset, pcount = self.pstate[sysid].status(self.master, self.mpstate)
+        return (pset, pcount)
         
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
@@ -421,6 +444,9 @@ class ParamModule(mp_module.MPModule):
         sysid = self.get_sysid()
         self.pstate[sysid].vehicle_name = self.vehicle_name
         self.pstate[sysid].fetch_check(self.master)
+        if self.module('console') is not None and not self.menu_added_console:
+            self.menu_added_console = True
+            self.module('console').add_menu(self.menu)
 
     def cmd_param(self, args):
         '''control parameters'''

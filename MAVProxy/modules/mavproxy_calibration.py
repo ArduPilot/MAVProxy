@@ -30,7 +30,7 @@ class CalibrationModule(mp_module.MPModule):
 
     def cmd_level(self, args):
         '''run a accel level'''
-        self.master.calibrate_level()
+        print("level is no longer supported; use ahrstrim, accelcal or accelcalsimple")
 
     def cmd_accelcal(self, args):
         '''do a full 3D accel calibration'''

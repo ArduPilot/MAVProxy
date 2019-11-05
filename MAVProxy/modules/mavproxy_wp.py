@@ -25,7 +25,7 @@ class WPModule(mp_module.MPModule):
         self.undo_wp_idx = -1
         self.wploader.expected_count = 0
         self.add_command('wp', self.cmd_wp,       'waypoint management',
-                         ["<list|clear|move|remove|loop|set|undo|movemulti|changealt|param|status>",
+                         ["<list|clear|move|remove|loop|set|undo|movemulti|changealt|param|status|slope>",
                           "<load|update|save|savecsv|show> (FILENAME)"])
 
         if self.continue_mode and self.logdir is not None:
@@ -82,9 +82,11 @@ class WPModule(mp_module.MPModule):
             wps = self.missing_wps_to_request()
         tnow = time.time()
         for seq in wps:
-            #print("REQUESTING %u/%u (%u)" % (seq, self.wploader.expected_count, i))
             self.wp_requested[seq] = tnow
-            self.master.waypoint_request_send(seq)
+            if self.settings.wp_use_mission_int:
+                self.master.mav.mission_request_int_send(self.master.target_system, self.master.target_component, seq)
+            else:
+                self.master.mav.mission_request_send(self.master.target_system, self.master.target_component, seq)
 
     def wp_status(self):
         '''show status of wp download'''
@@ -93,6 +95,44 @@ class WPModule(mp_module.MPModule):
         except Exception:
             print("Have %u waypoints" % (self.wploader.count()+len(self.wp_received)))
 
+
+    def wp_slope(self, args):
+        '''show slope of waypoints'''
+        if len(args) == 2:
+            # specific waypoints
+            wp1 = int(args[0])
+            wp2 = int(args[1])
+            w1 = self.wploader.wp(wp1)
+            w2 = self.wploader.wp(wp2)
+            delta_alt = w1.z - w2.z
+            if delta_alt == 0:
+                slope = "Level"
+            else:
+                delta_xy = mp_util.gps_distance(w1.x, w1.y, w2.x, w2.y)
+                slope = "%.1f" % (delta_xy / delta_alt)
+            print("wp%u -> wp%u %s" % (wp1, wp2, slope))
+            return
+        if len(args) != 0:
+            print("Usage: wp slope WP1 WP2")
+            return
+        last_w = None
+        for i in range(1, self.wploader.count()):
+            w = self.wploader.wp(i)
+            if w.command not in [mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, mavutil.mavlink.MAV_CMD_NAV_LAND]:
+                continue
+            if last_w is not None:
+                if last_w.frame != w.frame:
+                    print("WARNING: frame change %u -> %u at %u" % (last_w.frame, w.frame, i))
+                delta_alt = last_w.z - w.z
+                if delta_alt == 0:
+                    slope = "Level"
+                else:
+                    delta_xy = mp_util.gps_distance(w.x, w.y, last_w.x, last_w.y)
+                    slope = "%.1f" % (delta_xy / delta_alt)
+                print("WP%u: slope %s" % (i, slope))
+            last_w = w
+
+            
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         mtype = m.get_type()
@@ -108,7 +148,13 @@ class WPModule(mp_module.MPModule):
                                                                                  time.asctime()))
                 self.send_wp_requests()
 
-        elif mtype in ['WAYPOINT', 'MISSION_ITEM'] and self.wp_op is not None:
+        elif mtype in ['WAYPOINT', 'MISSION_ITEM', 'MISSION_ITEM_INT'] and self.wp_op is not None:
+            if m.get_type() == 'MISSION_ITEM_INT':
+                if getattr(m, 'mission_type', 0) != 0:
+                    # this is not a mission item, likely fence
+                    return
+                # our internal structure assumes MISSION_ITEM'''
+                m = self.wp_from_mission_item_int(m)
             if m.seq < self.wploader.count():
                 #print("DUPLICATE %u" % m.seq)
                 return
@@ -181,6 +227,48 @@ class WPModule(mp_module.MPModule):
             self.menu_added_map = True
             self.module('map').add_menu(self.menu)
 
+    def wp_to_mission_item_int(self, wp):
+        '''convert a MISSION_ITEM to a MISSION_ITEM_INT. We always send as MISSION_ITEM_INT
+           to give cm level accuracy'''
+        if wp.get_type() == 'MISSION_ITEM_INT':
+            return wp
+        wp_int = mavutil.mavlink.MAVLink_mission_item_int_message(wp.target_system,
+                                                                  wp.target_component,
+                                                                  wp.seq,
+                                                                  wp.frame,
+                                                                  wp.command,
+                                                                  wp.current,
+                                                                  wp.autocontinue,
+                                                                  wp.param1,
+                                                                  wp.param2,
+                                                                  wp.param3,
+                                                                  wp.param4,
+                                                                  int(wp.x*1.0e7),
+                                                                  int(wp.y*1.0e7),
+                                                                  wp.z)
+        return wp_int
+
+    def wp_from_mission_item_int(self, wp):
+        '''convert a MISSION_ITEM_INT to a MISSION_ITEM'''
+        wp2 = mavutil.mavlink.MAVLink_mission_item_message(wp.target_system,
+                                                           wp.target_component,
+                                                           wp.seq,
+                                                           wp.frame,
+                                                           wp.command,
+                                                           wp.current,
+                                                           wp.autocontinue,
+                                                           wp.param1,
+                                                           wp.param2,
+                                                           wp.param3,
+                                                           wp.param4,
+                                                           wp.x*1.0e-7,
+                                                           wp.y*1.0e-7,
+                                                           wp.z)
+        # preserve srcSystem as that is used for naming waypoint file
+        wp2._header.srcSystem = wp.get_srcSystem()
+        wp2._header.srcComponent = wp.get_srcComponent()
+        return wp2
+
     def process_waypoint_request(self, m, master):
         '''process a waypoint request from the master'''
         if (m.target_system != self.settings.source_system or
@@ -198,7 +286,11 @@ class WPModule(mp_module.MPModule):
         wp = self.wploader.wp(m.seq)
         wp.target_system = self.target_system
         wp.target_component = self.target_component
-        self.master.mav.send(self.wploader.wp(m.seq))
+        if self.settings.wp_use_mission_int:
+            wp_send = self.wp_to_mission_item_int(wp)
+        else:
+            wp_send = wp
+        self.master.mav.send(wp_send)
         self.loading_waypoint_lasttime = time.time()
         self.console.writeln("Sent waypoint %u : %s" % (m.seq, self.wploader.wp(m.seq)))
         if m.seq == self.wploader.count() - 1:
@@ -346,9 +438,8 @@ class WPModule(mp_module.MPModule):
 
     def nofly_add(self):
         '''add a square flight exclusion zone'''
-        try:
-            latlon = self.module('map').click_position
-        except Exception:
+        latlon = self.mpstate.click_location
+        if latlon is None:
             print("No position chosen")
             return
         loader = self.wploader
@@ -372,10 +463,9 @@ class WPModule(mp_module.MPModule):
         
     def set_home_location(self):
         '''set home location from last map click'''
-        try:
-            latlon = self.module('map').click_position
-        except Exception:
-            print("No map available")
+        latlon = self.mpstate.click_location
+        if latlon is None:
+            print("No position available")
             return
         lat = float(latlon[0])
         lon = float(latlon[1])
@@ -401,11 +491,7 @@ class WPModule(mp_module.MPModule):
         if idx < 1 or idx > self.wploader.count():
             print("Invalid wp number %u" % idx)
             return
-        try:
-            latlon = self.module('map').click_position
-        except Exception:
-            print("No map available")
-            return
+        latlon = self.mpstate.click_location
         if latlon is None:
             print("No map click position available")
             return
@@ -417,7 +503,9 @@ class WPModule(mp_module.MPModule):
         self.undo_type = "move"
 
         (lat, lon) = latlon
-        if getattr(self.console, 'ElevationMap', None) is not None and wp.frame != mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT:
+        if (getattr(self.console, 'ElevationMap', None) is not None and
+            wp.frame == mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT and
+            self.settings.wpterrainadjust):
             alt1 = self.console.ElevationMap.GetElevation(lat, lon)
             alt2 = self.console.ElevationMap.GetElevation(wp.x, wp.y)
             if alt1 is not None and alt2 is not None:
@@ -464,11 +552,7 @@ class WPModule(mp_module.MPModule):
             rotation = 0
 
         if latlon is None:
-            try:
-                latlon = self.module('map').click_position
-            except Exception:
-                print("No map available")
-                return
+            latlon = self.mpstate.click_location
         if latlon is None:
             print("No map click position available")
             return
@@ -492,7 +576,9 @@ class WPModule(mp_module.MPModule):
                 b2 = mp_util.gps_bearing(lat, lon, newlat, newlon)
                 (newlat, newlon) = mp_util.gps_newpos(lat, lon, b2+rotation, d2)
 
-            if getattr(self.console, 'ElevationMap', None) is not None and wp.frame != mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT:
+            if (getattr(self.console, 'ElevationMap', None) is not None and
+                wp.frame != mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT and
+                self.settings.wpterrainadjust):
                 alt1 = self.console.ElevationMap.GetElevation(newlat, newlon)
                 alt2 = self.console.ElevationMap.GetElevation(wp.x, wp.y)
                 if alt1 is not None and alt2 is not None:
@@ -547,7 +633,10 @@ class WPModule(mp_module.MPModule):
         numrows = self.wploader.count()
         for row in range(numrows):
             wp = self.wploader.wp(row)
-            if wp.command in [mavutil.mavlink.MAV_CMD_DO_JUMP, mavutil.mavlink.MAV_CMD_DO_CONDITION_JUMP]:
+            jump_cmds = [mavutil.mavlink.MAV_CMD_DO_JUMP]
+            if hasattr(mavutil.mavlink, "MAV_CMD_DO_CONDITION_JUMP"):
+                jump_cmds.append(mavutil.mavlink.MAV_CMD_DO_CONDITION_JUMP)
+            if wp.command in jump_cmds:
                 p1 = int(wp.param1)
                 if p1 > idx and p1+delta>0:
                     wp.param1 = float(p1+delta)
@@ -636,6 +725,85 @@ class WPModule(mp_module.MPModule):
         self.wploader.set(wp, idx)
         print("Set param %u for %u to %f" % (pnum, idx, param[pnum-1]))
 
+    def get_loc(self, m):
+        '''return a mavutil.location for item m'''
+        t = m.get_type()
+        if t == "MISSION_ITEM":
+            lat = m.x * 1e7
+            lng = m.y * 1e7
+            alt = m.z * 1e2
+        elif t == "MISSION_ITEM_INT":
+            lat = m.x
+            lng = m.y
+            alt = m.z
+        else:
+            return None
+        return mavutil.location(lat, lng, alt)
+
+    def cmd_split(self, args):
+        '''splits the segment ended by the supplied waypoint into two'''
+        try:
+            num = int(args[0])
+        except IOError as e:
+            return "Bad wp num (%s)" % args[0]
+
+        if num < 1 or num > self.wploader.count():
+            print("Bad item %s" % str(num))
+            return
+        wp = self.wploader.wp(num)
+        if wp is None:
+            print("Could not get wp %u" % num)
+            return
+        loc = self.get_loc(wp)
+        if loc is None:
+            print("wp is not a location command")
+            return
+
+        prev = num - 1
+        if prev < 1 or prev > self.wploader.count():
+            print("Bad item %u" % num)
+            return
+        prev_wp = self.wploader.wp(prev)
+        if prev_wp is None:
+            print("Could not get previous wp %u" % prev)
+            return
+        prev_loc = self.get_loc(prev_wp)
+        if prev_loc is None:
+            print("previous wp is not a location command")
+            return
+
+        if wp.frame != prev_wp.frame:
+            print("waypoints differ in frame (%u vs %u)" %
+                  (wp.frame, prev_wp.frame))
+            return
+
+        if wp.frame != prev_wp.frame:
+            print("waypoints differ in frame")
+            return
+
+        lat_avg = (loc.lat + prev_loc.lat)/2
+        lng_avg = (loc.lng + prev_loc.lng)/2
+        alt_avg = (loc.alt + prev_loc.alt)/2
+        new_wp = mavutil.mavlink.MAVLink_mission_item_message(
+            self.target_system,
+            self.target_component,
+            wp.seq,    # seq
+            wp.frame,    # frame
+            mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,    # command
+            0,    # current
+            0,    # autocontinue
+            0.0,  # param1,
+            0.0,  # param2,
+            0.0,  # param3
+            0.0,  # param4
+            lat_avg * 1e-7,  # x (latitude)
+            lng_avg * 1e-7,  # y (longitude)
+            alt_avg * 1e-2,  # z (altitude)
+        )
+        self.wploader.insert(wp.seq, new_wp)
+        self.fix_jumps(wp.seq, 1)
+        self.send_all_waypoints()
+
     def cmd_wp(self, args):
         '''waypoint commands'''
         usage = "usage: wp <editor|list|load|update|save|set|clear|loop|remove|move|movemulti|changealt>"
@@ -699,6 +867,8 @@ class WPModule(mp_module.MPModule):
                 print("usage: wp set <wpindex>")
                 return
             self.master.waypoint_set_current_send(int(args[1]))
+        elif args[0] == "split":
+            self.cmd_split(args[1:])
         elif args[0] == "clear":
             self.master.waypoint_clear_all_send()
             self.wploader.clear()
@@ -726,6 +896,8 @@ class WPModule(mp_module.MPModule):
             self.nofly_add()
         elif args[0] == "status":
             self.wp_status()
+        elif args[0] == "slope":
+            self.wp_slope(args[1:])
         else:
             print(usage)
 

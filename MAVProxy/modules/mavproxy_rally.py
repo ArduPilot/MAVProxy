@@ -49,14 +49,37 @@ class RallyModule(mp_module.MPModule):
                                                                                  self.settings.target_component)
         return self.rallyloader_by_sysid[self.target_system]
 
+    def last_change(self):
+        '''return time of last changes made to rally points'''
+        return self.rallyloader.last_change
+
+    def rally_count(self):
+        '''return number of waypoints'''
+        return self.rallyloader.rally_count()
+
+    def rally_point(self, i):
+        '''return instance of mavutil.mavlink.MAVLink_rally_point_message'''
+        return self.rallyloader.rally_point(i)
+
+    def set_last_change(self, time):
+        '''can be used to cause map redraws'''
+        self.rallyloader.last_change = time
+
     def idle_task(self):
         '''called on idle'''
-        if self.module('console') is not None and not self.menu_added_console:
-            self.menu_added_console = True
-            self.module('console').add_menu(self.menu)
-        if self.module('map') is not None and not self.menu_added_map:
-            self.menu_added_map = True
-            self.module('map').add_menu(self.menu)
+        if self.module('console') is not None:
+            if not self.menu_added_console:
+                self.menu_added_console = True
+                self.module('console').add_menu(self.menu)
+        else:
+            self.menu_added_console = False
+
+        if self.module('map') is not None:
+            if not self.menu_added_map:
+                self.menu_added_map = True
+                self.module('map').add_menu(self.menu)
+        else:
+            self.menu_added_map = False
 
         '''handle abort command; it is critical that the AP to receive it'''
         if self.abort_ack_received is False:
@@ -105,11 +128,7 @@ class RallyModule(mp_module.MPModule):
             print("Only 5 rally points possible per flight plan.")
             return
 
-        try:
-            latlon = self.module('map').click_position
-        except Exception:
-            print("No map available")
-            return
+        latlon = self.mpstate.click_location
         if latlon is None:
             print("No map click position available")
             return
@@ -160,11 +179,7 @@ class RallyModule(mp_module.MPModule):
 
         rpoint = self.rallyloader.rally_point(idx-1)
 
-        try:
-            latlon = self.module('map').click_position
-        except Exception:
-            print("No map available")
-            return
+        latlon = self.mpstate.click_location
         if latlon is None:
             print("No map click position available")
             return
@@ -271,6 +286,16 @@ class RallyModule(mp_module.MPModule):
             elif m.command == mavutil.mavlink.MAV_CMD_DO_RALLY_LAND:
                 if (m.result == 0):
                     self.say("Landing.")
+
+    def unload(self):
+        self.remove_command("rally")
+        if self.module('console') is not None and self.menu_added_console:
+            self.menu_added_console = False
+            self.module('console').remove_menu(self.menu)
+        if self.module('map') is not None and self.menu_added_map:
+            self.menu_added_map = False
+            self.module('map').remove_menu(self.menu)
+        super(RallyModule, self).unload()
 
     def send_rally_point(self, i):
         '''send rally points from fenceloader'''

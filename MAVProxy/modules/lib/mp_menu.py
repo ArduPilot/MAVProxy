@@ -68,8 +68,9 @@ class MPMenuItem(MPMenuGeneric):
     def id(self):
         '''id used to identify the returned menu items
         uses a 16 bit signed integer'''
-        # 0x7FFF is used as windows only allows for 16 bit IDs
-        return int(hash((self.name, self.returnkey)) & 0x7FFF)
+        # must be below SHRT_MAX
+        id = int(hash((self.name, self.returnkey))) % 32767
+        return id
 
     def _append(self, menu):
         '''append this menu item to a menu'''
@@ -100,8 +101,11 @@ class MPMenuCheckbox(MPMenuItem):
 
     def _append(self, menu):
         '''append this menu item to a menu'''
-        menu.AppendCheckItem(self.id(), self.name, self.description)
-        menu.Check(self.id(), self.checked)
+        try:
+            menu.AppendCheckItem(self.id(), self.name, self.description)
+            menu.Check(self.id(), self.checked)
+        except Exception:
+            pass
 
     def __str__(self):
         return "MPMenuCheckbox(%s,%s,%s,%s)" % (self.name, self.description, self.returnkey, str(self.checked))
@@ -169,6 +173,13 @@ class MPMenuSubMenu(MPMenuGeneric):
             if not updated:
                 self.items.append(m)
 
+    def remove(self, items):
+        '''remove items from a sub-menu'''
+        if not isinstance(items, list):
+            items = [items]
+        names = set([x.name for x in items])
+        self.items = list(filter(lambda x : x.name not in names, self.items))
+
     def add_to_submenu(self, submenu_path, item):
         '''add an item to a submenu using a menu path array'''
         if len(submenu_path) == 0:
@@ -227,6 +238,12 @@ class MPMenuTop(object):
                     updated = True
             if not updated:
                 self.items.append(m)
+
+    def remove(self, items):
+        if not isinstance(items, list):
+            items = [items]
+        names = set([x.name for x in items])
+        self.items = list(filter(lambda x : x.name not in names, self.items))
 
     def add_to_submenu(self, submenu_path, item):
         '''

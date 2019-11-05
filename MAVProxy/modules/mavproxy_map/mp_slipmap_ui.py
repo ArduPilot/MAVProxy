@@ -400,7 +400,7 @@ class MPSlipMapPanel(wx.Panel):
         (lat,lon) = self.coordinates(x, y)
         state.ground_width *= zoom
         # limit ground_width to sane values
-        state.ground_width = max(state.ground_width, 20)
+        state.ground_width = max(state.ground_width, 2)
         state.ground_width = min(state.ground_width, 20000000)
         self.re_center(x,y, lat, lon)
 
@@ -543,11 +543,16 @@ class MPSlipMapPanel(wx.Panel):
 
     def on_mouse_wheel(self, event):
         '''handle mouse wheel zoom changes'''
-        rotation = event.GetWheelRotation() / event.GetWheelDelta()
-        if rotation > 0:
-            zoom = 1.0/(1.1 * rotation)
-        elif rotation < 0:
-            zoom = 1.1 * (-rotation)
+        # >>> print -1/120
+        # -1
+        wheel_rotation = event.GetWheelRotation()
+        rotation = abs(wheel_rotation) // event.GetWheelDelta()
+        if rotation == 0:
+            return
+        zoom = 1.1 * rotation
+        if wheel_rotation > 0:
+            # zooming out
+            zoom = 1.0/zoom
         self.change_zoom(zoom)
         self.redraw_map()
 

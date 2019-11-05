@@ -18,7 +18,10 @@ class GraphDialog(wx.Dialog):
         hbox_name = wx.BoxSizer(wx.HORIZONTAL)
         st_name   = wx.StaticText(self.panel, -1, 'Name: ')
         self.tc_name = wx.TextCtrl(self.panel, -1, size=(400, -1))
-        self.tc_name.Value = self.graphdef.name
+        try:
+            self.tc_name.Value = self.graphdef.name
+        except Exception:
+            self.tc_name.Value = 'UNKNOWN'
         hbox_name.Add(st_name, 0, wx.LEFT, 10)
         hbox_name.Add(self.tc_name, 0, wx.LEFT, 35)
         vbox.Add(hbox_name, 0, wx.TOP, 10)
