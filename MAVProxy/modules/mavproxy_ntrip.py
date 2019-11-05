@@ -18,7 +18,8 @@ class NtripModule(mp_module.MPModule):
              ('port', int, 2101),
              ('username', str, 'IBS'),
              ('password', str, 'IBS'),
-             ('mountpoint', str, None)])
+             ('mountpoint', str, None),
+             ('logfile', str, None)])
         self.add_command('ntrip', self.cmd_ntrip, 'NTRIP control',
                          ["<status>",
                           "<start>",
@@ -29,14 +30,29 @@ class NtripModule(mp_module.MPModule):
         self.pos = None
         self.pkt_count = 0
         self.last_pkt = None
+        self.last_rate = None
+        self.rate_total = 0
         self.ntrip = None
         self.start_pending = False
+        self.rate = 0
+        self.logfile = None
+        self.id_counts = {}
+        self.last_by_id = {}
 
     def mavlink_packet(self, msg):
         '''handle an incoming mavlink packet'''
         if msg.get_type() in ['GPS_RAW_INT', 'GPS2_RAW']:
             if msg.fix_type >= 3:
                 self.pos = (msg.lat*1.0e-7, msg.lon*1.0e-7, msg.alt*1.0e-3)
+
+    def log_rtcm(self, data):
+        '''optionally log rtcm data'''
+        if self.ntrip_settings.logfile is None:
+            return
+        if self.logfile is None:
+            self.logfile = open(self.ntrip_settings.logfile, 'wb')
+        if self.logfile is not None:
+            self.logfile.write(data)
 
     def idle_task(self):
         '''called on idle'''
@@ -47,13 +63,45 @@ class NtripModule(mp_module.MPModule):
         data = self.ntrip.read()
         if data is None:
             return
+        self.log_rtcm(data)
+
+        rtcm_id = self.ntrip.get_ID()
+        if not rtcm_id in self.id_counts:
+            self.id_counts[rtcm_id] = 0
+            self.last_by_id[rtcm_id] = data[:]
+        self.id_counts[rtcm_id] += 1
+
         blen = len(data)
-        send_data = bytearray(data[:blen])
-        if blen < 110:
-            send_data.extend(bytearray([0]*(110-blen)))
-        self.master.mav.gps_inject_data_send(0, 0, blen, send_data)
+        if blen > 4*180:
+            # can't send this with GPS_RTCM_DATA
+            return
+        total_len = blen
+        self.rate_total += blen
+
+        if blen > 180:
+            flags = 1 # fragmented
+        else:
+            flags = 0
+
+        while blen > 0:
+            send_data = bytearray(data[:180])
+            frag_len = len(send_data)
+            data = data[frag_len:]
+            if frag_len < 180:
+                send_data.extend(bytearray([0]*(180-frag_len)))
+            self.master.mav.gps_rtcm_data_send(flags, frag_len, send_data)
+            flags += 2
+            blen -= frag_len
         self.pkt_count += 1
-        self.last_pkt = time.time()
+
+        now = time.time()
+        if now - self.last_rate > 1:
+            dt = now - self.last_rate
+            rate_now = self.rate_total / float(dt)
+            self.rate = 0.9 * self.rate + 0.1 * rate_now
+            self.last_rate = now
+            self.rate_total = 0
+        self.last_pkt = now
 
     def cmd_ntrip(self, args):
         '''ntrip command handling'''
@@ -77,8 +125,12 @@ class NtripModule(mp_module.MPModule):
             print("ntrip: Not started")
         elif self.last_pkt is None:
             print("ntrip: no data")
-        else:
-            print("ntrip: %u packets, last %.1fs ago" % (self.pkt_count, now - self.last_pkt))
+            return
+        frame_size = 0
+        for id in sorted(self.id_counts.keys()):
+            print(" %4u: %u (len %u)" % (id, self.id_counts[id], len(self.last_by_id[id])))
+            frame_size += len(self.last_by_id[id])
+        print("ntrip: %u packets, %.1f bytes/sec last %.1fs ago framesize %u" % (self.pkt_count, self.rate, now - self.last_pkt, frame_size))
 
     def cmd_start(self):
         '''start ntrip link'''
@@ -102,7 +154,9 @@ class NtripModule(mp_module.MPModule):
                                        height=self.pos[2])
         print("NTRIP started")
         self.start_pending = False
-            
+        self.last_rate = time.time()
+        self.rate_total = 0
+
 
 def init(mpstate):
     '''initialise module'''

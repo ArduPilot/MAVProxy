@@ -10,6 +10,7 @@ import datetime
 import base64
 import time
 import errno
+import rtcm3
 from optparse import OptionParser
 
 version = 0.1
@@ -55,6 +56,9 @@ class NtripClient(object):
         self.socket = None
         self.found_header = False
         self.sent_header = False
+        # RTCM3 parser
+        self.rtcm3 = rtcm3.RTCM3()
+        self.last_id = None
 
     def setPosition(self, lat, lon):
         self.flagN = "N"
@@ -106,6 +110,10 @@ class NtripClient(object):
             xsum_calc = xsum_calc ^ ord(char)
         return "%02X" % xsum_calc
 
+    def get_ID(self):
+        '''get ID of last packet'''
+        return self.last_id
+
     def read(self):
         if self.socket is None:
             time.sleep(0.1)
@@ -154,19 +162,22 @@ class NtripClient(object):
                         return None
             return None
         # normal data read
-        try:
-            data = self.socket.recv(50)
-        except IOError as e:
-            if e.errno == errno.EWOULDBLOCK:
+        while True:
+            try:
+                data = self.socket.recv(1)
+            except IOError as e:
+                if e.errno == errno.EWOULDBLOCK:
+                    return None
+                self.socket.close()
+                self.socket = None
                 return None
-            self.socket.close()
-            self.socket = None
-            return None
-        except Exception:
-            self.socket.close()
-            self.socket = None
-            return None
-        return data
+            except Exception:
+                self.socket.close()
+                self.socket = None
+                return None
+            if self.rtcm3.read(data):
+                self.last_id = self.rtcm3.get_packet_ID()
+                return self.rtcm3.get_packet()
 
     def connect(self):
         '''connect to NTRIP server'''
@@ -179,6 +190,7 @@ class NtripClient(object):
         if error_indicator == 0:
             sock.setblocking(0)
             self.socket = sock
+            self.rtcm3.reset()
             return True
         return False
 
