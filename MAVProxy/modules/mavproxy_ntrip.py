@@ -82,15 +82,18 @@ class NtripModule(mp_module.MPModule):
             flags = 1 # fragmented
         else:
             flags = 0
+        # add in the sequence number
+        flags |= (self.pkt_count & 0x1F) << 3
 
+        fragment = 0
         while blen > 0:
             send_data = bytearray(data[:180])
             frag_len = len(send_data)
             data = data[frag_len:]
             if frag_len < 180:
                 send_data.extend(bytearray([0]*(180-frag_len)))
-            self.master.mav.gps_rtcm_data_send(flags, frag_len, send_data)
-            flags += 2
+            self.master.mav.gps_rtcm_data_send(flags | (fragment<<1), frag_len, send_data)
+            fragment += 1
             blen -= frag_len
         self.pkt_count += 1
 
@@ -123,6 +126,7 @@ class NtripModule(mp_module.MPModule):
         now = time.time()
         if self.ntrip is None:
             print("ntrip: Not started")
+            return
         elif self.last_pkt is None:
             print("ntrip: no data")
             return

@@ -7,8 +7,9 @@ POLYCRC24 = 0x1864CFB
 import struct
 
 class RTCM3:
-    def __init__(self):
+    def __init__(self, debug=False):
         self.crc_table = None
+        self.debug = debug
         self.reset()
 
     def get_packet(self):
@@ -35,6 +36,8 @@ class RTCM3:
         crc1 = parity[0] << 16 | parity[1] << 8 | parity[2]
         crc2 = self.crc24(self.pkt[:-3])
         if crc1 != crc2:
+            if self.debug:
+                print("crc fail len=%u" % len(self.pkt))
             # look for preamble
             idx = self.pkt[1:].find(bytearray([RTCMv3_PREAMBLE]))
             if idx >= 0:
@@ -103,16 +106,22 @@ class RTCM3:
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
+    import time
     parser = ArgumentParser(description='RTCM3 parser')
 
     parser.add_argument("filename", type=str, help="input file")
+    parser.add_argument("--debug", action='store_true', help="show errors")
+    parser.add_argument("--follow", action='store_true', help="continue reading on EOF")
     args = parser.parse_args()
 
-    rtcm3 = RTCM3()
+    rtcm3 = RTCM3(args.debug)
     f = open(args.filename, 'rb')
     while True:
         b = f.read(1)
         if len(b) == 0:
+            if args.follow:
+                time.sleep(0.1)
+                continue
             break
         if rtcm3.read(b):
             print("packet len %u ID %u" % (len(rtcm3.get_packet()), rtcm3.get_packet_ID()))
