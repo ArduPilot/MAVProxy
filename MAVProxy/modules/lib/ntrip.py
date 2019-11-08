@@ -186,7 +186,10 @@ class NtripClient(object):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         if self.ssl:
             sock = ssl.wrap_socket(sock)
-        error_indicator = sock.connect_ex((self.caster, self.port))
+        try:
+            error_indicator = sock.connect_ex((self.caster, self.port))
+        except Exception:
+            return False
         if error_indicator == 0:
             sock.setblocking(0)
             self.socket = sock
