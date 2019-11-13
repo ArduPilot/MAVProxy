@@ -25,6 +25,8 @@ class ConsoleModule(mp_module.MPModule):
         self.max_link_num = 0
         self.last_sys_status_health = 0
         self.last_sys_status_errors_announce = 0
+        self.user_added = []
+        self.add_command('console_add', self.cmd_add, "console module", ['add'])
         mpstate.console = wxconsole.MessageConsole(title='Console')
 
         # setup some default status information
@@ -76,6 +78,11 @@ class ConsoleModule(mp_module.MPModule):
                                                MPMenuItem('Map', 'Load Map', '# module load map')]))
             self.vehicle_menu = MPMenuSubMenu('Vehicle', items=[])
             self.add_menu(self.vehicle_menu)
+
+    def cmd_add(self, args):
+        new_field = args[:]
+        self.user_added.append(new_field)
+        print self.user_added
 
     def add_menu(self, menu):
         '''add a new menu'''
@@ -517,6 +524,11 @@ class ConsoleModule(mp_module.MPModule):
         elif type == 'PARAM_VALUE':
             rec, tot = self.module('param').param_status()
             self.console.set_status('Params', 'Param %u/%u' % (rec,tot))
+
+        for i in range(0,len(self.user_added)):
+            if type == self.user_added[i][2]:
+                code = "self.console.set_status('"+self.user_added[i][0]+"','" +self.user_added[i][1]+"' %"+self.user_added[i][3]+", row = "+self.user_added[i][4]+")"
+                exec(code)
 
 def init(mpstate):
     '''initialise module'''
