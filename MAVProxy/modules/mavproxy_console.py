@@ -4,7 +4,7 @@
   uses lib/console.py for display
 """
 
-import os, sys, math, time
+import os, sys, math, time, re
 
 from MAVProxy.modules.lib import wxconsole
 from MAVProxy.modules.lib import textconsole
@@ -14,6 +14,15 @@ from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import wxsettings
 from MAVProxy.modules.lib.mp_menu import *
+
+class DisplayItem:
+    def __init__(self, fmt, expression, row):
+        self.expression = expression.strip('"\'')
+        self.format = fmt.strip('"\'')
+        re_caps = re.compile('[A-Z_][A-Z0-9_]+')
+        self.msg_types = set(re.findall(re_caps, expression))
+        print(self.expression, self.msg_types)
+        self.row = row
 
 class ConsoleModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -25,8 +34,8 @@ class ConsoleModule(mp_module.MPModule):
         self.max_link_num = 0
         self.last_sys_status_health = 0
         self.last_sys_status_errors_announce = 0
-        self.user_added = []
-        self.add_command('console_add', self.cmd_add, "console module", ['add'])
+        self.user_added = {}
+        self.add_command('console', self.cmd_console, "console module", ['add','list','remove'])
         mpstate.console = wxconsole.MessageConsole(title='Console')
 
         # setup some default status information
@@ -79,10 +88,34 @@ class ConsoleModule(mp_module.MPModule):
             self.vehicle_menu = MPMenuSubMenu('Vehicle', items=[])
             self.add_menu(self.vehicle_menu)
 
-    def cmd_add(self, args):
-        new_field = args[:]
-        self.user_added.append(new_field)
-        print self.user_added
+    def cmd_console(self, args):
+        usage = 'usage: console <add|list|remove>'
+        if len(args) < 1:
+            print(usage)
+            return
+        cmd = args[0]
+        if cmd == 'add':
+            if len(args) < 4:
+                print("usage: console add ID FORMAT EXPRESSION <row>")
+                return
+            if len(args) > 4:
+                row = int(args[4])
+            else:
+                row = 4
+            self.user_added[args[1]] = DisplayItem(args[2], args[3], row)
+        elif cmd == 'list':
+            for k in sorted(self.user_added.keys()):
+                d = self.user_added[k]
+                print("%s : FMT=%s EXPR=%s ROW=%u" % (k, d.format, d.expression, d.row))
+        elif cmd == 'remove':
+            if len(args) < 2:
+                print("usage: console remove ID")
+                return
+            id = args[1]
+            if id in self.user_added:
+                self.user_added.pop(id)
+        else:
+            print(usage)
 
     def add_menu(self, menu):
         '''add a new menu'''
@@ -525,11 +558,15 @@ class ConsoleModule(mp_module.MPModule):
             rec, tot = self.module('param').param_status()
             self.console.set_status('Params', 'Param %u/%u' % (rec,tot))
 
-        if type in [row[2] for row in self.user_added]:
-            for i in range(0,len(self.user_added)):
-                if type == self.user_added[i][2]:
-                    val = eval(self.user_added[i][3])
-                    self.console.set_status(self.user_added[i][0], self.user_added[i][1] % val, row = int(self.user_added[i][4]))
+        for id in self.user_added.keys():
+            if type in self.user_added[id].msg_types:
+                d = self.user_added[id]
+                val = mavutil.evaluate_expression(d.expression, self.master.messages)
+                try:
+                    self.console.set_status(id, d.format % val, row = d.row)
+                except Exception as ex:
+                    print(ex)
+                    pass
 
 def init(mpstate):
     '''initialise module'''
