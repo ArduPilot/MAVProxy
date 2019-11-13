@@ -525,10 +525,11 @@ class ConsoleModule(mp_module.MPModule):
             rec, tot = self.module('param').param_status()
             self.console.set_status('Params', 'Param %u/%u' % (rec,tot))
 
-        for i in range(0,len(self.user_added)):
-            if type == self.user_added[i][2]:
-                code = "self.console.set_status('"+self.user_added[i][0]+"','" +self.user_added[i][1]+"' %"+self.user_added[i][3]+", row = "+self.user_added[i][4]+")"
-                exec(code)
+        if type in [row[2] for row in self.user_added]:
+            for i in range(0,len(self.user_added)):
+                if type == self.user_added[i][2]:
+                    val = eval(self.user_added[i][3])
+                    self.console.set_status(self.user_added[i][0], self.user_added[i][1] % val, row = int(self.user_added[i][4]))
 
 def init(mpstate):
     '''initialise module'''
