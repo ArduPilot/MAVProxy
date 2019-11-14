@@ -640,6 +640,12 @@ def cmd_param(args):
 
 def cmd_paramchange(args):
     '''show param changes'''
+    if len(args) > 0:
+        wildcard = args[0]
+        if wildcard.find('*') == -1 and wildcard.find('?') == -1:
+            wildcard = "*" + wildcard + "*"
+    else:
+        wildcard = '*'
     types = set(['PARM','PARAM_VALUE'])
     vmap = {}
     while True:
@@ -656,6 +662,8 @@ def cmd_paramchange(args):
             continue
         if pname.startswith('STAT_'):
             # STAT_* changes are not interesting
+            continue
+        if not fnmatch.fnmatch(pname.upper(), wildcard.upper()):
             continue
         if not pname in vmap or vmap[pname] == pvalue:
             vmap[pname] = pvalue
