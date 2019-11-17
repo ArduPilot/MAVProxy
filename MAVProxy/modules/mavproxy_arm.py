@@ -110,13 +110,13 @@ class ArmModule(mp_module.MPModule):
             arming_mask = int(self.get_mav_param("ARMING_CHECK"))
             if arming_mask == 0:
                 print("NONE")
-            for name in sorted(arming_masks, key=lambda(x) : arming_masks[x]):
+            for name in sorted(arming_masks, key=lambda x : arming_masks[x]):
                 if arming_masks[name] & arming_mask:
                     print(name)
             return
 
         if args[0] == "bits":
-            for mask in sorted(arming_masks, key=lambda(x) : arming_masks[x]):
+            for mask in sorted(arming_masks, key=lambda x : arming_masks[x]):
                 print("%s" % mask)
             return
 
