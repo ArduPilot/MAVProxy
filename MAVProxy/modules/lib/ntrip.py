@@ -175,6 +175,10 @@ class NtripClient(object):
                 self.socket.close()
                 self.socket = None
                 return None
+            if len(data) == 0:
+                self.socket.close()
+                self.socket = None
+                return None
             if self.rtcm3.read(data):
                 self.last_id = self.rtcm3.get_packet_ID()
                 return self.rtcm3.get_packet()
