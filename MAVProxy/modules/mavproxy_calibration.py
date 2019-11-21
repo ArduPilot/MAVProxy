@@ -172,6 +172,27 @@ class CalibrationModule(mp_module.MPModule):
                 0, # param5
                 0, # param6
                 0) # param7
+        elif args[0] == 'yaw':
+            if len(args) < 2:
+                print("Usage: magcal yaw YAW_DEGREES <mask>")
+                return
+            yaw_deg = float(args[1])
+            mask = 0
+            if len(args) > 2:
+                mask = int(args[2])
+            print("Calibrating for yaw %.1f degrees with mask 0x%02x" % (yaw_deg, mask))
+            self.master.mav.command_long_send(
+                self.settings.target_system,  # target_system
+                0, # target_component
+                mavutil.mavlink.MAV_CMD_FIXED_MAG_CAL_YAW, # command
+                0, # confirmation
+                yaw_deg, # p1: yaw in degrees
+                mask, # p2: mask
+                0, # p3: lat_deg
+                0, # p4: lon_deg
+                0, # param5
+                0, # param6
+                0) # param7
         else:
             self.print_magcal_usage()
             return
