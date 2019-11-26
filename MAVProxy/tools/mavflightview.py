@@ -291,21 +291,22 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
                 pass
             continue
         if type == 'CMD':
-            m = mavutil.mavlink.MAVLink_mission_item_message(0,
-                                                             0,
-                                                             m.CNum,
-                                                             mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                                             m.CId,
-                                                             0, 1,
-                                                             m.Prm1, m.Prm2, m.Prm3, m.Prm4,
-                                                             m.Lat, m.Lng, m.Alt)
-            try:
-                while m.seq > wp.count():
-                    print("Adding dummy WP %u" % wp.count())
-                    wp.set(m, wp.count())
-                wp.set(m, m.seq)
-            except Exception:
-                pass
+            if options.mission is None:
+                m = mavutil.mavlink.MAVLink_mission_item_message(0,
+                                                                0,
+                                                                m.CNum,
+                                                                mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                                                m.CId,
+                                                                0, 1,
+                                                                m.Prm1, m.Prm2, m.Prm3, m.Prm4,
+                                                                m.Lat, m.Lng, m.Alt)
+                try:
+                    while m.seq > wp.count():
+                        print("Adding dummy WP %u" % wp.count())
+                        wp.set(m, wp.count())
+                    wp.set(m, m.seq)
+                except Exception:
+                    pass
             continue
         if not mlog.check_condition(options.condition):
             continue
