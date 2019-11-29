@@ -290,7 +290,13 @@ class ConsoleModule(mp_module.MPModule):
                 self.console.set_status(field, '%s %u (%u)' % (prefix, msg.fix_type, msg.satellites_visible), fg='red')
             gps_heading = int(self.mpstate.status.msgs['GPS_RAW_INT'].cog * 0.01)
             if type == 'GPS_RAW_INT':
-                self.console.set_status('Heading', 'Hdg %s/%u' % (master.field('VFR_HUD', 'heading', '-'), gps_heading))
+                vfr_hud_heading = master.field('VFR_HUD', 'heading', None)
+                if vfr_hud_heading is None:
+                    vfr_hud_heading = '---'
+                else:
+                    vfr_hud_heading = '%3u' % vfr_hud_heading
+                self.console.set_status('Heading', 'Hdg %s/%3u' %
+                                        (vfr_hud_heading, gps_heading))
         elif type == 'VFR_HUD':
             if master.mavlink10():
                 alt = master.field('GPS_RAW_INT', 'alt', 0) / 1.0e3
