@@ -129,7 +129,7 @@ class LogModule(mp_module.MPModule):
     def log_download_next(self):
         latest = self.download_queue.pop()
         filename = self.default_log_filename(latest)
-        if os.path.isfile(filename):
+        if os.path.isfile(filename) and os.path.getsize(filename) == self.entries.get(latest).to_dict()["size"]:
             print("Skipping existing %s" % (filename))
             self.log_download_next()
         else:
@@ -191,7 +191,7 @@ class LogModule(mp_module.MPModule):
 
         elif args[0] == "download":
             if len(args) < 2:
-                print("usage: log download <lognumber> <filename>")
+                print("usage: log download all | log download <lognumber> <filename>")
                 return
             if args[1] == 'all':
                 self.log_download_all()
