@@ -425,7 +425,7 @@ class MPSlipMapPanel(wx.Panel):
         alt = 0
         if pos is not None:
             (lat,lon) = self.coordinates(pos.x, pos.y)
-            newtext += 'Cursor: %f %f (%s)' % (lat, lon, mp_util.latlon_to_grid((lat, lon)))
+            newtext += 'Cursor: %.8f %.8f (%s)' % (lat, lon, mp_util.latlon_to_grid((lat, lon)))
             if state.elevation:
                 alt = self.ElevationMap.GetElevation(lat, lon)
                 if alt is not None:
@@ -440,7 +440,7 @@ class MPSlipMapPanel(wx.Panel):
             newtext += ' SRTM Downloading '
         newtext += '\n'
         if self.click_pos is not None:
-            newtext += 'Click: %f %f (%s %s) (%s)' % (self.click_pos[0], self.click_pos[1],
+            newtext += 'Click: %.8f %.8f (%s %s) (%s)' % (self.click_pos[0], self.click_pos[1],
                                                       mp_util.degrees_to_dms(self.click_pos[0]),
                                                       mp_util.degrees_to_dms(self.click_pos[1]),
                                                       mp_util.latlon_to_grid(self.click_pos))
@@ -449,7 +449,7 @@ class MPSlipMapPanel(wx.Panel):
                                             self.click_pos[0], self.click_pos[1])
             bearing = mp_util.gps_bearing(self.last_click_pos[0], self.last_click_pos[1],
                                             self.click_pos[0], self.click_pos[1])
-            newtext += '  Distance: %.1fm %.1fnm Bearing %.1f' % (distance, distance*0.000539957, bearing)
+            newtext += '  Distance: %.3fm %.3fnm Bearing %.1f' % (distance, distance*0.000539957, bearing)
         if newtext != state.oldtext:
             self.position.Clear()
             self.position.WriteText(newtext)
