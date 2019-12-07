@@ -335,7 +335,7 @@ fw download releasetype=OFFICIAL frame=quad platform=PX4-v2
                 self.downloaders_lock.release()
                 return
 
-            for url in ['http://firmware.ardupilot.org/manifest.json']:
+            for url in ['https://firmware.ardupilot.org/manifest.json']:
                 filename = self.make_safe_filename_from_url(url)
                 path = mp_util.dot_mavproxy("manifest-%s" % filename)
                 self.downloaders[url] = threading.Thread(target=self.download_url, args=(url, path))
