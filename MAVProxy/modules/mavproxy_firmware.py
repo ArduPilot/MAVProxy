@@ -173,7 +173,7 @@ fw download releasetype=OFFICIAL frame=quad platform=PX4-v2
     def filtered_rows_from_args(self, args):
         '''extracts filters from args, rows from manifests, returns filtered rows'''
         if len(self.manifests) == 0:
-            print("fw: No manifests downloaded.  Try 'manifest download'")
+            print("fw: No manifests downloaded.  Try 'fw manifest download'")
             return None
 
         (filters,remainder) = self.filters_from_args(args)
@@ -296,7 +296,7 @@ fw download releasetype=OFFICIAL frame=quad platform=PX4-v2
         self.manifests = []
         for manifest_path in self.find_manifests():
             if self.manifest_path_is_old(manifest_path):
-                print("fw: Manifest (%s) is old; consider 'manifest download'" % (manifest_path))
+                print("fw: Manifest (%s) is old; consider 'fw manifest download'" % (manifest_path))
             manifest = self.manifest_parse(manifest_path)
             if self.semver_major(manifest["format-version"]) != 1:
                 print("fw: Manifest (%s) has major version %d; MAVProxy only understands version 1" % (manifest_path,manifest["format-version"]))
