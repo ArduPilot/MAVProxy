@@ -64,7 +64,7 @@ class InvalidTileError(Exception):
 
 class SRTMDownloader():
     """Automatically download SRTM tiles."""
-    def __init__(self, server="https://firmware.ardupilot.org",
+    def __init__(self, server="firmware.ardupilot.org",
                  directory="/SRTM/",
                  cachedir=None,
                  offline=0,
@@ -137,7 +137,7 @@ class SRTMDownloader():
         '''fetch a URL with redirect handling'''
         tries = 0
         while tries < 5:
-                conn = httplib.HTTPConnection(self.server)
+                conn = httplib.HTTPSConnection(self.server)
                 conn.request("GET", url)
                 r1 = conn.getresponse()
                 if r1.status in [301, 302, 303, 307]:
