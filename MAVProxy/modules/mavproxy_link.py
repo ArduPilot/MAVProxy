@@ -74,6 +74,13 @@ class LinkModule(mp_module.MPModule):
             m.source_system = self.settings.source_system
             m.mav.srcSystem = m.source_system
             m.mav.srcComponent = self.settings.source_component
+        # don't let pending statustext wait forever for last chunk:
+        for src in self.status.statustexts_by_sysidcompid:
+            msgids = self.status.statustexts_by_sysidcompid[src].keys()
+            for msgid in msgids:
+                pending = self.status.statustexts_by_sysidcompid[src][msgid]
+                if time.time() - pending.last_chunk_time > 1:
+                    self.emit_accumulated_statustext(src, msgid, pending)
 
     def complete_serial_ports(self, text):
         '''return list of serial ports'''
@@ -372,6 +379,16 @@ class LinkModule(mp_module.MPModule):
             self.say("height %u" % rounded_alt, priority='notification')
 
 
+    def emit_accumulated_statustext(self, key, id, pending):
+        out = pending.accumulated_statustext()
+        if out != self.status.last_apm_msg or time.time() > self.status.last_apm_msg_time+2:
+            (fg, bg) = self.colors_for_severity(pending.severity)
+            out = pending.accumulated_statustext()
+            self.mpstate.console.writeln("APM: %s" % out, bg=bg, fg=fg)
+            self.status.last_apm_msg = out
+            self.status.last_apm_msg_time = time.time()
+        del self.status.statustexts_by_sysidcompid[key][id]
+
     def master_msg_handling(self, m, master):
         '''link message handling for an upstream link'''
         if self.settings.target_system != 0 and m.get_srcSystem() != self.settings.target_system:
@@ -453,11 +470,50 @@ class LinkModule(mp_module.MPModule):
                 self.mpstate.vehicle_name = 'AntennaTracker'
 
         elif mtype == 'STATUSTEXT':
-            if m.text != self.status.last_apm_msg or time.time() > self.status.last_apm_msg_time+2:
-                (fg, bg) = self.colors_for_severity(m.severity)
-                self.mpstate.console.writeln("APM: %s" % mp_util.null_term(m.text), bg=bg, fg=fg)
-                self.status.last_apm_msg = m.text
-                self.status.last_apm_msg_time = time.time()
+
+            class PendingText(object):
+                def __init__(self):
+                    self.expected_count = None
+                    self.severity = None
+                    self.chunks = {}
+                    self.start_time = time.time()
+                    self.last_chunk_time = time.time()
+
+                def add_chunk(self, m): # m is a statustext message
+                    self.severity = m.severity
+                    self.last_chunk_time = time.time()
+                    self.chunks[m.chunk_seq] = m.text
+
+                    if len(m.text) != 50 or m.id == 0:
+                        self.expected_count = m.chunk_seq + 1;
+
+                def complete(self):
+                    return (self.expected_count is not None and
+                            self.expected_count == len(self.chunks))
+
+                def accumulated_statustext(self):
+                    next_expected_chunk = 0
+                    out = ""
+                    for chunk_seq in sorted(self.chunks.keys()):
+                        if chunk_seq != next_expected_chunk:
+                            out += " ... "
+                            next_expected_chunk = chunk_seq
+                        out += self.chunks[chunk_seq]
+                        next_expected_chunk += 1
+
+                    return out
+
+            key = "%s.%s" % (m.get_srcSystem(), m.get_srcComponent())
+            if key not in self.status.statustexts_by_sysidcompid:
+                self.status.statustexts_by_sysidcompid[key] = {}
+            if m.id not in self.status.statustexts_by_sysidcompid[key]:
+                self.status.statustexts_by_sysidcompid[key][m.id] = PendingText()
+
+            pending = self.status.statustexts_by_sysidcompid[key][m.id]
+            pending.add_chunk(m)
+            if pending.complete():
+                # we have all of the chunks!
+                self.emit_accumulated_statustext(key, m.id, pending)
 
         elif mtype == "VFR_HUD":
             have_gps_lock = False

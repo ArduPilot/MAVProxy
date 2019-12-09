@@ -90,6 +90,7 @@ class MPStatus(object):
         self.heartbeat_error = False
         self.last_apm_msg = None
         self.last_apm_msg_time = 0
+        self.statustexts_by_sysidcompid = {}
         self.highest_msec = 0
         self.have_gps_lock = False
         self.lost_gps_lock = False
