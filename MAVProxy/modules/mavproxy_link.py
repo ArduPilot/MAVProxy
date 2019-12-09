@@ -74,6 +74,10 @@ class LinkModule(mp_module.MPModule):
             m.source_system = self.settings.source_system
             m.mav.srcSystem = m.source_system
             m.mav.srcComponent = self.settings.source_component
+        # don't let pending statustext wait forever for last chunk:
+        if (self.status.statustext_num_chunks != 0 and
+            time.time() - self.status.statustext_last_chunk_time > 1):
+            self.emit_accumulated_statustext()
 
     def complete_serial_ports(self, text):
         '''return list of serial ports'''
@@ -372,6 +376,24 @@ class LinkModule(mp_module.MPModule):
             self.say("height %u" % rounded_alt, priority='notification')
 
 
+    def emit_accumulated_statustext(self):
+        if self.status.statustext_num_chunks == 0:
+            return
+        out = ""
+        for i in range(0, self.status.statustext_num_chunks):
+            if i in self.status.statustext_chunks:
+                out += self.status.statustext_chunks[i]
+            else:
+                out += " ... "
+        self.status.statustext_chunks = {}
+        self.status.statustext_num_chunks = 0
+
+        if out != self.status.last_apm_msg or time.time() > self.status.last_apm_msg_time+2:
+            (fg, bg) = self.colors_for_severity(self.status.statustext_severity)
+            self.mpstate.console.writeln("APM: %s" % out, bg=bg, fg=fg)
+            self.status.last_apm_msg = out
+            self.status.last_apm_msg_time = time.time()
+
     def master_msg_handling(self, m, master):
         '''link message handling for an upstream link'''
         if self.settings.target_system != 0 and m.get_srcSystem() != self.settings.target_system:
@@ -453,11 +475,21 @@ class LinkModule(mp_module.MPModule):
                 self.mpstate.vehicle_name = 'AntennaTracker'
 
         elif mtype == 'STATUSTEXT':
-            if m.text != self.status.last_apm_msg or time.time() > self.status.last_apm_msg_time+2:
-                (fg, bg) = self.colors_for_severity(m.severity)
-                self.mpstate.console.writeln("APM: %s" % mp_util.null_term(m.text), bg=bg, fg=fg)
-                self.status.last_apm_msg = m.text
-                self.status.last_apm_msg_time = time.time()
+            if m.chunk_num == 0:
+                # we assume that there is a strict stream of statustexts
+                # q: what about multiple links?!
+                self.emit_accumulated_statustext()
+                self.status.statustext_chunk_count = m.chunk_count
+                self.status.statustext_severity = m.severity
+
+            self.status.statustext_chunks[m.chunk_num] = mp_util.null_term(m.text)
+            self.status.statustext_num_chunks += 1
+            self.status.statustext_last_chunk_time = time.time()
+            if (self.status.statustext_num_chunks == 0 or
+                self.status.statustext_num_chunks == self.status.statustext_chunk_count):
+                # all pieces have arrived (or num_chunks==0 meaning
+                # this didn't have extensions)
+                self.emit_accumulated_statustext()
 
         elif mtype == "VFR_HUD":
             have_gps_lock = False
