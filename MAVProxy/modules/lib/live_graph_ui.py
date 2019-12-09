@@ -167,6 +167,11 @@ class GraphFrame(wx.Frame):
         if self.paused:
             return
         for i in range(len(self.plot_data)):
+            if (type(state.values[i]) == list):
+                print("ERROR: Cannot plot array of length %d. Use 'graph %s[index]' instead"%(len(state.values[i]), state.fields[i]))
+                self.redraw_timer.Stop()
+                self.Destroy()
+                return
             if state.values[i] is not None:
                 self.data[i].append(state.values[i])
                 while len(self.data[i]) > len(self.xdata):
