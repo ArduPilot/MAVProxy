@@ -10,7 +10,7 @@ import datetime
 import base64
 import time
 import errno
-import rtcm3
+from . import rtcm3
 from optparse import OptionParser
 
 version = 0.1
