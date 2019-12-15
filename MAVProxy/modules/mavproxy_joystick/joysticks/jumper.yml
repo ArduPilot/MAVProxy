@@ -1,0 +1,28 @@
+description: >
+ Jumper T16 transmitter as a joystick via USB cable
+
+match:
+  - '*Jumper*'
+
+controls:
+  - channel: 1
+    type: axis
+    id: 0
+  - channel: 2
+    type: axis
+    id: 1
+  - channel: 3
+    type: axis
+    id: 2
+  - channel: 4
+    type: axis
+    id: 3
+  - channel: 5
+    type: axis
+    id: 4
+  - channel: 6
+    type: axis
+    id: 5
+  - channel: 7
+    type: axis
+    id: 6
