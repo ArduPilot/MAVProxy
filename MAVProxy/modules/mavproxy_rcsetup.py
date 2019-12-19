@@ -11,6 +11,7 @@ class RCSetupModule(mp_module.MPModule):
         self.clear_rc_cal()
         self.add_command('rccal', self.cmd_rccal, "RC calibration start/stop")
         self.add_command('rctrim', self.cmd_rctrim, "RC min/max trim")
+        self.empty_input_count = None
         print("rcsetup initialised")
 
     def clear_rc_cal(self):
@@ -58,15 +59,24 @@ class RCSetupModule(mp_module.MPModule):
             print("Calibrating %u channels" % self.num_channels)
             print("WARNING: remove propellers from electric planes!!")
             print("Push return when ready to calibrate.")
-            raw_input()
-
-            self.clear_rc_cal()
-            self.calibrating = True
+            self.empty_input_count = self.mpstate.empty_input_count
         elif (args[0] == "done"):
             self.calibrating = False
             self.apply_rc_cal()
         else:
             self.print_cal_usage()
+
+    def idle_task(self):
+        if self.empty_input_count is None:
+            # not waiting for input
+            return
+        if self.empty_input_count == self.mpstate.empty_input_count:
+            # haven't received input
+            return
+
+        self.clear_rc_cal()
+        self.calibrating = True
+        self.empty_input_count = None
 
     def cmd_rctrim(self, args):
         '''set RCx_TRIM'''
