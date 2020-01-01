@@ -475,13 +475,22 @@ class parseHTMLDirectoryListing(HTMLParser):
 
 #DEBUG ONLY
 if __name__ == '__main__':
-    downloader = SRTMDownloader()
+    from argparse import ArgumentParser
+    parser = ArgumentParser(description='srtm test')
+
+    parser.add_argument("--lat", type=float, default=-35.363261)
+    parser.add_argument("--lon", type=float, default=149.165230)
+    parser.add_argument("--debug", action='store_true', default=False)
+    args = parser.parse_args()
+
+    downloader = SRTMDownloader(debug=args.debug)
     downloader.loadFileList()
     import time
+    from math import floor
     start = time.time()
     while time.time() - start < 30:
-        tile = downloader.getTile(-36, 149)
+        tile = downloader.getTile(int(floor(args.lat)), int(floor(args.lon)))
         if tile:
-            print(tile.getAltitudeFromLatLon(-35.282, 149.1287))
+            print("Download took %.1fs alt=%.1f" % (time.time()-start, tile.getAltitudeFromLatLon(args.lat, args.lon)))
             break
         time.sleep(0.2)
