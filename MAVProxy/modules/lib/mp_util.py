@@ -384,6 +384,7 @@ def decode_devid(devid, pname):
         0x2D : "DEVTYPE_INS_ICM20648",
         0x2E : "DEVTYPE_INS_ICM20649",
         0x2F : "DEVTYPE_INS_ICM20602",
+        0x30 : "DEVTYPE_INS_ICM20601",
         }
 
     decoded_devname = ""
