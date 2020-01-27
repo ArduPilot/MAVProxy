@@ -330,10 +330,13 @@ def cmd_map(args):
     options.condition = mestate.settings.condition
     options._flightmodes = mestate.mlog._flightmodes
     options.show_flightmode_legend = mestate.settings.show_flightmode
+    options.colour_source='flightmode'
     if len(args) > 0:
         options.types = ','.join(args)
-    [path, wp, fen, used_flightmodes, mav_type] = mavflightview.mavflightview_mav(mestate.mlog, options, mestate.flightmode_selections)
-    child = multiproc.Process(target=mavflightview.mavflightview_show, args=[path, wp, fen, used_flightmodes, mav_type, options])
+        if len(options.types) > 1:
+            options.colour_source='type'
+    [path, wp, fen, used_flightmodes, mav_type, instances] = mavflightview.mavflightview_mav(mestate.mlog, options, mestate.flightmode_selections)
+    child = multiproc.Process(target=mavflightview.mavflightview_show, args=[path, wp, fen, used_flightmodes, mav_type, options, instances])
     child.start()
     mestate.mlog.rewind()
 
