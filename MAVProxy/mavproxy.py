@@ -1223,6 +1223,13 @@ if __name__ == '__main__':
 
     def quit_handler(signum = None, frame = None):
         #print('Signal handler called with signal', signum)
+        for mav_port in mpstate.mav_outputs:
+            try:
+                #Attempt immediate shutdown of ports in mpstate.mav_outputs list
+                mav_port.listen.shutdown(mavutil.socket.SHUT_RDWR)
+                mav_port.close()
+            except AttributeError:
+                pass
         if mpstate.status.exit:
             print('Clean shutdown impossible, forcing an exit')
             sys.exit(0)
