@@ -482,8 +482,17 @@ class LinkModule(mp_module.MPModule):
                 def add_chunk(self, m): # m is a statustext message
                     self.severity = m.severity
                     self.last_chunk_time = time.time()
-                    chunk_seq = getattr(m,'chunk_seq',0)
-                    mid = getattr(m,'id',0)
+                    if hasattr(m, 'chunk_seq'):
+                        # mavlink extensions are present.
+                        chunk_seq = m.chunk_seq
+                        mid = m.id
+                    else:
+                        # Note that m.id may still exist!  It will
+                        # contain the value 253, STATUSTEXT's mavlink
+                        # message id.  Thus our reliance on the
+                        # presence of chunk_seq.
+                        chunk_seq = 0
+                        mid = 0
                     self.chunks[chunk_seq] = m.text
 
                     if len(m.text) != 50 or mid == 0:
@@ -508,7 +517,11 @@ class LinkModule(mp_module.MPModule):
             key = "%s.%s" % (m.get_srcSystem(), m.get_srcComponent())
             if key not in self.status.statustexts_by_sysidcompid:
                 self.status.statustexts_by_sysidcompid[key] = {}
-            mid = getattr(m,'id',0)
+            if hasattr(m, 'chunk_seq'):
+                mid = m.id
+            else:
+                # m.id will have the value of 253, STATUSTEXT mavlink id
+                mid = 0
             if mid not in self.status.statustexts_by_sysidcompid[key]:
                 self.status.statustexts_by_sysidcompid[key][mid] = PendingText()
 
