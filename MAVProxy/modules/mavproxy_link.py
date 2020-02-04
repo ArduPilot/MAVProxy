@@ -482,10 +482,12 @@ class LinkModule(mp_module.MPModule):
                 def add_chunk(self, m): # m is a statustext message
                     self.severity = m.severity
                     self.last_chunk_time = time.time()
-                    self.chunks[m.chunk_seq] = m.text
+                    chunk_seq = getattr(m,'chunk_seq',0)
+                    mid = getattr(m,'id',0)
+                    self.chunks[chunk_seq] = m.text
 
-                    if len(m.text) != 50 or m.id == 0:
-                        self.expected_count = m.chunk_seq + 1;
+                    if len(m.text) != 50 or mid == 0:
+                        self.expected_count = chunk_seq + 1;
 
                 def complete(self):
                     return (self.expected_count is not None and
@@ -506,14 +508,15 @@ class LinkModule(mp_module.MPModule):
             key = "%s.%s" % (m.get_srcSystem(), m.get_srcComponent())
             if key not in self.status.statustexts_by_sysidcompid:
                 self.status.statustexts_by_sysidcompid[key] = {}
-            if m.id not in self.status.statustexts_by_sysidcompid[key]:
-                self.status.statustexts_by_sysidcompid[key][m.id] = PendingText()
+            mid = getattr(m,'id',0)
+            if mid not in self.status.statustexts_by_sysidcompid[key]:
+                self.status.statustexts_by_sysidcompid[key][mid] = PendingText()
 
-            pending = self.status.statustexts_by_sysidcompid[key][m.id]
+            pending = self.status.statustexts_by_sysidcompid[key][mid]
             pending.add_chunk(m)
             if pending.complete():
                 # we have all of the chunks!
-                self.emit_accumulated_statustext(key, m.id, pending)
+                self.emit_accumulated_statustext(key, mid, pending)
 
         elif mtype == "VFR_HUD":
             have_gps_lock = False
