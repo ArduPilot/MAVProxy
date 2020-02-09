@@ -32,12 +32,12 @@ class GoProModule(mp_module.MPModule):
         if args[0] == "shutter":
             name = args[1].lower()
             if name == 'start':
-                mav.gopro_set_request_send(0, mavutil.mavlink.MAV_COMP_ID_GIMBAL,
-                 mavutil.mavlink.GOPRO_COMMAND_SHUTTER, 1)
+                mav.gopro_set_request_send(self.target_system, mavutil.mavlink.MAV_COMP_ID_GIMBAL,
+                 mavutil.mavlink.GOPRO_COMMAND_SHUTTER, [1, 0 ,0 , 0])
                 return
             elif name == 'stop':
-                mav.gopro_set_request_send(0, mavutil.mavlink.MAV_COMP_ID_GIMBAL,
-                 mavutil.mavlink.GOPRO_COMMAND_SHUTTER, 0)
+                mav.gopro_set_request_send(self.target_system, mavutil.mavlink.MAV_COMP_ID_GIMBAL,
+                 mavutil.mavlink.GOPRO_COMMAND_SHUTTER, [0, 0 ,0 , 0])
                 return
             else:
                 print("unrecognized")
@@ -46,12 +46,12 @@ class GoProModule(mp_module.MPModule):
         if args[0] == "mode":
             name = args[1].lower()
             if name == 'video':
-                mav.gopro_set_request_send(0, mavutil.mavlink.MAV_COMP_ID_GIMBAL,
-                 mavutil.mavlink.GOPRO_COMMAND_CAPTURE_MODE, 0)
+                mav.gopro_set_request_send(self.target_system, mavutil.mavlink.MAV_COMP_ID_GIMBAL,
+                 mavutil.mavlink.GOPRO_COMMAND_CAPTURE_MODE, [0, 0 ,0 , 0])
                 return
             elif name == 'camera':
-                mav.gopro_set_request_send(0, mavutil.mavlink.MAV_COMP_ID_GIMBAL,
-                 mavutil.mavlink.GOPRO_COMMAND_CAPTURE_MODE, 1)
+                mav.gopro_set_request_send(self.target_system, mavutil.mavlink.MAV_COMP_ID_GIMBAL,
+                 mavutil.mavlink.GOPRO_COMMAND_CAPTURE_MODE, [1, 0 ,0 , 0])
                 return
             else:
                 print("unrecognized")
@@ -60,12 +60,12 @@ class GoProModule(mp_module.MPModule):
         if args[0] == "power":
             name = args[1].lower()
             if name == 'on':
-                mav.gopro_set_request_send(0, mavutil.mavlink.MAV_COMP_ID_GIMBAL,
-                 mavutil.mavlink.GOPRO_COMMAND_POWER, 1)
+                mav.gopro_set_request_send(self.target_system, mavutil.mavlink.MAV_COMP_ID_GIMBAL,
+                 mavutil.mavlink.GOPRO_COMMAND_POWER, [1, 0 ,0 , 0])
                 return
             elif name == 'off':
-                mav.gopro_set_request_send(0, mavutil.mavlink.MAV_COMP_ID_GIMBAL,
-                 mavutil.mavlink.GOPRO_COMMAND_POWER, 0)
+                mav.gopro_set_request_send(self.target_system, mavutil.mavlink.MAV_COMP_ID_GIMBAL,
+                 mavutil.mavlink.GOPRO_COMMAND_POWER, [0, 0 ,0 , 0])
                 return
             else:
                 print("unrecognized")
