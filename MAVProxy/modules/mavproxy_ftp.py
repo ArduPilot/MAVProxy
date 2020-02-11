@@ -165,6 +165,7 @@ class FTPModule(mp_module.MPModule):
         self.read_gaps = set()
         self.last_read = None
         self.last_burst_read = None
+        self.session = (self.session + 1) % 256
 
     def cmd_list(self, args):
         '''list files'''
@@ -254,6 +255,9 @@ class FTPModule(mp_module.MPModule):
                     print("FTP: dropping TX")
                 return
         if self.fh is None or self.filename is None:
+            if op.session != self.session:
+                # old session
+                return
             print("FTP Unexpected burst read reply")
             print(op)
             return
@@ -299,7 +303,7 @@ class FTPModule(mp_module.MPModule):
                     print("Wrote %u bytes to %s in %.1fs %.1fkByte/s (ecode %u)" % (ofs, self.filename, dt, rate, ecode))
                     self.terminate_session()
             else:
-                print("FTP: burst Nack: %s" % op)
+                print("FTP: burst Nack (ecode:%u): %s" % (ecode, op))
         else:
             print("FTP: burst error: %s" % op)
 
