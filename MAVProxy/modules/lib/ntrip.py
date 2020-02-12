@@ -11,6 +11,7 @@ import base64
 import time
 import errno
 import rtcm3
+import ssl
 from optparse import OptionParser
 
 version = 0.1
@@ -59,6 +60,9 @@ class NtripClient(object):
         # RTCM3 parser
         self.rtcm3 = rtcm3.RTCM3()
         self.last_id = None
+        if self.port == 443:
+            # force SSL on port 443
+            self.ssl = True
 
     def setPosition(self, lat, lon):
         self.flagN = "N"
@@ -86,7 +90,7 @@ class NtripClient(object):
         userstr = self.user
         if sys.version_info.major >= 3:
             userstr = str(userstr, 'ascii')
-        mountPointString = "GET %s HTTP/1.1\r\nUser-Agent: %s\r\nAuthorization: Basic %s\r\n" % (
+        mountPointString = "GET %s HTTP/1.0\r\nUser-Agent: %s\r\nAuthorization: Basic %s\r\n" % (
             self.mountpoint, useragent, userstr)
         if self.host or self.V2:
             hostString = "Host: %s:%i\r\n" % (self.caster, self.port)
@@ -134,10 +138,13 @@ class NtripClient(object):
                     return None
             try:
                 casterResponse = self.socket.recv(4096)
+            except ssl.SSLWantReadError:
+                    return None
             except IOError as e:
                 if e.errno == errno.EWOULDBLOCK:
                     return None
                 self.socket = None
+                casterResponse = ''
             if sys.version_info.major >= 3:
                 casterResponse = str(casterResponse, 'ascii')
             header_lines = casterResponse.split("\r\n")
@@ -165,6 +172,8 @@ class NtripClient(object):
         while True:
             try:
                 data = self.socket.recv(1)
+            except ssl.SSLWantReadError:
+                    return None
             except IOError as e:
                 if e.errno == errno.EWOULDBLOCK:
                     return None
