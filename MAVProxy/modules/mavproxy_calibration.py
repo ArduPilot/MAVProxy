@@ -125,7 +125,7 @@ class CalibrationModule(mp_module.MPModule):
         self.master.calibrate_pressure()
 
     def print_magcal_usage(self):
-        print("Usage: magcal <start|accept|cancel>")
+        print("Usage: magcal <start|accept|cancel|yaw>")
 
     def cmd_magcal(self, args):
         '''control magnetometer calibration'''
