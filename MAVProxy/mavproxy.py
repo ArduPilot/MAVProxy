@@ -1031,12 +1031,10 @@ def input_loop():
     '''wait for user input'''
     while mpstate.status.exit != True:
         try:
-            if mpstate.status.exit != True:
-                line = input(mpstate.rl.prompt)
-        except EOFError:
+            line = input(mpstate.rl.prompt)
+            mpstate.input_queue.put(line)
+        except (EOFError, IOError):
             mpstate.status.exit = True
-            sys.exit(1)
-        mpstate.input_queue.put(line)
 
 
 def run_script(scriptfile):
@@ -1232,8 +1230,8 @@ if __name__ == '__main__':
     # Listen for kill signals to cleanly shutdown modules
     fatalsignals = [signal.SIGTERM]
     try:
-        fatalsignals.append(signal.SIGHUP)
         fatalsignals.append(signal.SIGQUIT)
+        signal.signal(signal.SIGHUP, signal.SIG_IGN)
     except Exception:
         pass
     if opts.daemon or opts.non_interactive: # SIGINT breaks readline parsing - if we are interactive, just let things die
