@@ -120,7 +120,9 @@ class LogModule(mp_module.MPModule):
             size = 0
         else:
             size = m.size
-        highest = max(self.download_set)
+        highest = 0
+        if len(self.download_set):
+            highest = max(self.download_set)
         diff = set(range(highest)).difference(self.download_set)
 
         status = "Downloading %s - %u/%u bytes %.1f kbyte/s (%u retries %u missing)" % (self.download_filename,
