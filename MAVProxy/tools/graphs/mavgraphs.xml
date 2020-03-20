@@ -275,22 +275,26 @@ If PIDR.I has a constant positive value then it means the aircraft is trimmed to
 
  <graph name='Sensors/Compass/EarthField Error EK2 Lane1'>
   <description></description>
+  <expression>earth_field_error(GPS,NKF2[0]).x earth_field_error(GPS,NKF2[0]).y earth_field_error(GPS,NKF2[0]).z</expression>
   <expression>earth_field_error(GPS,NKF2).x earth_field_error(GPS,NKF2).y earth_field_error(GPS,NKF2).z</expression>
  </graph>
 
  <graph name='Sensors/Compass/EarthField Error EK2 Lane2'>
   <description></description>
+  <expression>earth_field_error(GPS,NKF2[1]).x earth_field_error(GPS,NKF2[1]).y earth_field_error(GPS,NKF2[1]).z</expression>
   <expression>earth_field_error(GPS,NKF7).x earth_field_error(GPS,NKF7).y earth_field_error(GPS,NKF7).z</expression>
  </graph>
 
  <graph name='Sensors/Compass/EarthField Error EK3 Lane1'>
   <description></description>
   <expression>earth_field_error(GPS,XKF2).x earth_field_error(GPS,XKF2).y earth_field_error(GPS,XKF2).z</expression>
+  <expression>earth_field_error(GPS,XKF2[0]).x earth_field_error(GPS,XKF2[0]).y earth_field_error(GPS,XKF2[0]).z</expression>
  </graph>
 
  <graph name='Sensors/Compass/EarthField Error EK3 Lane2'>
   <description></description>
   <expression>earth_field_error(GPS,XKF7).x earth_field_error(GPS,XKF7).y earth_field_error(GPS,XKF7).z</expression>
+  <expression>earth_field_error(GPS,XKF2[1]).x earth_field_error(GPS,XKF2[1]).y earth_field_error(GPS,XKF2[1]).z</expression>
  </graph>
  
  <graph name='Copter/PID/PIDP'>
