@@ -7,6 +7,7 @@ log analysis program
 Andrew Tridgell December 2014
 '''
 
+import copy
 import sys
 import time
 import os
@@ -714,14 +715,27 @@ def loadfile(args):
                                       progress_callback=progress_bar)
     mestate.filename = args
     mestate.mlog = mlog
-    mestate.status.msgs = mlog.messages
+    # note that this is a shallow copy of the messages.
+    # Instance-number-containing messages in mestate.status.msgs may
+    # reference messages in their parent DFReader object which no
+    # longer exist after a rewind() is performed.  Still, this is good
+    # enough for tab-completion to function.
+    mestate.status.msgs = copy.copy(mlog.messages)
     t1 = time.time()
     mestate.console.write("\ndone (%u messages in %.1fs)\n" % (mestate.mlog._count, t1-t0))
+
+    # evaluate graph expressions before finding flightmode list as
+    # flightmode_list does a rewind(), and that clears the DFReader
+    # object.  While we do take a copy of mestate.status.msgs above,
+    # that is a shallow copy, so does not allow
+    # DFMessage.parent.messages to function, which is vital for
+    # instance-number-indexing to work - and the graph expression
+    # evaluation requires that to function.
+    load_graphs()
 
     global flightmodes
     flightmodes = mlog.flightmode_list()
 
-    load_graphs()
     setup_menus()
 
 def process_stdin(line):
