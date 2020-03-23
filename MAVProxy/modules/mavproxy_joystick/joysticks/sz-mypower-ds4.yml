@@ -1,0 +1,40 @@
+description: >
+    SZ-MYPOWER DS Wired controller.  Only 10 axes usable. This assumes mode 2.
+match:
+  - 'SZ-MYPOWER DS4 Wired Controller'
+controls:
+  - channel: 1
+    type: axis
+    id: 2
+    invert: false
+  - channel: 2
+    type: axis
+    id: 5
+    invert: false
+  - channel: 3
+    type: axis
+    id: 1
+    invert: true
+  - channel: 4
+    type: axis
+    id: 0
+    invert: false
+  - channel: 6
+    type: axis
+    id: 4
+    invert: false
+  - channel: 5
+    type: multibutton
+    buttons:
+      - id: 0
+        value: 1200
+      - id: 1
+        value: 1300
+      - id: 2
+        value: 1400
+      - id: 3
+        value: 1500
+      - id: 5
+        value: 1700
+      - id: 4
+        value: 1800
