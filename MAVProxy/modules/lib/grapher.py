@@ -377,7 +377,6 @@ class MavGraph(object):
         return self.tday_base + (timestamp - self.tday_basetime + self.timeshift) * sec_to_days
 
     def process_mav(self, mlog, flightmode_selections):
-        print("processing now...\n")
         '''process one file'''
         self.vars = {}
         idx = 0
