@@ -408,6 +408,11 @@ class MavGraph(object):
             # prime the timestamp conversion
             self.timestamp_to_days(self.flightmode_list[0][1])
 
+        try:
+            reset_state_data()
+        except Exception:
+            pass
+
         while True:
             msg = mlog.recv_match(type=self.msg_types)
             if msg is None:
