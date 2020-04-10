@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 '''mavlink file transfer support'''
 
+import io
 import time, os, sys
 import struct
 import random
-import StringIO
 from pymavlink import mavutil
 
 from MAVProxy.modules.lib import mp_module
@@ -259,7 +259,7 @@ class FTPModule(mp_module.MPModule):
                 return
             try:
                 if self.filename == '-':
-                    self.fh = StringIO.StringIO()
+                    self.fh = io.BytesIO()
                 else:
                     self.fh = open(self.filename, 'wb')
             except Exception as ex:
