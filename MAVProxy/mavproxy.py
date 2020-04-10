@@ -436,7 +436,7 @@ def unload_module(modname):
                 t = threading.Thread(target=lambda : m.unload(), name="unload %s" % modname)
                 t.start()
                 t.join(timeout=5)
-                if t.isAlive():
+                if t.is_alive():
                     print("unload on module %s did not complete" % m.name)
                     mpstate.modules.remove((m,pm))
                     return False
