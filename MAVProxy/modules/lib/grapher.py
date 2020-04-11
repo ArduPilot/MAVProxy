@@ -42,7 +42,7 @@ edge_colour = (0.1, 0.1, 0.1)
 graph_num = 1
 
 class MavGraph(object):
-    def __init__(self, flightmode_colourmap=None):
+    def __init__(self, flightmode_colourmap=None, delay_dictionary={}):
         self.lowest_x = None
         self.highest_x = None
         self.mav_list = []
@@ -55,7 +55,7 @@ class MavGraph(object):
         self.legend = 'upper left'
         self.legend2 = 'upper right'
         self.legend_flightmode = 'lower left'
-        self.timeshift = 0
+        self.timeshift = 0.0
         self.labels = None
         self.multi = False
         self.modes_plotted = {}
@@ -77,6 +77,9 @@ class MavGraph(object):
         self.tday_base = None
         self.tday_basetime = None
         self.title = None
+        
+        self.delay_dictionary = delay_dictionary
+        
 
     def add_field(self, field):
         '''add another field to plot'''
@@ -364,14 +367,14 @@ class MavGraph(object):
         '''convert log timestamp to days'''
         if self.tday_base is None:
             try:
-                self.tday_base = matplotlib.dates.date2num(datetime.datetime.fromtimestamp(timestamp+self.timeshift))
+                self.tday_base = matplotlib.dates.date2num(datetime.datetime.fromtimestamp(timestamp))
                 self.tday_basetime = timestamp
             except ValueError:
                 # this can happen if the log is corrupt
                 # ValueError: year is out of range
                 return 0
         sec_to_days = 1.0 / (60*60*24)
-        return self.tday_base + (timestamp - self.tday_basetime) * sec_to_days
+        return self.tday_base + (timestamp - self.tday_basetime + self.timeshift) * sec_to_days
 
     def process_mav(self, mlog, flightmode_selections):
         '''process one file'''
@@ -422,10 +425,18 @@ class MavGraph(object):
             if self.condition:
                 if not mavutil.evaluate_condition(self.condition, mlog.messages):
                     continue
+            
+            if (msg.get_type() in self.delay_dictionary):
+                self.timeshift = self.delay_dictionary[msg.get_type()]
+            else:
+                self.timeshift = 0.0
+            
             tdays = self.timestamp_to_days(msg._timestamp)
 
             if all_false or len(flightmode_selections) == 0:
                 self.add_data(tdays, msg, mlog.messages)
+                
+                
             else:
                 if idx < len(self.flightmode_list) and msg._timestamp >= self.flightmode_list[idx][2]:
                     idx += 1

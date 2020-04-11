@@ -71,12 +71,14 @@ class MEState(object):
             "set"       : ["(SETTING)"],
             "condition" : ["(VARIABLE)"],
             "graph"     : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)'],
+            "delay"     : ['(VARIABLE)'],
             "map"       : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)']
             }
         self.aliases = {}
         self.graphs = []
         self.flightmode_selections = []
         self.last_graph = GraphDefinition(self.settings.title, '', '', [], None)
+        self.delay_dictionary = {}
         
         #pipe to the wxconsole for any child threads (such as the save dialog box)
         self.parent_pipe_recv_console,self.child_pipe_send_console = multiproc.Pipe(duplex=False)
@@ -299,6 +301,31 @@ def flightmode_colours():
                 idx = 0
     return mapping
 
+def cmd_delay(args):
+    ''' delay command '''
+    usage = "usage:\n   delay <VARIABLES> <SECONDS>\n   delay reset\n   delay remove <VARIABLES>\n"
+    if len(args) < 1:
+        print(usage)
+        print('current delayed variables: ')
+        for var in mestate.delay_dictionary:
+                print('   ', var, ":", mestate.delay_dictionary[var])
+        return
+    elif (args[0] == 'reset'):
+        mestate.delay_dictionary = {}
+        print('delay list cleared')
+        return
+    elif (args[0] == 'remove' and len(args)==2):
+        del mestate.delay_dictionary[args[1]]
+        print('removed delay for',args[1])
+        return
+    elif (len(args)%2 ==0):
+        for i in range(0, len(args)//2):
+                mestate.delay_dictionary[args[i*2]] = float(args[i*2+1])
+        return
+    else:
+        print(usage)
+        return
+
 def cmd_graph(args):
     '''graph command'''
     usage = "usage: graph <FIELD...>"
@@ -319,7 +346,7 @@ def cmd_graph(args):
         expression = ' '.join(args)
         mestate.last_graph = GraphDefinition(mestate.settings.title, expression, '', [expression], None)
     grui.append(Graph_UI(mestate))
-    grui[-1].display_graph(mestate.last_graph, flightmode_colours())
+    grui[-1].display_graph(mestate.last_graph, flightmode_colours(), mestate.delay_dictionary)
     global last_xlim
     if last_xlim is not None and mestate.settings.sync_xzoom:
         #print("initial: ", last_xlim)
@@ -800,6 +827,7 @@ def main_loop():
 
 command_map = {
     'graph'      : (cmd_graph,     'display a graph'),
+    'delay'      : (cmd_delay,     'delay a variable'),
     'set'        : (cmd_set,       'control settings'),
     'reload'     : (cmd_reload,    'reload graphs'),
     'save'       : (cmd_save,      'save a graph'),
