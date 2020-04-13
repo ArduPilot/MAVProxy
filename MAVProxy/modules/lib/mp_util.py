@@ -359,7 +359,8 @@ def decode_devid(devid, pname):
         0x0E : "DEVTYPE_MAG3110",
         0x0F : "DEVTYPE_SITL",
         0x10 : "DEVTYPE_IST8308",
-        0x11 : "DEVTYPE_RM3100",
+        0x11 : "DEVTYPE_RM3100_OLD",
+        0x12 : "DEVTYPE_RM3100",
         }
 
     imu_types = {
@@ -385,6 +386,7 @@ def decode_devid(devid, pname):
         0x2E : "DEVTYPE_INS_ICM20649",
         0x2F : "DEVTYPE_INS_ICM20602",
         0x30 : "DEVTYPE_INS_ICM20601",
+        0x31 : "DEVTYPE_INS_ADIS1647x",
         }
 
     decoded_devname = ""
