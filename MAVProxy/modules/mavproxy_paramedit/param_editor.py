@@ -72,8 +72,7 @@ class ParamEditorEventThread(threading.Thread):
                         master.mav.command_long_send(master.target_system, master.target_component, mavutil.mavlink.MAV_CMD_PREFLIGHT_STORAGE, 0, 2.0, 0, 0, 0, 0, 0, 0)
 
                     elif event_type == ph_event.PEE_FETCH:
-                        master = self.mp_paramedit.mpstate.mav_master[0]
-                        master.param_fetch_all()
+                        self.module('param').fetch_all()
 
                 except Exception:
                     time.sleep(0.2)

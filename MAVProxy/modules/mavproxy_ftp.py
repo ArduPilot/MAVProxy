@@ -91,7 +91,7 @@ class FTP_OP:
 
 class FTPModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(FTPModule, self).__init__(mpstate, "ftp")
+        super(FTPModule, self).__init__(mpstate, "ftp", public=True)
         self.add_command('ftp', self.cmd_ftp, "file transfer",
                          ["<list|get|rm|rmdir|rename|mkdir|crc|cancel|status>",
                           "set (FTPSETTING)",
@@ -111,6 +111,7 @@ class FTPModule(mp_module.MPModule):
         self.last_op = None
         self.fh = None
         self.filename = None
+        self.callback = None
         self.total_size = 0
         self.read_gaps = []
         self.read_gap_times = {}
@@ -178,6 +179,10 @@ class FTPModule(mp_module.MPModule):
         self.send(FTP_OP(self.seq, self.session, OP_TerminateSession, 0, 0, 0, 0, None))
         self.fh = None
         self.filename = None
+        if self.callback is not None:
+            # tell caller that the transfer failed
+            self.callback(None)
+            self.callback = None
         self.read_gaps = []
         self.read_gap_times = {}
         self.last_read = None
@@ -234,7 +239,7 @@ class FTPModule(mp_module.MPModule):
         else:
             print('LIST: %s' % op)
 
-    def cmd_get(self, args):
+    def cmd_get(self, args, callback=None):
         '''get file'''
         if len(args) == 0:
             print("Usage: get FILENAME <LOCALNAME>")
@@ -245,8 +250,10 @@ class FTPModule(mp_module.MPModule):
             self.filename = args[1]
         else:
             self.filename = os.path.basename(fname)
-        print("Getting %s as %s" % (fname, self.filename))
+        if callback is None or self.ftp_settings.debug > 1:
+            print("Getting %s as %s" % (fname, self.filename))
         self.op_start = time.time()
+        self.callback = callback
         self.read_retries = 0
         self.duplicates = 0
         self.reached_eof = False
@@ -265,7 +272,7 @@ class FTPModule(mp_module.MPModule):
             if self.filename is None:
                 return
             try:
-                if self.filename == '-':
+                if self.callback is not None or self.filename == '-':
                     self.fh = SIO()
                 else:
                     self.fh = open(self.filename, 'wb')
@@ -277,7 +284,8 @@ class FTPModule(mp_module.MPModule):
             self.last_burst_read = time.time()
             self.send(read)
         else:
-            print("Open failed")
+            if self.callback is None:
+                print("Open failed")
             self.terminate_session()
 
     def check_read_finished(self):
@@ -286,7 +294,11 @@ class FTPModule(mp_module.MPModule):
             ofs = self.fh.tell()
             dt = time.time() - self.op_start
             rate = (ofs / dt) / 1024.0
-            if self.filename == "-":
+            if self.callback is not None:
+                self.fh.seek(0)
+                self.callback(self.fh)
+                self.callback = None
+            elif self.filename == "-":
                 self.fh.seek(0)
                 if sys.version_info.major < 3:
                     print(self.fh.read())

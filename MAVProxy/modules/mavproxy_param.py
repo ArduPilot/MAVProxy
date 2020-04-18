@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 '''param command handling'''
 
-import time, os, fnmatch, time, struct
+import time, os, fnmatch, time, struct, sys
 from pymavlink import mavutil, mavparm
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
@@ -12,7 +12,7 @@ if mp_util.has_wxpython:
 class ParamState:
     '''this class is separated to make it possible to use the parameter
        functions on a secondary connection'''
-    def __init__(self, mav_param, logdir, vehicle_name, parm_file):
+    def __init__(self, mav_param, logdir, vehicle_name, parm_file, mpstate):
         self.mav_param_set = set()
         self.mav_param_count = 0
         self.param_period = mavutil.periodic_event(1)
@@ -26,6 +26,9 @@ class ParamState:
         self.new_sysid_timestamp = time.time()
         self.autopilot_type_by_sysid = {}
         self.param_types = {}
+        self.ftp_failed = False
+        self.ftp_started = False
+        self.mpstate = mpstate
 
     def handle_px4_param_value(self, m):
         '''special handling for the px4 style of PARAM_VALUE'''
@@ -106,8 +109,11 @@ class ParamState:
         if self.param_period.trigger() or force:
             if master is None:
                 return
-            if len(self.mav_param_set) == 0:
-                master.param_fetch_all()
+            if len(self.mav_param_set) == 0 and not self.ftp_started:
+                if self.ftp_failed:
+                    master.param_fetch_all()
+                else:
+                    self.ftp_start()
             elif self.mav_param_count != 0 and len(self.mav_param_set) != self.mav_param_count:
                 if master.time_since('PARAM_VALUE') >= 1 or force:
                     diff = set(range(self.mav_param_count)).difference(self.mav_param_set)
@@ -234,18 +240,118 @@ class ParamState:
     def status(self, master, mpstate):
         return(len(self.mav_param_set), self.mav_param_count)
 
+    def ftp_start(self):
+        '''start a ftp download of parameters'''
+        ftp = self.mpstate.module('ftp')
+        if ftp is None:
+            self.ftp_failed = True
+            return
+        self.ftp_started = True
+        ftp.cmd_get(["@PARAM/param.pck"], callback=self.ftp_callback)
+
+    def ftp_callback(self, fh):
+        '''callback from ftp fetch of parameters'''
+        self.ftp_started = False
+        if fh is None:
+            # the fetch failed
+            self.ftp_failed = True
+            return
+
+        magic = 0x671b
+        data = fh.read()
+        magic2,num_params,total_params = struct.unpack("<HHH", data[0:6])
+        if magic != magic2:
+            print("paramftp: bad magic 0x%x expected 0x%x" % (magic2, magic))
+            return
+        data = data[6:]
+
+        # mapping of data type to type length and format
+        data_types = {
+            1: (1, 'b'),
+            2: (2, 'h'),
+            3: (4, 'i'),
+            4: (4, 'f'),
+        }
+
+        count = 0
+        last_name = ''
+        params = []
+        pad_byte = 0
+        if sys.version_info.major < 3:
+            pad_byte = chr(0)
+
+        while True:
+            while len(data) > 0 and data[0] == pad_byte:
+                # skip pad bytes
+                data = data[1:]
+
+            if len(data) == 0:
+                break
+
+            ptype, plen = struct.unpack("<BB", data[0:2])
+            flags = (ptype>>4) & 0x0F
+            ptype &= 0x0F
+
+            if not ptype in data_types:
+                print("paramftp: bad type 0x%x" % ptype)
+                return
+
+            (type_len, type_format) = data_types[ptype]
+
+            name_len = ((plen>>4) & 0x0F) + 1
+            common_len = (plen & 0x0F)
+            name = last_name[0:common_len] + data[2:2+name_len].decode('utf-8')
+            vdata = data[2+name_len:2+name_len+type_len]
+            last_name = name
+            data = data[2+name_len+type_len:]
+            v, = struct.unpack("<" + type_format, vdata)
+            params.append((name, v, ptype))
+            count += 1
+
+        if count != total_params:
+            print("paramftp: bad count %u should be %u" % (count, total_params))
+            return
+        self.param_types = {}
+        self.mav_param_set = set()
+        self.fetch_one = dict()
+        self.fetch_set = None
+        self.mav_param.clear()
+        self.mav_param_count = total_params
+
+        idx = 0
+        for (name, v, ptype) in params:
+            # we need to set it to REAL32 to ensure we use write value for param_set
+            self.param_types[name] = mavutil.mavlink.MAV_PARAM_TYPE_REAL32
+            self.mav_param_set.add(idx)
+            self.mav_param[name] = v
+            idx += 1
+
+        self.ftp_failed = False
+        self.mpstate.console.set_status('Params', 'Param %u/%u' % (total_params, total_params))
+        print("Received %u parameters (ftp)" % total_params)
+
+    def fetch_all(self):
+        '''force refetch of parameters'''
+        if self.ftp_failed:
+            master.param_fetch_all()
+            self.mav_param_set = set()
+        else:
+            self.ftp_start()
+
     def handle_command(self, master, mpstate, args):
         '''handle parameter commands'''
         param_wildcard = "*"
-        usage="Usage: param <fetch|save|set|show|load|preload|forceload|diff|download|help>"
+        usage="Usage: param <fetch|ftp|save|set|show|load|preload|forceload|diff|download|help>"
         if len(args) < 1:
             print(usage)
             return
         if args[0] == "fetch":
             if len(args) == 1:
-                master.param_fetch_all()
-                self.mav_param_set = set()
-                print("Requested parameter list")
+                self.fetch_all()
+                if self.ftp_started:
+                    print("Requested parameter list (ftp)")
+                else:
+                    print("Requested parameter list")
             else:
                 found = False
                 pname = args[1].upper()
@@ -263,7 +369,9 @@ class ParamState:
                         self.fetch_one[pname] = 0
                     self.fetch_one[pname] += 1
                     print("Requested parameter %s" % pname)
-                        
+        elif args[0] == "ftp":
+            self.ftp_start()
+
         elif args[0] == "save":
             if len(args) < 2:
                 print("usage: param save <filename> [wildcard]")
@@ -405,7 +513,7 @@ class ParamModule(mp_module.MPModule):
         if sysid not in [(0,0),(1,1),(1,0)]:
 
             fname = 'mav_%u_%u.parm' % (sysid[0], sysid[1])
-        self.pstate[sysid] = ParamState(self.mpstate.mav_param_by_sysid[sysid], self.logdir, self.vehicle_name, fname)
+        self.pstate[sysid] = ParamState(self.mpstate.mav_param_by_sysid[sysid], self.logdir, self.vehicle_name, fname, self.mpstate)
         if self.continue_mode and self.logdir is not None:
             parmfile = os.path.join(self.logdir, fname)
             if os.path.exists(parmfile):
@@ -453,6 +561,13 @@ class ParamModule(mp_module.MPModule):
         self.check_new_target_system()
         sysid = self.get_sysid()
         self.pstate[sysid].handle_command(self.master, self.mpstate, args)
+
+    def fetch_all(self):
+        '''force fetch of all parameters'''
+        self.check_new_target_system()
+        sysid = self.get_sysid()
+        self.pstate[sysid].fetch_all()
+
 
 def init(mpstate, **kwargs):
     '''initialise module'''
