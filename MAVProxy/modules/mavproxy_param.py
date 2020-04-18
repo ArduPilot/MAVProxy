@@ -274,11 +274,14 @@ class ParamState:
         }
 
         count = 0
-        last_name = ''
         params = []
-        pad_byte = 0
+
         if sys.version_info.major < 3:
             pad_byte = chr(0)
+            last_name = ''
+        else:
+            pad_byte = 0
+            last_name = bytes()
 
         while True:
             while len(data) > 0 and data[0] == pad_byte:
@@ -300,7 +303,7 @@ class ParamState:
 
             name_len = ((plen>>4) & 0x0F) + 1
             common_len = (plen & 0x0F)
-            name = last_name[0:common_len] + data[2:2+name_len].decode('utf-8')
+            name = last_name[0:common_len] + data[2:2+name_len]
             vdata = data[2+name_len:2+name_len+type_len]
             last_name = name
             data = data[2+name_len+type_len:]
@@ -321,6 +324,7 @@ class ParamState:
         idx = 0
         for (name, v, ptype) in params:
             # we need to set it to REAL32 to ensure we use write value for param_set
+            name = str(name.decode('utf-8'))
             self.param_types[name] = mavutil.mavlink.MAV_PARAM_TYPE_REAL32
             self.mav_param_set.add(idx)
             self.mav_param[name] = v
