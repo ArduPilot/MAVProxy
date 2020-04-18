@@ -320,10 +320,10 @@ class CmdlongModule(mp_module.MPModule):
             command = int(args[0])
         else:
             try:
-                command = eval("mavutil.mavlink." + args[0])
+                command = getattr(mavutil.mavlink, args[0])
             except AttributeError as e:
                 try:
-                    command = eval("mavutil.mavlink.MAV_CMD_" + args[0])
+                    command = getattr(mavutil.mavlink, "MAV_CMD_" + args[0])
                 except AttributeError as e:
                     pass
 
@@ -356,11 +356,11 @@ class CmdlongModule(mp_module.MPModule):
         else:
             try:
                 # attempt to allow MAV_FRAME_GLOBAL for frame
-                frame = eval("mavutil.mavlink." + args[0])
+                frame = getattr(mavutil.mavlink, args[0])
             except AttributeError as e:
                 try:
                     # attempt to allow GLOBAL for frame
-                    frame = eval("mavutil.mavlink.MAV_FRAME_" + args[0])
+                    frame = getattr(mavutil.mavlink, "MAV_FRAME_" + args[0])
                 except AttributeError as e:
                     pass
 
@@ -374,11 +374,11 @@ class CmdlongModule(mp_module.MPModule):
         else:
             # let "command_int ... MAV_CMD_DO_SET_HOME ..." work
             try:
-                command = eval("mavutil.mavlink." + args[1])
+                command = getattr(mavutil.mavlink, args[1])
             except AttributeError as e:
                 try:
                     # let "command_int ... DO_SET_HOME" work
-                    command = eval("mavutil.mavlink.MAV_CMD_" + args[1])
+                    command = getattr(mavutil.mavlink, "MAV_CMD_" + args[1])
                 except AttributeError as e:
                     pass
 
