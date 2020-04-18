@@ -330,7 +330,7 @@ class ParamState:
         self.mpstate.console.set_status('Params', 'Param %u/%u' % (total_params, total_params))
         print("Received %u parameters (ftp)" % total_params)
 
-    def fetch_all(self):
+    def fetch_all(self, master):
         '''force refetch of parameters'''
         if self.ftp_failed:
             master.param_fetch_all()
@@ -347,7 +347,7 @@ class ParamState:
             return
         if args[0] == "fetch":
             if len(args) == 1:
-                self.fetch_all()
+                self.fetch_all(master)
                 if self.ftp_started:
                     print("Requested parameter list (ftp)")
                 else:
@@ -566,7 +566,7 @@ class ParamModule(mp_module.MPModule):
         '''force fetch of all parameters'''
         self.check_new_target_system()
         sysid = self.get_sysid()
-        self.pstate[sysid].fetch_all()
+        self.pstate[sysid].fetch_all(self.master)
 
 
 def init(mpstate, **kwargs):
