@@ -115,6 +115,7 @@ class FTPModule(mp_module.MPModule):
         self.total_size = 0
         self.read_gaps = []
         self.read_gap_times = {}
+        self.last_gap_send = None
         self.read_retries = 0
         self.duplicates = 0
         self.last_read = None
@@ -244,6 +245,7 @@ class FTPModule(mp_module.MPModule):
         if len(args) == 0:
             print("Usage: get FILENAME <LOCALNAME>")
             return
+        self.callback = None
         self.terminate_session()
         fname = args[0]
         if len(args) > 1:
@@ -284,8 +286,8 @@ class FTPModule(mp_module.MPModule):
             self.last_burst_read = time.time()
             self.send(read)
         else:
-            if self.callback is None:
-                print("Open failed")
+            if self.callback is None or self.ftp_settings.debug > 0:
+                print("ftp open failed")
             self.terminate_session()
 
     def check_read_finished(self):
@@ -379,6 +381,11 @@ class FTPModule(mp_module.MPModule):
             if self.ftp_settings.debug > 0:
                 print("FTP: burst nack: ", op)
             if ecode == ERR_EndOfFile or ecode == 0:
+                if not self.reached_eof and op.offset > self.fh.tell():
+                    # we lost the last part of the burst
+                    if self.ftp_settings.debug > 0:
+                        print("burst lost EOF %u %u" % (self.fh.tell(), op.offset))
+                    return
                 if not self.reached_eof and self.ftp_settings.debug > 0:
                     print("EOF at %u with %u gaps t=%.2f" % (self.fh.tell(), len(self.read_gaps), time.time() - self.op_start))
                 self.reached_eof = True
@@ -662,7 +669,8 @@ class FTPModule(mp_module.MPModule):
         self.send(read)
         self.read_gaps.remove(g)
         self.read_gaps.append(g)
-        self.read_gap_times[g] = time.time()
+        self.last_gap_send = time.time()
+        self.read_gap_times[g] = self.last_gap_send
         self.backlog += 1
 
     def check_read_send(self):
@@ -682,18 +690,40 @@ class FTPModule(mp_module.MPModule):
             if self.backlog > 0:
                 self.backlog -= 1
             self.read_gap_times[g] = 0
-        if self.read_gap_times[g] == 0 and self.backlog < self.ftp_settings.max_backlog:
-            self.send_gap_read(g)
+
+        if self.read_gap_times[g] != 0:
+            # still pending
+            return
+        if not self.reached_eof and self.backlog >= self.ftp_settings.max_backlog:
+            # don't fill queue too far until we have got past the burst
+            return
+        if now - self.last_gap_send < 0.05:
+            # don't send too fast
+            return
+        self.send_gap_read(g)
 
     def idle_task(self):
-        '''check for file gaps'''
+        '''check for file gaps and lost requests'''
+        now = time.time()
+
+        # see if we lost an open reply
+        if self.op_start is not None and now - self.op_start > 2.0 and self.last_op.opcode == OP_OpenFileRO:
+            self.op_start = now
+            if self.ftp_settings.debug > 0:
+                print("FTP: retry open")
+            send_op = self.last_op
+            self.send(FTP_OP(self.seq, self.session, OP_TerminateSession, 0, 0, 0, 0, None))
+            self.session = (self.session + 1) % 256
+            send_op.session = self.session
+            self.send(send_op)
+
         if len(self.read_gaps) == 0 and self.last_burst_read is None and not self.write_wait:
             return
+
         if self.fh is None:
             return
 
         # see if burst read has stalled
-        now = time.time()
         if not self.reached_eof and self.last_burst_read is not None and now - self.last_burst_read > self.ftp_settings.retry_time:
             dt = now - self.last_burst_read
             self.last_burst_read = now
@@ -710,6 +740,7 @@ class FTPModule(mp_module.MPModule):
             if self.ftp_settings.debug > 0:
                 print("FTP: write retry at %u" % self.last_op.offset)
             self.send(self.last_op)
+
 
 def init(mpstate):
     '''initialise module'''

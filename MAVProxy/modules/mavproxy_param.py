@@ -481,7 +481,7 @@ class ParamModule(mp_module.MPModule):
         self.menu_added_console = False
         self.add_command('param', self.cmd_param, "parameter handling",
                          ["<download|status>",
-                          "<set|show|fetch|help|apropos> (PARAMETER)",
+                          "<set|show|fetch|ftp|help|apropos> (PARAMETER)",
                           "<load|save|diff> (FILENAME)",
                           "<set_xml_filepath> (FILEPATH)"
                          ])
