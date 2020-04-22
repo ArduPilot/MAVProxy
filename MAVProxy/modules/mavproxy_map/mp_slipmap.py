@@ -39,7 +39,8 @@ class MPSlipMap():
                  brightness=0,
                  elevation=False,
                  download=True,
-                 show_flightmode_legend=True):
+                 show_flightmode_legend=True,
+                 timelim_pipe=None):
 
         self.lat = lat
         self.lon = lon
@@ -55,6 +56,7 @@ class MPSlipMap():
         self.oldtext = None
         self.brightness = brightness
         self.legend = show_flightmode_legend
+        self.timelim_pipe = timelim_pipe
 
         self.drag_step = 10
 

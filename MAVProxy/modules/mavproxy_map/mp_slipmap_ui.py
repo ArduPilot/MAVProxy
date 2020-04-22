@@ -292,6 +292,18 @@ class MPSlipMapFrame(wx.Frame):
                         state.layers[layer][obj.key].set_hidden(obj.hide)
                 state.need_redraw = True
 
+        if state.timelim_pipe is not None:
+            while state.timelim_pipe[1].poll():
+                try:
+                    obj = state.timelim_pipe[1].recv()
+                except Exception:
+                    state.timelim_pipe = None
+                    break
+                for layer in state.layers:
+                    for key in state.layers[layer].keys():
+                        state.layers[layer][key].set_time_range(obj)
+                state.need_redraw = True
+
         if obj is None:
             time.sleep(0.05)
 

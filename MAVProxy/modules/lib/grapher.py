@@ -41,6 +41,23 @@ edge_colour = (0.1, 0.1, 0.1)
 
 graph_num = 1
 
+tday_base = None
+tday_basetime = None
+
+def timestamp_to_days(timestamp, timeshift=0):
+    '''convert log timestamp to days, public so that mavflightview can access'''
+    global tday_base, tday_basetime
+    if tday_base is None:
+        try:
+            tday_base = matplotlib.dates.date2num(datetime.datetime.fromtimestamp(timestamp+timeshift))
+            tday_basetime = timestamp
+        except ValueError:
+            # this can happen if the log is corrupt
+            # ValueError: year is out of range
+            return 0
+    sec_to_days = 1.0 / (60*60*24)
+    return tday_base + (timestamp - tday_basetime) * sec_to_days
+
 class MavGraph(object):
     def __init__(self, flightmode_colourmap=None):
         self.lowest_x = None
@@ -304,8 +321,8 @@ class MavGraph(object):
             for i in range(len(self.flightmode_list)):
                 (mode_name,t0,t1) = self.flightmode_list[i]
                 c = self.flightmode_colour(mode_name)
-                tday0 = self.timestamp_to_days(t0)
-                tday1 = self.timestamp_to_days(t1)
+                tday0 = timestamp_to_days(t0, self.timeshift)
+                tday1 = timestamp_to_days(t1, self.timeshift)
                 if tday0 > xlim[1] or tday1 < xlim[0]:
                     continue
                 tday0 = max(tday0, xlim[0])
@@ -361,19 +378,6 @@ class MavGraph(object):
             self.y[i].append(v)
             self.x[i].append(xv)
 
-    def timestamp_to_days(self, timestamp):
-        '''convert log timestamp to days'''
-        if self.tday_base is None:
-            try:
-                self.tday_base = matplotlib.dates.date2num(datetime.datetime.fromtimestamp(timestamp+self.timeshift))
-                self.tday_basetime = timestamp
-            except ValueError:
-                # this can happen if the log is corrupt
-                # ValueError: year is out of range
-                return 0
-        sec_to_days = 1.0 / (60*60*24)
-        return self.tday_base + (timestamp - self.tday_basetime) * sec_to_days
-
     def process_mav(self, mlog, flightmode_selections):
         '''process one file'''
         self.vars = {}
@@ -407,7 +411,7 @@ class MavGraph(object):
 
         if len(self.flightmode_list) > 0:
             # prime the timestamp conversion
-            self.timestamp_to_days(self.flightmode_list[0][1])
+            timestamp_to_days(self.flightmode_list[0][1], self.timeshift)
 
         try:
             reset_state_data()
@@ -423,7 +427,7 @@ class MavGraph(object):
             if self.condition:
                 if not mavutil.evaluate_condition(self.condition, mlog.messages):
                     continue
-            tdays = self.timestamp_to_days(msg._timestamp)
+            tdays = timestamp_to_days(msg._timestamp, self.timeshift)
 
             if all_false or len(flightmode_selections) == 0:
                 self.add_data(tdays, msg, mlog.messages)
@@ -437,8 +441,11 @@ class MavGraph(object):
         '''handle xlim change requests from queue'''
         if not self.xlim_pipe[1].poll():
             return
-        xlim = self.xlim_pipe[1].recv()
-        if xlim is None:
+        try:
+            xlim = self.xlim_pipe[1].recv()
+            if xlim is None:
+                return
+        except Exception:
             return
         #print("recv: ", self.graph_num, xlim)
         if self.ax1 is not None and xlim != self.xlim:
