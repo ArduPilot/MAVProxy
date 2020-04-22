@@ -33,6 +33,7 @@ class SlipObject:
         self.latlon = None
         self.popup_menu = popup_menu
         self.hidden = False
+        self._timestamp_range = None
 
     def clip(self, px, py, w, h, img):
         '''clip an area for display on the map'''
@@ -84,6 +85,10 @@ class SlipObject:
     def set_hidden(self, hidden):
         '''set hidden attribute'''
         self.hidden = hidden
+
+    def set_time_range(self, trange):
+        '''set timestamp range for display'''
+        self._timestamp_range = trange
 
 class SlipLabel(SlipObject):
     '''a text label to display on the map'''
@@ -184,6 +189,7 @@ class SlipPolygon(SlipObject):
         self._bounds = mp_util.polygon_bounds(self.points)
         self._pix_points = []
         self._selected_vertex = None
+        self._has_timestamps = False
 
     def bounds(self):
         '''return bounding box'''
@@ -218,12 +224,18 @@ class SlipPolygon(SlipObject):
         '''draw a polygon on the image'''
         if self.hidden:
             return
+        self._has_timestamps = len(self.points) > 0 and len(self.points[0]) > 3
         self._pix_points = []
         for i in range(len(self.points)-1):
             if len(self.points[i]) > 2:
                 colour = self.points[i][2]
             else:
                 colour = self.colour
+            if len(self.points[i]) > 3:
+                timestamp = self.points[i][3]
+                if self._timestamp_range is not None:
+                    if timestamp < self._timestamp_range[0] or timestamp > self._timestamp_range[1]:
+                        continue
             self.draw_line(img, pixmapper, self.points[i], self.points[i+1],
                            colour, self.linewidth)
 

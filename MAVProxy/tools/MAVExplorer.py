@@ -59,6 +59,7 @@ class MEState(object):
               MPSetting('linestyle', str, None, 'linestyle'),
               MPSetting('show_flightmode', bool, True, 'show flightmode'),
               MPSetting('sync_xzoom', bool, True, 'sync X-axis zoom'),
+              MPSetting('sync_xmap', bool, True, 'sync X-axis zoom for map'),
               MPSetting('legend', str, 'upper left', 'legend position'),
               MPSetting('legend2', str, 'upper right', 'legend2 position'),
               MPSetting('title', str, None, 'Graph title'),
@@ -326,6 +327,8 @@ def cmd_graph(args):
         #print("initial: ", last_xlim)
         grui[-1].set_xlim(last_xlim)
 
+map_timelim_pipe = None
+
 def cmd_map(args):
     '''map command'''
     import mavflightview
@@ -341,7 +344,9 @@ def cmd_map(args):
         if len(options.types) > 1:
             options.colour_source='type'
     [path, wp, fen, used_flightmodes, mav_type, instances] = mavflightview.mavflightview_mav(mestate.mlog, options, mestate.flightmode_selections)
-    child = multiproc.Process(target=mavflightview.mavflightview_show, args=[path, wp, fen, used_flightmodes, mav_type, options, instances])
+    global map_timelim_pipe
+    map_timelim_pipe = multiproc.Pipe()
+    child = multiproc.Process(target=mavflightview.mavflightview_show, args=[path, wp, fen, used_flightmodes, mav_type, options, instances, None, map_timelim_pipe])
     child.start()
     mestate.mlog.rewind()
 
@@ -807,6 +812,10 @@ def main_loop():
                         if j not in remlist:
                             new_grui.append(grui[j])
                     grui = new_grui
+                if mestate.settings.sync_xmap:
+                    global map_timelim_pipe
+                    if map_timelim_pipe is not None:
+                        map_timelim_pipe[0].send(xlim)
                 break
 
         time.sleep(0.1)

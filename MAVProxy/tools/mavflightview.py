@@ -13,6 +13,7 @@ from pymavlink import mavutil, mavwp, mavextra
 from MAVProxy.modules.mavproxy_map import mp_slipmap, mp_tile
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import multiproc
+from MAVProxy.modules.lib import grapher
 import functools
 
 import cv2
@@ -386,7 +387,8 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
 
             if abs(lat)>0.01 or abs(lng)>0.01:
                 colour = colour_for_point(mlog, (lat, lng), instance, options)
-                point = (lat, lng, colour)
+                tdays = grapher.timestamp_to_days(m._timestamp)
+                point = (lat, lng, colour, tdays)
 
                 if options.rate == 0 or not type in last_timestamps or m._timestamp - last_timestamps[type] > 1.0/options.rate:
                     last_timestamps[type] = m._timestamp
@@ -397,7 +399,7 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
 
     return [path, wp, fen, used_flightmodes, getattr(mlog, 'mav_type',None), instances]
 
-def mavflightview_show(path, wp, fen, used_flightmodes, mav_type, options, instances, title=None):
+def mavflightview_show(path, wp, fen, used_flightmodes, mav_type, options, instances, title=None, timelim_pipe=None):
     if not title:
         title='MAVFlightView'
 
@@ -446,7 +448,8 @@ def mavflightview_show(path, wp, fen, used_flightmodes, mav_type, options, insta
                                        ground_width=ground_width,
                                        lat=lat, lon=lon,
                                        debug=options.debug,
-                                       show_flightmode_legend=options.show_flightmode_legend)
+                                       show_flightmode_legend=options.show_flightmode_legend,
+                                       timelim_pipe=timelim_pipe)
         if options.multi:
             multi_map = map
         for path_obj in path_objs:
