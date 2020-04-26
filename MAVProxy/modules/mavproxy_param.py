@@ -30,6 +30,12 @@ class ParamState:
         self.ftp_started = False
         self.mpstate = mpstate
 
+    def use_ftp(self):
+        '''return true if we should try ftp for download'''
+        if self.ftp_failed:
+            return False
+        return self.mpstate.settings.param_ftp
+
     def handle_px4_param_value(self, m):
         '''special handling for the px4 style of PARAM_VALUE'''
         if m.param_type == mavutil.mavlink.MAV_PARAM_TYPE_REAL32:
@@ -110,7 +116,7 @@ class ParamState:
             if master is None:
                 return
             if len(self.mav_param_set) == 0 and not self.ftp_started:
-                if self.ftp_failed:
+                if not self.use_ftp():
                     master.param_fetch_all()
                 else:
                     self.ftp_start()
@@ -336,7 +342,7 @@ class ParamState:
 
     def fetch_all(self, master):
         '''force refetch of parameters'''
-        if self.ftp_failed:
+        if not self.use_ftp():
             master.param_fetch_all()
             self.mav_param_set = set()
         else:
