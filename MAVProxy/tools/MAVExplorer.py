@@ -327,7 +327,7 @@ def cmd_graph(args):
         #print("initial: ", last_xlim)
         grui[-1].set_xlim(last_xlim)
 
-map_timelim_pipe = None
+map_timelim_pipes = []
 
 def cmd_map(args):
     '''map command'''
@@ -344,9 +344,16 @@ def cmd_map(args):
         if len(options.types) > 1:
             options.colour_source='type'
     [path, wp, fen, used_flightmodes, mav_type, instances] = mavflightview.mavflightview_mav(mestate.mlog, options, mestate.flightmode_selections)
-    global map_timelim_pipe
-    map_timelim_pipe = multiproc.Pipe()
-    child = multiproc.Process(target=mavflightview.mavflightview_show, args=[path, wp, fen, used_flightmodes, mav_type, options, instances, None, map_timelim_pipe])
+    global map_timelim_pipes
+    timelim_pipe = multiproc.Pipe()
+    child = multiproc.Process(target=mavflightview.mavflightview_show, args=[path, wp, fen, used_flightmodes, mav_type, options, instances, None, timelim_pipe])
+    map_timelim_pipes.append(timelim_pipe)
+    global last_xlim
+    if last_xlim is not None and mestate.settings.sync_xmap:
+        try:
+            timelim_pipe[0].send(last_xlim)
+        except Exception:
+            pass
     child.start()
     mestate.mlog.rewind()
 
@@ -813,9 +820,13 @@ def main_loop():
                             new_grui.append(grui[j])
                     grui = new_grui
                 if mestate.settings.sync_xmap:
-                    global map_timelim_pipe
-                    if map_timelim_pipe is not None:
-                        map_timelim_pipe[0].send(xlim)
+                    remlist = []
+                    global map_timelim_pipes
+                    for p in map_timelim_pipes[:]:
+                        try:
+                            p[0].send(xlim)
+                        except Exception:
+                            map_timelim_pipes.remove(p)
                 break
 
         time.sleep(0.1)
