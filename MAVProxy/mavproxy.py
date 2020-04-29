@@ -18,7 +18,13 @@ import platform
 import json
 import struct
 
-from imp import reload
+try:
+    reload
+except NameError:
+    try:
+        from importlib import reload
+    except ImportError:
+        from imp import reload
 
 try:
     import queue as Queue
