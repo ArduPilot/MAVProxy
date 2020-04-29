@@ -148,12 +148,14 @@ class LinkModule(mp_module.MPModule):
             except AttributeError as e:
                 # some mav objects may not have a "signing" attribute
                 pass
-            print("link %s %s (%u packets, %.2fs delay, %u lost, %.1f%% loss%s)" % (self.link_label(master),
+            print("link %s %s (%u packets, %u bytes, %.2fs delay, %u lost, %.1f%% loss, rate:%uB/s%s)" % (self.link_label(master),
                                                                                     status,
                                                                                     self.status.counters['MasterIn'][master.linknum],
+                                                                                    self.status.bytecounters['MasterIn'][master.linknum].total(),
                                                                                     linkdelay,
                                                                                     master.mav_loss,
                                                                                     master.packet_loss(),
+                                                                                    self.status.bytecounters['MasterIn'][master.linknum].rate(),
                                                                                     sign_string))
 
     def cmd_link_list(self):
@@ -226,6 +228,7 @@ class LinkModule(mp_module.MPModule):
         self.apply_link_attributes(conn, optional_attributes)
         self.mpstate.mav_master.append(conn)
         self.status.counters['MasterIn'].append(0)
+        self.status.bytecounters['MasterIn'].append(self.status.ByteCounter())
         try:
             mp_util.child_fd_list_add(conn.port.fileno())
         except Exception:
@@ -292,6 +295,7 @@ class LinkModule(mp_module.MPModule):
             pass
         self.mpstate.mav_master.pop(i)
         self.status.counters['MasterIn'].pop(i)
+        self.status.bytecounters['MasterIn'].pop(i)
         # renumber the links
         for j in range(len(self.mpstate.mav_master)):
             conn = self.mpstate.mav_master[j]
