@@ -283,11 +283,11 @@ class ConsoleModule(mp_module.MPModule):
                 field = 'GPS2'
                 prefix = 'GPS2'
             nsats = msg.satellites_visible
-            fix_type = "%u" % msg.fix_type
-            if msg.fix_type >= 3:
-                self.console.set_status(field, '%s OK%s (%u)' % (prefix, msg.fix_type, msg.satellites_visible), fg='green')
+            fix_type = msg.fix_type
+            if fix_type >= 3:
+                self.console.set_status(field, '%s OK%s (%u)' % (prefix, fix_type, nsats), fg='green')
             else:
-                self.console.set_status(field, '%s %u (%u)' % (prefix, msg.fix_type, msg.satellites_visible), fg='red')
+                self.console.set_status(field, '%s %u (%u)' % (prefix, fix_type, nsats), fg='red')
             gps_heading = int(self.mpstate.status.msgs['GPS_RAW_INT'].cog * 0.01)
             if type == 'GPS_RAW_INT':
                 vfr_hud_heading = master.field('VFR_HUD', 'heading', None)
