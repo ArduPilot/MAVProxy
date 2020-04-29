@@ -82,6 +82,7 @@ class MPStatus(object):
         self.msgs = {}
         self.msg_count = {}
         self.counters = {'MasterIn' : [], 'MasterOut' : 0, 'FGearIn' : 0, 'FGearOut' : 0, 'Slave' : 0}
+        self.bytecounters = {'MasterIn': []}
         self.setup_mode = opts.setup
         self.mav_error = 0
         self.altitude = 0
@@ -106,6 +107,49 @@ class MPStatus(object):
         self.last_streamrate2 = -1
         self.last_seq = 0
         self.armed = False
+        self.last_bytecounter_calc = 0
+
+    class ByteCounter(object):
+        def __init__(self):
+            self.total_count = 0
+            self.current_count = 0
+            self.buckets = []
+            self.max_buckets = 10  # 10 seconds
+
+        def update(self, bytecount):
+            self.total_count += bytecount
+            self.current_count += bytecount
+
+        def rotate(self):
+            '''move current count into a bucket, zero count'''
+            # huge assumption made that we're called rapidly enough to
+            # not need to rotate multiple buckets.
+            self.buckets.append(self.current_count)
+            self.current_count = 0
+            if len(self.buckets) > self.max_buckets:
+                self.buckets = self.buckets[-self.max_buckets:]
+
+        def rate(self):
+            if len(self.buckets) == 0:
+                return 0
+            total = 0
+            for bucket in self.buckets:
+                total += bucket
+            return total/float(len(self.buckets))
+
+        def total(self):
+            return self.total_count
+
+    def update_bytecounters(self):
+        '''rotate bytecounter buckets if required'''
+        now = time.time()
+        time_delta = now - self.last_bytecounter_calc
+        if time_delta < 1:
+            return
+        self.last_bytecounter_calc = now
+
+        for counter in self.bytecounters['MasterIn']:
+            counter.rotate()
 
     def show(self, f, pattern=None, verbose=False):
         '''write status to status.txt'''
@@ -682,6 +726,8 @@ def process_master(m):
         time.sleep(0.1)
         return
 
+    mpstate.status.bytecounters['MasterIn'][m.linknum].update(len(s))
+
     if (mpstate.settings.compdebug & 1) != 0:
         return
 
@@ -908,6 +954,8 @@ def periodic_tasks():
         check_link_status()
 
     set_stream_rates()
+
+    mpstate.status.update_bytecounters()
 
     # call optional module idle tasks. These are called at several hundred Hz
     for (m,pm) in mpstate.modules:
