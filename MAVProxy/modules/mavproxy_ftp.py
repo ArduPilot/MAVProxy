@@ -392,7 +392,7 @@ class FTPModule(mp_module.MPModule):
                 if self.check_read_finished():
                     return
                 self.check_read_send()
-            else:
+            elif self.ftp_settings.debug > 0:
                 print("FTP: burst Nack (ecode:%u): %s" % (ecode, op))
         else:
             print("FTP: burst error: %s" % op)
