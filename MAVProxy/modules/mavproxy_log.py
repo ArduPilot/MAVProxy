@@ -37,6 +37,9 @@ class LogModule(mp_module.MPModule):
             tstring = ''
         else:
             tstring = time.ctime(m.time_utc)
+        if m.num_logs == 0:
+            print("No logs")
+            return
         self.entries[m.id] = m
         print("Log %u  numLogs %u lastLog %u size %u %s" % (m.id, m.num_logs, m.last_log_num, m.size, tstring))
 
