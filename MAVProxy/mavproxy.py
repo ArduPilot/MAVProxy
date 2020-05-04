@@ -953,7 +953,8 @@ def periodic_tasks():
     if heartbeat_check_period.trigger():
         check_link_status()
 
-    set_stream_rates()
+    if mpstate.settings.mavfwd_rate == False:
+        set_stream_rates()
 
     mpstate.status.update_bytecounters()
 
