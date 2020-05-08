@@ -386,14 +386,17 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
                     path.append([])
             instance = instances[type]
 
-            if abs(lat)>0.01 or abs(lng)>0.01:
-                colour = colour_for_point(mlog, (lat, lng), instance, options)
-                tdays = grapher.timestamp_to_days(m._timestamp)
-                point = (lat, lng, colour, tdays)
+            # only plot thing we have a valid-looking location for:
+            if abs(lat)<=0.01 and abs(lng)<=0.01:
+                continue
 
-                if options.rate == 0 or not type in last_timestamps or m._timestamp - last_timestamps[type] > 1.0/options.rate:
-                    last_timestamps[type] = m._timestamp
-                    path[instance].append(point)
+            colour = colour_for_point(mlog, (lat, lng), instance, options)
+            tdays = grapher.timestamp_to_days(m._timestamp)
+            point = (lat, lng, colour, tdays)
+
+            if options.rate == 0 or not type in last_timestamps or m._timestamp - last_timestamps[type] > 1.0/options.rate:
+                last_timestamps[type] = m._timestamp
+                path[instance].append(point)
     if len(path[0]) == 0:
         print("No points to plot")
         return None
