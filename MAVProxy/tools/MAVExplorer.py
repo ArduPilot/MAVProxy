@@ -339,6 +339,7 @@ def cmd_map(args):
     options._flightmodes = mestate.mlog._flightmodes
     options.show_flightmode_legend = mestate.settings.show_flightmode
     options.colour_source='flightmode'
+    options.nkf_sample = 1
     if len(args) > 0:
         options.types = ','.join(args)
         if len(options.types) > 1:

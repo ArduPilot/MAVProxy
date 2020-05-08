@@ -331,13 +331,14 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
             used_flightmodes[mlog.flightmode] = 1
             if type in ['GPS','GPS2']:
                 status = getattr(m, 'Status', None)
+                nsats = getattr(m, 'NSats', None)
                 if status is None:
                     status = getattr(m, 'FixType', None)
                     if status is None:
                         print("Can't find status on GPS message")
                         print(m)
                         break
-                if status < 2:
+                if status < 2 and nsats < 5:
                     continue
                 # flash log
                 lat = m.Lat
