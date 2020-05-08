@@ -184,8 +184,8 @@ def colour_for_point(mlog, point, instance, options):
 #    v = mavutil.evaluate_expression(source, mlog.messages)
 
     if v is None:
-        v = 0
-    elif isinstance(v, str):
+        return v
+    if isinstance(v, str):
         print("colour expression returned a string: %s" % v)
         sys.exit(1)
     elif v < 0:
@@ -390,6 +390,9 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
                 continue
 
             colour = colour_for_point(mlog, (lat, lng), instance, options)
+            if colour is None:
+                continue
+
             tdays = grapher.timestamp_to_days(m._timestamp)
             point = (lat, lng, colour, tdays)
 
