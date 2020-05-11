@@ -36,8 +36,9 @@ For Fedora based systems:
 
 .. note::
 
-    On some older Linux systems, ``python-wxgtk3.0`` may be instead named
-    as ``python-wxgtk2.8``.
+    On some Linux systems, ``python-wxgtk3.0`` and ``python3-wxgtk3.0`` may not exist.
+    Alternative for older systems is ``python-wxgtk2.8``.
+    For newer systems use ``python3-wxgtk4.0``.
     
 .. note::
 
