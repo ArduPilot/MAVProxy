@@ -168,9 +168,10 @@ def display_waypoints(wploader, map):
 colour_expression_exceptions = dict()
 colour_source_min = 255
 colour_source_max = 0
+colour_over_255 = 0
 
 def colour_for_point(mlog, point, instance, options):
-    global colour_expression_exceptions, colour_source_max, colour_source_min
+    global colour_expression_exceptions, colour_source_max, colour_source_min, colour_over_255
     '''indicate a colour to be used to plot point'''
     source = getattr(options, "colour_source", "flightmode")
     if source == "flightmode":
@@ -209,6 +210,7 @@ def colour_for_point(mlog, point, instance, options):
     elif v > 255:
         print("colour expression returned %d (> 255)" % v)
         v = 255
+        colour_over_255 += 1
 
     if v < colour_source_min:
         colour_source_min = v
@@ -571,7 +573,7 @@ def mavflightview_show(path, wp, fen, used_flightmodes, mav_type, options, insta
             tuples = [ (t, map_colours[instances[t]]) for t in instances.keys() ]
             map.add_object(mp_slipmap.SlipFlightModeLegend("legend", tuples))
         else:
-            print("colour-source: min=%f max=%f" % (colour_source_min, colour_source_max))
+            print("colour-source: min=%f max=%f over-255=%u" % (colour_source_min, colour_source_max, colour_over_255))
 
 
 def load_kml(kml):
