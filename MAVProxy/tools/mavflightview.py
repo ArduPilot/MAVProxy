@@ -499,8 +499,13 @@ def mavflightview_show(path, wp, fen, used_flightmodes, mav_type, options, insta
     path_objs = []
     for i in range(len(path)):
         if len(path[i]) != 0:
-            path_objs.append(mp_slipmap.SlipPolygon('FlightPath[%u]-%s' % (i,title), path[i], layer='FlightPath',
-                                                    linewidth=2, colour=(255,0,180)))
+            path_objs.append(mp_slipmap.SlipPolygon(
+                'FlightPath[%u]-%s' % (i,title),
+                path[i],
+                layer='FlightPath',
+                linewidth=2,
+                showlines=(not getattr(options, "no_show_lines", False)),
+                colour=(255,0,180)))
     plist = []
     if options.show_waypoints:
         plist = wp.polygon_list()
@@ -665,6 +670,7 @@ if __name__ == "__main__":
     parser.add_option("--no-flightmode-legend", action="store_false", default=True, dest="show_flightmode_legend", help="hide legend for colour used for flight modes")
     parser.add_option("--kml", default=None, help="add kml overlay")
     parser.add_option("--hide-waypoints", dest='show_waypoints', action='store_false', help="do not show waypoints", default=True)
+    parser.add_option("--no-show-lines", action="store_true", default=False)
 
     (opts, args) = parser.parse_args()
 
