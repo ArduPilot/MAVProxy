@@ -371,6 +371,16 @@ class FTPModule(mp_module.MPModule):
             else:
                 self.fh.write(op.payload)
             if op.burst_complete:
+                if op.size > 0 and op.size < self.burst_size:
+                    # a burst complete with non-zero size and less than burst packet size
+                    # means EOF
+                    if not self.reached_eof and self.ftp_settings.debug > 0:
+                        print("EOF at %u with %u gaps t=%.2f" % (self.fh.tell(), len(self.read_gaps), time.time() - self.op_start))
+                    self.reached_eof = True
+                    if self.check_read_finished():
+                        return
+                    self.check_read_send()
+                    return
                 more = self.last_op
                 more.offset = op.offset + op.size
                 if self.ftp_settings.debug > 0:
