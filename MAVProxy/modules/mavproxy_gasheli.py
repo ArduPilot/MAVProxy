@@ -39,8 +39,6 @@ class GasHeliModule(mp_module.MPModule):
         '''handle an incoming mavlink packet'''
         type = msg.get_type()
 
-        master = self.master
-
         # add some status fields
         if type in [ 'RC_CHANNELS_RAW' ]:
             rc6 = msg.chan6_raw
@@ -111,14 +109,15 @@ class GasHeliModule(mp_module.MPModule):
             self.starting_motor = False
 
         # setup starter run
-        self.master.mav.command_long_send(self.target_system,
-                                          self.target_component,
-                                          mavutil.mavlink.MAV_CMD_DO_REPEAT_SERVO, 0,
-                                          self.gasheli_settings.starter_chan,
-                                          self.gasheli_settings.starter_pwm_on,
-                                          1,
-                                          self.gasheli_settings.starter_time*2,
-                                          0, 0, 0)
+        for m, t, c in self.master:
+            m.mav.command_long_send(t,
+                                    c,
+                                    mavutil.mavlink.MAV_CMD_DO_REPEAT_SERVO, 0,
+                                    self.gasheli_settings.starter_chan,
+                                    self.gasheli_settings.starter_pwm_on,
+                                    1,
+                                    self.gasheli_settings.starter_time*2,
+                                    0, 0, 0)
         print("Starting motor")
 
     def stop_motor(self):

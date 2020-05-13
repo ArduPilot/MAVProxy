@@ -124,24 +124,26 @@ class ArmModule(mp_module.MPModule):
             p2 = 0
             if len(args) == 2 and args[1] == 'force':
                 p2 = 2989
-            self.master.mav.command_long_send(
-                self.target_system,  # target_system
-                self.target_component,
-                mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM, # command
-                0, # confirmation
-                1, # param1 (1 to indicate arm)
-                p2, # param2  (all other params meaningless)
-                0, # param3
-                0, # param4
-                0, # param5
-                0, # param6
-                0) # param7
+            for m, t, c in self.master:
+                m.mav.command_long_send(
+                    t,  # target_system
+                    c,
+                    mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM, # command
+                    0, # confirmation
+                    1, # param1 (1 to indicate arm)
+                    p2, # param2  (all other params meaningless)
+                    0, # param3
+                    0, # param4
+                    0, # param5
+                    0, # param6
+                    0) # param7
             return
 
         if args[0] == "safetyon":
-            self.master.mav.set_mode_send(self.target_system,
-                                          mavutil.mavlink.MAV_MODE_FLAG_DECODE_POSITION_SAFETY,
-                                          1)
+            for m, t, _ in self.master:
+                m.mav.set_mode_send(t,
+                                    mavutil.mavlink.MAV_MODE_FLAG_DECODE_POSITION_SAFETY,
+                                    1)
             return
 
         if args[0] == "safetystatus":
@@ -157,9 +159,10 @@ class ArmModule(mp_module.MPModule):
             return
 
         if args[0] == "safetyoff":
-            self.master.mav.set_mode_send(self.target_system,
-                                          mavutil.mavlink.MAV_MODE_FLAG_DECODE_POSITION_SAFETY,
-                                          0)
+            for m, t, _ in self.master:
+                m.mav.set_mode_send(t,
+                                    mavutil.mavlink.MAV_MODE_FLAG_DECODE_POSITION_SAFETY,
+                                    0)
             return
 
         print(usage)
@@ -169,18 +172,19 @@ class ArmModule(mp_module.MPModule):
         p2 = 0
         if len(args) == 1 and args[0] == 'force':
             p2 = 21196
-        self.master.mav.command_long_send(
-            self.target_system,  # target_system
-            0,
-            mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM, # command
-            0, # confirmation
-            0, # param1 (0 to indicate disarm)
-            p2, # param2 (all other params meaningless)
-            0, # param3
-            0, # param4
-            0, # param5
-            0, # param6
-            0) # param7
+        for m, t, _ in self.master:
+            m.mav.command_long_send(
+                t,  # target_system
+                0,
+                mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM, # command
+                0, # confirmation
+                0, # param1 (0 to indicate disarm)
+                p2, # param2 (all other params meaningless)
+                0, # param3
+                0, # param4
+                0, # param5
+                0, # param6
+                0) # param7
 
     def all_checks_enabled(self):
         ''' returns true if the UAV is skipping any arming checks'''

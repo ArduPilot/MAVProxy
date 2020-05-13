@@ -28,7 +28,8 @@ class TimeSyncModule(mp_module.MPModule):
             print("Usage: timesync CURRENT_TIME")
             return
 
-        self.master.mav.timesync_send(0, int(args[0]))
+        for m, _, _ in self.master:
+            m.mav.timesync_send(0, int(args[0]))
 
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''

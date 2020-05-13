@@ -100,7 +100,6 @@ class ViconModule(mp_module.MPModule):
                 gps_period_ms = 1000 // self.vicon_settings.gps_rate
             time.sleep(0.01)
             vicon.get_frame()
-            mav = self.master
             now = time.time()
             now_ms = int(now * 1000)
             frame_num = vicon.get_frame_number()
@@ -160,16 +159,17 @@ class ViconModule(mp_module.MPModule):
             time_us = int(now * 1.0e6)
 
             if now - last_origin_send > 1 and self.vicon_settings.vision_rate > 0:
-                # send a heartbeat msg
-                mav.mav.heartbeat_send(mavutil.mavlink.MAV_TYPE_GCS, mavutil.mavlink.MAV_AUTOPILOT_GENERIC, 0, 0, 0)
+                for m, t, _ in self.master:
+                    # send a heartbeat msg
+                    m.mav.heartbeat_send(mavutil.mavlink.MAV_TYPE_GCS, mavutil.mavlink.MAV_AUTOPILOT_GENERIC, 0, 0, 0)
 
-                # send origin at 1Hz
-                mav.mav.set_gps_global_origin_send(self.target_system,
-                                                   int(self.vicon_settings.origin_lat*1.0e7),
-                                                   int(self.vicon_settings.origin_lon*1.0e7),
-                                                   int(self.vicon_settings.origin_alt*1.0e3),
-                                                   time_us)
-                last_origin_send = now
+                    # send origin at 1Hz
+                    m.mav.set_gps_global_origin_send(t,
+                                                     int(self.vicon_settings.origin_lat*1.0e7),
+                                                     int(self.vicon_settings.origin_lon*1.0e7),
+                                                     int(self.vicon_settings.origin_alt*1.0e3),
+                                                     time_us)
+                    last_origin_send = now
 
             if self.vicon_settings.gps_rate > 0 and now_ms - last_gps_send_ms > gps_period_ms:
                 '''send GPS data at the specified rate, trying to align on the given period'''

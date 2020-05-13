@@ -23,7 +23,6 @@ class GoProModule(mp_module.MPModule):
     def cmd_gopro(self, args):
         '''gopro commands'''
         usage = "status, shutter <start|stop>, mode <video|camera>, power <on|off>"
-        mav = self.master.mav
 
         if args[0] == "status":
             self.cmd_gopro_status(args[1:])
@@ -32,12 +31,14 @@ class GoProModule(mp_module.MPModule):
         if args[0] == "shutter":
             name = args[1].lower()
             if name == 'start':
-                mav.gopro_set_request_send(self.target_system, mavutil.mavlink.MAV_COMP_ID_GIMBAL,
-                 mavutil.mavlink.GOPRO_COMMAND_SHUTTER, [1, 0 ,0 , 0])
+                for m, t, _ in self.master:
+                    m.mav.gopro_set_request_send(t, mavutil.mavlink.MAV_COMP_ID_GIMBAL,
+                        mavutil.mavlink.GOPRO_COMMAND_SHUTTER, [1, 0 ,0 , 0])
                 return
             elif name == 'stop':
-                mav.gopro_set_request_send(self.target_system, mavutil.mavlink.MAV_COMP_ID_GIMBAL,
-                 mavutil.mavlink.GOPRO_COMMAND_SHUTTER, [0, 0 ,0 , 0])
+                for m, t, _ in self.master:
+                    m.mav.gopro_set_request_send(t, mavutil.mavlink.MAV_COMP_ID_GIMBAL,
+                        mavutil.mavlink.GOPRO_COMMAND_SHUTTER, [0, 0 ,0 , 0])
                 return
             else:
                 print("unrecognized")

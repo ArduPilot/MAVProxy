@@ -111,11 +111,11 @@ class FenceModule(mp_module.MPModule):
 
     def set_fence_enabled(self, do_enable):
         '''Enable or disable fence'''
-        self.master.mav.command_long_send(
-            self.target_system,
-            self.target_component,
-            mavutil.mavlink.MAV_CMD_DO_FENCE_ENABLE, 0,
-            do_enable, 0, 0, 0, 0, 0, 0)
+        for m, t, c in self.master:
+            m.mav.command_long_send(
+                t, c,
+                mavutil.mavlink.MAV_CMD_DO_FENCE_ENABLE, 0,
+                do_enable, 0, 0, 0, 0, 0, 0)
 
     def cmd_fence_move(self, args):
         '''handle fencepoint move'''
@@ -228,7 +228,8 @@ class FenceModule(mp_module.MPModule):
         self.param_set('FENCE_TOTAL', self.fenceloader.count(), 3)
         for i in range(self.fenceloader.count()):
             p = self.fenceloader.point(i)
-            self.master.mav.send(p)
+            for m, _, _ in self.master:
+                m.mav.send(p)
             p2 = self.fetch_fence_point(i)
             if p2 is None:
                 self.param_set('FENCE_ACTION', action, 3)
@@ -244,19 +245,20 @@ class FenceModule(mp_module.MPModule):
 
     def fetch_fence_point(self ,i):
         '''fetch one fence point'''
-        self.master.mav.fence_fetch_point_send(self.target_system,
-                                                    self.target_component, i)
+        for m, t, c in self.master:
+            m.mav.fence_fetch_point_send(t, c, self.target_component, i)
         tstart = time.time()
         p = None
-        while time.time() - tstart < 3:
-            p = self.master.recv_match(type='FENCE_POINT', blocking=False)
-            if p is not None:
-                break
-            time.sleep(0.1)
-            continue
-        if p is None:
-            self.console.error("Failed to fetch point %u" % i)
-            return None
+        for m in self.master:
+            while time.time() - tstart < 3:
+                p = self.master.recv_match(type='FENCE_POINT', blocking=False)
+                if p is not None:
+                    break
+                time.sleep(0.1)
+                continue
+            if p is None:
+                self.console.error("Failed to fetch point %u" % i)
+                return None
         return p
 
     def fence_draw_callback(self, points):

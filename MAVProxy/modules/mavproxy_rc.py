@@ -43,9 +43,8 @@ class RCModule(mp_module.MPModule):
             self.sitl_output.write(buf)
         else:
             chan18 = self.override[:18]
-            self.master.mav.rc_channels_override_send(self.target_system,
-                                                      self.target_component,
-                                                      *chan18)
+            for m, t, c in self.master:
+                m.mav.rc_channels_override_send(t, c, *chan18)
 
     def cmd_switch(self, args):
         '''handle RC switch changes'''

@@ -114,14 +114,15 @@ class FollowTestModule(mp_module.MPModule):
 
         if self.follow_settings.type == 'guided':
             # send normal guided mode packet
-            self.master.mav.mission_item_int_send(self.settings.target_system,
-                                                  self.settings.target_component,
-                                                  0,
-                                                  self.module('wp').get_default_frame(),
-                                                  mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
-                                                  2, 0, 0, 0, 0, 0,
-                                                  int(self.target_pos[0]*1.0e7), int(self.target_pos[1]*1.0e7),
-                                                  self.follow_settings.altitude)
+            for m, t, c in self.master:
+                m.mav.mission_item_int_send(t,
+                                            c,
+                                            0,
+                                            self.module('wp').get_default_frame(),
+                                            mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
+                                            2, 0, 0, 0, 0, 0,
+                                            int(self.target_pos[0]*1.0e7), int(self.target_pos[1]*1.0e7),
+                                            self.follow_settings.altitude)
 
         elif self.follow_settings.type == 'yaw':
             # display yaw from vehicle to target
@@ -132,12 +133,13 @@ class FollowTestModule(mp_module.MPModule):
             # note its in centi-degrees so *100
             relyaw = self.wrap_180(target_bearing - vehicle_yaw) * 100
 
-            self.master.mav.command_long_send(self.settings.target_system,
-                                                  self.settings.target_component,
-                                                  mavutil.mavlink.MAV_CMD_NAV_SET_YAW_SPEED, 0,
-                                                  relyaw,
-                                                  self.follow_settings.vehicle_throttle,
-                                                  0, 0, 0, 0, 0)
+            for m, t, c in self.master:
+                m.mav.command_long_send(t,
+                                        c,
+                                        mavutil.mavlink.MAV_CMD_NAV_SET_YAW_SPEED, 0,
+                                        relyaw,
+                                        self.follow_settings.vehicle_throttle,
+                                        0, 0, 0, 0, 0)
 
 def init(mpstate):
     '''initialise module'''

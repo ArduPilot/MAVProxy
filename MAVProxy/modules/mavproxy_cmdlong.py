@@ -45,18 +45,19 @@ class CmdlongModule(mp_module.MPModule):
         if (len(args) == 1):
             altitude = float(args[0])
             print("Take Off started")
-            self.master.mav.command_long_send(
-                self.settings.target_system,  # target_system
-                mavutil.mavlink.MAV_COMP_ID_SYSTEM_CONTROL, # target_component
-                mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, # command
-                0, # confirmation
-                0, # param1
-                0, # param2
-                0, # param3
-                0, # param4
-                0, # param5
-                0, # param6
-                altitude) # param7
+            for m, t, _ in self.master:
+                m.mav.command_long_send(
+                    t, # target_system
+                    mavutil.mavlink.MAV_COMP_ID_SYSTEM_CONTROL, # target_component
+                    mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, # command
+                    0, # confirmation
+                    0, # param1
+                    0, # param2
+                    0, # param3
+                    0, # param4
+                    0, # param5
+                    0, # param6
+                    altitude) # param7
 
     def cmd_parachute(self, args):
         '''parachute control'''
@@ -74,30 +75,32 @@ class CmdlongModule(mp_module.MPModule):
             print(usage)
             return
         cmd = cmds[args[0]]
-        self.master.mav.command_long_send(
-            self.settings.target_system,  # target_system
-            0, # target_component
-            mavutil.mavlink.MAV_CMD_DO_PARACHUTE,
-            0,
-            cmd,
-            0, 0, 0, 0, 0, 0)
+        for m, t, _ in self.master:
+            m.mav.command_long_send(
+                t, # target_system
+                0, # target_component
+                mavutil.mavlink.MAV_CMD_DO_PARACHUTE,
+                0,
+                cmd,
+                0, 0, 0, 0, 0, 0)
 
     def cmd_camctrlmsg(self, args):
         '''camctrlmsg'''
 
         print("Sent DIGICAM_CONFIGURE CMD_LONG")
-        self.master.mav.command_long_send(
-            self.settings.target_system,  # target_system
-            0, # target_component
-            mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONFIGURE, # command
-            0, # confirmation
-            10, # param1
-            20, # param2
-            30, # param3
-            40, # param4
-            50, # param5
-            60, # param6
-            70) # param7
+        for m, t, _ in self.master:
+            m.mav.command_long_send(
+                t, # target_system
+                0, # target_component
+                mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONFIGURE, # command
+                0, # confirmation
+                10, # param1
+                20, # param2
+                30, # param3
+                40, # param4
+                50, # param5
+                60, # param6
+                70) # param7
 
     def cmd_cammsg(self, args):
         '''cammsg'''
@@ -138,27 +141,29 @@ class CmdlongModule(mp_module.MPModule):
         for i in range(min(len(args),len(params))):
             params[i] = float(args[i])
 
-        self.master.mav.command_long_send(
-            self.settings.target_system,  # target_system
-            0, # target_component
-            mavutil.mavlink.MAV_CMD_DO_ENGINE_CONTROL, # command
-            0, # confirmation
-            params[0], # param1
-            params[1], # param2
-            params[2], # param3
-            params[3], # param4
-            params[4], # param5
-            params[5], # param6
-            params[6]) # param7
+        for m, t, _ in self.master:
+            m.mav.command_long_send(
+                t, # target_system
+                0, # target_component
+                mavutil.mavlink.MAV_CMD_DO_ENGINE_CONTROL, # command
+                0, # confirmation
+                params[0], # param1
+                params[1], # param2
+                params[2], # param3
+                params[3], # param4
+                params[4], # param5
+                params[5], # param6
+                params[6]) # param7
 
     def cmd_cammsg_old(self, args):
         '''cammsg_old'''
 
         print("Sent old DIGICAM_CONTROL")
-        self.master.mav.digicam_control_send(
-            self.settings.target_system,  # target_system
-            0, # target_component
-            0, 0, 0, 0, 1, 0, 0, 0)
+        for m, t, _ in self.master:
+            m.mav.digicam_control_send(
+                t, # target_system
+                0, # target_component
+                0, 0, 0, 0, 1, 0, 0, 0)
 
     def cmd_do_change_speed(self, args):
         '''speed value'''
@@ -169,18 +174,19 @@ class CmdlongModule(mp_module.MPModule):
         if (len(args) == 1):
             speed = float(args[0])
             print("SPEED %s" % (str(speed)))
-            self.master.mav.command_long_send(
-                self.settings.target_system,  # target_system
-                mavutil.mavlink.MAV_COMP_ID_SYSTEM_CONTROL, # target_component
-                mavutil.mavlink.MAV_CMD_DO_CHANGE_SPEED, # command
-                0, # confirmation
-                0, # param1
-                speed, # param2 (Speed value)
-                0, # param3
-                0, # param4
-                0, # param5
-                0, # param6
-                0) # param7
+            for m, t, _ in self.master:
+                m.mav.command_long_send(
+                    t, # target_system
+                    mavutil.mavlink.MAV_COMP_ID_SYSTEM_CONTROL, # target_component
+                    mavutil.mavlink.MAV_CMD_DO_CHANGE_SPEED, # command
+                    0, # confirmation
+                    0, # param1
+                    speed, # param2 (Speed value)
+                    0, # param3
+                    0, # param4
+                    0, # param5
+                    0, # param6
+                    0) # param7
 
     def cmd_condition_yaw(self, args):
         '''yaw angle angular_speed angle_mode'''
@@ -193,18 +199,19 @@ class CmdlongModule(mp_module.MPModule):
             angular_speed = float(args[1])
             angle_mode = float(args[2])
             print("ANGLE %s" % (str(angle)))
-            self.master.mav.command_long_send(
-                self.settings.target_system,  # target_system
-                mavutil.mavlink.MAV_COMP_ID_SYSTEM_CONTROL, # target_component
-                mavutil.mavlink.MAV_CMD_CONDITION_YAW, # command
-                0, # confirmation
-                angle, # param1 (angle value)
-                angular_speed, # param2 (angular speed value)
-                0, # param3
-                angle_mode, # param4 (mode: 0->absolute / 1->relative)
-                0, # param5
-                0, # param6
-                0) # param7
+            for m, t, _ in self.master:
+                m.mav.command_long_send(
+                    t, # target_system
+                    mavutil.mavlink.MAV_COMP_ID_SYSTEM_CONTROL, # target_component
+                    mavutil.mavlink.MAV_CMD_CONDITION_YAW, # command
+                    0, # confirmation
+                    angle, # param1 (angle value)
+                    angular_speed, # param2 (angular speed value)
+                    0, # param3
+                    angle_mode, # param4 (mode: 0->absolute / 1->relative)
+                    0, # param5
+                    0, # param6
+                    0) # param7
 
     def cmd_velocity(self, args):
         '''velocity x-ms y-ms z-ms'''
@@ -217,16 +224,17 @@ class CmdlongModule(mp_module.MPModule):
             y_mps = float(args[1])
             z_mps = float(args[2])
             print("x:%f, y:%f, z:%f" % (x_mps, y_mps, z_mps))
-            self.master.mav.set_position_target_local_ned_send(
-                                      0,  # system time in milliseconds
-                                      1,  # target system
-                                      0,  # target component
-                                      8,  # coordinate frame MAV_FRAME_BODY_NED
-                                      4039,     # type mask (vel only)
-                                      0, 0, 0,  # position x,y,z
-                                      x_mps, y_mps, z_mps,  # velocity x,y,z
-                                      0, 0, 0,  # accel x,y,z
-                                      0, 0)     # yaw, yaw rate
+            for m, _, _ in self.master:
+                m.mav.set_position_target_local_ned_send(
+                                          0,  # system time in milliseconds
+                                          1,  # target system
+                                          0,  # target component
+                                          8,  # coordinate frame MAV_FRAME_BODY_NED
+                                          4039,     # type mask (vel only)
+                                          0, 0, 0,  # position x,y,z
+                                          x_mps, y_mps, z_mps,  # velocity x,y,z
+                                          0, 0, 0,  # accel x,y,z
+                                          0, 0)     # yaw, yaw rate
 
     def cmd_position(self, args):
         '''position x-m y-m z-m'''
@@ -239,16 +247,17 @@ class CmdlongModule(mp_module.MPModule):
             y_m = float(args[1])
             z_m = float(args[2])
             print("x:%f, y:%f, z:%f" % (x_m, y_m, z_m))
-            self.master.mav.set_position_target_local_ned_send(
-                                      0,  # system time in milliseconds
-                                      1,  # target system
-                                      0,  # target component
-                                      8,  # coordinate frame MAV_FRAME_BODY_NED
-                                      3576,     # type mask (pos only)
-                                      x_m, y_m, z_m,  # position x,y,z
-                                      0, 0, 0,  # velocity x,y,z
-                                      0, 0, 0,  # accel x,y,z
-                                      0, 0)     # yaw, yaw rate
+            for m, _, _ in self.master:
+                m.mav.set_position_target_local_ned_send(
+                                          0,  # system time in milliseconds
+                                          1,  # target system
+                                          0,  # target component
+                                          8,  # coordinate frame MAV_FRAME_BODY_NED
+                                          3576,     # type mask (pos only)
+                                          x_m, y_m, z_m,  # position x,y,z
+                                          0, 0, 0,  # velocity x,y,z
+                                          0, 0, 0,  # accel x,y,z
+                                          0, 0)     # yaw, yaw rate
 
     def cmd_attitude(self, args):
         '''attitude q0 q1 q2 q3 thrust'''
@@ -264,16 +273,17 @@ class CmdlongModule(mp_module.MPModule):
             thrust = float(args[4])
             att_target = [q0, q1, q2, q3]
             print("q0:%.3f, q1:%.3f, q2:%.3f q3:%.3f thrust:%.2f" % (q0, q1, q2, q3, thrust))
-            self.master.mav.set_attitude_target_send(
-                                      0,  # system time in milliseconds
-                                      1,  # target system
-                                      0,  # target component
-                                      63, # type mask (ignore all except attitude + thrust)
-                                      att_target, # quaternion attitude
-                                      0,  # body roll rate
-                                      0,  # body pitch rate
-                                      0,  # body yaw rate
-                                      thrust)  # thrust
+            for m, _, _ in self.master:
+                m.mav.set_attitude_target_send(
+                                          0,  # system time in milliseconds
+                                          1,  # target system
+                                          0,  # target component
+                                          63, # type mask (ignore all except attitude + thrust)
+                                          att_target, # quaternion attitude
+                                          0,  # body roll rate
+                                          0,  # body pitch rate
+                                          0,  # body yaw rate
+                                          thrust)  # thrust
 
     def cmd_posvel(self, args):
         '''posvel mapclick vN vE vD'''
@@ -297,18 +307,19 @@ class CmdlongModule(mp_module.MPModule):
 
         print("ignoremask",ignoremask)
         print(latlon)
-        self.master.mav.set_position_target_global_int_send(
-            0,  # system time in ms
-            1,  # target system
-            0,  # target component
-            mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
-            ignoremask, # ignore
-            int(latlon[0] * 1e7),
-            int(latlon[1] * 1e7),
-            10,
-            vN, vE, vD, # velocity
-            0, 0, 0, # accel x,y,z
-            0, 0) # yaw, yaw rate
+        for m, _, _ in self.master:
+            m.mav.set_position_target_global_int_send(
+                0,  # system time in ms
+                1,  # target system
+                0,  # target component
+                mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
+                ignoremask, # ignore
+                int(latlon[0] * 1e7),
+                int(latlon[1] * 1e7),
+                10,
+                vN, vE, vD, # velocity
+                0, 0, 0, # accel x,y,z
+                0, 0) # yaw, yaw rate
 
     def cmd_long(self, args):
         '''execute supplied command long'''
@@ -334,11 +345,12 @@ class CmdlongModule(mp_module.MPModule):
         floating_args = [ float(x) for x in args[1:] ]
         while len(floating_args) < 7:
             floating_args.append(float(0))
-        self.master.mav.command_long_send(self.settings.target_system,
-                                          self.settings.target_component,
-                                          command,
-                                          0,
-                                          *floating_args)
+        for m, t, c in self.master:
+            m.mav.command_long_send(t,
+                                    c,
+                                    command,
+                                    0,
+                                    *floating_args)
 
     def cmd_command_int(self, args):
         '''execute supplied command_int'''
@@ -391,19 +403,20 @@ class CmdlongModule(mp_module.MPModule):
         x = int(args[8])
         y = int(args[9])
         z = float(args[10])
-        self.master.mav.command_int_send(self.settings.target_system,
-                                         self.settings.target_component,
-                                         frame,
-                                         command,
-                                         0,
-                                         0,
-                                         param1,
-                                         param2,
-                                         param3,
-                                         param4,
-                                         x,
-                                         y,
-                                         z)
+        for m, t, c in self.master:
+            m.mav.command_int_send(t,
+                                   c,
+                                   frame,
+                                   command,
+                                   0,
+                                   0,
+                                   param1,
+                                   param2,
+                                   param3,
+                                   param4,
+                                   x,
+                                   y,
+                                   z)
 
 def init(mpstate):
     '''initialise module'''

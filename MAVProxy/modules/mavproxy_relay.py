@@ -21,20 +21,22 @@ class RelayModule(mp_module.MPModule):
             if len(args) < 3:
                 print("Usage: relay set <RELAY_NUM> <0|1>")
                 return
-            self.master.mav.command_long_send(self.target_system,
-                                                   self.target_component,
-                                                   mavutil.mavlink.MAV_CMD_DO_SET_RELAY, 0,
-                                                   int(args[1]), int(args[2]),
-                                                   0, 0, 0, 0, 0)
+            for m, t, c in self.master:
+                m.mav.command_long_send(t,
+                                        c,
+                                        mavutil.mavlink.MAV_CMD_DO_SET_RELAY, 0,
+                                        int(args[1]), int(args[2]),
+                                        0, 0, 0, 0, 0)
         if args[0] == "repeat":
             if len(args) < 4:
                 print("Usage: relay repeat <RELAY_NUM> <COUNT> <PERIOD>")
                 return
-            self.master.mav.command_long_send(self.target_system,
-                                                   self.target_component,
-                                                   mavutil.mavlink.MAV_CMD_DO_REPEAT_RELAY, 0,
-                                                   int(args[1]), int(args[2]), float(args[3]),
-                                                   0, 0, 0, 0)
+            for m, t, c in self.master:
+                m.mav.command_long_send(t,
+                                        c,
+                                        mavutil.mavlink.MAV_CMD_DO_REPEAT_RELAY, 0,
+                                        int(args[1]), int(args[2]), float(args[3]),
+                                        0, 0, 0, 0)
 
     def cmd_servo(self, args):
         '''set servos'''
@@ -45,20 +47,22 @@ class RelayModule(mp_module.MPModule):
             if len(args) < 3:
                 print("Usage: servo set <SERVO_NUM> <PWM>")
                 return
-            self.master.mav.command_long_send(self.target_system,
-                                                   self.target_component,
-                                                   mavutil.mavlink.MAV_CMD_DO_SET_SERVO, 0,
-                                                   int(args[1]), int(args[2]),
-                                                   0, 0, 0, 0, 0)
+            for m, t, c in self.master:
+                m.mav.command_long_send(t,
+                                        c,
+                                        mavutil.mavlink.MAV_CMD_DO_SET_SERVO, 0,
+                                        int(args[1]), int(args[2]),
+                                        0, 0, 0, 0, 0)
         if args[0] == "repeat":
             if len(args) < 5:
                 print("Usage: servo repeat <SERVO_NUM> <PWM> <COUNT> <PERIOD>")
                 return
-            self.master.mav.command_long_send(self.target_system,
-                                                   self.target_component,
-                                                   mavutil.mavlink.MAV_CMD_DO_REPEAT_SERVO, 0,
-                                                   int(args[1]), int(args[2]), int(args[3]), float(args[4]),
-                                                   0, 0, 0)
+            for m, t, c in self.master:
+                m.mav.command_long_send(t,
+                                        c,
+                                        mavutil.mavlink.MAV_CMD_DO_REPEAT_SERVO, 0,
+                                        int(args[1]), int(args[2]), int(args[3]), float(args[4]),
+                                        0, 0, 0)
 
 
     def cmd_motortest(self, args):
@@ -70,11 +74,12 @@ class RelayModule(mp_module.MPModule):
             count = int(args[4])
         else:
             count = 0
-        self.master.mav.command_long_send(self.target_system,
-                                          0,
-                                          mavutil.mavlink.MAV_CMD_DO_MOTOR_TEST, 0,
-                                          int(args[0]), int(args[1]), int(args[2]), int(args[3]), count,
-                                          0, 0)
+        for m, t, _ in self.master:
+            m.mav.command_long_send(t,
+                                    0,
+                                    mavutil.mavlink.MAV_CMD_DO_MOTOR_TEST, 0,
+                                    int(args[0]), int(args[1]), int(args[2]), int(args[3]), count,
+                                    0, 0)
 
 
 def init(mpstate):

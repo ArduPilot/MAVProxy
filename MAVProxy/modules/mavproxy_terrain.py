@@ -57,12 +57,12 @@ class TerrainModule(mp_module.MPModule):
                 return
         self.check_lat = int(latlon[0]*1e7)
         self.check_lon = int(latlon[1]*1e7)
-        self.master.mav.terrain_check_send(self.check_lat, self.check_lon)
+        for m, _, _ in self.master:
+            m.mav.terrain_check_send(self.check_lat, self.check_lon)
 
     def mavlink_packet(self, msg):
         '''handle an incoming mavlink packet'''
         type = msg.get_type()
-        master = self.master
         # add some status fields
         if type == 'TERRAIN_REQUEST':
             self.current_request = msg
@@ -97,13 +97,14 @@ class TerrainModule(mp_module.MPModule):
                     print("no alt ", lat2, lon2)
                 return
             data.append(int(alt))
-        self.master.mav.terrain_data_send(self.current_request.lat,
-                                          self.current_request.lon,
-                                          self.current_request.grid_spacing,
-                                          bit,
-                                          data)
-        self.blocks_sent += 1
-        self.last_send_time = time.time()
+        for m, _, _ in self.master:
+            m.mav.terrain_data_send(self.current_request.lat,
+                                    self.current_request.lon,
+                                    self.current_request.grid_spacing,
+                                    bit,
+                                    data)
+            self.blocks_sent += 1
+            self.last_send_time = time.time()
         self.sent_mask |= 1<<bit
         if self.terrain_settings.debug and bit == 55:
             lat = self.current_request.lat * 1.0e-7

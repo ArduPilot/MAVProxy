@@ -26,7 +26,8 @@ class CalibrationModule(mp_module.MPModule):
 
     def cmd_ground(self, args):
         '''do a ground start mode'''
-        self.master.calibrate_imu()
+        for m, _, _ in self.master:
+            m.calibrate_imu()
 
     def cmd_level(self, args):
         '''run a accel level'''
@@ -34,34 +35,34 @@ class CalibrationModule(mp_module.MPModule):
 
     def cmd_accelcal(self, args):
         '''do a full 3D accel calibration'''
-        mav = self.master
         # ack the APM to begin 3D calibration of accelerometers
-        mav.mav.command_long_send(mav.target_system, mav.target_component,
-                                  mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, 0,
-                                  0, 0, 0, 0, 1, 0, 0)
+        for m, t, c in self.master:
+            m.mav.command_long_send(t, c,
+                                    mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, 0,
+                                    0, 0, 0, 0, 1, 0, 0)
         self.accelcal_count = 0
         self.accelcal_wait_enter = False
 
     def cmd_accelcal_simple(self, args):
         '''do a simple accel calibration'''
-        mav = self.master
-        mav.mav.command_long_send(mav.target_system, mav.target_component,
-                                  mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, 0,
-                                  0, 0, 0, 0, 4, 0, 0)
+        for m, t, c in self.master:
+            m.mav.command_long_send(t, c,
+                                    mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, 0,
+                                    0, 0, 0, 0, 4, 0, 0)
         
     def cmd_gyrocal(self, args):
         '''do a full gyro calibration'''
-        mav = self.master
-        mav.mav.command_long_send(mav.target_system, mav.target_component,
-                                  mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, 0,
-                                  1, 0, 0, 0, 0, 0, 0)
+        for m, t, c in self.master:
+            m.mav.command_long_send(t, c,
+                                    mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, 0,
+                                    1, 0, 0, 0, 0, 0, 0)
 
     def cmd_ahrstrim(self, args):
         '''do a AHRS trim'''
-        mav = self.master
-        mav.mav.command_long_send(mav.target_system, mav.target_component,
-                                  mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, 0,
-                                  0, 0, 0, 0, 2, 0, 0)
+        for m, t, c in self.master:
+            m.mav.command_long_send(t, c,
+                                    mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, 0,
+                                    0, 0, 0, 0, 2, 0, 0)
 
     def mavlink_packet(self, m):
         '''handle mavlink packets'''
@@ -86,10 +87,10 @@ class CalibrationModule(mp_module.MPModule):
             self.magcal_progess[m.compass_id] = result
             self.console.set_status('Progress', 'Calibration Progress: ' + " ".join(self.magcal_progess), row=4)
             print("Calibration of compass %u %s: fitness %.3f" % (m.compass_id, result, m.fitness))
-            mav = self.master
-            mav.mav.command_long_send(mav.target_system, mav.target_component,
-                                      mavutil.mavlink.MAV_CMD_DO_ACCEPT_MAG_CAL, 0,
-                                      1<<m.compass_id, 0, 0, 0, 0, 0, 0)
+            for ma, t, c in self.master:
+                ma.mav.command_long_send(t, c,
+                                         mavutil.mavlink.MAV_CMD_DO_ACCEPT_MAG_CAL, 0,
+                                         1<<m.compass_id, 0, 0, 0, 0, 0, 0)
 
     def idle_task(self):
         '''handle mavlink packets'''
@@ -98,7 +99,8 @@ class CalibrationModule(mp_module.MPModule):
                 self.accelcal_wait_enter = False
                 self.accelcal_count += 1
                 # tell the APM that user has done as requested
-                self.master.mav.command_ack_send(self.accelcal_count, 1)
+                for m, _, _ in self.master:
+                    m.mav.command_ack_send(self.accelcal_count, 1)
                 if self.accelcal_count >= 6:
                     self.accelcal_count = -1
 
@@ -107,22 +109,24 @@ class CalibrationModule(mp_module.MPModule):
                 # user has hit enter, stop the process
                     self.compassmot_running = False
                     print("sending stop")
-                    self.master.mav.command_ack_send(0, 1)
+                    for m, _, _ in self.master:
+                        m.mav.command_ack_send(0, 1)
 
 
     def cmd_compassmot(self, args):
         '''do a compass/motor interference calibration'''
-        mav = self.master
         print("compassmot starting")
-        mav.mav.command_long_send(mav.target_system, mav.target_component,
-                                  mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, 0,
-                                  0, 0, 0, 0, 0, 1, 0)
+        for m, t, c in self.master:
+            m.mav.command_long_send(t, c,
+                                    mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, 0,
+                                    0, 0, 0, 0, 0, 1, 0)
         self.compassmot_running = True
         self.empty_input_count = self.mpstate.empty_input_count
 
     def cmd_calpressure(self, args):
         '''calibrate pressure sensors'''
-        self.master.calibrate_pressure()
+        for m, _, _ in self.master:
+            m.calibrate_pressure()
 
     def print_magcal_usage(self):
         print("Usage: magcal <start|accept|cancel|yaw>")
@@ -134,44 +138,47 @@ class CalibrationModule(mp_module.MPModule):
             return
 
         if args[0] == 'start':
-            self.master.mav.command_long_send(
-                self.settings.target_system,  # target_system
-                0, # target_component
-                mavutil.mavlink.MAV_CMD_DO_START_MAG_CAL, # command
-                0, # confirmation
-                0, # p1: mag_mask
-                0, # p2: retry
-                1, # p3: autosave
-                0, # p4: delay
-                0, # param5
-                0, # param6
-                0) # param7
+            for m, t, _ in self.master:
+                m.mav.command_long_send(
+                    t, # target_system
+                    0, # target_component
+                    mavutil.mavlink.MAV_CMD_DO_START_MAG_CAL, # command
+                    0, # confirmation
+                    0, # p1: mag_mask
+                    0, # p2: retry
+                    1, # p3: autosave
+                    0, # p4: delay
+                    0, # param5
+                    0, # param6
+                    0) # param7
         elif args[0] == 'accept':
-            self.master.mav.command_long_send(
-                self.settings.target_system,  # target_system
-                0, # target_component
-                mavutil.mavlink.MAV_CMD_DO_ACCEPT_MAG_CAL, # command
-                0, # confirmation
-                0, # p1: mag_mask
-                0, # param2
-                1, # param3
-                0, # param4
-                0, # param5
-                0, # param6
-                0) # param7
+            for m, t, _ in self.master:
+                m.mav.command_long_send(
+                    t, # target_system
+                    0, # target_component
+                    mavutil.mavlink.MAV_CMD_DO_ACCEPT_MAG_CAL, # command
+                    0, # confirmation
+                    0, # p1: mag_mask
+                    0, # param2
+                    1, # param3
+                    0, # param4
+                    0, # param5
+                    0, # param6
+                    0) # param7
         elif args[0] == 'cancel':
-            self.master.mav.command_long_send(
-                self.settings.target_system,  # target_system
-                0, # target_component
-                mavutil.mavlink.MAV_CMD_DO_CANCEL_MAG_CAL, # command
-                0, # confirmation
-                0, # p1: mag_mask
-                0, # param2
-                1, # param3
-                0, # param4
-                0, # param5
-                0, # param6
-                0) # param7
+            for m, t, _ in self.master:
+                m.mav.command_long_send(
+                    t, # target_system
+                    0, # target_component
+                    mavutil.mavlink.MAV_CMD_DO_CANCEL_MAG_CAL, # command
+                    0, # confirmation
+                    0, # p1: mag_mask
+                    0, # param2
+                    1, # param3
+                    0, # param4
+                    0, # param5
+                    0, # param6
+                    0) # param7
         elif args[0] == 'yaw':
             if len(args) < 2:
                 print("Usage: magcal yaw YAW_DEGREES <mask>")
@@ -181,18 +188,19 @@ class CalibrationModule(mp_module.MPModule):
             if len(args) > 2:
                 mask = int(args[2])
             print("Calibrating for yaw %.1f degrees with mask 0x%02x" % (yaw_deg, mask))
-            self.master.mav.command_long_send(
-                self.settings.target_system,  # target_system
-                0, # target_component
-                mavutil.mavlink.MAV_CMD_FIXED_MAG_CAL_YAW, # command
-                0, # confirmation
-                yaw_deg, # p1: yaw in degrees
-                mask, # p2: mask
-                0, # p3: lat_deg
-                0, # p4: lon_deg
-                0, # param5
-                0, # param6
-                0) # param7
+            for m, t, _ in self.master:
+                m.mav.command_long_send(
+                    t, # target_system
+                    0, # target_component
+                    mavutil.mavlink.MAV_CMD_FIXED_MAG_CAL_YAW, # command
+                    0, # confirmation
+                    yaw_deg, # p1: yaw in degrees
+                    mask, # p2: mask
+                    0, # p3: lat_deg
+                    0, # p4: lon_deg
+                    0, # param5
+                    0, # param6
+                    0) # param7
         else:
             self.print_magcal_usage()
             return

@@ -50,9 +50,10 @@ class SigningModule(mp_module.MPModule):
         if len(args) == 0:
             print("usage: signing setup passphrase")
             return
-        if not self.master.mavlink20():
-            print("You must be using MAVLink2 for signing")
-            return
+        for m, _, _ in self.master:
+            if not m.mavlink20():
+                print("You must be using MAVLink2 for signing")
+                return
         passphrase = args[0]
         key = self.passphrase_to_key(passphrase)
         secret_key = []
@@ -65,8 +66,8 @@ class SigningModule(mp_module.MPModule):
         epoch_offset = 1420070400
         now = max(time.time(), epoch_offset)
         initial_timestamp = int((now - epoch_offset)*1e5)
-        self.master.mav.setup_signing_send(self.target_system, self.target_component,
-                                           secret_key, initial_timestamp)
+        for m, t, c in self.master:
+            m.mav.setup_signing_send(t, c, secret_key, initial_timestamp)
         print("Sent secret_key")
         self.cmd_signing_key([passphrase])
 
@@ -89,26 +90,31 @@ class SigningModule(mp_module.MPModule):
         if len(args) == 0:
             print("usage: signing setup passphrase")
             return
-        if not self.master.mavlink20():
-            print("You must be using MAVLink2 for signing")
-            return
+        for m, _, _ in self.master:
+            if not m.mavlink20():
+                print("You must be using MAVLink2 for signing")
+                return
         passphrase = args[0]
         key = self.passphrase_to_key(passphrase)
-        self.master.setup_signing(key, sign_outgoing=True, allow_unsigned_callback=self.allow_unsigned)
+        for m, _, _ in self.master:
+            m.setup_signing(key, sign_outgoing=True, allow_unsigned_callback=self.allow_unsigned)
         print("Setup signing key")
 
     def cmd_signing_disable(self, args):
         '''disable signing locally'''
-        self.master.disable_signing()
+        for m, _, _ in self.master:
+            m.disable_signing()
         print("Disabled signing")
 
     def cmd_signing_remove(self, args):
         '''remove signing from server'''
-        if not self.master.mavlink20():
-            print("You must be using MAVLink2 for signing")
-            return
-        self.master.mav.setup_signing_send(self.target_system, self.target_component, [0]*32, 0)
-        self.master.disable_signing()
+        for m, _, _ in self.master:
+            if not m.mavlink20():
+                print("You must be using MAVLink2 for signing")
+                return
+        for m, t, c in self.master:
+            m.mav.setup_signing_send(t, c, [0]*32, 0)
+            m.disable_signing()
         print("Removed signing")
 
 def init(mpstate):

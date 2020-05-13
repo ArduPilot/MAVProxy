@@ -46,15 +46,16 @@ class DeviceOpModule(mp_module.MPModule):
         count = int(args[4],base=0)
         if sys.version_info.major >= 3:
             name = bytearray(name, 'ascii')
-        self.master.mav.device_op_read_send(self.target_system,
-                                            self.target_component,
-                                            self.request_id,
-                                            bustype,
-                                            bus,
-                                            address,
-                                            name,
-                                            reg,
-                                            count)
+        for m, t, c in self.master:
+            m.mav.device_op_read_send(t,
+                                      c,
+                                      self.request_id,
+                                      bustype,
+                                      bus,
+                                      address,
+                                      name,
+                                      reg,
+                                      count)
         self.request_id += 1
 
     def devop_write(self, args, bustype):

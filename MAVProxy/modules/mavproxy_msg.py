@@ -41,8 +41,9 @@ class msg(mp_module.MPModule):
         if len(args) == 0:
             print(self.usage())
         txt = ' '.join(args)
-        self.master.mav.statustext_send(mavutil.mavlink.MAV_SEVERITY_NOTICE,
-                                        txt)
+        for m, _, _ in self.master:
+            m.mav.statustext_send(mavutil.mavlink.MAV_SEVERITY_NOTICE,
+                                  txt)
 
 def init(mpstate):
     '''initialise module'''

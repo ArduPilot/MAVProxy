@@ -73,8 +73,8 @@ class LogModule(mp_module.MPModule):
             self.download_file = None
             self.download_filename = None
             self.download_set = set()
-            self.master.mav.log_request_end_send(self.target_system,
-                                                 self.target_component)
+            for m, t, c in self.master:
+                m.mav.log_request_end_send(t, c)
             if len(self.download_queue):
                 self.log_download_next()
         self.update_status()
@@ -86,9 +86,11 @@ class LogModule(mp_module.MPModule):
         highest = max(self.download_set)
         diff = set(range(highest)).difference(self.download_set)
         if len(diff) == 0:
-            self.master.mav.log_request_data_send(self.target_system,
-                                                       self.target_component,
-                                                       self.download_lognum, (1 + highest) * 90, 0xffffffff)
+            for m, t, c in self.master:
+                m.mav.log_request_data_send(t,
+                                            c,
+                                            self.download_lognum,
+                                            (1 + highest) * 90, 0xffffffff)
             self.retries += 1
         else:
             num_requests = 0
@@ -99,9 +101,11 @@ class LogModule(mp_module.MPModule):
                 while end + 1 in diff:
                     end += 1
                     diff.remove(end)
-                self.master.mav.log_request_data_send(self.target_system,
-                                                           self.target_component,
-                                                           self.download_lognum, start * 90, (end + 1 - start) * 90)
+                for m, t, c in self.master:
+                    m.mav.log_request_data_send(t,
+                                                c,
+                                                self.download_lognum,
+                                                start * 90, (end + 1 - start) * 90)
                 num_requests += 1
                 self.retries += 1
                 if len(diff) == 0:
@@ -157,9 +161,12 @@ class LogModule(mp_module.MPModule):
         print("Downloading log %u as %s" % (log_num, filename))
         self.download_lognum = log_num
         self.download_file = open(filename, "wb")
-        self.master.mav.log_request_data_send(self.target_system,
-                                                   self.target_component,
-                                                   log_num, 0, 0xFFFFFFFF)
+        for m, t, c in self.master:
+            m.mav.log_request_data_send(t,
+                                        c,
+                                        log_num,
+                                        0,
+                                        0xFFFFFFFF)
         self.download_filename = filename
         self.download_set = set()
         self.download_start = time.time()
@@ -182,17 +189,19 @@ class LogModule(mp_module.MPModule):
         elif args[0] == "list":
             print("Requesting log list")
             self.download_set = set()
-            self.master.mav.log_request_list_send(self.target_system,
-                                                       self.target_component,
-                                                       0, 0xffff)
+            for m, t, c in self.master:
+                m.mav.log_request_list_send(t,
+                                            c,
+                                            0,
+                                            0xffff)
 
         elif args[0] == "erase":
-            self.master.mav.log_erase_send(self.target_system,
-                                                self.target_component)
+            for m, t, c in self.master:
+                m.mav.log_erase_send(t, c)
 
         elif args[0] == "resume":
-            self.master.mav.log_request_end_send(self.target_system,
-                                                      self.target_component)
+            for m, t, c in self.master:
+                m.mav.log_request_end_send(t, c)
 
         elif args[0] == "cancel":
             if self.download_file is not None:

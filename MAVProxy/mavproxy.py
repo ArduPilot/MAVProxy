@@ -169,6 +169,7 @@ class MPState(object):
         from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
         self.settings = MPSettings(
             [ MPSetting('link', int, 1, 'Primary Link', tab='Link', range=(0,4), increment=1),
+              MPSetting('sel_links', list, [], 'Selected Links'),
               MPSetting('streamrate', int, 4, 'Stream rate link1', range=(-1,500), increment=1),
               MPSetting('streamrate2', int, 4, 'Stream rate link2', range=(-1,500), increment=1),
               MPSetting('heartbeat', float, 1, 'Heartbeat rate (Hz)', range=(0,100), increment=0.1),
@@ -201,8 +202,8 @@ class MPState(object):
 
               MPSetting('source_system', int, 255, 'MAVLink Source system', range=(0,255), increment=1, tab='MAVLink'),
               MPSetting('source_component', int, 0, 'MAVLink Source component', range=(0,255), increment=1),
-              MPSetting('target_system', int, 0, 'MAVLink target system', range=(0,255), increment=1),
-              MPSetting('target_component', int, 0, 'MAVLink target component', range=(0,255), increment=1),
+              MPSetting('target_systems', list, [], 'MAVLink target system'),
+              MPSetting('target_components', list, [], 'MAVLink target component'),
               MPSetting('state_basedir', str, None, 'base directory for logs and aircraft directories'),
               MPSetting('allow_unsigned', bool, True, 'whether unsigned packets will be accepted'),
 
@@ -277,18 +278,23 @@ class MPState(object):
 
     def master(self):
         '''return the currently chosen mavlink master object'''
+        m = []
         if len(self.mav_master) == 0:
-              return None
-        if self.settings.link > len(self.mav_master):
-            self.settings.link = 1
+              return m
+        for i in self.settings.sel_links:
+            if i <= len(self.mav_master):
+                m.append((self.mav_master[i-1],
+                          self.settings.target_systems[i-1],
+                          self.settings.target_components[i-1]))
+        return m
 
-        # try to use one with no link error
-        if not self.mav_master[self.settings.link-1].linkerror:
-            return self.mav_master[self.settings.link-1]
-        for m in self.mav_master:
-            if not m.linkerror:
-                return m
-        return self.mav_master[self.settings.link-1]
+        # # try to use one with no link error
+        # if not self.mav_master[self.settings.link-1].linkerror:
+        #     return self.mav_master[self.settings.link-1]
+        # for m in self.mav_master:
+        #     if not m.linkerror:
+        #         return m
+        # return self.mav_master[self.settings.link-1]
 
     def notify_click(self):
         notify_mods = ['map', 'misseditor']

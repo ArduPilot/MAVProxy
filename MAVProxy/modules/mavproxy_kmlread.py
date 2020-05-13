@@ -175,7 +175,8 @@ class KmlReadModule(mp_module.MPModule):
         self.param_set('FENCE_TOTAL', self.fenceloader.count(), 3)
         for i in range(self.fenceloader.count()):
             p = self.fenceloader.point(i)
-            self.master.mav.send(p)
+            for m, _, _ in self.master:
+                m.mav.send(p)
             p2 = self.fetch_fence_point(i)
             if p2 is None:
                 self.param_set('FENCE_ACTION', action, 3)

@@ -63,12 +63,13 @@ class FakeGPSModule(mp_module.MPModule):
             fix_type = 3
         else:
             fix_type = 1
-        self.master.mav.gps_input_send(time_us, 0, 0, gps_week_ms, gps_week, fix_type,
-                                       int(gps_lat*1.0e7), int(gps_lon*1.0e7), gps_alt,
-                                       1.0, 1.0,
-                                       gps_vel[0], gps_vel[1], gps_vel[2],
-                                       0.2, 1.0, 1.0,
-                                       nsats)
+        for m, _, _ in self.master:
+            m.mav.gps_input_send(time_us, 0, 0, gps_week_ms, gps_week, fix_type,
+                                 int(gps_lat*1.0e7), int(gps_lon*1.0e7), gps_alt,
+                                 1.0, 1.0,
+                                 gps_vel[0], gps_vel[1], gps_vel[2],
+                                 0.2, 1.0, 1.0,
+                                 nsats)
 
 
 def init(mpstate):

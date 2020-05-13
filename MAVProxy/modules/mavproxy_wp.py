@@ -84,9 +84,11 @@ class WPModule(mp_module.MPModule):
         for seq in wps:
             self.wp_requested[seq] = tnow
             if self.settings.wp_use_mission_int:
-                self.master.mav.mission_request_int_send(self.master.target_system, self.master.target_component, seq)
+                for m, t, c in self.master:
+                    m.mav.mission_request_int_send(t, c, seq)
             else:
-                self.master.mav.mission_request_send(self.master.target_system, self.master.target_component, seq)
+                for m, t, c in self.master:
+                    m.mav.mission_request_send(t, c, seq)
 
     def wp_status(self):
         '''show status of wp download'''
@@ -192,7 +194,7 @@ class WPModule(mp_module.MPModule):
             self.wp_received = {}
 
         elif mtype in ["WAYPOINT_REQUEST", "MISSION_REQUEST"]:
-            self.process_waypoint_request(m, self.master)
+            self.process_waypoint_request(m)
 
         elif mtype in ["WAYPOINT_CURRENT", "MISSION_CURRENT"]:
             if m.seq != self.last_waypoint:
@@ -269,7 +271,7 @@ class WPModule(mp_module.MPModule):
         wp2._header.srcComponent = wp.get_srcComponent()
         return wp2
 
-    def process_waypoint_request(self, m, master):
+    def process_waypoint_request(self, m):
         '''process a waypoint request from the master'''
         if (m.target_system != self.settings.source_system or
             m.target_component != self.settings.source_component):
@@ -290,7 +292,8 @@ class WPModule(mp_module.MPModule):
             wp_send = self.wp_to_mission_item_int(wp)
         else:
             wp_send = wp
-        self.master.mav.send(wp_send)
+        for m, _, _ in self.master:
+            m.mav.send(wp_send)
         self.loading_waypoint_lasttime = time.time()
         self.console.writeln("Sent waypoint %u : %s" % (m.seq, self.wploader.wp(m.seq)))
         if m.seq == self.wploader.count() - 1:
@@ -299,7 +302,8 @@ class WPModule(mp_module.MPModule):
 
     def send_all_waypoints(self):
         '''send all waypoints to vehicle'''
-        self.master.waypoint_clear_all_send()
+        for m, _, _ in self.master:
+            m.waypoint_clear_all_send()
         if self.wploader.count() == 0:
             return
         self.loading_waypoints = True
@@ -347,9 +351,8 @@ class WPModule(mp_module.MPModule):
         else:
             start = wpnum
             end = wpnum
-        self.master.mav.mission_write_partial_list_send(self.target_system,
-                                                             self.target_component,
-                                                             start, end)
+        for m, t, c in self.master:
+            m.mav.mission_write_partial_list_send(t, c, start, end)
 
     def save_waypoints(self, filename):
         '''save waypoints to a file'''
@@ -433,7 +436,8 @@ class WPModule(mp_module.MPModule):
         loader.add(wp)
         self.loading_waypoints = True
         self.loading_waypoint_lasttime = time.time()
-        self.master.waypoint_count_send(self.wploader.count())
+        for m, _, _ in self.master:
+            m.waypoint_count_send(self.wploader.count())
         print("Closed loop on mission")
 
     def nofly_add(self):
@@ -456,9 +460,8 @@ class WPModule(mp_module.MPModule):
             loader.add(wp)
         self.loading_waypoints = True
         self.loading_waypoint_lasttime = time.time()
-        self.master.mav.mission_write_partial_list_send(self.target_system,
-                                                        self.target_component,
-                                                        start_idx, start_idx+4)
+        for m, t, c in self.master:
+            m.mav.mission_write_partial_list_send(t, c, start_idx, start_idx+4)
         print("Added nofly zone")
         
     def set_home_location(self):
@@ -477,9 +480,8 @@ class WPModule(mp_module.MPModule):
         self.wploader.set(w, 0)
         self.loading_waypoints = True
         self.loading_waypoint_lasttime = time.time()
-        self.master.mav.mission_write_partial_list_send(self.target_system,
-                                                             self.target_component,
-                                                             0, 0)
+        for m, t, c in self.master:
+            m.mav.mission_write_partial_list_send(t, c, 0, 0)
 
 
     def cmd_wp_move(self, args):
@@ -517,9 +519,8 @@ class WPModule(mp_module.MPModule):
         wp.target_component = self.target_component
         self.loading_waypoints = True
         self.loading_waypoint_lasttime = time.time()
-        self.master.mav.mission_write_partial_list_send(self.target_system,
-                                                        self.target_component,
-                                                        idx, idx)
+        for m, t, c in self.master:
+            m.mav.mission_write_partial_list_send(t, c, idx, idx)
         self.wploader.set(wp, idx)
         print("Moved WP %u to %f, %f at %.1fm" % (idx, lat, lon, wp.z))
 
@@ -591,9 +592,8 @@ class WPModule(mp_module.MPModule):
 
         self.loading_waypoints = True
         self.loading_waypoint_lasttime = time.time()
-        self.master.mav.mission_write_partial_list_send(self.target_system,
-                                                        self.target_component,
-                                                        wpstart, wpend+1)
+        for m, t, c in self.master:
+            m.mav.mission_write_partial_list_send(t, c, wpstart, wpend+1)
         print("Moved WPs %u:%u to %f, %f rotation=%.1f" % (wpstart, wpend, lat, lon, rotation))
 
 
@@ -623,9 +623,8 @@ class WPModule(mp_module.MPModule):
 
         self.loading_waypoints = True
         self.loading_waypoint_lasttime = time.time()
-        self.master.mav.mission_write_partial_list_send(self.target_system,
-                                                        self.target_component,
-                                                        idx, idx+count)
+        for m, t, c in self.master:
+            m.mav.mission_write_partial_list_send(t, c, idx, idx+count)
         print("Changed alt for WPs %u:%u to %f" % (idx, idx+(count-1), newalt))
 
     def fix_jumps(self, idx, delta):
@@ -674,9 +673,8 @@ class WPModule(mp_module.MPModule):
             wp.target_component = self.target_component
             self.loading_waypoints = True
             self.loading_waypoint_lasttime = time.time()
-            self.master.mav.mission_write_partial_list_send(self.target_system,
-                                                            self.target_component,
-                                                            self.undo_wp_idx, self.undo_wp_idx)
+            for m, t, c in self.master:
+                m.mav.mission_write_partial_list_send(t, c, self.undo_wp_idx, self.undo_wp_idx)
             self.wploader.set(wp, self.undo_wp_idx)
             print("Undid WP move")
         elif self.undo_type == 'remove':
@@ -719,9 +717,8 @@ class WPModule(mp_module.MPModule):
         wp.target_component = self.target_component
         self.loading_waypoints = True
         self.loading_waypoint_lasttime = time.time()
-        self.master.mav.mission_write_partial_list_send(self.target_system,
-                                                        self.target_component,
-                                                        idx, idx)
+        for m, t, c in self.master:
+            m.mav.mission_write_partial_list_send(t, c, idx, idx)
         self.wploader.set(wp, idx)
         print("Set param %u for %u to %f" % (pnum, idx, param[pnum-1]))
 
@@ -827,14 +824,16 @@ class WPModule(mp_module.MPModule):
             self.update_waypoints(args[1], wpnum)
         elif args[0] == "list":
             self.wp_op = "list"
-            self.master.waypoint_request_list_send()
+            for m, _, _ in self.master:
+                m.waypoint_request_list_send()
         elif args[0] == "save":
             if len(args) != 2:
                 print("usage: wp save <filename>")
                 return
             self.wp_save_filename = args[1]
             self.wp_op = "save"
-            self.master.waypoint_request_list_send()
+            for m, _, _ in self.master:
+                m.waypoint_request_list_send()
         elif args[0] == "savecsv":
             if len(args) != 2:
                 print("usage: wp savecsv <filename.csv>")
@@ -866,11 +865,13 @@ class WPModule(mp_module.MPModule):
             if len(args) != 2:
                 print("usage: wp set <wpindex>")
                 return
-            self.master.waypoint_set_current_send(int(args[1]))
+            for m, _, _ in self.master:
+                m.waypoint_set_current_send(int(args[1]))
         elif args[0] == "split":
             self.cmd_split(args[1:])
         elif args[0] == "clear":
-            self.master.waypoint_clear_all_send()
+            for m, _, _ in self.master:
+                m.waypoint_clear_all_send()
             self.wploader.clear()
         elif args[0] == "editor":
             if self.module('misseditor'):
@@ -959,7 +960,8 @@ class WPModule(mp_module.MPModule):
         """Download wpts from vehicle (this operation is public to support other modules)"""
         if self.wp_op is None:  # If we were already doing a list or save, just restart the fetch without changing the operation
             self.wp_op = "fetch"
-        self.master.waypoint_request_list_send()
+        for m, _, _ in self.master:
+            m.waypoint_request_list_send()
 
 def init(mpstate):
     '''initialise module'''

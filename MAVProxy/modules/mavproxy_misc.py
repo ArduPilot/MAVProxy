@@ -146,17 +146,20 @@ class MiscModule(mp_module.MPModule):
     def cmd_reboot(self, args):
         '''reboot autopilot'''
         if len(args) > 0 and args[0] == 'bootloader':
-            self.master.reboot_autopilot(True)
+            for m, _, _ in self.master:
+                m.reboot_autopilot(True)
         else:
-            self.master.reboot_autopilot()
+            for m, _, _ in self.master:
+                m.reboot_autopilot()
 
     def cmd_lockup_autopilot(self, args):
         '''lockup autopilot for watchdog testing'''
         if len(args) > 0 and args[0] == 'IREALLYMEANIT':
             print("Sending lockup command")
-            self.master.mav.command_long_send(self.settings.target_system, self.settings.target_component,
-                                              mavutil.mavlink.MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN, 0,
-                                              42, 24, 71, 93, 0, 0, 0)
+            for m, t, c in self.master:
+                m.mav.command_long_send(t, c,
+                                        mavutil.mavlink.MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN, 0,
+                                        42, 24, 71, 93, 0, 0, 0)
         else:
             print("Invalid lockup command")
 
@@ -164,17 +167,18 @@ class MiscModule(mp_module.MPModule):
         '''lockup autopilot for watchdog testing'''
         if len(args) > 0 and args[0] == 'IREALLYMEANIT':
             print("Sending hardfault command")
-            self.master.mav.command_long_send(
-                self.settings.target_system,
-                self.settings.target_component,
-                mavutil.mavlink.MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN, 0,
-                42,
-                24,
-                71,
-                94,
-                0,
-                0,
-                0)
+            for m, t, c in self.master:
+                m.mav.command_long_send(
+                    t,
+                    c,
+                    mavutil.mavlink.MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN, 0,
+                    42,
+                    24,
+                    71,
+                    94,
+                    0,
+                    0,
+                    0)
         else:
             print("Invalid hardfault command")
 
@@ -186,9 +190,10 @@ class MiscModule(mp_module.MPModule):
             mask = int(args[0])
         if len(args) > 1:
             remaining_pct = int(args[1])
-        self.master.mav.command_long_send(self.settings.target_system, self.settings.target_component,
-                                          mavutil.mavlink.MAV_CMD_BATTERY_RESET, 0,
-                                              mask, remaining_pct, 0, 0, 0, 0, 0)
+        for m, t, c in self.master:
+            m.mav.command_long_send(t, c,
+                                    mavutil.mavlink.MAV_CMD_BATTERY_RESET, 0,
+                                    mask, remaining_pct, 0, 0, 0, 0, 0)
 
     def cmd_time(self, args):
         '''show autopilot time'''
@@ -204,60 +209,66 @@ class MiscModule(mp_module.MPModule):
             print("usage: changealt <relaltitude>")
             return
         relalt = float(args[0])
-        self.master.mav.mission_item_send(self.settings.target_system,
-                                          self.settings.target_component,
-                                          0,
-                                          3,
-                                          mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
-                                          3, 1, 0, 0, 0, 0,
-                                          0, 0, relalt)
+        for m, t, c in self.master:
+            m.mav.mission_item_send(t,
+                                    c,
+                                    0,
+                                    3,
+                                    mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
+                                    3, 1, 0, 0, 0, 0,
+                                    0, 0, relalt)
         print("Sent change altitude command for %.1f meters" % relalt)
 
     def cmd_land(self, args):
         '''auto land commands'''
         if len(args) < 1:
-            self.master.mav.command_long_send(self.settings.target_system,
-                                              0,
-                                              mavutil.mavlink.MAV_CMD_DO_LAND_START,
-                                              0, 0, 0, 0, 0, 0, 0, 0)
+            for m, t, _ in self.master:
+                m.mav.command_long_send(t,
+                                        0,
+                                        mavutil.mavlink.MAV_CMD_DO_LAND_START,
+                                        0, 0, 0, 0, 0, 0, 0, 0)
         elif args[0] == 'abort':
-            self.master.mav.command_long_send(self.settings.target_system,
-                                              0,
-                                              mavutil.mavlink.MAV_CMD_DO_GO_AROUND,
-                                              0, 0, 0, 0, 0, 0, 0, 0)
+            for m, t, _ in self.master:
+                m.mav.command_long_send(t,
+                                        0,
+                                        mavutil.mavlink.MAV_CMD_DO_GO_AROUND,
+                                        0, 0, 0, 0, 0, 0, 0, 0)
         else:
             print("Usage: land [abort]")
 
     def cmd_version(self, args):
         '''show version'''
-        self.master.mav.autopilot_version_request_send(self.settings.target_system,
-                                                       self.settings.target_component)
+        for m, t, c in self.master:
+            m.mav.autopilot_version_request_send(t, c)
 
     def cmd_capabilities(self, args):
         '''show capabilities'''
-        self.master.mav.command_long_send(self.settings.target_system,
-                                          self.settings.target_component,
-                                          mavutil.mavlink.MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES,
-                                          0,
-                                          1, 0, 0, 0, 0, 0, 0)
+        for m, t, c in self.master:
+            m.mav.command_long_send(t,
+                                    c,
+                                    mavutil.mavlink.MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES,
+                                    0,
+                                    1, 0, 0, 0, 0, 0, 0)
         
     def cmd_rcbind(self, args):
         '''start RC bind'''
         if len(args) < 1:
             print("Usage: rcbind <dsmmode>")
             return
-        self.master.mav.command_long_send(self.settings.target_system,
-                                          self.settings.target_component,
-                                          mavutil.mavlink.MAV_CMD_START_RX_PAIR,
-                                          0,
-                                          float(args[0]), 0, 0, 0, 0, 0, 0)
+        for m, t, c in self.master:
+            m.mav.command_long_send(t,
+                                    c,
+                                    mavutil.mavlink.MAV_CMD_START_RX_PAIR,
+                                    0,
+                                    float(args[0]), 0, 0, 0, 0, 0, 0)
 
     def cmd_gethome(self, args):
         '''get home position'''
-        self.master.mav.command_long_send(self.settings.target_system,
-                                          0,
-                                          mavutil.mavlink.MAV_CMD_GET_HOME_POSITION,
-                                          0, 0, 0, 0, 0, 0, 0, 0)
+        for m, t, c in self.master:
+            m.mav.command_long_send(t,
+                                    0,
+                                    mavutil.mavlink.MAV_CMD_GET_HOME_POSITION,
+                                    0, 0, 0, 0, 0, 0, 0, 0)
 
     def cmd_led(self, args):
         '''send LED pattern as override'''
@@ -275,9 +286,10 @@ class MiscModule(mp_module.MPModule):
         else:
             plen = 3
             
-        self.master.mav.led_control_send(self.settings.target_system,
-                                         self.settings.target_component,
-                                         0, 0, plen, pattern)
+        for m, t, c in self.master:
+            m.mav.led_control_send(t,
+                                   c,
+                                   0, 0, plen, pattern)
 
     def cmd_oreoled(self, args):
         '''send LED pattern as override, using OreoLED conventions'''
@@ -295,16 +307,18 @@ class MiscModule(mp_module.MPModule):
         pattern[6] = int(args[2])
         pattern[7] = int(args[3])
         
-        self.master.mav.led_control_send(self.settings.target_system,
-                                         self.settings.target_component,
-                                         lednum, 255, 8, pattern)
+        for m, t, c in self.master:
+            m.mav.led_control_send(t,
+                                   c,
+                                   lednum, 255, 8, pattern)
         
     def cmd_flashbootloader(self, args):
         '''flash bootloader'''
-        self.master.mav.command_long_send(self.settings.target_system,
-                                          0,
-                                          mavutil.mavlink.MAV_CMD_FLASH_BOOTLOADER,
-                                              0, 0, 0, 0, 0, 290876, 0, 0)
+        for m, t, _ in self.master:
+            self.master.mav.command_long_send(t,
+                                              0,
+                                              mavutil.mavlink.MAV_CMD_FLASH_BOOTLOADER,
+                                                  0, 0, 0, 0, 0, 290876, 0, 0)
         
     def cmd_playtune(self, args):
         '''send PLAY_TUNE message'''
@@ -318,9 +332,10 @@ class MiscModule(mp_module.MPModule):
             str1 = bytes(str1, "ascii")
         if sys.version_info.major >= 3 and not isinstance(str2, bytes):
             str2 = bytes(str2, "ascii")
-        self.master.mav.play_tune_send(self.settings.target_system,
-                                       self.settings.target_component,
-                                       str1, str2)
+        for m, t, c in self.master:
+            m.mav.play_tune_send(t,
+                                 c,
+                                 str1, str2)
 
     def cmd_repeat(self, args):
         '''repeat a command at regular intervals'''
@@ -368,11 +383,12 @@ class MiscModule(mp_module.MPModule):
         lon = float(args[1])
         alt = float(args[2])
         print("Setting origin to: ", lat, lon, alt)
-        self.master.mav.set_gps_global_origin_send(
-            self.settings.target_system,
-            lat*10000000, # lat
-            lon*10000000, # lon
-            alt*1000) # param7
+        for m, t, _ in self.master:
+            m.mav.set_gps_global_origin_send(
+                t,
+                lat*10000000, # lat
+                lon*10000000, # lon
+                alt*1000) # param7
 
     def cmd_magset_field(self, args):
         '''set compass offsets by field'''

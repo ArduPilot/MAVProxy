@@ -85,10 +85,10 @@ class RallyModule(mp_module.MPModule):
         if self.abort_ack_received is False:
             #only send abort every second (be insistent, but don't spam)
             if (time.time() - self.abort_previous_send_time > 1):
-                self.master.mav.command_long_send(self.settings.target_system,
-                    self.settings.target_component,
-                    mavutil.mavlink.MAV_CMD_DO_GO_AROUND,
-                    0, int(self.abort_alt), 0, 0, 0, 0, 0, 0,)
+                for m, t, c in self.master:
+                    m.mav.command_long_send(t, c,
+                        mavutil.mavlink.MAV_CMD_DO_GO_AROUND,
+                        0, int(self.abort_alt), 0, 0, 0, 0, 0, 0,)
                 self.abort_previous_send_time = time.time()
 
             #try to get an ACK from the plane:
@@ -264,10 +264,10 @@ class RallyModule(mp_module.MPModule):
                     self.abort_alt = int(args[2])
 
             else:
-                self.master.mav.command_long_send(self.settings.target_system,
-                        self.settings.target_component,
-                        mavutil.mavlink.MAV_CMD_DO_RALLY_LAND,
-                        0, 0, 0, 0, 0, 0, 0, 0)
+                for m, t, c in self.master:
+                    m.mav.command_long_send(t, c,
+                            mavutil.mavlink.MAV_CMD_DO_RALLY_LAND,
+                            0, 0, 0, 0, 0, 0, 0, 0)
 
         else:
             self.print_usage()
@@ -302,7 +302,8 @@ class RallyModule(mp_module.MPModule):
         p = self.rallyloader.rally_point(i)
         p.target_system = self.target_system
         p.target_component = self.target_component
-        self.master.mav.send(p)
+        for m, _, _ in self.master:
+            m.mav.send(p)
 
     def send_rally_points(self):
         '''send rally points from rallyloader'''
@@ -313,8 +314,8 @@ class RallyModule(mp_module.MPModule):
 
     def fetch_rally_point(self, i):
         '''fetch one rally point'''
-        self.master.mav.rally_fetch_point_send(self.target_system,
-                                                    self.target_component, i)
+        for m, t, c in self.master:
+            m.mav.rally_fetch_point_send(t, c, i)
         tstart = time.time()
         p = None
         while time.time() - tstart < 1:

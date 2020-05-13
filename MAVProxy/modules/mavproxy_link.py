@@ -727,28 +727,39 @@ class LinkModule(mp_module.MPModule):
     def cmd_vehicle(self, args):
         '''handle vehicle commands'''
         if len(args) < 1:
-            print("Usage: vehicle SYSID[:COMPID]")
+            print("Usage: vehicle LINK:SYSID[:COMPID] [LINK:SYSID[:COMPID]]...")
             return
-        a = args[0].split(':')
-        self.mpstate.settings.target_system = int(a[0])
-        if len(a) > 1:
-            self.mpstate.settings.target_component = int(a[1])
+        links = []
+        systems = []
+        components = []
+        for a in args:
+            a = a.split(':')
+            systems.append(int(a[1]))
+            if len(a) > 2:
+                components.append(int(a[2]))
+            else:
+                # TODO
+                components.append(self.mpstate.settings.target_components[a[1]-1])
 
-        # change default link based on most recent HEARTBEAT
-        best_link = 0
-        best_timestamp = 0
-        for i in range(len(self.mpstate.mav_master)):
-            m = self.mpstate.mav_master[i]
-            m.target_system = self.mpstate.settings.target_system
-            m.target_component = self.mpstate.settings.target_component
-            if 'HEARTBEAT' in m.messages:
-                stamp = m.messages['HEARTBEAT']._timestamp
-                src_system = m.messages['HEARTBEAT'].get_srcSystem()
-                if stamp > best_timestamp:
-                    best_link = i
-                    best_timestamp = stamp
-        self.mpstate.settings.link = best_link + 1
-        print("Set vehicle %s (link %u)" % (args[0], best_link+1))
+            # TODO reincorporate this
+            # # change default link based on most recent HEARTBEAT
+            # best_link = 0
+            # best_timestamp = 0
+            # for i in range(len(self.mpstate.mav_master)):
+            #     m = self.mpstate.mav_master[i]
+            #     m.target_system = self.mpstate.settings.target_system
+            #     m.target_component = self.mpstate.settings.target_component
+            #     if 'HEARTBEAT' in m.messages:
+            #         stamp = m.messages['HEARTBEAT']._timestamp
+            #         src_system = m.messages['HEARTBEAT'].get_srcSystem()
+            #         if stamp > best_timestamp:
+            #             best_link = i
+            #             best_timestamp = stamp
+            links.append(a[0])
+            print("Set vehicle %s (link %u)" % (args[1], arg[0]))
+        self.mpstate.settings.sel_links = links
+        self.mpstate.settings.target_systems = systems
+        self.mpstate.settings.target_components = components
 
 def init(mpstate):
     '''initialise module'''

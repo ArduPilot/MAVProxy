@@ -119,7 +119,8 @@ class HILModule(mp_module.MPModule):
             return
         self.last_apm_send_time = now
         if self.hil_state_msg is not None:
-            self.master.mav.send(self.hil_state_msg)
+            for m, _, _ in self.master:
+                m.mav.send(self.hil_state_msg)
 
     def convert_body_frame(self, phi, theta, phiDot, thetaDot, psiDot):
         '''convert a set of roll rates from earth frame to body frame'''

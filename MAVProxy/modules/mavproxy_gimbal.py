@@ -68,10 +68,11 @@ class GimbalModule(mp_module.MPModule):
             mode = mavutil.mavlink.MAV_MOUNT_MODE_RC_TARGETING
         else:
             print("Unsupported mode %s" % args[0])
-        self.master.mav.mount_configure_send(self.target_system,
-                                             self.target_component,
-                                             mode,
-                                             1, 1, 1)
+        for m, t, c in self.master:
+            m.mav.mount_configure_send(t,
+                                       c,
+                                       mode,
+                                       1, 1, 1)
 
     def cmd_gimbal_roi(self, args):
         '''control roi position'''
@@ -80,12 +81,13 @@ class GimbalModule(mp_module.MPModule):
         if latlon is None:
             print("No map click position available")
             return
-        self.master.mav.mount_control_send(self.target_system,
-                                           self.target_component,
-                                           latlon[0]*1e7,
-                                           latlon[1]*1e7,
-                                           0, # altitude zero for now
-                                           0)
+        for m, t, c in self.master:
+            m.mav.mount_control_send(t,
+                                     c,
+                                     latlon[0]*1e7,
+                                     latlon[1]*1e7,
+                                     0, # altitude zero for now
+                                     0)
 
     def cmd_gimbal_roi_vel(self, args):
         '''control roi position and velocity'''
@@ -103,22 +105,24 @@ class GimbalModule(mp_module.MPModule):
         if latlon is None:
             print("No map click position available")
             latlon = (0,0,0)
-        self.master.mav.set_roi_global_int_send(0, #time_boot_ms
-            1, #target_system
-            1, #target_component
-            mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
-            0, #type_mask
-            0, #roi_index
-            0, #timeout_ms
-            int(latlon[0]*1e7), #lat int
-            int(latlon[1]*1e7), #lng int
-            float(0),       #alt
-            float(vel[0]), #vx
-            float(vel[1]), #vy
-            float(vel[2]), #vz
-            float(acc[0]), #ax
-            float(acc[1]), #ay
-            float(acc[2])) #az
+        for m, _, _ in self.master:
+            m.mav.set_roi_global_int_send(
+                0, #time_boot_ms
+                1, #target_system
+                1, #target_component
+                mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
+                0, #type_mask
+                0, #roi_index
+                0, #timeout_ms
+                int(latlon[0]*1e7), #lat int
+                int(latlon[1]*1e7), #lng int
+                float(0),       #alt
+                float(vel[0]), #vx
+                float(vel[1]), #vy
+                float(vel[2]), #vz
+                float(acc[0]), #ax
+                float(acc[1]), #ay
+                float(acc[2])) #az
 
     def cmd_gimbal_rate(self, args):
         '''control gimbal rate'''
@@ -126,11 +130,12 @@ class GimbalModule(mp_module.MPModule):
             print("usage: gimbal rate ROLL PITCH YAW")
             return
         (roll, pitch, yaw) = (float(args[0]), float(args[1]), float(args[2]))
-        self.master.mav.gimbal_control_send(self.target_system,
-                                            mavutil.mavlink.MAV_COMP_ID_GIMBAL,
-                                            radians(roll),
-                                            radians(pitch),
-                                            radians(yaw))
+        for m, t in self.master:
+            m.mav.gimbal_control_send(t,
+                                      mavutil.mavlink.MAV_COMP_ID_GIMBAL,
+                                      radians(roll),
+                                      radians(pitch),
+                                      radians(yaw))
 
     def cmd_gimbal_point(self, args):
         '''control gimbal pointing'''
@@ -138,12 +143,13 @@ class GimbalModule(mp_module.MPModule):
             print("usage: gimbal point ROLL PITCH YAW")
             return
         (roll, pitch, yaw) = (float(args[0]), float(args[1]), float(args[2]))
-        self.master.mav.mount_control_send(self.target_system,
-                                           self.target_component,
-                                           pitch*100,
-                                           roll*100,
-                                           yaw*100,
-                                           0)
+        for m, t, c in self.master:
+            m.mav.mount_control_send(t,
+                                     c,
+                                     pitch*100,
+                                     roll*100,
+                                     yaw*100,
+                                     0)
 
     def cmd_gimbal_status(self, args):
         '''show gimbal status'''

@@ -150,22 +150,24 @@ class movinghome(mp_module.MPModule):
                             message2 = message + "%.0f" % self.dist + "meters"
                             self.say("%s: %s" % (self.name,message2))
                             message2_enc = message2.encode(bytes)
-                            self.master.mav.statustext_send(mavutil.mavlink.MAV_SEVERITY_NOTICE, message2)
+                            for m, _, _ in self.master:
+                                m.mav.statustext_send(mavutil.mavlink.MAV_SEVERITY_NOTICE, message2)
                         self.console.writeln("home position updated")
 
-                        self.master.mav.command_int_send(
-                        self.settings.target_system, self.settings.target_component,
-                        mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
-                        mavutil.mavlink.MAV_CMD_DO_SET_HOME,
-                        1, # (1, set current location as home)
-                        0, # move on
-                        0, # param1
-                        0, # param2
-                        0, # param3
-                        0, # param4
-                        int(self.lat*1e7), # param5
-                        int(self.lon*1e7), # param6
-                        0) # param7
+                        for m, t, c in self.master:
+                            self.master.mav.command_int_send(
+                                t, c,
+                                mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
+                                mavutil.mavlink.MAV_CMD_DO_SET_HOME,
+                                1, # (1, set current location as home)
+                                0, # move on
+                                0, # param1
+                                0, # param2
+                                0, # param3
+                                0, # param4
+                                int(self.lat*1e7), # param5
+                                int(self.lon*1e7), # param6
+                                0) # param7
 
                         self.lath = self.lat
                         self.lonh = self.lon

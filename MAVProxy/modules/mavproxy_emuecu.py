@@ -39,11 +39,11 @@ class EMUECUModule(mp_module.MPModule):
         cmd = ' '.join(args) + '\n'
         buf = [ord(x) for x in cmd]
         buf.extend([0]*(70-len(buf)))
-        mav = self.master.mav
-        mav.serial_control_send(self.emuecu_settings.port,
-                                0,
-                                0, 0,
-                                len(cmd), buf)
+        for m, _, _ in self.master:
+            m.mav.serial_control_send(self.emuecu_settings.port,
+                                      0,
+                                      0, 0,
+                                      len(cmd), buf)
 
 
 def init(mpstate):

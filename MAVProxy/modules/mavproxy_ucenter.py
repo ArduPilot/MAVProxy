@@ -100,13 +100,14 @@ class UcenterModule(mp_module.MPModule):
             else:
                 baudrate = 0
 
-            self.master.mav.serial_control_send(self.ucenter_settings.devnum,
-                                                mavutil.mavlink.SERIAL_CONTROL_FLAG_EXCLUSIVE |
-                                                mavutil.mavlink.SERIAL_CONTROL_FLAG_RESPOND,
-                                                0,
-                                                baudrate,
-                                                n,
-                                                buf)
+            for m, _, _ in self.master:
+                m.mav.serial_control_send(self.ucenter_settings.devnum,
+                                          mavutil.mavlink.SERIAL_CONTROL_FLAG_EXCLUSIVE |
+                                          mavutil.mavlink.SERIAL_CONTROL_FLAG_RESPOND,
+                                          0,
+                                          baudrate,
+                                          n,
+                                          buf)
             b = b[n:]
             self.last_write = time.time()
             if len(b) == 0:

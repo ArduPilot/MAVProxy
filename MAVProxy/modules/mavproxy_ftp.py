@@ -166,7 +166,8 @@ class FTPModule(mp_module.MPModule):
         plen = len(payload)
         if plen < MAX_Payload + HDR_Len:
             payload.extend(bytearray([0]*((HDR_Len+MAX_Payload)-plen)))
-        self.master.mav.file_transfer_protocol_send(self.network, self.target_system, self.target_component, payload)
+        for m, t, c in self.master:
+            m.mav.file_transfer_protocol_send(self.network, t, c, payload)
         self.seq = (self.seq + 1) % 256
         self.last_op = op
         now = time.time()

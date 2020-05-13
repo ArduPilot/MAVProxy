@@ -91,11 +91,12 @@ class ublox(mp_module.MPModule):
         '''attempts to cold-reboot (factory-reboot) gps module'''
         print("Sending uBlox reset")
         msg = struct.pack("<HBB", 0xFFFF, 0x0, 0)
-        self.master.mav.gps_inject_data_send(
-            self.target_system,
-            self.target_component,
-            len(msg),
-            bytearray(msg.ljust(110, '\0')))
+        for m, t, c in self.master:
+            m.mav.gps_inject_data_send(
+                t,
+                c,
+                len(msg),
+                bytearray(msg.ljust(110, '\0')))
 
     def cmd_ublox_mga(self, args):
         '''returns information about module'''
@@ -137,11 +138,12 @@ class ublox(mp_module.MPModule):
                 print("offline data message too long")
                 continue
 #            print("Sending message (%s)" % (str(msg)))
-            self.master.mav.gps_inject_data_send(
-                self.target_system,
-                self.target_component,
-                len(raw),
-                bytearray(raw.ljust(110, '\0')))
+            for m, t, c in self.master:
+                m.mav.gps_inject_data_send(
+                    t,
+                    c,
+                    len(raw),
+                    bytearray(raw.ljust(110, '\0')))
             self.mga_offline_data_uploaded = date
         return True
 

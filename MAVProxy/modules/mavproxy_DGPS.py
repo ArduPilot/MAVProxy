@@ -51,18 +51,20 @@ class DGPSModule(mp_module.MPModule):
             amount = min(len(data) - a * msglen, msglen)
             datachunk = data[a*msglen : a*msglen + amount]
             
-            self.master.mav.gps_rtcm_data_send(
-                flags,
-                len(datachunk),
-                bytearray(datachunk.ljust(180, '\0')))
+            for m, _, _ in self.master:
+                m.mav.gps_rtcm_data_send(
+                    flags,
+                    len(datachunk),
+                    bytearray(datachunk.ljust(180, '\0')))
         
         # Send a terminal 0-length message if we sent 2 or 3 exactly-full messages.     
         if (msgs < 4) and (len(data) % msglen == 0) and (len(data) > msglen):
             flags = 1 | (msgs & 0x3)  << 1 | (self.inject_seq_nr & 0x1f) << 3
-            self.master.mav.gps_rtcm_data_send(
-                flags,
-                0,
-                bytearray("".ljust(180, '\0')))
+            for m, _, _ in self.master:
+                m.mav.gps_rtcm_data_send(
+                    flags,
+                    0,
+                    bytearray("".ljust(180, '\0')))
             
         self.inject_seq_nr += 1
 

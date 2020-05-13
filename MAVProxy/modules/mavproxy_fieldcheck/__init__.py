@@ -124,7 +124,8 @@ class FieldCheck(object):
                 ret = False
                 if fix:
                     self.whinge('Setting %s to %f' % (key, want))
-                    self.mav_param.mavset(self.master, key, want, retries=3)
+                    for m, _, _ in self.master:
+                        self.mav_param.mavset(m, key, want, retries=3)
 
         return ret
 

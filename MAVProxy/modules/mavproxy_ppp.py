@@ -29,8 +29,8 @@ class PPPModule(mp_module.MPModule):
             self.stop_ppp_link()
             return
         print("ppp packet len=%u" % len(buf))
-        master = self.master
-        master.mav.ppp_send(len(buf), buf)
+        for m, _, _ in self.master:
+            m.mav.ppp_send(len(buf), buf)
 
     def start_ppp_link(self):
         '''startup the link'''

@@ -540,56 +540,60 @@ class MapModule(mp_module.MPModule):
         (lat, lon) = (self.mpstate.click_location[0], self.mpstate.click_location[1])
         alt = self.ElevationMap.GetElevation(lat, lon)
         print("Setting home to: ", lat, lon, alt)
-        self.master.mav.command_long_send(
-            self.settings.target_system, self.settings.target_component,
-            mavutil.mavlink.MAV_CMD_DO_SET_HOME,
-            1, # set position
-            0, # param1
-            0, # param2
-            0, # param3
-            0, # param4
-            lat, # lat
-            lon, # lon
-            alt) # param7
+        for m, t, c in self.master:
+            m.mav.command_long_send(
+                t, c,
+                mavutil.mavlink.MAV_CMD_DO_SET_HOME,
+                1, # set position
+                0, # param1
+                0, # param2
+                0, # param3
+                0, # param4
+                lat, # lat
+                lon, # lon
+                alt) # param7
 
     def cmd_set_homepos(self, args):
         '''called when user selects "Set Home" on map'''
         (lat, lon) = (self.mpstate.click_location[0], self.mpstate.click_location[1])
         print("Setting home to: ", lat, lon)
-        self.master.mav.command_int_send(
-            self.settings.target_system, self.settings.target_component,
-            mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
-            mavutil.mavlink.MAV_CMD_DO_SET_HOME,
-            1, # current
-            0, # autocontinue
-            0, # param1
-            0, # param2
-            0, # param3
-            0, # param4
-            int(lat*1e7), # lat
-            int(lon*1e7), # lon
-            0) # no height change
+        for m, t, c in self.master:
+            m.mav.command_int_send(
+                t, c,
+                mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
+                mavutil.mavlink.MAV_CMD_DO_SET_HOME,
+                1, # current
+                0, # autocontinue
+                0, # param1
+                0, # param2
+                0, # param3
+                0, # param4
+                int(lat*1e7), # lat
+                int(lon*1e7), # lon
+                0) # no height change
 
     def cmd_set_origin(self, args):
         '''called when user selects "Set Origin (with height)" on map'''
         (lat, lon) = (self.mpstate.click_location[0], self.mpstate.click_location[1])
         alt = self.ElevationMap.GetElevation(lat, lon)
         print("Setting origin to: ", lat, lon, alt)
-        self.master.mav.set_gps_global_origin_send(
-            self.settings.target_system,
-            int(lat*10000000), # lat
-            int(lon*10000000), # lon
-            int(alt*1000)) # param7
+        for m, t, _ in self.master:
+            m.mav.set_gps_global_origin_send(
+                t,
+                int(lat*10000000), # lat
+                int(lon*10000000), # lon
+                int(alt*1000)) # param7
 
     def cmd_set_originpos(self, args):
         '''called when user selects "Set Origin" on map'''
         (lat, lon) = (self.mpstate.click_location[0], self.mpstate.click_location[1])
         print("Setting origin to: ", lat, lon)
-        self.master.mav.set_gps_global_origin_send(
-            self.settings.target_system,
-            int(lat*10000000), # lat
-            int(lon*10000000), # lon
-            0*1000) # no height change
+        for m, t, _ in self.master:
+            m.mav.set_gps_global_origin_send(
+                self.settings.target_system,
+                int(lat*10000000), # lat
+                int(lon*10000000), # lon
+                0*1000) # no height change
 
     def cmd_zoom(self, args):
         '''control zoom'''

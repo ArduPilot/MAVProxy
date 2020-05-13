@@ -41,11 +41,11 @@ class NSHModule(mp_module.MPModule):
         self.mpstate.functions.input_handler = None
         self.started = False
         # unlock the port
-        mav = self.master.mav
-        mav.serial_control_send(self.serial_settings.port,
-                                0,
-                                0, self.serial_settings.baudrate,
-                                0, [0]*70)
+        for m, _, _ in self.master:
+            m.mav.serial_control_send(self.serial_settings.port,
+                                      0,
+                                      0, self.serial_settings.baudrate,
+                                      0, [0]*70)
 
     def send(self, line):
         '''send some bytes'''
@@ -53,7 +53,6 @@ class NSHModule(mp_module.MPModule):
         if line == ".":
             self.stop()
             return
-        mav = self.master.mav
         if line != '+++':
             line += "\r\n"
         buf = [ord(x) for x in line]
@@ -62,10 +61,11 @@ class NSHModule(mp_module.MPModule):
         flags = mavutil.mavlink.SERIAL_CONTROL_FLAG_RESPOND
         flags |= mavutil.mavlink.SERIAL_CONTROL_FLAG_MULTI
         flags |= mavutil.mavlink.SERIAL_CONTROL_FLAG_EXCLUSIVE
-        mav.serial_control_send(self.serial_settings.port,
-                                flags,
-                                0, self.serial_settings.baudrate,
-                                len(line), buf)
+        for m, _, _ in self.master:
+            m.mav.serial_control_send(self.serial_settings.port,
+                                      flags,
+                                      0, self.serial_settings.baudrate,
+                                      len(line), buf)
 
     def idle_task(self):
         '''handle mavlink packets'''
@@ -78,14 +78,14 @@ class NSHModule(mp_module.MPModule):
             timeout = 0.2
         if now - self.last_check > timeout:
             self.last_check = now
-            mav = self.master.mav
             flags = mavutil.mavlink.SERIAL_CONTROL_FLAG_RESPOND
             flags |= mavutil.mavlink.SERIAL_CONTROL_FLAG_MULTI
             flags |= mavutil.mavlink.SERIAL_CONTROL_FLAG_EXCLUSIVE
-            mav.serial_control_send(self.serial_settings.port,
-                                    flags,
-                                    0, self.serial_settings.baudrate,
-                                    0, [0]*70)
+            for m, _, _ in self.master:
+                m.mav.serial_control_send(self.serial_settings.port,
+                                          flags,
+                                          0, self.serial_settings.baudrate,
+                                          0, [0]*70)
 
 
     def cmd_nsh(self, args):

@@ -78,8 +78,9 @@ class example(mp_module.MPModule):
             message = self.boredom_message()
             self.say("%s: %s" % (self.name,message))
             # See if whatever we're connected to would like to play:
-            self.master.mav.statustext_send(mavutil.mavlink.MAV_SEVERITY_NOTICE,
-                                            message)
+            for m, _, _ in self.master:
+                m.mav.statustext_send(mavutil.mavlink.MAV_SEVERITY_NOTICE,
+                                      message)
 
     def mavlink_packet(self, m):
         '''handle mavlink packets'''

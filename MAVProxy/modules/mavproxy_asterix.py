@@ -243,22 +243,23 @@ class AsterixModule(mp_module.MPModule):
 
             # consider filtering this packet out; if it's not close to
             # either home or the vehicle position don't send it
-            adsb_pkt = self.master.mav.adsb_vehicle_encode(icao_address,
-                                                           int(lat*1e7),
-                                                           int(lon*1e7),
-                                                           mavutil.mavlink.ADSB_ALTITUDE_TYPE_GEOMETRIC,
-                                                           int(alt_m*1000), # mm
-                                                           0, # heading
-                                                           0, # hor vel
-                                                           int(climb_rate_fps * 0.3048 * 100), # cm/s
-                                                           "%08x" % icao_address,
-                                                           100 + (trkn // 10000),
-                                                           1.0,
-                                                           (mavutil.mavlink.ADSB_FLAGS_VALID_COORDS |
-                                                            mavutil.mavlink.ADSB_FLAGS_VALID_ALTITUDE |
-                                                            mavutil.mavlink.ADSB_FLAGS_VALID_VELOCITY |
-                                                            mavutil.mavlink.ADSB_FLAGS_VALID_HEADING),
-                                                           squawk)
+            for m, _, _ in self.master:
+                adsb_pkt = m.mav.adsb_vehicle_encode(icao_address,
+                                                     int(lat*1e7),
+                                                     int(lon*1e7),
+                                                     mavutil.mavlink.ADSB_ALTITUDE_TYPE_GEOMETRIC,
+                                                     int(alt_m*1000), # mm
+                                                     0, # heading
+                                                     0, # hor vel
+                                                     int(climb_rate_fps * 0.3048 * 100), # cm/s
+                                                     "%08x" % icao_address,
+                                                     100 + (trkn // 10000),
+                                                     1.0,
+                                                     (mavutil.mavlink.ADSB_FLAGS_VALID_COORDS |
+                                                      mavutil.mavlink.ADSB_FLAGS_VALID_ALTITUDE |
+                                                      mavutil.mavlink.ADSB_FLAGS_VALID_VELOCITY |
+                                                      mavutil.mavlink.ADSB_FLAGS_VALID_HEADING),
+                                                     squawk)
             if icao_address in self.tracks:
                 self.tracks[icao_address].update(adsb_pkt, self.get_time())
             else:
