@@ -1,0 +1,60 @@
+description: >
+  GREAT PLANES InterLink Elite or Great Planes GP Controller. 4 axes
+  usable.
+match:
+  - 'GREAT PLANES InterLink-X'
+
+controls:
+  - channel: 1
+    type: axis
+    id: 2
+    invert: true
+  - channel: 2
+    type: axis
+    id: 5
+  - channel: 3
+    type: axis
+    id: 1
+  - channel: 4
+    type: axis
+    id: 0
+  - channel: 7
+    type: axis
+    id: 6
+    invert: true
+
+   # This maps the A, B, X, and Y buttons onto channel 5, providing
+  # a convenient way to select between four different flight modes.
+  # The PWM values here are for flight modes 1-4.
+  - channel: 5
+    type: multibutton
+    buttons:
+      - id: 3
+        value: 1200
+      - id: 4
+        value: 1800
+
+
+# From mavproxy_joystick.py:
+#
+#    'GREAT PLANES InterLink Elite':
+#    # 4 axes usable
+#    [(0, 500,  1500),
+#     (1, 500,  1500),
+#     (2, -1000, 1500),
+#     (4, 500,  1500),
+#     None,
+#     None,
+#     None,
+#     (3, 500,  1500)],
+#
+#    'Great Planes GP Controller':
+#    # 4 axes usable
+#    [(0, 500,  1500),
+#     (1, -500,  1500),
+#     (2, -1000, 1500),
+#     (4, -500,  1500),
+#     None,
+#     None,
+#     None,
+#     (3, 500,  1500)],
