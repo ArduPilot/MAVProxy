@@ -336,6 +336,9 @@ class MavGraph(object):
 
         if title is not None:
             pylab.title(title)
+            self.fig.canvas.set_window_title(title)
+        else:
+            self.fig.canvas.set_window_title(fields[0])
 
         if self.show_flightmode:
             mode_patches = []
