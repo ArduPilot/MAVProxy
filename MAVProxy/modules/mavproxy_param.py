@@ -204,6 +204,53 @@ class ParamState:
         for param in contains.keys():
             print("%s" % (param,))
 
+    def param_check(self, args):
+        '''Check through parameters for obvious misconfigurations'''
+        problems_found = False
+        htree = self.param_help_tree()
+        if htree is None:
+            return
+        for param in self.mav_param.keys():
+            if param.startswith("SIM_"):
+                # no documentation for these ATM
+                continue
+            value = self.mav_param[param]
+#            print("%s: %s" % (param, str(value)))
+            try:
+                help = htree[param]
+            except KeyError:
+                print("%s: not found in documentation" % (param,))
+                problems_found = True
+                continue
+
+            # we'll ignore the Values field if there's a bitmask field
+            # involved as they're usually just examples.
+            has_bitmask = False
+            for f in getattr(help, "field", []):
+                if f.get('name') == "Bitmask":
+                    has_bitmask = True
+                    break
+            if not has_bitmask:
+                values = self.get_Values_from_help(help)
+                if len(values) == 0:
+                    # no prescribed values list
+                    continue
+                value_values = [float(x.get("code")) for x in values]
+                if value not in value_values:
+                    print("%s: value %f not in Values (%s)" %
+                          (param, value, str(value_values)))
+                    problems_found = True
+
+        if problems_found:
+            print("Remember to `param download` before trusting the checking!  Also, remember that parameter documentation is for *master*!")
+
+    def get_Values_from_help(self, help):
+        children = help.getchildren()
+        if len(children) == 0:
+            return []
+        vchild = children[0]
+        return vchild.getchildren()
+
     def param_help(self, args):
         '''show help on a parameter'''
         if len(args) == 0:
@@ -230,9 +277,7 @@ class ParamState:
                     # The entry "values" has been blatted by a cython
                     # function at this point, so we instead get the
                     # "values" by offset rather than name.
-                    children = help.getchildren()
-                    vchild = children[0]
-                    values = vchild.getchildren()
+                    values = self.get_Values_from_help(value)
                     if len(values):
                         print("\nValues: ")
                         for v in values:
@@ -351,7 +396,7 @@ class ParamState:
     def handle_command(self, master, mpstate, args):
         '''handle parameter commands'''
         param_wildcard = "*"
-        usage="Usage: param <fetch|ftp|save|set|show|load|preload|forceload|diff|download|help>"
+        usage="Usage: param <fetch|ftp|save|set|show|load|preload|forceload|diff|download|check|help>"
         if len(args) < 1:
             print(usage)
             return
@@ -462,6 +507,8 @@ class ParamState:
             self.param_help_download()
         elif args[0] == "apropos":
             self.param_apropos(args[1:])
+        elif args[0] == "check":
+            self.param_check(args[1:])
         elif args[0] == "help":
             self.param_help(args[1:])
         elif args[0] == "set_xml_filepath":
