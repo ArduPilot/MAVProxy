@@ -1,0 +1,48 @@
+description: >
+    Spektrum InterLinkDX.  Only 7 axes usable. This assumes mode 2.
+match:
+  - 'Spektrum InterLinkDX'
+controls:
+  - channel: 1
+    type: axis
+    id: 3
+    invert: false
+  - channel: 2
+    type: axis
+    id: 4
+    invert: true
+  - channel: 3
+    type: axis
+    id: 1
+    invert: false
+  - channel: 4
+    type: axis
+    id: 0
+    invert: false
+  - channel: 6
+    type: axis
+    id: 7
+    invert: false
+  - channel: 7
+    type: button
+    id: 11
+    invert: false
+  - channel: 8
+    type: button
+    id: 12
+  - channel: 5
+    type: multibutton
+    buttons:
+      - id: 1
+        value: 1200
+      - id: 2
+        value: 1300
+      - id: 3
+        value: 1400
+      - id: 4
+        value: 1500
+      - id: 5
+        value: 1700
+      - id: 6
+        value: 1800
+
