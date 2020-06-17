@@ -250,7 +250,7 @@ class MPState(object):
               MPSetting('rally_flags', int, 0, 'Default Rally Flags', range=(0,10000), increment=1),
 
               MPSetting('source_system', int, 255, 'MAVLink Source system', range=(0,255), increment=1, tab='MAVLink'),
-              MPSetting('source_component', int, 0, 'MAVLink Source component', range=(0,255), increment=1),
+              MPSetting('source_component', int, 230, 'MAVLink Source component', range=(0,255), increment=1),
               MPSetting('target_system', int, 0, 'MAVLink target system', range=(0,255), increment=1),
               MPSetting('target_component', int, 0, 'MAVLink target component', range=(0,255), increment=1),
               MPSetting('state_basedir', str, None, 'base directory for logs and aircraft directories'),
@@ -1163,7 +1163,7 @@ if __name__ == '__main__':
     parser.add_option("--source-system", dest='SOURCE_SYSTEM', type='int',
                       default=255, help='MAVLink source system for this GCS')
     parser.add_option("--source-component", dest='SOURCE_COMPONENT', type='int',
-                      default=0, help='MAVLink source component for this GCS')
+                      default=230, help='MAVLink source component for this GCS')
     parser.add_option("--target-system", dest='TARGET_SYSTEM', type='int',
                       default=0, help='MAVLink target master system')
     parser.add_option("--target-component", dest='TARGET_COMPONENT', type='int',
