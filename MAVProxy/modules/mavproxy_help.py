@@ -66,7 +66,7 @@ class HelpModule(mp_module.MPModule):
         if mp_util.has_wxpython:
             self.menu_added_console = False
             self.menu = MPMenuSubMenu('Help',
-                                  items=[MPMenuItem('MAVProxy website', 'MAVProxy website', '', handler=MPMenuOpenWeblink('http://ardupilot.github.io/MAVProxy/')),
+                                  items=[MPMenuItem('MAVProxy website', 'MAVProxy website', '', handler=MPMenuOpenWeblink('https://ardupilot.org/mavproxy/index.html')),
                                          MPMenuItem('Check for Updates', 'Check for Updates', '', handler=MPMenuChildMessageDialog(title="Updates", message=self.newversion)),
                                          MPMenuItem('About', 'About', '', handler=MPMenuChildMessageDialog(title="About MAVProxy", message=self.about_string()))])
 
@@ -94,7 +94,7 @@ class HelpModule(mp_module.MPModule):
         if args[0] == "about":
             print(self.about_string())
         elif args[0] == "site":
-            print("See http://ardupilot.github.io/MAVProxy/ for documentation")
+            print("See https://ardupilot.org/mavproxy/index.html for documentation")
         else:
             self.print_usage()
 
