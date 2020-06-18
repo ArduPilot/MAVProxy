@@ -6,7 +6,7 @@
 ; Note MyAppVersion is defined in MAVProxyWinBuild.bat
 ; #define MyAppVersion {code:GetVersion}
 #define MyAppPublisher "Andrew Tridgell"
-#define MyAppURL "http://ardupilot.github.io/MAVProxy"
+#define MyAppURL "https://ardupilot.org/mavproxy/index.html"
 #define MyAppExeName "mavproxy.exe"
 
 [Setup]
@@ -53,7 +53,7 @@ Source: "..\windows\Startup Examples\MAVProxyMultiOutput.bat"; DestDir: "{app}\E
 Name: "{group}\{#MyAppName} (No GUI)"; Filename: "{app}\{#MyAppExeName}"
 Name: "{group}\MAVExplorer"; Filename: "{app}\MAVExplorer.exe"
 Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
-Name: "{group}\Documentation"; Filename: "http://ardupilot.github.io/MAVProxy/"
+Name: "{group}\Documentation"; Filename: "https://ardupilot.org/mavproxy/index.html"
 Name: "{group}\Startup Examples"; Filename: "{app}\Examples"
 Name: "{group}\Ardupilot MAVProxy Forum"; Filename: "http://discuss.ardupilot.org/c/ground-control-software/mavproxy"
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--map --console --load-module=graph"
