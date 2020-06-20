@@ -24,9 +24,8 @@ class TerrainModule(mp_module.MPModule):
         self.add_command('terrain', self.cmd_terrain, "terrain control",
                          ["<status|check>",
                           'set (TERRAINSETTING)'])
-        self.terrain_settings = mp_settings.MPSettings(
-            [ ('debug', int, 0) ]
-            )
+        self.terrain_settings = mp_settings.MPSettings([('debug', int, 0),
+                                                        ('enable', int, 1)])
         self.add_completion_function('(TERRAINSETTING)', self.terrain_settings.completion)
 
     def cmd_terrain(self, args):
@@ -61,14 +60,14 @@ class TerrainModule(mp_module.MPModule):
 
     def mavlink_packet(self, msg):
         '''handle an incoming mavlink packet'''
-        type = msg.get_type()
+        mtype = msg.get_type()
         master = self.master
         # add some status fields
-        if type == 'TERRAIN_REQUEST':
+        if mtype == 'TERRAIN_REQUEST' and self.terrain_settings.enable:
             self.current_request = msg
             self.sent_mask = 0
             self.requests_received += 1
-        elif type == 'TERRAIN_REPORT':
+        elif mtype == 'TERRAIN_REPORT':
             if (msg.lat == self.check_lat and
                 msg.lon == self.check_lon and
                 (self.check_lat != 0 or self.check_lon != 0)):
