@@ -10,7 +10,7 @@ import datetime
 import base64
 import time
 import errno
-import rtcm3
+from MAVProxy.modules.lib import rtcm3
 import ssl
 from optparse import OptionParser
 
