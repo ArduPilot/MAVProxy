@@ -34,6 +34,7 @@ class MapModule(mp_module.MPModule):
         self.moving_rally = None
         self.mission_list = None
         self.icon_counter = 0
+        self.circle_counter = 0
         self.draw_line = None
         self.draw_callback = None
         self.have_global_position = False
@@ -157,6 +158,35 @@ class MapModule(mp_module.MPModule):
                                                            (float(lat),float(lon)),
                                                    icon, layer=3, rotation=0, follow=False))
                 self.icon_counter += 1
+        elif args[0] == "circle":
+            if len(args) < 4:
+                # map circle -27.70533373 153.23404844 5 red
+                print("Usage: map circle <lat> <lon> <radius> <colour>")
+            else:
+                lat = args[1]
+                lon = args[2]
+                radius = args[3]
+                colour = 'red'
+                if len(args) > 4:
+                    colour = args[4]
+                if colour == "red":
+                    colour = (255,0,0)
+                elif colour == "green":
+                    colour = (0,255,0)
+                elif colour == "blue":
+                    colour = (0,0,255)
+                else:
+                    colour = eval(colour)
+                circle = mp_slipmap.SlipCircle(
+                    "circle %u" % self.circle_counter,
+                    3,
+                    (float(lat), float(lon)),
+                    float(radius),
+                    colour,
+                    linewidth=1,
+                )
+                self.map.add_object(circle)
+                self.circle_counter += 1
         elif args[0] == "set":
             self.map_settings.command(args[1:])
             self.map.add_object(mp_slipmap.SlipBrightness(self.map_settings.brightness))
