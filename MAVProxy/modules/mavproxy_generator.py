@@ -30,6 +30,9 @@ class generator(mp_module.MPModule):
                          ['status','set (LOGSETTING)'])
         self.console_row = 6
         self.console.set_status('Generator', 'No generator messages', row=self.console_row)
+        self.last_seen_generator_message = 0
+        self.mpstate = mpstate
+        self.last_set_interval_sent = 0
 
     def usage(self):
         '''show help on command line options'''
@@ -51,6 +54,7 @@ class generator(mp_module.MPModule):
         if m.get_type() == 'GENERATOR_STATUS':
             if self.generator_settings.verbose:
                 print("Got generator message")
+            self.last_seen_generator_message = time.time()
             error_string = ""
             errors = []
             prefix = "MAV_GENERATOR_STATUS_FLAG_"
@@ -76,6 +80,25 @@ class generator(mp_module.MPModule):
                  m.time_until_maintenance,
                  ),
                 row=self.console_row)
+
+        now  = time.time()
+        if now - self.last_seen_generator_message > 10:
+            # request the message once per second:
+            if now - self.last_set_interval_sent > 1:
+                self.last_set_interval_sent = now
+                self.master.mav.command_long_send(
+                    self.mpstate.settings.target_system,
+                    self.mpstate.settings.target_component,
+                    mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL,
+                    0,  # confirmation
+                    mavutil.mavlink.MAVLINK_MSG_ID_GENERATOR_STATUS,  # msg id
+                    100000,  # interval
+                    0,  # p3
+                    0,  # p4
+                    0,  # p5
+                    0,  # p6
+                    0)  # p7
+
 
 def init(mpstate):
     '''initialise module'''
