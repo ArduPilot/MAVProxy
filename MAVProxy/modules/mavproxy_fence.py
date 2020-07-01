@@ -40,11 +40,11 @@ class FenceModule(mp_module.MPModule):
                                          MPMenuItem('Load', 'Load', '# fence load ',
                                                     handler=MPMenuCallFileDialog(flags=('open',),
                                                                                  title='Fence Load',
-                                                                                 wildcard='*.fen')),
+                                                                                 wildcard='FenceFiles(*.txt,*.fen)|*.txt;*.fen')),
                                          MPMenuItem('Save', 'Save', '# fence save ',
                                                     handler=MPMenuCallFileDialog(flags=('save', 'overwrite_prompt'),
                                                                                  title='Fence Save',
-                                                                                 wildcard='*.fen')),
+                                                                                 wildcard='FenceFiles(*.txt,*.fen)|*.txt;*.fen')),
                                          MPMenuItem('Draw', 'Draw', '# fence draw')])
 
     @property

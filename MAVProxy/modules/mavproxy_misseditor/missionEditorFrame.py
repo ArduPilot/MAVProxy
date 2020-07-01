@@ -473,7 +473,7 @@ class MissionEditorFrame(wx.Frame):
 
     def load_wp_file_pushed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
         fd = wx.FileDialog(self, "Open Mission File", os.getcwd(), "",
-                "*.wp|*", wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
+                "MissionFiles(*.txt.*.wp,*.waypoints)|*.txt;*.wp;*.waypoints", wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
         if (fd.ShowModal() == wx.ID_CANCEL):
             return #user changed their mind...
 
@@ -553,7 +553,7 @@ class MissionEditorFrame(wx.Frame):
 
     def save_wp_file_pushed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
         fd = wx.FileDialog(self, "Save Mission File", os.getcwd(),
-                           os.path.basename(self.last_mission_file_path), "*.wp|*",
+                           os.path.basename(self.last_mission_file_path), "MissionFiles(*.txt.*.wp,*.waypoints)|*.txt;*.wp;*.waypoints",
                                wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT)
         if (fd.ShowModal() == wx.ID_CANCEL):
             return #user change their mind...

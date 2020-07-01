@@ -410,7 +410,7 @@ class ParamEditorFrame(wx.Frame):
 
     def Read_File(self, event):  # wxGlade: ParamEditor.<event_handler>
         fd = wx.FileDialog(self, "Open Parameter File", os.getcwd(), "",
-                           "ParmFiles|*.parm;*.param", wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
+                           "ParmFiles(*.parm,*.param)|*.parm;*.param", wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
         if (fd.ShowModal() == wx.ID_CANCEL):
             return  # user changed their mind...
 
@@ -426,7 +426,7 @@ class ParamEditorFrame(wx.Frame):
     def Write_File(self, event):  # wxGlade: ParamEditor.<event_handler>
         fd = wx.FileDialog(self, "Save Parameter File", os.getcwd(),
                            os.path.basename(self.last_param_file_path),
-                           "ParmFiles|*.parm;*.param", wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT)
+                           "ParmFiles(*.parm,*.param)|*.parm;*.param", wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT)
         if (fd.ShowModal() == wx.ID_CANCEL):
             return  # user change their mind...
 

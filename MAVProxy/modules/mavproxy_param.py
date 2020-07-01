@@ -545,11 +545,11 @@ class ParamModule(mp_module.MPModule):
                                          MPMenuItem('Load', 'Load', '# param load ',
                                                     handler=MPMenuCallFileDialog(flags=('open',),
                                                                                  title='Param Load',
-                                                                                 wildcard='*.parm')),
+                                                                                 wildcard='ParmFiles(*.parm,*.param)|*.parm;*.param')),
                                          MPMenuItem('Save', 'Save', '# param save ',
                                                     handler=MPMenuCallFileDialog(flags=('save', 'overwrite_prompt'),
                                                                                  title='Param Save',
-                                                                                 wildcard='*.parm'))])
+                                                                                 wildcard='ParmFiles(*.parm,*.param)|*.parm;*.param'))])
 
     def get_component_id_list(self, system_id):
         '''get list of component IDs with parameters for a given system ID'''

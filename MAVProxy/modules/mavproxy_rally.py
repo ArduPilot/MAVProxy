@@ -32,11 +32,11 @@ class RallyModule(mp_module.MPModule):
                                          MPMenuItem('Load', 'Load', '# rally load ',
                                                     handler=MPMenuCallFileDialog(flags=('open',),
                                                                                  title='Rally Load',
-                                                                                 wildcard='*.rally')),
+                                                                                 wildcard='RallyPoints(*.txt,*.rally,*.ral)|*.txt;*.rally;*.ral')),
                                          MPMenuItem('Save', 'Save', '# rally save ',
                                                     handler=MPMenuCallFileDialog(flags=('save', 'overwrite_prompt'),
                                                                                  title='Rally Save',
-                                                                                 wildcard='*.rally')),
+                                                                                 wildcard='RallyPoints(*.txt,*.rally,*.ral)|*.txt;*.rally;*.ral')),
                                          MPMenuItem('Add', 'Add', '# rally add ',
                                                     handler=MPMenuCallTextDialog(title='Rally Altitude (m)',
                                                                                  default=100))])
