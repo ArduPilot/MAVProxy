@@ -384,6 +384,8 @@ class ParamState:
         self.ftp_failed = False
         self.mpstate.console.set_status('Params', 'Param %u/%u' % (total_params, total_params))
         print("Received %u parameters (ftp)" % total_params)
+        if self.logdir is not None:
+            self.mav_param.save(os.path.join(self.logdir, self.parm_file), '*', verbose=True)
 
     def fetch_all(self, master):
         '''force refetch of parameters'''
