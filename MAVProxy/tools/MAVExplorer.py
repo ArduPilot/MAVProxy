@@ -644,7 +644,8 @@ def cmd_messages(args):
         else:
             mstr = m.text
         if fnmatch.fnmatch(mstr.upper(), wildcard.upper()):
-            tstr = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(m._timestamp))
+            ts_ms = int(m._timestamp * 1000.0) % 1000
+            tstr = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(m._timestamp)) + ".%.03u" % ts_ms
             print("%s %s" % (tstr, mstr))
     mestate.mlog.rewind()
 
