@@ -12,7 +12,7 @@ if mp_util.has_wxpython:
 class ParamState:
     '''this class is separated to make it possible to use the parameter
        functions on a secondary connection'''
-    def __init__(self, mav_param, logdir, vehicle_name, parm_file, mpstate):
+    def __init__(self, mav_param, logdir, vehicle_name, parm_file, mpstate, sysid):
         self.mav_param_set = set()
         self.mav_param_count = 0
         self.param_period = mavutil.periodic_event(1)
@@ -29,6 +29,7 @@ class ParamState:
         self.ftp_failed = False
         self.ftp_started = False
         self.mpstate = mpstate
+        self.sysid = sysid
 
     def use_ftp(self):
         '''return true if we should try ftp for download'''
@@ -300,6 +301,34 @@ class ParamState:
         self.ftp_started = True
         ftp.cmd_get(["@PARAM/param.pck"], callback=self.ftp_callback)
 
+    def log_params(self, params):
+        '''log PARAM_VALUE messages so that we can extract parameters from a tlog when using ftp download'''
+        if not self.mpstate.logqueue:
+            return
+        usec = int(time.time() * 1.0e6)
+        idx = 0
+        mav = self.mpstate.master().mav
+        for (name, v, ptype) in params:
+            p = mavutil.mavlink.MAVLink_param_value_message(name,
+                                                            float(v),
+                                                            mavutil.mavlink.MAV_PARAM_TYPE_REAL32,
+                                                            len(params),
+                                                            idx)
+            idx += 1
+            # log PARAM_VALUE using the source vehicles sysid but MAV_COMP_ID_MISSIONPLANNER, to allow
+            # us to tell that it came from the GCS, but to not corrupt the sequence numbers
+            id_saved = (mav.srcSystem, mav.srcComponent)
+            mav.srcSystem = self.sysid[0]
+            mav.srcComponent = mavutil.mavlink.MAV_COMP_ID_MISSIONPLANNER
+            try:
+                buf = p.pack(mav)
+                self.mpstate.logqueue.put(bytearray(struct.pack('>Q', usec) + buf))
+            except Exception:
+                pass
+            (mav.srcSystem, mav.srcComponent) = id_saved
+
+
+
     def ftp_callback(self, fh):
         '''callback from ftp fetch of parameters'''
         self.ftp_started = False
@@ -386,6 +415,7 @@ class ParamState:
         print("Received %u parameters (ftp)" % total_params)
         if self.logdir is not None:
             self.mav_param.save(os.path.join(self.logdir, self.parm_file), '*', verbose=True)
+        self.log_params(params)
 
     def fetch_all(self, master):
         '''force refetch of parameters'''
@@ -572,7 +602,7 @@ class ParamModule(mp_module.MPModule):
         if sysid not in [(0,0),(1,1),(1,0)]:
 
             fname = 'mav_%u_%u.parm' % (sysid[0], sysid[1])
-        self.pstate[sysid] = ParamState(self.mpstate.mav_param_by_sysid[sysid], self.logdir, self.vehicle_name, fname, self.mpstate)
+        self.pstate[sysid] = ParamState(self.mpstate.mav_param_by_sysid[sysid], self.logdir, self.vehicle_name, fname, self.mpstate, sysid)
         if self.continue_mode and self.logdir is not None:
             parmfile = os.path.join(self.logdir, fname)
             if os.path.exists(parmfile):
