@@ -9,8 +9,8 @@ environment:
     # Pre-installed Python versions, which Appveyor may upgrade to
     # a later point release.
     # See: https://www.appveyor.com/docs/installed-software#python
-    - PYTHON: "C:\\Python35"
-      PYTHON_VERSION: "3.5.x"
+    - PYTHON: "C:\\Python38"
+      PYTHON_VERSION: "3.8.x"
       PYTHON_ARCH: "32"
 
 
