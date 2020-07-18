@@ -49,6 +49,18 @@ rem -----Create version Info-----
 @echo %VERSION%> ..\windows\version.txt
 @echo on
 
+rem -----Download parameter files-----
+mkdir Parameters
+powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/APMrover2/apm.pdef.xml' -Destination 'Parameters\APMrover2.xml'"
+powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/ArduCopter/apm.pdef.xml' -Destination 'Parameters\ArduCopter.xml'"
+powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/ArduPlane/apm.pdef.xml' -Destination 'Parameters\ArduPlane.xml'"
+powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/ArduSub/apm.pdef.xml' -Destination 'Parameters\ArduSub.xml'"
+powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/AntennaTracker/apm.pdef.xml' -Destination 'Parameters\AntennaTracker.xml'"
+powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/APMrover2-defaults.parm' -Destination 'Parameters\APMrover2-defaults.parm'"
+powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/ArduCopter-defaults.parm' -Destination 'Parameters\ArduCopter-defaults.parm'"
+powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/ArduPlane-defaults.parm' -Destination 'Parameters\ArduPlane-defaults.parm'"
+powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/ArduSub-defaults.parm' -Destination 'Parameters\ArduSub-defaults.parm'"
+
 rem -----Build the Installer-----
 cd  ..\windows\
 rem Newer Inno Setup versions do not require a -compile flag, please add it if you have an old version

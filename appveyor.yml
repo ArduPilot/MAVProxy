@@ -36,7 +36,7 @@ install:
   # compiled extensions and are not provided as pre-built wheel packages,
   # pip will build them from source using the MSVC compiler matching the
   # target Python version and architecture
-  - "python -m pip install -U pywin32 lxml pymavlink numpy matplotlib pyserial opencv-python pyreadline PyYAML Pygame Pillow wxpython"
+  - "python -m pip install -U pywin32 lxml pymavlink numpy matplotlib pyserial opencv-python PyYAML Pygame Pillow wxpython"
   - "python -m pip install -U pyinstaller setuptools packaging --no-use-pep517"
   
   #We're using Inno Setup to build an installer
@@ -73,6 +73,18 @@ after_test:
   - "@echo on"
   - "cd ..\\"
   
+  # download parameter def files for installer
+  - mkdir Parameters
+  - ps: Start-FileDownload 'http://autotest.ardupilot.org/Parameters/APMrover2/apm.pdef.xml' -FileName 'Parameters\APMrover2.xml'
+  - ps: Start-FileDownload  'http://autotest.ardupilot.org/Parameters/ArduCopter/apm.pdef.xml' -FileName 'Parameters\ArduCopter.xml'
+  - ps: Start-FileDownload 'http://autotest.ardupilot.org/Parameters/ArduPlane/apm.pdef.xml' -FileName 'Parameters\ArduPlane.xml'
+  - ps: Start-FileDownload 'http://autotest.ardupilot.org/Parameters/ArduSub/apm.pdef.xml' -FileName 'Parameters\ArduSub.xml'
+  - ps: Start-FileDownload 'http://autotest.ardupilot.org/Parameters/AntennaTracker/apm.pdef.xml' -FileName 'Parameters\AntennaTracker.xml'
+  - ps: Start-FileDownload  'http://autotest.ardupilot.org/APMrover2-defaults.parm' -FileName 'Parameters\APMrover2-defaults.parm'
+  - ps: Start-FileDownload 'http://autotest.ardupilot.org/ArduCopter-defaults.parm' -FileName 'Parameters\ArduCopter-defaults.parm'
+  - ps: Start-FileDownload 'http://autotest.ardupilot.org/ArduPlane-defaults.parm' -FileName 'Parameters\ArduPlane-defaults.parm'
+  - ps: Start-FileDownload 'http://autotest.ardupilot.org/ArduSub-defaults.parm' -FileName 'Parameters\ArduSub-defaults.parm'
+
   #run setup
   - "cd  .\\windows\\"
   - "ISCC.exe /dMyAppVersion=%VERSION% mavproxy.iss"
