@@ -866,7 +866,7 @@ if __name__ == "__main__":
         try:
             version = pkg_resources.require("mavproxy")[0].version
         except Exception as e:
-            start_script = os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy", "version.txt")
+            start_script = os.path.join(os.environ['LOCALAPPDATA'], ".mavproxy", "version.txt")
             f = open(start_script, 'r')
             version = f.readline()
         print("MAVExplorer Version: " + version)

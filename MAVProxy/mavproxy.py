@@ -1230,7 +1230,7 @@ if __name__ == '__main__':
             import pkg_resources
             version = pkg_resources.require("mavproxy")[0].version
         except:
-            start_script = os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy", "version.txt")
+            start_script = os.path.join(os.environ['LOCALAPPDATA'], ".mavproxy", "version.txt")
             f = open(start_script, 'r')
             version = f.readline()
 
@@ -1364,7 +1364,7 @@ if __name__ == '__main__':
         start_script = os.path.join(os.environ['HOME'], ".mavinit.scr")
         start_scripts.append(start_script)
     if 'LOCALAPPDATA' in os.environ and not opts.setup:
-        start_script = os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy", "mavinit.scr")
+        start_script = os.path.join(os.environ['LOCALAPPDATA'], ".mavproxy", "mavinit.scr")
         start_scripts.append(start_script)
     if (mpstate.settings.state_basedir is not None and
         opts.aircraft is not None):
