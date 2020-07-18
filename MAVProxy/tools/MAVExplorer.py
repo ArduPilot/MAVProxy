@@ -892,7 +892,7 @@ if __name__ == "__main__":
     while mestate.rl is not None and not mestate.exit:
         try:
             try:
-                line = input(mestate.rl.prompt)
+                line = mestate.rl.input()
             except EOFError:
                 mestate.exit = True
                 break

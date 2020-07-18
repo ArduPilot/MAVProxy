@@ -40,6 +40,10 @@ if platform.system() == "Darwin":
                          'future',
                          'wxPython'])
 
+if platform.system() == "Windows":
+    # on MacOS we can have a more complete requirements list
+    requirements.extend(['prompt_toolkit'])
+                         
 setup(name='MAVProxy',
       version=version,
       zip_safe=True,
