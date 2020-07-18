@@ -45,8 +45,8 @@ Source: "..\MAVProxy\dist\MAVExplorer\MAVExplorer.exe"; DestDir: "{app}"; Flags:
 Source: "..\MAVProxy\dist\MAVExplorer\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 Source: "..\Parameters\*"; DestDir: "{localappdata}\.mavproxy"; Flags: ignoreversion
-Source: "..\windows\mavinit.scr"; DestDir: "{localappdata}\MAVProxy"; Flags: ignoreversion
-Source: "..\windows\version.txt"; DestDir: "{localappdata}\MAVProxy"; Flags: ignoreversion
+Source: "..\windows\mavinit.scr"; DestDir: "{localappdata}\.mavproxy"; Flags: ignoreversion
+Source: "..\windows\version.txt"; DestDir: "{localappdata}\.mavproxy"; Flags: ignoreversion
 Source: "..\windows\Startup Examples\MAVProxyLogput.bat"; DestDir: "{app}\Examples"; Flags: ignoreversion
 Source: "..\windows\Startup Examples\MAVProxyMultiOutput.bat"; DestDir: "{app}\Examples"; Flags: ignoreversion
 
