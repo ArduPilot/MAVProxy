@@ -47,10 +47,6 @@ try:
       multiproc.freeze_support()
       from pymavlink import mavwp, mavutil
       import matplotlib, HTMLParser
-      try:
-            import readline
-      except ImportError:
-            import pyreadline as readline
 except Exception:
       pass
 
@@ -1086,7 +1082,7 @@ def input_loop():
     '''wait for user input'''
     while mpstate.status.exit != True:
         try:
-            line = input(mpstate.rl.prompt)
+            line = mpstate.rl.input()
             mpstate.input_queue.put(line)
         except (EOFError, IOError):
             mpstate.status.exit = True
