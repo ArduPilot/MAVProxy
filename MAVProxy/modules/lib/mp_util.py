@@ -389,6 +389,22 @@ def decode_devid(devid, pname):
         0x31 : "DEVTYPE_INS_ADIS1647x",
         }
 
+    baro_types = {
+        0x01 : "DEVTYPE_BARO_SITL",
+        0x02 : "DEVTYPE_BARO_BMP085",
+        0x03 : "DEVTYPE_BARO_BMP280",
+        0x04 : "DEVTYPE_BARO_BMP388",
+        0x05 : "DEVTYPE_BARO_DPS280",
+        0x06 : "DEVTYPE_BARO_DPS310",
+        0x07 : "DEVTYPE_BARO_FBM320",
+        0x08 : "DEVTYPE_BARO_ICM20789",
+        0x09 : "DEVTYPE_BARO_KELLERLD",
+        0x0A : "DEVTYPE_BARO_LPS2XH",
+        0x0B : "DEVTYPE_BARO_MS5611",
+        0x0C : "DEVTYPE_BARO_SPL06",
+        0x0D : "DEVTYPE_BARO_UAVCAN",
+    }
+        
     decoded_devname = ""
 
     if pname.startswith("COMPASS"):
@@ -400,6 +416,9 @@ def decode_devid(devid, pname):
     if pname.startswith("INS"):
         decoded_devname = imu_types.get(devtype, "UNKNOWN")
 
+    if pname.startswith("GND_BARO"):
+        decoded_devname = baro_types.get(devtype, "UNKNOWN")
+        
     print("%s: bus_type:%s(%u)  bus:%u address:%u(0x%x) devtype:%u(0x%x) %s" % (
         pname,
         bustypes.get(bus_type,"UNKNOWN"), bus_type,
