@@ -1,47 +1,45 @@
 rem build the standalone MAVProxy.exe for Windows.
-rem This assumes Python is installed in C:\Python36
-rem   If it is not, change the PYTHON_LOCATION environment variable accordingly
+rem This assumes Python and pip are on the system path
 rem This assumes InnoSetup is installed in C:\Program Files (x86)\Inno Setup 5
 rem   If it is not, change the INNOSETUP environment variable accordingly
 SETLOCAL enableextensions
 
-if "%PYTHON_LOCATION%" == "" (set "PYTHON_LOCATION=C:\Python36")
 if "%INNOSETUP%" == "" (set "INNOSETUP=C:\Program Files (x86)\Inno Setup 5")
 
 rem get the version
 for /f "tokens=*" %%a in (
- '"%PYTHON_LOCATION%\python" returnVersion.py'
+ 'python.exe returnVersion.py'
  ) do (
  set VERSION=%%a
  )
 
 rem -----build the changelog-----
-"%PYTHON_LOCATION%\python" createChangelog.py
+python.exe createChangelog.py
 
  
 rem -----Upgrade pymavlink if needed-----
 if exist "..\..\pymavlink" (
  rem Rebuild and use pymavlink from pymavlink sources if available
  pushd ..\..\pymavlink
- "%PYTHON_LOCATION%\python.exe" setup.py build install
+ python.exe setup.py build install --user
  popd
 ) else (
  if exist "..\..\mavlink\pymavlink" (
   rem Rebuild and use pymavlink from mavlink\pymavlink sources if available
   pushd ..\..\mavlink\pymavlink
-  "%PYTHON_LOCATION%\python.exe" setup.py build install
+  python.exe setup.py build install --user
   popd
  ) else (
-  "%PYTHON_LOCATION%\Scripts\pip" install pymavlink -U
+  pip.exe install pymavlink -U --user
  )
 )
 
 rem -----Build MAVProxy-----
 cd ..\
-"%PYTHON_LOCATION%\python" setup.py clean build install
+python.exe setup.py clean build install --user
 cd .\MAVProxy
 copy ..\windows\mavproxy.spec
-"%PYTHON_LOCATION%\Scripts\pyinstaller" -y --clean mavproxy.spec
+pyinstaller -y --clean mavproxy.spec
 del mavproxy.spec
 
 rem -----Create version Info-----
