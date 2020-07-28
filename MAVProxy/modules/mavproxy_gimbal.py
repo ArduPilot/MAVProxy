@@ -82,8 +82,8 @@ class GimbalModule(mp_module.MPModule):
             return
         self.master.mav.mount_control_send(self.target_system,
                                            self.target_component,
-                                           latlon[0]*1e7,
-                                           latlon[1]*1e7,
+                                           int(latlon[0]*1e7),
+                                           int(latlon[1]*1e7),
                                            0, # altitude zero for now
                                            0)
 
@@ -140,9 +140,9 @@ class GimbalModule(mp_module.MPModule):
         (roll, pitch, yaw) = (float(args[0]), float(args[1]), float(args[2]))
         self.master.mav.mount_control_send(self.target_system,
                                            self.target_component,
-                                           pitch*100,
-                                           roll*100,
-                                           yaw*100,
+                                           int(pitch*100),
+                                           int(roll*100),
+                                           int(yaw*100),
                                            0)
 
     def cmd_gimbal_status(self, args):
