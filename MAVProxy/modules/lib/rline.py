@@ -59,7 +59,10 @@ class rline(object):
 
     def add_history(self, line):
         '''add a line to the history'''
-        readline.add_history(line)
+        if platform.system() == 'Windows':
+            self.session.history.append_string(line)
+        else:
+            readline.add_history(line)
         self.redisplay()
 
     def redisplay(self):
