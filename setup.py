@@ -1,5 +1,5 @@
 from setuptools import setup
-import os, platform
+import os, platform, sys
 
 version = "1.8.20"
 
@@ -40,10 +40,12 @@ if platform.system() == "Darwin":
                          'future',
                          'wxPython'])
 
-if platform.system() == "Windows":
+if platform.system() == "Windows" and sys.version_info >= (3, 0):
     # on MacOS we can have a more complete requirements list
     requirements.extend(['prompt_toolkit'])
-                         
+elif platform.system() == "Windows":
+    requirements.extend(['pyreadline'])
+
 setup(name='MAVProxy',
       version=version,
       zip_safe=True,
