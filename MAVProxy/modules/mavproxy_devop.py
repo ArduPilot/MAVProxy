@@ -15,7 +15,7 @@ class DeviceOpModule(mp_module.MPModule):
 
     def cmd_devop(self, args):
         '''device operations'''
-        usage = "Usage: devop <read|write> <spi|i2c> name bus address"
+        usage = "Usage: devop <read|write> <spi|i2c> name bus bank address"
         if len(args) < 5:
             print(usage)
             return
@@ -37,13 +37,14 @@ class DeviceOpModule(mp_module.MPModule):
     def devop_read(self, args, bustype):
         '''read from device'''
         if len(args) < 5:
-            print("Usage: devop read <spi|i2c> name bus address regstart count")
+            print("Usage: devop read <spi|i2c> name bus bank address regstart count")
             return
         name = args[0]
         bus = int(args[1],base=0)
-        address = int(args[2],base=0)
-        reg = int(args[3],base=0)
-        count = int(args[4],base=0)
+        bank = int(args[2],base=0)
+        address = int(args[3],base=0)
+        reg = int(args[4],base=0)
+        count = int(args[5],base=0)
         if sys.version_info.major >= 3:
             name = bytearray(name, 'ascii')
         self.master.mav.device_op_read_send(self.target_system,
@@ -54,21 +55,23 @@ class DeviceOpModule(mp_module.MPModule):
                                             address,
                                             name,
                                             reg,
-                                            count)
+                                            count,
+                                            bank)
         self.request_id += 1
 
     def devop_write(self, args, bustype):
         '''write to a device'''
-        usage = "Usage: devop write <spi|i2c> name bus address regstart count <bytes>"
+        usage = "Usage: devop write <spi|i2c> name bus bank address regstart count <bytes>"
         if len(args) < 5:
             print(usage)
             return
         name = args[0]
         bus = int(args[1],base=0)
-        address = int(args[2],base=0)
-        reg = int(args[3],base=0)
-        count = int(args[4],base=0)
-        args = args[5:]
+        bank = int(args[2],base=0)
+        address = int(args[3],base=0)
+        reg = int(args[4],base=0)
+        count = int(args[5],base=0)
+        args = args[6:]
         if len(args) < count:
             print(usage)
             return
@@ -86,7 +89,8 @@ class DeviceOpModule(mp_module.MPModule):
                                              name,
                                              reg,
                                              count,
-                                             bytes)
+                                             bytes,
+                                             bank)
         self.request_id += 1
 
 
