@@ -7,6 +7,7 @@ June 2104
 
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import multiproc
+from MAVProxy.modules.lib import win_layout
 
 from MAVProxy.modules.mavproxy_misseditor import me_event
 MissionEditorEvent = me_event.MissionEditorEvent
@@ -39,107 +40,111 @@ class MissionEditorEventThread(threading.Thread):
             request_read_after_processing_queue = False
             while self.event_queue.qsize() > 0 and (time.time() - queue_access_start_time) < 0.6:
                 event = self.event_queue.get()
-                event_type = event.get_type()
 
-                if event_type == me_event.MEE_READ_WPS:
-                    self.module('wp').cmd_wp(['list'])
-                    #list the rally points while I'm add it:
-                    #TODO: DON'T KNOW WHY THIS DOESN'T WORK
-                    #self.module('rally').cmd_rally(['list'])
+                if isinstance(event, win_layout.WinLayout):
+                    win_layout.set_layout(event, self.mp_misseditor.set_layout)
+                else:
+                    event_type = event.get_type()
 
-                    #means I'm doing a read & don't know how many wps to expect:
-                    self.mp_misseditor.num_wps_expected = -1
-                    self.wps_received = {}
+                    if event_type == me_event.MEE_READ_WPS:
+                        self.module('wp').cmd_wp(['list'])
+                        #list the rally points while I'm add it:
+                        #TODO: DON'T KNOW WHY THIS DOESN'T WORK
+                        #self.module('rally').cmd_rally(['list'])
 
-                elif event_type == me_event.MEE_TIME_TO_QUIT:
-                    self.time_to_quit = True
+                        #means I'm doing a read & don't know how many wps to expect:
+                        self.mp_misseditor.num_wps_expected = -1
+                        self.wps_received = {}
 
-                elif event_type == me_event.MEE_GET_WP_RAD:
-                    wp_radius = self.module('param').mav_param.get('WP_RADIUS')
-                    if (wp_radius is None):
-                        continue
-                    self.mp_misseditor.gui_event_queue_lock.acquire()
-                    self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
-                        me_event.MEGE_SET_WP_RAD,wp_rad=wp_radius))
-                    self.mp_misseditor.gui_event_queue_lock.release()
+                    elif event_type == me_event.MEE_TIME_TO_QUIT:
+                        self.time_to_quit = True
 
-                elif event_type == me_event.MEE_SET_WP_RAD:
-                    self.mp_misseditor.param_set('WP_RADIUS',event.get_arg("rad"))
+                    elif event_type == me_event.MEE_GET_WP_RAD:
+                        wp_radius = self.module('param').mav_param.get('WP_RADIUS')
+                        if (wp_radius is None):
+                            continue
+                        self.mp_misseditor.gui_event_queue_lock.acquire()
+                        self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
+                            me_event.MEGE_SET_WP_RAD,wp_rad=wp_radius))
+                        self.mp_misseditor.gui_event_queue_lock.release()
 
-                elif event_type == me_event.MEE_GET_LOIT_RAD:
-                    loiter_radius = self.module('param').mav_param.get('WP_LOITER_RAD')
-                    if (loiter_radius is None):
-                        continue
-                    self.mp_misseditor.gui_event_queue_lock.acquire()
-                    self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
-                        me_event.MEGE_SET_LOIT_RAD,loit_rad=loiter_radius))
-                    self.mp_misseditor.gui_event_queue_lock.release()
+                    elif event_type == me_event.MEE_SET_WP_RAD:
+                        self.mp_misseditor.param_set('WP_RADIUS',event.get_arg("rad"))
 
-                elif event_type == me_event.MEE_SET_LOIT_RAD:
-                    loit_rad = event.get_arg("rad")
-                    if (loit_rad is None):
-                        continue
+                    elif event_type == me_event.MEE_GET_LOIT_RAD:
+                        loiter_radius = self.module('param').mav_param.get('WP_LOITER_RAD')
+                        if (loiter_radius is None):
+                            continue
+                        self.mp_misseditor.gui_event_queue_lock.acquire()
+                        self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
+                            me_event.MEGE_SET_LOIT_RAD,loit_rad=loiter_radius))
+                        self.mp_misseditor.gui_event_queue_lock.release()
 
-                    self.mp_misseditor.param_set('WP_LOITER_RAD', loit_rad)
+                    elif event_type == me_event.MEE_SET_LOIT_RAD:
+                        loit_rad = event.get_arg("rad")
+                        if (loit_rad is None):
+                            continue
 
-                    #need to redraw rally points
-                    # Don't understand why this rally refresh isn't lagging...
-                    # likely same reason why "timeout setting WP_LOITER_RAD"
-                    #comes back:
-                    #TODO: fix timeout issue
-                    self.module('rally').set_last_change(time.time())
+                        self.mp_misseditor.param_set('WP_LOITER_RAD', loit_rad)
 
-                elif event_type == me_event.MEE_GET_WP_DEFAULT_ALT:
-                    self.mp_misseditor.gui_event_queue_lock.acquire()
-                    self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
-                        me_event.MEGE_SET_WP_DEFAULT_ALT,def_wp_alt=self.mp_misseditor.mpstate.settings.wpalt))
-                    self.mp_misseditor.gui_event_queue_lock.release()
-                elif event_type == me_event.MEE_SET_WP_DEFAULT_ALT:
-                    self.mp_misseditor.mpstate.settings.command(["wpalt",event.get_arg("alt")])
+                        #need to redraw rally points
+                        # Don't understand why this rally refresh isn't lagging...
+                        # likely same reason why "timeout setting WP_LOITER_RAD"
+                        #comes back:
+                        #TODO: fix timeout issue
+                        self.module('rally').set_last_change(time.time())
 
-                elif event_type == me_event.MEE_WRITE_WPS:
-                    self.module('wp').wploader.clear()
-                    self.master().waypoint_count_send(event.get_arg("count"))
-                    self.mp_misseditor.num_wps_expected = event.get_arg("count")
-                    self.mp_misseditor.wps_received = {}
-                elif event_type == me_event.MEE_WRITE_WP_NUM:
-                    w = mavutil.mavlink.MAVLink_mission_item_message(
-                        self.mp_misseditor.mpstate.settings.target_system,
-                        self.mp_misseditor.mpstate.settings.target_component,
-                        event.get_arg("num"),
-                        int(event.get_arg("frame")),
-                        event.get_arg("cmd_id"),
-                        0, 1,
-                        event.get_arg("p1"), event.get_arg("p2"),
-                        event.get_arg("p3"), event.get_arg("p4"),
-                        event.get_arg("lat"), event.get_arg("lon"),
-                        event.get_arg("alt"))
+                    elif event_type == me_event.MEE_GET_WP_DEFAULT_ALT:
+                        self.mp_misseditor.gui_event_queue_lock.acquire()
+                        self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
+                            me_event.MEGE_SET_WP_DEFAULT_ALT,def_wp_alt=self.mp_misseditor.mpstate.settings.wpalt))
+                        self.mp_misseditor.gui_event_queue_lock.release()
+                    elif event_type == me_event.MEE_SET_WP_DEFAULT_ALT:
+                        self.mp_misseditor.mpstate.settings.command(["wpalt",event.get_arg("alt")])
 
-                    self.module('wp').wploader.add(w)
-                    wsend = self.module('wp').wploader.wp(w.seq)
-                    if self.mp_misseditor.mpstate.settings.wp_use_mission_int:
-                        wsend = self.module('wp').wp_to_mission_item_int(w)
-                    self.master().mav.send(wsend)
+                    elif event_type == me_event.MEE_WRITE_WPS:
+                        self.module('wp').wploader.clear()
+                        self.master().waypoint_count_send(event.get_arg("count"))
+                        self.mp_misseditor.num_wps_expected = event.get_arg("count")
+                        self.mp_misseditor.wps_received = {}
+                    elif event_type == me_event.MEE_WRITE_WP_NUM:
+                        w = mavutil.mavlink.MAVLink_mission_item_message(
+                            self.mp_misseditor.mpstate.settings.target_system,
+                            self.mp_misseditor.mpstate.settings.target_component,
+                            event.get_arg("num"),
+                            int(event.get_arg("frame")),
+                            event.get_arg("cmd_id"),
+                            0, 1,
+                            event.get_arg("p1"), event.get_arg("p2"),
+                            event.get_arg("p3"), event.get_arg("p4"),
+                            event.get_arg("lat"), event.get_arg("lon"),
+                            event.get_arg("alt"))
 
-                    #tell the wp module to expect some waypoints
-                    self.module('wp').loading_waypoints = True
+                        self.module('wp').wploader.add(w)
+                        wsend = self.module('wp').wploader.wp(w.seq)
+                        if self.mp_misseditor.mpstate.settings.wp_use_mission_int:
+                            wsend = self.module('wp').wp_to_mission_item_int(w)
+                        self.master().mav.send(wsend)
 
-                elif event_type == me_event.MEE_LOAD_WP_FILE:
-                    self.module('wp').cmd_wp(['load',event.get_arg("path")])
-                    #Wait for the other thread to finish loading waypoints.
-                    #don't let this loop run forever in case we have a lousy
-                    #link to the plane
-                    i = 0
-                    while (i < 10 and
-                            self.module('wp').loading_waypoints):
-                        time.sleep(1)
-                        i = i + 1
+                        #tell the wp module to expect some waypoints
+                        self.module('wp').loading_waypoints = True
 
-                    #don't modify queue while in the middile of processing it:
-                    request_read_after_processing_queue = True
+                    elif event_type == me_event.MEE_LOAD_WP_FILE:
+                        self.module('wp').cmd_wp(['load',event.get_arg("path")])
+                        #Wait for the other thread to finish loading waypoints.
+                        #don't let this loop run forever in case we have a lousy
+                        #link to the plane
+                        i = 0
+                        while (i < 10 and
+                               self.module('wp').loading_waypoints):
+                            time.sleep(1)
+                            i = i + 1
 
-                elif event_type == me_event.MEE_SAVE_WP_FILE:
-                    self.module('wp').cmd_wp(['save',event.get_arg("path")])
+                            #don't modify queue while in the middile of processing it:
+                            request_read_after_processing_queue = True
+
+                    elif event_type == me_event.MEE_SAVE_WP_FILE:
+                        self.module('wp').cmd_wp(['save',event.get_arg("path")])
 
             self.event_queue_lock.release()
 
@@ -164,6 +169,8 @@ class MissionEditorMain(object):
         self.event_queue_lock = multiproc.Lock()
         self.gui_event_queue = multiproc.Queue()
         self.gui_event_queue_lock = multiproc.Lock()
+
+        self.object_queue = multiproc.Queue()
 
         self.close_window = multiproc.Semaphore()
         self.close_window.acquire()
@@ -285,7 +292,7 @@ class MissionEditorMain(object):
         from MAVProxy.modules.mavproxy_misseditor import missionEditorFrame
 
         self.app = wx.App(False)
-        self.app.frame = missionEditorFrame.MissionEditorFrame(parent=None,id=wx.ID_ANY)
+        self.app.frame = missionEditorFrame.MissionEditorFrame(self,parent=None,id=wx.ID_ANY)
 
         self.app.frame.set_event_queue(q)
         self.app.frame.set_event_queue_lock(l)
@@ -339,6 +346,9 @@ class MissionEditorMain(object):
         self.gui_event_queue.put(MissionEditorEvent(
             me_event.MEGE_SET_LAST_MAP_CLICK_POS,click_pos=new_click_pos))
         self.gui_event_queue_lock.release()
+
+    def set_layout(self, layout):
+        self.object_queue.put(layout)
 
 def init(mpstate):
     '''initialise module'''

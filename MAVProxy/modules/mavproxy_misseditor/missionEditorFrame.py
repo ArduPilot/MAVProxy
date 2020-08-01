@@ -13,6 +13,7 @@ import traceback
 
 import time, math, os
 from MAVProxy.modules.lib import mp_util
+from MAVProxy.modules.lib import win_layout
 from MAVProxy.modules.mavproxy_misseditor import me_event
 MissionEditorEvent = me_event.MissionEditorEvent
 
@@ -38,8 +39,9 @@ ME_DIST_COL = 12
 ME_ANGLE_COL = 13
 
 class MissionEditorFrame(wx.Frame):
-    def __init__(self, *args, **kwds):
+    def __init__(self, state, *args, **kwds):
         # begin wxGlade: MissionEditorFrame.__init__
+        self.state = state
         kwds["style"] = wx.DEFAULT_FRAME_STYLE
         wx.Frame.__init__(self, *args, **kwds)
         self.label_sync_state = wx.StaticText(self, wx.ID_ANY, "UNSYNCED   \n", style=wx.ALIGN_CENTRE)
@@ -95,6 +97,9 @@ class MissionEditorFrame(wx.Frame):
         self.timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.time_to_process_gui_events, self.timer)
         self.timer.Start(200)
+
+        self.last_layout_send = time.time()
+        self.Bind(wx.EVT_IDLE, self.on_idle)
 
         delete_br = button_renderer.ButtonRenderer("Delete",70,20)
         up_br = button_renderer.ButtonRenderer("+",20,20)
@@ -781,6 +786,18 @@ class MissionEditorFrame(wx.Frame):
             grad = format(grad, '.1f')
             self.grid_mission.SetCellValue(row, ME_DIST_COL, str(dist))
             self.grid_mission.SetCellValue(row, ME_ANGLE_COL, str(grad))
+
+    def on_idle(self, event):
+        now = time.time()
+        if now - self.last_layout_send > 1:
+            self.last_layout_send = now
+            self.event_queue.put(win_layout.get_wx_window_layout(self))
+
+        obj = None
+        while not self.state.object_queue.empty():
+            obj = self.state.object_queue.get()
+            if isinstance(obj, win_layout.WinLayout):
+                win_layout.set_wx_window_layout(self, obj)
 
 # end of class MissionEditorFrame
 if __name__ == "__main__":
