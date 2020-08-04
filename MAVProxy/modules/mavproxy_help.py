@@ -1,7 +1,7 @@
 """
     MAVProxy help/versioning module
 """
-import os, time, platform, re, sys
+import os, time, platform, re, sys, socket
 from pymavlink import mavwp, mavutil
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
@@ -45,14 +45,18 @@ class HelpModule(mp_module.MPModule):
             self.wxVersion = ''
 
         #check for updates, if able
-        import pip
         pypi = xmlrpclib.ServerProxy('https://pypi.python.org/pypi')
-        available = pypi.package_releases('MAVProxy')
-        if not available:
-            self.newversion = 'Error finding update'
-        else:
+        available = None
+        try:
+            available = pypi.package_releases('MAVProxy')
+        except socket.gaierror:
+            pass
+            
+        if available:
             self.newversion = available[0]
-
+        else:
+            self.newversion = 'Error finding update'
+            
         #and format the update string
         if not isinstance(self.newversion, basestring):
             self.newversion = "Error finding update"
