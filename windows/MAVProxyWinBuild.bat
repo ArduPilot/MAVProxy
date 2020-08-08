@@ -1,10 +1,10 @@
 rem build the standalone MAVProxy.exe for Windows.
 rem This assumes Python and pip are on the system path
-rem This assumes InnoSetup is installed in C:\Program Files (x86)\Inno Setup 5
+rem This assumes InnoSetup is installed in C:\Program Files (x86)\Inno Setup 6
 rem   If it is not, change the INNOSETUP environment variable accordingly
 SETLOCAL enableextensions
 
-if "%INNOSETUP%" == "" (set "INNOSETUP=C:\Program Files (x86)\Inno Setup 5")
+if "%INNOSETUP%" == "" (set "INNOSETUP=C:\Program Files (x86)\Inno Setup 6")
 
 rem get the version
 for /f "tokens=*" %%a in (
@@ -48,6 +48,7 @@ rem -----Create version Info-----
 @echo on
 
 rem -----Download parameter files-----
+cd  ..\
 mkdir Parameters
 powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/APMrover2/apm.pdef.xml' -Destination 'Parameters\APMrover2.xml'"
 powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/ArduCopter/apm.pdef.xml' -Destination 'Parameters\ArduCopter.xml'"
@@ -60,7 +61,7 @@ powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/ArduPl
 powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/ArduSub-defaults.parm' -Destination 'Parameters\ArduSub-defaults.parm'"
 
 rem -----Build the Installer-----
-cd  ..\windows\
+cd .\windows
 rem Newer Inno Setup versions do not require a -compile flag, please add it if you have an old version
 "%INNOSETUP%\ISCC.exe" /dMyAppVersion=%VERSION% mavproxy.iss
 
