@@ -36,7 +36,7 @@ install:
   # compiled extensions and are not provided as pre-built wheel packages,
   # pip will build them from source using the MSVC compiler matching the
   # target Python version and architecture
-  - "python -m pip install -U pywin32 lxml pymavlink numpy matplotlib pyserial opencv-python PyYAML Pygame Pillow wxpython"
+  - "python -m pip install -U pywin32 lxml pymavlink numpy matplotlib==3.2.2 pyserial opencv-python PyYAML Pygame Pillow wxpython"
   - "python -m pip install -U pyinstaller setuptools packaging --no-use-pep517"
   
   #We're using Inno Setup to build an installer
