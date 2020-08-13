@@ -329,6 +329,7 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
             idx += 1
         elif (idx < len(flightmode_selections) and flightmode_selections[idx]) or all_false or len(flightmode_selections) == 0:
             used_flightmodes[mlog.flightmode] = 1
+            (lat, lng) = (None,None)
             if type in ['GPS','GPS2']:
                 status = getattr(m, 'Status', None)
                 nsats = getattr(m, 'NSats', None)
@@ -376,8 +377,23 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
             elif type == 'SIM':
                 (lat, lng) = (m.Lat, m.Lng)
             else:
-                lat = m.lat * 1.0e-7
-                lng = m.lon * 1.0e-7
+                if hasattr(m,'Lat'):
+                    lat = m.Lat
+                if hasattr(m,'Lon'):
+                    lng = m.Lon
+                if hasattr(m,'Lng'):
+                    lng = m.Lng
+                if hasattr(m,'lat'):
+                    lat = m.lat * 1.0e-7
+                if hasattr(m,'lon'):
+                    lng = m.lon * 1.0e-7
+                if hasattr(m,'latitude'):
+                    lat = m.latitude * 1.0e-7
+                if hasattr(m,'longitude'):
+                    lng = m.longitude * 1.0e-7
+
+            if lat is None or lng is None:
+                continue
 
             # automatically add new types to instances
             if type not in instances:
