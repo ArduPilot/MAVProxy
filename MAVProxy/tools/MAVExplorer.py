@@ -209,7 +209,13 @@ def expression_ok(expression, msgs=None):
         try:
             if f.endswith(':2'):
                 f = f[:-2]
-            if mavutil.evaluate_expression(f, msgs) is None:
+            if f[-1] == '}':
+                # avoid passing nocondition unless needed to allow us to work witih older
+                # pymavlink versions
+                res = mavutil.evaluate_expression(f, msgs, nocondition=True)
+            else:
+                res = mavutil.evaluate_expression(f, msgs)
+            if res is None:
                 expression_ok = False
         except Exception:
             expression_ok = False
