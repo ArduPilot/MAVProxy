@@ -10,13 +10,13 @@ from ..lib.wx_loader import wx
 from wx import grid
 import copy
 
-class ButtonRenderer(wx.grid.PyGridCellRenderer):
+class ButtonRenderer(wx.grid.GridCellRenderer):
     def __init__(self,label,width=75,height=25):
         self.label = label
         self.width = width
         self.height = height
 
-        wx.grid.PyGridCellRenderer.__init__(self)
+        wx.grid.GridCellRenderer.__init__(self)
 
     def Clone(self):
         return copy.copy(self)
