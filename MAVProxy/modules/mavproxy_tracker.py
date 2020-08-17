@@ -29,7 +29,8 @@ class TrackerModule(mp_module.MPModule):
         super(TrackerModule, self).__init__(mpstate, "tracker", "antenna tracker control module")
         self.connection = None
         self.tracker_param = mavparm.MAVParmDict()
-        self.pstate = ParamState(self.tracker_param, self.logdir, self.vehicle_name, 'tracker.parm')
+        sysid = 2
+        self.pstate = ParamState(self.tracker_param, self.logdir, self.vehicle_name, 'tracker.parm', mpstate, sysid)
         self.tracker_settings = mp_settings.MPSettings(
             [ ('port', str, "/dev/ttyUSB0"),
               ('baudrate', int, 57600),
