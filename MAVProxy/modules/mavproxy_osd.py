@@ -72,11 +72,11 @@ class osd(mp_module.MPModule):
 
         if len(args) > 3 and type is None:
             type = mavutil.mavlink.OSD_PARAM_NONE
-            min_value = float(args[3], 0)
+            min_value = float(args[3])
             if len(args) > 4:
-                max_value = float(args[4], 0)
+                max_value = float(args[4])
             if len(args) > 5:
-                increment = float(args[5], 0)
+                increment = float(args[5])
 
         if sys.version_info.major >= 3:
             name = bytearray(name, 'ascii')
