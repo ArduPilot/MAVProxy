@@ -56,7 +56,7 @@ class osd(mp_module.MPModule):
 
     def param_set(self, args):
         '''sets an OSD parameter'''
-        if len(args) < 3:
+        if len(args) < 3 or len(args) > 6:
             print("param-set <screen> <index> <name> (<type> | <min> <max> <increment>)")
             return
         screen = int(args[0], 0)
@@ -69,6 +69,10 @@ class osd(mp_module.MPModule):
         # config type implies the ranges are pre-defined
         if len(args) > 3:
             type = self.string_to_config_type(args[3])
+            # can't have config type and ranges
+            if type is not None and len(args) > 4:
+                print("param-set <screen> <index> <name> (<type> | <min> <max> <increment>)")
+                return
 
         if len(args) > 3 and type is None:
             type = mavutil.mavlink.OSD_PARAM_NONE
@@ -95,7 +99,7 @@ class osd(mp_module.MPModule):
 
     def param_show(self, args):
         '''show an OSD parameter'''
-        if len(args) < 2:
+        if len(args) != 2:
             print("param-show <screen> <index>")
             return
         screen = int(args[0], 0)
