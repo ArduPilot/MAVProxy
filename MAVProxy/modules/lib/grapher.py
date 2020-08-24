@@ -157,6 +157,10 @@ class MavGraph(object):
             # convert back to data coords with respect to ax
             ax_coord = inv.transform(display_coord)
             xstr = self.formatter(x)
+            # add in hundredths of seconds, converting from days
+            sec = x * 60 * 60 * 24
+            hsec = int((sec - int(sec))*100)
+            xstr += ".%02u" % hsec
             y2 = ax_coord[1]
             if self.xaxis:
                 return ('x=%.3f Left=%.3f Right=%.3f' % (x, y2, y))
