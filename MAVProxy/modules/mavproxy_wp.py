@@ -804,6 +804,14 @@ class WPModule(mp_module.MPModule):
         self.fix_jumps(wp.seq, 1)
         self.send_all_waypoints()
 
+    def cmd_clear(self, args):
+        '''clear waypoints'''
+        clear_type = mavutil.mavlink.MAV_MISSION_TYPE_MISSION
+        if len(args) > 0 and args[0] == "all":
+            clear_type = mavutil.mavlink.MAV_MISSION_TYPE_ALL
+        self.master.mav.mission_clear_all_send(self.target_system, self.target_component, clear_type)
+        self.wploader.clear()
+        
     def cmd_wp(self, args):
         '''waypoint commands'''
         usage = "usage: wp <editor|list|load|update|save|set|clear|loop|remove|move|movemulti|changealt>"
@@ -870,8 +878,7 @@ class WPModule(mp_module.MPModule):
         elif args[0] == "split":
             self.cmd_split(args[1:])
         elif args[0] == "clear":
-            self.master.waypoint_clear_all_send()
-            self.wploader.clear()
+            self.cmd_clear(args[1:])
         elif args[0] == "editor":
             if self.module('misseditor'):
                 self.mpstate.functions.process_stdin("module reload misseditor", immediate=True)
