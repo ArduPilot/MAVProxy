@@ -68,11 +68,10 @@ class HorizonModule(mp_module.MPModule):
         master = self.master       
         if msgType == 'HEARTBEAT':
             # Update state and mode information
-            if type(master.motors_armed()) == type(True):
-                self.armed = master.motors_armed()
-                self.mode = master.flightmode
-                # Send Flight State information down pipe
-                self.msgList.append(FlightState(self.mode,self.armed))
+            self.armed = master.motors_armed()
+            self.mode = master.flightmode
+            # Send Flight State information down pipe
+            self.msgList.append(FlightState(self.mode,self.armed))
         elif msgType == 'ATTITUDE':
             # Send attitude information down pipe
             self.msgList.append(Attitude(msg))
