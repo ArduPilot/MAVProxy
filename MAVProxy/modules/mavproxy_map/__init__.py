@@ -738,14 +738,6 @@ class MapModule(mp_module.MPModule):
                 self.map.set_position('Pos' + vehicle, (lat, lon), rotation=heading, label=label, colour=(255,255,255))
                 self.map.set_follow_object('Pos' + vehicle, self.is_primary_vehicle(m))
 
-        elif mtype == 'LOCAL_POSITION_NED' and not self.have_global_position:
-            (lat, lon) = mp_util.gps_offset(0, 0, m.x, m.y)
-            self.lat_lon[m.get_srcSystem()] = (lat,lon)
-            heading = math.degrees(math.atan2(m.vy, m.vx))
-            self.create_vehicle_icon('Pos' + vehicle, 'red', follow=True)
-            self.map.set_position('Pos' + vehicle, (lat, lon), rotation=heading)
-            self.map.set_follow_object('Pos' + vehicle, self.is_primary_vehicle(m))
-
         elif mtype == 'HOME_POSITION':
             (lat, lon) = (m.latitude*1.0e-7, m.longitude*1.0e-7)
             icon = self.map.icon('home.png')
