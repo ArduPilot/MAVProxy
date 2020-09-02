@@ -121,7 +121,7 @@ class ParamState:
                     master.param_fetch_all()
                 else:
                     self.ftp_start()
-            elif self.mav_param_count != 0 and len(self.mav_param_set) != self.mav_param_count:
+            elif not self.ftp_started and self.mav_param_count != 0 and len(self.mav_param_set) != self.mav_param_count:
                 if master.time_since('PARAM_VALUE') >= 1 or force:
                     diff = set(range(self.mav_param_count)).difference(self.mav_param_set)
                     count = 0
@@ -297,6 +297,7 @@ class ParamState:
         ftp = self.mpstate.module('ftp')
         if ftp is None:
             self.ftp_failed = True
+            self.ftp_started = False
             return
         self.ftp_started = True
         ftp.cmd_get(["@PARAM/param.pck"], callback=self.ftp_callback)
