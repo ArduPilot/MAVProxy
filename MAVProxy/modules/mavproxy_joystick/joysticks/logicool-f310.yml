@@ -1,7 +1,7 @@
 description: >
   Support for the Logicool F310 joystick.
 match:
-  - 'Logicool Dual Action'
+  - 'Logicool Logicool Dual Action'
 controls:
   - channel: 1
     type: axis
