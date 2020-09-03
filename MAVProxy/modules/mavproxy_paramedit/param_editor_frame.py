@@ -500,7 +500,7 @@ class ParamEditorFrame(wx.Frame):
             self.categorical_list = self.param_received
         temp = {}
         for param, value in self.categorical_list.items():
-            if key.lower() in param.lower():
+            if isinstance(param,str) and key.lower() in param.lower():
                 temp[param] = value
             else:
                 try:
@@ -508,6 +508,9 @@ class ParamEditorFrame(wx.Frame):
                         temp[param] = value
                 except Exception as e:
                     continue
+        for param, value in self.param_received.items():
+            if param in temp:
+                temp[param] = value
         self.redraw_grid(temp)
 
     def ParamChanged(self, event):  # wxGlade: ParamEditor.<event_handler>

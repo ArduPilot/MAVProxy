@@ -309,6 +309,7 @@ class ParamState:
         usec = int(time.time() * 1.0e6)
         idx = 0
         mav = self.mpstate.master().mav
+        editor = self.mpstate.module('paramedit')
         for (name, v, ptype) in params:
             p = mavutil.mavlink.MAVLink_param_value_message(name,
                                                             float(v),
@@ -324,6 +325,9 @@ class ParamState:
             try:
                 buf = p.pack(mav)
                 self.mpstate.logqueue.put(bytearray(struct.pack('>Q', usec) + buf))
+                # also give to param editor so it can update for changes
+                if editor:
+                    editor.mavlink_packet(p)
             except Exception:
                 pass
             (mav.srcSystem, mav.srcComponent) = id_saved
