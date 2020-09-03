@@ -43,10 +43,8 @@ class ParamEditorEventThread(threading.Thread):
 
                     if event_type == ph_event.PEE_READ_PARAM:
                         self.param_received = self.module('param').mav_param
-                        self.mp_paramedit.gui_event_queue_lock.acquire()
                         self.mp_paramedit.gui_event_queue.put(ParamEditorEvent(
                             ph_event.PEGE_READ_PARAM, param=self.param_received, vehicle=self.mp_paramedit.mpstate.vehicle_name))
-                        self.mp_paramedit.gui_event_queue_lock.release()
 
                     elif event_type == ph_event.PEE_TIME_TO_QUIT:
                         self.mp_paramedit.needs_unloading = True
@@ -55,10 +53,8 @@ class ParamEditorEventThread(threading.Thread):
                         self.module('param').mav_param.load(
                                 event.get_arg("path"))
                         self.param_received = self.module('param').mav_param
-                        self.mp_paramedit.gui_event_queue_lock.acquire()
                         self.mp_paramedit.gui_event_queue.put(ParamEditorEvent(
                             ph_event.PEGE_READ_PARAM, param=self.param_received))
-                        self.mp_paramedit.gui_event_queue_lock.release()
 
                     elif event_type == ph_event.PEE_SAVE_FILE:
                         self.module('param').mav_param.save(
