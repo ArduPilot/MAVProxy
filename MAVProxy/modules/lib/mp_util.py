@@ -340,7 +340,8 @@ def decode_devid(devid, pname):
         1: "I2C",
         2: "SPI",
         3: "UAVCAN",
-        4: "SITL"
+        4: "SITL",
+        5: "MSP"
         }
 
     compass_types = {
@@ -419,7 +420,8 @@ def decode_devid(devid, pname):
     if pname.startswith("GND_BARO"):
         decoded_devname = baro_types.get(devtype, "UNKNOWN")
         
-    print("%s: bus_type:%s(%u)  bus:%u address:%u(0x%x) devtype:%u(0x%x) %s" % (
+    print("%s: bus_type:%s(%u)  bus:%u address:%u(0x%x) devtype:%u(0x%x) %s (%u)" % (
         pname,
         bustypes.get(bus_type,"UNKNOWN"), bus_type,
-        bus, address, address, devtype, devtype, decoded_devname))
+        bus, address, address, devtype, devtype, decoded_devname,
+        devid))

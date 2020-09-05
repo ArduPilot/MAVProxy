@@ -707,7 +707,7 @@ def cmd_devid(args):
     params = mestate.mlog.params
     k = sorted(params.keys())
     for p in k:
-        if p.startswith('COMPASS_DEV_ID'):
+        if p.startswith('COMPASS_DEV_ID') or p.startswith('COMPASS_PRIO'):
             mp_util.decode_devid(params[p], p)
         if p.startswith('INS_') and p.endswith('_ID'):
             mp_util.decode_devid(params[p], p)
