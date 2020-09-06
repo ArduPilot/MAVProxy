@@ -261,11 +261,13 @@ class HorizonFrame(wx.Frame):
         '''Updates the verticies of the patches for the ground and sky.'''
         ydiff = math.tan(math.radians(-self.roll))*float(self.ratio)
         pitchdiff = self.dist10deg*(self.pitch/10.0)
-        # Sky Polygon
-        vertsTop = [(-self.ratio,ydiff-pitchdiff),(-self.ratio,1),(self.ratio,1),(self.ratio,-ydiff-pitchdiff),(-self.ratio,ydiff-pitchdiff)]       
+        # Draw Polygons
+        vertsTop = [(-self.ratio,ydiff-pitchdiff),(-self.ratio,1),(self.ratio,1),(self.ratio,-ydiff-pitchdiff),(-self.ratio,ydiff-pitchdiff)]
+        vertsBot = [(-self.ratio,ydiff-pitchdiff),(-self.ratio,-1),(self.ratio,-1),(self.ratio,-ydiff-pitchdiff),(-self.ratio,ydiff-pitchdiff)]
+        if (self.roll > 90) or (self.roll < -90):
+            vertsTop = [(-self.ratio,ydiff-pitchdiff),(-self.ratio,-1),(self.ratio,-1),(self.ratio,-ydiff-pitchdiff),(-self.ratio,ydiff-pitchdiff)]
+            vertsBot = [(-self.ratio,ydiff-pitchdiff),(-self.ratio,1),(self.ratio,1),(self.ratio,-ydiff-pitchdiff),(-self.ratio,ydiff-pitchdiff)]
         self.topPolygon.set_xy(vertsTop)
-        # Ground Polygon
-        vertsBot = [(-self.ratio,ydiff-pitchdiff),(-self.ratio,-1),(self.ratio,-1),(self.ratio,-ydiff-pitchdiff),(-self.ratio,ydiff-pitchdiff)]       
         self.botPolygon.set_xy(vertsBot)  
     
     def createPitchMarkers(self):
