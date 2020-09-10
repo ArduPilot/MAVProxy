@@ -125,7 +125,7 @@ class proximity(mp_module.MPModule):
                 increment = float(m.increment)
             start_angle = -increment/2.0
             end_angle = increment/2.0
-            for i in range(0, int(360/abs(increment))):
+            for i in range(0, 72):
                 slipkey = '%s-POS%u' % (tlayer, i)
                 if m.distances[i] == m.max_distance+1:
                     # no measurement
