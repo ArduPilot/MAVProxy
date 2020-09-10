@@ -15,7 +15,8 @@ MAVProxyAny = Analysis(['mavproxy.py'],
                             'six','packaging', 'packaging.version', 'packaging.specifiers',
                             'pkg_resources.py2_warn'] + collect_submodules('MAVProxy.modules') + 
                             collect_submodules('pymavlink') + collect_submodules('yaml') + collect_submodules('pygame'),
-             datas= [ ('modules\\mavproxy_map\\data\\*.*', 'MAVProxy\\modules\\mavproxy_map\\data' ) ],
+             datas= [ ('modules\\mavproxy_map\\data\\*.*', 'MAVProxy\\modules\\mavproxy_map\\data' ),
+                      ('modules\\mavproxy_joystick\\joysticks\\*.*', 'MAVProxy\\modules\\mavproxy_joystick\\joysticks' )],
              hookspath=None,
              runtime_hooks=None,
              excludes= ['sphinx', 'docutils', 'alabaster'])
