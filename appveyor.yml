@@ -68,9 +68,7 @@ after_test:
   #create version txt file
   - "cd  .\\windows\\"
   - "for /f \"tokens=*\" %%a in ( \'python returnVersion.py\' ) do ( set VERSION=%%a )"
-  - "@echo off"
-  - "@echo %VERSION%> version.txt"
-  - "@echo on"
+  - "python returnVersion.py > version.txt"
   - "cd ..\\"
   
   # download parameter def files for installer
