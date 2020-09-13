@@ -34,7 +34,7 @@ class HelpModule(mp_module.MPModule):
             import pkg_resources
             self.version = pkg_resources.Environment()["mavproxy"][0].version
         except:
-            start_script = os.path.join(os.environ['LOCALAPPDATA'], ".mavproxy", "version.txt")
+            start_script = mp_util.dot_mavproxy("version.txt")
             f = open(start_script, 'r')
             self.version = f.readline()
         self.host = platform.system() + platform.release()

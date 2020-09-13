@@ -252,16 +252,10 @@ def load_graphs():
     '''load graphs from mavgraphs.xml'''
     mestate.graphs = []
     gfiles = ['mavgraphs.xml']
-    if 'HOME' in os.environ:
-        for dirname, dirnames, filenames in os.walk(os.path.join(os.environ['HOME'], ".mavproxy")):
-            for filename in filenames:
-                if filename.lower().endswith('.xml'):
-                    gfiles.append(os.path.join(dirname, filename))
-    elif 'LOCALAPPDATA' in os.environ:
-        for dirname, dirnames, filenames in os.walk(os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy")):
-            for filename in filenames:
-                if filename.lower().endswith('.xml'):
-                    gfiles.append(os.path.join(dirname, filename))
+    for dirname, dirnames, filenames in os.walk(mp_util.dot_mavproxy()):
+        for filename in filenames:
+            if filename.lower().endswith('.xml'):
+                gfiles.append(os.path.join(dirname, filename))
 
     for file in gfiles:
         if not os.path.exists(file):
@@ -397,21 +391,7 @@ def cmd_fft(args):
 def save_graph(graphdef):
     '''save a graph as XML'''
     if graphdef.filename is None:
-        if 'HOME' in os.environ:
-            dname = os.path.join(os.environ['HOME'], '.mavproxy')
-            if os.path.exists(dname):
-                mp_util.mkdir_p(dname)
-                graphdef.filename = os.path.join(dname, 'mavgraphs.xml')
-        elif 'LOCALAPPDATA' in os.environ:
-            dname = os.path.join(os.environ['LOCALAPPDATA'], 'MAVProxy')
-            if os.path.exists(dname):
-                mp_util.mkdir_p(dname)
-                graphdef.filename = os.path.join(dname, 'mavgraphs.xml')
-        else:
-            graphdef.filename = 'mavgraphs.xml'
-    if graphdef.filename is None:
-        print("No file to save graph to")
-        return
+        graphdef.filename = os.path.join(mp_util.dot_mavproxy(), 'mavgraphs.xml')
     contents = None
     try:
         contents = open(graphdef.filename).read()
@@ -874,7 +854,7 @@ if __name__ == "__main__":
         try:
             version = pkg_resources.require("mavproxy")[0].version
         except Exception as e:
-            start_script = os.path.join(os.environ['LOCALAPPDATA'], ".mavproxy", "version.txt")
+            start_script = mp_util.dot_mavproxy("version.txt")
             f = open(start_script, 'r')
             version = f.readline()
         print("MAVExplorer Version: " + version)

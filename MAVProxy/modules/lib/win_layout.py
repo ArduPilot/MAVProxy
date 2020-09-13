@@ -2,6 +2,7 @@
 
 from __future__ import print_function
 import os, wx, pickle
+from MAVProxy.modules.lib import mp_util
 
 '''
 handle saving/loading of window positions
@@ -70,17 +71,7 @@ def layout_filename(fallback):
     global display_size
     global vehiclename
     (dw,dh) = display_size
-    if 'HOME' in os.environ:
-        dirname = os.path.join(os.environ['HOME'], ".mavproxy")
-        if not os.path.exists(dirname):
-            try:
-                os.mkdir(dirname)
-            except Exception:
-                pass
-    elif 'LOCALAPPDATA' in os.environ:
-        dirname = os.path.join(os.environ['LOCALAPPDATA'], "MAVProxy")
-    else:
-        return None
+    dirname = mp_util.dot_mavproxy()
     if vehiclename:
         fname = os.path.join(dirname, "layout-%s-%ux%u" % (vehiclename,dw,dh))
         if not fallback or os.path.exists(fname):
