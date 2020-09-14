@@ -1358,6 +1358,8 @@ if __name__ == '__main__':
 
     start_scripts = []
     if not opts.setup:
+        if 'HOME' in os.environ:
+            start_scripts.append(os.path.join(os.environ['HOME'], ".mavinit.scr"))
         start_script = mp_util.dot_mavproxy("mavinit.scr")
         start_scripts.append(start_script)
     if (mpstate.settings.state_basedir is not None and
