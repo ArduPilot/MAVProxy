@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 '''common mavproxy utility functions'''
 
+import gzip
 import math
 import os
 import sys
@@ -269,6 +270,9 @@ def download_files(files):
         data = download_url(url)
         if data is None:
             continue
+        if url.endswith(".gz") and not file.endswith(".gz"):
+            # decompress it...
+            data = gzip.decompress(data)
         try:
             open(file, mode='wb').write(data)
         except Exception as e:
