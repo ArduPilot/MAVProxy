@@ -243,6 +243,7 @@ class MPState(object):
               MPSetting('wpalt', int, 100, 'Default WP Altitude', range=(0,10000), increment=1),
               MPSetting('rallyalt', int, 90, 'Default Rally Altitude', range=(0,10000), increment=1),
               MPSetting('terrainalt', str, 'Auto', 'Use terrain altitudes', choice=['Auto','True','False']),
+              MPSetting('guidedalt', int, 100, 'Default "Fly To" Altitude', range=(0,10000), increment=1),
               MPSetting('rally_breakalt', int, 40, 'Default Rally Break Altitude', range=(0,10000), increment=1),
               MPSetting('rally_flags', int, 0, 'Default Rally Flags', range=(0,10000), increment=1),
 
