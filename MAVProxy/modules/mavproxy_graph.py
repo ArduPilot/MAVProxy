@@ -137,10 +137,13 @@ class Graph():
         mtype = msg.get_type()
         if mtype not in self.msg_types:
             return
+        have_value = False
         for i in range(len(self.fields)):
             if mtype not in self.field_types[i]:
                 continue
             f = self.fields[i]
             self.values[i] = mavutil.evaluate_expression(f, self.state.master.messages)
-        if self.livegraph is not None:
+            if self.values[i] is not None:
+                have_value = True
+        if have_value and self.livegraph is not None:
             self.livegraph.add_values(self.values)
