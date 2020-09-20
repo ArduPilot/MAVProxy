@@ -160,6 +160,9 @@ class MPStatus(object):
         for m in sorted(self.msgs.keys()):
             if pattern is not None and not fnmatch.fnmatch(str(m).upper(), pattern.upper()):
                 continue
+            if getattr(self.msgs[m], '_instance_field', None) is not None and m.find('[') == -1:
+                # only show instance versions
+                continue
             if verbose:
                 try:
                     mavutil.dump_message_verbose(f, self.msgs[m])

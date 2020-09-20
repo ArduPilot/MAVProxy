@@ -671,10 +671,20 @@ class LinkModule(mp_module.MPModule):
 
         # keep the last message of each type around
         self.status.msgs[mtype] = m
+        instance_field = getattr(m, '_instance_field', None)
         if mtype not in self.status.msg_count:
             self.status.msg_count[mtype] = 0
         self.status.msg_count[mtype] += 1
 
+        if instance_field is not None:
+            instance_value = getattr(m, instance_field, None)
+            if instance_value is not None:
+                mtype_instance = "%s[%s]" % (mtype, instance_value)
+                self.status.msgs[mtype_instance] = m
+                if mtype_instance not in self.status.msg_count:
+                    self.status.msg_count[mtype_instance] = 0
+                self.status.msg_count[mtype_instance] += 1
+        
         if m.get_srcComponent() == mavutil.mavlink.MAV_COMP_ID_GIMBAL and mtype == 'HEARTBEAT':
             # silence gimbal heartbeat packets for now
             return
