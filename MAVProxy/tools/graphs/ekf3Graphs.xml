@@ -177,13 +177,13 @@
   </graph>
   
 
-  <graph name='EKF3/Normalised Innovations EK2 Lane1'>
+  <graph name='EKF3/Normalised Innovations EK3 Lane1'>
     <description>EKF3 Normalized Innovations Lane1</description>
     <expression>XKF4[0].SV XKF4[0].SP XKF4[0].SH XKF4[0].SM XKF4[0].SVT</expression>
     <expression>XKF4.SV XKF4.SP XKF4.SH XKF4.SM XKF4.SVT</expression>
   </graph>
 
-  <graph name='EKF3/Normalised Innovations EK2 Lane2'>
+  <graph name='EKF3/Normalised Innovations EK3 Lane2'>
     <description>EKF3  Normalized Innovations Lane2</description>
     <expression>XKF4[1].SV XKF4[1].SP XKF4[1].SH XKF4[1].SM XKF4[1].SVT</expression>
     <expression>XKF9.SV XKF9.SP XKF9.SH XKF9.SM XKF9.SVT</expression>
