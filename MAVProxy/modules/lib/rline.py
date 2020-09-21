@@ -12,6 +12,10 @@ from pymavlink import mavutil
 if platform.system() == 'Darwin':
     import gnureadline as readline
 elif platform.system() == 'Windows' and sys.version_info >= (3, 0):
+    # Python 3.8 defaults to Proactor event loop, which doesn't work well
+    if sys.version_info >= (3, 8):
+        import asyncio
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     from prompt_toolkit import prompt, PromptSession
     from prompt_toolkit.completion import Completer, Completion
     from prompt_toolkit.shortcuts import CompleteStyle
