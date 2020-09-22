@@ -94,8 +94,6 @@ for:
       only: 
         - master
     artifacts:
-    - path: MAVProxy\dist\
-      name: WindowsCompiledFiles
     - path: windows\Output\
       name: WindowsInstaller
 
