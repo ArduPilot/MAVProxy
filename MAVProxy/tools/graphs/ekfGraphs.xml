@@ -14,18 +14,11 @@
     <expression>NKF1.OH</expression>
   </graph>
 
-  <graph name='EKF2/Pos N'>
-    <description>EKF2 Position North</description>
-    <expression>NKF1[0].PN NKF1[1].PN NKF1[2].PN</expression>
-    <expression>NKF1[0].PN NKF1[1].PN</expression>
-    <expression>NKF1.PN</expression>
-  </graph>
-
-  <graph name='EKF2/Pos E'>
-    <description>EKF2 Position East</description>
-    <expression>NKF1[0].PE NKF1[1].PE NKF1[2].PE</expression>
-    <expression>NKF1[0].PE NKF1[1].PE</expression>
-    <expression>NKF1.PE</expression>
+  <graph name='EKF2/Pos NE'>
+    <description>EKF2 Position North/East</description>
+    <expression>NKF1[0].PN NKF1[1].PN NKF1[2].PN NKF1[0].PE NKF1[1].PE NKF1[2].PE</expression>
+    <expression>NKF1[0].PN NKF1[1].PN NKF1[0].PE NKF1[1].PE</expression>
+    <expression>NKF1.PN NKF1.PE</expression>
   </graph>
 
   <graph name='EKF2/Pos D'>
@@ -35,6 +28,34 @@
     <expression>NKF1.PD</expression>
   </graph>
 
+  <graph name='EKF2/Position Innovation NE'>
+    <description>EKF2 Position Innovation North/East</description>
+    <expression>NKF3[0].IPN NKF3[1].IPN NKF3[2].IPN NKF3[0].IPE NKF3[1].IPE NKF3[2].IPE</expression>
+    <expression>NKF3[0].IPN NKF3[1].IPN NKF3[0].IPE NKF3[1].IPE</expression>
+    <expression>NKF3.IPN NKF3.IPE</expression>
+  </graph>
+
+  <graph name='EKF2/Position Innovation Down'>
+    <description>EKF2 Position Down</description>
+    <expression>NKF3[0].IPD NKF3[1].IPD NKF3[2].IPD</expression>
+    <expression>NKF3[0].IPD NKF3[1].IPD</expression>
+    <expression>NKF3.IPD</expression>
+  </graph>
+
+  <graph name='EKF2/Velocity Innovation NE'>
+    <description>EKF2 Velocity Innovation North/East</description>
+    <expression>NKF3[0].IVN NKF3[1].IVN NKF3[2].IVN NKF3[0].IVE NKF3[1].IVE NKF3[2].IVE</expression>
+    <expression>NKF3[0].IVN NKF3[1].IVN NKF3[0].IVE NKF3[1].IVE</expression>
+    <expression>NKF3.IVN NKF3.IVE</expression>
+  </graph>
+
+  <graph name='EKF2/Velocity Innovation Down'>
+    <description>EKF2 Velocity Down</description>
+    <expression>NKF3[0].IVD NKF3[1].IVD NKF3[2].IVD</expression>
+    <expression>NKF3[0].IVD NKF3[1].IVD</expression>
+    <expression>NKF3.IVD</expression>
+  </graph>
+  
   <graph name='EKF2/Euler Roll'>
     <description>EKF2 Euler Roll</description>
     <expression>ATT.Roll NKF1[0].Roll NKF1[1].Roll NKF1[2].Roll</expression>

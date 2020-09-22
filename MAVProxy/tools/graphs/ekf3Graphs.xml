@@ -14,18 +14,19 @@
     <expression>XKF1.OH</expression>
   </graph>
 
-  <graph name='EKF3/Pos N'>
-    <description>EKF3 Position North</description>
-    <expression>XKF1[0].PN XKF1[1].PN XKF1[2].PN</expression>
-    <expression>XKF1[0].PN XKF1[1].PN</expression>
-    <expression>XKF1.PN</expression>
+  <graph name='EKF3/Pos D'>
+    <description>EKF3 Position Down</description>
+    <expression>XKF1[0].PD XKF1[1].PD XKF1[2].PD</expression>
+    <expression>XKF1[0].PD XKF1[1].PD</expression>
+    <expression>XKF1.PD</expression>
   </graph>
 
-  <graph name='EKF3/Pos E'>
-    <description>EKF3 Position East</description>
-    <expression>XKF1[0].PE XKF1[1].PE XKF1[2].PE</expression>
-    <expression>XKF1[0].PE XKF1[1].PE</expression>
-    <expression>XKF1.PE</expression>
+
+  <graph name='EKF3/Pos NE'>
+    <description>EKF3 Position North/East</description>
+    <expression>XKF1[0].PN XKF1[1].PN XKF1[2].PN XKF1[0].PE XKF1[1].PE XKF1[2].PE</expression>
+    <expression>XKF1[0].PN XKF1[1].PN XKF1[0].PE XKF1[1].PE</expression>
+    <expression>XKF1.PN XKF1.PE</expression>
   </graph>
 
   <graph name='EKF3/Pos D'>
@@ -33,6 +34,34 @@
     <expression>XKF1[0].PD XKF1[1].PD XKF1[2].PD</expression>
     <expression>XKF1[0].PD XKF1[1].PD</expression>
     <expression>XKF1.PD</expression>
+  </graph>
+
+  <graph name='EKF3/Position Innovation NE'>
+    <description>EKF3 Position Innovation North/East</description>
+    <expression>XKF3[0].IPN XKF3[1].IPN XKF3[2].IPN XKF3[0].IPE XKF3[1].IPE XKF3[2].IPE</expression>
+    <expression>XKF3[0].IPN XKF3[1].IPN XKF3[0].IPE XKF3[1].IPE</expression>
+    <expression>XKF3.IPN XKF3.IPE</expression>
+  </graph>
+
+  <graph name='EKF3/Position Innovation Down'>
+    <description>EKF3 Position Down</description>
+    <expression>XKF3[0].IPD XKF3[1].IPD XKF3[2].IPD</expression>
+    <expression>XKF3[0].IPD XKF3[1].IPD</expression>
+    <expression>XKF3.IPD</expression>
+  </graph>
+
+  <graph name='EKF3/Velocity Innovation NE'>
+    <description>EKF3 Velocity Innovation North/East</description>
+    <expression>XKF3[0].IVN XKF3[1].IVN XKF3[2].IVN XKF3[0].IVE XKF3[1].IVE XKF3[2].IVE</expression>
+    <expression>XKF3[0].IVN XKF3[1].IVN XKF3[0].IVE XKF3[1].IVE</expression>
+    <expression>XKF3.IVN XKF3.IVE</expression>
+  </graph>
+
+  <graph name='EKF3/Velocity Innovation Down'>
+    <description>EKF3 Velocity Down</description>
+    <expression>XKF3[0].IVD XKF3[1].IVD XKF3[2].IVD</expression>
+    <expression>XKF3[0].IVD XKF3[1].IVD</expression>
+    <expression>XKF3.IVD</expression>
   </graph>
 
   <graph name='EKF3/Euler Roll'>
