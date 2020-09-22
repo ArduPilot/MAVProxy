@@ -219,7 +219,7 @@ class CmdlongModule(mp_module.MPModule):
             print("x:%f, y:%f, z:%f" % (x_mps, y_mps, z_mps))
             self.master.mav.set_position_target_local_ned_send(
                                       0,  # system time in milliseconds
-                                      1,  # target system
+                                      self.settings.target_system,  # target system
                                       0,  # target component
                                       8,  # coordinate frame MAV_FRAME_BODY_NED
                                       4039,     # type mask (vel only)
@@ -241,7 +241,7 @@ class CmdlongModule(mp_module.MPModule):
             print("x:%f, y:%f, z:%f" % (x_m, y_m, z_m))
             self.master.mav.set_position_target_local_ned_send(
                                       0,  # system time in milliseconds
-                                      1,  # target system
+                                      self.settings.target_system,  # target system
                                       0,  # target component
                                       8,  # coordinate frame MAV_FRAME_BODY_NED
                                       3576,     # type mask (pos only)
@@ -266,7 +266,7 @@ class CmdlongModule(mp_module.MPModule):
             print("q0:%.3f, q1:%.3f, q2:%.3f q3:%.3f thrust:%.2f" % (q0, q1, q2, q3, thrust))
             self.master.mav.set_attitude_target_send(
                                       0,  # system time in milliseconds
-                                      1,  # target system
+                                      self.settings.target_system,  # target system
                                       0,  # target component
                                       63, # type mask (ignore all except attitude + thrust)
                                       att_target, # quaternion attitude
@@ -299,7 +299,7 @@ class CmdlongModule(mp_module.MPModule):
         print(latlon)
         self.master.mav.set_position_target_global_int_send(
             0,  # system time in ms
-            1,  # target system
+            self.settings.target_system,  # target system
             0,  # target component
             mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
             ignoremask, # ignore
