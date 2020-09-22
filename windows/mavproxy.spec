@@ -19,7 +19,7 @@ MAVProxyAny = Analysis(['mavproxy.py'],
                       ('modules\\mavproxy_joystick\\joysticks\\*.*', 'MAVProxy\\modules\\mavproxy_joystick\\joysticks' )],
              hookspath=None,
              runtime_hooks=None,
-             excludes= ['sphinx', 'docutils', 'alabaster'])
+             excludes= ['sphinx', 'docutils', 'alabaster', 'FixTk', 'tcl', 'tk', '_tkinter', 'tkinter', 'Tkinter'])
 MAVExpAny = Analysis(['.\\tools\\MAVExplorer.py'],
              pathex=[os.path.abspath('.')],
              # for some unknown reason these hidden imports don't pull in
@@ -34,7 +34,7 @@ MAVExpAny = Analysis(['.\\tools\\MAVExplorer.py'],
              datas= [ ('tools\\graphs\\*.*', 'MAVProxy\\tools\\graphs' ) ],
              hookspath=None,
              runtime_hooks=None,
-             excludes= ['sphinx', 'docutils', 'alabaster'])
+             excludes= ['sphinx', 'docutils', 'alabaster', 'FixTk', 'tcl', 'tk', '_tkinter', 'tkinter', 'Tkinter'])
 # MERGE( (MAVProxyAny, 'mavproxy', 'mavproxy'), (MAVExpAny, 'MAVExplorer', 'MAVExplorer') )
 MAVProxy_pyz = PYZ(MAVProxyAny.pure)
 MAVProxy_exe = EXE(MAVProxy_pyz,
