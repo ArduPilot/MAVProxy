@@ -569,6 +569,7 @@ subsystems = {
     26 : "FAILSAFE_SENSORS",
     27 : "FAILSAFE_LEAK",
     28 : "PILOT_INPUT",
+    29 : "FAILSAFE_VIBE",
 }
 
 error_codes = { # not used yet
