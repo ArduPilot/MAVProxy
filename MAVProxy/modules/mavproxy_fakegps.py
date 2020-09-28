@@ -4,7 +4,10 @@
 import time
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
+from MAVProxy.modules.lib import mp_util
 
+if mp_util.has_wxpython:
+    from MAVProxy.modules.lib.mp_menu import *
 
 class FakeGPSModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -19,6 +22,14 @@ class FakeGPSModule(mp_module.MPModule):
                          ["<status>", "set (FAKEGPSSETTING)"])
         self.add_completion_function('(FAKEGPSSETTING)',
                                      self.FakeGPS_settings.completion)
+        if mp_util.has_wxpython:
+            map = self.module('map')
+            if map is not None:
+                menu = MPMenuSubMenu('FakeGPS',
+                                    items=[MPMenuItem('SetPos', 'SetPos', '# fakegps setpos'),
+                                           MPMenuItem('SetPos (with alt)', 'SetPosAlt', '# fakegps setpos ',
+                                                    handler=MPMenuCallTextDialog(title='Altitude (m)', default=self.mpstate.settings.guidedalt))])
+                map.add_menu(menu)
 
     def cmd_FakeGPS(self, args):
         '''fakegps command parser'''
@@ -28,8 +39,22 @@ class FakeGPSModule(mp_module.MPModule):
             return
         if args[0] == "set":
             self.FakeGPS_settings.command(args[1:])
+        elif args[0] == "setpos":
+            self.cmd_setpos(args[1:])
         else:
             print(usage)
+
+    def cmd_setpos(self, args):
+        '''set pos from map'''
+        latlon = self.mpstate.click_location
+        if latlon is None:
+            print("No map click position available")
+            return
+        (lat,lon) = latlon
+        self.FakeGPS_settings.lat = lat
+        self.FakeGPS_settings.lon = lon
+        if len(args) > 0:
+            self.FakeGPS_settings.alt = float(args[0])
 
     def get_gps_time(self, tnow):
         '''return gps_week and gps_week_ms for current time'''
