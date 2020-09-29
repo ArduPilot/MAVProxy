@@ -158,11 +158,12 @@ class MPStatus(object):
             f.write('MAV Errors: %u\n' % self.mav_error)
             f.write(str(self.gps)+'\n')
         for m in sorted(self.msgs.keys()):
-            if pattern is not None and not fnmatch.fnmatch(str(m).upper(), pattern.upper()):
-                continue
-            if getattr(self.msgs[m], '_instance_field', None) is not None and m.find('[') == -1 and pattern.find('*') != -1:
-                # only show instance versions for patterns
-                continue
+            if pattern is not None:
+                if fnmatch.fnmatch(str(m).upper(), pattern.upper()):
+                    continue
+                if getattr(self.msgs[m], '_instance_field', None) is not None and m.find('[') == -1 and pattern.find('*') != -1:
+                    # only show instance versions for patterns
+                    continue
             if verbose:
                 try:
                     mavutil.dump_message_verbose(f, self.msgs[m])
