@@ -164,9 +164,21 @@ class MPStatus(object):
                 if getattr(self.msgs[m], '_instance_field', None) is not None and m.find('[') == -1 and pattern.find('*') != -1:
                     # only show instance versions for patterns
                     continue
+            msg = None
+            sysid = mpstate.settings.target_system
+            for mav in mpstate.mav_master:
+                if not sysid in mav.sysid_state:
+                    continue
+                if not m in mav.sysid_state[sysid].messages:
+                    continue
+                msg2 = mav.sysid_state[sysid].messages[m]
+                if msg is None or msg2._timestamp > msg._timestamp:
+                    msg = msg2
+            if msg is None:
+                continue
             if verbose:
                 try:
-                    mavutil.dump_message_verbose(f, self.msgs[m])
+                    mavutil.dump_message_verbose(f, msg)
                     f.write("\n")
                 except AttributeError as e:
                     if "has no attribute 'dump_message_verbose'" in str(e):
@@ -174,7 +186,7 @@ class MPStatus(object):
                     else:
                         raise e
             else:
-                f.write("%u: %s\n" % (self.msg_count[m], str(self.msgs[m])))
+                f.write("%u: %s\n" % (self.msg_count[m], str(msg)))
 
     def write(self):
         '''write status to status.txt'''
