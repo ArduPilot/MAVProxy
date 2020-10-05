@@ -19,7 +19,8 @@ class NtripModule(mp_module.MPModule):
              ('username', str, 'IBS'),
              ('password', str, 'IBS'),
              ('mountpoint', str, None),
-             ('logfile', str, None)])
+             ('logfile', str, None),
+             ('sendalllinks', bool, False)])
         self.add_command('ntrip', self.cmd_ntrip, 'NTRIP control',
                          ["<status>",
                           "<start>",
@@ -92,7 +93,12 @@ class NtripModule(mp_module.MPModule):
             data = data[frag_len:]
             if frag_len < 180:
                 send_data.extend(bytearray([0]*(180-frag_len)))
-            self.master.mav.gps_rtcm_data_send(flags | (fragment<<1), frag_len, send_data)
+            if self.ntrip_settings.sendalllinks:
+                links = self.mpstate.mav_master
+            else:
+                links = [self.master]
+            for link in links:
+                link.mav.gps_rtcm_data_send(flags | (fragment<<1), frag_len, send_data)
             fragment += 1
             blen -= frag_len
         self.pkt_count += 1
