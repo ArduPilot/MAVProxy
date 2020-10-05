@@ -36,19 +36,21 @@ preferred_ports = [
 class LinkModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(LinkModule, self).__init__(mpstate, "link", "link control", public=True)
+        super(LinkModule, self).__init__(mpstate, "link", "link control", public=True, multi_vehicle=True)
         self.add_command('link', self.cmd_link, "link control",
                          ["<list|ports>",
                           'add (SERIALPORT)',
                           'attributes (LINK) (ATTRIBUTES)',
                           'remove (LINKS)'])
         self.add_command('vehicle', self.cmd_vehicle, "vehicle control")
+        self.add_command('alllinks', self.cmd_alllinks, "send command on all links")
         self.no_fwd_types = set()
         self.no_fwd_types.add("BAD_DATA")
         self.add_completion_function('(SERIALPORT)', self.complete_serial_ports)
         self.add_completion_function('(LINKS)', self.complete_links)
         self.add_completion_function('(LINK)', self.complete_links)
         self.last_altitude_announce = 0.0
+        self.vehicle_list = set()
 
         self.menu_added_console = False
         if mp_util.has_wxpython:
@@ -158,6 +160,15 @@ class LinkModule(mp_module.MPModule):
                                                                                     self.status.bytecounters['MasterIn'][master.linknum].rate(),
                                                                                     sign_string))
 
+    def cmd_alllinks(self, args):
+        '''send command on all links'''
+        saved_target = self.mpstate.settings.target_system
+        print("Sending to: ", self.vehicle_list)
+        for v in sorted(self.vehicle_list):
+            self.cmd_vehicle([str(v)])
+            self.mpstate.functions.process_stdin(' '.join(args), True)
+        self.cmd_vehicle([str(saved_target)])
+        
     def cmd_link_list(self):
         '''list links'''
         print("%u links" % len(self.mpstate.mav_master))
@@ -630,7 +641,14 @@ class LinkModule(mp_module.MPModule):
                     self.mpstate.console.writeln('< '+ str(m))
                     break
 
+    def mavlink_packet(self, msg):
+        '''handle an incoming mavlink packet'''
+        type = msg.get_type()
 
+        if type == 'HEARTBEAT':
+            sysid = msg.get_srcSystem()
+            if not sysid in self.vehicle_list and msg.type != mavutil.mavlink.MAV_TYPE_GCS:
+                self.vehicle_list.add(sysid)
 
     def master_callback(self, m, master):
         '''process mavlink message m on master, sending any messages to recipients'''
