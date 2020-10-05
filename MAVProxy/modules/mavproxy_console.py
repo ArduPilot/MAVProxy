@@ -35,6 +35,7 @@ class ConsoleModule(mp_module.MPModule):
         self.last_sys_status_health = 0
         self.last_sys_status_errors_announce = 0
         self.user_added = {}
+        self.safety_on = False
         self.add_command('console', self.cmd_console, "console module", ['add','list','remove'])
         mpstate.console = wxconsole.MessageConsole(title='Console')
 
@@ -288,9 +289,9 @@ class ConsoleModule(mp_module.MPModule):
                 self.console.set_status(field, '%s OK%s (%u)' % (prefix, fix_type, nsats), fg='green')
             else:
                 self.console.set_status(field, '%s %u (%u)' % (prefix, fix_type, nsats), fg='red')
-            gps_heading = int(self.mpstate.status.msgs['GPS_RAW_INT'].cog * 0.01)
             if type == 'GPS_RAW_INT':
                 vfr_hud_heading = master.field('VFR_HUD', 'heading', None)
+                gps_heading = int(msg.cog * 0.01)
                 if vfr_hud_heading is None:
                     vfr_hud_heading = '---'
                 else:
@@ -409,6 +410,10 @@ class ConsoleModule(mp_module.MPModule):
                         self.last_sys_status_errors_announce = now
                         self.say("Critical failure")
                         break
+            if ((msg.onboard_control_sensors_enabled & mavutil.mavlink.MAV_SYS_STATUS_SENSOR_MOTOR_OUTPUTS) == 0):
+                self.safety_on = True
+            else:
+                self.safety_on = False                
 
         elif type == 'WIND':
             self.console.set_status('Wind', 'Wind %u/%s' % (msg.direction, self.speed_string(msg.speed)))
@@ -468,9 +473,8 @@ class ConsoleModule(mp_module.MPModule):
                 arm_colour = 'red'
             armstring = 'ARM'
             # add safety switch state
-            if 'SYS_STATUS' in self.mpstate.status.msgs:
-                if (self.mpstate.status.msgs['SYS_STATUS'].onboard_control_sensors_enabled & mavutil.mavlink.MAV_SYS_STATUS_SENSOR_MOTOR_OUTPUTS) == 0:
-                    armstring += '(SAFE)'
+            if self.safety_on:
+                armstring += '(SAFE)'
             self.console.set_status('ARM', armstring, fg=arm_colour)
             if self.max_link_num != len(self.mpstate.mav_master):
                 for i in range(self.max_link_num):
