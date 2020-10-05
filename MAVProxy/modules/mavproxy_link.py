@@ -133,7 +133,7 @@ class LinkModule(mp_module.MPModule):
     def show_link(self):
         '''show link information'''
         for master in self.mpstate.mav_master:
-            linkdelay = (self.status.highest_msec - master.highest_msec)*1.0e-3
+            linkdelay = (self.status.highest_msec.get(self.target_system,0) - master.highest_msec.get(self.target_system,0))*1.0e-3
             if master.linkerror:
                 status = "DOWN"
             else:
@@ -234,7 +234,7 @@ class LinkModule(mp_module.MPModule):
         conn.link_delayed = False
         conn.last_heartbeat = 0
         conn.last_message = 0
-        conn.highest_msec = 0
+        conn.highest_msec = {}
         conn.target_system = self.settings.target_system
         self.apply_link_attributes(conn, optional_attributes)
         self.mpstate.mav_master.append(conn)
@@ -338,20 +338,21 @@ class LinkModule(mp_module.MPModule):
             return
 
         msec = m.time_boot_ms
-        if msec + 30000 < master.highest_msec:
+        sysid = m.get_srcSystem()
+        if msec + 30000 < master.highest_msec.get(sysid,0):
             self.say('Time has wrapped')
-            print('Time has wrapped', msec, master.highest_msec)
-            self.status.highest_msec = msec
+            print('Time has wrapped', msec, master.highest_msec.get(sysid,0))
+            self.status.highest_msec[sysid] = msec
             for mm in self.mpstate.mav_master:
                 mm.link_delayed = False
-                mm.highest_msec = msec
+                mm.highest_msec[sysid] = msec
             return
 
         # we want to detect when a link is delayed
-        master.highest_msec = msec
-        if msec > self.status.highest_msec:
-            self.status.highest_msec = msec
-        if msec < self.status.highest_msec and len(self.mpstate.mav_master) > 1 and self.mpstate.settings.checkdelay:
+        master.highest_msec[sysid] = msec
+        if msec > self.status.highest_msec.get(sysid,0):
+            self.status.highest_msec[sysid] = msec
+        if msec < self.status.highest_msec.get(sysid,0) and len(self.mpstate.mav_master) > 1 and self.mpstate.settings.checkdelay:
             master.link_delayed = True
         else:
             master.link_delayed = False
@@ -779,6 +780,7 @@ class LinkModule(mp_module.MPModule):
                 if stamp > best_timestamp:
                     best_link = i
                     best_timestamp = stamp
+            m.link_delayed = False                    
         self.mpstate.settings.link = best_link + 1
         print("Set vehicle %s (link %u)" % (args[0], best_link+1))
 

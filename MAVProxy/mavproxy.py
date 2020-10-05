@@ -95,7 +95,7 @@ class MPStatus(object):
         self.last_apm_msg = None
         self.last_apm_msg_time = 0
         self.statustexts_by_sysidcompid = {}
-        self.highest_msec = 0
+        self.highest_msec = {}
         self.have_gps_lock = False
         self.lost_gps_lock = False
         self.last_gps_lock = 0

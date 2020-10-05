@@ -244,9 +244,9 @@ class ConsoleModule(mp_module.MPModule):
             self.mpstate.console = textconsole.SimpleConsole()
             return
         type = msg.get_type()
+        sysid = msg.get_srcSystem()
 
         if type == 'HEARTBEAT':
-            sysid = msg.get_srcSystem()
             if not sysid in self.vehicle_list:
                 self.add_new_vehicle(msg)
             if sysid not in self.component_name:
@@ -466,7 +466,7 @@ class ConsoleModule(mp_module.MPModule):
                 fmode = self.settings.vehicle_name + ':' + fmode
             self.console.set_status('Mode', '%s' % fmode, fg='blue')
             if len(self.vehicle_list) > 1:
-                self.console.set_status('SysID', 'Sys:%u' % msg.get_srcSystem(), fg='blue')
+                self.console.set_status('SysID', 'Sys:%u' % sysid, fg='blue')
             if self.master.motors_armed():
                 arm_colour = 'green'
             else:
@@ -482,7 +482,7 @@ class ConsoleModule(mp_module.MPModule):
                 self.max_link_num = len(self.mpstate.mav_master)
             for m in self.mpstate.mav_master:
                 if self.mpstate.settings.checkdelay:
-                    linkdelay = (self.mpstate.status.highest_msec - m.highest_msec)*1.0e-3
+                    linkdelay = (self.mpstate.status.highest_msec.get(sysid, 0) - m.highest_msec.get(sysid,0))*1.0e-3
                 else:
                     linkdelay = 0
                 linkline = "Link %s " % (self.link_label(m))
