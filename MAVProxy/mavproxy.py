@@ -340,12 +340,28 @@ class MPState(object):
             return self.public_modules[name]
         return None
 
-    def master(self):
+    def master(self, target_sysid = -1):
         '''return the currently chosen mavlink master object'''
         if len(self.mav_master) == 0:
               return None
         if self.settings.link > len(self.mav_master):
             self.settings.link = 1
+
+        if target_sysid != -1:
+            # if we're looking for a specific system ID then try to find best
+            # link for that
+            best_link = None
+            best_timestamp = 0
+            for m in self.mav_master:
+                try:
+                    tstamp = m.sysid_state[target_sysid].messages['HEARTBEAT']._timestamp
+                except Exception:
+                    continue
+                if tstamp > best_timestamp:
+                    best_link = m
+                    best_timestamp = tstamp
+            if best_link is not None:
+                return best_link
 
         # try to use one with no link error
         if not self.mav_master[self.settings.link-1].linkerror:
@@ -796,8 +812,9 @@ def process_mavlink(slave):
         return
     if mpstate.settings.mavfwd and not mpstate.status.setup_mode:
         for m in msgs:
+            target_sysid = getattr(m, 'target_system', -1)
             mbuf = m.get_msgbuf()
-            mpstate.master().write(mbuf)
+            mpstate.master(target_sysid).write(mbuf)
             if mpstate.logqueue:
                 usec = int(time.time() * 1.0e6)
                 mpstate.logqueue.put(bytearray(struct.pack('>Q', usec) + m.get_msgbuf()))
