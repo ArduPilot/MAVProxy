@@ -236,6 +236,17 @@ class ConsoleModule(mp_module.MPModule):
         self.vehicle_name_by_sysid[sysid] = self.vehicle_type_string(hb)
         self.update_vehicle_menu()
 
+    def check_critical_error(self, msg):
+        '''check for any error bits being set in SYS_STATUS'''
+        errors = msg.errors_count1 | (msg.errors_count2<<16)
+        if errors == 0:
+            return
+        now = time.time()
+        if now - self.last_sys_status_errors_announce > self.mpstate.settings.sys_status_error_warn_interval:
+            self.last_sys_status_errors_announce = now
+            self.say("Critical failure 0x%x sysid=%u" % (errors, msg.get_srcSystem()))
+
+        
     def mavlink_packet(self, msg):
         '''handle an incoming mavlink packet'''
         if not isinstance(self.console, wxconsole.MessageConsole):
@@ -268,7 +279,10 @@ class ConsoleModule(mp_module.MPModule):
             else:
                 fg = 'black'
             self.console.set_status('Radio', 'Radio %u/%u %u/%u' % (msg.rssi, msg.noise, msg.remrssi, msg.remnoise), fg=fg)
-            
+
+        if type == 'SYS_STATUS':
+            self.check_critical_error(msg)
+
         if not self.is_primary_vehicle(msg):
             # don't process msgs from other than primary vehicle, other than
             # updating vehicle list
@@ -396,20 +410,6 @@ class ConsoleModule(mp_module.MPModule):
                     self.say("%s fail" % s)
             self.last_sys_status_health = msg.onboard_control_sensors_health
 
-            # check for any error bits being set:
-            now = time.time()
-            if now - self.last_sys_status_errors_announce > self.mpstate.settings.sys_status_error_warn_interval:
-                for field_num in range(1, 5):
-                    field = "errors_count%u" % field_num
-                    x = getattr(msg, field, None)
-                    if x is None:
-                        self.console.writeln("Failed to get field %s" % field)
-                        self.last_sys_status_errors_announce = now
-                        break
-                    if x != 0:
-                        self.last_sys_status_errors_announce = now
-                        self.say("Critical failure")
-                        break
             if ((msg.onboard_control_sensors_enabled & mavutil.mavlink.MAV_SYS_STATUS_SENSOR_MOTOR_OUTPUTS) == 0):
                 self.safety_on = True
             else:
