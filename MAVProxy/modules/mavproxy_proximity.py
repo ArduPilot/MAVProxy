@@ -123,8 +123,10 @@ class proximity(mp_module.MPModule):
             increment = m.increment_f
             if increment == 0:
                 increment = float(m.increment)
+            fov = 72*increment
             start_angle = -increment/2.0
             end_angle = increment/2.0
+            rotation_start = -90 + heading - (fov/2)
             for i in range(0, 72):
                 slipkey = '%s-POS%u' % (tlayer, i)
                 if m.distances[i] == m.max_distance+1:
@@ -141,7 +143,7 @@ class proximity(mp_module.MPModule):
                     linewidth=3,
                     start_angle=start_angle,
                     end_angle=end_angle,
-                    rotation=(-90+(heading+i*increment))%360,
+                    rotation=(rotation_start+i*increment)%360,
                 )
                 self.foreach_map(lambda a_map : a_map.add_object(circle))
 
@@ -159,7 +161,6 @@ class proximity(mp_module.MPModule):
                 )))
             else:
                 # add an arc for max-range
-                fov = 72*increment
                 self.foreach_map(lambda a_map : a_map.add_object(mp_slipmap.SlipCircle(
                     slipkey,
                     3,
