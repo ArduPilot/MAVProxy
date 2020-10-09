@@ -145,16 +145,33 @@ class proximity(mp_module.MPModule):
                 )
                 self.foreach_map(lambda a_map : a_map.add_object(circle))
 
-            # add a circle for max-range
             slipkey = "%s-range" % tlayer
-            self.foreach_map(lambda a_map : a_map.add_object(mp_slipmap.SlipCircle(
-                slipkey,
-                3,
-                (lat, lon),
-                m.max_distance/100.0,
-                color,
-                linewidth=1,
-            )))
+            if increment == 5:
+                # perfect circle
+                # add a circle for max-range
+                self.foreach_map(lambda a_map : a_map.add_object(mp_slipmap.SlipCircle(
+                    slipkey,
+                    3,
+                    (lat, lon),
+                    m.max_distance/100.0,
+                    color,
+                    linewidth=1,
+                )))
+            else:
+                # add an arc for max-range
+                fov = 72*increment
+                self.foreach_map(lambda a_map : a_map.add_object(mp_slipmap.SlipCircle(
+                    slipkey,
+                    3,
+                    (lat, lon),
+                    m.max_distance/100.0,
+                    color,
+                    linewidth=1,
+                    start_angle=-fov/2,
+                    end_angle=fov/2,
+                    rotation=(-90+(heading))%360,
+                    add_radii = True,
+                )))
 
     def mavlink_packet(self, m):
         '''handle mavlink packets'''
