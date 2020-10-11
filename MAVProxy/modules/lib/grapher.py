@@ -239,7 +239,7 @@ class MavGraph(object):
         ax1_labels = []
         ax2_labels = []
 
-        for i in range(0, len(fields)):
+        for i in range(len(fields)):
             if len(x[i]) == 0:
                 #print("Failed to find any values for field %s" % fields[i])
                 continue
@@ -261,8 +261,12 @@ class MavGraph(object):
                 if label.endswith(":2"):
                     label = label[:-2]
                 ax2_labels.append(label)
+                if self.custom_labels[i] is not None:
+                    ax2_labels[-1] = self.custom_labels[i]
             else:
                 ax1_labels.append(fields[i])
+                if self.custom_labels[i] is not None:
+                    ax1_labels[-1] = self.custom_labels[i]
                 ax = self.ax1
 
             if self.xaxis:
@@ -394,9 +398,18 @@ class MavGraph(object):
             if s:
                 all_false = False
 
-        # pre-calc right/left axes
         self.num_fields = len(self.fields)
-        for i in range(0, self.num_fields):
+
+        self.custom_labels = [None] * self.num_fields
+        for i in range(self.num_fields):
+            if self.fields[i].endswith(">"):
+                a2 = self.fields[i].rfind("<")
+                if a2 != -1:
+                    self.custom_labels[i] = self.fields[i][a2+1:-1]
+                    self.fields[i] = self.fields[i][:a2]
+
+        # pre-calc right/left axes
+        for i in range(self.num_fields):
             f = self.fields[i]
             if f.endswith(":2"):
                 self.axes[i] = 2
