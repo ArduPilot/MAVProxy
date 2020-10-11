@@ -425,24 +425,28 @@ class MavGraph(object):
         except Exception:
             pass
 
+        all_messages = {}
+
         while True:
             msg = mlog.recv_match(type=self.msg_types)
             if msg is None:
                 break
-            if msg.get_type() not in self.msg_types:
+            mtype = msg.get_type()
+            all_messages[mtype] = msg
+            if mtype not in self.msg_types:
                 continue
             if self.condition:
-                if not mavutil.evaluate_condition(self.condition, mlog.messages):
+                if not mavutil.evaluate_condition(self.condition, all_messages):
                     continue
             tdays = timestamp_to_days(msg._timestamp, self.timeshift)
 
             if all_false or len(flightmode_selections) == 0:
-                self.add_data(tdays, msg, mlog.messages)
+                self.add_data(tdays, msg, all_messages)
             else:
                 if idx < len(self.flightmode_list) and msg._timestamp >= self.flightmode_list[idx][2]:
                     idx += 1
                 elif (idx < len(flightmode_selections) and flightmode_selections[idx]):
-                    self.add_data(tdays, msg, mlog.messages)
+                    self.add_data(tdays, msg, all_messages)
 
     def xlim_change_check(self, idx):
         '''handle xlim change requests from queue'''
