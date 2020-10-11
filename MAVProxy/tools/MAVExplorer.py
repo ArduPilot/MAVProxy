@@ -238,7 +238,8 @@ def load_graph_xml(xml, filename, load_all=False):
         name = g.attrib['name']
         expressions = [e.text for e in g.expression]
         if load_all:
-            ret.append(GraphDefinition(name, e, g.description.text, expressions, filename))
+            for e in expressions:
+                ret.append(GraphDefinition(name, e, g.description.text, expressions, filename))
             continue
         if have_graph(name):
             continue
@@ -398,6 +399,7 @@ def save_graph(graphdef):
         graphs = load_graph_xml(contents, graphdef.filename, load_all=True)
     except Exception as ex:
         graphs = []
+        print(ex)
     if contents is not None and len(graphs) == 0:
         print("Unable to parse %s" % graphdef.filename)
         return
