@@ -48,6 +48,7 @@ class MapModule(mp_module.MPModule):
             [ ('showgpspos', int, 1),
               ('showgps2pos', int, 1),
               ('showsimpos', int, 0),
+              ('showahrspos', int, 1),
               ('showahrs2pos', int, 0),
               ('showahrs3pos', int, 0),
               ('brightness', float, 1),
@@ -74,7 +75,8 @@ class MapModule(mp_module.MPModule):
                                                                 'set (MAPSETTING)',
                                                                 'zoom',
                                                                 'center',
-                                                                'follow'])
+                                                                'follow',
+                                                                'clear'])
         self.add_completion_function('(MAPSETTING)', self.map_settings.completion)
 
         self.default_popup = MPMenuSubMenu('Popup', items=[])
@@ -204,6 +206,8 @@ class MapModule(mp_module.MPModule):
             self.cmd_center(args)
         elif args[0] == "follow":
             self.cmd_follow(args)
+        elif args[0] == "clear":
+            self.cmd_clear(args)
         else:
             print("usage: map <icon|set>")
 
@@ -645,7 +649,12 @@ class MapModule(mp_module.MPModule):
             return
         follow = int(args[1])
         self.map.set_follow(follow)
-        
+
+    def cmd_clear(self, args):
+        '''clear displayed vehicle icons'''
+        self.map.add_object(mp_slipmap.SlipClearLayer(3))
+        self.have_vehicle = {}
+
     def set_secondary_vehicle_position(self, m):
         '''show 2nd vehicle on map'''
         if m.get_type() != 'GLOBAL_POSITION_INT':
@@ -725,7 +734,7 @@ class MapModule(mp_module.MPModule):
                 self.create_vehicle_icon('GPS2' + vehicle, 'green')
                 self.map.set_position('GPS2' + vehicle, (lat, lon), rotation=m.cog*0.01)
 
-        elif mtype == 'GLOBAL_POSITION_INT':
+        elif mtype == 'GLOBAL_POSITION_INT' and self.map_settings.showahrspos:
             (lat, lon, heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
             self.lat_lon[m.get_srcSystem()] = (lat,lon)
             if abs(lat) > 1.0e-3 or abs(lon) > 1.0e-3:
