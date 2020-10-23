@@ -37,6 +37,17 @@ flightmodes = None
 # Global var to hold the GUI menu element
 TopMenu = None
 
+def xml_unescape(e):
+    '''unescape < amd >'''
+    e = e.replace('&gt;', '>')
+    e = e.replace('&lt;', '<')
+    return e
+
+def xml_escape(e):
+    '''escape < amd >'''
+    e = e.replace('>', '&gt;')
+    e = e.replace('<', '&lt;')
+    return e
 
 class MEStatus(object):
     '''status object to conform with mavproxy structure for modules'''
@@ -207,6 +218,10 @@ def expression_ok(expression, msgs=None):
         msgs = mestate.status.msgs
     for f in fields:
         try:
+            if f.endswith(">"):
+                a2 = f.rfind("<")
+                if a2 != -1:
+                    f = f[:a2]
             if f.endswith(':2'):
                 f = f[:-2]
             if f[-1] == '}':
@@ -239,11 +254,13 @@ def load_graph_xml(xml, filename, load_all=False):
         expressions = [e.text for e in g.expression]
         if load_all:
             for e in expressions:
+                e = xml_unescape(e)
                 ret.append(GraphDefinition(name, e, g.description.text, expressions, filename))
             continue
         if have_graph(name):
             continue
         for e in expressions:
+            e = xml_unescape(e)
             if expression_ok(e):
                 ret.append(GraphDefinition(name, e, g.description.text, expressions, filename))
                 break
@@ -425,6 +442,7 @@ def save_graph(graphdef):
             g.description = ''
         f.write("  <description>%s</description>\n" % g.description.strip())
         for e in g.expressions:
+            e = xml_escape(e)
             f.write("  <expression>%s</expression>\n" % e.strip())
         f.write(" </graph>\n\n")
     f.write("</graphs>\n")
