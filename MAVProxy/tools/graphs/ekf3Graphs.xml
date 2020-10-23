@@ -64,6 +64,21 @@
     <expression>XKF3.IVD</expression>
   </graph>
 
+  <graph name='EKF3/Mag Innovations Lane1'>
+    <description>EKF3 Mag Innovations Lane1</description>
+    <expression>XKF3[0].IMX XKF3[0].IMY XKF3[0].IMZ XKF3[0].IYAW:2</expression>
+  </graph>
+
+  <graph name='EKF3/Mag Innovations Lane2'>
+    <description>EKF3 Mag Innovations Lane2</description>
+    <expression>XKF3[1].IMX XKF3[1].IMY XKF3[1].IMZ XKF3[1].IYAW:2</expression>
+  </graph>
+
+  <graph name='EKF3/Mag Innovations Lane3'>
+    <description>EKF3 Mag Innovations Lane3</description>
+    <expression>XKF3[2].IMX XKF3[2].IMY XKF3[2].IMZ XKF3[2].IYAW:2</expression>
+  </graph>
+  
   <graph name='EKF3/Euler Roll'>
     <description>EKF3 Euler Roll</description>
     <expression>ATT.Roll XKF1[0].Roll XKF1[1].Roll XKF1[2].Roll</expression>

@@ -201,6 +201,21 @@
     <expression>NKF9.SV NKF9.SP NKF9.SH NKF9.SM NKF9.SVT</expression>
   </graph>
 
+  <graph name='EKF2/Mag Innovations Lane1'>
+    <description>EKF2 Mag Innovations Lane1</description>
+    <expression>NKF3[0].IMX NKF3[0].IMY NKF3[0].IMZ NKF3[0].IYAW:2</expression>
+  </graph>
+
+  <graph name='EKF2/Mag Innovations Lane2'>
+    <description>EKF2 Mag Innovations Lane2</description>
+    <expression>NKF3[1].IMX NKF3[1].IMY NKF3[1].IMZ NKF3[1].IYAW:2</expression>
+  </graph>
+
+  <graph name='EKF2/Mag Innovations Lane3'>
+    <description>EKF2 Mag Innovations Lane3</description>
+    <expression>NKF3[2].IMX NKF3[2].IMY NKF3[2].IMZ NKF3[2].IYAW:2</expression>
+  </graph>
+  
   <graph name='EKF2/Wind Speed and Direction'>
     <description>EKF2 Wind Velocity NE</description>
     <expression>sqrt(NKF2[0].VWN**2+NKF2[0].VWE**2) wrap_360(degrees(atan2(-NKF2[0].VWE,-NKF2[0].VWN))):2 sqrt(NKF2[1].VWN**2+NKF2[1].VWE**2) wrap_360(degrees(atan2(-NKF2[1].VWE,-NKF2[1].VWN))):2</expression>
