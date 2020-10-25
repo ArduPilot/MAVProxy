@@ -26,8 +26,8 @@ class UserAlertsModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(UserAlertsModule, self).__init__(mpstate, "useralerts", public=True)
 
-        self.url = "https://firmware.ardupilot.org/userAlerts/manifest.json"
-        self.testurl = "https://firmware.ardupilot.org/userAlerts/exampleManifest.json"
+        self.url = "https://firmware.ardupilot.org/useralerts/manifest.json"
+        self.testurl = "https://firmware.ardupilot.org/useralerts/examplemanifest.json"
 
         # The useTest setting allows the user to query the example database
         # instead of the real database
