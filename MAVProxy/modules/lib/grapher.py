@@ -5,9 +5,12 @@
 '''
 
 import ast
-import sys, struct, time, os, datetime
+import sys, struct, time, os, datetime, platform
 import math, re
 import matplotlib
+if platform.system() != "Darwin":
+    # on MacOS we can't set WxAgg here as it conflicts with the MacOS version
+    matplotlib.use('WXAgg')
 from math import *
 from pymavlink.mavextra import *
 import pylab
