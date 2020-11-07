@@ -38,7 +38,7 @@ class MissionEditorEventThread(threading.Thread):
             queue_access_start_time = time.time()
             self.event_queue_lock.acquire()
             request_read_after_processing_queue = False
-            while self.event_queue.qsize() > 0 and (time.time() - queue_access_start_time) < 0.6:
+            while (not self.event_queue.empty()) and (time.time() - queue_access_start_time) < 0.6:
                 event = self.event_queue.get()
 
                 if isinstance(event, win_layout.WinLayout):
