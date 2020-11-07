@@ -36,7 +36,7 @@ class ParamEditorEventThread(threading.Thread):
 
     def run(self):
         while not self.time_to_quit:
-            while (self.event_queue.qsize() > 0):
+            while not self.event_queue.empty():
                 try:
                     event = self.event_queue.get(block=False)
                     event_type = event.get_type()

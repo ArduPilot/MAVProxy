@@ -247,7 +247,7 @@ class ParamEditorFrame(wx.Frame):
 
     def time_to_process_gui_events(self, evt):
         event_processed = False
-        while self.gui_event_queue.qsize() > 0:
+        while not self.gui_event_queue.empty():
             event_processed = True
             try:
                 event = self.gui_event_queue.get(block=False)

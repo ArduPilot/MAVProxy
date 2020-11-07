@@ -171,12 +171,12 @@ class MPImage():
 
     def poll(self):
         '''check for events, returning one event'''
-        if self.out_queue.qsize() <= 0:
+        if self.out_queue.empty():
             return None
         evt = self.out_queue.get()
         while isinstance(evt, win_layout.WinLayout):
             win_layout.set_layout(evt, self.set_layout)
-            if self.out_queue.qsize() == 0:
+            if self.out_queue.empty():
                 return None
             evt = self.out_queue.get()
         return evt
@@ -349,7 +349,7 @@ class MPImagePanel(wx.Panel):
         '''the redraw timer ensures we show new map tiles as they
         are downloaded'''
         state = self.state
-        while state.in_queue.qsize():
+        while not state.in_queue.empty():
             try:
                 obj = state.in_queue.get()
             except Exception:

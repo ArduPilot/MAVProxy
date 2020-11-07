@@ -144,9 +144,9 @@ class MPSlipMap():
         '''move an object on the map'''
         self.object_queue.put(SlipPosition(key, latlon, layer, rotation, label, colour))
 
-    def event_count(self):
-        '''return number of events waiting to be processed'''
-        return self.event_queue.qsize()
+    def event_queue_empty(self):
+        '''return True if there are no events waiting to be processed'''
+        return self.event_queue.empty()
 
     def set_layout(self, layout):
         '''set window layout'''
@@ -154,12 +154,12 @@ class MPSlipMap():
     
     def get_event(self):
         '''return next event or None'''
-        if self.event_queue.qsize() == 0:
+        if self.event_queue.empty():
             return None
         evt = self.event_queue.get()
         while isinstance(evt, win_layout.WinLayout):
             win_layout.set_layout(evt, self.set_layout)
-            if self.event_queue.qsize() == 0:
+            if self.event_queue.empty():
                 return None
             evt = self.event_queue.get()
         return evt
@@ -170,7 +170,7 @@ class MPSlipMap():
 
     def check_events(self):
         '''check for events, calling registered callbacks as needed'''
-        while self.event_count() > 0:
+        while not self.event_queue_empty():
             event = self.get_event()
             for callback in self._callbacks:
                 callback(event)
@@ -243,7 +243,7 @@ if __name__ == "__main__":
         sm.add_object(SlipIcon('icon - %s' % str(flag), (float(lat),float(lon)), icon, layer=3, rotation=0, follow=False))
 
     while sm.is_alive():
-        while sm.event_count() > 0:
+        while not sm.event_queue_empty():
             obj = sm.get_event()
             if not opts.verbose:
                 continue

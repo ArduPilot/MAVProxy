@@ -62,14 +62,11 @@ import platform, os, sys
 # we use billiard (and forking disable) on MacOS, and also if USE_BILLIARD environment
 # is set. Using USE_BILLIARD allows for debugging of the crazy forking disable approach on
 # a saner platform
-if platform.system() == 'Darwin' or os.environ.get('USE_BILLIARD',None) is not None:
-    # as of Python3.8 the default start method for macOS is spawn
-    if sys.version_info >= (3, 8):
-        from multiprocessing import Process, freeze_support, Pipe, Semaphore, Event, Lock
-        Queue = PipeQueue
-    else:
-        from billiard import Process, forking_enable, freeze_support, Pipe, Semaphore, Event, Lock
-        forking_enable(False)
-        Queue = PipeQueue
+# As of Python 3.8 the default start method for macOS is spawn and billiard is not required.
+if ((platform.system() == 'Darwin' or os.environ.get('USE_BILLIARD',None) is not None)
+    and sys.version_info < (3, 8)):
+    from billiard import Process, forking_enable, freeze_support, Pipe, Semaphore, Event, Lock
+    forking_enable(False)
+    Queue = PipeQueue
 else:
     from multiprocessing import Process, freeze_support, Pipe, Semaphore, Event, Lock, Queue

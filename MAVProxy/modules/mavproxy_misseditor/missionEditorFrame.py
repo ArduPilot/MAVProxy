@@ -248,7 +248,7 @@ class MissionEditorFrame(wx.Frame):
         event_processed = False
         queue_access_start_time = time.time()
         self.gui_event_queue_lock.acquire()
-        while self.gui_event_queue.qsize() > 0 and (time.time() < queue_access_start_time) < 0.6:
+        while (not self.gui_event_queue.empty()) and (time.time() < queue_access_start_time) < 0.6:
             event_processed = True
             event = self.gui_event_queue.get()
             try:
