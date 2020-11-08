@@ -16,3 +16,14 @@ License
 MAVProxy is released under the GNU General Public License v3 or later
 
 
+Maintainers
+-----------
+
+The best way to discuss MAVProxy with the maintainers is to join the
+mavproxy channel on ArduPilot discord at https://ardupilot.org/discord
+
+Lead Developers: Andrew Tridgell and Peter Barker
+
+Windows Maintainer: Stephen Dade
+
+MacOS Maintainer: Rhys Mainwaring
