@@ -257,22 +257,79 @@ If PIDR.I has a constant positive value then it means the aircraft is trimmed to
 
  <graph name='Sensors/Compass/Compare Predicted'>
   <description></description>
+  <expression>MAG[0].MagX expected_mag(GPS,ATT).x MAG[0].MagY expected_mag(GPS,ATT).y MAG[0].MagZ expected_mag(GPS,ATT).z</expression>
   <expression>MAG.MagX expected_mag(GPS,ATT).x MAG.MagY expected_mag(GPS,ATT).y MAG.MagZ expected_mag(GPS,ATT).z</expression>
   <expression>RAW_IMU.xmag expected_mag(GPS_RAW_INT,ATTITUDE).x RAW_IMU.ymag expected_mag(GPS_RAW_INT,ATTITUDE).y RAW_IMU.zmag expected_mag(GPS_RAW_INT,ATTITUDE).z</expression>
  </graph>
 
  <graph name='Sensors/Compass/Compare Predicted2'>
   <description></description>
+  <expression>MAG[1].MagX expected_mag(GPS,ATT).x MAG[1].MagY expected_mag(GPS,ATT).y MAG[1].MagZ expected_mag(GPS,ATT).z</expression>
   <expression>MAG2.MagX expected_mag(GPS,ATT).x MAG2.MagY expected_mag(GPS,ATT).y MAG2.MagZ expected_mag(GPS,ATT).z</expression>
   <expression>SCALED_IMU2.xmag expected_mag(GPS_RAW_INT,ATTITUDE).x SCALED_IMU2.ymag expected_mag(GPS_RAW_INT,ATTITUDE).y SCALED_IMU2.zmag expected_mag(GPS_RAW_INT,ATTITUDE).z</expression>
  </graph>
 
  <graph name='Sensors/Compass/Compare Predicted3'>
   <description></description>
+  <expression>MAG[2].MagX expected_mag(GPS,ATT).x MAG[2].MagY expected_mag(GPS,ATT).y MAG[2].MagZ expected_mag(GPS,ATT).z</expression>
   <expression>MAG3.MagX expected_mag(GPS,ATT).x MAG3.MagY expected_mag(GPS,ATT).y MAG3.MagZ expected_mag(GPS,ATT).z</expression>
   <expression>SCALED_IMU3.xmag expected_mag(GPS_RAW_INT,ATTITUDE).x SCALED_IMU3.ymag expected_mag(GPS_RAW_INT,ATTITUDE).y SCALED_IMU3.zmag expected_mag(GPS_RAW_INT,ATTITUDE).z</expression>
  </graph>
 
+ <graph name='Sensors/Compass/Compare Predicted Yaw'>
+  <description></description>
+  <expression>MAG[0].MagX expected_mag_yaw(GPS,ATT,MAG[0]).x MAG[0].MagY expected_mag_yaw(GPS,ATT,MAG[0]).y MAG[0].MagZ expected_mag_yaw(GPS,ATT,MAG[0]).z</expression>
+  <expression>MAG.MagX expected_mag_yaw(GPS,ATT,MAG).x MAG.MagY expected_mag_yaw(GPS,ATT,MAG).y MAG.MagZ expected_mag_yaw(GPS,ATT,MAG).z</expression>
+ </graph>
+
+ <graph name='Sensors/Compass/Compare Predicted2 Yaw'>
+  <description></description>
+  <expression>MAG[1].MagX expected_mag_yaw(GPS,ATT,MAG[1]).x MAG[1].MagY expected_mag_yaw(GPS,ATT,MAG[1]).y MAG[1].MagZ expected_mag_yaw(GPS,ATT,MAG[1]).z</expression>
+  <expression>MAG2.MagX expected_mag_yaw(GPS,ATT,MAG2).x MAG2.MagY expected_mag_yaw(GPS,ATT,MAG2).y MAG2.MagZ expected_mag_yaw(GPS,ATT,MAG2).z</expression>
+ </graph>
+
+ <graph name='Sensors/Compass/Compare Predicted3 Yaw'>
+  <description></description>
+  <expression>MAG[2].MagX expected_mag_yaw(GPS,ATT,MAG[2]).x MAG[2].MagY expected_mag_yaw(GPS,ATT,MAG[2]).y MAG[2].MagZ expected_mag_yaw(GPS,ATT,MAG[2]).z</expression>
+  <expression>MAG3.MagX expected_mag_yaw(GPS,ATT,MAG3).x MAG3.MagY expected_mag_yaw(GPS,ATT,MAG3).y MAG3.MagZ expected_mag_yaw(GPS,ATT,MAG3).z</expression>
+ </graph>
+
+ <graph name='Sensors/Compass/Compare Predicted Yaw NKF1'>
+  <description></description>
+  <expression>MAG[0].MagX expected_mag_yaw(GPS,NKF1,MAG[0]).x MAG[0].MagY expected_mag_yaw(GPS,NKF1,MAG[0]).y MAG[0].MagZ expected_mag_yaw(GPS,NKF1,MAG[0]).z</expression>
+  <expression>MAG.MagX expected_mag_yaw(GPS,NKF1,MAG).x MAG.MagY expected_mag_yaw(GPS,NKF1,MAG).y MAG.MagZ expected_mag_yaw(GPS,NKF1,MAG).z</expression>
+ </graph>
+
+ <graph name='Sensors/Compass/Compare Predicted2 Yaw NKF1'>
+  <description></description>
+  <expression>MAG[1].MagX expected_mag_yaw(GPS,NKF1,MAG[1]).x MAG[1].MagY expected_mag_yaw(GPS,NKF1,MAG[1]).y MAG[1].MagZ expected_mag_yaw(GPS,NKF1,MAG[1]).z</expression>
+  <expression>MAG2.MagX expected_mag_yaw(GPS,NKF1,MAG2).x MAG2.MagY expected_mag_yaw(GPS,NKF1,MAG2).y MAG2.MagZ expected_mag_yaw(GPS,NKF1,MAG2).z</expression>
+ </graph>
+
+ <graph name='Sensors/Compass/Compare Predicted3 Yaw NKF1'>
+  <description></description>
+  <expression>MAG[2].MagX expected_mag_yaw(GPS,NKF1,MAG[2]).x MAG[2].MagY expected_mag_yaw(GPS,NKF1,MAG[2]).y MAG[2].MagZ expected_mag_yaw(GPS,NKF1,MAG[2]).z</expression>
+  <expression>MAG3.MagX expected_mag_yaw(GPS,NKF1,MAG3).x MAG3.MagY expected_mag_yaw(GPS,NKF1,MAG3).y MAG3.MagZ expected_mag_yaw(GPS,NKF1,MAG3).z</expression>
+ </graph>
+
+ <graph name='Sensors/Compass/Compare Predicted Yaw XKF1'>
+  <description></description>
+  <expression>MAG[0].MagX expected_mag_yaw(GPS,XKF1,MAG[0]).x MAG[0].MagY expected_mag_yaw(GPS,XKF1,MAG[0]).y MAG[0].MagZ expected_mag_yaw(GPS,XKF1,MAG[0]).z</expression>
+  <expression>MAG.MagX expected_mag_yaw(GPS,XKF1,MAG).x MAG.MagY expected_mag_yaw(GPS,XKF1,MAG).y MAG.MagZ expected_mag_yaw(GPS,XKF1,MAG).z</expression>
+ </graph>
+
+ <graph name='Sensors/Compass/Compare Predicted2 Yaw XKF1'>
+  <description></description>
+  <expression>MAG[1].MagX expected_mag_yaw(GPS,XKF1,MAG[1]).x MAG[1].MagY expected_mag_yaw(GPS,XKF1,MAG[1]).y MAG[1].MagZ expected_mag_yaw(GPS,XKF1,MAG[1]).z</expression>
+  <expression>MAG2.MagX expected_mag_yaw(GPS,XKF1,MAG2).x MAG2.MagY expected_mag_yaw(GPS,XKF1,MAG2).y MAG2.MagZ expected_mag_yaw(GPS,XKF1,MAG2).z</expression>
+ </graph>
+
+ <graph name='Sensors/Compass/Compare Predicted3 Yaw XKF1'>
+  <description></description>
+  <expression>MAG[2].MagX expected_mag_yaw(GPS,XKF1,MAG[2]).x MAG[2].MagY expected_mag_yaw(GPS,XKF1,MAG[2]).y MAG[2].MagZ expected_mag_yaw(GPS,XKF1,MAG[2]).z</expression>
+  <expression>MAG3.MagX expected_mag_yaw(GPS,XKF1,MAG3).x MAG3.MagY expected_mag_yaw(GPS,XKF1,MAG3).y MAG3.MagZ expected_mag_yaw(GPS,XKF1,MAG3).z</expression>
+ </graph>
+ 
  <graph name='Sensors/Compass/EarthField Error EK2 Lane1'>
   <description></description>
   <expression>earth_field_error(GPS,NKF2[0]).x earth_field_error(GPS,NKF2[0]).y earth_field_error(GPS,NKF2[0]).z</expression>
