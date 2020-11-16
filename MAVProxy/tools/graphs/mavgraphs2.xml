@@ -184,16 +184,24 @@
   <expression>RATE.ROut RATE.POut RATE.YOut RATE.AOut</expression>
  </graph>
 
- <graph name='Sensors/Gyroscope/Gyros'>
+ <graph name='Sensors/Gyroscope/Gyro 1'>
   <description></description>
+  <expression>degrees(IMU[0].GyrX) degrees(IMU[0].GyrY) degrees(IMU[0].GyrZ)</expression>
   <expression>degrees(IMU.GyrX) degrees(IMU.GyrY) degrees(IMU.GyrZ)</expression>
  </graph>
 
- <graph name='Gyroscope Two Output'>
+ <graph name='Sensors/Gyroscope/Gyro 2'>
   <description></description>
+  <expression>degrees(IMU[1].GyrX) degrees(IMU[1].GyrY) degrees(IMU[1].GyrZ)</expression>
   <expression>degrees(IMU2.GyrX) degrees(IMU2.GyrY) degrees(IMU2.GyrZ)</expression>
  </graph>
 
+ <graph name='Sensors/Gyroscope/Gyro 3'>
+  <description></description>
+  <expression>degrees(IMU[2].GyrX) degrees(IMU[2].GyrY) degrees(IMU[2].GyrZ)</expression>
+  <expression>degrees(IMU3.GyrX) degrees(IMU3.GyrY) degrees(IMU3.GyrZ)</expression>
+ </graph>
+ 
  <graph name='Servos/OctaQuad-FRONT'>
   <description></description>
   <expression>RCOU.C5 RCOU.C6 RCOU.C9 RCOU.C10</expression>
@@ -271,6 +279,7 @@
 
  <graph name='Sensors/Compass Compare 1-2'>
   <description></description>
+  <expression>MAG[0].MagX MAG[0].MagY MAG[0].MagZ MAG[1].MagX MAG[1].MagY MAG[1].MagZ</expression>
   <expression>MAG.MagX MAG.MagY MAG.MagZ MAG2.MagX MAG2.MagY MAG2.MagZ</expression>
  </graph>
 
