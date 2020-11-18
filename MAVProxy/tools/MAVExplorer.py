@@ -201,13 +201,13 @@ def setup_menus():
     TopMenu.add(MPMenuSubMenu('Display',
                            items=[MPMenuItem('Map', 'Map', '# map'),
                                   MPMenuItem('Save Graph', 'Save', '# save'),
-                                  MPMenuItem('Reload Graphs', 'Reload', '# reload'),
-                                  MPMenuItem('FFT', 'FFT', '# fft')]))
+                                  MPMenuItem('Reload Graphs', 'Reload', '# reload')]))
     TopMenu.add(graph_menus())
     TopMenu.add(MPMenuSubMenu('FlightMode', items=flightmode_menu()))
     TopMenu.add(MPMenuSubMenu('Tools',
                               items=[MPMenuItem('MagFit', 'MagFit', '# magfit'),
-                                     MPMenuItem('Stats', 'Stats', '# stats')]))
+                                     MPMenuItem('Stats', 'Stats', '# stats'),
+                                     MPMenuItem('FFT', 'FFT', '# fft')]))
 
     mestate.console.set_menu(TopMenu, menu_callback)
 
@@ -407,7 +407,7 @@ def cmd_fft(args):
         condition = args[0]
     else:
         condition = None
-    child = multiproc.Process(target=mav_fft.mavfft_display, args=[mestate.filename,condition])
+    child = multiproc.Process(target=mav_fft.mavfft_display, args=[mestate.mlog,last_xlim])
     child.start()
 
 def cmd_stats(args):

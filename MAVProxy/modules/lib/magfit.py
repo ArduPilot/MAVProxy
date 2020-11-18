@@ -287,7 +287,6 @@ def magfit(mlog, tlim):
         if msg is None:
             break
         if tlim is not None:
-            #print(msg._timestamp, tlim_low, tlim_high)
             if msg._timestamp < tlim_low:
                 continue
             if msg._timestamp > tlim_high:
@@ -490,8 +489,6 @@ class MagFitUI(wx.Dialog):
         self.AddSpinInteger("OffsetMax", 500, 3000, 1500)
 
         self.StartRow('Scale Factor Estimation')
-        self.AddCheckBox("ScaleFactor")
-        self.StartRow()
         self.AddSpinFloat("ScaleMin", 0.5, 2.0, 0.01, 1.0)
         self.AddSpinFloat("ScaleMax", 0.5, 2.0, 0.01, 1.0)
 
