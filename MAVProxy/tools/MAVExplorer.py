@@ -433,6 +433,32 @@ def cmd_stats(args):
     child = multiproc.Process(target=msgstats.show_stats, args=[mestate.mlog])
     child.start()
 
+def cmd_dump(args):
+    '''dump messages from log'''
+    if len(args) > 0:
+        wildcard = args[0]
+    else:
+        print("Usage: dump PATTERN")
+        return
+    mlog = mestate.mlog
+    mlog.rewind()
+    types = []
+    for p in wildcard.split(','):
+        for t in mlog.name_to_id.keys():
+            if fnmatch.fnmatch(t, p):
+                types.extend([t])
+    while True:
+        msg = mlog.recv_match(type=types)
+        if msg is None:
+            break
+        in_range = timestamp_in_range(msg._timestamp)
+        if in_range < 0:
+            continue
+        if in_range > 0:
+            continue
+        print(msg)
+    mlog.rewind()
+
 def cmd_magfit(args):
     '''fit magnetic field'''
     from MAVProxy.modules.lib import magfit
@@ -899,6 +925,7 @@ command_map = {
     'loadLog'    : (cmd_loadfile,  'load a log file'),
     'stats'      : (cmd_stats,     'show statistics on the log'),
     'magfit'     : (cmd_magfit,    'fit mag parameters to WMM'),
+    'dump'       : (cmd_dump,      'dump messages from log'),
     }
 
 def progress_bar(pct):
