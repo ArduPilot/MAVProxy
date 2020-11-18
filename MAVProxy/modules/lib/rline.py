@@ -188,7 +188,7 @@ def complete_variable(text):
     else:
         suffix = ''
 
-    m1 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*(\[[0-9]\])?)[.]([A-Za-z0-9_]*)$", text)
+    m1 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*(\[[0-9]+\])?)[.]([A-Za-z0-9_]*)$", text)
     if m1 is not None:
         prefix = m1.group(1)
         mtype = m1.group(2)
@@ -201,7 +201,7 @@ def complete_variable(text):
                     ret.append(prefix + mtype + '.' + f + suffix)
             return ret
         return []
-    m2 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*(\[[0-9]\])?)$", text)
+    m2 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*(\[[0-9]+\])?)$", text)
     prefix = m2.group(1)
     mtype = m2.group(2)
     ret = []
