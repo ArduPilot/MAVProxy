@@ -275,7 +275,7 @@ def magfit(mlog, timestamp_in_range):
 
     # extract MAG data
     while True:
-        msg = mlog.recv_match(type=['GPS',mag_msg,ATT_NAME,'CTUN','BARO', 'BAT'])
+        msg = mlog.recv_match(type=['GPS',mag_msg,ATT_NAME,'BAT'])
         if msg is None:
             break
         in_range = timestamp_in_range(msg._timestamp)
@@ -422,9 +422,9 @@ def magfit(mlog, timestamp_in_range):
 
 
 class MagFitUI(wx.Dialog):
-    def __init__(self, mlog, tlim):
+    def __init__(self, mlog, timestamp_in_range):
         self.mlog = mlog
-        self.tlim = tlim
+        self.timestamp_in_range = timestamp_in_range
         self.closed = False
 
     def have_msg(self, msg):
@@ -604,4 +604,4 @@ class MagFitUI(wx.Dialog):
     def run(self):
         global margs
         margs = self.values
-        magfit(self.mlog, self.tlim)
+        magfit(self.mlog, self.timestamp_in_range)
