@@ -29,9 +29,13 @@ from MAVProxy.modules.lib.graphdefinition import GraphDefinition
 from lxml import objectify
 import pkg_resources
 from builtins import input
+import datetime
+import matplotlib
 
 grui = []
 last_xlim = None
+xlim_low = None
+xlim_high = None
 flightmodes = None
 
 # Global var to hold the GUI menu element
@@ -53,6 +57,19 @@ class MEStatus(object):
     '''status object to conform with mavproxy structure for modules'''
     def __init__(self):
         self.msgs = {}
+
+def timestamp_in_range(timestamp):
+    '''check if a timestamp is in current xlim
+       return -1 if too low
+       return 1 if too high
+       return 0 if in range
+    '''
+    global xlim_low, xlim_high
+    if xlim_low is not None and timestamp < xlim_low:
+        return -1
+    if xlim_high is not None and timestamp > xlim_high:
+        return 1
+    return 0
 
 
 class MEState(object):
@@ -407,7 +424,7 @@ def cmd_fft(args):
         condition = args[0]
     else:
         condition = None
-    child = multiproc.Process(target=mav_fft.mavfft_display, args=[mestate.mlog,last_xlim])
+    child = multiproc.Process(target=mav_fft.mavfft_display, args=[mestate.mlog,timestamp_in_range])
     child.start()
 
 def cmd_stats(args):
@@ -419,7 +436,7 @@ def cmd_stats(args):
 def cmd_magfit(args):
     '''fit magnetic field'''
     from MAVProxy.modules.lib import magfit
-    mfit = magfit.MagFitUI(mestate.mlog, last_xlim)
+    mfit = magfit.MagFitUI(mestate.mlog, timestamp_in_range)
     child = multiproc.Process(target=mfit.show)
     child.start()
     
@@ -840,6 +857,13 @@ def main_loop():
                     if not grui[j].set_xlim(xlim):
                         remlist.append(j)
                 last_xlim = xlim
+                from dateutil.tz import tzlocal
+                localtimezone = tzlocal()
+                tzofs = localtimezone.utcoffset(datetime.datetime.now()).total_seconds()
+                global xlim_low, xlim_high
+                xlim_low = matplotlib.dates.num2epoch(xlim[0]) - tzofs
+                xlim_high = matplotlib.dates.num2epoch(xlim[1]) - tzofs
+                
                 if len(remlist) > 0:
                     # remove stale graphs
                     new_grui = []

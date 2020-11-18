@@ -9,12 +9,10 @@ import os
 import pylab
 import sys
 import time
-import datetime
-import matplotlib
 
 from pymavlink import mavutil
 
-def mavfft_display(mlog,tlim):
+def mavfft_display(mlog,timestamp_in_range):
     '''display fft for raw ACC data in logfile'''
 
     '''object to store data about a single FFT plot'''
@@ -70,23 +68,15 @@ def mavfft_display(mlog,tlim):
     start_time = time.time()
     mlog.rewind()
 
-    if tlim is not None:
-        # allow for range of timestamps from last graph
-        from dateutil.tz import tzlocal
-        localtimezone = tzlocal()
-        tzofs = localtimezone.utcoffset(datetime.datetime.now()).total_seconds()
-        tlim_low = matplotlib.dates.num2epoch(tlim[0]) - tzofs
-        tlim_high = matplotlib.dates.num2epoch(tlim[1]) - tzofs
-
     while True:
         m = mlog.recv_match(type=['ISBH','ISBD'])
         if m is None:
             break
-        if tlim is not None:
-            if m._timestamp < tlim_low:
-                continue
-            if m._timestamp > tlim_high:
-                break
+        in_range = timestamp_in_range(m._timestamp)
+        if in_range < 0:
+            continue
+        if in_range > 0:
+            break
         msg_type = m.get_type()
         if msg_type == "ISBH":
             if plotdata is not None:

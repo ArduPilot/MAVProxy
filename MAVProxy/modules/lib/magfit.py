@@ -223,7 +223,7 @@ def remove_offsets(MAG, BAT, c):
     MAG.MagZ = int(field.z)
     return True
 
-def magfit(mlog, tlim):
+def magfit(mlog, timestamp_in_range):
     '''find best magnetometer offset fit to a log file'''
 
     global earth_field, declination
@@ -273,24 +273,16 @@ def magfit(mlog, tlim):
     ATT_NAME = margs['Attitude']
     print("Attitude source %s" % ATT_NAME);
 
-    if tlim is not None:
-        # allow for range of timestamps from last graph
-        from dateutil.tz import tzlocal
-        localtimezone = tzlocal()
-        tzofs = localtimezone.utcoffset(datetime.datetime.now()).total_seconds()
-        tlim_low = matplotlib.dates.num2epoch(tlim[0]) - tzofs
-        tlim_high = matplotlib.dates.num2epoch(tlim[1]) - tzofs
-
     # extract MAG data
     while True:
         msg = mlog.recv_match(type=['GPS',mag_msg,ATT_NAME,'CTUN','BARO', 'BAT'])
         if msg is None:
             break
-        if tlim is not None:
-            if msg._timestamp < tlim_low:
-                continue
-            if msg._timestamp > tlim_high:
-                break
+        in_range = timestamp_in_range(msg._timestamp)
+        if in_range < 0:
+            continue
+        if in_range > 0:
+            break
         if msg.get_type() == 'GPS' and msg.Status >= 3 and earth_field is None:
             earth_field = mavextra.expected_earth_field(msg)
             (declination,inclination,intensity) = mavextra.get_mag_field_ef(msg.Lat, msg.Lng)
