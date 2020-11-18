@@ -874,12 +874,13 @@ def main_loop():
             for c in cmds:
                 process_stdin(c)
 
+        remlist = []
         for i in range(0, len(grui)):
             xlim = grui[i].check_xlim_change()
             if xlim is not None and mestate.settings.sync_xzoom:
-                remlist = []
                 for j in range(0, len(grui)):
-                    #print("set_xlim: ", j, xlim)
+                    if j == i:
+                        continue
                     if not grui[j].set_xlim(xlim):
                         remlist.append(j)
                 last_xlim = xlim
@@ -890,13 +891,6 @@ def main_loop():
                 xlim_low = matplotlib.dates.num2epoch(xlim[0]) - tzofs
                 xlim_high = matplotlib.dates.num2epoch(xlim[1]) - tzofs
                 
-                if len(remlist) > 0:
-                    # remove stale graphs
-                    new_grui = []
-                    for j in range(0, len(grui)):
-                        if j not in remlist:
-                            new_grui.append(grui[j])
-                    grui = new_grui
                 if mestate.settings.sync_xmap:
                     remlist = []
                     global map_timelim_pipes
@@ -906,6 +900,13 @@ def main_loop():
                         except Exception:
                             map_timelim_pipes.remove(p)
                 break
+        if len(remlist) > 0:
+            # remove stale graphs
+            new_grui = []
+            for j in range(0, len(grui)):
+                if j not in remlist:
+                    new_grui.append(grui[j])
+            grui = new_grui
 
         time.sleep(0.1)
 
