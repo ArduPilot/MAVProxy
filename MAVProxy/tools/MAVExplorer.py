@@ -205,6 +205,9 @@ def setup_menus():
                                   MPMenuItem('FFT', 'FFT', '# fft')]))
     TopMenu.add(graph_menus())
     TopMenu.add(MPMenuSubMenu('FlightMode', items=flightmode_menu()))
+    TopMenu.add(MPMenuSubMenu('Tools',
+                              items=[MPMenuItem('MagFit', 'MagFit', '# magfit'),
+                                     MPMenuItem('Stats', 'Stats', '# stats')]))
 
     mestate.console.set_menu(TopMenu, menu_callback)
 
@@ -407,6 +410,19 @@ def cmd_fft(args):
     child = multiproc.Process(target=mav_fft.mavfft_display, args=[mestate.filename,condition])
     child.start()
 
+def cmd_stats(args):
+    '''show status on log'''
+    from MAVProxy.modules.lib import msgstats
+    child = multiproc.Process(target=msgstats.show_stats, args=[mestate.mlog])
+    child.start()
+
+def cmd_magfit(args):
+    '''fit magnetic field'''
+    from MAVProxy.modules.lib import magfit
+    mfit = magfit.MagFitUI(mestate.mlog, last_xlim)
+    child = multiproc.Process(target=mfit.show)
+    child.start()
+    
 def save_graph(graphdef):
     '''save a graph as XML'''
     if graphdef.filename is None:
@@ -857,6 +873,8 @@ command_map = {
     'map'        : (cmd_map,       'show map view'),
     'fft'        : (cmd_fft,       'show a FFT (if available)'),
     'loadLog'    : (cmd_loadfile,  'load a log file'),
+    'stats'      : (cmd_stats,     'show statistics on the log'),
+    'magfit'     : (cmd_magfit,    'fit mag parameters to WMM'),
     }
 
 def progress_bar(pct):
