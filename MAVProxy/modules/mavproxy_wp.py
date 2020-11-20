@@ -836,6 +836,7 @@ class WPModule(mp_module.MPModule):
         elif args[0] == "list":
             self.wp_op = "list"
             self.master.waypoint_request_list_send()
+            self.master.waypoint_ack_send(0)  '''Flylogix'''
         elif args[0] == "save":
             if len(args) != 2:
                 print("usage: wp save <filename>")
@@ -843,6 +844,7 @@ class WPModule(mp_module.MPModule):
             self.wp_save_filename = args[1]
             self.wp_op = "save"
             self.master.waypoint_request_list_send()
+            self.master.waypoint_ack_send(0)  '''Flylogix'''
         elif args[0] == "savecsv":
             if len(args) != 2:
                 print("usage: wp savecsv <filename.csv>")
@@ -967,6 +969,7 @@ class WPModule(mp_module.MPModule):
         if self.wp_op is None:  # If we were already doing a list or save, just restart the fetch without changing the operation
             self.wp_op = "fetch"
         self.master.waypoint_request_list_send()
+        self.master.waypoint_ack_send(0)  '''Flylogix'''
 
 def init(mpstate):
     '''initialise module'''
