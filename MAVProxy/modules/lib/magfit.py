@@ -278,11 +278,12 @@ def magfit(mlog, timestamp_in_range):
         msg = mlog.recv_match(type=['GPS',mag_msg,ATT_NAME,'BAT'])
         if msg is None:
             break
-        in_range = timestamp_in_range(msg._timestamp)
-        if in_range < 0:
-            continue
-        if in_range > 0:
-            break
+        if timestamp_in_range is not None:
+            in_range = timestamp_in_range(msg._timestamp)
+            if in_range < 0:
+                continue
+            if in_range > 0:
+                break
         if msg.get_type() == 'GPS' and msg.Status >= 3 and earth_field is None:
             earth_field = mavextra.expected_earth_field(msg)
             (declination,inclination,intensity) = mavextra.get_mag_field_ef(msg.Lat, msg.Lng)
@@ -422,10 +423,15 @@ def magfit(mlog, timestamp_in_range):
 
 
 class MagFitUI(wx.Dialog):
-    def __init__(self, mlog, timestamp_in_range):
-        self.mlog = mlog
+    def __init__(self, filearg, timestamp_in_range):
+        if isinstance(filearg, str):
+            # for windows
+            self.mlog = mavutil.mavlink_connection(filearg)
+        else:
+            self.mlog = filearg
         self.timestamp_in_range = timestamp_in_range
         self.closed = False
+        self.have_run = False
 
     def have_msg(self, msg):
         '''see if we have a given message name in the log'''
@@ -506,10 +512,11 @@ class MagFitUI(wx.Dialog):
         self.EndRow()
         
         self.Center()
+        self.Show()
         while not self.closed:
-            self.Show()
-            pyplot.pause(0.05)
-            time.sleep(0.05)
+            if self.have_run:
+                pyplot.pause(0.05)
+            time.sleep(0.1)
             wx.Yield()
         self.Close()
 
@@ -604,4 +611,9 @@ class MagFitUI(wx.Dialog):
     def run(self):
         global margs
         margs = self.values
+        self.have_run = True
         magfit(self.mlog, self.timestamp_in_range)
+
+def magfit_run(filearg, timestamp_in_range):
+    mg = MagFitUI(filearg, timestamp_in_range)
+    mg.show()

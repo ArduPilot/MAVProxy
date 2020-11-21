@@ -31,6 +31,7 @@ import pkg_resources
 from builtins import input
 import datetime
 import matplotlib
+import platform
 
 grui = []
 last_xlim = None
@@ -462,8 +463,12 @@ def cmd_dump(args):
 def cmd_magfit(args):
     '''fit magnetic field'''
     from MAVProxy.modules.lib import magfit
-    mfit = magfit.MagFitUI(mestate.mlog, timestamp_in_range)
-    child = multiproc.Process(target=mfit.show)
+    if platform.system() == 'Windows':
+        # windows can't pickle the log
+        filearg = mestate.filename
+    else:
+        filearg = mestate.mlog
+    child = multiproc.Process(target=magfit.magfit_run, args=[filearg,None])
     child.start()
     
 def save_graph(graphdef):
