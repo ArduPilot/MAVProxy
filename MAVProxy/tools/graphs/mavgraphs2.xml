@@ -40,11 +40,6 @@
   <expression>BARO.Alt RFND.Dist1*cos(radians(ATT.Roll))*cos(radians(ATT.Pitch))</expression>
  </graph>
 
- <graph name='System/Performance'>
-  <description></description>
-  <expression>PM.NLon PM.MaxT:2</expression>
- </graph>
-
  <graph name='Radio/RSSI_Distance'>
   <description></description>
   <expression>RADIO_STATUS.rssi RADIO_STATUS.noise RADIO_STATUS.remrssi RADIO_STATUS.remnoise distance_home(GPS_RAW_INT):2</expression>
@@ -130,21 +125,6 @@
   <expression>PM.MaxT PM.NLon:2 PM.LogDrop:2</expression>
  </graph>
 
- <graph name='Tridge/FireFly Tilt'>
-  <description></description>
-  <expression>CTUN.NavRoll CTUN.Roll CTUN.NavPitch CTUN.Pitch RCOU.Ch8:2 RCOU.Ch10:2 RCOU.Ch11:2</expression>
- </graph>
-
- <graph name='Tridge/OSC Roll'>
-  <description></description>
-  <expression>PTUN.Value sqrt(lowpass((PIDR.P+PIDR.D)**2,"f",0.95)):2</expression>
- </graph>
-
- <graph name='Sensors/GPS/Accuracy'>
-  <description></description>
-  <expression>GPA.HAcc GPA.SAcc GPA.VAcc GPS.NSats:2</expression>
- </graph>
-
  <graph name='Copter/Controller RMS'>
   <description></description>
   <expression>CTRL.RMSRoll CTRL.RMSPitch CTRL.RMSYaw</expression>
@@ -159,12 +139,6 @@
  <graph name='Rover/Steering'>
   <description></description>
   <expression>STER.Achieved STER.Demanded</expression>
- </graph>
-
- <graph name='Speed/GPS vs NKF1'>
-  <description></description>
-  <expression>GPS.Spd sqrt(NKF1[0].VN**2+NKF1[0].VE**2)</expression>
-  <expression>GPS.Spd sqrt(NKF1.VN**2+NKF1.VE**2)</expression>
  </graph>
 
  <graph name='Servos/OctaQuad-CCW'>

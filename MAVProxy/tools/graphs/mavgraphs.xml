@@ -423,5 +423,17 @@ If PIDR.I has a constant positive value then it means the aircraft is trimmed to
   <expression>IMU[0].GyrZ sim_body_rates(SIM).z</expression>
   <expression>IMU.GyrZ sim_body_rates(SIM).z</expression>
  </graph>
+
+ <graph name='Sensors/GPS/GPS Accuracy'>
+  <description></description>
+  <expression>GPA[0].HAcc GPA[0].SAcc GPA[0].VAcc GPS[0].NSats:2</expression>
+  <expression>GPA.HAcc GPA.SAcc GPA.VAcc GPS.NSats:2</expression>
+ </graph>
+
+ <graph name='Sensors/GPS/GPS2 Accuracy'>
+  <description></description>
+  <expression>GPA[1].HAcc GPA[1].SAcc GPA[1].VAcc GPS[1].NSats:2</expression>
+  <expression>GPA2.HAcc GPA2.SAcc GPA2.VAcc GPS2.NSats:2</expression>
+ </graph>
  
 </graphs>
