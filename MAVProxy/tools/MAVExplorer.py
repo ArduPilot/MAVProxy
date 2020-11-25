@@ -459,12 +459,25 @@ def cmd_dump(args):
         print(msg)
     mlog.rewind()
 
+def cmd_magfit_child_task(filename, timestamp_in_range):
+    '''child task for cmd_magfit on macOS'''
+    from MAVProxy.modules.lib import magfit    
+    mlog = mavutil.mavlink_connection(filename, notimestamps=False, zero_time_base=False)
+    mfit = magfit.MagFitUI(mlog, timestamp_in_range)
+    mfit.show()
+
 def cmd_magfit(args):
-    '''fit magnetic field'''
-    from MAVProxy.modules.lib import magfit
-    mfit = magfit.MagFitUI(mestate.mlog, timestamp_in_range)
-    child = multiproc.Process(target=mfit.show)
-    child.start()
+    '''fit magnetic field'''    
+    # On macOS multiprocess uses `spawn` and arguments to Process must be pickleable
+    if platform.system() == 'Darwin' and sys.version_info >= (3, 8):
+        child = multiproc.Process(target=cmd_magfit_child_task,
+                                  args=(mestate.filename, timestamp_in_range))
+        child.start()
+    else:
+        from MAVProxy.modules.lib import magfit
+        mfit = magfit.MagFitUI(mestate.mlog, timestamp_in_range)
+        child = multiproc.Process(target=mfit.show)
+        child.start()
     
 def save_graph(graphdef):
     '''save a graph as XML'''
