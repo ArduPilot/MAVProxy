@@ -459,10 +459,9 @@ def cmd_dump(args):
         print(msg)
     mlog.rewind()
 
-def cmd_magfit_child_task(filename, timestamp_in_range):
+def cmd_magfit_child_task(mlog, timestamp_in_range):
     '''child task for cmd_magfit on macOS'''
     from MAVProxy.modules.lib import magfit    
-    mlog = mavutil.mavlink_connection(filename, notimestamps=False, zero_time_base=False)
     mfit = magfit.MagFitUI(mlog, timestamp_in_range)
     mfit.show()
 
@@ -471,7 +470,7 @@ def cmd_magfit(args):
     # On macOS multiprocess uses `spawn` and arguments to Process must be pickleable
     if platform.system() == 'Darwin' and sys.version_info >= (3, 8):
         child = multiproc.Process(target=cmd_magfit_child_task,
-                                  args=(mestate.filename, timestamp_in_range))
+                                  args=(mestate.mlog, timestamp_in_range))
         child.start()
     else:
         from MAVProxy.modules.lib import magfit
