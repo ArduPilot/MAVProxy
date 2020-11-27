@@ -60,6 +60,7 @@
     <description>EKF2 Euler Roll</description>
     <expression>ATT.Roll NKF1[0].Roll NKF1[1].Roll NKF1[2].Roll</expression>
     <expression>ATT.Roll NKF1[0].Roll NKF1[1].Roll</expression>
+    <expression>ATT.Roll NKF1.Roll NKF6.Roll</expression>
     <expression>ATT.Roll NKF1.Roll</expression>
   </graph>
 
@@ -67,6 +68,7 @@
     <description>EKF2 Euler Pitch</description>
     <expression>ATT.Pitch NKF1[0].Pitch NKF1[1].Pitch NKF1[2].Pitch</expression>
     <expression>ATT.Pitch NKF1[0].Pitch NKF1[1].Pitch</expression>
+    <expression>ATT.Pitch NKF1.Pitch NKF6.Pitch</expression>
     <expression>ATT.Pitch NKF1.Pitch</expression>
   </graph>
 
@@ -74,6 +76,7 @@
     <description>EKF2 Euler Yaw</description>
     <expression>ATT.Yaw NKF1[0].Yaw NKF1[1].Yaw NKF1[2].Yaw</expression>
     <expression>ATT.Yaw NKF1[0].Yaw NKF1[1].Yaw</expression>
+    <expression>ATT.Yaw NKF1.Yaw NKF6.Yaw</expression>
     <expression>ATT.Yaw NKF1.Yaw</expression>
   </graph>
   
@@ -88,6 +91,7 @@
     <description>EKF2 Velocity East</description>
     <expression>NKF1[0].VE NKF1[1].VE NKF1[2].VE</expression>
     <expression>NKF1[0].VE NKF1[1].VE</expression>
+    <expression>NKF1.VE NKF6.VE</expression>
     <expression>NKF1.VE</expression>
   </graph>
 
@@ -95,6 +99,7 @@
     <description>EKF2 Velocity Down</description>
     <expression>NKF1[0].VD NKF1[1].VD NKF1[2].VD</expression>
     <expression>NKF1[0].VD NKF1[1].VD</expression>
+    <expression>NKF1.VD NKF6.VD</expression>
     <expression>NKF1.VD</expression>
   </graph>
 
@@ -109,6 +114,7 @@
     <description>EKF2 AccelZ Bias</description>
     <expression>NKF2[0].AZbias NKF2[1].AZbias NKF2[2].AZbias</expression>
     <expression>NKF2[0].AZbias NKF2[1].AZbias</expression>
+    <expression>NKF2.AZbias NKF7.AZbias</expression>
     <expression>NKF2.AZbias</expression>
   </graph>
 
