@@ -6,6 +6,7 @@ fit best estimate of magnetometer offsets, diagonals, off-diagonals, cmot and sc
 
 from MAVProxy.modules.lib import wx_processguard
 from MAVProxy.modules.lib.wx_loader import wx
+
 import sys, time, os, math, copy
 
 from pymavlink import mavutil
@@ -13,6 +14,8 @@ from pymavlink import mavextra
 from pymavlink.rotmat import Vector3
 from pymavlink.rotmat import Matrix3
 from MAVProxy.modules.lib import grapher
+from MAVProxy.modules.lib import multiproc
+from MAVProxy.modules.lib.multiproc_util import WrapFileHandle, WrapMMap
 
 import matplotlib
 import matplotlib.pyplot as pyplot
@@ -421,12 +424,97 @@ def magfit(mlog, timestamp_in_range):
 
     pyplot.show(block=False)
 
+class MagFit(object):
+    '''MagFit application
+    
+        Manage the MagFit application. This class is responsible
+        for launching the UI in another process and ensuring it is
+        closed properly when either the child window is closed or
+        the parent process exits.
+    '''
+
+    def __init__(self, title, mlog, timestamp_in_range):
+        self.title = title
+        self.close_event = multiproc.Event()
+        self.child = None
+
+        # capture mlog state before modifying
+        filehandle = mlog.filehandle
+        data_map = mlog.data_map
+        data_len = mlog.data_len
+
+        try:
+            # wrap filehandle and mmap in mlog for pickling
+            mlog.filehandle = WrapFileHandle(filehandle)
+            mlog.data_map = WrapMMap(data_map, filehandle, data_len)
+
+            # spawn the child process
+            self.child = multiproc.Process(target=self.child_task,
+                                           args=(mlog, timestamp_in_range))
+            self.child.start()
+        finally:
+            # restore the state of mlog
+            mlog.filehandle = filehandle
+            mlog.data_map = data_map
+
+    def child_task(self, mlog, timestamp_in_range):
+        from MAVProxy.modules.lib import wx_processguard
+        from MAVProxy.modules.lib.wx_loader import wx
+
+        # unwrap
+        mlog.filehandle = mlog.filehandle.unwrap()
+        mlog.data_map = mlog.data_map.unwrap()
+
+        # create wx application
+        app = wx.App(False)
+        app.frame = MagFitUI(title=self.title,
+                             close_event=self.close_event,
+                             mlog=mlog,
+                             timestamp_in_range=timestamp_in_range)
+
+        app.frame.SetDoubleBuffered(True)
+        app.frame.Show()
+        app.MainLoop()
+
+        # trigger close event when the main loop exits 
+        self.close_event.set()
+
+    def close(self):
+        self.close_event.set()
+        if self.is_alive():
+            self.child.join(2)
+
+    def is_alive(self):
+        return self.child.is_alive()
 
 class MagFitUI(wx.Dialog):
-    def __init__(self, mlog, timestamp_in_range):
+    def __init__(self, title, close_event, mlog, timestamp_in_range):
+        super(MagFitUI, self).__init__(None, title=title, size=(600, 800))
+
+        # capture the close event, log and timestamp range function
+        self.close_event = close_event
         self.mlog = mlog
         self.timestamp_in_range = timestamp_in_range
-        self.closed = False
+
+        # events
+        self.timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.OnTimer, self.timer)
+        self.timer.Start(100)
+        self.Bind(wx.EVT_IDLE, self.OnIdle)
+
+        # initialise the panels etc.
+        self.init_ui()
+
+    def OnIdle(self, event):
+        time.sleep(0.05)
+
+    def OnTimer(self, event):
+        '''Periodically check if the close event has been received'''
+
+        if self.close_event.wait(0.001):
+            self.timer.Stop()
+            self.Destroy()
+            return
 
     def have_msg(self, msg):
         '''see if we have a given message name in the log'''
@@ -435,12 +523,13 @@ class MagFitUI(wx.Dialog):
             return False
         return self.mlog.counts[mid] > 0
 
-    def show(self):
+    def init_ui(self):
+        '''Initalise the UI elements'''
+
         if not hasattr(self.mlog, 'formats'):
             print("Must be DF log")
             return
-        self.app = wx.App(False)
-        wx.Dialog.__init__(self, None, -1, "MagFit", size=(600, 800))
+
         self.panel = wx.Panel(self)
         self.vbox = wx.BoxSizer(wx.VERTICAL)
         self.vbox.AddStretchSpacer()
@@ -507,15 +596,11 @@ class MagFitUI(wx.Dialog):
         self.EndRow()
         
         self.Center()
-        while not self.closed:
-            self.Show()
-            pyplot.pause(0.05)
-            time.sleep(0.05)
-            wx.Yield()
-        self.Close()
 
     def close(self):
-        self.closed = True
+        '''Set the close event'''
+
+        self.close_event.set()
 
     def StartRow(self, label=None):
         if self.row:
