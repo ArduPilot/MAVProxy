@@ -20,7 +20,8 @@ class NtripModule(mp_module.MPModule):
              ('password', str, 'IBS'),
              ('mountpoint', str, None),
              ('logfile', str, None),
-             ('sendalllinks', bool, False)])
+             ('sendalllinks', bool, False),
+             ('sendmul', int, 1)])
         self.add_command('ntrip', self.cmd_ntrip, 'NTRIP control',
                          ["<status>",
                           "<start>",
@@ -31,6 +32,7 @@ class NtripModule(mp_module.MPModule):
         self.pos = None
         self.pkt_count = 0
         self.last_pkt = None
+        self.last_restart = None
         self.last_rate = None
         self.rate_total = 0
         self.ntrip = None
@@ -63,6 +65,14 @@ class NtripModule(mp_module.MPModule):
             return
         data = self.ntrip.read()
         if data is None:
+            now = time.time()
+            if (self.last_pkt is not None and
+                now - self.last_pkt > 15 and
+                (self.last_restart is None or now - self.last_restart > 30)):
+                print("NTRIP restart")
+                self.ntrip = None
+                self.start_pending = True
+                self.last_restart = now
             return
         self.log_rtcm(data)
 
@@ -77,7 +87,7 @@ class NtripModule(mp_module.MPModule):
             # can't send this with GPS_RTCM_DATA
             return
         total_len = blen
-        self.rate_total += blen
+        self.rate_total += blen * self.ntrip_settings.sendmul
 
         if blen > 180:
             flags = 1 # fragmented
@@ -98,7 +108,8 @@ class NtripModule(mp_module.MPModule):
             else:
                 links = [self.master]
             for link in links:
-                link.mav.gps_rtcm_data_send(flags | (fragment<<1), frag_len, send_data)
+                for d in range(self.ntrip_settings.sendmul):
+                    link.mav.gps_rtcm_data_send(flags | (fragment<<1), frag_len, send_data)
             fragment += 1
             blen -= frag_len
         self.pkt_count += 1
