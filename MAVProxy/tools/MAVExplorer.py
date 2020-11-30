@@ -417,15 +417,20 @@ def cmd_reload(args):
     setup_menus()
     mestate.console.write("Loaded %u graphs\n" % len(mestate.graphs))
 
+fft_tool = None
+
 def cmd_fft(args):
     '''display fft from log'''
+
     from MAVProxy.modules.lib import mav_fft
     if len(args) > 0:
         condition = args[0]
     else:
         condition = None
-    child = multiproc.Process(target=mav_fft.mavfft_display, args=[mestate.mlog,timestamp_in_range])
-    child.start()
+    global fft_tool
+    fft_tool = mav_fft.MavFFT(title="MavFFT",
+                              mlog=mestate.mlog,
+                              timestamp_in_range=timestamp_in_range)
 
 def cmd_stats(args):
     '''show status on log'''
