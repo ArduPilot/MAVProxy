@@ -432,11 +432,15 @@ def cmd_fft(args):
                               mlog=mestate.mlog,
                               timestamp_in_range=timestamp_in_range)
 
+msgstats_tool = None
+
 def cmd_stats(args):
     '''show status on log'''
+
     from MAVProxy.modules.lib import msgstats
-    child = multiproc.Process(target=msgstats.show_stats, args=[mestate.mlog])
-    child.start()
+    global msgstats_tool
+    msgstats_tool = msgstats.MavMsgStats(title="Stats",
+                                         mlog=mestate.mlog)
 
 def cmd_dump(args):
     '''dump messages from log'''
