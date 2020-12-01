@@ -4,6 +4,8 @@
     custom pickle functions and class wrappers
 '''
 
+from MAVProxy.modules.lib import multiproc
+
 import copyreg
 import mmap
 import platform
@@ -149,3 +151,146 @@ class WrapMMap(object):
 
         # restore the mmap
         self._mm = mm  
+
+mutex = multiproc.Lock()
+
+class MPChildTask(object):
+    '''Manage a MAVProxy child task
+    
+        MAVProxy child tasks typically require access to the dataflash
+        or telemetry logs. For processes started using the `spawn`
+        start method this requires the arguments to the child process
+        to be pickleable, which is not the case for file handles and 
+        memory mapped files. 
+
+        This class provides two functions `wrap` and `unwrap` that are
+        called before and after the parent spawns the child process,
+        and in the child process itself before the public child task
+        is called. Custom pickle functions and class wrappers / unwrappers
+        should be placed in these two functions.
+    '''
+
+    def __init__(self, *args, **kwargs):
+        self._child_pipe_recv, self._parent_pipe_send = multiproc.Pipe(duplex=False)
+        self._close_event = multiproc.Event()
+        self._close_event.clear()
+        self._child = None
+
+    # @abstractmethod
+    def wrap(self):
+        '''Apply custom pickle wrappers to non-pickleable attributes'''
+        pass
+
+    # @abstractmethod
+    def unwrap(self):
+        '''Unwrap custom pickle wrappers of non-pickleable attributes'''
+        pass
+
+    # @abstractmethod
+    def child_task(self):
+        '''Launch the child function or application'''
+        pass
+
+    def start(self):
+        '''Apply custom pickle wrappers then start the child process'''
+
+        # apply lock while the task is started as wrapping may mutate state
+        with mutex:
+            self.wrap()
+            try:
+                self._child = multiproc.Process(target=self._child_task)
+                self._child.start()
+            finally:
+                self.unwrap()
+
+        # deny the parent access to the child end of the pipe
+        self.child_pipe_recv.close()
+
+    def _child_task(self):
+        '''A non-public child task that calls unwrap before running the public child task'''
+        
+        # deny the child access to the parent end of the pipe and unwrap
+        self.parent_pipe_send.close()
+        self.unwrap()
+
+        # call child task (in sub-class)
+        self.child_task()
+
+        # set the close event when the task is complete
+        self.close_event.set()
+
+    @property
+    def child_pipe_recv(self):
+        '''The child end of the pipe for receiving data from the parent'''
+
+        return self._child_pipe_recv
+
+    @property
+    def parent_pipe_send(self):
+        '''The parent end of the pipe for sending data to the child'''
+
+        return self._parent_pipe_send
+
+    @property
+    def close_event(self):
+        '''A multiprocessing close event'''
+
+        return self._close_event
+
+    @property
+    def child(self):
+        '''The child process'''
+
+        return self._child
+
+    def close(self):
+        '''Set the close event and join the process'''
+
+        self.close_event.set()
+        if self.is_alive():
+            self.child.join(2)
+
+    def is_alive(self):
+        '''Returns True if the child process is alive'''
+
+        return self.child.is_alive()
+
+class MPDataLogChildTask(MPChildTask):
+    '''Manage a MAVProxy child task that expects a dataflash or telemetry log'''
+
+    def __init__(self, *args, **kwargs):
+        '''
+        Parameters
+        ----------
+        mlog : DFReader
+            A dataflash or telemetry log
+        '''
+        super(MPDataLogChildTask, self).__init__(*args, **kwargs)
+
+        # all attributes are implicitly passed to the child process 
+        self._mlog = kwargs['mlog']
+
+    # @override
+    def wrap(self):
+        '''Apply custom pickle wrappers to non-pickleable attributes'''
+
+        # wrap filehandle and mmap in mlog for pickling
+        filehandle = self._mlog.filehandle
+        data_map = self._mlog.data_map
+        data_len = self._mlog.data_len
+        self._mlog.filehandle = WrapFileHandle(filehandle)
+        self._mlog.data_map = WrapMMap(data_map, filehandle, data_len)
+
+    # @override
+    def unwrap(self):
+        '''Unwrap custom pickle wrappers of non-pickleable attributes'''
+
+        # restore the state of mlog
+        self._mlog.filehandle = self._mlog.filehandle.unwrap()
+        self._mlog.data_map = self._mlog.data_map.unwrap()
+
+    @property
+    def mlog(self):
+        '''The dataflash log (DFReader)'''
+
+        return self._mlog

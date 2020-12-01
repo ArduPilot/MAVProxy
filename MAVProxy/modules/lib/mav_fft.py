@@ -11,58 +11,32 @@ import sys
 import time
 
 from pymavlink import mavutil
-from MAVProxy.modules.lib import multiproc
-from MAVProxy.modules.lib.multiproc_util import WrapFileHandle, WrapMMap
+from MAVProxy.modules.lib.multiproc_util import MPDataLogChildTask
 
-class MavFFT(object):
-    '''MavFFT tool
-    
-    Launch the mavfft_display function in another process and manage
-    marshalling the log from the parent to child process. 
-    '''
+class MavFFT(MPDataLogChildTask):
+    '''A class used to launch `mavfft_display` in a child process'''
 
-    def __init__(self, title, mlog, timestamp_in_range):
-        self.title = title
-        self.close_event = multiproc.Event()
-        self.child = None
+    def __init__(self, *args, **kwargs):
+        '''
+        Parameters
+        ----------
+        mlog : DFReader
+            A dataflash or telemetry log
+        timestamp_in_range: func
+            A function with one arg that returns True if a time stamp is in range
+        '''
 
-        # capture mlog state before modifying
-        filehandle = mlog.filehandle
-        data_map = mlog.data_map
-        data_len = mlog.data_len
+        super(MavFFT, self).__init__(*args, **kwargs)
 
-        try:
-            # wrap filehandle and mmap in mlog for pickling
-            mlog.filehandle = WrapFileHandle(filehandle)
-            mlog.data_map = WrapMMap(data_map, filehandle, data_len)
+        # all attributes are implicitly passed to the child process 
+        self.timestamp_in_range = kwargs['timestamp_in_range']
 
-            # spawn the child process
-            self.child = multiproc.Process(target=self.child_task,
-                                           args=(mlog, timestamp_in_range))
-            self.child.start()
-        finally:
-            # restore the state of mlog
-            mlog.filehandle = filehandle
-            mlog.data_map = data_map
-
-    def child_task(self, mlog, timestamp_in_range):
-        # unwrap
-        mlog.filehandle = mlog.filehandle.unwrap()
-        mlog.data_map = mlog.data_map.unwrap()
+    # @override
+    def child_task(self):
+        '''Launch `mavfft_display`'''
 
         # run the fft tool
-        mavfft_display(mlog, timestamp_in_range)
-
-        # trigger close event when the tool exits 
-        self.close_event.set()
-
-    def close(self):
-        self.close_event.set()
-        if self.is_alive():
-            self.child.join(2)
-
-    def is_alive(self):
-        return self.child.is_alive()
+        mavfft_display(self.mlog, self.timestamp_in_range)
 
 def mavfft_display(mlog,timestamp_in_range):
     '''display fft for raw ACC data in logfile'''
