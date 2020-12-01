@@ -14,8 +14,7 @@ from pymavlink import mavextra
 from pymavlink.rotmat import Vector3
 from pymavlink.rotmat import Matrix3
 from MAVProxy.modules.lib import grapher
-from MAVProxy.modules.lib import multiproc
-from MAVProxy.modules.lib.multiproc_util import WrapFileHandle, WrapMMap
+from MAVProxy.modules.lib.multiproc_util import MPDataLogChildTask
 
 import matplotlib
 import matplotlib.pyplot as pyplot
@@ -424,68 +423,44 @@ def magfit(mlog, timestamp_in_range):
 
     pyplot.show(block=False)
 
-class MagFit(object):
-    '''MagFit application
-    
-        Manage the MagFit application. This class is responsible
-        for launching the UI in another process and ensuring it is
-        closed properly when either the child window is closed or
-        the parent process exits.
-    '''
+class MagFit(MPDataLogChildTask):
+    '''A class used to launch the MagFitUI in a child process'''
 
-    def __init__(self, title, mlog, timestamp_in_range):
-        self.title = title
-        self.close_event = multiproc.Event()
-        self.child = None
+    def __init__(self, *args, **kwargs):
+        '''
+        Parameters
+        ----------
+        title : str
+            The title of the application
+        mlog : DFReader
+            A dataflash or telemetry log
+        timestamp_in_range: func
+            A function with one arg that returns True if a time stamp is in range
+        '''
 
-        # capture mlog state before modifying
-        filehandle = mlog.filehandle
-        data_map = mlog.data_map
-        data_len = mlog.data_len
+        super(MagFit, self).__init__(*args, **kwargs)
 
-        try:
-            # wrap filehandle and mmap in mlog for pickling
-            mlog.filehandle = WrapFileHandle(filehandle)
-            mlog.data_map = WrapMMap(data_map, filehandle, data_len)
+        # all attributes are implicitly passed to the child process 
+        self.title = kwargs['title']
+        self.timestamp_in_range = kwargs['timestamp_in_range']
 
-            # spawn the child process
-            self.child = multiproc.Process(target=self.child_task,
-                                           args=(mlog, timestamp_in_range))
-            self.child.start()
-        finally:
-            # restore the state of mlog
-            mlog.filehandle = filehandle
-            mlog.data_map = data_map
+    # @override
+    def child_task(self):
+        '''Launch the MagFitUI'''
 
-    def child_task(self, mlog, timestamp_in_range):
         from MAVProxy.modules.lib import wx_processguard
         from MAVProxy.modules.lib.wx_loader import wx
-
-        # unwrap
-        mlog.filehandle = mlog.filehandle.unwrap()
-        mlog.data_map = mlog.data_map.unwrap()
 
         # create wx application
         app = wx.App(False)
         app.frame = MagFitUI(title=self.title,
                              close_event=self.close_event,
-                             mlog=mlog,
-                             timestamp_in_range=timestamp_in_range)
+                             mlog=self.mlog,
+                             timestamp_in_range=self.timestamp_in_range)
 
         app.frame.SetDoubleBuffered(True)
         app.frame.Show()
         app.MainLoop()
-
-        # trigger close event when the main loop exits 
-        self.close_event.set()
-
-    def close(self):
-        self.close_event.set()
-        if self.is_alive():
-            self.child.join(2)
-
-    def is_alive(self):
-        return self.child.is_alive()
 
 class MagFitUI(wx.Dialog):
     def __init__(self, title, close_event, mlog, timestamp_in_range):

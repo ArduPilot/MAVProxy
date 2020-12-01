@@ -428,9 +428,9 @@ def cmd_fft(args):
     else:
         condition = None
     global fft_tool
-    fft_tool = mav_fft.MavFFT(title="MavFFT",
-                              mlog=mestate.mlog,
+    fft_tool = mav_fft.MavFFT(mlog=mestate.mlog,
                               timestamp_in_range=timestamp_in_range)
+    fft_tool.start()
 
 msgstats_tool = None
 
@@ -439,8 +439,8 @@ def cmd_stats(args):
 
     from MAVProxy.modules.lib import msgstats
     global msgstats_tool
-    msgstats_tool = msgstats.MavMsgStats(title="Stats",
-                                         mlog=mestate.mlog)
+    msgstats_tool = msgstats.MPMsgStats(mlog=mestate.mlog)
+    msgstats_tool.start()
 
 def cmd_dump(args):
     '''dump messages from log'''
@@ -478,6 +478,7 @@ def cmd_magfit(args):
     mfit_tool = magfit.MagFit(title="MagFit",
                               mlog=mestate.mlog,
                               timestamp_in_range=timestamp_in_range)
+    mfit_tool.start()
 
 def save_graph(graphdef):
     '''save a graph as XML'''

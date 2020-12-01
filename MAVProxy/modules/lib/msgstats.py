@@ -5,8 +5,7 @@ show stats on messages in a log in MAVExplorer
 '''
 
 import fnmatch
-from MAVProxy.modules.lib import multiproc
-from MAVProxy.modules.lib.multiproc_util import WrapFileHandle, WrapMMap
+from MAVProxy.modules.lib.multiproc_util import MPDataLogChildTask
 
 categories = {
     'EKF2' : ['NK*'],
@@ -21,55 +20,25 @@ categories = {
                  'R??H', 'R??I', 'R??J'],
 }
 
-class MavMsgStats(object):
-    '''MavMsgStats tool
-    
-    Launch the show_stats function in another process and manage
-    marshalling the log from the parent to child process. 
-    '''
+class MPMsgStats(MPDataLogChildTask):
+    '''A class used launch `show_stats` in a child process'''
 
-    def __init__(self, title, mlog):
-        self.title = title
-        self.close_event = multiproc.Event()
-        self.child = None
+    def __init__(self, *args, **kwargs):
+        '''
+        Parameters
+        ----------
+        mlog : DFReader
+            A dataflash or telemetry log
+        '''
 
-        # capture mlog state before modifying
-        filehandle = mlog.filehandle
-        data_map = mlog.data_map
-        data_len = mlog.data_len
+        super(MPMsgStats, self).__init__(*args, **kwargs)
 
-        try:
-            # wrap filehandle and mmap in mlog for pickling
-            mlog.filehandle = WrapFileHandle(filehandle)
-            mlog.data_map = WrapMMap(data_map, filehandle, data_len)
+    # @override
+    def child_task(self):
+        '''Launch `show_stats`'''
 
-            # spawn the child process
-            self.child = multiproc.Process(target=self.child_task,
-                                           args=(mlog, ))
-            self.child.start()
-        finally:
-            # restore the state of mlog
-            mlog.filehandle = filehandle
-            mlog.data_map = data_map
-
-    def child_task(self, mlog):
-        # unwrap
-        mlog.filehandle = mlog.filehandle.unwrap()
-        mlog.data_map = mlog.data_map.unwrap()
-
-        # run the stats tool
-        show_stats(mlog)
-
-        # trigger close event when the tool exits 
-        self.close_event.set()
-
-    def close(self):
-        self.close_event.set()
-        if self.is_alive():
-            self.child.join(2)
-
-    def is_alive(self):
-        return self.child.is_alive()
+        # run the fft tool
+        show_stats(self.mlog)
 
 def show_stats(mlog):
     '''show stats on a file'''
