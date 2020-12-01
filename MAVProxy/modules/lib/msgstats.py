@@ -5,6 +5,8 @@ show stats on messages in a log in MAVExplorer
 '''
 
 import fnmatch
+from MAVProxy.modules.lib import multiproc
+from MAVProxy.modules.lib.multiproc_util import WrapFileHandle, WrapMMap
 
 categories = {
     'EKF2' : ['NK*'],
@@ -18,6 +20,56 @@ categories = {
                  'RGPH', 'RGPI', 'RGPJ', 'RASH', 'RASI', 'RBCH', 'RBCI', 'RVOH', 'RMGH',
                  'R??H', 'R??I', 'R??J'],
 }
+
+class MavMsgStats(object):
+    '''MavMsgStats tool
+    
+    Launch the show_stats function in another process and manage
+    marshalling the log from the parent to child process. 
+    '''
+
+    def __init__(self, title, mlog):
+        self.title = title
+        self.close_event = multiproc.Event()
+        self.child = None
+
+        # capture mlog state before modifying
+        filehandle = mlog.filehandle
+        data_map = mlog.data_map
+        data_len = mlog.data_len
+
+        try:
+            # wrap filehandle and mmap in mlog for pickling
+            mlog.filehandle = WrapFileHandle(filehandle)
+            mlog.data_map = WrapMMap(data_map, filehandle, data_len)
+
+            # spawn the child process
+            self.child = multiproc.Process(target=self.child_task,
+                                           args=(mlog, ))
+            self.child.start()
+        finally:
+            # restore the state of mlog
+            mlog.filehandle = filehandle
+            mlog.data_map = data_map
+
+    def child_task(self, mlog):
+        # unwrap
+        mlog.filehandle = mlog.filehandle.unwrap()
+        mlog.data_map = mlog.data_map.unwrap()
+
+        # run the stats tool
+        show_stats(mlog)
+
+        # trigger close event when the tool exits 
+        self.close_event.set()
+
+    def close(self):
+        self.close_event.set()
+        if self.is_alive():
+            self.child.join(2)
+
+    def is_alive(self):
+        return self.child.is_alive()
 
 def show_stats(mlog):
     '''show stats on a file'''
