@@ -435,5 +435,60 @@ If PIDR.I has a constant positive value then it means the aircraft is trimmed to
   <expression>GPA[1].HAcc GPA[1].SAcc GPA[1].VAcc GPS[1].NSats:2</expression>
   <expression>GPA2.HAcc GPA2.SAcc GPA2.VAcc GPS2.NSats:2</expression>
  </graph>
- 
+
+ <graph name='Sensors/GPS/RTKPosAltDiff'>
+  <description></description>
+  <expression>distance_two(GPS,GPS2){GPS2.GMS==GPS.GMS} GPS2.Alt-GPS.Alt{GPS2.GMS==GPS.GMS}</expression>
+ </graph>
+
+ <graph name='EKF3/GSF Yaws Lane1'>
+  <description></description>
+  <expression>degrees(XKY0[0].Y0) degrees(XKY0[0].Y1) degrees(XKY0[0].Y2) degrees(XKY0[0].Y3) degrees(XKY0[0].Y4) degrees(XKY0[0].YC)</expression>
+ </graph>
+
+ <graph name='EKF3/GSF Yaws Lane2'>
+  <description></description>
+  <expression>degrees(XKY0[1].Y0) degrees(XKY0[1].Y1) degrees(XKY0[1].Y2) degrees(XKY0[1].Y3) degrees(XKY0[1].Y4) degrees(XKY0[1].YC)</expression>
+ </graph>
+
+ <graph name='EKF3/GSF VelInnov Lane1'>
+  <description></description>
+  <expression>sqrt(XKY1[0].IVN0**2+XKY1[0].IVE0**2) sqrt(XKY1[0].IVN1**2+XKY1[0].IVE1**2) sqrt(XKY1[0].IVN2**2+XKY1[0].IVE2**2) sqrt(XKY1[0].IVN3**2+XKY1[0].IVE3**2) sqrt(XKY1[0].IVN4**2+XKY1[0].IVE4**2) ATT.Yaw:2</expression>
+ </graph>
+
+ <graph name='Replay/EK3 VelNE'>
+  <description></description>
+  <expression>XKF1[0].VN-XKF1[100].VN{XKF1.C==100} XKF1[0].VE-XKF1[100].VE{XKF1.C==100}</expression>
+ </graph>
+
+ <graph name='Replay/RollPitchDiff'>
+  <description></description>
+  <expression>XKF1[0].Pitch-XKF1[100].Pitch{XKF1.C==100} XKF1[0].Roll-XKF1[100].Roll{XKF1.C==100}</expression>
+ </graph>
+
+ <graph name='Replay/EK2 RollPitchDiff'>
+  <description></description>
+  <expression>NKF1[0].Pitch-NKF1[100].Pitch{NKF1.C==100} NKF1[0].Roll-NKF1[100].Roll{NKF1.C==100} NKF1[0].Yaw-NKF1[100].Yaw{NKF1.C==100}</expression>
+ </graph>
+
+ <graph name='Replay/EK3 DiffPNPE'>
+  <description></description>
+  <expression>XKF1[0].PN-XKF1[100].PN{XKF1.C==100} XKF1[0].PE-XKF1[100].PE{XKF1.C==100}</expression>
+ </graph>
+
+ <graph name='Replay/EK2 DiffPNPE'>
+  <description></description>
+  <expression>NKF1[0].PN-NKF1[100].PN{NKF1.C==100} NKF1[0].PE-NKF1[100].PE{NKF1.C==100}</expression>
+ </graph>
+
+ <graph name='Replay/EK2 DiffPD'>
+  <description></description>
+  <expression>NKF1[0].PD-NKF1[100].PD{NKF1.C==100}</expression>
+ </graph>
+
+ <graph name='Replay/EK3 DiffPD'>
+  <description></description>
+  <expression>XKF1[0].PD-XKF1[100].PD{XKF1.C==100}</expression>
+ </graph>
+
 </graphs>
