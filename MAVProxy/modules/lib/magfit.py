@@ -434,15 +434,15 @@ class MagFit(MPDataLogChildTask):
             The title of the application
         mlog : DFReader
             A dataflash or telemetry log
-        timestamp_in_range: func
-            A function with one arg that returns True if a time stamp is in range
+        xlimits: MAVExplorer.XLimits
+            An object capturing timestamp limits
         '''
 
         super(MagFit, self).__init__(*args, **kwargs)
 
         # all attributes are implicitly passed to the child process 
         self.title = kwargs['title']
-        self.timestamp_in_range = kwargs['timestamp_in_range']
+        self.xlimits = kwargs['xlimits']
 
     # @override
     def child_task(self):
@@ -456,7 +456,7 @@ class MagFit(MPDataLogChildTask):
         app.frame = MagFitUI(title=self.title,
                              close_event=self.close_event,
                              mlog=self.mlog,
-                             timestamp_in_range=self.timestamp_in_range)
+                             timestamp_in_range=self.xlimits.timestamp_in_range)
 
         app.frame.SetDoubleBuffered(True)
         app.frame.Show()

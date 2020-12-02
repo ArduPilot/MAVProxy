@@ -33,9 +33,6 @@ import datetime
 import matplotlib
 
 grui = []
-last_xlim = None
-xlim_low = None
-xlim_high = None
 flightmodes = None
 
 # Global var to hold the GUI menu element
@@ -58,19 +55,26 @@ class MEStatus(object):
     def __init__(self):
         self.msgs = {}
 
-def timestamp_in_range(timestamp):
-    '''check if a timestamp is in current xlim
-       return -1 if too low
-       return 1 if too high
-       return 0 if in range
-    '''
-    global xlim_low, xlim_high
-    if xlim_low is not None and timestamp < xlim_low:
-        return -1
-    if xlim_high is not None and timestamp > xlim_high:
-        return 1
-    return 0
+class XLimits(object):
+    '''A class capturing timestamp limits'''
+    def __init__(self):
+        self.last_xlim = None
+        self.xlim_low = None
+        self.xlim_high = None
 
+    def timestamp_in_range(self, timestamp):
+        '''check if a timestamp is in current limits
+        return -1 if too low
+        return 1 if too high
+        return 0 if in range
+        '''
+        if self.xlim_low is not None and timestamp < self.xlim_low:
+            return -1
+        if self.xlim_high is not None and timestamp > self.xlim_high:
+            return 1
+        return 0    
+
+xlimits = XLimits()
 
 class MEState(object):
     '''holds state of MAVExplorer'''
@@ -361,10 +365,10 @@ def cmd_graph(args):
         mestate.last_graph = GraphDefinition(mestate.settings.title, expression, '', [expression], None)
     grui.append(Graph_UI(mestate))
     grui[-1].display_graph(mestate.last_graph, flightmode_colours())
-    global last_xlim
-    if last_xlim is not None and mestate.settings.sync_xzoom:
-        #print("initial: ", last_xlim)
-        grui[-1].set_xlim(last_xlim)
+    global xlimits
+    if xlimits.last_xlim is not None and mestate.settings.sync_xzoom:
+        #print("initial: ", xlimits.last_xlim)
+        grui[-1].set_xlim(xlimits.last_xlim)
 
 map_timelim_pipes = []
 
@@ -388,10 +392,10 @@ def cmd_map(args):
     timelim_pipe = multiproc.Pipe()
     child = multiproc.Process(target=mavflightview.mavflightview_show, args=[path, wp, fen, used_flightmodes, mav_type, options, instances, None, timelim_pipe])
     map_timelim_pipes.append(timelim_pipe)
-    global last_xlim
-    if last_xlim is not None and mestate.settings.sync_xmap:
+    global xlimits
+    if xlimits.last_xlim is not None and mestate.settings.sync_xmap:
         try:
-            timelim_pipe[0].send(last_xlim)
+            timelim_pipe[0].send(xlimits.last_xlim)
         except Exception:
             pass
     child.start()
@@ -427,9 +431,9 @@ def cmd_fft(args):
         condition = args[0]
     else:
         condition = None
-    global fft_tool
+    global fft_tool, xlimits
     fft_tool = mav_fft.MavFFT(mlog=mestate.mlog,
-                              timestamp_in_range=timestamp_in_range)
+                              xlimits=xlimits)
     fft_tool.start()
 
 msgstats_tool = None
@@ -444,6 +448,7 @@ def cmd_stats(args):
 
 def cmd_dump(args):
     '''dump messages from log'''
+    global xlimits
     if len(args) > 0:
         wildcard = args[0]
     else:
@@ -460,7 +465,7 @@ def cmd_dump(args):
         msg = mlog.recv_match(type=types)
         if msg is None:
             break
-        in_range = timestamp_in_range(msg._timestamp)
+        in_range = xlimits.timestamp_in_range(msg._timestamp)
         if in_range < 0:
             continue
         if in_range > 0:
@@ -474,10 +479,10 @@ def cmd_magfit(args):
     '''fit magnetic field'''
 
     from MAVProxy.modules.lib import magfit    
-    global mfit_tool
+    global mfit_tool, xlimits
     mfit_tool = magfit.MagFit(title="MagFit",
                               mlog=mestate.mlog,
-                              timestamp_in_range=timestamp_in_range)
+                              xlimits=xlimits)
     mfit_tool.start()
 
 def save_graph(graphdef):
@@ -878,7 +883,7 @@ def input_loop():
 
 def main_loop():
     '''main processing loop, display graphs and maps'''
-    global grui, last_xlim
+    global grui, xlimits
     while True:
         if mestate is None or mestate.exit:
             return
@@ -897,13 +902,12 @@ def main_loop():
                         continue
                     if not grui[j].set_xlim(xlim):
                         remlist.append(j)
-                last_xlim = xlim
+                xlimits.last_xlim = xlim
                 from dateutil.tz import tzlocal
                 localtimezone = tzlocal()
                 tzofs = localtimezone.utcoffset(datetime.datetime.now()).total_seconds()
-                global xlim_low, xlim_high
-                xlim_low = matplotlib.dates.num2epoch(xlim[0]) - tzofs
-                xlim_high = matplotlib.dates.num2epoch(xlim[1]) - tzofs
+                xlimits.xlim_low = matplotlib.dates.num2epoch(xlim[0]) - tzofs
+                xlimits.xlim_high = matplotlib.dates.num2epoch(xlim[1]) - tzofs
                 
                 if mestate.settings.sync_xmap:
                     remlist = []

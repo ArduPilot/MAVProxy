@@ -22,23 +22,23 @@ class MavFFT(MPDataLogChildTask):
         ----------
         mlog : DFReader
             A dataflash or telemetry log
-        timestamp_in_range: func
-            A function with one arg that returns True if a time stamp is in range
+        xlimits: MAVExplorer.XLimits
+            An object capturing timestamp limits
         '''
 
         super(MavFFT, self).__init__(*args, **kwargs)
 
         # all attributes are implicitly passed to the child process 
-        self.timestamp_in_range = kwargs['timestamp_in_range']
+        self.xlimits = kwargs['xlimits']
 
     # @override
     def child_task(self):
         '''Launch `mavfft_display`'''
 
         # run the fft tool
-        mavfft_display(self.mlog, self.timestamp_in_range)
+        mavfft_display(self.mlog, self.xlimits.timestamp_in_range)
 
-def mavfft_display(mlog,timestamp_in_range):
+def mavfft_display(mlog, timestamp_in_range):
     '''display fft for raw ACC data in logfile'''
 
     '''object to store data about a single FFT plot'''
