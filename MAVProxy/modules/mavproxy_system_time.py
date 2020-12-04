@@ -64,7 +64,7 @@ class system_time(mp_module.MPModule):
             if self.system_time_settings.verbose:
                 print("ST: Sending system time: (%u/%u)" %
                       (time_us, self.uptime(),))
-            self.master.mav.system_time_send(time_us,
+            self.master.mav.system_time_send(int(time_us),
                                              self.uptime())
 
         if (now-self.last_sent_timesync >
@@ -74,7 +74,7 @@ class system_time(mp_module.MPModule):
             time_ns += 1234
             if self.system_time_settings.verbose:
                 print("ST: Sending timesync request")
-            self.master.mav.timesync_send(0, time_ns)
+            self.master.mav.timesync_send(0, int(time_ns))
             self.last_sent_ts1 = time_ns
 
     def mavlink_packet(self, m):
@@ -92,7 +92,7 @@ class system_time(mp_module.MPModule):
                     if self.system_time_settings.verbose:
                         print("ST: received timesync; sending response: %u" %
                               (time_ns))
-                    self.master.mav.timesync_send(time_ns,
+                    self.master.mav.timesync_send(int(time_ns),
                                                   m.ts1)
             else:
                 if m.ts1 == self.last_sent_ts1:
