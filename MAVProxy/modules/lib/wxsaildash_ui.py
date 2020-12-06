@@ -222,7 +222,7 @@ class WindMeter(SM.SpeedMeter):
 
         # wind speed display
         self.SetMiddleTextColour(wx.WHITE)
-        self.SetMiddleTextFont(wx.Font(24, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+        self.SetMiddleTextFont(wx.Font(16, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
         self.SetWindSpeed(0.0)
 
     def SetWindAngle(self, wind_angle):
@@ -303,10 +303,10 @@ class InstrumentDisplay(wx.Panel):
         self._label_text.ChangeValue("---")
 
         self._value_text = wx.TextCtrl(self, style=wx.BORDER_NONE|wx.TE_CENTRE)
-        self._value_text.SetFont(wx.Font(36, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+        self._value_text.SetFont(wx.Font(30, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
         self._value_text.SetBackgroundColour(self.GetBackgroundColour())
         self._value_text.ChangeValue("-.-")
-        self._value_text.SetMinSize((60, 30))
+        self._value_text.SetMinSize((60, 40))
 
         self._unit_text = wx.TextCtrl(self, style=wx.BORDER_NONE|wx.TE_RIGHT)
         self._unit_text.SetFont(wx.Font(12, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
