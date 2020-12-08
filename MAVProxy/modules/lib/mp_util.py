@@ -423,6 +423,9 @@ def decode_devid(devid, pname):
 
     if pname.startswith("GND_BARO"):
         decoded_devname = baro_types.get(devtype, "UNKNOWN")
+
+    if pname.startswith("BARO"):
+        decoded_devname = baro_types.get(devtype, "UNKNOWN")
         
     print("%s: bus_type:%s(%u)  bus:%u address:%u(0x%x) devtype:%u(0x%x) %s (%u)" % (
         pname,
