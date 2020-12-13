@@ -266,18 +266,27 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
         if options.ahr2:
             types.extend(['AHR2', 'AHRS2', 'GPS'])
 
+    # handle forms like GPS[0], mapping to GPS for recv_match_types
+    for i in range(len(types)):
+        bracket = types[i].find('[')
+        if bracket != -1:
+            types[i] = types[i][:bracket]
+
     recv_match_types = types[:]
     colour_source = getattr(options, "colour_source")
+    re_caps = re.compile('[A-Z_][A-Z0-9_]+')
+
     if colour_source is not None:
         # stolen from mavgraph.py
-        re_caps = re.compile('[A-Z_][A-Z0-9_]+')
         caps = set(re.findall(re_caps, colour_source))
         recv_match_types.extend(caps)
 
-    print("Looking for types %s" % str(types))
+    print("Looking for types %s" % str(recv_match_types))
 
     last_timestamps = {}
     used_flightmodes = {}
+
+    mlog.rewind()
 
     while True:
         try:
