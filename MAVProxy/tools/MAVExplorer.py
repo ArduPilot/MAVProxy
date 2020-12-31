@@ -793,6 +793,8 @@ def cmd_devid(args):
             mp_util.decode_devid(params[p], p)
         if p.startswith('GND_BARO') and p.endswith('_ID'):
             mp_util.decode_devid(params[p], p)
+        if p.startswith('BARO') and p.endswith('DEVID'):
+            mp_util.decode_devid(params[p], p)
 
 def cmd_loadfile(args):
     '''callback from menu to load a log file'''
