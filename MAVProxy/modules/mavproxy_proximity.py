@@ -123,15 +123,20 @@ class proximity(mp_module.MPModule):
             increment = m.increment_f
             if increment == 0:
                 increment = float(m.increment)
-            fov = 72*increment
+            measurement_count = 0
+            for i in range(0, 72):
+                if m.distances[i] != 65535:
+                    measurement_count += 1
+            fov = measurement_count*increment
             start_angle = -increment/2.0
             end_angle = increment/2.0
-            rotation_start = -90 + heading - (fov/2)
+            rotation_start = -90 + heading
             for i in range(0, 72):
                 slipkey = '%s-POS%u' % (tlayer, i)
                 if m.distances[i] == m.max_distance+1:
                     # no measurement
                     self.foreach_map(lambda a_map : a_map.remove_object(slipkey))
+                    measurement_count += 1
                     continue
                 distance = m.distances[i] / 100.0 # cm -> m
                 circle = mp_slipmap.SlipCircle(
@@ -143,12 +148,14 @@ class proximity(mp_module.MPModule):
                     linewidth=3,
                     start_angle=start_angle,
                     end_angle=end_angle,
-                    rotation=(rotation_start+i*increment)%360,
+                    rotation=(m.angle_offset+rotation_start+i*increment)%360,
                 )
+                if m.distances[i] < m.min_distance:
+                    measurement_count += 1
                 self.foreach_map(lambda a_map : a_map.add_object(circle))
 
             slipkey = "%s-range" % tlayer
-            if increment == 5:
+            if fov == 360:
                 # perfect circle
                 # add a circle for max-range
                 self.foreach_map(lambda a_map : a_map.add_object(mp_slipmap.SlipCircle(
@@ -170,7 +177,7 @@ class proximity(mp_module.MPModule):
                     linewidth=1,
                     start_angle=-fov/2,
                     end_angle=fov/2,
-                    rotation=(-90+(heading))%360,
+                    rotation=(m.angle_offset+-90+(heading))%360,
                     add_radii = True,
                 )))
 
