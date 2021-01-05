@@ -376,6 +376,7 @@ def decode_devid(devid, pname):
         0x13 : "DEVTYPE_ACC_MPU6000",
         0x16 : "DEVTYPE_ACC_MPU9250",
         0x17 : "DEVTYPE_ACC_IIS328DQ",
+        0x18 : "DEVTYPE_ACC_LSM9DS1",
         0x21 : "DEVTYPE_GYR_MPU6000",
         0x22 : "DEVTYPE_GYR_L3GD20",
         0x24 : "DEVTYPE_GYR_MPU9250",
