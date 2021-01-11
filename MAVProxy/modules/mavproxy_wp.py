@@ -25,7 +25,7 @@ class WPModule(mp_module.MPModule):
         self.undo_wp_idx = -1
         self.wploader.expected_count = 0
         self.add_command('wp', self.cmd_wp,       'waypoint management',
-                         ["<list|clear|move|remove|loop|set|undo|movemulti|changealt|param|status|slope>",
+                         ["<list|clear|move|remove|loop|set|undo|movemulti|moverelhome|changealt|param|status|slope>",
                           "<load|update|save|savecsv|show> (FILENAME)"])
 
         if self.continue_mode and self.logdir is not None:
@@ -597,6 +597,41 @@ class WPModule(mp_module.MPModule):
         print("Moved WPs %u:%u to %f, %f rotation=%.1f" % (wpstart, wpend, lat, lon, rotation))
 
 
+    def cmd_wp_move_rel_home(self, args, latlon=None):
+        '''handle wp move to a point relative to home by dist/bearing'''
+        if len(args) < 3:
+            print("usage: wp moverelhome WPNUM dist bearing")
+            return
+        idx = int(args[0])
+        if idx < 1 or idx > self.wploader.count():
+            print("Invalid wp number %u" % idx)
+            return
+        dist = float(args[1])
+        bearing = float(args[2])
+
+        home = self.get_home()
+        if home is None:
+            print("Need home")
+            return
+
+        wp = self.wploader.wp(idx)
+        if not self.wploader.is_location_command(wp.command):
+            print("Not a nav command")
+            return
+        (newlat, newlon) = mp_util.gps_newpos(home.x, home.y, bearing, dist)
+        wp.x = newlat
+        wp.y = newlon
+        wp.target_system    = self.target_system
+        wp.target_component = self.target_component
+        self.wploader.set(wp, idx)
+
+        self.loading_waypoints = True
+        self.loading_waypoint_lasttime = time.time()
+        self.master.mav.mission_write_partial_list_send(self.target_system,
+                                                        self.target_component,
+                                                        idx, idx+1)
+        print("Moved WP %u %.1fm bearing %.1f from home" % (idx, dist, bearing))
+
     def cmd_wp_changealt(self, args):
         '''handle wp change target alt of multiple waypoints'''
         if len(args) < 2:
@@ -862,6 +897,8 @@ class WPModule(mp_module.MPModule):
             self.cmd_wp_move(args[1:])
         elif args[0] == "movemulti":
             self.cmd_wp_movemulti(args[1:], None)
+        elif args[0] == "moverelhome":
+            self.cmd_wp_move_rel_home(args[1:], None)
         elif args[0] == "changealt":
             self.cmd_wp_changealt(args[1:])
         elif args[0] == "param":
