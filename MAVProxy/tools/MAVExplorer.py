@@ -50,6 +50,11 @@ def xml_escape(e):
     e = e.replace('<', '&lt;')
     return e
 
+def timestring(msg):
+    '''return string for msg timestamp'''
+    ts_ms = int(msg._timestamp * 1000.0) % 1000
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(msg._timestamp)) + ".%.03u" % ts_ms
+
 class MEStatus(object):
     '''status object to conform with mavproxy structure for modules'''
     def __init__(self):
@@ -470,7 +475,7 @@ def cmd_dump(args):
             continue
         if in_range > 0:
             continue
-        print(msg)
+        print("%s %s" % (timestring(msg), msg))
     mlog.rewind()
 
 mfit_tool = None
@@ -730,9 +735,7 @@ def cmd_messages(args):
         else:
             mstr = m.text
         if fnmatch.fnmatch(mstr.upper(), wildcard.upper()):
-            ts_ms = int(m._timestamp * 1000.0) % 1000
-            tstr = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(m._timestamp)) + ".%.03u" % ts_ms
-            print("%s %s" % (tstr, mstr))
+            print("%s %s" % (timestring(m), mstr))
     mestate.mlog.rewind()
 
 def cmd_param(args):
@@ -777,8 +780,7 @@ def cmd_paramchange(args):
             vmap[pname] = pvalue
             continue
 
-        tstr = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(m._timestamp))
-        print("%s %s %.6f -> %.6f" % (tstr, pname, vmap[pname], pvalue))
+        print("%s %s %.6f -> %.6f" % (timestring(m), pname, vmap[pname], pvalue))
         vmap[pname] = pvalue
     mestate.mlog.rewind()
 
