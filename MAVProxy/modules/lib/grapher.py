@@ -97,6 +97,7 @@ class MavGraph(object):
         self.tday_base = None
         self.tday_basetime = None
         self.title = None
+        self.grid = False
         if sys.version_info[0] >= 3:
             self.text_types = frozenset([str,])
         else:
@@ -122,6 +123,10 @@ class MavGraph(object):
         '''set graph title'''
         self.title = title
 
+    def set_grid(self, enable):
+        '''enable grid'''
+        self.grid = enable
+        
     def set_marker(self, marker):
         '''set graph marker'''
         self.marker = marker
@@ -255,6 +260,9 @@ class MavGraph(object):
             if self.axes[i] == 2:
                 if ax2 is None:
                     ax2 = self.ax1.twinx()
+                    if self.grid:
+                        ax2.grid(None)
+                        self.ax1.grid(True)
                     ax2.format_coord = self.make_format(ax2, self.ax1)
                 ax = ax2
                 if not self.xaxis:
@@ -326,6 +334,9 @@ class MavGraph(object):
 
             empty = False
             
+        if self.grid:
+            pylab.grid()
+
         if self.show_flightmode:
             alpha = 0.3
             xlim = self.ax1.get_xlim()
@@ -596,6 +607,7 @@ if __name__ == "__main__":
     parser.add_argument("--dialect", default="ardupilotmega", help="MAVLink dialect")
     parser.add_argument("--output", default=None, help="provide an output format")
     parser.add_argument("--timeshift", type=float, default=0, help="shift time on first graph in seconds")
+    parser.add_argument("--grid", action='store_true', help="show a grid")
     parser.add_argument("logs_fields", metavar="<LOG or FIELD>", nargs="+")
     args = parser.parse_args()
 
@@ -617,6 +629,7 @@ if __name__ == "__main__":
     mg.set_legend2(args.legend2)
     mg.set_multi(args.multi)
     mg.set_title(args.title)
+    mg.set_grid(args.grid)
     mg.set_show_flightmode(args.show_flightmode)
     mg.process([],[],0)
     mg.show(len(mg.mav_list), output=args.output)
