@@ -91,6 +91,8 @@ class MiscModule(mp_module.MPModule):
         self.add_command('lockup_autopilot', self.cmd_lockup_autopilot, "lockup autopilot")
         self.add_command('corrupt_params', self.cmd_corrupt_param, "corrupt param storage")
         self.add_command('hardfault_autopilot', self.cmd_hardfault_autopilot, "hardfault autopilot")
+        self.add_command('panic_autopilot', self.cmd_panic_autopilot, "panic autopilot")
+        self.add_command('longloop_autopilot', self.cmd_longloop_autopilot, "cause long loop in autopilot")
         self.add_command('batreset', self.cmd_battery_reset, "reset battery remaining")
         self.add_command('setorigin', self.cmd_setorigin, "set global origin")
         self.add_command('magsetfield', self.cmd_magset_field, "set expected mag field by field")
@@ -151,30 +153,11 @@ class MiscModule(mp_module.MPModule):
         else:
             self.master.reboot_autopilot()
 
-    def cmd_lockup_autopilot(self, args):
-        '''lockup autopilot for watchdog testing'''
+    def cmd_dosomethingreallynastyto_autopilot(self, args, description, code):
+        '''helper function for the following commands which do unpleasant
+        things to the autopilot'''
         if len(args) > 0 and args[0] == 'IREALLYMEANIT':
-            print("Sending lockup command")
-            self.master.mav.command_long_send(self.settings.target_system, self.settings.target_component,
-                                              mavutil.mavlink.MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN, 0,
-                                              42, 24, 71, 93, 0, 0, 0)
-        else:
-            print("Invalid lockup command")
-
-    def cmd_corrupt_param(self, args):
-        '''corrupt parameter storage for backup testing'''
-        if len(args) > 0 and args[0] == 'IREALLYMEANIT':
-            print("Sending corruption command")
-            self.master.mav.command_long_send(self.settings.target_system, self.settings.target_component,
-                                              mavutil.mavlink.MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN, 0,
-                                              42, 24, 71, 96, 0, 0, 0)
-        else:
-            print("Invalid corruption command")
-            
-    def cmd_hardfault_autopilot(self, args):
-        '''lockup autopilot for watchdog testing'''
-        if len(args) > 0 and args[0] == 'IREALLYMEANIT':
-            print("Sending hardfault command")
+            print("Sending %s command" % description)
             self.master.mav.command_long_send(
                 self.settings.target_system,
                 self.settings.target_component,
@@ -182,12 +165,32 @@ class MiscModule(mp_module.MPModule):
                 42,
                 24,
                 71,
-                94,
+                code,
                 0,
                 0,
                 0)
         else:
-            print("Invalid hardfault command")
+            print("Invalid %s command" % description)
+
+    def cmd_lockup_autopilot(self, args):
+        '''lockup autopilot for watchdog testing'''
+        self.cmd_dosomethingreallynastyto_autopilot(args, 'lockup', 93)
+
+    def cmd_hardfault_autopilot(self, args):
+        '''lockup autopilot for watchdog testing'''
+        self.cmd_dosomethingreallynastyto_autopilot(args, 'corruption', 94)
+
+    def cmd_panic_autopilot(self, args):
+        '''get ArduPilot to call AP_HAL::panic()'''
+        self.cmd_dosomethingreallynastyto_autopilot(args, 'panic', 95)
+
+    def cmd_corrupt_param(self, args):
+        '''corrupt parameter storage for backup testing'''
+        self.cmd_dosomethingreallynastyto_autopilot(args, 'corruption', 96)
+
+    def cmd_longloop_autopilot(self, args):
+        '''Ask the autopilot to create a long loop'''
+        self.cmd_dosomethingreallynastyto_autopilot(args, 'long-loop', 97)
 
     def cmd_battery_reset(self, args):
         '''reset battery remaining'''
