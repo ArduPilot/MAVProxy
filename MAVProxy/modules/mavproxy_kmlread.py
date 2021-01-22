@@ -255,8 +255,11 @@ class KmlReadModule(mp_module.MPModule):
         self.snap_points = []
 
         #go through each object in the kml...
-        for n in nodes:     
-            point = self.readObject(n)
+        for n in nodes:
+            try:
+                point = self.readObject(n)
+            except Exception as ex:
+                continue
 
             #and place any polygons on the map
             if self.mpstate.map is not None and point[0] == 'Polygon':
