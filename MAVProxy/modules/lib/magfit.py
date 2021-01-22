@@ -240,7 +240,7 @@ def magfit(mlog, timestamp_in_range):
     global mag_idx
     if mag_msg[-1].isdigit():
         mag_instance = None
-        max_idx = mag_msg[-1]
+        mag_idx = mag_msg[-1]
     elif mag_msg.endswith('[0]'):
         mag_instance = 0
         mag_idx = ''
