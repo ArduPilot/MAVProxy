@@ -14,8 +14,9 @@ from MAVProxy.modules.mavproxy_map import mp_slipmap, mp_tile
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import multiproc
 from MAVProxy.modules.lib import grapher
+from MAVProxy.modules.lib import kmlread
 import functools
-
+import random
 import cv2
 
 def create_map(title):
@@ -514,6 +515,35 @@ def mavflightview_show(path, wp, fen, used_flightmodes, mav_type, options, insta
         else:
             print("colour-source: min=%f max=%f" % (colour_source_min, colour_source_max))
 
+        kml = getattr(options,'kml',None)
+        if kml is not None:
+            load_kml(map, kml)
+
+
+def load_kml(map, kml):
+    '''load a kml overlay'''
+    print("Loading kml %s" % kml)
+    nodes = kmlread.readkmz(kml)
+    for n in nodes:
+        try:
+            point = kmlread.readObject(n)
+        except Exception as ex:
+            continue
+
+        if point[0] == 'Polygon':
+            newcolour = (random.randint(0, 255), 0, random.randint(0, 255))
+            curpoly = mp_slipmap.SlipPolygon(point[1], point[2],
+                                             layer=2, linewidth=2, colour=newcolour)
+            map.add_object(curpoly)
+
+        if point[0] == 'Point':
+            icon = map.icon('barrell.png')
+            curpoint = mp_slipmap.SlipIcon(point[1], latlon = (point[2][0][0], point[2][0][1]), layer=3, img=icon, rotation=0, follow=False)
+            curtext = mp_slipmap.SlipLabel(point[1], point = (point[2][0][0], point[2][0][1]), layer=4, label=point[1], colour=(0,255,255))
+            map.add_object(curpoint)
+            map.add_object(curtext)
+
+
 def mavflightview(filename, options):
     print("Loading %s ..." % filename)
     mlog = mavutil.mavlink_connection(filename)
@@ -572,6 +602,7 @@ if __name__ == "__main__":
     parser.add_option("--rate", type='int', default=0, help="maximum message rate to display (0 means all points)")
     parser.add_option("--colour-source", type="str", default="flightmode", help="expression with range 0f..255f used for point colour")
     parser.add_option("--no-flightmode-legend", action="store_false", default=True, dest="show_flightmode_legend", help="hide legend for colour used for flight modes")
+    parser.add_option("--kml", default=None, help="add kml overlay")
 
     (opts, args) = parser.parse_args()
 
@@ -581,6 +612,8 @@ if __name__ == "__main__":
 
     if opts.multi:
         multi_map = None
+
+    random.seed(1)
 
     for f in args:
         mavflightview(f, opts)
