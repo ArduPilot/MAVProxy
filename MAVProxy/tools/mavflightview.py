@@ -27,7 +27,7 @@ def pixel_coords(latlon, ground_width=0, mt=None, topleft=None, width=None):
     (lat,lon) = (latlon[0], latlon[1])
     return mt.coord_to_pixel(topleft[0], topleft[1], width, ground_width, lat, lon)
 
-def create_imagefile(options, filename, latlon, ground_width, path_objs, mission_obj, fence_obj, width=600, height=600, used_flightmodes=[], mav_type=None):
+def create_imagefile(options, filename, latlon, ground_width, path_objs, mission_obj, fence_obj, kml_objects, width=600, height=600, used_flightmodes=[], mav_type=None):
     '''create path and mission as an image file'''
     mt = mp_tile.MPTile(service=options.service)
 
@@ -47,6 +47,15 @@ def create_imagefile(options, filename, latlon, ground_width, path_objs, mission
             m.draw(map_img, pixmapper, None)
     if fence_obj is not None:
         fence_obj.draw(map_img, pixmapper, None)
+
+    if kml_objects is not None:
+        for obj in kml_objects:
+            print(obj)
+            try:
+                obj.draw(map_img, pixmapper, None)
+            except Exception:
+                pass
+
     if (options is not None and
         mav_type is not None and
         options.colour_source == "flightmode"):
@@ -469,8 +478,14 @@ def mavflightview_show(path, wp, fen, used_flightmodes, mav_type, options, insta
     else:
         fence_obj = None
 
+    kml = getattr(options,'kml',None)
+    if kml is not None:
+        kml_objects = load_kml(kml)
+    else:
+        kml_objects = None
+
     if options.imagefile:
-        create_imagefile(options, options.imagefile, (lat,lon), ground_width, path_objs, mission_obj, fence_obj, used_flightmodes=used_flightmodes, mav_type=mav_type)
+        create_imagefile(options, options.imagefile, (lat,lon), ground_width, path_objs, mission_obj, fence_obj, kml_objects, used_flightmodes=used_flightmodes, mav_type=mav_type)
     else:
         global multi_map
         if options.multi and multi_map is not None:
@@ -495,6 +510,10 @@ def mavflightview_show(path, wp, fen, used_flightmodes, mav_type, options, insta
         if fence_obj is not None:
             map.add_object(fence_obj)
 
+        if kml_objects is not None:
+            for obj in kml_objects:
+                map.add_object(obj)
+            
         for flag in options.flag:
             a = flag.split(',')
             lat = a[0]
@@ -515,15 +534,12 @@ def mavflightview_show(path, wp, fen, used_flightmodes, mav_type, options, insta
         else:
             print("colour-source: min=%f max=%f" % (colour_source_min, colour_source_max))
 
-        kml = getattr(options,'kml',None)
-        if kml is not None:
-            load_kml(map, kml)
 
-
-def load_kml(map, kml):
-    '''load a kml overlay'''
+def load_kml(kml):
+    '''load a kml overlay, return list of map objects'''
     print("Loading kml %s" % kml)
     nodes = kmlread.readkmz(kml)
+    ret = []
     for n in nodes:
         try:
             point = kmlread.readObject(n)
@@ -534,14 +550,15 @@ def load_kml(map, kml):
             newcolour = (random.randint(0, 255), 0, random.randint(0, 255))
             curpoly = mp_slipmap.SlipPolygon(point[1], point[2],
                                              layer=2, linewidth=2, colour=newcolour)
-            map.add_object(curpoly)
+            ret.append(curpoly)
 
         if point[0] == 'Point':
-            icon = map.icon('barrell.png')
+            icon = mp_tile.mp_icon('barrell.png')
             curpoint = mp_slipmap.SlipIcon(point[1], latlon = (point[2][0][0], point[2][0][1]), layer=3, img=icon, rotation=0, follow=False)
             curtext = mp_slipmap.SlipLabel(point[1], point = (point[2][0][0], point[2][0][1]), layer=4, label=point[1], colour=(0,255,255))
-            map.add_object(curpoint)
-            map.add_object(curtext)
+            ret.append(curpoint)
+            ret.append(curtext)
+    return ret
 
 
 def mavflightview(filename, options):
