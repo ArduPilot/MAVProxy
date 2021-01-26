@@ -32,6 +32,9 @@ class ModeModule(mp_module.MPModule):
         self.master.set_mode(modenum)
 
     def available_modes(self):
+        if self.master is None:
+            print('No mode mapping available')
+            return []
         mode_mapping = self.master.mode_mapping()
         if mode_mapping is None:
             print('No mode mapping available')
