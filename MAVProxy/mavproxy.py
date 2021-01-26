@@ -1340,8 +1340,7 @@ if __name__ == '__main__':
           print("Connecting to %s" % serial_list[0])
           mpstate.module('link').link_add(serial_list[0].device)
     elif not opts.master and len(serial_list) > 1:
-          print("Error: multiple possible serial ports; use --master to select a single port")
-          sys.exit(1)
+          print("Warning: multiple possible serial ports. Use console GUI to add port")
     elif not opts.master:
           wifi_device = '0.0.0.0:14550'
           mpstate.module('link').link_add(wifi_device)
