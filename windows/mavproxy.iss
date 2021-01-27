@@ -51,13 +51,13 @@ Source: "..\windows\Startup Examples\MAVProxyLogput.bat"; DestDir: "{app}\Exampl
 Source: "..\windows\Startup Examples\MAVProxyMultiOutput.bat"; DestDir: "{app}\Examples"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#MyAppName} (No GUI)"; Filename: "{app}\{#MyAppExeName}"
-Name: "{group}\MAVExplorer"; Filename: "{app}\MAVExplorer.exe"
+Name: "{group}\{#MyAppName} (No GUI)"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{commondocs}"
+Name: "{group}\MAVExplorer"; Filename: "{app}\MAVExplorer.exe"; WorkingDir: "{commondocs}"
 Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 Name: "{group}\Documentation"; Filename: "https://ardupilot.org/mavproxy/index.html"
 Name: "{group}\Startup Examples"; Filename: "{app}\Examples"
 Name: "{group}\Ardupilot MAVProxy Forum"; Filename: "http://discuss.ardupilot.org/c/ground-control-software/mavproxy"
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--map --console --load-module=graph"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--map --console --load-module=graph"; WorkingDir: "{commondocs}"
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
