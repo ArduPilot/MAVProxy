@@ -13,6 +13,13 @@ class DeviceOpModule(mp_module.MPModule):
                          ["<read|write> <spi|i2c>"])
         self.request_id = 1
 
+        self.failure_strings = {
+            1: "No such bus type",
+            2: "No such bus/device",
+            3: "Sempahore-take failure",
+            4: "transfer failed",
+        }
+
     def cmd_devop(self, args):
         '''device operations'''
         usage = "Usage: devop <read|write> <spi|i2c> name bus address"
@@ -125,14 +132,20 @@ class DeviceOpModule(mp_module.MPModule):
         mtype = m.get_type()
         if mtype == "DEVICE_OP_READ_REPLY":
             if m.result != 0:
-                print("Operation %u failed: %u" % (m.request_id, m.result))
+                print("Operation %u failed: %u (%s)" %
+                      (m.request_id,
+                       m.result,
+                       self.failure_strings.get(m.result, '????')))
             else:
                 print("Operation %u OK: %u bytes" % (m.request_id, m.count))
                 self.read_show_reply(m)
 
         if mtype == "DEVICE_OP_WRITE_REPLY":
             if m.result != 0:
-                print("Operation %u failed: %u" % (m.request_id, m.result))
+                print("Operation %u failed: %u (%s)" %
+                      (m.request_id,
+                       m.result,
+                       self.failure_strings.get(m.result, '????')))
             else:
                 print("Operation %u OK" % m.request_id)
 
