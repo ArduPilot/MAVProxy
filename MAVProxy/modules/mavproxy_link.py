@@ -14,6 +14,7 @@ from MAVProxy.modules.lib import mp_util
 
 if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import *
+    from MAVProxy.modules.lib.wx_addlink import MPMenulinkAddDialog
 
 dataPackets = frozenset(['BAD_DATA','LOG_DATA'])
 delayedPackets = frozenset([ 'MISSION_CURRENT', 'SYS_STATUS', 'VFR_HUD',
@@ -54,10 +55,9 @@ class LinkModule(mp_module.MPModule):
 
         self.menu_added_console = False
         if mp_util.has_wxpython:
-            self.menu_add = MPMenuSubMenu('Add', items=[])
             self.menu_rm = MPMenuSubMenu('Remove', items=[])
             self.menu = MPMenuSubMenu('Link',
-                                      items=[self.menu_add,
+                                      items=[MPMenuItem('Add...', 'Add...', '# link add ', handler=MPMenulinkAddDialog()),
                                              self.menu_rm,
                                              MPMenuItem('Ports', 'Ports', '# link ports'),
                                              MPMenuItem('List', 'List', '# link list'),
@@ -69,7 +69,6 @@ class LinkModule(mp_module.MPModule):
         if mp_util.has_wxpython and (not self.menu_added_console and self.module('console') is not None):
             self.menu_added_console = True
             # we don't dynamically update these yet due to a wx bug
-            self.menu_add.items = [ MPMenuItem(p, p, '# link add %s' % p) for p in self.complete_serial_ports('') ]
             self.menu_rm.items = [ MPMenuItem(p, p, '# link remove %s' % p) for p in self.complete_links('') ]
             self.module('console').add_menu(self.menu)
         for m in self.mpstate.mav_master:
@@ -208,6 +207,16 @@ class LinkModule(mp_module.MPModule):
         '''add new link'''
         try:
             (device, optional_attributes) = self.parse_link_descriptor(descriptor)
+            # if there's only 1 colon for port:baud
+            # and if the first string is a valid serial port, it's a serial connection
+            if len(device.split(':')) == 2:
+                ports = mavutil.auto_detect_serial(preferred_list=preferred_ports)
+                for p in ports:
+                    if p.device == device.split(':')[0]:
+                        # it's a valid serial port, reformat arguments to fit
+                        self.settings.baudrate = int(device.split(':')[1])
+                        device = device.split(':')[0]
+                        break
             print("Connect %s source_system=%d" % (device, self.settings.source_system))
             try:
                 conn = mavutil.mavlink_connection(device, autoreconnect=True,

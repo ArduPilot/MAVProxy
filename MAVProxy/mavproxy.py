@@ -1340,7 +1340,10 @@ if __name__ == '__main__':
           print("Connecting to %s" % serial_list[0])
           mpstate.module('link').link_add(serial_list[0].device)
     elif not opts.master and len(serial_list) > 1:
-          print("Warning: multiple possible serial ports. Use console GUI to add port")
+          print("Warning: multiple possible serial ports. Use console GUI or 'link add' to add port, or restart using --master to select a single port")
+          #if no display, assume running CLI mode and exit
+          if "DISPLAY" not in os.environ:
+              sys.exit(1)
     elif not opts.master:
           wifi_device = '0.0.0.0:14550'
           mpstate.module('link').link_add(wifi_device)
