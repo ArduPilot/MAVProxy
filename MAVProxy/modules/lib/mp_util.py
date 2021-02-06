@@ -5,6 +5,7 @@
 import gzip
 import math
 import os
+import io
 import sys
 import platform
 import warnings
@@ -272,7 +273,8 @@ def download_files(files):
             continue
         if url.endswith(".gz") and not file.endswith(".gz"):
             # decompress it...
-            data = gzip.decompress(data)
+            with gzip.GzipFile(fileobj=io.BytesIO(data)) as gz:
+                data = gz.read()
         try:
             open(file, mode='wb').write(data)
         except Exception as e:
