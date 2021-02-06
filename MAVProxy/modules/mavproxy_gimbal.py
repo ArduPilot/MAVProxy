@@ -58,7 +58,7 @@ class GimbalModule(mp_module.MPModule):
     def cmd_gimbal_mode(self, args):
         '''control gimbal mode'''
         if len(args) != 1:
-            print("usage: gimbal mode <GPS|MAVLink>")
+            print("usage: gimbal mode <GPS|MAVLink|RC>")
             return
         if args[0].upper() == 'GPS':
             mode = mavutil.mavlink.MAV_MOUNT_MODE_GPS_POINT
