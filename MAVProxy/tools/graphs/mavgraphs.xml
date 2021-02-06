@@ -491,4 +491,28 @@ If PIDR.I has a constant positive value then it means the aircraft is trimmed to
   <expression>XKF1[0].PD-XKF1[100].PD{XKF1.C==100}</expression>
  </graph>
 
+ <graph name='Aliasing/AccX'>
+  <description></description>
+  <expression>lowpass(IMU[0].AccX,0,0.9) lowpass(IMU[1].AccX,1,0.9) lowpass(IMU[2].AccX,2,0.9)</expression>
+  <expression>lowpass(IMU[0].AccX,0,0.9) lowpass(IMU[1].AccX,1,0.9)</expression>
+  <expression>lowpass(IMU.AccX,0,0.9) lowpass(IMU2.AccX,1,0.9) lowpass(IMU3.AccX,2,0.9)</expression>
+  <expression>lowpass(IMU.AccX,0,0.9) lowpass(IMU2.AccX,1,0.9)</expression>
+ </graph>
+
+ <graph name='Aliasing/AccY'>
+  <description></description>
+  <expression>lowpass(IMU[0].AccY,0,0.9) lowpass(IMU[1].AccY,1,0.9) lowpass(IMU[2].AccY,2,0.9)</expression>
+  <expression>lowpass(IMU[0].AccY,0,0.9) lowpass(IMU[1].AccY,1,0.9)</expression>
+  <expression>lowpass(IMU.AccY,0,0.9) lowpass(IMU2.AccY,1,0.9) lowpass(IMU3.AccY,2,0.9)</expression>
+  <expression>lowpass(IMU.AccY,0,0.9) lowpass(IMU2.AccY,1,0.9)</expression>
+ </graph>
+
+ <graph name='Aliasing/AccZ'>
+  <description></description>
+  <expression>lowpass(IMU[0].AccZ,0,0.9) lowpass(IMU[1].AccZ,1,0.9) lowpass(IMU[2].AccZ,2,0.9)</expression>
+  <expression>lowpass(IMU[0].AccZ,0,0.9) lowpass(IMU[1].AccZ,1,0.9)</expression>
+  <expression>lowpass(IMU.AccZ,0,0.9) lowpass(IMU2.AccZ,1,0.9) lowpass(IMU3.AccZ,2,0.9)</expression>
+  <expression>lowpass(IMU.AccZ,0,0.9) lowpass(IMU2.AccZ,1,0.9)</expression>
+ </graph>
+ 
 </graphs>
