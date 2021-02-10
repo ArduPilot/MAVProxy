@@ -76,15 +76,23 @@ class GimbalModule(mp_module.MPModule):
     def cmd_gimbal_roi(self, args):
         '''control roi position'''
         latlon = None
-        latlon = self.mpstate.click_location
-        if latlon is None:
-            print("No map click position available")
+        alt = 0
+        if len(args) == 0:
+            latlon = self.mpstate.click_location
+        elif len(args) == 3:
+            latlon = [float(i) for i in args[0:2]]
+            alt = float(args[2])
+        if latlon is None and len(args) == 0:
+            print("No map click position available and no parameters set")
+            return
+        elif latlon is None:
+            print("usage: gimbal roi [LAT LON ALT]")
             return
         self.master.mav.mount_control_send(self.target_system,
                                            self.target_component,
                                            int(latlon[0]*1e7),
                                            int(latlon[1]*1e7),
-                                           0, # altitude zero for now
+                                           int(alt),
                                            0)
 
     def cmd_gimbal_roi_vel(self, args):
