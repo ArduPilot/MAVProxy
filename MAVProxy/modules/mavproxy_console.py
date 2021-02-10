@@ -256,13 +256,13 @@ class ConsoleModule(mp_module.MPModule):
             return
         type = msg.get_type()
         sysid = msg.get_srcSystem()
+        compid = msg.get_srcComponent()
 
         if type == 'HEARTBEAT':
             if not sysid in self.vehicle_list:
                 self.add_new_vehicle(msg)
             if sysid not in self.component_name:
                 self.component_name[sysid] = {}
-            compid = msg.get_srcComponent()
             if compid not in self.component_name[sysid]:
                 self.component_name[sysid][compid] = self.component_type_string(msg)
                 self.update_vehicle_menu()
@@ -500,7 +500,8 @@ class ConsoleModule(mp_module.MPModule):
                 self.max_link_num = len(self.mpstate.mav_master)
             for m in self.mpstate.mav_master:
                 if self.mpstate.settings.checkdelay:
-                    linkdelay = (self.mpstate.status.highest_msec.get(sysid, 0) - m.highest_msec.get(sysid,0))*1.0e-3
+                    highest_msec_key = (sysid, compid)
+                    linkdelay = (self.mpstate.status.highest_msec.get(highest_msec_key, 0) - m.highest_msec.get(highest_msec_key,0))*1.0e-3
                 else:
                     linkdelay = 0
                 linkline = "Link %s " % (self.link_label(m))

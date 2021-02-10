@@ -133,7 +133,8 @@ class LinkModule(mp_module.MPModule):
     def show_link(self):
         '''show link information'''
         for master in self.mpstate.mav_master:
-            linkdelay = (self.status.highest_msec.get(self.target_system,0) - master.highest_msec.get(self.target_system,0))*1.0e-3
+            highest_msec_key = (self.target_system, self.target_component)
+            linkdelay = (self.status.highest_msec.get(highest_msec_key, 0) - master.highest_msec.get(highest_msec_key, 0))*1.0e-3
             if master.linkerror:
                 status = "DOWN"
             else:
@@ -339,20 +340,23 @@ class LinkModule(mp_module.MPModule):
 
         msec = m.time_boot_ms
         sysid = m.get_srcSystem()
-        if msec + 30000 < master.highest_msec.get(sysid,0):
+        compid = m.get_srcComponent()
+        highest_msec_key = (sysid,compid)
+        highest = master.highest_msec.get(highest_msec_key, 0)
+        if msec + 30000 < highest:
             self.say('Time has wrapped')
-            print('Time has wrapped', msec, master.highest_msec.get(sysid,0))
-            self.status.highest_msec[sysid] = msec
+            print('Time has wrapped', msec, highest)
+            self.status.highest_msec[highest_msec_key] = msec
             for mm in self.mpstate.mav_master:
                 mm.link_delayed = False
-                mm.highest_msec[sysid] = msec
+                mm.highest_msec[highest_msec_key] = msec
             return
 
         # we want to detect when a link is delayed
-        master.highest_msec[sysid] = msec
-        if msec > self.status.highest_msec.get(sysid,0):
-            self.status.highest_msec[sysid] = msec
-        if msec < self.status.highest_msec.get(sysid,0) and len(self.mpstate.mav_master) > 1 and self.mpstate.settings.checkdelay:
+        master.highest_msec[highest_msec_key] = msec
+        if msec > self.status.highest_msec.get(highest_msec_key, 0):
+            self.status.highest_msec[highest_msec_key] = msec
+        if msec < self.status.highest_msec.get(highest_msec_key, 0) and len(self.mpstate.mav_master) > 1 and self.mpstate.settings.checkdelay:
             master.link_delayed = True
         else:
             master.link_delayed = False
