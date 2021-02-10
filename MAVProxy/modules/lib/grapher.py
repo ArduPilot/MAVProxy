@@ -16,6 +16,7 @@ from pymavlink.mavextra import *
 import pylab
 from pymavlink import mavutil
 import threading
+import numpy as np
 
 colors = [ 'red', 'green', 'blue', 'orange', 'olive', 'black', 'grey', 'yellow', 'brown', 'darkcyan',
            'cornflowerblue', 'darkmagenta', 'deeppink', 'darkred']
@@ -222,13 +223,42 @@ class MavGraph(object):
         '''called on draw events'''
         self.draw_events += 1
 
+    def rescale_yaxis(self, axis):
+        '''rescale Y axes to fit'''
+        xdata = axis.lines[0].get_xdata()
+        xlim = axis.get_xlim()
+        xidx1 = np.argmax(xdata > xlim[0])
+        xidx2 = np.argmax(xdata > xlim[1])
+        if xidx2 == 0:
+            xidx2 = len(xdata)-1
+        ylim = [None,None]
+
+        for line in axis.lines:
+            ydata = line.get_ydata()[xidx1:xidx2]
+            min_v = np.amin(ydata)
+            max_v = np.amax(ydata)
+            if ylim[0] is None or min_v < ylim[0]:
+                ylim[0] = min_v
+            if ylim[1] is None or max_v > ylim[1]:
+                ylim[1] = max_v
+        rng = ylim[1] - ylim[0]
+        pad = 0.05 * rng
+        axis.set_ylim((ylim[0]-pad,ylim[1]+pad))
+
+    def button_click(self, event):
+        '''handle button clicks'''
+        if getattr(event, 'dblclick', False) and event.button==1:
+            self.rescale_yaxis(self.ax1)
+            if self.ax2:
+                self.rescale_yaxis(self.ax2)
+
     def plotit(self, x, y, fields, colors=[], title=None, interactive=True):
         '''plot a set of graphs using date for x axis'''
         if interactive:
             pylab.ion()
         self.fig = pylab.figure(num=1, figsize=(12,6))
         self.ax1 = self.fig.gca()
-        ax2 = None
+        self.ax2 = None
         for i in range(0, len(fields)):
             if len(x[i]) == 0: continue
             if self.lowest_x is None or x[i][0] < self.lowest_x:
@@ -243,6 +273,7 @@ class MavGraph(object):
             self.ax1.xaxis.set_major_formatter(self.formatter)
             self.ax1.callbacks.connect('xlim_changed', self.xlim_changed)
             self.fig.canvas.mpl_connect('draw_event', self.draw_event)
+        self.fig.canvas.mpl_connect('button_press_event', self.button_click)
         empty = True
         ax1_labels = []
         ax2_labels = []
@@ -258,16 +289,16 @@ class MavGraph(object):
                 (tz, tzdst) = time.tzname
 
             if self.axes[i] == 2:
-                if ax2 is None:
-                    ax2 = self.ax1.twinx()
+                if self.ax2 is None:
+                    self.ax2 = self.ax1.twinx()
                     if self.grid:
-                        ax2.grid(None)
+                        self.ax2.grid(None)
                         self.ax1.grid(True)
-                    ax2.format_coord = self.make_format(ax2, self.ax1)
-                ax = ax2
+                    self.ax2.format_coord = self.make_format(self.ax2, self.ax1)
+                ax = self.ax2
                 if not self.xaxis:
-                    ax2.xaxis.set_major_locator(self.locator)
-                    ax2.xaxis.set_major_formatter(self.formatter)
+                    self.ax2.xaxis.set_major_locator(self.locator)
+                    self.ax2.xaxis.set_major_formatter(self.formatter)
                 label = fields[i]
                 if label.endswith(":2"):
                     label = label[:-2]
@@ -378,7 +409,7 @@ class MavGraph(object):
         if ax1_labels != []:
             self.ax1.legend(ax1_labels,loc=self.legend)
         if ax2_labels != []:
-            ax2.legend(ax2_labels,loc=self.legend2)
+            self.ax2.legend(ax2_labels,loc=self.legend2)
 
     def add_data(self, t, msg, vars):
         '''add some data'''
