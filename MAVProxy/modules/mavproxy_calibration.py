@@ -18,6 +18,7 @@ class CalibrationModule(mp_module.MPModule):
         self.add_command('gyrocal', self.cmd_gyrocal, 'do gyro calibration')
         self.add_command('ahrstrim', self.cmd_ahrstrim, 'do AHRS trim')
         self.add_command('magcal', self.cmd_magcal, "magcal")
+        self.add_command('forcecal', self.cmd_forcecal, "force calibration save")
         self.accelcal_count = -1
         self.accelcal_wait_enter = False
         self.compassmot_running = False
@@ -48,6 +49,29 @@ class CalibrationModule(mp_module.MPModule):
         mav.mav.command_long_send(mav.target_system, mav.target_component,
                                   mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, 0,
                                   0, 0, 0, 0, 4, 0, 0)
+
+    def cmd_forcecal(self, args):
+        '''force calibration save'''
+        usage = "usage: forcecal accel|compass|both"
+        if len(args) < 1:
+            print(usage)
+            return
+        param2 = 0
+        param5 = 0
+        if args[0].lower() == "accel":
+            param5 = 76
+        elif args[0].lower() == "compass":
+            param2 = 76
+        elif args[0].lower() == "both":
+            param2 = 76
+            param5 = 76
+        else:
+            print(usage)
+            return
+        mav = self.master
+        mav.mav.command_long_send(mav.target_system, mav.target_component,
+                                  mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, 0,
+                                  0, param2, 0, 0, param5, 0, 0)
         
     def cmd_gyrocal(self, args):
         '''do a full gyro calibration'''
