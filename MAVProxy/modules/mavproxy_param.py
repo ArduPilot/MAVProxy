@@ -199,8 +199,9 @@ class ParamState:
 
         contains = {}
         for keyword in args:
+            keyword = keyword.lower()
             for param in htree.keys():
-                if str(htree[param]).find(keyword) != -1:
+                if str(htree[param]).lower().find(keyword) != -1:
                     contains[param] = True
         for param in contains.keys():
             print("%s" % (param,))
