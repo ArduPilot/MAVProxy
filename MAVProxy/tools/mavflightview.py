@@ -448,7 +448,17 @@ def mavflightview_show(path, wp, fen, used_flightmodes, mav_type, options, insta
     if not title:
         title='MAVFlightView'
 
-    bounds = mp_util.polygon_bounds(path[0])
+
+    boundary_path = []
+    for p in path[0]:
+        boundary_path.append((p[0],p[1]))
+
+    fence = fen.polygon()
+    if opts.fencebounds:
+        for p in fence:
+            boundary_path.append((p[0],p[1]))
+
+    bounds = mp_util.polygon_bounds(boundary_path)
     (lat, lon) = (bounds[0]+bounds[2], bounds[1])
     (lat, lon) = mp_util.gps_newpos(lat, lon, -45, 50)
     ground_width = mp_util.gps_distance(lat, lon, lat-bounds[2], lon+bounds[3])
@@ -471,7 +481,6 @@ def mavflightview_show(path, wp, fen, used_flightmodes, mav_type, options, insta
     else:
         mission_obj = None
 
-    fence = fen.polygon()
     if len(fence) > 1:
         fence_obj = mp_slipmap.SlipPolygon('Fence-%s' % title, fen.polygon(), layer='Fence',
                                            linewidth=2, colour=(0,255,0))
@@ -603,6 +612,7 @@ if __name__ == "__main__":
     parser.add_option("--condition", default=None, help="conditional check on log")
     parser.add_option("--mission", default=None, help="mission file (defaults to logged mission)")
     parser.add_option("--fence", default=None, help="fence file")
+    parser.add_option("--fencebounds", action='store_true', help="use fence boundary for zoom")
     parser.add_option("--imagefile", default=None, help="output to image file")
     parser.add_option("--flag", default=[], type='str', action='append', help="flag positions")
     parser.add_option("--rawgps", action='store_true', default=False, help="use GPS_RAW_INT")
