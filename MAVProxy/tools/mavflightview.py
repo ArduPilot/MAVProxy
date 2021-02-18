@@ -454,7 +454,7 @@ def mavflightview_show(path, wp, fen, used_flightmodes, mav_type, options, insta
         boundary_path.append((p[0],p[1]))
 
     fence = fen.polygon()
-    if opts.fencebounds:
+    if options.fencebounds:
         for p in fence:
             boundary_path.append((p[0],p[1]))
 
@@ -586,6 +586,7 @@ class mavflightview_options(object):
         self.condition = None
         self.mission = None
         self.fence = None
+        self.fencebounds = False
         self.imagefile = None
         self.flag = []
         self.rawgps = False
