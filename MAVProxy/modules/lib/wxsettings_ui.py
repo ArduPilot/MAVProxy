@@ -1,3 +1,4 @@
+import sys
 from MAVProxy.modules.lib.wx_loader import wx
 
 class TabbedDialog(wx.Dialog):
@@ -70,7 +71,12 @@ class TabbedDialog(wx.Dialog):
             setting = self.setting_map[label]
             ctrl = self.controls[label]
             value = ctrl.GetValue()
-            if isinstance(value, str) or isinstance(value, unicode):
+
+            # Python 2 compatiblility - alternative is:
+            # import six
+            # isinstance(value, six.string_types)
+            if isinstance(value, str) \
+                or isinstance(value, str if sys.version_info[0] >= 3 else unicode):
                 ctrl.SetValue(str(setting.value))
             else:
                 ctrl.SetValue(setting.value)
