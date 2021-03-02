@@ -28,7 +28,7 @@ class TabbedDialog(wx.Dialog):
         button_box.Add(self.button_apply, 0, wx.ALL)
         button_box.Add(self.button_save, 0, wx.ALL)
         button_box.Add(self.button_load, 0, wx.ALL)
-        self.dialog_sizer.Add(button_box, 0, wx.GROW|wx.ALIGN_CENTER_VERTICAL|wx.ALL, 5)
+        self.dialog_sizer.Add(button_box, 0, wx.GROW|wx.ALL, 5)
         wx.EVT_BUTTON(self, self.button_cancel.GetId(), self.on_cancel)
         wx.EVT_BUTTON(self, self.button_apply.GetId(), self.on_apply)
         wx.EVT_BUTTON(self, self.button_save.GetId(), self.on_save)
@@ -97,7 +97,7 @@ class TabbedDialog(wx.Dialog):
         box.Add( ctrl, 1, wx.ALIGN_CENTRE|wx.ALL, 5 )
         if ctrl2 is not None:
             box.Add( ctrl2, 0, wx.ALIGN_CENTRE|wx.ALL, 5 )
-        self.sizer(tab_name).Add(box, 0, wx.GROW|wx.ALIGN_CENTER_VERTICAL|wx.ALL, 5)
+        self.sizer(tab_name).Add(box, 0, wx.GROW|wx.ALL, 5)
         self.controls[label] = ctrl
         if value is not None:
             ctrl.Value = value
