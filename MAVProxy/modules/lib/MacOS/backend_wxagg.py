@@ -4,8 +4,7 @@ from matplotlib.figure import Figure
 
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.backends import backend_wx    # already uses wxversion.ensureMinimal('2.8')
-from matplotlib.backends.backend_wx import DEBUG_MSG, \
-    error_msg_wx, NavigationToolbar2Wx
+from matplotlib.backends.backend_wx import error_msg_wx, NavigationToolbar2Wx
 from matplotlib.backends.backend_wxagg import FigureManager, FigureCanvasWxAgg, \
     FigureFrameWx, draw_if_interactive, show, backend_version
 import wx
@@ -35,7 +34,6 @@ def new_figure_manager(num, *args, **kwargs):
     """
     # in order to expose the Figure constructor to the pylab
     # interface we need to create the figure here
-    DEBUG_MSG("new_figure_manager()", 3, None)
     backend_wx._create_wx_app()
 
     FigureClass = kwargs.pop('FigureClass', Figure)
