@@ -29,10 +29,10 @@ class TabbedDialog(wx.Dialog):
         button_box.Add(self.button_save, 0, wx.ALL)
         button_box.Add(self.button_load, 0, wx.ALL)
         self.dialog_sizer.Add(button_box, 0, wx.GROW|wx.ALL, 5)
-        wx.EVT_BUTTON(self, self.button_cancel.GetId(), self.on_cancel)
-        wx.EVT_BUTTON(self, self.button_apply.GetId(), self.on_apply)
-        wx.EVT_BUTTON(self, self.button_save.GetId(), self.on_save)
-        wx.EVT_BUTTON(self, self.button_load.GetId(), self.on_load)
+        self.Bind(wx.EVT_BUTTON, self.on_cancel, self.button_cancel)
+        self.Bind(wx.EVT_BUTTON, self.on_apply, self.button_apply)
+        self.Bind(wx.EVT_BUTTON, self.on_save, self.button_save)
+        self.Bind(wx.EVT_BUTTON, self.on_load, self.button_load)
         self.Centre()
 
     def on_cancel(self, event):
