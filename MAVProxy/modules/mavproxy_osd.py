@@ -25,7 +25,11 @@ class osd(mp_module.MPModule):
         self.osd_settings = mp_settings.MPSettings(
             [ ('verbose', bool, False),
           ])
-        self.add_command('osd', self.cmd_osd, "OSD module", ['param-set', 'param-show', 'set (OSDSETTING)'])
+        self.add_command('osd', self.cmd_osd, "OSD module",
+            ['param-set <5|6> <1|2|3|4|5|6|7|8|9> (PARAMETER) (TYPES)',
+             'param-show <5|6> <1|2|3|4|5|6|7|8|9>',
+             'set (OSDSETTING)'])
+        self.add_completion_function('(TYPES)', self.param_type_completion)
         self.type_map = {
             mavutil.mavlink.OSD_PARAM_NONE : "NONE",
             mavutil.mavlink.OSD_PARAM_SERIAL_PROTOCOL : "SERIAL_PROTOCOL",
@@ -36,6 +40,7 @@ class osd(mp_module.MPModule):
             mavutil.mavlink.OSD_PARAM_FAILSAFE_ACTION_1 : "FAILSAFE_ACTION_1",
             mavutil.mavlink.OSD_PARAM_FAILSAFE_ACTION_2 : "FAILSAFE_ACTION_2" }
         self.invtype_map = { v : k for k, v in self.type_map.items()}
+        self.param_list = {}
 
     def usage(self):
         '''show help on command line options'''
@@ -98,8 +103,30 @@ class osd(mp_module.MPModule):
         self.request_id += 1
 
     def param_show(self, args):
-        '''show an OSD parameter'''
-        if len(args) != 2:
+        '''show an OSD parameter or list of parameters'''
+        if len(args) == 0:
+            for screen in range(5, 7):
+                for index in range(1, 10):
+                    self.master.mav.osd_param_show_config_send(self.target_system,
+                                                    self.target_component,
+                                                    self.request_id,
+                                                    screen,
+                                                    index)
+                    self.request_id += 1
+            return
+
+        elif len(args) == 1:
+            screen = int(args[0], 0)
+            for index in range(1, 10):
+                self.master.mav.osd_param_show_config_send(self.target_system,
+                                                self.target_component,
+                                                self.request_id,
+                                                screen,
+                                                index)
+                self.request_id += 1
+            return
+
+        elif len(args) != 2:
             print("param-show <screen> <index>")
             return
         screen = int(args[0], 0)
@@ -138,6 +165,10 @@ class osd(mp_module.MPModule):
         if config_str in self.invtype_map:
             return self.invtype_map[config_str]
         return None
+
+    def param_type_completion(self, text):
+        '''return list of param-set type completions'''
+        return self.invtype_map.keys()
 
 def init(mpstate):
     '''initialise OSD module'''
