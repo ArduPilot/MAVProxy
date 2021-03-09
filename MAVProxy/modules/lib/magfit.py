@@ -296,6 +296,9 @@ def magfit(mlog, timestamp_in_range):
                 continue
             ATT = msg
         if msg.get_type() == 'BAT':
+            if hasattr(msg,'Instance'):
+                if margs['BatteryNum'] != msg.Instance+1:
+                    continue
             BAT = msg
         if msg.get_type() == mag_msg and ATT is not None:
             if mag_instance is not None:
@@ -563,7 +566,7 @@ class MagFitUI(wx.Dialog):
         self.AddCheckBox("CMOT NoChange")
         self.StartRow()
         self.AddSpinInteger("BatteryNum", 1, 8, 1)
-        self.AddSpinFloat("CMOT Max", 1.0, 10, 0.1, 10)
+        self.AddSpinFloat("CMOT Max", 1.0, 100, 0.1, 10)
 
         self.StartRow("Processing")
         self.AddButton('Run', callback=self.run)
