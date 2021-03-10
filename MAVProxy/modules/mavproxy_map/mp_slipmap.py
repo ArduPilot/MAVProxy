@@ -61,6 +61,7 @@ class MPSlipMap():
         self.drag_step = 10
 
         self.title = title
+        self.app_ready = multiproc.Event()
         self.event_queue = multiproc.Queue()
         self.object_queue = multiproc.Queue()
         self.close_window = multiproc.Semaphore()
@@ -69,6 +70,9 @@ class MPSlipMap():
         self.child.start()
         self._callbacks = set()
 
+        # ensure the map application is ready before returning
+        if not self._wait_ready(timeout=2.0):
+            raise Exception("map not ready")
 
     def child_task(self):
         '''child process - this holds all the GUI elements'''
@@ -93,6 +97,7 @@ class MPSlipMap():
         self.app.SetExitOnFrameDelete(True)
         self.app.frame = MPSlipMapFrame(state=self)
         self.app.frame.Show()
+        self.app_ready.set()
         self.app.MainLoop()
 
     def close(self):
@@ -178,6 +183,23 @@ class MPSlipMap():
     def icon(self, filename):
         '''load an icon from the data directory'''
         return mp_tile.mp_icon(filename)
+
+    def _wait_ready(self, timeout):
+        '''Wait at most timeout for the application to be ready
+
+        Param
+        -----
+        timeout: float
+            timeout in seconds
+
+        Returns True if the map is ready, False if the timeout is reached.
+        '''
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            if self.app_ready.is_set():
+                return True
+            time.sleep(0.1)
+        return False
 
 if __name__ == "__main__":
     multiproc.freeze_support()
