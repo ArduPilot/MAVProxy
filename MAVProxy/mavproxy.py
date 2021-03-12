@@ -9,7 +9,7 @@ Released under the GNU GPL version 3 or later
 
 import sys, os, time, socket, signal
 import fnmatch, errno, threading
-import serial, select
+import serial
 import traceback
 import select
 import shlex
