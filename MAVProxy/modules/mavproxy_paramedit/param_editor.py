@@ -10,8 +10,6 @@ from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import multiproc
 from MAVProxy.modules.mavproxy_paramedit import ph_event
 import threading
-from ..lib.wx_loader import wx
-from MAVProxy.modules.mavproxy_paramedit import param_editor_frame
 from pymavlink import mavutil
 import time
 ParamEditorEvent = ph_event.ParamEditorEvent
@@ -89,28 +87,35 @@ class ParamEditorMain(object):
         self.close_window = multiproc.Semaphore()
         self.close_window.acquire()
 
-        self.mpstate = mpstate
-        self.mpstate.param_editor = self
-        self.needs_unloading = False
+        # mpstate copied to child task
+        vehicle_name = mpstate.vehicle_name
+        moddebug = mpstate.settings.moddebug
+        mav_param = mpstate.module('param').mav_param
 
         if platform.system() == 'Windows':
             self.child = threading.Thread(
                             target=self.child_task,
                             args=(self.event_queue,
                                   self.event_queue_lock, self.gui_event_queue,
-                                  self.gui_event_queue_lock, self.close_window))
+                                  self.gui_event_queue_lock, self.close_window,
+                                  vehicle_name, moddebug, mav_param))
         else:
             self.child = multiproc.Process(
                                 target=self.child_task,
                                 args=(self.event_queue,
                                       self.event_queue_lock, self.gui_event_queue,
-                                      self.gui_event_queue_lock, self.close_window))
+                                      self.gui_event_queue_lock, self.close_window,
+                                      vehicle_name, moddebug, mav_param))
 
         self.child.start()
 
         self.event_thread = ParamEditorEventThread(
                             self, self.event_queue, self.event_queue_lock)
         self.event_thread.start()
+
+        self.mpstate = mpstate
+        self.mpstate.param_editor = self
+        self.needs_unloading = False
 
         self.last_unload_check_time = time.time()
         self.unload_check_interval = 0.1  # seconds
@@ -176,9 +181,15 @@ class ParamEditorMain(object):
                     self.gui_event_queue.put(ParamEditorEvent(
                         ph_event.PEGE_RCIN, rcin=rc_received))
 
-    def child_task(self, queue, lock, gui_queue, gui_lock, close_window_sem):
+    def child_task(self, queue, lock, gui_queue, gui_lock, close_window_sem,
+                   vehicle_name, moddebug, mav_param):
         '''child process - this holds GUI elements'''
         mp_util.child_close_fds()
+
+        from MAVProxy.modules.lib import wx_processguard
+        from MAVProxy.modules.lib.wx_loader import wx
+        from MAVProxy.modules.mavproxy_paramedit import param_editor_frame
+
         self.app = wx.App(False)
         self.app.frame = param_editor_frame.ParamEditorFrame(
             parent=None, id=wx.ID_ANY)
@@ -186,10 +197,10 @@ class ParamEditorMain(object):
         self.app.frame.set_event_queue_lock(lock)
         self.app.frame.set_gui_event_queue(gui_queue)
         self.app.frame.set_gui_event_queue_lock(gui_lock)
-        self.app.frame.get_vehicle_type(self.mpstate.vehicle_name)
+        self.app.frame.get_vehicle_type(vehicle_name)
         self.app.frame.set_close_window_semaphore(close_window_sem)
-        self.app.frame.redirect_err(self.mpstate.settings.moddebug)
-        self.app.frame.set_param_init(self.mpstate.module('param').mav_param, self.mpstate.vehicle_name)
+        self.app.frame.redirect_err(moddebug)
+        self.app.frame.set_param_init(mav_param, vehicle_name)
         self.app.SetExitOnFrameDelete(True)
         self.app.frame.Show()
 

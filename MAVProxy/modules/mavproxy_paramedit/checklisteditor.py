@@ -1,10 +1,18 @@
 #!/usr/bin/env python
-import wx
-import wx.grid as gridlib
+
 import math
+import sys
 
+from MAVProxy.modules.lib import wx_processguard
+from MAVProxy.modules.lib.wx_loader import wx
 
-class GridCheckListEditor(gridlib.PyGridCellEditor):
+# Python2 compatibility
+if sys.version_info[0] >=3:
+    from wx.grid import GridCellEditor as GridCellEditor
+else:
+    from wx.grid import PyGridCellEditor as GridCellEditor
+
+class GridCheckListEditor(GridCellEditor):
     """
     This is a custom CheckListBox editor for setting of Bitmasks
     """
@@ -13,7 +21,7 @@ class GridCheckListEditor(gridlib.PyGridCellEditor):
         binary = bin(int(start))[2:]
         self.startValue = [(len(binary)-ones-1) for ones in range(len(binary)) if binary[ones] == '1']
         self.pvalcol = pvalcol
-        gridlib.PyGridCellEditor.__init__(self)
+        GridCellEditor.__init__(self)
 
     def set_checked(self, selected):
         if int(selected) < int(math.pow(2, len(self.choices))):
@@ -35,8 +43,12 @@ class GridCheckListEditor(gridlib.PyGridCellEditor):
             self._tc.PushEventHandler(evtHandler)
 
     def SetSize(self, rect):
-        self._tc.SetDimensions(rect.x, rect.y, rect.width+2, 30*len(self.choices),
-                               wx.SIZE_ALLOW_MINUS_ONE)
+        if sys.version_info[0] >=3:
+            self._tc.SetSize(rect.x, rect.y, rect.width+2, 30*len(self.choices),
+                             wx.SIZE_ALLOW_MINUS_ONE)
+        else:
+            self._tc.SetDimensions(rect.x, rect.y, rect.width+2, 30*len(self.choices),
+                                   wx.SIZE_ALLOW_MINUS_ONE)
 
     def Show(self, show, attr):
         super(GridCheckListEditor, self).Show(show, attr)
@@ -78,7 +90,7 @@ class GridCheckListEditor(gridlib.PyGridCellEditor):
         return GridCheckListEditor(self.choices, self.pvalcol, self.startValue)
 
 
-class GridDropListEditor(gridlib.PyGridCellEditor):
+class GridDropListEditor(GridCellEditor):
     """
     This is a custom DropBox editor for setting of Parameter Values
     """
@@ -86,7 +98,7 @@ class GridDropListEditor(gridlib.PyGridCellEditor):
         self.choices = choice
         self.startValue = int(start)
         self.pvalcol = pvalcol
-        gridlib.PyGridCellEditor.__init__(self)
+        GridCellEditor.__init__(self)
 
     def set_checked(self, selected):
         self.startValue = int(selected)
@@ -109,8 +121,12 @@ class GridDropListEditor(gridlib.PyGridCellEditor):
         super(GridDropListEditor, self).Show(show, attr)
 
     def SetSize(self, rect):
-        self._tc.SetDimensions(rect.x, rect.y, rect.width+2, 30,
-                               wx.SIZE_ALLOW_MINUS_ONE)
+        if sys.version_info[0] >=3:
+            self._tc.SetSize(rect.x, rect.y, rect.width+2, 30,
+                             wx.SIZE_ALLOW_MINUS_ONE)
+        else:
+            self._tc.SetDimensions(rect.x, rect.y, rect.width+2, 30,
+                                   wx.SIZE_ALLOW_MINUS_ONE)
 
     def BeginEdit(self, row, col, grid):
         self._tc.SetSelection(self.startValue)
@@ -140,7 +156,7 @@ class GridDropListEditor(gridlib.PyGridCellEditor):
         return GridDropListEditor(self.choices, self.pvalcol, self.startValue)
 
 
-class GridScrollEditor(gridlib.PyGridCellEditor):
+class GridScrollEditor(GridCellEditor):
     """
     This is a custom SpinControlDouble editor for setting of float values with given range and increments
     """
@@ -148,7 +164,7 @@ class GridScrollEditor(gridlib.PyGridCellEditor):
         self.Range = Range
         self.startValue = float(start)
         self.pvalcol = pvalcol
-        gridlib.PyGridCellEditor.__init__(self)
+        GridCellEditor.__init__(self)
 
     def set_checked(self, selected):
         self.startValue = selected
@@ -158,8 +174,12 @@ class GridScrollEditor(gridlib.PyGridCellEditor):
             print (e)
 
     def SetSize(self, rect):
-        self._tc.SetDimensions(rect.x, rect.y, rect.width+2, 30,
-                               wx.SIZE_ALLOW_MINUS_ONE)
+        if sys.version_info[0] >=3:
+            self._tc.SetSize(rect.x, rect.y, rect.width+2, 30,
+                             wx.SIZE_ALLOW_MINUS_ONE)
+        else:
+            self._tc.SetDimensions(rect.x, rect.y, rect.width+2, 30,
+                                   wx.SIZE_ALLOW_MINUS_ONE)
 
     def get_checked(self):
         return self._tc.GetValue()
