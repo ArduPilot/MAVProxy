@@ -132,7 +132,8 @@ class ParamEditorMain(object):
             m = self.mavlink_message_queue.get()
             try:
                 self.process_mavlink_packet(m)
-            except Exception:
+            except Exception as ex:
+                print(ex)
                 import traceback
                 traceback.print_stack()
 
@@ -163,7 +164,11 @@ class ParamEditorMain(object):
             if self.mpstate.vehicle_name == 'APMrover2':
                 fltmode_ch = int(self.mpstate.module('param').mav_param['MODE_CH'])
             else:
-                fltmode_ch = int(self.mpstate.module('param').mav_param['FLTMODE_CH'])
+                if self.mpstate.vehicle_name.lower().find('copter') != -1:
+                    default_channel = 5
+                else:
+                    default_channel = 8
+                fltmode_ch = int(self.mpstate.module('param').mav_param.get('FLTMODE_CH', default_channel))
             if self.mpstate.vehicle_name is not None:
                 rc_received = float(getattr(m, 'chan%u_raw' % fltmode_ch))
                 if rc_received != self.fltmode_rc and ((fltmode_ch > 0 and fltmode_ch < 9 and mtype == 'RC_CHANNELS_RAW') or (fltmode_ch > 0 and fltmode_ch < 19 and mtype == 'RC_CHANNELS')):
