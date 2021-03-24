@@ -347,7 +347,8 @@ def decode_devid(devid, pname):
         2: "SPI",
         3: "UAVCAN",
         4: "SITL",
-        5: "MSP"
+        5: "MSP",
+        6: "EAHRS"
         }
 
     compass_types = {
@@ -421,6 +422,8 @@ def decode_devid(devid, pname):
     if pname.startswith("COMPASS"):
         if bus_type == 3 and devtype == 1:
             decoded_devname = "UAVCAN"
+        elif bus_type == 6 and devtype == 1:
+            decoded_devname = "EAHRS"
         else:
             decoded_devname = compass_types.get(devtype, "UNKNOWN")
 
