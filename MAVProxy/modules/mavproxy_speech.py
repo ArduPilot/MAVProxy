@@ -19,8 +19,13 @@ class SpeechModule(mp_module.MPModule):
             self.settings.set('speech_voice', '')
         except AttributeError:
             self.settings.append(('speech_voice', str, ''))
+        self.pyttsx3_engine = None
         self.kill_speech_dispatcher()
-        for (backend_name,backend) in [("speechd",self.say_speechd), ("espeak",self.say_espeak), ("speech", self.say_speech), ("say", self.say_say)]:
+        for (backend_name,backend) in [("speechd",self.say_speechd),
+                                       ("espeak",self.say_espeak),
+                                       ("speech", self.say_speech),
+                                       ("say", self.say_say),
+                                       ("pyttsx3", self.say_pyttsx3)]:
             try:
                 backend("")
                 self.say_backend = backend
@@ -85,6 +90,20 @@ class SpeechModule(mp_module.MPModule):
         import subprocess
         subprocess.check_call(["say",text])
 
+    def say_pyttsx3(self, text, priority='important'):
+        '''speak some text using pyttsx3 module'''
+        if self.pyttsx3_engine is None:
+            import pyttsx3
+            self.pyttsx3_engine = pyttsx3.init()
+            if self.settings.speech_voice:
+                self.pyttsx3_engine.setProperty('voice', self.settings.speech_voice)
+            self.pyttsx3_engine.startLoop(False)
+            return
+        if len(text) > 0:
+            if self.settings.speech_voice:
+                self.pyttsx3_engine.setProperty('voice', self.settings.speech_voice)
+            self.pyttsx3_engine.say(text)
+        
     def say(self, text, priority='important'):
         '''speak some text'''
         ''' http://cvs.freebsoft.org/doc/speechd/ssip.html see 4.3.1 for priorities'''
@@ -101,10 +120,14 @@ class SpeechModule(mp_module.MPModule):
                 self.say(msg.text[8:])
 
     def list_voices(self):
-        from espeak import espeak
-        voices = espeak.list_voices()
-        vlist = [ v.name for v in voices ]
-        print(vlist)
+        if self.say_backend == self.say_espeak:
+            from espeak import espeak
+            voices = espeak.list_voices()
+            vlist = [ v.name for v in voices ]
+            print(vlist)
+        elif self.say_backend == self.say_pyttsx3:
+            vlist = [ v.name for v in self.pyttsx3_engine.getProperty('voices') ]
+            print(vlist)
 
     def cmd_speech(self, args):
         '''speech commands'''
@@ -121,6 +144,10 @@ class SpeechModule(mp_module.MPModule):
         if args[0] == "list_voices":
             self.list_voices()
 
+    def idle_task(self):
+        '''called on idle'''
+        if self.pyttsx3_engine is not None:
+            self.pyttsx3_engine.iterate()
 
 def init(mpstate):
     '''initialise module'''
