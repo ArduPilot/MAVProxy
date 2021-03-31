@@ -363,12 +363,12 @@
 
  <graph name='Plane/PID Tuning/PIDR'>
   <description></description>
-  <expression>PIDR.P PIDR.I PIDR.D</expression>
+  <expression>PIDR.FF PIDR.P PIDR.I PIDR.D</expression>
  </graph>
 
  <graph name='Plane/PID Tuning/PIDP'>
   <description></description>
-  <expression>PIDP.P PIDP.I PIDP.D</expression>
+  <expression>PIDP.FF PIDP.P PIDP.I PIDP.D</expression>
  </graph>
 
  <graph name='Plane/PID Tuning/PIDS'>
