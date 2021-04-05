@@ -102,6 +102,8 @@ class FTPModule(mp_module.MPModule):
              ('pkt_loss_rx', int, 0),
              ('max_backlog', int, 5),
              ('burst_read_size', int, 110),
+             ('write_size', int, 110),
+             ('write_qsize', int, 5),
              ('retry_time', float, 0.5)])
         self.add_completion_function('(FTPSETTING)',
                                      self.ftp_settings.completion)
@@ -111,9 +113,13 @@ class FTPModule(mp_module.MPModule):
         self.last_op = None
         self.fh = None
         self.write_acks = set()
+        self.write_blockcount = 0
+        self.write_pending = 0
         self.filename = None
         self.callback = None
+        self.callback_progress = None
         self.put_callback = None
+        self.put_callback_progress = None
         self.total_size = 0
         self.read_gaps = []
         self.read_gap_times = {}
@@ -183,6 +189,8 @@ class FTPModule(mp_module.MPModule):
         self.fh = None
         self.filename = None
         self.write_acks = set()
+        self.write_blockcount = 0
+        self.write_pending = 0
         if self.callback is not None:
             # tell caller that the transfer failed
             self.callback(None)
@@ -191,6 +199,9 @@ class FTPModule(mp_module.MPModule):
             # tell caller that the transfer failed
             self.put_callback(None)
             self.put_callback = None
+        if self.put_callback_progress is not None:
+            self.put_callback_progress(None)
+            self.put_callback_progress = None
         self.read_gaps = []
         self.read_gap_times = {}
         self.last_read = None
@@ -449,7 +460,7 @@ class FTPModule(mp_module.MPModule):
             self.terminate_session()
         self.check_read_send()
             
-    def cmd_put(self, args, fh=None, callback=None):
+    def cmd_put(self, args, fh=None, callback=None, progress_callback=None):
         '''put file'''
         if len(args) == 0:
             print("Usage: put FILENAME <REMOTENAME>")
@@ -457,6 +468,7 @@ class FTPModule(mp_module.MPModule):
         fname = args[0]
         self.fh = fh
         self.write_acks = set()
+        self.write_pending = 0
         if self.fh is None:
             try:
                 self.fh = open(fname, 'rb')
@@ -469,12 +481,31 @@ class FTPModule(mp_module.MPModule):
             self.filename = os.path.basename(fname)
         if callback is None:
             print("Putting %s as %s" % (fname, self.filename))
+        self.fh.seek(0,2)
+        file_size = self.fh.tell()
+        self.fh.seek(0)
+        self.write_blockcount = file_size // self.ftp_settings.write_size
+        if file_size % self.ftp_settings.write_size != 0:
+            self.write_blockcount += 1
         self.put_callback = callback
+        self.put_callback_progress = progress_callback
         self.read_retries = 0
         self.op_start = time.time()
         enc_fname = bytearray(self.filename, 'ascii')
         op = FTP_OP(self.seq, self.session, OP_CreateFile, len(enc_fname), 0, 0, 0, enc_fname)
+        self.write_pending += 1
         self.send(op)
+
+    def put_finished(self, flen):
+        '''finish a put'''
+        if self.put_callback_progress:
+            self.put_callback_progress(1.0)
+            self.put_callback_progress = None
+        if self.put_callback is not None:
+            self.put_callback(flen)
+            self.put_callback = None
+        else:
+            print("Sent file of length ", flen)
         
     def handle_create_file_reply(self, op, m):
         '''handle OP_CreateFile reply'''
@@ -484,23 +515,20 @@ class FTPModule(mp_module.MPModule):
         if op.opcode == OP_Ack:
             ofs = self.fh.tell()
             self.write_acks.add(0)
+            self.write_pending -= 1
             try:
-                data = self.fh.read(MAX_Payload)
+                data = self.fh.read(self.ftp_settings.write_size)
             except Exception as ex:
-                print("Read error: %s" % ex)
                 self.terminate_session()
                 return
             if len(data) > 0:
                 write = FTP_OP(self.seq, self.session, OP_WriteFile, len(data), 0, 0, ofs, bytearray(data))
                 self.send(write)
                 self.write_wait = True
-            if len(data) < MAX_Payload:
+                self.write_pending += 1
+            if len(data) < self.ftp_settings.write_size:
                 t = self.fh.tell()
-                if self.put_callback is not None:
-                    self.put_callback(t)
-                    self.put_callback = None
-                else:
-                    print("Sent file of length ", t)
+                self.put_finished(t)
                 self.terminate_session()
         else:
             print("Create failed")
@@ -508,25 +536,25 @@ class FTPModule(mp_module.MPModule):
 
     def upload_done(self):
         '''see if upload is complete'''
-        count = len(self.write_acks)
-        if count-1 in self.write_acks:
-            return True
-        return False
+        return len(self.write_acks) == self.write_blockcount and self.write_blockcount-1 in self.write_acks
 
     def resend_writes(self):
         '''resend some writes'''
-        max_idx = max(self.write_acks)
-        for i in range(max_idx):
+        if self.write_pending >= self.ftp_settings.write_qsize:
+            return
+        for i in range(self.write_blockcount):
             if not i in self.write_acks:
-                ofs = i * MAX_Payload
+                ofs = i * self.ftp_settings.write_size
                 self.fh.seek(ofs)
-                data = self.fh.read(MAX_Payload)
+                data = self.fh.read(self.ftp_settings.write_size)
                 if self.ftp_settings.debug > 0:
                     print("FTP: retry write for %u" % ofs)
                 write = FTP_OP(self.seq, self.session, OP_WriteFile, len(data), 0, 0, ofs, bytearray(data))
                 self.send(write)
                 self.write_wait = True
-                break
+                self.write_pending += 1
+                if self.write_pending >= self.ftp_settings.write_qsize:
+                    break
 
     def handle_write_reply(self, op, m):
         '''handle OP_WriteFile reply'''
@@ -535,42 +563,33 @@ class FTPModule(mp_module.MPModule):
             return
         self.write_wait = False
         ack_ofs = op.offset
-        ack_num = ack_ofs // MAX_Payload
+        ack_num = ack_ofs // self.ftp_settings.write_size
         self.write_acks.add(ack_num)
+        if self.put_callback_progress:
+            self.put_callback_progress(len(self.write_acks)/float(self.write_blockcount))
+        self.write_pending -= 1
         if op.opcode == OP_Ack:
             ofs = self.fh.tell()
-            if self.last_op.size < MAX_Payload:
+            self.write_pending -= 1
+            if self.last_op.size < self.ftp_settings.write_size:
                 if not self.upload_done():
                     self.resend_writes()
                     return
-                if self.put_callback is not None:
-                    self.put_callback(ofs)
-                    self.put_callback = None
-                else:
-                    print("Sent file of length %u" % ofs)
+                self.put_finished(ofs)
                 self.terminate_session()
                 return
 
             try:
-                data = self.fh.read(MAX_Payload)
+                data = self.fh.read(self.ftp_settings.write_size)
             except Exception as ex:
                 print("Read error: %s" % ex)
                 self.terminate_session()
                 return
 
-            if len(data) > 0:
-                write = FTP_OP(self.seq, self.session, OP_WriteFile, len(data), 0, 0, ofs, bytearray(data))
-                self.write_wait = True
-                self.send(write)
-            elif not self.upload_done():
+            if not self.upload_done():
                 self.resend_writes()
-                return
             else:
-                if self.put_callback is not None:
-                    self.put_callback(self.fh.tell())
-                    self.put_callback = None
-                else:
-                    print("Sent file of length %u" % self.fh.tell())
+                self.put_finished(ofs)
                 self.terminate_session()
         else:
             print("Write failed")
