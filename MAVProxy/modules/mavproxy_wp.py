@@ -1098,7 +1098,15 @@ class WPModule(mp_module.MPModule):
         fh.seek(0)
 
         ftp.cmd_put([self.mission_ftp_name, self.mission_ftp_name],
-                    fh=fh, callback=self.ftp_upload_callback)
+                    fh=fh, callback=self.ftp_upload_callback, progress_callback=self.ftp_upload_progress)
+
+    def ftp_upload_progress(self, proportion):
+        '''callback from ftp put of mission'''
+        if proportion is None:
+            self.mpstate.console.set_status('Mission', 'Mission ERR')
+        else:
+            count = self.wploader.count()
+            self.mpstate.console.set_status('Mission', 'Mission %u/%u' % (int(proportion*count), count))
 
     def ftp_upload_callback(self, dlen):
         '''callback from ftp put of mission'''
