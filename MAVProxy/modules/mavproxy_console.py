@@ -71,6 +71,7 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('FlightTime', 'FlightTime --', row=3)
         mpstate.console.set_status('ETR', 'ETR --', row=3)
         mpstate.console.set_status('Params', 'Param ---/---', row=3)
+        mpstate.console.set_status('Mission', 'Mission --/--', row=3)
 
         mpstate.console.ElevationMap = mp_elevation.ElevationModel()
 
