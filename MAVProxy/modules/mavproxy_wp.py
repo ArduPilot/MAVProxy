@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 '''waypoint command handling'''
 
-import time, os, fnmatch, copy, platform
+import time, os, fnmatch, copy, platform, struct
 from pymavlink import mavutil, mavwp
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
@@ -25,7 +25,7 @@ class WPModule(mp_module.MPModule):
         self.undo_wp_idx = -1
         self.wploader.expected_count = 0
         self.add_command('wp', self.cmd_wp,       'waypoint management',
-                         ["<list|clear|move|remove|loop|set|undo|movemulti|moverelhome|changealt|param|status|slope>",
+                         ["<list|clear|move|remove|loop|set|undo|movemulti|moverelhome|changealt|param|status|slope|ftp>",
                           "<load|update|save|savecsv|show> (FILENAME)"])
 
         if self.continue_mode and self.logdir is not None:
@@ -54,7 +54,8 @@ class WPModule(mp_module.MPModule):
                                                                                  default=100)),
                                          MPMenuItem('Undo', 'Undo', '# wp undo'),
                                          MPMenuItem('Loop', 'Loop', '# wp loop'),
-                                         MPMenuItem('Add NoFly', 'Loop', '# wp noflyadd')])
+                                         MPMenuItem('Add NoFly', 'Loop', '# wp noflyadd'),
+                                         MPMenuItem('FTP', 'FTP', '# wp ftp')])
 
     @property
     def wploader(self):
@@ -171,19 +172,7 @@ class WPModule(mp_module.MPModule):
                 self.send_wp_requests()
                 return
             if self.wp_op == 'list':
-                for i in range(self.wploader.count()):
-                    w = self.wploader.wp(i)
-                    print("%u %u %.10f %.10f %f p1=%.1f p2=%.1f p3=%.1f p4=%.1f cur=%u auto=%u" % (
-                        w.command, w.frame, w.x, w.y, w.z,
-                        w.param1, w.param2, w.param3, w.param4,
-                        w.current, w.autocontinue))
-                if self.logdir is not None:
-                    fname = 'way.txt'
-                    if m.get_srcSystem() != 1:
-                        fname = 'way_%u.txt' % m.get_srcSystem()
-                    waytxt = os.path.join(self.logdir, fname)
-                    self.save_waypoints(waytxt)
-                    print("Saved waypoints to %s" % waytxt)
+                self.show_and_save(m.get_srcSystem())
                 self.loading_waypoints = False
             elif self.wp_op == "save":
                 self.save_waypoints(self.wp_save_filename)
@@ -849,7 +838,7 @@ class WPModule(mp_module.MPModule):
         
     def cmd_wp(self, args):
         '''waypoint commands'''
-        usage = "usage: wp <editor|list|load|update|save|set|clear|loop|remove|move|movemulti|changealt>"
+        usage = "usage: wp <editor|list|load|update|save|set|clear|loop|remove|move|movemulti|changealt|ftp>"
         if len(args) < 1:
             print(usage)
             return
@@ -942,6 +931,8 @@ class WPModule(mp_module.MPModule):
             self.wp_status()
         elif args[0] == "slope":
             self.wp_slope(args[1:])
+        elif args[0] == "ftp":
+            self.wp_ftp_download()
         else:
             print(usage)
 
@@ -1005,6 +996,63 @@ class WPModule(mp_module.MPModule):
             self.wp_op = "fetch"
         self.master.waypoint_request_list_send()
 
+    def wp_ftp_download(self):
+        '''Download wpts from vehicle with ftp'''
+        ftp = self.mpstate.module('ftp')
+        if ftp is None:
+            print("Need ftp module")
+            return
+        print("Fetching mission with ftp")
+        ftp.cmd_get(["@MISSION/mission.dat"], callback=self.ftp_callback)
+
+    def ftp_callback(self, fh):
+        '''callback from ftp fetch of mission'''
+        magic = 0x763d
+        data = fh.read()
+        magic2,dtype,num_items = struct.unpack("<HHI", data[0:8])
+        if magic != magic2:
+            print("mission: bad magic 0x%x expected 0x%x" % (magic2, magic))
+            return
+        if dtype != mavutil.mavlink.MAV_MISSION_TYPE_MISSION:
+            print("mission: bad data type %u" % dtype)
+            return
+
+        self.wploader.clear()
+
+        data = data[8:]
+        mavmsg = mavutil.mavlink.MAVLink_mission_item_int_message
+        item_size = struct.calcsize(mavmsg.native_format.decode())
+        while len(data) >= item_size:
+            mdata = data[:item_size]
+            data = data[item_size:]
+            msg = mavmsg.unpacker.unpack(mdata)
+            tlist = list(msg)
+            t = tlist[:]
+            for i in range(0, len(tlist)):
+                tlist[i] = t[mavmsg.orders[i]]
+            t = tuple(tlist)
+            w = mavmsg(*t)
+            w = self.wp_from_mission_item_int(w)
+            self.wploader.add(w)
+        self.show_and_save(self.target_system)
+
+
+    def show_and_save(self, source_system):
+        '''display waypoints and save'''
+        for i in range(self.wploader.count()):
+            w = self.wploader.wp(i)
+            print("%u %u %.10f %.10f %f p1=%.1f p2=%.1f p3=%.1f p4=%.1f cur=%u auto=%u" % (
+                w.command, w.frame, w.x, w.y, w.z,
+                w.param1, w.param2, w.param3, w.param4,
+                w.current, w.autocontinue))
+        if self.logdir is not None:
+            fname = 'way.txt'
+            if source_system != 1:
+                fname = 'way_%u.txt' % source_system
+            waytxt = os.path.join(self.logdir, fname)
+            self.save_waypoints(waytxt)
+            print("Saved waypoints to %s" % waytxt)
+        
 def init(mpstate):
     '''initialise module'''
     return WPModule(mpstate)
