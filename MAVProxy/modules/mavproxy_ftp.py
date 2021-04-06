@@ -88,6 +88,11 @@ class FTP_OP:
             ret += " [%u]" % self.payload[0]
         return ret
 
+class WriteQueue:
+    def __init__(self, ofs, size):
+        self.ofs = ofs
+        self.size = size
+        self.last_send = 0
 
 class FTPModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -112,9 +117,6 @@ class FTPModule(mp_module.MPModule):
         self.network = 0
         self.last_op = None
         self.fh = None
-        self.write_acks = set()
-        self.write_blockcount = 0
-        self.write_pending = 0
         self.filename = None
         self.callback = None
         self.callback_progress = None
@@ -130,12 +132,17 @@ class FTPModule(mp_module.MPModule):
         self.last_burst_read = None
         self.op_start = None
         self.dir_offset = 0
-        self.write_wait = False
         self.last_op_time = time.time()
         self.rtt = 0.5
         self.reached_eof = False
         self.backlog = 0
         self.burst_size = self.ftp_settings.burst_read_size
+        self.write_list = None
+        self.write_pending = 0
+        self.write_retries = 0
+        self.write_acks = 0
+        self.write_total = 0
+        self.write_file_size = 0
 
     def cmd_ftp(self, args):
         '''FTP operations'''
@@ -188,9 +195,7 @@ class FTPModule(mp_module.MPModule):
         self.send(FTP_OP(self.seq, self.session, OP_TerminateSession, 0, 0, 0, 0, None))
         self.fh = None
         self.filename = None
-        self.write_acks = set()
-        self.write_blockcount = 0
-        self.write_pending = 0
+        self.write_list = None
         if self.callback is not None:
             # tell caller that the transfer failed
             self.callback(None)
@@ -465,10 +470,11 @@ class FTPModule(mp_module.MPModule):
         if len(args) == 0:
             print("Usage: put FILENAME <REMOTENAME>")
             return
+        if self.write_list is not None:
+            print("put already in progress")
+            return
         fname = args[0]
         self.fh = fh
-        self.write_acks = set()
-        self.write_pending = 0
         if self.fh is None:
             try:
                 self.fh = open(fname, 'rb')
@@ -484,16 +490,26 @@ class FTPModule(mp_module.MPModule):
         self.fh.seek(0,2)
         file_size = self.fh.tell()
         self.fh.seek(0)
-        self.write_blockcount = file_size // self.ftp_settings.write_size
-        if file_size % self.ftp_settings.write_size != 0:
-            self.write_blockcount += 1
+
+        # setup write list
+        write_size = self.ftp_settings.write_size
+        write_blockcount = file_size // write_size
+        if file_size % write_size != 0:
+            write_blockcount += 1
+        self.write_list = [ WriteQueue(i*write_size,write_size) for i in range(write_blockcount) ]
+        self.write_list[-1].size = file_size % write_size
+        self.write_pending = 0
+        self.write_retries = 0
+        self.write_acks = 0
+        self.write_total = len(self.write_list)
+        self.write_file_size = file_size
+
         self.put_callback = callback
         self.put_callback_progress = progress_callback
         self.read_retries = 0
         self.op_start = time.time()
         enc_fname = bytearray(self.filename, 'ascii')
         op = FTP_OP(self.seq, self.session, OP_CreateFile, len(enc_fname), 0, 0, 0, enc_fname)
-        self.write_pending += 1
         self.send(op)
 
     def put_finished(self, flen):
@@ -513,88 +529,51 @@ class FTPModule(mp_module.MPModule):
             self.terminate_session()
             return
         if op.opcode == OP_Ack:
-            ofs = self.fh.tell()
-            self.write_acks.add(0)
-            self.write_pending -= 1
-            try:
-                data = self.fh.read(self.ftp_settings.write_size)
-            except Exception as ex:
-                self.terminate_session()
-                return
-            if len(data) > 0:
-                write = FTP_OP(self.seq, self.session, OP_WriteFile, len(data), 0, 0, ofs, bytearray(data))
-                self.send(write)
-                self.write_wait = True
-                self.write_pending += 1
-            if len(data) < self.ftp_settings.write_size:
-                t = self.fh.tell()
-                self.put_finished(t)
-                self.terminate_session()
+            self.send_more_writes()
         else:
             print("Create failed")
             self.terminate_session()
 
-    def upload_done(self):
-        '''see if upload is complete'''
-        return len(self.write_acks) == self.write_blockcount and self.write_blockcount-1 in self.write_acks
-
-    def resend_writes(self):
-        '''resend some writes'''
+    def send_more_writes(self):
+        '''send some more writes'''
         if self.write_pending >= self.ftp_settings.write_qsize:
             return
-        for i in range(self.write_blockcount):
-            if not i in self.write_acks:
-                ofs = i * self.ftp_settings.write_size
-                self.fh.seek(ofs)
-                data = self.fh.read(self.ftp_settings.write_size)
-                if self.ftp_settings.debug > 0:
-                    print("FTP: retry write for %u" % ofs)
-                write = FTP_OP(self.seq, self.session, OP_WriteFile, len(data), 0, 0, ofs, bytearray(data))
-                self.send(write)
-                self.write_wait = True
-                self.write_pending += 1
-                if self.write_pending >= self.ftp_settings.write_qsize:
-                    break
+        self.write_list.sort(key=lambda x: x.last_send)
+        n = self.ftp_settings.write_qsize - self.write_pending
+        n = min(n, len(self.write_list))
+        if n == 0:
+            # all done
+            self.put_finished(self.write_file_size)
+            self.terminate_session()
+        for i in range(n):
+            d = self.write_list[i]
+            if d.last_send != 0:
+                self.write_retries += 1
+            d.last_send = time.time()
+            self.fh.seek(d.ofs)
+            data = self.fh.read(d.size)
+            write = FTP_OP(self.seq, self.session, OP_WriteFile, len(data), 0, 0, d.ofs, bytearray(data))
+            self.send(write)
+            self.write_pending += 1
 
     def handle_write_reply(self, op, m):
         '''handle OP_WriteFile reply'''
         if self.fh is None:
             self.terminate_session()
             return
-        self.write_wait = False
-        ack_ofs = op.offset
-        ack_num = ack_ofs // self.ftp_settings.write_size
-        self.write_acks.add(ack_num)
-        if self.put_callback_progress:
-            self.put_callback_progress(len(self.write_acks)/float(self.write_blockcount))
-        self.write_pending -= 1
-        if op.opcode == OP_Ack:
-            ofs = self.fh.tell()
-            self.write_pending -= 1
-            if self.last_op.size < self.ftp_settings.write_size:
-                if not self.upload_done():
-                    self.resend_writes()
-                    return
-                self.put_finished(ofs)
-                self.terminate_session()
-                return
-
-            try:
-                data = self.fh.read(self.ftp_settings.write_size)
-            except Exception as ex:
-                print("Read error: %s" % ex)
-                self.terminate_session()
-                return
-
-            if not self.upload_done():
-                self.resend_writes()
-            else:
-                self.put_finished(ofs)
-                self.terminate_session()
-        else:
+        if op.opcode != OP_Ack:
             print("Write failed")
-            print(str(op), op.payload)
             self.terminate_session()
+            return
+        for d in self.write_list:
+            if d.ofs == op.offset:
+                self.write_list.remove(d)
+                self.write_acks += 1
+                break
+        self.write_pending -= 1
+        if self.put_callback_progress:
+            self.put_callback_progress(self.write_acks/float(self.write_total))
+        self.send_more_writes()
 
     def cmd_rm(self, args):
         '''remove file'''
@@ -807,7 +786,7 @@ class FTPModule(mp_module.MPModule):
             send_op.session = self.session
             self.send(send_op)
 
-        if len(self.read_gaps) == 0 and self.last_burst_read is None and not self.write_wait:
+        if len(self.read_gaps) == 0 and self.last_burst_read is None and not self.write_list:
             return
 
         if self.fh is None:
@@ -825,10 +804,8 @@ class FTPModule(mp_module.MPModule):
         # see if we can fill gaps
         self.check_read_send()
 
-        if self.write_wait and now - self.op_start > (self.rtt+0.02) and self.last_op.opcode == OP_WriteFile:
-            self.op_start = now
-            if not self.upload_done():
-                self.resend_writes()
+        if self.write_list:
+            self.send_more_writes()
 
 def init(mpstate):
     '''initialise module'''

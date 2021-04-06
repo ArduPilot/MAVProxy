@@ -30,6 +30,7 @@ class WPModule(mp_module.MPModule):
         self.undo_wp = None
         self.undo_type = None
         self.undo_wp_idx = -1
+        self.upload_start = None
         self.wploader.expected_count = 0
         self.add_command('wp', self.cmd_wp,       'waypoint management',
                          ["<list|clear|move|remove|loop|set|undo|movemulti|moverelhome|changealt|param|status|slope|ftp>",
@@ -292,10 +293,12 @@ class WPModule(mp_module.MPModule):
         self.mpstate.console.set_status('Mission', 'Mission %u/%u' % (m.seq, self.wploader.count()-1))
         if m.seq == self.wploader.count() - 1:
             self.loading_waypoints = False
+            print("Loaded %u waypoint in %.2fs" % (self.wploader.count(), time.time() - self.upload_start))
             self.console.writeln("Sent all %u waypoints" % self.wploader.count())
 
     def send_all_waypoints(self):
         '''send all waypoints to vehicle'''
+        self.upload_start = time.time()
         self.master.waypoint_clear_all_send()
         if self.wploader.count() == 0:
             return
@@ -1097,6 +1100,8 @@ class WPModule(mp_module.MPModule):
             fh.write(buf)
         fh.seek(0)
 
+        self.upload_start = time.time()
+
         ftp.cmd_put([self.mission_ftp_name, self.mission_ftp_name],
                     fh=fh, callback=self.ftp_upload_callback, progress_callback=self.ftp_upload_progress)
 
@@ -1115,7 +1120,7 @@ class WPModule(mp_module.MPModule):
         else:
             mavmsg = mavutil.mavlink.MAVLink_mission_item_int_message
             item_size = struct.calcsize(mavmsg.format)
-            print("Sent mission of length %u" % ((dlen - 8) // item_size))
+            print("Sent mission of length %u in %.2fs" % ((dlen - 8) // item_size, time.time() - self.upload_start))
         
 def init(mpstate):
     '''initialise module'''
