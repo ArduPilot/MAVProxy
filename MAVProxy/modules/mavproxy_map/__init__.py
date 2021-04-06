@@ -55,6 +55,7 @@ class MapModule(mp_module.MPModule):
               ('rallycircle', bool, False),
               ('loitercircle',bool, False),
               ('showclicktime',int, 2),
+              ('showwpnum',bool, True),
               ('showdirection', bool, False)])
         
         service='MicrosoftHyb'
@@ -245,6 +246,8 @@ class MapModule(mp_module.MPModule):
                                                                    arrow = self.map_settings.showdirection, popup_menu=popup))
         labeled_wps = {}
         self.map.add_object(mp_slipmap.SlipClearLayer('LoiterCircles'))
+        if not self.map_settings.showwpnum:
+            return
         for i in range(len(self.mission_list)):
             next_list = self.mission_list[i]
             for j in range(len(next_list)):
