@@ -139,10 +139,14 @@ class FTPModule(mp_module.MPModule):
         self.backlog = 0
         self.burst_size = self.ftp_settings.burst_read_size
         self.write_list = None
-        self.write_retries = 0
+        self.write_block_size = 0
         self.write_acks = 0
         self.write_total = 0
         self.write_file_size = 0
+        self.write_idx = 0
+        self.write_recv_idx = -1
+        self.write_pending = 0
+        self.write_last_send = None
 
     def cmd_ftp(self, args):
         '''FTP operations'''
@@ -502,16 +506,20 @@ class FTPModule(mp_module.MPModule):
         self.fh.seek(0)
 
         # setup write list
-        write_size = self.ftp_settings.write_size
-        write_blockcount = file_size // write_size
-        if file_size % write_size != 0:
-            write_blockcount += 1
-        self.write_list = [ WriteQueue(i*write_size,write_size) for i in range(write_blockcount) ]
-        self.write_list[-1].size = file_size % write_size
-        self.write_retries = 0
-        self.write_acks = 0
-        self.write_total = len(self.write_list)
+        self.write_block_size = self.ftp_settings.write_size
         self.write_file_size = file_size
+
+        write_blockcount = file_size // self.write_block_size
+        if file_size % self.write_block_size != 0:
+            write_blockcount += 1
+
+        self.write_list = set(range(write_blockcount))
+        self.write_acks = 0
+        self.write_total = write_blockcount
+        self.write_idx = 0
+        self.write_recv_idx = -1
+        self.write_pending = 0
+        self.write_last_send = None
 
         self.put_callback = callback
         self.put_callback_progress = progress_callback
@@ -523,8 +531,6 @@ class FTPModule(mp_module.MPModule):
 
     def put_finished(self, flen):
         '''finish a put'''
-        if self.ftp_settings.debug > 1:
-            print("write_retries %u/%u" % (self.write_retries, self.write_total))
         if self.put_callback_progress:
             self.put_callback_progress(1.0)
             self.put_callback_progress = None
@@ -553,20 +559,26 @@ class FTPModule(mp_module.MPModule):
             self.terminate_session()
             return
 
-        self.write_list.sort(key=lambda x: x.last_send)
-
         now = time.time()
-        for i in range(min(self.ftp_settings.write_qsize, len(self.write_list))):
-            d = self.write_list[i]
-            if d.last_send != 0 and now - d.last_send < self.rtt:
-                break
-            if d.last_send != 0:
-                self.write_retries += 1
-            d.last_send = time.time()
-            self.fh.seek(d.ofs)
-            data = self.fh.read(d.size)
-            write = FTP_OP(self.seq, self.session, OP_WriteFile, len(data), 0, 0, d.ofs, bytearray(data))
+        if self.write_last_send is not None:
+            if now - self.write_last_send > max(min(10*self.rtt, 1),0.2):
+                # we seem to have lost a block of replies
+                self.write_pending = max(0, self.write_pending-1)
+
+        n = min(self.ftp_settings.write_qsize-self.write_pending, len(self.write_list))
+        for i in range(n):
+            # send in round-robin, skipping any that have been acked
+            idx = self.write_idx
+            while idx not in self.write_list:
+                idx = (idx + 1) % self.write_total
+            ofs = idx * self.write_block_size
+            self.fh.seek(ofs)
+            data = self.fh.read(self.write_block_size)
+            write = FTP_OP(self.seq, self.session, OP_WriteFile, len(data), 0, 0, ofs, bytearray(data))
             self.send(write)
+            self.write_idx = (idx + 1) % self.write_total
+            self.write_pending += 1
+            self.write_last_send = now
 
     def handle_write_reply(self, op, m):
         '''handle OP_WriteFile reply'''
@@ -577,11 +589,17 @@ class FTPModule(mp_module.MPModule):
             print("Write failed")
             self.terminate_session()
             return
-        for d in self.write_list:
-            if d.ofs == op.offset:
-                self.write_list.remove(d)
-                self.write_acks += 1
-                break
+
+        # assume the FTP server processes the blocks sequentially. This means
+        # when we receive an ack that any blocks between the last ack and this
+        # one have been lost
+        idx = op.offset // self.write_block_size
+        count = (idx - self.write_recv_idx) % self.write_total
+
+        self.write_pending = max(0, self.write_pending - count)
+        self.write_recv_idx = idx
+        self.write_list.discard(idx)
+        self.write_acks += 1
         if self.put_callback_progress:
             self.put_callback_progress(self.write_acks/float(self.write_total))
         self.send_more_writes()
