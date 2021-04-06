@@ -127,6 +127,7 @@ class FTPModule(mp_module.MPModule):
         self.read_gap_times = {}
         self.last_gap_send = None
         self.read_retries = 0
+        self.read_total = 0
         self.duplicates = 0
         self.last_read = None
         self.last_burst_read = None
@@ -138,7 +139,6 @@ class FTPModule(mp_module.MPModule):
         self.backlog = 0
         self.burst_size = self.ftp_settings.burst_read_size
         self.write_list = None
-        self.write_pending = 0
         self.write_retries = 0
         self.write_acks = 0
         self.write_total = 0
@@ -208,6 +208,7 @@ class FTPModule(mp_module.MPModule):
             self.put_callback_progress(None)
             self.put_callback_progress = None
         self.read_gaps = []
+        self.read_total = 0
         self.read_gap_times = {}
         self.last_read = None
         self.last_burst_read = None
@@ -263,12 +264,11 @@ class FTPModule(mp_module.MPModule):
         else:
             print('LIST: %s' % op)
 
-    def cmd_get(self, args, callback=None):
+    def cmd_get(self, args, callback=None, callback_progress=None):
         '''get file'''
         if len(args) == 0:
             print("Usage: get FILENAME <LOCALNAME>")
             return
-        self.callback = None
         self.terminate_session()
         fname = args[0]
         if len(args) > 1:
@@ -279,6 +279,7 @@ class FTPModule(mp_module.MPModule):
             print("Getting %s as %s" % (fname, self.filename))
         self.op_start = time.time()
         self.callback = callback
+        self.callback_progress = callback_progress
         self.read_retries = 0
         self.duplicates = 0
         self.reached_eof = False
@@ -335,7 +336,15 @@ class FTPModule(mp_module.MPModule):
             self.terminate_session()
             return True
         return False
-            
+
+    def write_payload(self, op):
+        '''write payload from a read op'''
+        self.fh.seek(op.offset)
+        self.fh.write(op.payload)
+        self.read_total += len(op.payload)
+        if self.callback_progress is not None:
+            self.callback_progress(self.fh, self.read_total)
+    
     def handle_burst_read(self, op, m):
         '''handle OP_BurstReadFile reply'''
         if self.ftp_settings.pkt_loss_tx > 0:
@@ -372,9 +381,9 @@ class FTPModule(mp_module.MPModule):
                         print("FTP: dup read reply at %u of len %u ofs=%u" % (op.offset, op.size, self.fh.tell()))
                     self.duplicates += 1
                     return
-                self.fh.seek(op.offset)
-                self.fh.write(op.payload)
+                self.write_payload(op)
                 self.fh.seek(ofs)
+                self.read_total += len(op.payload)
                 if self.check_read_finished():
                     return
             elif op.offset > ofs:
@@ -390,10 +399,11 @@ class FTPModule(mp_module.MPModule):
                     self.read_gaps.append(g)
                     self.read_gap_times[g] = 0
                     gap = (gap[0] + max_read, gap[1] - max_read)
-                self.fh.seek(op.offset)
-                self.fh.write(op.payload)
+                self.write_payload(op)
+                self.read_total += len(op.payload)
             else:
-                self.fh.write(op.payload)
+                self.write_payload(op)
+                self.read_total += len(op.payload)
             if op.burst_complete:
                 if op.size > 0 and op.size < self.burst_size:
                     # a burst complete with non-zero size and less than burst packet size
@@ -446,9 +456,9 @@ class FTPModule(mp_module.MPModule):
                 self.read_gaps.remove(gap)
                 self.read_gap_times.pop(gap)
                 ofs = self.fh.tell()
-                self.fh.seek(op.offset)
-                self.fh.write(op.payload)
+                self.write_payload(op)
                 self.fh.seek(ofs)
+                self.read_total += len(op.payload)
                 if self.ftp_settings.debug > 0:
                     print("FTP: removed gap", gap, self.reached_eof, len(self.read_gaps))
                 if self.check_read_finished():
@@ -498,7 +508,6 @@ class FTPModule(mp_module.MPModule):
             write_blockcount += 1
         self.write_list = [ WriteQueue(i*write_size,write_size) for i in range(write_blockcount) ]
         self.write_list[-1].size = file_size % write_size
-        self.write_pending = 0
         self.write_retries = 0
         self.write_acks = 0
         self.write_total = len(self.write_list)
@@ -514,6 +523,8 @@ class FTPModule(mp_module.MPModule):
 
     def put_finished(self, flen):
         '''finish a put'''
+        if self.ftp_settings.debug > 1:
+            print("write_retries %u/%u" % (self.write_retries, self.write_total))
         if self.put_callback_progress:
             self.put_callback_progress(1.0)
             self.put_callback_progress = None
@@ -536,17 +547,19 @@ class FTPModule(mp_module.MPModule):
 
     def send_more_writes(self):
         '''send some more writes'''
-        if self.write_pending >= self.ftp_settings.write_qsize:
-            return
-        self.write_list.sort(key=lambda x: x.last_send)
-        n = self.ftp_settings.write_qsize - self.write_pending
-        n = min(n, len(self.write_list))
-        if n == 0:
+        if len(self.write_list) == 0:
             # all done
             self.put_finished(self.write_file_size)
             self.terminate_session()
-        for i in range(n):
+            return
+
+        self.write_list.sort(key=lambda x: x.last_send)
+
+        now = time.time()
+        for i in range(min(self.ftp_settings.write_qsize, len(self.write_list))):
             d = self.write_list[i]
+            if d.last_send != 0 and now - d.last_send < self.rtt:
+                break
             if d.last_send != 0:
                 self.write_retries += 1
             d.last_send = time.time()
@@ -554,7 +567,6 @@ class FTPModule(mp_module.MPModule):
             data = self.fh.read(d.size)
             write = FTP_OP(self.seq, self.session, OP_WriteFile, len(data), 0, 0, d.ofs, bytearray(data))
             self.send(write)
-            self.write_pending += 1
 
     def handle_write_reply(self, op, m):
         '''handle OP_WriteFile reply'''
@@ -570,7 +582,6 @@ class FTPModule(mp_module.MPModule):
                 self.write_list.remove(d)
                 self.write_acks += 1
                 break
-        self.write_pending -= 1
         if self.put_callback_progress:
             self.put_callback_progress(self.write_acks/float(self.write_total))
         self.send_more_writes()
@@ -786,7 +797,7 @@ class FTPModule(mp_module.MPModule):
             send_op.session = self.session
             self.send(send_op)
 
-        if len(self.read_gaps) == 0 and self.last_burst_read is None and not self.write_list:
+        if len(self.read_gaps) == 0 and self.last_burst_read is None and self.write_list is None:
             return
 
         if self.fh is None:
@@ -804,7 +815,7 @@ class FTPModule(mp_module.MPModule):
         # see if we can fill gaps
         self.check_read_send()
 
-        if self.write_list:
+        if self.write_list is not None:
             self.send_more_writes()
 
 def init(mpstate):

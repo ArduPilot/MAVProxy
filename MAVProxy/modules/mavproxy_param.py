@@ -28,6 +28,7 @@ class ParamState:
         self.param_types = {}
         self.ftp_failed = False
         self.ftp_started = False
+        self.ftp_count = None
         self.mpstate = mpstate
         self.sysid = sysid
 
@@ -301,7 +302,8 @@ class ParamState:
             self.ftp_started = False
             return
         self.ftp_started = True
-        ftp.cmd_get(["@PARAM/param.pck"], callback=self.ftp_callback)
+        self.ftp_count = None
+        ftp.cmd_get(["@PARAM/param.pck"], callback=self.ftp_callback, callback_progress=self.ftp_callback_progress)
 
     def log_params(self, params):
         '''log PARAM_VALUE messages so that we can extract parameters from a tlog when using ftp download'''
@@ -333,7 +335,20 @@ class ParamState:
                 pass
             (mav.srcSystem, mav.srcComponent) = id_saved
 
-
+    def ftp_callback_progress(self, fh, total_size):
+        '''callback as read progresses'''
+        if self.ftp_count is None and total_size >= 6:
+            ofs = fh.tell()
+            fh.seek(0)
+            buf = fh.read(6)
+            fh.seek(ofs)
+            magic2,num_params,total_params = struct.unpack("<HHH", buf)
+            if magic2 == 0x671b:
+                self.ftp_count = total_params
+        # approximate count
+        if self.ftp_count is not None:
+            done = min(int(total_size / 20), self.ftp_count-1)
+            self.mpstate.console.set_status('Params', 'Param %u/%u' % (done, self.ftp_count))
 
     def ftp_callback(self, fh):
         '''callback from ftp fetch of parameters'''
