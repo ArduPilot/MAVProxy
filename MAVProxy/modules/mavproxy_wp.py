@@ -568,7 +568,7 @@ class WPModule(mp_module.MPModule):
 
         for wpnum in range(wpstart, wpend+1):
             wp = self.wploader.wp(wpnum)
-            if not self.wploader.is_location_command(wp.command):
+            if wp is None or not self.wploader.is_location_command(wp.command):
                 continue
             (newlat, newlon) = mp_util.gps_newpos(wp.x, wp.y, bearing, distance)
             if wpnum != idx and rotation != 0:
