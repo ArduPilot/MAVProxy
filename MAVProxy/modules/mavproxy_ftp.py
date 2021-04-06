@@ -387,7 +387,6 @@ class FTPModule(mp_module.MPModule):
                     return
                 self.write_payload(op)
                 self.fh.seek(ofs)
-                self.read_total += len(op.payload)
                 if self.check_read_finished():
                     return
             elif op.offset > ofs:
@@ -404,10 +403,8 @@ class FTPModule(mp_module.MPModule):
                     self.read_gap_times[g] = 0
                     gap = (gap[0] + max_read, gap[1] - max_read)
                 self.write_payload(op)
-                self.read_total += len(op.payload)
             else:
                 self.write_payload(op)
-                self.read_total += len(op.payload)
             if op.burst_complete:
                 if op.size > 0 and op.size < self.burst_size:
                     # a burst complete with non-zero size and less than burst packet size
@@ -462,7 +459,6 @@ class FTPModule(mp_module.MPModule):
                 ofs = self.fh.tell()
                 self.write_payload(op)
                 self.fh.seek(ofs)
-                self.read_total += len(op.payload)
                 if self.ftp_settings.debug > 0:
                     print("FTP: removed gap", gap, self.reached_eof, len(self.read_gaps))
                 if self.check_read_finished():

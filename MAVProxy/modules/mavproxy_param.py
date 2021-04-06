@@ -347,7 +347,9 @@ class ParamState:
                 self.ftp_count = total_params
         # approximate count
         if self.ftp_count is not None:
-            done = min(int(total_size / 20), self.ftp_count-1)
+            # each entry takes 11 bytes on average
+            per_entry_size = 11
+            done = min(int(total_size / per_entry_size), self.ftp_count-1)
             self.mpstate.console.set_status('Params', 'Param %u/%u' % (done, self.ftp_count))
 
     def ftp_callback(self, fh):
