@@ -36,6 +36,7 @@ class WPModule(mp_module.MPModule):
                          ["<list|clear|move|remove|loop|set|undo|movemulti|moverelhome|changealt|param|status|slope|ftp>",
                           "<load|update|save|savecsv|show|ftpload> (FILENAME)"])
         self.mission_ftp_name = "@MISSION/mission.dat"
+        self.ftp_count = None
 
         if self.continue_mode and self.logdir is not None:
             waytxt = os.path.join(mpstate.status.logdir, 'way.txt')
@@ -1019,10 +1020,30 @@ class WPModule(mp_module.MPModule):
             print("Need ftp module")
             return
         print("Fetching mission with ftp")
-        ftp.cmd_get([self.mission_ftp_name], callback=self.ftp_callback)
+        self.ftp_count = None
+        ftp.cmd_get([self.mission_ftp_name], callback=self.ftp_callback, callback_progress=self.ftp_callback_progress)
+
+    def ftp_callback_progress(self, fh, total_size):
+        '''progress callback from ftp fetch of mission'''
+        if self.ftp_count is None and total_size >= 8:
+            ofs = fh.tell()
+            fh.seek(0)
+            buf = fh.read(8)
+            fh.seek(ofs)
+            magic2,dtype,num_items = struct.unpack("<HHI", buf)
+            if magic2 == 0x763d:
+                self.ftp_count = num_items
+        if self.ftp_count is not None:
+            mavmsg = mavutil.mavlink.MAVLink_mission_item_int_message
+            item_size = struct.calcsize(mavmsg.format)
+            done = (total_size - 8) // item_size
+            self.mpstate.console.set_status('Mission', 'Mission %u/%u' % (done, self.ftp_count))
 
     def ftp_callback(self, fh):
         '''callback from ftp fetch of mission'''
+        if fh is None:
+            print("mission: failed ftp download")
+            return
         magic = 0x763d
         data = fh.read()
         magic2,dtype,num_items = struct.unpack("<HHI", data[0:8])
@@ -1037,7 +1058,7 @@ class WPModule(mp_module.MPModule):
 
         data = data[8:]
         mavmsg = mavutil.mavlink.MAVLink_mission_item_int_message
-        item_size = struct.calcsize(mavmsg.native_format.decode())
+        item_size = struct.calcsize(mavmsg.format)
         while len(data) >= item_size:
             mdata = data[:item_size]
             data = data[item_size:]
