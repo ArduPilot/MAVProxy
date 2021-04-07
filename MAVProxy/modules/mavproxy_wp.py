@@ -1025,18 +1025,18 @@ class WPModule(mp_module.MPModule):
 
     def ftp_callback_progress(self, fh, total_size):
         '''progress callback from ftp fetch of mission'''
-        if self.ftp_count is None and total_size >= 8:
+        if self.ftp_count is None and total_size >= 10:
             ofs = fh.tell()
             fh.seek(0)
-            buf = fh.read(8)
+            buf = fh.read(10)
             fh.seek(ofs)
-            magic2,dtype,num_items = struct.unpack("<HHI", buf)
+            magic2,dtype,options,start,num_items = struct.unpack("<HHHHH", buf)
             if magic2 == 0x763d:
                 self.ftp_count = num_items
         if self.ftp_count is not None:
             mavmsg = mavutil.mavlink.MAVLink_mission_item_int_message
             item_size = struct.calcsize(mavmsg.format)
-            done = (total_size - 8) // item_size
+            done = (total_size - 10) // item_size
             self.mpstate.console.set_status('Mission', 'Mission %u/%u' % (done, self.ftp_count))
 
     def ftp_callback(self, fh):
@@ -1046,7 +1046,7 @@ class WPModule(mp_module.MPModule):
             return
         magic = 0x763d
         data = fh.read()
-        magic2,dtype,num_items = struct.unpack("<HHI", data[0:8])
+        magic2,dtype,options,start,num_items = struct.unpack("<HHHHH", data[0:10])
         if magic != magic2:
             print("mission: bad magic 0x%x expected 0x%x" % (magic2, magic))
             return
@@ -1056,7 +1056,7 @@ class WPModule(mp_module.MPModule):
 
         self.wploader.clear()
 
-        data = data[8:]
+        data = data[10:]
         mavmsg = mavutil.mavlink.MAVLink_mission_item_int_message
         item_size = struct.calcsize(mavmsg.format)
         while len(data) >= item_size:
@@ -1108,7 +1108,7 @@ class WPModule(mp_module.MPModule):
         print("Sending mission with ftp")
 
         fh = SIO()
-        fh.write(struct.pack("<HHI", 0x763d,mavutil.mavlink.MAV_MISSION_TYPE_MISSION,self.wploader.count()))
+        fh.write(struct.pack("<HHHHH", 0x763d,mavutil.mavlink.MAV_MISSION_TYPE_MISSION,0,0,self.wploader.count()))
         mavmsg = mavutil.mavlink.MAVLink_mission_item_int_message
         for i in range(self.wploader.count()):
             w = self.wploader.wp(i)
@@ -1141,7 +1141,7 @@ class WPModule(mp_module.MPModule):
         else:
             mavmsg = mavutil.mavlink.MAVLink_mission_item_int_message
             item_size = struct.calcsize(mavmsg.format)
-            print("Sent mission of length %u in %.2fs" % ((dlen - 8) // item_size, time.time() - self.upload_start))
+            print("Sent mission of length %u in %.2fs" % ((dlen - 10) // item_size, time.time() - self.upload_start))
         
 def init(mpstate):
     '''initialise module'''
