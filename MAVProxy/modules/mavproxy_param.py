@@ -9,6 +9,13 @@ from MAVProxy.modules.lib import multiproc
 if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import *
 
+try:
+    # py2
+    from StringIO import StringIO as SIO
+except ImportError:
+    # py3
+    from io import BytesIO as SIO
+    
 class ParamState:
     '''this class is separated to make it possible to use the parameter
        functions on a secondary connection'''
@@ -29,6 +36,7 @@ class ParamState:
         self.ftp_failed = False
         self.ftp_started = False
         self.ftp_count = None
+        self.ftp_send_param = None
         self.mpstate = mpstate
         self.sysid = sysid
 
@@ -451,7 +459,7 @@ class ParamState:
     def handle_command(self, master, mpstate, args):
         '''handle parameter commands'''
         param_wildcard = "*"
-        usage="Usage: param <fetch|ftp|save|set|show|load|preload|forceload|diff|download|check|help>"
+        usage="Usage: param <fetch|ftp|save|set|show|load|preload|forceload|ftpload|diff|download|check|help>"
         if len(args) < 1:
             print(usage)
             return
@@ -558,6 +566,15 @@ class ParamState:
             else:
                 param_wildcard = "*"
             self.mav_param.load(args[1].strip('"'), param_wildcard, master, check=False)
+        elif args[0] == "ftpload":
+            if len(args) < 2:
+                print("Usage: param ftpload <filename> [wildcard]")
+                return
+            if len(args) > 2:
+                param_wildcard = args[2]
+            else:
+                param_wildcard = "*"
+            self.ftp_load(args[1].strip('"'), param_wildcard, master)
         elif args[0] == "download":
             self.param_help_download()
         elif args[0] == "apropos":
@@ -579,6 +596,94 @@ class ParamState:
         else:
             print(usage)
 
+    def ftp_upload_callback(self, dlen):
+        '''callback on ftp put completion'''
+        if dlen is None:
+            print("Failed to send parameters")
+        else:
+            if self.ftp_send_param is not None:
+                for k in sorted(self.ftp_send_param.keys()):
+                    v = self.ftp_send_param.get(k)
+                    self.mav_param[k] = v
+                self.ftp_send_param = None
+            print("Parameter upload done")
+
+    def ftp_upload_progress(self, proportion):
+        '''callback from ftp put of parameters'''
+        if proportion is None:
+            self.mpstate.console.set_status('Params', 'Params ERR')
+        else:
+            self.mpstate.console.set_status('Params', 'Param %.1f%%' % (100.0*proportion))
+
+    def best_type(self, v):
+        '''work out best type for a variable'''
+        if not v.is_integer():
+            # treat as float
+            return 4
+        if v >= -128 and v <= 127:
+            return 1
+        if v >= -32768 and v <= 32767:
+            return 2
+        return 3
+
+    def str_common_len(self, s1, s2):
+        '''return common length between two strings'''
+        c = min(len(s1),len(s2))
+        for i in range(c):
+            if s1[i] != s2[i]:
+                return i
+        return c
+
+    def ftp_load(self, filename, param_wildcard, master):
+        '''load parameters with ftp'''
+        ftp = self.mpstate.module('ftp')
+        if ftp is None:
+            print("Need ftp module")
+            return
+        newparm = mavparm.MAVParmDict()
+        newparm.load(filename, param_wildcard, check=False)
+        fh = SIO()
+        for k in sorted(newparm.keys()):
+            v = newparm.get(k)
+            oldv = self.mav_param.get(k, None)
+            if oldv is not None and abs(oldv - v) <= newparm.mindelta:
+                # not changed
+                newparm.pop(k)
+        count = len(newparm.keys())
+        if count == 0:
+            print("No parameter changes")
+            return
+
+        fh.write(struct.pack("<HHH", 0x671b, count, count))
+        last_param = ""
+        for k in sorted(newparm.keys()):
+            v = newparm.get(k)
+            vtype = self.best_type(v)
+            common_len = self.str_common_len(last_param, k)
+            b1 = vtype
+            b2 = common_len | ((len(k)-(common_len+1))<<4)
+            fh.write(struct.pack("<BB", b1, b2))
+            fh.write(k[common_len:].encode("UTF-8"))
+            if vtype == 1: # int8
+                fh.write(struct.pack("<b", int(v)))
+            if vtype == 2: # int16
+                fh.write(struct.pack("<h", int(v)))
+            if vtype == 3: # int32
+                fh.write(struct.pack("<i", int(v)))
+            if vtype == 4: # float
+                fh.write(struct.pack("<f", v))
+            last_param = k
+
+        # re-pack with full file length in total_params
+        file_len = fh.tell()
+        fh.seek(0)
+        fh.write(struct.pack("<HHH", 0x671b, count, file_len))
+        fh.seek(0)
+        self.ftp_send_param = newparm
+        print("Sending %u params" % count)
+        ftp.cmd_put(["-", "@PARAM/param.pck"],
+                    fh=fh, callback=self.ftp_upload_callback, progress_callback=self.ftp_upload_progress)
+
 
 class ParamModule(mp_module.MPModule):
     def __init__(self, mpstate, **kwargs):
@@ -590,7 +695,7 @@ class ParamModule(mp_module.MPModule):
         self.add_command('param', self.cmd_param, "parameter handling",
                          ["<download|status>",
                           "<set|show|fetch|ftp|help|apropos> (PARAMETER)",
-                          "<load|save|diff> (FILENAME)",
+                          "<load|save|diff|forceload|ftpload> (FILENAME)",
                           "<set_xml_filepath> (FILEPATH)"
                          ])
         if mp_util.has_wxpython:
