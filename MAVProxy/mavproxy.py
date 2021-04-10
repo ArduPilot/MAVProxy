@@ -1216,6 +1216,8 @@ if __name__ == '__main__':
     parser.add_option("--aircraft", dest="aircraft", help="aircraft name", default=None)
     parser.add_option("--cmd", dest="cmd", help="initial commands", default=None, action='append')
     parser.add_option("--console", action='store_true', help="use GUI console")
+    if platform.system() == 'Windows':
+        parser.add_option("--no-console", action='store_true', help="don't use GUI console")
     parser.add_option("--map", action='store_true', help="load map module")
     parser.add_option(
         '--load-module',
@@ -1386,8 +1388,13 @@ if __name__ == '__main__':
         for m in standard_modules:
             load_module(m, quiet=True)
 
-    if opts.console:
-        process_stdin('module load console')
+    if platform.system() != 'Windows':
+        if opts.console:
+            process_stdin('module load console')
+    else:
+        # default to having console on windows
+        if opts.console or not opts.no_console:
+            process_stdin('module load console')
 
     if opts.map:
         process_stdin('module load map')
