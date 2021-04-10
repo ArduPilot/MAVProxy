@@ -1342,7 +1342,7 @@ if __name__ == '__main__':
     elif not opts.master and len(serial_list) > 1:
           print("Warning: multiple possible serial ports. Use console GUI or 'link add' to add port, or restart using --master to select a single port")
           #if no display, assume running CLI mode and exit
-          if "DISPLAY" not in os.environ:
+          if platform.system() != 'Windows' and "DISPLAY" not in os.environ:
               sys.exit(1)
     elif not opts.master:
           wifi_device = '0.0.0.0:14550'
