@@ -115,7 +115,7 @@ class FTPModule(mp_module.MPModule):
         self.total_size = 0
         self.read_gaps = []
         self.read_gap_times = {}
-        self.last_gap_send = None
+        self.last_gap_send = 0
         self.read_retries = 0
         self.duplicates = 0
         self.last_read = None
