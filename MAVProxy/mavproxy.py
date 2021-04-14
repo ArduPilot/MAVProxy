@@ -472,6 +472,15 @@ def generate_kwargs(args):
                                                            repr(e)))
     return (module_name, kwargs)
 
+def get_exception_stacktrace(e):
+    if sys.version_info[0] >= 3:
+        ret = "%s\n" % e
+        ret += ''.join(traceback.format_exception(etype=type(e),
+                                                  value=e,
+                                                  tb=e.__traceback__))
+        return ret
+    return traceback.format_exc(e)
+
 def load_module(modname, quiet=False, **kwargs):
     '''load a module'''
     modpaths = ['MAVProxy.modules.mavproxy_%s' % modname, modname]
@@ -501,8 +510,7 @@ def load_module(modname, quiet=False, **kwargs):
         except ImportError as msg:
             ex = msg
             if mpstate.settings.moddebug > 1:
-                import traceback
-                print(traceback.format_exc())
+                print(get_exception_stacktrace(ex))
     help_traceback = ""
     if mpstate.settings.moddebug < 3:
         help_traceback = " Use 'set moddebug 3' in the MAVProxy console to enable traceback"
@@ -997,9 +1005,7 @@ def periodic_tasks():
                 if mpstate.settings.moddebug == 1:
                     print(msg)
                 elif mpstate.settings.moddebug > 1:
-                    exc_type, exc_value, exc_traceback = sys.exc_info()
-                    traceback.print_exception(exc_type, exc_value, exc_traceback,
-                                              limit=2, file=sys.stdout)
+                    print(get_exception_stacktrace(msg))
 
         # also see if the module should be unloaded:
         if m.needs_unloading:
