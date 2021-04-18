@@ -413,7 +413,7 @@ class LinkModule(mp_module.MPModule):
         if out != self.status.last_apm_msg or time.time() > self.status.last_apm_msg_time+2:
             (fg, bg) = self.colors_for_severity(pending.severity)
             out = pending.accumulated_statustext()
-            self.mpstate.console.writeln("APM: %s" % out, bg=bg, fg=fg)
+            self.mpstate.console.writeln("AP: %s" % out, bg=bg, fg=fg)
             self.status.last_apm_msg = out
             self.status.last_apm_msg_time = time.time()
         del self.status.statustexts_by_sysidcompid[key][id]
