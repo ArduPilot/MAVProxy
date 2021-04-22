@@ -260,7 +260,7 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
     instances = {}
     ekf_counter = 0
     nkf_counter = 0
-    types = ['MISSION_ITEM','CMD']
+    types = ['MISSION_ITEM', 'MISSION_ITEM_INT', 'CMD']
     if options.types is not None:
         types.extend(options.types.split(','))
     else:
@@ -308,16 +308,36 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
 
         type = m.get_type()
 
-        if type == 'MISSION_ITEM':
+        if type in ['MISSION_ITEM', 'MISSION_ITEM_INT']:
             try:
-                while m.seq > wp.count():
+                new_m = m
+                if type == 'MISSION_ITEM_INT':
+                    # create a MISSION_ITEM from MISSION_ITEM_INT
+                    new_m = mavutil.mavlink.MAVLink_mission_item_message(
+                        0,
+                        0,
+                        m.seq,
+                        m.frame,
+                        m.command,
+                        m.current,
+                        m.autocontinue,
+                        m.param1,
+                        m.param2,
+                        m.param3,
+                        m.param4,
+                        m.x / 1.0e7,
+                        m.y / 1.0e7,
+                        m.z
+                    )
+                while new_m.seq > wp.count():
                     print("Adding dummy WP %u" % wp.count())
-                    wp.set(m, wp.count())
-                wp.set(m, m.seq)
-            except Exception:
+                    wp.set(new_m, wp.count())
+                wp.set(new_m, m.seq)
+            except Exception as e:
+                print("Exception: %s" % str(e))
                 pass
             continue
-        if type == 'CMD':
+        elif type == 'CMD':
             if options.mission is None:
                 m = mavutil.mavlink.MAVLink_mission_item_message(0,
                                                                 0,
