@@ -295,6 +295,9 @@ def magfit(mlog, timestamp_in_range):
                 # use core zero for EKF attitude
                 continue
             ATT = msg
+            ATT.Roll  += math.degrees(parameters['AHRS_TRIM_X'])
+            ATT.Pitch += math.degrees(parameters['AHRS_TRIM_Y'])
+            ATT.Yaw   += math.degrees(parameters['AHRS_TRIM_Z'])
         if msg.get_type() == 'BAT':
             if hasattr(msg,'Instance'):
                 if margs['BatteryNum'] != msg.Instance+1:
