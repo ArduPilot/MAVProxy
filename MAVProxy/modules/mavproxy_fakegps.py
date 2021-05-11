@@ -17,6 +17,7 @@ class FakeGPSModule(mp_module.MPModule):
                                                         ("lat", float, -35.363261),
                                                         ("lon", float, 149.165230),
                                                         ("alt", float, 584.0),
+                                                        ("yaw", float, 0.0),
                                                         ("rate", float, 5)])
         self.add_command('fakegps', self.cmd_FakeGPS, "fakegps control",
                          ["<status>", "set (FAKEGPSSETTING)"])
@@ -93,7 +94,8 @@ class FakeGPSModule(mp_module.MPModule):
                                        1.0, 1.0,
                                        gps_vel[0], gps_vel[1], gps_vel[2],
                                        0.2, 1.0, 1.0,
-                                       nsats)
+                                       nsats,
+                                       int(self.FakeGPS_settings.yaw*100))
 
 
 def init(mpstate):
