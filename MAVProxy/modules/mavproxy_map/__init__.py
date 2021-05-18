@@ -679,7 +679,7 @@ class MapModule(mp_module.MPModule):
         sysid = m.get_srcSystem()
 
         if mtype == "HEARTBEAT":
-            vname = 'plane'
+            vname = None
             if m.type in [mavutil.mavlink.MAV_TYPE_FIXED_WING]:
                 vname = 'plane'
             elif m.type in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER]:
@@ -699,7 +699,8 @@ class MapModule(mp_module.MPModule):
                 vname = 'heli'
             elif m.type in [mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER]:
                 vname = 'antenna'
-            self.vehicle_type_by_sysid[sysid] = vname
+            if vname is not None:
+                self.vehicle_type_by_sysid[sysid] = vname
 
         if not sysid in self.vehicle_type_by_sysid:
             self.vehicle_type_by_sysid[sysid] = 'plane'
