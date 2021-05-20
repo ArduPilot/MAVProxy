@@ -42,7 +42,8 @@ class LinkModule(mp_module.MPModule):
                          ["<list|ports>",
                           'add (SERIALPORT)',
                           'attributes (LINK) (ATTRIBUTES)',
-                          'remove (LINKS)'])
+                          'remove (LINKS)',
+                          'hl (HLSTATE)'])
         self.add_command('vehicle', self.cmd_vehicle, "vehicle control")
         self.add_command('alllinks', self.cmd_alllinks, "send command on all links")
         self.no_fwd_types = set()
@@ -50,8 +51,12 @@ class LinkModule(mp_module.MPModule):
         self.add_completion_function('(SERIALPORT)', self.complete_serial_ports)
         self.add_completion_function('(LINKS)', self.complete_links)
         self.add_completion_function('(LINK)', self.complete_links)
+        self.add_completion_function('(HLSTATE)', self.complete_hl)
         self.last_altitude_announce = 0.0
         self.vehicle_list = set()
+        self.high_latency = False
+        self.old_streamrate = 0
+        self.old_streamrate2 = 0
 
         self.menu_added_console = False
         if mp_util.has_wxpython:
@@ -88,6 +93,10 @@ class LinkModule(mp_module.MPModule):
         ports = mavutil.auto_detect_serial(preferred_list=preferred_ports)
         return [ p.device for p in ports ]
 
+    def complete_hl(self, text):
+        '''return list of hl options'''
+        return [ 'on', 'off' ]
+        
     def complete_links(self, text):
         '''return list of links'''
         try:
@@ -106,6 +115,8 @@ class LinkModule(mp_module.MPModule):
             self.show_link()
         elif args[0] == "list":
             self.cmd_link_list()
+        elif args[0] == "hl":
+            self.cmd_hl(args[1:])
         elif args[0] == "add":
             if len(args) != 2:
                 print("Usage: link add LINK")
@@ -127,8 +138,71 @@ class LinkModule(mp_module.MPModule):
                 return
             self.cmd_link_remove(args[1:])
         else:
-            print("usage: link <list|add|remove|attributes>")
-
+            print("usage: link <list|add|remove|attributes|hl>")
+            
+    def cmd_hl(self, args):
+        '''Toggle high latency mode'''
+        if len(args) < 1:
+            print("High latency mode is " + str(self.high_latency))
+            return
+        elif args[0] == "on": 
+            print("High latency mode ON")
+            self.high_latency = True
+            # Tell ArduPilot to start sending HIGH_LATENCY2 messages
+            self.master.mav.command_long_send(
+                self.target_system,  # target_system
+                self.target_component,
+                mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL, # command
+                0, # confirmation
+                mavutil.mavlink.MAVLINK_MSG_ID_HIGH_LATENCY2, # param1 (msg id)
+                1000000, # param2  (message interval, us)
+                0, # param3
+                0, # param4
+                0, # param5
+                0, # param6
+                0) # param7
+            # and stop sending any other messages
+            self.old_streamrate = self.settings.streamrate
+            self.old_streamrate2 = self.settings.streamrate2
+            self.settings.streamrate = -1
+            self.settings.streamrate2 = -1
+            for master in self.mpstate.mav_master:
+                master.mav.request_data_stream_send(self.mpstate.settings.target_system, self.mpstate.settings.target_component,
+                                                    mavutil.mavlink.MAV_DATA_STREAM_ALL,
+                                                    0, 1)
+            return
+        elif args[0] == "off": 
+            print("High latency mode OFF")
+            self.high_latency = False
+            # Start sending the full message set again
+            self.settings.streamrate = self.old_streamrate
+            self.settings.streamrate2 = self.old_streamrate2
+            for master in self.mpstate.mav_master:
+                if master.linknum == 0:
+                    rate = self.settings.streamrate
+                else:
+                    rate = self.settings.streamrate2
+                if rate != -1 and self.mpstate.settings.streamrate != -1:
+                    master.mav.request_data_stream_send(self.mpstate.settings.target_system, self.mpstate.settings.target_component,
+                                                        mavutil.mavlink.MAV_DATA_STREAM_ALL,
+                                                        rate, 1)
+            # Tell ArduPilot to stop sending HIGH_LATENCY2 messages
+            self.master.mav.command_long_send(
+                self.target_system,  # target_system
+                self.target_component,
+                mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL, # command
+                0, # confirmation
+                mavutil.mavlink.MAVLINK_MSG_ID_HIGH_LATENCY2, # param1 (msg id)
+                -1, # param2  (message interval)
+                0, # param3
+                0, # param4
+                0, # param5
+                0, # param6
+                0) # param7
+            return
+        else:
+            print("usage: hl <on|off>")
+                        
     def show_link(self):
         '''show link information'''
         for master in self.mpstate.mav_master:
