@@ -46,7 +46,7 @@ class KmlReadModule(mp_module.MPModule):
                           
     def cmd_param(self, args):
         '''control kml reading'''
-        usage = "Usage: kml <clear | load (filename) | layers | toggle (layername) | fence (layername)>"
+        usage = "Usage: kml <clear | load (filename) | layers | toggle (layername) | fence (layername)> | snapfence | snapwp"
         if len(args) < 1:
             print(usage)
             return
