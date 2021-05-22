@@ -714,12 +714,17 @@ error_codes = { # not used yet
     
 def cmd_messages(args):
     '''show messages'''
+    invert = False
     if len(args) > 0:
         wildcard = args[0]
+        if wildcard.startswith("!"):
+            invert = True
+            wildcard = wildcard[1:]
         if wildcard.find('*') == -1 and wildcard.find('?') == -1:
             wildcard = "*" + wildcard + "*"
     else:
         wildcard = '*'
+
     mestate.mlog.rewind()
     types = set(['MSG','EV','ERR', 'STATUSTEXT'])
     while True:
@@ -734,7 +739,10 @@ def cmd_messages(args):
             mstr = "Error: Subsys %s ECode %u " % (subsystems.get(m.Subsys, str(m.Subsys)), m.ECode)
         else:
             mstr = m.text
-        if fnmatch.fnmatch(mstr.upper(), wildcard.upper()):
+        matches = fnmatch.fnmatch(mstr.upper(), wildcard.upper())
+        if invert:
+            matches = not matches
+        if matches:
             print("%s %s" % (timestring(m), mstr))
     mestate.mlog.rewind()
 
