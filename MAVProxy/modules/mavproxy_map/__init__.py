@@ -678,7 +678,7 @@ class MapModule(mp_module.MPModule):
         mtype = m.get_type()
         sysid = m.get_srcSystem()
 
-        if mtype == "HEARTBEAT":
+        if mtype == "HEARTBEAT" or mtype == "HIGH_LATENCY2":
             vname = None
             if m.type in [mavutil.mavlink.MAV_TYPE_FIXED_WING]:
                 vname = 'plane'
@@ -731,7 +731,14 @@ class MapModule(mp_module.MPModule):
                     cog = math.degrees(self.master.messages['ATTITUDE'].yaw)
                 self.create_vehicle_icon('GPS' + vehicle, 'blue')
                 self.map.set_position('GPS' + vehicle, (lat, lon), rotation=cog)
-
+                
+        elif mtype == "HIGH_LATENCY2" and self.map_settings.showgpspos:
+            (lat, lon) = (m.latitude*1.0e-7, m.longitude*1.0e-7)
+            if lat != 0 or lon != 0:
+                cog = m.heading * 2
+                self.create_vehicle_icon('GPS' + vehicle, 'blue')
+                self.map.set_position('GPS' + vehicle, (lat, lon), rotation=cog)
+                            
         elif mtype == "GPS2_RAW" and self.map_settings.showgps2pos:
             (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
             if lat != 0 or lon != 0:
