@@ -78,7 +78,15 @@ class ModeModule(mp_module.MPModule):
                                            int(latlon[0]*1.0e7),
                                            int(latlon[1]*1.0e7),
                                            altitude)
-
+                                           
+    def mavlink_packet(self, m):
+            mtype = m.get_type()
+            if mtype == 'HIGH_LATENCY2':
+                mode_map = mavutil.mode_mapping_bynumber(m.type)
+                if mode_map and m.custom_mode in mode_map:
+                    self.master.flightmode = mode_map[m.custom_mode]
+            
+            
 def init(mpstate):
     '''initialise module'''
     return ModeModule(mpstate)
