@@ -515,7 +515,7 @@ class LinkModule(mp_module.MPModule):
             
         mtype = m.get_type()
 
-        if mtype == 'HEARTBEAT' and m.type != mavutil.mavlink.MAV_TYPE_GCS:
+        if (mtype == 'HEARTBEAT' or mtype == 'HIGH_LATENCY2') and m.type != mavutil.mavlink.MAV_TYPE_GCS:
             if self.settings.target_system == 0 and self.settings.target_system != m.get_srcSystem():
                 self.settings.target_system = m.get_srcSystem()
                 self.say("online system %u" % self.settings.target_system,'message')
@@ -733,7 +733,7 @@ class LinkModule(mp_module.MPModule):
         '''handle an incoming mavlink packet'''
         type = msg.get_type()
 
-        if type == 'HEARTBEAT':
+        if type == 'HEARTBEAT' or type == 'HIGH_LATENCY2':
             sysid = msg.get_srcSystem()
             if not sysid in self.vehicle_list and msg.type != mavutil.mavlink.MAV_TYPE_GCS:
                 self.vehicle_list.add(sysid)
