@@ -259,7 +259,7 @@ class ConsoleModule(mp_module.MPModule):
         sysid = msg.get_srcSystem()
         compid = msg.get_srcComponent()
 
-        if type == 'HEARTBEAT':
+        if type == 'HEARTBEAT' or type == 'HIGH_LATENCY2':
             if not sysid in self.vehicle_list:
                 self.add_new_vehicle(msg)
             if sysid not in self.component_name:
@@ -587,7 +587,60 @@ class ConsoleModule(mp_module.MPModule):
         elif type == 'PARAM_VALUE':
             rec, tot = self.module('param').param_status()
             self.console.set_status('Params', 'Param %u/%u' % (rec,tot))
-
+            
+        elif type == 'HIGH_LATENCY2':
+            self.console.set_status('WPDist', 'Distance %s' % self.dist_string(msg.target_distance * 10))
+            # The -180 here for for consistency with NAV_CONTROLLER_OUTPUT (-180->180), whereas HIGH_LATENCY2 is (0->360)
+            self.console.set_status('WPBearing', 'Bearing %u' % ((msg.target_heading * 2) - 180))
+            alt_error = "%s%s" % (self.height_string(msg.target_altitude - msg.altitude),
+                                  "(L)" if (msg.target_altitude - msg.altitude) > 0 else "(L)")
+            self.console.set_status('AltError', 'AltError %s' % alt_error)
+            self.console.set_status('AspdError', 'AspdError %s%s' % (self.speed_string((msg.airspeed_sp - msg.airspeed)/5),
+                                                                    "(L)" if (msg.airspeed_sp - msg.airspeed) > 0 else "(L)"))
+            # The -180 here for for consistency with WIND (-180->180), whereas HIGH_LATENCY2 is (0->360)
+            self.console.set_status('Wind', 'Wind %u/%s' % ((msg.wind_heading * 2) - 180, self.speed_string(msg.windspeed / 5)))
+            self.console.set_status('Alt', 'Alt %s' % self.height_string(msg.altitude - self.console.ElevationMap.GetElevation(msg.latitude / 1E7, msg.longitude / 1E7)))
+            self.console.set_status('AirSpeed', 'AirSpeed %s' % self.speed_string(msg.airspeed / 5))
+            self.console.set_status('GPSSpeed', 'GPSSpeed %s' % self.speed_string(msg.groundspeed / 5))
+            self.console.set_status('Thr', 'Thr %u' % msg.throttle)
+            self.console.set_status('Heading', 'Hdg %s/---' % (msg.heading * 2))
+            self.console.set_status('WP', 'WP %u/--' % (msg.wp_num))
+            
+            #re-map sensors
+            sensors = { 'AS'   : mavutil.mavlink.HL_FAILURE_FLAG_DIFFERENTIAL_PRESSURE,
+                        'MAG'  : mavutil.mavlink.HL_FAILURE_FLAG_3D_MAG,
+                        'INS'  : mavutil.mavlink.HL_FAILURE_FLAG_3D_ACCEL | mavutil.mavlink.HL_FAILURE_FLAG_3D_GYRO,
+                        'AHRS' : mavutil.mavlink.HL_FAILURE_FLAG_ESTIMATOR,
+                        'RC'   : mavutil.mavlink.HL_FAILURE_FLAG_RC_RECEIVER,
+                        'TERR' : mavutil.mavlink.HL_FAILURE_FLAG_TERRAIN
+            }
+            for s in sensors.keys():
+                bits = sensors[s]
+                failed = ((msg.failure_flags & bits) == bits)
+                if failed:
+                    fg = 'red'
+                else:
+                    fg = 'green'
+                self.console.set_status(s, s, fg=fg)
+                
+            # do the remaining non-standard system mappings
+            fence_failed = ((msg.failure_flags & mavutil.mavlink.HL_FAILURE_FLAG_GEOFENCE) == mavutil.mavlink.HL_FAILURE_FLAG_GEOFENCE)
+            if fence_failed:
+                fg = 'red'
+            else:
+                fg = 'green'
+            self.console.set_status('Fence', 'FEN', fg=fg)
+            gps_failed = ((msg.failure_flags & mavutil.mavlink.HL_FAILURE_FLAG_GPS) == mavutil.mavlink.HL_FAILURE_FLAG_GPS)
+            if gps_failed:
+                self.console.set_status('GPS', 'GPS FAILED', fg='red')
+            else:
+                self.console.set_status('GPS', 'GPS OK', fg='green')
+            batt_failed = ((msg.failure_flags & mavutil.mavlink.HL_FAILURE_FLAG_GPS) == mavutil.mavlink.HL_FAILURE_FLAG_BATTERY)
+            if batt_failed:
+                self.console.set_status('PWR', 'PWR FAILED', fg='red')
+            else:
+                self.console.set_status('PWR', 'PWR OK', fg='green')            
+                                                                        
         for id in self.user_added.keys():
             if type in self.user_added[id].msg_types:
                 d = self.user_added[id]
