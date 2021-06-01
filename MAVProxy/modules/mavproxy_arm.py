@@ -61,7 +61,7 @@ class ArmModule(mp_module.MPModule):
 
     def cmd_arm(self, args):
         '''arm commands'''
-        usage = "usage: arm <check|uncheck|list|throttle|safetyon|safetyoff|safetystatus|bits>"
+        usage = "usage: arm <check|uncheck|list|throttle|safetyon|safetyoff|safetystatus|bits|prearms>"
 
         if len(args) <= 0:
             print(usage)
@@ -118,6 +118,21 @@ class ArmModule(mp_module.MPModule):
         if args[0] == "bits":
             for mask in sorted(arming_masks, key=lambda x : arming_masks[x]):
                 print("%s" % mask)
+            return
+
+        if args[0] == "prearms":
+            self.master.mav.command_long_send(
+                self.target_system,  # target_system
+                self.target_component,
+                mavutil.mavlink.MAV_CMD_RUN_PREARM_CHECKS, # command
+                0, # confirmation
+                0, # param1
+                0, # param2
+                0, # param3
+                0, # param4
+                0, # param5
+                0, # param6
+                0) # param7
             return
 
         if args[0] == "throttle":
