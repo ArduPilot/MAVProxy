@@ -245,10 +245,13 @@ class FTPModule(mp_module.MPModule):
                 if len(d) == 0:
                     continue
                 self.dir_offset += 1
-                if sys.version_info.major >= 3:
-                    d = str(d, 'ascii')
-                else:
-                    d = str(d)
+                try:
+                    if sys.version_info.major >= 3:
+                        d = str(d, 'ascii')
+                    else:
+                        d = str(d)
+                except Exception:
+                    continue
                 if d[0] == 'D':
                     print(" D %s" % d[1:])
                 elif d[0] == 'F':
