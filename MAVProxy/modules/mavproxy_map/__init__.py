@@ -760,7 +760,7 @@ class MapModule(mp_module.MPModule):
 
         elif mtype == "NAV_CONTROLLER_OUTPUT":
             tlayer = 'Trajectory%u' % m.get_srcSystem()
-            if (self.master.flightmode in [ "AUTO", "GUIDED", "LOITER", "RTL", "QRTL", "QLOITER", "QLAND", "FOLLOW" ] and
+            if (self.master.flightmode in [ "AUTO", "GUIDED", "LOITER", "RTL", "QRTL", "QLOITER", "QLAND", "FOLLOW", "ZIGZAG" ] and
                 m.get_srcSystem() in self.lat_lon):
                 (lat,lon) = self.lat_lon[m.get_srcSystem()]
                 trajectory = [ (lat, lon),
