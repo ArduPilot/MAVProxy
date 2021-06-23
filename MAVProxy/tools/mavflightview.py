@@ -127,7 +127,8 @@ def colourmap_for_mav_type(mav_type):
         map = colour_map_copter
     if mav_type == mavutil.mavlink.MAV_TYPE_FIXED_WING:
         map = colour_map_plane
-    if mav_type == mavutil.mavlink.MAV_TYPE_GROUND_ROVER:
+    if mav_type in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER,
+                    mavutil.mavlink.MAV_TYPE_SURFACE_BOAT]:
         map = colour_map_rover
     if mav_type == mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER:
         map = colour_map_tracker
