@@ -115,7 +115,7 @@ class TileInfo:
         world_tiles = 1<<self.zoom
         x = ( tilex + 1.0*offsetx/TILES_WIDTH ) / (world_tiles/2.) - 1
         y = ( tiley + 1.0*offsety/TILES_HEIGHT) / (world_tiles/2.) - 1
-        lon = x * 180.0
+        lon = mp_util.wrap_180(x * 180.0)
         y = math.exp(-y*2*math.pi)
         e = (y-1)/(y+1)
         lat = 180.0/math.pi * math.asin(e)
@@ -227,6 +227,7 @@ class MPTile:
     def coord_to_tile(self, lat, lon, zoom):
         '''convert lat/lon/zoom to a TileInfo'''
         world_tiles = 1<<zoom
+        lon = mp_util.wrap_180(lon)
         x = world_tiles / 360.0 * (lon + 180.0)
         tiles_pre_radian = world_tiles / (2 * math.pi)
         e = math.sin(lat * (1/180.*math.pi))
@@ -452,7 +453,7 @@ class MPTile:
             return (0,0)
 
         dx = mp_util.gps_distance(lat, lon, lat, lon2)
-        if lon2 < lon:
+        if mp_util.wrap_180(lon2 - lon) < 0:
             dx = -dx
         dy = mp_util.gps_distance(lat, lon, lat2, lon)
         if lat2 > lat:
@@ -509,12 +510,16 @@ class MPTile:
         for y in range(tile_min.y, tile_max.y+1):
             srcx = ofsx
             dstx = 0
-            for x in range(tile_min.x, tile_max.x+1):
+            world_tiles = 1<<zoom
+            lim_x = (tile_max.x+1) % world_tiles
+            x = tile_min.x
+            while x != lim_x:
                 if dstx < width and dsty < height:
                     ret.append(TileInfoScaled((x,y), zoom, scale,
                                                                   (srcx,srcy), (dstx,dsty), self.service))
                 dstx += scaled_tile_width-srcx
                 srcx = 0
+                x = (x+1) % world_tiles
             dsty += scaled_tile_height-srcy
             srcy = 0
         return ret
@@ -596,8 +601,8 @@ if __name__ == "__main__":
         bounds = mp_util.polygon_bounds(boundary)
         lat = bounds[0]+bounds[2]
         lon = bounds[1]
-        ground_width = max(mp_util.gps_distance(lat, lon, lat, lon+bounds[3]),
-                   mp_util.gps_distance(lat, lon, lat-bounds[2], lon))
+        ground_width = max(mp_util.gps_distance(lat, lon, lat, mp_util.wrap_180(lon+bounds[3])),
+                           mp_util.gps_distance(lat, lon, lat-bounds[2], lon))
         print(lat, lon, ground_width)
 
     mt = MPTile(debug=opts.debug, service=opts.service,

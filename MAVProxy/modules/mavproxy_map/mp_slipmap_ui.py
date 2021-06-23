@@ -510,7 +510,7 @@ class MPSlipMapPanel(wx.Panel):
             
         # find display bounding box
         (lat2,lon2) = self.coordinates(state.width-1, state.height-1)
-        bounds = (lat2, state.lon, state.lat-lat2, lon2-state.lon)
+        bounds = (lat2, state.lon, state.lat-lat2, mp_util.wrap_180(lon2-state.lon))
 
         # get the image
         img = self.map_img.copy()

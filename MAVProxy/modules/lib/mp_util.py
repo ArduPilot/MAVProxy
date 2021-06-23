@@ -27,6 +27,23 @@ else:
 
 radius_of_earth = 6378100.0 # in meters
 
+def wrap_360(angle):
+    '''wrap an angle to 0..360 degrees'''
+    while angle < 0:
+        angle = 360 + angle
+    while angle >= 360:
+        angle -= 360
+    return angle
+
+def wrap_180(angle):
+    '''wrap an angle to -180..180 degrees'''
+    while angle < -180:
+        angle = 360 + angle
+    while angle >= 180:
+        angle -= 360
+    return angle
+    
+
 def gps_distance(lat1, lon1, lat2, lon2):
     '''return distance between two points in meters,
     coordinates are in degrees
@@ -36,7 +53,7 @@ def gps_distance(lat1, lon1, lat2, lon2):
     lon1 = math.radians(lon1)
     lon2 = math.radians(lon2)
     dLat = lat2 - lat1
-    dLon = lon2 - lon1
+    dLon = wrap_valid_longitude(lon2 - lon1)
 
     a = math.sin(0.5*dLat)**2 + math.sin(0.5*dLon)**2 * math.cos(lat1) * math.cos(lat2)
     c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0-a))
@@ -51,7 +68,7 @@ def gps_bearing(lat1, lon1, lat2, lon2):
     lon1 = math.radians(lon1)
     lon2 = math.radians(lon2)
     dLat = lat2 - lat1
-    dLon = lon2 - lon1
+    dLon = wrap_valid_longitude(lon2 - lon1)
     y = math.sin(dLon) * math.cos(lat2)
     x = math.cos(lat1)*math.sin(lat2) - math.sin(lat1)*math.cos(lat2)*math.cos(dLon)
     bearing = math.degrees(math.atan2(y, x))
@@ -191,6 +208,7 @@ class UTMGrid:
         '''return (lat,lon) for the grid coordinates'''
         from MAVProxy.modules.lib.ANUGA import lat_long_UTM_conversion
         (lat, lon) = lat_long_UTM_conversion.UTMtoLL(self.northing, self.easting, self.zone, isSouthernHemisphere=(self.hemisphere=='S'))
+        lon = wrap_180(lon)
         return (lat, lon)
 
 
