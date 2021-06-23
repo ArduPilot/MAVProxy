@@ -151,16 +151,16 @@ def polygon_bounds(points):
     return (minx, miny, maxx-minx, maxy-miny)
 
 def bounds_overlap(bound1, bound2):
-    '''return true if two bounding boxes overlap'''
+    '''return true if two bounding boxes overlap. coordinates are lat/lon degrees. x is lat, y is lon'''
     (x1,y1,w1,h1) = bound1
     (x2,y2,w2,h2) = bound2
     if x1+w1 < x2:
         return False
     if x2+w2 < x1:
         return False
-    if y1+h1 < y2:
+    if wrap_180((y1+h1)-y2) < 0:
         return False
-    if y2+h2 < y1:
+    if wrap_180((y2+h2)-y1) < 0:
         return False
     return True
 
