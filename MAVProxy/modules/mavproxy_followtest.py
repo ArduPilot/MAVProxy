@@ -80,22 +80,6 @@ class FollowTestModule(mp_module.MPModule):
         pass
 
 
-    def wrap_180(self, angle):
-        '''wrap an angle to -180..180 degrees'''
-        while angle < -180:
-                angle = 360 + angle
-        while angle >= 180:
-            angle -= 360
-        return angle
-
-    def wrap_360(self, angle):
-        '''wrap an angle to 0..360 degrees'''
-        while angle < 0:
-                angle = 360 + angle
-        while angle >= 360:
-            angle -= 360
-        return angle
-
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         if not self.mpstate.map:
@@ -130,7 +114,7 @@ class FollowTestModule(mp_module.MPModule):
             target_bearing = mp_util.gps_bearing(vehicle[0], vehicle[1], self.target_pos[0], self.target_pos[1])
             # wrap the angle from -180 to 180 thus commanding the vehicle to turn left or right
             # note its in centi-degrees so *100
-            relyaw = self.wrap_180(target_bearing - vehicle_yaw) * 100
+            relyaw = mp_util.wrap_180(target_bearing - vehicle_yaw) * 100
 
             self.master.mav.command_long_send(self.settings.target_system,
                                                   self.settings.target_component,
