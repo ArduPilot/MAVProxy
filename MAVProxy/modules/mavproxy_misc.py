@@ -376,6 +376,8 @@ class MiscModule(mp_module.MPModule):
                 mp_util.decode_devid(self.mav_param[p], p)
             if p.startswith('BARO') and p.endswith('_DEVID'):
                 mp_util.decode_devid(self.mav_param[p], p)
+            if p.startswith('ARSPD') and p.endswith('_DEVID'):
+                mp_util.decode_devid(self.mav_param[p], p)
 
     def cmd_setorigin(self, args):
         '''set global origin'''
