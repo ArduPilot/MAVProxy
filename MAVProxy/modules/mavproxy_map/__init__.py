@@ -26,6 +26,8 @@ class MapModule(mp_module.MPModule):
         self.wp_change_time = 0
         self.fence_change_time = 0
         self.rally_change_time = 0
+        self.sitl_obj_change_time = 0
+        self.sitl_obj_last_change = 1
         self.have_simstate = False
         self.have_vehicle = {}
         self.move_wp = -1
@@ -209,6 +211,8 @@ class MapModule(mp_module.MPModule):
             self.cmd_follow(args)
         elif args[0] == "clear":
             self.cmd_clear(args)
+        elif args[0] == "setprecland":
+            self.cmd_set_precland(args)
         else:
             print("usage: map <icon|set>")
 
@@ -290,6 +294,20 @@ class MapModule(mp_module.MPModule):
                                                                linewidth=2, colour=(0,255,0), popup_menu=popup))
         else:
             self.map.remove_object('Fence')
+
+    def display_sitl_obj(self):
+        """Display sitl object."""
+        from MAVProxy.modules.mavproxy_map import mp_slipmap
+        if self.get_mav_param('SIM_PLD_ENABLE') == 1:
+            lat = self.get_mav_param('SIM_PLD_LAT')
+            lon = self.get_mav_param('SIM_PLD_LON')
+            if lat is not None and lon is not None:
+                rotation = self.get_mav_param('SIM_PLD_YAW')
+                icon = self.map.icon('precland.png')
+                self.map.add_object(mp_slipmap.SlipIcon('PRECLAND_POSITION',
+                                                               (lat, lon),
+                                                               icon, layer=4, rotation=rotation, follow=False))
+                self.sitl_obj_change_time = self.sitl_obj_last_change
 
 
     def closest_waypoint(self, latlon):
@@ -589,6 +607,17 @@ class MapModule(mp_module.MPModule):
             lon, # lon
             alt) # param7
 
+    def cmd_set_precland(self, args):
+        '''called when user selects "Set Precland" on map'''
+        if self.get_mav_param('SIM_PLD_ENABLE') != 1:
+            print("Enable SITL Precland first : param set SIM_PLD_ENABLE 1")
+            return
+        (lat, lon) = (self.mpstate.click_location[0], self.mpstate.click_location[1])
+        print("Setting precland to: ", lat, lon)
+        self.param_set("SIM_PLD_LAT", lat)
+        self.param_set("SIM_PLD_LON", lon)
+        self.sitl_obj_last_change = time.time()
+
     def cmd_set_homepos(self, args):
         '''called when user selects "Set Home" on map'''
         (lat, lon) = (self.mpstate.click_location[0], self.mpstate.click_location[1])
@@ -710,9 +739,13 @@ class MapModule(mp_module.MPModule):
         # in the air at the same time
         vehicle = 'Vehicle%u' % m.get_srcSystem()
 
-        if mtype == "SIMSTATE" and self.map_settings.showsimpos:
-            self.create_vehicle_icon('Sim' + vehicle, 'green')
-            self.map.set_position('Sim' + vehicle, (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
+        if mtype == "SIMSTATE":
+            if not self.have_simstate:
+                self.add_menu(MPMenuItem('Set Precland', 'Set SITL Precland', '# map setprecland '))
+                self.have_simstate = True
+            if self.map_settings.showsimpos:
+                self.create_vehicle_icon('Sim' + vehicle, 'green')
+                self.mpstate.map.set_position('Sim' + vehicle, (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
 
         elif mtype == "AHRS2" and self.map_settings.showahrs2pos:
             self.create_vehicle_icon('AHRS2' + vehicle, 'blue')
@@ -810,6 +843,11 @@ class MapModule(mp_module.MPModule):
         if (self.module('fence') and
             self.fence_change_time != self.module('fence').fenceloader.last_change):
             self.display_fence()
+
+        # if the sitl objects have changed, redisplay
+        if self.have_simstate:
+            if self.sitl_obj_change_time != self.sitl_obj_last_change:
+                self.display_sitl_obj()
 
         # if the rallypoints have changed, redisplay
         if (self.module('rally') and
