@@ -417,6 +417,10 @@ class MavGraph(object):
         for i in range(0, len(self.fields)):
             if mtype not in self.field_types[i]:
                 continue
+            if self.instance_types[i] and hasattr(msg, 'fmt') and hasattr(msg.fmt, 'instance_field'):
+                mtype_instance = '%s[%s]' % (mtype, getattr(msg, msg.fmt.instance_field))
+                if mtype_instance not in self.instance_types[i]:
+                    continue
             f = self.fields[i]
             simple = self.simple_field[i]
             if simple is not None:
@@ -536,6 +540,7 @@ class MavGraph(object):
         self.msg_types = set()
         self.multiplier = []
         self.field_types = []
+        self.instance_types = []
         self.xlim = None
         self.flightmode_list = _flightmodes
 
@@ -546,10 +551,13 @@ class MavGraph(object):
         self.axes = []
         self.first_only = []
         re_caps = re.compile('[A-Z_][A-Z0-9_]+')
+        re_instance = re.compile('[A-Z_][A-Z0-9_]+\[\d+\]')
         for f in self.fields:
             caps = set(re.findall(re_caps, f))
             self.msg_types = self.msg_types.union(caps)
             self.field_types.append(caps)
+            instances = set(re.findall(re_instance, f))
+            self.instance_types.append(instances)
             self.y.append([])
             self.x.append([])
             self.axes.append(1)
