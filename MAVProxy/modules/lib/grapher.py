@@ -417,7 +417,7 @@ class MavGraph(object):
         for i in range(0, len(self.fields)):
             if mtype not in self.field_types[i]:
                 continue
-            if self.instance_types[i] and hasattr(msg, 'fmt') and hasattr(msg.fmt, 'instance_field'):
+            if self.instance_types[i] and hasattr(msg, 'fmt') and hasattr(msg.fmt, 'instance_field') and msg.fmt.instance_field is not None:
                 mtype_instance = '%s[%s]' % (mtype, getattr(msg, msg.fmt.instance_field))
                 if mtype_instance not in self.instance_types[i]:
                     continue
