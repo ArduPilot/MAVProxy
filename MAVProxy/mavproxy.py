@@ -950,9 +950,10 @@ def set_stream_rates():
         else:
             rate = mpstate.settings.streamrate2
         if rate != -1 and mpstate.settings.streamrate != -1:
-            master.mav.request_data_stream_send(mpstate.settings.target_system, mpstate.settings.target_component,
-                                                mavutil.mavlink.MAV_DATA_STREAM_ALL,
-                                                rate, 1)
+            for v in sorted(mpstate.vehicle_list):
+                master.mav.request_data_stream_send(v, mpstate.settings.target_component,
+                                                    mavutil.mavlink.MAV_DATA_STREAM_ALL,
+                                                    rate, 1)
 
 def check_link_status():
     '''check status of master links'''
