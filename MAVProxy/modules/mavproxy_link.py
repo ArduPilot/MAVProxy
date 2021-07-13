@@ -55,10 +55,13 @@ class LinkModule(mp_module.MPModule):
         self.add_completion_function('(LINK)', self.complete_links)
         self.add_completion_function('(HLSTATE)', self.complete_hl)
         self.last_altitude_announce = 0.0
+<<<<<<< HEAD
         self.vehicle_list = set()
         self.high_latency = False
         self.old_streamrate = 0
         self.old_streamrate2 = 0
+=======
+>>>>>>> Link: Move multi-vehicle list to mpstate
 
         self.menu_added_console = False
         if mp_util.has_wxpython:
@@ -250,12 +253,12 @@ class LinkModule(mp_module.MPModule):
     def cmd_alllinks(self, args):
         '''send command on all links'''
         saved_target = self.mpstate.settings.target_system
-        print("Sending to: ", self.vehicle_list)
-        for v in sorted(self.vehicle_list):
+        print("Sending to: ", self.mpstate.vehicle_list)
+        for v in sorted(self.mpstate.vehicle_list):
             self.cmd_vehicle([str(v)])
             self.mpstate.functions.process_stdin(' '.join(args), True)
         self.cmd_vehicle([str(saved_target)])
-        
+                
     def cmd_link_list(self):
         '''list links'''
         print("%u links" % len(self.mpstate.mav_master))
@@ -753,8 +756,8 @@ class LinkModule(mp_module.MPModule):
 
         if type == 'HEARTBEAT' or type == 'HIGH_LATENCY2':
             sysid = msg.get_srcSystem()
-            if not sysid in self.vehicle_list and msg.type != mavutil.mavlink.MAV_TYPE_GCS:
-                self.vehicle_list.add(sysid)
+            if not sysid in self.mpstate.vehicle_list and msg.type != mavutil.mavlink.MAV_TYPE_GCS:
+                self.mpstate.vehicle_list.add(sysid)
 
     def master_callback(self, m, master):
         '''process mavlink message m on master, sending any messages to recipients'''

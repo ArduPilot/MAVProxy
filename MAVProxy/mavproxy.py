@@ -229,6 +229,7 @@ class MPState(object):
         self.click_time = None
         self.vehicle_type = None
         self.vehicle_name = None
+        self.vehicle_list = set()
         from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
         self.settings = MPSettings(
             [ MPSetting('link', int, 1, 'Primary Link', tab='Link', range=(0,4), increment=1),
