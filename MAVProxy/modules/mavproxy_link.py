@@ -47,7 +47,7 @@ class LinkModule(mp_module.MPModule):
                           'remove (LINKS)',
                           'hl (HLSTATE)'])
         self.add_command('vehicle', self.cmd_vehicle, "vehicle control")
-        self.add_command('alllinks', self.cmd_alllinks, "send command on all links")
+        self.add_command('alllinks', self.cmd_alllinks, "send command to all vehicles")
         self.no_fwd_types = set()
         self.no_fwd_types.add("BAD_DATA")
         self.add_completion_function('(SERIALPORT)', self.complete_serial_ports)
