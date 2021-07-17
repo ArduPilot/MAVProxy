@@ -34,6 +34,13 @@
     <expression>CTUN.NavRoll CTUN.Roll CTUN.NavPitch CTUN.Pitch</expression>
   </graph>
 
+  <graph name='Attitude/Circular Angle'>
+  <description>Total circular angle, as limited by ANGLE_MAX in Copter.</description>
+    <expression>sqrt(ATT.Roll*ATT.Roll+ATT.Pitch*ATT.Pitch)</expression>
+    <expression>sqrt(CTUN.Roll*CTUN.Roll+CTUN.Pitch*CTUN.Pitch)</expression>
+    <expression>degrees(sqrt(ATTITUDE.roll*ATTITUDE.roll+ATTITUDE.pitch*ATTITUDE.Pitch))</expression>
+  </graph>
+
   <graph name='Sensors/Accelerometer/Accelerometers'>
     <description>Accelerometer Output</description>
     <expression>RAW_IMU.xacc*9.81*0.001 RAW_IMU.yacc*9.81*0.001 RAW_IMU.zacc*9.81*0.001 gravity(RAW_IMU)</expression>
