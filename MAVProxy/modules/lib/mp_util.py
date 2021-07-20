@@ -9,6 +9,7 @@ import io
 import sys
 import platform
 import warnings
+from math import cos, sin, tan, atan2, sqrt, radians, degrees, pi, log, fmod
 
 # Some platforms (CYGWIN and others) many not have the wx library
 # use imp to see if wx is on the path
@@ -29,53 +30,44 @@ radius_of_earth = 6378100.0 # in meters
 
 def wrap_360(angle):
     '''wrap an angle to 0..360 degrees'''
-    while angle < 0:
-        angle = 360 + angle
-    while angle >= 360:
-        angle -= 360
-    return angle
+    return math.fmod(angle, 360.0)
 
 def wrap_180(angle):
     '''wrap an angle to -180..180 degrees'''
-    while angle < -180:
-        angle = 360 + angle
-    while angle >= 180:
-        angle -= 360
-    return angle
-    
+    if angle >= -180 and angle < 180:
+        return angle
+    a = math.fmod(angle+180, 360.0)-180.0
+    return a
 
 def gps_distance(lat1, lon1, lat2, lon2):
-    '''return distance between two points in meters,
+    '''distance between two points in meters along rhumb line
     coordinates are in degrees
-    thanks to http://www.movable-type.co.uk/scripts/latlong.html'''
-    lat1 = math.radians(lat1)
-    lat2 = math.radians(lat2)
-    lon1 = math.radians(lon1)
-    lon2 = math.radians(lon2)
-    dLat = lat2 - lat1
-    dLon = wrap_valid_longitude(lon2 - lon1)
+    thanks to http://www.movable-type.co.uk/scripts/latlong.html
+    and http://www.edwilliams.org/avform147.htm#Rhumb
+    '''
+    lat1 = radians(lat1)
+    lat2 = radians(lat2)
+    lon1 = radians(lon1)
+    lon2 = radians(lon2)
 
-    a = math.sin(0.5*dLat)**2 + math.sin(0.5*dLon)**2 * math.cos(lat1) * math.cos(lat2)
-    c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0-a))
-    return radius_of_earth * c
-
+    if abs(lat2-lat1) < 1.0e-15:
+        q = cos(lat1)
+    else:
+        q = (lat2-lat1)/log(tan(lat2/2+pi/4)/tan(lat1/2+pi/4))
+    d = sqrt((lat2-lat1)**2 + q**2 * (lon2-lon1)**2)
+    return d * radius_of_earth
 
 def gps_bearing(lat1, lon1, lat2, lon2):
-    '''return bearing between two points in degrees, in range 0-360
+    '''return rhumb bearing between two points in degrees, in range 0-360
     thanks to http://www.movable-type.co.uk/scripts/latlong.html'''
-    lat1 = math.radians(lat1)
-    lat2 = math.radians(lat2)
-    lon1 = math.radians(lon1)
-    lon2 = math.radians(lon2)
-    dLat = lat2 - lat1
-    dLon = wrap_valid_longitude(lon2 - lon1)
-    y = math.sin(dLon) * math.cos(lat2)
-    x = math.cos(lat1)*math.sin(lat2) - math.sin(lat1)*math.cos(lat2)*math.cos(dLon)
-    bearing = math.degrees(math.atan2(y, x))
-    if bearing < 0:
-        bearing += 360.0
-    return bearing
-
+    lat1 = radians(lat1)
+    lat2 = radians(lat2)
+    lon1 = radians(lon1)
+    lon2 = radians(lon2)
+    tc = -fmod(atan2(lon1-lon2,log(tan(lat2/2+pi/4)/tan(lat1/2+pi/4))),2*pi)
+    if tc < 0:
+        tc += 2*pi
+    return degrees(tc)
 
 def wrap_valid_longitude(lon):
     ''' wrap a longitude value around to always have a value in the range
@@ -83,26 +75,42 @@ def wrap_valid_longitude(lon):
     '''
     return (((lon + 180.0) % 360.0) - 180.0)
 
+def constrain(v, minv, maxv):
+    if v < minv:
+        v = minv
+    if v > maxv:
+        v = maxv
+    return v
+
 def gps_newpos(lat, lon, bearing, distance):
     '''extrapolate latitude/longitude given a heading and distance
-    thanks to http://www.movable-type.co.uk/scripts/latlong.html
+    along rhumb line thanks to http://www.movable-type.co.uk/scripts/latlong.html
     '''
-    lat1 = math.radians(lat)
-    lon1 = math.radians(lon)
-    brng = math.radians(bearing)
-    dr = distance/radius_of_earth
+    lat1 = constrain(radians(lat), -pi/2+1.0e-15, pi/2-1.0e-15)
+    lon1 = radians(lon)
+    tc = radians(-bearing)
+    d = distance/radius_of_earth
 
-    lat2 = math.asin(math.sin(lat1)*math.cos(dr) +
-                     math.cos(lat1)*math.sin(dr)*math.cos(brng))
-    lon2 = lon1 + math.atan2(math.sin(brng)*math.sin(dr)*math.cos(lat1),
-                             math.cos(dr)-math.sin(lat1)*math.sin(lat2))
-    return (math.degrees(lat2), wrap_valid_longitude(math.degrees(lon2)))
+    lat = lat1 + d * cos(tc)
+    lat = constrain(lat, -pi/2 + 1.0e-15, pi/2 - 1.0e-15)
+    if abs(lat-lat1) < 1.0e-15:
+        q = cos(lat1)
+    else:
+        try:
+            dphi = log(tan(lat/2+pi/4)/tan(lat1/2+pi/4))
+        except Exception:
+            print(degrees(lat),degrees(lat1))
+            raise
+        q = (lat-lat1)/dphi
+    dlon = -d*sin(tc)/q
+    lon = fmod(lon1+dlon+pi,2*pi)-pi
+    return (degrees(lat), degrees(lon))
 
 def gps_offset(lat, lon, east, north):
     '''return new lat/lon after moving east/north
     by the given number of meters'''
-    bearing = math.degrees(math.atan2(east, north))
-    distance = math.sqrt(east**2 + north**2)
+    bearing = degrees(atan2(east, north))
+    distance = sqrt(east**2 + north**2)
     return gps_newpos(lat, lon, bearing, distance)
 
 
