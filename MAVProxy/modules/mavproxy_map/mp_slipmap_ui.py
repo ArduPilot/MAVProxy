@@ -410,6 +410,8 @@ class MPSlipMapPanel(wx.Panel):
         else:
             (x,y) = (state.width/2, state.height/2)
         (lat,lon) = self.coordinates(x, y)
+        lat = mp_util.constrain(lat, -85, 85)
+        lon = mp_util.constrain(lon, -180, 180)
         state.ground_width *= zoom
         # limit ground_width to sane values
         state.ground_width = max(state.ground_width, 2)
