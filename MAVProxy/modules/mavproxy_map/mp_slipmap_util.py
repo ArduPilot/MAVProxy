@@ -290,17 +290,17 @@ class SlipGrid(SlipObject):
         if ret is False:
             return
         cv2.line(img, pix1, pix2, colour, linewidth)
-        cv2.circle(img, pix2, linewidth*2, colour)
 
     def draw(self, img, pixmapper, bounds):
         '''draw a polygon on the image'''
         if self.hidden:
             return
-        (x,y,w,h) = bounds
+        (lat,lon,w,h) = bounds
+        # note that w and h are in degrees
         spacing = 1000
         while True:
-            start = mp_util.latlon_round((x,y), spacing)
-            dist = mp_util.gps_distance(x,y,x+w,y+h)
+            start = mp_util.latlon_round((lat,lon), spacing)
+            dist = mp_util.gps_distance(lat+h*0.5,lon,lat+h*0.5,lon+w)
             count = int(dist / spacing)
             if count < 2:
                 spacing /= 10
@@ -308,14 +308,17 @@ class SlipGrid(SlipObject):
                 spacing *= 10
             else:
                 break
+        count += 10
 
-        for i in range(count*2+2):
+        for i in range(count):
+            # draw vertical lines of constant longitude
             pos1 = mp_util.gps_newpos(start[0], start[1], 90, i*spacing)
-            pos3 = mp_util.gps_newpos(pos1[0], pos1[1], 0, 3*count*spacing)
+            pos3 = (pos1[0]+h*2, pos1[1])
             self.draw_line(img, pixmapper, pos1, pos3, self.colour, self.linewidth)
 
+            # draw horizontal lines of constant latitude
             pos1 = mp_util.gps_newpos(start[0], start[1], 0, i*spacing)
-            pos3 = mp_util.gps_newpos(pos1[0], pos1[1], 90, 3*count*spacing)
+            pos3 = (pos1[0], pos1[1]+w*2)
             self.draw_line(img, pixmapper, pos1, pos3, self.colour, self.linewidth)
 
 
