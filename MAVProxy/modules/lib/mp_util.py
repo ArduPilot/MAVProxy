@@ -82,6 +82,10 @@ def constrain(v, minv, maxv):
         v = maxv
     return v
 
+def constrain_latlon(latlon):
+    epsilon = 1.0e-3
+    return (constrain(latlon[0],-90+epsilon, 90-epsilon), constrain(latlon[1],-180,180))
+
 def gps_newpos(lat, lon, bearing, distance):
     '''extrapolate latitude/longitude given a heading and distance
     along rhumb line thanks to http://www.movable-type.co.uk/scripts/latlong.html
