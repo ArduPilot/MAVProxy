@@ -7,7 +7,15 @@ some functions are based on code from mapUtils.py in gmapcatcher
 Andrew Tridgell
 May 2012
 released under GNU GPL v3 or later
+
+conventions:
+ - lat,lon is top left corner of area
+ - ground_width is width at top of area
+
+see also:
+  https://wiki.openstreetmap.org/wiki/Zoom_levels
 '''
+
 
 import collections
 import errno
@@ -20,6 +28,8 @@ import string
 import time
 import cv2
 import numpy as np
+
+from math import log, tan, radians, degrees, sin, cos, exp, pi, asin
 
 if sys.version_info.major < 3:
     from urllib2 import Request as url_request
@@ -116,9 +126,9 @@ class TileInfo:
         x = ( tilex + 1.0*offsetx/TILES_WIDTH ) / (world_tiles/2.) - 1
         y = ( tiley + 1.0*offsety/TILES_HEIGHT) / (world_tiles/2.) - 1
         lon = mp_util.wrap_180(x * 180.0)
-        y = math.exp(-y*2*math.pi)
+        y = exp(-y*2*pi)
         e = (y-1)/(y+1)
-        lat = 180.0/math.pi * math.asin(e)
+        lat = 180.0/pi * asin(e)
         return (lat, lon)
 
     def size(self):
@@ -183,7 +193,7 @@ class MPTile:
 
         self.cache_path = cache_path
         self.max_zoom = max_zoom
-        self.min_zoom = 1
+        self.min_zoom = 4
         self.download = download
         self.cache_size = cache_size
         self.tile_delay = tile_delay
@@ -229,9 +239,10 @@ class MPTile:
         world_tiles = 1<<zoom
         lon = mp_util.wrap_180(lon)
         x = world_tiles / 360.0 * (lon + 180.0)
-        tiles_pre_radian = world_tiles / (2 * math.pi)
-        e = math.sin(lat * (1/180.*math.pi))
-        y = world_tiles/2 + 0.5*math.log((1+e)/(1-e)) * (-tiles_pre_radian)
+        tiles_pre_radian = world_tiles / (2 * pi)
+        e = sin(radians(lat))
+        e = mp_util.constrain(e, -1+1.0e-15, 1-1.0e-15)
+        y = world_tiles/2 + 0.5*log((1+e)/(1-e)) * (-tiles_pre_radian)
         offsetx = int((x - int(x)) * TILES_WIDTH)
         offsety = int((y - int(y)) * TILES_HEIGHT)
         return TileInfo((int(x) % world_tiles, int(y) % world_tiles), zoom, self.service, offset=(offsetx, offsety))
@@ -357,6 +368,7 @@ class MPTile:
                 img = cv2.imread(path)
                 if img is None:
                     continue
+                #cv2.rectangle(img, (0,0), (TILES_WIDTH-1,TILES_WIDTH-1), (255,0,0), 1)
                 # add it to the tile cache
                 self._tile_cache[key] = img
                 while len(self._tile_cache) > self.cache_size:
@@ -392,6 +404,7 @@ class MPTile:
         path = self.tile_to_path(tile)
         ret = cv2.imread(path)
         if ret is not None:
+            #cv2.rectangle(ret, (0,0), (TILES_WIDTH-1,TILES_WIDTH-1), (255,0,0), 1)
             # if it is an old tile, then try to refresh
             if os.path.getmtime(path) + self.refresh_age < time.time():
                 try:
@@ -434,35 +447,58 @@ class MPTile:
 
 
     def coord_from_area(self, x, y, lat, lon, width, ground_width):
-        '''return (lat,lon) for a pixel in an area image'''
+        '''return (lat,lon) for a pixel in an area image
+        x is pixel coord to the right from top,left
+        y is pixel coord down from top left
+        '''
+
+        # ground_width is width at (0,0)
+
+        scale1 = mp_util.constrain(cos(radians(lat)), 1.0e-15, 1)
 
         pixel_width = ground_width / float(width)
-        dx = x * pixel_width
+
         dy = y * pixel_width
+        (lat2,lon2) = mp_util.gps_offset(lat, lon, 0, -dy)
 
-        return mp_util.gps_offset(lat, lon, dx, -dy)
+        # iterative form for the latitude change. We should replace this with a closed form
+        # solution
+        pixel_width_equator = (ground_width / float(width)) / cos(radians(lat))
+        latr = radians(lat)
+        for yi in range(max(0,int(y+0.5))):
+            pw = pixel_width_equator * cos(latr)
+            dlatr = pw / mp_util.radius_of_earth
+            latr -= dlatr
+        lat2 = degrees(latr)
 
+        dx = pixel_width_equator * cos(radians(lat2)) * x
+
+        (lat2,lon2) = mp_util.gps_offset(lat2, lon, dx, 0)
+
+        return (lat2,lon2)
 
     def coord_to_pixel(self, lat, lon, width, ground_width, lat2, lon2):
         '''return pixel coordinate (px,py) for position (lat2,lon2)
         in an area image. Note that the results are relative to top,left
-        and may be outside the image'''
-        pixel_width = ground_width / float(width)
+        and may be outside the image
+        ground_width is with at lat,lon
+        px is pixel coord to the right from top,left
+        py is pixel coord down from top left
+        '''
 
-        if lat is None or lon is None or lat2 is None or lon2 is None:
-            return (0,0)
+        pixel_width_equator = (ground_width / float(width)) / cos(radians(lat))
+        latr = radians(lat)
+        lat2r = radians(lat2)
 
-        dx = mp_util.gps_distance(lat, lon, lat, lon2)
-        if mp_util.wrap_180(lon2 - lon) < 0:
+        C = mp_util.radius_of_earth / pixel_width_equator
+        y = C * (log(abs(1.0/cos(latr) + tan(latr))) - log(abs(1.0/cos(lat2r) + tan(lat2r))))
+        y = int(y+0.5)
+
+        dx = mp_util.gps_distance(lat2, lon, lat2, lon2)
+        if mp_util.gps_bearing(lat2, lon, lat2, lon2) > 180:
             dx = -dx
-        dy = mp_util.gps_distance(lat, lon, lat2, lon)
-        if lat2 > lat:
-            dy = -dy
-
-        dx /= pixel_width
-        dy /= pixel_width
-        return (int(dx), int(dy))
-
+        x = int(0.5 + dx / (pixel_width_equator * cos(radians(lat2))))
+        return (x,y)
 
     def area_to_tile_list(self, lat, lon, width, height, ground_width, zoom=None):
         '''return a list of TileInfoScaled objects needed for
@@ -478,7 +514,8 @@ class MPTile:
         ground_height = ground_width * (height/(float(width)))
         top_right = mp_util.gps_newpos(lat, lon, 90, ground_width)
         bottom_left = mp_util.gps_newpos(lat, lon, 180, ground_height)
-        bottom_right = mp_util.gps_newpos(bottom_left[0], bottom_left[1], 90, ground_width)
+        ground_width_bottom = ground_width * cos(radians(lat)) / max(1.0e-15,cos(radians(bottom_left[0])))
+        bottom_right = mp_util.gps_newpos(bottom_left[0], bottom_left[1], 90, ground_width_bottom)
 
         # choose a zoom level if not provided
         if zoom is None:
