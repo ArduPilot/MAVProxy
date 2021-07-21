@@ -581,10 +581,12 @@ class MPTile:
         for t in tlist:
             scaled_tile = self.scaled_tile(t)
 
-            w = min(width - t.dstx, scaled_tile.shape[1] - t.srcx)
-            h = min(height - t.dsty, scaled_tile.shape[0] - t.srcy)
+            w = width - t.dstx
+            h = height - t.dsty
             if w > 0 and h > 0:
                 scaled_tile_roi = scaled_tile[t.srcy:t.srcy+h, t.srcx:t.srcx+w]
+                h = scaled_tile_roi.shape[0]
+                w = scaled_tile_roi.shape[1]
                 img[t.dsty:t.dsty+h, t.dstx:t.dstx+w] = scaled_tile_roi.copy()
 
         # return as an RGB image

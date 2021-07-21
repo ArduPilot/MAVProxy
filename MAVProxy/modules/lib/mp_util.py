@@ -84,7 +84,7 @@ def constrain(v, minv, maxv):
 
 def constrain_latlon(latlon):
     epsilon = 1.0e-3
-    return (constrain(latlon[0],-90+epsilon, 90-epsilon), constrain(latlon[1],-180,180))
+    return (constrain(latlon[0],-90+epsilon, 90-epsilon), wrap_180(latlon[1]))
 
 def gps_newpos(lat, lon, bearing, distance):
     '''extrapolate latitude/longitude given a heading and distance

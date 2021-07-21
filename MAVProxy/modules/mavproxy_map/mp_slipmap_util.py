@@ -304,7 +304,9 @@ class SlipGrid(SlipObject):
         spacing = 1000
         while True:
             start = mp_util.latlon_round((lat,lon), spacing)
-            dist = mp_util.gps_distance(lat+h*0.5,lon,lat+h*0.5,lon+w)
+            lat2 = mp_util.constrain(lat+h*0.5,-85,85)
+            lon2 = mp_util.wrap_180(lon+w)
+            dist = mp_util.gps_distance(lat2,lon,lat2,lon2)
             count = int(dist / spacing)
             if count < 2:
                 spacing /= 10
@@ -312,6 +314,7 @@ class SlipGrid(SlipObject):
                 spacing *= 10
             else:
                 break
+
         count += 10
 
         for i in range(count):
