@@ -214,6 +214,8 @@ class SlipPolygon(SlipObject):
 
     def draw_line(self, img, pixmapper, pt1, pt2, colour, linewidth):
         '''draw a line on the image'''
+        pt1 = mp_util.constrain_latlon(pt1)
+        pt2 = mp_util.constrain_latlon(pt2)
         pix1 = pixmapper(pt1)
         pix2 = pixmapper(pt2)
         (width, height) = image_shape(img)
@@ -283,6 +285,8 @@ class SlipGrid(SlipObject):
 
     def draw_line(self, img, pixmapper, pt1, pt2, colour, linewidth):
         '''draw a line on the image'''
+        pt1 = mp_util.constrain_latlon(pt1)
+        pt2 = mp_util.constrain_latlon(pt2)
         pix1 = pixmapper(pt1)
         pix2 = pixmapper(pt2)
         (width, height) = image_shape(img)
