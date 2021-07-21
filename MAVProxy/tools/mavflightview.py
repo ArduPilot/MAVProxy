@@ -655,6 +655,12 @@ if __name__ == "__main__":
 
     (opts, args) = parser.parse_args()
 
+    try:
+        import faulthandler, signal
+        faulthandler.register(signal.SIGUSR1)
+    except ImportError:
+        pass
+
     if len(args) < 1:
         print("Usage: mavflightview.py [options] <LOGFILE...>")
         sys.exit(1)
