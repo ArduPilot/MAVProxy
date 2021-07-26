@@ -12,10 +12,6 @@ for /f "tokens=*" %%a in (
  ) do (
  set VERSION=%%a
  )
-
-rem -----build the changelog-----
-python.exe createChangelog.py
-
  
 rem -----Upgrade pymavlink if needed-----
 if exist "..\..\pymavlink" (
@@ -50,12 +46,12 @@ rem -----Create version Info-----
 rem -----Download parameter files-----
 cd  ..\
 mkdir Parameters
-powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/APMrover2/apm.pdef.xml' -Destination 'Parameters\APMrover2.xml'"
+powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/APMrover2/apm.pdef.xml' -Destination 'Parameters\Rover.xml'"
 powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/ArduCopter/apm.pdef.xml' -Destination 'Parameters\ArduCopter.xml'"
 powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/ArduPlane/apm.pdef.xml' -Destination 'Parameters\ArduPlane.xml'"
 powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/ArduSub/apm.pdef.xml' -Destination 'Parameters\ArduSub.xml'"
 powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/AntennaTracker/apm.pdef.xml' -Destination 'Parameters\AntennaTracker.xml'"
-powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/APMrover2-defaults.parm' -Destination 'Parameters\APMrover2-defaults.parm'"
+powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/APMrover2-defaults.parm' -Destination 'Parameters\Rover-defaults.parm'"
 powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/ArduCopter-defaults.parm' -Destination 'Parameters\ArduCopter-defaults.parm'"
 powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/ArduPlane-defaults.parm' -Destination 'Parameters\ArduPlane-defaults.parm'"
 powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/ArduSub-defaults.parm' -Destination 'Parameters\ArduSub-defaults.parm'"

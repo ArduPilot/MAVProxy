@@ -1,0 +1,64 @@
+name: Windows Build
+
+on: [push, pull_request, workflow_dispatch]
+concurrency:
+  group: ci-${{github.workflow}}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: 'windows-latest'
+    strategy:
+      matrix:
+        python-version: [3.8]
+        
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install -U wheel
+          python -m pip install -U pywin32 lxml pymavlink numpy matplotlib==3.2.2 pyserial opencv-python PyYAML Pygame Pillow wxpython prompt-toolkit
+          python -m pip install -U pyinstaller==4.3 setuptools packaging 
+      - name: Build MAVProxy
+        run: |
+          python setup.py build install
+          python -m pip list
+      - name: Prepare installer
+        run: |
+          cd MAVProxy
+          copy ..\\windows\\mavproxy.spec
+          pyinstaller --clean mavproxy.spec
+          del mavproxy.spec
+      - name: Download parameters
+        run: |          
+          mkdir Parameters
+          $wc = New-Object System.Net.WebClient
+          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/APMrover2/apm.pdef.xml', 'Parameters\Rover.xml')
+          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/ArduCopter/apm.pdef.xml', 'Parameters\ArduCopter.xml')
+          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/ArduPlane/apm.pdef.xml', 'Parameters\ArduPlane.xml')
+          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/ArduSub/apm.pdef.xml', 'Parameters\ArduSub.xml')
+          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/AntennaTracker/apm.pdef.xml', 'Parameters\AntennaTracker.xml')
+          $wc.DownloadFile('https://autotest.ardupilot.org/Rover-defaults.parm', 'Parameters\Rover-defaults.parm')
+          $wc.DownloadFile('https://autotest.ardupilot.org/Copter-defaults.parm', 'Parameters\ArduCopter-defaults.parm')
+          $wc.DownloadFile('https://autotest.ardupilot.org/Plane-defaults.parm', 'Parameters\ArduPlane-defaults.parm')
+          $wc.DownloadFile('https://autotest.ardupilot.org/Sub-defaults.parm', 'Parameters\ArduSub-defaults.parm')
+      - name: Build installer
+        run: |
+          cd  windows
+          $env:VERSION=$(python returnVersion.py)
+          python returnVersion.py > version.txt
+          ISCC.exe /dMyAppVersion=$env:VERSION mavproxy.iss
+          ls Output
+      - name: Archive build
+        uses: actions/upload-artifact@v2
+        with:
+           name: MAVProxyInstaller
+           path: windows/Output
+           retention-days: 7
