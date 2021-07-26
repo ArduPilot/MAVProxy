@@ -29,7 +29,7 @@ import time
 import cv2
 import numpy as np
 
-from math import log, tan, radians, degrees, sin, cos, exp, pi, asin
+from math import log, tan, radians, degrees, sin, cos, exp, pi, asin, atan
 
 if sys.version_info.major < 3:
     from urllib2 import Request as url_request
@@ -452,24 +452,15 @@ class MPTile:
         y is pixel coord down from top left
         '''
 
-        # ground_width is width at (0,0)
-
         scale1 = mp_util.constrain(cos(radians(lat)), 1.0e-15, 1)
-
         pixel_width = ground_width / float(width)
 
-        dy = y * pixel_width
-        (lat2,lon2) = mp_util.gps_offset(lat, lon, 0, -dy)
-
-        # iterative form for the latitude change. We should replace this with a closed form
-        # solution
         pixel_width_equator = (ground_width / float(width)) / cos(radians(lat))
+
         latr = radians(lat)
-        for yi in range(max(0,int(y+0.5))):
-            pw = pixel_width_equator * cos(latr)
-            dlatr = pw / mp_util.radius_of_earth
-            latr -= dlatr
-        lat2 = degrees(latr)
+        y0 = abs(1.0/cos(latr) + tan(latr))
+        lat2 = 2 * atan(y0 * exp(-(y * pixel_width_equator) / mp_util.radius_of_earth)) - pi/2.0
+        lat2 = degrees(lat2)
 
         dx = pixel_width_equator * cos(radians(lat2)) * x
 
