@@ -477,6 +477,38 @@ def cmd_dump(args):
             continue
         print("%s %s" % (timestring(msg), msg))
     mlog.rewind()
+    
+def cmd_dump_attr(args):
+    '''dump an attribute of a specific message from log'''
+    global xlimits
+    if len(args) < 2:
+        print("Usage: dump_attr MESSAGE attribute")
+        return
+    else:
+        arg_msg = args[0]
+        arg_attribute = args[1]
+    mlog = mestate.mlog
+    mlog.rewind()
+    types = []
+    attribute_types = []
+    for t in mlog.name_to_id.keys():
+        if fnmatch.fnmatch(t, arg_msg):
+            types.extend([t])
+
+    if types == []:
+        print("No message found matching", arg_msg)
+
+    while True:
+        msg = mlog.recv_match(type=types)
+        if msg is None:
+            break
+        in_range = xlimits.timestamp_in_range(msg._timestamp)
+        if in_range < 0:
+            continue
+        if in_range > 0:
+            continue
+        print("%s" % getattr(msg, arg_attribute))
+    mlog.rewind()
 
 mfit_tool = None
 
@@ -963,6 +995,7 @@ command_map = {
     'stats'      : (cmd_stats,     'show statistics on the log'),
     'magfit'     : (cmd_magfit,    'fit mag parameters to WMM'),
     'dump'       : (cmd_dump,      'dump messages from log'),
+    'dump_attr'  : (cmd_dump_attr, 'dump an attribute of a specific message from log'),
     }
 
 def progress_bar(pct):
