@@ -146,7 +146,8 @@ class NtripClient(object):
                 self.socket = None
                 casterResponse = ''
             if sys.version_info.major >= 3:
-                casterResponse = str(casterResponse, 'ascii')
+                # Ignore non ascii characters in HTTP response
+                casterResponse = str(casterResponse, 'ascii', 'ignore')
             header_lines = casterResponse.split("\r\n")
             for line in header_lines:
                 if line == "":
