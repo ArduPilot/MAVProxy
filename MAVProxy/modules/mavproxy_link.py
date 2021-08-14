@@ -32,7 +32,9 @@ preferred_ports = [
     '*Hex_*',
     '*Holybro_*',
     '*mRo*',
-    '*FMU*']
+    '*FMU*',
+    '*Swift-Flyer*',
+]
 
 class LinkModule(mp_module.MPModule):
 
