@@ -1,12 +1,17 @@
 <graphs>
   <graph name="Speed/Ground vs Air Speed">
     <expression>VFR_HUD.groundspeed VFR_HUD.airspeed</expression>
+    <expression>GPS.Spd CTUN.As ARSP.Airspeed</expression>
     <expression>GPS.Spd ARSP.Airspeed</expression>
     <description>
       This shows the ground speed of the vehicle versus its air speed
     </description>
   </graph>
 
+  <graph name="Ground vs Corrected AirSpeed">
+    <expression>GPS.Spd CTUN.As*CTUN.E2T</expression>
+  </graph>
+  
   <graph name="Speed/Ground Speed">
     <expression>VFR_HUD.groundspeed</expression>
     <expression>GPS.Spd</expression>
