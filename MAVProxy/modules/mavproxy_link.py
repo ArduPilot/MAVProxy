@@ -424,6 +424,8 @@ class LinkModule(mp_module.MPModule):
             return
 
         msec = m.time_boot_ms
+        if msec == 0:
+            return
         sysid = m.get_srcSystem()
         compid = m.get_srcComponent()
         highest_msec_key = (sysid,compid)
