@@ -699,6 +699,8 @@ class MapModule(mp_module.MPModule):
                 vname = 'heli'
             elif m.type in [mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER]:
                 vname = 'antenna'
+            elif m.type in [mavutil.mavlink.MAV_TYPE_AIRSHIP]:
+                vname = 'blimp'
             if vname is not None:
                 self.vehicle_type_by_sysid[sysid] = vname
 

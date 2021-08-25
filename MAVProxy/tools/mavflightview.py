@@ -97,12 +97,14 @@ colour_map_plane = {}
 colour_map_rover = {}
 colour_map_tracker = {}
 colour_map_submarine = {}
+colour_map_blimp = {}
 
 for mytuple in ((mavutil.mode_mapping_apm.values(),colour_map_plane),
                 (mavutil.mode_mapping_acm.values(),colour_map_copter),
                 (mavutil.mode_mapping_rover.values(),colour_map_rover),
                 (mavutil.mode_mapping_tracker.values(),colour_map_tracker),
                 (mavutil.mode_mapping_sub.values(),colour_map_submarine),
+                (mavutil.mode_mapping_blimp.values(),colour_map_blimp),
 ):
     (mode_names, colour_map) = mytuple
     i=0
@@ -134,6 +136,8 @@ def colourmap_for_mav_type(mav_type):
         map = colour_map_tracker
     if mav_type == mavutil.mavlink.MAV_TYPE_SUBMARINE:
         map = colour_map_submarine
+    if mav_type == mavutil.mavlink.MAV_TYPE_AIRSHIP:
+        map = colour_map_blimp
     if map is None:
         print("No colormap for mav_type=%u" % (mav_type,))
         # we probably don't have a valid mode map, so returning

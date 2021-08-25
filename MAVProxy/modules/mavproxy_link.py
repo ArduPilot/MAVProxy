@@ -586,6 +586,9 @@ class LinkModule(mp_module.MPModule):
             elif m.type in [mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER]:
                 self.mpstate.vehicle_type = 'antenna'
                 self.mpstate.vehicle_name = 'AntennaTracker'
+            elif m.type in [mavutil.mavlink.MAV_TYPE_AIRSHIP]:
+                self.mpstate.vehicle_type = 'blimp'
+                self.mpstate.vehicle_name = 'Blimp'
 
         elif mtype == 'STATUSTEXT':
 
