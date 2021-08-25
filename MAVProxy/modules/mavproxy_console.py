@@ -197,6 +197,8 @@ class ConsoleModule(mp_module.MPModule):
             return "Heli"
         if hb.type == mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER:
             return "Tracker"
+        if hb.type == mavutil.mavlink.MAV_TYPE_AIRSHIP:
+            return "Blimp"
         return "UNKNOWN(%u)" % hb.type
 
     def component_type_string(self, hb):
