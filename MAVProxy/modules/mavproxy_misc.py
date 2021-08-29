@@ -76,6 +76,7 @@ class MiscModule(mp_module.MPModule):
         self.add_command('time', self.cmd_time, "show autopilot time")
         self.add_command('shell', self.cmd_shell, "run shell command")
         self.add_command('changealt', self.cmd_changealt, "change target altitude")
+        self.add_command('changealt_abs', self.cmd_changealt_abs, "change target absolute altitude")
         self.add_command('land', self.cmd_land, "auto land")
         self.add_command('repeat', self.cmd_repeat, "repeat a command at regular intervals",
                          ["<add|remove|clear>"])
@@ -227,6 +228,21 @@ class MiscModule(mp_module.MPModule):
                                           0, 0, relalt)
         print("Sent change altitude command for %.1f meters" % relalt)
 
+    def cmd_changealt_abs(self, args):
+        '''change target altitude'''
+        if len(args) < 1:
+            print("usage: changealt <relaltitude>")
+            return
+        absalt = float(args[0])
+        self.master.mav.mission_item_send(self.settings.target_system,
+                                          self.settings.target_component,
+                                          0,
+                                          0,
+                                          mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
+                                          3, 1, 0, 0, 0, 0,
+                                          0, 0, absalt)
+        print("Sent change altitude command for %.1f meters" % absalt)
+        
     def cmd_land(self, args):
         '''auto land commands'''
         if len(args) < 1:
