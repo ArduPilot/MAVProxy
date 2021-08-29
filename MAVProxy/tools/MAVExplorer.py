@@ -284,7 +284,11 @@ def load_graph_xml(xml, filename, load_all=False):
         expressions = [e.text for e in g.expression]
         if load_all:
             if not name in names:
-                ret.append(GraphDefinition(name, expressions[0], g.description.text, expressions, filename))
+                if hasattr(g,'description'):
+                    description = g.description.text
+                else:
+                    description = ''
+                ret.append(GraphDefinition(name, expressions[0], description, expressions, filename))
             names.add(name)
             continue
         if have_graph(name):
@@ -292,7 +296,11 @@ def load_graph_xml(xml, filename, load_all=False):
         for e in expressions:
             e = xml_unescape(e)
             if expression_ok(e):
-                ret.append(GraphDefinition(name, e, g.description.text, expressions, filename))
+                if hasattr(g,'description'):
+                    description = g.description.text
+                else:
+                    description = ''
+                ret.append(GraphDefinition(name, e, description, expressions, filename))
                 break
     return ret
 
