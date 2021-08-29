@@ -41,7 +41,7 @@ class LinkModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(LinkModule, self).__init__(mpstate, "link", "link control", public=True, multi_vehicle=True)
         self.add_command('link', self.cmd_link, "link control",
-                         ["<list|ports>",
+                         ["<list|ports|resetstats>",
                           'add (SERIALPORT)',
                           'attributes (LINK) (ATTRIBUTES)',
                           'remove (LINKS)',
@@ -139,8 +139,10 @@ class LinkModule(mp_module.MPModule):
                 print("Usage: link remove LINK")
                 return
             self.cmd_link_remove(args[1:])
+        elif args[0] == "resetstats":
+            self.reset_link_stats()
         else:
-            print("usage: link <list|add|remove|attributes|hl>")
+            print("usage: link <list|add|remove|attributes|hl|resetstats>")
             
     def cmd_hl(self, args):
         '''Toggle high latency mode'''
@@ -235,6 +237,15 @@ class LinkModule(mp_module.MPModule):
                                                                                     master.packet_loss(),
                                                                                     self.status.bytecounters['MasterIn'][master.linknum].rate(),
                                                                                     sign_string))
+
+
+    def reset_link_stats(self):
+        '''reset link statistics'''
+        for master in self.mpstate.mav_master:
+            self.status.counters['MasterIn'][master.linknum] = 0
+            self.status.bytecounters['MasterIn'][master.linknum].__init__()
+            master.mav_loss = 0
+            master.mav_count = 0
 
     def cmd_alllinks(self, args):
         '''send command on all links'''
