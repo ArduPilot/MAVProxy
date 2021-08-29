@@ -8,8 +8,9 @@
     </description>
   </graph>
 
-  <graph name="Ground vs Corrected AirSpeed">
+  <graph name="Speed/Ground vs Corrected AirSpeed">
     <expression>GPS.Spd CTUN.As*CTUN.E2T</expression>
+    <description>Airspeed correction</description>
   </graph>
   
   <graph name="Speed/Ground Speed">
