@@ -98,6 +98,7 @@ class MiscModule(mp_module.MPModule):
         self.add_command('setorigin', self.cmd_setorigin, "set global origin")
         self.add_command('magsetfield', self.cmd_magset_field, "set expected mag field by field")
         self.add_command('magresetofs', self.cmd_magreset_ofs, "reset offsets for all compasses")
+        self.add_command('namedvaluefloat', self.cmd_namedvaluefloat, "send a NAMED_VALUE_FLOAT")
         self.repeats = []
 
     def altitude_difference(self, pressure1, pressure2, ground_temp):
@@ -474,7 +475,16 @@ class MiscModule(mp_module.MPModule):
         self.param_set('COMPASS_ODI3_X', 0)
         self.param_set('COMPASS_ODI3_Y', 0)
         self.param_set('COMPASS_ODI3_Z', 0)
-        
+
+    def cmd_namedvaluefloat(self, args):
+        '''send a NAMED_VALUE_FLOAT'''
+        if len(args) < 2:
+            print("Usage: namedvaluefloat NAME value")
+            return
+        tnow_ms = int((time.time() - self.mpstate.start_time_s)*1000)
+        name = args[0]
+        value = float(args[1])
+        self.master.mav.named_value_float_send(tnow_ms, name.encode("utf-8"), value)
 
     def idle_task(self):
         '''called on idle'''
