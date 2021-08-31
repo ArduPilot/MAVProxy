@@ -8,9 +8,11 @@ from MAVProxy.modules.lib import win_layout
 class ConsoleFrame(wx.Frame):
     """ The main frame of the console"""
 
-    def __init__(self, state, title):
+    def __init__(self, state, title, ico=None):
         self.state = state
         wx.Frame.__init__(self, None, title=title, size=(800,300))
+        if ico is not None:
+            self.SetIcon(ico.get_ico())
         self.panel = wx.Panel(self)
         self.panel.SetBackgroundColour('white')
         state.frame = self

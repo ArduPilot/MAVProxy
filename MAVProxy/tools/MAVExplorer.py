@@ -26,6 +26,7 @@ from pymavlink import mavutil
 from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
 from MAVProxy.modules.lib import wxsettings
 from MAVProxy.modules.lib.graphdefinition import GraphDefinition
+from MAVProxy.modules.lib import icon
 from lxml import objectify
 import pkg_resources
 from builtins import input
@@ -86,7 +87,7 @@ class MEState(object):
     def __init__(self):
         self.input_queue = multiproc.Queue()
         self.rl = None
-        self.console = wxconsole.MessageConsole(title='MAVExplorer')
+        self.console = wxconsole.MessageConsole(title='MAVExplorer', ico=icon.SimpleIcon("EXPLORER"))
         self.exit = False
         self.status = MEStatus()
         self.settings = MPSettings(

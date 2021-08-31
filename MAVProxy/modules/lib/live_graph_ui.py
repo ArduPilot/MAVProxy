@@ -1,4 +1,5 @@
 from MAVProxy.modules.lib.wx_loader import wx
+from MAVProxy.modules.lib import icon
 import time
 import numpy, pylab
 
@@ -8,6 +9,7 @@ class GraphFrame(wx.Frame):
 
     def __init__(self, state):
         wx.Frame.__init__(self, None, -1, state.title)
+        self.SetIcon(icon.SimpleIcon().get_ico())
         self.state = state
         self.data = []
         for i in range(len(state.fields)):

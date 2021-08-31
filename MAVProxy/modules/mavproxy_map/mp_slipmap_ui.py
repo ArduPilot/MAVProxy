@@ -30,6 +30,7 @@ from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipFollowObject
 
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import win_layout
+from MAVProxy.modules.lib import icon
 
 from MAVProxy.modules.lib.mp_menu import MPMenuCheckbox
 from MAVProxy.modules.lib.mp_menu import MPMenuItem
@@ -44,6 +45,7 @@ class MPSlipMapFrame(wx.Frame):
     """
     def __init__(self, state):
         wx.Frame.__init__(self, None, wx.ID_ANY, state.title)
+        self.SetIcon(icon.SimpleIcon("MAP").get_ico())
         self.state = state
         state.frame = self
         state.grid = True
