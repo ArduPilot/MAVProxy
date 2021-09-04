@@ -81,6 +81,14 @@ def mavfft_display(mlog, timestamp_in_range):
             else:
                 return "?Unknown Sensor Type?"
 
+        def units(self):
+            if self.sensor_type == 0:
+                return "cm/s/s/Hz"
+            elif self.sensor_type == 1:
+                return "rad/s/hz"
+            else:
+                return "Unknown Units"
+
         def tag(self):
             return str(self)
 
@@ -125,6 +133,7 @@ def mavfft_display(mlog, timestamp_in_range):
 
     sum_fft = {}
     freqmap = {}
+    unit = {}
     count = 0
 
     first_freq = None
@@ -148,6 +157,7 @@ def mavfft_display(mlog, timestamp_in_range):
             count += 1
             freq = numpy.fft.rfftfreq(len(d), 1.0/thing_to_plot.sample_rate_hz)
             freqmap[thing_to_plot.tag()] = freq
+            unit[thing_to_plot.tag()] = thing_to_plot.units()
 
     for sensor in sum_fft:
         pylab.figure(str(sensor))
@@ -155,5 +165,6 @@ def mavfft_display(mlog, timestamp_in_range):
             pylab.plot(freqmap[sensor], numpy.abs(sum_fft[sensor][axis]/count), label=axis)
         pylab.legend(loc='upper right')
         pylab.xlabel('Hz')
+        pylab.ylabel(str(sensor) + ' Magnitude  (' + unit[sensor] + ')')
 
     pylab.show()
