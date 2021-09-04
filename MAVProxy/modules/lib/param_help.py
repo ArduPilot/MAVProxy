@@ -7,6 +7,8 @@ class ParamHelp:
     def __init__(self):
         self.xml_filepath = None
         self.vehicle_name = None
+        self.last_pair = (None,None)
+        self.last_htree = None
 
     def param_help_download(self):
         '''download XML files for parameters'''
@@ -31,6 +33,8 @@ class ParamHelp:
 
     def param_help_tree(self):
         '''return a "help tree", a map between a parameter and its metadata.  May return None if help is not available'''
+        if self.last_pair == (self.xml_filepath, self.vehicle_name):
+            return self.last_htree
         if self.xml_filepath is not None:
             print("param: using xml_filepath=%s" % self.xml_filepath)
             path = self.xml_filepath
@@ -57,6 +61,8 @@ class ParamHelp:
             for p in lib.param:
                 n = p.get('name')
                 htree[n] = p
+        self.last_htree = htree
+        self.last_pair = (self.xml_filepath, self.vehicle_name)
         return htree
 
     def param_set_xml_filepath(self, args):
@@ -87,7 +93,52 @@ class ParamHelp:
             return []
         vchild = children[0]
         return vchild.getchildren()
-            
+
+    def get_bitmask_from_help(self, help):
+        if not hasattr(help, 'field'):
+            return None
+        field = help.field
+        if not hasattr(field, 'attrib'):
+            return None
+        if field.attrib.get('name',None) != 'Bitmask':
+            return None
+        a = str(field).split(',')
+        ret = {}
+        for v in a:
+            a2 = v.split(':')
+            if len(a2) == 2:
+                ret[a2[0]] = a2[1]
+        return ret
+
+    def param_info(self, param, value):
+        '''return info string for a param value'''
+        htree = self.param_help_tree()
+        if htree is None:
+            return
+        param = param.upper()
+        if not param in htree:
+            return None
+        help = htree[param]
+        try:
+            bitmask = self.get_bitmask_from_help(help)
+            if bitmask is not None:
+                v = []
+                for k in bitmask.keys():
+                    if int(value) & (1<<int(k)):
+                        v.append(bitmask[k])
+                return '|'.join(v)
+        except Exception as e:
+            print(e)
+            pass
+        try:
+            values = self.get_Values_from_help(help)
+            for v in values:
+                if int(v.get('code')) == int(value):
+                    return v
+        except Exception as e:
+            pass
+        return None
+
     def param_help(self, args):
         '''show help on a parameter'''
         if len(args) == 0:
