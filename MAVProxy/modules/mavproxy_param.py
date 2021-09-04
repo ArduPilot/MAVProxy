@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 '''param command handling'''
 
-import time, os, fnmatch, time, struct, sys
+import time, os, fnmatch, struct, sys
 from pymavlink import mavutil, mavparm
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
-from MAVProxy.modules.lib import multiproc
+from MAVProxy.modules.lib import param_help
 if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import *
 
@@ -29,7 +29,6 @@ class ParamState:
         self.vehicle_name = vehicle_name
         self.parm_file = parm_file
         self.fetch_set = None
-        self.xml_filepath = None
         self.new_sysid_timestamp = time.time()
         self.autopilot_type_by_sysid = {}
         self.param_types = {}
@@ -39,6 +38,8 @@ class ParamState:
         self.ftp_send_param = None
         self.mpstate = mpstate
         self.sysid = sysid
+        self.param_help = param_help.ParamHelp()
+        self.param_help.vehicle_name = vehicle_name
 
     def use_ftp(self):
         '''return true if we should try ftp for download'''
@@ -142,162 +143,11 @@ class ParamState:
                         self.fetch_set.add(idx)
                         count += 1
 
-    def param_help_download(self):
-        '''download XML files for parameters'''
-        files = []
-        for vehicle in ['Rover', 'ArduCopter', 'ArduPlane', 'ArduSub', 'AntennaTracker']:
-            url = 'http://autotest.ardupilot.org/Parameters/%s/apm.pdef.xml.gz' % vehicle
-            path = mp_util.dot_mavproxy("%s.xml" % vehicle)
-            files.append((url, path))
-            url = 'http://autotest.ardupilot.org/%s-defaults.parm' % vehicle
-            if vehicle != 'AntennaTracker':
-                # defaults not generated for AntennaTracker ATM
-                path = mp_util.dot_mavproxy("%s-defaults.parm" % vehicle)
-                files.append((url, path))
-        try:
-            child = multiproc.Process(target=mp_util.download_files, args=(files,))
-            child.start()
-        except Exception as e:
-            print(e)
-
     def param_use_xml_filepath(self, filepath):
-        self.xml_filepath = filepath
-
-    def param_help_tree(self):
-        '''return a "help tree", a map between a parameter and its metadata.  May return None if help is not available'''
-        if self.xml_filepath is not None:
-            print("param: using xml_filepath=%s" % self.xml_filepath)
-            path = self.xml_filepath
-        else:
-            if self.vehicle_name is None:
-                print("Unknown vehicle type")
-                return None
-            path = mp_util.dot_mavproxy("%s.xml" % self.vehicle_name)
-            if not os.path.exists(path):
-                print("Please run 'param download' first (vehicle_name=%s)" % self.vehicle_name)
-                return None
-        if not os.path.exists(path):
-            print("Param XML (%s) does not exist" % path)
-            return None
-        xml = open(path,'rb').read()
-        from lxml import objectify
-        objectify.enable_recursive_str()
-        tree = objectify.fromstring(xml)
-        htree = {}
-        for p in tree.vehicles.parameters.param:
-            n = p.get('name').split(':')[1]
-            htree[n] = p
-        for lib in tree.libraries.parameters:
-            for p in lib.param:
-                n = p.get('name')
-                htree[n] = p
-        return htree
+        self.param_help.xml_filepath = filepath
 
     def param_set_xml_filepath(self, args):
-        self.xml_filepath = args[0]
-
-    def param_apropos(self, args):
-        '''search parameter help for a keyword, list those parameters'''
-        if len(args) == 0:
-            print("Usage: param apropos keyword")
-            return
-
-        htree = self.param_help_tree()
-        if htree is None:
-            return
-
-        contains = {}
-        for keyword in args:
-            keyword = keyword.lower()
-            for param in htree.keys():
-                if str(htree[param]).lower().find(keyword) != -1:
-                    contains[param] = True
-        for param in contains.keys():
-            print("%s" % (param,))
-
-    def param_check(self, args):
-        '''Check through parameters for obvious misconfigurations'''
-        problems_found = False
-        htree = self.param_help_tree()
-        if htree is None:
-            return
-        for param in self.mav_param.keys():
-            if param.startswith("SIM_"):
-                # no documentation for these ATM
-                continue
-            value = self.mav_param[param]
-#            print("%s: %s" % (param, str(value)))
-            try:
-                help = htree[param]
-            except KeyError:
-                print("%s: not found in documentation" % (param,))
-                problems_found = True
-                continue
-
-            # we'll ignore the Values field if there's a bitmask field
-            # involved as they're usually just examples.
-            has_bitmask = False
-            for f in getattr(help, "field", []):
-                if f.get('name') == "Bitmask":
-                    has_bitmask = True
-                    break
-            if not has_bitmask:
-                values = self.get_Values_from_help(help)
-                if len(values) == 0:
-                    # no prescribed values list
-                    continue
-                value_values = [float(x.get("code")) for x in values]
-                if value not in value_values:
-                    print("%s: value %f not in Values (%s)" %
-                          (param, value, str(value_values)))
-                    problems_found = True
-
-        if problems_found:
-            print("Remember to `param download` before trusting the checking!  Also, remember that parameter documentation is for *master*!")
-
-    def get_Values_from_help(self, help):
-        children = help.getchildren()
-        if len(children) == 0:
-            return []
-        vchild = children[0]
-        return vchild.getchildren()
-
-    def param_help(self, args):
-        '''show help on a parameter'''
-        if len(args) == 0:
-            print("Usage: param help PARAMETER_NAME")
-            return
-
-        htree = self.param_help_tree()
-        if htree is None:
-            return
-
-        for h in args:
-            h = h.upper()
-            if h in htree:
-                help = htree[h]
-                print("%s: %s\n" % (h, help.get('humanName')))
-                print(help.get('documentation'))
-                try:
-                    print("\n")
-                    for f in help.field:
-                        print("%s : %s" % (f.get('name'), str(f)))
-                except Exception as e:
-                    pass
-                try:
-                    # The entry "values" has been blatted by a cython
-                    # function at this point, so we instead get the
-                    # "values" by offset rather than name.
-                    values = self.get_Values_from_help(help)
-                    if len(values):
-                        print("\nValues: ")
-                        for v in values:
-                            print("\t%s : %s" % (v.get('code'), str(v)))
-                except Exception as e:
-                    print("Caught exception %s" % repr(e))
-                    pass
-            else:
-                print("Parameter '%s' not found in documentation" % h)
+        self.param_use_xml_filepath(args[0])
 
     def status(self, master, mpstate):
         return(len(self.mav_param_set), self.mav_param_count)
@@ -576,13 +426,13 @@ class ParamState:
                 param_wildcard = "*"
             self.ftp_load(args[1].strip('"'), param_wildcard, master)
         elif args[0] == "download":
-            self.param_help_download()
+            self.param_help.param_help_download()
         elif args[0] == "apropos":
-            self.param_apropos(args[1:])
+            self.param_help.param_apropos(args[1:])
         elif args[0] == "check":
-            self.param_check(args[1:])
+            self.param_help.param_check(self.mav_param, args[1:])
         elif args[0] == "help":
-            self.param_help(args[1:])
+            self.param_help.param_help(args[1:])
         elif args[0] == "set_xml_filepath":
             self.param_set_xml_filepath(args[1:])
         elif args[0] == "show":
@@ -736,7 +586,7 @@ class ParamModule(mp_module.MPModule):
             if os.path.exists(parmfile):
                 mpstate.mav_param.load(parmfile)
                 self.pstate[sysid].mav_param_set = set(self.mav_param.keys())
-        self.pstate[sysid].xml_filepath = self.xml_filepath
+        self.pstate[sysid].param_help.xml_filepath = self.xml_filepath
 
     def get_sysid(self):
         '''get sysid tuple to use for parameters'''
@@ -768,6 +618,7 @@ class ParamModule(mp_module.MPModule):
         self.check_new_target_system()
         sysid = self.get_sysid()
         self.pstate[sysid].vehicle_name = self.vehicle_name
+        self.pstate[sysid].param_help.vehicle_name = self.vehicle_name
         self.pstate[sysid].fetch_check(self.master)
         if self.module('console') is not None and not self.menu_added_console:
             self.menu_added_console = True

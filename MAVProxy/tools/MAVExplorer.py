@@ -18,6 +18,7 @@ from math import *
 from MAVProxy.modules.lib import multiproc
 from MAVProxy.modules.lib import rline
 from MAVProxy.modules.lib import wxconsole
+from MAVProxy.modules.lib import param_help
 from MAVProxy.modules.lib.graph_ui import Graph_UI
 from pymavlink.mavextra import *
 from MAVProxy.modules.lib.mp_menu import *
@@ -104,13 +105,15 @@ class MEState(object):
             )
 
         self.mlog = None
+        self.mav_param = None
         self.filename = None
         self.command_map = command_map
         self.completions = {
             "set"       : ["(SETTING)"],
             "condition" : ["(VARIABLE)"],
             "graph"     : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)'],
-            "map"       : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)']
+            "map"       : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)'],
+            "param"     : ['download', 'check', 'help (PARAMETER)'],
             }
         self.aliases = {}
         self.graphs = []
@@ -121,6 +124,7 @@ class MEState(object):
         self.parent_pipe_recv_console,self.child_pipe_send_console = multiproc.Pipe(duplex=False)
         #pipe for creating graphs (such as from the save dialog box)
         self.parent_pipe_recv_graph,self.child_pipe_send_graph = multiproc.Pipe(duplex=False)
+        self.param_help = param_help.ParamHelp()
         
         tConsoleWrite = threading.Thread(target=self.pipeRecvConsole)
         tConsoleWrite.daemon = True
@@ -758,9 +762,29 @@ def cmd_messages(args):
             print("%s %s" % (timestring(m), mstr))
     mestate.mlog.rewind()
 
+def set_vehicle_name():
+    mapping = { mavutil.mavlink.MAV_TYPE_GROUND_ROVER : "Rover",
+                mavutil.mavlink.MAV_TYPE_FIXED_WING : "ArduPlane",
+                mavutil.mavlink.MAV_TYPE_QUADROTOR : "ArduCopter",
+                mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER : "AntennaTracker",
+                mavutil.mavlink.MAV_TYPE_SUBMARINE : "ArduSub",
+                }
+    mestate.param_help.vehicle_name = mapping.get(mestate.mlog.mav_type, None)
+
 def cmd_param(args):
     '''show parameters'''
     if len(args) > 0:
+        if args[0] == 'help':
+            set_vehicle_name()
+            mestate.param_help.param_help(args[1:])
+            return
+        if args[0] == 'download':
+            mestate.param_help.param_help_download()
+            return
+        if args[0] == 'check':
+            set_vehicle_name()
+            mestate.param_help.param_check(mestate.mlog.params, args[1:])
+            return
         wildcard = args[0]
     else:
         wildcard = '*'
@@ -863,6 +887,8 @@ def loadfile(args):
 
     global flightmodes
     flightmodes = mlog.flightmode_list()
+
+    mestate.mav_param = mlog.params
 
     setup_menus()
 
