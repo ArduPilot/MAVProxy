@@ -14,6 +14,7 @@ import os
 import fnmatch
 import threading
 import shlex
+import traceback
 from math import *
 from MAVProxy.modules.lib import multiproc
 from MAVProxy.modules.lib import rline
@@ -101,6 +102,7 @@ class MEState(object):
               MPSetting('legend', str, 'upper left', 'legend position'),
               MPSetting('legend2', str, 'upper right', 'legend2 position'),
               MPSetting('title', str, None, 'Graph title'),
+              MPSetting('debug', int, 0, 'debug level'),
               ]
             )
 
@@ -132,7 +134,7 @@ class MEState(object):
         tGraphWrite = threading.Thread(target=self.pipeRecvGraph)
         tGraphWrite.daemon = True
         tGraphWrite.start()
-                
+
     def pipeRecvConsole(self):
         '''watch for piped data from save dialog'''
         try:
@@ -380,6 +382,8 @@ def cmd_graph(args):
     else:
         expression = ' '.join(args)
         mestate.last_graph = GraphDefinition(mestate.settings.title, expression, '', [expression], None)
+    if mestate.settings.debug > 0:
+        print("Adding graph: %s" % mestate.last_graph.expression)
     grui.append(Graph_UI(mestate))
     grui[-1].display_graph(mestate.last_graph, flightmode_colours())
     global xlimits
@@ -921,6 +925,15 @@ def process_stdin(line):
         fn(args[1:])
     except Exception as e:
         print("ERROR in command %s: %s" % (args[1:], str(e)))
+        if mestate.settings.debug > 0:
+            if sys.version_info[0] >= 3:
+                ret = "%s\n" % e
+                ret += ''.join(traceback.format_exception(etype=type(e),
+                                                        value=e,
+                                                        tb=e.__traceback__))
+                print(ret)
+            else:
+                print(traceback.format_exc(e))
 
 def input_loop():
     '''wait for user input'''
