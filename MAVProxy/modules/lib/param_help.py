@@ -111,9 +111,6 @@ class ParamHelp:
                 except Exception as e:
                     pass
                 try:
-                    # The entry "values" has been blatted by a cython
-                    # function at this point, so we instead get the
-                    # "values" by offset rather than name.
                     values = self.get_Values_from_help(help)
                     if len(values):
                         print("\nValues: ")
