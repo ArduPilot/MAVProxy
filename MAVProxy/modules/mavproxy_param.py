@@ -436,15 +436,32 @@ class ParamState:
         elif args[0] == "set_xml_filepath":
             self.param_set_xml_filepath(args[1:])
         elif args[0] == "show":
+            verbose = False
             if len(args) > 1:
                 pattern = args[1]
+                if len(args) > 2 and args[2] == '-v':
+                    verbose = True
             else:
                 pattern = "*"
-            self.mav_param.show(pattern)
+            self.param_show(pattern, verbose)
         elif args[0] == "status":
             print("Have %u/%u params" % (len(self.mav_param_set), self.mav_param_count))
         else:
             print(usage)
+
+    def param_show(self, pattern, verbose):
+        '''show parameters'''
+        k = sorted(self.mav_param.keys())
+        for p in k:
+            name = str(p).upper()
+            if fnmatch.fnmatch(name, pattern.upper()):
+                value = self.mav_param.get(name)
+                s = "%-16.16s %s" % (name, value)
+                if verbose:
+                    info = self.param_help.param_info(name, value)
+                    if info is not None:
+                        s = "%-28.28s # %s" % (s, info)
+                print(s)
 
     def ftp_upload_callback(self, dlen):
         '''callback on ftp put completion'''
