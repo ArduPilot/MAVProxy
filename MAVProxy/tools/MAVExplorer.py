@@ -778,6 +778,7 @@ def set_vehicle_name():
 
 def cmd_param(args):
     '''show parameters'''
+    verbose = False
     if len(args) > 0:
         if args[0] == 'help':
             set_vehicle_name()
@@ -791,12 +792,20 @@ def cmd_param(args):
             mestate.param_help.param_check(mestate.mlog.params, args[1:])
             return
         wildcard = args[0]
+        if len(args) > 1 and args[1] == "-v":
+            set_vehicle_name()
+            verbose = True
     else:
         wildcard = '*'
     k = sorted(mestate.mlog.params.keys())
     for p in k:
         if fnmatch.fnmatch(str(p).upper(), wildcard.upper()):
-            print("%-16.16s %f" % (str(p), mestate.mlog.params[p]))
+            s = "%-16.16s %f" % (str(p), mestate.mlog.params[p])
+            if verbose:
+                info = mestate.param_help.param_info(p, mestate.mlog.params[p])
+                if info is not None:
+                    s += " # %s" % info
+            print(s)
 
 def cmd_paramchange(args):
     '''show param changes'''
