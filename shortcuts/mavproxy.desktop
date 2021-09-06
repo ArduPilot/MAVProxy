@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Terminal=true
+Exec=mavproxy.py --console --map
+Name=MAVProxy
+Icon=mavproxy
+Comment=MAVProxy GCS
+
