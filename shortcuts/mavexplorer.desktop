@@ -2,7 +2,7 @@
 Version=1.0
 Type=Application
 Terminal=true
-Exec=MAVExplorer.py
+Exec=bash -c 'export PATH="$PATH:~/.local/bin"; MAVExplorer.py %F'
 Name=MAVExplorer
 Icon=mavexplorer
 Comment=MAVExplorer Log Analyzer
