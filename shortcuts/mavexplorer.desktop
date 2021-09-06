@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Terminal=true
+Exec=MAVExplorer.py
+Name=MAVExplorer
+Icon=mavexplorer
+Comment=MAVExplorer Log Analyzer
+
