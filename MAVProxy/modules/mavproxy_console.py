@@ -14,7 +14,6 @@ from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import wxsettings
 from MAVProxy.modules.lib.mp_menu import *
-from MAVProxy.modules.lib import icon
 
 class DisplayItem:
     def __init__(self, fmt, expression, row):
@@ -38,7 +37,7 @@ class ConsoleModule(mp_module.MPModule):
         self.user_added = {}
         self.safety_on = False
         self.add_command('console', self.cmd_console, "console module", ['add','list','remove'])
-        mpstate.console = wxconsole.MessageConsole(title='Console', ico=icon.SimpleIcon("CONSOLE"))
+        mpstate.console = wxconsole.MessageConsole(title='Console')
 
         # setup some default status information
         mpstate.console.set_status('Mode', 'UNKNOWN', row=0, fg='blue')

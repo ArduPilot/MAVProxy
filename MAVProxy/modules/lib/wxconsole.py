@@ -16,11 +16,9 @@ class MessageConsole(textconsole.SimpleConsole):
     a message console for MAVProxy
     '''
     def __init__(self,
-                 title='MAVProxy: console',
-                 ico=None):
+                 title='MAVProxy: console'):
         textconsole.SimpleConsole.__init__(self)
         self.title = title
-        self.ico = ico
         self.menu_callback = None
         self.parent_pipe_recv,self.child_pipe_send = multiproc.Pipe(duplex=False)
         self.child_pipe_recv,self.parent_pipe_send = multiproc.Pipe(duplex=False)
@@ -43,7 +41,7 @@ class MessageConsole(textconsole.SimpleConsole):
         from MAVProxy.modules.lib.wx_loader import wx
         from MAVProxy.modules.lib.wxconsole_ui import ConsoleFrame
         app = wx.App(False)
-        app.frame = ConsoleFrame(state=self, title=self.title, ico=self.ico)
+        app.frame = ConsoleFrame(state=self, title=self.title)
         app.frame.SetDoubleBuffered(True)
         app.frame.Show()
         app.MainLoop()

@@ -4,15 +4,19 @@ from MAVProxy.modules.lib import mp_menu
 from MAVProxy.modules.lib.wxconsole_util import Value, Text
 from MAVProxy.modules.lib.wx_loader import wx
 from MAVProxy.modules.lib import win_layout
+from MAVProxy.modules.lib import icon
 
 class ConsoleFrame(wx.Frame):
     """ The main frame of the console"""
 
-    def __init__(self, state, title, ico=None):
+    def __init__(self, state, title):
         self.state = state
         wx.Frame.__init__(self, None, title=title, size=(800,300))
-        if ico is not None:
-            self.SetIcon(ico.get_ico())
+        # different icons for MAVExplorer and MAVProxy
+        if title == "MAVExplorer":
+            self.SetIcon(icon.SimpleIcon("EXPLORER").get_ico())
+        else:
+            self.SetIcon(icon.SimpleIcon("CONSOLE").get_ico())
         self.panel = wx.Panel(self)
         self.panel.SetBackgroundColour('white')
         state.frame = self
