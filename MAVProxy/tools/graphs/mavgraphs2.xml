@@ -17,11 +17,25 @@
 
  <graph name='Sensors/Accelerometer/Vibration'>
   <description>This shows the raw vibration values before filtering in the accelerometers. If you see values above 50 m/s/s then you should redo your vibration isolation system</description>
+  <expression>VIBE[0].VibeX VIBE[0].VibeY VIBE[0].VibeZ</expression>
   <expression>VIBE.VibeX VIBE.VibeY VIBE.VibeZ</expression>
  </graph>
 
+  <graph name='Sensors/Accelerometer/Vibration IMU2'>
+  <description>This shows the raw vibration values before filtering in the accelerometers. If you see values above 50 m/s/s then you should redo your vibration isolation system</description>
+  <expression>VIBE[1].VibeX VIBE[1].VibeY VIBE[1].VibeZ</expression>
+ </graph>
+
+  <graph name='Sensors/Accelerometer/Vibration IMU3'>
+  <description>This shows the raw vibration values before filtering in the accelerometers. If you see values above 50 m/s/s then you should redo your vibration isolation system</description>
+  <expression>VIBE[2].VibeX VIBE[2].VibeY VIBE[2].VibeZ</expression>
+ </graph>
+ 
  <graph name='Sensors/Accelerometer/Clipping'>
   <description>This shows the clipping count for the accelerometers. A clipping event is when any axis of an accelerometer goes above 16g. You should only see clipping events if the vehicle hits a surface very hard, such as a crash or hard landing. If you see any clipping events (the clipping value rising) in flight then you should redo your vibration isolation system</description>
+  <expression>VIBE[0].Clip VIBE[1].Clip VIBE[2].Clip</expression>
+  <expression>VIBE[0].Clip VIBE[1].Clip</expression>
+  <expression>VIBE[0].Clip</expression>
   <expression>VIBE.Clip0 VIBE.Clip1 VIBE.Clip2</expression>
  </graph>
 
