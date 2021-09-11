@@ -9,7 +9,10 @@ class GraphFrame(wx.Frame):
 
     def __init__(self, state):
         wx.Frame.__init__(self, None, -1, state.title)
-        self.SetIcon(icon.SimpleIcon().get_ico())
+        try:
+            self.SetIcon(icon.SimpleIcon().get_ico())
+        except Exception:
+            pass
         self.state = state
         self.data = []
         for i in range(len(state.fields)):

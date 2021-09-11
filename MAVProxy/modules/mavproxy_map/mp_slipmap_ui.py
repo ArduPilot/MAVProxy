@@ -45,7 +45,10 @@ class MPSlipMapFrame(wx.Frame):
     """
     def __init__(self, state):
         wx.Frame.__init__(self, None, wx.ID_ANY, state.title)
-        self.SetIcon(icon.SimpleIcon("MAP").get_ico())
+        try:
+            self.SetIcon(icon.SimpleIcon("MAP").get_ico())
+        except Exception:
+            pass
         self.state = state
         state.frame = self
         state.grid = True

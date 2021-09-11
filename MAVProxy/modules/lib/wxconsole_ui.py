@@ -13,10 +13,13 @@ class ConsoleFrame(wx.Frame):
         self.state = state
         wx.Frame.__init__(self, None, title=title, size=(800,300))
         # different icons for MAVExplorer and MAVProxy
-        if title == "MAVExplorer":
-            self.SetIcon(icon.SimpleIcon("EXPLORER").get_ico())
-        else:
-            self.SetIcon(icon.SimpleIcon("CONSOLE").get_ico())
+        try:
+            if title == "MAVExplorer":
+                self.SetIcon(icon.SimpleIcon("EXPLORER").get_ico())
+            else:
+                self.SetIcon(icon.SimpleIcon("CONSOLE").get_ico())
+        except Exception:
+            pass
         self.panel = wx.Panel(self)
         self.panel.SetBackgroundColour('white')
         state.frame = self
