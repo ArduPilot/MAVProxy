@@ -1,6 +1,7 @@
 <graphs>
   <graph name="Speed/Ground vs Air Speed">
     <expression>VFR_HUD.groundspeed VFR_HUD.airspeed</expression>
+    <expression>GPS[0].Spd GPS[1].Spd CTUN.As ARSP.Airspeed</expression>
     <expression>GPS.Spd CTUN.As ARSP.Airspeed</expression>
     <expression>GPS.Spd ARSP.Airspeed</expression>
     <description>
@@ -9,6 +10,7 @@
   </graph>
 
   <graph name="Speed/Ground vs Corrected AirSpeed">
+    <expression>GPS[0].Spd GPS[1].Spd CTUN.As*CTUN.E2T</expression>
     <expression>GPS.Spd CTUN.As*CTUN.E2T</expression>
     <description>Airspeed correction</description>
   </graph>
