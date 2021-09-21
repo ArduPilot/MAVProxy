@@ -161,6 +161,14 @@ class LogModule(mp_module.MPModule):
         self.download_queue = sorted(self.entries, key=lambda id: self.entries[id].time_utc)
         self.log_download_next()
 
+    def log_download_from(self,fromnum = 0):
+        if len(self.entries.keys()) == 0:
+            print("Please use log list first")
+            return
+        self.download_queue = sorted(self.entries, key=lambda id: self.entries[id].time_utc)
+        self.download_queue = self.download_queue[fromnum:len(self.download_queue)]
+        self.log_download_next()
+
     def log_download(self, log_num, filename):
         '''download a log file'''
         print("Downloading log %u as %s" % (log_num, filename))
@@ -210,10 +218,15 @@ class LogModule(mp_module.MPModule):
 
         elif args[0] == "download":
             if len(args) < 2:
-                print("usage: log download all | log download <lognumber> <filename>")
+                print("usage: log download all | log download <lognumber> <filename> | log download from <lognumber>")
                 return
             if args[1] == 'all':
                 self.log_download_all()
+                return
+            if args[1] == 'from':
+                if len(args) < 2:
+                    args[2] == 0
+                self.log_download_from(int(args[2]))
                 return
             if args[1] == 'latest':
                 if len(self.entries.keys()) == 0:
