@@ -390,4 +390,21 @@
   <expression>PIDS.P PIDS.I PIDS.D</expression>
  </graph>
 
+ <graph name='Servos/X8 Mean Motor Yaw CCW-CW'>
+  <description>Average motor contibution to yaw</description>
+  <expression>(RCOU.C5+RCOU.C7+RCOU.C1+RCOU.C3)/4 (RCOU.C6+RCOU.C8+RCOU.C4+RCOU.C2)/4</expression>
+  <label>CCW(C1,C3,C5,C7) CW(C2,C4,C6,C8)</label>
+ </graph>
+
+  <graph name='Servos/X8 Mean Roll P-SB'>
+  <description>Average motor contibution to Roll</description>
+  <expression>(RCOU.C2+RCOU.C5+RCOU.C3+RCOU.C8)/4 (RCOU.C1+RCOU.C6+RCOU.C4+RCOU.C7)/4</expression>
+  <label>Port(C2,C3,C5,C8) Starboard(C1,C4,C6,C7)</label>
+ </graph>
+
+  <graph name='Servos/X8 Mean Pitch Rear-Fwd'>
+  <description>Average motor contibution to Pitch</description>
+  <expression>(RCOU.C3+RCOU.C8+RCOU.C4+RCOU.C7)/4 (RCOU.C2+RCOU.C5+RCOU.C1+RCOU.C6)/4</expression>
+  <label>Rear(C3,C4,C7,C8) Forward(C1,C2,C5,C6)</label>
+ </graph>
 </graphs>
