@@ -306,7 +306,11 @@ def load_graph_xml(xml, filename, load_all=False):
                     description = g.description.text
                 else:
                     description = ''
-                ret.append(GraphDefinition(name, e, description, expressions, filename))
+                # add a legend label overide if the xml feild has been populated
+                label_overide = None
+                if hasattr(g,'label'):
+                    label_overide = g.label.text
+                ret.append(GraphDefinition(name, e, description, expressions, filename, label_overide))
                 break
     return ret
 
@@ -379,6 +383,17 @@ def cmd_graph(args):
         # write desciption to console
         if g.description:
             mestate.console.write("%s\n" % g.description, fg='blue')
+        # check for label overides. These were defined using <label> in the .xml files.
+        label = []
+        if g.label_override is not None:
+            label = g.label_override.split()
+            # only add the label override if the number of labels matches the number of expressions
+            if len(label) == len(args):
+                # amend the expression to add the label overide syntax
+                amended = ''
+                for j,e in enumerate(args):
+                    amended = '%s %s<%s>' % (amended,e,label[j])
+                g.expression = amended
         mestate.rl.add_history("graph %s" % ' '.join(expression.split()))
         mestate.last_graph = g
     else:
