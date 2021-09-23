@@ -15,6 +15,7 @@ import sys
 from pymavlink import mavutil
 import errno
 import time
+import math
 
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
