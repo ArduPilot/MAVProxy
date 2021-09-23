@@ -370,11 +370,13 @@ def cmd_graph(args):
         print(usage)
         return
     if args[0][0] == ':':
+        # then this is a predefined graph from an xml file
         i = int(args[0][1:])
         g = mestate.graphs[i]
         expression = g.expression
         args = expression.split()
         mestate.console.write("Added graph: %s\n" % g.name)
+        # write desciption to console
         if g.description:
             mestate.console.write("%s\n" % g.description, fg='blue')
         mestate.rl.add_history("graph %s" % ' '.join(expression.split()))
