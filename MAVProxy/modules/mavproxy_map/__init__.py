@@ -691,7 +691,9 @@ class MapModule(mp_module.MPModule):
             elif m.type in [mavutil.mavlink.MAV_TYPE_QUADROTOR,
                             mavutil.mavlink.MAV_TYPE_HEXAROTOR,
                             mavutil.mavlink.MAV_TYPE_OCTOROTOR,
-                            mavutil.mavlink.MAV_TYPE_TRICOPTER]:
+                            mavutil.mavlink.MAV_TYPE_TRICOPTER,
+                            mavutil.mavlink.MAV_TYPE_DODECAROTOR,
+                            mavutil.mavlink.MAV_TYPE_DECAROTOR]:
                 vname = 'copter'
             elif m.type in [mavutil.mavlink.MAV_TYPE_COAXIAL]:
                 vname = 'singlecopter'
