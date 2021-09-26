@@ -47,7 +47,7 @@ class CmdlongModule(mp_module.MPModule):
             print("Take Off started")
             self.master.mav.command_long_send(
                 self.settings.target_system,  # target_system
-                mavutil.mavlink.MAV_COMP_ID_SYSTEM_CONTROL, # target_component
+                self.settings.target_component, # target_component
                 mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, # command
                 0, # confirmation
                 0, # param1
@@ -171,7 +171,7 @@ class CmdlongModule(mp_module.MPModule):
             print("SPEED %s" % (str(speed)))
             self.master.mav.command_long_send(
                 self.settings.target_system,  # target_system
-                mavutil.mavlink.MAV_COMP_ID_SYSTEM_CONTROL, # target_component
+                self.settings.target_component, # target_component
                 mavutil.mavlink.MAV_CMD_DO_CHANGE_SPEED, # command
                 0, # confirmation
                 0, # param1
@@ -195,7 +195,7 @@ class CmdlongModule(mp_module.MPModule):
             print("ANGLE %s" % (str(angle)))
             self.master.mav.command_long_send(
                 self.settings.target_system,  # target_system
-                mavutil.mavlink.MAV_COMP_ID_SYSTEM_CONTROL, # target_component
+                self.settings.target_component, # target_component
                 mavutil.mavlink.MAV_CMD_CONDITION_YAW, # command
                 0, # confirmation
                 angle, # param1 (angle value)
