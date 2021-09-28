@@ -80,10 +80,10 @@ class RCSetupModule(mp_module.MPModule):
 
     def cmd_rctrim(self, args):
         '''set RCx_TRIM'''
-        if not 'RC_CHANNELS_RAW' in self.status.msgs:
-            print("No RC_CHANNELS_RAW to trim with")
+        if not 'RC_CHANNELS' in self.status.msgs:
+            print("No RC_CHANNELS to trim with")
             return
-        m = self.status.msgs['RC_CHANNELS_RAW']
+        m = self.status.msgs['RC_CHANNELS']
         for ch in range(1,5):
             self.param_set('RC%u_TRIM' % ch, getattr(m, 'chan%u_raw' % ch))
 
