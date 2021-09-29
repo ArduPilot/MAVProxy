@@ -314,6 +314,7 @@ class MPState(object):
         self.functions = MAVFunctions()
         self.select_extra = {}
         self.continue_mode = False
+        self.params_from_file = False
         self.aliases = {}
         import platform
         self.system = platform.system()
@@ -1236,6 +1237,7 @@ if __name__ == '__main__':
     parser.add_option("--mavversion", type='choice', choices=['1.0', '2.0'] , help="Force MAVLink Version (1.0, 2.0). Otherwise autodetect version")
     parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
     parser.add_option("-c", "--continue", dest='continue_mode', action='store_true', default=False, help="continue logs")
+    parser.add_option("--no_params_upload", dest='params_auto_upload', action='store_false', default=True, help="No params auto upload")
     parser.add_option("--dialect",  default="ardupilotmega", help="MAVLink dialect")
     parser.add_option("--rtscts",  action='store_true', help="enable hardware RTS/CTS flow control")
     parser.add_option("--moddebug",  type=int, help="module debug level", default=0)
@@ -1282,6 +1284,7 @@ if __name__ == '__main__':
     mpstate.status.exit = False
     mpstate.command_map = command_map
     mpstate.continue_mode = opts.continue_mode
+    mpstate.params_auto_upload = opts.params_auto_upload
     # queues for logging
     mpstate.logqueue = Queue.Queue()
     mpstate.logqueue_raw = Queue.Queue()

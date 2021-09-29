@@ -114,7 +114,7 @@ class ParamState:
                 if self.logdir is not None:
                     self.mav_param.save(os.path.join(self.logdir, self.parm_file), '*', verbose=True)
                 self.fetch_set = None
-            if self.fetch_set is not None and len(self.fetch_set) == 0:
+            if self.fetch_set is not None and len(self.fetch_set) == 0 and self.mpstate.params_auto_upload:
                 self.fetch_check(master, force=True)
         elif m.get_type() == 'HEARTBEAT':
             if m.get_srcComponent() == 1:
@@ -126,7 +126,7 @@ class ParamState:
         if self.param_period.trigger() or force:
             if master is None:
                 return
-            if len(self.mav_param_set) == 0 and not self.ftp_started:
+            if len(self.mav_param_set) == 0 and not self.ftp_started and self.mpstate.params_auto_upload:
                 if not self.use_ftp():
                     master.param_fetch_all()
                 else:
@@ -573,6 +573,10 @@ class ParamModule(mp_module.MPModule):
                                                     handler=MPMenuCallFileDialog(flags=('open',),
                                                                                  title='Param Load',
                                                                                  wildcard='ParmFiles(*.parm,*.param)|*.parm;*.param')),
+                                         MPMenuItem('Preload', 'Preload', '# param preload ',
+                                                    handler=MPMenuCallFileDialog(flags=('open',),
+                                                                                 title='Param Preload',
+                                                                                 wildcard='ParmFiles(*.parm,*.param)|*.parm;*.param')),
                                          MPMenuItem('Save', 'Save', '# param save ',
                                                     handler=MPMenuCallFileDialog(flags=('save', 'overwrite_prompt'),
                                                                                  title='Param Save',
@@ -601,7 +605,7 @@ class ParamModule(mp_module.MPModule):
         if self.continue_mode and self.logdir is not None:
             parmfile = os.path.join(self.logdir, fname)
             if os.path.exists(parmfile):
-                mpstate.mav_param.load(parmfile)
+                self.mpstate.mav_param.load(parmfile)
                 self.pstate[sysid].mav_param_set = set(self.mav_param.keys())
         self.pstate[sysid].param_help.xml_filepath = self.xml_filepath
 
