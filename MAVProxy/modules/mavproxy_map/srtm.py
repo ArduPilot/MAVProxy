@@ -68,7 +68,8 @@ class SRTMDownloader():
                  directory="/SRTM/",
                  cachedir=None,
                  offline=0,
-                 debug=False):
+                 debug=False,
+                 use_http=False):
 
         if cachedir is None:
             try:
@@ -98,6 +99,7 @@ class SRTMDownloader():
                 r"([NS])(\d{2})([EW])(\d{3})\.hgt\.zip")
         self.filelist_file = os.path.join(self.cachedir, "filelist_python")
         self.min_filelist_len = 14500
+        self.use_http = use_http
 
     def loadFileList(self):
         """Load a previously created file list or create a new one if none is
@@ -137,7 +139,10 @@ class SRTMDownloader():
         '''fetch a URL with redirect handling'''
         tries = 0
         while tries < 5:
-                conn = httplib.HTTPSConnection(self.server)
+                if self.use_http:
+                    conn = httplib.HTTPConnection(self.server)
+                else:
+                    conn = httplib.HTTPSConnection(self.server)
                 conn.request("GET", url)
                 r1 = conn.getresponse()
                 if r1.status in [301, 302, 303, 307]:
@@ -481,9 +486,10 @@ if __name__ == '__main__':
     parser.add_argument("--lat", type=float, default=-35.363261)
     parser.add_argument("--lon", type=float, default=149.165230)
     parser.add_argument("--debug", action='store_true', default=False)
+    parser.add_argument("--use-http", action='store_true', default=False)
     args = parser.parse_args()
 
-    downloader = SRTMDownloader(debug=args.debug)
+    downloader = SRTMDownloader(debug=args.debug, use_http=args.use_http)
     downloader.loadFileList()
     import time
     from math import floor
