@@ -55,13 +55,9 @@ class LinkModule(mp_module.MPModule):
         self.add_completion_function('(LINK)', self.complete_links)
         self.add_completion_function('(HLSTATE)', self.complete_hl)
         self.last_altitude_announce = 0.0
-<<<<<<< HEAD
-        self.vehicle_list = set()
         self.high_latency = False
         self.old_streamrate = 0
         self.old_streamrate2 = 0
-=======
->>>>>>> Link: Move multi-vehicle list to mpstate
 
         self.menu_added_console = False
         if mp_util.has_wxpython:
