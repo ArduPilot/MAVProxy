@@ -84,6 +84,12 @@ class MPSlipMapFrame(wx.Frame):
                 MPMenuItem('Brightness -\tCtrl+Shift+B',
                            'Decrease Brightness',
                            'decreaseBrightness'),
+                MPMenuItem('Zoom +\t+',
+                           'Zoom In',
+                           'zoomIn'),
+                MPMenuItem('Zoom -\t-',
+                           'Zoom Out',
+                           'zoomOut'),
                 MPMenuCheckbox('Download Tiles\tCtrl+D',
                                'Enable Tile Download',
                                'toggleDownload',
@@ -140,6 +146,10 @@ class MPSlipMapFrame(wx.Frame):
             state.brightness -= 20
             if state.brightness < -255:
                 state.brightness = -255
+        elif ret.returnkey == 'zoomIn':
+            state.panel.change_zoom(1.0/1.2)
+        elif ret.returnkey == 'zoomOut':
+            state.panel.change_zoom(1.2)
         state.need_redraw = True
 
     def find_object(self, key, layers):
