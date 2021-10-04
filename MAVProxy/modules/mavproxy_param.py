@@ -19,11 +19,17 @@ except ImportError:
 class ParamState:
     '''this class is separated to make it possible to use the parameter
        functions on a secondary connection'''
+    IDLE              = 0
+    FETCHING_ALL      = 1
+    FETCHING_ONE      = 2
+    
     def __init__(self, mav_param, logdir, vehicle_name, parm_file, mpstate, sysid):
+        self.fetch_state = ParamState.IDLE
         self.mav_param_set = set()
         self.mav_param_count = 0
         self.param_period = mavutil.periodic_event(1)
         self.fetch_one = dict()
+        self.preloaded = set()
         self.mav_param = mav_param
         self.logdir = logdir
         self.vehicle_name = vehicle_name
@@ -93,6 +99,7 @@ class ParamState:
             # Note: the xml specifies param_index is a uint16, so -1 in that field will show as 65535
             # We accept both -1 and 65535 as 'unknown index' to future proof us against someday having that
             # xml fixed.
+            self.preloaded.discard(m.param_id)
             if self.fetch_set is not None:
                 self.fetch_set.discard(m.param_index)
             if m.param_index != -1 and m.param_index != 65535 and m.param_index not in self.mav_param_set:
@@ -110,6 +117,7 @@ class ParamState:
                 else:
                     print("%s = %s" % (param_id, str(value)))
             if added_new_parameter and len(self.mav_param_set) == m.param_count:
+                self.fetch_state = ParamState.IDLE
                 print("Received %u parameters" % m.param_count)
                 if self.logdir is not None:
                     self.mav_param.save(os.path.join(self.logdir, self.parm_file), '*', verbose=True)
@@ -126,23 +134,25 @@ class ParamState:
         if self.param_period.trigger() or force:
             if master is None:
                 return
-            if len(self.mav_param_set) == 0 and not self.ftp_started:
+            if len(self.mav_param_set) == 0 and not self.ftp_started and (self.mpstate.params_auto_fetch or not self.fetch_state == ParamState.IDLE):
                 if not self.use_ftp():
                     master.param_fetch_all()
                 else:
                     self.ftp_start()
-            elif not self.ftp_started and self.mav_param_count != 0 and len(self.mav_param_set) != self.mav_param_count:
+                self.fetch_state = ParamState.FETCHING_ALL
+            elif not self.ftp_started and self.mav_param_count != 0 and (len(self.mav_param_set) != self.mav_param_count) and (self.mpstate.params_auto_fetch  or not self.fetch_state == ParamState.IDLE):
                 if master.time_since('PARAM_VALUE') >= 1 or force:
                     diff = set(range(self.mav_param_count)).difference(self.mav_param_set)
                     count = 0
                     while len(diff) > 0 and count < 10:
                         idx = diff.pop()
                         master.param_fetch_one(idx)
+                        self.fetch_state = ParamState.FETCHING_ONE
                         if self.fetch_set is None:
                             self.fetch_set = set()
                         self.fetch_set.add(idx)
                         count += 1
-
+ 
     def param_use_xml_filepath(self, filepath):
         self.param_help.xml_filepath = filepath
 
@@ -162,6 +172,7 @@ class ParamState:
         self.ftp_started = True
         self.ftp_count = None
         ftp.cmd_get(["@PARAM/param.pck"], callback=self.ftp_callback, callback_progress=self.ftp_callback_progress)
+        self.fetch_state = ParamState.FETCHING_ALL
 
     def log_params(self, params):
         '''log PARAM_VALUE messages so that we can extract parameters from a tlog when using ftp download'''
@@ -213,6 +224,8 @@ class ParamState:
     def ftp_callback(self, fh):
         '''callback from ftp fetch of parameters'''
         self.ftp_started = False
+        self.fetch_state = ParamState.IDLE
+        
         if fh is None:
             # the fetch failed
             self.ftp_failed = True
@@ -277,6 +290,7 @@ class ParamState:
             return
         self.param_types = {}
         self.mav_param_set = set()
+        self.preloaded = set()
         self.fetch_one = dict()
         self.fetch_set = None
         self.mav_param.clear()
@@ -305,6 +319,7 @@ class ParamState:
             self.mav_param_set = set()
         else:
             self.ftp_start()
+        self.fetch_state = ParamState.FETCHING_ALL
 
     def handle_command(self, master, mpstate, args):
         '''handle parameter commands'''
@@ -320,12 +335,14 @@ class ParamState:
                     print("Requested parameter list (ftp)")
                 else:
                     print("Requested parameter list")
+                self.fetch_state = ParamState.FETCHING_ALL
             else:
                 found = False
                 pname = args[1].upper()
                 for p in self.mav_param.keys():
                     if fnmatch.fnmatch(p, pname):
                         master.param_fetch_one(p)
+                        self.fetch_state = ParamState.FETCHING_ONE
                         if p not in self.fetch_one:
                             self.fetch_one[p] = 0
                         self.fetch_one[p] += 1
@@ -333,12 +350,14 @@ class ParamState:
                         print("Requested parameter %s" % p)
                 if not found and args[1].find('*') == -1:
                     master.param_fetch_one(pname)
+                    self.fetch_state = ParamState.FETCHING_ONE
                     if pname not in self.fetch_one:
                         self.fetch_one[pname] = 0
                     self.fetch_one[pname] += 1
                     print("Requested parameter %s" % pname)
         elif args[0] == "ftp":
             self.ftp_start()
+            self.fetch_state = ParamState.FETCHING_ALL
 
         elif args[0] == "save":
             if len(args) < 2:
@@ -402,11 +421,15 @@ class ParamState:
             else:
                 param_wildcard = "*"
             self.mav_param.load(args[1].strip('"'), param_wildcard, master)
+            self.fetch_state = ParamState.LOADED
         elif args[0] == "preload":
             if len(args) < 2:
                 print("Usage: param preload <filename>")
                 return
             self.mav_param.load(args[1].strip('"'))
+            self.preloaded = set()
+            for param_name in self.mav_param.keys():
+              self.preloaded.add(param_name)
         elif args[0] == "forceload":
             if len(args) < 2:
                 print("Usage: param forceload <filename> [wildcard]")
@@ -416,6 +439,7 @@ class ParamState:
             else:
                 param_wildcard = "*"
             self.mav_param.load(args[1].strip('"'), param_wildcard, master, check=False)
+            self.fetch_state = ParamState.FORCE_LOADED
         elif args[0] == "ftpload":
             if len(args) < 2:
                 print("Usage: param ftpload <filename> [wildcard]")
@@ -425,6 +449,7 @@ class ParamState:
             else:
                 param_wildcard = "*"
             self.ftp_load(args[1].strip('"'), param_wildcard, master)
+            self.fetch_state = ParamState.LOADED
         elif args[0] == "download":
             self.param_help.param_help_download()
         elif args[0] == "apropos":
@@ -572,6 +597,10 @@ class ParamModule(mp_module.MPModule):
                                          MPMenuItem('Load', 'Load', '# param load ',
                                                     handler=MPMenuCallFileDialog(flags=('open',),
                                                                                  title='Param Load',
+                                                                                 wildcard='ParmFiles(*.parm,*.param)|*.parm;*.param')),
+                                         MPMenuItem('Preload', 'Preload', '# param preload ',
+                                                    handler=MPMenuCallFileDialog(flags=('open',),
+                                                                                 title='Param Preload',
                                                                                  wildcard='ParmFiles(*.parm,*.param)|*.parm;*.param')),
                                          MPMenuItem('Save', 'Save', '# param save ',
                                                     handler=MPMenuCallFileDialog(flags=('save', 'overwrite_prompt'),
