@@ -399,6 +399,8 @@ def decode_devid(devid, pname):
         0x10 : "IST8308",
         0x11 : "RM3100",
         0x12 : "RM3100_2",
+        0x13 : "MMC5883",
+        0x14 : "AK09918",
         }
 
     imu_types = {
