@@ -979,7 +979,8 @@ def main_loop():
                 xlimits.last_xlim = xlim
                 from dateutil.tz import tzlocal
                 localtimezone = tzlocal()
-                tzofs = localtimezone.utcoffset(datetime.datetime.now()).total_seconds()
+                tbase = matplotlib.dates.num2epoch(xlim[0])
+                tzofs = localtimezone.utcoffset(datetime.datetime.utcfromtimestamp(tbase)).total_seconds()
                 xlimits.xlim_low = matplotlib.dates.num2epoch(xlim[0]) - tzofs
                 xlimits.xlim_high = matplotlib.dates.num2epoch(xlim[1]) - tzofs
                 
