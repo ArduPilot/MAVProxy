@@ -71,7 +71,7 @@ class MPSlipMap():
         self._callbacks = set()
 
         # ensure the map application is ready before returning
-        if not self._wait_ready(timeout=2.0):
+        if not self._wait_ready(timeout=5.0):
             raise Exception("map not ready")
 
     def child_task(self):
