@@ -342,6 +342,7 @@ class LinkModule(mp_module.MPModule):
         self.mpstate.mav_master.append(conn)
         self.status.counters['MasterIn'].append(0)
         self.status.bytecounters['MasterIn'].append(self.status.ByteCounter())
+        self.mpstate.vehicle_link_map[conn.linknum] = set(())
         try:
             mp_util.child_fd_list_add(conn.port.fileno())
         except Exception:
@@ -409,10 +410,15 @@ class LinkModule(mp_module.MPModule):
         self.mpstate.mav_master.pop(i)
         self.status.counters['MasterIn'].pop(i)
         self.status.bytecounters['MasterIn'].pop(i)
+        del self.mpstate.vehicle_link_map[conn.linknum]
         # renumber the links
+        vehicle_link_map_reordered = {}
         for j in range(len(self.mpstate.mav_master)):
             conn = self.mpstate.mav_master[j]
+            map_old = self.mpstate.vehicle_link_map[conn.linknum]
             conn.linknum = j
+            vehicle_link_map_reordered[j] = map_old
+        self.mpstate.vehicle_link_map = vehicle_link_map_reordered
 
     def get_usec(self):
         '''time since 1970 in microseconds'''
@@ -754,19 +760,22 @@ class LinkModule(mp_module.MPModule):
 
     def mavlink_packet(self, msg):
         '''handle an incoming mavlink packet'''
-        type = msg.get_type()
-
-        if type == 'HEARTBEAT' or type == 'HIGH_LATENCY2':
-            sysid = msg.get_srcSystem()
-            if not sysid in self.vehicle_list and msg.type != mavutil.mavlink.MAV_TYPE_GCS:
-                self.vehicle_list.add(sysid)
+        pass
 
     def master_callback(self, m, master):
         '''process mavlink message m on master, sending any messages to recipients'''
-
-        # see if it is handled by a specialised sysid connection
         sysid = m.get_srcSystem()
         mtype = m.get_type()
+
+        if mtype in ['HEARTBEAT', 'HIGH_LATENCY2'] and m.type != mavutil.mavlink.MAV_TYPE_GCS:
+            compid = m.get_srcComponent()
+            if sysid not in self.vehicle_list:
+                self.vehicle_list.add(sysid)
+            if (sysid, compid) not in self.mpstate.vehicle_link_map[master.linknum]:
+                self.mpstate.vehicle_link_map[master.linknum].add((sysid, compid))
+                print("Detected vehicle {0}:{1} on link {2}".format(sysid, compid, master.linknum))
+
+        # see if it is handled by a specialised sysid connection
         if sysid in self.mpstate.sysid_outputs:
             self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
             if mtype == "GLOBAL_POSITION_INT":
