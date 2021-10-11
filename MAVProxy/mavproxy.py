@@ -304,6 +304,11 @@ class MPState(object):
         self.mav_outputs = []
         self.sysid_outputs = {}
 
+        # Mapping of all detected sysid's to links
+        # Key is link id, value is all detected sysid's/compid's in that link
+        # Dict of self.vehicle_link_map[linknumber] = set([(sysid1,compid1), (sysid2,compid2), ...])
+        self.vehicle_link_map = {}
+
         # SITL output
         self.sitl_output = None
 
@@ -949,9 +954,11 @@ def set_stream_rates():
         else:
             rate = mpstate.settings.streamrate2
         if rate != -1 and mpstate.settings.streamrate != -1:
-            master.mav.request_data_stream_send(mpstate.settings.target_system, mpstate.settings.target_component,
-                                                mavutil.mavlink.MAV_DATA_STREAM_ALL,
-                                                rate, 1)
+            # Send to all detected vehicles in this link
+            for (sysid, compid) in mpstate.vehicle_link_map[master.linknum]:
+                master.mav.request_data_stream_send(sysid, compid,
+                                                    mavutil.mavlink.MAV_DATA_STREAM_ALL,
+                                                    rate, 1)
 
 def check_link_status():
     '''check status of master links'''
