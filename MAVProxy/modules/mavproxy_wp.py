@@ -219,12 +219,19 @@ class WPModule(mp_module.MPModule):
                 wps = self.missing_wps_to_request();
                 print("re-requesting WPs %s" % str(wps))
                 self.send_wp_requests(wps)
-        if self.module('console') is not None and not self.menu_added_console:
-            self.menu_added_console = True
-            self.module('console').add_menu(self.menu)
-        if self.module('map') is not None and not self.menu_added_map:
-            self.menu_added_map = True
-            self.module('map').add_menu(self.menu)
+        if self.module('console') is not None:
+            if not self.menu_added_console:
+                self.menu_added_console = True
+                self.module('console').add_menu(self.menu)
+        else:
+            self.menu_added_console = False
+
+        if self.module('map') is not None:
+            if not self.menu_added_map:
+                self.menu_added_map = True
+                self.module('map').add_menu(self.menu)
+        else:
+            self.menu_added_map = False
 
     def wp_to_mission_item_int(self, wp):
         '''convert a MISSION_ITEM to a MISSION_ITEM_INT. We always send as MISSION_ITEM_INT

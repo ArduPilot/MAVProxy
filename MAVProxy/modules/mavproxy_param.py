@@ -637,9 +637,12 @@ class ParamModule(mp_module.MPModule):
         self.pstate[sysid].vehicle_name = self.vehicle_name
         self.pstate[sysid].param_help.vehicle_name = self.vehicle_name
         self.pstate[sysid].fetch_check(self.master)
-        if self.module('console') is not None and not self.menu_added_console:
-            self.menu_added_console = True
-            self.module('console').add_menu(self.menu)
+        if self.module('console') is not None:
+            if not self.menu_added_console:
+                self.menu_added_console = True
+                self.module('console').add_menu(self.menu)
+        else:
+            self.menu_added_console = False
 
     def cmd_param(self, args):
         '''control parameters'''
