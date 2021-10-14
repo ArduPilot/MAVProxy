@@ -85,9 +85,12 @@ class HelpModule(mp_module.MPModule):
 
     def idle_task(self):
         '''called on idle'''
-        if self.module('console') is not None and not self.menu_added_console:
-            self.menu_added_console = True
-            self.module('console').add_menu(self.menu)
+        if self.module('console') is not None:
+            if not self.menu_added_console:
+                self.menu_added_console = True
+                self.module('console').add_menu(self.menu)
+        else:
+            self.menu_added_console = False
 
     def cmd_help(self, args):
         '''help commands'''

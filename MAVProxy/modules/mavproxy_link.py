@@ -73,11 +73,16 @@ class LinkModule(mp_module.MPModule):
 
     def idle_task(self):
         '''called on idle'''
-        if mp_util.has_wxpython and (not self.menu_added_console and self.module('console') is not None):
-            self.menu_added_console = True
-            # we don't dynamically update these yet due to a wx bug
-            self.menu_rm.items = [ MPMenuItem(p, p, '# link remove %s' % p) for p in self.complete_links('') ]
-            self.module('console').add_menu(self.menu)
+        if mp_util.has_wxpython: 
+            if self.module('console') is not None:
+                if not self.menu_added_console:
+                    self.menu_added_console = True
+                    # we don't dynamically update these yet due to a wx bug
+                    self.menu_rm.items = [ MPMenuItem(p, p, '# link remove %s' % p) for p in self.complete_links('') ]
+                    self.module('console').add_menu(self.menu)
+            else:
+                self.menu_added_console = False
+            
         for m in self.mpstate.mav_master:
             m.source_system = self.settings.source_system
             m.mav.srcSystem = m.source_system
