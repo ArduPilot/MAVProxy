@@ -1,5 +1,6 @@
 import time
 import os
+import socket
 from MAVProxy.modules.lib import mp_menu
 from MAVProxy.modules.lib.wxconsole_util import Value, Text
 from MAVProxy.modules.lib.wx_loader import wx
@@ -93,14 +94,23 @@ class ConsoleFrame(wx.Frame):
             self.timer.Stop()
             self.Destroy()
             return
-        while state.child_pipe_recv.poll():
+
+        while True:
+            try:
+                poll_success = state.child_pipe_recv.poll()
+                if not poll_success:
+                    return
+            except socket.error as e:
+                if e.errno == errno.EPIPE:
+                    break
+                else:
+                    raise e
+
             try:
                 obj = state.child_pipe_recv.recv()
             except EOFError:
-                self.timer.Stop()
-                self.Destroy()
-                return
-            
+                break
+                
             if isinstance(obj, Value):
                 # request to set a status field
                 if not obj.name in self.values:
@@ -142,3 +152,7 @@ class ConsoleFrame(wx.Frame):
                 self.Update()
             elif isinstance(obj, win_layout.WinLayout):
                 win_layout.set_wx_window_layout(self, obj)
+
+        self.timer.Stop()
+        self.Destroy()
+        return
