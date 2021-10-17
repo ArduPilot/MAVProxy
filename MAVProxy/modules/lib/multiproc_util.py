@@ -8,8 +8,10 @@ from MAVProxy.modules.lib import multiproc
 
 import copyreg
 import mmap
+import os
 import platform
 import struct
+import threading
 
 def pickle_struct(s):
     '''Custom pickle function for struct.Struct'''
@@ -198,10 +200,15 @@ class MPChildTask(object):
         with mutex:
             self.wrap()
             try:
-                self._child = multiproc.Process(target=self._child_task)
+                if os.name == 'nt':
+                    # Windows can't pickle the mavlog object, thus can't spin off
+                    self._child = threading.Thread(target=self._child_task)
+                else:
+                    self._child = multiproc.Process(target=self._child_task)
                 self._child.start()
             finally:
-                self.unwrap()
+                if not os.name == 'nt':
+                    self.unwrap()
 
         # deny the parent access to the child end of the pipe
         self.child_pipe_recv.close()
