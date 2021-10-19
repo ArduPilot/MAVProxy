@@ -89,6 +89,7 @@ class MiscModule(mp_module.MPModule):
         self.add_command('devid', self.cmd_devid, "show device names from parameter IDs")
         self.add_command('gethome', self.cmd_gethome, "get HOME_POSITION")
         self.add_command('flashbootloader', self.cmd_flashbootloader, "flash bootloader (dangerous)")
+        self.add_command('wipe_parameters', self.cmd_wipe_parameters, "wipe autopilot parameters")
         self.add_command('lockup_autopilot', self.cmd_lockup_autopilot, "lockup autopilot")
         self.add_command('corrupt_params', self.cmd_corrupt_param, "corrupt param storage")
         self.add_command('hardfault_autopilot', self.cmd_hardfault_autopilot, "hardfault autopilot")
@@ -155,6 +156,20 @@ class MiscModule(mp_module.MPModule):
             self.master.reboot_autopilot(True)
         else:
             self.master.reboot_autopilot()
+
+    def cmd_wipe_parameters(self, args):
+        self.master.mav.command_long_send(
+            self.settings.target_system,
+            self.settings.target_component,
+            mavutil.mavlink.MAV_CMD_PREFLIGHT_STORAGE,
+            0,
+            2,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0)
 
     def cmd_dosomethingreallynastyto_autopilot(self, args, description, code):
         '''helper function for the following commands which do unpleasant
