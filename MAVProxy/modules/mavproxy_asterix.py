@@ -251,9 +251,9 @@ class AsterixModule(mp_module.MPModule):
                                                            0, # heading
                                                            0, # hor vel
                                                            int(climb_rate_fps * 0.3048 * 100), # cm/s
-                                                           "%08x" % icao_address,
+                                                           ("%08x" % icao_address).encode("ascii"),
                                                            100 + (trkn // 10000),
-                                                           1.0,
+                                                           1,
                                                            (mavutil.mavlink.ADSB_FLAGS_VALID_COORDS |
                                                             mavutil.mavlink.ADSB_FLAGS_VALID_ALTITUDE |
                                                             mavutil.mavlink.ADSB_FLAGS_VALID_VELOCITY |
