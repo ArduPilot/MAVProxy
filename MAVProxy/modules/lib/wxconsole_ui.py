@@ -1,3 +1,4 @@
+import errno
 import time
 import os
 import socket
