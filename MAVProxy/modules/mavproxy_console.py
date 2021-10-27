@@ -199,6 +199,8 @@ class ConsoleModule(mp_module.MPModule):
             return "Tracker"
         if hb.type == mavutil.mavlink.MAV_TYPE_AIRSHIP:
             return "Blimp"
+        elif hb.type == mavutil.mavlink.MAV_TYPE_ADSB:
+            return "ADSB"
         return "UNKNOWN(%u)" % hb.type
 
     def component_type_string(self, hb):
@@ -209,6 +211,8 @@ class ConsoleModule(mp_module.MPModule):
             return "Gimbal"
         elif hb.type == mavutil.mavlink.MAV_TYPE_ONBOARD_CONTROLLER:
             return "CC"
+        elif hb.type == mavutil.mavlink.MAV_TYPE_ADSB:
+            return "ADSB"
         elif hb.type == mavutil.mavlink.MAV_TYPE_GENERIC:
             return "Generic"
         return self.vehicle_type_string(hb)
