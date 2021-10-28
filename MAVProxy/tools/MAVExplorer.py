@@ -766,6 +766,41 @@ def cmd_messages(args):
             print("%s %s" % (timestring(m), mstr))
     mestate.mlog.rewind()
 
+def extract_files():
+    '''extract all FILE messages as a dictionary of files'''
+    ret = {}
+    mestate.mlog.rewind()
+    while True:
+        m = mestate.mlog.recv_match(type=['FILE'], condition=mestate.settings.condition)
+        if m is None:
+            break
+        if not m.FileName in ret:
+            ret[m.FileName] = ''
+        ret[m.FileName] += m.Data
+    mestate.mlog.rewind()
+    return ret
+
+def cmd_file(args):
+    '''show files'''
+    files = extract_files()
+    if len(args) == 0:
+        # list
+        for n in sorted(files.keys()):
+            print(n)
+        return
+    fname = args[0]
+    if not fname in files:
+        print("File %s not found" % fname)
+        return
+    if len(args) == 1:
+        # print on terminal
+        print(files[fname])
+    else:
+        # save to file
+        dest = args[1]
+        open(dest, "w").write(files[fname])
+        print("Saved %s to %s" % (fname, dest))
+
 def set_vehicle_name():
     mapping = { mavutil.mavlink.MAV_TYPE_GROUND_ROVER : "Rover",
                 mavutil.mavlink.MAV_TYPE_FIXED_WING : "ArduPlane",
@@ -1020,6 +1055,7 @@ command_map = {
     'stats'      : (cmd_stats,     'show statistics on the log'),
     'magfit'     : (cmd_magfit,    'fit mag parameters to WMM'),
     'dump'       : (cmd_dump,      'dump messages from log'),
+    'file'       : (cmd_file,      'show files'),
     }
 
 def progress_bar(pct):
