@@ -36,6 +36,8 @@ class ConsoleModule(mp_module.MPModule):
         self.last_sys_status_errors_announce = 0
         self.user_added = {}
         self.safety_on = False
+        self.unload_check_interval = 5 # seconds
+        self.last_unload_check_time = time.time()
         self.add_command('console', self.cmd_console, "console module", ['add','list','remove'])
         mpstate.console = wxconsole.MessageConsole(title='Console')
 
@@ -652,6 +654,13 @@ class ConsoleModule(mp_module.MPModule):
                 except Exception as ex:
                     print(ex)
                     pass
+
+    def idle_task(self):
+        now = time.time()
+        if self.last_unload_check_time + self.unload_check_interval < now:
+            self.last_unload_check_time = now
+            if not self.console.is_alive():
+                self.needs_unloading = True
 
 def init(mpstate):
     '''initialise module'''
