@@ -101,6 +101,8 @@ class MiscModule(mp_module.MPModule):
         self.add_command('magsetfield', self.cmd_magset_field, "set expected mag field by field")
         self.add_command('magresetofs', self.cmd_magreset_ofs, "reset offsets for all compasses")
         self.add_command('namedvaluefloat', self.cmd_namedvaluefloat, "send a NAMED_VALUE_FLOAT")
+        self.add_command('scripting', self.cmd_scripting, "control onboard scripting", ["<stop|restart>"])
+
         self.repeats = []
 
     def altitude_difference(self, pressure1, pressure2, ground_temp):
@@ -329,6 +331,30 @@ class MiscModule(mp_module.MPModule):
         self.master.mav.led_control_send(self.settings.target_system,
                                          self.settings.target_component,
                                          0, 0, plen, pattern)
+
+    def cmd_scripting(self, args):
+        '''control onboard scripting'''
+        if len(args) < 1:
+            print("Usage: scripting <stop|restart>")
+            return
+
+        if args[0] == 'restart':
+            cmd = mavutil.mavlink.SCRIPTING_CMD_STOP_AND_RESTART
+        elif args[0] == 'stop':
+            cmd = mavutil.mavlink.SCRIPTING_CMD_STOP
+        else:
+            print("Usage: scripting <stop|restart>")
+            return
+
+        # MAVProxy command to stop and re-start is: command_int 0 42701 0 0 3 0 0 0 0 0 0
+
+        self.master.mav.command_int_send(
+            self.settings.target_system, self.settings.target_component,
+            mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
+            mavutil.mavlink.MAV_CMD_SCRIPTING,
+            0, 0,
+            cmd,
+            0,0,0,0,0,0)
 
     def cmd_oreoled(self, args):
         '''send LED pattern as override, using OreoLED conventions'''
