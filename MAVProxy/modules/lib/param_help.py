@@ -44,6 +44,9 @@ class ParamHelp:
                 return None
             path = mp_util.dot_mavproxy("%s.xml" % self.vehicle_name)
             if not os.path.exists(path):
+                if self.vehicle_name == 'APMrover2':
+                    path = mp_util.dot_mavproxy("%s.xml" % "Rover")
+            if not os.path.exists(path):
                 print("Please run 'param download' first (vehicle_name=%s)" % self.vehicle_name)
                 return None
         if not os.path.exists(path):
