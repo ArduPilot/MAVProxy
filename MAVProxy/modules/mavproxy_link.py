@@ -7,7 +7,7 @@
 '''
 
 from pymavlink import mavutil
-import time, struct, math, sys, fnmatch, traceback, json
+import time, struct, math, sys, fnmatch, traceback, json, os
 
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
@@ -46,6 +46,7 @@ class LinkModule(mp_module.MPModule):
                           'add (SERIALPORT)',
                           'attributes (LINK) (ATTRIBUTES)',
                           'remove (LINKS)',
+                          'dataratelogging (DLSTATE)',
                           'hl (HLSTATE)'])
         self.add_command('vehicle', self.cmd_vehicle, "vehicle control")
         self.add_command('alllinks', self.cmd_alllinks, "send command on all links")
@@ -55,9 +56,12 @@ class LinkModule(mp_module.MPModule):
         self.add_completion_function('(LINKS)', self.complete_links)
         self.add_completion_function('(LINK)', self.complete_links)
         self.add_completion_function('(HLSTATE)', self.complete_hl)
+        self.add_completion_function('(DLSTATE)', self.complete_dl)
         self.last_altitude_announce = 0.0
         self.vehicle_list = set()
         self.high_latency = False
+        self.datarate_logging = False
+        self.datarate_logging_timer = mavutil.periodic_event(1)
         self.old_streamrate = 0
         self.old_streamrate2 = 0
 
@@ -95,6 +99,19 @@ class LinkModule(mp_module.MPModule):
                 pending = self.status.statustexts_by_sysidcompid[src][msgid]
                 if time.time() - pending.last_chunk_time > 1:
                     self.emit_accumulated_statustext(src, msgid, pending)
+        # datarate logging if enabled, at 1 Hz
+        if self.datarate_logging_timer.trigger() and self.datarate_logging:
+            with open(self.datarate_logging, 'a') as logfile:
+                for master in self.mpstate.mav_master:
+                    highest_msec_key = (self.target_system, self.target_component)
+                    linkdelay = (self.status.highest_msec.get(highest_msec_key, 0) - master.highest_msec.get(highest_msec_key, 0))*1.0e-3
+                    logfile.write(str(time.strftime("%H:%M:%S")) + "," + 
+                                  str(self.link_label(master)) + "," +
+                                  str(master.linknum) + "," +
+                                  str(self.status.counters['MasterIn'][master.linknum]) + "," +
+                                  str(self.status.bytecounters['MasterIn'][master.linknum].total()) + "," +
+                                  str(linkdelay) + "," +
+                                  str(100 * round(master.packet_loss(), 3)) + "\n")
 
     def complete_serial_ports(self, text):
         '''return list of serial ports'''
@@ -104,7 +121,11 @@ class LinkModule(mp_module.MPModule):
     def complete_hl(self, text):
         '''return list of hl options'''
         return [ 'on', 'off' ]
-        
+
+    def complete_dl(self, text):
+        '''return list of datarate_logging options'''
+        return [ 'on', 'off' ]
+
     def complete_links(self, text):
         '''return list of links'''
         try:
@@ -125,6 +146,8 @@ class LinkModule(mp_module.MPModule):
             self.cmd_link_list()
         elif args[0] == "hl":
             self.cmd_hl(args[1:])
+        elif args[0] == "dataratelogging":
+            self.cmd_dl(args[1:])
         elif args[0] == "add":
             if len(args) != 2:
                 print("Usage: link add LINK")
@@ -148,8 +171,25 @@ class LinkModule(mp_module.MPModule):
         elif args[0] == "resetstats":
             self.reset_link_stats()
         else:
-            print("usage: link <list|add|remove|attributes|hl|resetstats>")
-            
+            print("usage: link <list|add|remove|attributes|hl|dataratelogging|resetstats>")
+
+    def cmd_dl(self, args):
+        '''Toggle datarate logging'''
+        if len(args) < 1:
+            print("Datarate logging is " + ("on" if self.datarate_logging else "off"))
+            return
+        elif args[0] == "on":
+            self.datarate_logging = os.path.join(self.logdir, "dataratelog.csv")
+            print("Datarate Logging ON, logfile: " + self.datarate_logging)
+            # Open a new file handle (don't append) for logging
+            with open(self.datarate_logging, 'w') as logfile:
+                logfile.write("time, linkname, linkid, packetsreceived, bytesreceived, delaysec, lostpercent\n")
+        elif args[0] == "off": 
+            print("Datarate Logging OFF")
+            self.datarate_logging = None
+        else:
+            print("usage: dataratelogging <on|off>")
+
     def cmd_hl(self, args):
         '''Toggle high latency mode'''
         if len(args) < 1:
