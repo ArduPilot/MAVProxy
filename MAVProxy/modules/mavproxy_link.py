@@ -89,7 +89,7 @@ class LinkModule(mp_module.MPModule):
             m.mav.srcComponent = self.settings.source_component
         # don't let pending statustext wait forever for last chunk:
         for src in self.status.statustexts_by_sysidcompid:
-            msgids = self.status.statustexts_by_sysidcompid[src].keys()
+            msgids = list(self.status.statustexts_by_sysidcompid[src].keys())
             for msgid in msgids:
                 pending = self.status.statustexts_by_sysidcompid[src][msgid]
                 if time.time() - pending.last_chunk_time > 1:
