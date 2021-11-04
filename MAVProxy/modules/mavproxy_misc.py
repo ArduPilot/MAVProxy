@@ -198,7 +198,7 @@ class MiscModule(mp_module.MPModule):
 
     def cmd_hardfault_autopilot(self, args):
         '''lockup autopilot for watchdog testing'''
-        self.cmd_dosomethingreallynastyto_autopilot(args, 'corruption', 94)
+        self.cmd_dosomethingreallynastyto_autopilot(args, 'hardfault', 94)
 
     def cmd_panic_autopilot(self, args):
         '''get ArduPilot to call AP_HAL::panic()'''
