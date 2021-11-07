@@ -825,6 +825,10 @@ def cmd_param(args):
             set_vehicle_name()
             mestate.param_help.param_check(mestate.mlog.params, args[1:])
             return
+        if args[0] == 'show':
+            # habits from mavproxy
+            cmd_param(args[1:])
+            return
         wildcard = args[0]
         if len(args) > 1 and args[1] == "-v":
             set_vehicle_name()
