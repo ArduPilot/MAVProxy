@@ -102,6 +102,7 @@ class MiscModule(mp_module.MPModule):
         self.add_command('magresetofs', self.cmd_magreset_ofs, "reset offsets for all compasses")
         self.add_command('namedvaluefloat', self.cmd_namedvaluefloat, "send a NAMED_VALUE_FLOAT")
         self.add_command('scripting', self.cmd_scripting, "control onboard scripting", ["<stop|restart>"])
+        self.add_command('formatsdcard', self.cmd_formatsdcard, "format SD card")
 
         self.repeats = []
 
@@ -356,6 +357,16 @@ class MiscModule(mp_module.MPModule):
             cmd,
             0,0,0,0,0,0)
 
+    def cmd_formatsdcard(self, args):
+        '''format SD card'''
+        self.master.mav.command_int_send(
+            self.settings.target_system, self.settings.target_component,
+            mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
+            mavutil.mavlink.MAV_CMD_STORAGE_FORMAT,
+            0, 0,
+            1, 1,
+            0,0,0,0,0)
+        
     def cmd_oreoled(self, args):
         '''send LED pattern as override, using OreoLED conventions'''
         if len(args) < 4:
