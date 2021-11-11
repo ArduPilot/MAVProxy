@@ -4,32 +4,39 @@ from __future__ import print_function
 
 '''firmware handling'''
 
-'''Currently handles firmware downloading but not flashing'''
-
 import time, os, fnmatch
 import json
 import threading
 import re
+import subprocess
 
 from pymavlink import mavutil, mavparm
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import multiproc
+from MAVProxy.modules.lib import mp_settings
 
 class FirmwareModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
         super(FirmwareModule, self).__init__(mpstate, "firmware", "firmware handling", public = True)
+        self.firmware_settings = mp_settings.MPSettings(
+            [('uploader', str, "uploader.py"),
+            ])
         self.add_command('fw', self.cmd_fw, "firmware handling",
                          ["<manifest> (OPT)",
-                          "list <filterterm...>"])
+                          "list <filterterm...>",
+                          "set (FIRMWARESETTING)",
+                          "flashfile FILENAME"])
+        self.add_completion_function('(FIRMWARESETTING)',
+                                     self.firmware_settings.completion)
         self.downloaders_lock = threading.Lock()
         self.downloaders = {}
         self.manifests_parse()
 
     def usage(self):
         '''show help on a command line options'''
-        return '''Usage: fw <manifest|list>
+        return '''Usage: fw <manifest|set|list|flashfile>
 
 # Use the column headings from "list" as filter terms
 
@@ -54,10 +61,14 @@ fw download releasetype=OFFICIAL frame=quad platform=PX4-v2
             self.cmd_fw_manifest(rest)
         elif args[0] == "list":
             self.cmd_fw_list(rest)
+        elif args[0] == "set":
+            self.firmware_settings.command(args[1:])
         elif args[0] == "download":
             self.cmd_fw_download(rest)
         elif args[0] in ["help","usage"]:
             self.cmd_fw_help(rest)
+        elif args[0] == "flashfile":
+            self.cmd_flashfile(rest)
         else:
             print(self.usage())
 
@@ -181,6 +192,11 @@ fw download releasetype=OFFICIAL frame=quad platform=PX4-v2
         rows = self.rows_for_firmwares(all)
         filtered = self.filter_rows(filters, rows)
         return (filtered, remainder)
+
+    def cmd_flashfile(self, args):
+        filename = args[0]
+        subprocess.check_call([self.firmware_settings.uploader, filename])
+
 
     def cmd_fw_list(self, args):
         '''cmd handler for list'''
