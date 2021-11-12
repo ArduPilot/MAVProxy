@@ -423,6 +423,9 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
                 (lat, lng) = (m.Lat, m.Lng)
             elif type == 'SIM':
                 (lat, lng) = (m.Lat, m.Lng)
+            elif type == 'GUID':
+                if (m.Type == 0):
+                    (lat, lng) = (m.pX*1.0e-7, m.pY*1.0e-7)
             else:
                 if hasattr(m,'Lat'):
                     lat = m.Lat
