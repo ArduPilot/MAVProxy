@@ -12,13 +12,14 @@ from MAVProxy.modules.lib import mp_module
 import statistics
 import struct
 import numpy as np
+import math
 
 class messagestats(mp_module.MPModule):
     def __init__(self, mpstate):
         """Initialise module"""
         super(messagestats, self).__init__(mpstate, "messagestats", "")
         
-        self.max_timestamps = 20
+        self.max_timestamps = 100
         self.msg_stats_timeout = 60.0
         self.msg_timestamps = {}
         self.msg_type_lengths = {}
@@ -38,7 +39,10 @@ class messagestats(mp_module.MPModule):
         if len(args) == 0:
             print(self.usage())
         elif args[0] == "show":
-            print(self.stats())
+            if len(args) == 2:
+                print(self.stats(int(args[1])))
+            else:
+                print(self.stats())
         elif args[0] == "reset":
             self.reset()
         elif args[0] == "len":
@@ -57,7 +61,7 @@ class messagestats(mp_module.MPModule):
         self.msg_timestamps = {}
 
 
-    def stats(self):
+    def stats(self, show_length=10):
         ret = "\n\n"
         ret += "Message stats - Max timestamps:%u   Msg timeout:%fs\n" % (self.max_timestamps, self.msg_stats_timeout)
         mtypes = sorted(self.msg_timestamps.keys())
@@ -86,8 +90,9 @@ class messagestats(mp_module.MPModule):
                     period_stdev = statistics.stdev(periods)
                     period_stdev_norm = period_stdev / period_mean
                   
-                ret += "%25s: %3uB  age:%6.1fs  %5uBps  Period(ms)(%5.0f:mean %5.0u:max  %5.0u:min %5.2f:stddev_norm)    PERIODS:" % (mtype, size, age, mean_bitrate, period_mean*1000.0, period_max*1000, period_min*1000, period_stdev_norm)
-                for period in periods:
+                ret += "%30s: %3uB  age:%6.1fs  %5uBps  Intervals(ms) (%5.0f:mean %5.0u:max  %5.0u:min %5.2f:stddev_norm) :" % (mtype, size, age, mean_bitrate, period_mean*1000.0, period_max*1000, period_min*1000, period_stdev_norm)
+                showlen = min(len(periods), show_length)
+                for period in periods[0:showlen]:
                     ret += "  %5.0fms" % (period*1000)
                 ret += "\n"
         if total_datarate < 1000.0:
