@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 '''
-Message Rate viewer
-Peter Barker, December 2018
+Message Statistics
+Matthew Coleman, December 2021
 
-Simply display message rates
+Simply display message statistics
 '''
 
 import time
