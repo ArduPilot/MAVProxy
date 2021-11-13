@@ -6,6 +6,7 @@
 
 from pymavlink import mavutil
 import re, os, sys
+import time
 
 from MAVProxy.modules.lib import live_graph
 
@@ -35,7 +36,7 @@ class GraphModule(mp_module.MPModule):
             return
 
         elif args[0] == "help":
-            print("graph <timespan|tickresolution|expression>")
+            print("graph <timespan|tickresolution|expression|frequency>")
         elif args[0] == "timespan":
             if len(args) == 1:
                 print("timespan: %.1f" % self.timespan)
@@ -99,12 +100,19 @@ class Graph():
         self.field_types = []
         self.msg_types = set()
         self.state = state
+        self.msg_timestamp = {}
 
         re_caps = re.compile('[A-Z_][A-Z0-9_]+')
         for f in self.fields:
             caps = set(re.findall(re_caps, f))
             self.msg_types = self.msg_types.union(caps)
             self.field_types.append(caps)
+            #Check for interval keyword. If used then add field keywords to messages needing intervals.
+            if "interval" in f:
+                for cap in caps:
+                    if cap not in self.msg_timestamp:
+                        self.msg_timestamp[cap] = None
+                        
         print("Adding graph: %s" % self.fields)
 
         fields = [ self.pretty_print_fieldname(x) for x in fields ]
@@ -137,6 +145,14 @@ class Graph():
         mtype = msg.get_type()
         if mtype not in self.msg_types:
             return
+        now = time.time()
+        if mtype in self.msg_timestamp.keys():
+            last_timestamp = self.msg_timestamp[mtype]
+            if self.msg_timestamp[mtype] is None:
+                msg.interval = 0
+            else:
+                msg.interval = now - last_timestamp
+            self.msg_timestamp[mtype] = now
         have_value = False
         for i in range(len(self.fields)):
             if mtype not in self.field_types[i]:
