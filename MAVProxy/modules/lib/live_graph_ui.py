@@ -15,10 +15,14 @@ class GraphFrame(wx.Frame):
             pass
         self.state = state
         self.data = []
+        self.log_yaxis = False
+        self.log_ranges = 4
+        
         for i in range(len(state.fields)):
             self.data.append([])
         self.paused = False
-
+        
+        
         self.create_main_panel()
 
         self.Bind(wx.EVT_IDLE, self.on_idle)
@@ -49,10 +53,29 @@ class GraphFrame(wx.Frame):
         self.Bind(wx.EVT_BUTTON, self.on_pause_button, self.pause_button)
         self.Bind(wx.EVT_UPDATE_UI, self.on_update_pause_button, self.pause_button)
 
+        self.log_yaxis_button = wx.Button(self.panel, -1, "Log Yaxis")
+        self.Bind(wx.EVT_BUTTON, self.on_log_yaxis_button, self.log_yaxis_button)
+        self.Bind(wx.EVT_UPDATE_UI, self.on_update_log_yaxis_button, self.log_yaxis_button)
+
+        self.log_yaxis_text = wx.StaticText(self.panel, -1, "Range:")
+
+        spinSize = wx.Size(120,36)
+        self.log_range_spinControl = wx.SpinCtrl(self.panel, -1, "Log ranges", size=spinSize)
+        self.log_range_spinControl.SetRange(2, 10)
+        self.log_range_spinControl.SetValue(self.log_ranges)
+        self.Bind(wx.EVT_SPINCTRL, self.OnSpinLogRange, self.log_range_spinControl)
+ 
         self.hbox1 = wx.BoxSizer(wx.HORIZONTAL)
         self.hbox1.Add(self.close_button, border=5, flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL)
         self.hbox1.AddSpacer(1)
         self.hbox1.Add(self.pause_button, border=5, flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL)
+
+        self.hbox1.AddSpacer(1)
+        self.hbox1.Add(self.log_yaxis_button, border=5, flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL)
+
+        self.hbox1.AddSpacer(1)
+        self.hbox1.Add(self.log_yaxis_text, border=5, flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL)
+        self.hbox1.Add(self.log_range_spinControl, border=5, flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL)
 
         self.vbox = wx.BoxSizer(wx.VERTICAL)
         self.vbox.Add(self.canvas, 1, flag=wx.LEFT | wx.TOP | wx.GROW)
@@ -124,6 +147,14 @@ class GraphFrame(wx.Frame):
             ymax = ymin + 0.1 * ymin
             ymin = ymin - 0.1 * ymin
 
+        if self.log_yaxis:
+            if ymax < 1.0:
+                ymax = 1.0
+            log_range = numpy.log(ymax)
+            log_range = numpy.ceil(log_range)
+            ymax = numpy.power(10,log_range)
+            ymin = numpy.power(10,log_range-self.log_ranges)
+            
         if (ymin, ymax) != self.last_yrange:
             self.last_yrange = (ymin, ymax)
 
@@ -140,7 +171,7 @@ class GraphFrame(wx.Frame):
                 xdata = xdata[-len(ydata):]
             self.plot_data[i].set_xdata(xdata)
             self.plot_data[i].set_ydata(ydata)
-
+            
         self.canvas.draw()
         self.canvas.Refresh()
 
@@ -150,6 +181,20 @@ class GraphFrame(wx.Frame):
     def on_update_pause_button(self, event):
         label = "Resume" if self.paused else "Pause"
         self.pause_button.SetLabel(label)
+
+    def on_log_yaxis_button(self, event):
+        self.log_yaxis = not self.log_yaxis
+        if self.log_yaxis:
+            self.axes.set_yscale('log')
+        else:
+            self.axes.set_yscale('linear')
+
+    def on_update_log_yaxis_button(self, event):
+        label = "Lin YAxis" if self.log_yaxis else "Log YAxis"
+        self.log_yaxis_button.SetLabel(label)
+        
+    def OnSpinLogRange(self, evt):
+        self.log_ranges = self.log_range_spinControl.GetValue()
 
     def on_close_button(self, event):
         self.redraw_timer.Stop()
