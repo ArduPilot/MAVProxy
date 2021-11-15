@@ -35,6 +35,7 @@ class GraphModule(mp_module.MPModule):
             for i in range(len(self.graphs)):
                 print("Graph %u: %s" % (i, self.graphs[i].fields))
             return
+
         elif args[0] == "help":
             print("graph <timespan|tickresolution|expression>")
         elif args[0] == "timespan":
@@ -141,17 +142,15 @@ class Graph():
         if mtype not in self.msg_types:
             return
         have_value = False
-        now = time.time()
         for i in range(len(self.fields)):
             if mtype not in self.field_types[i]:
                 continue
-            field = self.fields[i]
-            value = mavutil.evaluate_expression(field, self.state.master.messages)
-            if value is not None:
+            f = self.fields[i]
+            self.values[i] = mavutil.evaluate_expression(f, self.state.master.messages)
+            if self.values[i] is not None:
                 have_value = True
         if have_value and self.livegraph is not None:
-            graph_point = GraphPoint(field, value, now)
-            self.livegraph.add_values(graph_point)
+            self.livegraph.add_values(self.values)
 
 
 class GraphPoint():
@@ -173,7 +172,7 @@ class GraphTime(Graph):
             caps = set(re.findall(re_caps, f))
             self.msg_types = self.msg_types.union(caps)
             self.field_types.append(caps)
-        print("Adding graph: %s" % self.fields)
+        print("Adding time scatter graph: %s" % self.fields)
 
         fields = [ self.pretty_print_fieldname(x) for x in fields ]
 
@@ -189,7 +188,6 @@ class GraphTime(Graph):
         if mtype not in self.msg_types:
             return
         have_value = False
-        now = time.time()
         for i in range(len(self.fields)):
             if mtype not in self.field_types[i]:
                 continue
@@ -197,5 +195,5 @@ class GraphTime(Graph):
             value = mavutil.evaluate_expression(field, self.state.master.messages)
             if value is not None:
                 if self.livegraph is not None:
-                    graph_point = GraphPoint(field, value, now)
+                    graph_point = GraphPoint(field, value, msg._timestamp)
                     self.livegraph.add_values(graph_point)
