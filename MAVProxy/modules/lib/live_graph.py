@@ -91,3 +91,36 @@ if __name__ == "__main__":
                               math.sin(t+1), math.cos(t+1),
                               math.sin(t+2), math.cos(t+2)])
         time.sleep(0.05)
+        
+        
+class LiveTimeGraph(LiveGraph):
+    def __init__(self,
+                 fields,
+                 title='MAVProxy: LiveTimeGraph',
+                 timespan=20.0,
+                 tickresolution=0.2,
+                 colors=[ 'red', 'green', 'blue', 'orange', 'olive', 'cyan', 'magenta', 'brown',
+                          'violet', 'purple', 'grey', 'black']):
+        super(LiveTimeGraph, self).__init__( fields,
+                 title,
+                 timespan,
+                 tickresolution,
+                 colors)
+      
+    def child_task(self):
+        '''child process - this holds all the GUI elements'''
+        mp_util.child_close_fds()
+
+        import matplotlib, platform
+        if platform.system() != "Darwin":
+            # on MacOS we can't set WxAgg here as it conflicts with the MacOS version
+            matplotlib.use('WXAgg')
+
+        from MAVProxy.modules.lib import wx_processguard
+        from MAVProxy.modules.lib.wx_loader import wx
+
+        app = wx.App(False)
+        from MAVProxy.modules.lib import live_graph_ui
+        app.frame = live_graph_ui.GraphTimeFrame(state=self)
+        app.frame.Show()
+        app.MainLoop()

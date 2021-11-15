@@ -16,7 +16,7 @@ class GraphFrame(wx.Frame):
         self.state = state
         self.data = []
         for i in range(len(state.fields)):
-            self.data.append([])
+            self.data.append([0])
         self.paused = False
 
         self.create_main_panel()
@@ -186,3 +186,159 @@ class GraphFrame(wx.Frame):
             if state.values[i] is None or len(self.data[i]) < 2:
                 return
         self.draw_plot()
+
+
+
+class GraphTimeFrame(GraphFrame):
+    def __init__(self, state):
+      
+        now = time.time()
+
+        wx.Frame.__init__(self, None, -1, state.title)
+        try:
+            self.SetIcon(icon.SimpleIcon().get_ico())
+        except Exception:
+            pass
+        self.state = state
+        self.data = []
+
+        self.field_index_dict = {}
+        for i in range(len(state.fields)):
+            self.data.append([[now,0]])
+            self.field_index_dict[state.fields[i]] = i
+        self.paused = False
+
+        self.create_main_panel()
+
+        self.Bind(wx.EVT_IDLE, self.on_idle)
+
+        self.redraw_timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.on_redraw_timer, self.redraw_timer)
+        self.redraw_timer.Start(1000*self.state.tickresolution)
+
+        self.last_yrange = (None, None)
+        
+        
+    def init_plot(self):
+        self.dpi = 100
+        from matplotlib.figure import Figure
+        self.fig = Figure((6.0, 3.0), dpi=self.dpi)
+
+        self.axes = self.fig.add_subplot(111)
+        try:
+            self.axes.set_facecolor('white')
+        except AttributeError as e:
+            # this was removed in matplotlib 2.2.0:
+            self.axes.set_axis_bgcolor('white')
+
+        pylab.setp(self.axes.get_xticklabels(), fontsize=8)
+        pylab.setp(self.axes.get_yticklabels(), fontsize=8)
+
+        # plot the data as a line series, and save the reference
+        # to the plotted line series
+        #
+        self.plot_data = []
+
+        now = time.time()
+        for i in range(len(self.data)):
+            p = self.axes.scatter(
+                x=[0],
+                y=[0],
+                linewidth=1,
+                color=self.state.colors[i],
+                label=self.state.fields[i],
+                )
+#             p = self.axes.scatter(
+#                 self.time_deltas[i],
+#                 self.data[i],
+#                 linewidth=1,
+#                 color=self.state.colors[i],
+#                 label=self.state.fields[i],
+#                 )[0]
+            self.plot_data.append(p)
+
+        self.axes.set_xbound(lower=0, upper=self.state.timespan)
+        self.axes.set_ybound(0, 0.1)
+        self.axes.legend(self.state.fields, loc='upper right', bbox_to_anchor=(0, 1.1))
+        
+        
+    def draw_plot(self):
+        """ Redraws the plot
+        """
+        state = self.state
+
+        vhigh = 0
+        vlow = 0
+        for i in range(1,len(self.plot_data)):
+            data = self.data[i]
+            if len(data) > 0:
+                vhigh = data[0][1]
+                vlow  = data[0][1]
+                continue
+
+        for i in range(1,len(self.plot_data)):
+            data = numpy.array(self.data[i])
+            datalen = len(data)
+            if datalen > 0:
+                vhigh = max(vhigh, numpy.max(data[:,1]))
+                vlow  = min(vlow,  numpy.min(data[:,1]))
+        ymin = vlow  - 0.05*(vhigh-vlow)
+        ymax = vhigh + 0.05*(vhigh-vlow)
+
+        if ymin == ymax:
+            ymax = ymin + 0.1 * ymin
+            ymin = ymin - 0.1 * ymin
+
+        if (ymin, ymax) != self.last_yrange:
+            self.last_yrange = (ymin, ymax)
+
+            self.axes.set_ybound(lower=ymin, upper=ymax)
+            #self.axes.ticklabel_format(useOffset=False, style='plain')
+            self.axes.grid(True, color='gray')
+            pylab.setp(self.axes.get_xticklabels(), visible=True)
+            pylab.setp(self.axes.get_legend().get_texts(), fontsize='small')
+
+        now = time.time()
+        for i in range(len(self.plot_data)):
+            scatter_plot = self.plot_data[i]
+            data = numpy.array(self.data[i])
+            data_with_time_offset = [now, 0] + (data * [-1,1]) 
+            scatter_plot.set_offsets( data_with_time_offset )
+
+        self.canvas.draw()
+        self.canvas.Refresh()
+      
+    def on_redraw_timer(self, event):
+        # if paused do not add data, but still redraw the plot
+        # (to respond to scale modifications, grid change, etc.)
+        #
+        state = self.state
+        if state.close_graph.wait(0.001):
+            self.redraw_timer.Stop()
+            self.Destroy()
+            return
+
+        if self.paused:
+            return
+
+        while state.child_pipe.poll():
+            graph_point = state.child_pipe.recv()
+            
+            try:
+                field_index = state.fields.index(graph_point.field)
+            except:
+                print("live_graph_ui: ERROR: Unknwon field name %s" % graph_point.field)
+                continue
+              
+            if (type(graph_point.value) == list):
+                print("ERROR: Cannot plot array of length %d. Use 'graph %s[index]' instead"%(len(graph_point.value)), graph_point.field) 
+                self.redraw_timer.Stop()
+                self.Destroy()
+                return
+            
+#             print("live_graph_ui . graph index:%u data added field:%s" % (field_index, graph_point.field) )
+            self.data[field_index].append( [graph_point.timestamp, graph_point.value] )
+            
+        self.draw_plot()
+        
+        

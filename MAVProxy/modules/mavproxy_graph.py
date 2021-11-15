@@ -6,6 +6,7 @@
 
 from pymavlink import mavutil
 import re, os, sys
+import time
 
 from MAVProxy.modules.lib import live_graph
 
@@ -19,6 +20,7 @@ class GraphModule(mp_module.MPModule):
         self.graphs = []
         self.add_command('graph', self.cmd_graph, "[expression...] add a live graph",
                          ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)',
+                          'time - add a time plot with variables',
                           'legend',
                           'timespan',
                           'tickresolution'])
@@ -33,7 +35,6 @@ class GraphModule(mp_module.MPModule):
             for i in range(len(self.graphs)):
                 print("Graph %u: %s" % (i, self.graphs[i].fields))
             return
-
         elif args[0] == "help":
             print("graph <timespan|tickresolution|expression>")
         elif args[0] == "timespan":
@@ -48,6 +49,8 @@ class GraphModule(mp_module.MPModule):
             self.tickresolution = float(args[1])
         elif args[0] == "legend":
             self.cmd_legend(args[1:])
+        elif args[0] == "time":
+            self.graphs.append(GraphTime(self, args[1:]))
         else:
             # start a new graph
             self.graphs.append(Graph(self, args[:]))
@@ -138,12 +141,61 @@ class Graph():
         if mtype not in self.msg_types:
             return
         have_value = False
+        now = time.time()
         for i in range(len(self.fields)):
             if mtype not in self.field_types[i]:
                 continue
-            f = self.fields[i]
-            self.values[i] = mavutil.evaluate_expression(f, self.state.master.messages)
-            if self.values[i] is not None:
+            field = self.fields[i]
+            value = mavutil.evaluate_expression(field, self.state.master.messages)
+            if value is not None:
                 have_value = True
         if have_value and self.livegraph is not None:
-            self.livegraph.add_values(self.values)
+            graph_point = GraphPoint(field, value, now)
+            self.livegraph.add_values(graph_point)
+
+
+class GraphPoint():
+    def __init__(self, field:str, value:float, timestamp:time.time):
+        self.field = field
+        self.value = value
+        self.timestamp = timestamp
+            
+class GraphTime(Graph):
+    '''a graph instance'''
+    def __init__(self, state, fields):
+        self.fields = fields[:]
+        self.field_types = []
+        self.msg_types = set()
+        self.state = state
+
+        re_caps = re.compile('[A-Z_][A-Z0-9_]+')
+        for f in self.fields:
+            caps = set(re.findall(re_caps, f))
+            self.msg_types = self.msg_types.union(caps)
+            self.field_types.append(caps)
+        print("Adding graph: %s" % self.fields)
+
+        fields = [ self.pretty_print_fieldname(x) for x in fields ]
+
+        self.values = [None] * len(self.fields)
+        self.livegraph = live_graph.LiveTimeGraph(fields,
+                                              timespan=state.timespan,
+                                              tickresolution=state.tickresolution,
+                                              title=self.fields[0])
+        
+    def add_mavlink_packet(self, msg):
+        '''add data to the graph'''
+        mtype = msg.get_type()
+        if mtype not in self.msg_types:
+            return
+        have_value = False
+        now = time.time()
+        for i in range(len(self.fields)):
+            if mtype not in self.field_types[i]:
+                continue
+            field = self.fields[i]
+            value = mavutil.evaluate_expression(field, self.state.master.messages)
+            if value is not None:
+                if self.livegraph is not None:
+                    graph_point = GraphPoint(field, value, now)
+                    self.livegraph.add_values(graph_point)
