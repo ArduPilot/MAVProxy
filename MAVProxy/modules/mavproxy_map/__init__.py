@@ -42,7 +42,7 @@ class MapModule(mp_module.MPModule):
         self.vehicle_type_name = 'plane'
         self.ElevationMap = mp_elevation.ElevationModel()
         self.last_unload_check_time = time.time()
-        self.unload_check_interval = 0.1 # seconds
+        self.unload_check_interval = 5 # seconds
         self.trajectory_layers = set()
         self.map_settings = mp_settings.MPSettings(
             [ ('showgpspos', int, 1),

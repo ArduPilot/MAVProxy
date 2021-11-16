@@ -185,7 +185,7 @@ class MissionEditorMain(object):
         self.mpstate.miss_editor = self
 
         self.last_unload_check_time = time.time()
-        self.unload_check_interval = 0.1 # seconds
+        self.unload_check_interval = 5 # seconds
 
         self.time_to_quit = False
         self.mavlink_message_queue = multiproc.Queue()
