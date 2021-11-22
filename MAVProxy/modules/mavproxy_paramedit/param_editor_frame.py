@@ -339,8 +339,15 @@ class ParamEditorFrame(wx.Frame):
                     self.display_list.SetCellEditor(row, PE_OPTION, cle.GridCheckListEditor(bits, PE_VALUE, pvalue))
                     val = ""
                     binary = bin(int(pvalue))[2:]
-                    for i in [(len(binary)-ones-1) for ones in range(len(binary)) if binary[ones] == '1']:
-                        val = val + str(bits[i]) + "\n"
+                    for b in bits:
+                        bopt = b.split(":")
+                        if len(bopt) != 2:
+                            continue
+                        bvalue = int(bopt[0])
+                        bstr = bopt[1].strip()
+                        if (int(pvalue) & (1 << bvalue)) != 0:
+                            val = val + "%u: %s\n" % (bvalue, bstr)
+                    val = val.strip()
                     self.display_list.SetCellValue(row, PE_OPTION, str(val))
                     self.set_row_size(row, 25*len(bits))
                     return
