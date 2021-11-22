@@ -9,7 +9,19 @@ class GridCheckListEditor(gridlib.PyGridCellEditor):
     This is a custom CheckListBox editor for setting of Bitmasks
     """
     def __init__(self, choice, pvalcol, start):
-        self.choices = choice
+        # ensure the choices list has no gaps
+        bvalue = 0
+        self.choices = []
+        for c in choice:
+            bopt = c.split(":")
+            if len(bopt) != 2:
+                continue
+            bval = int(bopt[0])
+            while bvalue < bval:
+                self.choices.append("%u:INVALID" % bvalue)
+                bvalue += 1
+            self.choices.append(c)
+            bvalue += 1
         binary = bin(int(start))[2:]
         self.startValue = [(len(binary)-ones-1) for ones in range(len(binary)) if binary[ones] == '1']
         self.pvalcol = pvalcol
