@@ -664,7 +664,10 @@ if __name__ == "__main__":
 
     try:
         import faulthandler, signal
-        faulthandler.register(signal.SIGUSR1)
+        try:
+            faulthandler.register(signal.SIGUSR1)
+        except AttributeError as e:
+            pass
     except ImportError:
         pass
 
