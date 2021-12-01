@@ -775,8 +775,8 @@ def extract_files():
         if m is None:
             break
         if not m.FileName in ret:
-            ret[m.FileName] = ''
-        ret[m.FileName] += m.Data
+            ret[m.FileName] = bytes()
+        ret[m.FileName] += m.Data[:m.Length]
     mestate.mlog.rewind()
     return ret
 
@@ -786,7 +786,7 @@ def cmd_file(args):
     if len(args) == 0:
         # list
         for n in sorted(files.keys()):
-            print(n)
+            print("%s (length %u)" % (n, len(files[n])))
         return
     fname = args[0]
     if not fname in files:
@@ -798,7 +798,7 @@ def cmd_file(args):
     else:
         # save to file
         dest = args[1]
-        open(dest, "w").write(files[fname])
+        open(dest, "wb").write(files[fname])
         print("Saved %s to %s" % (fname, dest))
 
 def set_vehicle_name():
