@@ -464,9 +464,9 @@ class MiscModule(mp_module.MPModule):
         print("Setting origin to: ", lat, lon, alt)
         self.master.mav.set_gps_global_origin_send(
             self.settings.target_system,
-            lat*10000000, # lat
-            lon*10000000, # lon
-            alt*1000) # param7
+            int(lat*10000000), # lat
+            int(lon*10000000), # lon
+            int(alt*1000)) # param7
 
     def cmd_magset_field(self, args):
         '''set compass offsets by field'''
