@@ -376,6 +376,15 @@ class MPState(object):
                 return m
         return self.mav_master[self.settings.link-1]
 
+    def foreach_mav(self, sysid, compid, closure):
+        # Send mavlink message only on all links that contain vehicle (sysid, compid)
+        # More efficient than just blasting all links, when sending targetted messages
+        # Also useful for sending messages to non-selected vehicles
+        for linkNumber, vehicleList in self.vehicle_link_map.items():
+            if (sysid, compid) not in vehicleList:
+                continue
+            closure(self.mav_master[linkNumber].mav)
+
     def notify_click(self):
         notify_mods = ['map', 'misseditor']
         for modname in notify_mods:
