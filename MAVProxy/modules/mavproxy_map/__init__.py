@@ -22,7 +22,7 @@ class MapModule(mp_module.MPModule):
         if self.instance > 1:
             cmdname += "%u" % self.instance
         # lat/lon per system ID
-        self.lat_lon = {}
+        self.lat_lon_heading = {}
         self.wp_change_time = 0
         self.fence_change_time = 0
         self.rally_change_time = 0
@@ -730,11 +730,11 @@ class MapModule(mp_module.MPModule):
             (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
             if lat != 0 or lon != 0:
                 if m.vel > 300 or 'ATTITUDE' not in self.master.messages:
-                    cog = m.cog*0.01
+                    heading = m.cog*0.01
                 else:
-                    cog = math.degrees(self.master.messages['ATTITUDE'].yaw)
+                    (_,_,heading) = self.lat_lon_heading[m.get_srcSystem()]
                 self.create_vehicle_icon('GPS' + vehicle, 'blue')
-                self.map.set_position('GPS' + vehicle, (lat, lon), rotation=cog)
+                self.map.set_position('GPS' + vehicle, (lat, lon), rotation=heading)
                 
         elif mtype == "HIGH_LATENCY2" and self.map_settings.showgpspos:
             (lat, lon) = (m.latitude*1.0e-7, m.longitude*1.0e-7)
@@ -751,7 +751,7 @@ class MapModule(mp_module.MPModule):
 
         elif mtype == 'GLOBAL_POSITION_INT' and self.map_settings.showahrspos:
             (lat, lon, heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
-            self.lat_lon[m.get_srcSystem()] = (lat,lon)
+            self.lat_lon_heading[m.get_srcSystem()] = (lat,lon,heading)
             if abs(lat) > 1.0e-3 or abs(lon) > 1.0e-3:
                 self.have_global_position = True
                 self.create_vehicle_icon('Pos' + vehicle, 'red', follow=True)
@@ -772,8 +772,8 @@ class MapModule(mp_module.MPModule):
         elif mtype == "NAV_CONTROLLER_OUTPUT":
             tlayer = 'Trajectory%u' % m.get_srcSystem()
             if (self.master.flightmode in [ "AUTO", "GUIDED", "LOITER", "RTL", "QRTL", "QLOITER", "QLAND", "FOLLOW", "ZIGZAG" ] and
-                m.get_srcSystem() in self.lat_lon):
-                (lat,lon) = self.lat_lon[m.get_srcSystem()]
+                m.get_srcSystem() in self.lat_lon_heading):
+                (lat,lon,_) = self.lat_lon_heading[m.get_srcSystem()]
                 trajectory = [ (lat, lon),
                                 mp_util.gps_newpos(lat, lon, m.target_bearing, m.wp_dist) ]
                 self.map.add_object(mp_slipmap.SlipPolygon('trajectory',
@@ -787,10 +787,10 @@ class MapModule(mp_module.MPModule):
 
         elif mtype == "POSITION_TARGET_GLOBAL_INT":
             # FIXME: base this off SYS_STATUS.MAV_SYS_STATUS_SENSOR_XY_POSITION_CONTROL?
-            if not m.get_srcSystem() in self.lat_lon:
+            if not m.get_srcSystem() in self.lat_lon_heading:
                 return
             tlayer = 'PostionTarget%u' % m.get_srcSystem()
-            (lat,lon) = self.lat_lon[m.get_srcSystem()]
+            (lat,lon,_) = self.lat_lon_heading[m.get_srcSystem()]
             if (self.master.flightmode in [ "AUTO", "GUIDED", "LOITER", "RTL", "QRTL", "QLOITER", "QLAND", "FOLLOW" ]):
                 lat_float = m.lat_int*1e-7
                 lon_float = m.lon_int*1e-7
