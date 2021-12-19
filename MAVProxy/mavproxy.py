@@ -277,6 +277,7 @@ class MPState(object):
               MPSetting('fwdpos', bool, False, 'Forward GLOBAL_POSITION_INT on all links'),
               MPSetting('checkdelay', bool, True, 'check for link delay'),
               MPSetting('param_ftp', bool, True, 'try ftp for parameter download'),
+              MPSetting('param_docs', bool, True, 'show help for parameters'),
 
               MPSetting('vehicle_name', str, '', 'Vehicle Name', tab='Vehicle'),
 

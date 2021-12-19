@@ -103,6 +103,7 @@ class MEState(object):
               MPSetting('legend2', str, 'upper right', 'legend2 position'),
               MPSetting('title', str, None, 'Graph title'),
               MPSetting('debug', int, 0, 'debug level'),
+              MPSetting('paramdocs', bool, True, 'show param docs'),
               ]
             )
 
@@ -812,7 +813,7 @@ def set_vehicle_name():
 
 def cmd_param(args):
     '''show parameters'''
-    verbose = False
+    verbose = mestate.settings.paramdocs
     if len(args) > 0:
         if args[0] == 'help':
             set_vehicle_name()
@@ -831,7 +832,6 @@ def cmd_param(args):
             return
         wildcard = args[0]
         if len(args) > 1 and args[1] == "-v":
-            set_vehicle_name()
             verbose = True
     else:
         wildcard = '*'
@@ -840,6 +840,7 @@ def cmd_param(args):
         if fnmatch.fnmatch(str(p).upper(), wildcard.upper()):
             s = "%-16.16s %f" % (str(p), mestate.mlog.params[p])
             if verbose:
+                set_vehicle_name()
                 info = mestate.param_help.param_info(p, mestate.mlog.params[p])
                 if info is not None:
                     s += " # %s" % info

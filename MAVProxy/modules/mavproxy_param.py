@@ -372,7 +372,7 @@ class ParamState:
                 print("Usage: param set PARMNAME VALUE")
                 return
             if len(args) == 2:
-                self.mav_param.show(args[1])
+                self.param_show(args[1], self.mpstate.settings.param_docs)
                 return
             param = args[1]
             value = args[2]
@@ -436,7 +436,7 @@ class ParamState:
         elif args[0] == "set_xml_filepath":
             self.param_set_xml_filepath(args[1:])
         elif args[0] == "show":
-            verbose = False
+            verbose = self.mpstate.settings.param_docs
             if len(args) > 1:
                 pattern = args[1]
                 if len(args) > 2 and args[2] == '-v':
