@@ -31,26 +31,30 @@ class ParamHelp:
     def param_use_xml_filepath(self, filepath):
         self.xml_filepath = filepath
 
-    def param_help_tree(self):
+    def param_help_tree(self, verbose=False):
         '''return a "help tree", a map between a parameter and its metadata.  May return None if help is not available'''
         if self.last_pair == (self.xml_filepath, self.vehicle_name):
             return self.last_htree
         if self.xml_filepath is not None:
-            print("param: using xml_filepath=%s" % self.xml_filepath)
+            if verbose:
+                print("param: using xml_filepath=%s" % self.xml_filepath)
             path = self.xml_filepath
         else:
             if self.vehicle_name is None:
-                print("Unknown vehicle type")
+                if verbose:
+                    print("Unknown vehicle type")
                 return None
             path = mp_util.dot_mavproxy("%s.xml" % self.vehicle_name)
             if not os.path.exists(path):
                 if self.vehicle_name == 'APMrover2':
                     path = mp_util.dot_mavproxy("%s.xml" % "Rover")
             if not os.path.exists(path):
-                print("Please run 'param download' first (vehicle_name=%s)" % self.vehicle_name)
+                if verbose:
+                    print("Please run 'param download' first (vehicle_name=%s)" % self.vehicle_name)
                 return None
         if not os.path.exists(path):
-            print("Param XML (%s) does not exist" % path)
+            if verbose:
+                print("Param XML (%s) does not exist" % path)
             return None
         xml = open(path,'rb').read()
         from lxml import objectify
@@ -77,7 +81,7 @@ class ParamHelp:
             print("Usage: param apropos keyword")
             return
 
-        htree = self.param_help_tree()
+        htree = self.param_help_tree(True)
         if htree is None:
             return
 
@@ -148,7 +152,7 @@ class ParamHelp:
             print("Usage: param help PARAMETER_NAME")
             return
 
-        htree = self.param_help_tree()
+        htree = self.param_help_tree(True)
         if htree is None:
             return
 
@@ -179,7 +183,7 @@ class ParamHelp:
     def param_check(self, params, args):
         '''Check through parameters for obvious misconfigurations'''
         problems_found = False
-        htree = self.param_help_tree()
+        htree = self.param_help_tree(True)
         if htree is None:
             return
         for param in params.keys():
