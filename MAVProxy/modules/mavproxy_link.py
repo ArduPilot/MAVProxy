@@ -21,6 +21,7 @@ delayedPackets = frozenset([ 'MISSION_CURRENT', 'SYS_STATUS', 'VFR_HUD',
                   'GPS_RAW_INT', 'SCALED_PRESSURE', 'GLOBAL_POSITION_INT',
                   'NAV_CONTROLLER_OUTPUT' ])
 activityPackets = frozenset([ 'HEARTBEAT', 'GPS_RAW_INT', 'GPS_RAW', 'GLOBAL_POSITION_INT', 'SYS_STATUS' ])
+radioStatusPackets = frozenset([ 'RADIO', 'RADIO_STATUS'])
 
 preferred_ports = [
     '*FTDI*',
@@ -862,13 +863,11 @@ class LinkModule(mp_module.MPModule):
             for (mod,pm) in self.mpstate.modules:
                 if not hasattr(mod, 'mavlink_packet'):
                     continue
-                # sysid 51/'3' is used by SiK radio for the injected RADIO_STATUS mavlink frames.
-                # In order to be able to pass these to the graph module, which is not multi-vehicle,
-                # special handling is needed to have graph display both RADIO_STATUS and target 
+                # sysid 51/'3' is used by SiK radio for the injected RADIO/RADIO_STATUS mavlink frames.
+                # In order to be able to pass these to e.g. the graph module, which is not multi-vehicle,
+                # special handling is needed, so that the module gets both RADIO_STATUS and (single) target 
                 # vehicle information.
-                # Since only graph module is tested getting the additional sysid frames, condition
-                # for this is added to the exception as well.
-                if not(sysid == 51 and mod.name == "graph"):
+                if not(sysid == 51 and mtype in radioStatusPackets):
                     if not mod.multi_vehicle and sysid != target_sysid:
                         # only pass packets not from our target to modules that
                         # have marked themselves as being multi-vehicle capable
