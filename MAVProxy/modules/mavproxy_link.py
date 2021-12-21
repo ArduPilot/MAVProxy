@@ -862,10 +862,17 @@ class LinkModule(mp_module.MPModule):
             for (mod,pm) in self.mpstate.modules:
                 if not hasattr(mod, 'mavlink_packet'):
                     continue
-                if not mod.multi_vehicle and sysid != target_sysid:
-                    # only pass packets not from our target to modules that
-                    # have marked themselves as being multi-vehicle capable
-                    continue
+                # sysid 51/'3' is used by SiK radio for the injected RADIO_STATUS mavlink frames.
+                # In order to be able to pass these to the graph module, which is not multi-vehicle,
+                # special handling is needed to have graph display both RADIO_STATUS and target 
+                # vehicle information.
+                # Since only graph module is tested getting the additional sysid frames, condition
+                # for this is added to the exception as well.
+                if not(sysid == 51 and mod.name == "graph"):
+                    if not mod.multi_vehicle and sysid != target_sysid:
+                        # only pass packets not from our target to modules that
+                        # have marked themselves as being multi-vehicle capable
+                        continue
                 try:
                     mod.mavlink_packet(m)
                 except Exception as msg:
