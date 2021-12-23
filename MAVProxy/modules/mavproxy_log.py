@@ -123,6 +123,9 @@ class LogModule(mp_module.MPModule):
         if m is None:
             size = 0
             pct = 0
+        elif m.size == 0:
+            size = 0
+            pct = 100
         else:
             size = m.size
             pct = (100.0*file_size)/size
