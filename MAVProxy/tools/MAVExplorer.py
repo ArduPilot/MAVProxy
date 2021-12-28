@@ -994,6 +994,19 @@ def input_loop():
             sys.exit(1)
         mestate.input_queue.put(line)
 
+new_matplotlib = False
+(matplotlib_major, matplotlib_minor, matplotlib_point) = matplotlib.__version__.split('.')
+if int(matplotlib_major) > 3:
+    new_matplotlib = True
+elif (int(matplotlib_major) >= 3 and int(matplotlib_minor) >= 5):
+    new_matplotlib = True
+
+def epoch_time(num):
+    '''converts a number into an epoch time - compatability wrapper'''
+    if new_matplotlib:
+        return matplotlib.dates.num2date(num).timestamp()
+    return matplotlib.dates.num2epoch(num)
+
 def main_loop():
     '''main processing loop, display graphs and maps'''
     global grui, xlimits
@@ -1018,10 +1031,10 @@ def main_loop():
                 xlimits.last_xlim = xlim
                 from dateutil.tz import tzlocal
                 localtimezone = tzlocal()
-                tbase = matplotlib.dates.num2epoch(xlim[0])
+                tbase = epoch_time(xlim[0])
                 tzofs = localtimezone.utcoffset(datetime.datetime.utcfromtimestamp(tbase)).total_seconds()
-                xlimits.xlim_low = matplotlib.dates.num2epoch(xlim[0]) - tzofs
-                xlimits.xlim_high = matplotlib.dates.num2epoch(xlim[1]) - tzofs
+                xlimits.xlim_low = epoch_time(xlim[0]) - tzofs
+                xlimits.xlim_high = epoch_time(xlim[1]) - tzofs
                 
                 if mestate.settings.sync_xmap:
                     remlist = []
