@@ -60,6 +60,7 @@ class NtripClient(object):
         # RTCM3 parser
         self.rtcm3 = rtcm3.RTCM3()
         self.last_id = None
+        self.dt_last_gga_sent = 0
         if self.port == 443:
             # force SSL on port 443
             self.ssl = True
@@ -159,14 +160,7 @@ class NtripClient(object):
                     raise NtripError("Mount Point does not exist")
                 elif line.find(" 200 OK") != -1:
                     # Request was valid
-                    try:
-                        gga = self.getGGAString()
-                        if sys.version_info.major >= 3:
-                            gga = bytearray(gga, 'ascii')
-                        self.socket.sendall(gga)
-                    except Exception:
-                        self.socket = None
-                        return None
+                    self.send_gga()
             return None
         # normal data read
         while True:
@@ -216,6 +210,16 @@ class NtripClient(object):
             if data is None:
                 continue
             print("got: ", len(data))
+
+    def send_gga(self):
+        gga = self.getGGAString()
+        if sys.version_info.major >= 3:
+            gga = bytearray(gga, "ascii")
+        try:
+            self.socket.sendall(gga)
+            self.dt_last_gga_sent = time.time()
+        except Exception:
+            self.socket = None
 
 if __name__ == '__main__':
     usage = "NtripClient.py [options] [caster] [port] mountpoint"

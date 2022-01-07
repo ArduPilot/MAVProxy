@@ -74,6 +74,9 @@ class NtripModule(mp_module.MPModule):
                 self.start_pending = True
                 self.last_restart = now
             return
+        if time.time() - self.ntrip.dt_last_gga_sent > 2:
+            self.ntrip.setPosition(self.pos[0], self.pos[1])
+            self.ntrip.send_gga()
         self.log_rtcm(data)
 
         rtcm_id = self.ntrip.get_ID()
