@@ -692,7 +692,7 @@ class MPSlipMapPanel(wx.Panel):
         '''clear all thumbnails from the map'''
         state = self.state
         for l in state.layers:
-            keys = state.layers[l].keys()[:]
+            keys = list(state.layers[l].keys())[:]
             for key in keys:
                 if (isinstance(state.layers[l][key], SlipThumbnail)
                     and not isinstance(state.layers[l][key], SlipIcon)):
