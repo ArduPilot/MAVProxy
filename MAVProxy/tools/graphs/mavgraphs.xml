@@ -451,6 +451,24 @@ If PIDR.I has a constant positive value then it means the aircraft is trimmed to
   <expression>GPA2.HAcc GPA2.SAcc GPA2.VAcc GPS2.NSats:2</expression>
  </graph>
 
+ <graph name='Sensors/GPS/GPS Vel NE'>
+  <description></description>
+  <expression>GPS[0].Spd*sin(radians(GPS[0].GCrs)) GPS[0].Spd*cos(radians(GPS[0].GCrs))</expression>
+  <expression>GPS.Spd*sin(radians(GPS.GCrs)) GPS.Spd*cos(radians(GPS.GCrs))</expression>
+ </graph>
+
+ <graph name='Sensors/GPS/GPS2 Vel NE'>
+  <description></description>
+  <expression>GPS[1].Spd*sin(radians(GPS[1].GCrs)) GPS[1].Spd*cos(radians(GPS[1].GCrs))</expression>
+  <expression>GPS2.Spd*sin(radians(GPS2.GCrs)) GPS2.Spd*cos(radians(GPS2.GCrs))</expression>
+ </graph>
+
+ <graph name='Sensors/GPS/Dual GPS Vel NE'>
+  <description></description>
+  <expression>GPS[0].Spd*sin(radians(GPS[0].GCrs)) GPS[0].Spd*cos(radians(GPS[0].GCrs)) GPS[1].Spd*sin(radians(GPS[1].GCrs)) GPS[1].Spd*cos(radians(GPS[1].GCrs))</expression>
+  <expression>GPS.Spd*sin(radians(GPS.GCrs)) GPS.Spd*cos(radians(GPS.GCrs)) GPS2.Spd*sin(radians(GPS2.GCrs)) GPS2.Spd*cos(radians(GPS2.GCrs))</expression>
+ </graph>
+ 
  <graph name='Sensors/GPS/RTKPosAltDiff'>
   <description></description>
   <expression>distance_two(GPS,GPS2){GPS2.GMS==GPS.GMS} GPS2.Alt-GPS.Alt{GPS2.GMS==GPS.GMS}</expression>
