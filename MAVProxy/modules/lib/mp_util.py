@@ -490,3 +490,24 @@ def decode_devid(devid, pname):
         bustypes.get(bus_type,"UNKNOWN"), bus_type,
         bus, address, address, devtype, devtype, decoded_devname,
         devid))
+
+
+def decode_flight_sw_version(flight_sw_version):
+    '''decode 32 bit flight_sw_version mavlink parameter - corresponds to encoding in ardupilot GCS_MAVLINK::send_autopilot_version'''
+    fw_type_id = (flight_sw_version >>  0) % 256
+    patch      = (flight_sw_version >>  8) % 256
+    minor      = (flight_sw_version >> 16) % 256
+    major      = (flight_sw_version >> 24) % 256
+    if (fw_type_id==0):
+        fw_type="dev"
+    elif (fw_type_id==64):
+        fw_type="alpha"
+    elif (fw_type_id==128):
+        fw_type="beta"
+    elif (fw_type_id==192):
+        fw_type="rc"
+    elif (fw_type_id==255):
+        fw_type="official"
+    else:
+        fw_type="undefined"
+    return major,minor,patch,fw_type
