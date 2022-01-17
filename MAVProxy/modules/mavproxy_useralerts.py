@@ -21,6 +21,7 @@ else:
 
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
+from MAVProxy.modules.lib.mp_util import decode_flight_sw_version
 
 class UserAlertsModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -67,9 +68,7 @@ class UserAlertsModule(mp_module.MPModule):
             # board_version : 0, flight_custom_version : [54, 49, 51, 100, 50, 99, 50, 101],
             # middleware_custom_version : [0, 0, 0, 0, 0, 0, 0, 0], os_custom_version : [51, 51, 49, 102, 101, 55, 53, 100],
             # vendor_id : 0, product_id : 0, uid : 0, uid2 : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
-            vMajor = hex(m.flight_sw_version)[2]
-            vMinor = hex(m.flight_sw_version)[3]
-            vPatch = hex(m.flight_sw_version)[4]
+            vMajor,vMinor,vPatch,vFwType = decode_flight_sw_version(m.flight_sw_version)
             self.version = "{0}.{1}.{2}".format(vMajor, vMinor, vPatch)
 
         if self.board and self.version:
