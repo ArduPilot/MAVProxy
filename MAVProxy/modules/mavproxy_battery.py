@@ -44,7 +44,7 @@ class BatteryModule(mp_module.MPModule):
                                                               self.vcell_to_battery_percent(self.per_cell)))
 
     def battery_report(self):
-        batt_mon = int(self.get_mav_param('BATT_MONITOR',0))
+        batt_mon = int(self.get_mav_param('BATT_MONITOR',4)) # Default of 4 ensures PX4 compatibility
 
         #report voltage level only
         battery_string = ''
