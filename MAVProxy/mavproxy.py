@@ -285,6 +285,8 @@ class MPState(object):
 
               MPSetting('inhibit_screensaver_when_armed', bool, False, 'inhibit screensaver while vehicle armed'),
 
+              MPSetting('timeout', int, 5, 'Number of seconds with no packets for a link to considered down', range=(0,255), increment=1),
+
             ])
 
         self.completions = {
@@ -973,11 +975,11 @@ def set_stream_rates():
 def check_link_status():
     '''check status of master links'''
     tnow = time.time()
-    if mpstate.status.last_message != 0 and tnow > mpstate.status.last_message + 5:
+    if mpstate.status.last_message != 0 and tnow > mpstate.status.last_message + mpstate.settings.timeout:
         say("no link")
         mpstate.status.heartbeat_error = True
     for master in mpstate.mav_master:
-        if not master.linkerror and (tnow > master.last_message + 5 or master.portdead):
+        if not master.linkerror and (tnow > master.last_message + mpstate.settings.timeout or master.portdead):
             say("link %s down" % (mp_module.MPModule.link_label(master)))
             master.linkerror = True
 
