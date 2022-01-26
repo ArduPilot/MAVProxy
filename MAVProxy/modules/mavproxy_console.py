@@ -487,7 +487,7 @@ class ConsoleModule(mp_module.MPModule):
                 status += 'O2'
             self.console.set_status('PWR', status, fg=fg)
             self.console.set_status('Srv', 'Srv %.2f' % (msg.Vservo*0.001), fg='green')
-        elif type == 'HEARTBEAT':
+        elif type in ['HEARTBEAT', 'HIGH_LATENCY2']:
             fmode = master.flightmode
             if self.settings.vehicle_name:
                 fmode = self.settings.vehicle_name + ':' + fmode
@@ -596,7 +596,7 @@ class ConsoleModule(mp_module.MPModule):
             rec, tot = self.module('param').param_status()
             self.console.set_status('Params', 'Param %u/%u' % (rec,tot))
             
-        elif type == 'HIGH_LATENCY2':
+        if type == 'HIGH_LATENCY2':
             self.console.set_status('WPDist', 'Distance %s' % self.dist_string(msg.target_distance * 10))
             # The -180 here for for consistency with NAV_CONTROLLER_OUTPUT (-180->180), whereas HIGH_LATENCY2 is (0->360)
             self.console.set_status('WPBearing', 'Bearing %u' % ((msg.target_heading * 2) - 180))
