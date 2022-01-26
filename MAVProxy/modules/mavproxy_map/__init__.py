@@ -735,13 +735,6 @@ class MapModule(mp_module.MPModule):
                     (_,_,heading) = self.lat_lon_heading[m.get_srcSystem()]
                 self.create_vehicle_icon('GPS' + vehicle, 'blue')
                 self.map.set_position('GPS' + vehicle, (lat, lon), rotation=heading)
-                
-        elif mtype == "HIGH_LATENCY2" and self.map_settings.showgpspos:
-            (lat, lon) = (m.latitude*1.0e-7, m.longitude*1.0e-7)
-            if lat != 0 or lon != 0:
-                cog = m.heading * 2
-                self.create_vehicle_icon('GPS' + vehicle, 'blue')
-                self.map.set_position('GPS' + vehicle, (lat, lon), rotation=cog)
                             
         elif mtype == "GPS2_RAW" and self.map_settings.showgps2pos:
             (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
@@ -760,6 +753,19 @@ class MapModule(mp_module.MPModule):
                 else:
                     label = None
                 self.map.set_position('Pos' + vehicle, (lat, lon), rotation=heading, label=label, colour=(255,255,255))
+                self.map.set_follow_object('Pos' + vehicle, self.is_primary_vehicle(m))
+
+        elif mtype == "HIGH_LATENCY2" and self.map_settings.showahrspos:
+            (lat, lon) = (m.latitude*1.0e-7, m.longitude*1.0e-7)
+            if lat != 0 or lon != 0:
+                cog = m.heading * 2
+                self.have_global_position = True
+                self.create_vehicle_icon('Pos' + vehicle, 'red', follow=True)
+                if len(self.vehicle_type_by_sysid) > 1:
+                    label = str(sysid)
+                else:
+                    label = None
+                self.map.set_position('Pos' + vehicle, (lat, lon), rotation=cog, label=label, colour=(255,255,255))
                 self.map.set_follow_object('Pos' + vehicle, self.is_primary_vehicle(m))
 
         elif mtype == 'HOME_POSITION':
