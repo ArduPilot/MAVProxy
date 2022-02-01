@@ -26,6 +26,8 @@ class CmdlongModule(mp_module.MPModule):
         self.add_command('command_int', self.cmd_command_int, "execute mavlink command_int",
                          self.cmd_long_commands())
         self.add_command('engine', self.cmd_engine, "engine")
+        self.add_command('pause', self.cmd_pause, "pause AUTO/GUIDED modes")
+        self.add_command('resume', self.cmd_resume, "resume AUTO/GUIDED modes")
 
     def cmd_long_commands(self):
         atts = dir(mavutil.mavlink)
@@ -309,6 +311,36 @@ class CmdlongModule(mp_module.MPModule):
             vN, vE, vD, # velocity
             0, 0, 0, # accel x,y,z
             0, 0) # yaw, yaw rate
+
+    def cmd_pause(self, args):
+        '''pause AUTO/GUIDED modes'''
+        self.master.mav.command_long_send(
+            self.settings.target_system,  # target_system
+            self.settings.target_component,  # target_component
+            mavutil.mavlink.MAV_CMD_DO_PAUSE_CONTINUE,  # command
+            0,  # confirmation
+            0,  # 0: pause, 1: continue
+            0,  # param2
+            0,  # param3
+            0,  # param4
+            0,  # param5
+            0,  # param6
+            0)  # param7
+
+    def cmd_resume(self, args):
+        '''resume AUTO/GUIDED modes'''
+        self.master.mav.command_long_send(
+            self.settings.target_system,  # target_system
+            self.settings.target_component,  # target_component
+            mavutil.mavlink.MAV_CMD_DO_PAUSE_CONTINUE,  # command
+            0,  # confirmation
+            1,  # 0: pause, 1: continue
+            0,  # param2
+            0,  # param3
+            0,  # param4
+            0,  # param5
+            0,  # param6
+            0)  # param7
 
     def cmd_long(self, args):
         '''execute supplied command long'''
