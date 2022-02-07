@@ -103,6 +103,7 @@ class MiscModule(mp_module.MPModule):
         self.add_command('namedvaluefloat', self.cmd_namedvaluefloat, "send a NAMED_VALUE_FLOAT")
         self.add_command('scripting', self.cmd_scripting, "control onboard scripting", ["<stop|restart>"])
         self.add_command('formatsdcard', self.cmd_formatsdcard, "format SD card")
+        self.add_command('canforward', self.cmd_canforward, "enable CAN forwarding")
 
         self.repeats = []
 
@@ -544,6 +545,24 @@ class MiscModule(mp_module.MPModule):
         value = float(args[1])
         self.master.mav.named_value_float_send(tnow_ms, name.encode("utf-8"), value)
 
+    def cmd_canforward(self, args):
+        if len(args) < 1:
+            print("Usage: canforward bus")
+            return
+        bus = int(args[0])
+        self.master.mav.command_long_send(
+            self.settings.target_system,
+            self.settings.target_component,
+            mavutil.mavlink.MAV_CMD_CAN_FORWARD,
+            0,
+            bus,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0)
+        
     def idle_task(self):
         '''called on idle'''
         for r in self.repeats:

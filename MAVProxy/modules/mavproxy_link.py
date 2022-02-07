@@ -765,7 +765,8 @@ class LinkModule(mp_module.MPModule):
                 cmd = cmd[8:]
                 res = mavutil.mavlink.enums["MAV_RESULT"][m.result].name
                 res = res[11:]
-                self.mpstate.console.writeln("Got COMMAND_ACK: %s: %s" % (cmd, res))
+                if m.target_component not in [mavutil.mavlink.MAV_COMP_ID_MAVCAN]:
+                    self.mpstate.console.writeln("Got COMMAND_ACK: %s: %s" % (cmd, res))
             except Exception:
                 self.mpstate.console.writeln("Got MAVLink msg: %s" % m)
 
