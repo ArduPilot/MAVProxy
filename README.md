@@ -1,4 +1,4 @@
-[![MAVProxy status](https://ci.appveyor.com/api/projects/status/github/Ardupilot/MAVProxy?branch=master&svg=true)]( https://ci.appveyor.com/project/tridge/MAVProxy/history)
+![GitHub Actions](https://github.com/ardupilot/MAVProxy/actions/workflows/windows_build.yml/badge.svg)
 
 MAVProxy
 
