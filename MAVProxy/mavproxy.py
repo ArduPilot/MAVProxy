@@ -1409,7 +1409,8 @@ if __name__ == '__main__':
         # some core functionality is in modules
         standard_modules = opts.default_modules.split(',')
         for m in standard_modules:
-            load_module(m, quiet=True)
+            if m:
+                load_module(m, quiet=True)
 
     if platform.system() != 'Windows':
         if opts.console:
