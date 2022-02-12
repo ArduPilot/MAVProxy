@@ -973,7 +973,7 @@ def set_stream_rates():
 def check_link_status():
     '''check status of master links'''
     tnow = time.time()
-    if mpstate.status.last_message != 0 and tnow > mpstate.status.last_message + 5:
+    if mpstate.status.last_message != 0 and tnow > mpstate.status.last_message + 5 and not mpstate.status.heartbeat_error:
         say("no link")
         mpstate.status.heartbeat_error = True
     for master in mpstate.mav_master:
