@@ -512,9 +512,9 @@ class MavGraph(object):
 
     def xlim_change_check(self, idx):
         '''handle xlim change requests from queue'''
-        if not self.xlim_pipe[1].poll():
-            return
         try:
+            if not self.xlim_pipe[1].poll():
+                return
             xlim = self.xlim_pipe[1].recv()
             if xlim is None:
                 return
