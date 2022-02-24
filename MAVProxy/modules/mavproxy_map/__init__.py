@@ -44,6 +44,7 @@ class MapModule(mp_module.MPModule):
         self.last_unload_check_time = time.time()
         self.unload_check_interval = 0.1 # seconds
         self.trajectory_layers = set()
+        self.vehicle_type_override = {}
         self.map_settings = mp_settings.MPSettings(
             [ ('showgpspos', int, 1),
               ('showgps2pos', int, 1),
@@ -74,6 +75,7 @@ class MapModule(mp_module.MPModule):
         self.map.add_callback(functools.partial(self.map_callback))
         self.add_command(cmdname, self.cmd_map, "map control", ['icon',
                                                                 'set (MAPSETTING)',
+                                                                'vehicletype',
                                                                 'zoom',
                                                                 'center',
                                                                 'follow',
@@ -161,6 +163,14 @@ class MapModule(mp_module.MPModule):
                                                            (float(lat),float(lon)),
                                                    icon, layer=3, rotation=0, follow=False))
                 self.icon_counter += 1
+        elif args[0] == "vehicletype":
+            if len(args) < 3:
+                print("Usage: map vehicletype SYSID TYPE")
+            else:
+                sysid = int(args[1])
+                vtype = int(args[2])
+                self.vehicle_type_override[sysid] = vtype
+                print("Set sysid %u to vehicle type %u" % (sysid, vtype))
         elif args[0] == "circle":
             if len(args) < 4:
                 # map circle -27.70533373 153.23404844 5 red
@@ -680,28 +690,29 @@ class MapModule(mp_module.MPModule):
 
         if mtype == "HEARTBEAT" or mtype == "HIGH_LATENCY2":
             vname = None
-            if m.type in [mavutil.mavlink.MAV_TYPE_FIXED_WING]:
+            vtype = self.vehicle_type_override.get(sysid, m.type)
+            if vtype in [mavutil.mavlink.MAV_TYPE_FIXED_WING]:
                 vname = 'plane'
-            elif m.type in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER]:
+            elif vtype in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER]:
                 vname = 'rover'
-            elif m.type in [mavutil.mavlink.MAV_TYPE_SUBMARINE]:
+            elif vtype in [mavutil.mavlink.MAV_TYPE_SUBMARINE]:
                 vname = 'sub'
-            elif m.type in [mavutil.mavlink.MAV_TYPE_SURFACE_BOAT]:
+            elif vtype in [mavutil.mavlink.MAV_TYPE_SURFACE_BOAT]:
                 vname = 'boat'
-            elif m.type in [mavutil.mavlink.MAV_TYPE_QUADROTOR,
+            elif vtype in [mavutil.mavlink.MAV_TYPE_QUADROTOR,
                             mavutil.mavlink.MAV_TYPE_HEXAROTOR,
                             mavutil.mavlink.MAV_TYPE_OCTOROTOR,
                             mavutil.mavlink.MAV_TYPE_TRICOPTER,
                             mavutil.mavlink.MAV_TYPE_DODECAROTOR,
                             mavutil.mavlink.MAV_TYPE_DECAROTOR]:
                 vname = 'copter'
-            elif m.type in [mavutil.mavlink.MAV_TYPE_COAXIAL]:
+            elif vtype in [mavutil.mavlink.MAV_TYPE_COAXIAL]:
                 vname = 'singlecopter'
-            elif m.type in [mavutil.mavlink.MAV_TYPE_HELICOPTER]:
+            elif vtype in [mavutil.mavlink.MAV_TYPE_HELICOPTER]:
                 vname = 'heli'
-            elif m.type in [mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER]:
+            elif vtype in [mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER]:
                 vname = 'antenna'
-            elif m.type in [mavutil.mavlink.MAV_TYPE_AIRSHIP]:
+            elif vtype in [mavutil.mavlink.MAV_TYPE_AIRSHIP]:
                 vname = 'blimp'
             if vname is not None:
                 self.vehicle_type_by_sysid[sysid] = vname
