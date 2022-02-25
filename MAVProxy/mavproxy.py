@@ -231,7 +231,7 @@ class MPState(object):
         self.vehicle_name = None
         from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
         self.settings = MPSettings(
-            [ MPSetting('link', int, 1, 'Primary Link', tab='Link', range=(0,4), increment=1),
+            [ MPSetting('link', int, 1, 'Primary Link', tab='Link', range=(0,100), increment=1),
               MPSetting('streamrate', int, 4, 'Stream rate link1', range=(-1,500), increment=1),
               MPSetting('streamrate2', int, 4, 'Stream rate link2', range=(-1,500), increment=1),
               MPSetting('heartbeat', float, 1, 'Heartbeat rate (Hz)', range=(0,100), increment=0.1),
