@@ -17,6 +17,7 @@ import math
 import platform
 import json
 import struct
+import glob
 
 try:
     reload
@@ -1360,7 +1361,11 @@ if __name__ == '__main__':
 
     # open master link
     for mdev in opts.master:
-        if not mpstate.module('link').link_add(mdev, force_connected=opts.force_connected):
+        if mdev.find('?') != -1 or mdev.find('*') != -1:
+            for m in glob.glob(mdev):
+                if not mpstate.module('link').link_add(m, force_connected=opts.force_connected):
+                    sys.exit(1)
+        elif not mpstate.module('link').link_add(mdev, force_connected=opts.force_connected):
             sys.exit(1)
 
     if not opts.master and len(serial_list) == 1:
