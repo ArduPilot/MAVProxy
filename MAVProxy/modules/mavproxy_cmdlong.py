@@ -2,7 +2,9 @@
 '''command long'''
 
 import time, os
+from numpy import equal
 from pymavlink import mavutil
+from math import *
 
 from MAVProxy.modules.lib import mp_module
 
@@ -253,29 +255,59 @@ class CmdlongModule(mp_module.MPModule):
                                       0, 0)     # yaw, yaw rate
 
     def cmd_attitude(self, args):
-        '''attitude q0 q1 q2 q3 thrust'''
-        if len(args) != 5:
-            print("Usage: attitude q0 q1 q2 q3 thrust (0~1)")
+        '''attitude mask q0 q1 q2 q3 roll_rate pitch_rate yaw_rate thrust'''
+        if len(args) < 5:
+            print("Usage: attitude q0 q1 q2 q3 thrust")
+            print("q0 q1 q2 q3: [w, x, y, z] order, zero-rotation is [1, 0, 0, 0], unit-length")
+            print("thrust: (0~1)")
+            return
+        elif len(args) not in [5, 9]:
+            print("Usage: attitude mask q0 q1 q2 q3 roll_rate pitch_rate yaw_rate thrust")
+            print("mask : Example 7 (0b00000111): Ignore roll rate, pitch rate, yaw rate")
+            print("mask : Example 128 (0b10000000): Ignore attitude")
+            print("mask : Example 132 (0b10000100): Ignore yaw rate, Ignore attitude")
+            print("     : See https://mavlink.io/en/messages/common.html#ATTITUDE_TARGET_TYPEMASK")
+            print("q0 q1 q2 q3: [w, x, y, z] order, zero-rotation is [1, 0, 0, 0], unit-length")
+            print("roll_rate pitch_rate yaw_rate: in degrees per second")
+            print("thrust: (0~1)")
             return
 
         if len(args) == 5:
+            mask = 7                    # ignore angular rates
             q0 = float(args[0])
             q1 = float(args[1])
             q2 = float(args[2])
             q3 = float(args[3])
             thrust = float(args[4])
-            att_target = [q0, q1, q2, q3]
-            print("q0:%.3f, q1:%.3f, q2:%.3f q3:%.3f thrust:%.2f" % (q0, q1, q2, q3, thrust))
-            self.master.mav.set_attitude_target_send(
-                                      0,  # system time in milliseconds
-                                      self.settings.target_system,  # target system
-                                      0,  # target component
-                                      63, # type mask (ignore all except attitude + thrust)
-                                      att_target, # quaternion attitude
-                                      0,  # body roll rate
-                                      0,  # body pitch rate
-                                      0,  # body yaw rate
-                                      thrust)  # thrust
+            roll_rate = 0.0
+            pitch_rate = 0.0
+            yaw_rate = 0.0
+            print("q0:%.3f, q1:%.3f, q2:%.3f q3:%.3f, thrust:%.3f" % (q0, q1, q2, q3, thrust))
+
+        elif len(args) == 9:
+            mask = int(args[0])
+            q0 = float(args[1])
+            q1 = float(args[2])
+            q2 = float(args[3])
+            q3 = float(args[4])
+            roll_rate = float(args[5])
+            pitch_rate = float(args[6])
+            yaw_rate = float(args[7])
+            thrust = float(args[8])
+            print("mask:%i, q0:%.3f, q1:%.3f, q2:%.3f q3:%.3f, roll_rate:%.3f, pitch_rate:%.3f, yaw_rate:%.3f, thrust:%.3f" %
+                  (mask, q0, q1, q2, q3, roll_rate, pitch_rate, yaw_rate, thrust))
+
+        att_target = [q0, q1, q2, q3]
+        self.master.mav.set_attitude_target_send(
+                                    0,  # system time in milliseconds
+                                    self.settings.target_system,  # target system
+                                    0,            # target component
+                                    mask,         # type mask
+                                    att_target,   # quaternion attitude
+                                    radians(roll_rate),    # body roll rate
+                                    radians(pitch_rate),   # body pitch rate
+                                    radians(yaw_rate),     # body yaw rate
+                                    thrust)       # thrust
 
     def cmd_posvel(self, args):
         '''posvel mapclick vN vE vD'''
