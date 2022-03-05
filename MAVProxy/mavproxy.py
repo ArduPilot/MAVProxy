@@ -493,8 +493,8 @@ def generate_kwargs(args):
 def get_exception_stacktrace(e):
     if sys.version_info[0] >= 3:
         ret = "%s\n" % e
-        ret += ''.join(traceback.format_exception(etype=type(e),
-                                                  value=e,
+        ret += ''.join(traceback.format_exception(type(e),
+                                                  e,
                                                   tb=e.__traceback__))
         return ret
     return traceback.format_exc(e)
