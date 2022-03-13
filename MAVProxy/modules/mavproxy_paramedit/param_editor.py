@@ -169,7 +169,7 @@ class ParamEditorMain(object):
                 else:
                     default_channel = 8
                 fltmode_ch = int(self.mpstate.module('param').mav_param.get('FLTMODE_CH', default_channel))
-            if self.mpstate.vehicle_name is not None:
+            if self.mpstate.vehicle_name is not None and fltmode_ch > 0:
                 rc_received = float(getattr(m, 'chan%u_raw' % fltmode_ch))
                 if rc_received != self.fltmode_rc and ((fltmode_ch > 0 and fltmode_ch < 9 and mtype == 'RC_CHANNELS_RAW') or (fltmode_ch > 0 and fltmode_ch < 19 and mtype == 'RC_CHANNELS')):
                     self.fltmode_rc = rc_received
