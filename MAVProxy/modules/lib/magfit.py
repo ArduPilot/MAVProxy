@@ -274,11 +274,16 @@ def magfit(mlog, timestamp_in_range):
         print("Earth field: %s  strength %.0f declination %.1f degrees" % (earth_field, earth_field.length(), declination))
 
     ATT_NAME = margs['Attitude']
-    print("Attitude source %s" % ATT_NAME);
+
+    mtypes = ['GPS',mag_msg,ATT_NAME,'BAT']
+    if ATT_NAME == "XKY0":
+        mtypes.append('ATT')
+    last_ATT = None
+    print("Attitude source %s mtypes=%s" % (ATT_NAME, mtypes))
 
     # extract MAG data
     while True:
-        msg = mlog.recv_match(type=['GPS',mag_msg,ATT_NAME,'BAT'])
+        msg = mlog.recv_match(type=mtypes)
         if msg is None:
             break
         in_range = timestamp_in_range(msg._timestamp)
@@ -290,11 +295,21 @@ def magfit(mlog, timestamp_in_range):
             earth_field = mavextra.expected_earth_field(msg)
             (declination,inclination,intensity) = mavextra.get_mag_field_ef(msg.Lat, msg.Lng)
             print("Earth field: %s  strength %.0f declination %.1f degrees" % (earth_field, earth_field.length(), declination))
+        if msg.get_type() == 'ATT':
+            # needed for XKY0 for yaw
+            last_ATT = msg
         if msg.get_type() == ATT_NAME:
             if getattr(msg, 'C', 0) != 0:
                 # use core zero for EKF attitude
                 continue
-            ATT = msg
+            if ATT_NAME == 'XKY0':
+                if last_ATT is None:
+                    continue
+                # get yaw from GSF, and roll/pitch from ATT
+                ATT = last_ATT
+                ATT.Yaw = math.degrees(msg.YC)
+            else:
+                ATT = msg
             ATT.Roll  += math.degrees(parameters['AHRS_TRIM_X'])
             ATT.Pitch += math.degrees(parameters['AHRS_TRIM_Y'])
             ATT.Yaw   += math.degrees(parameters['AHRS_TRIM_Z'])
@@ -533,6 +548,8 @@ class MagFitUI(wx.Dialog):
             att_choices.append('NKF1')
         if self.have_msg('XKF1'):
             att_choices.append('XKF1')
+        if self.have_msg('XKY0'):
+            att_choices.append('XKY0')
 
         # first row, Mag and attitude source
         self.StartRow('Source Selection')
