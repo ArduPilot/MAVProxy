@@ -1359,7 +1359,7 @@ if __name__ == '__main__':
     parser.add_option("--mavversion", type='choice', choices=['1.0', '2.0'] , help="Force MAVLink Version (1.0, 2.0). Otherwise autodetect version")  # noqa:E501
     parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
     parser.add_option("-c", "--continue", dest='continue_mode', action='store_true', default=False, help="continue logs")
-    parser.add_option("--dialect", default="ardupilotmega", help="MAVLink dialect")
+    parser.add_option("--dialect", default="all", help="MAVLink dialect")
     parser.add_option("--rtscts", action='store_true', help="enable hardware RTS/CTS flow control")
     parser.add_option("--moddebug", type=int, help="module debug level", default=0)
     parser.add_option("--mission", dest="mission", help="mission name", default=None)
