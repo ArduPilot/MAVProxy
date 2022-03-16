@@ -355,22 +355,22 @@
   <expression>XKF2.AX XKF2.AY XKF2.AZ</expression>
  </graph>
 
- <graph name='Copter/PID Tuning/PIQP'>
+ <graph name='Quadplane/PID Tuning/PIQP'>
   <description></description>
   <expression>PIQP.FF PIQP.P PIQP.I PIQP.D</expression>
  </graph>
 
- <graph name='Copter/PID Tuning/PIQR'>
+ <graph name='Quadplane/PID Tuning/PIQR'>
   <description></description>
   <expression>PIQR.FF PIQR.P PIQR.I PIQR.D</expression>
  </graph>
 
- <graph name='Copter/PID Tuning/PIQY'>
+ <graph name='Quadplane/PID Tuning/PIQY'>
   <description></description>
   <expression>PIQY.FF PIQY.P PIQY.I PIQY.D</expression>
  </graph>
 
- <graph name='Copter/PID Tuning/PIQA'>
+ <graph name='Quadplane/PID Tuning/PIQA'>
   <description></description>
   <expression>PIQA.P PIQA.I PIQA.D</expression>
  </graph>
