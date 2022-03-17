@@ -34,13 +34,13 @@ class PipeQueue(object):
     def fill(self):
         if not self.alive:
             return
-        while self.receiver.poll():
-            try:
+        try:
+            while self.receiver.poll():
                 m = self.receiver.recv()
                 self.pending.append(m)
-            except Exception:
-                self.close()
-                break
+        except Exception:
+            self.alive = False
+            self.close()
 
     def get(self):
         if not self.alive:

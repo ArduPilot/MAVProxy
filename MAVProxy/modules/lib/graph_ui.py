@@ -58,12 +58,8 @@ class Graph_UI(object):
         try:
             while self.xlim_pipe[0].poll():
                 xlim = self.xlim_pipe[0].recv()
-        except EOFError:
+        except Exception:
             return None
-        except socket.error as e:
-            if e.errno == errno.EPIPE:
-                return None
-            raise e
         if xlim != self.xlim:
             return xlim
         return None
