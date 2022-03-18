@@ -309,9 +309,9 @@ class SlipGrid(SlipObject):
             dist = mp_util.gps_distance(lat2,lon,lat2,lon2)
             count = int(dist / spacing)
             if count < 2:
-                spacing /= 10
+                spacing /= 10.0
             elif count > 50:
-                spacing *= 10
+                spacing *= 10.0
             else:
                 break
 
