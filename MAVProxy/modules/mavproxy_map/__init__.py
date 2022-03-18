@@ -753,18 +753,19 @@ class MapModule(mp_module.MPModule):
                 self.create_vehicle_icon('GPS2' + vehicle, 'green')
                 self.map.set_position('GPS2' + vehicle, (lat, lon), rotation=m.cog*0.01)
 
-        elif mtype == 'GLOBAL_POSITION_INT' and self.map_settings.showahrspos:
+        elif mtype == 'GLOBAL_POSITION_INT':
             (lat, lon, heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
             self.lat_lon_heading[m.get_srcSystem()] = (lat,lon,heading)
-            if abs(lat) > 1.0e-3 or abs(lon) > 1.0e-3:
-                self.have_global_position = True
-                self.create_vehicle_icon('Pos' + vehicle, 'red', follow=True)
-                if len(self.vehicle_type_by_sysid) > 1:
-                    label = str(sysid)
-                else:
-                    label = None
-                self.map.set_position('Pos' + vehicle, (lat, lon), rotation=heading, label=label, colour=(255,255,255))
-                self.map.set_follow_object('Pos' + vehicle, self.is_primary_vehicle(m))
+            if self.map_settings.showahrspos:
+                if abs(lat) > 1.0e-3 or abs(lon) > 1.0e-3:
+                    self.have_global_position = True
+                    self.create_vehicle_icon('Pos' + vehicle, 'red', follow=True)
+                    if len(self.vehicle_type_by_sysid) > 1:
+                        label = str(sysid)
+                    else:
+                        label = None
+                    self.map.set_position('Pos' + vehicle, (lat, lon), rotation=heading, label=label, colour=(255,255,255))
+                    self.map.set_follow_object('Pos' + vehicle, self.is_primary_vehicle(m))
 
         elif mtype == "HIGH_LATENCY2" and self.map_settings.showahrspos:
             (lat, lon) = (m.latitude*1.0e-7, m.longitude*1.0e-7)
