@@ -740,7 +740,7 @@ class MapModule(mp_module.MPModule):
         elif mtype == "GPS_RAW_INT" and self.map_settings.showgpspos:
             (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
             if lat != 0 or lon != 0:
-                if m.vel > 300 or 'ATTITUDE' not in self.master.messages:
+                if m.vel > 300 or m.get_srcSystem() not in self.lat_lon_heading:
                     heading = m.cog*0.01
                 else:
                     (_,_,heading) = self.lat_lon_heading[m.get_srcSystem()]
