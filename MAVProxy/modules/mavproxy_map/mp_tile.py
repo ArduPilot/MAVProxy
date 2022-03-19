@@ -38,7 +38,9 @@ if sys.version_info.major < 3:
 else:
     from urllib.request import Request as url_request
     from urllib.request import urlopen as url_open
-    from urllib.error import URLError as url_error
+    from urllib.error import URLError as actual_url_error
+    from http.client import RemoteDisconnected
+    url_error = (RemoteDisconnected, actual_url_error)
 
 from MAVProxy.modules.lib import mp_util
 
