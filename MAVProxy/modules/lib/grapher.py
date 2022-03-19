@@ -360,7 +360,7 @@ class MavGraph(object):
                                 alpha=0.6,
                                 verticalalignment='center')
                 else:
-                    ax.plot_date(x[i], y[i], color=color, label=fields[i],
+                    ax.plot_date(x[i], y[i], fmt=color, label=fields[i],
                                  linestyle=linestyle, marker=marker, tz=None)
 
             empty = False
