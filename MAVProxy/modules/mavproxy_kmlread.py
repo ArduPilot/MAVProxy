@@ -254,6 +254,9 @@ class KmlReadModule(mp_module.MPModule):
         self.snap_points = []
 
         #go through each object in the kml...
+        if nodes is None:
+            print("No nodes found")
+            return
         for n in nodes:
             try:
                 point = kmlread.readObject(n)
