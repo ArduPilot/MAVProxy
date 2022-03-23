@@ -452,6 +452,10 @@ class FieldSpringValley(FieldCheck):
     location = mavutil.location(-35.281315, 149.005329, 581, 280)
     lc_name = "springvalley"
 
+class FieldSpringValleyBottom(FieldCheck):
+    location = mavutil.location(-35.2824450, 149.0053668, 593, 0)
+    lc_name = "springvalleybottom"
+
 class FieldCheckModule(mp_module.MPModule):
     def __init__(self, mpstate):
 
@@ -463,6 +467,7 @@ class FieldCheckModule(mp_module.MPModule):
         self.fields = [
             FieldCMAC(),
             FieldSpringValley(),
+            FieldSpringValleyBottom(),
         ]
 
         self.field = None
