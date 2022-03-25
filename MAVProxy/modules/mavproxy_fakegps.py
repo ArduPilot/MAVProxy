@@ -71,6 +71,8 @@ class FakeGPSModule(mp_module.MPModule):
 
     def idle_task(self):
         '''called on idle'''
+        if self.master is None:
+            return
         now = time.time()
         if now - self.last_send < 1.0 / self.FakeGPS_settings.rate:
             return
