@@ -10,6 +10,7 @@ import datetime
 import base64
 import time
 import errno
+import select
 from MAVProxy.modules.lib import rtcm3
 import ssl
 from optparse import OptionParser
@@ -55,6 +56,7 @@ class NtripClient(object):
         self.host = host
         self.V2 = V2
         self.socket = None
+        self.socket_pending = None
         self.found_header = False
         self.sent_header = False
         # RTCM3 parser
@@ -121,7 +123,8 @@ class NtripClient(object):
 
     def read(self):
         if self.socket is None:
-            time.sleep(0.1)
+            if self.socket_pending is None:
+                time.sleep(0.1)
             self.connect()
             return None
 
@@ -191,12 +194,28 @@ class NtripClient(object):
         '''connect to NTRIP server'''
         self.sent_header = False
         self.found_header = False
+        # use a non-blocking connect to prevent blocking of mavproxy main thread
+        if self.socket_pending is not None:
+            read_ok, write_ok, err = select.select([], [self.socket_pending], [], 0)
+            if self.socket_pending in write_ok:
+                err = self.socket_pending.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
+                if err == 0:
+                    self.socket = self.socket_pending
+                    self.socket_pending = None
+                    self.rtcm3.reset()
+                    return True
+                else:
+                    self.socket_pending = None
+            return
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setblocking(0)
         if self.ssl:
             sock = ssl.wrap_socket(sock)
         try:
             error_indicator = sock.connect_ex((self.caster, self.port))
-        except Exception:
+            self.socket_pending = sock
+            return False
+        except Exception as ex:
             return False
         if error_indicator == 0:
             sock.setblocking(0)
