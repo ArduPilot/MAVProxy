@@ -73,7 +73,7 @@ class RelayModule(mp_module.MPModule):
         self.master.mav.command_long_send(self.target_system,
                                           0,
                                           mavutil.mavlink.MAV_CMD_DO_MOTOR_TEST, 0,
-                                          int(args[0]), int(args[1]), int(args[2]), int(args[3]), count,
+                                          int(args[0]), int(args[1]), float(args[2]), int(args[3]), count,
                                           0, 0)
 
 
