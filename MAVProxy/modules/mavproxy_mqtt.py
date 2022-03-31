@@ -55,14 +55,14 @@ class MqttModule(mp_module.MPModule):
 
     def convert_to_dict(self, message):
         """converts mavlink message to python dict"""
-        if hasattr(message, '_fieldnames'):
-            result = {}
-            for field in message._fieldnames:
-                result[field] = self.convert_to_dict(getattr(message, field))
-            return result
-        if isinstance(message, numbers.Number):
-            return message
-        return str(message)
+        result = {}
+        for field in message._fieldnames:
+            value = getattr(message, field)
+            if isinstance(value, numbers.Number):
+                result[field] = value
+            else:
+                result[field] = str(value)
+        return result
 
 
 def init(mpstate):
