@@ -48,6 +48,7 @@ class MqttModule(mp_module.MPModule):
     def disconnect(self):
         """disconnect"""
         self.client.disconnect()
+        self.connected = False
         print('mqtt: disconnected')
 
     def mqtt_command(self, args):
@@ -63,7 +64,7 @@ class MqttModule(mp_module.MPModule):
 
     def usage(self):
         """show help on command line options"""
-        return "Usage: mqtt <set|connect>"
+        return "Usage: mqtt <set|connect|disconnect>"
 
     def convert_to_dict(self, message):
         """converts mavlink message to python dict"""
