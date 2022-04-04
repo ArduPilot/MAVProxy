@@ -10,6 +10,7 @@ class MqttModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
         super(MqttModule, self).__init__(mpstate, "mqtt", "mqtt publisher")
+        self.connected = False
         self.client = mqtt.Client()
         self.device_prefix = ''
         self.mqtt_settings = mp_settings.MPSettings(
@@ -18,15 +19,18 @@ class MqttModule(mp_module.MPModule):
              ('name', str, 'mavproxy'),
              ('prefix', str, '')
              ])
-        self.add_command('mqtt', self.mqtt_command, "mqtt module", ['connect', 'set (MQTTSETTING)'])
+        self.add_command('mqtt', self.mqtt_command, "mqtt module", ['connect', 'set (MQTTSETTING)', 'disconnect'])
         self.add_completion_function('(MQTTSETTING)', self.mqtt_settings.completion)
 
     def mavlink_packet(self, m):
         """handle an incoming mavlink packet"""
+        if not self.connected:
+            return
         try:
             data = self.convert_to_dict(m)
             self.client.publish(f'{self.mqtt_settings.prefix}/{m.get_type()}', json.dumps(data))
         except MQTTException as e:
+            self.connected = False
             print(f'mqtt: Exception occurred: {e}')
 
     def connect(self):
@@ -38,7 +42,13 @@ class MqttModule(mp_module.MPModule):
         except MQTTException as e:
             print(f'mqtt: could not establish connection: {e}')
             return
-        print('connected...')
+        self.connected = True
+        print('mqtt: connected...')
+
+    def disconnect(self):
+        """disconnect"""
+        self.client.disconnect()
+        print('mqtt: disconnected')
 
     def mqtt_command(self, args):
         """control behaviour of the module"""
@@ -48,6 +58,8 @@ class MqttModule(mp_module.MPModule):
             self.mqtt_settings.command(args[1:])
         elif args[0] == 'connect':
             self.connect()
+        elif args[0] == 'disconnect':
+            self.disconnect()
 
     def usage(self):
         """show help on command line options"""
