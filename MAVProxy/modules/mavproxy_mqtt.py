@@ -4,7 +4,7 @@ from MAVProxy.modules.lib import mp_module
 import paho.mqtt.client as mqtt
 import json
 import numbers
-
+import sys
 
 class MqttModule(mp_module.MPModule):
 
@@ -16,7 +16,9 @@ class MqttModule(mp_module.MPModule):
             [('ip', str, '127.0.0.1'),
              ('port', int, '1883'),
              ('name', str, 'mavproxy'),
-             ('prefix', str, '')
+             ('prefix', str, ''),
+             ('username', str, ''),
+             ('password', str, '')
              ])
         self.add_command('mqtt', self.mqtt_command, "mqtt module", ['connect', 'set (MQTTSETTING)', 'disconnect'])
         self.add_completion_function('(MQTTSETTING)', self.mqtt_settings.completion)
@@ -35,6 +37,11 @@ class MqttModule(mp_module.MPModule):
     def connect(self):
         """connect to mqtt broker"""
         try:
+            if self.mqtt_settings.username != '':
+                if self.mqtt_settings.password != '':
+                    self.client.username_pw_set(self.mqtt_settings.username, password=self.mqtt_settings.password)
+                else:
+                    self.client.username_pw_set(self.mqtt_settings.username, password=None)
             self.client.reinitialise(client_id=self.mqtt_settings.name)
             print(f'connecting to {self.mqtt_settings.ip}:{self.mqtt_settings.port}')
             self.client.connect(self.mqtt_settings.ip, int(self.mqtt_settings.port), 30)
