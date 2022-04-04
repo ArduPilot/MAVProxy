@@ -12,7 +12,6 @@ class MqttModule(mp_module.MPModule):
         super(MqttModule, self).__init__(mpstate, "mqtt", "mqtt publisher")
         self.connected = False
         self.client = mqtt.Client()
-        self.device_prefix = ''
         self.mqtt_settings = mp_settings.MPSettings(
             [('ip', str, '127.0.0.1'),
              ('port', int, '1883'),
