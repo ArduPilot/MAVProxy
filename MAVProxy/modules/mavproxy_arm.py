@@ -52,7 +52,9 @@ class ArmModule(mp_module.MPModule):
                                       'throttle',
                                       'safetyon',
                                       'safetystatus',
-                                      'safetyoff'])
+                                      'safetyoff',
+                                      'bits',
+                                      'prearms'])
         self.add_command('disarm', self.cmd_disarm,   'disarm motors')
         self.was_armed = False
 
