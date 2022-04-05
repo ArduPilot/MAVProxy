@@ -47,6 +47,7 @@ class NtripClient(object):
         self.user = base64.b64encode(user)
         self.port = port
         self.caster = caster
+        self.caster_ip = None
         self.mountpoint = mountpoint
         if not self.mountpoint.startswith("/"):
             self.mountpoint = "/" + self.mountpoint
@@ -63,6 +64,7 @@ class NtripClient(object):
         self.rtcm3 = rtcm3.RTCM3()
         self.last_id = None
         self.dt_last_gga_sent = 0
+        self.last_connect_attempt = time.time()
         if self.port == 443:
             # force SSL on port 443
             self.ssl = True
@@ -124,7 +126,11 @@ class NtripClient(object):
     def read(self):
         if self.socket is None:
             if self.socket_pending is None:
-                time.sleep(0.1)
+                now = time.time()
+                # rate limit connection attempts
+                if now - self.last_connect_attempt < 1.0:
+                    return None
+                self.last_connect_attempt = now
             self.connect()
             return None
 
@@ -212,7 +218,14 @@ class NtripClient(object):
         if self.ssl:
             sock = ssl.wrap_socket(sock)
         try:
-            error_indicator = sock.connect_ex((self.caster, self.port))
+            if self.caster_ip is None:
+                try:
+                    self.caster_ip = socket.gethostbyname(self.caster)
+                except Exception:
+                    return False
+            if self.caster_ip is None:
+                return False
+            error_indicator = sock.connect_ex((self.caster_ip, self.port))
             self.socket_pending = sock
             return False
         except Exception as ex:
