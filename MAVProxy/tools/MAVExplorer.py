@@ -769,15 +769,30 @@ def cmd_messages(args):
 
 def extract_files():
     '''extract all FILE messages as a dictionary of files'''
-    ret = {}
+    sequences = {}
     mestate.mlog.rewind()
     while True:
         m = mestate.mlog.recv_match(type=['FILE'], condition=mestate.settings.condition)
         if m is None:
             break
-        if not m.FileName in ret:
-            ret[m.FileName] = bytes()
-        ret[m.FileName] += m.Data[:m.Length]
+        if not m.FileName in sequences:
+            sequences[m.FileName] = set()
+        sequences[m.FileName].add((m.Offset, m.Data[:m.Length]))
+    ret = {}
+    for f in sequences:
+        ofs = 0
+        seen = set()
+        seq = sorted(list(sequences[f]), key=lambda t: t[0])
+        ret[f] = bytes()
+        for t in seq:
+            if t[0] in seen:
+                continue
+            seen.add(t[0])
+            if t[0] != ofs:
+                print("Gap in %s at %u" % (f, ofs))
+            ret[f] += t[1]
+            ofs = t[0]+len(t[1])
+
     mestate.mlog.rewind()
     return ret
 
@@ -795,7 +810,7 @@ def cmd_file(args):
         return
     if len(args) == 1:
         # print on terminal
-        print(files[fname])
+        print(files[fname].decode('utf-8'))
     else:
         # save to file
         dest = args[1]
