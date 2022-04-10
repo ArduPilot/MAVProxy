@@ -32,7 +32,7 @@ if exist "..\..\pymavlink" (
 
 rem -----Build MAVProxy-----
 cd ..\
-python.exe setup.py clean build install --user
+python.exe -m pip install . --user
 cd .\MAVProxy
 copy ..\windows\mavproxy.spec
 pyinstaller -y --clean mavproxy.spec
