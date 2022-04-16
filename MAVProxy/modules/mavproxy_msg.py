@@ -42,7 +42,7 @@ class msg(mp_module.MPModule):
             print(self.usage())
         txt = ' '.join(args)
         self.master.mav.statustext_send(mavutil.mavlink.MAV_SEVERITY_NOTICE,
-                                        txt)
+                                        txt.encode('utf8'))
 
 def init(mpstate):
     '''initialise module'''
