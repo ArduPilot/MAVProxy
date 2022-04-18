@@ -163,6 +163,17 @@ class ParamState:
         self.ftp_count = None
         ftp.cmd_get(["@PARAM/param.pck"], callback=self.ftp_callback, callback_progress=self.ftp_callback_progress)
 
+    def ftp_defaults_start(self):
+        '''start a ftp download of default parameters'''
+        ftp = self.mpstate.module('ftp')
+        if ftp is None:
+            self.ftp_failed = True
+            self.ftp_started = False
+            return
+        self.ftp_started = True
+        self.ftp_count = None
+        ftp.cmd_get(["@PARAM/defaults.pck"], callback=self.ftp_defaults_callback, callback_progress=self.ftp_callback_progress)
+        
     def log_params(self, params):
         '''log PARAM_VALUE messages so that we can extract parameters from a tlog when using ftp download'''
         if not self.mpstate.logqueue:
@@ -210,20 +221,20 @@ class ParamState:
             done = min(int(total_size / per_entry_size), self.ftp_count-1)
             self.mpstate.console.set_status('Params', 'Param %u/%u' % (done, self.ftp_count))
 
-    def ftp_callback(self, fh):
-        '''callback from ftp fetch of parameters'''
+    def ftp_decode(self, fh):
+        '''decode from ftp fetch of parameters'''
         self.ftp_started = False
         if fh is None:
             # the fetch failed
             self.ftp_failed = True
-            return
+            return None
 
         magic = 0x671b
         data = fh.read()
         magic2,num_params,total_params = struct.unpack("<HHH", data[0:6])
         if magic != magic2:
             print("paramftp: bad magic 0x%x expected 0x%x" % (magic2, magic))
-            return
+            return None
         data = data[6:]
 
         # mapping of data type to type length and format
@@ -272,6 +283,17 @@ class ParamState:
             params.append((name, v, ptype))
             count += 1
 
+        return params
+
+    def ftp_callback(self, fh):
+        '''callback from ftp fetch of parameters'''
+
+        params = self.ftp_decode(fh)
+        if params is None:
+            return
+
+        count = len(params)
+
         if count != total_params:
             print("paramftp: bad count %u should be %u" % (count, total_params))
             return
@@ -298,6 +320,21 @@ class ParamState:
             self.mav_param.save(os.path.join(self.logdir, self.parm_file), '*', verbose=True)
         self.log_params(params)
 
+    def ftp_defaults_callback(self, fh):
+        '''callback from ftp fetch of defaults'''
+
+        params = self.ftp_decode(fh)
+        if params is None:
+            return
+
+        count = len(params)
+        mp = mavparm.MAVParmDict()
+        for (name,v,ptype) in params:
+            name = str(name.decode('utf-8'))
+            mp[name] = v
+        if self.logdir is not None:
+            mp.save(os.path.join(self.logdir, self.parm_file + ".defaults"), '*', verbose=True)
+
     def fetch_all(self, master):
         '''force refetch of parameters'''
         if not self.use_ftp():
@@ -309,7 +346,7 @@ class ParamState:
     def handle_command(self, master, mpstate, args):
         '''handle parameter commands'''
         param_wildcard = "*"
-        usage="Usage: param <fetch|ftp|save|set|show|load|preload|forceload|ftpload|diff|download|check|help>"
+        usage="Usage: param <fetch|ftp|ftpdefaults|save|set|show|load|preload|forceload|ftpload|diff|download|check|help>"
         if len(args) < 1:
             print(usage)
             return
@@ -339,6 +376,9 @@ class ParamState:
                     print("Requested parameter %s" % pname)
         elif args[0] == "ftp":
             self.ftp_start()
+
+        elif args[0] == "ftpdefaults":
+            self.ftp_defaults_start()
 
         elif args[0] == "save":
             if len(args) < 2:
@@ -561,7 +601,7 @@ class ParamModule(mp_module.MPModule):
         self.menu_added_console = False
         self.add_command('param', self.cmd_param, "parameter handling",
                          ["<download|status>",
-                          "<set|show|fetch|ftp|help|apropos> (PARAMETER)",
+                          "<set|show|fetch|ftp|ftpdefaults|help|apropos> (PARAMETER)",
                           "<load|save|diff|forceload|ftpload> (FILENAME)",
                           "<set_xml_filepath> (FILEPATH)"
                          ])
