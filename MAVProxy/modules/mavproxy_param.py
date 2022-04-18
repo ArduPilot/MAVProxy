@@ -576,7 +576,10 @@ class ParamModule(mp_module.MPModule):
                                          MPMenuItem('Save', 'Save', '# param save ',
                                                     handler=MPMenuCallFileDialog(flags=('save', 'overwrite_prompt'),
                                                                                  title='Param Save',
-                                                                                 wildcard='ParmFiles(*.parm,*.param)|*.parm;*.param'))])
+                                                                                 wildcard='ParmFiles(*.parm,*.param)|*.parm;*.param')),
+                                         MPMenuItem('FTP', 'FTP', '# param ftp'),
+                                         MPMenuItem('Update Metadata', 'Update Metadata', '# param download'),
+                                             ])
 
     def get_component_id_list(self, system_id):
         '''get list of component IDs with parameters for a given system ID'''
