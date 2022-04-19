@@ -722,6 +722,41 @@ class LinkModule(mp_module.MPModule):
             continue
         mav_type_planes.append(attr)
 
+    def should_show_command_ack(self, m):
+        '''returns true if we should display some text on the console for m'''
+        if m.target_component in [mavutil.mavlink.MAV_COMP_ID_MAVCAN]:
+            # too noisy?
+            return False
+
+        if m.command in frozenset([
+                mavutil.mavlink.MAV_CMD_GET_HOME_POSITION,
+                mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONTROL,
+                mavutil.mavlink.MAV_CMD_SET_CAMERA_MODE,
+                mavutil.mavlink.MAV_CMD_SET_CAMERA_ZOOM,
+                mavutil.mavlink.MAV_CMD_SET_CAMERA_FOCUS,
+                mavutil.mavlink.MAV_CMD_CAN_FORWARD,
+        ]):
+            # too noisy?
+            return False
+
+        if self.settings.all_vehicle_command_acks:
+            # we're showing everything
+            return True
+
+        if m.target_system == 0:
+            return True
+
+        if m.target_system != self.settings.source_system:
+            return False
+
+        if m.target_component == 0:
+            return True
+
+        if m.target_component != self.settings.source_component:
+            return False
+
+        return True
+
     def master_msg_handling(self, m, master):
         '''link message handling for an upstream link'''
 
@@ -938,15 +973,9 @@ class LinkModule(mp_module.MPModule):
                 cmd = cmd[8:]
                 res = mavutil.mavlink.enums["MAV_RESULT"][m.result].name
                 res = res[11:]
-                if (m.target_component not in [mavutil.mavlink.MAV_COMP_ID_MAVCAN] and
-                    m.command not in [mavutil.mavlink.MAV_CMD_GET_HOME_POSITION,
-                                      mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONTROL,
-                                      mavutil.mavlink.MAV_CMD_SET_CAMERA_MODE,
-                                      mavutil.mavlink.MAV_CMD_SET_CAMERA_ZOOM,
-                                      mavutil.mavlink.MAV_CMD_CAN_FORWARD,
-                                      mavutil.mavlink.MAV_CMD_SET_CAMERA_FOCUS]):
-                    self.mpstate.console.writeln("Got COMMAND_ACK: %s: %s" % (cmd, res))
-            except Exception:
+                if self.should_show_command_ack(m):
+                    self.mpstate.console.writeln("Got COMMAND_ACK: %s: %s" % (cmd, res))  # noqa
+            except KeyError:
                 self.mpstate.console.writeln("Got MAVLink msg: %s" % m)
 
             if m.command == mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION:
