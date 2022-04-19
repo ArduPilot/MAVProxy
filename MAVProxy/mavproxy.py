@@ -304,6 +304,8 @@ class MPState(object):
 
             MPSetting('vehicle_name', str, '', 'Vehicle Name', tab='Vehicle'),
 
+            MPSetting('all_vehicle_command_acks', bool, True, "Show COMMAND_ACKs even if they're targetted at other vehicles"),
+
             MPSetting('sys_status_error_warn_interval', int, 30, 'interval to warn of autopilot software failure'),
 
             MPSetting('inhibit_screensaver_when_armed', bool, False, 'inhibit screensaver while vehicle armed'),
