@@ -294,7 +294,7 @@ class MissionEditorMain(object):
                 self.num_wps_expected = m.count
                 self.wps_received = {}
 
-                if (m.count > 0):
+                if m.count > 1:
                     self.gui_event_queue.put(MissionEditorEvent(
                         me_event.MEGE_ADD_MISS_TABLE_ROWS,num_rows=m.count-1))
             #write has been sent by the mission editor:
