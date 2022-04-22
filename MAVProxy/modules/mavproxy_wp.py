@@ -33,7 +33,7 @@ class WPModule(mp_module.MPModule):
         self.upload_start = None
         self.wploader.expected_count = 0
         self.add_command('wp', self.cmd_wp,       'waypoint management',
-                         ["<list|clear|move|remove|loop|set|undo|movemulti|moverelhome|changealt|param|status|slope|ftp>",
+                         ["<list|clear|move|remove|loop|set|undo|movemulti|moverelhome|changealt|param|status|slope|ftp|add_takeoff|add_landing|add_dls>",
                           "<load|update|save|savecsv|show|ftpload> (FILENAME)"])
         self.mission_ftp_name = "@MISSION/mission.dat"
         self.ftp_count = None
@@ -51,6 +51,7 @@ class WPModule(mp_module.MPModule):
                                   items=[MPMenuItem('Editor', 'Editor', '# wp editor'),
                                          MPMenuItem('Clear', 'Clear', '# wp clear'),
                                          MPMenuItem('List', 'List', '# wp list'),
+                                         MPMenuItem('FTP', 'FTP', '# wp ftp'),
                                          MPMenuItem('Load', 'Load', '# wp load ',
                                                     handler=MPMenuCallFileDialog(flags=('open',),
                                                                                  title='Mission Load',
@@ -65,7 +66,11 @@ class WPModule(mp_module.MPModule):
                                          MPMenuItem('Undo', 'Undo', '# wp undo'),
                                          MPMenuItem('Loop', 'Loop', '# wp loop'),
                                          MPMenuItem('Add NoFly', 'Loop', '# wp noflyadd'),
-                                         MPMenuItem('FTP', 'FTP', '# wp ftp')])
+                                         MPMenuItem('Add Takeoff', 'Add Takeoff', '# wp add_takeoff ',
+                                             handler=MPMenuCallTextDialog(title='Takeoff Altitude (m)',
+                                                                                 default=20)),
+                                         MPMenuItem('Add Landing', 'Add Landing', '# wp add_landing'),
+                                         MPMenuItem('Add DO_LAND_START', 'Add DO_LAND_START', '# wp add_dls')])
 
     @property
     def wploader(self):
@@ -86,6 +91,10 @@ class WPModule(mp_module.MPModule):
                 continue
             ret.append(seq)
         return ret
+
+    def is_quadplane(self):
+        Q_ENABLE = int(self.get_mav_param("Q_ENABLE",0))
+        return Q_ENABLE > 0
 
     def send_wp_requests(self, wps=None):
         '''send some more WP requests'''
@@ -410,14 +419,15 @@ class WPModule(mp_module.MPModule):
         if len(points) < 3:
             return
         from MAVProxy.modules.lib import mp_util
-        home = self.get_home()
-        if home is None:
-            print("Need home location for draw - please run gethome")
-            return
-        self.wploader.clear()
         self.wploader.target_system = self.target_system
         self.wploader.target_component = self.target_component
-        self.wploader.add(home)
+        if self.wploader.count() < 2:
+            home = self.get_home()
+            if home is None:
+                print("Need home location for draw - please run gethome")
+                return
+            self.wploader.clear()
+            self.wploader.add(home)
         if self.get_default_frame() == mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT:
             use_terrain = True
         else:
@@ -468,6 +478,59 @@ class WPModule(mp_module.MPModule):
                                                         self.target_component,
                                                         start_idx, start_idx+4)
         print("Added nofly zone")
+
+    def wp_add_takeoff(self, args):
+        '''add a takeoff as first mission item'''
+        latlon = self.mpstate.click_location
+        if latlon is None:
+            print("No position chosen")
+            return
+        takeoff_alt = 20
+        if len(args) > 0:
+            takeoff_alt = float(args[0])
+        if self.is_quadplane():
+            wptype = mavutil.mavlink.MAV_CMD_NAV_VTOL_TAKEOFF
+        else:
+            wptype = mavutil.mavlink.MAV_CMD_NAV_TAKEOFF
+        wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0,
+                                                          mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                                          wptype,
+                                                          0, 1, 0, 0, 0, 0, 0, 0, takeoff_alt)
+        # assume first waypoint
+        self.wploader.insert(1, wp)
+        self.send_all_waypoints()
+
+    def wp_add_landing(self):
+        '''add a landing as last mission item'''
+        latlon = self.mpstate.click_location
+        if latlon is None:
+            print("No position chosen")
+            return
+        if self.is_quadplane():
+            wptype = mavutil.mavlink.MAV_CMD_NAV_VTOL_LAND
+        else:
+            wptype = mavutil.mavlink.MAV_CMD_NAV_LAND
+        wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0,
+                                                          mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                                          wptype,
+                                                          0, 1, 0, 0, 0, 0, latlon[0], latlon[1], 0)
+        # assume last waypoint
+        self.wploader.add(wp)
+        self.send_all_waypoints()
+
+    def wp_add_dls(self):
+        '''add a DO_LAND_START as last mission item'''
+        latlon = self.mpstate.click_location
+        if latlon is None:
+            print("No position chosen")
+            return
+        wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0,
+                                                          mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                                          mavutil.mavlink.MAV_CMD_DO_LAND_START,
+                                                          0, 1, 0, 0, 0, 0, latlon[0], latlon[1], 0)
+        # assume last waypoint
+        self.wploader.add(wp)
+        self.send_all_waypoints()
         
     def set_home_location(self):
         '''set home location from last map click'''
@@ -857,7 +920,7 @@ class WPModule(mp_module.MPModule):
         
     def cmd_wp(self, args):
         '''waypoint commands'''
-        usage = "usage: wp <editor|list|load|update|save|set|clear|loop|remove|move|movemulti|changealt|ftp|ftpload>"
+        usage = "usage: wp <editor|list|load|update|save|set|clear|loop|remove|move|movemulti|changealt|ftp|ftpload|add_takeoff|add_landing|add_dls>"
         if len(args) < 1:
             print(usage)
             return
@@ -957,6 +1020,12 @@ class WPModule(mp_module.MPModule):
                 print("usage: wp ftpload <filename>")
                 return
             self.wp_ftp_upload(args[1])
+        elif args[0] == "add_takeoff":
+            self.wp_add_takeoff(args[1:])
+        elif args[0] == "add_landing":
+            self.wp_add_landing()
+        elif args[0] == "add_dls":
+            self.wp_add_dls()
         else:
             print(usage)
 
