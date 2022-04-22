@@ -13,6 +13,7 @@ from MAVProxy.modules.mavproxy_misseditor import me_event
 MissionEditorEvent = me_event.MissionEditorEvent
 
 from pymavlink import mavutil
+from pymavlink import mavwp
 
 import time
 import threading
@@ -43,6 +44,25 @@ class MissionEditorEventThread(threading.Thread):
 
                 if isinstance(event, win_layout.WinLayout):
                     win_layout.set_layout(event, self.mp_misseditor.set_layout)
+                elif isinstance(event, mavwp.MAVWPLoader):
+                    self.mp_misseditor.gui_event_queue_lock.acquire()
+                    self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
+                        me_event.MEGE_CLEAR_MISS_TABLE))
+                    self.mp_misseditor.gui_event_queue_lock.release()
+                    if event.count() > 0:
+                        self.mp_misseditor.gui_event_queue_lock.acquire()
+                        self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
+                            me_event.MEGE_ADD_MISS_TABLE_ROWS,num_rows=event.count()-1))
+                        self.mp_misseditor.gui_event_queue_lock.release()
+
+                    for m in event.wpoints:
+                        self.mp_misseditor.gui_event_queue_lock.acquire()
+                        self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
+                            me_event.MEGE_SET_MISS_ITEM,
+                            num=m.seq,command=m.command,param1=m.param1,
+                            param2=m.param2,param3=m.param3,param4=m.param4,
+                            lat=m.x,lon=m.y,alt=m.z,frame=m.frame))
+                        self.mp_misseditor.gui_event_queue_lock.release()
                 else:
                     event_type = event.get_type()
 
@@ -192,6 +212,7 @@ class MissionEditorMain(object):
         self.mavlink_message_queue_handler = threading.Thread(target=self.mavlink_message_queue_handler)
         self.mavlink_message_queue_handler.start()
         self.needs_unloading = False
+        self.last_wp_change = time.time()
 
     def mavlink_message_queue_handler(self):
         while not self.time_to_quit:
@@ -221,12 +242,25 @@ class MissionEditorMain(object):
         self.mpstate.miss_editor.close()
         self.mpstate.miss_editor = None
 
+    def get_wps_from_module(self):
+        '''get WP list from wp module'''
+        self.event_queue_lock.acquire()
+        self.event_queue.put(self.mpstate.module('wp').wploader)
+        self.event_queue_lock.release()
+
     def idle_task(self):
         now = time.time()
         if self.last_unload_check_time + self.unload_check_interval < now:
             self.last_unload_check_time = now
             if not self.child.is_alive():
                 self.close()
+                return
+        last_wp_change = self.mpstate.module('wp').loading_waypoint_lasttime
+        if last_wp_change > self.last_wp_change:
+            self.last_wp_change = last_wp_change
+            self.get_wps_from_module()
+
+
 
 
     def mavlink_packet(self, m):
