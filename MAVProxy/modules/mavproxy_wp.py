@@ -32,6 +32,7 @@ class WPModule(mp_module.MPModule):
         self.undo_wp_idx = -1
         self.upload_start = None
         self.wploader.expected_count = 0
+        self.last_get_home = time.time()
         self.add_command('wp', self.cmd_wp,       'waypoint management',
                          ["<list|clear|move|remove|loop|set|undo|movemulti|moverelhome|changealt|param|status|slope|ftp|add_takeoff|add_landing|add_dls>",
                           "<load|update|save|savecsv|show|ftpload> (FILENAME)"])
@@ -241,6 +242,13 @@ class WPModule(mp_module.MPModule):
                 self.module('map').add_menu(self.menu)
         else:
             self.menu_added_map = False
+        if not 'HOME_POSITION' in self.master.messages and time.time() - self.last_get_home > 2:
+            self.master.mav.command_long_send(self.settings.target_system,
+                                            0,
+                                            mavutil.mavlink.MAV_CMD_GET_HOME_POSITION,
+                                            0, 0, 0, 0, 0, 0, 0, 0)
+            self.last_get_home = time.time()
+
 
     def wp_to_mission_item_int(self, wp):
         '''convert a MISSION_ITEM to a MISSION_ITEM_INT. We always send as MISSION_ITEM_INT
@@ -446,8 +454,12 @@ class WPModule(mp_module.MPModule):
         if wp.command == mavutil.mavlink.MAV_CMD_DO_JUMP:
             print("Mission is already looped")
             return
+        if loader.count() > 1 and loader.wp(1).command in [mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, mavutil.mavlink.MAV_CMD_NAV_VTOL_TAKEOFF]:
+            target = 2
+        else:
+            target = 1
         wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0, 0, mavutil.mavlink.MAV_CMD_DO_JUMP,
-                                                          0, 1, 1, -1, 0, 0, 0, 0, 0)
+                                                          0, 1, target, -1, 0, 0, 0, 0, 0)
         loader.add(wp)
         self.loading_waypoints = True
         self.loading_waypoint_lasttime = time.time()
@@ -495,7 +507,14 @@ class WPModule(mp_module.MPModule):
         wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0,
                                                           mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
                                                           wptype,
-                                                          0, 1, 0, 0, 0, 0, 0, 0, takeoff_alt)
+                                                          0, 1, 0, 0, 0, 0, latlon[0], latlon[1], takeoff_alt)
+        if self.wploader.count() < 2:
+            home = self.get_home()
+            if home is None:
+                print("Need home location - please run gethome")
+                return
+            self.wploader.clear()
+            self.wploader.add(home)
         # assume first waypoint
         self.wploader.insert(1, wp)
         self.send_all_waypoints()
@@ -917,7 +936,8 @@ class WPModule(mp_module.MPModule):
             clear_type = mavutil.mavlink.MAV_MISSION_TYPE_ALL
         self.master.mav.mission_clear_all_send(self.target_system, self.target_component, clear_type)
         self.wploader.clear()
-        
+        self.loading_waypoint_lasttime = time.time()
+
     def cmd_wp(self, args):
         '''waypoint commands'''
         usage = "usage: wp <editor|list|load|update|save|set|clear|loop|remove|move|movemulti|changealt|ftp|ftpload|add_takeoff|add_landing|add_dls>"
