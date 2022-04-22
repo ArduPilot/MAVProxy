@@ -274,8 +274,8 @@ class MissionEditorFrame(wx.Frame):
             self.grid_mission.SetColSize(ME_LAT_COL, 100)
             self.grid_mission.SetColSize(ME_LON_COL, 100)
             self.grid_mission.SetColSize(ME_ALT_COL, 75)
-            self.grid_mission.SetColSize(ME_DIST_COL, -1)
-            self.grid_mission.SetColSize(ME_ANGLE_COL, -1)
+            self.grid_mission.SetColSize(ME_DIST_COL, 1)
+            self.grid_mission.SetColSize(ME_ANGLE_COL, 1)
 
             self.grid_mission.ForceRefresh()
         elif event.get_type() == me_event.MEGE_ADD_MISS_TABLE_ROWS:
