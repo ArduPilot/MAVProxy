@@ -34,7 +34,7 @@ class WPModule(mp_module.MPModule):
         self.wploader.expected_count = 0
         self.last_get_home = time.time()
         self.add_command('wp', self.cmd_wp,       'waypoint management',
-                         ["<list|clear|move|remove|loop|set|undo|movemulti|moverelhome|changealt|param|status|slope|ftp|add_takeoff|add_landing|add_dls>",
+                         ["<list|clear|move|remove|loop|set|undo|movemulti|moverelhome|changealt|param|status|slope|ftp|add_takeoff|add_landing|add_dls|add_rtl>",
                           "<load|update|save|savecsv|show|ftpload> (FILENAME)"])
         self.mission_ftp_name = "@MISSION/mission.dat"
         self.ftp_count = None
@@ -71,6 +71,7 @@ class WPModule(mp_module.MPModule):
                                              handler=MPMenuCallTextDialog(title='Takeoff Altitude (m)',
                                                                                  default=20)),
                                          MPMenuItem('Add Landing', 'Add Landing', '# wp add_landing'),
+                                         MPMenuItem('Add RTL', 'Add RTL', '# wp add_rtl'),
                                          MPMenuItem('Add DO_LAND_START', 'Add DO_LAND_START', '# wp add_dls')])
 
     @property
@@ -537,6 +538,16 @@ class WPModule(mp_module.MPModule):
         self.wploader.add(wp)
         self.send_all_waypoints()
 
+    def wp_add_RTL(self):
+        '''add a RTL as last mission item'''
+        wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0,
+                                                          mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                                          mavutil.mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH,
+                                                          0, 1, 0, 0, 0, 0, 0, 0, 0)
+        # assume last waypoint
+        self.wploader.add(wp)
+        self.send_all_waypoints()
+        
     def wp_add_dls(self):
         '''add a DO_LAND_START as last mission item'''
         latlon = self.mpstate.click_location
@@ -1044,6 +1055,8 @@ class WPModule(mp_module.MPModule):
             self.wp_add_takeoff(args[1:])
         elif args[0] == "add_landing":
             self.wp_add_landing()
+        elif args[0] == "add_rtl":
+            self.wp_add_RTL()
         elif args[0] == "add_dls":
             self.wp_add_dls()
         else:
