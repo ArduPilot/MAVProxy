@@ -699,6 +699,11 @@ class ParamModule(mp_module.MPModule):
         '''handle missing parameters'''
         self.check_new_target_system()
         sysid = self.get_sysid()
+        if sysid[0] == 0:
+            # haven't seen a vehicle yet?  Note thecurrent
+            # implementation of get-sysid() won't return 0 in
+            # component id.
+            return
         self.pstate[sysid].vehicle_name = self.vehicle_name
         self.pstate[sysid].param_help.vehicle_name = self.vehicle_name
         self.pstate[sysid].fetch_check(self.master)

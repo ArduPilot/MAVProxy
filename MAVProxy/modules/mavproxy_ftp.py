@@ -186,6 +186,9 @@ class FTPModule(mp_module.MPModule):
         plen = len(payload)
         if plen < MAX_Payload + HDR_Len:
             payload.extend(bytearray([0]*((HDR_Len+MAX_Payload)-plen)))
+        if self.target_system == 0:
+            raise ValueError("Should not be called with broadcast ID (%u,%u)" %
+                             (self.target_system, self.target_component))
         self.master.mav.file_transfer_protocol_send(self.network, self.target_system, self.target_component, payload)
         self.seq = (self.seq + 1) % 256
         self.last_op = op

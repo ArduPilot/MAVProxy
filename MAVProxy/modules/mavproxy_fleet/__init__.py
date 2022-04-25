@@ -82,11 +82,11 @@ class SeenVehicle(object):
 
 class VehicleClass(object):
     '''definition of a Vehicle class, of which a vehicle will have a list'''
-    def __init__(self, name, params=None, paramfile=None, calibration_params=None):
+    def __init__(self, name, params=dict(), paramfile=None, volatile_params=dict()):
         self.name = name
         self.params = params
         self.paramfile = paramfile
-        self.calibration_params = calibration_params
+        self.volatile_params = volatile_params
 
     def set_params(self, params):
         self.params = copy.copy(params)
@@ -176,7 +176,7 @@ class Fleet(mp_module.MPModule):
                 line = f.readline()
                 if line == "":
                     break
-                m = re.match(r"\s*(\w+)[^\w.\d]+([.\d]+)", line)
+                m = re.match(r"\s*(\w+)[^-\w.\d]+(-?[.\d]+)", line)
                 if m is None:
                     self.print("Did not match line (%s)" % line)
                     return
@@ -205,8 +205,6 @@ class Fleet(mp_module.MPModule):
             self.cmd_fleet_vehicle(args[1:])
         elif args[0] == "class":
             self.cmd_fleet_class(args[1:])
-        elif args[0] == "param":
-            self.cmd_fleet_param(args[1:])
         elif args[0] == "set":
             self.fleet_settings.command(args[1:])
         elif args[0] == "backup_config":
@@ -222,24 +220,24 @@ class Fleet(mp_module.MPModule):
 
         (name, *args) = args
 
-        self.config["classes"]["name"] = VehicleClass(name)
+        self.config["classes"][name] = VehicleClass(name)
 
     def cmd_fleet_class_param(self, args):
         '''command to manipulate class parameters'''
         if len(args) < 1:
-            self.print("fleet class param (cal|del|load|loadfromvehicle|set)")
+            self.print("fleet class param (cal|del|loadfromfile|loadfromvehicle|set|show|move|copy)")
             return
 
         (cmd, *args) = args
 
-        if cmd == "cal" or cmd == "calibration":
-            return self.cmd_fleet_class_param_cal(args)
+        if cmd == "volatile":
+            return self.cmd_fleet_class_param_volatile(args)
 
         if cmd == "del":
             return self.cmd_fleet_class_param_del(args)
 
-        if cmd == "load":
-            return self.cmd_fleet_class_param_load(args)
+        if cmd == "loadfromfile":
+            return self.cmd_fleet_class_param_loadfromfile(args)
 
         if cmd == "loadfromvehicle":
             return self.cmd_fleet_class_param_loadfromvehicle(args)
@@ -247,9 +245,18 @@ class Fleet(mp_module.MPModule):
         if cmd == "set":
             return self.cmd_fleet_class_param_set(args)
 
+        if cmd == "move":
+            return self.cmd_fleet_class_param_copy(args, move=True)
+
+        if cmd == "copy":
+            return self.cmd_fleet_class_param_copy(args)
+
+        if cmd == "show":
+            return self.cmd_fleet_class_param_show(args)
+
         self.print("Unknown param subcommand %s" % cmd)
 
-    def cmd_fleet_class_param_load(self, args):
+    def cmd_fleet_class_param_loadfromfile(self, args):
         '''load parameters into a class from a file'''
         if len(args) < 2:
             self.print("load requires classname and filename")
@@ -268,9 +275,43 @@ class Fleet(mp_module.MPModule):
         pattern = None
         if len(args):
             (pattern, *args) = args
+        else:
+            self.print("Need pattern")
+            return
 
-        params = self.load_param_file(filepath, pattern=pattern)
-        gotclass.set_params(params)
+        change_made = False
+        for (n, v) in self.load_param_file(filepath, pattern=pattern).items():
+            if n in gotclass.params:
+                self.print("Setting %s to %f (was %f)" % (n, v, gotclass.params[n]))
+            else:
+                self.print("Setting %s to %f" % (n, v))
+            gotclass.params[n] = v
+            change_made = True
+
+        if change_made:
+            self.last_config_change = time.time()
+
+    def cmd_fleet_class_param_show(self, args):
+        if len(args) < 1:
+            self.print("set requires classname and optional pattern")
+            return
+        (classname, *args) = args
+        pattern = None
+        if len(args) > 0:
+            pattern = args[0]
+
+        gotclass = self.get_config_class_by_name(classname)
+        if gotclass is None:
+            self.print("bad classname")
+            return
+
+        print("")
+        for (name, value) in gotclass.params.items():
+            if pattern is not None:
+                if not fnmatch.fnmatch(name.upper(), pattern):
+                    continue
+            # emit in format that can be pasted into a defaults file:
+            print("%s %f" % (name, value))
 
     def cmd_fleet_class_param_set(self, args):
         if len(args) < 3:
@@ -284,21 +325,75 @@ class Fleet(mp_module.MPModule):
             return
 
         if name in gotclass.params:
-            self.print("Old value for (%s) was %f" % gotclass.params[name])
+            self.print("Old value for (%s) was %f" % (name, gotclass.params[name]))
 
-        if name in gotclass.calibration_params:
-            self.print("Warning: setting calibration parameter")
+        if name in gotclass.volatile_params:
+            self.print("Warning: setting volatile parameter")
 
         name = name.upper()
-        if not re.match(r"^[\w\d]+$"):
+        if not re.match(r"^[\w\d]+$", name):
             self.print("Invalid parameter name")
             return
 
         gotclass.params[name] = float(value)
 
+        self.last_config_change = time.time()
+
+    def cmd_fleet_class_param_copy(self, args, move=False):
+        '''copy or move parameters from one class to another'''
+        if move:
+            op = "move"
+            oping = "Moving"
+        else:
+            op = "copy"
+            oping = "Copying"
+        if len(args) < 3:
+            self.print("%s requires from-classname, to-classname and parameter name pattern" % (op,))
+            return
+        (from_classname, to_classname, pattern) = args
+
+        got_fromclass = self.get_config_class_by_name(from_classname)
+        if got_fromclass is None:
+            self.print("bad from classname")
+            return
+
+        got_toclass = self.get_config_class_by_name(to_classname)
+        if got_toclass is None:
+            self.print("bad to classname")
+            return
+
+        # sanity check first
+        for (name, value) in got_fromclass.params.items():
+            if not fnmatch.fnmatch(name.upper(), pattern):
+                continue
+            if name in got_toclass.params:
+                self.print("%s already in %s" % (name, to_classname))
+                return
+
+        change_made = False
+        new_params = copy.copy(got_fromclass.params)
+        new_volatile_params = copy.copy(got_fromclass.volatile_params)
+        for (name, value) in got_fromclass.params.items():
+            if not fnmatch.fnmatch(name.upper(), pattern):
+                continue
+            self.print("%s (%s)" % (oping, str(name)))
+            got_toclass.params[name] = value
+            del new_params[name]
+            if name in got_fromclass.volatile_params:
+                got_toclass.volatile_params[name] = 1
+                del new_volatile_params[name]
+            change_made = True
+
+        if move:
+            got_fromclass.params = new_params
+            got_fromclass.volatile_params = new_volatile_params
+
+        if change_made:
+            self.last_config_change = time.time()
+
     def cmd_fleet_class_param_loadfromvehicle(self, args):
         if len(args) < 3:
-            self.print("loadfromvehicle requires classname uid parametername")
+            self.print("loadfromvehicle requires classname uid pattern")
             return
         (classname, vehicle_uid, pattern, *args) = args
 
@@ -321,8 +416,8 @@ class Fleet(mp_module.MPModule):
         for (name, value) in sorted(mavparm.items(), key=lambda x : x[0]):
             if not fnmatch.fnmatch(name.upper(), pattern):
                 continue
-            if name in gotclass.calibration_params:
-                self.print("Warning: setting calibration parameter")
+            if name in gotclass.volatile_params:
+                self.print("Warning: setting volatile parameter")
             old = ""
             if name in gotclass.params:
                 old = " (was %f)" % gotclass.params[name]
@@ -334,10 +429,10 @@ class Fleet(mp_module.MPModule):
             self.last_config_change = time.time()
 
     def cmd_fleet_class_param_cal_setorunset(self, setorunset, args):
-        is_cal = setorunset == "set"
+        is_volatile = (setorunset == "set")
 
         if len(args) < 2:
-            self.print("fleet class param config %s CLASSNAME PATTERN" % setorunset)
+            self.print("fleet class param cal %s CLASSNAME PATTERN" % setorunset)
             return
 
         (classname, pattern, *args) = args
@@ -349,20 +444,23 @@ class Fleet(mp_module.MPModule):
             return
 
         change_made = False
-        for name in c.params.keys():
-            if not fnmatch.fnmatch(name.upper(), pattern):
-                continue
-            if is_cal:
-                if not c.calibration_params.get(name, 0):
-                    self.print("Marking (%s) as a calibration parameter" % (name,))
-                    c.calibration_params[name] = 1
-                    change_made = True
-            else:
-                try:
-                    del c.calibration_params[name]
-                    change_made = True
-                except KeyError:
+        if is_volatile:
+            for name in c.params.keys():
+                if not fnmatch.fnmatch(name.upper(), pattern):
                     continue
+                if not c.volatile_params.get(name, 0):
+                    self.print("Marking (%s) as a volatile parameter" % (name,))
+                    c.volatile_params[name] = 1
+                    change_made = True
+        else:
+            new_volatile_params = copy.copy(c.volatile_params)
+            for name in c.volatile_params.keys():
+                if not fnmatch.fnmatch(name.upper(), pattern):
+                    continue
+                self.print("Marking (%s) as NOT a volatile parameter" % (name,))
+                del new_volatile_params[name]
+                change_made = True
+            c.volatile_params = new_volatile_params
         if change_made:
             self.last_config_change = time.time()
 
@@ -372,10 +470,32 @@ class Fleet(mp_module.MPModule):
     def cmd_fleet_class_param_cal_unset(self, args):
         self.cmd_fleet_class_param_cal_setorunset("unset", args)
 
-    def cmd_fleet_class_param_cal(self, args):
-        '''command to mark parameters as calibration variables'''
+    def cmd_fleet_class_param_cal_show(self, args):
         if len(args) < 1:
-            self.print("fleet class param cal (set|unset)")
+            self.print("fleet class param cal show CLASSNAME [PATTERN]")
+            return
+
+        (classname, *args) = args
+        pattern = None
+        if len(args):
+            pattern = args[0].upper()
+            args = args[1:]
+
+        c = self.get_config_class_by_name(classname)
+        if c is None:
+            self.print("No such class")
+            return
+
+        for name in sorted(c.volatile_params.keys()):
+            if (pattern is not None and
+                    not fnmatch.fnmatch(name.upper(), pattern)):
+                continue
+            self.print("%s" % (name,))
+
+    def cmd_fleet_class_param_volatile(self, args):
+        '''command to mark parameters as volatile variables'''
+        if len(args) < 1:
+            self.print("fleet class param cal (set|unset|show)")
             return
 
         (cmd, *args) = args
@@ -385,6 +505,9 @@ class Fleet(mp_module.MPModule):
 
         if cmd == "unset":
             return self.cmd_fleet_class_param_cal_unset(args)
+
+        if cmd == "show":
+            return self.cmd_fleet_class_param_cal_show(args)
 
         self.print("Unknown param config subcommand %s" % cmd)
 
@@ -406,14 +529,28 @@ class Fleet(mp_module.MPModule):
             print("Deleting (%s) (was %f)" % (name, gotclass.params[name]))
             del gotclass.params[name]
 
-    def cmd_fleet_param_loadtovehicle(self, args):
-        '''loads parameters to vehicle based on which classes it is in'''
-        if len(args) < 2:
-            self.print("fleet param loadtovehicle UID PATTERN")
-            return
+    def cmd_fleet_vehicle_param_setunexpectedfromclasses(self, args):
+        '''like cmd_fleet_vehicle_param_setfromclasses but resets unexpected
+        variables as presented by "fleet status"'''
+        self.cmd_fleet_vehicle_param_setfromclasses(args, set_unexpected=True)
 
-        (vehicle_uid, pattern, *args) = args
-        pattern = pattern.upper()
+    def cmd_fleet_vehicle_param_setfromclasses(self, args, set_unexpected=False):
+        '''loads parameters to vehicle based on which classes it is in'''
+        if set_unexpected:
+            if len(args) < 1:
+                self.print("fleet vehicle param setunexpectedfromclasses UID")
+                return
+
+            (vehicle_uid, *args) = args
+            pattern = '*'
+
+        else:
+            if len(args) < 2:
+                self.print("fleet vehicle param setfromclasses UID PATTERN")
+                return
+
+            (vehicle_uid, pattern, *args) = args
+            pattern = pattern.upper()
 
         try:
             vehicle = self.get_config_vehicle_by_uid(vehicle_uid)
@@ -437,15 +574,28 @@ class Fleet(mp_module.MPModule):
             self.print("No param module")
             return ""
 
+        volatiles = self.get_expected_volatile_parameters_for_vehicle(vehicle)
+
+        change_made = False
         for (name, oldvalue) in sorted(expected_values.items(), key=lambda x : x[0]):
             if not fnmatch.fnmatch(name.upper(), pattern):
                 continue
+
             if name not in mavparm:
                 self.print("%s not in vehicle parameters?" % name)
                 continue
-            oldvalue = mavparm[name]
 
+            if set_unexpected:
+                if name.upper() in volatiles:
+                    continue
+
+            oldvalue = mavparm[name]
             newvalue = expected_values[name]
+
+            if abs(oldvalue - newvalue) < 0.00001:
+                if not set_unexpected:
+                    self.print("%s already has value %f" % (name, oldvalue))
+                continue
 
             self.print("Setting vehicle %s to %f from %f" %
                        (name, newvalue, oldvalue))
@@ -456,23 +606,10 @@ class Fleet(mp_module.MPModule):
         if change_made:
             self.last_config_change = time.time()
 
-    def cmd_fleet_param(self, args):
-        '''handle "fleet param" commands'''
-        if len(args) < 1:
-            self.print("fleet param (loadtovehicle)")
-            return
-
-        (cmd, *args) = args
-
-        if cmd == "loadtovehicle":
-            return self.cmd_fleet_param_loadtovehicle(args)
-
-        self.print("Unknown fleet param command (%s)" % cmd)
-
     def cmd_fleet_class(self, args):
         '''handle "fleet class" commands - manipulation of classes vehicles can be in'''
         if len(args) == 0:
-            self.print("fleet class (status|param)")
+            self.print("fleet class (status|param|add)")
             return
 
         (cmd, *args) = args
@@ -483,10 +620,13 @@ class Fleet(mp_module.MPModule):
                 if c.params is not None:
                     out.append("paramcount=%u" % len(list(c.params.keys())))
                 print(" ".join(out))
-                return
+            return
 
         if cmd == "param":
             return self.cmd_fleet_class_param(args)
+
+        if cmd == "add":
+            return self.cmd_fleet_class_add(args)
 
         self.print("Unknown class command (%s)" % cmd)
 
@@ -499,7 +639,7 @@ class Fleet(mp_module.MPModule):
 
     def cmd_fleet_vehicle(self, args):
         if len(args) < 1:
-            self.print("fleet vehicle (status|add|del|setclasses) ...")
+            self.print("fleet vehicle (status|add|del|setclasses|param) ...")
             return
         (cmd, *args) = args
 
@@ -564,6 +704,9 @@ class Fleet(mp_module.MPModule):
 
             return
 
+        if cmd == "param":
+            return self.cmd_fleet_vehicle_param(args)
+
         if cmd == "setclasses":
             # set which classes the vehicle is in
             if len(args) < 1:
@@ -581,6 +724,24 @@ class Fleet(mp_module.MPModule):
             return
 
         self.print("Unknown vehicle command %s" % str(cmd))
+
+    def cmd_fleet_vehicle_param(self, args):
+        if len(args) < 1:
+            self.print("fleet vehicle param (setfromclasses|show)")
+            return
+
+        (cmd, *args) = args
+
+        if cmd == "setfromclasses":
+            return self.cmd_fleet_vehicle_param_setfromclasses(args)
+
+        if cmd == "setunexpectedfromclasses":
+            return self.cmd_fleet_vehicle_param_setunexpectedfromclasses(args)
+
+#        if cmd == "show":
+#            return self.cmd_fleet_vehicle_param_show(args)
+
+        self.print("Unknown vehicle param command %s" % str(cmd))
 
     def vehicle_status(self, vehicle):
         class Item(object):
@@ -600,7 +761,7 @@ class Fleet(mp_module.MPModule):
 
         # check parameters
         desired_parameter_values = {
-            "ARMING_CHECK": 0,
+            "ARMING_CHECK": 1,
         }
         params = self.mpstate.mav_param_by_sysid[vehicle.mavlink_target()]
         for (param_name, want_value) in desired_parameter_values.items():
@@ -663,13 +824,13 @@ class Fleet(mp_module.MPModule):
             ret.update(c.params)
         return ret
 
-    def get_expected_calibration_parameters_for_vehicle(self, vehicle):
+    def get_expected_volatile_parameters_for_vehicle(self, vehicle):
         ret = {}
         for c in self.get_classes_for_vehicle(vehicle):
-            if c.calibration_params is None:
+            if c.volatile_params is None:
                 print("No params for (%s)" % str(c))
                 continue
-            ret.update(c.calibration_params)
+            ret.update(c.volatile_params)
         return ret
 
     def cmd_fleet_status_check_params(self, vehicle):
@@ -689,7 +850,7 @@ class Fleet(mp_module.MPModule):
 
         expected_parameters = self.get_expected_parameters_for_vehicle(vehicle)
 
-        expected_calibration_parameters = self.get_expected_calibration_parameters_for_vehicle(vehicle)
+        expected_volatile_parameters = self.get_expected_volatile_parameters_for_vehicle(vehicle)
 
         ret = ""
         for (got_param, got_value) in sorted(mavparm.items(), key=lambda x : x[0]):
@@ -698,9 +859,9 @@ class Fleet(mp_module.MPModule):
                 continue
             expected_value = expected_parameters[got_param]
             del expected_parameters[got_param]
-            if got_param in expected_calibration_parameters:
-                # don't bother checking the value - it's a calibration parameter
-                del expected_calibration_parameters[got_param]
+            if got_param in expected_volatile_parameters:
+                # don't bother checking the value - it's a volatile parameter
+                del expected_volatile_parameters[got_param]
                 continue
             if abs(expected_value - got_value) < 0.00001:
                 continue
@@ -709,8 +870,8 @@ class Fleet(mp_module.MPModule):
             continue
 
         for expected in expected_parameters.keys():
-            if expected in expected_calibration_parameters.keys():
-                ret += "Vehicle does not have (calibration) parameter (%s)\n" % (expected, )
+            if expected in expected_volatile_parameters.keys():
+                ret += "Vehicle does not have (volatile) parameter (%s)\n" % (expected, )
             else:
                 ret += "Vehicle does not have parameter (%s)\n" % (expected, )
 
@@ -728,7 +889,7 @@ class Fleet(mp_module.MPModule):
             self.print("No such vehicle (%s)" % uid)
             return
 
-        ret = "Status for %s:" % uid
+        ret = "\nStatus for %s:\n" % uid
         ret += self.cmd_fleet_status_check_params(vehicle)
         return ret
 
@@ -840,10 +1001,10 @@ class Fleet(mp_module.MPModule):
                     kwargs["paramfile"] = thing["paramfile"]
                 else:
                     kwargs["params"] = thing["params"]
-                if "calibration_params" in thing:
-                    kwargs["calibration_params"] = thing["calibration_params"]
+                if "volatile_params" in thing:
+                    kwargs["volatile_params"] = thing["volatile_params"]
                 else:
-                    kwargs["calibration_params"] = {}
+                    kwargs["volatile_params"] = {}
                 return VehicleClass(thing["name"], **kwargs)
             if "__Vehicle__" in thing:
                 return Vehicle(thing["uid"], name=thing["name"], classes=thing["classes"])
@@ -859,7 +1020,7 @@ class Fleet(mp_module.MPModule):
                 ret = {
                     "__VehicleClass__": 1,
                     "name": thing.name,
-                    "calibration_params": thing.calibration_params,
+                    "volatile_params": thing.volatile_params,
                 }
                 if thing.paramfile is not None:
                     ret["paramfile"] = thing.paramfile
