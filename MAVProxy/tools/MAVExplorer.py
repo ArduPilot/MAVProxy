@@ -1012,7 +1012,9 @@ def input_loop():
         mestate.input_queue.put(line)
 
 new_matplotlib = False
-(matplotlib_major, matplotlib_minor, matplotlib_point) = matplotlib.__version__.split('.')
+mversion = matplotlib.__version__.split('.')
+matplotlib_major = mversion[0]
+matplotlib_minor = mversion[1]
 if int(matplotlib_major) > 3:
     new_matplotlib = True
 elif (int(matplotlib_major) >= 3 and int(matplotlib_minor) >= 5):

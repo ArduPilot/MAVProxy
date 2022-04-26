@@ -526,9 +526,6 @@ class MavGraph(object):
             self.fig.canvas.toolbar.push_current()
             #print("setting: ", self.graph_num, xlim)
             self.ax1.set_xlim(xlim)
-            # trigger the timer, this allows us to setup a v slow animation,
-            # which saves a lot of CPU
-            self.ani.event_source._on_timer()
 
     def xlim_timer(self):
         '''called every 0.1s to check for xlim change'''
