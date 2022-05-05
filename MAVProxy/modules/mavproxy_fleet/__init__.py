@@ -36,6 +36,11 @@ from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
 
 
+class NoSuchClassException(Exception):
+    def __init__(self, classname):
+        self.classname = classname
+
+
 class SeenVehicle(object):
     '''information about a vehicle we've seen traffic from'''
 
@@ -150,15 +155,12 @@ class Fleet(mp_module.MPModule):
         '''returns a list of VehicleClass objects for the vehicle'''
         ret = []
         for c_name in vehicle._classes:
-            try:
-                c = self.get_config_class_by_name(c_name)
-            except KeyError:
-                self.print("No such class %s" % c_name)
-                return
-            ret.append(c)
+            ret.append(self.get_config_class_by_name(c_name))
         return ret
 
     def get_config_class_by_name(self, classname):
+        if classname not in self.config["classes"]:
+            raise NoSuchClassException(classname)
         return self.config["classes"][classname]
 
     def get_config_vehicle_by_uid(self, uid):
@@ -221,11 +223,12 @@ class Fleet(mp_module.MPModule):
         (name, *args) = args
 
         self.config["classes"][name] = VehicleClass(name)
+        self.last_config_change = time.time()
 
     def cmd_fleet_class_param(self, args):
         '''command to manipulate class parameters'''
         if len(args) < 1:
-            self.print("fleet class param (cal|del|loadfromfile|loadfromvehicle|set|show|move|copy)")
+            self.print("fleet class param (cal|del|loadfromfile|loadfromvehicle|set|loadunknownfromvehicle||show|move|copy)")
             return
 
         (cmd, *args) = args
@@ -241,6 +244,9 @@ class Fleet(mp_module.MPModule):
 
         if cmd == "loadfromvehicle":
             return self.cmd_fleet_class_param_loadfromvehicle(args)
+
+        if cmd == "loadunknownfromvehicle":
+            return self.cmd_fleet_class_param_loadunknownfromvehicle(args)
 
         if cmd == "set":
             return self.cmd_fleet_class_param_set(args)
@@ -391,6 +397,60 @@ class Fleet(mp_module.MPModule):
         if change_made:
             self.last_config_change = time.time()
 
+    def cmd_fleet_class_param_loadunknownfromvehicle(self, args):
+        '''like loadfromvehicle, but instead of taking a pattern takes all
+        "unknown" parameters as reported by "fleet status UID"'''
+        if len(args) < 3:
+            self.print("loadunknownfromvehicle requires classname uid pattern")
+            return
+        (classname, vehicle_uid, pattern, *args) = args
+
+        pattern = pattern.upper()
+
+        try:
+            vehicle = self.get_config_vehicle_by_uid(vehicle_uid)
+        except KeyError:
+            self.print("No such vehicle %s" % vehicle_uid)
+            return
+
+        gotclass = self.get_config_class_by_name(classname)
+        if gotclass is None:
+            self.print("bad classname")
+            return
+
+        seen_vehicle = self.get_seen_vehicle_by_uid(vehicle.uid)
+        if seen_vehicle is None:
+            self.print("%s is not live" % vehicle.uid)
+            return ""
+
+        mavparm = self.mpstate.mav_param_by_sysid[seen_vehicle.mavlink_target()]
+
+        expected_parameters = self.get_expected_parameters_for_vehicle(vehicle)
+
+        expected_volatile_parameters = self.get_expected_volatile_parameters_for_vehicle(vehicle)
+
+        change_made = False
+        for (name, value) in sorted(mavparm.items(), key=lambda x : x[0]):
+            if name in expected_parameters:
+                continue
+
+            if not fnmatch.fnmatch(name.upper(), pattern):
+                continue
+
+            if name in expected_volatile_parameters:
+                self.print("Warning: skipping volatile parameter")
+                continue
+
+            old = ""
+            if name in gotclass.params:
+                old = " (was %f)" % gotclass.params[name]
+            self.print("Setting (%s) to (%f)%s" % (name, value, old))
+            gotclass.params[name] = value
+            change_made = True
+
+        if change_made:
+            self.last_config_change = time.time()
+
     def cmd_fleet_class_param_loadfromvehicle(self, args):
         if len(args) < 3:
             self.print("loadfromvehicle requires classname uid pattern")
@@ -493,6 +553,7 @@ class Fleet(mp_module.MPModule):
             self.print("%s" % (name,))
 
     def cmd_fleet_class_param_volatile(self, args):
+
         '''command to mark parameters as volatile variables'''
         if len(args) < 1:
             self.print("fleet class param cal (set|unset|show)")
@@ -606,6 +667,25 @@ class Fleet(mp_module.MPModule):
         if change_made:
             self.last_config_change = time.time()
 
+    def cmd_fleet_class_status_help(self):
+        self.print("fleet class status (help|vehicle)")
+
+    def cmd_fleet_class_status(self, args):
+        if len(args) is None:
+            for c in self.config["classes"].values():
+                out = [c.name]
+                if c.params is not None:
+                    out.append("paramcount=%u" % len(list(c.params.keys())))
+                print(" ".join(out))
+            return
+
+        (cmd, *args) = args
+
+        if cmd == "help":
+            return self.cmd_fleet_class_status_help()
+
+        return self.cmd_fleet_class_status_help()
+
     def cmd_fleet_class(self, args):
         '''handle "fleet class" commands - manipulation of classes vehicles can be in'''
         if len(args) == 0:
@@ -615,12 +695,7 @@ class Fleet(mp_module.MPModule):
         (cmd, *args) = args
 
         if cmd == "status":
-            for c in self.config["classes"].values():
-                out = [c.name]
-                if c.params is not None:
-                    out.append("paramcount=%u" % len(list(c.params.keys())))
-                print(" ".join(out))
-            return
+            return self.cmd_fleet_class_status(args)
 
         if cmd == "param":
             return self.cmd_fleet_class_param(args)
@@ -637,37 +712,39 @@ class Fleet(mp_module.MPModule):
 
         return None
 
+    def cmd_fleet_vehicle_status(self, args):
+        if len(args) < 1:
+            print("Seen vehicles")
+            for seen_vehicle in self.seen_vehicles.values():
+                items = []
+                items.append("UID:%s" % seen_vehicle.uid_as_string())
+                items.append("%u/%u" % seen_vehicle.mavlink_target())
+                if seen_vehicle.uid_as_string() in self.config["vehicles"]:
+                    items.append("KNOWN")
+                else:
+                    items.append("UNKNOWN")
+                print(" ".join(items))
+            return
+
+        (vehicle_uid, *args) = args
+        seen_vehicle = None
+        for seen_vehicle in self.seen_vehicles.values():
+            if seen_vehicle.uid_as_string() == vehicle_uid:
+                break
+        if seen_vehicle is None:
+            self.print("Unknown vehicle (%s)" % vehicle_uid)
+            return
+        print(self.vehicle_status(seen_vehicle))
+        return
+
     def cmd_fleet_vehicle(self, args):
         if len(args) < 1:
-            self.print("fleet vehicle (status|add|del|setclasses|param) ...")
+            self.print("fleet vehicle (status|add|del|setclasses|setname|param) ...")
             return
         (cmd, *args) = args
 
         if cmd == "status":
-            if len(args) < 1:
-                print("Seen vehicles")
-                for seen_vehicle in self.seen_vehicles.values():
-                    items = []
-                    items.append("UID:%s" % seen_vehicle.uid_as_string())
-                    items.append("%u/%u" % seen_vehicle.mavlink_target())
-                    if seen_vehicle.uid_as_string() in self.config["vehicles"]:
-                        items.append("KNOWN")
-                    else:
-                        items.append("UNKNOWN")
-                    print(" ".join(items))
-                return
-
-            (vehicle_uid, *args) = args
-            vehicle = None
-            for seen_vehicle in self.seen_vehicles.values():
-                if seen_vehicle.uid_as_string() == vehicle_uid:
-                    vehicle = seen_vehicle
-                    break
-            if vehicle is None:
-                self.print("Unknown vehicle (%s)" % vehicle_uid)
-                return
-            print(self.vehicle_status(vehicle))
-            return
+            return self.cmd_fleet_vehicle_status(args)
 
         if cmd == "add":
             if len(args) < 1:
@@ -707,6 +784,9 @@ class Fleet(mp_module.MPModule):
         if cmd == "param":
             return self.cmd_fleet_vehicle_param(args)
 
+        if cmd == "setname":
+            return self.cmd_fleet_vehicle_setname(args)
+
         if cmd == "setclasses":
             # set which classes the vehicle is in
             if len(args) < 1:
@@ -725,9 +805,24 @@ class Fleet(mp_module.MPModule):
 
         self.print("Unknown vehicle command %s" % str(cmd))
 
+    def cmd_fleet_vehicle_setname(self, args):
+        if len(args) < 2:
+            self.print("fleet vehicle setname UID name")
+            return
+
+        (vehicle_uid, name, *args) = args
+
+        try:
+            vehicle = self.get_config_vehicle_by_uid(vehicle_uid)
+        except KeyError:
+            self.print("No such UID")
+            return
+        vehicle.name = name
+        self.last_config_change = time.time()
+
     def cmd_fleet_vehicle_param(self, args):
         if len(args) < 1:
-            self.print("fleet vehicle param (setfromclasses|show)")
+            self.print("fleet vehicle param (setfromclasses|setunexpectedfromclasses|show)")
             return
 
         (cmd, *args) = args
@@ -743,13 +838,25 @@ class Fleet(mp_module.MPModule):
 
         self.print("Unknown vehicle param command %s" % str(cmd))
 
-    def vehicle_status(self, vehicle):
+    def vehicle_status(self, seen_vehicle):
         class Item(object):
             def __init__(self, passed, desc, reason):
                 self.passed = passed
                 self.desc = desc
                 self.reason = reason
         items = []
+
+        vehicle = self.get_config_vehicle_by_uid(seen_vehicle.uid_as_string())
+
+        if len(vehicle._classes) == 0:
+            items.append(Item(False, "Vehicle in some classes", "Vehicle is not in any classes"))
+        else:
+            items.append(Item(True, "Vehicle in some classes", "Vehicle is in classes (%s)" % " ".join(vehicle._classes)))
+
+        try:
+            self.get_classes_for_vehicle(vehicle)
+        except NoSuchClassException as e:
+            items.append(Item(False, "Vehicle classes exist", "Vehicle is in class (%s), which doesn't exist" % e.classname))
 
         # check firmware version being run - needs to come from classes
         # desired_fwver = vehicle.desired_firmware_version()
@@ -763,7 +870,7 @@ class Fleet(mp_module.MPModule):
         desired_parameter_values = {
             "ARMING_CHECK": 1,
         }
-        params = self.mpstate.mav_param_by_sysid[vehicle.mavlink_target()]
+        params = self.mpstate.mav_param_by_sysid[seen_vehicle.mavlink_target()]
         for (param_name, want_value) in desired_parameter_values.items():
             got_value = params[param_name]
             if want_value != got_value:
@@ -808,7 +915,7 @@ class Fleet(mp_module.MPModule):
                 status = "OK"
             if vehicle.name is None:
                 vehicle.name = "[NoName]"
-            ret += "%10s (%s): %s %s" % (
+            ret += "%10s (%s): %s %s\n" % (
                 vehicle.name,
                 vehicle.uid,
                 age,
@@ -838,13 +945,6 @@ class Fleet(mp_module.MPModule):
         if seen_vehicle is None:
             self.print("%s is not live" % vehicle.uid)
             return ""
-
-        param_module = self.mpstate.module('param')
-        if param_module is None:
-            self.print("No param module")
-            return ""
-
-        (pset, pcount) = param_module.param_status(sysid=seen_vehicle.mavlink_target())
 
         mavparm = self.mpstate.mav_param_by_sysid[seen_vehicle.mavlink_target()]
 
