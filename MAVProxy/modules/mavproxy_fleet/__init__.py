@@ -48,7 +48,7 @@ class SeenVehicle(object):
         self.sysidcompid = sysidcompid
 
         self.uid = None
-        self.last_seen = None
+        self.last_seen = 0
         self.autopilot_version_flight_sw_version = None
 
     def seen(self):
@@ -62,6 +62,8 @@ class SeenVehicle(object):
 
     def uid_as_string(self):
         '''turns byte array into string'''
+        if self.uid is None:
+            return None
         ret = "".join(["%02x" % x for x in self.uid])
         return ret[0:24]
 
@@ -110,11 +112,11 @@ class Fleet(mp_module.MPModule):
     '''main module, reads/writes mavlink, configures vehicle, ...'''
     def __init__(self, mpstate):
         """Initialise module"""
-        super(Fleet, self).__init__(mpstate, "fleet", "")
+        super(Fleet, self).__init__(mpstate, "fleet", "", multi_vehicle=True)
 
         self.fleet_settings = mp_settings.MPSettings([
             ('verbose', bool, False),
-            ('probe_interval', int, 15),  # probe each sysid at 15s intervals
+            ('probe_interval', int, 5),  # probe each sysid at 15s intervals
             ('config_filepath', str, "fleet.json"),
         ])
         self.add_command('fleet', self.cmd_fleet, "fleet module", ['status', 'set (LOGSETTING)'])
@@ -671,7 +673,7 @@ class Fleet(mp_module.MPModule):
         self.print("fleet class status (help|vehicle)")
 
     def cmd_fleet_class_status(self, args):
-        if len(args) is None:
+        if len(args) == 0:
             for c in self.config["classes"].values():
                 out = [c.name]
                 if c.params is not None:
@@ -727,12 +729,9 @@ class Fleet(mp_module.MPModule):
             return
 
         (vehicle_uid, *args) = args
-        seen_vehicle = None
-        for seen_vehicle in self.seen_vehicles.values():
-            if seen_vehicle.uid_as_string() == vehicle_uid:
-                break
+        seen_vehicle = self.get_seen_vehicle_by_uid(vehicle_uid)
         if seen_vehicle is None:
-            self.print("Unknown vehicle (%s)" % vehicle_uid)
+            self.print("%s is not live" % vehicle_uid)
             return
         print(self.vehicle_status(seen_vehicle))
         return
@@ -846,7 +845,16 @@ class Fleet(mp_module.MPModule):
                 self.reason = reason
         items = []
 
-        vehicle = self.get_config_vehicle_by_uid(seen_vehicle.uid_as_string())
+        vehicle_uid = seen_vehicle.uid_as_string()
+        if vehicle_uid is None:
+            self.print("%s is not live" % vehicle_uid)
+            return
+
+        try:
+            vehicle = self.get_config_vehicle_by_uid(vehicle_uid)
+        except KeyError:
+            self.print("No such vehicle %s" % vehicle_uid)
+            return
 
         if len(vehicle._classes) == 0:
             items.append(Item(False, "Vehicle in some classes", "Vehicle is not in any classes"))
@@ -865,16 +873,6 @@ class Fleet(mp_module.MPModule):
         #     items.append(Item(False, "Firmware Version", "want=%s != got=%s" % (desired_fwver, current_fwver)))
         # else:
         #     items.append(Item(True, "Firmware Version", "want=%s == got=%s" % (desired_fwver, current_fwver)))
-
-        # check parameters
-        desired_parameter_values = {
-            "ARMING_CHECK": 1,
-        }
-        params = self.mpstate.mav_param_by_sysid[seen_vehicle.mavlink_target()]
-        for (param_name, want_value) in desired_parameter_values.items():
-            got_value = params[param_name]
-            if want_value != got_value:
-                items.append(Item(False, "Parameter %s" % param_name, "want=%f got=%f" % (want_value, got_value)))
 
         # format and return output
         desc_len = 0
@@ -906,20 +904,24 @@ class Fleet(mp_module.MPModule):
             seen_vehicle = self.get_seen_vehicle_by_uid(vehicle.uid)
             if seen_vehicle is not None:
                 age = "%2.2f" % (now - seen_vehicle.last_seen)
+                no_params = ""
+                if not self.vehicle_has_fetched_parameters(seen_vehicle):
+                    no_params = " !PARAMS"
 
 #            if not vehicle.correct_firmware_version():
 #                status = "!FW"
 #            if not vehicle.correct_firmware_hash():
 #                status = "!FWHash"
-            if not len(status):
-                status = "OK"
+#            if not len(status):
+#                status = "OK"
             if vehicle.name is None:
                 vehicle.name = "[NoName]"
-            ret += "%10s (%s): %s %s\n" % (
+            ret += "%10s (%s): %s %s%s\n" % (
                 vehicle.name,
                 vehicle.uid,
                 age,
-                status)
+                status,
+                no_params)
         return ret
 
     def get_expected_parameters_for_vehicle(self, vehicle):
@@ -940,6 +942,22 @@ class Fleet(mp_module.MPModule):
             ret.update(c.volatile_params)
         return ret
 
+    def vehicle_has_fetched_parameters(self, vehicle):
+        seen_vehicle = self.get_seen_vehicle_by_uid(vehicle.uid)
+        if seen_vehicle is None:
+            return False
+        mavparm = self.mpstate.mav_param_by_sysid[seen_vehicle.mavlink_target()]
+        expected_volatile_parameters = self.get_expected_volatile_parameters_for_vehicle(vehicle)
+
+        filtered_parms = list(filter(lambda x : x not in expected_volatile_parameters, mavparm.keys()))
+
+        num_params = len(filtered_parms)
+
+        if num_params < 10 and num_params != 0:
+            self.print("suspiciously low number of params for vehicle %s (%s)" % (vehicle.uid, filtered_parms))
+
+        return num_params != 0
+
     def cmd_fleet_status_check_params(self, vehicle):
         seen_vehicle = self.get_seen_vehicle_by_uid(vehicle.uid)
         if seen_vehicle is None:
@@ -951,6 +969,10 @@ class Fleet(mp_module.MPModule):
         expected_parameters = self.get_expected_parameters_for_vehicle(vehicle)
 
         expected_volatile_parameters = self.get_expected_volatile_parameters_for_vehicle(vehicle)
+
+        if not self.vehicle_has_fetched_parameters(vehicle):
+            self.print("%s has no fetched parameters" % vehicle.uid)
+            return ""
 
         ret = ""
         for (got_param, got_value) in sorted(mavparm.items(), key=lambda x : x[0]):
@@ -1012,7 +1034,21 @@ class Fleet(mp_module.MPModule):
             0, # param6
             0) # param7
 
-    def send_probe_for_autopilot_version(self, to_probe):
+        (target_sysid, target_compid) = to_probe.mavlink_target()
+
+    def send_request_for_parameters(self, to_probe):
+        param_module = self.mpstate.module('param')
+        if param_module is None:
+            self.print("No param module")
+            return
+
+        self.print("Asking (%s) for parameters" % (to_probe.mavlink_target(),))
+        param_module.add_new_target_system(to_probe.mavlink_target())
+        mavparm = self.mpstate.mav_param_by_sysid[to_probe.mavlink_target()]
+        mavparm.fetch_check()
+
+    def send_request_for_autopilot_version(self, to_probe):
+        # self.print("Asking (%s) for autopilot version" % (to_probe.mavlink_target(),))
         self.request_message(to_probe,
                              mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE,
                              p1=mavutil.mavlink.MAVLINK_MSG_ID_AUTOPILOT_VERSION)
@@ -1043,7 +1079,14 @@ class Fleet(mp_module.MPModule):
         (to_probe, *self.probe_list) = self.probe_list
 
         # pass it around
-        self.send_probe_for_autopilot_version(to_probe)
+        self.send_request_for_autopilot_version(to_probe)
+
+        if to_probe.uid is not None:
+            vehicle = self.get_config_vehicle_by_uid(to_probe.uid_as_string())
+
+            if not self.vehicle_has_fetched_parameters(vehicle):
+                self.print("Sending request for parameters from (%s)" % str(vehicle))
+                self.send_request_for_parameters(to_probe)
 
     def config_filepath_mtime(self):
         '''return mtime of the current config file'''
@@ -1204,6 +1247,10 @@ class Fleet(mp_module.MPModule):
     def handle_autopilot_version(self, m):
         uid = m.uid2  # lots of zeroes on the end after this
 
+#        print("Received autopilot version from %u.%u: %s" %
+#              (m.get_srcSystem(), m.get_srcComponent(),
+#               uid))
+
         key = (m.get_srcSystem(), m.get_srcComponent())
 
         if key not in self.seen_vehicles:
@@ -1212,6 +1259,7 @@ class Fleet(mp_module.MPModule):
         vehicle = self.seen_vehicles[key]
         vehicle.seen()
 
+#        print("Setting uid %s in key (%s)" % (uid, str(key)))
         vehicle.set_uid(uid)
 
         major = (m.flight_sw_version >> 24) & 0xff
@@ -1230,10 +1278,6 @@ class Fleet(mp_module.MPModule):
 
         if m_type == 'AUTOPILOT_VERSION':
             self.handle_autopilot_version(m)
-
-            # print("Received autopilot version from %u.%u: %s" %
-            #       (m.get_srcSystem(), m.get_srcComponent(),
-            #        vehicle.uid_as_string()))
             return
 
         if m_type == "HEARTBEAT":
@@ -1241,7 +1285,10 @@ class Fleet(mp_module.MPModule):
                 # OK, that's really rude... FIXME
                 return
             if key not in self.seen_vehicles:
-                self.seen_vehicles[key] = SeenVehicle(key)
+                seen_vehicle = SeenVehicle(key)
+                self.seen_vehicles[key] = seen_vehicle
+                self.send_request_for_autopilot_version(seen_vehicle)
+                self.send_request_for_parameters(seen_vehicle)
             self.seen_vehicles[key].seen()
 
 
