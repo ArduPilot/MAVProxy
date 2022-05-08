@@ -238,6 +238,7 @@ class MPState(object):
               MPSetting('heartbeat', float, 1, 'Heartbeat rate (Hz)', range=(0,100), increment=0.1),
               MPSetting('mavfwd', bool, True, 'Allow forwarded control'),
               MPSetting('mavfwd_rate', bool, False, 'Allow forwarded rate control'),
+              MPSetting('mavfwd_link', int, -1, 'Forward to a specific link'),
               MPSetting('shownoise', bool, True, 'Show non-MAVLink data'),
               MPSetting('baudrate', int, opts.baudrate, 'baudrate for new links', range=(0,10000000), increment=1),
               MPSetting('rtscts', bool, opts.rtscts, 'enable flow control'),
@@ -840,7 +841,11 @@ def process_mavlink(slave):
         for m in msgs:
             target_sysid = getattr(m, 'target_system', -1)
             mbuf = m.get_msgbuf()
-            mpstate.master(target_sysid).write(mbuf)
+            if mpstate.settings.mavfwd_link > 0 and mpstate.settings.mavfwd_link <= len(mpstate.mav_master):
+                mpstate.mav_master[mpstate.settings.mavfwd_link-1].write(mbuf)
+            else:
+                # find best link by sysid
+                mpstate.master(target_sysid).write(mbuf)
             if mpstate.logqueue:
                 usec = int(time.time() * 1.0e6)
                 mpstate.logqueue.put(bytearray(struct.pack('>Q', usec) + m.get_msgbuf()))
