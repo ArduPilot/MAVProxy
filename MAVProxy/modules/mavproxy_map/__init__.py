@@ -91,6 +91,7 @@ class MapModule(mp_module.MPModule):
         self.add_menu(MPMenuItem('Set Origin (with height)', 'Set Origin', '# map setorigin '))
         self.add_menu(MPMenuItem('Terrain Check', 'Terrain Check', '# terrain check'))
         self.add_menu(MPMenuItem('Show Position', 'Show Position', 'showPosition'))
+        self.add_menu(MPMenuItem('Set ROI', 'Set ROI', '# map setroi '))
 
         self._colour_for_wp_command = {
             # takeoff commands
@@ -219,6 +220,8 @@ class MapModule(mp_module.MPModule):
             self.cmd_follow(args)
         elif args[0] == "clear":
             self.cmd_clear(args)
+        elif args[0] == "setroi":
+            self.cmd_set_roi(args)
         else:
             print("usage: map <icon|set>")
 
@@ -617,6 +620,23 @@ class MapModule(mp_module.MPModule):
             int(lon*1e7), # lon
             0) # no height change
 
+    def cmd_set_roi(self, args):
+        '''called when user selects "Set ROI" on map'''
+        (lat, lon) = (self.mpstate.click_location[0], self.mpstate.click_location[1])
+        alt = self.ElevationMap.GetElevation(lat, lon)
+        print("Setting ROI to: ", lat, lon, alt)
+        self.master.mav.command_long_send(
+            self.settings.target_system, self.settings.target_component,
+            mavutil.mavlink.MAV_CMD_DO_SET_ROI_LOCATION,
+            0, # confirmation
+            0, # param1
+            0, # param2
+            0, # param3
+            0, # param4
+            lat, # lat
+            lon, # lon
+            alt) # param7
+        
     def cmd_set_origin(self, args):
         '''called when user selects "Set Origin (with height)" on map'''
         (lat, lon) = (self.mpstate.click_location[0], self.mpstate.click_location[1])
