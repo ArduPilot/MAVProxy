@@ -384,7 +384,10 @@ class MPTile:
             roi = img[tile_info.offsety:tile_info.offsety+height2, tile_info.offsetx:tile_info.offsetx+width2]
 
             # and scale it
-            scaled = cv2.resize(roi, (TILES_HEIGHT,TILES_WIDTH))
+            try:
+                scaled = cv2.resize(roi, (TILES_HEIGHT,TILES_WIDTH))
+            except Exception as ex:
+                return None
             #cv.Rectangle(scaled, (0,0), (255,255), (0,255,0), 1)
             return scaled
         return None
