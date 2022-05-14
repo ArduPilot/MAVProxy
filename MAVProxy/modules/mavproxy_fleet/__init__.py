@@ -230,7 +230,7 @@ class Fleet(mp_module.MPModule):
     def cmd_fleet_class_param(self, args):
         '''command to manipulate class parameters'''
         if len(args) < 1:
-            self.print("fleet class param (cal|del|loadfromfile|loadfromvehicle|set|loadunknownfromvehicle||show|move|copy)")
+            self.print("fleet class param (cal|del|loadfromfile|setfromvehicle|set|setunknownfromvehicle|setdifferentfromvehicle|show|move|copy)")  # noqa
             return
 
         (cmd, *args) = args
@@ -244,11 +244,14 @@ class Fleet(mp_module.MPModule):
         if cmd == "loadfromfile":
             return self.cmd_fleet_class_param_loadfromfile(args)
 
-        if cmd == "loadfromvehicle":
-            return self.cmd_fleet_class_param_loadfromvehicle(args)
+        if cmd == "setfromvehicle":
+            return self.cmd_fleet_class_param_setfromvehicle(args)
 
-        if cmd == "loadunknownfromvehicle":
-            return self.cmd_fleet_class_param_loadunknownfromvehicle(args)
+        if cmd == "setdifferentfromvehicle":
+            return self.cmd_fleet_class_param_setdifferentfromvehicle(args)
+
+        if cmd == "setunknownfromvehicle":
+            return self.cmd_fleet_class_param_setunknownfromvehicle(args)
 
         if cmd == "set":
             return self.cmd_fleet_class_param_set(args)
@@ -266,10 +269,10 @@ class Fleet(mp_module.MPModule):
 
     def cmd_fleet_class_param_loadfromfile(self, args):
         '''load parameters into a class from a file'''
-        if len(args) < 2:
-            self.print("load requires classname and filename")
+        if len(args) < 3:
+            self.print("load requires classname filename pattern")
             return
-        (classname, filepath, *args) = args
+        (classname, filepath, pattern, *args) = args
 
         gotclass = self.get_config_class_by_name(classname)
         if gotclass is None:
@@ -278,13 +281,6 @@ class Fleet(mp_module.MPModule):
 
         if not os.path.exists(filepath):
             self.print("%s does not exist" % filepath)
-            return
-
-        pattern = None
-        if len(args):
-            (pattern, *args) = args
-        else:
-            self.print("Need pattern")
             return
 
         change_made = False
@@ -399,11 +395,11 @@ class Fleet(mp_module.MPModule):
         if change_made:
             self.last_config_change = time.time()
 
-    def cmd_fleet_class_param_loadunknownfromvehicle(self, args):
-        '''like loadfromvehicle, but instead of taking a pattern takes all
+    def cmd_fleet_class_param_setunknownfromvehicle(self, args):
+        '''like setfromvehicle, but instead of taking a pattern takes all
         "unknown" parameters as reported by "fleet status UID"'''
         if len(args) < 3:
-            self.print("loadunknownfromvehicle requires classname uid pattern")
+            self.print("setunknownfromvehicle requires classname uid pattern")
             return
         (classname, vehicle_uid, pattern, *args) = args
 
@@ -453,9 +449,70 @@ class Fleet(mp_module.MPModule):
         if change_made:
             self.last_config_change = time.time()
 
-    def cmd_fleet_class_param_loadfromvehicle(self, args):
+    def cmd_fleet_class_param_setdifferentfromvehicle(self, args):
+        '''like setfromvehicle, but instead of taking a pattern takes all
+        "different" parameters as reported by "fleet status UID"'''
+
         if len(args) < 3:
-            self.print("loadfromvehicle requires classname uid pattern")
+            self.print("fleet class param CLASSNAME UID PATTERN")
+            return
+
+        (classname, vehicle_uid, pattern, *args) = args
+
+        gotclass = self.get_config_class_by_name(classname)
+        if gotclass is None:
+            self.print("bad classname")
+            return
+
+        pattern = pattern.upper()
+
+        try:
+            vehicle = self.get_config_vehicle_by_uid(vehicle_uid)
+        except KeyError:
+            self.print("No such vehicle %s" % vehicle_uid)
+            return
+
+        seen_vehicle = self.get_seen_vehicle_by_uid(vehicle.uid)
+        if seen_vehicle is None:
+            self.print("%s is not live" % vehicle.uid)
+            return
+
+        mavparm = self.mpstate.mav_param_by_sysid[seen_vehicle.mavlink_target()]
+
+        expected_parameters = self.get_expected_parameters_for_vehicle(vehicle)
+
+        expected_volatile_parameters = self.get_expected_volatile_parameters_for_vehicle(vehicle)
+
+        if not self.vehicle_has_fetched_parameters(vehicle):
+            self.print("%s has no fetched parameters" % vehicle.uid)
+            return
+
+        change_made = False
+        for (name, value) in sorted(mavparm.items(), key=lambda x : x[0]):
+            if not fnmatch.fnmatch(name.upper(), pattern):
+                continue
+
+            if name not in expected_parameters:
+                continue
+
+            class_value = expected_parameters[name]
+            if name in expected_volatile_parameters:
+                # don't bother checking the value - it's a volatile parameter
+                del expected_volatile_parameters[name]
+                continue
+            if abs(class_value - value) < 0.00001:
+                continue
+
+            self.print("Setting (%s) to (%f) (was %f)" % (name, value, class_value))
+            gotclass.params[name] = value
+            change_made = True
+
+        if change_made:
+            self.last_config_change = time.time()
+
+    def cmd_fleet_class_param_setfromvehicle(self, args):
+        if len(args) < 3:
+            self.print("setfromvehicle requires classname uid pattern")
             return
         (classname, vehicle_uid, pattern, *args) = args
 
@@ -902,11 +959,11 @@ class Fleet(mp_module.MPModule):
             status = ""
             age = "?"
             seen_vehicle = self.get_seen_vehicle_by_uid(vehicle.uid)
+            no_params = ""
             if seen_vehicle is not None:
                 age = "%2.2f" % (now - seen_vehicle.last_seen)
-                no_params = ""
-                if not self.vehicle_has_fetched_parameters(seen_vehicle):
-                    no_params = " !PARAMS"
+                if not self.vehicle_has_fetched_parameters(vehicle):
+                    no_params = " NOPARAMS"
 
 #            if not vehicle.correct_firmware_version():
 #                status = "!FW"
@@ -1044,8 +1101,8 @@ class Fleet(mp_module.MPModule):
 
         self.print("Asking (%s) for parameters" % (to_probe.mavlink_target(),))
         param_module.add_new_target_system(to_probe.mavlink_target())
-        mavparm = self.mpstate.mav_param_by_sysid[to_probe.mavlink_target()]
-        mavparm.fetch_check()
+        # mavparm = self.mpstate.mav_param_by_sysid[to_probe.mavlink_target()]
+        # mavparm.fetch_check()
 
     def send_request_for_autopilot_version(self, to_probe):
         # self.print("Asking (%s) for autopilot version" % (to_probe.mavlink_target(),))

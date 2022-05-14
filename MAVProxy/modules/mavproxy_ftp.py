@@ -121,8 +121,8 @@ class FTPModule(mp_module.MPModule):
         '''
         self.default_instance = self.create_instance()
 
-    def create_instance(self):
-        new_instance = FTPInstance(self.master, self.ftp_settings)
+    def create_instance(self, target=None):
+        new_instance = FTPInstance(self.master, self.ftp_settings, target=target)
         self.instances.append(new_instance)
         return new_instance
 
@@ -331,12 +331,11 @@ class FTPModule(mp_module.MPModule):
 
 class FTPInstance(object):
     '''encapsulates data and methods for a mavlink ftp connection'''
-    def __init__(self, master, ftp_settings, target_system=1, target_component=1):
+    def __init__(self, master, ftp_settings, target=(1, 1)):
         #        self.session = session
         self.master = master
         self.ftp_settings = ftp_settings
-        self.target_system = target_system
-        self.target_component = target_component
+        self.target = target
 
         self.seq = 0
         self.session = 0
