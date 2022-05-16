@@ -828,7 +828,7 @@ class WPModule(mp_module.MPModule):
                 self.ftp_count = num_items
         if self.ftp_count is not None:
             mavmsg = mavutil.mavlink.MAVLink_mission_item_int_message
-            item_size = struct.calcsize(mavmsg.format)
+            item_size = mavmsg.unpacker.size
             done = (total_size - 10) // item_size
             self.mpstate.console.set_status('Mission', 'Mission %u/%u' % (done, self.ftp_count))
 
@@ -851,7 +851,7 @@ class WPModule(mp_module.MPModule):
 
         data = data[10:]
         mavmsg = mavutil.mavlink.MAVLink_mission_item_int_message
-        item_size = struct.calcsize(mavmsg.format)
+        item_size = mavmsg.unpacker.size
         while len(data) >= item_size:
             mdata = data[:item_size]
             data = data[item_size:]
@@ -910,7 +910,7 @@ class WPModule(mp_module.MPModule):
             for field in mavmsg.ordered_fieldnames:
                 tlist.append(getattr(w, field))
             tlist = tuple(tlist)
-            buf = struct.pack(mavmsg.format, *tlist)
+            buf = mavmsg.unpacker.pack(*tlist)
             fh.write(buf)
         fh.seek(0)
 
@@ -933,7 +933,7 @@ class WPModule(mp_module.MPModule):
             print("Failed to send waypoints")
         else:
             mavmsg = mavutil.mavlink.MAVLink_mission_item_int_message
-            item_size = struct.calcsize(mavmsg.format)
+            item_size = mavmsg.unpacker.size
             print("Sent mission of length %u in %.2fs" % ((dlen - 10) // item_size, time.time() - self.upload_start))
 
     # waypoint-specific methods:
