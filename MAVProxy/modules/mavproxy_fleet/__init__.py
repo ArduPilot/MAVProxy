@@ -102,9 +102,10 @@ class VehicleClass(object):
 class Vehicle(object):
     '''a Vehicle configuration keyed off UID'''
 
-    def __init__(self, uid, classes=[], name=None):
+    def __init__(self, uid, classes=[], name=None, quicknote=None):
         self.uid = uid
         self.name = name
+        self.quicknote = quicknote
         self._classes = classes
 
 
@@ -795,7 +796,7 @@ class Fleet(mp_module.MPModule):
 
     def cmd_fleet_vehicle(self, args):
         if len(args) < 1:
-            self.print("fleet vehicle (status|add|del|setclasses|setname|param) ...")
+            self.print("fleet vehicle (status|add|del|setclasses|setname|param|set|quicknote) ...")
             return
         (cmd, *args) = args
 
@@ -843,6 +844,9 @@ class Fleet(mp_module.MPModule):
         if cmd == "setname":
             return self.cmd_fleet_vehicle_setname(args)
 
+        if cmd == "quicknote":
+            return self.cmd_fleet_vehicle_quicknote(args)
+
         if cmd == "setclasses":
             # set which classes the vehicle is in
             if len(args) < 1:
@@ -874,6 +878,23 @@ class Fleet(mp_module.MPModule):
             self.print("No such UID")
             return
         vehicle.name = name
+        self.last_config_change = time.time()
+
+    def cmd_fleet_vehicle_quicknote(self, args):
+        '''allows a short piece of descriptive text'''
+        if len(args) < 2:
+            self.print("fleet vehicle quicknote UID NOTE")
+            return
+
+        (vehicle_uid, *args) = args
+        quicknote = " ".join(args)
+
+        try:
+            vehicle = self.get_config_vehicle_by_uid(vehicle_uid)
+        except KeyError:
+            self.print("No such UID")
+            return
+        vehicle.quicknote = quicknote
         self.last_config_change = time.time()
 
     def cmd_fleet_vehicle_param(self, args):
@@ -973,12 +994,16 @@ class Fleet(mp_module.MPModule):
 #                status = "OK"
             if vehicle.name is None:
                 vehicle.name = "[NoName]"
-            ret += "%10s (%s): %s %s%s\n" % (
+            quicknote = ""
+            if vehicle.quicknote is not None and len(vehicle.quicknote):
+                quicknote = "(%s)" % vehicle.quicknote
+            ret += "%10s (%s): %s %s%s%s\n" % (
                 vehicle.name,
                 vehicle.uid,
                 age,
                 status,
-                no_params)
+                no_params,
+                quicknote)
         return ret
 
     def get_expected_parameters_for_vehicle(self, vehicle):
@@ -1139,7 +1164,10 @@ class Fleet(mp_module.MPModule):
         self.send_request_for_autopilot_version(to_probe)
 
         if to_probe.uid is not None:
-            vehicle = self.get_config_vehicle_by_uid(to_probe.uid_as_string())
+            try:
+                vehicle = self.get_config_vehicle_by_uid(to_probe.uid_as_string())
+            except KeyError:
+                return
 
             if not self.vehicle_has_fetched_parameters(vehicle):
                 self.print("Sending request for parameters from (%s)" % str(vehicle))
@@ -1207,7 +1235,13 @@ class Fleet(mp_module.MPModule):
                     kwargs["volatile_params"] = {}
                 return VehicleClass(thing["name"], **kwargs)
             if "__Vehicle__" in thing:
-                return Vehicle(thing["uid"], name=thing["name"], classes=thing["classes"])
+                kwargs = {
+                    "name": thing["name"],
+                    "classes": thing["classes"],
+                }
+                if "quicknote" in thing:
+                    kwargs["quicknote"] = thing["quicknote"]
+                return Vehicle(thing["uid"], **kwargs)
 
             return thing
         return json.loads(string, object_hook=oh)
