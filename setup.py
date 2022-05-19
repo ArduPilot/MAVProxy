@@ -18,6 +18,9 @@ package_data = ['modules/mavproxy_map/data/*.jpg',
                 'modules/mavproxy_magical/data/*.obj',
                 'modules/mavproxy_fieldcheck/*.txt',
                 'tools/graphs/*.xml',
+                'modules/mavproxy_nokov/nokov/*',
+                'modules/mavproxy_nokov/nokov/lib/*',
+                'modules/mavproxy_nokov/nokov/lib32/*',
 ]
 
 package_data.extend(package_files('MAVProxy/modules/mavproxy_cesium/app'))
@@ -85,6 +88,7 @@ on how to use MAVProxy.''',
                 'MAVProxy.modules.mavproxy_joystick',
                 'MAVProxy.modules.mavproxy_magical',
                 'MAVProxy.modules.mavproxy_optitrack',
+                'MAVProxy.modules.mavproxy_nokov',
                 'MAVProxy.modules.lib',
                 'MAVProxy.modules.lib.ANUGA',
                 'MAVProxy.modules.lib.MacOS',
