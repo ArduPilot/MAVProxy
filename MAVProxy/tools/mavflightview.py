@@ -472,7 +472,7 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
 
     return [path, wp, fen, used_flightmodes, getattr(mlog, 'mav_type',None), instances]
 
-def mavflightview_show(path, wp, fen, used_flightmodes, mav_type, options, instances, title=None, timelim_pipe=None):
+def mavflightview_show(path, wp, fen, used_flightmodes, mav_type, options, instances, title=None, timelim_pipe=None, show_waypoints=True):
     if not title:
         title='MAVFlightView'
 
@@ -499,7 +499,9 @@ def mavflightview_show(path, wp, fen, used_flightmodes, mav_type, options, insta
         if len(path[i]) != 0:
             path_objs.append(mp_slipmap.SlipPolygon('FlightPath[%u]-%s' % (i,title), path[i], layer='FlightPath',
                                                     linewidth=2, colour=(255,0,180)))
-    plist = wp.polygon_list()
+    plist = []
+    if options.show_waypoints:
+        plist = wp.polygon_list()
     mission_obj = None
     if len(plist) > 0:
         mission_obj = []
@@ -630,6 +632,7 @@ class mavflightview_options(object):
         self.rate = 0
         self._flightmodes = []
         self.colour_source = 'flightmode'
+        self.show_waypoints = True
 
 if __name__ == "__main__":
     multiproc.freeze_support()
@@ -659,6 +662,7 @@ if __name__ == "__main__":
     parser.add_option("--colour-source", type="str", default="flightmode", help="expression with range 0f..255f used for point colour")
     parser.add_option("--no-flightmode-legend", action="store_false", default=True, dest="show_flightmode_legend", help="hide legend for colour used for flight modes")
     parser.add_option("--kml", default=None, help="add kml overlay")
+    parser.add_option("--hide-waypoints", dest='show_waypoints', action='store_false', help="do not show waypoints", default=True)
 
     (opts, args) = parser.parse_args()
 
