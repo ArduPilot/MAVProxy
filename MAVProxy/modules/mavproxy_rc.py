@@ -17,7 +17,7 @@ class RCModule(mp_module.MPModule):
         self.add_command('rc', self.cmd_rc, "RC input control", ['<%s|all>' % x])
         self.add_command('switch', self.cmd_switch, "flight mode switch control", ['<0|1|2|3|4|5|6>'])
         self.rc_settings = mp_settings.MPSettings(
-            [('override_hz', float, 5.0)])
+            [('override_hz', float, 10.0)])
         if self.sitl_output:
             self.rc_settings.override_hz = 20.0
         self.add_completion_function('(RCSETTING)',
