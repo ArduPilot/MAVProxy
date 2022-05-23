@@ -490,6 +490,16 @@ If PIDR.I has a constant positive value then it means the aircraft is trimmed to
   <expression>sqrt(XKY1[0].IVN0**2+XKY1[0].IVE0**2) sqrt(XKY1[0].IVN1**2+XKY1[0].IVE1**2) sqrt(XKY1[0].IVN2**2+XKY1[0].IVE2**2) sqrt(XKY1[0].IVN3**2+XKY1[0].IVE3**2) sqrt(XKY1[0].IVN4**2+XKY1[0].IVE4**2) ATT.Yaw:2</expression>
  </graph>
 
+ <graph name='EKF3/GSF Weights Lane1'>
+  <description></description>
+  <expression>XKY0[0].W0 XKY0[0].W1 XKY0[0].W2 XKY0[0].W3 XKY0[0].W4</expression>
+ </graph>
+
+ <graph name='EKF3/GSF Weights Lane2'>
+  <description></description>
+  <expression>XKY0[1].W0 XKY0[1].W1 XKY0[1].W2 XKY0[1].W3 XKY0[1].W4</expression>
+ </graph>
+
  <graph name='Replay/EK3 VelNE'>
   <description></description>
   <expression>XKF1[0].VN-XKF1[100].VN{XKF1.C==100} XKF1[0].VE-XKF1[100].VE{XKF1.C==100}</expression>
