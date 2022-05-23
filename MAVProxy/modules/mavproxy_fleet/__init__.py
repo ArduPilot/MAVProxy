@@ -728,7 +728,7 @@ class Fleet(mp_module.MPModule):
             self.last_config_change = time.time()
 
     def cmd_fleet_class_status_help(self):
-        self.print("fleet class status (help|vehicle)")
+        self.print("fleet class status [UID]")
 
     def cmd_fleet_class_status(self, args):
         if len(args) == 0:
@@ -739,12 +739,15 @@ class Fleet(mp_module.MPModule):
                 print(" ".join(out))
             return
 
-        (cmd, *args) = args
+        (classname, *args) = args
 
-        if cmd == "help":
-            return self.cmd_fleet_class_status_help()
+        gotclass = self.get_config_class_by_name(classname)
+        if gotclass is None:
+            self.print("bad classname")
+            return
 
-        return self.cmd_fleet_class_status_help()
+        for (name, value) in gotclass.params.items():
+            print("%s: %f" % (name, value))
 
     def cmd_fleet_class(self, args):
         '''handle "fleet class" commands - manipulation of classes vehicles can be in'''
@@ -787,6 +790,15 @@ class Fleet(mp_module.MPModule):
             return
 
         (vehicle_uid, *args) = args
+
+        try:
+            vehicle = self.get_config_vehicle_by_uid(vehicle_uid)
+        except KeyError:
+            print("No such vehicle")
+            return
+
+        print("Classes: %s" % " ".join(vehicle._classes))
+
         seen_vehicle = self.get_seen_vehicle_by_uid(vehicle_uid)
         if seen_vehicle is None:
             self.print("%s is not live" % vehicle_uid)
@@ -1266,6 +1278,7 @@ class Fleet(mp_module.MPModule):
                     "__Vehicle__": 1,
                     "uid": thing.uid,
                     "name": thing.name,
+                    "quicknote": thing.quicknote,
                     "classes": thing._classes,
                 }
                 return ret
