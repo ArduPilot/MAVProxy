@@ -107,7 +107,10 @@ class ChecklistModule(mp_module.MPModule):
             else:
                 self.checklist.set_check("IMU Check", 0)
 
-
+    def unload(self):
+        '''unload module'''
+        self.checklist.close()
+        
 def init(mpstate):
     '''initialise module'''
     return ChecklistModule(mpstate)
