@@ -14,6 +14,8 @@ class FenceModule(mp_module.MPModule):
         self.fenceloader_by_sysid = {}
         self.last_fence_breach = 0
         self.last_fence_status = 0
+        self.sysid = 0
+        self.compid = 0
         self.present = False
         self.enabled = False
         self.healthy = True
@@ -72,15 +74,22 @@ class FenceModule(mp_module.MPModule):
 
     def mavlink_packet(self, m):
         '''handle and incoming mavlink packet'''
+        if self.sysid != 0 and (self.sysid != m.get_srcSystem() or self.compid != m.get_srcComponent()):
+            # ignore messages from other components we haven't locked on to
+            return
         if m.get_type() == "FENCE_STATUS":
             self.last_fence_breach = m.breach_time
             self.last_fence_status = m.breach_status
+            self.compid = m.get_srcComponent()
+            self.sysid = m.get_srcSystem()
         elif m.get_type() in ['SYS_STATUS']:
             bits = mavutil.mavlink.MAV_SYS_STATUS_GEOFENCE
 
             present = ((m.onboard_control_sensors_present & bits) == bits)
             if self.present == False and present == True:
                 self.say("fence present")
+                self.compid = m.get_srcComponent()
+                self.sysid = m.get_srcSystem()
             elif self.present == True and present == False:
                 self.say("fence removed")
             self.present = present
@@ -88,6 +97,8 @@ class FenceModule(mp_module.MPModule):
             enabled = ((m.onboard_control_sensors_enabled & bits) == bits)
             if self.enabled == False and enabled == True:
                 self.say("fence enabled")
+                self.compid = m.get_srcComponent()
+                self.sysid = m.get_srcSystem()
             elif self.enabled == True and enabled == False:
                 self.say("fence disabled")
             self.enabled = enabled
