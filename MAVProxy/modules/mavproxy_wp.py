@@ -206,7 +206,9 @@ class WPModule(mp_module.MPModule):
                 self.module('map').add_menu(self.menu)
         else:
             self.menu_added_map = False
-        if not 'HOME_POSITION' in self.master.messages and time.time() - self.last_get_home > 2:
+        if (self.master is not None and
+            'HOME_POSITION' not in self.master.messages and
+            time.time() - self.last_get_home > 2):
             self.master.mav.command_long_send(self.settings.target_system,
                                             0,
                                             mavutil.mavlink.MAV_CMD_GET_HOME_POSITION,
