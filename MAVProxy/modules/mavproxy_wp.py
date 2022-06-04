@@ -40,10 +40,10 @@ class WPModule(mp_module.MPModule):
         self.ftp_count = None
 
         if self.continue_mode and self.logdir is not None:
-            waytxt = os.path.join(mpstate.status.logdir, 'way.txt')
+            waytxt = os.path.join(mpstate.status.logdir, self.save_filename())
             if os.path.exists(waytxt):
                 self.wploader.load(waytxt)
-                print("Loaded waypoints from %s" % waytxt)
+                print("Loaded %s from %s" % (self.itemstype(), waytxt))
 
         self.menu_added_console = False
         self.menu_added_map = False
@@ -74,11 +74,14 @@ class WPModule(mp_module.MPModule):
                                          MPMenuItem('Add RTL', 'Add RTL', '# wp add_rtl'),
                                          MPMenuItem('Add DO_LAND_START', 'Add DO_LAND_START', '# wp add_dls')])
 
+    def save_filename(self):
+        return self.save_filename_base() + ".txt"
+
     @property
     def wploader(self):
         '''per-sysid wploader'''
         if self.target_system not in self.wploader_by_sysid:
-            self.wploader_by_sysid[self.target_system] = mavwp.MAVWPLoader()
+            self.wploader_by_sysid[self.target_system] = self.create_loader()
         return self.wploader_by_sysid[self.target_system]
 
     def missing_wps_to_request(self):
@@ -113,9 +116,9 @@ class WPModule(mp_module.MPModule):
     def wp_status(self):
         '''show status of wp download'''
         try:
-            print("Have %u of %u waypoints" % (self.wploader.count()+len(self.wp_received), self.wploader.expected_count))
+            print("Have %u of %u %s" % (self.wploader.count()+len(self.wp_received), self.wploader.expected_count), self.itemstype())
         except Exception:
-            print("Have %u waypoints" % (self.wploader.count()+len(self.wp_received)))
+            print("Have %u %s" % (self.wploader.count()+len(self.wp_received), self.itemstype()))
 
 
     def mavlink_packet(self, m):
@@ -128,9 +131,12 @@ class WPModule(mp_module.MPModule):
                 pass
             else:
                 self.wploader.clear()
-                self.console.writeln("Requesting %u waypoints t=%s now=%s" % (m.count,
-                                                                                 time.asctime(time.localtime(m._timestamp)),
-                                                                                 time.asctime()))
+                self.console.writeln("Requesting %u %s t=%s now=%s" % (
+                    m.count,
+                    self.itemstype(),
+                    time.asctime(time.localtime(m._timestamp)),
+                    time.asctime(),
+                ))
                 self.send_wp_requests()
 
         elif mtype in ['WAYPOINT', 'MISSION_ITEM', 'MISSION_ITEM_INT'] and self.wp_op is not None:
@@ -144,7 +150,7 @@ class WPModule(mp_module.MPModule):
                 #print("DUPLICATE %u" % m.seq)
                 return
             if m.seq+1 > self.wploader.expected_count:
-                self.console.writeln("Unexpected waypoint number %u - expected %u" % (m.seq, self.wploader.count()))
+                self.console.writeln("Unexpected %s number %u - expected %u" % (self.itemtype(), m.seq, self.wploader.count()))
             self.wp_received[m.seq] = m
             next_seq = self.wploader.count()
             while next_seq in self.wp_received:
@@ -171,7 +177,7 @@ class WPModule(mp_module.MPModule):
             if m.seq != self.last_waypoint:
                 self.last_waypoint = m.seq
                 if self.settings.wpupdates:
-                    self.say("waypoint %u" % m.seq,priority='message')
+                    self.say("%s %u" % (self.itemtype(), m.seq), priority='message')
 
         elif mtype == "MISSION_ITEM_REACHED":
             wp = self.wploader.wp(m.seq)
@@ -268,7 +274,7 @@ class WPModule(mp_module.MPModule):
             #self.console.error("not loading waypoints")
             return
         if m.seq >= self.wploader.count():
-            self.console.error("Request for bad waypoint %u (max %u)" % (m.seq, self.wploader.count()))
+            self.console.error("Request for bad %s %u (max %u)" % (self.itemtype(), m.seq, self.wploader.count()))
             return
         wp = self.wploader.wp(m.seq)
         wp.target_system = self.target_system
@@ -282,8 +288,8 @@ class WPModule(mp_module.MPModule):
         self.mpstate.console.set_status('Mission', 'Mission %u/%u' % (m.seq, self.wploader.count()-1))
         if m.seq == self.wploader.count() - 1:
             self.loading_waypoints = False
-            print("Loaded %u waypoint in %.2fs" % (self.wploader.count(), time.time() - self.upload_start))
-            self.console.writeln("Sent all %u waypoints" % self.wploader.count())
+            print("Loaded %u %s in %.2fs" % (self.wploader.count(), self.itemstype(), time.time() - self.upload_start, ))
+            self.console.writeln("Sent all %u %s" % (self.wploader.count(), self.itemstype()))
 
     def send_all_waypoints(self):
         '''send all waypoints to vehicle'''
@@ -305,7 +311,7 @@ class WPModule(mp_module.MPModule):
         except Exception as msg:
             print("Unable to load %s - %s" % (filename, msg))
             return
-        print("Loaded %u waypoints from %s" % (self.wploader.count(), filename))
+        print("Loaded %u %s from %s" % (self.wploader.count(), self.itemstype(), filename))
         self.send_all_waypoints()
 
     def update_waypoints(self, filename, wpnum):
@@ -318,15 +324,15 @@ class WPModule(mp_module.MPModule):
             print("Unable to load %s - %s" % (filename, msg))
             return
         if self.wploader.count() == 0:
-            print("No waypoints found in %s" % filename)
+            print("No %s found in %s" % (self.itemstype(), filename))
             return
         if wpnum == -1:
-            print("Loaded %u updated waypoints from %s" % (self.wploader.count(), filename))
+            print("Loaded %u updated %s from %s" % (self.wploader.count(), self.itemstype(), filename))
         elif wpnum >= self.wploader.count():
-            print("Invalid waypoint number %u" % wpnum)
+            print("Invalid %s number %u" % (self.itemtype(), wpnum))
             return
         else:
-            print("Loaded updated waypoint %u from %s" % (wpnum, filename))
+            print("Loaded updated %s %u from %s" % (self.itemtype(), wpnum, filename))
 
         self.loading_waypoints = True
         self.loading_waypoint_lasttime = time.time()
@@ -348,7 +354,7 @@ class WPModule(mp_module.MPModule):
         except Exception as msg:
             print("Failed to save %s - %s" % (filename, msg))
             return
-        print("Saved %u waypoints to %s" % (self.wploader.count(), filename))
+        print("Saved %u %s to %s" % (self.wploader.count(), self.itemstype(), filename))
 
     def save_waypoints_csv(self, filename):
         '''save waypoints to a file in a human readable CSV file'''
@@ -358,7 +364,7 @@ class WPModule(mp_module.MPModule):
         except Exception as msg:
             print("Failed to save %s - %s" % (filename, msg))
             return
-        print("Saved %u waypoints to CSV %s" % (self.wploader.count(), filename))
+        print("Saved %u %s to CSV %s" % (self.wploader.count(), self.itemstype(), filename))
 
     def cmd_wp_move(self, args):
         '''handle wp move'''
@@ -626,7 +632,7 @@ class WPModule(mp_module.MPModule):
 
     def cmd_clear(self, args):
         '''clear waypoints'''
-        clear_type = mavutil.mavlink.MAV_MISSION_TYPE_MISSION
+        clear_type = self.mav_mission_type()
         if len(args) > 0 and args[0] == "all":
             clear_type = mavutil.mavlink.MAV_MISSION_TYPE_ALL
         self.master.mav.mission_clear_all_send(self.target_system, self.target_component, clear_type)
@@ -717,7 +723,7 @@ class WPModule(mp_module.MPModule):
             if len(args) > 1:
                 self.settings.wpalt = int(args[1])
             self.mpstate.map_functions['draw_lines'](self.wp_draw_callback)
-            print("Drawing waypoints on map at altitude %d" % self.settings.wpalt)
+            print("Drawing %s on map at altitude %d" % (self.itemstype(), self.settings.wpalt))
         elif args[0] == "sethome":
             self.set_home_location()
         elif args[0] == "loop":
@@ -843,7 +849,7 @@ class WPModule(mp_module.MPModule):
         if magic != magic2:
             print("mission: bad magic 0x%x expected 0x%x" % (magic2, magic))
             return
-        if dtype != mavutil.mavlink.MAV_MISSION_TYPE_MISSION:
+        if dtype != self.mav_mission_type():
             print("mission: bad data type %u" % dtype)
             return
 
@@ -876,12 +882,12 @@ class WPModule(mp_module.MPModule):
                 w.param1, w.param2, w.param3, w.param4,
                 w.current, w.autocontinue))
         if self.logdir is not None:
-            fname = 'way.txt'
+            fname = self.save_filename()
             if source_system != 1:
                 fname = 'way_%u.txt' % source_system
             waytxt = os.path.join(self.logdir, fname)
             self.save_waypoints(waytxt)
-            print("Saved waypoints to %s" % waytxt)
+            print("Saved %s to %s" % (self.itemstype(), waytxt))
 
     def wp_ftp_upload(self, filename):
         '''upload waypoints to vehicle with ftp'''
@@ -897,11 +903,11 @@ class WPModule(mp_module.MPModule):
         except Exception as msg:
             print("Unable to load %s - %s" % (filename, msg))
             return
-        print("Loaded %u waypoints from %s" % (self.wploader.count(), filename))
+        print("Loaded %u %s from %s" % (self.wploader.count(), self.itemstype(), filename))
         print("Sending mission with ftp")
 
         fh = SIO()
-        fh.write(struct.pack("<HHHHH", 0x763d,mavutil.mavlink.MAV_MISSION_TYPE_MISSION,0,0,self.wploader.count()))
+        fh.write(struct.pack("<HHHHH", 0x763d,self.mav_mission_type(),0,0,self.wploader.count()))
         mavmsg = mavutil.mavlink.MAVLink_mission_item_int_message
         for i in range(self.wploader.count()):
             w = self.wploader.wp(i)
@@ -937,6 +943,24 @@ class WPModule(mp_module.MPModule):
             print("Sent mission of length %u in %.2fs" % ((dlen - 10) // item_size, time.time() - self.upload_start))
 
     # waypoint-specific methods:
+
+    def create_loader(self):
+        return mavwp.MAVWPLoader()
+
+    def mav_mission_type(self):
+        return mavutil.mavlink.MAV_MISSION_TYPE_MISSION
+
+    def save_filename_base(self):
+        return 'way'
+
+    def itemstype(self):
+        '''returns description of items in the plural'''
+        return 'waypoints'
+
+    def itemtype(self):
+        '''returns description of item'''
+        return 'waypoint'
+
     def wp_slope(self, args):
         '''show slope of waypoints'''
         if len(args) == 2:
