@@ -669,7 +669,10 @@ class LinkModule(mp_module.MPModule):
                         if chunk_seq != next_expected_chunk:
                             out += " ... "
                             next_expected_chunk = chunk_seq
-                        out += self.chunks[chunk_seq]
+                        if isinstance(self.chunks[chunk_seq], str):
+                            out += self.chunks[chunk_seq]
+                        else:
+                            out += self.chunks[chunk_seq].decode(errors="ignore")
                         next_expected_chunk += 1
 
                     return out
