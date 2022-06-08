@@ -44,7 +44,8 @@ class messagerate(mp_module.MPModule):
             message_name = args[1]
             mavlink_map = mavutil.mavlink.mavlink_map
             for msg_id in mavlink_map.keys():
-                mav_cmd_name = mavlink_map[msg_id].name
+                msg_type = mavlink_map[msg_id]
+                mav_cmd_name = msg_type.msgname if hasattr(msg_type, "msgname") else msg_type.name
                 if mav_cmd_name == message_name:
                     self.master.mav.command_long_send(
                         self.settings.target_system,
@@ -65,7 +66,8 @@ class messagerate(mp_module.MPModule):
               priority = int(args[3])
             mavlink_map = mavutil.mavlink.mavlink_map
             for msg_id in mavlink_map.keys():
-                mav_cmd_name = mavlink_map[msg_id].name
+                msg_type = mavlink_map[msg_id]
+                mav_cmd_name = msg_type.msgname if hasattr(msg_type, "msgname") else msg_type.name
                 if mav_cmd_name == message_name:
                     self.master.mav.command_long_send(
                         self.settings.target_system,
@@ -75,7 +77,7 @@ class messagerate(mp_module.MPModule):
                         msg_id, (int) (1E6/message_rate), priority, 0, 0, 0, 0)
                     return
             print("Unknown message ID:%s" % message_name)
-            
+
         else:
             print(self.usage())
 
@@ -119,12 +121,14 @@ class messagerate(mp_module.MPModule):
         if mtype not in self.counts:
             self.counts[mtype] = 0
         self.counts[mtype] += 1
-        
+
         mavlink_map = mavutil.mavlink.mavlink_map
-              
+
         if mtype ==  'MESSAGE_INTERVAL':
             if  m.message_id in mavlink_map:
-                print("Msg:%s  rate:%0.2fHz" % (mavlink_map[m.message_id].name, (1E6/m.interval_us) ) )
+                msg_type =  mavlink_map[m.message_id]
+                mav_cmd_name = msg_type.msgname if hasattr(msg_type, "msgname") else msg_type.name
+                print("Msg:%s  rate:%0.2fHz" % (mav_cmd_name, (1E6/m.interval_us) ) )
             else:
                 print("Msg ID:%s  rate:%0.2fHz" % (m.message_id, (1E6/m.interval_us) ) )
 
