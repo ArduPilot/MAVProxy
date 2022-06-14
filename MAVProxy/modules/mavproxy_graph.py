@@ -100,6 +100,12 @@ class Graph():
         self.msg_types = set()
         self.state = state
 
+        for i in range(len(self.fields)):
+            # special handling for NAMED_VALUE_FLOAT
+            m = re.match("^NAMED_VALUE_FLOAT\[([A-Z0-9_]+)\]\.(.*)$", self.fields[i])
+            if m:
+                self.fields[i] = 'NAMED_VALUE_FLOAT["%s"].%s' % (m.group(1), m.group(2))
+
         re_caps = re.compile('[A-Z_][A-Z0-9_]+')
         for f in self.fields:
             caps = set(re.findall(re_caps, f))
