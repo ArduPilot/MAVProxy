@@ -188,7 +188,7 @@ def complete_variable(text):
     else:
         suffix = ''
 
-    m1 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*(\[[0-9]+\])?)[.]([A-Za-z0-9_]*)$", text)
+    m1 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*(\[[0-9A-Z_]+\])?)[.]([A-Za-z0-9_]*)$", text)
     if m1 is not None:
         prefix = m1.group(1)
         mtype = m1.group(2)
@@ -201,7 +201,20 @@ def complete_variable(text):
                     ret.append(prefix + mtype + '.' + f + suffix)
             return ret
         return []
-    m2 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*(\[[0-9]+\])?)$", text)
+
+    # handle partially open arrays, like 'NAMED_VALUE_FLOAT[A'
+    m1 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*(\[[0-9A-Z_]+))$", text)
+    if m1 is not None:
+        prefix = m1.group(1)
+        mtype = m1.group(2)
+        ret = []
+        for k in list(rline_mpstate.status.msgs.keys()):
+            if k.startswith(mtype):
+                ret.append(prefix + k + suffix)
+        if len(ret):
+            return ret
+
+    m2 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*(\[[0-9A-Z_]+\])?)$", text)
     prefix = m2.group(1)
     mtype = m2.group(2)
     ret = []
