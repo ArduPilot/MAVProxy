@@ -188,6 +188,10 @@ class SilvusModule(mp_module.MPModule):
         return ((int(ip[2]) * 256) + int(ip[3]))
 
     def send_named_float(self, name, value):
+        '''inject a NAMED_VALUE_FLOAT into the local master input, so it becomes available
+           for graphs, logging and status command'''
+
+        # use the ATTITUDE message for srcsystem and time stamps
         att = self.master.messages.get('ATTITUDE',None)
         if att is None:
             return
