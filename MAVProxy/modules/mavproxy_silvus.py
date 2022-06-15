@@ -196,7 +196,11 @@ class SilvusModule(mp_module.MPModule):
         if att is None:
             return
         msec = att.time_boot_ms
-        m = self.master.mav.named_value_float_encode(msec, name.encode('UTF-8'), value)
+        ename = name.encode('ASCII')
+        if len(ename) < 10:
+            ename += bytes([0] * (10-len(ename)))
+        m = self.master.mav.named_value_float_encode(msec, bytearray(ename), value)
+        #m.name = ename
         m.pack(self.master.mav)
         m._header.srcSystem = att._header.srcSystem
         m._header.srcComponent = mavutil.mavlink.MAV_COMP_ID_TELEMETRY_RADIO
