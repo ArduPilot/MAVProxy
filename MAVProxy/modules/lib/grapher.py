@@ -417,13 +417,24 @@ class MavGraph(object):
         for i in range(0, len(self.fields)):
             if mtype not in self.field_types[i]:
                 continue
-            if self.instance_types[i] and hasattr(msg, 'fmt') and hasattr(msg.fmt, 'instance_field') and msg.fmt.instance_field is not None:
-                mtype_instance = '%s[%s]' % (mtype, getattr(msg, msg.fmt.instance_field))
+            f = self.fields[i]
+            has_instance = False
+            if self.instance_types[i] and hasattr(msg, 'format') and hasattr(msg, 'instance_field') and msg.instance_field is not None:
+                ins_value = getattr(msg, msg.instance_field)
+                mtype_instance = '%s[%s]' % (mtype, ins_value)
+                mtype_instance_str = '%s["%s"]' % (mtype, getattr(msg, msg.instance_field))
                 if mtype_instance not in self.instance_types[i]:
                     continue
-            f = self.fields[i]
+                if not mtype in vars or not isinstance(vars[mtype], dict):
+                    vars[mtype] = dict()
+
+                vars[mtype][ins_value] = msg
+                if isinstance(ins_value, str):
+                    f = f.replace(mtype_instance, mtype_instance_str)
+                has_instance = True
+
             simple = self.simple_field[i]
-            if simple is not None:
+            if simple is not None and not has_instance:
                 v = getattr(vars[simple[0]], simple[1])
             else:
                 v = mavutil.evaluate_expression(f, vars)
@@ -548,7 +559,7 @@ class MavGraph(object):
         self.axes = []
         self.first_only = []
         re_caps = re.compile('[A-Z_][A-Z0-9_]+')
-        re_instance = re.compile('[A-Z_][A-Z0-9_]+\[\d+\]')
+        re_instance = re.compile('[A-Z_][A-Z0-9_]+\[[0-9A-Z_]+\]')
         for f in self.fields:
             caps = set(re.findall(re_caps, f))
             self.msg_types = self.msg_types.union(caps)
