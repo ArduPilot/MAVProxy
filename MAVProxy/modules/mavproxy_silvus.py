@@ -250,8 +250,12 @@ class SilvusModule(mp_module.MPModule):
     def thread_loop(self):
         while True:
             time.sleep(self.silvus_settings.log_dt)
-            self.send_nmea()
-            self.get_radio_data()
+            try:
+                self.send_nmea()
+                self.get_radio_data()
+            except Exception as ex:
+                if self.silvus_settings.debug > 0:
+                    print(ex)
 
 
 def init(mpstate):
