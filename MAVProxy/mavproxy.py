@@ -237,6 +237,7 @@ class MPState(object):
               MPSetting('streamrate2', int, 4, 'Stream rate link2', range=(-1,500), increment=1),
               MPSetting('heartbeat', float, 1, 'Heartbeat rate (Hz)', range=(0,100), increment=0.1),
               MPSetting('mavfwd', bool, True, 'Allow forwarded control'),
+              MPSetting('mavfwd_disarmed', bool, True, 'Allow forwarded control when disarmed'),
               MPSetting('mavfwd_rate', bool, False, 'Allow forwarded rate control'),
               MPSetting('mavfwd_link', int, -1, 'Forward to a specific link'),
               MPSetting('shownoise', bool, True, 'Show non-MAVLink data'),
@@ -837,7 +838,12 @@ def process_mavlink(slave):
         return
     if msgs is None:
         return
-    if mpstate.settings.mavfwd and not mpstate.status.setup_mode:
+    allow_fwd = mpstate.settings.mavfwd
+    if not allow_fwd and mpstate.settings.mavfwd_disarmed and not mpstate.master(-1).motors_armed():
+        allow_fwd = True
+    if mpstate.status.setup_mode:
+        allow_fwd = False
+    if allow_fwd:
         for m in msgs:
             target_sysid = getattr(m, 'target_system', -1)
             mbuf = m.get_msgbuf()
