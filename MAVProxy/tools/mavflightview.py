@@ -405,7 +405,7 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
                 if ekf_counter % options.ekf_sample != 0:
                     continue
                 (lat, lng) = pos
-            elif type in ['NKF1']:
+            elif type in ['NKF1','XKF1']:
                 pos = mavextra.ekf1_pos(m)
                 if pos is None:
                     continue
