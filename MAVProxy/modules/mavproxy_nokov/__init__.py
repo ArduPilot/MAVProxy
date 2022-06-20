@@ -7,7 +7,7 @@ import time
 
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
-from MAVProxy.modules.mavproxy_nokov.nokov import nokovsdk
+#from MAVProxy.modules.mavproxy_nokov.nokov import nokovsdk
 
 Descriptor_MarkerSet = 0
 Descriptor_RigidBody = 1
