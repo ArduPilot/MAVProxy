@@ -296,9 +296,12 @@ class FenceModule(mp_module.MPModule):
             print("No geo-fence points")
             return
         for i in range(int(count)):
-            p = self.fetch_fence_point(i)
-            if p is None:
-                return
+            for t in range(6):
+                p = self.fetch_fence_point(i)
+                if p is None:
+                    print("retrying %u" % i)
+                    continue
+                break
             self.fenceloader.add(p)
 
         if filename is not None:
