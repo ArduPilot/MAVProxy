@@ -118,43 +118,6 @@ class WPModule(mp_module.MPModule):
             print("Have %u waypoints" % (self.wploader.count()+len(self.wp_received)))
 
 
-    def wp_slope(self, args):
-        '''show slope of waypoints'''
-        if len(args) == 2:
-            # specific waypoints
-            wp1 = int(args[0])
-            wp2 = int(args[1])
-            w1 = self.wploader.wp(wp1)
-            w2 = self.wploader.wp(wp2)
-            delta_alt = w1.z - w2.z
-            if delta_alt == 0:
-                slope = "Level"
-            else:
-                delta_xy = mp_util.gps_distance(w1.x, w1.y, w2.x, w2.y)
-                slope = "%.1f" % (delta_xy / delta_alt)
-            print("wp%u -> wp%u %s" % (wp1, wp2, slope))
-            return
-        if len(args) != 0:
-            print("Usage: wp slope WP1 WP2")
-            return
-        last_w = None
-        for i in range(1, self.wploader.count()):
-            w = self.wploader.wp(i)
-            if w.command not in [mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, mavutil.mavlink.MAV_CMD_NAV_LAND]:
-                continue
-            if last_w is not None:
-                if last_w.frame != w.frame:
-                    print("WARNING: frame change %u -> %u at %u" % (last_w.frame, w.frame, i))
-                delta_alt = last_w.z - w.z
-                if delta_alt == 0:
-                    slope = "Level"
-                else:
-                    delta_xy = mp_util.gps_distance(w.x, w.y, last_w.x, last_w.y)
-                    slope = "%.1f" % (delta_xy / delta_alt)
-                print("WP%u: slope %s" % (i, slope))
-            last_w = w
-
-            
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         mtype = m.get_type()
@@ -397,192 +360,6 @@ class WPModule(mp_module.MPModule):
             return
         print("Saved %u waypoints to CSV %s" % (self.wploader.count(), filename))
 
-    def get_default_frame(self):
-        '''default frame for waypoints'''
-        if self.settings.terrainalt == 'Auto':
-            if self.get_mav_param('TERRAIN_FOLLOW',0) == 1:
-                return mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT
-            return mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT
-        if self.settings.terrainalt == 'True':
-            return mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT
-        return mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT
-
-    def get_home(self):
-        '''get home location'''
-        if 'HOME_POSITION' in self.master.messages:
-            h = self.master.messages['HOME_POSITION']
-            return mavutil.mavlink.MAVLink_mission_item_message(self.target_system,
-                                                                self.target_component,
-                                                                0,
-                                                                0,
-                                                                mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
-                                                                0, 0, 0, 0, 0, 0,
-                                                                h.latitude*1.0e-7, h.longitude*1.0e-7, h.altitude*1.0e-3)
-        if self.wploader.count() > 0:
-            return self.wploader.wp(0)
-        return None
-        
-
-    def wp_draw_callback(self, points):
-        '''callback from drawing waypoints'''
-        if len(points) < 3:
-            return
-        from MAVProxy.modules.lib import mp_util
-        self.wploader.target_system = self.target_system
-        self.wploader.target_component = self.target_component
-        if self.wploader.count() < 2:
-            home = self.get_home()
-            if home is None:
-                print("Need home location for draw - please run gethome")
-                return
-            self.wploader.clear()
-            self.wploader.add(home)
-        if self.get_default_frame() == mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT:
-            use_terrain = True
-        else:
-            use_terrain = False
-        for p in points:
-            self.wploader.add_latlonalt(p[0], p[1], self.settings.wpalt, terrain_alt=use_terrain)
-        self.send_all_waypoints()
-
-    def wp_loop(self):
-        '''close the loop on a mission'''
-        loader = self.wploader
-        if loader.count() < 2:
-            print("Not enough waypoints (%u)" % loader.count())
-            return
-        wp = loader.wp(loader.count()-2)
-        if wp.command == mavutil.mavlink.MAV_CMD_DO_JUMP:
-            print("Mission is already looped")
-            return
-        if loader.count() > 1 and loader.wp(1).command in [mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, mavutil.mavlink.MAV_CMD_NAV_VTOL_TAKEOFF]:
-            target = 2
-        else:
-            target = 1
-        wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0, 0, mavutil.mavlink.MAV_CMD_DO_JUMP,
-                                                          0, 1, target, -1, 0, 0, 0, 0, 0)
-        loader.add(wp)
-        self.loading_waypoints = True
-        self.loading_waypoint_lasttime = time.time()
-        self.master.waypoint_count_send(self.wploader.count())
-        print("Closed loop on mission")
-
-    def nofly_add(self):
-        '''add a square flight exclusion zone'''
-        latlon = self.mpstate.click_location
-        if latlon is None:
-            print("No position chosen")
-            return
-        loader = self.wploader
-        (center_lat, center_lon) = latlon
-        points = []
-        points.append(mp_util.gps_offset(center_lat, center_lon, -25,  25))
-        points.append(mp_util.gps_offset(center_lat, center_lon,  25,  25))
-        points.append(mp_util.gps_offset(center_lat, center_lon,  25, -25))
-        points.append(mp_util.gps_offset(center_lat, center_lon, -25, -25))
-        start_idx = loader.count()
-        for p in points:
-            wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0, 0, mavutil.mavlink.MAV_CMD_NAV_FENCE_POLYGON_VERTEX_EXCLUSION,
-                                                              0, 1, 4, 0, 0, 0, p[0], p[1], 0)
-            loader.add(wp)
-        self.loading_waypoints = True
-        self.loading_waypoint_lasttime = time.time()
-        self.master.mav.mission_write_partial_list_send(self.target_system,
-                                                        self.target_component,
-                                                        start_idx, start_idx+4)
-        print("Added nofly zone")
-
-    def wp_add_takeoff(self, args):
-        '''add a takeoff as first mission item'''
-        latlon = self.mpstate.click_location
-        if latlon is None:
-            print("No position chosen")
-            return
-        takeoff_alt = 20
-        if len(args) > 0:
-            takeoff_alt = float(args[0])
-        if self.is_quadplane():
-            wptype = mavutil.mavlink.MAV_CMD_NAV_VTOL_TAKEOFF
-        else:
-            wptype = mavutil.mavlink.MAV_CMD_NAV_TAKEOFF
-        wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0,
-                                                          mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                                          wptype,
-                                                          0, 1, 0, 0, 0, 0, latlon[0], latlon[1], takeoff_alt)
-        if self.wploader.count() < 2:
-            home = self.get_home()
-            if home is None:
-                print("Need home location - please run gethome")
-                return
-            self.wploader.clear()
-            self.wploader.add(home)
-        # assume first waypoint
-        self.wploader.insert(1, wp)
-        self.send_all_waypoints()
-
-    def wp_add_landing(self):
-        '''add a landing as last mission item'''
-        latlon = self.mpstate.click_location
-        if latlon is None:
-            print("No position chosen")
-            return
-        if self.is_quadplane():
-            wptype = mavutil.mavlink.MAV_CMD_NAV_VTOL_LAND
-        else:
-            wptype = mavutil.mavlink.MAV_CMD_NAV_LAND
-        wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0,
-                                                          mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                                          wptype,
-                                                          0, 1, 0, 0, 0, 0, latlon[0], latlon[1], 0)
-        # assume last waypoint
-        self.wploader.add(wp)
-        self.send_all_waypoints()
-
-    def wp_add_RTL(self):
-        '''add a RTL as last mission item'''
-        wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0,
-                                                          mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                                          mavutil.mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH,
-                                                          0, 1, 0, 0, 0, 0, 0, 0, 0)
-        # assume last waypoint
-        self.wploader.add(wp)
-        self.send_all_waypoints()
-        
-    def wp_add_dls(self):
-        '''add a DO_LAND_START as last mission item'''
-        latlon = self.mpstate.click_location
-        if latlon is None:
-            print("No position chosen")
-            return
-        wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0,
-                                                          mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                                          mavutil.mavlink.MAV_CMD_DO_LAND_START,
-                                                          0, 1, 0, 0, 0, 0, latlon[0], latlon[1], 0)
-        # assume last waypoint
-        self.wploader.add(wp)
-        self.send_all_waypoints()
-        
-    def set_home_location(self):
-        '''set home location from last map click'''
-        latlon = self.mpstate.click_location
-        if latlon is None:
-            print("No position available")
-            return
-        lat = float(latlon[0])
-        lon = float(latlon[1])
-        if self.wploader.count() == 0:
-            self.wploader.add_latlonalt(lat, lon, 0)
-        w = self.wploader.wp(0)
-        w.x = lat
-        w.y = lon
-        self.wploader.set(w, 0)
-        self.loading_waypoints = True
-        self.loading_waypoint_lasttime = time.time()
-        self.master.mav.mission_write_partial_list_send(self.target_system,
-                                                             self.target_component,
-                                                             0, 0)
-
-
     def cmd_wp_move(self, args):
         '''handle wp move'''
         if len(args) != 1:
@@ -764,20 +541,6 @@ class WPModule(mp_module.MPModule):
                                                         idx, idx+count)
         print("Changed alt for WPs %u:%u to %f" % (idx, idx+(count-1), newalt))
 
-    def fix_jumps(self, idx, delta):
-        '''fix up jumps when we add/remove rows'''
-        numrows = self.wploader.count()
-        for row in range(numrows):
-            wp = self.wploader.wp(row)
-            jump_cmds = [mavutil.mavlink.MAV_CMD_DO_JUMP]
-            if hasattr(mavutil.mavlink, "MAV_CMD_DO_CONDITION_JUMP"):
-                jump_cmds.append(mavutil.mavlink.MAV_CMD_DO_CONDITION_JUMP)
-            if wp.command in jump_cmds:
-                p1 = int(wp.param1)
-                if p1 > idx and p1+delta>0:
-                    wp.param1 = float(p1+delta)
-                    self.wploader.set(wp, row)
-
     def cmd_wp_remove(self, args):
         '''handle wp remove'''
         if len(args) != 1:
@@ -860,85 +623,6 @@ class WPModule(mp_module.MPModule):
                                                         idx, idx)
         self.wploader.set(wp, idx)
         print("Set param %u for %u to %f" % (pnum, idx, param[pnum-1]))
-
-    def get_loc(self, m):
-        '''return a mavutil.location for item m'''
-        t = m.get_type()
-        if t == "MISSION_ITEM":
-            lat = m.x * 1e7
-            lng = m.y * 1e7
-            alt = m.z * 1e2
-        elif t == "MISSION_ITEM_INT":
-            lat = m.x
-            lng = m.y
-            alt = m.z
-        else:
-            return None
-        return mavutil.location(lat, lng, alt)
-
-    def cmd_split(self, args):
-        '''splits the segment ended by the supplied waypoint into two'''
-        try:
-            num = int(args[0])
-        except IOError as e:
-            return "Bad wp num (%s)" % args[0]
-
-        if num < 1 or num > self.wploader.count():
-            print("Bad item %s" % str(num))
-            return
-        wp = self.wploader.wp(num)
-        if wp is None:
-            print("Could not get wp %u" % num)
-            return
-        loc = self.get_loc(wp)
-        if loc is None:
-            print("wp is not a location command")
-            return
-
-        prev = num - 1
-        if prev < 1 or prev > self.wploader.count():
-            print("Bad item %u" % num)
-            return
-        prev_wp = self.wploader.wp(prev)
-        if prev_wp is None:
-            print("Could not get previous wp %u" % prev)
-            return
-        prev_loc = self.get_loc(prev_wp)
-        if prev_loc is None:
-            print("previous wp is not a location command")
-            return
-
-        if wp.frame != prev_wp.frame:
-            print("waypoints differ in frame (%u vs %u)" %
-                  (wp.frame, prev_wp.frame))
-            return
-
-        if wp.frame != prev_wp.frame:
-            print("waypoints differ in frame")
-            return
-
-        lat_avg = (loc.lat + prev_loc.lat)/2
-        lng_avg = (loc.lng + prev_loc.lng)/2
-        alt_avg = (loc.alt + prev_loc.alt)/2
-        new_wp = mavutil.mavlink.MAVLink_mission_item_message(
-            self.target_system,
-            self.target_component,
-            wp.seq,    # seq
-            wp.frame,    # frame
-            mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,    # command
-            0,    # current
-            0,    # autocontinue
-            0.0,  # param1,
-            0.0,  # param2,
-            0.0,  # param3
-            0.0,  # param4
-            lat_avg * 1e-7,  # x (latitude)
-            lng_avg * 1e-7,  # y (longitude)
-            alt_avg * 1e-2,  # z (altitude)
-        )
-        self.wploader.insert(wp.seq, new_wp)
-        self.fix_jumps(wp.seq, 1)
-        self.send_all_waypoints()
 
     def cmd_clear(self, args):
         '''clear waypoints'''
@@ -1144,7 +828,7 @@ class WPModule(mp_module.MPModule):
                 self.ftp_count = num_items
         if self.ftp_count is not None:
             mavmsg = mavutil.mavlink.MAVLink_mission_item_int_message
-            item_size = struct.calcsize(mavmsg.format)
+            item_size = mavmsg.unpacker.size
             done = (total_size - 10) // item_size
             self.mpstate.console.set_status('Mission', 'Mission %u/%u' % (done, self.ftp_count))
 
@@ -1167,7 +851,7 @@ class WPModule(mp_module.MPModule):
 
         data = data[10:]
         mavmsg = mavutil.mavlink.MAVLink_mission_item_int_message
-        item_size = struct.calcsize(mavmsg.format)
+        item_size = mavmsg.unpacker.size
         while len(data) >= item_size:
             mdata = data[:item_size]
             data = data[item_size:]
@@ -1226,7 +910,7 @@ class WPModule(mp_module.MPModule):
             for field in mavmsg.ordered_fieldnames:
                 tlist.append(getattr(w, field))
             tlist = tuple(tlist)
-            buf = struct.pack(mavmsg.format, *tlist)
+            buf = mavmsg.unpacker.pack(*tlist)
             fh.write(buf)
         fh.seek(0)
 
@@ -1249,9 +933,325 @@ class WPModule(mp_module.MPModule):
             print("Failed to send waypoints")
         else:
             mavmsg = mavutil.mavlink.MAVLink_mission_item_int_message
-            item_size = struct.calcsize(mavmsg.format)
+            item_size = mavmsg.unpacker.size
             print("Sent mission of length %u in %.2fs" % ((dlen - 10) // item_size, time.time() - self.upload_start))
+
+    # waypoint-specific methods:
+    def wp_slope(self, args):
+        '''show slope of waypoints'''
+        if len(args) == 2:
+            # specific waypoints
+            wp1 = int(args[0])
+            wp2 = int(args[1])
+            w1 = self.wploader.wp(wp1)
+            w2 = self.wploader.wp(wp2)
+            delta_alt = w1.z - w2.z
+            if delta_alt == 0:
+                slope = "Level"
+            else:
+                delta_xy = mp_util.gps_distance(w1.x, w1.y, w2.x, w2.y)
+                slope = "%.1f" % (delta_xy / delta_alt)
+            print("wp%u -> wp%u %s" % (wp1, wp2, slope))
+            return
+        if len(args) != 0:
+            print("Usage: wp slope WP1 WP2")
+            return
+        last_w = None
+        for i in range(1, self.wploader.count()):
+            w = self.wploader.wp(i)
+            if w.command not in [mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, mavutil.mavlink.MAV_CMD_NAV_LAND]:
+                continue
+            if last_w is not None:
+                if last_w.frame != w.frame:
+                    print("WARNING: frame change %u -> %u at %u" % (last_w.frame, w.frame, i))
+                delta_alt = last_w.z - w.z
+                if delta_alt == 0:
+                    slope = "Level"
+                else:
+                    delta_xy = mp_util.gps_distance(w.x, w.y, last_w.x, last_w.y)
+                    slope = "%.1f" % (delta_xy / delta_alt)
+                print("WP%u: slope %s" % (i, slope))
+            last_w = w
+
+    def get_default_frame(self):
+        '''default frame for waypoints'''
+        if self.settings.terrainalt == 'Auto':
+            if self.get_mav_param('TERRAIN_FOLLOW',0) == 1:
+                return mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT
+            return mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT
+        if self.settings.terrainalt == 'True':
+            return mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT
+        return mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT
+
+    def get_home(self):
+        '''get home location'''
+        if 'HOME_POSITION' in self.master.messages:
+            h = self.master.messages['HOME_POSITION']
+            return mavutil.mavlink.MAVLink_mission_item_message(self.target_system,
+                                                                self.target_component,
+                                                                0,
+                                                                0,
+                                                                mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
+                                                                0, 0, 0, 0, 0, 0,
+                                                                h.latitude*1.0e-7, h.longitude*1.0e-7, h.altitude*1.0e-3)
+        if self.wploader.count() > 0:
+            return self.wploader.wp(0)
+        return None
         
+
+    def wp_draw_callback(self, points):
+        '''callback from drawing waypoints'''
+        if len(points) < 3:
+            return
+        from MAVProxy.modules.lib import mp_util
+        self.wploader.target_system = self.target_system
+        self.wploader.target_component = self.target_component
+        if self.wploader.count() < 2:
+            home = self.get_home()
+            if home is None:
+                print("Need home location for draw - please run gethome")
+                return
+            self.wploader.clear()
+            self.wploader.add(home)
+        if self.get_default_frame() == mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT:
+            use_terrain = True
+        else:
+            use_terrain = False
+        for p in points:
+            self.wploader.add_latlonalt(p[0], p[1], self.settings.wpalt, terrain_alt=use_terrain)
+        self.send_all_waypoints()
+
+    def wp_loop(self):
+        '''close the loop on a mission'''
+        loader = self.wploader
+        if loader.count() < 2:
+            print("Not enough waypoints (%u)" % loader.count())
+            return
+        wp = loader.wp(loader.count()-2)
+        if wp.command == mavutil.mavlink.MAV_CMD_DO_JUMP:
+            print("Mission is already looped")
+            return
+        if loader.count() > 1 and loader.wp(1).command in [mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, mavutil.mavlink.MAV_CMD_NAV_VTOL_TAKEOFF]:
+            target = 2
+        else:
+            target = 1
+        wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0, 0, mavutil.mavlink.MAV_CMD_DO_JUMP,
+                                                          0, 1, target, -1, 0, 0, 0, 0, 0)
+        loader.add(wp)
+        self.loading_waypoints = True
+        self.loading_waypoint_lasttime = time.time()
+        self.master.waypoint_count_send(self.wploader.count())
+        print("Closed loop on mission")
+
+    def nofly_add(self):
+        '''add a square flight exclusion zone'''
+        latlon = self.mpstate.click_location
+        if latlon is None:
+            print("No position chosen")
+            return
+        loader = self.wploader
+        (center_lat, center_lon) = latlon
+        points = []
+        points.append(mp_util.gps_offset(center_lat, center_lon, -25,  25))
+        points.append(mp_util.gps_offset(center_lat, center_lon,  25,  25))
+        points.append(mp_util.gps_offset(center_lat, center_lon,  25, -25))
+        points.append(mp_util.gps_offset(center_lat, center_lon, -25, -25))
+        start_idx = loader.count()
+        for p in points:
+            wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0, 0, mavutil.mavlink.MAV_CMD_NAV_FENCE_POLYGON_VERTEX_EXCLUSION,
+                                                              0, 1, 4, 0, 0, 0, p[0], p[1], 0)
+            loader.add(wp)
+        self.loading_waypoints = True
+        self.loading_waypoint_lasttime = time.time()
+        self.master.mav.mission_write_partial_list_send(self.target_system,
+                                                        self.target_component,
+                                                        start_idx, start_idx+4)
+        print("Added nofly zone")
+
+    def wp_add_takeoff(self, args):
+        '''add a takeoff as first mission item'''
+        latlon = self.mpstate.click_location
+        if latlon is None:
+            print("No position chosen")
+            return
+        takeoff_alt = 20
+        if len(args) > 0:
+            takeoff_alt = float(args[0])
+        if self.is_quadplane():
+            wptype = mavutil.mavlink.MAV_CMD_NAV_VTOL_TAKEOFF
+        else:
+            wptype = mavutil.mavlink.MAV_CMD_NAV_TAKEOFF
+        wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0,
+                                                          mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                                          wptype,
+                                                          0, 1, 0, 0, 0, 0, latlon[0], latlon[1], takeoff_alt)
+        if self.wploader.count() < 2:
+            home = self.get_home()
+            if home is None:
+                print("Need home location - please run gethome")
+                return
+            self.wploader.clear()
+            self.wploader.add(home)
+        # assume first waypoint
+        self.wploader.insert(1, wp)
+        self.send_all_waypoints()
+
+    def wp_add_landing(self):
+        '''add a landing as last mission item'''
+        latlon = self.mpstate.click_location
+        if latlon is None:
+            print("No position chosen")
+            return
+        if self.is_quadplane():
+            wptype = mavutil.mavlink.MAV_CMD_NAV_VTOL_LAND
+        else:
+            wptype = mavutil.mavlink.MAV_CMD_NAV_LAND
+        wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0,
+                                                          mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                                          wptype,
+                                                          0, 1, 0, 0, 0, 0, latlon[0], latlon[1], 0)
+        # assume last waypoint
+        self.wploader.add(wp)
+        self.send_all_waypoints()
+
+    def wp_add_RTL(self):
+        '''add a RTL as last mission item'''
+        wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0,
+                                                          mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                                          mavutil.mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH,
+                                                          0, 1, 0, 0, 0, 0, 0, 0, 0)
+        # assume last waypoint
+        self.wploader.add(wp)
+        self.send_all_waypoints()
+
+    def wp_add_dls(self):
+        '''add a DO_LAND_START as last mission item'''
+        latlon = self.mpstate.click_location
+        if latlon is None:
+            print("No position chosen")
+            return
+        wp = mavutil.mavlink.MAVLink_mission_item_message(0, 0, 0,
+                                                          mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                                          mavutil.mavlink.MAV_CMD_DO_LAND_START,
+                                                          0, 1, 0, 0, 0, 0, latlon[0], latlon[1], 0)
+        # assume last waypoint
+        self.wploader.add(wp)
+        self.send_all_waypoints()
+
+    def set_home_location(self):
+        '''set home location from last map click'''
+        latlon = self.mpstate.click_location
+        if latlon is None:
+            print("No position available")
+            return
+        lat = float(latlon[0])
+        lon = float(latlon[1])
+        if self.wploader.count() == 0:
+            self.wploader.add_latlonalt(lat, lon, 0)
+        w = self.wploader.wp(0)
+        w.x = lat
+        w.y = lon
+        self.wploader.set(w, 0)
+        self.loading_waypoints = True
+        self.loading_waypoint_lasttime = time.time()
+        self.master.mav.mission_write_partial_list_send(self.target_system,
+                                                             self.target_component,
+                                                             0, 0)
+
+    def fix_jumps(self, idx, delta):
+        '''fix up jumps when we add/remove rows'''
+        numrows = self.wploader.count()
+        for row in range(numrows):
+            wp = self.wploader.wp(row)
+            jump_cmds = [mavutil.mavlink.MAV_CMD_DO_JUMP]
+            if hasattr(mavutil.mavlink, "MAV_CMD_DO_CONDITION_JUMP"):
+                jump_cmds.append(mavutil.mavlink.MAV_CMD_DO_CONDITION_JUMP)
+            if wp.command in jump_cmds:
+                p1 = int(wp.param1)
+                if p1 > idx and p1+delta>0:
+                    wp.param1 = float(p1+delta)
+                    self.wploader.set(wp, row)
+
+    def get_loc(self, m):
+        '''return a mavutil.location for item m'''
+        t = m.get_type()
+        if t == "MISSION_ITEM":
+            lat = m.x * 1e7
+            lng = m.y * 1e7
+            alt = m.z * 1e2
+        elif t == "MISSION_ITEM_INT":
+            lat = m.x
+            lng = m.y
+            alt = m.z
+        else:
+            return None
+        return mavutil.location(lat, lng, alt)
+
+    def cmd_split(self, args):
+        '''splits the segment ended by the supplied waypoint into two'''
+        try:
+            num = int(args[0])
+        except IOError as e:
+            return "Bad wp num (%s)" % args[0]
+
+        if num < 1 or num > self.wploader.count():
+            print("Bad item %s" % str(num))
+            return
+        wp = self.wploader.wp(num)
+        if wp is None:
+            print("Could not get wp %u" % num)
+            return
+        loc = self.get_loc(wp)
+        if loc is None:
+            print("wp is not a location command")
+            return
+
+        prev = num - 1
+        if prev < 1 or prev > self.wploader.count():
+            print("Bad item %u" % num)
+            return
+        prev_wp = self.wploader.wp(prev)
+        if prev_wp is None:
+            print("Could not get previous wp %u" % prev)
+            return
+        prev_loc = self.get_loc(prev_wp)
+        if prev_loc is None:
+            print("previous wp is not a location command")
+            return
+
+        if wp.frame != prev_wp.frame:
+            print("waypoints differ in frame (%u vs %u)" %
+                  (wp.frame, prev_wp.frame))
+            return
+
+        if wp.frame != prev_wp.frame:
+            print("waypoints differ in frame")
+            return
+
+        lat_avg = (loc.lat + prev_loc.lat)/2
+        lng_avg = (loc.lng + prev_loc.lng)/2
+        alt_avg = (loc.alt + prev_loc.alt)/2
+        new_wp = mavutil.mavlink.MAVLink_mission_item_message(
+            self.target_system,
+            self.target_component,
+            wp.seq,    # seq
+            wp.frame,    # frame
+            mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,    # command
+            0,    # current
+            0,    # autocontinue
+            0.0,  # param1,
+            0.0,  # param2,
+            0.0,  # param3
+            0.0,  # param4
+            lat_avg * 1e-7,  # x (latitude)
+            lng_avg * 1e-7,  # y (longitude)
+            alt_avg * 1e-2,  # z (altitude)
+        )
+        self.wploader.insert(wp.seq, new_wp)
+        self.fix_jumps(wp.seq, 1)
+        self.send_all_waypoints()
+
+
 def init(mpstate):
     '''initialise module'''
     return WPModule(mpstate)
