@@ -64,8 +64,8 @@ class InvalidTileError(Exception):
 
 class SRTMDownloader():
     """Automatically download SRTM tiles."""
-    def __init__(self, server="firmware.ardupilot.org",
-                 directory="/SRTM/",
+    def __init__(self, server="terrain.ardupilot.org",
+                 directory="SRTM3",
                  cachedir=None,
                  offline=0,
                  debug=False,
@@ -73,14 +73,19 @@ class SRTMDownloader():
 
         if cachedir is None:
             try:
-                cachedir = os.path.join(os.environ['HOME'], '.tilecache/SRTM')
+                cachedir = os.path.join(os.environ['HOME'], '.tilecache', directory)
             except Exception:
                 if 'LOCALAPPDATA' in os.environ:
-                    cachedir = os.path.join(os.environ['LOCALAPPDATA'], '.tilecache/SRTM')
+                    cachedir = os.path.join(os.environ['LOCALAPPDATA'], '.tilecache', directory)
                 else:
                     import tempfile
-                    cachedir = os.path.join(tempfile.gettempdir(), 'MAVProxySRTM')
+                    cachedir = os.path.join(tempfile.gettempdir(), 'MAVProxy', directory)
 
+        # User migration to new folder struct (SRTM -> SRTM3)
+        if directory == "SRTM3" and not os.path.exists(cachedir) and os.path.exists(cachedir[:-1]):
+            print("Migrating old SRTM folder")
+            os.rename(cachedir[:-1], cachedir)
+        
         self.debug = debug
         self.offline = offline
         self.offlinemessageshown = 0
@@ -88,7 +93,7 @@ class SRTMDownloader():
             print("Map Module in Offline mode")
         self.first_failure = False
         self.server = server
-        self.directory = directory
+        self.directory = "/" + directory +"/"
         self.cachedir = cachedir
         if self.debug:
             print("SRTMDownloader - server=%s, directory=%s." % (self.server, self.directory))
@@ -182,31 +187,40 @@ class SRTMDownloader():
         parser = parseHTMLDirectoryListing()
         parser.feed(data)
         continents = parser.getDirListing()
-        if self.debug:
-            print('continents: ', continents)
-
-        for continent in continents:
-            if not continent[0].isalpha() or continent.startswith('README'):
-                continue
-            if self.debug:
-                print("Downloading file list for: ", continent)
-            url = "%s%s" % (self.directory,continent)
-            if self.debug:
-                print("fetching %s" % url)
-            try:
-                data = self.getURIWithRedirect(url)
-            except Exception as ex:
-                print("Failed to download %s : %s" % (url, ex))
-                continue
-            parser = parseHTMLDirectoryListing()
-            parser.feed(data)
-            files = parser.getDirListing()
-
+        
+        # Flat structure
+        if any(".hgt.zip" in mystring for mystring in continents):
+            files = continents
             for filename in files:
-                self.filelist[self.parseFilename(filename)] = (
-                            continent, filename)
+                if ".hgt.zip" in filename:
+                    self.filelist[self.parseFilename(filename)] = ("/", filename)
+        else:
+            # tiles in subfolders
+            if self.debug:
+                print('continents: ', continents)
 
-            '''print(self.filelist)'''
+            for continent in continents:
+                if not continent[0].isalpha() or continent.startswith('README'):
+                    continue
+                if self.debug:
+                    print("Downloading file list for: ", continent)
+                url = "%s%s" % (self.directory,continent)
+                if self.debug:
+                    print("fetching %s" % url)
+                try:
+                    data = self.getURIWithRedirect(url)
+                except Exception as ex:
+                    print("Failed to download %s : %s" % (url, ex))
+                    continue
+                parser = parseHTMLDirectoryListing()
+                parser.feed(data)
+                files = parser.getDirListing()
+
+                for filename in files:
+                    self.filelist[self.parseFilename(filename)] = (
+                                continent, filename)
+
+                '''print(self.filelist)'''
         # Add meta info
         self.filelist["server"] = self.server
         self.filelist["directory"] = self.directory
@@ -487,9 +501,13 @@ if __name__ == '__main__':
     parser.add_argument("--lon", type=float, default=149.165230)
     parser.add_argument("--debug", action='store_true', default=False)
     parser.add_argument("--use-http", action='store_true', default=False)
+    parser.add_argument("--database", type=str, default="SRTM1", choices=["SRTM1", "SRTM3"])
     args = parser.parse_args()
 
-    downloader = SRTMDownloader(debug=args.debug, use_http=args.use_http)
+    if args.database == "SRTM1":
+        downloader = SRTMDownloader(debug=args.debug, use_http=args.use_http, directory="SRTM1")
+    else: #SRTM3
+        downloader = SRTMDownloader(debug=args.debug, use_http=args.use_http, directory="SRTM3")
     downloader.loadFileList()
     import time
     from math import floor
