@@ -180,7 +180,7 @@ def fit_WWW():
             for i in range(3):
                 bounds.append((-max_cmot,max_cmot))
 
-    (p,err,iterations,imode,smode) = optimize.fmin_slsqp(wmm_error, p, bounds=bounds, full_output=True)
+    (p,err,iterations,imode,smode) = optimize.fmin_slsqp(wmm_error, p, bounds=bounds, full_output=True, iter=200)
     if imode != 0:
         print("Fit failed: %s" % smode)
         sys.exit(1)

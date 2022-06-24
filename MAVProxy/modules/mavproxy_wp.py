@@ -219,38 +219,56 @@ class WPModule(mp_module.MPModule):
            to give cm level accuracy'''
         if wp.get_type() == 'MISSION_ITEM_INT':
             return wp
-        wp_int = mavutil.mavlink.MAVLink_mission_item_int_message(wp.target_system,
-                                                                  wp.target_component,
-                                                                  wp.seq,
-                                                                  wp.frame,
-                                                                  wp.command,
-                                                                  wp.current,
-                                                                  wp.autocontinue,
-                                                                  wp.param1,
-                                                                  wp.param2,
-                                                                  wp.param3,
-                                                                  wp.param4,
-                                                                  int(wp.x*1.0e7),
-                                                                  int(wp.y*1.0e7),
-                                                                  wp.z)
+        lat = wp.x
+        lng = wp.y
+        if mavutil.mavlink.enums["MAV_CMD"][wp.command].has_location:
+            lat *= 1.0e7
+            lng *= 1.0e7
+        lat = int(lat)
+        lng = int(lng)
+        wp_int = mavutil.mavlink.MAVLink_mission_item_int_message(
+            wp.target_system,
+            wp.target_component,
+            wp.seq,
+            wp.frame,
+            wp.command,
+            wp.current,
+            wp.autocontinue,
+            wp.param1,
+            wp.param2,
+            wp.param3,
+            wp.param4,
+            lat,
+            lng,
+            wp.z
+        )
         return wp_int
 
     def wp_from_mission_item_int(self, wp):
         '''convert a MISSION_ITEM_INT to a MISSION_ITEM'''
-        wp2 = mavutil.mavlink.MAVLink_mission_item_message(wp.target_system,
-                                                           wp.target_component,
-                                                           wp.seq,
-                                                           wp.frame,
-                                                           wp.command,
-                                                           wp.current,
-                                                           wp.autocontinue,
-                                                           wp.param1,
-                                                           wp.param2,
-                                                           wp.param3,
-                                                           wp.param4,
-                                                           wp.x*1.0e-7,
-                                                           wp.y*1.0e-7,
-                                                           wp.z)
+        lat = wp.x
+        lng = wp.y
+        if mavutil.mavlink.enums["MAV_CMD"][wp.command].has_location:
+            lat *= 1.0e-7
+            lng *= 1.0e-7
+        lat = int(lat)
+        lng = int(lng)
+        wp2 = mavutil.mavlink.MAVLink_mission_item_message(
+            wp.target_system,
+            wp.target_component,
+            wp.seq,
+            wp.frame,
+            wp.command,
+            wp.current,
+            wp.autocontinue,
+            wp.param1,
+            wp.param2,
+            wp.param3,
+            wp.param4,
+            lat,
+            lng,
+            wp.z
+        )
         # preserve srcSystem as that is used for naming waypoint file
         wp2._header.srcSystem = wp.get_srcSystem()
         wp2._header.srcComponent = wp.get_srcComponent()
