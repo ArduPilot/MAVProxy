@@ -389,9 +389,12 @@ class MavGraph(object):
 
         if title is not None:
             pylab.title(title)
-            self.fig.canvas.set_window_title(title)
         else:
-            self.fig.canvas.set_window_title(fields[0])
+            title = fields[0]
+        if self.fig.canvas.manager is not None:
+            self.fig.canvas.manager.set_window_title(title)
+        else:
+            self.fig.canvas.set_window_title(title)
 
         if self.show_flightmode:
             mode_patches = []
