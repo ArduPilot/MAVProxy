@@ -7,7 +7,6 @@ Feb 2014
 
 import math
 from MAVProxy.modules.mavproxy_map import mp_slipmap
-from MAVProxy.modules.mavproxy_map import mp_elevation
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_settings
 from cuav.lib import cuav_util
@@ -35,7 +34,6 @@ class CameraViewModule(mp_module.MPModule):
         self.lon = 0
         self.home_height = 0
         self.hdg = 0
-        self.elevation_model = mp_elevation.ElevationModel()
         self.camera_params = CameraParams() # TODO how to get actual camera params
         self.view_settings = mp_settings.MPSettings(
             [ ('r', float, 0.5),
@@ -88,7 +86,7 @@ class CameraViewModule(mp_module.MPModule):
         if mtype == 'GLOBAL_POSITION_INT':
             state.lat, state.lon = m.lat*scale_latlon, m.lon*scale_latlon
             state.hdg = m.hdg*scale_hdg
-            agl = state.elevation_model.GetElevation(state.lat, state.lon)
+            agl = self.module('terrain').ElevationModel.GetElevation(state.lat, state.lon)
             if agl is not None:
                 state.height = m.relative_alt*scale_relative_alt + state.home_height - agl
         elif mtype == 'ATTITUDE':
@@ -99,7 +97,7 @@ class CameraViewModule(mp_module.MPModule):
             else:
                 home = [self.master.field('HOME', c)*scale_latlon for c in ['lat', 'lon']]
             old = state.home_height # TODO TMP
-            agl = state.elevation_model.GetElevation(*home)
+            agl = self.module('terrain').ElevationModel.GetElevation(*home)
             if agl is None:
                 return
             state.home_height = agl
