@@ -39,7 +39,7 @@ ME_DIST_COL = 12
 ME_ANGLE_COL = 13
 
 class MissionEditorFrame(wx.Frame):
-    def __init__(self, state, *args, **kwds):
+    def __init__(self, state, elemodel='SRTM1', *args, **kwds):
         # begin wxGlade: MissionEditorFrame.__init__
         self.state = state
         kwds["style"] = wx.DEFAULT_FRAME_STYLE
@@ -71,7 +71,7 @@ class MissionEditorFrame(wx.Frame):
         self.__set_properties()
         self.__do_layout()
 
-        self.ElevationModel = mp_elevation.ElevationModel()
+        self.ElevationModel = mp_elevation.ElevationModel(database=elemodel)
 
 
         self.Bind(wx.EVT_TEXT_ENTER, self.on_wp_radius_enter, self.text_ctrl_wp_radius)

@@ -16,7 +16,7 @@ class MissionEditorModule(mp_module.MPModule):
 
         # to work around an issue on MacOS this module is a thin wrapper around a separate MissionEditorMain object
         from MAVProxy.modules.mavproxy_misseditor import mission_editor
-        self.me_main = mission_editor.MissionEditorMain(mpstate)
+        self.me_main = mission_editor.MissionEditorMain(mpstate, self.module('terrain').ElevationModel.database)
 
     def unload(self):
         '''unload module'''
