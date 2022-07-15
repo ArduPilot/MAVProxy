@@ -219,7 +219,7 @@ class ADSBModule(mp_module.MPModule):
                 self.threat_vehicles[id].update(m.to_dict(), self.get_time())
                 for mp in self.module_matching('map*'):
                     # update the map
-                    ground_alt = mp.ElevationMap.GetElevation(m.lat*1e-7, m.lon*1e-7)
+                    ground_alt = self.module('terrain').ElevationModel.GetElevation(m.lat*1e-7, m.lon*1e-7)
                     alt_amsl = m.altitude * 0.001
                     if alt_amsl > 0:
                         alt = int(alt_amsl - ground_alt)
