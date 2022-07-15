@@ -39,6 +39,7 @@ from MAVProxy.modules.lib.mp_menu import MPMenuSeparator
 from MAVProxy.modules.lib.mp_menu import MPMenuSubMenu
 from MAVProxy.modules.lib.mp_menu import MPMenuTop
 
+from MAVProxy.modules.mavproxy_map.mp_elevation import TERRAIN_SERVICES
 
 class MPSlipMapFrame(wx.Frame):
     """ The main frame of the viewer
@@ -94,10 +95,14 @@ class MPSlipMapFrame(wx.Frame):
                                'Enable Tile Download',
                                'toggleDownload',
                                checked=state.download),
-                MPMenuRadio('Service', 'Select map service',
+                MPMenuRadio('Tile Service', 'Select map tile service',
                             returnkey='setService',
                             selected=state.mt.get_service(),
-                            items=state.mt.get_service_list())])])
+                            items=state.mt.get_service_list()),
+                MPMenuRadio('Terrain Service', 'Select terrain service',
+                            returnkey='setServiceTerrain',
+                            selected=state.elevation,
+                            items=sorted(TERRAIN_SERVICES.keys()))])])
         self.SetMenuBar(self.menu.wx_menu())
         self.Bind(wx.EVT_MENU, self.on_menu)
 
@@ -136,6 +141,11 @@ class MPSlipMapFrame(wx.Frame):
             state.download = ret.IsChecked()
         elif ret.returnkey == 'setService':
             state.mt.set_service(ret.get_choice())
+        elif ret.returnkey == 'setServiceTerrain':
+            state.elevation = ret.get_choice()
+            state.ElevationMap = mp_elevation.ElevationModel(database=state.elevation)
+            # Send to MAVProxy main process, so the terrain module can be updated too
+            state.event_queue.put(SlipMenuEvent(None, event, [], ret))
         elif ret.returnkey == 'gotoPosition':
             state.panel.enter_position()
         elif ret.returnkey == 'increaseBrightness':
@@ -341,8 +351,8 @@ class MPSlipMapPanel(wx.Panel):
         self.mouse_down = None
         self.click_pos = None
         self.last_click_pos = None
-        if state.elevation:
-            self.ElevationMap = mp_elevation.ElevationModel()
+        if state.elevation != "None":
+            state.ElevationMap = mp_elevation.ElevationModel(database=state.elevation)
 
         self.mainSizer = wx.BoxSizer(wx.VERTICAL)
         self.SetSizer(self.mainSizer)
@@ -461,8 +471,8 @@ class MPSlipMapPanel(wx.Panel):
         if pos is not None:
             (lat,lon) = self.coordinates(pos.x, pos.y)
             newtext += 'Cursor: %.8f %.8f (%s)' % (lat, lon, mp_util.latlon_to_grid((lat, lon)))
-            if state.elevation:
-                alt = self.ElevationMap.GetElevation(lat, lon)
+            if state.elevation != "None":
+                alt = state.ElevationMap.GetElevation(lat, lon)
                 if alt is not None:
                     newtext += ' %.1fm %uft' % (alt, alt*3.28084)
         state.mt.set_download(state.download)

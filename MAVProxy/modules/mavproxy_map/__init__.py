@@ -8,7 +8,6 @@ June 2012
 import sys, os, math
 import functools
 import time
-from MAVProxy.modules.mavproxy_map import mp_elevation
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_module
@@ -40,7 +39,6 @@ class MapModule(mp_module.MPModule):
         self.have_global_position = False
         self.vehicle_type_by_sysid = {}
         self.vehicle_type_name = 'plane'
-        self.ElevationMap = mp_elevation.ElevationModel()
         self.last_unload_check_time = time.time()
         self.unload_check_interval = 0.1 # seconds
         self.trajectory_layers = set()
@@ -67,7 +65,7 @@ class MapModule(mp_module.MPModule):
         title = "Map"
         if self.instance > 1:
             title += str(self.instance)
-        self.map = mp_slipmap.MPSlipMap(service=service, elevation=True, title=title)
+        self.map = mp_slipmap.MPSlipMap(service=service, elevation=self.module('terrain').ElevationModel.database, title=title)
         if self.instance == 1:
             self.mpstate.map = self.map
             mpstate.map_functions = { 'draw_lines' : self.draw_lines }
@@ -474,7 +472,8 @@ class MapModule(mp_module.MPModule):
             self.move_fencepoint(obj.selected[0].objkey, obj.selected[0].extra_info)
         elif menuitem.returnkey == 'showPosition':
             self.show_position()
-
+        elif menuitem.returnkey == 'setServiceTerrain':
+            self.module('terrain').cmd_terrain(['set', 'source', menuitem.get_choice()])
 
     def map_callback(self, obj):
         '''called when an event happens on the slipmap'''
@@ -588,7 +587,7 @@ class MapModule(mp_module.MPModule):
     def cmd_set_home(self, args):
         '''called when user selects "Set Home (with height)" on map'''
         (lat, lon) = (self.mpstate.click_location[0], self.mpstate.click_location[1])
-        alt = self.ElevationMap.GetElevation(lat, lon)
+        alt = self.module('terrain').ElevationModel.GetElevation(lat, lon)
         print("Setting home to: ", lat, lon, alt)
         self.master.mav.command_long_send(
             self.settings.target_system, self.settings.target_component,
@@ -623,7 +622,7 @@ class MapModule(mp_module.MPModule):
     def cmd_set_roi(self, args):
         '''called when user selects "Set ROI" on map'''
         (lat, lon) = (self.mpstate.click_location[0], self.mpstate.click_location[1])
-        alt = self.ElevationMap.GetElevation(lat, lon)
+        alt = self.module('terrain').ElevationModel.GetElevation(lat, lon)
         print("Setting ROI to: ", lat, lon, alt)
         self.master.mav.command_long_send(
             self.settings.target_system, self.settings.target_component,
@@ -640,7 +639,7 @@ class MapModule(mp_module.MPModule):
     def cmd_set_origin(self, args):
         '''called when user selects "Set Origin (with height)" on map'''
         (lat, lon) = (self.mpstate.click_location[0], self.mpstate.click_location[1])
-        alt = self.ElevationMap.GetElevation(lat, lon)
+        alt = self.module('terrain').ElevationModel.GetElevation(lat, lon)
         print("Setting origin to: ", lat, lon, alt)
         self.master.mav.set_gps_global_origin_send(
             self.settings.target_system,
@@ -696,7 +695,7 @@ class MapModule(mp_module.MPModule):
         if abs(lat) < 1.0e-3 and abs(lon) > 1.0e-3:
             return
         # hack for OBC2016
-        alt = self.ElevationMap.GetElevation(lat, lon)
+        alt = self.module('terrain').ElevationModel.GetElevation(lat, lon)
         agl = m.alt * 0.001 - alt
         agl_s = str(int(agl)) + 'm'
         self.create_vehicle_icon('VehiclePos2', 'blue', follow=False, vehicle_type='plane')
