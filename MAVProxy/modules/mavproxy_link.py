@@ -511,10 +511,10 @@ class LinkModule(mp_module.MPModule):
     def report_altitude(self, altitude):
         '''possibly report a new altitude'''
         master = self.master
-        if getattr(self.console, 'ElevationMap', None) is not None and self.mpstate.settings.basealt != 0:
+        if len(self.module_matching('terrain')) > 0 and self.mpstate.settings.basealt != 0:
             lat = master.field('GLOBAL_POSITION_INT', 'lat', 0)*1.0e-7
             lon = master.field('GLOBAL_POSITION_INT', 'lon', 0)*1.0e-7
-            alt1 = self.console.ElevationMap.GetElevation(lat, lon)
+            alt1 = self.module('terrain').ElevationModel.GetElevation(lat, lon)
             if alt1 is not None:
                 alt2 = self.mpstate.settings.basealt
                 altitude += alt2 - alt1
