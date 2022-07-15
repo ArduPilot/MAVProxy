@@ -8,7 +8,6 @@ import os, sys, math, time, re
 
 from MAVProxy.modules.lib import wxconsole
 from MAVProxy.modules.lib import textconsole
-from MAVProxy.modules.mavproxy_map import mp_elevation
 from pymavlink import mavutil
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
@@ -74,8 +73,6 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('ETR', 'ETR --', row=3)
         mpstate.console.set_status('Params', 'Param ---/---', row=3)
         mpstate.console.set_status('Mission', 'Mission --/--', row=3)
-
-        mpstate.console.ElevationMap = mp_elevation.ElevationModel()
 
         self.vehicle_list = []
         self.vehicle_menu = None
@@ -339,17 +336,17 @@ class ConsoleModule(mp_module.MPModule):
             rel_alt = master.field('GLOBAL_POSITION_INT', 'relative_alt', 0) * 1.0e-3
             agl_alt = None
             if self.settings.basealt != 0:
-                agl_alt = self.console.ElevationMap.GetElevation(lat, lng)
+                agl_alt = self.module('terrain').ElevationModel.GetElevation(lat, lng)
                 if agl_alt is not None:
                     agl_alt = self.settings.basealt - agl_alt
             else:
                 try:
-                    agl_alt_home = self.console.ElevationMap.GetElevation(home_lat, home_lng)
+                    agl_alt_home = self.module('terrain').ElevationModel.GetElevation(home_lat, home_lng)
                 except Exception as ex:
                     print(ex)
                     agl_alt_home = None
                 if agl_alt_home is not None:
-                    agl_alt = self.console.ElevationMap.GetElevation(lat, lng)
+                    agl_alt = self.module('terrain').ElevationModel.GetElevation(lat, lng)
                 if agl_alt is not None:
                     agl_alt = agl_alt_home - agl_alt
             if agl_alt is not None:
@@ -608,7 +605,7 @@ class ConsoleModule(mp_module.MPModule):
                                                                     "(L)" if (msg.airspeed_sp - msg.airspeed) > 0 else "(L)"))
             # The -180 here for for consistency with WIND (-180->180), whereas HIGH_LATENCY2 is (0->360)
             self.console.set_status('Wind', 'Wind %u/%s' % ((msg.wind_heading * 2) - 180, self.speed_string(msg.windspeed / 5)))
-            self.console.set_status('Alt', 'Alt %s' % self.height_string(msg.altitude - self.console.ElevationMap.GetElevation(msg.latitude / 1E7, msg.longitude / 1E7)))
+            self.console.set_status('Alt', 'Alt %s' % self.height_string(msg.altitude - self.module('terrain').ElevationModel.GetElevation(msg.latitude / 1E7, msg.longitude / 1E7)))
             self.console.set_status('AirSpeed', 'AirSpeed %s' % self.speed_string(msg.airspeed / 5))
             self.console.set_status('GPSSpeed', 'GPSSpeed %s' % self.speed_string(msg.groundspeed / 5))
             self.console.set_status('Thr', 'Thr %u' % msg.throttle)
