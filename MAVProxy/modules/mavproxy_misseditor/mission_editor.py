@@ -181,7 +181,7 @@ class MissionEditorEventThread(threading.Thread):
             time.sleep(0.2)
 
 class MissionEditorMain(object):
-    def __init__(self, mpstate):
+    def __init__(self, mpstate, elemodel):
         self.num_wps_expected = 0 #helps me to know if all my waypoints I'm expecting have arrived
         self.wps_received = {}
 
@@ -195,7 +195,7 @@ class MissionEditorMain(object):
         self.close_window = multiproc.Semaphore()
         self.close_window.acquire()
 
-        self.child = multiproc.Process(target=self.child_task,args=(self.event_queue,self.event_queue_lock,self.gui_event_queue,self.gui_event_queue_lock,self.close_window))
+        self.child = multiproc.Process(target=self.child_task,args=(self.event_queue,self.event_queue_lock,self.gui_event_queue,self.gui_event_queue_lock,self.close_window, elemodel))
         self.child.start()
 
         self.event_thread = MissionEditorEventThread(self, self.event_queue, self.event_queue_lock)
@@ -317,7 +317,7 @@ class MissionEditorMain(object):
 
                     self.wps_received[m.seq] = True
 
-    def child_task(self, q, l, gq, gl, cw_sem):
+    def child_task(self, q, l, gq, gl, cw_sem, elemodel):
         '''child process - this holds GUI elements'''
         mp_util.child_close_fds()
 
@@ -326,7 +326,7 @@ class MissionEditorMain(object):
         from MAVProxy.modules.mavproxy_misseditor import missionEditorFrame
 
         self.app = wx.App(False)
-        self.app.frame = missionEditorFrame.MissionEditorFrame(self,parent=None,id=wx.ID_ANY)
+        self.app.frame = missionEditorFrame.MissionEditorFrame(self,parent=None,id=wx.ID_ANY, elemodel=elemodel)
 
         self.app.frame.set_event_queue(q)
         self.app.frame.set_event_queue_lock(l)
