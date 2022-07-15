@@ -14,7 +14,6 @@ import cv2
 import numpy as np
 import warnings
 
-from MAVProxy.modules.mavproxy_map import mp_elevation
 from MAVProxy.modules.mavproxy_map import mp_tile
 from MAVProxy.modules.lib import mp_util
 

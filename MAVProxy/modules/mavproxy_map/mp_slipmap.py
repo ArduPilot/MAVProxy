@@ -37,7 +37,7 @@ class MPSlipMap():
                  max_zoom=19,
                  debug=False,
                  brightness=0,
-                 elevation=False,
+                 elevation=None,
                  download=True,
                  show_flightmode_legend=True,
                  timelim_pipe=None):
@@ -205,61 +205,61 @@ if __name__ == "__main__":
     multiproc.freeze_support()
     import time
 
-    from optparse import OptionParser
-    parser = OptionParser("mp_slipmap.py [options]")
-    parser.add_option("--lat", type='float', default=-26.582218, help="start latitude")
-    parser.add_option("--lon", type='float', default=151.840113, help="start longitude")
-    parser.add_option("--service", default="MicrosoftSat", help="tile service")
-    parser.add_option("--offline", action='store_true', default=False, help="no download")
-    parser.add_option("--delay", type='float', default=0.3, help="tile download delay")
-    parser.add_option("--max-zoom", type='int', default=19, help="maximum tile zoom")
-    parser.add_option("--debug", action='store_true', default=False, help="show debug info")
-    parser.add_option("--boundary", default=None, help="show boundary")
-    parser.add_option("--mission", default=[], action='append', help="show mission")
-    parser.add_option("--thumbnail", default=None, help="show thumbnail")
-    parser.add_option("--icon", default=None, help="show icon")
-    parser.add_option("--flag", default=[], type='str', action='append', help="flag positions")
-    parser.add_option("--grid", default=False, action='store_true', help="add a UTM grid")
-    parser.add_option("--elevation", action='store_true', default=False, help="show elevation information")
-    parser.add_option("--verbose", action='store_true', default=False, help="show mount actions")
-    (opts, args) = parser.parse_args()
+    from argparse import ArgumentParser
+    parser = ArgumentParser("mp_slipmap.py [options]")
+    parser.add_argument("--lat", type=float, default=-26.582218, help="start latitude")
+    parser.add_argument("--lon", type=float, default=151.840113, help="start longitude")
+    parser.add_argument("--service", default="MicrosoftSat", help="tile service")
+    parser.add_argument("--offline", action='store_true', default=False, help="no download")
+    parser.add_argument("--delay", type=float, default=0.3, help="tile download delay")
+    parser.add_argument("--max-zoom", type=int, default=19, help="maximum tile zoom")
+    parser.add_argument("--debug", action='store_true', default=False, help="show debug info")
+    parser.add_argument("--boundary", default=None, help="show boundary")
+    parser.add_argument("--mission", default=[], action='append', help="show mission")
+    parser.add_argument("--thumbnail", default=None, help="show thumbnail")
+    parser.add_argument("--icon", default=None, help="show icon")
+    parser.add_argument("--flag", default=[], type=str, action='append', help="flag positions")
+    parser.add_argument("--grid", default=False, action='store_true', help="add a UTM grid")
+    parser.add_argument("--verbose", action='store_true', default=False, help="show mount actions")
+    parser.add_argument("--elevation", type=str, default="SRTM1", choices=["SRTM1", "SRTM3", "None"], help="Elevation model")
+    args = parser.parse_args()
 
-    sm = MPSlipMap(lat=opts.lat,
-                   lon=opts.lon,
-                   download=not opts.offline,
-                   service=opts.service,
-                   debug=opts.debug,
-                   max_zoom=opts.max_zoom,
-                   elevation=opts.elevation,
-                   tile_delay=opts.delay)
+    sm = MPSlipMap(lat=args.lat,
+                   lon=args.lon,
+                   download=not args.offline,
+                   service=args.service,
+                   debug=args.debug,
+                   max_zoom=args.max_zoom,
+                   elevation=args.elevation,
+                   tile_delay=args.delay)
 
-    if opts.boundary:
-        boundary = mp_util.polygon_load(opts.boundary)
+    if args.boundary:
+        boundary = mp_util.polygon_load(args.boundary)
         sm.add_object(SlipPolygon('boundary', boundary, layer=1, linewidth=2, colour=(0,255,0)))
 
-    if opts.mission:
+    if args.mission:
         from pymavlink import mavwp
-        for file in opts.mission:
+        for file in args.mission:
             wp = mavwp.MAVWPLoader()
             wp.load(file)
             boundary = wp.polygon()
             sm.add_object(SlipPolygon('mission-%s' % file, boundary, layer=1, linewidth=1, colour=(255,255,255)))
 
-    if opts.grid:
+    if args.grid:
         sm.add_object(SlipGrid('grid', layer=3, linewidth=1, colour=(255,255,0)))
 
-    if opts.thumbnail:
-        thumb = cv2.imread(opts.thumbnail)
-        sm.add_object(SlipThumbnail('thumb', (opts.lat,opts.lon), layer=1, img=thumb, border_width=2, border_colour=(255,0,0)))
+    if args.thumbnail:
+        thumb = cv2.imread(args.thumbnail)
+        sm.add_object(SlipThumbnail('thumb', (args.lat,args.lon), layer=1, img=thumb, border_width=2, border_colour=(255,0,0)))
 
-    if opts.icon:
-        icon = cv2.imread(opts.icon)
-        sm.add_object(SlipIcon('icon', (opts.lat,opts.lon), icon, layer=3, rotation=90, follow=True))
-        sm.set_position('icon', mp_util.gps_newpos(opts.lat,opts.lon, 180, 100), rotation=45)
+    if args.icon:
+        icon = cv2.imread(args.icon)
+        sm.add_object(SlipIcon('icon', (args.lat,args.lon), icon, layer=3, rotation=90, follow=True))
+        sm.set_position('icon', mp_util.gps_newpos(args.lat,args.lon, 180, 100), rotation=45)
         sm.add_object(SlipInfoImage('detail', icon))
         sm.add_object(SlipInfoText('detail text', 'test text'))
 
-    for flag in opts.flag:
+    for flag in args.flag:
         (lat,lon) = flag.split(',')
         icon = sm.icon('flag.png')
         sm.add_object(SlipIcon('icon - %s' % str(flag), (float(lat),float(lon)), icon, layer=3, rotation=0, follow=False))
@@ -267,7 +267,7 @@ if __name__ == "__main__":
     while sm.is_alive():
         while not sm.event_queue_empty():
             obj = sm.get_event()
-            if not opts.verbose:
+            if not args.verbose:
                 continue
             if isinstance(obj, SlipMouseEvent):
                 print("Mouse event at %s (X/Y=%u/%u) for %u objects" % (obj.latlon,
