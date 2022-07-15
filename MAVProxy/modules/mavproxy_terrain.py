@@ -11,9 +11,8 @@ from MAVProxy.modules.lib import mp_settings
 
 class TerrainModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(TerrainModule, self).__init__(mpstate, "terrain", "terrain handling", public=False)
+        super(TerrainModule, self).__init__(mpstate, "terrain", "terrain handling", public=True)
 
-        self.ElevationModel = mp_elevation.ElevationModel()
         self.current_request = None
         self.sent_mask = 0
         self.last_send_time = time.time()
@@ -25,8 +24,12 @@ class TerrainModule(mp_module.MPModule):
                          ["<status|check>",
                           'set (TERRAINSETTING)'])
         self.terrain_settings = mp_settings.MPSettings([('debug', int, 0),
-                                                        ('enable', int, 1)])
+                                                        ('enable', int, 1),
+                                                        ('offline', int, 0),
+                                                        mp_settings.MPSetting('source', str, "SRTM3", choice=mp_elevation.TERRAIN_SERVICES.keys())])
         self.add_completion_function('(TERRAINSETTING)', self.terrain_settings.completion)
+
+        self.ElevationModel = mp_elevation.ElevationModel(database=self.terrain_settings.source, offline=self.terrain_settings.offline)
 
     def cmd_terrain(self, args):
         '''terrain command parser'''
@@ -40,6 +43,8 @@ class TerrainModule(mp_module.MPModule):
                 self.requests_received))
         elif args[0] == "set":
             self.terrain_settings.command(args[1:])
+            # Re-init terrain model
+            self.ElevationModel = mp_elevation.ElevationModel(database=self.terrain_settings.source, offline=self.terrain_settings.offline)
         elif args[0] == "check":
             self.cmd_terrain_check(args[1:])
         else:
