@@ -432,6 +432,10 @@ def decode_devid(devid, pname):
         0x33 : "INS_ICM40609",
         0x34 : "INS_ICM42688",
         0x35 : "INS_ICM42605",
+        0x37 : "INS_IIM42652",
+        0x38 : "INS_BMI270",
+        0x39 : "INS_BMI085",
+        0x3A : "INS_ICM42670",
         }
 
     baro_types = {
@@ -448,6 +452,9 @@ def decode_devid(devid, pname):
         0x0B : "BARO_MS5611",
         0x0C : "BARO_SPL06",
         0x0D : "BARO_UAVCAN",
+        0x0E : "BARO_MSP",
+        0x0F : "BARO_ICP101XX",
+        0x10 : "BARO_ICP201XX",
     }
 
     airspeed_types = {
