@@ -161,7 +161,7 @@ class ParamState:
             return
         self.ftp_started = True
         self.ftp_count = None
-        ftp.cmd_get(["@PARAM/param.pck"], callback=self.ftp_callback, callback_progress=self.ftp_callback_progress)
+        ftp.cmd_get(["@PARAM/param.pck?withdefaults=1"], callback=self.ftp_callback, callback_progress=self.ftp_callback_progress)
 
     def log_params(self, params):
         '''log PARAM_VALUE messages so that we can extract parameters from a tlog when using ftp download'''
@@ -201,7 +201,7 @@ class ParamState:
             buf = fh.read(6)
             fh.seek(ofs)
             magic2,num_params,total_params = struct.unpack("<HHH", buf)
-            if magic2 == 0x671b:
+            if magic2 == 0x671b or magic2 == 0x671c:
                 self.ftp_count = total_params
         # approximate count
         if self.ftp_count is not None:
@@ -219,11 +219,13 @@ class ParamState:
             return
 
         magic = 0x671b
+        magic_defaults = 0x671c
         data = fh.read()
         magic2,num_params,total_params = struct.unpack("<HHH", data[0:6])
-        if magic != magic2:
+        if magic != magic2 and magic_defaults != magic2:
             print("paramftp: bad magic 0x%x expected 0x%x" % (magic2, magic))
             return
+        with_defaults = magic2 == magic_defaults
         data = data[6:]
 
         # mapping of data type to type length and format
@@ -236,6 +238,8 @@ class ParamState:
 
         count = 0
         params = []
+        if with_defaults:
+            defaults = []
 
         if sys.version_info.major < 3:
             pad_byte = chr(0)
@@ -254,22 +258,35 @@ class ParamState:
 
             ptype, plen = struct.unpack("<BB", data[0:2])
             flags = (ptype>>4) & 0x0F
+            has_default = with_defaults and (flags&1) != 0
             ptype &= 0x0F
+
 
             if not ptype in data_types:
                 print("paramftp: bad type 0x%x" % ptype)
                 return
 
             (type_len, type_format) = data_types[ptype]
+            default_len = type_len if has_default else 0
 
             name_len = ((plen>>4) & 0x0F) + 1
             common_len = (plen & 0x0F)
             name = last_name[0:common_len] + data[2:2+name_len]
-            vdata = data[2+name_len:2+name_len+type_len]
+            vdata = data[2+name_len:2+name_len+type_len+default_len]
             last_name = name
-            data = data[2+name_len+type_len:]
-            v, = struct.unpack("<" + type_format, vdata)
-            params.append((name, v, ptype))
+            data = data[2+name_len+type_len+default_len:]
+            if with_defaults:
+                if has_default:
+                    v1,v2, = struct.unpack("<" + type_format + type_format, vdata)
+                    params.append((name, v1, ptype))
+                    defaults.append((name, v2, ptype))
+                else:
+                    v, = struct.unpack("<" + type_format, vdata)
+                    params.append((name, v, ptype))
+                    defaults.append((name, v, ptype))
+            else:
+                v, = struct.unpack("<" + type_format, vdata)
+                params.append((name, v, ptype))
             count += 1
 
         if count != total_params:
@@ -297,6 +314,17 @@ class ParamState:
         if self.logdir is not None:
             self.mav_param.save(os.path.join(self.logdir, self.parm_file), '*', verbose=True)
         self.log_params(params)
+
+        if with_defaults:
+            defaults_path = os.path.join(self.logdir, "defaults.parm") if self.logdir else "defaults.parm"
+            defparm = mavparm.MAVParmDict()
+            for (name, v, ptype) in defaults:
+                name = str(name.decode('utf-8'))
+                defparm[name] = v
+            defparm.save(defaults_path, '*', verbose=False)
+            print("Saved %u defaults to %s" % (len(defaults), defaults_path))
+
+
 
     def fetch_all(self, master):
         '''force refetch of parameters'''
@@ -352,19 +380,22 @@ class ParamState:
         elif args[0] == "diff":
             wildcard = '*'
             if len(args) < 2 or args[1].find('*') != -1:
-                if self.vehicle_name is None:
-                    print("Unknown vehicle type")
-                    return
-                filename = mp_util.dot_mavproxy("%s-defaults.parm" % self.vehicle_name)
+                filename = os.path.join(self.logdir, "defaults.parm")
                 if not os.path.exists(filename):
-                    print("Please run 'param download' first (vehicle_name=%s)" % self.vehicle_name)
-                    return
+                    if self.vehicle_name is None:
+                        print("Unknown vehicle type")
+                        return
+                    filename = mp_util.dot_mavproxy("%s-defaults.parm" % self.vehicle_name)
+                    if not os.path.exists(filename):
+                        print("Please run 'param download' first (vehicle_name=%s)" % self.vehicle_name)
+                        return
                 if len(args) >= 2:
                     wildcard = args[1]
             else:
                 filename = args[1]
                 if len(args) == 3:
                     wildcard = args[2]
+            print("defaults path: %s" % filename)
             print("%-16.16s %12.12s %12.12s" % ('Parameter', 'Defaults', 'Current'))
             self.mav_param.diff(filename, wildcard=wildcard)
         elif args[0] == "set":
