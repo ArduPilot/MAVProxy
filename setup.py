@@ -27,14 +27,14 @@ package_data.extend(package_files('MAVProxy/modules/mavproxy_cesium/app'))
 # use the system versions of these dependencies, so it tries to download and install
 # large numbers of modules like numpy etc which may be already installed
 requirements=['pymavlink>=2.4.14',
-              'pyserial>=3.0']
+              'pyserial>=3.0',
+              'numpy']
 
 if platform.system() == "Darwin":
     # on MacOS we can have a more complete requirements list
     requirements.extend(['billiard>=3.5.0',
                          'gnureadline',
                          'matplotlib',
-                         'numpy',
                          'opencv-python',
                          'lxml',
                          'future',
