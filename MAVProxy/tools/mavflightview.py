@@ -532,7 +532,7 @@ def mavflightview_show(path, wp, fen, used_flightmodes, mav_type, options, insta
         else:
             map = mp_slipmap.MPSlipMap(title=title,
                                        service=options.service,
-                                       elevation=True,
+                                       elevation="SRTM3",
                                        width=600,
                                        height=600,
                                        ground_width=ground_width,
