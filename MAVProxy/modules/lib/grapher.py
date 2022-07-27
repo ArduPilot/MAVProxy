@@ -18,6 +18,8 @@ from pymavlink import mavutil
 import threading
 import numpy as np
 
+MAVGRAPH_DEBUG = 'MAVGRAPH_DEBUG' in os.environ
+
 colors = [ 'red', 'green', 'blue', 'orange', 'olive', 'black', 'grey', 'yellow', 'brown', 'darkcyan',
            'cornflowerblue', 'darkmagenta', 'deeppink', 'darkred']
 
@@ -441,13 +443,19 @@ class MavGraph(object):
                     has_instance = True
 
             simple = self.simple_field[i]
+            v = None
             if simple is not None and not has_instance:
-                v = getattr(vars[simple[0]], simple[1])
-            else:
+                try:
+                    v = getattr(vars[simple[0]], simple[1])
+                except Exception as ex:
+                    if MAVGRAPH_DEBUG:
+                        print(ex)
+            if v is None:
                 try:
                     v = mavutil.evaluate_expression(f, vars)
-                except Exception:
-                    continue
+                except Exception as ex:
+                    if MAVGRAPH_DEBUG:
+                        print(ex)
             if v is None:
                 continue
             if self.xaxis is None:
