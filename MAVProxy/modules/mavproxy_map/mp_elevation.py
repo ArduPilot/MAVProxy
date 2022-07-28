@@ -26,6 +26,9 @@ class ElevationModel():
     def __init__(self, database='SRTM3', offline=0, debug=False):
         '''Use offline=1 to disable any downloading of tiles, regardless of whether the
         tile exists'''
+        if database.lower() == 'srtm':
+            # compatibility with the old naming
+            database = "SRTM3"
         self.database = database
         if self.database in ['SRTM1', 'SRTM3']:
             self.downloader = srtm.SRTMDownloader(offline=offline, debug=debug, directory=self.database)
