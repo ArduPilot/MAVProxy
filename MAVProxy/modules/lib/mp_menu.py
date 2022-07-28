@@ -9,6 +9,7 @@ November 2013
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import multiproc
 import platform
+from MAVProxy.modules.lib.wx_loader import wx
 
 class MPMenuGeneric(object):
     '''a MP menu separator'''
@@ -50,6 +51,7 @@ class MPMenuItem(MPMenuGeneric):
         self.returnkey = returnkey
         self.handler = handler
         self.handler_result = None
+        self._id = wx.NewId()
 
     def find_selected(self, event):
         '''find the selected menu item'''
@@ -66,11 +68,7 @@ class MPMenuItem(MPMenuGeneric):
             self.handler_result = call()
 
     def id(self):
-        '''id used to identify the returned menu items
-        uses a 16 bit signed integer'''
-        # must be below SHRT_MAX
-        id = int(hash((self.name, self.returnkey))) % 32767
-        return id
+        return self._id
 
     def _append(self, menu):
         '''append this menu item to a menu'''
