@@ -8,6 +8,7 @@ November 2013
 
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import multiproc
+from MAVProxy.modules.lib.wx_loader import wx
 import platform
 
 class MPMenuGeneric(object):
@@ -51,6 +52,13 @@ class MPMenuItem(MPMenuGeneric):
         self.handler = handler
         self.handler_result = None
 
+    def __getstate__(self):
+        '''use __getstate__ to override pickle so that we don't propogate IDs across process boundaries'''
+        attr = self.__dict__.copy()
+        if hasattr(attr,'_id'):
+            del attr['_id']
+        return attr
+
     def find_selected(self, event):
         '''find the selected menu item'''
         if event.GetId() == self.id():
@@ -66,11 +74,11 @@ class MPMenuItem(MPMenuGeneric):
             self.handler_result = call()
 
     def id(self):
-        '''id used to identify the returned menu items
-        uses a 16 bit signed integer'''
-        # must be below SHRT_MAX
-        id = int(hash((self.name, self.returnkey))) % 32767
-        return id
+        '''id used to identify the returned menu items uses a 16 bit signed integer. We allocate these
+           on use, and use __getstate__ to avoid them crossing processs boundaries'''
+        if getattr(self, '_id', None) is None:
+            self._id = wx.NewId()
+        return self._id
 
     def _append(self, menu):
         '''append this menu item to a menu'''
@@ -118,6 +126,12 @@ class MPMenuRadio(MPMenuItem):
         self.choice = 0
         self.initial = selected
 
+    def __getstate__(self):
+        attr = self.__dict__.copy()
+        if hasattr(attr,'_ids'):
+            del attr['_ids']
+        return attr
+        
     def set_choices(self, items):
         '''set radio item choices'''
         self.items = items
@@ -128,11 +142,11 @@ class MPMenuRadio(MPMenuItem):
 
     def find_selected(self, event):
         '''find the selected menu item'''
-        first = self.id()
-        last = first + len(self.items) - 1
+        if not hasattr(self, '_ids'):
+            return None
         evid = event.GetId()
-        if evid >= first and evid <= last:
-            self.choice = evid - first
+        if evid in self._ids:
+            self.choice = self._ids.index(evid)
             return self
         return None
 
@@ -140,10 +154,14 @@ class MPMenuRadio(MPMenuItem):
         '''append this menu item to a menu'''
         from MAVProxy.modules.lib.wx_loader import wx
         submenu = wx.Menu()
+        if not hasattr(self, '_ids') or len(self._ids) != len(self.items):
+            self._ids = []
+            for i in range(len(self.items)):
+                self._ids.append(wx.NewId())
         for i in range(len(self.items)):
-            submenu.AppendRadioItem(self.id()+i, self.items[i], self.description)
+            submenu.AppendRadioItem(self._ids[i], self.items[i], self.description)
             if self.items[i] == self.initial:
-                submenu.Check(self.id()+i, True)
+                submenu.Check(self._ids[i], True)
         menu.AppendSubMenu(submenu, self.name)
 
     def __str__(self):
