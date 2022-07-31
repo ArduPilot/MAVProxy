@@ -637,6 +637,10 @@ class mavflightview_options(object):
 if __name__ == "__main__":
     multiproc.freeze_support()
 
+    # start ID server
+    from MAVProxy.modules.lib import wx_idserver
+    wx_idserver.start()
+    
     from optparse import OptionParser
     parser = OptionParser("mavflightview.py [options]")
     parser.add_option("--service", default="MicrosoftSat", help="tile service")

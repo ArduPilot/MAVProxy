@@ -8,7 +8,6 @@ November 2013
 
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import multiproc
-from MAVProxy.modules.lib import wx_idserver
 import platform
 
 class MPMenuGeneric(object):
@@ -51,6 +50,7 @@ class MPMenuItem(MPMenuGeneric):
         self.returnkey = returnkey
         self.handler = handler
         self.handler_result = None
+        from MAVProxy.modules.lib import wx_idserver
         self._id = wx_idserver.NewId()
 
     def find_selected(self, event):

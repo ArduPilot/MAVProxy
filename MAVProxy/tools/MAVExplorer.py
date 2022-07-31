@@ -1100,6 +1100,11 @@ def progress_bar(pct):
 
 if __name__ == "__main__":
     multiproc.freeze_support()
+
+    # start ID server
+    from MAVProxy.modules.lib import wx_idserver
+    wx_idserver.start()
+
     from argparse import ArgumentParser
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("--version", action='store_true', help="show version")

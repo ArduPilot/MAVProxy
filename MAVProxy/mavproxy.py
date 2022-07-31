@@ -70,6 +70,10 @@ except Exception as e:
 if __name__ == '__main__':
       multiproc.freeze_support()
 
+      # start ID server
+      from MAVProxy.modules.lib import wx_idserver
+      wx_idserver.start()
+
 #The MAVLink version being used (None, "1.0", "2.0")
 mavversion = None
 
