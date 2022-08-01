@@ -23,7 +23,7 @@ TERRAIN_SERVICES = {
 class ElevationModel():
     '''Elevation Model. Only SRTM for now'''
 
-    def __init__(self, database='SRTM3', cachedir=None, offline=0, debug=False):
+    def __init__(self, database='SRTM3', offline=0, debug=False, cachedir=None):
         '''Use offline=1 to disable any downloading of tiles, regardless of whether the
         tile exists'''
         if database.lower() == 'srtm':
