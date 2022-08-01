@@ -501,7 +501,7 @@ if __name__ == '__main__':
     parser.add_argument("--lon", type=float, default=149.165230)
     parser.add_argument("--debug", action='store_true', default=False)
     parser.add_argument("--use-http", action='store_true', default=False)
-    parser.add_argument("--database", type=str, default="SRTM1", choices=["SRTM1", "SRTM3"])
+    parser.add_argument("--database", type=str, default="SRTM3", choices=["SRTM1", "SRTM3"])
     args = parser.parse_args()
 
     if args.database == "SRTM1":

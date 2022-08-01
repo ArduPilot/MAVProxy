@@ -39,7 +39,7 @@ ME_DIST_COL = 12
 ME_ANGLE_COL = 13
 
 class MissionEditorFrame(wx.Frame):
-    def __init__(self, state, elemodel='SRTM1', *args, **kwds):
+    def __init__(self, state, elemodel='SRTM3', *args, **kwds):
         # begin wxGlade: MissionEditorFrame.__init__
         self.state = state
         kwds["style"] = wx.DEFAULT_FRAME_STYLE

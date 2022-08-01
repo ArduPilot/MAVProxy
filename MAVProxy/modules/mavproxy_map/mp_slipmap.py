@@ -221,7 +221,7 @@ if __name__ == "__main__":
     parser.add_argument("--flag", default=[], type=str, action='append', help="flag positions")
     parser.add_argument("--grid", default=False, action='store_true', help="add a UTM grid")
     parser.add_argument("--verbose", action='store_true', default=False, help="show mount actions")
-    parser.add_argument("--elevation", type=str, default="SRTM1", choices=["SRTM1", "SRTM3", "None"], help="Elevation model")
+    parser.add_argument("--elevation", type=str, default="SRTM3", choices=["SRTM1", "SRTM3", "None"], help="Elevation model")
     args = parser.parse_args()
 
     sm = MPSlipMap(lat=args.lat,
