@@ -961,6 +961,16 @@ def loadfile(args):
 
     setup_menus()
 
+def print_caught_exception(e):
+    if sys.version_info[0] >= 3:
+        ret = "%s\n" % e
+        ret += ''.join(traceback.format_exception(type(e),
+                                                  value=e,
+                                                  tb=e.__traceback__))
+        print(ret)
+    else:
+        print(traceback.format_exc(e))
+
 def process_stdin(line):
     '''handle commands from user'''
     if line is None:
@@ -970,7 +980,12 @@ def process_stdin(line):
     if not line:
         return
 
-    args = shlex.split(line)
+    try:
+        args = shlex.split(line)
+    except ValueError as e:
+        print_caught_exception(e)
+        return
+
     cmd = args[0]
     if cmd == 'help':
         k = command_map.keys()
@@ -991,14 +1006,7 @@ def process_stdin(line):
     except Exception as e:
         print("ERROR in command %s: %s" % (args[1:], str(e)))
         if mestate.settings.debug > 0:
-            if sys.version_info[0] >= 3:
-                ret = "%s\n" % e
-                ret += ''.join(traceback.format_exception(etype=type(e),
-                                                        value=e,
-                                                        tb=e.__traceback__))
-                print(ret)
-            else:
-                print(traceback.format_exc(e))
+            print_caught_exception(e)
 
 def input_loop():
     '''wait for user input'''
