@@ -8,7 +8,6 @@ November 2013
 
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import multiproc
-from MAVProxy.modules.lib.wx_loader import wx
 import platform
 
 class MPMenuGeneric(object):
@@ -77,6 +76,7 @@ class MPMenuItem(MPMenuGeneric):
         '''id used to identify the returned menu items uses a 16 bit signed integer. We allocate these
            on use, and use __getstate__ to avoid them crossing processs boundaries'''
         if getattr(self, '_id', None) is None:
+            from MAVProxy.modules.lib.wx_loader import wx
             self._id = wx.NewId()
         return self._id
 
