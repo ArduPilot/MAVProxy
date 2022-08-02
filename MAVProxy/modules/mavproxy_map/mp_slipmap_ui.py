@@ -1,6 +1,6 @@
 import functools
 import math
-from MAVProxy.modules.mavproxy_map import mp_elevation
+from MAVProxy.modules.lib import mp_elevation
 import numpy as np
 import os
 import time

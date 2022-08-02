@@ -18,7 +18,7 @@ from MAVProxy.modules.mavproxy_misseditor import me_event
 MissionEditorEvent = me_event.MissionEditorEvent
 
 from MAVProxy.modules.mavproxy_misseditor import me_defines
-from MAVProxy.modules.mavproxy_map import mp_elevation
+from MAVProxy.modules.lib import mp_elevation
 
 from MAVProxy.modules.mavproxy_misseditor import button_renderer
 
