@@ -11,7 +11,7 @@ import time
 
 import numpy
 
-from MAVProxy.modules.mavproxy_map import srtm
+from MAVProxy.modules.lib import srtm
 
 # SRTM1 = 1 arc-second resolution data (~30m)
 # SRTM3 = 3 arc-second resolution data (~90m)
