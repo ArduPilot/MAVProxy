@@ -10,6 +10,8 @@ from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import multiproc
 import platform
 
+idmap = {}
+
 class MPMenuGeneric(object):
     '''a MP menu separator'''
     def __init__(self):
@@ -76,8 +78,15 @@ class MPMenuItem(MPMenuGeneric):
         '''id used to identify the returned menu items uses a 16 bit signed integer. We allocate these
            on use, and use __getstate__ to avoid them crossing processs boundaries'''
         if getattr(self, '_id', None) is None:
-            from MAVProxy.modules.lib.wx_loader import wx
-            self._id = wx.NewId()
+            global idmap
+            import os
+            key_tuple = (os.getpid(), self.name, self.returnkey)
+            if key_tuple in idmap:
+                self._id = idmap[key_tuple]
+            else:
+                from MAVProxy.modules.lib.wx_loader import wx
+                self._id = wx.NewId()
+                idmap[key_tuple] = self._id
         return self._id
 
     def _append(self, menu):
