@@ -11,7 +11,7 @@ if mp_util.has_wxpython:
 
 class FakeGPSModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(FakeGPSModule, self).__init__(mpstate, "fakegps")
+        super(FakeGPSModule, self).__init__(mpstate, "fakegps", public = True)
         self.last_send = time.time()
         self.FakeGPS_settings = mp_settings.MPSettings([("nsats", int, 16),
                                                         ("lat", float, -35.363261),
@@ -31,6 +31,12 @@ class FakeGPSModule(mp_module.MPModule):
                                            MPMenuItem('SetPos (with alt)', 'SetPosAlt', '# fakegps setpos ',
                                                     handler=MPMenuCallTextDialog(title='Altitude (m)', default=self.mpstate.settings.guidedalt))])
                 map.add_menu(menu)
+
+    def get_location(self):
+        '''access to location for other modules'''
+        return (self.FakeGPS_settings.lat,
+                self.FakeGPS_settings.lon,
+                self.FakeGPS_settings.alt)
 
     def cmd_FakeGPS(self, args):
         '''fakegps command parser'''
