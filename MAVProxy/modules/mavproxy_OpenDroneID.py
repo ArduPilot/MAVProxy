@@ -71,6 +71,11 @@ class OpenDroneIDModule(mp_module.MPModule):
 
     def send_system(self):
         '''send SYSTEM'''
+        # allow use of fakegps module for testing
+        fakegps = self.module("fakegps")
+        if fakegps is not None:
+            (self.operator_latitude, self.operator_longitude, self.operator_altitude_geo) = fakegps.get_location()
+
         self.master.mav.open_drone_id_system_send(
             self.target_system,
             self.target_component,
