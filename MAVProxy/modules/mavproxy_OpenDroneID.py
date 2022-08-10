@@ -126,7 +126,7 @@ class OpenDroneIDModule(mp_module.MPModule):
 
     def timestamp_2019(self):
         jan_1_2019_s = 1546261200
-        return int(time.time() + jan_1_2019_s)
+        return int(time.time() - jan_1_2019_s)
 
     def idle_task(self):
         '''called on idle'''
