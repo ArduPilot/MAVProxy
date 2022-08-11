@@ -201,6 +201,8 @@ class ConsoleModule(mp_module.MPModule):
             return "Blimp"
         elif hb.type == mavutil.mavlink.MAV_TYPE_ADSB:
             return "ADSB"
+        elif hb.type == mavutil.mavlink.MAV_TYPE_ODID:
+            return "ODID"
         return "UNKNOWN(%u)" % hb.type
 
     def component_type_string(self, hb):
@@ -213,6 +215,8 @@ class ConsoleModule(mp_module.MPModule):
             return "CC"
         elif hb.type == mavutil.mavlink.MAV_TYPE_ADSB:
             return "ADSB"
+        elif hb.type == mavutil.mavlink.MAV_TYPE_ODID:
+            return "ODID"
         elif hb.type == mavutil.mavlink.MAV_TYPE_GENERIC:
             return "Generic"
         return self.vehicle_type_string(hb)
@@ -486,6 +490,13 @@ class ConsoleModule(mp_module.MPModule):
             self.console.set_status('PWR', status, fg=fg)
             self.console.set_status('Srv', 'Srv %.2f' % (msg.Vservo*0.001), fg='green')
         elif type in ['HEARTBEAT', 'HIGH_LATENCY2']:
+            if msg.get_srcComponent() in [mavutil.mavlink.MAV_COMP_ID_ADSB,
+                                          mavutil.mavlink.MAV_COMP_ID_ODID_TXRX_1,
+                                          mavutil.mavlink.MAV_COMP_ID_ODID_TXRX_2,
+                                          mavutil.mavlink.MAV_COMP_ID_ODID_TXRX_3]:
+                # ignore these
+                return
+
             fmode = master.flightmode
             if self.settings.vehicle_name:
                 fmode = self.settings.vehicle_name + ':' + fmode

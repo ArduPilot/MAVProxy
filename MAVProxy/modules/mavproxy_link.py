@@ -568,6 +568,13 @@ class LinkModule(mp_module.MPModule):
                 for mav in self.mpstate.mav_master:
                     mav.target_system = self.settings.target_system
 
+            if m.get_srcComponent() in [mavutil.mavlink.MAV_COMP_ID_ADSB,
+                                        mavutil.mavlink.MAV_COMP_ID_ODID_TXRX_1,
+                                        mavutil.mavlink.MAV_COMP_ID_ODID_TXRX_2,
+                                        mavutil.mavlink.MAV_COMP_ID_ODID_TXRX_3]:
+                # ignore these
+                return
+
             if self.status.heartbeat_error:
                 self.status.heartbeat_error = False
                 self.say("heartbeat OK")
