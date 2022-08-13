@@ -24,6 +24,15 @@ class MPSetting:
         self.format = format
         self.digits = digits
 
+    def describe(self):
+        if self.choice is not None:
+            for v in self.choice:
+                if isinstance(v, tuple):
+                    (v, thisvalue) = v
+                    if thisvalue == self.value:
+                        return "%s(%d)" % (v, thisvalue)
+        return "%s" % self.value
+
     def set(self, value):
         '''set a setting'''
         if value == 'None' and self.default is None:
@@ -48,13 +57,23 @@ class MPSetting:
                 return False
         if self.choice is not None:
             found = False
+            options = []
             for v in self.choice:
-                if v.lower() == value.lower():
+                if isinstance(v, tuple):
+                    (v, thisvalue) = v
+                else:
+                    thisvalue = v
+                options.append(v)
+                if isinstance(value, self.type):
+                    if thisvalue == value:
+                        found = True
+                        break
+                if isinstance(value, str) and v.lower() == value.lower():
                     found = True
-                    value = v
+                    value = thisvalue
                     break
             if not found:
-                print("Must be one of %s" % str(self.choice))
+                print("Must be one of %s" % str(options))
                 return False
         self.value = value
         return True
@@ -141,7 +160,7 @@ class MPSettings(object):
 
     def show(self, v):
         '''show settings'''
-        print("%20s %s" % (v, getattr(self, v)))
+        print("%20s %s" % (v, self._vars[v].describe()))
 
     def show_all(self):
         '''show all settings'''
