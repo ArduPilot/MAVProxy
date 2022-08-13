@@ -31,6 +31,7 @@ class FakeGPSModule(mp_module.MPModule):
                                            MPMenuItem('SetPos (with alt)', 'SetPosAlt', '# fakegps setpos ',
                                                     handler=MPMenuCallTextDialog(title='Altitude (m)', default=self.mpstate.settings.guidedalt))])
                 map.add_menu(menu)
+        self.position = mp_util.mp_position()
 
     def get_location(self):
         '''access to location for other modules'''
@@ -62,6 +63,14 @@ class FakeGPSModule(mp_module.MPModule):
         self.FakeGPS_settings.lon = lon
         if len(args) > 0:
             self.FakeGPS_settings.alt = float(args[0])
+
+        # provide position to other modules
+        self.position.latitude = lat
+        self.position.longitude = lon
+        self.position.altitude = self.FakeGPS_settings.alt
+        self.position.timestamp = time.time()
+        self.mpstate.position = self.position
+            
 
     def get_gps_time(self, tnow):
         '''return gps_week and gps_week_ms for current time'''

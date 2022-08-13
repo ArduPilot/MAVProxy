@@ -333,6 +333,7 @@ class MPState(object):
         self.is_sitl = False
         self.start_time_s = time.time()
         self.attitude_time_s = 0
+        self.position = None
 
     @property
     def mav_param(self):
