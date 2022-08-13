@@ -9,6 +9,7 @@ import io
 import sys
 import platform
 import warnings
+import time
 from math import cos, sin, tan, atan2, sqrt, radians, degrees, pi, log, fmod
 
 # Some platforms (CYGWIN and others) many not have the wx library
@@ -518,3 +519,21 @@ def decode_flight_sw_version(flight_sw_version):
     else:
         fw_type="undefined"
     return major,minor,patch,fw_type
+
+class mp_position(object):
+    '''a position object from a local provider such as a NMEA GPS module'''
+    def __init__(self):
+        self.timestamp = None
+        self.latitude = None
+        self.longitude = None
+        self.altitude = None
+        self.ground_course = None
+        self.ground_speed = None
+        self.num_sats = None
+
+    def __str__(self):
+        return "%u satellites age=%.1fs lat=%.9f lon=%.9f alt=%.3f m spd=%.2f m/s course=%.2f deg" % (
+            self.num_sats,
+            time.time() - self.timestamp,
+            self.latitude, self.longitude, self.altitude,
+            self.ground_speed, self.ground_course)
