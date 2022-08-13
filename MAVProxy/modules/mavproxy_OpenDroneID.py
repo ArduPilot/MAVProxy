@@ -14,27 +14,32 @@ class OpenDroneIDModule(mp_module.MPModule):
         self.add_command('opendroneid', self.cmd_opendroneid, "opendroneid control",
                          ["<status>", "set (OPENDRONEIDSETTING)"])
 
+        from MAVProxy.modules.lib.mp_settings import MPSetting
         self.OpenDroneID_settings = mp_settings.MPSettings([
-            ("rate_hz", float, 0.2),
+            MPSetting("rate_hz", float, 1.0),
             # BASIC_ID
-            ("UAS_ID_type", int, 0),
-            ("UAS_ID", str, ""),
-            ("UA_type", int, 0),
+            MPSetting("UAS_ID_type", int, 0, choice=[("None",0), ("SerialNumber",1), ("CAA", 2), ("UTM_ASSIGNED", 3), ("SessionID", 4)]),
+            MPSetting("UAS_ID", str, ""),
+            MPSetting("UA_type", int, 0, choice=[("None",0), ("Aeroplane",1), ("HeliOrMulti",2),
+                                            ("GyroPlane",3), ("HybridLift",4), ("Ornithopter",5),
+                                            ("Glider",6), ("Kite",7), ("FreeBalloon",8), ("CaptiveBalloon",9),
+                                            ("Airship", 10), ("Parachute",11), ("Rocket",12),
+                                            ("TetheredPowered", 13), ("GroundObstacle", 14)]),
             # SELF_ID
-            ("description_type", int, 0),
-            ("description", str, ""),
+            MPSetting("description_type", int, 0),
+            MPSetting("description", str, ""),
             # SYSTEM
-            ("area_count", int, 1),
-            ("area_radius", int, 0),
-            ("area_ceiling", int, -1000),
-            ("area_floor", int, -1000),
-            ("category_eu", int, 0),
-            ("class_eu", int, 0),
-            ("classification_type", int, 0),
+            MPSetting("area_count", int, 1),
+            MPSetting("area_radius", int, 0),
+            MPSetting("area_ceiling", int, -1000),
+            MPSetting("area_floor", int, -1000),
+            MPSetting("category_eu", int, 0, choice=[("Undeclared",0), ("Open",1), ("Specific",2), ("Certified",3)]),
+            MPSetting("class_eu", int, 0),
+            MPSetting("classification_type", int, 0, choice=[("Undeclared",0),("EU",1)]),
             # OPERATOR_ID
-            ("operator_location_type", int, 0),
-            ("operator_id_type", int, 0),
-            ("operator_id", str, ""),
+            MPSetting("operator_location_type", int, 0, choice=[("Takeoff",0),("LiveGNSS",1),("Fixed",2)]),
+            MPSetting("operator_id_type", int, 0),
+            MPSetting("operator_id", str, ""),
             ])
         self.add_completion_function('(OPENDRONEIDSETTING)',
                                      self.OpenDroneID_settings.completion)
@@ -72,9 +77,13 @@ class OpenDroneIDModule(mp_module.MPModule):
     def send_system(self):
         '''send SYSTEM'''
         # allow use of fakegps module for testing
-        fakegps = self.module("fakegps")
-        if fakegps is not None:
-            (self.operator_latitude, self.operator_longitude, self.operator_altitude_geo) = fakegps.get_location()
+        if self.mpstate.position is not None:
+            pos = self.mpstate.position
+            if pos.latitude is not None:
+                self.operator_latitude = pos.latitude
+                self.operator_longitude = pos.longitude
+            if pos.altitude is not None:
+                self.operator_altitude_geo = pos.altitude
 
         self.master.mav.open_drone_id_system_send(
             self.target_system,
