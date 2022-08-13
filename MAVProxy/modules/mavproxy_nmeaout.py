@@ -16,9 +16,9 @@ It is highly desirable that teams provide:
 import sys, os, serial
 from MAVProxy.modules.lib import mp_module
 
-class NMEAModule(mp_module.MPModule):
+class NMEAMOutModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(NMEAModule, self).__init__(mpstate, "NMEA", "NMEA output")
+        super(NMEAModule, self).__init__(mpstate, "NMEAOUT", "NMEA output")
         self.port = None
         self.baudrate = 4800
         self.data = 8
@@ -26,11 +26,11 @@ class NMEAModule(mp_module.MPModule):
         self.stop = 1
         self.serial = None
         self.output_time = 0.0
-        self.add_command('nmea', self.cmd_nmea, "nmea control")
+        self.add_command('nmeaout', self.cmd_nmeaout, "nmea output control")
 
-    def cmd_nmea(self, args):
+    def cmd_nmeaout(self, args):
         '''set nmea'''
-        usage = "nmea port [baudrate data parity stop]"
+        usage = "nmeaout port [baudrate data parity stop]"
         if len(args) == 0:
             if self.port is None:
                 print("NMEA output port not set")
@@ -146,4 +146,4 @@ class NMEAModule(mp_module.MPModule):
 
 def init(mpstate):
     '''initialise module'''
-    return NMEAModule(mpstate)
+    return NMEAOutModule(mpstate)
