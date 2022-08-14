@@ -16,7 +16,8 @@ class OpenDroneIDModule(mp_module.MPModule):
 
         from MAVProxy.modules.lib.mp_settings import MPSetting
         self.OpenDroneID_settings = mp_settings.MPSettings([
-            MPSetting("rate_hz", float, 1.0),
+            MPSetting("rate_hz", float, 0.1),
+            MPSetting("location_rate_hz", float, 1.0),
             # BASIC_ID
             MPSetting("UAS_ID_type", int, 0, choice=[("None",0), ("SerialNumber",1), ("CAA", 2), ("UTM_ASSIGNED", 3), ("SessionID", 4)]),
             MPSetting("UAS_ID", str, ""),
@@ -44,6 +45,7 @@ class OpenDroneIDModule(mp_module.MPModule):
         self.add_completion_function('(OPENDRONEIDSETTING)',
                                      self.OpenDroneID_settings.completion)
         self.last_send_s = time.time()
+        self.last_loc_send_s = time.time()
         self.next_msg = 0
         self.operator_latitude = 0
         self.operator_longitude = 0
@@ -76,7 +78,6 @@ class OpenDroneIDModule(mp_module.MPModule):
 
     def send_system(self):
         '''send SYSTEM'''
-        # allow use of fakegps module for testing
         if self.mpstate.position is not None:
             pos = self.mpstate.position
             if pos.latitude is not None:
@@ -102,6 +103,24 @@ class OpenDroneIDModule(mp_module.MPModule):
             self.operator_altitude_geo,
             self.timestamp_2019())
 
+    def send_system_update(self):
+        '''send SYSTEM_UPDATE'''
+        if self.mpstate.position is not None:
+            pos = self.mpstate.position
+            if pos.latitude is not None:
+                self.operator_latitude = pos.latitude
+                self.operator_longitude = pos.longitude
+            if pos.altitude is not None:
+                self.operator_altitude_geo = pos.altitude
+
+        self.master.mav.open_drone_id_system_update_send(
+            self.target_system,
+            self.target_component,
+            int(self.operator_latitude*1.0e7),
+            int(self.operator_longitude*1.0e7),
+            self.operator_altitude_geo,
+            self.timestamp_2019())
+        
     def send_self_id(self):
         '''send SELF_ID'''
         self.master.mav.open_drone_id_self_id_send(
@@ -140,6 +159,9 @@ class OpenDroneIDModule(mp_module.MPModule):
     def idle_task(self):
         '''called on idle'''
         now = time.time()
+        if now - self.last_loc_send_s > 1.0/self.OpenDroneID_settings.location_rate_hz:
+            self.last_loc_send_s = now
+            self.send_system_update()
         if now - self.last_send_s > (1.0/self.OpenDroneID_settings.rate_hz)/4:
             self.last_send_s = now
             if self.next_msg == 0:
