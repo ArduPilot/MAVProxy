@@ -27,7 +27,7 @@ class OpenDroneIDModule(mp_module.MPModule):
                                             ("Airship", 10), ("Parachute",11), ("Rocket",12),
                                             ("TetheredPowered", 13), ("GroundObstacle", 14)]),
             # SELF_ID
-            MPSetting("description_type", int, 0),
+            MPSetting("description_type", int, 0, choice=[("Text",0), ("Emergency",1), ("ExtendedStatus", 2)]),
             MPSetting("description", str, ""),
             # SYSTEM
             MPSetting("area_count", int, 1),
