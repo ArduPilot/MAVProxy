@@ -619,7 +619,7 @@ if __name__ == "__main__":
     parser.add_option("--lat", type='float', default=-35.362938, help="start latitude")
     parser.add_option("--lon", type='float', default=149.165085, help="start longitude")
     parser.add_option("--width", type='float', default=1000.0, help="width in meters")
-    parser.add_option("--service", default="OviHybrid", help="tile service")
+    parser.add_option("--service", default="MicrosoftSat", help="tile service")
     parser.add_option("--zoom", default=None, type='int', help="zoom level")
     parser.add_option("--max-zoom", type='int', default=19, help="maximum tile zoom")
     parser.add_option("--delay", type='float', default=1.0, help="tile download delay")
