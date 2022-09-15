@@ -635,7 +635,7 @@ class ParamModule(mp_module.MPModule):
         if self.continue_mode and self.logdir is not None:
             parmfile = os.path.join(self.logdir, fname)
             if os.path.exists(parmfile):
-                mpstate.mav_param.load(parmfile)
+                self.mpstate.mav_param.load(parmfile)
                 self.pstate[sysid].mav_param_set = set(self.mav_param.keys())
         self.pstate[sysid].param_help.xml_filepath = self.xml_filepath
 
