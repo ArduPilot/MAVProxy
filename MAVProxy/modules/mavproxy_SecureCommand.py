@@ -20,7 +20,7 @@ class SecureCommandModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(SecureCommandModule, self).__init__(mpstate, "SecureCommand", "SecureCommand Support", public = True)
         self.add_command('securecommand', self.cmd_securecommand, "SecureCommand control",
-                         ["<getsessionkey|getpublickeys|setpublickeys|removepublickeys>", "set (SECURECOMMANDSETTING)"])
+                         ["<getsessionkey|getpublickeys|setpublickeys|removepublickeys|setconfig>", "set (SECURECOMMANDSETTING)"])
 
         from MAVProxy.modules.lib.mp_settings import MPSetting
         self.SecureCommand_settings = mp_settings.MPSettings([
@@ -49,6 +49,8 @@ class SecureCommandModule(mp_module.MPModule):
             self.cmd_setpublickeys(args[1:])
         elif args[0] == "removepublickeys":
             self.cmd_removepublickeys(args[1:])
+        elif args[0] == "setconfig":
+            self.cmd_setconfig(args[1:])
         else:
             print(usage)
 
@@ -164,7 +166,6 @@ class SecureCommandModule(mp_module.MPModule):
             print("No session key")
             return
         if len(args) < 2:
-            print(args)
             print("Usage: setpublickeys keyindex KEYFILES...")
             return
         idx = int(args[0])
@@ -191,6 +192,30 @@ class SecureCommandModule(mp_module.MPModule):
                                             self.sequence, mavutil.mavlink.SECURE_COMMAND_SET_PUBLIC_KEYS,
                                             len(req), len(sig), self.pad_data(req+sig))
         print("Sent %u public keys starting at index %u" % (len(keys), idx))
+        self.advance_sequence()
+
+    def cmd_setconfig(self, args):
+        '''set configuration parameters'''
+        if not self.have_private_key():
+            print("No private key set")
+            return
+        if not self.session_key:
+            print("No session key")
+            return
+        if len(args) < 1:
+            print("Usage: setconfig PARAM=VALUE...")
+            return
+        req = bytearray()
+        for i in range(len(args)):
+            p = args[i]
+            req += p.encode('utf-8')
+            if i < len(args)-1:
+                req += bytearray([0])
+        sig = self.make_signature(self.sequence, mavutil.mavlink.SECURE_COMMAND_SET_REMOTEID_CONFIG, req)
+        self.master.mav.secure_command_send(self.target_system, self.target_component,
+                                            self.sequence, mavutil.mavlink.SECURE_COMMAND_SET_REMOTEID_CONFIG,
+                                            len(req), len(sig), self.pad_data(req+sig))
+        print("Sent %u config commands" % len(args))
         self.advance_sequence()
         
     def mavlink_packet(self, m):
