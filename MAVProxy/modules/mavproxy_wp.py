@@ -32,6 +32,7 @@ class WPModule(mp_module.MPModule):
         self.undo_wp_idx = -1
         self.upload_start = None
         self.wploader.expected_count = 0
+        self.send_all_waypoints_pending_start = None
         self.last_get_home = time.time()
         self.add_command('wp', self.cmd_wp,       'waypoint management',
                          ["<list|clear|move|remove|loop|set|undo|movemulti|moverelhome|changealt|param|status|slope|ftp|add_takeoff|add_landing|add_dls|add_rtl>",
@@ -133,6 +134,28 @@ class WPModule(mp_module.MPModule):
                                                                                  time.asctime()))
                 self.send_wp_requests()
 
+        elif mtype == "MISSION_CHECKSUM":
+            if self.send_all_waypoints_pending_start is None:
+                return
+            self.send_all_waypoints_pending_start = None
+            # only want missions:
+            if m.mission_type != mavutil.mavlink.MAV_MISSION_TYPE_MISSION:
+                return
+            # check if we already have this:
+            try:
+                local_checksum = self.wploader.checksum()
+            except AttributeError:
+                # pymavlink too old
+                self.send_all_waypoints()
+                return
+
+            if local_checksum == m.checksum:
+                self.console.writeln("Mission checksum match")
+                return
+
+            self.console.writeln("Mission checksum mismatch")
+            self.send_all_waypoints()
+
         elif mtype in ['WAYPOINT', 'MISSION_ITEM', 'MISSION_ITEM_INT'] and self.wp_op is not None:
             if m.get_type() == 'MISSION_ITEM_INT':
                 if getattr(m, 'mission_type', 0) != 0:
@@ -188,6 +211,12 @@ class WPModule(mp_module.MPModule):
     def idle_task(self):
         '''handle missing waypoints'''
         if self.wp_period.trigger():
+            # handle timeout of receiving requested MISSION_CHECKSUM message:
+            if (self.send_all_waypoints_pending_start is not None and
+                time.time() - self.send_all_waypoints_pending_start > 0.5):
+                self.send_all_waypoints_pending_start = None
+                self.send_all_waypoints()
+
             # cope with packet loss fetching mission
             if self.master is not None and self.master.time_since('MISSION_ITEM') >= 2 and self.wploader.count() < getattr(self.wploader,'expected_count',0):
                 wps = self.missing_wps_to_request();
@@ -303,12 +332,24 @@ class WPModule(mp_module.MPModule):
         self.wploader.target_component = self.target_component
         try:
             #need to remove the leading and trailing quotes in filename
-            self.wploader.load(filename.strip('"'))
+            self.wploader.load(filename.strip('"'), use_mission_item_int=self.settings.wp_use_mission_int)
         except Exception as msg:
             print("Unable to load %s - %s" % (filename, msg))
             return
         print("Loaded %u waypoints from %s" % (self.wploader.count(), filename))
-        self.send_all_waypoints()
+        self.master.mav.command_long_send(
+            self.target_system,  # target_system
+            self.target_component,
+            mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE, # command
+            0, # confirmation
+            53, # param1 - MISSION_CHECKSUM
+            0, # param2
+            0, # param3
+            0, # param4
+            0, # param5
+            0, # param6
+            0) # param7
+        self.send_all_waypoints_pending_start = time.time()
 
     def update_waypoints(self, filename, wpnum):
         '''update waypoints from a file'''
