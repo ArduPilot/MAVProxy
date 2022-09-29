@@ -261,6 +261,8 @@ class HorizonFrame(wx.Frame):
         '''Updates the verticies of the patches for the ground and sky.'''
         ydiff = math.tan(math.radians(-self.roll))*float(self.ratio)
         pitchdiff = self.dist10deg*(self.pitch/10.0)
+        if (self.roll > 90) or (self.roll < -90):
+            pitchdiff = pitchdiff*-1
         # Draw Polygons
         vertsTop = [(-self.ratio,ydiff-pitchdiff),(-self.ratio,1),(self.ratio,1),(self.ratio,-ydiff-pitchdiff),(-self.ratio,ydiff-pitchdiff)]
         vertsBot = [(-self.ratio,ydiff-pitchdiff),(-self.ratio,-1),(self.ratio,-1),(self.ratio,-ydiff-pitchdiff),(-self.ratio,ydiff-pitchdiff)]
