@@ -36,6 +36,7 @@ preferred_ports = [
     '*FMU*',
     '*Swift-Flyer*',
     '*Serial*',
+    '*CubePilot*',
 ]
 
 class LinkModule(mp_module.MPModule):
