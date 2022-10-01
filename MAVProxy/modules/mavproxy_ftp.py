@@ -498,6 +498,8 @@ class FTPModule(mp_module.MPModule):
             self.filename = args[1]
         else:
             self.filename = os.path.basename(fname)
+        if self.filename.endswith("/"):
+            self.filename += os.path.basename(fname)
         if callback is None:
             print("Putting %s as %s" % (fname, self.filename))
         self.fh.seek(0,2)
