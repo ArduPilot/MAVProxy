@@ -826,6 +826,37 @@ def set_vehicle_name():
                 }
     mestate.param_help.vehicle_name = mapping.get(mestate.mlog.mav_type, None)
 
+def cmd_param_diff(args):
+    '''show parameter changed using 4.3.x defaults'''
+    verbose = mestate.settings.paramdocs
+    mlog = mestate.mlog
+    if not hasattr(mlog, 'param_defaults'):
+        print("No param defaults in log")
+        return
+    if len(args) > 0:
+        wildcard = args[0]
+    else:
+        wildcard = '*'
+    k = sorted(mlog.params.keys())
+    defaults = mlog.param_defaults
+    for p in k:
+        p = str(p).upper()
+        if not p in defaults:
+            continue
+        if mlog.params[p] == defaults[p]:
+            continue
+        if fnmatch.fnmatch(p, wildcard.upper()):
+            s = "%-16.16s %f %f" % (str(p), mlog.params[p], defaults[p])
+            if verbose:
+                set_vehicle_name()
+                info = mestate.param_help.param_info(p, mlog.params[p])
+                if info is not None:
+                    s += " # %s" % info
+                info_default = mestate.param_help.param_info(p, defaults[p])
+                if info_default is not None:
+                    s += " (DEFAULT: %s)" % info_default
+            print(s)
+
 def cmd_param(args):
     '''show parameters'''
     verbose = mestate.settings.paramdocs
@@ -844,6 +875,9 @@ def cmd_param(args):
         if args[0] == 'show':
             # habits from mavproxy
             cmd_param(args[1:])
+            return
+        if args[0] == 'diff':
+            cmd_param_diff(args[1:])
             return
         wildcard = args[0]
         if len(args) > 1 and args[1] == "-v":
