@@ -20,6 +20,7 @@ from MAVProxy.modules.lib import multiproc
 from MAVProxy.modules.lib import rline
 from MAVProxy.modules.lib import wxconsole
 from MAVProxy.modules.lib import param_help
+from MAVProxy.modules.lib import param_ftp
 from MAVProxy.modules.lib.graph_ui import Graph_UI
 from pymavlink.mavextra import *
 from MAVProxy.modules.lib.mp_menu import *
@@ -33,12 +34,16 @@ import pkg_resources
 from builtins import input
 import datetime
 import matplotlib
+import struct
 
 grui = []
 flightmodes = None
 
 # Global var to hold the GUI menu element
 TopMenu = None
+
+# have we decoded MAVFtp params?
+done_ftp_decode = False
 
 def xml_unescape(e):
     '''unescape < amd >'''
@@ -857,9 +862,84 @@ def cmd_param_diff(args):
                     s += " (DEFAULT: %s)" % info_default
             print(s)
 
+def ftp_decode(mlog):
+    '''decode FILE_TRANSFER_PROTOCOL for parameters'''
+    mlog.rewind()
+    ftp_transfers = {}
+    ftp_block_size = 0
+
+    FTP_OpenFileRO = 4
+    FTP_ReadFile = 5
+    FTP_BurstReadFile = 15
+    FTP_Ack = 128
+    FTP_NAck = 129
+
+    class Block(object):
+        def __init__(self, offset, size, data):
+            self.offset = offset
+            self.size = size
+            self.data = data
+
+    class Transfer(object):
+        def __init__(self, filename):
+            self.filename = filename
+            self.blocks = []
+
+        def extract(self):
+            self.blocks.sort(key = lambda x: x.offset)
+            data = bytes()
+            for b in self.blocks:
+                if b.offset != len(data):
+                    print("gap at %u" % len(data))
+                    return None
+                data += bytes(b.data)
+            return data
+    
+    while True:
+        m = mestate.mlog.recv_match(type=['FILE_TRANSFER_PROTOCOL'])
+        if m is None:
+            break
+        session = m.payload[2]
+        opcode = m.payload[3]
+        size = m.payload[4]
+        req_opcode = m.payload[5]
+        burst_complete = m.payload[6]
+        data = m.payload[12:12+size]
+        if opcode == FTP_OpenFileRO:
+            filename = data
+            ftp_transfers[session] = Transfer(bytearray(filename))
+        if req_opcode in [FTP_ReadFile, FTP_BurstReadFile] and opcode == FTP_Ack:
+            if not session in ftp_transfers:
+                print("No session %u" % session)
+                return
+            offset, = struct.unpack("<I", bytearray(m.payload[8:12]))
+            ftp_transfers[session].blocks.append(Block(offset,size,bytearray(data)))
+
+    pdata = None
+    for session in ftp_transfers:
+        f = ftp_transfers[session]
+        if f.filename.decode().startswith('@PARAM/param.pck'):
+            pdata = param_ftp.ftp_param_decode(f.extract())
+    if pdata is not None:
+        for (name,value,ptype) in pdata.params:
+            name = name.decode('utf-8')
+            if name not in mlog.params:
+                mlog.params[name] = value
+        if pdata.defaults is not None and len(pdata.defaults) > 0:
+            mlog.param_defaults = {}
+            for (name,value,ptype) in pdata.defaults:
+                name = name.decode('utf-8')
+                mlog.param_defaults[name] = value
+
+
 def cmd_param(args):
     '''show parameters'''
     verbose = mestate.settings.paramdocs
+    mlog = mestate.mlog
+    global done_ftp_decode
+    if isinstance(mlog, mavutil.mavfile) and not done_ftp_decode:
+        done_ftp_decode = True
+        ftp_decode(mlog)
     if len(args) > 0:
         if args[0] == 'help':
             set_vehicle_name()
@@ -870,7 +950,7 @@ def cmd_param(args):
             return
         if args[0] == 'check':
             set_vehicle_name()
-            mestate.param_help.param_check(mestate.mlog.params, args[1:])
+            mestate.param_help.param_check(mlog.params, args[1:])
             return
         if args[0] == 'show':
             # habits from mavproxy
@@ -884,13 +964,13 @@ def cmd_param(args):
             verbose = True
     else:
         wildcard = '*'
-    k = sorted(mestate.mlog.params.keys())
+    k = sorted(mlog.params.keys())
     for p in k:
         if fnmatch.fnmatch(str(p).upper(), wildcard.upper()):
-            s = "%-16.16s %f" % (str(p), mestate.mlog.params[p])
+            s = "%-16.16s %f" % (str(p), mlog.params[p])
             if verbose:
                 set_vehicle_name()
-                info = mestate.param_help.param_info(p, mestate.mlog.params[p])
+                info = mestate.param_help.param_info(p, mlog.params[p])
                 if info is not None:
                     s += " # %s" % info
             print(s)
