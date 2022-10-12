@@ -6,6 +6,7 @@ from pymavlink import mavutil, mavparm
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import param_help
+from MAVProxy.modules.lib import param_ftp
 if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import *
 
@@ -221,86 +222,21 @@ class ParamState:
         magic = 0x671b
         magic_defaults = 0x671c
         data = fh.read()
-        magic2,num_params,total_params = struct.unpack("<HHH", data[0:6])
-        if magic != magic2 and magic_defaults != magic2:
-            print("paramftp: bad magic 0x%x expected 0x%x" % (magic2, magic))
+        pdata = param_ftp.ftp_param_decode(data)
+        if pdata is None or len(pdata.params) == 0:
             return
-        with_defaults = magic2 == magic_defaults
-        data = data[6:]
+        with_defaults = pdata.defaults is not None
 
-        # mapping of data type to type length and format
-        data_types = {
-            1: (1, 'b'),
-            2: (2, 'h'),
-            3: (4, 'i'),
-            4: (4, 'f'),
-        }
-
-        count = 0
-        params = []
-        if with_defaults:
-            defaults = []
-
-        if sys.version_info.major < 3:
-            pad_byte = chr(0)
-            last_name = ''
-        else:
-            pad_byte = 0
-            last_name = bytes()
-
-        while True:
-            while len(data) > 0 and data[0] == pad_byte:
-                # skip pad bytes
-                data = data[1:]
-
-            if len(data) == 0:
-                break
-
-            ptype, plen = struct.unpack("<BB", data[0:2])
-            flags = (ptype>>4) & 0x0F
-            has_default = with_defaults and (flags&1) != 0
-            ptype &= 0x0F
-
-
-            if not ptype in data_types:
-                print("paramftp: bad type 0x%x" % ptype)
-                return
-
-            (type_len, type_format) = data_types[ptype]
-            default_len = type_len if has_default else 0
-
-            name_len = ((plen>>4) & 0x0F) + 1
-            common_len = (plen & 0x0F)
-            name = last_name[0:common_len] + data[2:2+name_len]
-            vdata = data[2+name_len:2+name_len+type_len+default_len]
-            last_name = name
-            data = data[2+name_len+type_len+default_len:]
-            if with_defaults:
-                if has_default:
-                    v1,v2, = struct.unpack("<" + type_format + type_format, vdata)
-                    params.append((name, v1, ptype))
-                    defaults.append((name, v2, ptype))
-                else:
-                    v, = struct.unpack("<" + type_format, vdata)
-                    params.append((name, v, ptype))
-                    defaults.append((name, v, ptype))
-            else:
-                v, = struct.unpack("<" + type_format, vdata)
-                params.append((name, v, ptype))
-            count += 1
-
-        if count != total_params:
-            print("paramftp: bad count %u should be %u" % (count, total_params))
-            return
         self.param_types = {}
         self.mav_param_set = set()
         self.fetch_one = dict()
         self.fetch_set = None
         self.mav_param.clear()
+        total_params = len(pdata.params)
         self.mav_param_count = total_params
 
         idx = 0
-        for (name, v, ptype) in params:
+        for (name, v, ptype) in pdata.params:
             # we need to set it to REAL32 to ensure we use write value for param_set
             name = str(name.decode('utf-8'))
             self.param_types[name] = mavutil.mavlink.MAV_PARAM_TYPE_REAL32
@@ -313,18 +249,16 @@ class ParamState:
         print("Received %u parameters (ftp)" % total_params)
         if self.logdir is not None:
             self.mav_param.save(os.path.join(self.logdir, self.parm_file), '*', verbose=True)
-        self.log_params(params)
+        self.log_params(pdata.params)
 
         if with_defaults:
             defaults_path = os.path.join(self.logdir, "defaults.parm") if self.logdir else "defaults.parm"
             defparm = mavparm.MAVParmDict()
-            for (name, v, ptype) in defaults:
+            for (name, v, ptype) in pdata.defaults:
                 name = str(name.decode('utf-8'))
                 defparm[name] = v
             defparm.save(defaults_path, '*', verbose=False)
-            print("Saved %u defaults to %s" % (len(defaults), defaults_path))
-
-
+            print("Saved %u defaults to %s" % (len(pdata.defaults), defaults_path))
 
     def fetch_all(self, master):
         '''force refetch of parameters'''
