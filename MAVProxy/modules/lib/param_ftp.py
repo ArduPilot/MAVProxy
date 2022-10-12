@@ -27,6 +27,8 @@ def ftp_param_decode(data):
 
     magic = 0x671b
     magic_defaults = 0x671c
+    if len(data) < 6:
+        return None
     magic2,num_params,total_params = struct.unpack("<HHH", data[0:6])
     if magic != magic2 and magic_defaults != magic2:
         print("paramftp: bad magic 0x%x expected 0x%x" % (magic2, magic))
