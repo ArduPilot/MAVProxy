@@ -215,12 +215,26 @@ class WPModule(mp_module.MPModule):
                                             0, 0, 0, 0, 0, 0, 0, 0)
             self.last_get_home = time.time()
 
+    def has_location(self, cmd_id):
+        '''return True if a WP command has a location'''
+        if cmd_id in mavutil.mavlink.enums['MAV_CMD'].keys():
+            cmd_enum = mavutil.mavlink.enums['MAV_CMD'][cmd_id]
+            # default to having location for older installs of pymavlink
+            # which don't have the attribute
+            return getattr(cmd_enum,'has_location',True)
+        return False
 
     def wp_to_mission_item_int(self, wp):
         '''convert a MISSION_ITEM to a MISSION_ITEM_INT. We always send as MISSION_ITEM_INT
            to give cm level accuracy'''
         if wp.get_type() == 'MISSION_ITEM_INT':
             return wp
+        if self.has_location(wp.command):
+            p5 = int(wp.x*1.0e7)
+            p6 = int(wp.y*1.0e7)
+        else:
+            p5 = int(wp.x)
+            p6 = int(wp.y)
         wp_int = mavutil.mavlink.MAVLink_mission_item_int_message(wp.target_system,
                                                                   wp.target_component,
                                                                   wp.seq,
@@ -232,13 +246,19 @@ class WPModule(mp_module.MPModule):
                                                                   wp.param2,
                                                                   wp.param3,
                                                                   wp.param4,
-                                                                  int(wp.x*1.0e7),
-                                                                  int(wp.y*1.0e7),
+                                                                  p5,
+                                                                  p6,
                                                                   wp.z)
         return wp_int
 
     def wp_from_mission_item_int(self, wp):
         '''convert a MISSION_ITEM_INT to a MISSION_ITEM'''
+        if self.has_location(wp.command):
+            p5 = wp.x*1.0e-7
+            p6 = wp.y*1.0e-7
+        else:
+            p5 = wp.x
+            p6 = wp.y
         wp2 = mavutil.mavlink.MAVLink_mission_item_message(wp.target_system,
                                                            wp.target_component,
                                                            wp.seq,
@@ -250,8 +270,8 @@ class WPModule(mp_module.MPModule):
                                                            wp.param2,
                                                            wp.param3,
                                                            wp.param4,
-                                                           wp.x*1.0e-7,
-                                                           wp.y*1.0e-7,
+                                                           p5,
+                                                           p6,
                                                            wp.z)
         # preserve srcSystem as that is used for naming waypoint file
         wp2._header.srcSystem = wp.get_srcSystem()
@@ -437,7 +457,7 @@ class WPModule(mp_module.MPModule):
             print("No map click position available")
             return
         wp = self.wploader.wp(idx)
-        if not self.wploader.is_location_command(wp.command):
+        if not self.wploader.is_location_wp(wp):
             print("WP must be a location command")
             return
 
@@ -447,7 +467,7 @@ class WPModule(mp_module.MPModule):
 
         for wpnum in range(wpstart, wpend+1):
             wp = self.wploader.wp(wpnum)
-            if wp is None or not self.wploader.is_location_command(wp.command):
+            if wp is None or not self.wploader.is_location_wp(wp):
                 continue
             (newlat, newlon) = mp_util.gps_newpos(wp.x, wp.y, bearing, distance)
             if wpnum != idx and rotation != 0:
@@ -495,7 +515,7 @@ class WPModule(mp_module.MPModule):
             return
 
         wp = self.wploader.wp(idx)
-        if not self.wploader.is_location_command(wp.command):
+        if not self.wploader.is_location_wp(wp):
             print("Not a nav command")
             return
         (newlat, newlon) = mp_util.gps_newpos(home.x, home.y, bearing, dist)
@@ -529,7 +549,7 @@ class WPModule(mp_module.MPModule):
 
         for wpnum in range(idx, idx+count):
             wp = self.wploader.wp(wpnum)
-            if not self.wploader.is_location_command(wp.command):
+            if not self.wploader.is_location_wp(wp):
                 continue
             wp.z = newalt
             wp.target_system    = self.target_system
