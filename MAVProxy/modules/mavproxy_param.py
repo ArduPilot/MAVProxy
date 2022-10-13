@@ -41,6 +41,7 @@ class ParamState:
         self.sysid = sysid
         self.param_help = param_help.ParamHelp()
         self.param_help.vehicle_name = vehicle_name
+        self.default_params = None
 
     def use_ftp(self):
         '''return true if we should try ftp for download'''
@@ -252,13 +253,14 @@ class ParamState:
         self.log_params(pdata.params)
 
         if with_defaults:
-            defaults_path = os.path.join(self.logdir, "defaults.parm") if self.logdir else "defaults.parm"
-            defparm = mavparm.MAVParmDict()
+            self.default_params = mavparm.MAVParmDict()
             for (name, v, ptype) in pdata.defaults:
                 name = str(name.decode('utf-8'))
-                defparm[name] = v
-            defparm.save(defaults_path, '*', verbose=False)
-            print("Saved %u defaults to %s" % (len(pdata.defaults), defaults_path))
+                self.default_params[name] = v
+            if self.logdir:
+                defaults_path = os.path.join(self.logdir, "defaults.parm")
+                self.default_params.save(defaults_path, '*', verbose=False)
+                print("Saved %u defaults to %s" % (len(pdata.defaults), defaults_path))
 
     def fetch_all(self, master):
         '''force refetch of parameters'''
@@ -267,6 +269,51 @@ class ParamState:
             self.mav_param_set = set()
         else:
             self.ftp_start()
+
+    def param_diff(self, args):
+        '''handle param diff'''
+        wildcard = '*'
+        if len(args) < 1 or args[0].find('*') != -1:
+            defaults = self.default_params
+            if defaults is None and self.vehicle_name is not None:
+                filename = mp_util.dot_mavproxy("%s-defaults.parm" % self.vehicle_name)
+                if not os.path.exists(filename):
+                    print("Please run 'param download' first (vehicle_name=%s)" % self.vehicle_name)
+                    return
+                defaults = mavparm.MAVParmDict()
+                defaults.load(filename)
+            if len(args) >= 1:
+                wildcard = args[0]
+        else:
+            filename = args[0]
+            if not os.path.exists(filename):
+                print("Can't find defaults file %s" % filename)
+                return
+            defaults = mavparm.MAVParmDict()
+            defaults.load(filename)
+            if len(args) == 2:
+                wildcard = args[1]
+        print("\nParameter        Current  Default")
+        for p in self.mav_param:
+            p = str(p).upper()
+            if not p in defaults:
+                continue
+            if self.mav_param[p] == defaults[p]:
+                continue
+            if fnmatch.fnmatch(p, wildcard.upper()):
+                s1 = "%f" % self.mav_param[p]
+                s2 = "%f" % defaults[p]
+                if s1 == s2:
+                    continue
+                s = "%-16.16s %s %s" % (str(p), s1, s2)
+                if self.mpstate.settings.param_docs and self.vehicle_name is not None:
+                    info = self.param_help.param_info(p, self.mav_param[p])
+                    if info is not None:
+                        s += " # %s" % info
+                    info_default = self.param_help.param_info(p, defaults[p])
+                    if info_default is not None:
+                        s += " (DEFAULT: %s)" % info_default
+                print(s)
 
     def handle_command(self, master, mpstate, args):
         '''handle parameter commands'''
@@ -312,26 +359,7 @@ class ParamState:
                 param_wildcard = "*"
             self.mav_param.save(args[1].strip('"'), param_wildcard, verbose=True)
         elif args[0] == "diff":
-            wildcard = '*'
-            if len(args) < 2 or args[1].find('*') != -1:
-                filename = os.path.join(self.logdir, "defaults.parm")
-                if not os.path.exists(filename):
-                    if self.vehicle_name is None:
-                        print("Unknown vehicle type")
-                        return
-                    filename = mp_util.dot_mavproxy("%s-defaults.parm" % self.vehicle_name)
-                    if not os.path.exists(filename):
-                        print("Please run 'param download' first (vehicle_name=%s)" % self.vehicle_name)
-                        return
-                if len(args) >= 2:
-                    wildcard = args[1]
-            else:
-                filename = args[1]
-                if len(args) == 3:
-                    wildcard = args[2]
-            print("defaults path: %s" % filename)
-            print("%-16.16s %12.12s %12.12s" % ('Parameter', 'Defaults', 'Current'))
-            self.mav_param.diff(filename, wildcard=wildcard)
+            self.param_diff(args[1:])
         elif args[0] == "set":
             if len(args) < 2:
                 print("Usage: param set PARMNAME VALUE")
