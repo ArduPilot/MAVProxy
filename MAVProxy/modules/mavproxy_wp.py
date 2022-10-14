@@ -423,6 +423,18 @@ class WPModule(mp_module.MPModule):
         self.wploader.set(wp, idx)
         print("Moved WP %u to %f, %f at %.1fm" % (idx, lat, lon, wp.z))
 
+    def is_location_command(self, cmd):
+        '''see if cmd is a MAV_CMD with a latitude/longitude'''
+        mav_cmd = mavutil.mavlink.enums['MAV_CMD']
+        if not cmd in mav_cmd:
+            return False
+        return getattr(mav_cmd[cmd],'has_location',True)
+
+    def is_location_wp(self, w):
+        '''see if w.command is a MAV_CMD with a latitude/longitude'''
+        if w.x == 0 and w.y == 0:
+            return False
+        return self.is_location_command(w.command)
 
     def cmd_wp_movemulti(self, args, latlon=None):
         '''handle wp move of multiple waypoints'''
@@ -457,7 +469,7 @@ class WPModule(mp_module.MPModule):
             print("No map click position available")
             return
         wp = self.wploader.wp(idx)
-        if not self.wploader.is_location_wp(wp):
+        if not self.is_location_wp(wp):
             print("WP must be a location command")
             return
 
@@ -467,7 +479,7 @@ class WPModule(mp_module.MPModule):
 
         for wpnum in range(wpstart, wpend+1):
             wp = self.wploader.wp(wpnum)
-            if wp is None or not self.wploader.is_location_wp(wp):
+            if wp is None or not self.is_location_wp(wp):
                 continue
             (newlat, newlon) = mp_util.gps_newpos(wp.x, wp.y, bearing, distance)
             if wpnum != idx and rotation != 0:
@@ -515,7 +527,7 @@ class WPModule(mp_module.MPModule):
             return
 
         wp = self.wploader.wp(idx)
-        if not self.wploader.is_location_wp(wp):
+        if not self.is_location_wp(wp):
             print("Not a nav command")
             return
         (newlat, newlon) = mp_util.gps_newpos(home.x, home.y, bearing, dist)
@@ -549,7 +561,7 @@ class WPModule(mp_module.MPModule):
 
         for wpnum in range(idx, idx+count):
             wp = self.wploader.wp(wpnum)
-            if not self.wploader.is_location_wp(wp):
+            if not self.is_location_wp(wp):
                 continue
             wp.z = newalt
             wp.target_system    = self.target_system
