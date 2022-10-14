@@ -21,6 +21,7 @@ from MAVProxy.modules.mavproxy_misseditor import me_defines
 from MAVProxy.modules.lib import mp_elevation
 
 from MAVProxy.modules.mavproxy_misseditor import button_renderer
+from pymavlink import mavutil
 
 #define column names via "enums":
 ME_COMMAND_COL = 0
@@ -743,6 +744,21 @@ class MissionEditorFrame(wx.Frame):
                 if p1 > row_selected and p1+delta>0:
                     self.grid_mission.SetCellValue(row, ME_P1_COL, str(float(p1+delta)))
 
+    def has_location_cmd(self, cmd_id):
+        '''return True if a WP command has a location'''
+        if cmd_id in mavutil.mavlink.enums['MAV_CMD'].keys():
+            cmd_enum = mavutil.mavlink.enums['MAV_CMD'][cmd_id]
+            # default to having location for older installs of pymavlink
+            # which don't have the attribute
+            return getattr(cmd_enum,'has_location',True)
+        return False
+
+    def has_location(self, lat, lon, cmd_id):
+        '''return True if a WP command has a location'''
+        if lat == 0 and lon == 0:
+            return False
+        return self.has_location_cmd(cmd_id)
+
     def set_grad_dist(self):
         '''fix up distance and gradient when changing cell values'''
         home_def_alt = float(self.label_home_alt_value.GetLabel())
@@ -752,13 +768,13 @@ class MissionEditorFrame(wx.Frame):
             command_prev = self.grid_mission.GetCellValue(row - 1, ME_COMMAND_COL)
             lat = float(self.grid_mission.GetCellValue(row, ME_LAT_COL))
             lon = float(self.grid_mission.GetCellValue(row, ME_LON_COL))
-            if (lat == 0) and (lon == 0):
+            if not self.has_location(lat, lon, command):
                 dist = 0.0
                 grad = 0.0
             else :
               if "NAV" in command:
                 row_prev = row - 1
-                while ("NAV" not in command_prev) and (row_prev > 0):
+                while not self.has_location_cmd(command_prev) and (row_prev > 0):
                     command_prev = self.grid_mission.GetCellValue(row_prev - 1, ME_COMMAND_COL)
                     row_prev = row_prev - 1
                 prev_lat = float(self.grid_mission.GetCellValue(row_prev, ME_LAT_COL))
@@ -768,9 +784,10 @@ class MissionEditorFrame(wx.Frame):
                     prev_alt = prev_alt + home_def_alt
                 elif (self.grid_mission.GetCellValue(row_prev, ME_FRAME_COL) == "AGL"):
                     prev_alt = self.ElevationModel.GetElevation(prev_lat, prev_lon) + prev_alt
-                while (prev_lat == 0) and (prev_lon == 0) and (row_prev > 0):
+                while not self.has_location(prev_lat,prev_lon,command_prev) and (row_prev > 0):
                     prev_lat = float(self.grid_mission.GetCellValue(row_prev - 1, ME_LAT_COL))
                     prev_lon = float(self.grid_mission.GetCellValue(row_prev - 1, ME_LON_COL))
+                    command_prev = self.grid_mission.GetCellValue(row_prev - 1, ME_COMMAND_COL)
                     row_prev = row_prev - 1
                 dist = mp_util.gps_distance(lat, lon, prev_lat, prev_lon)
                 curr_alt = float(self.grid_mission.GetCellValue(row, ME_ALT_COL))
