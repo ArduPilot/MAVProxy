@@ -7,7 +7,7 @@ This is a MAVLink ground station written in python.
 Please see https://ardupilot.org/mavproxy/index.html for more information
 
 This ground station was developed as part of the CanberraUAV OBC team
-entry
+entry 
 
 License
 -------
