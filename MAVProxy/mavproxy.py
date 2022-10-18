@@ -1295,6 +1295,7 @@ if __name__ == '__main__':
     parser.add_option("--non-interactive", action='store_true', help="do not start interactive shell")
     parser.add_option("--profile", action='store_true', help="run the Yappi python profiler")
     parser.add_option("--state-basedir", default=None, help="base directory for logs and aircraft directories")
+    parser.add_option("--no-state", action='store_true', default=False, help="Don't save logs and other state to disk. Useful for read-only filesystems or long-running systems.")
     parser.add_option("--version", action='store_true', help="version information")
     parser.add_option("--default-modules", default="log,signing,wp,rally,fence,ftp,param,relay,tuneopt,arm,mode,calibration,rc,auxopt,misc,cmdlong,battery,terrain,output,adsb,layout", help='default module list')
     parser.add_option("--udp-timeout",dest="udp_timeout", default=0.0, type='float', help="Timeout for udp clients in seconds")
@@ -1335,9 +1336,13 @@ if __name__ == '__main__':
     mpstate.command_map = command_map
     mpstate.continue_mode = opts.continue_mode
     # queues for logging
-    mpstate.logqueue = multiproc.Queue()
-    mpstate.logqueue_raw = multiproc.Queue()
 
+    if not opts.no_state:
+        mpstate.logqueue = multiproc.Queue()
+        mpstate.logqueue_raw = multiproc.Queue()
+    else:
+        mpstate.logqueue = None
+        mpstate.logqueue_raw = None
 
     if opts.speech:
         # start the speech-dispatcher early, so it doesn't inherit any ports from
@@ -1441,7 +1446,8 @@ if __name__ == '__main__':
         mpstate.rl.set_prompt("")
 
     # call this early so that logdir is setup based on --aircraft
-    (mpstate.status.logdir, logpath_telem, logpath_telem_raw) = log_paths()
+    if not opts.no_state:
+        (mpstate.status.logdir, logpath_telem, logpath_telem_raw) = log_paths()
 
     for module in opts.load_module:
         modlist = module.split(',')
@@ -1505,7 +1511,10 @@ if __name__ == '__main__':
         yappi.start()
 
     # log all packets from the master, for later replay
-    open_telemetry_logs(logpath_telem, logpath_telem_raw)
+    if not opts.no_state:
+        open_telemetry_logs(logpath_telem, logpath_telem_raw)
+    else:
+        print("Note: Not saving telemetry logs")
 
     # run main loop as a thread
     mpstate.status.thread = threading.Thread(target=main_loop, name='main_loop')
