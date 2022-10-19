@@ -832,21 +832,21 @@ class LinkModule(mp_module.MPModule):
             if (sysid, compid) not in self.mpstate.vehicle_link_map[master.linknum]:
                 self.mpstate.vehicle_link_map[master.linknum].add((sysid, compid))
                 print("Detected vehicle {0}:{1} on link {2}".format(sysid, compid, master.linknum))
-                print("HELLO MAN")
-                start_scripts = []
-                if 'HOME' in os.environ:
-                    start_scripts.append(os.path.join(os.environ['HOME'], ".mavinit.scr"))
-                start_script = mp_util.dot_mavproxy("mavinit.scr")
-                start_scripts.append(start_script)
-                if (self.mpstate.settings.state_basedir is not None and
-                    opts.aircraft is not None):
-                    start_script = os.path.join(self.mpstate.settings.state_basedir, opts.aircraft, "mavinit.scr")
-                    start_scripts.append(start_script)
-                for start_script in start_scripts:
-                    if os.path.exists(start_script):
-                        print("HELLO 3, running")
-                        print("Running script (%s)" % (start_script))
-                        self.run_script(start_script)
+                # print("HELLO MAN")
+                # start_scripts = []
+                # if 'HOME' in os.environ:
+                #     start_scripts.append(os.path.join(os.environ['HOME'], ".mavinit.scr"))
+                # start_script = mp_util.dot_mavproxy("mavinit.scr")
+                # start_scripts.append(start_script)
+                # if (self.mpstate.settings.state_basedir is not None and
+                #     opts.aircraft is not None):
+                #     start_script = os.path.join(self.mpstate.settings.state_basedir, opts.aircraft, "mavinit.scr")
+                #     start_scripts.append(start_script)
+                # for start_script in start_scripts:
+                #     if os.path.exists(start_script):
+                #         print("HELLO 3, running")
+                #         print("Running script (%s)" % (start_script))
+                #         self.run_script(start_script)
 
         # see if it is handled by a specialised sysid connection
         if sysid in self.mpstate.sysid_outputs:

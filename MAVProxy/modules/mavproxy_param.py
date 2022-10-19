@@ -6,6 +6,7 @@ from pymavlink import mavutil, mavparm
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import param_help
+from MAVProxy.modules.lib import mp_substitute
 from MAVProxy.modules.lib import param_ftp
 if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import *
@@ -212,6 +213,32 @@ class ParamState:
             done = min(int(total_size / per_entry_size), self.ftp_count-1)
             self.mpstate.console.set_status('Params', 'Param %u/%u' % (done, self.ftp_count))
 
+    def run_script(self, scriptfile):
+        '''run a script file'''
+        try:
+            f = open(scriptfile, mode='r')
+        except Exception:
+            return
+        self.mpstate.console.writeln("Running script %s" % scriptfile)
+        sub = mp_substitute.MAVSubstitute()
+        for line in f:
+            line = line.strip()
+            if line == "" or line.startswith('#'):
+                continue
+            try:
+                line = sub.substitute(line, os.environ)
+            except mp_substitute.MAVSubstituteError as ex:
+                print("Bad variable: %s" % str(ex))
+                if self.mpstate.mpstate.settings.script_fatal:
+                    sys.exit(1)
+                continue
+            if line.startswith('@'):
+                line = line[1:]
+            else:
+                self.mpstate.console.writeln("-> %s" % line)
+            self.mpstate.functions.process_stdin(line)
+        f.close()
+
     def ftp_callback(self, fh):
         '''callback from ftp fetch of parameters'''
         self.ftp_started = False
@@ -248,6 +275,22 @@ class ParamState:
         self.ftp_failed = False
         self.mpstate.console.set_status('Params', 'Param %u/%u' % (total_params, total_params))
         print("Received %u parameters (ftp)" % total_params)
+        print("HELLO MAN11")
+        start_scripts = []
+        if 'HOME' in os.environ:
+            start_scripts.append(os.path.join(os.environ['HOME'], ".mavinit.scr"))
+        start_script = mp_util.dot_mavproxy("mavinit.scr")
+        start_scripts.append(start_script)
+        if (self.mpstate.settings.state_basedir is not None and
+            opts.aircraft is not None):
+            start_script = os.path.join(self.mpstate.settings.state_basedir, opts.aircraft, "mavinit.scr")
+            start_scripts.append(start_script)
+        for start_script in start_scripts:
+            if os.path.exists(start_script):
+                print("HELLO 3, running")
+                print("Running script (%s)" % (start_script))
+                self.run_script(start_script)
+
         if self.logdir is not None:
             self.mav_param.save(os.path.join(self.logdir, self.parm_file), '*', verbose=True)
         self.log_params(pdata.params)
