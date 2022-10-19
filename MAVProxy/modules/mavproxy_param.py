@@ -637,6 +637,7 @@ class ParamModule(mp_module.MPModule):
             if not self.menu_added_console:
                 self.menu_added_console = True
                 self.module('console').add_menu(self.menu)
+                
         else:
             self.menu_added_console = False
 

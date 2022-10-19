@@ -805,6 +805,8 @@ class LinkModule(mp_module.MPModule):
             if (sysid, compid) not in self.mpstate.vehicle_link_map[master.linknum]:
                 self.mpstate.vehicle_link_map[master.linknum].add((sysid, compid))
                 print("Detected vehicle {0}:{1} on link {2}".format(sysid, compid, master.linknum))
+                print("HELLO MAN")
+                
 
         # see if it is handled by a specialised sysid connection
         if sysid in self.mpstate.sysid_outputs:

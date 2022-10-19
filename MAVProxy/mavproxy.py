@@ -1383,6 +1383,23 @@ if __name__ == '__main__':
     if not opts.master and len(serial_list) == 1:
           print("Connecting to %s" % serial_list[0])
           mpstate.module('link').link_add(serial_list[0].device)
+          print("HELLO 2")
+          start_scripts = []
+          if not opts.setup:
+              if 'HOME' in os.environ:
+                  start_scripts.append(os.path.join(os.environ['HOME'], ".mavinit.scr"))
+              start_script = mp_util.dot_mavproxy("mavinit.scr")
+              start_scripts.append(start_script)
+          if (mpstate.settings.state_basedir is not None and
+              opts.aircraft is not None):
+              start_script = os.path.join(mpstate.settings.state_basedir, opts.aircraft, "mavinit.scr")
+              start_scripts.append(start_script)
+          for start_script in start_scripts:
+              if os.path.exists(start_script):
+                  print("HELLO 3, running")
+                  print("Running script (%s)" % (start_script))
+                  run_script(start_script)
+
     elif not opts.master and len(serial_list) > 1:
           print("Warning: multiple possible serial ports. Use console GUI or 'link add' to add port, or restart using --master to select a single port")
           #if no display, assume running CLI mode and exit
