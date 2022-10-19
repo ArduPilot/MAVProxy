@@ -11,6 +11,7 @@ import time, struct, math, sys, fnmatch, traceback, json, os
 
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
+from MAVProxy.modules.lib import mp_substitute
 
 if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import *
@@ -793,6 +794,32 @@ class LinkModule(mp_module.MPModule):
         '''handle an incoming mavlink packet'''
         pass
 
+    def run_script(scriptfile):
+        '''run a script file'''
+        try:
+            f = open(scriptfile, mode='r')
+        except Exception:
+            return
+        self.mpstate.console.writeln("Running script %s" % scriptfile)
+        sub = mp_substitute.MAVSubstitute()
+        for line in f:
+            line = line.strip()
+            if line == "" or line.startswith('#'):
+                continue
+            try:
+                line = sub.substitute(line, os.environ)
+            except mp_substitute.MAVSubstituteError as ex:
+                print("Bad variable: %s" % str(ex))
+                if self.mpstate.mpstate.settings.script_fatal:
+                    sys.exit(1)
+                continue
+            if line.startswith('@'):
+                line = line[1:]
+            else:
+                self.mpstate.console.writeln("-> %s" % line)
+            process_stdin(line)
+        f.close()
+        
     def master_callback(self, m, master):
         '''process mavlink message m on master, sending any messages to recipients'''
         sysid = m.get_srcSystem()
@@ -806,7 +833,21 @@ class LinkModule(mp_module.MPModule):
                 self.mpstate.vehicle_link_map[master.linknum].add((sysid, compid))
                 print("Detected vehicle {0}:{1} on link {2}".format(sysid, compid, master.linknum))
                 print("HELLO MAN")
-                
+                start_scripts = []
+                if not opts.setup:
+                    if 'HOME' in os.environ:
+                        start_scripts.append(os.path.join(os.environ['HOME'], ".mavinit.scr"))
+                    start_script = mp_util.dot_mavproxy("mavinit.scr")
+                    start_scripts.append(start_script)
+                if (self.mpstate.settings.state_basedir is not None and
+                    opts.aircraft is not None):
+                    start_script = os.path.join(self.mpstate.settings.state_basedir, opts.aircraft, "mavinit.scr")
+                    start_scripts.append(start_script)
+                for start_script in start_scripts:
+                    if os.path.exists(start_script):
+                        print("HELLO 3, running")
+                        print("Running script (%s)" % (start_script))
+                        run_script(start_script)
 
         # see if it is handled by a specialised sysid connection
         if sysid in self.mpstate.sysid_outputs:
