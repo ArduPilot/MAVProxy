@@ -834,11 +834,10 @@ class LinkModule(mp_module.MPModule):
                 print("Detected vehicle {0}:{1} on link {2}".format(sysid, compid, master.linknum))
                 print("HELLO MAN")
                 start_scripts = []
-                if not opts.setup:
-                    if 'HOME' in os.environ:
-                        start_scripts.append(os.path.join(os.environ['HOME'], ".mavinit.scr"))
-                    start_script = mp_util.dot_mavproxy("mavinit.scr")
-                    start_scripts.append(start_script)
+                if 'HOME' in os.environ:
+                    start_scripts.append(os.path.join(os.environ['HOME'], ".mavinit.scr"))
+                start_script = mp_util.dot_mavproxy("mavinit.scr")
+                start_scripts.append(start_script)
                 if (self.mpstate.settings.state_basedir is not None and
                     opts.aircraft is not None):
                     start_script = os.path.join(self.mpstate.settings.state_basedir, opts.aircraft, "mavinit.scr")
