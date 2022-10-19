@@ -794,7 +794,7 @@ class LinkModule(mp_module.MPModule):
         '''handle an incoming mavlink packet'''
         pass
 
-    def run_script(scriptfile):
+    def run_script(self, scriptfile):
         '''run a script file'''
         try:
             f = open(scriptfile, mode='r')
