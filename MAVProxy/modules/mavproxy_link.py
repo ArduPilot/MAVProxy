@@ -817,7 +817,7 @@ class LinkModule(mp_module.MPModule):
                 line = line[1:]
             else:
                 self.mpstate.console.writeln("-> %s" % line)
-            process_stdin(line)
+            self.mpstate.functions.process_stdin(line)
         f.close()
         
     def master_callback(self, m, master):
