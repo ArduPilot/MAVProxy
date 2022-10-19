@@ -846,7 +846,7 @@ class LinkModule(mp_module.MPModule):
                     if os.path.exists(start_script):
                         print("HELLO 3, running")
                         print("Running script (%s)" % (start_script))
-                        run_script(start_script)
+                        self.run_script(start_script)
 
         # see if it is handled by a specialised sysid connection
         if sysid in self.mpstate.sysid_outputs:
