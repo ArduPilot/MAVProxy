@@ -275,18 +275,20 @@ class ParamState:
         self.ftp_failed = False
         self.mpstate.console.set_status('Params', 'Param %u/%u' % (total_params, total_params))
         print("Received %u parameters (ftp)" % total_params)
-        print("HELLO MAN11")
+        print("Received")
         start_scripts = []
         if 'HOME' in os.environ:
             start_scripts.append(os.path.join(os.environ['HOME'], ".mavinit.scr"))
+            print("Path")
+            print(os.path.join(os.environ['HOME'], ".mavinit.scr"))
         start_script = mp_util.dot_mavproxy("mavinit.scr")
         start_scripts.append(start_script)
         if (self.mpstate.settings.state_basedir is not None and
             opts.aircraft is not None):
             start_script = os.path.join(self.mpstate.settings.state_basedir, opts.aircraft, "mavinit.scr")
+            print ("Appending")
             start_scripts.append(start_script)
         for start_script in start_scripts:
-            if os.path.exists(start_script):
                 print("HELLO 3, running")
                 print("Running script (%s)" % (start_script))
                 self.run_script(start_script)
