@@ -13,12 +13,12 @@ jobs:
         python-version: [3.8]
         
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: 'recursive'
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v3
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
@@ -61,8 +61,12 @@ jobs:
           ISCC.exe /dMyAppVersion=$env:VERSION mavproxy.iss
           ls Output
       - name: Archive build
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
            name: MAVProxyInstaller
            path: windows/Output
            retention-days: 7
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: windows/Output/MAVProxyInstaller.zip
