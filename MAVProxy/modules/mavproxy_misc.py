@@ -292,8 +292,12 @@ class MiscModule(mp_module.MPModule):
 
     def cmd_version(self, args):
         '''show version'''
-        self.master.mav.autopilot_version_request_send(self.settings.target_system,
-                                                       self.settings.target_component)
+        self.master.mav.command_long_send(
+            self.settings.target_system,
+            self.settings.target_component,
+            mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE,
+            0, # confirmation
+            mavutil.mavlink.MAVLINK_MSG_ID_AUTOPILOT_VERSION, 0, 0, 0, 0, 0, 0)
 
     def cmd_capabilities(self, args):
         '''show capabilities'''
