@@ -146,7 +146,7 @@ class osd(mp_module.MPModule):
                 if mtype == "OSD_PARAM_CONFIG_REPLY":
                     print("OSD parameter set")
                 else:
-                    print("%s %f %f %f %s" % (m.param_id, m.min_value, m.max_value, m.increment,
+                    print("%s %f %f %f %s" % (m.param_id.decode('ascii'), m.min_value, m.max_value, m.increment,
                         self.config_type_to_string(m.config_type)))
 
     def config_type_to_string(self, config_type):

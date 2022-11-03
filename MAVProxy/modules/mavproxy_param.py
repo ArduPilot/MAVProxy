@@ -84,14 +84,14 @@ class ParamState:
         # can't pack other types
 
         # remember type for param set
-        self.param_types[m.param_id.upper()] = m.param_type
+        self.param_types[m.param_id.decode('ascii').upper()] = m.param_type
         return value
 
     def handle_mavlink_packet(self, master, m):
         '''handle an incoming mavlink packet'''
         if m.get_type() == 'PARAM_VALUE':
             value = self.handle_px4_param_value(m)
-            param_id = "%.16s" % m.param_id
+            param_id = "%.16s" % m.param_id.decode('ascii')
             # Note: the xml specifies param_index is a uint16, so -1 in that field will show as 65535
             # We accept both -1 and 65535 as 'unknown index' to future proof us against someday having that
             # xml fixed.

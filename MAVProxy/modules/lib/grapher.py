@@ -430,6 +430,8 @@ class MavGraph(object):
                     instance_field = getattr(msg.fmt,'instance_field')
                 if instance_field is not None:
                     ins_value = getattr(msg,instance_field,None)
+                    if isinstance(ins_value, bytes):
+                        ins_value = ins_value.decode(errors="backslashreplace").rstrip("\\x00")
                     if ins_value is None or not str(ins_value) in self.instance_types[i][mtype]:
                         continue
                     if not mtype in vars or not isinstance(vars[mtype], dict):
@@ -438,7 +440,7 @@ class MavGraph(object):
                     vars[mtype][ins_value] = msg
                     if isinstance(ins_value, str):
                         mtype_instance = '%s[%s]' % (mtype, ins_value)
-                        mtype_instance_str = '%s["%s"]' % (mtype, getattr(msg, instance_field))
+                        mtype_instance_str = '%s["%s"]' % (mtype, ins_value)
                         f = f.replace(mtype_instance, mtype_instance_str)
                     has_instance = True
 

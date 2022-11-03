@@ -156,10 +156,11 @@ class ParamEditorMain(object):
         '''handle an incoming mavlink packet'''
         mtype = m.get_type()
         if mtype == 'PARAM_VALUE':
-            if m.param_id in self.paramchanged:
-                del self.paramchanged[m.param_id.upper()]
+            param_id = m.param_id.decode('ascii')
+            if param_id in self.paramchanged:
+                del self.paramchanged[param_id.upper()]
             self.gui_event_queue.put(ParamEditorEvent(
-                ph_event.PEGE_WRITE_SUCC, paramid=m.param_id.upper(), paramvalue=m.param_value, pstatus = self.mpstate.module('param').param_status()))
+                ph_event.PEGE_WRITE_SUCC, paramid=param_id.upper(), paramvalue=m.param_value, pstatus = self.mpstate.module('param').param_status()))
         if mtype in ['RC_CHANNELS_RAW', 'RC_CHANNELS']:
             if self.mpstate.vehicle_name == 'APMrover2':
                 fltmode_ch = int(self.mpstate.module('param').mav_param['MODE_CH'])

@@ -850,6 +850,8 @@ class LinkModule(mp_module.MPModule):
 
         if instance_field is not None:
             instance_value = getattr(m, instance_field, None)
+            if isinstance(instance_value, bytes):
+                instance_value = instance_value.decode(errors="backslashreplace").rstrip("\\x00")
             if instance_value is not None:
                 mtype_instance = "%s[%s]" % (mtype, instance_value)
                 self.status.msgs[mtype_instance] = m

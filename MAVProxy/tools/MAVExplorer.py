@@ -993,7 +993,7 @@ def cmd_paramchange(args):
             pname = m.Name
             pvalue = m.Value
         elif m.get_type() == 'PARAM_VALUE':
-            pname = m.param_id
+            pname = m.param_id.decode('ascii')
             pvalue = m.param_value
         else:
             continue

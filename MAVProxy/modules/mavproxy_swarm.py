@@ -727,8 +727,8 @@ class SwarmFrame(wx.Frame):
                 elif mtype == "STATUSTEXT" and msg.severity <= mavutil.mavlink.MAV_SEVERITY_WARNING:
                     # Only pass on warning messages or more severe
                     widget.addstatustext(msg.text)
-                elif mtype == 'PARAM_VALUE' and msg.param_id in self.parmsToShow:
-                    widget.updateOffset(msg.param_id, int(msg.param_value))
+                elif mtype == 'PARAM_VALUE' and msg.param_id.decode('ascii') in self.parmsToShow:
+                    widget.updateOffset(msg.param_id.decode('ascii'), int(msg.param_value))
 
 
 class swarm(mp_module.MPModule):
@@ -939,7 +939,7 @@ class swarm(mp_module.MPModule):
                 self.vehicleLastHB[(sysid, compid)] = time.time()
 
             # updated leader information from vehicle
-            elif mtype == 'PARAM_VALUE' and m.param_id == "FOLL_SYSID":
+            elif mtype == 'PARAM_VALUE' and m.param_id.decode('ascii') == "FOLL_SYSID":
                 for i in range(0, len(self.vehicleListing)):
                     # only update if the leader ID has changed (avoids unessariliy refreshing the UI)
                     if self.vehicleListing[i][0] == sysid and self.vehicleListing[i][1] == compid and self.vehicleListing[i][2] != int(m.param_value):
