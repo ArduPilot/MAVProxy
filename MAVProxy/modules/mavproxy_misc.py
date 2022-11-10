@@ -106,6 +106,8 @@ class MiscModule(mp_module.MPModule):
         self.add_command('formatsdcard', self.cmd_formatsdcard, "format SD card")
         self.add_command('canforward', self.cmd_canforward, "enable CAN forwarding")
 
+        self.add_command('gear', self.cmd_landing_gear, "landing gear control")
+        
         self.repeats = []
 
     def altitude_difference(self, pressure1, pressure2, ground_temp):
@@ -567,7 +569,41 @@ class MiscModule(mp_module.MPModule):
             0,
             0,
             0)
-        
+    
+    def cmd_landing_gear(self, args):
+        usage='''Usage: gear <up|down> [ID]
+Alt: gear <extend|retract> [ID]'''
+        if len(args) == 0 or args[0] not in ['up','down','extend', 'retract']:
+            print(usage)
+            return
+        if args[0] in ['down','extend']:
+            DesiredState=0
+        elif args [0] in ['up','retract']:
+            DesiredState=1
+        else:
+            print(usage)
+            return
+        if len(args)==1:
+            ID=-1
+        elif len(args)==2:
+            try:
+                ID=int(args[1])
+            except ValueError:
+                print(usage)
+                return
+            if ID<-1:
+                print(usage)
+                return
+        else:
+            print(usage)
+            return
+        self.master.mav.command_long_send(self.target_system,
+                                               self.target_component,
+                                               mavutil.mavlink.MAV_CMD_AIRFRAME_CONFIGURATION , 0, 
+                                               ID,
+                                               DesiredState,
+                                               0, 0, 0, 0, 0, 0)
+    
     def idle_task(self):
         '''called on idle'''
         for r in self.repeats:
