@@ -315,10 +315,39 @@ class ParamState:
                         s += " (DEFAULT: %s)" % info_default
                 print(s)
 
+    def param_savechanged(self, args):
+        '''handle param savechanged'''
+        if len(args) < 1:
+            filename = "changed.parm"
+        else:
+            filename = args[0]
+        defaults = self.default_params
+        if defaults is None:
+            print("No defaults available")
+            return
+        f = open(filename, "w")
+        count = 0
+        for p in self.mav_param:
+            p = str(p).upper()
+            if not p in defaults:
+                continue
+            if self.mav_param[p] == defaults[p]:
+                continue
+            s1 = "%f" % self.mav_param[p]
+            s2 = "%f" % defaults[p]
+            if s1 == s2:
+                continue
+            s = "%-16.16s %s" % (str(p), s1)
+            f.write("%s\n" % s)
+            count += 1
+        f.close()
+        print("Saved %u parameters to %s" % (count, filename))
+
+                
     def handle_command(self, master, mpstate, args):
         '''handle parameter commands'''
         param_wildcard = "*"
-        usage="Usage: param <fetch|ftp|save|set|show|load|preload|forceload|ftpload|diff|download|check|help>"
+        usage="Usage: param <fetch|ftp|save|savechanged|set|show|load|preload|forceload|ftpload|diff|download|check|help>"
         if len(args) < 1:
             print(usage)
             return
@@ -360,6 +389,8 @@ class ParamState:
             self.mav_param.save(args[1].strip('"'), param_wildcard, verbose=True)
         elif args[0] == "diff":
             self.param_diff(args[1:])
+        elif args[0] == "savechanged":
+            self.param_savechanged(args[1:])
         elif args[0] == "set":
             if len(args) < 2:
                 print("Usage: param set PARMNAME VALUE")
@@ -555,7 +586,7 @@ class ParamModule(mp_module.MPModule):
         self.add_command('param', self.cmd_param, "parameter handling",
                          ["<download|status>",
                           "<set|show|fetch|ftp|help|apropos> (PARAMETER)",
-                          "<load|save|diff|forceload|ftpload> (FILENAME)",
+                          "<load|save|savechanged|diff|forceload|ftpload> (FILENAME)",
                           "<set_xml_filepath> (FILEPATH)"
                          ])
         if mp_util.has_wxpython:
