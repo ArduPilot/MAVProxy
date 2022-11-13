@@ -615,7 +615,7 @@ class LinkModule(mp_module.MPModule):
 
     def master_msg_handling(self, m, master):
         '''link message handling for an upstream link'''
-        if self.settings.target_system != 0 and m.get_srcSystem() != self.settings.target_system:
+        if not self.message_is_from_primary_vehicle(m):
             # don't process messages not from our target
             if m.get_type() == "BAD_DATA":
                 if self.mpstate.settings.shownoise and mavutil.all_printable(m.data):
@@ -927,12 +927,8 @@ class LinkModule(mp_module.MPModule):
                 if mtype_instance not in self.status.msg_count:
                     self.status.msg_count[mtype_instance] = 0
                 self.status.msg_count[mtype_instance] += 1
-        
-        if m.get_srcComponent() == mavutil.mavlink.MAV_COMP_ID_GIMBAL and mtype == 'HEARTBEAT':
-            # silence gimbal heartbeat packets for now
-            return
 
-        if getattr(m, 'time_boot_ms', None) is not None and self.settings.target_system == m.get_srcSystem():
+        if getattr(m, 'time_boot_ms', None) is not None and self.message_is_from_primary_vehicle(m):
             # update link_delayed attribute
             self.handle_msec_timestamp(m, master)
 
@@ -966,6 +962,9 @@ class LinkModule(mp_module.MPModule):
             # pass to modules
             for (mod,pm) in self.mpstate.modules:
                 if not hasattr(mod, 'mavlink_packet'):
+                    continue
+                # Do not send other-system-or-component heartbeat packets to non-multi-vehicle modules
+                if not self.message_is_from_primary_vehicle(m) and not mod.multi_vehicle and mtype == 'HEARTBEAT':
                     continue
                 # sysid 51/'3' is used by SiK radio for the injected RADIO/RADIO_STATUS mavlink frames.
                 # In order to be able to pass these to e.g. the graph module, which is not multi-vehicle,
