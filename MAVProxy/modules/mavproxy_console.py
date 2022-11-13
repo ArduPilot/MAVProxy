@@ -336,7 +336,7 @@ class ConsoleModule(mp_module.MPModule):
         if type == 'SYS_STATUS':
             self.check_critical_error(msg)
 
-        if not self.is_primary_vehicle(msg):
+        if not self.message_is_from_primary_vehicle(msg):
             # don't process msgs from other than primary vehicle, other than
             # updating vehicle list
             return
@@ -540,13 +540,6 @@ class ConsoleModule(mp_module.MPModule):
             self.console.set_status('PWR', status, fg=fg)
             self.console.set_status('Srv', 'Srv %.2f' % (msg.Vservo*0.001), fg='green')
         elif type in ['HEARTBEAT', 'HIGH_LATENCY2']:
-            if msg.get_srcComponent() in [mavutil.mavlink.MAV_COMP_ID_ADSB,
-                                          mavutil.mavlink.MAV_COMP_ID_ODID_TXRX_1,
-                                          mavutil.mavlink.MAV_COMP_ID_ODID_TXRX_2,
-                                          mavutil.mavlink.MAV_COMP_ID_ODID_TXRX_3]:
-                # ignore these
-                return
-
             fmode = master.flightmode
             if self.settings.vehicle_name:
                 fmode = self.settings.vehicle_name + ':' + fmode

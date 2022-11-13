@@ -959,7 +959,7 @@ class MapModule(mp_module.MPModule):
                     else:
                         label = None
                     self.map.set_position('Pos' + vehicle, (lat, lon), rotation=heading, label=label, colour=(255,255,255))
-                    self.map.set_follow_object('Pos' + vehicle, self.is_primary_vehicle(m))
+                    self.map.set_follow_object('Pos' + vehicle, self.message_is_from_primary_vehicle(m))
 
         elif mtype == "HIGH_LATENCY2" and self.map_settings.showahrspos:
             (lat, lon) = (m.latitude*1.0e-7, m.longitude*1.0e-7)
@@ -972,7 +972,7 @@ class MapModule(mp_module.MPModule):
                 else:
                     label = None
                 self.map.set_position('Pos' + vehicle, (lat, lon), rotation=cog, label=label, colour=(255,255,255))
-                self.map.set_follow_object('Pos' + vehicle, self.is_primary_vehicle(m))
+                self.map.set_follow_object('Pos' + vehicle, self.message_is_from_primary_vehicle(m))
 
         elif mtype == 'HOME_POSITION':
             (lat, lon) = (m.latitude*1.0e-7, m.longitude*1.0e-7)
@@ -1016,7 +1016,7 @@ class MapModule(mp_module.MPModule):
             else:
                 self.map.add_object(mp_slipmap.SlipClearLayer(tlayer))
 
-        if not self.is_primary_vehicle(m):
+        if not self.message_is_from_primary_vehicle(m):
             # the rest should only be done for the primary vehicle
             return
 
