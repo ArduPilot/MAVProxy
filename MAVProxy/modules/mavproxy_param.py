@@ -343,11 +343,43 @@ class ParamState:
         f.close()
         print("Saved %u parameters to %s" % (count, filename))
 
+    def param_revert(self, master, args):
+        '''handle param revert'''
+        defaults = self.default_params
+        if defaults is None:
+            print("No defaults available")
+            return
+        if len(args) == 0:
+            print("Usage: param revert PATTERN")
+            return
+        wildcard = args[0].upper()
+        count = 0
+        for p in self.mav_param:
+            p = str(p).upper()
+            if not fnmatch.fnmatch(p, wildcard):
+                continue
+            if not p in defaults:
+                continue
+            if self.mav_param[p] == defaults[p]:
+                continue
+            s1 = "%f" % self.mav_param[p]
+            s2 = "%f" % defaults[p]
+            if s1 == s2:
+                continue
+            s = "%-16.16s %s" % (str(p), s1)
+            print("Reverting %-16.16s  %s -> %s" % (p, s1, s2))
+            ptype = None
+            if p in self.param_types:
+                ptype = self.param_types[p]
+            self.mav_param.mavset(master, p, defaults[p], retries=3, parm_type=ptype)
+            count += 1
+        print("Reverted %u parameters" % count)
+        
                 
     def handle_command(self, master, mpstate, args):
         '''handle parameter commands'''
         param_wildcard = "*"
-        usage="Usage: param <fetch|ftp|save|savechanged|set|show|load|preload|forceload|ftpload|diff|download|check|help>"
+        usage="Usage: param <fetch|ftp|save|savechanged|revert|set|show|load|preload|forceload|ftpload|diff|download|check|help>"
         if len(args) < 1:
             print(usage)
             return
@@ -391,6 +423,8 @@ class ParamState:
             self.param_diff(args[1:])
         elif args[0] == "savechanged":
             self.param_savechanged(args[1:])
+        elif args[0] == "revert":
+            self.param_revert(master, args[1:])
         elif args[0] == "set":
             if len(args) < 2:
                 print("Usage: param set PARMNAME VALUE")
@@ -585,7 +619,7 @@ class ParamModule(mp_module.MPModule):
         self.menu_added_console = False
         self.add_command('param', self.cmd_param, "parameter handling",
                          ["<download|status>",
-                          "<set|show|fetch|ftp|help|apropos> (PARAMETER)",
+                          "<set|show|fetch|ftp|help|apropos|revert> (PARAMETER)",
                           "<load|save|savechanged|diff|forceload|ftpload> (FILENAME)",
                           "<set_xml_filepath> (FILEPATH)"
                          ])
