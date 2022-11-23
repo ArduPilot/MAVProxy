@@ -125,7 +125,7 @@ class movinghome(mp_module.MPModule):
                         self.say("%s: %s" % (self.name, message))
                         self.master.mav.statustext_send(
                                 mavutil.mavlink.MAV_SEVERITY_NOTICE,
-                                message.encode(bytes)
+                                message.encode("utf-8")
                                 )
                     self.console.writeln("Home position updated")
 
