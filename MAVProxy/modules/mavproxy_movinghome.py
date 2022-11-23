@@ -43,8 +43,11 @@ class movinghome(mp_module.MPModule):
 
     def cmd_movinghome(self, args):
         '''control behaviour of the module'''
+
+        usage = "Usage: movinghome <status|on|off|radius|device|baud>\n On/Off: enable position update.\n Radius defines the threshold in meters (2D) from last position, when exceeded, home position is updated."
+
         if len(args) == 0:
-            print("Usage: movinghome <status|on|off|radius|device|baud>\n On/Off: enable position update.\n Radius defines the threshold in meters (2D) from last position, when exceeded, home position is updated.\n device and baud is the serial port setup for NMEA device.")
+            print(usage)
         elif args[0] == "status":
             self.status()
         elif args[0] == "on":
@@ -57,7 +60,7 @@ class movinghome(mp_module.MPModule):
                 return
             self.radius=float(args[1])
         else:
-            print(self.usage)
+            print(usage)
 
     def status(self):
         # Returns information about module'''
