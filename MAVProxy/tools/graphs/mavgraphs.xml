@@ -702,14 +702,22 @@ If PIDR.I has a constant positive value then it means the aircraft is trimmed to
 
  <graph name='Plane/FF/Roll'>
   <description></description>
+  <expression>0.3*PIDR.Act*AETR.SSx AETR.Ail*0.01</expression>
   <expression>0.3*PIDR.Act*AETR.SS AETR.Ail*0.01</expression>
  </graph>
 
  <graph name='Plane/FF/Pitch'>
   <description></description>
+  <expression>0.3*PIDP.Act*AETR.SSy AETR.Elev*0.01</expression>
   <expression>0.3*PIDP.Act*AETR.SS AETR.Elev*0.01</expression>
  </graph>
 
+ <graph name='Plane/FF/Yaw'>
+  <description></description>
+  <expression>0.3*PIDY.Act*AETR.SSz AETR.Rudd*0.01</expression>
+  <expression>0.3*PIDY.Act*AETR.SS AETR.Rudd*0.01</expression>
+ </graph>
+ 
  <graph name='Sensors/Gyroscope/GyroX Lowpass'>
   <description></description>
   <expression>lowpass(degrees(IMU[0].GyrX),0,0.9) lowpass(degrees(IMU[1].GyrX),1,0.9) lowpass(degrees(IMU[2].GyrX),2,0.9)</expression>
