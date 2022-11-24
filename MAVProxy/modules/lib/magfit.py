@@ -569,8 +569,8 @@ class MagFitUI(wx.Dialog):
         self.AddSpinInteger("OffsetMax", 500, 3000, 1500)
 
         self.StartRow('Scale Factor Estimation')
-        self.AddSpinFloat("ScaleMin", 0.5, 2.0, 0.01, 1.0)
-        self.AddSpinFloat("ScaleMax", 0.5, 2.0, 0.01, 1.0)
+        self.AddSpinFloat("ScaleMin", 0.25, 4.0, 0.01, 1.0)
+        self.AddSpinFloat("ScaleMax", 0.25, 4.0, 0.01, 1.0)
 
         self.StartRow('Elliptical Estimation')
         self.AddCheckBox("Elliptical")
