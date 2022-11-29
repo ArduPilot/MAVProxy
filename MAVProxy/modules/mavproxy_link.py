@@ -769,6 +769,9 @@ class LinkModule(mp_module.MPModule):
                     self.say("Calibration failed")
                 elif m.result == mavutil.mavlink.MAV_RESULT_UNSUPPORTED:
                     self.say("Calibration unsupported")
+                elif m.result == mavutil.mavlink.MAV_RESULT_IN_PROGRESS:
+                    # don't bother the user with this
+                    pass
                 elif m.result == mavutil.mavlink.MAV_RESULT_TEMPORARILY_REJECTED:
                     self.say("Calibration temporarily rejected")
                 else:
