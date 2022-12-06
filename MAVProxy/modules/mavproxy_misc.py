@@ -159,6 +159,33 @@ class MiscModule(mp_module.MPModule):
 
     def cmd_reboot(self, args):
         '''reboot autopilot'''
+
+        hold_in_bootloader = "bootloader" in args
+        force = "force" in args
+
+        # different path for force/not force to avoid dependency on
+        # pymavlink's force-reboot support:
+        if force:
+            if hold_in_bootloader:
+                param1 = 3
+            else:
+                param1 = 1
+            param6 = 20190226
+            self.master.mav.command_long_send(
+                self.target_system,
+                self.target_component,
+                mavutil.mavlink.MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN,
+                0,
+                param1,
+                0,
+                0,
+                0,
+                0,
+                param6,
+                0
+            )
+            return
+
         if len(args) > 0 and args[0] == 'bootloader':
             self.master.reboot_autopilot(True)
         else:
