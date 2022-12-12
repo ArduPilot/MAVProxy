@@ -26,6 +26,7 @@ class TerrainModule(mp_module.MPModule):
         self.terrain_settings = mp_settings.MPSettings([('debug', int, 0),
                                                         ('enable', int, 1),
                                                         ('offline', int, 0),
+                                                        ('terrain_data_rate', int, 5),
                                                         mp_settings.MPSetting('source', str, "SRTM3", choice=mp_elevation.TERRAIN_SERVICES.keys())])
         self.add_completion_function('(TERRAINSETTING)', self.terrain_settings.completion)
 
@@ -135,8 +136,11 @@ class TerrainModule(mp_module.MPModule):
         '''called when idle'''
         if self.current_request is None:
             return
-        if time.time() - self.last_send_time < 0.2:
-            # limit to 5 per second
+        if self.terrain_settings.terrain_data_rate <= 0:
+            # disabled
+            return
+        if time.time() - self.last_send_time < 1/self.terrain_settings.terrain_data_rate:
+            # limit rate according to parameter
             return
         self.send_terrain_data()
 
