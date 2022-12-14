@@ -16,7 +16,7 @@ class SerialModule(mp_module.MPModule):
         self.serial_settings = mp_settings.MPSettings(
             [ ('port', int, 0),
               ('baudrate', int, 57600),
-              ('timeout', int, 500)
+              ('timeout', int, 350)
               ]
             )
         self.add_completion_function('(SERIALSETTING)', self.serial_settings.completion)
@@ -28,6 +28,7 @@ class SerialModule(mp_module.MPModule):
             data = m.data[:m.count]
             s = ''.join(str(chr(x)) for x in data)
             sys.stdout.write(s)
+            print("")
 
     def serial_lock(self, lock):
         '''lock or unlock the port'''
