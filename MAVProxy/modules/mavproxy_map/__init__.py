@@ -89,6 +89,7 @@ class MapModule(mp_module.MPModule):
         self.add_menu(MPMenuItem('Set Origin (with height)', 'Set Origin', '# map setorigin '))
         self.add_menu(MPMenuItem('Terrain Check', 'Terrain Check', '# terrain check'))
         self.add_menu(MPMenuItem('Show Position', 'Show Position', 'showPosition'))
+        self.add_menu(MPMenuItem('Google Maps Link', 'Google Maps Link', 'printGoogleMapsLink'))
         self.add_menu(MPMenuItem('Set ROI', 'Set ROI', '# map setroi '))
 
         self._colour_for_wp_command = {
@@ -142,6 +143,11 @@ class MapModule(mp_module.MPModule):
             logf.close()
         posbox = MPMenuChildMessageDialog('Position', msg, font_size=32)
         posbox.show()
+
+    def print_google_maps_link(self):
+        '''show map position click information'''
+        pos = self.mpstate.click_location
+        print("https://www.google.com/maps/search/?api=1&query=%f,%f" % (pos[0], pos[1]))
 
     def cmd_map(self, args):
         '''map commands'''
@@ -472,6 +478,8 @@ class MapModule(mp_module.MPModule):
             self.move_fencepoint(obj.selected[0].objkey, obj.selected[0].extra_info)
         elif menuitem.returnkey == 'showPosition':
             self.show_position()
+        elif menuitem.returnkey == 'printGoogleMapsLink':
+            self.print_google_maps_link()
         elif menuitem.returnkey == 'setServiceTerrain':
             self.module('terrain').cmd_terrain(['set', 'source', menuitem.get_choice()])
 
