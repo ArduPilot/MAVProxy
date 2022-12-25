@@ -367,6 +367,8 @@ class MPTile:
                     continue
             else:
                 path = self.tile_to_path(tile_info)
+                if not os.path.exists(path):
+                    continue
                 img = cv2.imread(path)
                 if img is None:
                     continue
@@ -407,7 +409,10 @@ class MPTile:
 
 
         path = self.tile_to_path(tile)
-        ret = cv2.imread(path)
+        if not os.path.exists(path):
+            ret = None
+        else:
+            ret = cv2.imread(path)
         if ret is not None:
             #cv2.rectangle(ret, (0,0), (TILES_WIDTH-1,TILES_WIDTH-1), (255,0,0), 1)
             # if it is an old tile, then try to refresh
