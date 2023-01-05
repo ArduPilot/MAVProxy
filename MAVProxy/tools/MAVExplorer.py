@@ -26,6 +26,7 @@ from pymavlink.mavextra import *
 from MAVProxy.modules.lib.mp_menu import *
 import MAVProxy.modules.lib.mp_util as mp_util
 from pymavlink import mavutil
+from pymavlink import mavwp
 from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
 from MAVProxy.modules.lib import wxsettings
 from MAVProxy.modules.lib.graphdefinition import GraphDefinition
@@ -1010,6 +1011,61 @@ def cmd_paramchange(args):
         vmap[pname] = pvalue
     mestate.mlog.rewind()
 
+def cmd_mission(args):
+    '''show mission'''
+    mestate.mlog.rewind()
+    types = set(['CMD','MISSION_ITEM_INT'])
+    wp = mavwp.MAVWPLoader()
+    while True:
+        m = mestate.mlog.recv_match(type=types, condition=mestate.settings.condition)
+        if m is None:
+            break
+        if m.get_type() == 'CMD':
+            try:
+                frame = m.Frame
+            except AttributeError:
+                print("Warning: assuming frame is GLOBAL_RELATIVE_ALT")
+                frame = mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT
+            num_wps = m.CTot
+            m = mavutil.mavlink.MAVLink_mission_item_message(0,
+                                                             0,
+                                                             m.CNum,
+                                                             frame,
+                                                             m.CId,
+                                                             0, 1,
+                                                             m.Prm1, m.Prm2, m.Prm3, m.Prm4,
+                                                             m.Lat, m.Lng, m.Alt)
+
+        if m.get_type() == 'MISSION_ITEM_INT':
+            m = mavutil.mavlink.MAVLink_mission_item_message(m.target_system,
+                                                             m.target_component,
+                                                             m.seq,
+                                                             m.frame,
+                                                             m.command,
+                                                             m.current,
+                                                             m.autocontinue,
+                                                             m.param1,
+                                                             m.param2,
+                                                             m.param3,
+                                                             m.param4,
+                                                             m.x*1.0e-7,
+                                                             m.y*1.0e-7,
+                                                             m.z)
+        if m.current >= 2:
+            continue
+
+        while m.seq > wp.count():
+            print("Adding dummy WP %u" % wp.count())
+            wp.set(m, wp.count())
+        wp.set(m, m.seq)
+    for i in range(wp.count()):
+        w = wp.wp(i)
+        print("%u\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%u" % (
+            w.seq, w.current, w.frame, w.command,
+            w.param1, w.param2, w.param3, w.param4,
+            w.x, w.y, w.z, w.autocontinue))
+    mestate.mlog.rewind()
+    
 def cmd_devid(args):
     '''show parameters'''
     params = mestate.mlog.params
@@ -1214,6 +1270,7 @@ command_map = {
     'magfit'     : (cmd_magfit,    'fit mag parameters to WMM'),
     'dump'       : (cmd_dump,      'dump messages from log'),
     'file'       : (cmd_file,      'show files'),
+    'mission'    : (cmd_mission,   'show mission'),
     }
 
 def progress_bar(pct):
