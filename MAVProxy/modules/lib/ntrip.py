@@ -143,6 +143,9 @@ class NtripClient(object):
                     mps = bytearray(mps, 'ascii')
                 try:
                     self.socket.sendall(mps)
+                except ssl.SSLWantReadError:
+                    self.sent_header = False
+                    return None
                 except Exception:
                     self.socket = None
                     return None
