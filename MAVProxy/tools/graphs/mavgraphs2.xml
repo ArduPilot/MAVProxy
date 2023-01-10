@@ -679,5 +679,34 @@
   <description></description>
   <expression>ATT.DesPitch:2 BAT.Curr CTUN.ThO CTUN.As BARO.Alt</expression>
  </graph>
+
+ <graph name='Rover/Steering Control'>
+  <description></description>
+  <expression>STER.DesTurnRate STER.TurnRate STER.DesLatAcc:2 STER.LatAcc:2</expression>
+ </graph>
+
+ <graph name='Rover/Speed Control'>
+  <description></description>
+  <expression>THR.DesSpeed THR.Speed</expression>
+ </graph>
+
+ <graph name='Rover/Speed and Battery'>
+  <description></description>
+  <expression>THR.Speed BAT.Curr:2 BAT.Volt:2</expression>
+ </graph>
  
+ <graph name='Rover/Speed and Throttle'>
+  <description></description>
+  <expression>THR.Speed THR.ThrOut:2</expression>
+ </graph>
+ 
+ <graph name='Sensors/Wheel Encoders'>
+  <description></description>
+  <expression>WENC.Dist0 WENC.Dist1</expression>
+ </graph>
+ 
+ <graph name='Sensors/Visual Position'>
+  <description></description>
+  <expression>VISP.PX VISP.PY VISP.PZ</expression>
+ </graph>
 </graphs>
