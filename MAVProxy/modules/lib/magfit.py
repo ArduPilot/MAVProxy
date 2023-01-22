@@ -485,7 +485,7 @@ class MagFit(MPDataLogChildTask):
 
 class MagFitUI(wx.Dialog):
     def __init__(self, title, close_event, mlog, timestamp_in_range):
-        super(MagFitUI, self).__init__(None, title=title, size=(600, 800))
+        super(MagFitUI, self).__init__(None, title=title, size=(600, 800), style=wx.DEFAULT_DIALOG_STYLE|wx.RESIZE_BORDER)
 
         # capture the close event, log and timestamp range function
         self.close_event = close_event
