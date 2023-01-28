@@ -480,12 +480,12 @@
 
  <graph name='EKF3/GSF/GSF Yaws Lane1'>
   <description></description>
-  <expression>degrees(XKY0[0].Y0) degrees(XKY0[0].Y1) degrees(XKY0[0].Y2) degrees(XKY0[0].Y3) degrees(XKY0[0].Y4) degrees(XKY0[0].YC)</expression>
+  <expression>XKY0[0].Y0 XKY0[0].Y1 XKY0[0].Y2 XKY0[0].Y3 XKY0[0].Y4 XKY0[0].YC</expression>
  </graph>
 
  <graph name='EKF3/GSF/GSF Yaws Lane2'>
   <description></description>
-  <expression>degrees(XKY0[1].Y0) degrees(XKY0[1].Y1) degrees(XKY0[1].Y2) degrees(XKY0[1].Y3) degrees(XKY0[1].Y4) degrees(XKY0[1].YC)</expression>
+  <expression>XKY0[1].Y0 XKY0[1].Y1 XKY0[1].Y2 XKY0[1].Y3 XKY0[1].Y4 XKY0[1].YC</expression>
  </graph>
 
  <graph name='EKF3/GSF/GSF VelInnov Lane1'>
