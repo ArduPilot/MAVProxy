@@ -863,6 +863,40 @@ def cmd_param_diff(args):
                     s += " (DEFAULT: %s)" % info_default
             print(s)
 
+def cmd_param_save(args, changed_only=False):
+    '''save parameters'''
+    mlog = mestate.mlog
+    if changed_only and not hasattr(mlog, 'param_defaults'):
+        print("No param defaults in log")
+        return
+    filename = args[0]
+    if len(args) > 1:
+        wildcard = args[1]
+    else:
+        wildcard = '*'
+    k = sorted(mlog.params.keys())
+    count = 0
+    try:
+        f = open(filename, "w")
+    except Exception as ex:
+        print("Failed to open %s - %s" % (filename, ex))
+        return
+    for p in k:
+        p = str(p).upper()
+        if changed_only and p in mlog.param_defaults and mlog.params[p] == mlog.param_defaults[p]:
+            continue
+        if fnmatch.fnmatch(p, wildcard.upper()):
+            v = mlog.params[p]
+            if int(v) == v:
+                s = "%-16.16s %d" % (str(p), mlog.params[p])
+            else:
+                s = "%-16.16s %f" % (str(p), mlog.params[p])
+                s = s.rstrip('0')
+            f.write(s + "\n")
+            count += 1
+    f.close()
+    print("Saved %u parameters to %s" % (count, filename))
+            
 def ftp_decode(mlog):
     '''decode FILE_TRANSFER_PROTOCOL for parameters'''
     mlog.rewind()
@@ -959,6 +993,20 @@ def cmd_param(args):
             return
         if args[0] == 'diff':
             cmd_param_diff(args[1:])
+            return
+        if args[0] == 'save':
+            # save parameters
+            if len(args) < 2:
+                print("Usage: param save FILENAME <WILDCARD>")
+                return
+            cmd_param_save(args[1:], False)
+            return
+        if args[0] == 'savechanged':
+            # save changed parameters
+            if len(args) < 2:
+                print("Usage: param savechanged FILENAME <WILDCARD>")
+                return
+            cmd_param_save(args[1:], True)
             return
         wildcard = args[0]
         if len(args) > 1 and args[1] == "-v":
