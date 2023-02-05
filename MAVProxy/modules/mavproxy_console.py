@@ -466,13 +466,12 @@ class ConsoleModule(mp_module.MPModule):
                 fg = 'green'
             self.console.set_status('EKF', 'EKF', fg=fg)
 
-        elif type == 'HWSTATUS':
+        elif type == 'POWER_STATUS':
             if msg.Vcc >= 4600 and msg.Vcc <= 5300:
                 fg = 'green'
             else:
                 fg = 'red'
             self.console.set_status('Vcc', 'Vcc %.2f' % (msg.Vcc * 0.001), fg=fg)
-        elif type == 'POWER_STATUS':
             if msg.flags & mavutil.mavlink.MAV_POWER_STATUS_CHANGED:
                 fg = 'red'
             else:
