@@ -477,6 +477,13 @@ def cmd_stats(args):
 def cmd_dump(args):
     '''dump messages from log'''
     global xlimits
+
+    # understand --verbose to give as much information about message as possible
+    verbose = False
+    if "--verbose" in args:
+        verbose = True
+        args = list(filter(lambda x : x != "--verbose", args))
+
     if len(args) > 0:
         wildcard = args[0]
     else:
@@ -498,7 +505,10 @@ def cmd_dump(args):
             continue
         if in_range > 0:
             continue
-        print("%s %s" % (timestring(msg), msg))
+        if verbose and "pymavlink.dialects" in str(type(msg)):
+            mavutil.dump_message_verbose(sys.stdout, msg)
+        else:
+            print("%s %s" % (timestring(msg), msg))
     mlog.rewind()
 
 mfit_tool = None
