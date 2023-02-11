@@ -290,7 +290,7 @@ class MiscModule(mp_module.MPModule):
     def cmd_changealt_abs(self, args):
         '''change target altitude'''
         if len(args) < 1:
-            print("usage: changealt <relaltitude>")
+            print("usage: changealt_abs <absaltitude>")
             return
         absalt = float(args[0])
         self.master.mav.mission_item_send(self.settings.target_system,
