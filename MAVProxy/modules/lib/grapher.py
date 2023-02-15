@@ -101,6 +101,7 @@ class MavGraph(object):
         self.tday_basetime = None
         self.title = None
         self.grid = False
+        self.xlim_t = None
         if sys.version_info[0] >= 3:
             self.text_types = frozenset([str,])
         else:
@@ -560,7 +561,7 @@ class MavGraph(object):
     def xlim_timer(self):
         '''called every 0.1s to check for xlim change'''
         self.xlim_change_check(0)
-        threading.Timer(0.1, self.xlim_timer).start()
+        self.xlim_t = threading.Timer(0.1, self.xlim_timer).start()
 
     def process(self, flightmode_selections, _flightmodes, block=True):
         '''process and display graph'''
@@ -643,7 +644,8 @@ class MavGraph(object):
             self.ani = matplotlib.animation.FuncAnimation(self.fig, self.xlim_change_check,
                                                           frames=10, interval=20000,
                                                           repeat=True, blit=False)
-            threading.Timer(0.1, self.xlim_timer).start()
+            if self.xlim_t is None:
+                self.xlim_t = threading.Timer(0.1, self.xlim_timer).start()
 
         if output is None:
             pylab.draw()
