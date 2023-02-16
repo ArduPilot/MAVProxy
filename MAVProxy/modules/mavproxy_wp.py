@@ -32,6 +32,7 @@ class WPModule(mp_module.MPModule):
         self.undo_wp_idx = -1
         self.upload_start = None
         self.wploader.expected_count = 0
+        self.wploader.retry_count = 0
         self.last_get_home = time.time()
         self.add_command('wp', self.cmd_wp,       'waypoint management',
                          ["<list|clear|move|remove|loop|set|undo|movemulti|moverelhome|changealt|param|status|slope|ftp|add_takeoff|add_landing|add_dls|add_rtl>",
@@ -190,9 +191,16 @@ class WPModule(mp_module.MPModule):
         if self.wp_period.trigger():
             # cope with packet loss fetching mission
             if self.master is not None and self.master.time_since('MISSION_ITEM') >= 2 and self.wploader.count() < getattr(self.wploader,'expected_count',0):
-                wps = self.missing_wps_to_request();
-                print("re-requesting WPs %s" % str(wps))
-                self.send_wp_requests(wps)
+                self.wploader.retry_count = self.wploader.retry_count + 1 
+                if self.wploader.retry_count > 5:
+                    '''we've already re-requested individual chunks of waypoints a few times, lets just start over'''
+                    print("re-requesting all WPs")
+                    self.wploader.retry_count = 0
+                    self.fetch()
+                else:
+                    wps = self.missing_wps_to_request()
+                    print("re-requesting WPs %s" % str(wps))
+                    self.send_wp_requests(wps)
         if self.module('console') is not None:
             if not self.menu_added_console:
                 self.menu_added_console = True
