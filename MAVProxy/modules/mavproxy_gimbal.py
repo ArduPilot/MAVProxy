@@ -14,6 +14,7 @@ from pymavlink.rotmat import Vector3, Matrix3, Plane, Line
 from math import radians
 if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import *
+import pymavlink
 
 class GimbalModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -184,24 +185,31 @@ class GimbalModule(mp_module.MPModule):
             # don't draw if no map
             return
 
-        if m.get_type() != 'GIMBAL_REPORT':
-            return
-
-        needed = ['ATTITUDE', 'GLOBAL_POSITION_INT']
-        for n in needed:
+        for n in frozenset(['ATTITUDE', 'GLOBAL_POSITION_INT']):
             if not n in self.master.messages:
                 return
+
+        gpi = self.master.messages['GLOBAL_POSITION_INT']
+        att = self.master.messages['ATTITUDE']
+
+        rotmat_copter_gimbal = Matrix3()
+        if m.get_type() == 'GIMBAL_REPORT':
+            rotmat_copter_gimbal.from_euler312(m.joint_roll, m.joint_el, m.joint_az)
+        elif m.get_type() == 'GIMBAL_DEVICE_ATTITUDE_STATUS':
+            r, p, y = pymavlink.quaternion.Quaternion(m.q).euler
+            # rotate back from earth-frame on roll and pitch to body-frame
+            r -= att.roll
+            p -= att.pitch
+            rotmat_copter_gimbal.from_euler(r, p, y)
+        else:
+            return
 
         # clear the camera icon
         self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('GimbalView'))
 
-        gpi = self.master.messages['GLOBAL_POSITION_INT']
-        att = self.master.messages['ATTITUDE']
         vehicle_dcm = Matrix3()
         vehicle_dcm.from_euler(att.roll, att.pitch, att.yaw)
 
-        rotmat_copter_gimbal = Matrix3()
-        rotmat_copter_gimbal.from_euler312(m.joint_roll, m.joint_el, m.joint_az)
         gimbal_dcm = vehicle_dcm * rotmat_copter_gimbal
 
         lat = gpi.lat * 1.0e-7
