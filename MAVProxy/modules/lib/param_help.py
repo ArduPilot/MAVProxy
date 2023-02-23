@@ -96,10 +96,10 @@ class ParamHelp:
 
     def get_Values_from_help(self, help):
         children = help.getchildren()
-        if len(children) == 0:
-            return []
-        vchild = children[0]
-        return vchild.getchildren()
+        for c in children:
+            if str(c).startswith("values"):
+                return c.getchildren()
+        return []
 
     def get_bitmask_from_help(self, help):
         if not hasattr(help, 'field'):
