@@ -90,14 +90,20 @@ class GimbalModule(mp_module.MPModule):
             print("No map click position available and no parameters set")
             return
         elif latlon is None:
-            print("usage: gimbal roi [LAT LON ALT]")
+            print("usage: gimbal roi [LAT LON RELHOMEALT]")
             return
-        self.master.mav.mount_control_send(self.target_system,
-                                           self.target_component,
-                                           int(latlon[0]*1e7),
-                                           int(latlon[1]*1e7),
-                                           int(alt),
-                                           0)
+        self.master.mav.command_long_send(
+            self.settings.target_system,
+            self.settings.target_component,
+            mavutil.mavlink.MAV_CMD_DO_MOUNT_CONTROL,
+            0, # confirmation
+            0, # param1
+            0, # param2
+            0, # param3
+            alt, # param4 - alt (exception to the usual rule about where this goes)
+            int(latlon[0]*1e7), # lat
+            int(latlon[1]*1e7), # lon
+            mavutil.mavlink.MAV_MOUNT_MODE_GPS_POINT) # param7
 
     def cmd_gimbal_roi_vel(self, args):
         '''control roi position and velocity'''
