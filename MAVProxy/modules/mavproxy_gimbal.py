@@ -156,12 +156,18 @@ class GimbalModule(mp_module.MPModule):
             print("usage: gimbal point ROLL PITCH YAW")
             return
         (roll, pitch, yaw) = (float(args[0]), float(args[1]), float(args[2]))
-        self.master.mav.mount_control_send(self.target_system,
-                                           self.target_component,
-                                           int(pitch*100),
-                                           int(roll*100),
-                                           int(yaw*100),
-                                           0)
+        self.master.mav.command_long_send(
+            self.settings.target_system,
+            self.settings.target_component,
+            mavutil.mavlink.MAV_CMD_DO_MOUNT_CONTROL,
+            0, # confirmation
+            pitch, # param1
+            roll, # param2
+            yaw, # param3
+            0, # param4
+            0, # lat
+            0, # lon
+            mavutil.mavlink.MAV_MOUNT_MODE_MAVLINK_TARGETING) # param7
 
     def cmd_gimbal_status(self, args):
         '''show gimbal status'''
