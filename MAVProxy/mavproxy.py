@@ -101,6 +101,7 @@ class MPStatus(object):
         self.lost_gps_lock = False
         self.last_gps_lock = 0
         self.watch = None
+        self.watch_verbose = False
         self.last_streamrate1 = -1
         self.last_streamrate2 = -1
         self.last_seq = 0
@@ -475,7 +476,14 @@ def cmd_watch(args):
     '''watch a mavlink packet pattern'''
     if len(args) == 0:
         mpstate.status.watch = None
+        mpstate.status.watch_verbose = False
         return
+    if "--verbose" in args:
+        mpstate.status.watch_verbose = True
+        args.remove('--verbose')
+    else:
+        mpstate.status.watch_verbose = False
+
     mpstate.status.watch = args
     print("Watching %s" % mpstate.status.watch)
 

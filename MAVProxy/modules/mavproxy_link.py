@@ -9,6 +9,11 @@
 from pymavlink import mavutil
 import time, struct, math, sys, fnmatch, traceback, json, os
 
+if sys.version_info[0] >= 3:
+    import io as StringIO
+else:
+    import StringIO
+
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
 
@@ -445,13 +450,31 @@ class LinkModule(mp_module.MPModule):
         '''time since 1970 in microseconds'''
         return int(time.time() * 1.0e6)
 
+    def dump_message_verbose(self, m):
+        '''return verbose dump of m.  Wraps the pymavlink routine which
+        inconveniently takes a filehandle'''
+        f = StringIO.StringIO()
+        mavutil.dump_message_verbose(f, m)
+        return f.getvalue()
+
+    def check_watched_message(self, m, direction_string):
+        '''if we are watching a message, print it out'''
+        if self.status.watch is None:
+            return
+        mtype = m.get_type().upper()
+        for msg_type in self.status.watch:
+            if not fnmatch.fnmatch(mtype, msg_type.upper()):
+                continue
+            if self.status.watch_verbose:
+                message_string = self.dump_message_verbose(m)
+            else:
+                message_string = str(m)
+            self.mpstate.console.writeln(direction_string + ' ' + message_string)
+            break
+
     def master_send_callback(self, m, master):
         '''called on sending a message'''
-        if self.status.watch is not None:
-            for msg_type in self.status.watch:
-                if fnmatch.fnmatch(m.get_type().upper(), msg_type.upper()):
-                    self.mpstate.console.writeln('> '+ str(m))
-                    break
+        self.check_watched_message(m, '>')
 
         mtype = m.get_type()
         if mtype != 'BAD_DATA' and self.mpstate.logqueue:
@@ -789,11 +812,7 @@ class LinkModule(mp_module.MPModule):
             #self.mpstate.console.writeln("Got MAVLink msg: %s" % m)
             pass
 
-        if self.status.watch is not None:
-            for msg_type in self.status.watch:
-                if fnmatch.fnmatch(mtype.upper(), msg_type.upper()):
-                    self.mpstate.console.writeln('< '+ str(m))
-                    break
+        self.check_watched_message(m, '<')
 
     def mavlink_packet(self, msg):
         '''handle an incoming mavlink packet'''
