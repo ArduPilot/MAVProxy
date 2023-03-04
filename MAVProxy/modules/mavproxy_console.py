@@ -267,7 +267,13 @@ class ConsoleModule(mp_module.MPModule):
             self.last_sys_status_errors_announce = now
             self.say("Critical failure 0x%x sysid=%u compid=%u" % (errors, sysid, compid))
 
-        
+    def set_component_name(self, sysid, compid, name):
+        if sysid not in self.component_name:
+            self.component_name[sysid] = {}
+        if compid not in self.component_name[sysid]:
+            self.component_name[sysid][compid] = name
+            self.update_vehicle_menu()
+
     def mavlink_packet(self, msg):
         '''handle an incoming mavlink packet'''
         if not isinstance(self.console, wxconsole.MessageConsole):
@@ -279,16 +285,15 @@ class ConsoleModule(mp_module.MPModule):
         sysid = msg.get_srcSystem()
         compid = msg.get_srcComponent()
 
-        if type == 'HEARTBEAT' or type == 'HIGH_LATENCY2':
+        if type in frozenset(['HEARTBEAT', 'HIGH_LATENCY2']):
             if type == 'HEARTBEAT':
                 self.vehicle_heartbeats[(sysid, compid)] = msg
             if not sysid in self.vehicle_list:
                 self.add_new_vehicle(msg)
-            if sysid not in self.component_name:
-                self.component_name[sysid] = {}
-            if compid not in self.component_name[sysid]:
-                self.component_name[sysid][compid] = self.component_type_string(msg)
-                self.update_vehicle_menu()
+            self.set_component_name(sysid, compid, self.component_type_string(msg))
+        elif type == 'GIMBAL_DEVICE_INFORMATION':
+            self.set_component_name(sysid, compid, "%s-%s" %
+                                    (msg.vendor_name, msg.model_name))
 
         if self.last_param_sysid_timestamp != self.module('param').new_sysid_timestamp:
             '''a new component ID has appeared for parameters'''
