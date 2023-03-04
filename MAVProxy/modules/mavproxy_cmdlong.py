@@ -395,6 +395,13 @@ class CmdlongModule(mp_module.MPModule):
             print("Unknown command long ({0})".format(args[0]))
             return
 
+        if command == mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE:
+            if not args[1].isdigit():
+                try:
+                    args[1] = getattr(mavutil.mavlink, "MAVLINK_MSG_ID_" + args[1])
+                except AttributeError as e:
+                    pass
+
         floating_args = [ float(x) for x in args[1:] ]
         while len(floating_args) < 7:
             floating_args.append(float(0))
