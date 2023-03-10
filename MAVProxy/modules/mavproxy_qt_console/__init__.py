@@ -1,5 +1,4 @@
 from MAVProxy.modules.lib import mp_module
-from MAVProxy.modules.mavproxy_qt_console.ui_dialog import Ui_Dialog
 from MAVProxy.modules.mavproxy_qt_console.ui_qt_console import Ui_QtConsole
 from PySide6.QtWidgets import QApplication, QMainWindow
 from PySide6.QtCore import QTimer
@@ -9,9 +8,10 @@ import threading
 from MAVProxy.modules.lib import multiproc
 import multiprocessing
 import time
-from MAVProxy.modules.lib.wxconsole_util import  Text
+from MAVProxy.modules.lib.wxconsole_util import  Text, Value
 import socket
 import errno
+from MAVProxy.modules.lib import textconsole
 
 class QtConsoleWindow(QMainWindow):
     def __init__(self, parent):
@@ -22,10 +22,17 @@ class QtConsoleWindow(QMainWindow):
 
         self._timer = QTimer(self)
         self._timer.timeout.connect(self.update)
-        self._timer.start(1000)
+        self._timer.start(200)
+
+        self._ui.actionShow_Map.triggered.connect(self.show_map)
     
     def update(self):
         '''Slot called by QTimer at a specified interval'''
+        if self._parent.close_event.wait(0.001):
+            self._timer.stop()
+            self.close()
+            return
+
         try:
             poll_success = self._parent.child_pipe_recv.poll()
             if not poll_success:
@@ -47,26 +54,39 @@ class QtConsoleWindow(QMainWindow):
             self._ui.textEdit.setTextColor(QColor(msg.fg))
             self._ui.textEdit.setTextBackgroundColor(QColor(msg.bg))
             self._ui.textEdit.append(msg.text)
+        
+    def show_map(self):
+        self._parent.child_pipe_send.send("# module load map")
 
-    def accept(self):
-        print("accepted")
-    
-    def reject(self):
-        self.app.quit()
-        print("rejected")
+    def closeEvent(self, event) -> None:
+        """Handles the cross button on the UI"""
+        if not self._parent.close_event.is_set():
+            self._parent.child_pipe_send.send("# module unload qt_console")
+            return super().closeEvent(event)
 
-class QtConsole():
-    def __init__(self) -> None:
+class QtConsole(textconsole.SimpleConsole):
+    def __init__(self, mpstate) -> None:
+        super(QtConsole, self).__init__()
+        self.mpstate = mpstate
         self.parent_pipe_recv, self.child_pipe_send = multiproc.Pipe(duplex=False)
         self.child_pipe_recv,self.parent_pipe_send = multiproc.Pipe(duplex=False)
-
+        
+        # For quitting cleanly
+        self.close_event = multiproc.Event()
+        self.close_event.clear()
+        
+        # main process in which GUI (child) lives
         self.child = multiprocessing.Process(target=self.child_task)
         self.child.start()
+
+        # This class (parent) doesn't need the child pipes
         self.child_pipe_send.close()
         self.child_pipe_recv.close()
+
+        # Thread that listens to clicks etc. from the GUI
         t = threading.Thread(target=self.watch_thread)
         t.daemon = True
-        # t.start()
+        t.start()
     
     def watch_thread(self):
         '''watch for menu events from child'''
@@ -74,6 +94,8 @@ class QtConsole():
         try:
             while True:
                 msg = self.parent_pipe_recv.recv()
+                if msg.startswith("#"): # Header for command packet
+                    self.mpstate.functions.process_stdin(msg[2:])
                 # print(msg)
                 # if isinstance(msg, win_layout.WinLayout):
                 #     win_layout.set_layout(msg, self.set_layout)
@@ -100,7 +122,7 @@ class QtConsole():
         try:
             self.parent_pipe_send.send(Text(text, fg, bg))
         except Exception:
-            pass  
+            pass
 
     def writeln(self, text, fg='black', bg='white'):
         '''write to the console with linefeed'''
@@ -108,11 +130,17 @@ class QtConsole():
             text = str(text)
         self.write(text, fg=fg, bg=bg)
 
+    def close(self):
+        '''close the console'''
+        self.close_event.set()
+        if self.child.is_alive():
+            self.child.join()
+
 class QtConsoleModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super().__init__(mpstate, "Qt Console", "GUI Console (Qt)", public=True, multi_vehicle=True)
+        super().__init__(mpstate, "qt_console", "GUI Console (Qt)", public=True, multi_vehicle=True)
         self.add_command('qt_console', self.cmd_qt_console, "qt console module", ['add','list','remove'])        
-        self.mpstate.console = QtConsole()
+        self.mpstate.console = QtConsole(mpstate)
 
     def cmd_qt_console(self, args):
         pass
@@ -121,6 +149,11 @@ class QtConsoleModule(mp_module.MPModule):
         # print("Packet recieved")
         return super().mavlink_packet(packet)
     
+    def unload(self):
+        '''unload module'''
+        self.mpstate.console.close()
+        self.mpstate.console = textconsole.SimpleConsole()
+
 def init(mpstate):
     '''initialise module'''
     return QtConsoleModule(mpstate)
