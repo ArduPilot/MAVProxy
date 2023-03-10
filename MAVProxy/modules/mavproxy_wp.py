@@ -31,7 +31,6 @@ class WPModule(mp_module.MPModule):
         self.undo_type = None
         self.undo_wp_idx = -1
         self.upload_start = None
-        self.wploader.expected_count = 0
         self.last_get_home = time.time()
         self.add_command('wp', self.cmd_wp,       'waypoint management',
                          ["<list|clear|move|remove|loop|set|undo|movemulti|moverelhome|changealt|param|status|slope|ftp|add_takeoff|add_landing|add_dls|add_rtl>",
@@ -79,6 +78,7 @@ class WPModule(mp_module.MPModule):
         '''per-sysid wploader'''
         if self.target_system not in self.wploader_by_sysid:
             self.wploader_by_sysid[self.target_system] = mavwp.MAVWPLoader()
+            self.wploader_by_sysid[self.target_system].expected_count = 0
         return self.wploader_by_sysid[self.target_system]
 
     def missing_wps_to_request(self):
@@ -122,15 +122,18 @@ class WPModule(mp_module.MPModule):
         '''handle an incoming mavlink packet'''
         mtype = m.get_type()
         if mtype in ['WAYPOINT_COUNT','MISSION_COUNT']:
-            self.wploader.expected_count = m.count
+            if getattr(m, 'mission_type', 0) != 0:
+                # this is not a mission item, likely fence
+                return
             if self.wp_op is None:
-                #self.console.error("No waypoint load started")
-                pass
+                if self.wploader.expected_count != m.count:
+                    self.console.writeln("Mission is stale")
             else:
                 self.wploader.clear()
                 self.console.writeln("Requesting %u waypoints t=%s now=%s" % (m.count,
                                                                                  time.asctime(time.localtime(m._timestamp)),
                                                                                  time.asctime()))
+                self.wploader.expected_count = m.count
                 self.send_wp_requests()
 
         elif mtype in ['WAYPOINT', 'MISSION_ITEM', 'MISSION_ITEM_INT'] and self.wp_op is not None:

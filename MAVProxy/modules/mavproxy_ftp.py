@@ -714,6 +714,11 @@ class FTPModule(mp_module.MPModule):
         '''handle a mavlink packet'''
         mtype = m.get_type()
         if mtype == "FILE_TRANSFER_PROTOCOL":
+            if (m.target_system != self.settings.source_system or
+                m.target_component != self.settings.source_component):
+                # this is not for me
+                return
+
             op = self.op_parse(m)
             now = time.time()
             dt = now - self.last_op_time
