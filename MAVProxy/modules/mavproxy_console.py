@@ -75,6 +75,7 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('Mission', 'Mission --/--', row=3)
 
         self.vehicle_list = []
+        self.vehicle_heartbeats = {}  # map from (sysid,compid) tuple to most recent HEARTBEAT nessage
         self.vehicle_menu = None
         self.vehicle_name_by_sysid = {}
         self.component_name = {}
@@ -249,13 +250,22 @@ class ConsoleModule(mp_module.MPModule):
 
     def check_critical_error(self, msg):
         '''check for any error bits being set in SYS_STATUS'''
+        sysid = msg.get_srcSystem()
+        compid = msg.get_srcComponent()
+        hb = self.vehicle_heartbeats.get((sysid, compid), None)
+        if hb is None:
+            return
+        # only ArduPilot populates the fields with internal error stuff:
+        if hb.autopilot != mavutil.mavlink.MAV_AUTOPILOT_ARDUPILOTMEGA:
+            return
+
         errors = msg.errors_count1 | (msg.errors_count2<<16)
         if errors == 0:
             return
         now = time.time()
         if now - self.last_sys_status_errors_announce > self.mpstate.settings.sys_status_error_warn_interval:
             self.last_sys_status_errors_announce = now
-            self.say("Critical failure 0x%x sysid=%u" % (errors, msg.get_srcSystem()))
+            self.say("Critical failure 0x%x sysid=%u compid=%u" % (errors, sysid, compid))
 
         
     def mavlink_packet(self, msg):
@@ -270,6 +280,8 @@ class ConsoleModule(mp_module.MPModule):
         compid = msg.get_srcComponent()
 
         if type == 'HEARTBEAT' or type == 'HIGH_LATENCY2':
+            if type == 'HEARTBEAT':
+                self.vehicle_heartbeats[(sysid, compid)] = msg
             if not sysid in self.vehicle_list:
                 self.add_new_vehicle(msg)
             if sysid not in self.component_name:
