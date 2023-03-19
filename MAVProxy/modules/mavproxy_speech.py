@@ -116,8 +116,10 @@ class SpeechModule(mp_module.MPModule):
         type = msg.get_type()
         if type == "STATUSTEXT":
             # say some statustext values
-            if msg.text.startswith("Tuning: "):
-                self.say(msg.text[8:])
+            speech_prefixes = [ "Tuning: ", "@" ]
+            for s in speech_prefixes:
+                if msg.text.startswith(s):
+                    self.say(msg.text[len(s):])
 
     def list_voices(self):
         if self.say_backend == self.say_espeak:
