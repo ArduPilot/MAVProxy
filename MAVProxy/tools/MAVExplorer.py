@@ -1071,6 +1071,9 @@ def cmd_paramchange(args):
 
 def cmd_mission(args):
     '''show mission'''
+    if (len(args) == 1):
+        print("Usage: mission <save FILENAME>")
+        return
     mestate.mlog.rewind()
     types = set(['CMD','MISSION_ITEM_INT'])
     wp = mavwp.MAVWPLoader()
@@ -1116,9 +1119,13 @@ def cmd_mission(args):
             print("Adding dummy WP %u" % wp.count())
             wp.set(m, wp.count())
         wp.set(m, m.seq)
+    if len(args) == 2 and args[0] == 'save':
+        wp.save(args[1])
+        mestate.mlog.rewind()
+        return
     for i in range(wp.count()):
         w = wp.wp(i)
-        print("%u\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%u" % (
+        print("%u\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t\t%f\t\t%f\t%u" % (
             w.seq, w.current, w.frame, w.command,
             w.param1, w.param2, w.param3, w.param4,
             w.x, w.y, w.z, w.autocontinue))
