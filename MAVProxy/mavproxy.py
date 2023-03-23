@@ -258,6 +258,7 @@ class MPState(object):
               MPSetting('wpupdates', bool, True, 'Announce waypoint updates'),
               MPSetting('wpterrainadjust', bool, True, 'Adjust alt of moved wp using terrain'),
               MPSetting('wp_use_mission_int', bool, True, 'use MISSION_ITEM_INT messages'),
+              MPSetting('wp_use_waypoint_set_current', bool, False, 'use deprecated WAYPOINT_SET_CURRENT message'),
 
               MPSetting('basealt', int, 0, 'Base Altitude', range=(0,30000), increment=1, tab='Altitude'),
               MPSetting('wpalt', int, 100, 'Default WP Altitude', range=(0,10000), increment=1),

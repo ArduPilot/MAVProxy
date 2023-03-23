@@ -38,6 +38,9 @@ class WPModule(mp_module.MPModule):
         self.mission_ftp_name = "@MISSION/mission.dat"
         self.ftp_count = None
 
+        # support for setting mission waypoint via command
+        self.accepts_DO_SET_MISSION_CURRENT = {}  # keyed by (sysid/compid)
+
         if self.continue_mode and self.logdir is not None:
             waytxt = os.path.join(mpstate.status.logdir, 'way.txt')
             if os.path.exists(waytxt):
@@ -187,6 +190,18 @@ class WPModule(mp_module.MPModule):
                     alt_offset = self.get_mav_param('ALT_OFFSET', 0)
                     if alt_offset > 0.005:
                         self.say("ALT OFFSET IS NOT ZERO passing DO_LAND_START")
+
+        elif mtype == "COMMAND_ACK":
+            # check to see if the vehicle has bounced our attempts to
+            # set the current mission item via mavlink command (as
+            # opposed to the old message):
+            if m.command == mavutil.mavlink.MAV_CMD_DO_SET_MISSION_CURRENT:
+                key = (m.get_srcSystem(), m.get_srcComponent())
+                if m.result == mavutil.mavlink.MAV_RESULT_UNSUPPORTED:
+                    # stop sending the commands:
+                    self.accepts_DO_SET_MISSION_CURRENT[key] = False
+                elif m.result in [ mavutil.mavlink.MAV_RESULT_ACCEPTED ]:
+                    self.accepts_DO_SET_MISSION_CURRENT[key] = True
 
     def idle_task(self):
         '''handle missing waypoints'''
@@ -734,7 +749,27 @@ class WPModule(mp_module.MPModule):
             if len(args) != 2:
                 print("usage: wp set <wpindex>")
                 return
-            self.master.waypoint_set_current_send(int(args[1]))
+            # At time of writing MAVProxy sends to (1, 0) by default,
+            # but ArduPilot will respond from (1,1) by default -and
+            # that means COMMAND_ACK handling will fill
+            # self.accepts_DO_SET_MISSION_CURRENT for (1, 1) and we
+            # will not get that value here:
+            key = (self.target_system, self.target_component)
+            supports = self.accepts_DO_SET_MISSION_CURRENT.get(key, None)
+            # if we don't know, send both.  If we do know, send only one.
+            # we "know" because we hook receipt of COMMAND_ACK.
+
+            if self.settings.wp_use_waypoint_set_current or supports is False:
+                self.master.waypoint_set_current_send(int(args[1]))
+            else:
+                self.master.mav.command_long_send(
+                    self.target_system,
+                    self.target_component,
+                    mavutil.mavlink.MAV_CMD_DO_SET_MISSION_CURRENT,
+                    0,
+                    int(args[1]), 0, 0, 0, 0, 0, 0
+                )
+
         elif args[0] == "split":
             self.cmd_split(args[1:])
         elif args[0] == "clear":
