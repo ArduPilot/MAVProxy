@@ -539,6 +539,56 @@ class LinkModule(mp_module.MPModule):
             self.status.last_apm_msg_time = time.time()
         del self.status.statustexts_by_sysidcompid[key][id]
 
+    def heartbeat_is_from_autopilot(self, m):
+        '''returns true if m is a HEARTBEAT (or HIGH_LATENCY2) message and
+        looks like it is from an actual autopilot rather than from e.g. a
+        mavlink-connected camera'''
+
+        mtype = m.get_type()
+
+        if mtype not in ['HEARTBEAT', 'HIGH_LATENCY2']:
+            return False
+
+        mav_autopilots_which_are_not_vehicles = frozenset([
+            'MAV_AUTOPILOT_INVALID',
+            'MAV_AUTOPILOT_RESERVED',
+        ])
+        if m.autopilot in mav_autopilots_which_are_not_vehicles:
+            return False
+
+        # this is a rather bogus assumption - and might break people's
+        # setups.  It should probably be removed in favour of trusting
+        # the MAV_TYPE field.
+        component_ids_which_are_not_vehicles = frozenset([
+            mavutil.mavlink.MAV_COMP_ID_ADSB,
+            mavutil.mavlink.MAV_COMP_ID_ODID_TXRX_1,
+            mavutil.mavlink.MAV_COMP_ID_ODID_TXRX_2,
+            mavutil.mavlink.MAV_COMP_ID_ODID_TXRX_3
+        ])
+        if m.get_srcComponent() in component_ids_which_are_not_vehicles:
+            return False
+
+        mav_types_which_are_not_vehicles = frozenset([
+            mavutil.mavlink.MAV_TYPE_GCS,
+            mavutil.mavlink.MAV_TYPE_ONBOARD_CONTROLLER,
+            mavutil.mavlink.MAV_TYPE_GIMBAL,
+            mavutil.mavlink.MAV_TYPE_ADSB,
+            mavutil.mavlink.MAV_TYPE_CAMERA,
+            mavutil.mavlink.MAV_TYPE_CHARGING_STATION,
+            mavutil.mavlink.MAV_TYPE_SERVO,
+            mavutil.mavlink.MAV_TYPE_ODID,
+            mavutil.mavlink.MAV_TYPE_BATTERY,
+            mavutil.mavlink.MAV_TYPE_LOG,
+            mavutil.mavlink.MAV_TYPE_OSD,
+            mavutil.mavlink.MAV_TYPE_IMU,
+            mavutil.mavlink.MAV_TYPE_GPS,
+            mavutil.mavlink.MAV_TYPE_WINCH,
+        ])
+        if m.type in mav_types_which_are_not_vehicles:
+            return False
+
+        return True
+
     def master_msg_handling(self, m, master):
         '''link message handling for an upstream link'''
         if self.settings.target_system != 0 and m.get_srcSystem() != self.settings.target_system:
@@ -562,19 +612,14 @@ class LinkModule(mp_module.MPModule):
             
         mtype = m.get_type()
 
-        if (mtype == 'HEARTBEAT' or mtype == 'HIGH_LATENCY2') and m.type != mavutil.mavlink.MAV_TYPE_GCS:
+        if self.heartbeat_is_from_autopilot(m):
             if self.settings.target_system == 0 and self.settings.target_system != m.get_srcSystem():
                 self.settings.target_system = m.get_srcSystem()
+                self.settings.target_component = m.get_srcComponent()
                 self.say("online system %u" % self.settings.target_system,'message')
                 for mav in self.mpstate.mav_master:
                     mav.target_system = self.settings.target_system
-
-            if m.get_srcComponent() in [mavutil.mavlink.MAV_COMP_ID_ADSB,
-                                        mavutil.mavlink.MAV_COMP_ID_ODID_TXRX_1,
-                                        mavutil.mavlink.MAV_COMP_ID_ODID_TXRX_2,
-                                        mavutil.mavlink.MAV_COMP_ID_ODID_TXRX_3]:
-                # ignore these
-                return
+                    mav.target_component = self.settings.target_component
 
             if self.status.heartbeat_error:
                 self.status.heartbeat_error = False
