@@ -106,8 +106,8 @@ class FTPModule(mp_module.MPModule):
              ('pkt_loss_tx', int, 0),
              ('pkt_loss_rx', int, 0),
              ('max_backlog', int, 5),
-             ('burst_read_size', int, 110),
-             ('write_size', int, 110),
+             ('burst_read_size', int, 80),
+             ('write_size', int, 80),
              ('write_qsize', int, 5),
              ('retry_time', float, 0.5)])
         self.add_completion_function('(FTPSETTING)',
