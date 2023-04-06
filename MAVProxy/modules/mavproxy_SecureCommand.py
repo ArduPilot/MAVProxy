@@ -35,7 +35,7 @@ class SecureCommandModule(mp_module.MPModule):
 
     def cmd_securecommand(self, args):
         '''securecommand command parser'''
-        usage = "usage: securecommand <set>"
+        usage = "usage: securecommand <set|getsessionkey|getpublickeys|setpublickeys|removepublickeys|setconfig>"
         if len(args) == 0:
             print(usage)
             return
