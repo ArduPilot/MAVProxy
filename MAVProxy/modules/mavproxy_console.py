@@ -333,6 +333,14 @@ class ConsoleModule(mp_module.MPModule):
                 self.console.set_status(field, '%s %u (%u)' % (prefix, fix_type, nsats), fg='red')
             if type == 'GPS_RAW_INT':
                 vfr_hud_heading = master.field('VFR_HUD', 'heading', None)
+                if vfr_hud_heading is None:
+                    # try to fill it in from GLOBAL_POSITION_INT instead:
+                    vfr_hud_heading = master.field('GLOBAL_POSITION_INT', 'hdg', None)
+                    if vfr_hud_heading is not None:
+                        if vfr_hud_heading == 65535:  # mavlink magic "unknown" value
+                            vfr_hud_heading = None
+                        else:
+                            vfr_hud_heading /= 100
                 gps_heading = int(msg.cog * 0.01)
                 if vfr_hud_heading is None:
                     vfr_hud_heading = '---'
