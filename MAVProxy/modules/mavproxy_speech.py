@@ -9,6 +9,7 @@ from MAVProxy.modules.lib import mp_util
 class SpeechCommandSay(object):
     def __init__(self, text, priority):
         self.text = text
+        self.timestamp = time.time()
         self.priority = priority
 
 class SpeechCommandSetVoice(object):
@@ -30,6 +31,7 @@ class SpeechBackend():
 
     def __init__(self, settings):
         self.settings = settings
+        self.max_age = 5
         self.parent_pipe, self.child_pipe = multiproc.Pipe()
         self.child = multiproc.Process(target=self.child_task)
         self.child.start()
@@ -67,7 +69,7 @@ class SpeechBackend():
             if self.child_pipe.poll():
                 cmd = self.child_pipe.recv()
                 if isinstance(cmd, SpeechCommandSay):
-                    if self.say_backend is not None:
+                    if self.say_backend is not None and time.time() - cmd.timestamp < self.max_age:
                         self.say_backend(cmd.text, cmd.priority)
                 elif isinstance(cmd, SpeechCommandListVoices):
                     self.list_voices()
@@ -93,6 +95,8 @@ class SpeechBackend():
         if self.voice:
             espeak.set_voice(self.voice)
         espeak.synth(text)
+        while espeak.is_playing():
+            time.sleep(0.1)
 
     def say_speech(self, text, priority='important'):
         '''speak some text using speech module'''
