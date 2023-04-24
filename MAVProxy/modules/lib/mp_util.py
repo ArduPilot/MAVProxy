@@ -433,6 +433,7 @@ def decode_devid(devid, pname):
         0x33 : "INS_ICM40609",
         0x34 : "INS_ICM42688",
         0x35 : "INS_ICM42605",
+        0x36 : "INS_ICM40605",
         0x37 : "INS_IIM42652",
         0x38 : "INS_BMI270",
         0x39 : "INS_BMI085",
