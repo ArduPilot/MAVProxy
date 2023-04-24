@@ -95,6 +95,7 @@ class MavGraph(object):
         self.start_time = None
         graph_num += 1
         self.draw_events = 0
+        self.closing = False
         self.xlim_pipe = None
         self.xlim = None
         self.tday_base = None
@@ -226,6 +227,10 @@ class MavGraph(object):
         '''called on draw events'''
         self.draw_events += 1
 
+    def close_event(self, evt):
+        '''called on close events'''
+        self.closing = True
+        
     def rescale_yaxis(self, axis):
         '''rescale Y axes to fit'''
         xdata = axis.lines[0].get_xdata()
@@ -276,6 +281,7 @@ class MavGraph(object):
             self.ax1.xaxis.set_major_formatter(self.formatter)
             self.ax1.callbacks.connect('xlim_changed', self.xlim_changed)
             self.fig.canvas.mpl_connect('draw_event', self.draw_event)
+            self.fig.canvas.mpl_connect('close_event', self.close_event)
         self.fig.canvas.mpl_connect('button_press_event', self.button_click)
         empty = True
         ax1_labels = []
@@ -560,8 +566,9 @@ class MavGraph(object):
 
     def xlim_timer(self):
         '''called every 0.1s to check for xlim change'''
+        if self.closing:
+            return
         self.xlim_change_check(0)
-        self.xlim_t = threading.Timer(0.1, self.xlim_timer).start()
 
     def process(self, flightmode_selections, _flightmodes, block=True):
         '''process and display graph'''
@@ -605,6 +612,8 @@ class MavGraph(object):
 
     def show(self, lenmavlist, block=True, xlim_pipe=None, output=None):
         '''show graph'''
+        if self.closing:
+            return
         if xlim_pipe is not None:
             xlim_pipe[0].close()
         self.xlim_pipe = xlim_pipe
@@ -645,7 +654,9 @@ class MavGraph(object):
                                                           frames=10, interval=20000,
                                                           repeat=True, blit=False)
             if self.xlim_t is None:
-                self.xlim_t = threading.Timer(0.1, self.xlim_timer).start()
+                self.xlim_t = self.fig.canvas.new_timer(interval=100)
+                self.xlim_t.add_callback(self.xlim_timer)
+                self.xlim_t.start()
 
         if output is None:
             pylab.draw()
