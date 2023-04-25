@@ -1405,7 +1405,11 @@ if __name__ == '__main__':
 
     # open any mavlink output ports
     for port in opts.output:
-        mpstate.mav_outputs.append(mavutil.mavlink_connection(port, baud=int(opts.baudrate), input=False, udp_timeout=opts.udp_timeout))
+        # cope with older pymavlink
+        if opts.udp_timeout > 0:
+            mpstate.mav_outputs.append(mavutil.mavlink_connection(port, baud=int(opts.baudrate), input=False, udp_timeout=opts.udp_timeout))
+        else:
+            mpstate.mav_outputs.append(mavutil.mavlink_connection(port, baud=int(opts.baudrate), input=False))
 
     if opts.sitl:
         mpstate.sitl_output = mavutil.mavudp(opts.sitl, input=False)
