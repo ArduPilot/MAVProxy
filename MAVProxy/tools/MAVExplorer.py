@@ -294,7 +294,10 @@ def load_graph_xml(xml, filename, load_all=False):
     names = set()
     for g in root.graph:
         name = g.attrib['name']
-        expressions = [e.text for e in g.expression]
+        expressions = []
+        for e in g.expression:
+            if e.text is not None:
+                expressions.append(e.text)
         if load_all:
             if not name in names:
                 if hasattr(g,'description'):
@@ -307,6 +310,8 @@ def load_graph_xml(xml, filename, load_all=False):
         if have_graph(name):
             continue
         for e in expressions:
+            if e is None:
+                continue
             e = xml_unescape(e)
             if expression_ok(e):
                 if hasattr(g,'description'):
@@ -559,6 +564,8 @@ def save_graph(graphdef):
             g.description = ''
         f.write("  <description>%s</description>\n" % g.description.strip())
         for e in g.expressions:
+            if e is None:
+                continue
             e = xml_escape(e)
             f.write("  <expression>%s</expression>\n" % e.strip())
         f.write(" </graph>\n\n")
@@ -569,6 +576,8 @@ def save_callback(operation, graphdef):
     '''callback from save thread'''
     if operation == 'test':
         for e in graphdef.expressions:
+            if e is None:
+                continue
             if expression_ok(e, msgs):
                 graphdef.expression = e
                 pipe_graph_input.send('graph ' + graphdef.expression)
