@@ -233,15 +233,15 @@ class MavGraph(object):
         
     def rescale_yaxis(self, axis):
         '''rescale Y axes to fit'''
-        xdata = axis.lines[0].get_xdata()
-        xlim = axis.get_xlim()
-        xidx1 = np.argmax(xdata > xlim[0])
-        xidx2 = np.argmax(xdata > xlim[1])
-        if xidx2 == 0:
-            xidx2 = len(xdata)-1
         ylim = [None,None]
 
         for line in axis.lines:
+            xdata = line.get_xdata()
+            xlim = axis.get_xlim()
+            xidx1 = np.argmax(xdata > xlim[0])
+            xidx2 = np.argmax(xdata > xlim[1])
+            if xidx2 == 0:
+                xidx2 = len(xdata)-1
             ydata = line.get_ydata()[xidx1:xidx2]
             min_v = np.amin(ydata)
             max_v = np.amax(ydata)
