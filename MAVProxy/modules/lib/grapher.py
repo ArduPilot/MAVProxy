@@ -251,6 +251,8 @@ class MavGraph(object):
                 ylim[1] = max_v
         rng = ylim[1] - ylim[0]
         pad = 0.05 * rng
+        if pad == 0:
+            pad = 0.001 * ylim[0]
         axis.set_ylim((ylim[0]-pad,ylim[1]+pad))
 
     def button_click(self, event):
