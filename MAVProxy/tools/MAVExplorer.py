@@ -110,6 +110,7 @@ class MEState(object):
               MPSetting('title', str, None, 'Graph title'),
               MPSetting('debug', int, 0, 'debug level'),
               MPSetting('paramdocs', bool, True, 'show param docs'),
+              MPSetting('max_rate', float, 0, 'maximum display rate of graphs in Hz'),
               ]
             )
 
