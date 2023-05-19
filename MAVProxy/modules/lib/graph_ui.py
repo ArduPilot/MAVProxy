@@ -31,6 +31,8 @@ class Graph_UI(object):
             self.mg.set_title(self.mestate.settings.title)
         else:
             self.mg.set_title(graphdef.name)
+        if self.mestate.settings.max_rate > 0:
+            self.mg.set_max_message_rate(self.mestate.settings.max_rate)
         self.mg.set_marker(self.mestate.settings.marker)
         self.mg.set_condition(self.mestate.settings.condition)
         self.mg.set_xaxis(self.mestate.settings.xaxis)

@@ -107,6 +107,12 @@ class MavGraph(object):
             self.text_types = frozenset([str,])
         else:
             self.text_types = frozenset([unicode, str])
+        self.max_message_rate = 0
+
+    def set_max_message_rate(self, rate_hz):
+        '''set maximum rate we will graph any message'''
+        self.max_message_rate = rate_hz
+        self.last_message_t = {}
 
     def add_field(self, field):
         '''add another field to plot'''
@@ -433,6 +439,7 @@ class MavGraph(object):
                 continue
             f = self.fields[i]
             has_instance = False
+            ins_value = None
             if mtype in self.instance_types[i]:
                 instance_field = getattr(msg,'instance_field',None)
                 if instance_field is None and hasattr(msg,'fmt'):
@@ -450,6 +457,16 @@ class MavGraph(object):
                         mtype_instance_str = '%s["%s"]' % (mtype, getattr(msg, instance_field))
                         f = f.replace(mtype_instance, mtype_instance_str)
                     has_instance = True
+
+            # allow for capping the displayed message rate
+            if self.max_message_rate > 0:
+                mtype_ins = (mtype,ins_value)
+                mt = msg._timestamp
+                if mtype_ins in self.last_message_t:
+                    dt = mt - self.last_message_t[mtype_ins]
+                    if dt < 1.0 / self.max_message_rate:
+                        continue
+                self.last_message_t[mtype_ins] = mt
 
             simple = self.simple_field[i]
             v = None
