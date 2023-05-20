@@ -85,8 +85,8 @@ class Axis (Control):
 class Hat (Control):
     '''A Hat maps one axis of a hat as if it were a toggle switch.
     When the axis goes negative, the corresponding channel value is
-    set to `outputlow`.  When the axis goes positive, the value is set
-    to `outputhigh`.  No change is made when the axis returns to 0.'''
+    set to `outlow`.  When the axis goes positive, the value is set
+    to `outhigh`.  No change is made when the axis returns to 0.'''
 
     def __init__(self, joystick, id, axis, **kwargs):
         super(Hat, self).__init__(joystick, **kwargs)
@@ -181,7 +181,7 @@ class Joystick (object):
                           for k in control.keys()
                           if k in ['outlow', 'outhigh']}
 
-                handler = Hat(self.joystick, control['id'], control['axis'])
+                handler = Hat(self.joystick, control['id'], control['axis'], **kwargs)
 
             elif control['type'] == 'dial':
                 kwargs = {k: control[k]
