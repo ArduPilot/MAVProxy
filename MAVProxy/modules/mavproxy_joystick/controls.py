@@ -136,6 +136,8 @@ class Dial (Control):
         if value != self._last_value:
             self._last_value = value
             if value != 0:
+                if self.invert:
+                    value *= -1
                 # In my testing the hat is clamped to -1, 0, 1 values only
                 # NOTE: check if this universal
                 self._value += value * self.step
@@ -186,7 +188,7 @@ class Joystick (object):
             elif control['type'] == 'dial':
                 kwargs = {k: control[k]
                           for k in control.keys()
-                          if k in ['outlow', 'outhigh', 'invert', 'step']}
+                          if k in ['outlow', 'outhigh', 'invert', 'step', 'centered']}
 
                 handler = Dial(self.joystick, control['id'], control['axis'], **kwargs)
 
