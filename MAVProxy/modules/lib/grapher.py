@@ -460,7 +460,7 @@ class MavGraph(object):
 
             # allow for capping the displayed message rate
             if self.max_message_rate > 0:
-                mtype_ins = (mtype,ins_value)
+                mtype_ins = (mtype,ins_value,f)
                 mt = msg._timestamp
                 if mtype_ins in self.last_message_t:
                     dt = mt - self.last_message_t[mtype_ins]
