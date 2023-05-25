@@ -12,7 +12,7 @@ class OpenDroneIDModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(OpenDroneIDModule, self).__init__(mpstate, "OpenDroneID", "OpenDroneID Support", public = True)
         self.add_command('opendroneid', self.cmd_opendroneid, "opendroneid control",
-                         ["<status>", "set (OPENDRONEIDSETTING)"])
+                         ["<status>", "set (OPENDRONEIDSETTING)", "vehicle set (OPENDRONEIDVEHICLESETTING)"])
 
         from MAVProxy.modules.lib.mp_settings import MPSetting
         self.OpenDroneID_settings = mp_settings.MPSettings([
@@ -42,8 +42,14 @@ class OpenDroneIDModule(mp_module.MPModule):
             MPSetting("operator_id_type", int, 0),
             MPSetting("operator_id", str, ""),
             ])
+        self.OpenDroneID_vehicle_settings = mp_settings.MPSettings([
+            MPSetting("UAS_ID", str, ""),
+            MPSetting("lock_id", int, 0),
+            ])
         self.add_completion_function('(OPENDRONEIDSETTING)',
                                      self.OpenDroneID_settings.completion)
+        self.add_completion_function('(OPENDRONEIDVEHICLESETTING)',
+                                     self.OpenDroneID_vehicle_settings.completion)
         self.last_send_s = time.time()
         self.last_loc_send_s = time.time()
         self.next_msg = 0
@@ -53,10 +59,16 @@ class OpenDroneIDModule(mp_module.MPModule):
 
     def cmd_opendroneid(self, args):
         '''opendroneid command parser'''
-        usage = "usage: opendroneid <set>"
+        usage = "usage: opendroneid <vehicle> <set>"
         if len(args) == 0:
             print(usage)
             return
+        if args[0] == "vehicle":
+            if args[1] == "set":
+                self.OpenDroneID_vehicle_settings.command(args[2:])
+                return
+            else:
+                print(usage)
         if args[0] == "set":
             self.OpenDroneID_settings.command(args[1:])
         else:
@@ -159,6 +171,16 @@ class OpenDroneIDModule(mp_module.MPModule):
     def idle_task(self):
         '''called on idle'''
         now = time.time()
+        if len(self.OpenDroneID_vehicle_settings.UAS_ID) != 0:
+            # convert to bytes
+            UAS_ID_Bytes = self.to_bytes(self.OpenDroneID_vehicle_settings.UAS_ID, 16)
+            uas_id_len = self.param_set("DID_ID_LEN", len(self.OpenDroneID_vehicle_settings.UAS_ID))
+            if self.get_mav_param("DID_ID_LEN") != uas_id_len:
+                self.param_set("DID_ID_LEN", len(self.OpenDroneID_vehicle_settings.UAS_ID))
+            for i in range(8):
+                if self.get_mav_param("DID_ID{}".format(i)) != (UAS_ID_Bytes[2*i] | (UAS_ID_Bytes[2*i+1] << 8)):
+                    print("DID_ID{}".format(i), " {:x}{:x}".format(UAS_ID_Bytes[i+1] , UAS_ID_Bytes[i]))
+                    self.param_set("DID_ID{}".format(i), UAS_ID_Bytes[2*i] | (UAS_ID_Bytes[2*i+1] << 8))
         if now - self.last_loc_send_s > 1.0/self.OpenDroneID_settings.location_rate_hz:
             self.last_loc_send_s = now
             self.send_system_update()
