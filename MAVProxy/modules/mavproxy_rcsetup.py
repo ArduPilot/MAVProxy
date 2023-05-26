@@ -101,7 +101,7 @@ class RCSetupModule(mp_module.MPModule):
         if (self.calibrating == False):
             return
 
-        if m.get_type() == 'RC_CHANNELS_RAW':
+        if m.get_type() == 'RC_CHANNELS':
             for i in range(1,self.num_channels+1):
                 v = getattr(m, 'chan%u_raw' % i)
 
