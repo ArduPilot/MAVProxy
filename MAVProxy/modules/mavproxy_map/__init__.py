@@ -55,7 +55,8 @@ class MapModule(mp_module.MPModule):
               ('loitercircle',bool, False),
               ('showclicktime',int, 2),
               ('showwpnum',bool, True),
-              ('showdirection', bool, False)])
+              ('showdirection', bool, False),
+              ('setpos_accuracy', float, 50)])
         
         service='MicrosoftHyb'
         if 'MAP_SERVICE' in os.environ:
@@ -91,6 +92,7 @@ class MapModule(mp_module.MPModule):
         self.add_menu(MPMenuItem('Show Position', 'Show Position', 'showPosition'))
         self.add_menu(MPMenuItem('Google Maps Link', 'Google Maps Link', 'printGoogleMapsLink'))
         self.add_menu(MPMenuItem('Set ROI', 'Set ROI', '# map setroi '))
+        self.add_menu(MPMenuItem('Set Position', 'Set Position', '# map setposition '))
 
         self._colour_for_wp_command = {
             # takeoff commands
@@ -226,6 +228,8 @@ class MapModule(mp_module.MPModule):
             self.cmd_clear(args)
         elif args[0] == "setroi":
             self.cmd_set_roi(args)
+        elif args[0] == "setposition":
+            self.cmd_set_position(args)
         else:
             print("usage: map <icon|set>")
 
@@ -645,7 +649,27 @@ class MapModule(mp_module.MPModule):
             int(lat*1e7), # lat
             int(lon*1e7), # lon
             alt) # param7
-        
+
+    def cmd_set_position(self, args):
+        '''called when user selects "Set Position" on map'''
+        (lat, lon) = (self.mpstate.click_location[0], self.mpstate.click_location[1])
+        accuracy = self.map_settings.setpos_accuracy
+        print("Setting position to (%.7f %.7f) with accuracy %.1fm" % (lat, lon, accuracy))
+        now = time.time()
+        self.master.mav.command_int_send(
+            self.settings.target_system, self.settings.target_component,
+            mavutil.mavlink.MAV_FRAME_GLOBAL,
+            mavutil.mavlink.MAV_CMD_EXTERNAL_POSITION_ESTIMATE,
+            0, # current
+            0, # autocontinue
+            time.time() - self.mpstate.start_time_s, # transmission_time
+            0, # processing_time
+            self.map_settings.setpos_accuracy, # accuracy
+            0, # param4
+            int(lat*1e7), # lat
+            int(lon*1e7), # lon
+            float('NaN')) # alt, send as NaN for ignore
+            
     def cmd_set_origin(self, args):
         '''called when user selects "Set Origin (with height)" on map'''
         (lat, lon) = (self.mpstate.click_location[0], self.mpstate.click_location[1])
