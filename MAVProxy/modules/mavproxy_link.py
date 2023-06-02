@@ -671,7 +671,10 @@ class LinkModule(mp_module.MPModule):
                     self.status.last_mode_announced = master.flightmode
                     self.say("Mode " + self.status.flightmode)
 
-            if m.type == mavutil.mavlink.MAV_TYPE_FIXED_WING:
+            if m.type in [mavutil.mavlink.MAV_TYPE_FIXED_WING,
+                            mavutil.mavlink.MAV_TYPE_VTOL_DUOROTOR,
+                            mavutil.mavlink.MAV_TYPE_VTOL_QUADROTOR,
+                            mavutil.mavlink.MAV_TYPE_VTOL_TILTROTOR]:
                 self.mpstate.vehicle_type = 'plane'
                 self.mpstate.vehicle_name = 'ArduPlane'
             elif m.type in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER,
