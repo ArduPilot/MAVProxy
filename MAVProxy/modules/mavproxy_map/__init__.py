@@ -720,7 +720,10 @@ class MapModule(mp_module.MPModule):
         if mtype == "HEARTBEAT" or mtype == "HIGH_LATENCY2":
             vname = None
             vtype = self.vehicle_type_override.get(sysid, m.type)
-            if vtype in [mavutil.mavlink.MAV_TYPE_FIXED_WING]:
+            if vtype in [mavutil.mavlink.MAV_TYPE_FIXED_WING,
+                            mavutil.mavlink.MAV_TYPE_VTOL_DUOROTOR,
+                            mavutil.mavlink.MAV_TYPE_VTOL_QUADROTOR,
+                            mavutil.mavlink.MAV_TYPE_VTOL_TILTROTOR]:
                 vname = 'plane'
             elif vtype in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER]:
                 vname = 'rover'

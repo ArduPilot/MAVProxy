@@ -127,7 +127,10 @@ def colourmap_for_mav_type(mav_type):
                     mavutil.mavlink.MAV_TYPE_COAXIAL,
                     mavutil.mavlink.MAV_TYPE_TRICOPTER]:
         map = colour_map_copter
-    if mav_type == mavutil.mavlink.MAV_TYPE_FIXED_WING:
+    if mav_type in [mavutil.mavlink.MAV_TYPE_FIXED_WING,
+                    mavutil.mavlink.MAV_TYPE_VTOL_DUOROTOR,
+                    mavutil.mavlink.MAV_TYPE_VTOL_QUADROTOR,
+                    mavutil.mavlink.MAV_TYPE_VTOL_TILTROTOR]:
         map = colour_map_plane
     if mav_type in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER,
                     mavutil.mavlink.MAV_TYPE_SURFACE_BOAT]:
