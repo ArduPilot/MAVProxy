@@ -490,6 +490,9 @@ class ParamState:
         elif args[0] == "check":
             self.param_help.param_check(self.mav_param, args[1:])
         elif args[0] == "help":
+            if len(args) < 2:
+                print(usage)
+                return
             self.param_help.param_help(args[1:])
         elif args[0] == "set_xml_filepath":
             self.param_set_xml_filepath(args[1:])

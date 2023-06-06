@@ -991,12 +991,16 @@ def cmd_param(args):
     '''show parameters'''
     verbose = mestate.settings.paramdocs
     mlog = mestate.mlog
+    usage = "Usage: param <help|download|check|show|diff|save|savechanged>"
     global done_ftp_decode
     if isinstance(mlog, mavutil.mavfile) and not done_ftp_decode:
         done_ftp_decode = True
         ftp_decode(mlog)
     if len(args) > 0:
         if args[0] == 'help':
+            if len(args) < 2:
+                print(usage)
+                return
             set_vehicle_name()
             mestate.param_help.param_help(args[1:])
             return
