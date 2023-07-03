@@ -16,6 +16,8 @@ from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import wxsettings
 from MAVProxy.modules.lib.mp_menu import *
 
+green = (0, 128, 0)
+
 class DisplayItem:
     def __init__(self, fmt, expression, row):
         self.expression = expression.strip('"\'')
@@ -350,7 +352,7 @@ class ConsoleModule(mp_module.MPModule):
             nsats = msg.satellites_visible
             fix_type = msg.fix_type
             if fix_type >= 3:
-                self.console.set_status(field, '%s OK%s (%u)' % (prefix, fix_type, nsats), fg='green')
+                self.console.set_status(field, '%s OK%s (%u)' % (prefix, fix_type, nsats), fg=green)
             else:
                 self.console.set_status(field, '%s %u (%u)' % (prefix, fix_type, nsats), fg='red')
             if type == 'GPS_RAW_INT':
@@ -465,9 +467,9 @@ class ConsoleModule(mp_module.MPModule):
                 elif not healthy:
                     fg = 'red'
                 else:
-                    fg = 'green'
+                    fg = green
                 # for terrain show yellow if still loading
-                if s == 'TERR' and fg == 'green' and master.field('TERRAIN_REPORT', 'pending', 0) != 0:
+                if s == 'TERR' and fg == green and master.field('TERRAIN_REPORT', 'pending', 0) != 0:
                     fg = 'yellow'
                 self.console.set_status(s, s, fg=fg)
             announce_unhealthy = {
@@ -516,19 +518,19 @@ class ConsoleModule(mp_module.MPModule):
             elif highest >= 0.5:
                 fg = 'orange'
             else:
-                fg = 'green'
+                fg = green
             self.console.set_status('EKF', 'EKF', fg=fg)
 
     def handle_power_status(self, msg):
             if msg.Vcc >= 4600 and msg.Vcc <= 5300:
-                fg = 'green'
+                fg = green
             else:
                 fg = 'red'
             self.console.set_status('Vcc', 'Vcc %.2f' % (msg.Vcc * 0.001), fg=fg)
             if msg.flags & mavutil.mavlink.MAV_POWER_STATUS_CHANGED:
                 fg = 'red'
             else:
-                fg = 'green'
+                fg = green
             status = 'PWR:'
             if msg.flags & mavutil.mavlink.MAV_POWER_STATUS_USB_CONNECTED:
                 status += 'U'
@@ -541,7 +543,7 @@ class ConsoleModule(mp_module.MPModule):
             if msg.flags & mavutil.mavlink.MAV_POWER_STATUS_PERIPH_HIPOWER_OVERCURRENT:
                 status += 'O2'
             self.console.set_status('PWR', status, fg=fg)
-            self.console.set_status('Srv', 'Srv %.2f' % (msg.Vservo*0.001), fg='green')
+            self.console.set_status('Srv', 'Srv %.2f' % (msg.Vservo*0.001), fg=green)
 
     # this method is called on receipt of any HEARTBEAT so long as it
     # comes from the device we are interested in
@@ -557,7 +559,7 @@ class ConsoleModule(mp_module.MPModule):
             if len(self.vehicle_list) > 1:
                 self.console.set_status('SysID', 'Sys:%u' % sysid, fg='blue')
             if self.master.motors_armed():
-                arm_colour = 'green'
+                arm_colour = green
             else:
                 arm_colour = 'red'
             armstring = 'ARM'
@@ -692,7 +694,7 @@ class ConsoleModule(mp_module.MPModule):
                 if failed:
                     fg = 'red'
                 else:
-                    fg = 'green'
+                    fg = green
                 self.console.set_status(s, s, fg=fg)
                 
             # do the remaining non-standard system mappings
@@ -700,18 +702,18 @@ class ConsoleModule(mp_module.MPModule):
             if fence_failed:
                 fg = 'red'
             else:
-                fg = 'green'
+                fg = green
             self.console.set_status('Fence', 'FEN', fg=fg)
             gps_failed = ((msg.failure_flags & mavutil.mavlink.HL_FAILURE_FLAG_GPS) == mavutil.mavlink.HL_FAILURE_FLAG_GPS)
             if gps_failed:
                 self.console.set_status('GPS', 'GPS FAILED', fg='red')
             else:
-                self.console.set_status('GPS', 'GPS OK', fg='green')
+                self.console.set_status('GPS', 'GPS OK', fg=green)
             batt_failed = ((msg.failure_flags & mavutil.mavlink.HL_FAILURE_FLAG_GPS) == mavutil.mavlink.HL_FAILURE_FLAG_BATTERY)
             if batt_failed:
                 self.console.set_status('PWR', 'PWR FAILED', fg='red')
             else:
-                self.console.set_status('PWR', 'PWR OK', fg='green')
+                self.console.set_status('PWR', 'PWR OK', fg=green)
 
     # update user-added console entries; called after a mavlink packet
     # is received:
