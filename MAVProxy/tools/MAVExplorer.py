@@ -503,7 +503,7 @@ def cmd_dump(args):
             if fnmatch.fnmatch(t, p):
                 types.extend([t])
     while True:
-        msg = mlog.recv_match(type=types)
+        msg = mlog.recv_match(type=types, condition=mestate.settings.condition)
         if msg is None:
             break
         in_range = xlimits.timestamp_in_range(msg._timestamp)
