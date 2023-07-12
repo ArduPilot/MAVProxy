@@ -97,6 +97,7 @@ class MiscModule(mp_module.MPModule):
         self.add_command('longloop_autopilot', self.cmd_longloop_autopilot, "cause long loop in autopilot")
         self.add_command('internalerror_autopilot', self.cmd_internalerror_autopilot, "cause internal error in autopilot")
         self.add_command('dfu_boot', self.cmd_dfu_boot, "boot into DFU mode")
+        self.add_command('deadlock', self.cmd_deadlock, "trigger deadlock")
         self.add_command('batreset', self.cmd_battery_reset, "reset battery remaining")
         self.add_command('setorigin', self.cmd_setorigin, "set global origin")
         self.add_command('magsetfield', self.cmd_magset_field, "set expected mag field by field")
@@ -251,7 +252,11 @@ class MiscModule(mp_module.MPModule):
     def cmd_dfu_boot(self, args):
         '''boot into DFU bootloader without hold'''
         self.cmd_dosomethingreallynastyto_autopilot(args, 'DFU-boot-without-hold', 99)
-    
+
+    def cmd_deadlock(self, args):
+        '''trigger a mutex deadlock'''
+        self.cmd_dosomethingreallynastyto_autopilot(args, 'mutex-deadlock', 100)
+        
     def cmd_battery_reset(self, args):
         '''reset battery remaining'''
         mask = -1
