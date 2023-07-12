@@ -55,6 +55,7 @@ class MPSlipMapFrame(wx.Frame):
         state.grid = True
         state.follow = True
         state.download = True
+        state.keep_focus = True
         state.popup_object = None
         state.popup_latlon = None
         state.popup_started = False
@@ -76,6 +77,10 @@ class MPSlipMapFrame(wx.Frame):
                                'Enable Grid',
                                'toggleGrid',
                                checked=state.grid),
+                MPMenuCheckbox('Focus Map\tCtrl+K',
+                               'Keep Map Focused',
+                               'toggleFocus',
+                               checked=state.keep_focus),
                 MPMenuItem('Goto\tCtrl+P',
                            'Goto Position',
                            'gotoPosition'),
@@ -137,6 +142,8 @@ class MPSlipMapFrame(wx.Frame):
             state.legend = ret.IsChecked()
         elif ret.returnkey == 'toggleFollow':
             state.follow = ret.IsChecked()
+        elif ret.returnkey == 'toggleFocus':
+            state.keep_focus = ret.IsChecked()
         elif ret.returnkey == 'toggleDownload':
             state.download = ret.IsChecked()
         elif ret.returnkey == 'setService':
@@ -570,7 +577,8 @@ class MPSlipMapPanel(wx.Panel):
         self.mainSizer.Fit(self)
         self.Refresh()
         self.last_view = self.current_view()
-        self.SetFocus()
+        if state.keep_focus:
+            self.SetFocus()
         state.need_redraw = False
 
     def on_redraw_timer(self, event):
