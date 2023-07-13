@@ -106,6 +106,7 @@ class ConsoleModule(mp_module.MPModule):
             else:
                 row = 4
             self.user_added[args[1]] = DisplayItem(args[2], args[3], row)
+            self.console.set_status(args[1], "", row=row)
         elif cmd == 'list':
             for k in sorted(self.user_added.keys()):
                 d = self.user_added[k]
