@@ -42,6 +42,7 @@ class ParamState:
         self.param_help = param_help.ParamHelp()
         self.param_help.vehicle_name = vehicle_name
         self.default_params = None
+        self.watch_patterns = set()
 
     def use_ftp(self):
         '''return true if we should try ftp for download'''
@@ -90,6 +91,7 @@ class ParamState:
     def handle_mavlink_packet(self, master, m):
         '''handle an incoming mavlink packet'''
         if m.get_type() == 'PARAM_VALUE':
+            self.handle_mavlink_watch_param_value(master, m)
             value = self.handle_px4_param_value(m)
             param_id = "%.16s" % m.param_id
             # Note: the xml specifies param_index is a uint16, so -1 in that field will show as 65535
@@ -343,6 +345,27 @@ class ParamState:
         f.close()
         print("Saved %u parameters to %s" % (count, filename))
 
+    def handle_mavlink_watch_param_value(self, master, m):
+        param_id = "%.16s" % m.param_id
+        for pattern in self.watch_patterns:
+            if fnmatch.fnmatch(param_id, pattern):
+                self.mpstate.console.writeln("> %s=%f" % (param_id, m.param_value))
+
+    def param_watch(self, master, args):
+        '''command to allow addition of watches for parameter changes'''
+        for pattern in args:
+            self.watch_patterns.add(pattern)
+
+    def param_unwatch(self, master, args):
+        '''command to allow removal of watches for parameter changes'''
+        for pattern in args:
+            self.watch_patterns.discard(pattern)
+
+    def param_watchlist(self, master, args):
+        '''command to show watch patterns for parameter changes'''
+        for pattern in self.watch_patterns:
+            self.mpstate.console.writeln("> %s" % (pattern))
+
     def param_revert(self, master, args):
         '''handle param revert'''
         defaults = self.default_params
@@ -379,7 +402,7 @@ class ParamState:
     def handle_command(self, master, mpstate, args):
         '''handle parameter commands'''
         param_wildcard = "*"
-        usage="Usage: param <fetch|ftp|save|savechanged|revert|set|show|load|preload|forceload|ftpload|diff|download|check|help>"
+        usage="Usage: param <fetch|ftp|save|savechanged|revert|set|show|load|preload|forceload|ftpload|diff|download|check|help|watch|unwatch|watchlist>"
         if len(args) < 1:
             print(usage)
             return
@@ -425,6 +448,12 @@ class ParamState:
             self.param_savechanged(args[1:])
         elif args[0] == "revert":
             self.param_revert(master, args[1:])
+        elif args[0] == "watch":
+            self.param_watch(master, args[1:])
+        elif args[0] == "unwatch":
+            self.param_unwatch(master, args[1:])
+        elif args[0] == "watchlist":
+            self.param_watchlist(master, args[1:])
         elif args[0] == "set":
             if len(args) < 2:
                 print("Usage: param set PARMNAME VALUE")
