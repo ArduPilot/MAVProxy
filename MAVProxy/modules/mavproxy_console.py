@@ -93,7 +93,7 @@ class ConsoleModule(mp_module.MPModule):
             self.add_menu(self.vehicle_menu)
 
     def cmd_console(self, args):
-        usage = 'usage: console <add|list|remove>'
+        usage = 'usage: console <add|list|remove|menu>'
         if len(args) < 1:
             print(usage)
             return
@@ -119,6 +119,8 @@ class ConsoleModule(mp_module.MPModule):
             id = args[1]
             if id in self.user_added:
                 self.user_added.pop(id)
+        elif cmd == 'menu':
+            self.cmd_menu(args[1:])
         else:
             print(usage)
 
@@ -126,6 +128,24 @@ class ConsoleModule(mp_module.MPModule):
         '''add a new menu'''
         self.menu.add(menu)
         self.mpstate.console.set_menu(self.menu, self.menu_callback)
+
+    def cmd_menu_add(self, args):
+        '''add to console menus'''
+        if len(args) < 2:
+            print("Usage: console menu add MenuPath command")
+            return
+        menupath = args[0].split(':')
+        name = menupath[-1]
+        cmd = '# ' + ' '.join(args[1:])
+        self.menu.add_to_submenu(menupath[:-1], MPMenuItem(name, name, cmd))
+
+    def cmd_menu(self, args):
+        '''control console menus'''
+        if len(args) < 2:
+            print("Usage: console menu <add>")
+            return
+        if args[0] == 'add':
+            self.cmd_menu_add(args[1:])
 
     def remove_menu(self, menu):
         '''add a new menu'''
