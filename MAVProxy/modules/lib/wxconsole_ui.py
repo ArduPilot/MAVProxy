@@ -128,6 +128,8 @@ class ConsoleFrame(wx.Frame):
                 value = self.values[obj.name]
                 value.SetForegroundColour(obj.fg)
                 value.SetBackgroundColour(obj.bg)
+                # workaround wx bug on windows
+                value._foregroundColour = obj.fg
                 value.SetLabel(obj.text)
                 self.panel.Layout()
             elif isinstance(obj, Text):
