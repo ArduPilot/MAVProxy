@@ -231,6 +231,7 @@ class MPState(object):
         self.click_time = None
         self.vehicle_type = None
         self.vehicle_name = None
+        self.aircraft_dir = None
         from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
         self.settings = MPSettings(
             [ MPSetting('link', int, 1, 'Primary Link', tab='Link', range=(0,100), increment=1),
@@ -1456,6 +1457,12 @@ if __name__ == '__main__':
     if opts.map:
         process_stdin('module load map')
 
+    if (mpstate.settings.state_basedir is not None and
+        opts.aircraft is not None):
+        mpstate.aircraft_dir = os.path.join(mpstate.settings.state_basedir, opts.aircraft)
+    elif opts.aircraft is not None:
+        mpstate.aircraft_dir = opts.aircraft
+
     start_scripts = []
     if not opts.setup:
         if 'HOME' in os.environ:
@@ -1464,7 +1471,7 @@ if __name__ == '__main__':
         start_scripts.append(start_script)
     if (mpstate.settings.state_basedir is not None and
         opts.aircraft is not None):
-        start_script = os.path.join(mpstate.settings.state_basedir, opts.aircraft, "mavinit.scr")
+        start_script = os.path.join(mpstate.aircraft_dir, "mavinit.scr")
         start_scripts.append(start_script)
     for start_script in start_scripts:
         if os.path.exists(start_script):
