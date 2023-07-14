@@ -13,7 +13,12 @@ from pymavlink import mavutil
 class ChecklistModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(ChecklistModule, self).__init__(mpstate, "checklist", "checklist module")
-        self.checklist = mp_checklist.CheckUI()
+        checklist_file = None
+        if mpstate.aircraft_dir is not None:
+            path = os.path.join(mpstate.aircraft_dir, "checklist.txt")
+            if os.path.exists(path):
+                checklist_file = path
+        self.checklist = mp_checklist.CheckUI(checklist_file=checklist_file)
 
     def mavlink_packet(self, msg):
         '''handle an incoming mavlink packet'''

@@ -87,7 +87,8 @@ class ConsoleModule(mp_module.MPModule):
             self.add_menu(MPMenuSubMenu('MAVProxy',
                                         items=[MPMenuItem('Settings', 'Settings', 'menuSettings'),
                                                MPMenuItem('Show Map', 'Load Map', '# module load map'),
-                                               MPMenuItem('Show HUD', 'Load HUD', '# module load horizon')]))
+                                               MPMenuItem('Show HUD', 'Load HUD', '# module load horizon'),
+                                               MPMenuItem('Show Checklist', 'Load Checklist', '# module load checklist')]))
             self.vehicle_menu = MPMenuSubMenu('Vehicle', items=[])
             self.add_menu(self.vehicle_menu)
 
