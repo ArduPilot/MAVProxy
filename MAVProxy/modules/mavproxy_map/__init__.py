@@ -256,7 +256,7 @@ class MapModule(mp_module.MPModule):
         for i in range(len(polygons)):
             p = polygons[i]
             if len(p) > 1:
-                items = [MPMenuItem('Set', returnkey='popupMissionSet'),
+                items = [MPMenuItem('WP Set', returnkey='popupMissionSet'),
                          MPMenuItem('WP Remove', returnkey='popupMissionRemove'),
                          MPMenuItem('WP Move', returnkey='popupMissionMove'),
                          MPMenuItem('Remove NoFly', returnkey='popupMissionRemoveNoFly'),
