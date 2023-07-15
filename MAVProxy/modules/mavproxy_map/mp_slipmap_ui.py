@@ -570,7 +570,6 @@ class MPSlipMapPanel(wx.Panel):
         self.mainSizer.Fit(self)
         self.Refresh()
         self.last_view = self.current_view()
-        self.SetFocus()
         state.need_redraw = False
 
     def on_redraw_timer(self, event):
