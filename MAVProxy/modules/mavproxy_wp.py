@@ -74,7 +74,8 @@ class WPModule(mp_module.MPModule):
                                                                                  default=20)),
                                          MPMenuItem('Add Landing', 'Add Landing', '# wp add_landing'),
                                          MPMenuItem('Add RTL', 'Add RTL', '# wp add_rtl'),
-                                         MPMenuItem('Add DO_LAND_START', 'Add DO_LAND_START', '# wp add_dls')])
+                                         MPMenuItem('Add DO_LAND_START', 'Add DO_LAND_START', '# wp add_dls'),
+                                         MPMenuItem('Reset', 'Reset', '# wp set 0')])
 
     @property
     def wploader(self):
