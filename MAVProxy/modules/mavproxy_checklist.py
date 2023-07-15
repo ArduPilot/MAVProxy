@@ -22,9 +22,12 @@ class ChecklistModule(mp_module.MPModule):
 
     def mavlink_packet(self, msg):
         '''handle an incoming mavlink packet'''
+        if self.checklist is None:
+            return
         if not isinstance(self.checklist, mp_checklist.CheckUI):
             return
         if not self.checklist.is_alive():
+            self.needs_unloading = True
             return
 
         type = msg.get_type()
@@ -114,8 +117,10 @@ class ChecklistModule(mp_module.MPModule):
 
     def unload(self):
         '''unload module'''
-        self.checklist.close()
-        
+        if self.checklist is not None:
+            self.checklist.close()
+            self.checklist = None
+
 def init(mpstate):
     '''initialise module'''
     return ChecklistModule(mpstate)
