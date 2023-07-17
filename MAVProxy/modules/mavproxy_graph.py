@@ -114,12 +114,24 @@ class Graph():
         print("Adding graph: %s" % self.fields)
 
         fields = [ self.pretty_print_fieldname(x) for x in fields ]
+        labels = []
+        for i in range(len(fields)):
+            f = fields[i]
+            f1 = f.find("<")
+            f2 = f.find(">")
+            if f1 > 0 and f2 > f1:
+                labels.append(f[f1+1:f2])
+                fields[i] = f[:f1]
+            else:
+                labels.append(None)
 
+        self.fields = fields[:]
         self.values = [None] * len(self.fields)
         self.livegraph = live_graph.LiveGraph(fields,
                                               timespan=state.timespan,
                                               tickresolution=state.tickresolution,
-                                              title=self.fields[0])
+                                              title=fields[0] if labels[0] is None else labels[0],
+                                              labels=labels)
 
     def pretty_print_fieldname(self, fieldname):
         if fieldname in self.state.legend:

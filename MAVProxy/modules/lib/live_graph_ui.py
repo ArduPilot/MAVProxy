@@ -84,12 +84,19 @@ class GraphFrame(wx.Frame):
             max_y = min_y = 0
         else:
             max_y = min_y = self.data[0][0]
+        num_labels = 0 if not self.state.labels else len(self.state.labels)
+        labels = []
         for i in range(len(self.data)):
+            if i < num_labels and self.state.labels[i] is not None:
+                label = self.state.labels[i]
+            else:
+                label = self.state.fields[i]
+            labels.append(label)
             p = self.axes.plot(
                 self.data[i],
                 linewidth=1,
                 color=self.state.colors[i],
-                label=self.state.fields[i],
+                label=label
                 )[0]
             self.plot_data.append(p)
             if len(self.data[i]) != 0:
@@ -101,7 +108,7 @@ class GraphFrame(wx.Frame):
         self.axes.set_xbound(lower=self.xdata[0], upper=0)
         if min_y == max_y:
             self.axes.set_ybound(min_y, max_y+0.1)
-        self.axes.legend(self.state.fields, loc='upper left', bbox_to_anchor=(0, 1.1))
+        self.axes.legend(labels, loc='upper left', bbox_to_anchor=(0, 1.1))
 
     def draw_plot(self):
         """ Redraws the plot

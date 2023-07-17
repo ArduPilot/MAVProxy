@@ -26,8 +26,10 @@ class LiveGraph():
                  timespan=20.0,
                  tickresolution=0.2,
                  colors=[ 'red', 'green', 'blue', 'orange', 'olive', 'cyan', 'magenta', 'brown',
-                          'violet', 'purple', 'grey', 'black']):
+                          'violet', 'purple', 'grey', 'black'],
+                 labels=None):
         self.fields = fields
+        self.labels = labels
         self.colors = colors
         self.title  = title
         self.timespan = timespan
@@ -79,10 +81,11 @@ if __name__ == "__main__":
     import time, math
     import live_graph
     livegraph = live_graph.LiveGraph(['sin(t)', 'cos(t)', 'sin(t+1)',
-                           'cos(t+1)', 'sin(t+2)', 'cos(t+2)',
-                           'cos(t+1)', 'sin(t+2)', 'cos(t+2)', 'x'],
-                          timespan=30,
-                          title='Graph Test')
+                                      'cos(t+1)', 'sin(t+2)', 'cos(t+2)',
+                                      'cos(t+1)', 'sin(t+2)', 'cos(t+2)', 'x'],
+                                      timespan=30,
+                                      title='Graph Test',
+                                      labels=['a','b','c','d'])
     while livegraph.is_alive():
         t = time.time()
         livegraph.add_values([math.sin(t), math.cos(t),
