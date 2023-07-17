@@ -20,7 +20,6 @@ class DisplayItem:
         self.format = fmt.strip('"\'')
         re_caps = re.compile('[A-Z_][A-Z0-9_]+')
         self.msg_types = set(re.findall(re_caps, expression))
-        print(self.expression, self.msg_types)
         self.row = row
 
 class ConsoleModule(mp_module.MPModule):
@@ -711,11 +710,12 @@ class ConsoleModule(mp_module.MPModule):
         for id in self.user_added.keys():
             if type in self.user_added[id].msg_types:
                 d = self.user_added[id]
-                val = mavutil.evaluate_expression(d.expression, self.master.messages)
                 try:
+                    val = mavutil.evaluate_expression(d.expression, self.master.messages)
                     self.console.set_status(id, d.format % val, row = d.row)
                 except Exception as ex:
-                    print(ex)
+                    if self.mpstate.settings.moddebug > 1:
+                        print(ex)
                     pass
 
     def idle_task(self):
