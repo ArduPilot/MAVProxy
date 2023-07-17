@@ -5,12 +5,14 @@ import time, os
 from pymavlink import mavutil
 
 from MAVProxy.modules.lib import mp_module
+from MAVProxy.modules.lib import mp_util
 
 class ModeModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(ModeModule, self).__init__(mpstate, "mode", public=True)
         self.add_command('mode', self.cmd_mode, "mode change", self.available_modes())
         self.add_command('guided', self.cmd_guided, "fly to a clicked location on map")
+        self.add_command('confirm', self.cmd_confirm, "confirm a command")
 
     def cmd_mode(self, args):
         '''set arbitrary mode'''
@@ -30,6 +32,19 @@ class ModeModule(mp_module.MPModule):
                 return
             modenum = mode_mapping[mode]
         self.master.set_mode(modenum)
+
+    def cmd_confirm(self, args):
+        '''confirm a command'''
+        if len(args) < 2:
+            print('Usage: confirm "Question to display" command <arguments>')
+            return
+        question = args[0].strip('"')
+        command = ' '.join(args[1:])
+        if not mp_util.has_wxpython:
+            print("No UI available for confirm")
+            return
+        from MAVProxy.modules.lib import mp_menu
+        mp_menu.MPMenuConfirmDialog(question, callback=self.mpstate.functions.process_stdin, args=command)
 
     def available_modes(self):
         if self.master is None:

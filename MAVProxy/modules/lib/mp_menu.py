@@ -351,6 +351,26 @@ class MPMenuCallTextDialog(object):
             return None
         return dlg.GetValue()
 
+class MPMenuConfirmDialog(object):
+    '''used to create a confirmation dialog'''
+    def __init__(self, title='Confirmation', message='', callback=None, args=None):
+        self.title = title
+        self.message = message
+        self.callback = callback
+        self.args = args
+        t = multiproc.Process(target=self.thread)
+        t.start()
+
+    def thread(self):
+        mp_util.child_close_fds()
+        from MAVProxy.modules.lib import wx_processguard
+        from MAVProxy.modules.lib.wx_loader import wx
+        app = wx.App(False)
+        dlg = wx.MessageDialog(None, self.title, self.message, wx.YES|wx.NO)
+        ret = dlg.ShowModal()
+        if ret == wx.ID_YES and self.callback is not None:
+            self.callback(self.args)
+
 class MPMenuChildMessageDialog(object):
     '''used to create a message dialog in a child process'''
     def __init__(self, title='Information', message='', font_size=18):

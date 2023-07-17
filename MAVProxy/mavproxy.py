@@ -72,6 +72,7 @@ if __name__ == '__main__':
 
 #The MAVLink version being used (None, "1.0", "2.0")
 mavversion = None
+mpstate = None
 
 class MPStatus(object):
     '''hold status information about the mavproxy'''
@@ -1326,8 +1327,8 @@ if __name__ == '__main__':
     mpstate.command_map = command_map
     mpstate.continue_mode = opts.continue_mode
     # queues for logging
-    mpstate.logqueue = Queue.Queue()
-    mpstate.logqueue_raw = Queue.Queue()
+    mpstate.logqueue = multiproc.Queue()
+    mpstate.logqueue_raw = multiproc.Queue()
 
 
     if opts.speech:
@@ -1425,7 +1426,7 @@ if __name__ == '__main__':
     heartbeat_period = mavutil.periodic_event(1)
     heartbeat_check_period = mavutil.periodic_event(0.33)
 
-    mpstate.input_queue = Queue.Queue()
+    mpstate.input_queue = multiproc.Queue()
     mpstate.input_count = 0
     mpstate.empty_input_count = 0
     if opts.setup:
