@@ -134,7 +134,7 @@ class ConsoleModule(mp_module.MPModule):
         if len(args) < 2:
             print("Usage: console menu add MenuPath command")
             return
-        menupath = args[0].split(':')
+        menupath = args[0].strip('"').split(':')
         name = menupath[-1]
         cmd = '# ' + ' '.join(args[1:])
         self.menu.add_to_submenu(menupath[:-1], MPMenuItem(name, name, cmd))
