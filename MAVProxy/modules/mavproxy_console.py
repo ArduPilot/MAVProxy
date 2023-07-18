@@ -137,6 +137,7 @@ class ConsoleModule(mp_module.MPModule):
         name = menupath[-1]
         cmd = '# ' + ' '.join(args[1:])
         self.menu.add_to_submenu(menupath[:-1], MPMenuItem(name, name, cmd))
+        self.mpstate.console.set_menu(self.menu, self.menu_callback)
 
     def cmd_menu(self, args):
         '''control console menus'''
