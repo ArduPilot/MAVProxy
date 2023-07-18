@@ -151,17 +151,6 @@ class MissionEditorEventThread(threading.Thread):
 
                     elif event_type == me_event.MEE_LOAD_WP_FILE:
                         self.module('wp').cmd_wp(['load',event.get_arg("path")])
-                        #Wait for the other thread to finish loading waypoints.
-                        #don't let this loop run forever in case we have a lousy
-                        #link to the plane
-                        i = 0
-                        while (i < 10 and
-                               self.module('wp').loading_waypoints):
-                            time.sleep(1)
-                            i = i + 1
-
-                            #don't modify queue while in the middile of processing it:
-                            request_read_after_processing_queue = True
 
                     elif event_type == me_event.MEE_SAVE_WP_FILE:
                         self.module('wp').cmd_wp(['save',event.get_arg("path")])
