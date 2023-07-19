@@ -120,7 +120,7 @@ class movinghome(mp_module.MPModule):
                     print("movinghome: decode error; baudrate issue?")
                     self.last_decode_error_print = now
                 return
-            if (data.startswith("$GPGGA")):
+            if (data.startswith("$GPGGA") or data.startswith("$GNGGA")):
                 msg = pynmea2.parse(data)
                 if int(msg.num_sats) > 5:
                     #convert LAT
