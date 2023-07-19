@@ -134,6 +134,10 @@ class GraphFrame(wx.Frame):
         if (ymin, ymax) != self.last_yrange:
             self.last_yrange = (ymin, ymax)
 
+            if ymax == ymin:
+                ymin = ymin-0.5
+                ymax = ymin+1
+
             self.axes.set_ybound(lower=ymin, upper=ymax)
             #self.axes.ticklabel_format(useOffset=False, style='plain')
             self.axes.grid(True, color='gray')
