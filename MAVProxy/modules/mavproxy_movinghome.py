@@ -149,8 +149,8 @@ class movinghome(mp_module.MPModule):
                             message = "GCS moved "
                             message2 = message + "%.0f" % self.dist + "meters"
                             self.say("%s: %s" % (self.name,message2))
-                            message2_enc = message2.encode(bytes)
-                            self.master.mav.statustext_send(mavutil.mavlink.MAV_SEVERITY_NOTICE, message2)
+                            message2_enc = message2.encode("utf-8")
+                            self.master.mav.statustext_send(mavutil.mavlink.MAV_SEVERITY_NOTICE, message2_enc)
                         self.console.writeln("home position updated")
 
                         self.master.mav.command_int_send(
