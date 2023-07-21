@@ -20,7 +20,7 @@ class FenceModule(mp_module.MPModule):
         self.enabled = False
         self.healthy = True
         self.add_command('fence', self.cmd_fence,
-                         "geo-fence management",
+                         "fence item protocol geo-fence management",
                          ["<draw|list|clear|enable|disable|move|remove>",
                           "<load|save> (FILENAME)"])
 
