@@ -787,6 +787,7 @@ on'''
         self.wploader.clear()
         if getattr(self.wploader, 'expected_count', None) is not None:
             self.wploader.expected_count = 0
+        self.wploader.expected_count = 0
         self.loading_waypoint_lasttime = time.time()
 
     def cmd_list(self, args):
