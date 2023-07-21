@@ -15,7 +15,7 @@ class RallyModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(RallyModule, self).__init__(mpstate, "rally", "rally point control", public = True)
         self.rallyloader_by_sysid = {}
-        self.add_command('rally', self.cmd_rally, "rally point control", ["<add|clear|land|list|move|remove|>",
+        self.add_command('rally', self.cmd_rally, "old rally point control", ["<add|clear|land|list|move|remove|>",
                                     "<load|save> (FILENAME)"])
         self.have_list = False
         self.abort_alt = 50
