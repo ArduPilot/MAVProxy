@@ -290,7 +290,7 @@ class MissionEditorMain(object):
             #write has been sent by the mission editor:
             elif (self.num_wps_expected > 1):
                 if (m.count != self.num_wps_expected):
-                    self.mpstate.console.error("Unexpected waypoint count from vehicle after write (Editor)")
+                    self.mpstate.console.error("wpedit: mission is stale")
                 #since this is a write operation from the Editor there
                 #should be no need to update number of table rows
 
