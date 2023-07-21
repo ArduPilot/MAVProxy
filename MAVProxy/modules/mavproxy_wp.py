@@ -84,7 +84,6 @@ class WPModule(mp_module.MPModule):
                             default=100)),
                     MPMenuItem('Undo', 'Undo', '# wp undo'),
                     MPMenuItem('Loop', 'Loop', '# wp loop'),
-                    MPMenuItem('Add NoFly', 'Loop', '# wp noflyadd'),
                     MPMenuItem(
                         'Add Takeoff', 'Add Takeoff', '# wp add_takeoff ',
                         handler=MPMenuCallTextDialog(
@@ -821,8 +820,6 @@ class WPModule(mp_module.MPModule):
             self.set_home_location()
         elif args[0] == "loop":
             self.wp_loop()
-        elif args[0] == "noflyadd":
-            self.nofly_add()
         elif args[0] == "status":
             self.wp_status()
         elif args[0] == "slope":
@@ -1140,32 +1137,6 @@ class WPModule(mp_module.MPModule):
         self.loading_waypoint_lasttime = time.time()
         self.master.waypoint_count_send(self.wploader.count())
         print("Closed loop on mission")
-
-    def nofly_add(self):
-        '''add a square flight exclusion zone'''
-        latlon = self.mpstate.click_location
-        if latlon is None:
-            print("No position chosen")
-            return
-        loader = self.wploader
-        (center_lat, center_lon) = latlon
-        points = []
-        points.append(mp_util.gps_offset(center_lat, center_lon, -25, 25))
-        points.append(mp_util.gps_offset(center_lat, center_lon, 25, 25))
-        points.append(mp_util.gps_offset(center_lat, center_lon, 25, -25))
-        points.append(mp_util.gps_offset(center_lat, center_lon, -25, -25))
-        start_idx = loader.count()
-        for p in points:
-            wp = mavutil.mavlink.MAVLink_mission_item_message(
-                0, 0, 0, 0, mavutil.mavlink.MAV_CMD_NAV_FENCE_POLYGON_VERTEX_EXCLUSION, 0, 1, 4, 0, 0, 0, p[0], p[1], 0
-            )
-            loader.add(wp)
-        self.loading_waypoints = True
-        self.loading_waypoint_lasttime = time.time()
-        self.master.mav.mission_write_partial_list_send(self.target_system,
-                                                        self.target_component,
-                                                        start_idx, start_idx+4)
-        print("Added nofly zone")
 
     def wp_add_takeoff(self, args):
         '''add a takeoff as first mission item'''
