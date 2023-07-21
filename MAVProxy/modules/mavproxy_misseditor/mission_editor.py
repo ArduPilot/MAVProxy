@@ -306,6 +306,12 @@ class MissionEditorMain(object):
                         lat=m.x,lon=m.y,alt=m.z,frame=m.frame))
 
                     self.wps_received[m.seq] = True
+                    if len(self.wps_received) == self.num_wps_expected:
+                        # if we have received everything then reset
+                        # our state to indicate we're not currently
+                        # expecting waypoints.  That way if we receive
+                        # a count we don't expect we don't spew errors
+                        self.num_wps_expected = -1
 
     def child_task(self, q, l, gq, gl, cw_sem, elemodel):
         '''child process - this holds GUI elements'''
