@@ -550,6 +550,7 @@ on'''
     def send_single_waypoint(self, idx):
         self.loading_waypoints = True
         self.loading_waypoint_lasttime = time.time()
+        self.upload_start = time.time()
         self.master.mav.mission_write_partial_list_send(
             self.target_system,
             self.target_component,
