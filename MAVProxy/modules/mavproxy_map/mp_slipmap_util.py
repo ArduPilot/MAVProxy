@@ -206,8 +206,8 @@ class SlipCircle(SlipObject):
 
         dx = self.center_px[0] - px
         dy = self.center_px[1] - py
-        ret = abs(dx*dx+dy*dy - radius_px*radius_px)
-        if ret > 100:  # threshold of within 10 pixels for a click to count
+        ret = abs(math.sqrt(dx*dx+dy*dy) - radius_px)
+        if ret > 10:  # threshold of within 10 pixels for a click to count
             return None
         return ret
 
