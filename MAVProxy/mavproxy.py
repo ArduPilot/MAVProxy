@@ -356,6 +356,62 @@ class MPState(object):
             return self.public_modules[name]
         return None
 
+    def load_module(self, modname, quiet=False, **kwargs):
+        '''load a module'''
+        modpaths = ['MAVProxy.modules.mavproxy_%s' % modname, modname]
+        for (m,pm) in mpstate.modules:
+            if m.name == modname and not modname in mpstate.multi_instance:
+                if not quiet:
+                    print("module %s already loaded" % modname)
+                # don't report an error
+                return True
+        ex = None
+        for modpath in modpaths:
+            try:
+                m = import_package(modpath)
+                reload(m)
+                module = m.init(mpstate, **kwargs)
+                if isinstance(module, mp_module.MPModule):
+                    mpstate.modules.append((module, m))
+                    if not quiet:
+                        if kwargs:
+                            print("Loaded module %s with kwargs = %s" % (modname, kwargs))
+                        else:
+                            print("Loaded module %s" % (modname,))
+                    return True
+                else:
+                    ex = "%s.init did not return a MPModule instance" % modname
+                    break
+            except ImportError as msg:
+                ex = msg
+                if mpstate.settings.moddebug > 1:
+                    print(get_exception_stacktrace(ex))
+        help_traceback = ""
+        if mpstate.settings.moddebug < 3:
+            help_traceback = " Use 'set moddebug 3' in the MAVProxy console to enable traceback"
+        print("Failed to load module: %s.%s" % (ex, help_traceback))
+        return False
+
+    def unload_module(self, modname):
+        '''unload a module'''
+        for (m,pm) in mpstate.modules:
+            if m.name == modname:
+                if hasattr(m, 'unload'):
+                    t = threading.Thread(target=lambda : m.unload(), name="unload %s" % modname)
+                    t.start()
+                    t.join(timeout=5)
+                    if t.is_alive():
+                        print("unload on module %s did not complete" % m.name)
+                        mpstate.modules.remove((m,pm))
+                        return False
+                mpstate.modules.remove((m,pm))
+                if modname in mpstate.public_modules:
+                    del mpstate.public_modules[modname]
+                print("Unloaded module %s" % modname)
+                return True
+        print("Unable to find module %s" % modname)
+        return False
+
     def master(self, target_sysid = -1):
         '''return the currently chosen mavlink master object'''
         if len(self.mav_master) == 0:
@@ -513,62 +569,6 @@ def get_exception_stacktrace(e):
         return ret
     return traceback.format_exc(e)
 
-def load_module(modname, quiet=False, **kwargs):
-    '''load a module'''
-    modpaths = ['MAVProxy.modules.mavproxy_%s' % modname, modname]
-    for (m,pm) in mpstate.modules:
-        if m.name == modname and not modname in mpstate.multi_instance:
-            if not quiet:
-                print("module %s already loaded" % modname)
-            # don't report an error
-            return True
-    ex = None
-    for modpath in modpaths:
-        try:
-            m = import_package(modpath)
-            reload(m)
-            module = m.init(mpstate, **kwargs)
-            if isinstance(module, mp_module.MPModule):
-                mpstate.modules.append((module, m))
-                if not quiet:
-                    if kwargs:
-                        print("Loaded module %s with kwargs = %s" % (modname, kwargs))
-                    else:
-                        print("Loaded module %s" % (modname,))
-                return True
-            else:
-                ex = "%s.init did not return a MPModule instance" % modname
-                break
-        except ImportError as msg:
-            ex = msg
-            if mpstate.settings.moddebug > 1:
-                print(get_exception_stacktrace(ex))
-    help_traceback = ""
-    if mpstate.settings.moddebug < 3:
-        help_traceback = " Use 'set moddebug 3' in the MAVProxy console to enable traceback"
-    print("Failed to load module: %s.%s" % (ex, help_traceback))
-    return False
-
-def unload_module(modname):
-    '''unload a module'''
-    for (m,pm) in mpstate.modules:
-        if m.name == modname:
-            if hasattr(m, 'unload'):
-                t = threading.Thread(target=lambda : m.unload(), name="unload %s" % modname)
-                t.start()
-                t.join(timeout=5)
-                if t.is_alive():
-                    print("unload on module %s did not complete" % m.name)
-                    mpstate.modules.remove((m,pm))
-                    return False
-            mpstate.modules.remove((m,pm))
-            if modname in mpstate.public_modules:
-                del mpstate.public_modules[modname]
-            print("Unloaded module %s" % modname)
-            return True
-    print("Unable to find module %s" % modname)
-    return False
-
 def cmd_module(args):
     '''module commands'''
     usage = "usage: module <list|load|reload|unload>"
@@ -588,7 +588,7 @@ def cmd_module(args):
             return
         (modname, kwargs) = generate_kwargs(args[1])
         try:
-            load_module(modname, **kwargs)
+            mpstate.load_module(modname, **kwargs)
         except TypeError as ex:
             print(ex)
             print("%s module does not support keyword arguments"% modname)
@@ -605,7 +605,7 @@ def cmd_module(args):
         if pmodule is None:
             print("Module %s not loaded" % modname)
             return
-        if unload_module(modname):
+        if mpstate.unload_module(modname):
             import zipimport
             try:
                 reload(pmodule)
@@ -613,7 +613,7 @@ def cmd_module(args):
                 clear_zipimport_cache()
                 reload(pmodule)
             try:
-                if load_module(modname, quiet=True, **kwargs):
+                if mpstate.load_module(modname, quiet=True, **kwargs):
                     print("Reloaded module %s" % modname)
             except TypeError:
                 print("%s module does not support keyword arguments" % modname)
@@ -622,7 +622,7 @@ def cmd_module(args):
             print("usage: module unload <name>")
             return
         modname = os.path.basename(args[1])
-        unload_module(modname)
+        mpstate.unload_module(modname)
     else:
         print(usage)
 
@@ -1052,7 +1052,7 @@ def periodic_tasks():
 
         # also see if the module should be unloaded:
         if m.needs_unloading:
-            unload_module(m.name)
+            mpstate.unload_module(m.name)
 
 def main_loop():
     '''main processing loop'''
@@ -1334,7 +1334,7 @@ if __name__ == '__main__':
     if opts.speech:
         # start the speech-dispatcher early, so it doesn't inherit any ports from
         # modules/mavutil
-        load_module('speech')
+        mpstate.load_module('speech')
 
     serial_list = mavutil.auto_detect_serial(preferred_list=preferred_ports)
     serial_list.sort(key=lambda x: x.device)
@@ -1378,7 +1378,7 @@ if __name__ == '__main__':
     for sig in fatalsignals:
         signal.signal(sig, quit_handler)
 
-    load_module('link', quiet=True)
+    mpstate.load_module('link', quiet=True)
 
     mpstate.settings.source_system = opts.SOURCE_SYSTEM
     mpstate.settings.source_component = opts.SOURCE_COMPONENT
@@ -1445,7 +1445,7 @@ if __name__ == '__main__':
         standard_modules = opts.default_modules.split(',')
         for m in standard_modules:
             if m:
-                load_module(m, quiet=True)
+                mpstate.load_module(m, quiet=True)
 
     if platform.system() != 'Windows':
         if opts.console:
