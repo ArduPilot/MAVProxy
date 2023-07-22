@@ -72,6 +72,11 @@ class LinkModule(mp_module.MPModule):
         self.old_streamrate = 0
         self.old_streamrate2 = 0
 
+        # some parameters for ensuring we don't print too many
+        # exceptions, flooding the console:
+        self.last_exception_print = 0
+        self.squelched_exception_print_count = 0
+
         self.menu_added_console = False
         if mp_util.has_wxpython:
             self.menu_rm = MPMenuSubMenu('Remove', items=[])
@@ -119,6 +124,18 @@ class LinkModule(mp_module.MPModule):
                                   str(self.status.bytecounters['MasterIn'][master.linknum].total()) + "," +
                                   str(linkdelay) + "," +
                                   str(100 * round(master.packet_loss(), 3)) + "\n")
+
+        now = time.time()
+        if now - self.last_exception_print > 5:
+            self.check_squelched_exception_prints()
+
+    def check_squelched_exception_prints(self):
+        '''if exceptions have been squelched then warn about that'''
+        if self.squelched_exception_print_count == 0:
+            return
+        print("%u exceptions have been squelched" % self.squelched_exception_print_count)
+        self.squelched_exception_print_count = 0
+        self.last_exception_print = time.time()
 
     def complete_serial_ports(self, text):
         '''return list of serial ports'''
@@ -866,6 +883,15 @@ class LinkModule(mp_module.MPModule):
         '''handle an incoming mavlink packet'''
         pass
 
+    def get_exception_stacktrace(self, e):
+        if sys.version_info[0] >= 3:
+            ret = "%s\n" % e
+            ret += ''.join(traceback.format_exception(type(e),
+                                                      e,
+                                                      tb=e.__traceback__))
+            return ret
+        return traceback.format_exc(e)
+
     def master_callback(self, m, master):
         '''process mavlink message m on master, sending any messages to recipients'''
         sysid = m.get_srcSystem()
@@ -981,9 +1007,15 @@ class LinkModule(mp_module.MPModule):
                     if self.mpstate.settings.moddebug == 1:
                         print(msg)
                     elif self.mpstate.settings.moddebug > 1:
-                        exc_type, exc_value, exc_traceback = sys.exc_info()
-                        traceback.print_exception(exc_type, exc_value, exc_traceback,
-                                                  limit=2, file=sys.stdout)
+                        # print a stacktrace for the exception, but at
+                        # most one exception each 5 seconds:
+                        now = time.time()
+                        if now - self.last_exception_print < 5:
+                            self.squelched_exception_print_count += 1
+                        else:
+                            self.check_squelched_exception_prints()
+                            print(self.get_exception_stacktrace(msg))
+                            self.last_exception_print = now
 
     def cmd_vehicle(self, args):
         '''handle vehicle commands'''
