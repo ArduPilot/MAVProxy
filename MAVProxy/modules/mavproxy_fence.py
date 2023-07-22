@@ -579,6 +579,8 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
         if moving_item.get_type() == "MISSION_ITEM_INT":
             moving_item.x *= 1e7
             moving_item.y *= 1e7
+            moving_item.x = int(moving_item.x)
+            moving_item.y = int(moving_item.y)
 
         self.wploader.set(moving_item, moving_item.seq)
         self.wploader.last_change = time.time()
