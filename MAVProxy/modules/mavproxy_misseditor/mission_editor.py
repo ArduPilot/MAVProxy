@@ -124,6 +124,7 @@ class MissionEditorEventThread(threading.Thread):
 
                     elif event_type == me_event.MEE_WRITE_WPS:
                         self.module('wp').wploader.clear()
+                        self.module('wp').wploader.expected_count = event.get_arg("count")
                         self.master().waypoint_count_send(event.get_arg("count"))
                         self.mp_misseditor.num_wps_expected = event.get_arg("count")
                         self.mp_misseditor.wps_received = {}
