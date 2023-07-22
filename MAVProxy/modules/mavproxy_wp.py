@@ -252,7 +252,7 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
 
     def wp_draw_callback(self, points):
         '''callback from drawing waypoints'''
-        if len(points) < 3:
+        if len(points) < 2:
             return
         self.wploader.target_system = self.target_system
         self.wploader.target_component = self.target_component
