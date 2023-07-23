@@ -235,7 +235,6 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
         self.append(items)
         self.send_all_items()
         self.wploader.last_change = time.time()
-        print("Reset last changed time to %f" % self.wploader.last_change)
 
     def cmd_draw(self, args):
         '''convenience / compatability / slow learner command to work like the

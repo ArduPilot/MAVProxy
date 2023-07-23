@@ -380,7 +380,7 @@ on'''
         '''process a waypoint request from the master'''
         if m.mission_type != self.mav_mission_type():
             return
-        print("Processing %s request: (%s)" % (self.itemtype(), str(m)))
+        # print("Processing %s request: (%s)" % (self.itemtype(), str(m)))
         if (m.target_system != self.settings.source_system or
                 m.target_component != self.settings.source_component):
             # self.console.error("Mission request is not for me")
@@ -678,7 +678,6 @@ on'''
             wp.z = newalt
             wp.target_system = self.target_system
             wp.target_component = self.target_component
-            print("new wp: (%s)" % str(wp))
             self.wploader.set(wp, offset)
 
         self.wploader.last_change = time.time()
@@ -778,7 +777,6 @@ on'''
         wp.target_component = self.target_component
         self.wploader.set(wp, idx)
         self.wploader.last_change = time.time()
-        print("Set param %u for %u to %f" % (pnum, idx, param[pnum-1]))
         self.send_single_waypoint(idx)
 
     def cmd_clear(self, args):
@@ -796,7 +794,6 @@ on'''
         self.request_list_send()
 
     def cmd_load(self, args):
-        print("args: %s" % str(args))
         if len(args) != 1:
             print("usage: %s load FILENAME" % self.command_name())
             return
@@ -912,8 +909,6 @@ on'''
         '''save waypoints to a file in human-readable CSV file'''
         f = open(filename, mode='w')
         headers = ["Seq", "Frame", "Cmd", "P1", "P2", "P3", "P4", "X", "Y", "Z"]
-        print(self.csv_line(headers))
-        f.write(self.csv_line(headers) + "\n")
         for w in self.wploader.wpoints:
             if getattr(w, 'comment', None):
                 #                f.write("# %s\n" % w.comment)
@@ -930,7 +925,6 @@ on'''
                 self.pretty_parameter_value(w.y),
                 self.pretty_parameter_value(w.z),
             ]
-            print(self.csv_line(out_list))
             f.write(self.csv_line(out_list) + "\n")
         f.close()
 
@@ -952,7 +946,6 @@ on'''
         if ftp is None:
             print("Need ftp module")
             return
-        print("Fetching mission with ftp")
         self.ftp_count = None
         ftp.cmd_get([self.mission_ftp_name()], callback=self.ftp_callback, callback_progress=self.ftp_callback_progress)
 
