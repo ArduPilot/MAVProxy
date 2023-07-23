@@ -974,10 +974,17 @@ class MapModule(mp_module.MPModule):
             self.rally_change_time = time.time()
 
         # if the fence has changed, redisplay
-        if (self.module('fence') and
-            self.fence_change_time != self.module('fence').last_change()):
-            self.fence_change_time = self.module('fence').last_change()
-            self.display_fence()
+        fence_module = self.module('fence')
+        if fence_module is not None:
+            if hasattr(fence_module, 'last_change'):
+                # new fence module
+                last_change = fence_module.last_change()
+            else:
+                # old fence module
+                last_change = fence_module.fenceloader.last_change
+            if self.fence_change_time != last_change:
+                self.fence_change_time = last_change
+                self.display_fence()
 
         # if the rallypoints have changed, redisplay
         if (self.module('rally') and

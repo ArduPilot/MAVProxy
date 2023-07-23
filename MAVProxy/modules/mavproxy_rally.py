@@ -15,10 +15,7 @@ if mp_util.has_wxpython:
 class RallyModule(mission_item_protocol.MissionItemProtocolModule):
 
     def __init__(self, mpstate):
-        '''initialise module; will raise AttributeError if pymavlink is too
-        old to use'''
-        # raise an attribute error if pymavlink is too old:
-        mavwp.MissionItemProtocol_Rally
+        '''initialise module'''
         super(RallyModule, self).__init__(
             mpstate,
             "rally",
@@ -140,4 +137,17 @@ class RallyModule(mission_item_protocol.MissionItemProtocolModule):
 
 def init(mpstate):
     '''initialise module'''
+
+    # see if pymavlink is new enough to support new protocols:
+    oldmodule = "rallypoint_protocol"
+    try:
+        mavwp.MissionItemProtocol_Rally
+    except AttributeError:
+        print("pymavlink too old; using old %s module" % oldmodule)
+        mpstate.load_module(oldmodule)
+        for (m, pm) in mpstate.modules:
+            if m.name == "rally":
+                return m
+        return None
+
     return RallyModule(mpstate)
