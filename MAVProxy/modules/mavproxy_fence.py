@@ -22,9 +22,6 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
     '''
 
     def __init__(self, mpstate):
-        '''initialise module; will raise AttributeError if pymavlink is too
-        old to use'''
-        mavwp.MissionItemProtocol_Fence # raise an attribute error if pymavlink is too old
         super(FenceModule, self).__init__(mpstate, "fence", "fence point management (new)", public=True)
         self.present = False
         self.enabled = False
@@ -627,4 +624,16 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
 
 def init(mpstate):
     '''initialise module'''
+    # see if pymavlink is new enough to support new protocols:
+    oldmodule = "fenceitem_protocol"
+    try:
+        mavwp.MissionItemProtocol_Fence
+    except AttributeError:
+        print("pymavlink too old; using old %s module" % oldmodule)
+        mpstate.load_module(oldmodule)
+        for (m, pm) in mpstate.modules:
+            if m.name == "fence":
+                return m
+        return None
+
     return FenceModule(mpstate)
