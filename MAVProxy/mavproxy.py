@@ -252,7 +252,7 @@ class MPState(object):
                         range=(0,100), increment=1, tab='Announcements'),
               MPSetting('distreadout', int, 200, 'Distance Readout', range=(0,10000), increment=1),
 
-              MPSetting('moddebug', int, opts.moddebug, 'Module Debug Level', range=(0,3), increment=1, tab='Debug'),
+              MPSetting('moddebug', int, opts.moddebug, 'Module Debug Level', range=(0,4), increment=1, tab='Debug'),
               MPSetting('script_fatal', bool, False, 'fatal error on bad script', tab='Debug'),
               MPSetting('compdebug', int, 0, 'Computation Debug Mask', range=(0,3), tab='Debug'),
               MPSetting('flushlogs', bool, False, 'Flush logs on every packet'),
