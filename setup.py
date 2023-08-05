@@ -26,25 +26,25 @@ package_data.extend(package_files('MAVProxy/modules/mavproxy_cesium/app'))
 # as that breaks the pip install. It seems that pip is not smart enough to
 # use the system versions of these dependencies, so it tries to download and install
 # large numbers of modules like numpy etc which may be already installed
-requirements=['pymavlink>=2.4.14',
-              'pyserial>=3.0',
-              'numpy']
+requirements=set(['pymavlink>=2.4.14',
+                  'pyserial>=3.0',
+                  'numpy',
+                  'matplotlib',
+                  'opencv-python',
+                  'wxPython'])
 
 if platform.system() == "Darwin":
     # on MacOS we can have a more complete requirements list
-    requirements.extend(['billiard>=3.5.0',
-                         'gnureadline',
-                         'matplotlib',
-                         'opencv-python',
-                         'lxml',
-                         'future',
-                         'wxPython'])
+    requirements.add(['billiard>=3.5.0',
+                      'gnureadline',
+                      'lxml',
+                      'future'])
 
 if platform.system() == "Windows" and sys.version_info >= (3, 0):
     # on MacOS we can have a more complete requirements list
-    requirements.extend(['prompt_toolkit'])
+    requirements.add(['prompt_toolkit'])
 elif platform.system() == "Windows":
-    requirements.extend(['pyreadline'])
+    requirements.add(['pyreadline'])
 
 setup(name='MAVProxy',
       version=version,
@@ -90,7 +90,7 @@ on how to use MAVProxy.''',
                 'MAVProxy.modules.lib.ANUGA',
                 'MAVProxy.modules.lib.MacOS',
                 'MAVProxy.modules.lib.optparse_gui'],
-      install_requires=requirements,
+      install_requires=list(requirements),
       extras_require={
         # restserver module
         'server': ['flask'],
