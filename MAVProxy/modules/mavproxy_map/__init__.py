@@ -67,7 +67,11 @@ class MapModule(mp_module.MPModule):
         title = "Map"
         if self.instance > 1:
             title += str(self.instance)
-        self.map = mp_slipmap.MPSlipMap(service=service, elevation=self.module('terrain').ElevationModel.database, title=title)
+        elevation = None
+        terrain_module = self.module('terrain')
+        if terrain_module is not None:
+            elevation = terrain_module.ElevationModel.database
+        self.map = mp_slipmap.MPSlipMap(service=service, elevation=elevation, title=title)
         if self.instance == 1:
             self.mpstate.map = self.map
             mpstate.map_functions = { 'draw_lines' : self.draw_lines }

@@ -26,7 +26,7 @@ class ElevationModel():
     def __init__(self, database='SRTM3', offline=0, debug=False, cachedir=None):
         '''Use offline=1 to disable any downloading of tiles, regardless of whether the
         tile exists'''
-        if database.lower() == 'srtm':
+        if database is not None and database.lower() == 'srtm':
             # compatibility with the old naming
             database = "SRTM3"
         self.database = database
@@ -40,7 +40,7 @@ class ElevationModel():
             self.mappy = GAreader.ERMap()
             self.mappy.read_ermapper(os.path.join(os.environ['HOME'], './Documents/Elevation/Canberra/GSNSW_P756demg'))
         else:
-            print("Error: Bad terrain source " + database)
+            print("Error: Bad terrain source " + str(database))
             self.database = None
 
     def GetElevation(self, latitude, longitude, timeout=0):
