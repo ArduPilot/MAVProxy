@@ -50,6 +50,9 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
             MPMenuItem(
                 'Draw Exclusion Poly', 'Draw Exclusion Poly', '# fence draw exc ',
             ),
+            MPMenuItem(
+                'Add Return Point', 'Add Return Point', '# fence addreturnpoint',
+            ),
         ])
         return ret
 
@@ -150,6 +153,19 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
     def exclusion_polygons(self):
         '''return a list of polygon exclusion fences - each a list of items'''
         return self.polygons_of_type(mavutil.mavlink.MAV_CMD_NAV_FENCE_POLYGON_VERTEX_EXCLUSION)
+
+    def returnpoint(self):
+        '''return a return point if one exists'''
+        loader = self.wploader
+        for i in range(0, loader.count()):
+            p = loader.item(i)
+            if p is None:
+                print("Bad loader item (%u)" % i)
+                return []
+            if p.command != mavutil.mavlink.MAV_CMD_NAV_FENCE_RETURN_POINT:
+                continue
+            return p
+        return None
 
     @staticmethod
     def loader_class():
@@ -307,6 +323,31 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
         self.append(m)
         self.send_all_items()
 
+    def cmd_addreturnpoint(self, args):
+        '''adds a returnpoint at the map click location'''
+        if not self.check_have_list():
+            return
+        latlon = self.mpstate.click_location
+        m = mavutil.mavlink.MAVLink_mission_item_int_message(
+            self.target_system,
+            self.target_component,
+            0,    # seq
+            mavutil.mavlink.MAV_FRAME_GLOBAL,    # frame
+            mavutil.mavlink.MAV_CMD_NAV_FENCE_RETURN_POINT,    # command
+            0,    # current
+            0,    # autocontinue
+            0, # param1,
+            0.0,  # param2,
+            0.0,  # param3
+            0.0,  # param4
+            int(latlon[0] * 1e7),  # x (latitude)
+            int(latlon[1] * 1e7),  # y (longitude)
+            0,                     # z (altitude)
+            self.mav_mission_type(),
+        )
+        self.append(m)
+        self.send_all_items()
+
     def cmd_addpoly(self, args):
         '''adds a number of waypoints equally spaced around a circle around
         click point
@@ -383,6 +424,23 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
         print("remove is not currently supported for fence.  Try removepolygon_point or removecircle")
         if not self.check_have_list():
             return
+
+    def removereturnpoint(self, seq):
+        '''remove returnpoint at offset seq'''
+        if not self.check_have_list():
+            return
+        item = self.wploader.item(seq)
+        if item is None:
+            print("No item %s" % str(seq))
+            return
+
+        if item.command != mavutil.mavlink.MAV_CMD_NAV_FENCE_RETURN_POINT:
+            print("Item %u is not a return point" % seq)
+            return
+        self.wploader.remove(item)
+        self.wploader.expected_count -= 1
+        self.wploader.last_change = time.time()
+        self.send_all_items()
 
     def removecircle(self, seq):
         '''remove circle at offset seq'''
@@ -613,6 +671,7 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
             'addcircle': (self.cmd_addcircle, ["<inclusion|inc|exclusion|exc>", "RADIUS"]),
             'addpoly': (self.cmd_addpoly, ["<inclusion|inc|exclusion|exc>", "<radius>" "<pointcount>", "<rotation>"]),
             'movepolypoint': (self.cmd_movepolypoint, ["POLY_FIRSTPOINT", "POINT_OFFSET"]),
+            'addreturnpoint': (self.cmd_addreturnpoint, []),
             'enable': self.cmd_enable,
             'disable': self.cmd_disable,
             'draw': self.cmd_draw,
