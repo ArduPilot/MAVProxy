@@ -306,6 +306,13 @@ class MapModule(mp_module.MPModule):
         (seq, type) = id.split(":")
         self.module('fence').removecircle(int(seq))
 
+    def polyfence_remove_returnpoint(self, id):
+        '''called when a returnpoint is right-clicked and remove is selected;
+        removes the return point
+        '''
+        (seq, type) = id.split(":")
+        self.module('fence').removereturnpoint(int(seq))
+
     def polyfence_remove_polygon(self, id):
         '''called when a fence is right-clicked and remove is selected;
         removes the polygon
@@ -396,6 +403,32 @@ class MapModule(mp_module.MPModule):
                 popup_menu=popup)
             self.map.add_object(poly)
 
+    def display_polyfences_returnpoint(self):
+        returnpoint = self.module('fence').returnpoint()
+
+        if returnpoint is None:
+            return
+
+        lat = returnpoint.x
+        lng = returnpoint.y
+
+        if returnpoint.get_type() == 'MISSION_ITEM_INT':
+            lat *= 1e-7
+            lng *= 1e-7
+
+        popup = MPMenuSubMenu('Popup', [
+            MPMenuItem('Remove Return Point', returnkey='popupPolyFenceRemoveReturnPoint'),
+        ])
+        self.map.add_object(mp_slipmap.SlipCircle(
+            str(returnpoint.seq) + ":returnpoint", # key
+            'PolyFence',
+            (lat, lng),
+            10,
+            (255,127,127),
+            2,
+            popup_menu=popup,
+        ))
+
     def display_polyfences_inclusion_polygons(self):
         '''draws inclusion polygons in the PolyFence layer with colour colour'''
         inclusions = self.module('fence').inclusion_polygons()
@@ -413,6 +446,7 @@ class MapModule(mp_module.MPModule):
         self.display_polyfences_exclusion_circles()
         self.display_polyfences_inclusion_polygons()
         self.display_polyfences_exclusion_polygons()
+        self.display_polyfences_returnpoint()
 
     def display_fence(self):
         '''display the fence'''
@@ -543,6 +577,8 @@ class MapModule(mp_module.MPModule):
             self.move_fencepoint(obj.selected[0].objkey, obj.selected[0].extra_info)
         elif menuitem.returnkey == 'popupPolyFenceRemoveCircle':
             self.polyfence_remove_circle(obj.selected[0].objkey)
+        elif menuitem.returnkey == 'popupPolyFenceRemoveReturnPoint':
+            self.polyfence_remove_returnpoint(obj.selected[0].objkey)
         elif menuitem.returnkey == 'popupPolyFenceRemovePolygon':
             self.polyfence_remove_polygon(obj.selected[0].objkey)
         elif menuitem.returnkey == 'popupPolyFenceMovePolygonPoint':
