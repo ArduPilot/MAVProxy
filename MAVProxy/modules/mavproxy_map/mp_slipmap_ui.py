@@ -4,6 +4,7 @@ from MAVProxy.modules.lib import mp_elevation
 import numpy as np
 import os
 import time
+import copy
 
 from ..lib.wx_loader import wx
 
@@ -55,7 +56,7 @@ class MPSlipMapFrame(wx.Frame):
         state.grid = True
         state.follow = True
         state.download = True
-        state.popup_object = None
+        state.popup_objects = None
         state.popup_latlon = None
         state.popup_started = False
         state.default_popup = None
@@ -110,16 +111,17 @@ class MPSlipMapFrame(wx.Frame):
         '''handle menu selection'''
         state = self.state
         # see if it is a popup menu
-        if state.popup_object is not None:
-            obj = state.popup_object
-            ret = obj.popup_menu.find_selected(event)
-            if ret is not None:
-                ret.call_handler()
-                state.event_queue.put(SlipMenuEvent(state.popup_latlon, event,
-                                                    [SlipObjectSelection(obj.key, 0, obj.layer, obj.selection_info())],
-                                                    ret))
-                state.popup_object = None
-                state.popup_latlon = None
+        if state.popup_objects is not None:
+            for obj in state.popup_objects:
+                ret = obj.popup_menu.find_selected(event)
+                if ret is not None:
+                    ret.call_handler()
+                    state.event_queue.put(SlipMenuEvent(state.popup_latlon, event,
+                                                        [SlipObjectSelection(obj.key, 0, obj.layer, obj.selection_info())],
+                                                        ret))
+                    break
+            state.popup_objects = None
+            state.popup_latlon = None
         if state.default_popup is not None:
             ret = state.default_popup.popup.find_selected(event)
             if ret is not None:
@@ -614,18 +616,21 @@ class MPSlipMapPanel(wx.Panel):
         selected.sort(key=lambda c: c.distance)
         return selected
 
-    def show_popup(self, selected, pos):
+    def show_popup(self, objs, pos):
         '''show popup menu for an object'''
         state = self.state
-        if selected.popup_menu is not None:
-            import copy
-            popup_menu = selected.popup_menu
-            if state.default_popup is not None and state.default_popup.combine:
+        popup_menu = None
+        popups = [ p.popup_menu for p in objs ]
+        if state.default_popup is not None and state.default_popup.combine:
+            popups.append(state.default_popup.popup)
+        popup_menu = popups[0]
+        if len(popups) > 1:
+            for p in popups[1:]:
                 popup_menu = copy.deepcopy(popup_menu)
                 popup_menu.add(MPMenuSeparator())
-                popup_menu.combine(state.default_popup.popup)
-            wx_menu = popup_menu.wx_menu()
-            state.frame.PopupMenu(wx_menu, pos)
+                popup_menu.combine(p)
+        wx_menu = popup_menu.wx_menu()
+        state.frame.PopupMenu(wx_menu, pos)
 
     def show_default_popup(self, pos):
         '''show default popup menu'''
@@ -659,14 +664,14 @@ class MPSlipMapPanel(wx.Panel):
             selected = self.selected_objects(pos)
             state.event_queue.put(SlipMouseEvent(latlon, event, selected))
             if event.RightDown():
-                state.popup_object = None
+                state.popup_objects = None
                 state.popup_latlon = None
                 if len(selected) > 0:
-                    obj = state.layers[selected[0].layer][selected[0].objkey]
-                    if obj.popup_menu is not None:
-                        state.popup_object = obj
+                    objs = [ state.layers[s.layer][s.objkey] for s in selected if state.layers[s.layer][s.objkey].popup_menu is not None ]
+                    if len(objs) > 0:
+                        state.popup_objects = objs
                         state.popup_latlon = latlon
-                        self.show_popup(obj, pos)
+                        self.show_popup(objs, pos)
                         state.popup_started = True
                 if not state.popup_started and state.default_popup is not None:
                     state.popup_latlon = latlon

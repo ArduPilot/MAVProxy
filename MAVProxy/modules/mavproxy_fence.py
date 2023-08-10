@@ -465,6 +465,27 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
             mavutil.mavlink.MAV_CMD_NAV_FENCE_CIRCLE_INCLUSION,
         ]
 
+    def find_polygon_point(self, polygon_start_seq, item_offset):
+        '''find polygon point selected on map
+        returns first_item, item_offset
+        '''
+        first_item = self.wploader.item(polygon_start_seq)
+        if first_item is None:
+            print("No item at %u" % polygon_start_seq)
+            return None, None
+        if not self.is_polygon_item(first_item):
+            print("Item %u is not a polygon vertex" % polygon_start_seq)
+            return None, None
+        original_count = int(first_item.param1)
+        if item_offset == original_count:
+            # selecting closing point on polygon selects first point
+            item_offset = 0
+        if item_offset > original_count:
+            print("Out-of-range point")
+            return None, None
+
+        return first_item, item_offset
+    
     def removepolygon_point(self, polygon_start_seq, item_offset):
         '''removes item at offset item_offset from the polygon starting at
         polygon_start_seq'''
@@ -473,14 +494,10 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
 
         items_to_set = []
 
-        first_item = self.wploader.item(polygon_start_seq)
-        if not self.is_polygon_item(first_item):
-            print("Item %u is not a polygon vertex" % polygon_start_seq)
+        first_item, item_offset = self.find_polygon_point(polygon_start_seq, item_offset)
+        if first_item is None:
             return
         original_count = int(first_item.param1)
-        if item_offset >= original_count:
-            print("Out-of-range point")
-            return
         if original_count <= 3:
             print("Too few points to remove one")
             return
@@ -610,16 +627,8 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
             return
         polygon_start_seq = int(args[0])
         item_offset = int(args[1])
-        first_item = self.wploader.item(polygon_start_seq)
+        first_item, item_offset = self.find_polygon_point(polygon_start_seq, item_offset)
         if first_item is None:
-            print("No item at %u" % polygon_start_seq)
-            return
-        if not self.is_polygon_item(first_item):
-            print("Item %u is not a polygon vertex" % polygon_start_seq)
-            return
-        original_count = int(first_item.param1)
-        if item_offset >= original_count:
-            print("Out-of-range point")
             return
 
         latlon = self.mpstate.click_location

@@ -258,14 +258,14 @@ class MapModule(mp_module.MPModule):
         self.mission_list = self.module('wp').wploader.view_list()
         polygons = self.module('wp').wploader.polygon_list()
         self.map.add_object(mp_slipmap.SlipClearLayer('Mission'))
+        items = [MPMenuItem('WP Set', returnkey='popupMissionSet'),
+                     MPMenuItem('WP Remove', returnkey='popupMissionRemove'),
+                     MPMenuItem('WP Move', returnkey='popupMissionMove'),
+                     MPMenuItem('WP Split', returnkey='popupMissionSplit'),
+                    ]
         for i in range(len(polygons)):
             p = polygons[i]
             if len(p) > 1:
-                items = [MPMenuItem('WP Set', returnkey='popupMissionSet'),
-                         MPMenuItem('WP Remove', returnkey='popupMissionRemove'),
-                         MPMenuItem('WP Move', returnkey='popupMissionMove'),
-                         MPMenuItem('WP Split', returnkey='popupMissionSplit'),
-                ]
                 popup = MPMenuSubMenu('Popup', items)
                 self.map.add_object(mp_slipmap.SlipPolygon('mission %u' % i, p,
                                                                    layer='Mission', linewidth=2, colour=(255,255,255),

@@ -282,7 +282,13 @@ class SlipPolygon(SlipObject):
         '''
         if self.hidden:
             return None
-        for i in range(len(self._pix_points)):
+        num_points = len(self._pix_points)
+        if num_points <= 0:
+            return None
+        for idx in range(num_points):
+            # the odd ordering here is to that the home point, which is index 0, is checked last
+            # as home cannot be moved
+            i = (idx+1) % num_points
             if self._pix_points[i] is None:
                 continue
             (pixx,pixy) = self._pix_points[i]
