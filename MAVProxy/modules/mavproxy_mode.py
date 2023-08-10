@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 '''mode command handling'''
 
-import time, os
 from pymavlink import mavutil
 
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
+
 
 class ModeModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -84,24 +84,26 @@ class ModeModule(mp_module.MPModule):
             altitude = float(args[0])
 
         print("Guided %s %s" % (str(latlon), str(altitude)))
-        self.master.mav.mission_item_int_send (self.settings.target_system,
-                                           self.settings.target_component,
-                                           0,
-                                           self.module('wp').get_default_frame(),
-                                           mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
-                                           2, 0, 0, 0, 0, 0,
-                                           int(latlon[0]*1.0e7),
-                                           int(latlon[1]*1.0e7),
-                                           altitude)
-                                           
+        self.master.mav.mission_item_int_send(
+            self.settings.target_system,
+            self.settings.target_component,
+            0,
+            self.module('wp').get_default_frame(),
+            mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
+            2, 0, 0, 0, 0, 0,
+            int(latlon[0]*1.0e7),
+            int(latlon[1]*1.0e7),
+            altitude
+        )
+
     def mavlink_packet(self, m):
-            mtype = m.get_type()
-            if mtype == 'HIGH_LATENCY2':
-                mode_map = mavutil.mode_mapping_bynumber(m.type)
-                if mode_map and m.custom_mode in mode_map:
-                    self.master.flightmode = mode_map[m.custom_mode]
-            
-            
+        mtype = m.get_type()
+        if mtype == 'HIGH_LATENCY2':
+            mode_map = mavutil.mode_mapping_bynumber(m.type)
+            if mode_map and m.custom_mode in mode_map:
+                self.master.flightmode = mode_map[m.custom_mode]
+
+
 def init(mpstate):
     '''initialise module'''
     return ModeModule(mpstate)
