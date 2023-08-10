@@ -79,7 +79,7 @@ class Axis (Control):
         if self.invert:
             val = -val
 
-        return scale(val, outlow=self.outlow, outhigh=self.outhigh)
+        return scale(val, inlow=self.inlow, inhigh=self.inhigh, outlow=self.outlow, outhigh=self.outhigh)
 
 
 class Hat (Control):
