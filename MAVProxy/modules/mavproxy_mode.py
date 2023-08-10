@@ -84,6 +84,25 @@ class ModeModule(mp_module.MPModule):
             altitude = float(args[0])
 
         print("Guided %s %s" % (str(latlon), str(altitude)))
+
+        if self.settings.guided_use_reposition:
+            self.master.mav.command_int_send(
+                self.settings.target_system,
+                self.settings.target_component,
+                self.module('wp').get_default_frame(),
+                mavutil.mavlink.MAV_CMD_DO_REPOSITION,
+                0,  # current
+                0,  # autocontinue
+                -1,   # p1 - ground speed, -1 is use-default
+                mavutil.mavlink.MAV_DO_REPOSITION_FLAGS_CHANGE_MODE,   # p2 - flags
+                0,   # p3 - loiter radius for Planes, 0 is ignored
+                0,   # p4 - yaw - 0 is loiter clockwise
+                int(latlon[0]*1.0e7),
+                int(latlon[1]*1.0e7),
+                altitude
+            )
+            return
+
         self.master.mav.mission_item_int_send(
             self.settings.target_system,
             self.settings.target_component,
