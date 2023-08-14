@@ -147,6 +147,7 @@ class FTPModule(mp_module.MPModule):
         self.write_recv_idx = -1
         self.write_pending = 0
         self.write_last_send = None
+        self.warned_component = False
 
     def cmd_ftp(self, args):
         '''FTP operations'''
@@ -716,7 +717,9 @@ class FTPModule(mp_module.MPModule):
         if mtype == "FILE_TRANSFER_PROTOCOL":
             if (m.target_system != self.settings.source_system or
                 m.target_component != self.settings.source_component):
-                # this is not for me
+                if m.target_system == self.settings.source_system and not self.warned_component:
+                    self.warned_component = True
+                    print("FTP reply for mavlink component %u" % m.target_component)
                 return
 
             op = self.op_parse(m)
