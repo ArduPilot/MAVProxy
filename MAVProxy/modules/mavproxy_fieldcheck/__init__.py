@@ -70,17 +70,17 @@ class FieldCheck(object):
     def loadRally(self):
         filepath = self.flightdata_filepath(self.fc_settings.rally_filename)
         rallymod = self.module('rally')
-        rallymod.cmd_rally(["load", filepath])
+        rallymod.cmd_load([filepath])
 
     def loadFoamyFence(self):
         filepath = self.flightdata_filepath(self.fc_settings.fence_filename)
         fencemod = self.module('fence')
-        fencemod.cmd_fence(["load", filepath])
+        fencemod.cmd_load([filepath])
 
     def loadFoamyMission(self, filename):
         filepath = self.flightdata_filepath(filename)
         wpmod = self.module('wp')
-        wpmod.cmd_wp(["load", filepath])
+        wpmod.cmd_load([filepath])
 
     def loadFoamyMissionCW(self):
         self.loadFoamyMission(self.fc_settings.mission_filename_cw)
@@ -106,7 +106,7 @@ class FieldCheck(object):
         '''check key parameters'''
         want_values = {
             "FENCE_ACTION": 4,
-            "FENCE_MAXALT": self.fc_settings.param_fence_maxalt,
+            "FENCE_ALT_MAX": self.fc_settings.param_fence_maxalt,
             "THR_FAILSAFE": 1,
             "FS_SHORT_ACTN": 0,
             "FS_LONG_ACTN": 1,
@@ -133,18 +133,17 @@ class FieldCheck(object):
         if fencemod is None:
             self.whinge("Fence module not loaded")
             return False
-        if not fencemod.have_list:
-            self.whinge("No fence list")
+        if not fencemod.check_have_list():
             if self.is_armed:
                 return False
             now = time.time()
             if now - self.last_fence_fetch > 10:
                 self.last_fence_fetch = now
                 self.whinge("Running 'fence list'")
-                fencemod.list_fence(None)
+                fencemod.cmd_list(None)
             return False
 
-        count = fencemod.fenceloader.count()
+        count = fencemod.count()
         if count < 6:
             self.whinge("Too few fence points")
             return False
@@ -163,7 +162,7 @@ class FieldCheck(object):
         if rallymod is None:
             self.whinge("No rally module")
             return False
-        if not rallymod.have_list:
+        if not rallymod.check_have_list():
             self.whinge("No rally list")
             if self.is_armed:
                 return False
@@ -171,7 +170,7 @@ class FieldCheck(object):
             if now - self.last_rally_fetch > 10:
                 self.last_rally_fetch = now
                 self.whinge("Running 'rally list'")
-                rallymod.cmd_rally(["list"])
+                rallymod.cmd_list([])
             return False
 
         count = rallymod.rally_count()
