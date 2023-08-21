@@ -838,7 +838,7 @@ on'''
         self.update_waypoints(args[0], wpnum)
 
     def commands(self):
-        if not self.master.mavlink20():
+        if self.master and not self.master.mavlink20():
             print("%s module not available; use old compat modules" % str(self.itemtype()))
             return
         return {
