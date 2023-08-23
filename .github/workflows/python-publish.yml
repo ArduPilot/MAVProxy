@@ -25,6 +25,7 @@ jobs:
         python -m pip install -U pymavlink
         pip install build
         pip install -U .
+        git submodule update --recursive --init
     - name: Build package
       run: python -m build
     - name: Publish package
