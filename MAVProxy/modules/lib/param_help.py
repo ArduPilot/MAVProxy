@@ -126,6 +126,7 @@ class ParamHelp:
         if not param in htree:
             return None
         help = htree[param]
+        remaining_bits = int(value)
         try:
             bitmask = self.get_bitmask_from_help(help)
             if bitmask is not None:
@@ -133,6 +134,10 @@ class ParamHelp:
                 for k in bitmask.keys():
                     if int(value) & (1<<int(k)):
                         v.append(bitmask[k])
+                        remaining_bits &= ~(1<<int(k))
+                for i in range(31):
+                    if remaining_bits & (1<<i):
+                        v.append("Uknownbit%u" % i)
                 return '|'.join(v)
         except Exception as e:
             print(e)
