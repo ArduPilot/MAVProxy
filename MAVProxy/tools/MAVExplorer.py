@@ -1220,6 +1220,28 @@ def print_caught_exception(e):
     else:
         print(traceback.format_exc(e))
 
+def cmd_help(args):
+    '''help command'''
+    if len(args) == 0:
+        k = command_map.keys()
+        for cmd in sorted(k):
+            (fn, help) = command_map[cmd]
+            print("%-15s : %s" % (cmd, help))
+        return
+    cmd = args[0]
+    if cmd in command_map.keys():
+        (fn, help) = command_map[cmd]
+        print("%-15s : %s" % (cmd, help))
+        return
+    import pymavlink.mavextra as mavextra
+    import math
+    import pydoc
+    for v in [mavextra,math]:
+        if hasattr(v,cmd):
+            pydoc.help(getattr(v,cmd))
+            return
+    print("%s not found" % cmd)
+
 def process_stdin(line):
     '''handle commands from user'''
     if line is None:
@@ -1237,10 +1259,7 @@ def process_stdin(line):
 
     cmd = args[0]
     if cmd == 'help':
-        k = command_map.keys()
-        for cmd in sorted(k):
-            (fn, help) = command_map[cmd]
-            print("%-15s : %s" % (cmd, help))
+        cmd_help(args[1:])
         return
     if cmd == 'exit':
         mestate.exit = True
