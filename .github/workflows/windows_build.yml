@@ -49,10 +49,6 @@ jobs:
           $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/ArduPlane/apm.pdef.xml', 'Parameters\ArduPlane.xml')
           $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/ArduSub/apm.pdef.xml', 'Parameters\ArduSub.xml')
           $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/AntennaTracker/apm.pdef.xml', 'Parameters\AntennaTracker.xml')
-          $wc.DownloadFile('https://autotest.ardupilot.org/Rover-defaults.parm', 'Parameters\Rover-defaults.parm')
-          $wc.DownloadFile('https://autotest.ardupilot.org/Copter-defaults.parm', 'Parameters\ArduCopter-defaults.parm')
-          $wc.DownloadFile('https://autotest.ardupilot.org/Plane-defaults.parm', 'Parameters\ArduPlane-defaults.parm')
-          $wc.DownloadFile('https://autotest.ardupilot.org/Sub-defaults.parm', 'Parameters\ArduSub-defaults.parm')
       - name: Build installer
         run: |
           cd  windows
