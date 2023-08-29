@@ -1236,6 +1236,7 @@ def cmd_help(args):
     import pymavlink.mavextra as mavextra
     import math
     import pydoc
+    pydoc.pager = pydoc.plainpager
     for v in [mavextra,math]:
         if hasattr(v,cmd):
             pydoc.help(getattr(v,cmd))
