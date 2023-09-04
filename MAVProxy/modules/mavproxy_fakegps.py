@@ -75,16 +75,27 @@ class FakeGPSModule(mp_module.MPModule):
         self.update_mpstate()
 
 
-    def get_gps_time(self, tnow):
+    def get_gps_time(self, t_unix):
         '''return gps_week and gps_week_ms for current time'''
+        # At the time of writing (September 2023), there have been 18 leap seconds
+        # since the GPS epoch - the last of which was in 2016. We need to add them,
+        # because Unix time skips them, whereas GPS time counts them.
         leapseconds = 18
+        # 315964800 is the number of seconds between Unix epoch (01.01.1970) and
+        # GPS epoch (06.01.1980 UTC), including the 2 leap days (1972 & 1976)
+        UNIX_GPS_EPOCH_DIFF = 315964800
+        # Number of seconds per week
         SEC_PER_WEEK = 7 * 86400
 
-        epoch = 86400*(10*365 + (1980-1969)/4 + 1 + 6 - 2) - leapseconds
-        epoch_seconds = int(tnow - epoch)
-        week = int(epoch_seconds) // SEC_PER_WEEK
-        t_ms = int(tnow * 1000) % 1000
-        week_ms = (epoch_seconds % SEC_PER_WEEK) * 1000 + ((t_ms//200) * 200)
+        # Get GPS time by applying the epoch delta and adding the leap seconds.
+        # This is rounded down to full second, as milliseconds are handled later
+        t_gps = int(t_unix - UNIX_GPS_EPOCH_DIFF + leapseconds)
+        # Week number since GPS epoch
+        week = t_gps // SEC_PER_WEEK
+        # Milliseconds within this second
+        t_ms = int(t_unix * 1000) % 1000
+        # Milliseconds within specified week
+        week_ms = (t_gps % SEC_PER_WEEK) * 1000 + ((t_ms//200) * 200)
         return week, week_ms
 
     def idle_task(self):
