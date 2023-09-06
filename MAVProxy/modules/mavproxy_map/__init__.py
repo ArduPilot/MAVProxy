@@ -37,6 +37,7 @@ class MapModule(mp_module.MPModule):
         self.circle_counter = 0
         self.draw_line = None
         self.draw_callback = None
+        self.current_ROI = None
         self.have_global_position = False
         self.vehicle_type_by_sysid = {}
         self.vehicle_type_name = 'plane'
@@ -758,6 +759,7 @@ class MapModule(mp_module.MPModule):
         (lat, lon) = (self.mpstate.click_location[0], self.mpstate.click_location[1])
         alt = self.module('terrain').ElevationModel.GetElevation(lat, lon)
         print("Setting ROI to: ", lat, lon, alt)
+        self.current_ROI = (lat,lon,alt)
         self.master.mav.command_int_send(
             self.settings.target_system, self.settings.target_component,
             mavutil.mavlink.MAV_FRAME_GLOBAL,
