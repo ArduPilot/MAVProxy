@@ -31,13 +31,15 @@ radius_of_earth = 6378100.0 # in meters
 
 def wrap_360(angle):
     '''wrap an angle to 0..360 degrees'''
+    if angle < 0:
+        return 360.0 - math.fmod(abs(angle),360)
     return math.fmod(angle, 360.0)
 
 def wrap_180(angle):
     '''wrap an angle to -180..180 degrees'''
-    if angle >= -180 and angle < 180:
-        return angle
-    a = math.fmod(angle+180, 360.0)-180.0
+    a = wrap_360(angle)
+    if a > 180:
+        a = a - 360
     return a
 
 def gps_distance(lat1, lon1, lat2, lon2):
