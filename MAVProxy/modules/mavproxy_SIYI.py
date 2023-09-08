@@ -2,6 +2,11 @@
 control SIYI camera over UDP
 '''
 
+'''
+TODO:
+  circle hottest area?
+'''
+
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_util
@@ -13,6 +18,7 @@ import socket, time, os, struct
 if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import MPMenuCallTextDialog
     from MAVProxy.modules.lib.mp_menu import MPMenuItem
+    from MAVProxy.modules.lib.mp_menu import MPMenuSubMenu
 
 SIYI_RATE_MAX_DPS = 90.0
 SIYI_HEADER1 = 0x55
@@ -112,6 +118,32 @@ class SIYIModule(mp_module.MPModule):
         self.target_pos = None
         self.last_map_ROI = None
 
+        if mp_util.has_wxpython:
+            menu = MPMenuSubMenu('SIYI',
+                                 items=[
+                                     MPMenuItem('Center', 'Center', '# siyi center '),
+                                     MPMenuItem('ModeFollow', 'ModeFollow', '# siyi follow '),
+                                     MPMenuItem('ModeLock', 'ModeLock', '# siyi lock '),
+                                     MPMenuItem('ModeFPV', 'ModeFPV', '# siyi fpv '),
+                                     MPMenuItem('GetConfig', 'GetConfig', '# siyi getconfig '),
+                                     MPMenuItem('TakePhoto', 'TakePhoto', '# siyi photo '),
+                                     MPMenuItem('AutoFocus', 'AutoFocus', '# siyi autofocus '),
+                                     MPMenuItem('AutoFocus', 'AutoFocus', '# siyi autofocus '),
+                                     MPMenuItem('ImageSplit', 'ImageSplit', '# siyi imode split '),
+                                     MPMenuItem('ImageWide', 'ImageWide', '# siyi imode wide '),
+                                     MPMenuItem('ImageZoom', 'ImageZoom', '# siyi imode zoom '),
+                                     MPMenuItem('Recording', 'Recording', '# siyi recording '),
+                                     MPMenuItem('Zoom1', 'Zoom1', '# siyi zoom 1 '),
+                                     MPMenuItem('Zoom2', 'Zoom2', '# siyi zoom 2 '),
+                                     MPMenuItem('Zoom4', 'Zoom4', '# siyi zoom 4 '),
+                                     MPMenuItem('Zoom8', 'Zoom8', '# siyi zoom 8 ')])
+            map = self.module('map')
+            if map is not None:
+                map.add_menu(menu)
+            console = self.module('console')
+            if console is not None:
+                console.add_menu(menu)
+
     def cmd_siyi(self, args):
         '''siyi command parser'''
         usage = "usage: siyi <set|rates>"
@@ -144,6 +176,7 @@ class SIYIModule(mp_module.MPModule):
             self.send_packet(PHOTO, struct.pack("<B", 0))
         elif args[0] == "recording":
             self.send_packet(PHOTO, struct.pack("<B", 2))
+            self.send_packet(FUNCTION_FEEDBACK_INFO, None)
         elif args[0] == "lock":
             self.send_packet(PHOTO, struct.pack("<B", 3))
         elif args[0] == "follow":
@@ -328,7 +361,17 @@ class SIYIModule(mp_module.MPModule):
             self.tmax = self.tmax * 0.01
             self.tmin = self.tmin * 0.01
             self.last_temp_t = time.time()
-        elif cmd in [SET_ANGLE, CENTER, GIMBAL_ROTATION, ABSOLUTE_ZOOM]:
+        elif cmd == FUNCTION_FEEDBACK_INFO:
+            info_type = struct.unpack("<B", data[:1])
+            feedback = {
+                0: "Success",
+                1: "FailPhoto",
+                2: "HDR ON",
+                3: "HDR OFF",
+                4: "FailRecord",
+            }
+            print("Feedback %s" % feedback.get(info_type, str(info_type)))
+        elif cmd in [SET_ANGLE, CENTER, GIMBAL_ROTATION, ABSOLUTE_ZOOM, SET_IMAGE_TYPE]:
             # an ack
             pass
         else:
