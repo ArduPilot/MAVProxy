@@ -19,6 +19,7 @@ if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import MPMenuCallTextDialog
     from MAVProxy.modules.lib.mp_menu import MPMenuItem
     from MAVProxy.modules.lib.mp_menu import MPMenuSubMenu
+    from MAVProxy.modules.mavproxy_map import mp_slipmap
 
 SIYI_RATE_MAX_DPS = 90.0
 SIYI_HEADER1 = 0x55
@@ -88,6 +89,10 @@ class SIYIModule(mp_module.MPModule):
                                                      ('rates_hz', float, 5),
                                                      ('yaw_gain', float, 0.5),
                                                      ('pitch_gain', float, 0.5),
+                                                     ('mount_pitch', float, 0),
+                                                     ('mount_yaw', float, 0),
+                                                     ('lag', float, 0),
+                                                     ('target_rate', float, 10),
                                                      ('telem_hz', float, 5)])
         self.add_completion_function('(SIYISETTING)',
                                      self.siyi_settings.completion)
@@ -117,6 +122,8 @@ class SIYIModule(mp_module.MPModule):
         self.ATTITUDE = None
         self.target_pos = None
         self.last_map_ROI = None
+        self.icon = self.mpstate.map.icon('camera-small-red.png')
+        self.last_target_send = time.time()
 
         if mp_util.has_wxpython:
             menu = MPMenuSubMenu('SIYI',
@@ -133,6 +140,7 @@ class SIYIModule(mp_module.MPModule):
                                      MPMenuItem('ImageWide', 'ImageWide', '# siyi imode wide '),
                                      MPMenuItem('ImageZoom', 'ImageZoom', '# siyi imode zoom '),
                                      MPMenuItem('Recording', 'Recording', '# siyi recording '),
+                                     MPMenuItem('ClearTarget', 'ClearTarget', '# siyi notarget '),
                                      MPMenuItem('Zoom1', 'Zoom1', '# siyi zoom 1 '),
                                      MPMenuItem('Zoom2', 'Zoom2', '# siyi zoom 2 '),
                                      MPMenuItem('Zoom4', 'Zoom4', '# siyi zoom 4 '),
@@ -166,6 +174,7 @@ class SIYIModule(mp_module.MPModule):
             self.send_packet(AUTO_FOCUS, struct.pack("<B", 1))
         elif args[0] == "center":
             self.send_packet(CENTER, struct.pack("<B", 1))
+            self.clear_target()
         elif args[0] == "zoom":
             self.cmd_zoom(args[1:])
         elif args[0] == "getconfig":
@@ -186,7 +195,7 @@ class SIYIModule(mp_module.MPModule):
         elif args[0] == "settarget":
             self.cmd_settarget(args[1:])
         elif args[0] == "notarget":
-            self.target_pos = None
+            self.clear_target()
         else:
             print(usage)
 
@@ -249,6 +258,20 @@ class SIYIModule(mp_module.MPModule):
         frac = int((fval - ival)*10)
         self.send_packet(ABSOLUTE_ZOOM, struct.pack("<BB", ival, frac))
 
+    def set_target(self, lat, lon, alt):
+        '''set target position'''
+        self.target_pos = (lat, lon, alt)
+        self.mpstate.map.add_object(mp_slipmap.SlipIcon('SIYI',
+                                                        (lat, lon),
+                                                        self.icon, layer='SIYI', rotation=0, follow=False))
+
+    def clear_target(self):
+        '''clear target position'''
+        self.target_pos = None
+        self.mpstate.map.remove_object('SIYI')
+        self.yaw_rate = None
+        self.pitch_rate = None
+
     def cmd_angle(self, args):
         '''set zoom'''
         if len(args) < 1:
@@ -256,6 +279,8 @@ class SIYIModule(mp_module.MPModule):
             return
         yaw = -float(args[0])
         pitch = float(args[1])
+        self.target_pos = None
+        self.clear_target()
         self.send_packet(SET_ANGLE, struct.pack("<hh", int(yaw*10), int(pitch*10)))
         
     def send_rates(self):
@@ -271,6 +296,8 @@ class SIYIModule(mp_module.MPModule):
                 y = 0.0
             if p is None:
                 p = 0.0
+            y = mp_util.constrain(y, -128, 127)
+            p = mp_util.constrain(p, -128, 127)
             pkt = struct.pack("<bb",
                             int(100.0*y/SIYI_RATE_MAX_DPS),
                             int(100.0*p/SIYI_RATE_MAX_DPS))
@@ -288,7 +315,7 @@ class SIYIModule(mp_module.MPModule):
         if alt is None:
             print("No terrain for location")
             return
-        self.target_pos = (lat, lon, alt)
+        self.set_target(lat, lon, alt)
 
     def request_telem(self):
         '''request telemetry'''
@@ -371,7 +398,7 @@ class SIYIModule(mp_module.MPModule):
                 4: "FailRecord",
             }
             print("Feedback %s" % feedback.get(info_type, str(info_type)))
-        elif cmd in [SET_ANGLE, CENTER, GIMBAL_ROTATION, ABSOLUTE_ZOOM, SET_IMAGE_TYPE]:
+        elif cmd in [SET_ANGLE, CENTER, GIMBAL_ROTATION, ABSOLUTE_ZOOM, SET_IMAGE_TYPE, REQUEST_CONTINUOUS_ATTITUDE]:
             # an ack
             pass
         else:
@@ -396,28 +423,58 @@ class SIYIModule(mp_module.MPModule):
             self.pitch_rate = 0
             self.pitch_end = None
 
+    def send_named_float(self, name, value):
+        '''inject a NAMED_VALUE_FLOAT into the local master input, so it becomes available
+           for graphs, logging and status command'''
+
+        # use the ATTITUDE message for srcsystem and time stamps
+        att = self.master.messages.get('ATTITUDE',None)
+        if att is None:
+            return
+        msec = att.time_boot_ms
+        ename = name.encode('ASCII')
+        if len(ename) < 10:
+            ename += bytes([0] * (10-len(ename)))
+        m = self.master.mav.named_value_float_encode(msec, bytearray(ename), value)
+        #m.name = ename
+        m.pack(self.master.mav)
+        m._header.srcSystem = att._header.srcSystem
+        m._header.srcComponent = mavutil.mavlink.MAV_COMP_ID_TELEMETRY_RADIO
+        m.name = name
+        self.mpstate.module('link').master_callback(m, self.master)
+
     def get_gimbal_attitude(self):
         '''get extrapolated gimbal attitude, returning yaw and pitch'''
         now = time.time()
-        dt = now - self.last_att_t
+        dt = (now - self.last_att_t)+self.siyi_settings.lag
         yaw = self.attitude[2]+self.attitude[5]*dt
         pitch = self.attitude[1]+self.attitude[4]*dt
-        return yaw, pitch
+        pitch -= self.siyi_settings.mount_pitch
+        yaw -= self.siyi_settings.mount_yaw
+        yaw = mp_util.wrap_180(yaw)
+        roll = self.attitude[0]
+        return yaw, pitch, roll
 
     def update_target(self):
         '''update position targetting'''
         if not 'GLOBAL_POSITION_INT' in self.master.messages or not 'ATTITUDE' in self.master.messages:
             return
 
+        # added rate of target update
+
         map_module = self.module('map')
         if map_module is not None and map_module.current_ROI != self.last_map_ROI:
             self.last_map_ROI = map_module.current_ROI
-            self.target_pos = self.last_map_ROI
+            (lat, lon, alt) = self.last_map_ROI
+            self.set_target(lat, lon, alt)
 
         if self.target_pos is None or self.attitude is None:
             return
 
         now = time.time()
+        if self.siyi_settings.target_rate <= 0 or now - self.last_target_send < 1.0 / self.siyi_settings.target_rate:
+            return
+        self.last_target_send = now
 
         GLOBAL_POSITION_INT = self.master.messages['GLOBAL_POSITION_INT']
         ATTITUDE = self.master.messages['ATTITUDE']
@@ -448,11 +505,24 @@ class SIYIModule(mp_module.MPModule):
         yaw_deg = mp_util.wrap_180(math.degrees(yaw))
         pitch_deg = math.degrees(pitch)
 
-        cam_yaw, cam_pitch = self.get_gimbal_attitude()
+        cam_yaw, cam_pitch, cam_roll = self.get_gimbal_attitude()
         err_yaw = mp_util.wrap_180(yaw_deg - cam_yaw)
         err_pitch = pitch_deg - cam_pitch
+
         self.yaw_rate = err_yaw * self.siyi_settings.yaw_gain
         self.pitch_rate = err_pitch * self.siyi_settings.pitch_gain
+        self.send_named_float('CROLL', cam_roll)
+        self.send_named_float('CYAW', cam_yaw)
+        self.send_named_float('CPITCH', cam_pitch)
+        self.send_named_float('TYAW', yaw_deg)
+        self.send_named_float('TPITCH', pitch_deg)
+        self.send_named_float('EYAW', err_yaw)
+        self.send_named_float('EPITCH', err_pitch)
+        self.send_named_float('CROLL_RT', self.attitude[3])
+        self.send_named_float('CPTCH_RT', self.attitude[4])
+        self.send_named_float('CYAW_RT', self.attitude[5])
+        self.send_named_float('YAW_RT', self.yaw_rate)
+        self.send_named_float('PITCH_RT', self.pitch_rate)
 
     def idle_task(self):
         '''called on idle'''
