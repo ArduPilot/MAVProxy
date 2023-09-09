@@ -104,7 +104,7 @@ class Graph():
             # special handling for NAMED_VALUE_FLOAT
             m = re.match("^NAMED_VALUE_FLOAT\[([A-Z0-9_]+)\]\.(.*)$", self.fields[i])
             if m:
-                self.fields[i] = 'NAMED_VALUE_FLOAT["%s"].%s' % (m.group(1), m.group(2))
+                self.fields[i] = "NAMED_VALUE_FLOAT['%s'].%s" % (m.group(1), m.group(2))
 
         re_caps = re.compile('[A-Z_][A-Z0-9_]+')
         for f in self.fields:
@@ -113,7 +113,7 @@ class Graph():
             self.field_types.append(caps)
         print("Adding graph: %s" % self.fields)
 
-        fields = [ self.pretty_print_fieldname(x) for x in fields ]
+        fields = [ self.pretty_print_fieldname(x) for x in self.fields ]
         labels = []
         for i in range(len(fields)):
             f = fields[i]
