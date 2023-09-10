@@ -44,10 +44,6 @@ READ_TEMP_FULL_SCREEN = 0x14
 SET_IMAGE_TYPE = 0x11
 REQUEST_CONTINUOUS_ATTITUDE = 0x25
 
-def micros64():
-    return int(time.time()*1.0e6)
-
-
 def crc16_from_bytes(bytes, initial=0):
     # CRC-16-CCITT
     # Initial value: 0xFFFF
@@ -183,6 +179,7 @@ class SIYIModule(mp_module.MPModule):
         self.yaw_controller = PI_controller(self.siyi_settings, 'yaw_gain_P', 'yaw_gain_I', 'yaw_gain_IMAX')
         self.pitch_controller = PI_controller(self.siyi_settings, 'pitch_gain_P', 'pitch_gain_I', 'pitch_gain_IMAX')
         self.logf = DF_logger(self.siyi_settings.logfile)
+        self.start_time = time.time()
 
         if mp_util.has_wxpython:
             menu = MPMenuSubMenu('SIYI',
@@ -210,6 +207,9 @@ class SIYIModule(mp_module.MPModule):
             console = self.module('console')
             if console is not None:
                 console.add_menu(menu)
+
+    def micros64(self):
+        return int((time.time()-self.start_time)*1.0e6)
 
     def cmd_siyi(self, args):
         '''siyi command parser'''
@@ -362,7 +362,7 @@ class SIYIModule(mp_module.MPModule):
             p = int(mp_util.constrain(p*scale, -100, 100))
             self.send_packet_fmt(GIMBAL_ROTATION, "<bb", y, p)
             self.logf.write('SIGR', 'Qffbb', 'TimeUS,YRate,PRate,YC,PC',
-                            micros64(), self.yaw_rate, self.pitch_rate, y, p)
+                            self.micros64(), self.yaw_rate, self.pitch_rate, y, p)
 
             cam_yaw, cam_pitch, cam_roll = self.get_gimbal_attitude()
             self.send_named_float('CROLL', cam_roll)
@@ -422,14 +422,14 @@ class SIYIModule(mp_module.MPModule):
         self.send_packet(command_id, struct.pack(fmt, *args))
         args = list(args)
         args.extend([0]*(8-len(args)))
-        self.logf.write('SIOU', 'QBiiiiiiii', 'TimeUS,Cmd,P1,P2,P3,P4,P5,P6,P7,P8', micros64(), command_id, *args)
+        self.logf.write('SIOU', 'QBiiiiiiii', 'TimeUS,Cmd,P1,P2,P3,P4,P5,P6,P7,P8', self.micros64(), command_id, *args)
 
     def unpack(self, command_id, fmt, data):
         '''unpack SIYI data and log'''
         v = struct.unpack(fmt, data)
         args = list(v)
         args.extend([0]*(8-len(args)))
-        self.logf.write('SIIN', 'QBiiiiiiii', 'TimeUS,Cmd,P1,P2,P3,P4,P5,P6,P7,P8', micros64(), command_id, *args)
+        self.logf.write('SIIN', 'QBiiiiiiii', 'TimeUS,Cmd,P1,P2,P3,P4,P5,P6,P7,P8', self.micros64(), command_id, *args)
         return v
 
     def parse_packet(self, pkt):
@@ -455,7 +455,7 @@ class SIYIModule(mp_module.MPModule):
             self.attitude = (x*0.1, y*0.1, mp_util.wrap_180(-z*0.1), sx*0.1, sy*0.1, -sz*0.1)
             self.update_status()
             self.logf.write('SIGA', 'Qffffffhhhhhh', 'TimeUS,Y,P,R,Yr,Pr,Rr,z,y,x,sz,sy,sx',
-                            micros64(),
+                            self.micros64(),
                                 self.attitude[2], self.attitude[1], self.attitude[0],
                                 self.attitude[5], self.attitude[4], self.attitude[3],
                                 z,y,x,sz,sy,sx)
@@ -609,19 +609,33 @@ class SIYIModule(mp_module.MPModule):
         self.send_named_float('EYAW', err_yaw)
         self.send_named_float('EPITCH', err_pitch)
         self.logf.write('SIPY', "Qffff", "TimeUS,CYaw,TYaw,Yerr,I",
-                        micros64(), cam_yaw, yaw_deg, err_yaw, self.yaw_controller.I)
+                        self.micros64(), cam_yaw, yaw_deg, err_yaw, self.yaw_controller.I)
         self.logf.write('SIPP', "Qffff", "TimeUS,CPitch,TPitch,Perr,I",
-                        micros64(), cam_pitch, pitch_deg, err_pitch, self.pitch_controller.I)
+                        self.micros64(), cam_pitch, pitch_deg, err_pitch, self.pitch_controller.I)
+
+    def get_gps_time(self, tnow):
+        '''return gps_week and gps_week_ms for current time'''
+        leapseconds = 18
+        SEC_PER_WEEK = 7 * 86400
+
+        epoch = 86400*(10*365 + (1980-1969)/4 + 1 + 6 - 2) - leapseconds
+        epoch_seconds = int(tnow - epoch)
+        week = int(epoch_seconds) // SEC_PER_WEEK
+        t_ms = int(tnow * 1000) % 1000
+        week_ms = (epoch_seconds % SEC_PER_WEEK) * 1000 + ((t_ms//200) * 200)
+        return week, week_ms
 
     def mavlink_packet(self, m):
         '''process a mavlink message'''
         mtype = m.get_type()
         if mtype == 'GPS_RAW_INT':
-            self.logf.write('GPS', "QBLLff", "TimeUS,Status,Lat,Lng,Alt,Spd",
-                            micros64(), m.fix_type, m.lat, m.lon, m.alt*0.001, m.vel*0.01)
+            # ?!? why off by 18 hours
+            gwk, gms = self.get_gps_time(time.time()+18*3600)
+            self.logf.write('GPS', "QBIHLLff", "TimeUS,Status,GMS,GWk,Lat,Lng,Alt,Spd",
+                            self.micros64(), m.fix_type, gms, gwk, m.lat, m.lon, m.alt*0.001, m.vel*0.01)
         if mtype == 'ATTITUDE':
             self.logf.write('ATT', "Qffffff", "TimeUS,Roll,Pitch,Yaw,GyrX,GyrY,GyrZ",
-                            micros64(),
+                            self.micros64(),
                             math.degrees(m.roll), math.degrees(m.pitch), math.degrees(m.yaw),
                             math.degrees(m.rollspeed), math.degrees(m.pitchspeed), math.degrees(m.yawspeed))
 
