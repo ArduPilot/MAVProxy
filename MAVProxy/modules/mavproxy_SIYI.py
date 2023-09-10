@@ -11,6 +11,7 @@ from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_util
 from pymavlink import mavutil
+from pymavlink import DFReader
 import math
 
 import socket, time, os, struct
@@ -42,6 +43,10 @@ READ_RANGEFINDER = 0x15
 READ_TEMP_FULL_SCREEN = 0x14
 SET_IMAGE_TYPE = 0x11
 REQUEST_CONTINUOUS_ATTITUDE = 0x25
+
+def micros64():
+    return int(time.time()*1.0e6)
+
 
 def crc16_from_bytes(bytes, initial=0):
     # CRC-16-CCITT
@@ -97,6 +102,23 @@ class PI_controller:
     def reset_I(self):
         self.I = 0
 
+class DF_logger:
+    '''write to a DF format log'''
+    def __init__(self, filename):
+        self.outf = open(filename,'wb')
+        self.outf.write(bytes([0]))
+        self.outf.flush()
+        self.mlog = DFReader.DFReader_binary(filename)
+        self.outf.seek(0)
+        self.formats = {}
+
+    def write(self, name, fmt, fields, *args):
+        if not name in self.formats:
+            self.formats[name] = self.mlog.add_format(DFReader.DFFormat(0, name, 0, fmt, fields))
+            self.outf.write(self.mlog.make_format_msgbuf(self.formats[name]))
+        self.outf.write(self.mlog.make_msgbuf(self.formats[name], args))
+        self.outf.flush()
+
 class SIYIModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
@@ -124,7 +146,9 @@ class SIYIModule(mp_module.MPModule):
                                                      ('mount_yaw', float, 0),
                                                      ('lag', float, 0),
                                                      ('target_rate', float, 10),
-                                                     ('telem_hz', float, 5)])
+                                                     ('telem_hz', float, 5),
+                                                     ('logfile', str, 'SIYI_log.bin'),
+                                                         ])
         self.add_completion_function('(SIYISETTING)',
                                      self.siyi_settings.completion)
         self.sock = None
@@ -158,6 +182,7 @@ class SIYIModule(mp_module.MPModule):
         self.last_rate_display = time.time()
         self.yaw_controller = PI_controller(self.siyi_settings, 'yaw_gain_P', 'yaw_gain_I', 'yaw_gain_IMAX')
         self.pitch_controller = PI_controller(self.siyi_settings, 'pitch_gain_P', 'pitch_gain_I', 'pitch_gain_IMAX')
+        self.logf = DF_logger(self.siyi_settings.logfile)
 
         if mp_util.has_wxpython:
             menu = MPMenuSubMenu('SIYI',
@@ -205,9 +230,9 @@ class SIYIModule(mp_module.MPModule):
         elif args[0] == "imode":
             self.cmd_imode(args[1:])
         elif args[0] == "autofocus":
-            self.send_packet(AUTO_FOCUS, struct.pack("<B", 1))
+            self.send_packet_fmt(AUTO_FOCUS, "<B", 1)
         elif args[0] == "center":
-            self.send_packet(CENTER, struct.pack("<B", 1))
+            self.send_packet_fmt(CENTER, "<B", 1)
             self.clear_target()
         elif args[0] == "zoom":
             self.cmd_zoom(args[1:])
@@ -216,17 +241,17 @@ class SIYIModule(mp_module.MPModule):
         elif args[0] == "angle":
             self.cmd_angle(args[1:])
         elif args[0] == "photo":
-            self.send_packet(PHOTO, struct.pack("<B", 0))
+            self.send_packet_fmt(PHOTO, "<B", 0)
         elif args[0] == "recording":
-            self.send_packet(PHOTO, struct.pack("<B", 2))
+            self.send_packet_fmt(PHOTO, "<B", 2)
             self.send_packet(FUNCTION_FEEDBACK_INFO, None)
         elif args[0] == "lock":
-            self.send_packet(PHOTO, struct.pack("<B", 3))
+            self.send_packet_fmt(PHOTO, "<B", 3)
         elif args[0] == "follow":
-            self.send_packet(PHOTO, struct.pack("<B", 4))
+            self.send_packet_fmt(PHOTO, "<B", 4)
             self.clear_target()
         elif args[0] == "fpv":
-            self.send_packet(PHOTO, struct.pack("<B", 5))
+            self.send_packet_fmt(PHOTO, "<B", 5)
             self.clear_target()
         elif args[0] == "settarget":
             self.cmd_settarget(args[1:])
@@ -282,7 +307,7 @@ class SIYIModule(mp_module.MPModule):
         mode = imode_map.get(args[0],None)
         if mode is None:
             mode = int(args[0])
-        self.send_packet(SET_IMAGE_TYPE, struct.pack("<B", mode))
+        self.send_packet_fmt(SET_IMAGE_TYPE, "<B", mode)
 
     def cmd_zoom(self, args):
         '''set zoom'''
@@ -292,7 +317,7 @@ class SIYIModule(mp_module.MPModule):
         fval = float(args[0])
         ival = int(fval)
         frac = int((fval - ival)*10)
-        self.send_packet(ABSOLUTE_ZOOM, struct.pack("<BB", ival, frac))
+        self.send_packet_fmt(ABSOLUTE_ZOOM, "<BB", ival, frac)
 
     def set_target(self, lat, lon, alt):
         '''set target position'''
@@ -317,7 +342,7 @@ class SIYIModule(mp_module.MPModule):
         pitch = float(args[1])
         self.target_pos = None
         self.clear_target()
-        self.send_packet(SET_ANGLE, struct.pack("<hh", int(yaw*10), int(pitch*10)))
+        self.send_packet_fmt(SET_ANGLE, "<hh", int(yaw*10), int(pitch*10))
         
     def send_rates(self):
         '''send rates packet'''
@@ -335,8 +360,9 @@ class SIYIModule(mp_module.MPModule):
             scale = 100.0 / SIYI_RATE_MAX_DPS
             y = int(mp_util.constrain(y*scale, -100, 100))
             p = int(mp_util.constrain(p*scale, -100, 100))
-            pkt = struct.pack("<bb", y, p)
-            self.send_packet(GIMBAL_ROTATION, pkt)
+            self.send_packet_fmt(GIMBAL_ROTATION, "<bb", y, p)
+            self.logf.write('SIGR', 'Qffbb', 'TimeUS,YRate,PRate,YC,PC',
+                            micros64(), self.yaw_rate, self.pitch_rate, y, p)
 
             cam_yaw, cam_pitch, cam_roll = self.get_gimbal_attitude()
             self.send_named_float('CROLL', cam_roll)
@@ -370,9 +396,9 @@ class SIYIModule(mp_module.MPModule):
         self.last_att_send = now
         self.send_packet(READ_RANGEFINDER, None)
         if self.last_temp_t is None or now - self.last_temp_t > 5:
-            self.send_packet(READ_TEMP_FULL_SCREEN, struct.pack("<B", 2))
+            self.send_packet_fmt(READ_TEMP_FULL_SCREEN, "<B", 2)
         if self.last_att_t is None or now - self.last_att_t > 2:
-            self.send_packet(REQUEST_CONTINUOUS_ATTITUDE, struct.pack("<BB", 1, 4))
+            self.send_packet_fmt(REQUEST_CONTINUOUS_ATTITUDE, "<BB", 1, 4)
 
     def send_packet(self, command_id, pkt):
         '''send SIYI packet'''
@@ -388,6 +414,24 @@ class SIYIModule(mp_module.MPModule):
         except Exception:
             pass
 
+    def send_packet_fmt(self, command_id, fmt, *args):
+        '''send SIYI packet'''
+        if fmt is None:
+            fmt = ""
+            args = []
+        self.send_packet(command_id, struct.pack(fmt, *args))
+        args = list(args)
+        args.extend([0]*(8-len(args)))
+        self.logf.write('SIOU', 'QBiiiiiiii', 'TimeUS,Cmd,P1,P2,P3,P4,P5,P6,P7,P8', micros64(), command_id, *args)
+
+    def unpack(self, command_id, fmt, data):
+        '''unpack SIYI data and log'''
+        v = struct.unpack(fmt, data)
+        args = list(v)
+        args.extend([0]*(8-len(args)))
+        self.logf.write('SIIN', 'QBiiiiiiii', 'TimeUS,Cmd,P1,P2,P3,P4,P5,P6,P7,P8', micros64(), command_id, *args)
+        return v
+
     def parse_packet(self, pkt):
         '''parse SIYI packet'''
         if len(pkt) < 10:
@@ -400,20 +444,24 @@ class SIYIModule(mp_module.MPModule):
             return
 
         if cmd == ACQUIRE_FIRMWARE_VERSION:
-            (patch,minor,major) = struct.unpack("<BBB", data[:3])
+            (patch,minor,major,gpatch,gminor,gmajor) = self.unpack(cmd, "<BBBBBB", data[:6])
             print("SIYI CAM %u.%u.%u" % (major, minor, patch))
-            (patch,minor,major) = struct.unpack("<BBB", data[3:6])
-            print("SIYI Gimbal %u.%u.%u" % (major, minor, patch))
+            print("SIYI Gimbal %u.%u.%u" % (gmajor, gminor, gpatch))
             self.have_version = True
 
         elif cmd == ACQUIRE_GIMBAL_ATTITUDE:
-            (z,y,x,sz,sy,sx) = struct.unpack("<hhhhhh", data[:12])
+            (z,y,x,sz,sy,sx) = self.unpack(cmd, "<hhhhhh", data[:12])
             self.last_att_t = time.time()
             self.attitude = (x*0.1, y*0.1, mp_util.wrap_180(-z*0.1), sx*0.1, sy*0.1, -sz*0.1)
             self.update_status()
+            self.logf.write('SIGA', 'Qffffffhhhhhh', 'TimeUS,Y,P,R,Yr,Pr,Rr,z,y,x,sz,sy,sx',
+                            micros64(),
+                                self.attitude[2], self.attitude[1], self.attitude[0],
+                                self.attitude[5], self.attitude[4], self.attitude[3],
+                                z,y,x,sz,sy,sx)
 
         elif cmd == ACQUIRE_GIMBAL_CONFIG_INFO:
-            res, hdr_sta, res2, record_sta, gim_motion, gim_mount, video = struct.unpack("<BBBBBBB", data[:7])
+            res, hdr_sta, res2, record_sta, gim_motion, gim_mount, video = self.unpack(cmd, "<BBBBBBB", data[:7])
             print("HDR: %u" % hdr_sta)
             print("Recording: %u" % record_sta)
             print("GimbalMotion: %u" % gim_motion)
@@ -421,7 +469,7 @@ class SIYIModule(mp_module.MPModule):
             print("Video: %u" % video)
 
         elif cmd == READ_RANGEFINDER:
-            r = struct.unpack("<H", data[:2])
+            r, = self.unpack(cmd, "<H", data[:2])
             self.rf_dist = r * 0.1
             self.update_status()
 
@@ -429,12 +477,12 @@ class SIYIModule(mp_module.MPModule):
             if len(data) < 12:
                 print("READ_TEMP_FULL_SCREEN: Expected 12 bytes, got %u" % len(data))
                 return
-            self.tmax,self.tmin,self.tmax_x,self.tmax_y,self.tmin_x,self.tmin_y = struct.unpack("<HHHHHH", data[:12])
+            self.tmax,self.tmin,self.tmax_x,self.tmax_y,self.tmin_x,self.tmin_y = self.unpack(cmd, "<HHHHHH", data[:12])
             self.tmax = self.tmax * 0.01
             self.tmin = self.tmin * 0.01
             self.last_temp_t = time.time()
         elif cmd == FUNCTION_FEEDBACK_INFO:
-            info_type = struct.unpack("<B", data[:1])
+            info_type, = self.unpack(cmd, "<B", data[:1])
             feedback = {
                 0: "Success",
                 1: "FailPhoto",
@@ -560,6 +608,24 @@ class SIYIModule(mp_module.MPModule):
         self.send_named_float('TPITCH', pitch_deg)
         self.send_named_float('EYAW', err_yaw)
         self.send_named_float('EPITCH', err_pitch)
+        self.logf.write('SIPY', "Qffff", "TimeUS,CYaw,TYaw,Yerr,I",
+                        micros64(), cam_yaw, yaw_deg, err_yaw, self.yaw_controller.I)
+        self.logf.write('SIPP', "Qffff", "TimeUS,CPitch,TPitch,Perr,I",
+                        micros64(), cam_pitch, pitch_deg, err_pitch, self.pitch_controller.I)
+
+    def mavlink_packet(self, m):
+        '''process a mavlink message'''
+        mtype = m.get_type()
+        if mtype == 'GPS_RAW_INT':
+            self.logf.write('GPS', "QBLLff", "TimeUS,Status,Lat,Lng,Alt,Spd",
+                            micros64(), m.fix_type, m.lat, m.lon, m.alt*0.001, m.vel*0.01)
+        if mtype == 'ATTITUDE':
+            self.logf.write('ATT', "Qffffff", "TimeUS,Roll,Pitch,Yaw,GyrX,GyrY,GyrZ",
+                            micros64(),
+                            math.degrees(m.roll), math.degrees(m.pitch), math.degrees(m.yaw),
+                            math.degrees(m.rollspeed), math.degrees(m.pitchspeed), math.degrees(m.yawspeed))
+
+
 
     def idle_task(self):
         '''called on idle'''
@@ -574,9 +640,9 @@ class SIYIModule(mp_module.MPModule):
             self.send_packet(ACQUIRE_FIRMWARE_VERSION, None)
         try:
             pkt = self.sock.recv(10240)
-            self.parse_packet(pkt)
-        except Exception:
-            pass
+        except Exception as ex:
+            return
+        self.parse_packet(pkt)
 
 def init(mpstate):
     '''initialise module'''
