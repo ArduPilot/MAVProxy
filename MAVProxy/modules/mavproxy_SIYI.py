@@ -69,6 +69,33 @@ def crc16_from_bytes(bytes, initial=0):
                 crc = (crc << 1) & 0xFFFF
     return crc & 0xFFFF
 
+class PI_controller:
+    '''simple PI controller'''
+    def __init__(self, settings, Pgain, Igain, IMAX):
+        self.Pgain = Pgain
+        self.Igain = Igain
+        self.IMAX = IMAX
+        self.I = 0.0
+        self.settings = settings
+        self.last_t = time.time()
+
+    def run(self, err):
+        now = time.time()
+        dt = now - self.last_t
+        if now - self.last_t > 1.0:
+            self.reset_I()
+            dt = 0
+        self.last_t = now
+        P = self.settings.get(self.Pgain)
+        I = self.settings.get(self.Igain)
+        IMAX = self.settings.get(self.IMAX)
+        out = P*err
+        self.I += I*err*dt
+        self.I = mp_util.constrain(self.I, -IMAX, IMAX)
+        return out + self.I
+
+    def reset_I(self):
+        self.I = 0
 
 class SIYIModule(mp_module.MPModule):
 
@@ -87,8 +114,12 @@ class SIYIModule(mp_module.MPModule):
                                                      ('yaw_rate', float, 10),
                                                      ('pitch_rate', float, 10),
                                                      ('rates_hz', float, 5),
-                                                     ('yaw_gain', float, 0.5),
-                                                     ('pitch_gain', float, 0.5),
+                                                     ('yaw_gain_P', float, 0.5),
+                                                     ('yaw_gain_I', float, 0.5),
+                                                     ('yaw_gain_IMAX', float, 5),
+                                                     ('pitch_gain_P', float, 0.5),
+                                                     ('pitch_gain_I', float, 0.5),
+                                                     ('pitch_gain_IMAX', float, 5),
                                                      ('mount_pitch', float, 0),
                                                      ('mount_yaw', float, 0),
                                                      ('lag', float, 0),
@@ -124,6 +155,9 @@ class SIYIModule(mp_module.MPModule):
         self.last_map_ROI = None
         self.icon = self.mpstate.map.icon('camera-small-red.png')
         self.last_target_send = time.time()
+        self.last_rate_display = time.time()
+        self.yaw_controller = PI_controller(self.siyi_settings, 'yaw_gain_P', 'yaw_gain_I', 'yaw_gain_IMAX')
+        self.pitch_controller = PI_controller(self.siyi_settings, 'pitch_gain_P', 'pitch_gain_I', 'pitch_gain_IMAX')
 
         if mp_util.has_wxpython:
             menu = MPMenuSubMenu('SIYI',
@@ -190,8 +224,10 @@ class SIYIModule(mp_module.MPModule):
             self.send_packet(PHOTO, struct.pack("<B", 3))
         elif args[0] == "follow":
             self.send_packet(PHOTO, struct.pack("<B", 4))
+            self.clear_target()
         elif args[0] == "fpv":
             self.send_packet(PHOTO, struct.pack("<B", 5))
+            self.clear_target()
         elif args[0] == "settarget":
             self.cmd_settarget(args[1:])
         elif args[0] == "notarget":
@@ -296,12 +332,21 @@ class SIYIModule(mp_module.MPModule):
                 y = 0.0
             if p is None:
                 p = 0.0
-            y = mp_util.constrain(y, -128, 127)
-            p = mp_util.constrain(p, -128, 127)
-            pkt = struct.pack("<bb",
-                            int(100.0*y/SIYI_RATE_MAX_DPS),
-                            int(100.0*p/SIYI_RATE_MAX_DPS))
+            scale = 100.0 / SIYI_RATE_MAX_DPS
+            y = int(mp_util.constrain(y*scale, -100, 100))
+            p = int(mp_util.constrain(p*scale, -100, 100))
+            pkt = struct.pack("<bb", y, p)
             self.send_packet(GIMBAL_ROTATION, pkt)
+
+            cam_yaw, cam_pitch, cam_roll = self.get_gimbal_attitude()
+            self.send_named_float('CROLL', cam_roll)
+            self.send_named_float('CYAW', cam_yaw)
+            self.send_named_float('CPITCH', cam_pitch)
+            self.send_named_float('CROLL_RT', self.attitude[3])
+            self.send_named_float('CPTCH_RT', self.attitude[4])
+            self.send_named_float('CYAW_RT', self.attitude[5])
+            self.send_named_float('YAW_RT', self.yaw_rate)
+            self.send_named_float('PITCH_RT', self.pitch_rate)
 
     def cmd_settarget(self, args):
         '''set target'''
@@ -509,20 +554,12 @@ class SIYIModule(mp_module.MPModule):
         err_yaw = mp_util.wrap_180(yaw_deg - cam_yaw)
         err_pitch = pitch_deg - cam_pitch
 
-        self.yaw_rate = err_yaw * self.siyi_settings.yaw_gain
-        self.pitch_rate = err_pitch * self.siyi_settings.pitch_gain
-        self.send_named_float('CROLL', cam_roll)
-        self.send_named_float('CYAW', cam_yaw)
-        self.send_named_float('CPITCH', cam_pitch)
+        self.yaw_rate = self.yaw_controller.run(err_yaw)
+        self.pitch_rate = self.yaw_controller.run(err_pitch)
         self.send_named_float('TYAW', yaw_deg)
         self.send_named_float('TPITCH', pitch_deg)
         self.send_named_float('EYAW', err_yaw)
         self.send_named_float('EPITCH', err_pitch)
-        self.send_named_float('CROLL_RT', self.attitude[3])
-        self.send_named_float('CPTCH_RT', self.attitude[4])
-        self.send_named_float('CYAW_RT', self.attitude[5])
-        self.send_named_float('YAW_RT', self.yaw_rate)
-        self.send_named_float('PITCH_RT', self.pitch_rate)
 
     def idle_task(self):
         '''called on idle'''
