@@ -295,7 +295,7 @@ class MPImagePanel(wx.Panel):
             self.mainSizer.Fit(self)
             self.Refresh()
             state.frame.Refresh()
-            self.SetFocus()
+            #self.SetFocus()
             return
 
         # get the current size of the containing window frame
@@ -337,7 +337,7 @@ class MPImagePanel(wx.Panel):
         self.mainSizer.Fit(self)
         self.Refresh()
         state.frame.Refresh()
-        self.SetFocus()
+        #self.SetFocus()
         '''
         from guppy import hpy
         h = hpy()
