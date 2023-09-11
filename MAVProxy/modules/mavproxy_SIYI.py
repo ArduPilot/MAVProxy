@@ -14,6 +14,8 @@ from pymavlink import mavutil
 from pymavlink import DFReader
 from pymavlink.rotmat import Matrix3
 import math
+from threading import Thread
+import cv2
 
 import socket, time, os, struct
 
@@ -21,6 +23,7 @@ if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import MPMenuCallTextDialog
     from MAVProxy.modules.lib.mp_menu import MPMenuItem
     from MAVProxy.modules.lib.mp_menu import MPMenuSubMenu
+    from MAVProxy.modules.lib.mp_image import MPImage
     from MAVProxy.modules.mavproxy_map import mp_slipmap
 
 SIYI_RATE_MAX_DPS = 90.0
@@ -47,6 +50,7 @@ SET_THERMAL_PALETTE = 0x1B
 REQUEST_CONTINUOUS_ATTITUDE = 0x25
 ATTITUDE_EXTERNAL = 0x22
 VELOCITY_EXTERNAL = 0x26
+TEMPERATURE_BOX = 0x13
 
 def crc16_from_bytes(bytes, initial=0):
     # CRC-16-CCITT
@@ -125,7 +129,7 @@ class SIYIModule(mp_module.MPModule):
         super(SIYIModule, self).__init__(mpstate, "SIYI", "SIYI camera support")
 
         self.add_command('siyi', self.cmd_siyi, "SIYI camera control",
-                         ["<rates|connect|autofocus|zoom|yaw|pitch|center|getconfig|angle|photo|recording|lock|follow|fpv|settarget|notarget>",
+                         ["<rates|connect|autofocus|zoom|yaw|pitch|center|getconfig|angle|photo|recording|lock|follow|fpv|settarget|notarget|thermal|box>",
                           "set (SIYISETTING)",
                           "imode <1|2|3|4|5|6|7|8|wide|zoom|split>",
                           "palette <WhiteHot|Sepia|Ironbow|Rainbow|Night|Aurora|RedHot|Jungle|Medical|BlackHot|GloryHot>"
@@ -152,6 +156,7 @@ class SIYIModule(mp_module.MPModule):
                                                      ('att_send_hz', float, 10),
                                                      ('lidar_hz', float, 10),
                                                      ('temp_hz', float, 5),
+                                                     ('thermal_port', int, 7002),
                                                      ('logfile', str, 'SIYI_log.bin'),
                                                          ])
         self.add_completion_function('(SIYISETTING)',
@@ -169,8 +174,9 @@ class SIYIModule(mp_module.MPModule):
         self.pitch_end = None
         self.rf_dist = 0
         self.attitude = None
-        self.tmax = None
-        self.tmin = None
+        self.tmax = -1
+        self.tmin = -1
+        self.spot_temp = -1
         self.tmax_x = None
         self.tmax_y = None
         self.tmin_x = None
@@ -191,6 +197,10 @@ class SIYIModule(mp_module.MPModule):
         self.last_att_send_t = time.time()
         self.last_lidar_t = time.time()
         self.last_temp_t = time.time()
+        self.thermal_im = None
+        self.thermal_cap = None
+        self.box_pending = None
+        self.last_box_req_t = time.time()
 
         if mp_util.has_wxpython:
             menu = MPMenuSubMenu('SIYI',
@@ -208,6 +218,7 @@ class SIYIModule(mp_module.MPModule):
                                      MPMenuItem('ImageZoom', 'ImageZoom', '# siyi imode zoom '),
                                      MPMenuItem('Recording', 'Recording', '# siyi recording '),
                                      MPMenuItem('ClearTarget', 'ClearTarget', '# siyi notarget '),
+                                     MPMenuItem('ThermalView', 'Thermalview', '# siyi thermal '),
                                      MPMenuItem('Zoom1', 'Zoom1', '# siyi zoom 1 '),
                                      MPMenuItem('Zoom2', 'Zoom2', '# siyi zoom 2 '),
                                      MPMenuItem('Zoom4', 'Zoom4', '# siyi zoom 4 '),
@@ -273,6 +284,10 @@ class SIYIModule(mp_module.MPModule):
             self.clear_target()
         elif args[0] == "palette":
             self.cmd_palette(args[1:])
+        elif args[0] == "thermal":
+            self.cmd_thermal()
+        elif args[0] == "box":
+            self.cmd_box(args[1:])
         else:
             print(usage)
 
@@ -291,6 +306,7 @@ class SIYIModule(mp_module.MPModule):
             return
         self.yaw_rate = float(args[0])
         self.pitch_rate = float(args[1])
+        self.clear_target()
 
     def cmd_yaw(self, args):
         '''update yaw'''
@@ -337,7 +353,70 @@ class SIYIModule(mp_module.MPModule):
         if pal is None:
             pal = int(args[0])
         self.send_packet_fmt(SET_THERMAL_PALETTE, "<B", pal)
-        
+
+    def cmd_box(self, args):
+        '''open query temp in box'''
+        if len(args) < 4:
+            print("usage: xmin ymin xmax ymax")
+            return
+        xmin = int(args[0])
+        ymin = int(args[1])
+        xmax = int(args[2])
+        ymax = int(args[3])
+        self.box_pending = (xmin,xmax,ymin,ymax)
+
+    def thermal_capture(self):
+        '''thermal capture thread'''
+        while True:
+            try:
+                _, frame = self.thermal_cap.read()
+            except Exception:
+                break
+            if frame is None:
+                break
+            self.thermal_im.set_image(frame, bgr=True)
+        print("thermal stream ended")
+        self.thermal_im = None
+        self.thermal_cap = None
+
+    def cmd_thermal(self):
+        '''open thermal viewer'''
+        self.thermal_cap = cv2.VideoCapture('udp://@:%u' % self.siyi_settings.thermal_port)
+        if not self.thermal_cap or not self.thermal_cap.isOpened():
+            print('Cannot open thermal UDP stream')
+            self.thermal_cap = None
+            return
+        self.thermal_im = MPImage(title='Thermal View',
+                                  mouse_events=True,
+                                  width=640,
+                                  height=512,
+                                  key_events=True,
+                                  can_drag = False,
+                                  can_zoom = False,
+                                  auto_size = False)
+        if self.thermal_im is None:
+            self.thermal_cap.release()
+            self.thermal_cap = None
+        self.thermal_thread = Thread(target=self.thermal_capture)
+        self.thermal_thread.daemon = True
+        self.thermal_thread.start()
+
+    def check_thermal_events(self):
+        '''check for mouse events on thermal image'''
+        if self.thermal_im is None:
+            return
+        for event in self.thermal_im.events():
+            if isinstance(event, MPMenuItem):
+                print(event)
+                continue
+            if event.ClassName == 'wxMouseEvent' and event.leftIsDown:
+                #print(dir(event))
+                xmin = max(event.x-10, 1)
+                ymin = max(event.y-10, 1)
+                xmax = min(event.x+10, 639)
+                ymax = min(event.y+10, 511)
+                self.box_pending = (xmin,xmax,ymin,ymax)
+
     def cmd_zoom(self, args):
         '''set zoom'''
         if len(args) < 1:
@@ -484,8 +563,8 @@ class SIYIModule(mp_module.MPModule):
         '''unpack SIYI data and log'''
         v = struct.unpack(fmt, data)
         args = list(v)
-        args.extend([0]*(8-len(args)))
-        self.logf.write('SIIN', 'QBffffffff', 'TimeUS,Cmd,P1,P2,P3,P4,P5,P6,P7,P8', self.micros64(), command_id, *args)
+        args.extend([0]*(10-len(args)))
+        self.logf.write('SIIN', 'QBffffffffff', 'TimeUS,Cmd,P1,P2,P3,P4,P5,P6,P7,P8,P9,P10', self.micros64(), command_id, *args)
         return v
 
     def parse_packet(self, pkt):
@@ -547,12 +626,27 @@ class SIYIModule(mp_module.MPModule):
                 4: "FailRecord",
             }
             print("Feedback %s" % feedback.get(info_type, str(info_type)))
+        elif cmd == TEMPERATURE_BOX:
+            self.box_pending = None
+            startx,starty,endx,endy,temp_max,temp_min,temp_max_x,temp_max_y,temp_min_x,temp_min_y = self.unpack(cmd, "<HHHHHHHHHH", data[:20])
+            #print("got box: ", startx, starty)
+            if self.thermal_im is not None:
+                self.spot_temp = temp_max*0.01
+                self.update_title()
+
         elif cmd in [SET_ANGLE, CENTER, GIMBAL_ROTATION, ABSOLUTE_ZOOM, SET_IMAGE_TYPE,
                      REQUEST_CONTINUOUS_ATTITUDE, SET_THERMAL_PALETTE]:
             # an ack
             pass
         else:
             print("SIYI: Unknown command 0x%02x" % cmd)
+
+    def update_title(self):
+        '''update thermal view title'''
+        if self.thermal_im is None:
+            return
+        self.thermal_im.set_title("Thermal View TEMP=%.2fC%s RANGE(%.2fC to %.2fC)" % (
+            self.spot_temp, "(*)" if self.box_pending else "", self.tmin, self.tmax))
 
     def update_status(self):
         if self.attitude is None:
@@ -562,6 +656,7 @@ class SIYIModule(mp_module.MPModule):
             self.rf_dist), row=6)
         if self.tmin is not None:
             self.console.set_status('TEMP', 'TEMP %.2f/%.2f' % (self.tmin, self.tmax), row=6)
+            self.update_title()
 
     def check_rate_end(self):
         '''check for ending yaw/pitch command'''
@@ -697,6 +792,15 @@ class SIYIModule(mp_module.MPModule):
                             math.degrees(m.rollspeed), math.degrees(m.pitchspeed), math.degrees(m.yawspeed))
 
 
+    def check_box_pending(self):
+        now = time.time()
+        if self.box_pending is None or now - self.last_box_req_t < 0.2:
+            return
+        self.last_box_req_t = now
+        (xmin,xmax,ymin,ymax) = self.box_pending
+        #print("send box: ", xmin, ymin)
+        self.send_packet_fmt(TEMPERATURE_BOX, "<HHHHB", xmin, ymin, xmax, ymax, 1)
+        self.update_title()
 
     def idle_task(self):
         '''called on idle'''
@@ -707,6 +811,8 @@ class SIYIModule(mp_module.MPModule):
         self.send_rates()
         self.request_telem()
         self.send_attitude()
+        self.check_thermal_events()
+        self.check_box_pending()
         if not self.have_version and time.time() - self.last_version_send > 1.0:
             self.last_version_send = time.time()
             self.send_packet(ACQUIRE_FIRMWARE_VERSION, None)
