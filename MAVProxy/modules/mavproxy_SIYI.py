@@ -13,6 +13,7 @@ from MAVProxy.modules.lib import mp_util
 from pymavlink import mavutil
 from pymavlink import DFReader
 from pymavlink.rotmat import Matrix3
+from pymavlink.rotmat import Vector3
 import math
 from threading import Thread
 import cv2
@@ -543,7 +544,7 @@ class SIYIModule(mp_module.MPModule):
         if pkt:
             buf += pkt
         buf += struct.pack("<H", crc16_from_bytes(buf))
-        self.sequence += 1
+        self.sequence = (self.sequence+1) % 0xffff
         try:
             self.sock.send(buf)
         except Exception:
@@ -567,6 +568,12 @@ class SIYIModule(mp_module.MPModule):
         self.logf.write('SIIN', 'QBffffffffff', 'TimeUS,Cmd,P1,P2,P3,P4,P5,P6,P7,P8,P9,P10', self.micros64(), command_id, *args)
         return v
 
+    def euler_312_to_euler_321(self, r, p, y):
+        '''convert between euler conventions'''
+        m = Matrix3()
+        m.from_euler312(r,p,y)
+        return m.to_euler()
+
     def parse_packet(self, pkt):
         '''parse SIYI packet'''
         if len(pkt) < 10:
@@ -587,7 +594,9 @@ class SIYIModule(mp_module.MPModule):
         elif cmd == ACQUIRE_GIMBAL_ATTITUDE:
             (z,y,x,sz,sy,sx) = self.unpack(cmd, "<hhhhhh", data[:12])
             self.last_att_t = time.time()
-            self.attitude = (x*0.1, y*0.1, mp_util.wrap_180(-z*0.1), sx*0.1, sy*0.1, -sz*0.1)
+            (roll,pitch,yaw) = (x*0.1, y*0.1, mp_util.wrap_180(-z*0.1))
+            (roll,pitch,yaw) = self.euler_312_to_euler_321(math.radians(roll),math.radians(pitch),math.radians(yaw))
+            self.attitude = (math.degrees(roll),math.degrees(pitch),math.degrees(yaw), sx*0.1, sy*0.1, -sz*0.1)
             self.update_status()
             self.logf.write('SIGA', 'Qffffffhhhhhh', 'TimeUS,Y,P,R,Yr,Pr,Rr,z,y,x,sz,sy,sx',
                             self.micros64(),
@@ -699,6 +708,19 @@ class SIYIModule(mp_module.MPModule):
         yaw = mp_util.wrap_180(yaw)
         roll = self.attitude[0]
         return yaw, pitch, roll
+
+    def get_latlon(self, slant_range):
+        '''get lat/lon given vehicle orientation, camera orientation and slant range'''
+        att = self.master.messages.get('ATTITUDE',None)
+        if att is None:
+            return None
+        gpi = self.master.messages.get('GLOBAL_POSITION_INT',None)
+        if gpi is None:
+            return None
+        cam_att = self.attitude
+        v = Vector3(slant_range, 0, 0)
+        m = Matrix3()
+        m.from_euler()
 
     def update_target(self):
         '''update position targetting'''
