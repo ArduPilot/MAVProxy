@@ -42,6 +42,7 @@ ABSOLUTE_ZOOM = 0x0F
 READ_RANGEFINDER = 0x15
 READ_TEMP_FULL_SCREEN = 0x14
 SET_IMAGE_TYPE = 0x11
+SET_THERMAL_PALETTE = 0x1B
 REQUEST_CONTINUOUS_ATTITUDE = 0x25
 
 def crc16_from_bytes(bytes, initial=0):
@@ -123,7 +124,9 @@ class SIYIModule(mp_module.MPModule):
         self.add_command('siyi', self.cmd_siyi, "SIYI camera control",
                          ["<rates|connect|autofocus|zoom|yaw|pitch|center|getconfig|angle|photo|recording|lock|follow|fpv|settarget|notarget>",
                           "set (SIYISETTING)",
-                          "imode <1|2|3|4|5|6|7|8|wide|zoom|split>"])
+                          "imode <1|2|3|4|5|6|7|8|wide|zoom|split>",
+                          "palette <WhiteHot|Sepia|Ironbow|Rainbow|Night|Aurora|RedHot|Jungle|Medical|BlackHot|GloryHot>"
+                          ])
 
         # filter_dist is distance in metres
         self.siyi_settings = mp_settings.MPSettings([("port", int, 37260),
@@ -132,11 +135,11 @@ class SIYIModule(mp_module.MPModule):
                                                      ('yaw_rate', float, 10),
                                                      ('pitch_rate', float, 10),
                                                      ('rates_hz', float, 5),
-                                                     ('yaw_gain_P', float, 0.5),
-                                                     ('yaw_gain_I', float, 0.5),
+                                                     ('yaw_gain_P', float, 1),
+                                                     ('yaw_gain_I', float, 1),
                                                      ('yaw_gain_IMAX', float, 5),
-                                                     ('pitch_gain_P', float, 0.5),
-                                                     ('pitch_gain_I', float, 0.5),
+                                                     ('pitch_gain_P', float, 1),
+                                                     ('pitch_gain_I', float, 1),
                                                      ('pitch_gain_IMAX', float, 5),
                                                      ('mount_pitch', float, 0),
                                                      ('mount_yaw', float, 0),
@@ -257,6 +260,8 @@ class SIYIModule(mp_module.MPModule):
             self.cmd_settarget(args[1:])
         elif args[0] == "notarget":
             self.clear_target()
+        elif args[0] == "palette":
+            self.cmd_palette(args[1:])
         else:
             print(usage)
 
@@ -309,6 +314,19 @@ class SIYIModule(mp_module.MPModule):
             mode = int(args[0])
         self.send_packet_fmt(SET_IMAGE_TYPE, "<B", mode)
 
+    def cmd_palette(self, args):
+        '''update thermal palette'''
+        if len(args) < 1:
+            print("Usage: siyi palette PALETTENUM")
+            return
+        pal_map = { "WhiteHot" : 0, "Sepia" : 2, "Ironbow" : 3, "Rainbow" : 4,
+                    "Night" : 5, "Aurora" : 6, "RedHot" : 7, "Jungle" : 8 , "Medical" : 9,
+                    "BlackHot" : 10, "GloryHot" : 11}
+        pal = pal_map.get(args[0],None)
+        if pal is None:
+            pal = int(args[0])
+        self.send_packet_fmt(SET_THERMAL_PALETTE, "<B", pal)
+        
     def cmd_zoom(self, args):
         '''set zoom'''
         if len(args) < 1:
@@ -491,7 +509,8 @@ class SIYIModule(mp_module.MPModule):
                 4: "FailRecord",
             }
             print("Feedback %s" % feedback.get(info_type, str(info_type)))
-        elif cmd in [SET_ANGLE, CENTER, GIMBAL_ROTATION, ABSOLUTE_ZOOM, SET_IMAGE_TYPE, REQUEST_CONTINUOUS_ATTITUDE]:
+        elif cmd in [SET_ANGLE, CENTER, GIMBAL_ROTATION, ABSOLUTE_ZOOM, SET_IMAGE_TYPE,
+                     REQUEST_CONTINUOUS_ATTITUDE, SET_THERMAL_PALETTE]:
             # an ack
             pass
         else:
