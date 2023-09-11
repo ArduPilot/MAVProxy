@@ -12,6 +12,7 @@ from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_util
 from pymavlink import mavutil
 from pymavlink import DFReader
+from pymavlink.rotmat import Matrix3
 import math
 
 import socket, time, os, struct
@@ -44,6 +45,8 @@ READ_TEMP_FULL_SCREEN = 0x14
 SET_IMAGE_TYPE = 0x11
 SET_THERMAL_PALETTE = 0x1B
 REQUEST_CONTINUOUS_ATTITUDE = 0x25
+ATTITUDE_EXTERNAL = 0x22
+VELOCITY_EXTERNAL = 0x26
 
 def crc16_from_bytes(bytes, initial=0):
     # CRC-16-CCITT
@@ -146,6 +149,9 @@ class SIYIModule(mp_module.MPModule):
                                                      ('lag', float, 0),
                                                      ('target_rate', float, 10),
                                                      ('telem_hz', float, 5),
+                                                     ('att_send_hz', float, 10),
+                                                     ('lidar_hz', float, 10),
+                                                     ('temp_hz', float, 5),
                                                      ('logfile', str, 'SIYI_log.bin'),
                                                          ])
         self.add_completion_function('(SIYISETTING)',
@@ -156,7 +162,6 @@ class SIYIModule(mp_module.MPModule):
         self.sequence = 0
         self.last_req_send = time.time()
         self.last_version_send = time.time()
-        self.last_att_send = time.time()
         self.have_version = False
         self.console.set_status('SIYI', 'SIYI - -', row=6)
         self.console.set_status('TEMP', 'TEMP -/-', row=6)
@@ -183,6 +188,9 @@ class SIYIModule(mp_module.MPModule):
         self.pitch_controller = PI_controller(self.siyi_settings, 'pitch_gain_P', 'pitch_gain_I', 'pitch_gain_IMAX')
         self.logf = DF_logger(self.siyi_settings.logfile)
         self.start_time = time.time()
+        self.last_att_send_t = time.time()
+        self.last_lidar_t = time.time()
+        self.last_temp_t = time.time()
 
         if mp_util.has_wxpython:
             menu = MPMenuSubMenu('SIYI',
@@ -214,6 +222,9 @@ class SIYIModule(mp_module.MPModule):
     def micros64(self):
         return int((time.time()-self.start_time)*1.0e6)
 
+    def millis32(self):
+        return int((time.time()-self.start_time)*1.0e3)
+    
     def cmd_siyi(self, args):
         '''siyi command parser'''
         usage = "usage: siyi <set|rates>"
@@ -409,14 +420,41 @@ class SIYIModule(mp_module.MPModule):
     def request_telem(self):
         '''request telemetry'''
         now = time.time()
-        if self.siyi_settings.telem_hz <= 0 or now - self.last_att_send < 1.0/self.siyi_settings.telem_hz:
-            return
-        self.last_att_send = now
-        self.send_packet(READ_RANGEFINDER, None)
-        if self.last_temp_t is None or now - self.last_temp_t > 5:
+        if self.siyi_settings.lidar_hz > 0 and now - self.last_lidar_t >= 1.0/self.siyi_settings.lidar_hz:
+            self.last_lidar_t = now
+            self.send_packet(READ_RANGEFINDER, None)
+        if self.siyi_settings.temp_hz > 0 and now - self.last_temp_t >= 1.0/self.siyi_settings.temp_hz:
+            self.last_temp_t = now
             self.send_packet_fmt(READ_TEMP_FULL_SCREEN, "<B", 2)
         if self.last_att_t is None or now - self.last_att_t > 2:
-            self.send_packet_fmt(REQUEST_CONTINUOUS_ATTITUDE, "<BB", 1, 4)
+            self.last_att_t = now
+            self.send_packet_fmt(REQUEST_CONTINUOUS_ATTITUDE, "<BB", 1, 5)
+
+    def send_attitude(self):
+        '''send attitude to gimbal'''
+        now = time.time()
+        if self.siyi_settings.att_send_hz <= 0 or now - self.last_att_send_t < 1.0/self.siyi_settings.telem_hz:
+            return
+        self.last_att_send_t = now
+        att = self.master.messages.get('ATTITUDE',None)
+        if att is None:
+            return
+        r = Matrix3()
+        r.from_euler(att.roll, att.pitch, att.yaw)
+        (roll, pitch, yaw) = r.to_euler312()
+        self.send_packet_fmt(ATTITUDE_EXTERNAL, "<Iffffff",
+                             self.millis32(),
+                             roll, pitch, yaw,
+                             att.rollspeed, att.pitchspeed, att.yawspeed)
+        gpi = self.master.messages.get('GLOBAL_POSITION_INT',None)
+        if gpi is None:
+            return
+        self.send_packet_fmt(VELOCITY_EXTERNAL, "<Ifff",
+                             self.millis32(),
+                             gpi.vx*0.01,
+                             gpi.vy*0.01,
+                             gpi.vz*0.01)
+
 
     def send_packet(self, command_id, pkt):
         '''send SIYI packet'''
@@ -440,14 +478,14 @@ class SIYIModule(mp_module.MPModule):
         self.send_packet(command_id, struct.pack(fmt, *args))
         args = list(args)
         args.extend([0]*(8-len(args)))
-        self.logf.write('SIOU', 'QBiiiiiiii', 'TimeUS,Cmd,P1,P2,P3,P4,P5,P6,P7,P8', self.micros64(), command_id, *args)
+        self.logf.write('SIOU', 'QBffffffff', 'TimeUS,Cmd,P1,P2,P3,P4,P5,P6,P7,P8', self.micros64(), command_id, *args)
 
     def unpack(self, command_id, fmt, data):
         '''unpack SIYI data and log'''
         v = struct.unpack(fmt, data)
         args = list(v)
         args.extend([0]*(8-len(args)))
-        self.logf.write('SIIN', 'QBiiiiiiii', 'TimeUS,Cmd,P1,P2,P3,P4,P5,P6,P7,P8', self.micros64(), command_id, *args)
+        self.logf.write('SIIN', 'QBffffffff', 'TimeUS,Cmd,P1,P2,P3,P4,P5,P6,P7,P8', self.micros64(), command_id, *args)
         return v
 
     def parse_packet(self, pkt):
@@ -522,7 +560,7 @@ class SIYIModule(mp_module.MPModule):
         self.console.set_status('SIYI', 'SIYI (%.1f,%.1f,%.1f) rf=%.1f' % (
             self.attitude[0], self.attitude[1], self.attitude[2],
             self.rf_dist), row=6)
-        if self.last_temp_t is not None:
+        if self.tmin is not None:
             self.console.set_status('TEMP', 'TEMP %.2f/%.2f' % (self.tmin, self.tmax), row=6)
 
     def check_rate_end(self):
@@ -668,6 +706,7 @@ class SIYIModule(mp_module.MPModule):
         self.update_target()
         self.send_rates()
         self.request_telem()
+        self.send_attitude()
         if not self.have_version and time.time() - self.last_version_send > 1.0:
             self.last_version_send = time.time()
             self.send_packet(ACQUIRE_FIRMWARE_VERSION, None)
