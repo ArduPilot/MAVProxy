@@ -212,6 +212,22 @@ class ThermalView:
                     if event.x < xres and event.y < yres and event.x >= 0 and event.y >= 0:
                         self.siyi.spot_temp = self.get_pixel_temp(event.x, event.y)
                         self.update_title()
+                    x = (2*event.x/float(xres))-1.0
+                    y = (2*event.y/float(yres))-1.0
+                    aspect_ratio = float(xres)/yres
+                    slant_range = self.siyi.get_slantrange(x,y,self.siyi.siyi_settings.thermal_fov,aspect_ratio)
+                    if slant_range is None:
+                        return
+                    latlonalt = self.siyi.get_latlonalt(slant_range, x, y,
+                                                        self.siyi.siyi_settings.thermal_fov,
+                                                        aspect_ratio)
+                    if latlonalt is None:
+                        return
+                    latlon = (latlonalt[0],latlonalt[1])
+                    self.siyi.mpstate.map.add_object(mp_slipmap.SlipIcon('SIYIClick', latlon,
+                                                     self.siyi.click_icon, layer='SIYI', rotation=0, follow=False))
+
+
 
 
 class SIYIModule(mp_module.MPModule):
@@ -249,6 +265,7 @@ class SIYIModule(mp_module.MPModule):
                                                      ('temp_hz', float, 5),
                                                      ('thermal_port', int, 7002),
                                                      ('logfile', str, 'SIYI_log.bin'),
+                                                     ('thermal_fov', float, 18),
                                                          ])
         self.add_completion_function('(SIYISETTING)',
                                      self.siyi_settings.completion)
@@ -279,6 +296,7 @@ class SIYIModule(mp_module.MPModule):
         self.target_pos = None
         self.last_map_ROI = None
         self.icon = self.mpstate.map.icon('camera-small-red.png')
+        self.click_icon = self.mpstate.map.icon('flag.png')
         self.last_target_send = time.time()
         self.last_rate_display = time.time()
         self.yaw_controller = PI_controller(self.siyi_settings, 'yaw_gain_P', 'yaw_gain_I', 'yaw_gain_IMAX')
@@ -684,7 +702,7 @@ class SIYIModule(mp_module.MPModule):
     def update_status(self):
         if self.attitude is None:
             return
-        self.console.set_status('SIYI', 'SIYI (%.1f,%.1f,%.1f) rf=%.1f' % (
+        self.console.set_status('SIYI', 'SIYI (%.1f,%.1f,%.1f) SR=%.1f' % (
             self.attitude[0], self.attitude[1], self.attitude[2],
             self.rf_dist), row=6)
         if self.tmin is not None:
@@ -733,18 +751,81 @@ class SIYIModule(mp_module.MPModule):
         roll = self.attitude[0]
         return yaw, pitch, roll
 
-    def get_latlon(self, slant_range):
-        '''get lat/lon given vehicle orientation, camera orientation and slant range'''
+    def get_slantrange(self,x,y,FOV,aspect_ratio):
+        '''
+         get range to ground
+         x and y are from -1 to 1, relative to center of camera view
+        '''
+        if self.rf_dist > 0:
+            # use rangefinder if possible
+            return self.rf_dist
+        gpi = self.master.messages.get('GLOBAL_POSITION_INT',None)
+        if not gpi:
+            return None
+        (lat,lon,alt) = gpi.lat*1.0e-7,gpi.lon*1.0e-7,gpi.alt*1.0e-3
+        ground_alt = self.module('terrain').ElevationModel.GetElevation(lat, lon)
+        if alt <= ground_alt:
+            return None
+        if self.attitude is None:
+            return None
+        pitch = self.attitude[1]
+        if pitch >= 0:
+            return None
+        pitch -= y*FOV*0.5/aspect_ratio
+        pitch = min(pitch, -1)
+
+        # start with flat earth
+        sin_pitch = math.sin(abs(math.radians(pitch)))
+        sr = (alt-ground_alt) / sin_pitch
+
+        # iterate to make more accurate
+        for i in range(3):
+            (lat2,lon2,alt2) = self.get_latlonalt(sr,x,y,FOV,aspect_ratio)
+            ground_alt2 = self.module('terrain').ElevationModel.GetElevation(lat2, lon2)
+            # adjust for height at this point
+            sr += (alt2 - ground_alt2) / sin_pitch
+        return sr
+
+
+
+    def get_view_vector(self, x, y, FOV, aspect_ratio):
+        '''
+        get ground lat/lon given vehicle orientation, camera orientation and slant range
+        x and y are from -1 to 1, relative to center of camera view
+        positive x is to the right
+        positive y is down
+        '''
         att = self.master.messages.get('ATTITUDE',None)
         if att is None:
+            return None
+        v = Vector3(1, 0, 0)
+        m = Matrix3()
+        (roll,pitch,yaw) = (math.radians(self.attitude[0]),math.radians(self.attitude[1]),math.radians(self.attitude[2]))
+        yaw += att.yaw
+        FOV_half = math.radians(0.5*FOV)
+        yaw += FOV_half*x
+        pitch -= y*FOV_half/aspect_ratio
+        m.from_euler(roll, pitch, yaw)
+        v = m * v
+        return v
+
+    def get_latlonalt(self, slant_range, x, y, FOV, aspect_ratio):
+        '''
+        get ground lat/lon given vehicle orientation, camera orientation and slant range
+        x and y are from -1 to 1, relative to center of camera view
+        '''
+        if slant_range is None:
+            return None
+        v = self.get_view_vector(x,y,FOV,aspect_ratio)
+        if v is None:
             return None
         gpi = self.master.messages.get('GLOBAL_POSITION_INT',None)
         if gpi is None:
             return None
-        cam_att = self.attitude
-        v = Vector3(slant_range, 0, 0)
-        m = Matrix3()
-        m.from_euler()
+        v *= slant_range
+        (lat,lon,alt) = (gpi.lat*1.0e-7,gpi.lon*1.0e-7,gpi.alt*1.0e-3)
+        (lat,lon) = mp_util.gps_offset(lat,lon,v.y,v.x)
+        return (lat,lon,alt-v.z)
 
     def update_target(self):
         '''update position targetting'''
@@ -823,6 +904,21 @@ class SIYIModule(mp_module.MPModule):
         week_ms = (epoch_seconds % SEC_PER_WEEK) * 1000 + ((t_ms//200) * 200)
         return week, week_ms
 
+    def show_thermal_fov(self):
+        '''show thermal FOV polygon'''
+        points = []
+        FOV = self.siyi_settings.thermal_fov
+        aspect_ratio = 640.0/512.0
+        for (x,y) in [(-1,-1),(1,-1),(1,1),(-1,1),(-1,-1)]:
+            latlonalt = self.get_latlonalt(self.get_slantrange(x,y,FOV,aspect_ratio),x,y,FOV,aspect_ratio)
+            if latlonalt is None:
+                return
+            (lat,lon) = (latlonalt[0],latlonalt[1])
+            points.append((lat,lon))
+        self.mpstate.map.add_object(mp_slipmap.SlipPolygon('SIYIThermalFOV', points, layer='SIYI',
+                                                           linewidth=2, colour=(0,0,120)))
+
+
     def mavlink_packet(self, m):
         '''process a mavlink message'''
         mtype = m.get_type()
@@ -836,6 +932,8 @@ class SIYIModule(mp_module.MPModule):
                             self.micros64(),
                             math.degrees(m.roll), math.degrees(m.pitch), math.degrees(m.yaw),
                             math.degrees(m.rollspeed), math.degrees(m.pitchspeed), math.degrees(m.yawspeed))
+        if mtype == 'GLOBAL_POSITION_INT':
+            self.show_thermal_fov()
 
 
     def idle_task(self):
