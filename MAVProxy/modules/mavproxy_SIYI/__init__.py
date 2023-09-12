@@ -17,6 +17,7 @@ from pymavlink.rotmat import Vector3
 import math
 from threading import Thread
 import cv2
+import traceback
 
 import socket, time, os, struct
 
@@ -125,17 +126,20 @@ class DF_logger:
         self.outf.flush()
 
 
-class ThermalView:
-    '''handle thermal view image'''
-    def __init__(self, siyi):
+class CameraView:
+    '''handle camera view image'''
+    def __init__(self, siyi, port, res, thermal=False):
         self.siyi = siyi
+        self.thermal = thermal
         self.im = None
         self.im_colormap = "COLORMAP_MAGMA"
         self.cap = None
+        self.raw_frame = None
+        self.res = res
+        self.port = port
         self.thread = Thread(target=self.capture)
         self.thread.daemon = True
         self.thread.start()
-        self.grey_frame = None
 
     def set_title(self, title):
         '''set image title'''
@@ -145,10 +149,10 @@ class ThermalView:
 
     def capture(self):
         '''thermal capture thread'''
-        self.im = MPImage(title='Thermal View',
+        self.im = MPImage(title='Camera View',
                                   mouse_events=True,
-                                  width=640,
-                                  height=512,
+                                  width=self.res[0],
+                                  height=self.res[1],
                                   key_events=True,
                                   can_drag = False,
                                   can_zoom = False,
@@ -160,9 +164,9 @@ class ThermalView:
         popup = MPMenuSubMenu('ColorMap', items=[MPMenuItem(c,returnkey="COLORMAP_"+c) for c in colormaps])
         self.im.set_popup_menu(popup)
 
-        self.cap = cv2.VideoCapture('udp://@:%u' % self.siyi.siyi_settings.thermal_port)
+        self.cap = cv2.VideoCapture('udp://@:%u' % self.port)
         if not self.cap or not self.cap.isOpened():
-            print('Cannot open thermal UDP stream')
+            print('Cannot open UDP stream on port %u' % self.port)
             self.cap = None
             return
 
@@ -173,33 +177,47 @@ class ThermalView:
                 break
             if frame is None:
                 break
-            self.grey_frame = frame
-            if self.im_colormap is not None:
+            im = self.im
+            if im is None:
+                self.cap.release()
+                self.cap = None
+                return
+            self.raw_frame = frame
+            if self.thermal and self.im_colormap is not None:
                 cmap = getattr(cv2,self.im_colormap,None)
                 if cmap is not None:
                     frame = cv2.applyColorMap(frame, cmap)
-            self.im.set_image(frame, bgr=True)
-        print("thermal stream ended")
+            im.set_image(frame, bgr=True)
+        print("stream ended on port %u" % self.port)
         self.im = None
+        self.cap.release()
         self.cap = None
 
     def get_pixel_temp(self, x, y):
         '''get temperature of a pixel'''
-        v = self.grey_frame[y][x][0]
-        gmin = self.grey_frame[...,0].min()
-        gmax = self.grey_frame[...,0].max()
+        v = self.raw_frame[y][x][0]
+        gmin = self.raw_frame[...,0].min()
+        gmax = self.raw_frame[...,0].max()
         if gmax <= gmin:
             return -1
         return self.siyi.tmin + ((v-gmin)/float(gmax-gmin))*(self.siyi.tmax-self.siyi.tmin)
 
     def update_title(self):
         '''update thermal view title'''
-        self.set_title("Thermal View TEMP=%.2fC RANGE(%.2fC to %.2fC)" % (
-            self.siyi.spot_temp, self.siyi.tmin, self.siyi.tmax))
-    
+        if self.thermal:
+            self.set_title("Thermal View TEMP=%.2fC RANGE(%.2fC to %.2fC)" % (
+                self.siyi.spot_temp, self.siyi.tmin, self.siyi.tmax))
+        elif self.siyi.rgb_lens == "zoom":
+            self.set_title("Zoom View %.1fx" % self.siyi.last_zoom)
+        else:
+            self.set_title("Wide View")
+
     def check_events(self):
         '''check for image events'''
         if self.im is None:
+            return
+        if not self.im.is_alive():
+            self.im = None
             return
         for event in self.im.events():
             if isinstance(event, MPMenuItem):
@@ -207,20 +225,24 @@ class ThermalView:
                     self.im_colormap = event.returnkey
                 continue
             if event.ClassName == 'wxMouseEvent' and event.leftIsDown:
-                if self.grey_frame is not None:
-                    (yres,xres,depth) = self.grey_frame.shape
-                    if event.x < xres and event.y < yres and event.x >= 0 and event.y >= 0:
+                if self.raw_frame is not None:
+                    (yres,xres,depth) = self.raw_frame.shape
+                    if self.thermal and event.x < xres and event.y < yres and event.x >= 0 and event.y >= 0:
                         self.siyi.spot_temp = self.get_pixel_temp(event.x, event.y)
                         self.update_title()
                     x = (2*event.x/float(xres))-1.0
                     y = (2*event.y/float(yres))-1.0
                     aspect_ratio = float(xres)/yres
-                    slant_range = self.siyi.get_slantrange(x,y,self.siyi.siyi_settings.thermal_fov,aspect_ratio)
+                    if self.thermal:
+                        FOV = self.siyi.siyi_settings.thermal_fov
+                    elif self.siyi.rgb_lens == "zoom":
+                        FOV = self.siyi.siyi_settings.zoom_fov / self.siyi.last_zoom
+                    else:
+                        FOV = self.siyi.siyi_settings.wide_fov
+                    slant_range = self.siyi.get_slantrange(x,y,FOV,aspect_ratio)
                     if slant_range is None:
                         return
-                    latlonalt = self.siyi.get_latlonalt(slant_range, x, y,
-                                                        self.siyi.siyi_settings.thermal_fov,
-                                                        aspect_ratio)
+                    latlonalt = self.siyi.get_latlonalt(slant_range, x, y, FOV, aspect_ratio)
                     if latlonalt is None:
                         return
                     latlon = (latlonalt[0],latlonalt[1])
@@ -236,7 +258,7 @@ class SIYIModule(mp_module.MPModule):
         super(SIYIModule, self).__init__(mpstate, "SIYI", "SIYI camera support")
 
         self.add_command('siyi', self.cmd_siyi, "SIYI camera control",
-                         ["<rates|connect|autofocus|zoom|yaw|pitch|center|getconfig|angle|photo|recording|lock|follow|fpv|settarget|notarget|thermal>",
+                         ["<rates|connect|autofocus|zoom|yaw|pitch|center|getconfig|angle|photo|recording|lock|follow|fpv|settarget|notarget|thermal|rgbview>",
                           "set (SIYISETTING)",
                           "imode <1|2|3|4|5|6|7|8|wide|zoom|split>",
                           "palette <WhiteHot|Sepia|Ironbow|Rainbow|Night|Aurora|RedHot|Jungle|Medical|BlackHot|GloryHot>"
@@ -249,12 +271,12 @@ class SIYIModule(mp_module.MPModule):
                                                      ('yaw_rate', float, 10),
                                                      ('pitch_rate', float, 10),
                                                      ('rates_hz', float, 5),
-                                                     ('yaw_gain_P', float, 1),
-                                                     ('yaw_gain_I', float, 1),
-                                                     ('yaw_gain_IMAX', float, 5),
-                                                     ('pitch_gain_P', float, 1),
-                                                     ('pitch_gain_I', float, 1),
-                                                     ('pitch_gain_IMAX', float, 5),
+                                                     ('yaw_gain_P', float, 1.5),
+                                                     ('yaw_gain_I', float, 2),
+                                                     ('yaw_gain_IMAX', float, 10),
+                                                     ('pitch_gain_P', float, 1.5),
+                                                     ('pitch_gain_I', float, 2),
+                                                     ('pitch_gain_IMAX', float, 10),
                                                      ('mount_pitch', float, 0),
                                                      ('mount_yaw', float, 0),
                                                      ('lag', float, 0),
@@ -263,9 +285,13 @@ class SIYIModule(mp_module.MPModule):
                                                      ('att_send_hz', float, 10),
                                                      ('lidar_hz', float, 10),
                                                      ('temp_hz', float, 5),
+                                                     ('rgb_port', int, 7001),
                                                      ('thermal_port', int, 7002),
+                                                     ('rgb_port', int, 7001),
                                                      ('logfile', str, 'SIYI_log.bin'),
-                                                     ('thermal_fov', float, 18),
+                                                     ('thermal_fov', float, 24.2),
+                                                     ('zoom_fov', float, 62.0),
+                                                     ('wide_fov', float, 88.0),
                                                          ])
         self.add_completion_function('(SIYISETTING)',
                                      self.siyi_settings.completion)
@@ -307,6 +333,9 @@ class SIYIModule(mp_module.MPModule):
         self.last_lidar_t = time.time()
         self.last_temp_t = time.time()
         self.thermal_view = None
+        self.rgb_view = None
+        self.last_zoom = 1.0
+        self.rgb_lens = "wide"
 
         if mp_util.has_wxpython:
             menu = MPMenuSubMenu('SIYI',
@@ -318,17 +347,16 @@ class SIYIModule(mp_module.MPModule):
                                      MPMenuItem('GetConfig', 'GetConfig', '# siyi getconfig '),
                                      MPMenuItem('TakePhoto', 'TakePhoto', '# siyi photo '),
                                      MPMenuItem('AutoFocus', 'AutoFocus', '# siyi autofocus '),
-                                     MPMenuItem('AutoFocus', 'AutoFocus', '# siyi autofocus '),
                                      MPMenuItem('ImageSplit', 'ImageSplit', '# siyi imode split '),
                                      MPMenuItem('ImageWide', 'ImageWide', '# siyi imode wide '),
                                      MPMenuItem('ImageZoom', 'ImageZoom', '# siyi imode zoom '),
                                      MPMenuItem('Recording', 'Recording', '# siyi recording '),
                                      MPMenuItem('ClearTarget', 'ClearTarget', '# siyi notarget '),
                                      MPMenuItem('ThermalView', 'Thermalview', '# siyi thermal '),
-                                     MPMenuItem('Zoom1', 'Zoom1', '# siyi zoom 1 '),
-                                     MPMenuItem('Zoom2', 'Zoom2', '# siyi zoom 2 '),
-                                     MPMenuItem('Zoom4', 'Zoom4', '# siyi zoom 4 '),
-                                     MPMenuItem('Zoom8', 'Zoom8', '# siyi zoom 8 ')])
+                                     MPMenuItem('RGBView', 'RGBview', '# siyi rgbview '),
+                                     MPMenuSubMenu('Zoom',
+                                                   items=[MPMenuItem('Zoom%u'%z, 'Zoom%u'%z, '# siyi zoom %u ' % z) for z in range(1,11)])
+                                                   ])
             map = self.module('map')
             if map is not None:
                 map.add_menu(menu)
@@ -392,6 +420,8 @@ class SIYIModule(mp_module.MPModule):
             self.cmd_palette(args[1:])
         elif args[0] == "thermal":
             self.cmd_thermal()
+        elif args[0] == "rgbview":
+            self.cmd_rgbview()
         else:
             print(usage)
 
@@ -440,7 +470,8 @@ class SIYIModule(mp_module.MPModule):
             print("Usage: siyi imode MODENUM")
             return
         imode_map = { "wide" : 5, "zoom" : 3, "split" : 2 }
-        mode = imode_map.get(args[0],None)
+        self.rgb_lens = args[0]
+        mode = imode_map.get(self.rgb_lens,None)
         if mode is None:
             mode = int(args[0])
         self.send_packet_fmt(SET_IMAGE_TYPE, "<B", mode)
@@ -460,21 +491,27 @@ class SIYIModule(mp_module.MPModule):
 
     def cmd_thermal(self):
         '''open thermal viewer'''
-        self.thermal_view = ThermalView(self)
+        self.thermal_view = CameraView(self, self.siyi_settings.thermal_port, (640,512), True)
+
+    def cmd_rgbview(self):
+        '''open rgb viewer'''
+        self.rgb_view = CameraView(self, self.siyi_settings.rgb_port, (1280,720), False)
 
     def check_thermal_events(self):
         '''check for mouse events on thermal image'''
         if self.thermal_view is not None:
             self.thermal_view.check_events()
+        if self.rgb_view is not None:
+            self.rgb_view.check_events()
 
     def cmd_zoom(self, args):
         '''set zoom'''
         if len(args) < 1:
             print("Usage: siyi zoom ZOOM")
             return
-        fval = float(args[0])
-        ival = int(fval)
-        frac = int((fval - ival)*10)
+        self.last_zoom = float(args[0])
+        ival = int(self.last_zoom)
+        frac = int((self.last_zoom - ival)*10)
         self.send_packet_fmt(ABSOLUTE_ZOOM, "<BB", ival, frac)
 
     def set_target(self, lat, lon, alt):
@@ -687,7 +724,7 @@ class SIYIModule(mp_module.MPModule):
             }
             print("Feedback %s" % feedback.get(info_type, str(info_type)))
         elif cmd in [SET_ANGLE, CENTER, GIMBAL_ROTATION, ABSOLUTE_ZOOM, SET_IMAGE_TYPE,
-                     REQUEST_CONTINUOUS_ATTITUDE, SET_THERMAL_PALETTE]:
+                     REQUEST_CONTINUOUS_ATTITUDE, SET_THERMAL_PALETTE, MANUAL_ZOOM_AND_AUTO_FOCUS]:
             # an ack
             pass
         else:
@@ -695,9 +732,10 @@ class SIYIModule(mp_module.MPModule):
 
     def update_title(self):
         '''update thermal view title'''
-        if self.thermal_view is None:
-            return
-        self.thermal_view.update_title()
+        if self.thermal_view is not None:
+            self.thermal_view.update_title()
+        if self.rgb_view is not None:
+            self.rgb_view.update_title()
 
     def update_status(self):
         if self.attitude is None:
@@ -782,6 +820,8 @@ class SIYIModule(mp_module.MPModule):
         for i in range(3):
             (lat2,lon2,alt2) = self.get_latlonalt(sr,x,y,FOV,aspect_ratio)
             ground_alt2 = self.module('terrain').ElevationModel.GetElevation(lat2, lon2)
+            if ground_alt2 is None:
+                return None
             # adjust for height at this point
             sr += (alt2 - ground_alt2) / sin_pitch
         return sr
@@ -904,20 +944,26 @@ class SIYIModule(mp_module.MPModule):
         week_ms = (epoch_seconds % SEC_PER_WEEK) * 1000 + ((t_ms//200) * 200)
         return week, week_ms
 
-    def show_thermal_fov(self):
-        '''show thermal FOV polygon'''
+    def show_fov1(self, FOV, name, aspect_ratio, color):
+        '''show one FOV polygon'''
         points = []
-        FOV = self.siyi_settings.thermal_fov
-        aspect_ratio = 640.0/512.0
         for (x,y) in [(-1,-1),(1,-1),(1,1),(-1,1),(-1,-1)]:
             latlonalt = self.get_latlonalt(self.get_slantrange(x,y,FOV,aspect_ratio),x,y,FOV,aspect_ratio)
             if latlonalt is None:
+                self.mpstate.map.remove_object(name)
                 return
             (lat,lon) = (latlonalt[0],latlonalt[1])
             points.append((lat,lon))
-        self.mpstate.map.add_object(mp_slipmap.SlipPolygon('SIYIThermalFOV', points, layer='SIYI',
-                                                           linewidth=2, colour=(0,0,120)))
+        self.mpstate.map.add_object(mp_slipmap.SlipPolygon(name, points, layer='SIYI',
+                                                           linewidth=2, colour=color))
 
+    def show_fov(self):
+        '''show FOV polygons'''
+        self.show_fov1(self.siyi_settings.thermal_fov, 'FOV_thermal', 640.0/512.0, (0,0,128))
+        FOV2 = self.siyi_settings.wide_fov
+        if self.rgb_lens == "zoom":
+            FOV2 = self.siyi_settings.zoom_fov / self.last_zoom
+        self.show_fov1(FOV2, 'FOV_RGB', 1280.0/720.0, (0,128,128))
 
     def mavlink_packet(self, m):
         '''process a mavlink message'''
@@ -933,7 +979,10 @@ class SIYIModule(mp_module.MPModule):
                             math.degrees(m.roll), math.degrees(m.pitch), math.degrees(m.yaw),
                             math.degrees(m.rollspeed), math.degrees(m.pitchspeed), math.degrees(m.yawspeed))
         if mtype == 'GLOBAL_POSITION_INT':
-            self.show_thermal_fov()
+            try:
+                self.show_fov()
+            except Exception as ex:
+                print(traceback.format_exc())
 
 
     def idle_task(self):
