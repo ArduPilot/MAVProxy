@@ -156,13 +156,16 @@ class CameraView:
                                   key_events=True,
                                   can_drag = False,
                                   can_zoom = False,
-                                  auto_size = False)
+                                  auto_size = False,
+                                  auto_fit = True)
 
-        colormaps = [ "AUTUMN", "BONE", "JET", "WINTER", "RAINBOW", "OCEAN", "SUMMER", "SPRING", "COOL", "HSV", "PINK",
-                      "HOT","PARULA","MAGMA","INFERNO","PLASMA","VIRIDIS","CIVIDIS","TWILIGHT","TWILIGHT_SHIFTED","TURBO",
-                      "DEEPGREEN"]
-        popup = MPMenuSubMenu('ColorMap', items=[MPMenuItem(c,returnkey="COLORMAP_"+c) for c in colormaps])
-        self.im.set_popup_menu(popup)
+        if self.thermal:
+            colormaps = [ "AUTUMN", "BONE", "JET", "WINTER", "RAINBOW", "OCEAN", "SUMMER", "SPRING", "COOL", "HSV", "PINK",
+                          "HOT","PARULA","MAGMA","INFERNO","PLASMA","VIRIDIS","CIVIDIS","TWILIGHT","TWILIGHT_SHIFTED","TURBO",
+                          "DEEPGREEN"]
+            popup = self.im.get_popup_menu()
+            for c in colormaps:
+                popup.add_to_submenu(["ColorMap"], MPMenuItem(c, returnkey="COLORMAP_"+c))
 
         self.cap = cv2.VideoCapture('udp://@:%u' % self.port)
         if not self.cap or not self.cap.isOpened():
@@ -223,6 +226,10 @@ class CameraView:
             if isinstance(event, MPMenuItem):
                 if event.returnkey.startswith("COLORMAP_"):
                     self.im_colormap = event.returnkey
+                elif event.returnkey == 'fitWindow':
+                    self.im.fit_to_window()
+                elif event.returnkey == 'fullSize':
+                    self.im.full_size()
                 continue
             if event.ClassName == 'wxMouseEvent' and event.leftIsDown:
                 if self.raw_frame is not None:

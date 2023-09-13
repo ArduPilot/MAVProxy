@@ -84,7 +84,8 @@ class MPImage():
                  key_events = False,
                  auto_size = False,
                  report_size_changes = False,
-                 daemon = False):
+                 daemon = False,
+                 auto_fit = False):
 
         self.title = title
         self.width = width
@@ -94,6 +95,7 @@ class MPImage():
         self.mouse_events = mouse_events
         self.key_events = key_events
         self.auto_size = auto_size
+        self.auto_fit = auto_fit
         self.report_size_changes = report_size_changes
         self.menu = None
         self.popup_menu = None
@@ -361,13 +363,15 @@ class MPImagePanel(wx.Panel):
                     img = wx.EmptyImage(obj.width, obj.height)
                 img.SetData(obj.data)
                 self.img = img
-                self.need_redraw = True
                 if state.auto_size:
                     client_area = state.frame.GetClientSize()
                     total_area = state.frame.GetSize()
                     bx = max(total_area.x - client_area.x,0)
                     by = max(total_area.y - client_area.y,0)
                     state.frame.SetSize(wx.Size(obj.width+bx, obj.height+by))
+                elif state.auto_fit:
+                    self.fit_to_window()
+                self.need_redraw = True
             if isinstance(obj, MPImageTitle):
                 state.frame.SetTitle(obj.title)
             if isinstance(obj, MPImageRecenter):
@@ -400,6 +404,8 @@ class MPImagePanel(wx.Panel):
     def on_size(self, event):
         '''handle window size changes'''
         state = self.state
+        if state.auto_fit and self.img is not None:
+            self.fit_to_window()
         self.need_redraw = True
         if state.report_size_changes:
             # tell owner the new size
@@ -578,13 +584,15 @@ if __name__ == "__main__":
     parser.add_option("--zoom", action='store_true', default=False, help="allow zoom")
     parser.add_option("--drag", action='store_true', default=False, help="allow drag")
     parser.add_option("--autosize", action='store_true', default=False, help="auto size window")
+    parser.add_option("--autofit", action='store_true', default=False, help="auto fit window")
     (opts, args) = parser.parse_args()
 
     im = MPImage(mouse_events=True,
                  key_events=True,
                  can_drag = opts.drag,
                  can_zoom = opts.zoom,
-                 auto_size = opts.autosize)
+                 auto_size = opts.autosize,
+                 auto_fit = opts.autofit)
     img = cv2.imread(args[0])
     im.set_image(img, bgr=True)
 
