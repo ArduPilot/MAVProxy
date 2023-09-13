@@ -775,6 +775,20 @@ def cmd_messages(args):
     else:
         wildcard = '*'
 
+    # statustext reassembly:
+    statustext_current_id = None
+    statustext_next_seq = 0
+    statustext_accumulation = None
+    # statustext_timestring = None
+
+
+    def print_if_match(m_timestring, mstr):
+        matches = fnmatch.fnmatch(mstr.upper(), wildcard.upper())
+        if invert:
+            matches = not matches
+        if matches:
+            print("%s %s" % (m_timestring, mstr))
+
     mestate.mlog.rewind()
     types = set(['MSG','EV','ERR', 'STATUSTEXT'])
     while True:
@@ -789,11 +803,28 @@ def cmd_messages(args):
             mstr = "Error: Subsys %s ECode %u " % (subsystems.get(m.Subsys, str(m.Subsys)), m.ECode)
         else:
             mstr = m.text
-        matches = fnmatch.fnmatch(mstr.upper(), wildcard.upper())
-        if invert:
-            matches = not matches
-        if matches:
-            print("%s %s" % (timestring(m), mstr))
+
+        # special handling for statustext:
+        if hasattr(m, 'id') and hasattr(m, 'chunk_seq'):  # assume STATUSTEXT
+            if m.id != statustext_current_id:
+                if statustext_accumulation is not None:
+                    print_if_match(statustext_timestring, statustext_accumulation)
+                statustext_accumulation = ""
+                statustext_current_id = m.id
+                statustext_next_seq = 0
+                statustext_timestring = timestring(m)
+            if m.chunk_seq != statustext_next_seq:
+                statustext_accumulation += "..."
+            statustext_next_seq = m.chunk_seq + 1
+            statustext_accumulation += m.text
+            continue
+
+        print_if_match(timestring(m), mstr)
+
+    # emit any remaining statustext if it matches:
+    if statustext_accumulation is not None:
+        print_if_match(statustext_timestring, statustext_accumulation)
+
     mestate.mlog.rewind()
 
 def extract_files():
