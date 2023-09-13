@@ -16,6 +16,9 @@ import threading
 import shlex
 import traceback
 from math import *
+
+os.environ['MAVLINK20'] = '1'
+
 from MAVProxy.modules.lib import multiproc
 from MAVProxy.modules.lib import rline
 from MAVProxy.modules.lib import wxconsole
