@@ -315,6 +315,7 @@ class SIYIModule(mp_module.MPModule):
         self.pitch_end = None
         self.rf_dist = 0
         self.attitude = None
+        self.fov_att = (0,0,0)
         self.tmax = -1
         self.tmin = -1
         self.spot_temp = -1
@@ -692,6 +693,7 @@ class SIYIModule(mp_module.MPModule):
             (roll,pitch,yaw) = (x*0.1, y*0.1, mp_util.wrap_180(-z*0.1))
             (roll,pitch,yaw) = self.euler_312_to_euler_321(math.radians(roll),math.radians(pitch),math.radians(yaw))
             self.attitude = (math.degrees(roll),math.degrees(pitch),math.degrees(yaw), sx*0.1, sy*0.1, -sz*0.1)
+            self.fov_att = (self.attitude[0],self.attitude[1]-self.siyi_settings.mount_pitch,self.attitude[2]-self.siyi_settings.mount_yaw)
             self.update_status()
             self.logf.write('SIGA', 'Qffffffhhhhhh', 'TimeUS,Y,P,R,Yr,Pr,Rr,z,y,x,sz,sy,sx',
                             self.micros64(),
@@ -790,8 +792,6 @@ class SIYIModule(mp_module.MPModule):
         dt = (now - self.last_att_t)+self.siyi_settings.lag
         yaw = self.attitude[2]+self.attitude[5]*dt
         pitch = self.attitude[1]+self.attitude[4]*dt
-        pitch -= self.siyi_settings.mount_pitch
-        yaw -= self.siyi_settings.mount_yaw
         yaw = mp_util.wrap_180(yaw)
         roll = self.attitude[0]
         return yaw, pitch, roll
@@ -813,7 +813,7 @@ class SIYIModule(mp_module.MPModule):
             return None
         if self.attitude is None:
             return None
-        pitch = self.attitude[1]
+        pitch = self.fov_att[1]
         if pitch >= 0:
             return None
         pitch -= y*FOV*0.5/aspect_ratio
@@ -847,7 +847,7 @@ class SIYIModule(mp_module.MPModule):
             return None
         v = Vector3(1, 0, 0)
         m = Matrix3()
-        (roll,pitch,yaw) = (math.radians(self.attitude[0]),math.radians(self.attitude[1]),math.radians(self.attitude[2]))
+        (roll,pitch,yaw) = (math.radians(self.fov_att[0]),math.radians(self.fov_att[1]),math.radians(self.fov_att[2]))
         yaw += att.yaw
         FOV_half = math.radians(0.5*FOV)
         yaw += FOV_half*x
@@ -927,6 +927,10 @@ class SIYIModule(mp_module.MPModule):
         cam_yaw, cam_pitch, cam_roll = self.get_gimbal_attitude()
         err_yaw = mp_util.wrap_180(yaw_deg - cam_yaw)
         err_pitch = pitch_deg - cam_pitch
+
+        err_yaw += self.siyi_settings.mount_yaw
+        err_yaw = mp_util.wrap_180(err_yaw)
+        err_pitch += self.siyi_settings.mount_pitch
 
         self.yaw_rate = self.yaw_controller.run(err_yaw)
         self.pitch_rate = self.yaw_controller.run(err_pitch)
