@@ -137,6 +137,7 @@ class CameraView:
         self.raw_frame = None
         self.res = res
         self.port = port
+        self.mode = "Flag"
         self.thread = Thread(target=self.capture)
         self.thread.daemon = True
         self.thread.start()
@@ -159,11 +160,13 @@ class CameraView:
                                   auto_size = False,
                                   auto_fit = True)
 
+        popup = self.im.get_popup_menu()
+        popup.add_to_submenu(["Mode"], MPMenuItem("ClickTrack", returnkey="Mode:ClickTrack"))
+        popup.add_to_submenu(["Mode"], MPMenuItem("Flag", returnkey="Mode:Flag"))
         if self.thermal:
             colormaps = [ "AUTUMN", "BONE", "JET", "WINTER", "RAINBOW", "OCEAN", "SUMMER", "SPRING", "COOL", "HSV", "PINK",
                           "HOT","PARULA","MAGMA","INFERNO","PLASMA","VIRIDIS","CIVIDIS","TWILIGHT","TWILIGHT_SHIFTED","TURBO",
                           "DEEPGREEN"]
-            popup = self.im.get_popup_menu()
             for c in colormaps:
                 popup.add_to_submenu(["ColorMap"], MPMenuItem(c, returnkey="COLORMAP_"+c))
 
@@ -226,6 +229,9 @@ class CameraView:
             if isinstance(event, MPMenuItem):
                 if event.returnkey.startswith("COLORMAP_"):
                     self.im_colormap = event.returnkey
+                elif event.returnkey.startswith("Mode:"):
+                    self.mode = event.returnkey[5:]
+                    print("ViewMode: %s" % self.mode)
                 elif event.returnkey == 'fitWindow':
                     self.im.fit_to_window()
                 elif event.returnkey == 'fullSize':
@@ -253,8 +259,11 @@ class CameraView:
                     if latlonalt is None:
                         return
                     latlon = (latlonalt[0],latlonalt[1])
-                    self.siyi.mpstate.map.add_object(mp_slipmap.SlipIcon('SIYIClick', latlon,
-                                                     self.siyi.click_icon, layer='SIYI', rotation=0, follow=False))
+                    if self.mode == "ClickTrack":
+                        self.siyi.set_target(latlonalt[0], latlonalt[1], latlonalt[2])
+                    else:
+                        self.siyi.mpstate.map.add_object(mp_slipmap.SlipIcon('SIYIClick', latlon,
+                                                            self.siyi.click_icon, layer='SIYI', rotation=0, follow=False))
 
 
 
