@@ -152,6 +152,7 @@ class CameraView:
         '''thermal capture thread'''
         self.im = MPImage(title='Camera View',
                                   mouse_events=True,
+                                  mouse_movement_events=self.thermal,
                                   width=self.res[0],
                                   height=self.res[1],
                                   key_events=True,
@@ -169,6 +170,13 @@ class CameraView:
                           "DEEPGREEN"]
             for c in colormaps:
                 popup.add_to_submenu(["ColorMap"], MPMenuItem(c, returnkey="COLORMAP_"+c))
+        else:
+            popup.add_to_submenu(["Lens"], MPMenuItem("WideAngle", returnkey="Lens:wide"))
+            popup.add_to_submenu(["Lens"], MPMenuItem("Zoom", returnkey="Lens:zoom"))
+            popup.add_to_submenu(["Lens"], MPMenuItem("SplitScreen", returnkey="Lens:split"))
+            for z in range(1,11):
+                popup.add_to_submenu(['Zoom'],
+                                     MPMenuItem('%ux'%z, returnkey="Zoom:%u" % z))
 
         self.cap = cv2.VideoCapture('udp://@:%u' % self.port)
         if not self.cap or not self.cap.isOpened():
@@ -232,38 +240,44 @@ class CameraView:
                 elif event.returnkey.startswith("Mode:"):
                     self.mode = event.returnkey[5:]
                     print("ViewMode: %s" % self.mode)
+                elif event.returnkey.startswith("Lens:"):
+                    self.siyi.cmd_imode([event.returnkey[5:]])
+                elif event.returnkey.startswith("Zoom:"):
+                    self.siyi.cmd_zoom([event.returnkey[5:]])
                 elif event.returnkey == 'fitWindow':
                     self.im.fit_to_window()
                 elif event.returnkey == 'fullSize':
                     self.im.full_size()
                 continue
-            if event.ClassName == 'wxMouseEvent' and event.leftIsDown:
+            if event.ClassName == 'wxMouseEvent':
                 if self.raw_frame is not None:
                     (yres,xres,depth) = self.raw_frame.shape
                     if self.thermal and event.x < xres and event.y < yres and event.x >= 0 and event.y >= 0:
                         self.siyi.spot_temp = self.get_pixel_temp(event.x, event.y)
                         self.update_title()
-                    x = (2*event.x/float(xres))-1.0
-                    y = (2*event.y/float(yres))-1.0
-                    aspect_ratio = float(xres)/yres
-                    if self.thermal:
-                        FOV = self.siyi.siyi_settings.thermal_fov
-                    elif self.siyi.rgb_lens == "zoom":
-                        FOV = self.siyi.siyi_settings.zoom_fov / self.siyi.last_zoom
-                    else:
-                        FOV = self.siyi.siyi_settings.wide_fov
-                    slant_range = self.siyi.get_slantrange(x,y,FOV,aspect_ratio)
-                    if slant_range is None:
-                        return
-                    latlonalt = self.siyi.get_latlonalt(slant_range, x, y, FOV, aspect_ratio)
-                    if latlonalt is None:
-                        return
-                    latlon = (latlonalt[0],latlonalt[1])
-                    if self.mode == "ClickTrack":
-                        self.siyi.set_target(latlonalt[0], latlonalt[1], latlonalt[2])
-                    else:
-                        self.siyi.mpstate.map.add_object(mp_slipmap.SlipIcon('SIYIClick', latlon,
-                                                            self.siyi.click_icon, layer='SIYI', rotation=0, follow=False))
+            if event.ClassName == 'wxMouseEvent' and event.leftIsDown:
+                x = (2*event.x/float(xres))-1.0
+                y = (2*event.y/float(yres))-1.0
+                aspect_ratio = float(xres)/yres
+                if self.thermal:
+                    FOV = self.siyi.siyi_settings.thermal_fov
+                elif self.siyi.rgb_lens == "zoom":
+                    FOV = self.siyi.siyi_settings.zoom_fov / self.siyi.last_zoom
+                else:
+                    FOV = self.siyi.siyi_settings.wide_fov
+                slant_range = self.siyi.get_slantrange(x,y,FOV,aspect_ratio)
+                if slant_range is None:
+                    return
+                latlonalt = self.siyi.get_latlonalt(slant_range, x, y, FOV, aspect_ratio)
+                if latlonalt is None:
+                    return
+                latlon = (latlonalt[0],latlonalt[1])
+                if self.mode == "ClickTrack":
+                    self.siyi.set_target(latlonalt[0], latlonalt[1], latlonalt[2])
+                else:
+                    self.siyi.mpstate.map.add_object(mp_slipmap.SlipIcon('SIYIClick', latlon,
+                                                                self.siyi.click_icon, layer='SIYI'))
+
 
 
 
@@ -492,6 +506,7 @@ class SIYIModule(mp_module.MPModule):
         if mode is None:
             mode = int(args[0])
         self.send_packet_fmt(SET_IMAGE_TYPE, "<B", mode)
+        print("Lens: %s" % args[0])
 
     def cmd_palette(self, args):
         '''update thermal palette'''
