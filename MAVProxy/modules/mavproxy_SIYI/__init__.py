@@ -576,6 +576,8 @@ class SIYIModule(mp_module.MPModule):
             self.send_named_float('CYAW_RT', self.attitude[5])
             self.send_named_float('YAW_RT', self.yaw_rate)
             self.send_named_float('PITCH_RT', self.pitch_rate)
+            self.send_named_float('TMIN', self.tmin)
+            self.send_named_float('TMAX', self.tmax)
 
     def cmd_settarget(self, args):
         '''set target'''
@@ -713,6 +715,7 @@ class SIYIModule(mp_module.MPModule):
             r, = self.unpack(cmd, "<H", data[:2])
             self.rf_dist = r * 0.1
             self.update_status()
+            self.send_named_float('RFND', self.rf_dist)
 
         elif cmd == READ_TEMP_FULL_SCREEN:
             if len(data) < 12:
