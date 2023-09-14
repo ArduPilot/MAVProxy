@@ -81,6 +81,7 @@ class MPImage():
                  can_zoom = False,
                  can_drag = False,
                  mouse_events = False,
+                 mouse_movement_events = False,
                  key_events = False,
                  auto_size = False,
                  report_size_changes = False,
@@ -93,6 +94,7 @@ class MPImage():
         self.can_zoom = can_zoom
         self.can_drag = can_drag
         self.mouse_events = mouse_events
+        self.mouse_movement_events = mouse_movement_events
         self.key_events = key_events
         self.auto_size = auto_size
         self.auto_fit = auto_fit
@@ -518,7 +520,7 @@ class MPImagePanel(wx.Panel):
                 any_button_down = event.ButtonIsDown(wx.MOUSE_BTN_ANY)
             else:
                 any_button_down = event.leftIsDown or event.rightIsDown
-            if not any_button_down and event.GetWheelRotation() == 0:
+            if not any_button_down and event.GetWheelRotation() == 0 and not self.state.mouse_movement_events:
                 # don't flood the queue with mouse movement
                 return
         evt = mp_util.object_container(event)
