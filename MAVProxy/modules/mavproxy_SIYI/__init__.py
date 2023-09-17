@@ -141,6 +141,8 @@ class CameraView:
         self.thread = Thread(target=self.capture)
         self.thread.daemon = True
         self.thread.start()
+        self.last_frame_t = time.time()
+        self.fps = 30.0
 
     def set_title(self, title):
         '''set image title'''
@@ -197,6 +199,11 @@ class CameraView:
                 self.cap = None
                 return
             self.raw_frame = frame
+            now = time.time()
+            dt = now - self.last_frame_t
+            self.last_frame_t = now
+            self.fps = 0.95 * self.fps + 0.05 / dt
+            # self.siyi.console.set_status('FPS', 'FPS %.2f' % self.fps, row=6)
             if self.thermal and self.im_colormap is not None:
                 cmap = getattr(cv2,self.im_colormap,None)
                 if cmap is not None:
