@@ -255,7 +255,8 @@ class CameraView:
                     if self.thermal and event.x < xres and event.y < yres and event.x >= 0 and event.y >= 0:
                         self.siyi.spot_temp = self.get_pixel_temp(event.x, event.y)
                         self.update_title()
-            if event.ClassName == 'wxMouseEvent' and event.leftIsDown:
+            if event.ClassName == 'wxMouseEvent' and event.leftIsDown and self.raw_frame is not None:
+                (yres,xres,depth) = self.raw_frame.shape
                 x = (2*event.x/float(xres))-1.0
                 y = (2*event.y/float(yres))-1.0
                 aspect_ratio = float(xres)/yres
