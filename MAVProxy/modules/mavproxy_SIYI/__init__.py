@@ -28,6 +28,8 @@ if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_image import MPImage
     from MAVProxy.modules.mavproxy_map import mp_slipmap
 
+from MAVProxy.modules.mavproxy_SIYI.camera_view import CameraView
+
 SIYI_RATE_MAX_DPS = 90.0
 SIYI_HEADER1 = 0x55
 SIYI_HEADER2 = 0x66
@@ -126,170 +128,6 @@ class DF_logger:
         self.outf.flush()
 
 
-class CameraView:
-    '''handle camera view image'''
-    def __init__(self, siyi, port, res, thermal=False):
-        self.siyi = siyi
-        self.thermal = thermal
-        self.im = None
-        self.im_colormap = "COLORMAP_MAGMA"
-        self.cap = None
-        self.raw_frame = None
-        self.res = res
-        self.port = port
-        self.mode = "Flag"
-        self.thread = Thread(target=self.capture)
-        self.thread.daemon = True
-        self.thread.start()
-        self.last_frame_t = time.time()
-        self.fps = 30.0
-
-    def set_title(self, title):
-        '''set image title'''
-        if self.im is None:
-            return
-        self.im.set_title(title)
-
-    def capture(self):
-        '''thermal capture thread'''
-        self.im = MPImage(title='Camera View',
-                                  mouse_events=True,
-                                  mouse_movement_events=self.thermal,
-                                  width=self.res[0],
-                                  height=self.res[1],
-                                  key_events=True,
-                                  can_drag = False,
-                                  can_zoom = False,
-                                  auto_size = False,
-                                  auto_fit = True)
-
-        popup = self.im.get_popup_menu()
-        popup.add_to_submenu(["Mode"], MPMenuItem("ClickTrack", returnkey="Mode:ClickTrack"))
-        popup.add_to_submenu(["Mode"], MPMenuItem("Flag", returnkey="Mode:Flag"))
-        if self.thermal:
-            colormaps = [ "AUTUMN", "BONE", "JET", "WINTER", "RAINBOW", "OCEAN", "SUMMER", "SPRING", "COOL", "HSV", "PINK",
-                          "HOT","PARULA","MAGMA","INFERNO","PLASMA","VIRIDIS","CIVIDIS","TWILIGHT","TWILIGHT_SHIFTED","TURBO",
-                          "DEEPGREEN"]
-            for c in colormaps:
-                popup.add_to_submenu(["ColorMap"], MPMenuItem(c, returnkey="COLORMAP_"+c))
-        else:
-            popup.add_to_submenu(["Lens"], MPMenuItem("WideAngle", returnkey="Lens:wide"))
-            popup.add_to_submenu(["Lens"], MPMenuItem("Zoom", returnkey="Lens:zoom"))
-            popup.add_to_submenu(["Lens"], MPMenuItem("SplitScreen", returnkey="Lens:split"))
-            for z in range(1,11):
-                popup.add_to_submenu(['Zoom'],
-                                     MPMenuItem('%ux'%z, returnkey="Zoom:%u" % z))
-
-        self.cap = cv2.VideoCapture('udp://@:%u' % self.port)
-        if not self.cap or not self.cap.isOpened():
-            print('Cannot open UDP stream on port %u' % self.port)
-            self.cap = None
-            return
-
-        while True:
-            try:
-                _, frame = self.cap.read()
-            except Exception:
-                break
-            if frame is None:
-                break
-            im = self.im
-            if im is None:
-                self.cap.release()
-                self.cap = None
-                return
-            self.raw_frame = frame
-            now = time.time()
-            dt = now - self.last_frame_t
-            self.last_frame_t = now
-            self.fps = 0.95 * self.fps + 0.05 / dt
-            # self.siyi.console.set_status('FPS', 'FPS %.2f' % self.fps, row=6)
-            if self.thermal and self.im_colormap is not None:
-                cmap = getattr(cv2,self.im_colormap,None)
-                if cmap is not None:
-                    frame = cv2.applyColorMap(frame, cmap)
-            im.set_image(frame, bgr=True)
-        print("stream ended on port %u" % self.port)
-        self.im = None
-        self.cap.release()
-        self.cap = None
-
-    def get_pixel_temp(self, x, y):
-        '''get temperature of a pixel'''
-        v = self.raw_frame[y][x][0]
-        gmin = self.raw_frame[...,0].min()
-        gmax = self.raw_frame[...,0].max()
-        if gmax <= gmin:
-            return -1
-        return self.siyi.tmin + ((v-gmin)/float(gmax-gmin))*(self.siyi.tmax-self.siyi.tmin)
-
-    def update_title(self):
-        '''update thermal view title'''
-        if self.thermal:
-            self.set_title("Thermal View TEMP=%.2fC RANGE(%.2fC to %.2fC)" % (
-                self.siyi.spot_temp, self.siyi.tmin, self.siyi.tmax))
-        elif self.siyi.rgb_lens == "zoom":
-            self.set_title("Zoom View %.1fx" % self.siyi.last_zoom)
-        else:
-            self.set_title("Wide View")
-
-    def check_events(self):
-        '''check for image events'''
-        if self.im is None:
-            return
-        if not self.im.is_alive():
-            self.im = None
-            return
-        for event in self.im.events():
-            if isinstance(event, MPMenuItem):
-                if event.returnkey.startswith("COLORMAP_"):
-                    self.im_colormap = event.returnkey
-                elif event.returnkey.startswith("Mode:"):
-                    self.mode = event.returnkey[5:]
-                    print("ViewMode: %s" % self.mode)
-                elif event.returnkey.startswith("Lens:"):
-                    self.siyi.cmd_imode([event.returnkey[5:]])
-                elif event.returnkey.startswith("Zoom:"):
-                    self.siyi.cmd_zoom([event.returnkey[5:]])
-                elif event.returnkey == 'fitWindow':
-                    self.im.fit_to_window()
-                elif event.returnkey == 'fullSize':
-                    self.im.full_size()
-                continue
-            if event.ClassName == 'wxMouseEvent':
-                if self.raw_frame is not None:
-                    (yres,xres,depth) = self.raw_frame.shape
-                    if self.thermal and event.x < xres and event.y < yres and event.x >= 0 and event.y >= 0:
-                        self.siyi.spot_temp = self.get_pixel_temp(event.x, event.y)
-                        self.update_title()
-            if event.ClassName == 'wxMouseEvent' and event.leftIsDown and self.raw_frame is not None:
-                (yres,xres,depth) = self.raw_frame.shape
-                x = (2*event.x/float(xres))-1.0
-                y = (2*event.y/float(yres))-1.0
-                aspect_ratio = float(xres)/yres
-                if self.thermal:
-                    FOV = self.siyi.siyi_settings.thermal_fov
-                elif self.siyi.rgb_lens == "zoom":
-                    FOV = self.siyi.siyi_settings.zoom_fov / self.siyi.last_zoom
-                else:
-                    FOV = self.siyi.siyi_settings.wide_fov
-                slant_range = self.siyi.get_slantrange(x,y,FOV,aspect_ratio)
-                if slant_range is None:
-                    return
-                latlonalt = self.siyi.get_latlonalt(slant_range, x, y, FOV, aspect_ratio)
-                if latlonalt is None:
-                    return
-                latlon = (latlonalt[0],latlonalt[1])
-                if self.mode == "ClickTrack":
-                    self.siyi.set_target(latlonalt[0], latlonalt[1], latlonalt[2])
-                else:
-                    self.siyi.mpstate.map.add_object(mp_slipmap.SlipIcon('SIYIClick', latlon,
-                                                                self.siyi.click_icon, layer='SIYI'))
-
-
-
-
-
 class SIYIModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
@@ -309,12 +147,12 @@ class SIYIModule(mp_module.MPModule):
                                                      ('yaw_rate', float, 10),
                                                      ('pitch_rate', float, 10),
                                                      ('rates_hz', float, 5),
-                                                     ('yaw_gain_P', float, 1.5),
-                                                     ('yaw_gain_I', float, 2),
-                                                     ('yaw_gain_IMAX', float, 10),
-                                                     ('pitch_gain_P', float, 1.5),
-                                                     ('pitch_gain_I', float, 2),
-                                                     ('pitch_gain_IMAX', float, 10),
+                                                     ('yaw_gain_P', float, 1),
+                                                     ('yaw_gain_I', float, 1),
+                                                     ('yaw_gain_IMAX', float, 5),
+                                                     ('pitch_gain_P', float, 1),
+                                                     ('pitch_gain_I', float, 1),
+                                                     ('pitch_gain_IMAX', float, 5),
                                                      ('mount_pitch', float, 0),
                                                      ('mount_yaw', float, 0),
                                                      ('lag', float, 0),
@@ -323,9 +161,10 @@ class SIYIModule(mp_module.MPModule):
                                                      ('att_send_hz', float, 10),
                                                      ('lidar_hz', float, 10),
                                                      ('temp_hz', float, 5),
-                                                     ('rgb_port', int, 7001),
-                                                     ('thermal_port', int, 7002),
-                                                     ('rgb_port', int, 7001),
+                                                     ('rtsp_rgb', str, 'rtsp://192.168.144.25:8554/video1'),
+                                                     ('rtsp_thermal', str, 'rtsp://192.168.144.25:8554/video2'),
+                                                     ('fps_thermal', int, 20),
+                                                     ('fps_rgb', int, 20),
                                                      ('logfile', str, 'SIYI_log.bin'),
                                                      ('thermal_fov', float, 24.2),
                                                      ('zoom_fov', float, 62.0),
@@ -366,7 +205,7 @@ class SIYIModule(mp_module.MPModule):
         self.last_rate_display = time.time()
         self.yaw_controller = PI_controller(self.siyi_settings, 'yaw_gain_P', 'yaw_gain_I', 'yaw_gain_IMAX')
         self.pitch_controller = PI_controller(self.siyi_settings, 'pitch_gain_P', 'pitch_gain_I', 'pitch_gain_IMAX')
-        self.logf = DF_logger(self.siyi_settings.logfile)
+        self.logf = DF_logger(os.path.join(self.logdir, self.siyi_settings.logfile))
         self.start_time = time.time()
         self.last_att_send_t = time.time()
         self.last_lidar_t = time.time()
@@ -531,11 +370,21 @@ class SIYIModule(mp_module.MPModule):
 
     def cmd_thermal(self):
         '''open thermal viewer'''
-        self.thermal_view = CameraView(self, self.siyi_settings.thermal_port, (640,512), True)
+        vidfile = "thermal.mts"
+        if self.logdir is not None:
+            vidfile = os.path.join(self.logdir, vidfile)
+        self.thermal_view = CameraView(self, self.siyi_settings.rtsp_thermal,
+                                       vidfile, (640,512), thermal=True,
+                                       fps=self.siyi_settings.fps_thermal)
 
     def cmd_rgbview(self):
         '''open rgb viewer'''
-        self.rgb_view = CameraView(self, self.siyi_settings.rgb_port, (1280,720), False)
+        vidfile = "rgb.mts"
+        if self.logdir is not None:
+            vidfile = os.path.join(self.logdir, vidfile)
+        self.rgb_view = CameraView(self, self.siyi_settings.rtsp_rgb,
+                                   vidfile, (1280,720), thermal=False,
+                                   fps=self.siyi_settings.fps_rgb)
 
     def check_thermal_events(self):
         '''check for mouse events on thermal image'''
