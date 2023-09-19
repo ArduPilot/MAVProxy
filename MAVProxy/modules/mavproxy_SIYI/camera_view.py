@@ -16,27 +16,15 @@ class CameraView:
         self.siyi = siyi
         self.thermal = thermal
         self.im = None
-        self.im_colormap = "COLORMAP_MAGMA"
+        self.im_colormap = "MAGMA"
         self.cap = None
-        self.raw_frame = None
         self.res = res
         self.rtsp_url = rtsp_url
         self.filename = filename
         self.mode = "Flag"
-        self.thread = Thread(target=self.capture)
-        self.thread.daemon = True
-        self.thread.start()
         self.last_frame_t = time.time()
         self.fps = fps
 
-    def set_title(self, title):
-        """set image title"""
-        if self.im is None:
-            return
-        self.im.set_title(title)
-
-    def capture(self):
-        """thermal capture thread"""
         self.im = MPImage(
             title="Camera View",
             mouse_events=True,
@@ -48,6 +36,7 @@ class CameraView:
             can_zoom=False,
             auto_size=False,
             auto_fit=True,
+            fps = 30,
         )
 
         popup = self.im.get_popup_menu()
@@ -98,59 +87,27 @@ class CameraView:
                     ["Zoom"], MPMenuItem("%ux" % z, returnkey="Zoom:%u" % z)
                 )
 
-        gst_pipeline = "rtspsrc location={0} latency=0 buffer-mode=auto ! rtph265depay !  tee name=tee1 tee1. ! h265parse ! avdec_h265  ! videoconvert ! video/x-raw,format=BGRx ! videorate ! video/x-raw,framerate={2}/1 ! appsink drop=true tee1. ! queue ! h265parse config-interval=15 ! video/x-h265 ! mpegtsmux ! filesink location={1}".format(
+        gst_pipeline = "rtspsrc location={0} latency=0 buffer-mode=auto ! rtph265depay !  tee name=tee1 tee1. ! h265parse ! avdec_h265  ! videoconvert ! video/x-raw,format=BGRx ! videorate ! video/x-raw,framerate={2}/1 ! appsink tee1. ! queue ! h265parse config-interval=15 ! video/x-h265 ! mpegtsmux ! filesink location={1}".format(
             self.rtsp_url, self.filename, self.fps
         )
 
-        print("gstreamer pipeline is:")
-        print("gst-launch-1.0 %s" % gst_pipeline)
+        self.im.set_gstreamer(gst_pipeline)
+        if self.thermal:
+            self.im.set_colormap(self.im_colormap)
 
-        self.cap = cv2.VideoCapture(
-            gst_pipeline,
-            cv2.CAP_GSTREAMER,
-        )
-
-        if not self.cap or not self.cap.isOpened():
-            print("VideoCapture not opened")
-            self.cap = None
+    def set_title(self, title):
+        """set image title"""
+        if self.im is None:
             return
+        self.im.set_title(title)
 
-        while True:
-            try:
-                _, frame = self.cap.read()
-            except Exception:
-                break
-            if frame is None:
-                break
-            im = self.im
-            if im is None:
-                self.cap.release()
-                self.cap = None
-                return
-            self.raw_frame = frame
-            now = time.time()
-            dt = now - self.last_frame_t
-            self.last_frame_t = now
-            self.fps = 0.95 * self.fps + 0.05 / dt
-            # self.siyi.console.set_status('FPS', 'FPS %.2f' % self.fps, row=6)
-            if self.thermal and self.im_colormap is not None:
-                cmap = getattr(cv2, self.im_colormap, None)
-                if cmap is not None:
-                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                    frame = cv2.applyColorMap(frame, cmap)
-            im.set_image(frame, bgr=True)
-        print("rtsp stream ended for %s" % self.rtsp_url)
-        self.im = None
-        self.cap.release()
-        self.cap = None
-
-    def get_pixel_temp(self, x, y):
+    def get_pixel_temp(self, event):
         """get temperature of a pixel"""
-        v = self.raw_frame[y][x][0]
-        gmin = self.raw_frame[..., 0].min()
-        gmax = self.raw_frame[..., 0].max()
-        if gmax <= gmin:
+        if event.pixel is None:
             return -1
+        v = event.pixel[0]
+        gmin = 0
+        gmax = 255
         if self.siyi is None:
             return -1
         return self.siyi.tmin + ((v - gmin) / float(gmax - gmin)) * (
@@ -181,7 +138,7 @@ class CameraView:
         for event in self.im.events():
             if isinstance(event, MPMenuItem):
                 if event.returnkey.startswith("COLORMAP_"):
-                    self.im_colormap = event.returnkey
+                    self.im.set_colormap(event.returnkey[9:])
                 elif event.returnkey.startswith("Mode:"):
                     self.mode = event.returnkey[5:]
                     print("ViewMode: %s" % self.mode)
@@ -195,25 +152,16 @@ class CameraView:
                     self.im.full_size()
                 continue
             if event.ClassName == "wxMouseEvent":
-                if self.raw_frame is not None:
-                    (yres, xres, depth) = self.raw_frame.shape
-                    if (
-                        self.thermal
-                        and self.siyi is not None
-                        and event.x < xres
-                        and event.y < yres
-                        and event.x >= 0
-                        and event.y >= 0
-                    ):
-                        self.siyi.spot_temp = self.get_pixel_temp(event.x, event.y)
-                        self.update_title()
+                if event.pixel is not None:
+                    self.siyi.spot_temp = self.get_pixel_temp(event)
+                    self.update_title()
             if (
                 event.ClassName == "wxMouseEvent"
                 and event.leftIsDown
-                and self.raw_frame is not None
+                and event.pixel is not None
                 and self.siyi is not None
             ):
-                (yres, xres, depth) = self.raw_frame.shape
+                (yres, xres, depth) = event.shape
                 x = (2 * event.x / float(xres)) - 1.0
                 y = (2 * event.y / float(yres)) - 1.0
                 aspect_ratio = float(xres) / yres
