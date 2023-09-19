@@ -13,6 +13,7 @@ from MAVProxy.modules.lib.wx_loader import wx
 import cv2
 import numpy as np
 import warnings
+from threading import Thread
 
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_widgets
@@ -70,6 +71,16 @@ class MPImageRecenter:
     def __init__(self, location):
         self.location = location
 
+class MPImageGStreamer:
+    '''request getting image feed from gstreamer pipeline'''
+    def __init__(self, pipeline):
+        self.pipeline = pipeline
+
+class MPImageColormap:
+    '''set a colormap for display'''
+    def __init__(self, colormap):
+        self.colormap = colormap
+        
 class MPImage():
     '''
     a generic image viewer widget for use in MP tools
@@ -86,7 +97,8 @@ class MPImage():
                  auto_size = False,
                  report_size_changes = False,
                  daemon = False,
-                 auto_fit = False):
+                 auto_fit = False,
+                 fps = 10):
 
         self.title = title
         self.width = width
@@ -101,6 +113,7 @@ class MPImage():
         self.report_size_changes = report_size_changes
         self.menu = None
         self.popup_menu = None
+        self.fps = fps
 
         self.in_queue = multiproc.Queue()
         self.out_queue = multiproc.Queue()
@@ -188,7 +201,15 @@ class MPImage():
     def set_layout(self, layout):
         '''set window layout'''
         self.in_queue.put(layout)
-    
+
+    def set_gstreamer(self, pipeline):
+        '''set gstreamer pipeline source'''
+        self.in_queue.put(MPImageGStreamer(pipeline))
+
+    def set_colormap(self, colormap):
+        '''set a colormap for greyscale data'''
+        self.in_queue.put(MPImageColormap(colormap))
+        
     def events(self):
         '''check for events a list of events'''
         ret = []
@@ -242,7 +263,7 @@ class MPImagePanel(wx.Panel):
         self.redraw_timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.on_redraw_timer, self.redraw_timer)
         self.Bind(wx.EVT_SET_FOCUS, self.on_focus)
-        self.redraw_timer.Start(100)
+        self.redraw_timer.Start(int(1000/state.fps))
 
         self.mouse_down = None
         self.drag_step = 10
@@ -253,6 +274,8 @@ class MPImagePanel(wx.Panel):
         self.popup_pos = None
         self.last_size = None
         self.done_PIL_warning = False
+        self.colormap = None
+        self.raw_img = None
         state.brightness = 1.0
 
         # dragpos is the top left position in image coordinates
@@ -349,6 +372,34 @@ class MPImagePanel(wx.Panel):
         '''
 
 
+    def set_image_data(self, data, width, height):
+        '''set image data'''
+        state = self.state
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            img = wx.EmptyImage(width, height)
+
+        self.raw_img = data
+
+        if self.colormap is not None:
+            '''optional colormap for greyscale data'''
+            cmap = getattr(cv2, "COLORMAP_" + self.colormap, None)
+            if cmap is not None:
+                data = cv2.cvtColor(data, cv2.COLOR_BGR2GRAY)
+                data = cv2.applyColorMap(data, cmap)
+
+        img.SetData(data)
+        self.img = img
+        if state.auto_size:
+            client_area = state.frame.GetClientSize()
+            total_area = state.frame.GetSize()
+            bx = max(total_area.x - client_area.x,0)
+            by = max(total_area.y - client_area.y,0)
+            state.frame.SetSize(wx.Size(width+bx, height+by))
+        elif state.auto_fit:
+            self.fit_to_window()
+        self.need_redraw = True
+
     def on_redraw_timer(self, event):
         '''the redraw timer ensures we show new map tiles as they
         are downloaded'''
@@ -360,20 +411,7 @@ class MPImagePanel(wx.Panel):
                 time.sleep(0.05)
                 return
             if isinstance(obj, MPImageData):
-                with warnings.catch_warnings():
-                    warnings.simplefilter('ignore')
-                    img = wx.EmptyImage(obj.width, obj.height)
-                img.SetData(obj.data)
-                self.img = img
-                if state.auto_size:
-                    client_area = state.frame.GetClientSize()
-                    total_area = state.frame.GetSize()
-                    bx = max(total_area.x - client_area.x,0)
-                    by = max(total_area.y - client_area.y,0)
-                    state.frame.SetSize(wx.Size(obj.width+bx, obj.height+by))
-                elif state.auto_fit:
-                    self.fit_to_window()
-                self.need_redraw = True
+                self.set_image_data(obj.data, obj.width, obj.height)
             if isinstance(obj, MPImageTitle):
                 state.frame.SetTitle(obj.title)
             if isinstance(obj, MPImageRecenter):
@@ -391,9 +429,38 @@ class MPImagePanel(wx.Panel):
                 self.fit_to_window()
             if isinstance(obj, win_layout.WinLayout):
                 win_layout.set_wx_window_layout(state.frame, obj)
+            if isinstance(obj, MPImageGStreamer):
+                self.start_gstreamer(obj.pipeline)
+            if isinstance(obj, MPImageColormap):
+                self.colormap = obj.colormap
                 
         if self.need_redraw:
             self.redraw()
+
+    def start_gstreamer(self, pipeline):
+        '''start a gstreamer pipeline'''
+        thread = Thread(target=self.gstreamer_thread, args=(pipeline,))
+        thread.daemon = True
+        thread.start()
+
+    def gstreamer_thread(self, pipeline):
+        '''thread for gstreamer capture'''
+        cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
+        if not cap or not cap.isOpened():
+            print("gstreamer VideoCapture failed")
+            return
+
+        while True:
+            try:
+                _, frame = cap.read()
+            except Exception:
+                break
+            if frame is None:
+                break
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            (width, height) = (frame.shape[1], frame.shape[0])
+            self.set_image_data(frame, width, height)
+
 
     def on_recenter(self, location):
         client_area = self.state.frame.GetClientSize()
@@ -527,6 +594,14 @@ class MPImagePanel(wx.Panel):
         pt = self.image_coordinates(wx.Point(evt.X,evt.Y))
         evt.X = pt.x
         evt.Y = pt.y
+        evt.pixel = None
+        if self.raw_img is not None:
+            # provide the pixel value if available
+            (width, height) = (self.raw_img.shape[1], self.raw_img.shape[0])
+            if evt.X < width and evt.Y < height:
+                evt.pixel = self.raw_img[evt.Y][evt.X]
+            evt.shape = self.raw_img.shape
+
         state.out_queue.put(evt)
 
     def on_menu(self, event):
@@ -587,6 +662,8 @@ if __name__ == "__main__":
     parser.add_option("--drag", action='store_true', default=False, help="allow drag")
     parser.add_option("--autosize", action='store_true', default=False, help="auto size window")
     parser.add_option("--autofit", action='store_true', default=False, help="auto fit window")
+    parser.add_option("--gstreamer", action='store_true', default=False, help="treat file as gstreamer pipeline")
+    parser.add_option("--colormap", type=str, default=None, help="set colormap for greyscale images")
     (opts, args) = parser.parse_args()
 
     im = MPImage(mouse_events=True,
@@ -595,8 +672,14 @@ if __name__ == "__main__":
                  can_zoom = opts.zoom,
                  auto_size = opts.autosize,
                  auto_fit = opts.autofit)
-    img = cv2.imread(args[0])
-    im.set_image(img, bgr=True)
+    if opts.gstreamer:
+        im.set_gstreamer(args[0])
+    else:
+        img = cv2.imread(args[0])
+        im.set_image(img, bgr=True)
+
+    if opts.colormap is not None:
+        im.set_colormap(opts.colormap)
 
     while im.is_alive():
         for event in im.events():
