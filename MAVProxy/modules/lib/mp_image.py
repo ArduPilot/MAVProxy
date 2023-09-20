@@ -80,6 +80,23 @@ class MPImageColormap:
     '''set a colormap for display'''
     def __init__(self, colormap):
         self.colormap = colormap
+
+class MPImageStartTracker:
+    def __init__(self, x, y, width, height):
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+
+class MPImageTrackPos:
+    def __init__(self, x, y, shape):
+        self.x = x
+        self.y = y
+        self.shape = shape
+
+class MPImageEndTracker:
+    def __init__(self):
+        pass
         
 class MPImage():
     '''
@@ -209,6 +226,14 @@ class MPImage():
     def set_colormap(self, colormap):
         '''set a colormap for greyscale data'''
         self.in_queue.put(MPImageColormap(colormap))
+
+    def start_tracker(self, x, y, width, height):
+        '''start a tracker'''
+        self.in_queue.put(MPImageStartTracker(x, y, width, height))
+
+    def end_tracker(self):
+        '''end a tracker'''
+        self.in_queue.put(MPImageEndTracker())
         
     def events(self):
         '''check for events a list of events'''
@@ -276,6 +301,7 @@ class MPImagePanel(wx.Panel):
         self.done_PIL_warning = False
         self.colormap = None
         self.raw_img = None
+        self.tracker = None
         state.brightness = 1.0
 
         # dragpos is the top left position in image coordinates
@@ -433,9 +459,30 @@ class MPImagePanel(wx.Panel):
                 self.start_gstreamer(obj.pipeline)
             if isinstance(obj, MPImageColormap):
                 self.colormap = obj.colormap
-                
+            if isinstance(obj, MPImageStartTracker):
+                self.start_tracker(obj)
+            if isinstance(obj, MPImageEndTracker):
+                self.tracker = None
+
         if self.need_redraw:
             self.redraw()
+
+    def start_tracker(self, obj):
+        '''start a tracker on an object identified by a box'''
+        if self.raw_img is None:
+            return
+        self.tracker = None
+        import dlib
+        maxx = self.raw_img.shape[1]-1
+        maxy = self.raw_img.shape[0]-1
+        rect = dlib.rectangle(max(int(obj.x-obj.width/2),0),
+                              max(int(obj.y-obj.height/2),0),
+                              min(int(obj.x+obj.width/2),maxx),
+                              min(int(obj.y+obj.height/2),maxy))
+        tracker = dlib.correlation_tracker()
+        tracker.start_track(self.raw_img, rect)
+        self.tracker = tracker
+
 
     def start_gstreamer(self, pipeline):
         '''start a gstreamer pipeline'''
@@ -459,6 +506,24 @@ class MPImagePanel(wx.Panel):
                 break
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             (width, height) = (frame.shape[1], frame.shape[0])
+            if self.tracker:
+                self.tracker.update(frame)
+                pos = self.tracker.get_position()
+                if pos is not None:
+                    startX = int(pos.left())
+                    startY = int(pos.top())
+                    endX = int(pos.right())
+                    endY = int(pos.bottom())
+                    if (startX >= 0
+                        and startY >= 0
+                        and endX < width
+                        and endY < height
+                        and endX > startX
+                        and endY > startY):
+                        cv2.rectangle(frame, (startX, startY), (endX, endY), (0,255,0), 2)
+                        self.state.out_queue.put(MPImageTrackPos(int((startX+endX)/2),
+                                                                 int((startY+endY)/2),
+                                                                frame.shape))
             self.set_image_data(frame, width, height)
 
 
@@ -686,9 +751,13 @@ if __name__ == "__main__":
             if isinstance(event, MPMenuItem):
                 print(event)
                 continue
-            print(event.ClassName)
+            if isinstance(event, MPImageTrackPos):
+                continue
             if event.ClassName == 'wxMouseEvent':
-                print('mouse', event.X, event.Y)
+                if event.leftIsDown and event.shiftDown:
+                    im.start_tracker(event.X, event.Y, 50, 50)
+                if event.leftIsDown and event.controlDown:
+                    im.end_tracker()
             if event.ClassName == 'wxKeyEvent':
                 print('key %u' % event.KeyCode)
         time.sleep(0.1)
