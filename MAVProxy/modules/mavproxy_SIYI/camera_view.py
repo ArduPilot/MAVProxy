@@ -7,6 +7,7 @@ import time, sys
 
 from MAVProxy.modules.lib.mp_menu import MPMenuItem
 from MAVProxy.modules.lib.mp_image import MPImage
+from MAVProxy.modules.lib.mp_image import MPImageTrackPos
 from MAVProxy.modules.mavproxy_map import mp_slipmap
 
 class CameraView:
@@ -40,9 +41,7 @@ class CameraView:
         )
 
         popup = self.im.get_popup_menu()
-        popup.add_to_submenu(
-            ["Mode"], MPMenuItem("ClickTrack", returnkey="Mode:ClickTrack")
-        )
+        popup.add_to_submenu(["Mode"], MPMenuItem("ClickTrack", returnkey="Mode:ClickTrack"))
         popup.add_to_submenu(["Mode"], MPMenuItem("Flag", returnkey="Mode:Flag"))
         if self.thermal:
             colormaps = [
@@ -128,6 +127,23 @@ class CameraView:
         else:
             self.set_title("Wide View")
 
+    def xy_to_latlon(self, x, y, shape):
+        '''convert x,y pixel coordinates to a latlon tuple'''
+        (yres, xres, depth) = shape
+        x = (2 * x / float(xres)) - 1.0
+        y = (2 * y / float(yres)) - 1.0
+        aspect_ratio = float(xres) / yres
+        if self.thermal:
+            FOV = self.siyi.siyi_settings.thermal_fov
+        elif self.siyi.rgb_lens == "zoom":
+            FOV = self.siyi.siyi_settings.zoom_fov / self.siyi.last_zoom
+        else:
+            FOV = self.siyi.siyi_settings.wide_fov
+        slant_range = self.siyi.get_slantrange(x, y, FOV, aspect_ratio)
+        if slant_range is None:
+            return None
+        return self.siyi.get_latlonalt(slant_range, x, y, FOV, aspect_ratio)
+
     def check_events(self):
         """check for image events"""
         if self.im is None:
@@ -151,6 +167,13 @@ class CameraView:
                 elif event.returnkey == "fullSize":
                     self.im.full_size()
                 continue
+            if isinstance(event, MPImageTrackPos):
+                latlonalt = self.xy_to_latlon(event.x, event.y, event.shape)
+                if latlonalt is None:
+                    return
+                self.siyi.set_target(latlonalt[0], latlonalt[1], latlonalt[2])
+                continue
+
             if event.ClassName == "wxMouseEvent":
                 if event.pixel is not None:
                     self.siyi.spot_temp = self.get_pixel_temp(event)
@@ -161,32 +184,21 @@ class CameraView:
                 and event.pixel is not None
                 and self.siyi is not None
             ):
-                (yres, xres, depth) = event.shape
-                x = (2 * event.x / float(xres)) - 1.0
-                y = (2 * event.y / float(yres)) - 1.0
-                aspect_ratio = float(xres) / yres
-                if self.thermal:
-                    FOV = self.siyi.siyi_settings.thermal_fov
-                elif self.siyi.rgb_lens == "zoom":
-                    FOV = self.siyi.siyi_settings.zoom_fov / self.siyi.last_zoom
-                else:
-                    FOV = self.siyi.siyi_settings.wide_fov
-                slant_range = self.siyi.get_slantrange(x, y, FOV, aspect_ratio)
-                if slant_range is None:
-                    return
-                latlonalt = self.siyi.get_latlonalt(
-                    slant_range, x, y, FOV, aspect_ratio
-                )
+                latlonalt = self.xy_to_latlon(event.x, event.y, event.shape)
                 if latlonalt is None:
-                    return
-                latlon = (latlonalt[0], latlonalt[1])
-                if self.mode == "ClickTrack":
+                    continue
+                if event.shiftDown:
+                    (xres,yres) = (event.shape[1], event.shape[0])
+                    twidth = int(yres*0.01*self.siyi.siyi_settings.track_size_pct)
+                    self.im.start_tracker(event.X, event.Y, twidth, twidth)
+                elif event.controlDown:
+                    self.im.end_tracker()
+                elif self.mode == "ClickTrack":
                     self.siyi.set_target(latlonalt[0], latlonalt[1], latlonalt[2])
                 else:
+                    latlon = (latlonalt[0], latlonalt[1])
                     self.siyi.mpstate.map.add_object(
-                        mp_slipmap.SlipIcon(
-                            "SIYIClick", latlon, self.siyi.click_icon, layer="SIYI"
-                        )
+                        mp_slipmap.SlipIcon("SIYIClick", latlon, self.siyi.click_icon, layer="SIYI")
                     )
 
 if __name__ == '__main__':

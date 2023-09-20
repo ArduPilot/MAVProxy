@@ -147,11 +147,11 @@ class SIYIModule(mp_module.MPModule):
                                                      ('yaw_rate', float, 10),
                                                      ('pitch_rate', float, 10),
                                                      ('rates_hz', float, 5),
-                                                     ('yaw_gain_P', float, 1),
-                                                     ('yaw_gain_I', float, 1),
+                                                     ('yaw_gain_P', float, 0.5),
+                                                     ('yaw_gain_I', float, 0.5),
                                                      ('yaw_gain_IMAX', float, 5),
-                                                     ('pitch_gain_P', float, 1),
-                                                     ('pitch_gain_I', float, 1),
+                                                     ('pitch_gain_P', float, 0.5),
+                                                     ('pitch_gain_I', float, 0.5),
                                                      ('pitch_gain_IMAX', float, 5),
                                                      ('mount_pitch', float, 0),
                                                      ('mount_yaw', float, 0),
@@ -163,6 +163,8 @@ class SIYIModule(mp_module.MPModule):
                                                      ('temp_hz', float, 5),
                                                      ('rtsp_rgb', str, 'rtsp://192.168.144.25:8554/video1'),
                                                      ('rtsp_thermal', str, 'rtsp://192.168.144.25:8554/video2'),
+                                                     #('rtsp_rgb', str, 'rtsp://127.0.0.1:8554/video1'),
+                                                     #('rtsp_thermal', str, 'rtsp://127.0.0.1:8554/video2'),
                                                      ('fps_thermal', int, 20),
                                                      ('fps_rgb', int, 20),
                                                      ('logfile', str, 'SIYI_log.bin'),
@@ -170,6 +172,8 @@ class SIYIModule(mp_module.MPModule):
                                                      ('zoom_fov', float, 62.0),
                                                      ('wide_fov', float, 88.0),
                                                      ('use_lidar', int, 0),
+                                                     ('max_rate', float, 30.0),
+                                                     ('track_size_pct', float, 5.0),
                                                          ])
         self.add_completion_function('(SIYISETTING)',
                                      self.siyi_settings.completion)
@@ -436,8 +440,8 @@ class SIYIModule(mp_module.MPModule):
             return
         self.last_req_send = now
         if self.yaw_rate is not None or self.pitch_rate is not None:
-            y = self.yaw_rate
-            p = self.pitch_rate
+            y = mp_util.constrain(self.yaw_rate, -self.siyi_settings.max_rate, self.siyi_settings.max_rate)
+            p = mp_util.constrain(self.pitch_rate, -self.siyi_settings.max_rate, self.siyi_settings.max_rate)
             if y is None:
                 y = 0.0
             if p is None:
