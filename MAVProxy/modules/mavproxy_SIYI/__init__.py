@@ -597,6 +597,9 @@ class SIYIModule(mp_module.MPModule):
             self.rf_dist = r * 0.1
             self.update_status()
             self.send_named_float('RFND', self.rf_dist)
+            self.logf.write('SIRF', 'Qf', 'TimeUS,Dist',
+                            self.micros64(),
+                            self.rf_dist)
 
         elif cmd == READ_TEMP_FULL_SCREEN:
             if len(data) < 12:
