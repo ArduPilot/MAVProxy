@@ -169,6 +169,7 @@ class SIYIModule(mp_module.MPModule):
                                                      ('thermal_fov', float, 24.2),
                                                      ('zoom_fov', float, 62.0),
                                                      ('wide_fov', float, 88.0),
+                                                     ('use_lidar', int, 0),
                                                          ])
         self.add_completion_function('(SIYISETTING)',
                                      self.siyi_settings.completion)
@@ -597,9 +598,13 @@ class SIYIModule(mp_module.MPModule):
             self.rf_dist = r * 0.1
             self.update_status()
             self.send_named_float('RFND', self.rf_dist)
-            self.logf.write('SIRF', 'Qf', 'TimeUS,Dist',
+            SR = self.get_slantrange(0,0,0,1)
+            if SR is None:
+                SR = -1.0
+            self.logf.write('SIRF', 'Qff', 'TimeUS,Dist,SR',
                             self.micros64(),
-                            self.rf_dist)
+                            self.rf_dist,
+                            SR)
 
         elif cmd == READ_TEMP_FULL_SCREEN:
             if len(data) < 12:
@@ -688,8 +693,8 @@ class SIYIModule(mp_module.MPModule):
          get range to ground
          x and y are from -1 to 1, relative to center of camera view
         '''
-        if self.rf_dist > 0:
-            # use rangefinder if possible
+        if self.rf_dist > 0 and self.siyi_settings.use_lidar > 0:
+            # use rangefinder if enabled
             return self.rf_dist
         gpi = self.master.messages.get('GLOBAL_POSITION_INT',None)
         if not gpi:
