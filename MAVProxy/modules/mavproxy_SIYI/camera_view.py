@@ -87,8 +87,8 @@ class CameraView:
                     ["Zoom"], MPMenuItem("%ux" % z, returnkey="Zoom:%u" % z)
                 )
 
-        gst_pipeline = "rtspsrc location={0} latency=0 buffer-mode=auto ! rtph265depay !  tee name=tee1 tee1. ! h265parse ! avdec_h265  ! videoconvert ! video/x-raw,format=BGRx ! videorate ! video/x-raw,framerate={2}/1 ! appsink tee1. ! queue ! h265parse config-interval=15 ! video/x-h265 ! mpegtsmux ! filesink location={1}".format(
-            self.rtsp_url, self.filename, self.fps
+        gst_pipeline = "rtspsrc location={0} latency=0 buffer-mode=auto ! rtph265depay !  tee name=tee1 tee1. ! queue ! h265parse ! avdec_h265  ! videoconvert ! video/x-raw,format=BGRx ! appsink tee1. ! queue ! h265parse config-interval=15 ! video/x-h265 ! mpegtsmux ! filesink location={1}".format(
+            self.rtsp_url, self.filename
         )
 
         self.im.set_gstreamer(gst_pipeline)
