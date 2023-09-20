@@ -144,6 +144,14 @@ class CameraView:
             return None
         return self.siyi.get_latlonalt(slant_range, x, y, FOV, aspect_ratio)
 
+
+    def end_tracking(self):
+        '''end all tracking'''
+        if self.siyi.rgb_view is not None:
+            self.siyi.rgb_view.im.end_tracker()
+        if self.siyi.thermal_view is not None:
+            self.siyi.thermal_view.im.end_tracker()
+    
     def check_events(self):
         """check for image events"""
         if self.im is None:
@@ -190,9 +198,10 @@ class CameraView:
                 if event.shiftDown:
                     (xres,yres) = (event.shape[1], event.shape[0])
                     twidth = int(yres*0.01*self.siyi.siyi_settings.track_size_pct)
+                    self.end_tracking()
                     self.im.start_tracker(event.X, event.Y, twidth, twidth)
                 elif event.controlDown:
-                    self.im.end_tracker()
+                    self.end_tracking()
                 elif self.mode == "ClickTrack":
                     self.siyi.set_target(latlonalt[0], latlonalt[1], latlonalt[2])
                 else:
