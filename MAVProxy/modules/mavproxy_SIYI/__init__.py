@@ -182,9 +182,9 @@ class SIYIModule(mp_module.MPModule):
                                                      ('yaw_rate', float, 10),
                                                      ('pitch_rate', float, 10),
                                                      ('rates_hz', float, 5),
-                                                     ('yaw_gain_P', float, 3),
-                                                     ('yaw_gain_I', float, 3),
-                                                     ('yaw_gain_IMAX', float, 20),
+                                                     ('yaw_gain_P', float, 1),
+                                                     ('yaw_gain_I', float, 1),
+                                                     ('yaw_gain_IMAX', float, 10),
                                                      ('pitch_gain_P', float, 1),
                                                      ('pitch_gain_I', float, 1),
                                                      ('pitch_gain_IMAX', float, 10),
@@ -408,20 +408,28 @@ class SIYIModule(mp_module.MPModule):
             pal = int(args[0])
         self.send_packet_fmt(SET_THERMAL_PALETTE, "<B", pal)
 
+    def video_filename(self, base):
+        '''get a video file name'''
+        if self.logdir is None:
+            return base + ".mts"
+        i = 1
+        while True:
+            vidfile = os.path.join(self.logdir, "%s%u.mts" % (base,i))
+            if not os.path.exists(vidfile):
+                break
+            i += 1
+        return vidfile
+
     def cmd_thermal(self):
         '''open thermal viewer'''
-        vidfile = "thermal.mts"
-        if self.logdir is not None:
-            vidfile = os.path.join(self.logdir, vidfile)
+        vidfile = self.video_filename('thermal')
         self.thermal_view = CameraView(self, self.siyi_settings.rtsp_thermal,
                                        vidfile, (640,512), thermal=True,
                                        fps=self.siyi_settings.fps_thermal)
 
     def cmd_rgbview(self):
         '''open rgb viewer'''
-        vidfile = "rgb.mts"
-        if self.logdir is not None:
-            vidfile = os.path.join(self.logdir, vidfile)
+        vidfile = self.video_filename('rgb')
         self.rgb_view = CameraView(self, self.siyi_settings.rtsp_rgb,
                                    vidfile, (1280,720), thermal=False,
                                    fps=self.siyi_settings.fps_rgb)
