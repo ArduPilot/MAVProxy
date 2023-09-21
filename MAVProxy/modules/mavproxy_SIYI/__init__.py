@@ -128,6 +128,41 @@ class DF_logger:
         self.outf.flush()
 
 
+def rate_mapping(desired_rate):
+    '''map from a desired rate in deg/sec to a siyi SDK rate'''
+    drate = abs(desired_rate)
+    rate_map = [
+        (60, 90),
+        (50, 74),
+        (45, 68),
+        (40, 57),
+        (35, 51),
+        (30, 42),
+        (25, 34),
+        (20, 27),
+        (15, 18),
+        (10, 7.5),
+        (7.5, 6.0),
+        (5.0, 1.0),
+        (4.0, 0.0),
+        (0.0, 0.0),
+        ]
+    if drate >= rate_map[0][1]:
+        ret = rate_map[0][0]
+        if desired_rate < 0:
+            ret = -ret
+        return ret
+    for i in range(1, len(rate_map)):
+        (rate_to2, rate_from2) = rate_map[i-1]
+        (rate_to1, rate_from1) = rate_map[i]
+        if drate <= rate_from2 and drate >= rate_from1:
+            p = (drate - rate_from1) / (rate_from2 - rate_from1)
+            ret = rate_to1 + p * (rate_to2 - rate_to1)
+            if desired_rate < 0:
+                ret = -ret
+            return ret
+    return 0.0
+
 class SIYIModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
@@ -147,12 +182,12 @@ class SIYIModule(mp_module.MPModule):
                                                      ('yaw_rate', float, 10),
                                                      ('pitch_rate', float, 10),
                                                      ('rates_hz', float, 5),
-                                                     ('yaw_gain_P', float, 0.5),
-                                                     ('yaw_gain_I', float, 0.5),
-                                                     ('yaw_gain_IMAX', float, 5),
-                                                     ('pitch_gain_P', float, 0.5),
-                                                     ('pitch_gain_I', float, 0.5),
-                                                     ('pitch_gain_IMAX', float, 5),
+                                                     ('yaw_gain_P', float, 3),
+                                                     ('yaw_gain_I', float, 3),
+                                                     ('yaw_gain_IMAX', float, 20),
+                                                     ('pitch_gain_P', float, 1),
+                                                     ('pitch_gain_I', float, 1),
+                                                     ('pitch_gain_IMAX', float, 10),
                                                      ('mount_pitch', float, 0),
                                                      ('mount_yaw', float, 0),
                                                      ('lag', float, 0),
@@ -321,9 +356,9 @@ class SIYIModule(mp_module.MPModule):
         if len(args) < 2:
             print("Usage: siyi rates PAN_RATE PITCH_RATE")
             return
+        self.clear_target()
         self.yaw_rate = float(args[0])
         self.pitch_rate = float(args[1])
-        self.clear_target()
 
     def cmd_yaw(self, args):
         '''update yaw'''
@@ -419,6 +454,7 @@ class SIYIModule(mp_module.MPModule):
         '''clear target position'''
         self.target_pos = None
         self.mpstate.map.remove_object('SIYI')
+        self.end_tracking()
         self.yaw_rate = None
         self.pitch_rate = None
 
@@ -439,13 +475,11 @@ class SIYIModule(mp_module.MPModule):
         if self.siyi_settings.rates_hz <= 0 or now - self.last_req_send < 1.0/self.siyi_settings.rates_hz:
             return
         self.last_req_send = now
-        if self.yaw_rate is not None or self.pitch_rate is not None:
-            y = mp_util.constrain(self.yaw_rate, -self.siyi_settings.max_rate, self.siyi_settings.max_rate)
-            p = mp_util.constrain(self.pitch_rate, -self.siyi_settings.max_rate, self.siyi_settings.max_rate)
-            if y is None:
-                y = 0.0
-            if p is None:
-                p = 0.0
+        if self.yaw_rate is not None and self.pitch_rate is not None:
+            y = rate_mapping(self.yaw_rate)
+            p = rate_mapping(self.pitch_rate)
+            y = mp_util.constrain(y, -self.siyi_settings.max_rate, self.siyi_settings.max_rate)
+            p = mp_util.constrain(p, -self.siyi_settings.max_rate, self.siyi_settings.max_rate)
             scale = 100.0 / SIYI_RATE_MAX_DPS
             y = int(mp_util.constrain(y*scale, -100, 100))
             p = int(mp_util.constrain(p*scale, -100, 100))
@@ -781,6 +815,7 @@ class SIYIModule(mp_module.MPModule):
         if map_module is not None and map_module.current_ROI != self.last_map_ROI:
             self.last_map_ROI = map_module.current_ROI
             (lat, lon, alt) = self.last_map_ROI
+            self.clear_target()
             self.set_target(lat, lon, alt)
 
         if self.target_pos is None or self.attitude is None:
@@ -859,6 +894,13 @@ class SIYIModule(mp_module.MPModule):
         if self.rgb_lens == "zoom":
             FOV2 = self.siyi_settings.zoom_fov / self.last_zoom
         self.show_fov1(FOV2, 'FOV_RGB', 1280.0/720.0, (0,128,128))
+
+    def end_tracking(self):
+        '''end all tracking'''
+        if self.rgb_view is not None and self.rgb_view.im is not None:
+            self.rgb_view.im.end_tracker()
+        if self.thermal_view is not None and self.thermal_view.im is not None:
+            self.thermal_view.im.end_tracker()
 
     def mavlink_packet(self, m):
         '''process a mavlink message'''
