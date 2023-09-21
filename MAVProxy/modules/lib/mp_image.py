@@ -118,8 +118,8 @@ class MPImage():
                  fps = 10):
 
         self.title = title
-        self.width = width
-        self.height = height
+        self.width = int(width)
+        self.height = int(height)
         self.can_zoom = can_zoom
         self.can_drag = can_drag
         self.mouse_events = mouse_events
@@ -314,7 +314,7 @@ class MPImagePanel(wx.Panel):
         # panel for the main image
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
-            self.imagePanel = mp_widgets.ImagePanel(self, wx.EmptyImage(state.width,state.height))
+            self.imagePanel = mp_widgets.ImagePanel(self, wx.EmptyImage(int(state.width),int(state.height)))
         self.mainSizer.Add(self.imagePanel, flag=wx.TOP|wx.LEFT|wx.GROW, border=0)
         if state.mouse_events:
             self.imagePanel.Bind(wx.EVT_MOUSE_EVENTS, self.on_event)
@@ -529,8 +529,8 @@ class MPImagePanel(wx.Panel):
 
     def on_recenter(self, location):
         client_area = self.state.frame.GetClientSize()
-        self.dragpos.x = location[0] - client_area.x/2
-        self.dragpos.y = location[1] - client_area.y/2
+        self.dragpos.x = int(location[0] - client_area.x*0.5)
+        self.dragpos.y = int(location[1] - client_area.y*0.5)
         self.limit_dragpos()
         self.need_redraw = True
         self.redraw()
