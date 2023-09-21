@@ -660,7 +660,7 @@ class MPImagePanel(wx.Panel):
         evt.X = pt.x
         evt.Y = pt.y
         evt.pixel = None
-        if self.raw_img is not None:
+        if self.raw_img is not None and hasattr(self.raw_img, 'shape'):
             # provide the pixel value if available
             (width, height) = (self.raw_img.shape[1], self.raw_img.shape[0])
             if evt.X < width and evt.Y < height:
