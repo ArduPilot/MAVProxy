@@ -159,7 +159,7 @@ class SIYIModule(mp_module.MPModule):
                                                      ('target_rate', float, 10),
                                                      ('telem_hz', float, 5),
                                                      ('att_send_hz', float, 10),
-                                                     ('lidar_hz', float, 10),
+                                                     ('lidar_hz', float, 2),
                                                      ('temp_hz', float, 5),
                                                      ('rtsp_rgb', str, 'rtsp://192.168.144.25:8554/video1'),
                                                      ('rtsp_thermal', str, 'rtsp://192.168.144.25:8554/video2'),
