@@ -355,6 +355,9 @@ class MPImagePanel(wx.Panel):
         size = self.frame.GetSize()
         (width, height) = (self.img.GetWidth(), self.img.GetHeight())
 
+        if self.zoom <= 0:
+            self.zoom = 1
+
         rect = wx.Rect(self.dragpos.x, self.dragpos.y, int(size.x/self.zoom), int(size.y/self.zoom))
 
         #print("redraw", self.zoom, self.dragpos, size, rect);
