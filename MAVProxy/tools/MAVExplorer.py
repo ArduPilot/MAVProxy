@@ -978,7 +978,9 @@ def ftp_decode(mlog):
             self.blocks.sort(key = lambda x: x.offset)
             data = bytes()
             for b in self.blocks:
-                if b.offset != len(data):
+                if b.offset < len(data):
+                    continue
+                if b.offset > len(data):
                     print("gap at %u" % len(data))
                     return None
                 data += bytes(b.data)
@@ -1000,7 +1002,7 @@ def ftp_decode(mlog):
         if req_opcode in [FTP_ReadFile, FTP_BurstReadFile] and opcode == FTP_Ack:
             if not session in ftp_transfers:
                 print("No session %u" % session)
-                return
+                continue
             offset, = struct.unpack("<I", bytearray(m.payload[8:12]))
             ftp_transfers[session].blocks.append(Block(offset,size,bytearray(data)))
 
@@ -1008,7 +1010,9 @@ def ftp_decode(mlog):
     for session in ftp_transfers:
         f = ftp_transfers[session]
         if f.filename.decode().startswith('@PARAM/param.pck'):
-            pdata = param_ftp.ftp_param_decode(f.extract())
+            ex = f.extract()
+            if ex is not None:
+                pdata = param_ftp.ftp_param_decode(ex)
     if pdata is not None:
         for (name,value,ptype) in pdata.params:
             name = name.decode('utf-8')
