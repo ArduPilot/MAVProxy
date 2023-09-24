@@ -64,6 +64,20 @@ def timestamp_to_days(timestamp, timeshift=0):
     sec_to_days = 1.0 / (60*60*24)
     return tday_base + (timestamp - tday_basetime) * sec_to_days
 
+class MilliFormatter(matplotlib.dates.AutoDateFormatter):
+    '''tick formatter that shows millisecond resolution'''
+    def __init__(self, locator):
+        super().__init__(locator)
+        # don't show day until much wider range
+        self.scaled[1.0/(24*60)] = self.scaled[1.0/(24*60*60)]
+
+    def __call__(self, x, pos=0):
+        """Return the label for time x at position pos."""
+        v = super().__call__(x,pos=pos)
+        if v.endswith("000"):
+            return v[:-3]
+        return v
+
 class MavGraph(object):
     def __init__(self, flightmode_colourmap=None):
         self.lowest_x = None
@@ -176,10 +190,6 @@ class MavGraph(object):
             # convert back to data coords with respect to ax
             ax_coord = inv.transform(display_coord)
             xstr = self.formatter(x)
-            # add in hundredths of seconds, converting from days
-            sec = x * 60 * 60 * 24
-            hsec = int((sec - int(sec))*100)
-            xstr += ".%02u" % hsec
             y2 = ax_coord[1]
             if self.xaxis:
                 return ('x=%.3f Left=%.3f Right=%.3f' % (x, y2, y))
@@ -202,29 +212,10 @@ class MavGraph(object):
             self.flightmode_colourmap[flightmode] = self.next_flightmode_colour()
         return self.flightmode_colourmap[flightmode]
 
-    def setup_xrange(self, xrange):
-        '''setup plotting ticks on x axis'''
-        if self.xaxis:
-            return
-        xrange *= 24 * 60 * 60
-        interval = 1
-        intervals = [ 0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5,
-                      1, 2, 5, 10, 15, 30, 60, 120, 240, 300, 600,
-                      900, 1800, 3600, 7200, 5*3600, 10*3600, 24*3600 ]
-        for interval in intervals:
-            if xrange / interval < 12:
-                break
-        if interval < 1:
-            self.locator = matplotlib.dates.MicrosecondLocator(interval=int(interval*1.0e6))
-        else:
-            self.locator = matplotlib.dates.SecondLocator(interval=interval)
-        self.ax1.xaxis.set_major_locator(self.locator)
-
     def xlim_changed(self, axsubplot):
         '''called when x limits are changed'''
         xrange = axsubplot.get_xbound()
         xlim = axsubplot.get_xlim()
-        self.setup_xrange(xrange[1] - xrange[0])
         if self.draw_events == 0:
             # ignore limit change before first draw event
             return
@@ -287,9 +278,10 @@ class MavGraph(object):
                 self.highest_x = x[i][-1]
         if self.highest_x is None or self.lowest_x is None:
             return
-        self.formatter = matplotlib.dates.DateFormatter('%H:%M:%S')
+        self.locator = matplotlib.dates.AutoDateLocator()
+        self.ax1.xaxis.set_major_locator(self.locator)
+        self.formatter = MilliFormatter(self.locator)
         if not self.xaxis:
-            self.setup_xrange(self.highest_x - self.lowest_x)
             self.ax1.xaxis.set_major_formatter(self.formatter)
             self.ax1.callbacks.connect('xlim_changed', self.xlim_changed)
             self.fig.canvas.mpl_connect('draw_event', self.draw_event)
