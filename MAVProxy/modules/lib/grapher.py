@@ -208,12 +208,16 @@ class MavGraph(object):
             return
         xrange *= 24 * 60 * 60
         interval = 1
-        intervals = [ 1, 2, 5, 10, 15, 30, 60, 120, 240, 300, 600,
+        intervals = [ 0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5,
+                      1, 2, 5, 10, 15, 30, 60, 120, 240, 300, 600,
                       900, 1800, 3600, 7200, 5*3600, 10*3600, 24*3600 ]
         for interval in intervals:
             if xrange / interval < 12:
                 break
-        self.locator = matplotlib.dates.SecondLocator(interval=interval)
+        if interval < 1:
+            self.locator = matplotlib.dates.MicrosecondLocator(interval=int(interval*1.0e6))
+        else:
+            self.locator = matplotlib.dates.SecondLocator(interval=interval)
         self.ax1.xaxis.set_major_locator(self.locator)
 
     def xlim_changed(self, axsubplot):
