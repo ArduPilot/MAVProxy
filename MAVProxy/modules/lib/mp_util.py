@@ -540,3 +540,16 @@ class mp_position(object):
             time.time() - self.timestamp,
             self.latitude, self.longitude, self.altitude,
             self.ground_speed, self.ground_course)
+
+def get_gps_time(tnow):
+    '''return gps_week and gps_week_ms for current unix time in seconds'''
+    leapseconds = 18
+    SEC_PER_WEEK = 7 * 86400
+    UNIX_TO_GPS_EPOCH = 315964800
+
+    epoch = UNIX_TO_GPS_EPOCH - leapseconds
+    epoch_seconds = int(tnow - epoch)
+    week = int(epoch_seconds) // SEC_PER_WEEK
+    t_ms = int(tnow * 1000) % 1000
+    week_ms = (epoch_seconds % SEC_PER_WEEK) * 1000 + ((t_ms//200) * 200)
+    return week, week_ms

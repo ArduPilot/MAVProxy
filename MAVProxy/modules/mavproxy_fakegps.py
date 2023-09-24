@@ -75,18 +75,6 @@ class FakeGPSModule(mp_module.MPModule):
         self.update_mpstate()
 
 
-    def get_gps_time(self, tnow):
-        '''return gps_week and gps_week_ms for current time'''
-        leapseconds = 18
-        SEC_PER_WEEK = 7 * 86400
-
-        epoch = 86400*(10*365 + (1980-1969)/4 + 1 + 6 - 2) - leapseconds
-        epoch_seconds = int(tnow - epoch)
-        week = int(epoch_seconds) // SEC_PER_WEEK
-        t_ms = int(tnow * 1000) % 1000
-        week_ms = (epoch_seconds % SEC_PER_WEEK) * 1000 + ((t_ms//200) * 200)
-        return week, week_ms
-
     def idle_task(self):
         '''called on idle'''
         if self.master is None or self.FakeGPS_settings.rate <= 0:
@@ -100,7 +88,7 @@ class FakeGPSModule(mp_module.MPModule):
         gps_alt = self.FakeGPS_settings.alt
         gps_vel = [0, 0, 0]
 
-        gps_week, gps_week_ms = self.get_gps_time(now)
+        gps_week, gps_week_ms = mp_util.get_gps_time(now)
 
         time_us = int(now*1.0e6)
 

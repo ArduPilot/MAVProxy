@@ -839,18 +839,6 @@ class SIYIModule(mp_module.MPModule):
         self.logf.write('SIPP', "Qffff", "TimeUS,CPitch,TPitch,Perr,I",
                         self.micros64(), cam_pitch, pitch_deg, err_pitch, self.pitch_controller.I)
 
-    def get_gps_time(self, tnow):
-        '''return gps_week and gps_week_ms for current time'''
-        leapseconds = 18
-        SEC_PER_WEEK = 7 * 86400
-
-        epoch = 86400*(10*365 + (1980-1969)/4 + 1 + 6 - 2) - leapseconds
-        epoch_seconds = int(tnow - epoch)
-        week = int(epoch_seconds) // SEC_PER_WEEK
-        t_ms = int(tnow * 1000) % 1000
-        week_ms = (epoch_seconds % SEC_PER_WEEK) * 1000 + ((t_ms//200) * 200)
-        return week, week_ms
-
     def show_fov1(self, FOV, name, aspect_ratio, color):
         '''show one FOV polygon'''
         points = []
@@ -877,7 +865,7 @@ class SIYIModule(mp_module.MPModule):
         mtype = m.get_type()
         if mtype == 'GPS_RAW_INT':
             # ?!? why off by 18 hours
-            gwk, gms = self.get_gps_time(time.time()+18*3600)
+            gwk, gms = mp_util.get_gps_time(time.time()+18*3600)
             self.logf.write('GPS', "QBIHLLff", "TimeUS,Status,GMS,GWk,Lat,Lng,Alt,Spd",
                             self.micros64(), m.fix_type, gms, gwk, m.lat, m.lon, m.alt*0.001, m.vel*0.01)
         if mtype == 'ATTITUDE':
