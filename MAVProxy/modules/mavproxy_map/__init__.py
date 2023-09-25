@@ -163,19 +163,31 @@ class MapModule(mp_module.MPModule):
         if len(args) < 1:
             print("usage: map <icon|set>")
         elif args[0] == "icon":
-            if len(args) < 3:
-                print("Usage: map icon <lat> <lon> <icon>")
-            else:
+            usage = "Usage: map icon <lat> <lon> <icon>"
+            flag = 'flag.png'
+            if len(args) > 2:
                 lat = args[1]
                 lon = args[2]
-                flag = 'flag.png'
                 if len(args) > 3:
                     flag = args[3] + '.png'
-                icon = self.map.icon(flag)
-                self.map.add_object(mp_slipmap.SlipIcon('icon - %s [%u]' % (str(flag),self.icon_counter),
-                                                           (float(lat),float(lon)),
-                                                   icon, layer=3, rotation=0, follow=False))
-                self.icon_counter += 1
+            elif self.mpstate.click_location is not None:
+                if len(args) >= 1:
+                    # i.e. "map icon"
+                    (lat, lon) = self.mpstate.click_location
+                    if len(args) == 2:
+                        # i.e. map icon barrell
+                        flag = args[1]
+            else:
+                print(usage)
+                return
+
+            icon = self.map.icon(flag)
+            self.map.add_object(mp_slipmap.SlipIcon(
+                'icon - %s [%u]' % (str(flag),self.icon_counter),
+                (float(lat),float(lon)),
+                icon, layer=3, rotation=0, follow=False))
+            self.icon_counter += 1
+
         elif args[0] == "vehicletype":
             if len(args) < 3:
                 print("Usage: map vehicletype SYSID TYPE")
