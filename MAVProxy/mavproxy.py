@@ -522,11 +522,18 @@ def cmd_reset(args):
 
 def cmd_click(args):
     '''synthesise click at lat/lon; no arguments is "unclick"'''
+    usage = "click <show|LAT_EXPRESSION LNG_EXPRESSION>"
     if len(args) == 0:
         mpstate.click(None)
         return
+    if len(args) < 1:
+        print(usage)
+        return
+    if args[0] == "show":
+        print("%f %f" % mpstate.click_location)
+        return
     if len(args) < 2:
-        print("click LAT_EXPRESSION LNG_EXPRESSION")
+        print(usage)
         return
     lat = mavutil.evaluate_expression(args[0], mpstate.master().messages)
     lng = mavutil.evaluate_expression(args[1], mpstate.master().messages)
