@@ -231,7 +231,7 @@ class MPImage():
         '''start a tracker'''
         self.in_queue.put(MPImageStartTracker(x, y, width, height))
 
-    def end_tracker(self):
+    def end_tracking(self):
         '''end a tracker'''
         self.in_queue.put(MPImageEndTracker())
         
@@ -666,7 +666,7 @@ class MPImagePanel(wx.Panel):
         if self.raw_img is not None and hasattr(self.raw_img, 'shape'):
             # provide the pixel value if available
             (width, height) = (self.raw_img.shape[1], self.raw_img.shape[0])
-            if evt.X < width and evt.Y < height:
+            if evt.X >= 0 and ent.Y >= 0 and evt.X < width and evt.Y < height:
                 evt.pixel = self.raw_img[evt.Y][evt.X]
             evt.shape = self.raw_img.shape
 
@@ -760,7 +760,7 @@ if __name__ == "__main__":
                 if event.leftIsDown and event.shiftDown:
                     im.start_tracker(event.X, event.Y, 50, 50)
                 if event.leftIsDown and event.controlDown:
-                    im.end_tracker()
+                    im.end_tracking()
             if event.ClassName == 'wxKeyEvent':
                 print('key %u' % event.KeyCode)
         time.sleep(0.1)
