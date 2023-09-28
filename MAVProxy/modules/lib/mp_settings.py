@@ -2,6 +2,7 @@
 '''settings object for MAVProxy modules'''
 
 import time
+import fnmatch
 
 class MPSetting:
     def __init__(self, name, type, default, label=None, tab=None,
@@ -162,10 +163,15 @@ class MPSettings(object):
         '''show settings'''
         print("%20s %s" % (v, self._vars[v].describe()))
 
-    def show_all(self):
+    def show_pattern(self, pattern):
         '''show all settings'''
         for setting in sorted(self._vars):
-            self.show(setting)
+            if fnmatch.fnmatch(setting, pattern):
+                self.show(setting)
+
+    def show_all(self):
+        '''show all settings'''
+        self.show_pattern('*')
 
     def list(self):
         '''list all settings'''
@@ -180,6 +186,10 @@ class MPSettings(object):
         if len(args) == 0:
             self.show_all()
             return
+        if args[0].find('*') != -1:
+            self.show_pattern(args[0])
+            return
+
         if getattr(self, args[0], [None]) == [None]:
             print("Unknown setting '%s'" % args[0])
             return
