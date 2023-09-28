@@ -18,6 +18,7 @@ class CameraView:
         self.thermal = thermal
         self.im = None
         self.im_colormap = "MAGMA"
+        self.tracking = False
         self.cap = None
         self.res = res
         self.rtsp_url = rtsp_url
@@ -113,6 +114,12 @@ class CameraView:
             self.siyi.tmax - self.siyi.tmin
         )
 
+    def end_tracking(self):
+        '''end object tracking'''
+        self.tracking = False
+        if self.im is not None:
+            self.im.end_tracking()
+
     def update_title(self):
         """update thermal view title"""
         if self.siyi is None:
@@ -169,6 +176,8 @@ class CameraView:
                     self.im.full_size()
                 continue
             if isinstance(event, MPImageTrackPos):
+                if not self.tracking:
+                    continue
                 latlonalt = self.xy_to_latlon(event.x, event.y, event.shape)
                 if latlonalt is None:
                     return
@@ -193,6 +202,7 @@ class CameraView:
                     twidth = int(yres*0.01*self.siyi.siyi_settings.track_size_pct)
                     self.siyi.end_tracking()
                     self.im.start_tracker(event.X, event.Y, twidth, twidth)
+                    self.tracking = True
                 elif event.controlDown:
                     self.siyi.end_tracking()
                 elif self.mode == "ClickTrack":
