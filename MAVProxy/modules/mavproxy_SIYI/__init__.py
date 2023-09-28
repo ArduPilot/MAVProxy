@@ -9,6 +9,7 @@ TODO:
 
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
+from MAVProxy.modules.lib.mp_settings import MPSetting
 from MAVProxy.modules.lib import mp_util
 from pymavlink import mavutil
 from pymavlink import DFReader
@@ -46,12 +47,18 @@ FUNCTION_FEEDBACK_INFO = 0x0B
 PHOTO = 0x0C
 ACQUIRE_GIMBAL_ATTITUDE = 0x0D
 SET_ANGLE = 0x0E
+RESET_ATTITUDE = 0x08
 ABSOLUTE_ZOOM = 0x0F
 READ_RANGEFINDER = 0x15
+READ_ENCODERS = 0x26
+READ_CONTROL_MODE = 0x27
+READ_THRESHOLDS = 0x28
+SET_THRESHOLDS = 0x29
+READ_VOLTAGES = 0x2A
 READ_TEMP_FULL_SCREEN = 0x14
 SET_IMAGE_TYPE = 0x11
 SET_THERMAL_PALETTE = 0x1B
-REQUEST_CONTINUOUS_ATTITUDE = 0x25
+REQUEST_CONTINUOUS_DATA = 0x25
 ATTITUDE_EXTERNAL = 0x22
 VELOCITY_EXTERNAL = 0x26
 TEMPERATURE_BOX = 0x13
@@ -193,8 +200,8 @@ class SIYIModule(mp_module.MPModule):
                                                      ('lag', float, 0),
                                                      ('target_rate', float, 10),
                                                      ('telem_hz', float, 5),
+                                                     ('telem_rate', float, 4),
                                                      ('att_send_hz', float, 10),
-                                                     ('lidar_hz', float, 2),
                                                      ('temp_hz', float, 5),
                                                      ('rtsp_rgb', str, 'rtsp://192.168.144.25:8554/video1'),
                                                      ('rtsp_thermal', str, 'rtsp://192.168.144.25:8554/video2'),
@@ -209,6 +216,9 @@ class SIYIModule(mp_module.MPModule):
                                                      ('use_lidar', int, 0),
                                                      ('max_rate', float, 30.0),
                                                      ('track_size_pct', float, 5.0),
+                                                     MPSetting('thresh_climit', int, 20, range=(10,50)),
+                                                     MPSetting('thresh_volt', int, 40, range=(20,50)),
+                                                     MPSetting('thresh_ang', int, 40, range=(30,300)),
                                                          ])
         self.add_completion_function('(SIYISETTING)',
                                      self.siyi_settings.completion)
@@ -224,7 +234,9 @@ class SIYIModule(mp_module.MPModule):
         self.yaw_end = None
         self.pitch_end = None
         self.rf_dist = 0
-        self.attitude = None
+        self.attitude = (0,0,0,0,0,0)
+        self.encoders = None
+        self.voltages = None
         self.fov_att = (0,0,0)
         self.tmax = -1
         self.tmin = -1
@@ -235,6 +247,12 @@ class SIYIModule(mp_module.MPModule):
         self.tmin_y = None
         self.last_temp_t = None
         self.last_att_t = None
+        self.last_rf_t = None
+        self.last_enc_t = None
+        self.last_volt_t = None
+        self.last_mode_t = None
+        self.last_thresh_t = None
+        self.last_thresh_send_t = None
         self.GLOBAL_POSITION_INT = None
         self.ATTITUDE = None
         self.target_pos = None
@@ -248,7 +266,6 @@ class SIYIModule(mp_module.MPModule):
         self.logf = DF_logger(os.path.join(self.logdir, self.siyi_settings.logfile))
         self.start_time = time.time()
         self.last_att_send_t = time.time()
-        self.last_lidar_t = time.time()
         self.last_temp_t = time.time()
         self.thermal_view = None
         self.rgb_view = None
@@ -272,6 +289,7 @@ class SIYIModule(mp_module.MPModule):
                                      MPMenuItem('ClearTarget', 'ClearTarget', '# siyi notarget '),
                                      MPMenuItem('ThermalView', 'Thermalview', '# siyi thermal '),
                                      MPMenuItem('RGBView', 'RGBview', '# siyi rgbview '),
+                                     MPMenuItem('ResetAttitude', 'ResetAttitude', '# siyi resetattitude '),
                                      MPMenuSubMenu('Zoom',
                                                    items=[MPMenuItem('Zoom%u'%z, 'Zoom%u'%z, '# siyi zoom %u ' % z) for z in range(1,11)])
                                                    ])
@@ -322,6 +340,8 @@ class SIYIModule(mp_module.MPModule):
         elif args[0] == "recording":
             self.send_packet_fmt(PHOTO, "<B", 2)
             self.send_packet(FUNCTION_FEEDBACK_INFO, None)
+        elif args[0] == "resetattitude":
+            self.send_packet(RESET_ATTITUDE, None)
         elif args[0] == "lock":
             self.send_packet_fmt(PHOTO, "<B", 3)
         elif args[0] == "follow":
@@ -495,13 +515,6 @@ class SIYIModule(mp_module.MPModule):
             self.logf.write('SIGR', 'Qffbb', 'TimeUS,YRate,PRate,YC,PC',
                             self.micros64(), self.yaw_rate, self.pitch_rate, y, p)
 
-            cam_yaw, cam_pitch, cam_roll = self.get_gimbal_attitude()
-            self.send_named_float('CROLL', cam_roll)
-            self.send_named_float('CYAW', cam_yaw)
-            self.send_named_float('CPITCH', cam_pitch)
-            self.send_named_float('CROLL_RT', self.attitude[3])
-            self.send_named_float('CPTCH_RT', self.attitude[4])
-            self.send_named_float('CYAW_RT', self.attitude[5])
             self.send_named_float('YAW_RT', self.yaw_rate)
             self.send_named_float('PITCH_RT', self.pitch_rate)
             self.send_named_float('TMIN', self.tmin)
@@ -524,15 +537,33 @@ class SIYIModule(mp_module.MPModule):
     def request_telem(self):
         '''request telemetry'''
         now = time.time()
-        if self.siyi_settings.lidar_hz > 0 and now - self.last_lidar_t >= 1.0/self.siyi_settings.lidar_hz:
-            self.last_lidar_t = now
-            self.send_packet(READ_RANGEFINDER, None)
         if self.siyi_settings.temp_hz > 0 and now - self.last_temp_t >= 1.0/self.siyi_settings.temp_hz:
             self.last_temp_t = now
             self.send_packet_fmt(READ_TEMP_FULL_SCREEN, "<B", 2)
         if self.last_att_t is None or now - self.last_att_t > 2:
             self.last_att_t = now
-            self.send_packet_fmt(REQUEST_CONTINUOUS_ATTITUDE, "<BB", 1, 5)
+            self.send_packet_fmt(REQUEST_CONTINUOUS_DATA, "<BB", 1, self.siyi_settings.telem_rate)
+        if self.last_rf_t is None or now - self.last_rf_t > 5:
+            self.last_rf_t = now
+            self.send_packet_fmt(REQUEST_CONTINUOUS_DATA, "<BB", 2, self.siyi_settings.telem_rate)
+        if self.last_enc_t is None or now - self.last_enc_t > 2:
+            self.last_enc_t = now
+            self.send_packet_fmt(REQUEST_CONTINUOUS_DATA, "<BB", 3, self.siyi_settings.telem_rate)
+        if self.last_volt_t is None or now - self.last_volt_t > 2:
+            self.last_volt_t = now
+            self.send_packet_fmt(REQUEST_CONTINUOUS_DATA, "<BB", 4, self.siyi_settings.telem_rate)
+        if self.last_mode_t is None or now - self.last_mode_t > 1:
+            self.last_mode_t = now
+            self.send_packet_fmt(READ_CONTROL_MODE, None)
+        if self.last_thresh_t is None or now - self.last_thresh_t > 1:
+            self.last_thresh_t = now
+            self.send_packet_fmt(READ_THRESHOLDS, None)
+        if self.last_thresh_send_t is None or now - self.last_thresh_send_t > 5:
+            self.last_thresh_send_t = now
+            self.send_packet_fmt(SET_THRESHOLDS, "<hhh",
+                                 self.siyi_settings.thresh_climit,
+                                 self.siyi_settings.thresh_volt,
+                                 self.siyi_settings.thresh_ang)
 
     def send_attitude(self):
         '''send attitude to gimbal'''
@@ -543,21 +574,18 @@ class SIYIModule(mp_module.MPModule):
         att = self.master.messages.get('ATTITUDE',None)
         if att is None:
             return
-        r = Matrix3()
-        r.from_euler(att.roll, att.pitch, att.yaw)
-        (roll, pitch, yaw) = r.to_euler312()
         self.send_packet_fmt(ATTITUDE_EXTERNAL, "<Iffffff",
                              self.millis32(),
-                             roll, pitch, yaw,
+                             att.roll, att.pitch, att.yaw,
                              att.rollspeed, att.pitchspeed, att.yawspeed)
         gpi = self.master.messages.get('GLOBAL_POSITION_INT',None)
         if gpi is None:
             return
-        self.send_packet_fmt(VELOCITY_EXTERNAL, "<Ifff",
-                             self.millis32(),
-                             gpi.vx*0.01,
-                             gpi.vy*0.01,
-                             gpi.vz*0.01)
+        #self.send_packet_fmt(VELOCITY_EXTERNAL, "<Ifff",
+        #                     self.millis32(),
+        #                     gpi.vx*0.01,
+        #                     gpi.vy*0.01,
+        #                     gpi.vz*0.01)
 
 
     def send_packet(self, command_id, pkt):
@@ -586,17 +614,12 @@ class SIYIModule(mp_module.MPModule):
 
     def unpack(self, command_id, fmt, data):
         '''unpack SIYI data and log'''
-        v = struct.unpack(fmt, data)
+        fsize = struct.calcsize(fmt)
+        v = struct.unpack(fmt, data[:fsize])
         args = list(v)
         args.extend([0]*(10-len(args)))
         self.logf.write('SIIN', 'QBffffffffff', 'TimeUS,Cmd,P1,P2,P3,P4,P5,P6,P7,P8,P9,P10', self.micros64(), command_id, *args)
         return v
-
-    def euler_312_to_euler_321(self, r, p, y):
-        '''convert between euler conventions'''
-        m = Matrix3()
-        m.from_euler312(r,p,y)
-        return m.to_euler()
 
     def parse_packet(self, pkt):
         '''parse SIYI packet'''
@@ -610,7 +633,7 @@ class SIYIModule(mp_module.MPModule):
             return
 
         if cmd == ACQUIRE_FIRMWARE_VERSION:
-            (patch,minor,major,gpatch,gminor,gmajor) = self.unpack(cmd, "<BBBBBB", data[:6])
+            (patch,minor,major,gpatch,gminor,gmajor) = self.unpack(cmd, "<BBBBBB", data)
             print("SIYI CAM %u.%u.%u" % (major, minor, patch))
             print("SIYI Gimbal %u.%u.%u" % (gmajor, gminor, gpatch))
             self.have_version = True
@@ -618,11 +641,16 @@ class SIYIModule(mp_module.MPModule):
             self.send_packet_fmt(SET_THERMAL_PALETTE, "<B", 0)
 
         elif cmd == ACQUIRE_GIMBAL_ATTITUDE:
-            (z,y,x,sz,sy,sx) = self.unpack(cmd, "<hhhhhh", data[:12])
+            (z,y,x,sz,sy,sx) = self.unpack(cmd, "<hhhhhh", data)
             self.last_att_t = time.time()
             (roll,pitch,yaw) = (x*0.1, y*0.1, mp_util.wrap_180(-z*0.1))
-            (roll,pitch,yaw) = self.euler_312_to_euler_321(math.radians(roll),math.radians(pitch),math.radians(yaw))
-            self.attitude = (math.degrees(roll),math.degrees(pitch),math.degrees(yaw), sx*0.1, sy*0.1, -sz*0.1)
+            self.attitude = (roll,pitch,yaw, sx*0.1, sy*0.1, -sz*0.1)
+            self.send_named_float('CROLL', self.attitude[0])
+            self.send_named_float('CPITCH', self.attitude[1])
+            self.send_named_float('CYAW', self.attitude[2])
+            self.send_named_float('CROLL_RT', self.attitude[3])
+            self.send_named_float('CPTCH_RT', self.attitude[4])
+            self.send_named_float('CYAW_RT', self.attitude[5])
             self.fov_att = (self.attitude[0],self.attitude[1]-self.siyi_settings.mount_pitch,self.attitude[2]-self.siyi_settings.mount_yaw)
             self.update_status()
             self.logf.write('SIGA', 'Qffffffhhhhhh', 'TimeUS,Y,P,R,Yr,Pr,Rr,z,y,x,sz,sy,sx',
@@ -632,7 +660,7 @@ class SIYIModule(mp_module.MPModule):
                                 z,y,x,sz,sy,sx)
 
         elif cmd == ACQUIRE_GIMBAL_CONFIG_INFO:
-            res, hdr_sta, res2, record_sta, gim_motion, gim_mount, video = self.unpack(cmd, "<BBBBBBB", data[:7])
+            res, hdr_sta, res2, record_sta, gim_motion, gim_mount, video = self.unpack(cmd, "<BBBBBBB", data)
             print("HDR: %u" % hdr_sta)
             print("Recording: %u" % record_sta)
             print("GimbalMotion: %u" % gim_motion)
@@ -640,8 +668,9 @@ class SIYIModule(mp_module.MPModule):
             print("Video: %u" % video)
 
         elif cmd == READ_RANGEFINDER:
-            r, = self.unpack(cmd, "<H", data[:2])
+            r, = self.unpack(cmd, "<H", data)
             self.rf_dist = r * 0.1
+            self.last_rf_t = time.time()
             self.update_status()
             self.send_named_float('RFND', self.rf_dist)
             SR = self.get_slantrange(0,0,0,1)
@@ -652,16 +681,55 @@ class SIYIModule(mp_module.MPModule):
                             self.rf_dist,
                             SR)
 
+        elif cmd == READ_ENCODERS:
+            y,p,r, = self.unpack(cmd, "<hhh", data)
+            self.last_enc_t = time.time()
+            self.encoders = (r*0.1,p*0.1,y*0.1)
+            self.send_named_float('ENC_R', self.encoders[0])
+            self.send_named_float('ENC_P', self.encoders[1])
+            self.send_named_float('ENC_Y', self.encoders[2])
+            self.logf.write('SIEN', 'Qfff', 'TimeUS,R,P,Y',
+                            self.micros64(),
+                            self.encoders[0], self.encoders[1], self.encoders[2])
+
+        elif cmd == READ_VOLTAGES:
+            y,p,r, = self.unpack(cmd, "<hhh", data)
+            self.last_volt_t = time.time()
+            self.voltages = (r*0.001,p*0.001,y*0.001)
+            self.send_named_float('VLT_R', self.voltages[0])
+            self.send_named_float('VLT_P', self.voltages[1])
+            self.send_named_float('VLT_Y', self.voltages[2])
+            self.logf.write('SIVL', 'Qfff', 'TimeUS,R,P,Y',
+                            self.micros64(),
+                            self.voltages[0], self.voltages[1], self.voltages[2])
+
+        elif cmd == READ_THRESHOLDS:
+            climit,volt_thresh,ang_thresh, = self.unpack(cmd, "<hhh", data)
+            self.last_thresh_t = time.time()
+            self.send_named_float('CLIMIT', climit)
+            self.send_named_float('VTHRESH', volt_thresh)
+            self.send_named_float('ATHRESH', ang_thresh)
+            self.logf.write('SITH', 'Qhhh', 'TimeUS,WLimit,VThresh,AErr',
+                            self.micros64(),
+                            climit, volt_thresh, ang_thresh)
+
+        elif cmd == READ_CONTROL_MODE:
+            mode, = self.unpack(cmd, "<B", data)
+            self.last_mode_t = time.time()
+            self.send_named_float('CMODE', mode)
+            self.logf.write('SIMO', 'QB', 'TimeUS,Mode',
+                            self.micros64(), mode)
+
         elif cmd == READ_TEMP_FULL_SCREEN:
             if len(data) < 12:
                 print("READ_TEMP_FULL_SCREEN: Expected 12 bytes, got %u" % len(data))
                 return
-            self.tmax,self.tmin,self.tmax_x,self.tmax_y,self.tmin_x,self.tmin_y = self.unpack(cmd, "<HHHHHH", data[:12])
+            self.tmax,self.tmin,self.tmax_x,self.tmax_y,self.tmin_x,self.tmin_y = self.unpack(cmd, "<HHHHHH", data)
             self.tmax = self.tmax * 0.01
             self.tmin = self.tmin * 0.01
             self.last_temp_t = time.time()
         elif cmd == FUNCTION_FEEDBACK_INFO:
-            info_type, = self.unpack(cmd, "<B", data[:1])
+            info_type, = self.unpack(cmd, "<B", data)
             feedback = {
                 0: "Success",
                 1: "FailPhoto",
@@ -670,8 +738,12 @@ class SIYIModule(mp_module.MPModule):
                 4: "FailRecord",
             }
             print("Feedback %s" % feedback.get(info_type, str(info_type)))
+        elif cmd == SET_THRESHOLDS:
+            ok, = self.unpack(cmd, "<B", data)
+            if ok != 1:
+                print("Threshold set failure")
         elif cmd in [SET_ANGLE, CENTER, GIMBAL_ROTATION, ABSOLUTE_ZOOM, SET_IMAGE_TYPE,
-                     REQUEST_CONTINUOUS_ATTITUDE, SET_THERMAL_PALETTE, MANUAL_ZOOM_AND_AUTO_FOCUS]:
+                     REQUEST_CONTINUOUS_DATA, SET_THERMAL_PALETTE, MANUAL_ZOOM_AND_AUTO_FOCUS]:
             # an ack
             pass
         else:
