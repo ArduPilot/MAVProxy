@@ -391,6 +391,8 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
                         print("Can't find status on GPS message")
                         print(m)
                         break
+                if nsats is None:
+                    nsats = 0
                 if status < 2 and nsats < 5:
                     continue
                 # flash log
