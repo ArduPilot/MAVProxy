@@ -805,7 +805,7 @@ def cmd_messages(args):
             mstr = m.text
 
         # special handling for statustext:
-        if hasattr(m, 'id') and hasattr(m, 'chunk_seq'):  # assume STATUSTEXT
+        if hasattr(m, 'id') and hasattr(m, 'chunk_seq') and m.chunk_seq != 0:  # assume STATUSTEXT
             if m.id != statustext_current_id:
                 if statustext_accumulation is not None:
                     print_if_match(statustext_timestring, statustext_accumulation)
