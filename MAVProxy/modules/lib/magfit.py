@@ -13,6 +13,7 @@ from pymavlink import mavutil
 from pymavlink import mavextra
 from pymavlink.rotmat import Vector3
 from pymavlink.rotmat import Matrix3
+from pymavlink.rotmat import rotations
 from MAVProxy.modules.lib import grapher
 from MAVProxy.modules.lib.multiproc_util import MPDataLogChildTask
 
@@ -50,6 +51,17 @@ class Correction:
         print("COMPASS_SCALE%s %.2f" % (mag_idx, self.scaling))
         if margs['CMOT']:
             print("COMPASS_MOTCT 2")
+
+def RotationIDToString(id):
+    '''map rotation number to a string'''
+    return rotations[id].name
+
+def StringToRotationID(s):
+    '''map rotation string to an index'''
+    for i in range(len(rotations)):
+        if rotations[i].name == s:
+            return i
+    return 0
 
 def correct(MAG, BAT, c):
     '''correct a mag sample, returning a Vector3'''
@@ -210,7 +222,7 @@ def remove_offsets(MAG, BAT, c):
     try:
         correction_matrix = correction_matrix.invert()
     except Exception:
-        return False
+        return None
 
     field = Vector3(MAG.MagX, MAG.MagY, MAG.MagZ)
     if BAT is not None and hasattr(BAT,'Curr') and not math.isnan(BAT.Curr):
@@ -220,11 +232,11 @@ def remove_offsets(MAG, BAT, c):
     field -= Vector3(MAG.OfsX, MAG.OfsY, MAG.OfsZ)
 
     if math.isnan(field.x) or math.isnan(field.y) or math.isnan(field.z):
-        return False
+        return None
     MAG.MagX = int(field.x)
     MAG.MagY = int(field.y)
     MAG.MagZ = int(field.z)
-    return True
+    return MAG
 
 def magfit(mlog, timestamp_in_range):
     '''find best magnetometer offset fit to a log file'''
@@ -349,11 +361,25 @@ def magfit(mlog, timestamp_in_range):
     else:
         force_scale = True
 
+    rot = None
+    orig_orient = int(parameters.get('COMPASS_ORIENT'+mag_idx,0))
+    new_orient = StringToRotationID(margs['Orientation'])
+    if orig_orient != new_orient:
+        rot = rotations[orig_orient].rt * rotations[new_orient].r
+
     # remove existing corrections
     data2 = []
     for (MAG,ATT,BAT) in data:
-        if remove_offsets(MAG, BAT, old_corrections):
-            data2.append((MAG,ATT,BAT))
+        MAG = remove_offsets(MAG, BAT, old_corrections)
+        if MAG is None:
+            continue
+        if rot is not None:
+            v = Vector3(MAG.MagX,MAG.MagY,MAG.MagZ)
+            v = rot * v
+            MAG.MagX = v.x
+            MAG.MagY = v.y
+            MAG.MagZ = v.z
+        data2.append((MAG,ATT,BAT))
     data = data2
 
     print("Extracted %u points" % len(data))
@@ -485,7 +511,7 @@ class MagFit(MPDataLogChildTask):
 
 class MagFitUI(wx.Dialog):
     def __init__(self, title, close_event, mlog, timestamp_in_range):
-        super(MagFitUI, self).__init__(None, title=title, size=(600, 800), style=wx.DEFAULT_DIALOG_STYLE|wx.RESIZE_BORDER)
+        super(MagFitUI, self).__init__(None, title=title, size=(600, 900), style=wx.DEFAULT_DIALOG_STYLE|wx.RESIZE_BORDER)
 
         # capture the close event, log and timestamp range function
         self.close_event = close_event
@@ -531,6 +557,7 @@ class MagFitUI(wx.Dialog):
         self.vbox.AddStretchSpacer()
         self.panel.SetSizer(self.vbox)
         self.idmap = {}
+        self.id_by_string = {}
         self.values = {}
         self.controls = {}
         self.callbacks = {}
@@ -551,10 +578,17 @@ class MagFitUI(wx.Dialog):
         if self.have_msg('XKY0'):
             att_choices.append('XKY0')
 
+        orientation_choices = [ r.name for r in rotations ]
+
+        default_orientation = RotationIDToString(int(self.mlog.params.get("COMPASS_ORIENT", 0)))
+
         # first row, Mag and attitude source
         self.StartRow('Source Selection')
-        self.AddCombo('Magnetometer', mag_choices)
+        self.AddCombo('Magnetometer', mag_choices, callback=self.change_mag)
         self.AddCombo('Attitude', att_choices)
+
+        self.StartRow('Orientation Selection')
+        self.AddCombo('Orientation', orientation_choices, default=default_orientation)
 
         self.StartRow('Position')
         self.AddSpinFloat("Lattitude", -90, 90, 0.000001, 0, digits=8)
@@ -595,9 +629,24 @@ class MagFitUI(wx.Dialog):
         
         self.Center()
 
-    def close(self):
-        '''Set the close event'''
+    def original_orient(self, idx):
+        '''get original parameter orientation of a compass'''
+        mag_idx = '' if idx==0 else str(idx+1)
+        return int(self.mlog.params.get('COMPASS_ORIENT'+mag_idx,0))
 
+    def change_mag(self, cid):
+        '''change selected mag, update orientation'''
+        mag = int(self.values['Magnetometer'][4])
+        orig_orient = self.original_orient(mag)
+        orient_str = RotationIDToString(orig_orient)
+        c = self.controls[cid]
+        orient_id = self.id_by_string['Orientation']
+        orient_c = self.controls[orient_id]
+        orient_c.SetValue(orient_str)
+        self.values['Orientation'] = orient_str
+
+    def close(self, cid):
+        '''Set the close event'''
         self.close_event.set()
 
     def StartRow(self, label=None):
@@ -618,18 +667,23 @@ class MagFitUI(wx.Dialog):
 
     def AddControl(self, c, label, default):
         self.idmap[c.GetId()] = label
+        self.id_by_string[label] = c.GetId()
         self.controls[c.GetId()] = c
         self.values[label] = default
 
-    def AddCombo(self, label, choices):
+    def AddCombo(self, label, choices, default=None, callback=None):
+        if default is None:
+            default = choices[0]
         c = wx.ComboBox(choices=choices,
                         parent=self.panel,
                         style=0,
-                        value=choices[0])
-        self.AddControl(c, label, choices[0])
+                        value=default)
+        self.AddControl(c, label, default)
         c.Bind(wx.EVT_COMBOBOX, self.OnValue)
         self.row.Add(wx.StaticText(self.panel, label=label), 0, wx.LEFT, 20)
         self.row.Add(c, 0, wx.LEFT, 20)
+        if callback is not None:
+            self.callbacks[c.GetId()] = callback
 
     def AddButton(self, label, callback=None):
         c = wx.Button(self.panel, label=label)
@@ -647,7 +701,7 @@ class MagFitUI(wx.Dialog):
         self.row.Add(c, 0, wx.LEFT, 20)
         
     def AddSpinInteger(self, label, min_value, max_value, default):
-        c = wx.SpinCtrl(self.panel, -1)
+        c = wx.SpinCtrl(self.panel, -1, min=min_value, max=max_value)
         c.SetRange(min_value, max_value)
         c.SetValue(default)
         self.AddControl(c, label, default)
@@ -656,8 +710,8 @@ class MagFitUI(wx.Dialog):
         self.row.Add(wx.StaticText(self.panel, label=""), 0, wx.LEFT, 20)
         self.Bind(wx.EVT_SPINCTRL, self.OnValue)
 
-    def AddSpinFloat(self, label, min_value, max_value, increment, default, digits=2):
-        c = wx.SpinCtrlDouble(self.panel, -1)
+    def AddSpinFloat(self, label, min_value, max_value, increment, default, digits=4):
+        c = wx.SpinCtrlDouble(self.panel, -1, min=min_value, max=max_value)
         c.SetRange(min_value, max_value)
         c.SetValue(default)
         c.SetIncrement(increment)
@@ -669,7 +723,7 @@ class MagFitUI(wx.Dialog):
         else:
             s = s2
         if hasattr(c, 'GetSizeFromText'):
-            size = c.GetSizeFromText(s+" ")
+            size = c.GetSizeFromText(s+"xx")
             c.SetMinSize(size)
         self.AddControl(c, label, default)
         self.row.Add(wx.StaticText(self.panel, label=label), 0, wx.LEFT, 20)
@@ -679,13 +733,15 @@ class MagFitUI(wx.Dialog):
         
     def OnValue(self, event):
         self.values[self.idmap[event.GetId()]] = self.controls[event.GetId()].GetValue()
+        if event.GetId() in self.callbacks:
+            self.callbacks[event.GetId()](event.GetId())
 
     def OnButton(self, event):
         self.values[self.idmap[event.GetId()]] = True
         if event.GetId() in self.callbacks:
-            self.callbacks[event.GetId()]()
+            self.callbacks[event.GetId()](event.GetId())
 
-    def run(self):
+    def run(self, cid):
         global margs
         margs = self.values
-        magfit(self.mlog, self.timestamp_in_range)
+        magfit(self.mlog,self.timestamp_in_range)
