@@ -281,7 +281,7 @@ class MPMenuTop(object):
                 m.add_to_submenu(submenu_path[1:], item)
                 return
         # new submenu
-        if len(submenu_path) > 2:
+        if len(submenu_path) > 1:
             self.add(MPMenuSubMenu(submenu_path[0], []))
             self.add_to_submenu(submenu_path, item)
         else:
