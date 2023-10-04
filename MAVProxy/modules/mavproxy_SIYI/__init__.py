@@ -107,13 +107,18 @@ class PI_controller:
             self.reset_I()
             dt = 0
         self.last_t = now
-        P = self.settings.get(self.Pgain)
-        I = self.settings.get(self.Igain)
+        P = self.settings.get(self.Pgain) * self.settings.gain_mul
+        I = self.settings.get(self.Igain) * self.settings.gain_mul
         IMAX = self.settings.get(self.IMAX)
+        max_rate = self.settings.max_rate
+
         out = P*err
-        self.I += I*err*dt
+        saturated = err > 0 and (out + self.I) >= max_rate
+        saturated |= err < 0 and (out + self.I) <= -max_rate
+        if not saturated:
+            self.I += I*err*dt
         self.I = mp_util.constrain(self.I, -IMAX, IMAX)
-        return out + self.I
+        return mp_util.constrain(out + self.I, -max_rate, max_rate)
 
     def reset_I(self):
         self.I = 0
@@ -193,12 +198,13 @@ class SIYIModule(mp_module.MPModule):
                                                      ('yaw_rate', float, 10),
                                                      ('pitch_rate', float, 10),
                                                      ('rates_hz', float, 5),
+                                                     ('gain_mul', float, 1.0),
                                                      ('yaw_gain_P', float, 1),
                                                      ('yaw_gain_I', float, 1),
-                                                     ('yaw_gain_IMAX', float, 10),
+                                                     ('yaw_gain_IMAX', float, 5),
                                                      ('pitch_gain_P', float, 1),
                                                      ('pitch_gain_I', float, 1),
-                                                     ('pitch_gain_IMAX', float, 10),
+                                                     ('pitch_gain_IMAX', float, 5),
                                                      ('mount_pitch', float, 0),
                                                      ('mount_yaw', float, 0),
                                                      ('lag', float, 0),
@@ -219,7 +225,7 @@ class SIYIModule(mp_module.MPModule):
                                                      ('wide_fov', float, 88.0),
                                                      ('use_lidar', int, 0),
                                                      ('use_encoders', int, 0),
-                                                     ('max_rate', float, 30.0),
+                                                     ('max_rate', float, 10.0),
                                                      ('track_size_pct', float, 5.0),
                                                      MPSetting('thresh_climit', int, 40, range=(10,50)),
                                                      MPSetting('thresh_volt', int, 40, range=(20,50)),
@@ -453,6 +459,10 @@ class SIYIModule(mp_module.MPModule):
         while True:
             vidfile = os.path.join(self.logdir, "%s%u.mts" % (base,i))
             if not os.path.exists(vidfile):
+                self.logf.write('SIVI', 'QBB', 'TimeUS,Type,Idx',
+                                self.micros64(),
+                                1 if base=='thermal' else 0,
+                                i)
                 break
             i += 1
         return vidfile
@@ -866,10 +876,14 @@ class SIYIModule(mp_module.MPModule):
 
     def get_gimbal_attitude(self):
         '''get extrapolated gimbal attitude, returning yaw and pitch'''
+        ret = self.get_encoder_attitude()
+        if ret is not None:
+            (r,p,y) = ret
+            self.logf.write('SIEA', 'Qfff', 'TimeUS,R,P,Y',
+                            self.micros64(),
+                            r,p,y)
         if self.siyi_settings.use_encoders:
-            ret = self.get_encoder_attitude()
             if ret is not None:
-                (r,p,y) = ret
                 return r,p,y
         return self.get_direct_attitude()
 
