@@ -227,6 +227,7 @@ class SIYIModule(mp_module.MPModule):
                                                      ('use_encoders', int, 0),
                                                      ('max_rate', float, 10.0),
                                                      ('track_size_pct', float, 5.0),
+                                                     ('threshold_temp', int, 50),
                                                      MPSetting('thresh_climit', int, 40, range=(10,50)),
                                                      MPSetting('thresh_volt', int, 40, range=(20,50)),
                                                      MPSetting('thresh_ang', int, 200, range=(30,300)),
@@ -312,8 +313,9 @@ class SIYIModule(mp_module.MPModule):
                                      MPMenuItem('RGBView', 'RGBview', '# siyi rgbview '),
                                      MPMenuItem('ResetAttitude', 'ResetAttitude', '# siyi resetattitude '),
                                      MPMenuSubMenu('Zoom',
-                                                   items=[MPMenuItem('Zoom%u'%z, 'Zoom%u'%z, '# siyi zoom %u ' % z) for z in range(1,11)])
-                                                   ])
+                                                   items=[MPMenuItem('Zoom%u'%z, 'Zoom%u'%z, '# siyi zoom %u ' % z) for z in range(1,11)]),
+                                     MPMenuSubMenu('Threshold',
+                                                  items=[MPMenuItem('Threshold%u'%z, 'Threshold%u'%z, '# siyi set threshold_temp %u ' % z) for z in range(20,115,5)])])
             map = self.module('map')
             if map is not None:
                 map.add_menu(menu)
@@ -775,6 +777,11 @@ class SIYIModule(mp_module.MPModule):
             self.tmax = self.tmax * 0.01
             self.tmin = self.tmin * 0.01
             self.last_temp_t = time.time()
+            if self.thermal_view is not None:
+                threshold = self.siyi_settings.threshold_temp
+                threshold_value = int(255*(threshold - self.tmin)/(self.tmax-self.tmin))
+                threshold_value = mp_util.constrain(threshold_value, 0, 255)
+                self.thermal_view.set_threshold(threshold_value)
         elif cmd == FUNCTION_FEEDBACK_INFO:
             info_type, = self.unpack(cmd, "<B", data)
             feedback = {

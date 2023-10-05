@@ -9,6 +9,8 @@ from MAVProxy.modules.lib.mp_menu import MPMenuItem
 from MAVProxy.modules.lib.mp_image import MPImage
 from MAVProxy.modules.lib.mp_image import MPImageTrackPos
 from MAVProxy.modules.mavproxy_map import mp_slipmap
+from MAVProxy.modules.lib import mp_util
+import numpy as np
 
 class CameraView:
     """handle camera view image"""
@@ -46,6 +48,7 @@ class CameraView:
         popup.add_to_submenu(["Mode"], MPMenuItem("Flag", returnkey="Mode:Flag"))
         if self.thermal:
             colormaps = [
+                "Threshold",
                 "AUTUMN",
                 "BONE",
                 "JET",
@@ -95,6 +98,37 @@ class CameraView:
         if self.thermal:
             self.im.set_colormap(self.im_colormap)
 
+    def create_colormap_threshold(self, threshold):
+        '''create a yellow->red colormap for a given threshold'''
+        def pixel(c):
+            p = np.zeros((1,1,3), np.uint8)
+            p[:] = c
+            return p
+
+        lightyellow = pixel((255,255,0))
+        red = pixel((255,0,0))
+        white = pixel((threshold,threshold,threshold))
+        black = pixel((0,0,0))
+
+        threshold = mp_util.constrain(threshold, 1, 255)
+
+        lut1 = cv2.resize(np.concatenate((black,white), axis=0), (1,threshold), interpolation=cv2.INTER_CUBIC)
+        lut2 = cv2.resize(np.concatenate((lightyellow,red), axis=0), (1,256-threshold), interpolation=cv2.INTER_CUBIC)
+        lut = np.concatenate((lut1, lut2), axis=0)
+        return lut
+
+    def create_colormap_dict(self):
+        '''create a yellow->red colormap for all thresholds'''
+        ret = dict()
+        for i in range(256):
+            ret[i] = self.create_colormap_threshold(i)
+        return ret
+
+    def set_threshold(self, threshold_value):
+        '''set pixel value for thermal colormap'''
+        if self.im is not None:
+            self.im.set_colormap_index(threshold_value)
+    
     def set_title(self, title):
         """set image title"""
         if self.im is None:
@@ -161,7 +195,10 @@ class CameraView:
             return
         for event in self.im.events():
             if isinstance(event, MPMenuItem):
-                if event.returnkey.startswith("COLORMAP_"):
+                if event.returnkey.startswith("COLORMAP_Threshold"):
+                    d = self.create_colormap_dict()
+                    self.im.set_colormap(d)
+                elif event.returnkey.startswith("COLORMAP_"):
                     self.im.set_colormap(event.returnkey[9:])
                 elif event.returnkey.startswith("Mode:"):
                     self.mode = event.returnkey[5:]
