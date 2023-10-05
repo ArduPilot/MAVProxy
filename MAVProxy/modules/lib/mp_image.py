@@ -81,6 +81,11 @@ class MPImageColormap:
     def __init__(self, colormap):
         self.colormap = colormap
 
+class MPImageColormapIndex:
+    '''set a colormap index for display'''
+    def __init__(self, colormap_index):
+        self.colormap_index = colormap_index
+        
 class MPImageStartTracker:
     def __init__(self, x, y, width, height):
         self.x = x
@@ -227,6 +232,10 @@ class MPImage():
         '''set a colormap for greyscale data'''
         self.in_queue.put(MPImageColormap(colormap))
 
+    def set_colormap_index(self, colormap_index):
+        '''set a colormap index for greyscale data'''
+        self.in_queue.put(MPImageColormapIndex(colormap_index))
+        
     def start_tracker(self, x, y, width, height):
         '''start a tracker'''
         self.in_queue.put(MPImageStartTracker(x, y, width, height))
@@ -300,6 +309,7 @@ class MPImagePanel(wx.Panel):
         self.last_size = None
         self.done_PIL_warning = False
         self.colormap = None
+        self.colormap_index = None
         self.raw_img = None
         self.tracker = None
         state.brightness = 1.0
@@ -412,11 +422,21 @@ class MPImagePanel(wx.Panel):
 
         if self.colormap is not None:
             '''optional colormap for greyscale data'''
-            cmap = getattr(cv2, "COLORMAP_" + self.colormap, None)
-            if cmap is not None:
-                data = cv2.cvtColor(data, cv2.COLOR_BGR2GRAY)
-                data = cv2.applyColorMap(data, cmap)
+            if isinstance(self.colormap, str):
+                cmap = getattr(cv2, "COLORMAP_" + self.colormap, None)
+                if cmap is not None:
+                    data = cv2.cvtColor(data, cv2.COLOR_BGR2GRAY)
+                    data = cv2.applyColorMap(data, cmap)
+            elif isinstance(self.colormap, dict):
+                if self.colormap_index is not None:
+                    cmap = self.colormap.get(self.colormap_index,None)
+                    if cmap is not None:
+                        data = cv2.LUT(data, cmap)
+            else:
+                data = cv2.LUT(data, self.colormap)
 
+
+        #cv2.imwrite("x.jpg", data)
         img.SetData(data)
         self.img = img
         if state.auto_size:
@@ -462,6 +482,8 @@ class MPImagePanel(wx.Panel):
                 self.start_gstreamer(obj.pipeline)
             if isinstance(obj, MPImageColormap):
                 self.colormap = obj.colormap
+            if isinstance(obj, MPImageColormapIndex):
+                self.colormap_index = obj.colormap_index
             if isinstance(obj, MPImageStartTracker):
                 self.start_tracker(obj)
             if isinstance(obj, MPImageEndTracker):
@@ -666,7 +688,7 @@ class MPImagePanel(wx.Panel):
         if self.raw_img is not None and hasattr(self.raw_img, 'shape'):
             # provide the pixel value if available
             (width, height) = (self.raw_img.shape[1], self.raw_img.shape[0])
-            if evt.X >= 0 and ent.Y >= 0 and evt.X < width and evt.Y < height:
+            if evt.X >= 0 and evt.Y >= 0 and evt.X < width and evt.Y < height:
                 evt.pixel = self.raw_img[evt.Y][evt.X]
             evt.shape = self.raw_img.shape
 
@@ -744,6 +766,7 @@ if __name__ == "__main__":
         im.set_gstreamer(args[0])
     else:
         img = cv2.imread(args[0])
+        img = twiddle_color(img)
         im.set_image(img, bgr=True)
 
     if opts.colormap is not None:
