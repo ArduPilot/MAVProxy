@@ -212,7 +212,7 @@ class SIYIModule(mp_module.MPModule):
                                                      ('target_rate', float, 10),
                                                      ('telem_hz', float, 5),
                                                      ('telem_rate', float, 4),
-                                                     ('att_send_hz', float, 10),
+                                                     ('att_send_hz', float, 0),
                                                      ('temp_hz', float, 5),
                                                      ('rtsp_rgb', str, 'rtsp://192.168.144.25:8554/video1'),
                                                      ('rtsp_thermal', str, 'rtsp://192.168.144.25:8554/video2'),
@@ -1152,7 +1152,7 @@ class SIYIModule(mp_module.MPModule):
         self.update_target()
         self.send_rates()
         self.request_telem()
-        #self.send_attitude()
+        self.send_attitude()
         self.check_thermal_events()
 
 def init(mpstate):

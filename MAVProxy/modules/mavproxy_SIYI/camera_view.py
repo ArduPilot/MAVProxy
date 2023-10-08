@@ -51,6 +51,7 @@ class CameraView:
         if self.thermal:
             colormaps = [
                 "Threshold",
+                "GloryHot",
                 "AUTUMN",
                 "BONE",
                 "JET",
@@ -200,8 +201,13 @@ class CameraView:
                 if event.returnkey.startswith("COLORMAP_Threshold"):
                     d = self.create_colormap_dict()
                     self.im.set_colormap(d)
+                    self.siyi.cmd_palette(["WhiteHot"])
+                if event.returnkey.startswith("COLORMAP_GloryHot"):
+                    self.im.set_colormap("None")
+                    self.siyi.cmd_palette(["GloryHot"])
                 elif event.returnkey.startswith("COLORMAP_"):
                     self.im.set_colormap(event.returnkey[9:])
+                    self.siyi.cmd_palette(["WhiteHot"])
                 elif event.returnkey.startswith("Mode:"):
                     self.mode = event.returnkey[5:]
                     print("ViewMode: %s" % self.mode)
