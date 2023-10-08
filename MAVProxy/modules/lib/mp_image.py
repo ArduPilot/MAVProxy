@@ -66,6 +66,16 @@ class MPImageNewSize:
     def __init__(self, size):
         self.size = size
 
+class MPImageFPSMax:
+    '''set maximum frame rate'''
+    def __init__(self, fps_max):
+        self.fps_max = fps_max
+
+class MPImageSeekPercent:
+    '''seek video to given percentage'''
+    def __init__(self, percent):
+        self.percent = percent
+        
 class MPImageRecenter:
     '''recenter on location'''
     def __init__(self, location):
@@ -76,6 +86,11 @@ class MPImageGStreamer:
     def __init__(self, pipeline):
         self.pipeline = pipeline
 
+class MPImageVideo:
+    '''request getting image feed from video file'''
+    def __init__(self, filename):
+        self.filename = filename
+        
 class MPImageColormap:
     '''set a colormap for display'''
     def __init__(self, colormap):
@@ -102,7 +117,12 @@ class MPImageTrackPos:
 class MPImageEndTracker:
     def __init__(self):
         pass
-        
+
+class MPImageFrameCounter:
+    '''frame counter'''
+    def __init__(self, frame):
+        self.frame = frame
+    
 class MPImage():
     '''
     a generic image viewer widget for use in MP tools
@@ -174,6 +194,14 @@ class MPImage():
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         self.in_queue.put(MPImageData(img))
 
+    def set_fps_max(self, fps_max):
+        '''set the maximum frame rate'''
+        self.in_queue.put(MPImageFPSMax(fps_max))
+
+    def seek_percentage(self, percent):
+        '''seek to the given video percentage'''
+        self.in_queue.put(MPImageSeekPercent(percent))
+        
     def set_title(self, title):
         '''set the frame title'''
         self.in_queue.put(MPImageTitle(title))
@@ -228,6 +256,10 @@ class MPImage():
         '''set gstreamer pipeline source'''
         self.in_queue.put(MPImageGStreamer(pipeline))
 
+    def set_video(self, filename):
+        '''set video file source'''
+        self.in_queue.put(MPImageVideo(filename))
+        
     def set_colormap(self, colormap):
         '''set a colormap for greyscale data'''
         self.in_queue.put(MPImageColormap(colormap))
@@ -312,6 +344,10 @@ class MPImagePanel(wx.Panel):
         self.colormap_index = None
         self.raw_img = None
         self.tracker = None
+        self.fps_max = None
+        self.last_frame_time = None
+        self.vcap = None
+        self.seek_percentage = None
         state.brightness = 1.0
 
         # dragpos is the top left position in image coordinates
@@ -480,6 +516,13 @@ class MPImagePanel(wx.Panel):
                 win_layout.set_wx_window_layout(state.frame, obj)
             if isinstance(obj, MPImageGStreamer):
                 self.start_gstreamer(obj.pipeline)
+            if isinstance(obj, MPImageVideo):
+                self.start_video(obj.filename)
+            if isinstance(obj, MPImageFPSMax):
+                self.fps_max = obj.fps_max
+                print("FPS_MAX: ", self.fps_max)
+            if isinstance(obj, MPImageSeekPercent):
+                self.seek_video(obj.percent)
             if isinstance(obj, MPImageColormap):
                 self.colormap = obj.colormap
             if isinstance(obj, MPImageColormapIndex):
@@ -511,24 +554,45 @@ class MPImagePanel(wx.Panel):
 
     def start_gstreamer(self, pipeline):
         '''start a gstreamer pipeline'''
-        thread = Thread(target=self.gstreamer_thread, args=(pipeline,))
+        thread = Thread(target=self.video_thread, args=(pipeline,cv2.CAP_GSTREAMER))
         thread.daemon = True
         thread.start()
 
-    def gstreamer_thread(self, pipeline):
-        '''thread for gstreamer capture'''
-        cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
-        if not cap or not cap.isOpened():
-            print("gstreamer VideoCapture failed")
+    def start_video(self, filename):
+        '''start a video'''
+        thread = Thread(target=self.video_thread, args=(filename,0))
+        thread.daemon = True
+        thread.start()
+
+    def seek_video(self, percentage):
+        '''seek to given percentage'''
+        self.seek_percentage = percentage
+
+    def video_thread(self, url, cap_options):
+        '''thread for video capture'''
+        self.vcap = cv2.VideoCapture(url, cap_options)
+        if not self.vcap or not self.vcap.isOpened():
+            print("VideoCapture failed")
             return
 
         while True:
+            if self.seek_percentage is not None:
+                frame_count = self.vcap.get(cv2.CAP_PROP_FRAME_COUNT)
+                if frame_count > 0:
+                    pos = int(frame_count*self.seek_percentage*0.01)
+                    self.vcap.set(cv2.CAP_PROP_POS_FRAMES, pos)
+                    self.seek_percentage = None
             try:
-                _, frame = cap.read()
-            except Exception:
+                _, frame = self.vcap.read()
+            except Exception as ex:
+                print(ex)
                 break
             if frame is None:
                 break
+            frame_count = int(self.vcap.get(cv2.CAP_PROP_POS_FRAMES))
+            if frame_count % 5 == 0:
+                self.state.out_queue.put(MPImageFrameCounter(frame_count))
+
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             (width, height) = (frame.shape[1], frame.shape[0])
             if self.tracker:
@@ -550,6 +614,15 @@ class MPImagePanel(wx.Panel):
                                                                  int((startY+endY)/2),
                                                                 frame.shape))
             self.set_image_data(frame, width, height)
+            if self.fps_max is not None:
+                while self.fps_max <= 0:
+                    time.sleep(0.1)
+                now = time.time()
+                if self.last_frame_time is not None:
+                    dt = now - self.last_frame_time
+                    if dt < 1.0 / self.fps_max:
+                        time.sleep((1.0 / self.fps_max)-dt)
+                self.last_frame_time = now
 
 
     def on_recenter(self, location):
