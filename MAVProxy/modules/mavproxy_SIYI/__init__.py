@@ -100,7 +100,7 @@ class PI_controller:
         self.settings = settings
         self.last_t = time.time()
 
-    def run(self, err):
+    def run(self, err, ff_rate):
         now = time.time()
         dt = now - self.last_t
         if now - self.last_t > 1.0:
@@ -118,7 +118,8 @@ class PI_controller:
         if not saturated:
             self.I += I*err*dt
         self.I = mp_util.constrain(self.I, -IMAX, IMAX)
-        return mp_util.constrain(out + self.I, -max_rate, max_rate)
+        ret = out + self.I + ff_rate
+        return mp_util.constrain(ret, -max_rate, max_rate)
 
     def reset_I(self):
         self.I = 0
@@ -991,6 +992,21 @@ class SIYIModule(mp_module.MPModule):
         (lat,lon) = mp_util.gps_offset(lat,lon,v.y,v.x)
         return (lat,lon,alt-v.z)
 
+    def get_target_yaw_pitch(self, lat, lon, alt, mylat, mylon, myalt, vehicle_yaw_rad):
+        '''get target yaw/pitch in vehicle frame for a target lat/lon'''
+        GPS_vector_x = (lon-mylon)*1.0e7*math.cos(math.radians((mylat + lat) * 0.5)) * 0.01113195
+        GPS_vector_y = (lat - mylat) * 0.01113195 * 1.0e7
+        GPS_vector_z = alt - myalt # was cm
+        target_distance = math.sqrt(GPS_vector_x**2 + GPS_vector_y**2)
+
+        # calculate pitch, yaw angles
+        pitch = math.atan2(GPS_vector_z, target_distance)
+        yaw = math.atan2(GPS_vector_x, GPS_vector_y)
+        yaw -= vehicle_yaw_rad
+        yaw_deg = mp_util.wrap_180(math.degrees(yaw))
+        pitch_deg = math.degrees(pitch)
+        return yaw_deg, pitch_deg
+    
     def update_target(self):
         '''update position targetting'''
         if not 'GLOBAL_POSITION_INT' in self.master.messages or not 'ATTITUDE' in self.master.messages:
@@ -1027,20 +1043,19 @@ class SIYIModule(mp_module.MPModule):
         (mylat, mylon) = mp_util.gps_offset(mylat, mylon, ve*dt, vn*dt)
         myalt -= vd*dt
 
-        GPS_vector_x = (lon-mylon)*1.0e7*math.cos(math.radians((mylat + lat) * 0.5)) * 0.01113195
-        GPS_vector_y = (lat - mylat) * 0.01113195 * 1.0e7
-        GPS_vector_z = alt - myalt # was cm
-        target_distance = math.sqrt(GPS_vector_x**2 + GPS_vector_y**2)
-
         dt = now - ATTITUDE._timestamp
         vehicle_yaw_rad = ATTITUDE.yaw + ATTITUDE.yawspeed*dt
 
-        # calculate pitch, yaw angles
-        pitch = math.atan2(GPS_vector_z, target_distance)
-        yaw = math.atan2(GPS_vector_x, GPS_vector_y)
-        yaw -= vehicle_yaw_rad
-        yaw_deg = mp_util.wrap_180(math.degrees(yaw))
-        pitch_deg = math.degrees(pitch)
+        yaw_deg, pitch_deg = self.get_target_yaw_pitch(lat, lon, alt, mylat, mylon, myalt, vehicle_yaw_rad)
+
+        # look ahread 1 second to get target los rate
+        (mylat2, mylon2) = mp_util.gps_offset(mylat, mylon, ve*(dt+1), vn*(dt+1))
+        vehicle_yaw_rad2 = vehicle_yaw_rad + ATTITUDE.yawspeed
+        yaw_deg2, pitch_deg2 = self.get_target_yaw_pitch(lat, lon, alt, mylat2, mylon2, myalt, vehicle_yaw_rad2)
+
+        los_yaw_rate = mp_util.wrap_180(yaw_deg2 - yaw_deg)
+        los_pitch_rate = pitch_deg2 - pitch_deg
+        #print(los_yaw_rate, los_pitch_rate)
 
         cam_roll, cam_pitch, cam_yaw = self.get_gimbal_attitude()
         err_yaw = mp_util.wrap_180(yaw_deg - cam_yaw)
@@ -1050,8 +1065,8 @@ class SIYIModule(mp_module.MPModule):
         err_yaw = mp_util.wrap_180(err_yaw)
         err_pitch += self.siyi_settings.mount_pitch
 
-        self.yaw_rate = self.yaw_controller.run(err_yaw)
-        self.pitch_rate = self.yaw_controller.run(err_pitch)
+        self.yaw_rate = self.yaw_controller.run(err_yaw, los_yaw_rate)
+        self.pitch_rate = self.yaw_controller.run(err_pitch, los_pitch_rate)
         self.send_named_float('TYAW', yaw_deg)
         self.send_named_float('TPITCH', pitch_deg)
         self.send_named_float('EYAW', err_yaw)
