@@ -8,6 +8,7 @@ import time, sys
 from MAVProxy.modules.lib.mp_menu import MPMenuItem
 from MAVProxy.modules.lib.mp_image import MPImage
 from MAVProxy.modules.lib.mp_image import MPImageTrackPos
+from MAVProxy.modules.lib.mp_image import MPImageFrameCounter
 from MAVProxy.modules.mavproxy_map import mp_slipmap
 from MAVProxy.modules.lib import mp_util
 import numpy as np
@@ -28,6 +29,7 @@ class CameraView:
         self.mode = "Flag"
         self.last_frame_t = time.time()
         self.fps = fps
+        self.frame_counter = -1
 
         self.im = MPImage(
             title="Camera View",
@@ -219,6 +221,9 @@ class CameraView:
                 if latlonalt is None:
                     return
                 self.siyi.set_target(latlonalt[0], latlonalt[1], latlonalt[2])
+                continue
+            if isinstance(event, MPImageFrameCounter):
+                self.frame_counter = event.frame
                 continue
 
             if event.ClassName == "wxMouseEvent":

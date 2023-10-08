@@ -228,9 +228,10 @@ class SIYIModule(mp_module.MPModule):
                                                      ('max_rate', float, 10.0),
                                                      ('track_size_pct', float, 5.0),
                                                      ('threshold_temp', int, 50),
-                                                     MPSetting('thresh_climit', int, 40, range=(10,50)),
-                                                     MPSetting('thresh_volt', int, 40, range=(20,50)),
-                                                     MPSetting('thresh_ang', int, 200, range=(30,300)),
+                                                     ('threshold_min', int, 220),
+                                                     MPSetting('thresh_climit', int, 50, range=(10,50)),
+                                                     MPSetting('thresh_volt', int, 50, range=(20,50)),
+                                                     MPSetting('thresh_ang', int, 300, range=(30,300)),
                                                      MPSetting('thresh_climit_dis', int, 20, range=(10,50)),
                                                      MPSetting('thresh_volt_dis', int, 40, range=(20,50)),
                                                      MPSetting('thresh_ang_dis', int, 40, range=(30,300)),
@@ -546,8 +547,6 @@ class SIYIModule(mp_module.MPModule):
 
             self.send_named_float('YAW_RT', self.yaw_rate)
             self.send_named_float('PITCH_RT', self.pitch_rate)
-            self.send_named_float('TMIN', self.tmin)
-            self.send_named_float('TMAX', self.tmax)
 
     def cmd_settarget(self, args):
         '''set target'''
@@ -776,11 +775,24 @@ class SIYIModule(mp_module.MPModule):
             self.tmax,self.tmin,self.tmax_x,self.tmax_y,self.tmin_x,self.tmin_y = self.unpack(cmd, "<HHHHHH", data)
             self.tmax = self.tmax * 0.01
             self.tmin = self.tmin * 0.01
+            self.send_named_float('TMIN', self.tmin)
+            self.send_named_float('TMAX', self.tmax)
             self.last_temp_t = time.time()
+            frame_counter = -1 if self.thermal_view is None else self.thermal_view.frame_counter
+            self.logf.write('SITR', 'QffHHHHi', 'TimeUS,TMin,TMax,TMinX,TMinY,TMaxX,TMaxY,FC',
+                            self.micros64(),
+                            self.tmin, self.tmax,
+                            self.tmin_x, self.tmin_y,
+                            self.tmax_x, self.tmax_y,
+                            frame_counter)
             if self.thermal_view is not None:
                 threshold = self.siyi_settings.threshold_temp
-                threshold_value = int(255*(threshold - self.tmin)/(self.tmax-self.tmin))
+                threshold_value = int(255*(threshold - self.tmin)/max(1,(self.tmax-self.tmin)))
                 threshold_value = mp_util.constrain(threshold_value, 0, 255)
+                if self.tmax < threshold:
+                    threshold_value = -1
+                else:
+                    threshold_value = max(threshold_value, self.siyi_settings.threshold_min)
                 self.thermal_view.set_threshold(threshold_value)
         elif cmd == FUNCTION_FEEDBACK_INFO:
             info_type, = self.unpack(cmd, "<B", data)
