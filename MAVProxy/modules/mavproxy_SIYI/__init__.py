@@ -230,6 +230,7 @@ class SIYIModule(mp_module.MPModule):
                                                      ('track_size_pct', float, 5.0),
                                                      ('threshold_temp', int, 50),
                                                      ('threshold_min', int, 240),
+                                                     ('los_correction', int, 1),
                                                      MPSetting('thresh_climit', int, 50, range=(10,50)),
                                                      MPSetting('thresh_volt', int, 50, range=(20,50)),
                                                      MPSetting('thresh_ang', int, 300, range=(30,300)),
@@ -1049,12 +1050,16 @@ class SIYIModule(mp_module.MPModule):
         yaw_deg, pitch_deg = self.get_target_yaw_pitch(lat, lon, alt, mylat, mylon, myalt, vehicle_yaw_rad)
 
         # look ahread 1 second to get target los rate
-        (mylat2, mylon2) = mp_util.gps_offset(mylat, mylon, ve*(dt+1), vn*(dt+1))
-        vehicle_yaw_rad2 = vehicle_yaw_rad + ATTITUDE.yawspeed
-        yaw_deg2, pitch_deg2 = self.get_target_yaw_pitch(lat, lon, alt, mylat2, mylon2, myalt, vehicle_yaw_rad2)
+        if self.siyi_settings.los_correction == 1:
+            (mylat2, mylon2) = mp_util.gps_offset(mylat, mylon, ve*(dt+1), vn*(dt+1))
+            vehicle_yaw_rad2 = vehicle_yaw_rad + ATTITUDE.yawspeed
+            yaw_deg2, pitch_deg2 = self.get_target_yaw_pitch(lat, lon, alt, mylat2, mylon2, myalt, vehicle_yaw_rad2)
 
-        los_yaw_rate = mp_util.wrap_180(yaw_deg2 - yaw_deg)
-        los_pitch_rate = pitch_deg2 - pitch_deg
+            los_yaw_rate = mp_util.wrap_180(yaw_deg2 - yaw_deg)
+            los_pitch_rate = pitch_deg2 - pitch_deg
+        else:
+            los_yaw_rate = 0.0
+            los_pitch_rate = 0.0
         #print(los_yaw_rate, los_pitch_rate)
 
         cam_roll, cam_pitch, cam_yaw = self.get_gimbal_attitude()
@@ -1071,10 +1076,10 @@ class SIYIModule(mp_module.MPModule):
         self.send_named_float('TPITCH', pitch_deg)
         self.send_named_float('EYAW', err_yaw)
         self.send_named_float('EPITCH', err_pitch)
-        self.logf.write('SIPY', "Qffff", "TimeUS,CYaw,TYaw,Yerr,I",
-                        self.micros64(), cam_yaw, yaw_deg, err_yaw, self.yaw_controller.I)
-        self.logf.write('SIPP', "Qffff", "TimeUS,CPitch,TPitch,Perr,I",
-                        self.micros64(), cam_pitch, pitch_deg, err_pitch, self.pitch_controller.I)
+        self.logf.write('SIPY', "Qfffff", "TimeUS,CYaw,TYaw,Yerr,I,FF",
+                        self.micros64(), cam_yaw, yaw_deg, err_yaw, self.yaw_controller.I, los_yaw_rate)
+        self.logf.write('SIPP', "Qfffff", "TimeUS,CPitch,TPitch,Perr,I,FF",
+                        self.micros64(), cam_pitch, pitch_deg, err_pitch, self.pitch_controller.I, los_pitch_rate)
 
     def show_fov1(self, FOV, name, aspect_ratio, color):
         '''show one FOV polygon'''
