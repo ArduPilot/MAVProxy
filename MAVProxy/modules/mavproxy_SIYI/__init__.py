@@ -229,7 +229,7 @@ class SIYIModule(mp_module.MPModule):
                                                      ('max_rate', float, 10.0),
                                                      ('track_size_pct', float, 5.0),
                                                      ('threshold_temp', int, 50),
-                                                     ('threshold_min', int, 220),
+                                                     ('threshold_min', int, 240),
                                                      MPSetting('thresh_climit', int, 50, range=(10,50)),
                                                      MPSetting('thresh_volt', int, 50, range=(20,50)),
                                                      MPSetting('thresh_ang', int, 300, range=(30,300)),
