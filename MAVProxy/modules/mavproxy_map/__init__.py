@@ -1027,7 +1027,11 @@ class MapModule(mp_module.MPModule):
 
     def check_redisplay_waypoints(self):
         # if the waypoints have changed, redisplay
-        last_wp_change = self.module('wp').wploader.last_change
+        wp_module = self.module('wp')
+        if wp_module is None:
+            '''wp nodule not loaded'''
+            return
+        last_wp_change = wp_module.wploader.last_change
         if self.wp_change_time != last_wp_change and abs(time.time() - last_wp_change) > 1:
             self.wp_change_time = last_wp_change
             self.display_waypoints()
