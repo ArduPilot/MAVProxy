@@ -89,6 +89,8 @@ class MissionItemProtocolModule(mp_module.MPModule):
         '''initialise menus for console and map'''
         self.menu_added_console = False
         self.menu_added_map = False
+        self.menu = None
+
         if not mp_util.has_wxpython:
             return
 
@@ -123,6 +125,15 @@ on'''
 
     def unload(self):
         self.remove_command(self.command_name())
+        self.unload_remove_menu_items()
+
+    def unload_remove_menu_items(self):
+        '''remove out menu items from other modules'''
+
+        if self.menu is None:
+            '''can get here if wxpython is not present'''
+            return
+
         if self.module('console') is not None and self.menu_added_console:
             self.menu_added_console = False
             self.module('console').remove_menu(self.menu)
@@ -293,6 +304,15 @@ on'''
                 wps = self.missing_wps_to_request()
                 print("re-requesting %s %s" % (self.itemstype(), str(wps)))
                 self.send_wp_requests(wps)
+
+        self.idle_task_add_menu_items()
+
+    def idle_task_add_menu_items(self):
+        '''check for load of other modules, add our items as required'''
+
+        if self.menu is None:
+            '''can get here if wxpython is not present'''
+            return
 
         if self.module('console') is not None:
             if not self.menu_added_console:
