@@ -1018,6 +1018,14 @@ class MapModule(mp_module.MPModule):
             # the rest should only be done for the primary vehicle
             return
 
+        self.check_redisplay_waypoints()
+        self.check_redisplay_fencepoints()
+        self.check_redisplay_rallypoints()
+
+        # check for any events from the map
+        self.map.check_events()
+
+    def check_redisplay_waypoints(self):
         # if the waypoints have changed, redisplay
         last_wp_change = self.module('wp').wploader.last_change
         if self.wp_change_time != last_wp_change and abs(time.time() - last_wp_change) > 1:
@@ -1027,6 +1035,7 @@ class MapModule(mp_module.MPModule):
             #this may have affected the landing lines from the rally points:
             self.rally_change_time = time.time()
 
+    def check_redisplay_fencepoints(self):
         # if the fence has changed, redisplay
         fence_module = self.module('fence')
         if fence_module is not None:
@@ -1040,6 +1049,7 @@ class MapModule(mp_module.MPModule):
                 self.fence_change_time = last_change
                 self.display_fence()
 
+    def check_redisplay_rallypoints(self):
         # if the rallypoints have changed, redisplay
         if (self.module('rally') and
             self.rally_change_time != self.module('rally').last_change()):
@@ -1089,9 +1099,6 @@ class MapModule(mp_module.MPModule):
 
                     points.append((nearest_land_wp.x, nearest_land_wp.y))
                     self.map.add_object(mp_slipmap.SlipPolygon('Rally Land %u' % (i+1), points, 'RallyPoints', (255,255,0), 2))
-
-        # check for any events from the map
-        self.map.check_events()
 
 def init(mpstate):
     '''initialise module'''
