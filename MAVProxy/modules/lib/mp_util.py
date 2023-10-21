@@ -440,6 +440,8 @@ def decode_devid(devid, pname):
         0x38 : "INS_BMI270",
         0x39 : "INS_BMI085",
         0x3A : "INS_ICM42670",
+        0x3B : "INS_ICM45686",
+        0x3C : "INS_SCHA63T",
         }
 
     baro_types = {
