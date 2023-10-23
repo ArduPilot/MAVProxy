@@ -262,6 +262,8 @@ class KmlReadModule(mp_module.MPModule):
                 point = kmlread.readObject(n)
             except Exception as ex:
                 continue
+            if point is None:
+                continue
 
             #and place any polygons on the map
             if self.mpstate.map is not None and point[0] == 'Polygon':
