@@ -473,21 +473,23 @@ class SIYIModule(mp_module.MPModule):
                                 i)
                 break
             i += 1
-        return vidfile
+        return vidfile, i
 
     def cmd_thermal(self):
         '''open thermal viewer'''
-        vidfile = self.video_filename('thermal')
+        vidfile,idx = self.video_filename('thermal')
         self.thermal_view = CameraView(self, self.siyi_settings.rtsp_thermal,
                                        vidfile, (640,512), thermal=True,
-                                       fps=self.siyi_settings.fps_thermal)
+                                       fps=self.siyi_settings.fps_thermal,
+                                       video_idx=idx)
 
     def cmd_rgbview(self):
         '''open rgb viewer'''
-        vidfile = self.video_filename('rgb')
+        vidfile,idx = self.video_filename('rgb')
         self.rgb_view = CameraView(self, self.siyi_settings.rtsp_rgb,
                                    vidfile, (1280,720), thermal=False,
-                                   fps=self.siyi_settings.fps_rgb)
+                                   fps=self.siyi_settings.fps_rgb,
+                                   video_idx=idx)
 
     def check_thermal_events(self):
         '''check for mouse events on thermal image'''
@@ -495,6 +497,14 @@ class SIYIModule(mp_module.MPModule):
             self.thermal_view.check_events()
         if self.rgb_view is not None:
             self.rgb_view.check_events()
+
+    def log_frame_counter(self, video_idx, thermal, frame_counter):
+        '''log video frame counter'''
+        self.logf.write('SIFC', 'QBBI', 'TimeUS,Type,Idx,Frame',
+                        self.micros64(),
+                        1 if thermal else 0,
+                        video_idx,
+                        frame_counter)
 
     def cmd_zoom(self, args):
         '''set zoom'''
