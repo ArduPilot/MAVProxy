@@ -228,7 +228,7 @@ class SIYIModule(mp_module.MPModule):
                                                      ('wide_fov', float, 88.0),
                                                      ('use_lidar', int, 0),
                                                      ('use_encoders', int, 0),
-                                                     ('max_rate', float, 10.0),
+                                                     ('max_rate', float, 30.0),
                                                      ('track_size_pct', float, 5.0),
                                                      ('threshold_temp', int, 50),
                                                      ('threshold_min', int, 240),
@@ -295,6 +295,7 @@ class SIYIModule(mp_module.MPModule):
         self.rgb_lens = "wide"
         self.bad_crc = 0
         self.control_mode = -1
+        self.last_SIEA = time.time()
 
         self.recv_thread = Thread(target=self.receive_thread, name='SIYI_Receive')
         self.recv_thread.daemon = True
@@ -905,9 +906,12 @@ class SIYIModule(mp_module.MPModule):
         ret = self.get_encoder_attitude()
         if ret is not None:
             (r,p,y) = ret
-            self.logf.write('SIEA', 'Qfff', 'TimeUS,R,P,Y',
-                            self.micros64(),
-                            r,p,y)
+            now = time.time()
+            if now - self.last_SIEA >= 0.2:
+                self.last_SIEA = now
+                self.logf.write('SIEA', 'Qfff', 'TimeUS,R,P,Y',
+                                self.micros64(),
+                                r,p,y)
         if self.siyi_settings.use_encoders:
             if ret is not None:
                 return r,p,y
