@@ -595,9 +595,6 @@ class SIYIModule(mp_module.MPModule):
         if self.last_volt_t is None or now - self.last_volt_t > 5:
             self.last_volt_t = now
             self.send_packet_fmt(REQUEST_CONTINUOUS_DATA, "<BB", 4, self.siyi_settings.telem_rate)
-        if self.last_mode_t is None or now - self.last_mode_t > 1:
-            self.last_mode_t = now
-            self.send_packet_fmt(READ_CONTROL_MODE, None)
         if self.last_thresh_t is None or now - self.last_thresh_t > 10:
             self.last_thresh_t = now
             self.send_packet_fmt(READ_THRESHOLDS, None)
@@ -743,15 +740,17 @@ class SIYIModule(mp_module.MPModule):
                             self.encoders[0], self.encoders[1], self.encoders[2])
 
         elif cmd == READ_VOLTAGES:
-            y,p,r, = self.unpack(cmd, "<hhh", data)
+            y,p,r,mode,mode_ms, = self.unpack(cmd, "<hhhBI", data)
             self.last_volt_t = time.time()
             self.voltages = (r*0.001,p*0.001,y*0.001)
             self.send_named_float('VLT_R', self.voltages[0])
             self.send_named_float('VLT_P', self.voltages[1])
             self.send_named_float('VLT_Y', self.voltages[2])
-            self.logf.write('SIVL', 'Qfff', 'TimeUS,R,P,Y',
+            self.logf.write('SIVL', 'QfffBI', 'TimeUS,R,P,Y,Mode,ModeMS',
                             self.micros64(),
-                            self.voltages[0], self.voltages[1], self.voltages[2])
+                            self.voltages[0], self.voltages[1], self.voltages[2],
+                            mode, mode_ms)
+            self.control_mode = mode
 
         elif cmd == READ_THRESHOLDS:
             climit,volt_thresh,ang_thresh, = self.unpack(cmd, "<hhh", data)
@@ -775,13 +774,6 @@ class SIYIModule(mp_module.MPModule):
                       (climit,volt_thresh,ang_thresh,new_thresh[0],new_thresh[1],new_thresh[2]))
                 self.send_packet_fmt(SET_THRESHOLDS, "<hhh",
                                      new_thresh[0], new_thresh[1], new_thresh[2])
-
-        elif cmd == READ_CONTROL_MODE:
-            self.control_mode, = self.unpack(cmd, "<B", data)
-            self.last_mode_t = time.time()
-            self.send_named_float('CMODE', self.control_mode)
-            self.logf.write('SIMO', 'QB', 'TimeUS,Mode',
-                            self.micros64(), self.control_mode)
 
         elif cmd == READ_TEMP_FULL_SCREEN:
             if len(data) < 12:
