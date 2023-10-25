@@ -233,6 +233,7 @@ class SIYIModule(mp_module.MPModule):
                                                      ('threshold_temp', int, 50),
                                                      ('threshold_min', int, 240),
                                                      ('los_correction', int, 1),
+                                                     ('att_control', int, 0),
                                                      MPSetting('thresh_climit', int, 50, range=(10,50)),
                                                      MPSetting('thresh_volt', int, 50, range=(20,50)),
                                                      MPSetting('thresh_ang', int, 300, range=(30,300)),
@@ -1051,8 +1052,17 @@ class SIYIModule(mp_module.MPModule):
 
         yaw_deg, pitch_deg = self.get_target_yaw_pitch(lat, lon, alt, mylat, mylon, myalt, vehicle_yaw_rad)
 
-        # look ahread 1 second to get target los rate
+        self.send_named_float('TYAW', yaw_deg)
+        self.send_named_float('TPITCH', pitch_deg)
+        
+        if self.siyi_settings.att_control == 1:
+            self.yaw_rate = None
+            self.pitch_rate = None
+            self.send_packet_fmt(SET_ANGLE, "<hh", int(-yaw_deg*10), int(pitch_deg*10))
+            return
+
         if self.siyi_settings.los_correction == 1:
+            GLOBAL_POSITION_INT = self.master.messages['GLOBAL_POSITION_INT']
             (mylat2, mylon2) = mp_util.gps_offset(mylat, mylon, ve*(dt+1), vn*(dt+1))
             vehicle_yaw_rad2 = vehicle_yaw_rad + ATTITUDE.yawspeed
             yaw_deg2, pitch_deg2 = self.get_target_yaw_pitch(lat, lon, alt, mylat2, mylon2, myalt, vehicle_yaw_rad2)
@@ -1074,8 +1084,6 @@ class SIYIModule(mp_module.MPModule):
 
         self.yaw_rate = self.yaw_controller.run(err_yaw, los_yaw_rate)
         self.pitch_rate = self.yaw_controller.run(err_pitch, los_pitch_rate)
-        self.send_named_float('TYAW', yaw_deg)
-        self.send_named_float('TPITCH', pitch_deg)
         self.send_named_float('EYAW', err_yaw)
         self.send_named_float('EPITCH', err_pitch)
         self.logf.write('SIPY', "Qfffff", "TimeUS,CYaw,TYaw,Yerr,I,FF",
