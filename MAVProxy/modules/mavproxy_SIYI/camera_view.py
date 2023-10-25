@@ -16,7 +16,7 @@ import numpy as np
 class CameraView:
     """handle camera view image"""
 
-    def __init__(self, siyi, rtsp_url, filename, res, thermal=False, fps=10):
+    def __init__(self, siyi, rtsp_url, filename, res, thermal=False, fps=10, video_idx=-1):
         self.siyi = siyi
         self.thermal = thermal
         self.im = None
@@ -30,6 +30,7 @@ class CameraView:
         self.last_frame_t = time.time()
         self.fps = fps
         self.frame_counter = -1
+        self.video_idx = video_idx
 
         self.im = MPImage(
             title="Camera View",
@@ -230,6 +231,7 @@ class CameraView:
                 continue
             if isinstance(event, MPImageFrameCounter):
                 self.frame_counter = event.frame
+                self.siyi.log_frame_counter(self.video_idx, self.thermal, self.frame_counter)
                 continue
 
             if event.ClassName == "wxMouseEvent":
