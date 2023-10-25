@@ -150,18 +150,20 @@ def rate_mapping(desired_rate):
     '''map from a desired rate in deg/sec to a siyi SDK rate'''
     drate = abs(desired_rate)
     rate_map = [
-        (60, 90),
-        (50, 74),
-        (45, 68),
-        (40, 57),
-        (35, 51),
-        (30, 42),
-        (25, 34),
-        (20, 27),
-        (15, 18),
-        (10, 7.5),
-        (7.5, 6.0),
-        (5.0, 1.0),
+        (70, 98.0),
+        (60, 83.4),
+        (50, 68.1),
+        (40, 53.4),
+        (30, 38.6),
+        (25, 31.2),
+        (20, 23.8),
+        (15, 16.2),
+        (10.0, 9.0),
+        (9.0, 7.5),
+        (8.0, 6.0),
+        (7.0, 4.7),
+        (6.0, 3.0),
+        (5.0, 1.75),
         (4.0, 0.0),
         (0.0, 0.0),
         ]
@@ -540,7 +542,7 @@ class SIYIModule(mp_module.MPModule):
             p = rate_mapping(self.pitch_rate)
             y = mp_util.constrain(y, -self.siyi_settings.max_rate, self.siyi_settings.max_rate)
             p = mp_util.constrain(p, -self.siyi_settings.max_rate, self.siyi_settings.max_rate)
-            scale = 100.0 / SIYI_RATE_MAX_DPS
+            scale = 1.0
             y = int(mp_util.constrain(y*scale, -100, 100))
             p = int(mp_util.constrain(p*scale, -100, 100))
             self.send_packet_fmt(GIMBAL_ROTATION, "<bb", y, p)
