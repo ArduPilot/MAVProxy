@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 '''mavlink file transfer support'''
 
-import io
-import time, os, sys
+import time
+import os
+import sys
 import struct
 import random
-from pymavlink import mavutil
 
 try:
     # py2
@@ -53,6 +53,7 @@ ERR_FileNotFound = 10
 HDR_Len = 12
 MAX_Payload = 239
 
+
 class FTP_OP:
     def __init__(self, seq, session, opcode, size, req_opcode, burst_complete, offset, payload):
         self.seq = seq
@@ -66,7 +67,7 @@ class FTP_OP:
 
     def pack(self):
         '''pack message'''
-        ret = struct.pack("<HBBBBBBI", self.seq, self.session, self.opcode, self.size, self.req_opcode, self.burst_complete, 0, self.offset)
+        ret = struct.pack("<HBBBBBBI", self.seq, self.session, self.opcode, self.size, self.req_opcode, self.burst_complete, 0, self.offset)  # noqa: 401
         if self.payload is not None:
             ret += self.payload
         ret = bytearray(ret)
@@ -88,11 +89,13 @@ class FTP_OP:
             ret += " [%u]" % self.payload[0]
         return ret
 
+
 class WriteQueue:
     def __init__(self, ofs, size):
         self.ofs = ofs
         self.size = size
         self.last_send = 0
+
 
 class FTPModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -112,6 +115,228 @@ class FTPModule(mp_module.MPModule):
              ('retry_time', float, 0.5)])
         self.add_completion_function('(FTPSETTING)',
                                      self.ftp_settings.completion)
+        self.instances = []
+        '''for historical purposes we support a default instance which other
+        modules can fight over:
+        '''
+        self.default_instance = self.create_instance()
+
+    def create_instance(self, target=None):
+        new_instance = FTPInstance(self.master, self.ftp_settings, target=target)
+        self.instances.append(new_instance)
+        return new_instance
+
+    def cmd_ftp(self, args):
+        '''FTP operations'''
+        usage = "Usage: ftp <list|get|put|rm|rmdir|rename|mkdir|crc>"
+        if len(args) < 1:
+            print(usage)
+            return
+        if args[0] == 'list':
+            self.cmd_list(args[1:])
+        elif args[0] == "set":
+            self.ftp_settings.command(args[1:])
+        elif args[0] == 'get':
+            self.cmd_get(args[1:])
+        elif args[0] == 'put':
+            self.cmd_put(args[1:])
+        elif args[0] == 'rm':
+            self.cmd_rm(args[1:])
+        elif args[0] == 'rmdir':
+            self.cmd_rmdir(args[1:])
+        elif args[0] == 'rename':
+            self.cmd_rename(args[1:])
+        elif args[0] == 'mkdir':
+            self.cmd_mkdir(args[1:])
+        elif args[0] == 'crc':
+            self.cmd_crc(args[1:])
+        elif args[0] == 'status':
+            self.cmd_status()
+        elif args[0] == 'cancel':
+            self.cmd_cancel()
+        else:
+            print(usage)
+
+    def cmd_list(self, args):
+        '''list files'''
+        dname = None
+        if len(args) > 0:
+            dname = args[0]
+
+        # the default instance always targets the current MAVProxy
+        # vehicle target:
+        self.default_instance.target_system = self.target_system
+        self.default_instance.target_component = self.target_component
+
+        return self.default_instance.list(dname=dname)
+
+    def cmd_get(self, args, callback=None, callback_progress=None):
+        '''get file'''
+        if len(args) == 0:
+            print("Usage: get FILENAME <LOCALNAME>")
+            return
+        fname = args[0]
+        save_to_filepath = None
+        if len(args) > 1:
+            save_to_filepath = args[1]
+
+        # the default instance always targets the current MAVProxy
+        # vehicle target:
+        self.default_instance.target_system = self.target_system
+        self.default_instance.target_component = self.target_component
+
+        return self.default_instance.get(
+            fname,
+            callback=callback,
+            callback_progress=callback_progress,
+            save_to_filepath=save_to_filepath
+        )
+
+    def cmd_put(self, args, fh=None, callback=None, progress_callback=None):
+        '''put file'''
+        if len(args) == 0:
+            print("Usage: put FILENAME <REMOTENAME>")
+            return
+        filepath = args[0]
+        destname = None
+        if len(args) > 1:
+            destname = args[1]
+
+        # the default instance always targets the current MAVProxy
+        # vehicle target:
+        self.default_instance.target_system = self.target_system
+        self.default_instance.target_component = self.target_component
+
+        return self.default_instance.put(
+            fname=filepath,
+            fh=fh,
+            callback=callback,
+            progress_callback=progress_callback,
+            destname=destname,
+        )
+
+    def cmd_rm(self, args):
+        '''remove file'''
+        if len(args) == 0:
+            print("Usage: rm FILENAME")
+            return
+        print("Removing %s" % args[0])
+
+        # the default instance always targets the current MAVProxy
+        # vehicle target:
+        self.default_instance.target_system = self.target_system
+        self.default_instance.target_component = self.target_component
+
+        return self.default_instance.rm(args[0])
+
+    def cmd_rmdir(self, args):
+        '''remove directory'''
+        if len(args) == 0:
+            print("Usage: rmdir FILENAME")
+            return
+
+        print("Removing %s" % args[0])
+
+        # the default instance always targets the current MAVProxy
+        # vehicle target:
+        self.default_instance.target_system = self.target_system
+        self.default_instance.target_component = self.target_component
+
+        return self.default_instance.rmdir(args[0])
+
+    def cmd_rename(self, args):
+        '''rename file'''
+        if len(args) < 2:
+            print("Usage: rename OLDNAME NEWNAME")
+            return
+
+        print("Renaming %s to %s" % (args[0], args[1]))
+
+        # the default instance always targets the current MAVProxy
+        # vehicle target:
+        self.default_instance.target_system = self.target_system
+        self.default_instance.target_component = self.target_component
+
+        return self.default_instance.rename(args[0], args[1])
+
+    def cmd_mkdir(self, args):
+        '''make directory'''
+        if len(args) < 1:
+            print("Usage: mkdir NAME")
+            return
+
+        print("Creating directory %s" % args[0])
+
+        # the default instance always targets the current MAVProxy
+        # vehicle target:
+        self.default_instance.target_system = self.target_system
+        self.default_instance.target_component = self.target_component
+
+        return self.default_instance.mkdir(args[0])
+
+    def cmd_crc(self, args):
+        '''get crc'''
+        if len(args) < 1:
+            print("Usage: crc NAME")
+            return
+        print("Getting CRC for %s" % args[0])
+
+        # the default instance always targets the current MAVProxy
+        # vehicle target:
+        self.default_instance.target_system = self.target_system
+        self.default_instance.target_component = self.target_component
+
+        return self.default_instance.crc(args[0])
+
+    def cmd_cancel(self):
+        '''cancel any pending op'''
+
+        # the default instance always targets the current MAVProxy
+        # vehicle target:
+        self.default_instance.target_system = self.target_system
+        self.default_instance.target_component = self.target_component
+
+        self.default_instance.terminate_session()
+
+    def cmd_status(self):
+        '''show status'''
+
+        # the default instance always targets the current MAVProxy
+        # vehicle target:
+        self.default_instance.target_system = self.target_system
+        self.default_instance.target_component = self.target_component
+
+        return self.default_instance.status()
+
+    def mavlink_packet(self, m):
+
+        # the default instance always targets the current MAVProxy
+        # vehicle target:
+        self.default_instance.target_system = self.target_system
+        self.default_instance.target_component = self.target_component
+
+        for i in self.instances:
+            i.mavlink_packet(m)
+
+    def idle_task(self):
+
+        # the default instance always targets the current MAVProxy
+        # vehicle target:
+        self.default_instance.target_system = self.target_system
+        self.default_instance.target_component = self.target_component
+
+        for i in self.instances:
+            i.idle_task()
+
+
+class FTPInstance(object):
+    '''encapsulates data and methods for a mavlink ftp connection'''
+    def __init__(self, master, ftp_settings, target=(1, 1)):
+        #        self.session = session
+        self.master = master
+        self.ftp_settings = ftp_settings
+        self.target = target
+
         self.seq = 0
         self.session = 0
         self.network = 0
@@ -149,37 +374,6 @@ class FTPModule(mp_module.MPModule):
         self.write_last_send = None
         self.warned_component = False
 
-    def cmd_ftp(self, args):
-        '''FTP operations'''
-        usage = "Usage: ftp <list|get|put|rm|rmdir|rename|mkdir|crc>"
-        if len(args) < 1:
-            print(usage)
-            return
-        if args[0] == 'list':
-            self.cmd_list(args[1:])
-        elif args[0] == "set":
-            self.ftp_settings.command(args[1:])
-        elif args[0] == 'get':
-            self.cmd_get(args[1:])
-        elif args[0] == 'put':
-            self.cmd_put(args[1:])
-        elif args[0] == 'rm':
-            self.cmd_rm(args[1:])
-        elif args[0] == 'rmdir':
-            self.cmd_rmdir(args[1:])
-        elif args[0] == 'rename':
-            self.cmd_rename(args[1:])
-        elif args[0] == 'mkdir':
-            self.cmd_mkdir(args[1:])
-        elif args[0] == 'crc':
-            self.cmd_crc(args[1:])
-        elif args[0] == 'status':
-            self.cmd_status()
-        elif args[0] == 'cancel':
-            self.cmd_cancel()
-        else:
-            print(usage)
-
     def send(self, op):
         '''send a request'''
         op.seq = self.seq
@@ -187,6 +381,9 @@ class FTPModule(mp_module.MPModule):
         plen = len(payload)
         if plen < MAX_Payload + HDR_Len:
             payload.extend(bytearray([0]*((HDR_Len+MAX_Payload)-plen)))
+        if self.target_system == 0:
+            raise ValueError("Should not be called with broadcast ID (%u,%u)" %
+                             (self.target_system, self.target_component))
         self.master.mav.file_transfer_protocol_send(self.network, self.target_system, self.target_component, payload)
         self.seq = (self.seq + 1) % 256
         self.last_op = op
@@ -224,11 +421,8 @@ class FTPModule(mp_module.MPModule):
         if self.ftp_settings.debug > 0:
             print("Terminated session")
 
-    def cmd_list(self, args):
-        '''list files'''
-        if len(args) > 0:
-            dname = args[0]
-        else:
+    def list(self, dname=None):
+        if dname is None:
             dname = '/'
         print("Listing %s" % dname)
         enc_dname = bytearray(dname, 'ascii')
@@ -241,7 +435,7 @@ class FTPModule(mp_module.MPModule):
         '''handle OP_ListDirectory reply'''
         if op.opcode == OP_Ack:
             dentries = sorted(op.payload.split(b'\x00'))
-            #print(dentries)
+            # print(dentries)
             for d in dentries:
                 if len(d) == 0:
                     continue
@@ -272,15 +466,11 @@ class FTPModule(mp_module.MPModule):
         else:
             print('LIST: %s' % op)
 
-    def cmd_get(self, args, callback=None, callback_progress=None):
+    def get(self, fname, callback=None, callback_progress=None, save_to_filepath=None):
         '''get file'''
-        if len(args) == 0:
-            print("Usage: get FILENAME <LOCALNAME>")
-            return
         self.terminate_session()
-        fname = args[0]
-        if len(args) > 1:
-            self.filename = args[1]
+        if save_to_filepath is not None:
+            self.filename = save_to_filepath
         else:
             self.filename = os.path.basename(fname)
         if callback is None or self.ftp_settings.debug > 1:
@@ -352,11 +542,11 @@ class FTPModule(mp_module.MPModule):
         self.read_total += len(op.payload)
         if self.callback_progress is not None:
             self.callback_progress(self.fh, self.read_total)
-    
+
     def handle_burst_read(self, op, m):
         '''handle OP_BurstReadFile reply'''
         if self.ftp_settings.pkt_loss_tx > 0:
-            if random.uniform(0,100) < self.ftp_settings.pkt_loss_tx:
+            if random.uniform(0, 100) < self.ftp_settings.pkt_loss_tx:
                 if self.ftp_settings.debug > 0:
                     print("FTP: dropping TX")
                 return
@@ -414,7 +604,8 @@ class FTPModule(mp_module.MPModule):
                     # a burst complete with non-zero size and less than burst packet size
                     # means EOF
                     if not self.reached_eof and self.ftp_settings.debug > 0:
-                        print("EOF at %u with %u gaps t=%.2f" % (self.fh.tell(), len(self.read_gaps), time.time() - self.op_start))
+                        print("EOF at %u with %u gaps t=%.2f" %
+                              (self.fh.tell(), len(self.read_gaps), time.time() - self.op_start))
                     self.reached_eof = True
                     if self.check_read_finished():
                         return
@@ -478,32 +669,33 @@ class FTPModule(mp_module.MPModule):
             print("Read failed with %u gaps" % len(self.read_gaps), str(op))
             self.terminate_session()
         self.check_read_send()
-            
-    def cmd_put(self, args, fh=None, callback=None, progress_callback=None):
+
+    def put(self, fname=None, fh=None, destname=None, callback=None, progress_callback=None):
         '''put file'''
-        if len(args) == 0:
-            print("Usage: put FILENAME <REMOTENAME>")
-            return
         if self.write_list is not None:
             print("put already in progress")
             return
-        fname = args[0]
+        if fname is None and fh is None:
+            print("Neither of filepath nor fh set")
+            return
+
         self.fh = fh
+        self.filename = destname
+
         if self.fh is None:
             try:
                 self.fh = open(fname, 'rb')
             except Exception as ex:
                 print("Failed to open %s: %s" % (fname, ex))
                 return
-        if len(args) > 1:
-            self.filename = args[1]
-        else:
+
+        if self.filename is None:
             self.filename = os.path.basename(fname)
         if self.filename.endswith("/"):
             self.filename += os.path.basename(fname)
         if callback is None:
             print("Putting %s as %s" % (fname, self.filename))
-        self.fh.seek(0,2)
+        self.fh.seek(0, 2)
         file_size = self.fh.tell()
         self.fh.seek(0)
 
@@ -541,7 +733,7 @@ class FTPModule(mp_module.MPModule):
             self.put_callback = None
         else:
             print("Sent file of length ", flen)
-        
+
     def handle_create_file_reply(self, op, m):
         '''handle OP_CreateFile reply'''
         if self.fh is None:
@@ -563,7 +755,7 @@ class FTPModule(mp_module.MPModule):
 
         now = time.time()
         if self.write_last_send is not None:
-            if now - self.write_last_send > max(min(10*self.rtt, 1),0.2):
+            if now - self.write_last_send > max(min(10*self.rtt, 1), 0.2):
                 # we seem to have lost a block of replies
                 self.write_pending = max(0, self.write_pending-1)
 
@@ -606,24 +798,14 @@ class FTPModule(mp_module.MPModule):
             self.put_callback_progress(self.write_acks/float(self.write_total))
         self.send_more_writes()
 
-    def cmd_rm(self, args):
+    def rm(self, fname):
         '''remove file'''
-        if len(args) == 0:
-            print("Usage: rm FILENAME")
-            return
-        fname = args[0]
-        print("Removing %s" % fname)
         enc_fname = bytearray(fname, 'ascii')
         op = FTP_OP(self.seq, self.session, OP_RemoveFile, len(enc_fname), 0, 0, 0, enc_fname)
         self.send(op)
 
-    def cmd_rmdir(self, args):
+    def rmdir(self, dname):
         '''remove directory'''
-        if len(args) == 0:
-            print("Usage: rmdir FILENAME")
-            return
-        dname = args[0]
-        print("Removing %s" % dname)
         enc_dname = bytearray(dname, 'ascii')
         op = FTP_OP(self.seq, self.session, OP_RemoveDirectory, len(enc_dname), 0, 0, 0, enc_dname)
         self.send(op)
@@ -633,14 +815,8 @@ class FTPModule(mp_module.MPModule):
         if op.opcode != OP_Ack:
             print("Remove failed %s" % op)
 
-    def cmd_rename(self, args):
+    def rename(self, name1, name2):
         '''rename file'''
-        if len(args) < 2:
-            print("Usage: rename OLDNAME NEWNAME")
-            return
-        name1 = args[0]
-        name2 = args[1]
-        print("Renaming %s to %s" % (name1, name2))
         enc_name1 = bytearray(name1, 'ascii')
         enc_name2 = bytearray(name2, 'ascii')
         enc_both = enc_name1 + b'\x00' + enc_name2
@@ -652,13 +828,8 @@ class FTPModule(mp_module.MPModule):
         if op.opcode != OP_Ack:
             print("Rename failed %s" % op)
 
-    def cmd_mkdir(self, args):
+    def mkdir(self, name):
         '''make directory'''
-        if len(args) < 1:
-            print("Usage: mkdir NAME")
-            return
-        name = args[0]
-        print("Creating directory %s" % name)
         enc_name = bytearray(name, 'ascii')
         op = FTP_OP(self.seq, self.session, OP_CreateDirectory, len(enc_name), 0, 0, 0, enc_name)
         self.send(op)
@@ -668,15 +839,10 @@ class FTPModule(mp_module.MPModule):
         if op.opcode != OP_Ack:
             print("Create directory failed %s" % op)
 
-    def cmd_crc(self, args):
+    def crc(self, name):
         '''get crc'''
-        if len(args) < 1:
-            print("Usage: crc NAME")
-            return
-        name = args[0]
         self.filename = name
         self.op_start = time.time()
-        print("Getting CRC for %s" % name)
         enc_name = bytearray(name, 'ascii')
         op = FTP_OP(self.seq, self.session, OP_CalcFileCRC32, len(enc_name), 0, 0, 0, bytearray(enc_name))
         self.send(op)
@@ -690,11 +856,11 @@ class FTPModule(mp_module.MPModule):
         else:
             print("crc failed %s" % op)
 
-    def cmd_cancel(self):
+    def cancel(self):
         '''cancel any pending op'''
         self.terminate_session()
 
-    def cmd_status(self):
+    def status(self):
         '''show status'''
         if self.fh is None:
             print("No transfer in progress")
@@ -702,7 +868,8 @@ class FTPModule(mp_module.MPModule):
             ofs = self.fh.tell()
             dt = time.time() - self.op_start
             rate = (ofs / dt) / 1024.0
-            print("Transfer at offset %u with %u gaps %u retries %.1f kByte/sec" % (ofs, len(self.read_gaps), self.read_retries, rate))
+            print("Transfer at offset %u with %u gaps %u retries %.1f kByte/sec" %
+                  (ofs, len(self.read_gaps), self.read_retries, rate))
 
     def op_parse(self, m):
         '''parse a FILE_TRANSFER_PROTOCOL msg'''
@@ -729,7 +896,7 @@ class FTPModule(mp_module.MPModule):
                 print("< %s dt=%.2f" % (op, dt))
             self.last_op_time = now
             if self.ftp_settings.pkt_loss_rx > 0:
-                if random.uniform(0,100) < self.ftp_settings.pkt_loss_rx:
+                if random.uniform(0, 100) < self.ftp_settings.pkt_loss_rx:
                     if self.ftp_settings.debug > 1:
                         print("FTP: dropping packet RX")
                     return
@@ -831,7 +998,9 @@ class FTPModule(mp_module.MPModule):
             return
 
         # see if burst read has stalled
-        if not self.reached_eof and self.last_burst_read is not None and now - self.last_burst_read > self.ftp_settings.retry_time:
+        if (not self.reached_eof and
+                self.last_burst_read is not None and
+                now - self.last_burst_read > self.ftp_settings.retry_time):
             dt = now - self.last_burst_read
             self.last_burst_read = now
             if self.ftp_settings.debug > 0:
@@ -844,6 +1013,7 @@ class FTPModule(mp_module.MPModule):
 
         if self.write_list is not None:
             self.send_more_writes()
+
 
 def init(mpstate):
     '''initialise module'''
