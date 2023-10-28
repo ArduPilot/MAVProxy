@@ -839,7 +839,7 @@ if __name__ == "__main__":
         im.set_gstreamer(args[0])
     else:
         img = cv2.imread(args[0])
-        img = twiddle_color(img)
+        #img = twiddle_color(img)
         im.set_image(img, bgr=True)
 
     if opts.colormap is not None:
