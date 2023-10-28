@@ -63,6 +63,9 @@ REQUEST_CONTINUOUS_DATA = 0x25
 ATTITUDE_EXTERNAL = 0x22
 VELOCITY_EXTERNAL = 0x26
 TEMPERATURE_BOX = 0x13
+GET_THERMAL_MODE = 0x33
+SET_THERMAL_MODE = 0x34
+GET_TEMP_FRAME = 0x35
 
 def crc16_from_bytes(bytes, initial=0):
     # CRC-16-CCITT
@@ -189,10 +192,11 @@ class SIYIModule(mp_module.MPModule):
         super(SIYIModule, self).__init__(mpstate, "SIYI", "SIYI camera support")
 
         self.add_command('siyi', self.cmd_siyi, "SIYI camera control",
-                         ["<rates|connect|autofocus|zoom|yaw|pitch|center|getconfig|angle|photo|recording|lock|follow|fpv|settarget|notarget|thermal|rgbview>",
+                         ["<rates|connect|autofocus|zoom|yaw|pitch|center|getconfig|angle|photo|recording|lock|follow|fpv|settarget|notarget|thermal|rgbview|tempsnap|get_thermal_mode>",
                           "set (SIYISETTING)",
                           "imode <1|2|3|4|5|6|7|8|wide|zoom|split>",
-                          "palette <WhiteHot|Sepia|Ironbow|Rainbow|Night|Aurora|RedHot|Jungle|Medical|BlackHot|GloryHot>"
+                          "palette <WhiteHot|Sepia|Ironbow|Rainbow|Night|Aurora|RedHot|Jungle|Medical|BlackHot|GloryHot>",
+                          "thermal_mode <0|1>",
                           ])
 
         # filter_dist is distance in metres
@@ -234,6 +238,7 @@ class SIYIModule(mp_module.MPModule):
                                                      ('threshold_min', int, 240),
                                                      ('los_correction', int, 1),
                                                      ('att_control', int, 0),
+                                                     ('therm_cap_rate', float, 0),
                                                      MPSetting('thresh_climit', int, 50, range=(10,50)),
                                                      MPSetting('thresh_volt', int, 50, range=(20,50)),
                                                      MPSetting('thresh_ang', int, 300, range=(30,300)),
@@ -296,6 +301,8 @@ class SIYIModule(mp_module.MPModule):
         self.bad_crc = 0
         self.control_mode = -1
         self.last_SIEA = time.time()
+        self.last_therm_cap = time.time()
+        self.thermal_capture_count = 0
 
         self.recv_thread = Thread(target=self.receive_thread, name='SIYI_Receive')
         self.recv_thread.daemon = True
@@ -367,6 +374,12 @@ class SIYIModule(mp_module.MPModule):
             self.cmd_angle(args[1:])
         elif args[0] == "photo":
             self.send_packet_fmt(PHOTO, "<B", 0)
+        elif args[0] == "tempsnap":
+            self.send_packet_fmt(GET_TEMP_FRAME, None)
+        elif args[0] == "thermal_mode":
+            self.send_packet_fmt(SET_THERMAL_MODE, "<B", int(args[1]))
+        elif args[0] == "get_thermal_mode":
+            self.send_packet_fmt(GET_THERMAL_MODE, None)
         elif args[0] == "recording":
             self.send_packet_fmt(PHOTO, "<B", 2)
             self.send_packet(FUNCTION_FEEDBACK_INFO, None)
@@ -816,6 +829,16 @@ class SIYIModule(mp_module.MPModule):
             ok, = self.unpack(cmd, "<B", data)
             if ok != 1:
                 print("Threshold set failure")
+        elif cmd == GET_THERMAL_MODE:
+            ok, = self.unpack(cmd,"<B", data)
+            print("ThermalMode: %u" % ok)
+        elif cmd == SET_THERMAL_MODE:
+            ok, = self.unpack(cmd,"<B", data)
+            print("SetThermalMode: %u" % ok)
+        elif cmd == GET_TEMP_FRAME:
+            ok, = self.unpack(cmd,"<B", data)
+            if ok:
+                self.thermal_capture_count += 1
         elif cmd in [SET_ANGLE, CENTER, GIMBAL_ROTATION, ABSOLUTE_ZOOM, SET_IMAGE_TYPE,
                      REQUEST_CONTINUOUS_DATA, SET_THERMAL_PALETTE, MANUAL_ZOOM_AND_AUTO_FOCUS]:
             # an ack
@@ -841,6 +864,8 @@ class SIYIModule(mp_module.MPModule):
         if self.tmin is not None:
             self.console.set_status('TEMP', 'TEMP %.2f/%.2f' % (self.tmin, self.tmax), row=6)
             self.update_title()
+        self.console.set_status('TCAP', 'TCAP %u' % self.thermal_capture_count, row=6)
+
 
     def check_rate_end(self):
         '''check for ending yaw/pitch command'''
@@ -1157,6 +1182,17 @@ class SIYIModule(mp_module.MPModule):
                 continue
             self.parse_data(pkt)
 
+    def therm_capture(self):
+        if self.siyi_settings.therm_cap_rate <= 0:
+            return
+        now = time.time()
+        dt = now - self.last_therm_cap
+        if dt > 5:
+            self.send_packet_fmt(SET_THERMAL_MODE, "<B", 1)
+        if dt > 1.0 / self.siyi_settings.therm_cap_rate:
+            self.send_packet_fmt(GET_TEMP_FRAME, None)
+            self.last_therm_cap = now
+
     def idle_task(self):
         '''called on idle'''
         if not self.sock:
@@ -1170,6 +1206,7 @@ class SIYIModule(mp_module.MPModule):
         self.request_telem()
         self.send_attitude()
         self.check_thermal_events()
+        self.therm_capture()
 
 def init(mpstate):
     '''initialise module'''
