@@ -29,6 +29,8 @@ if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import MPMenuSubMenu
     from MAVProxy.modules.lib.mp_image import MPImage
     from MAVProxy.modules.mavproxy_map import mp_slipmap
+    from MAVProxy.modules.lib.mp_image import MPImageOSD_HorizonLine
+    from MAVProxy.modules.lib.mp_image import MPImageOSD_None
 
 from MAVProxy.modules.mavproxy_SIYI.camera_view import CameraView
 
@@ -218,7 +220,7 @@ class SIYIModule(mp_module.MPModule):
                                                      ('target_rate', float, 10),
                                                      ('telem_hz', float, 5),
                                                      ('telem_rate', float, 4),
-                                                     ('att_send_hz', float, 0),
+                                                     ('att_send_hz', float, 4),
                                                      ('temp_hz', float, 5),
                                                      ('rtsp_rgb', str, 'rtsp://192.168.144.25:8554/video1'),
                                                      ('rtsp_thermal', str, 'rtsp://192.168.144.25:8554/video2'),
@@ -239,6 +241,7 @@ class SIYIModule(mp_module.MPModule):
                                                      ('los_correction', int, 1),
                                                      ('att_control', int, 0),
                                                      ('therm_cap_rate', float, 0),
+                                                     ('show_horizon', int, 0),
                                                      MPSetting('thresh_climit', int, 50, range=(10,50)),
                                                      MPSetting('thresh_volt', int, 50, range=(20,50)),
                                                      MPSetting('thresh_ang', int, 300, range=(30,300)),
@@ -307,6 +310,7 @@ class SIYIModule(mp_module.MPModule):
         self.recv_thread = Thread(target=self.receive_thread, name='SIYI_Receive')
         self.recv_thread.daemon = True
         self.recv_thread.start()
+        self.have_horizon_lines = False
 
         if mp_util.has_wxpython:
             menu = MPMenuSubMenu('SIYI',
@@ -752,6 +756,12 @@ class SIYIModule(mp_module.MPModule):
             self.logf.write('SIEN', 'Qfff', 'TimeUS,R,P,Y',
                             self.micros64(),
                             self.encoders[0], self.encoders[1], self.encoders[2])
+            if self.siyi_settings.show_horizon == 1:
+                self.have_horizon_lines = True
+                self.show_horizon_lines()
+            elif self.have_horizon_lines:
+                self.remove_horizon_lines()
+                self.have_horizon_lines = False
 
         elif cmd == READ_VOLTAGES:
             y,p,r,mode,mode_ms, = self.unpack(cmd, "<hhhBI", data)
@@ -903,15 +913,10 @@ class SIYIModule(mp_module.MPModule):
         att = self.master.messages.get('ATTITUDE',None)
         if now - self.last_enc_recv_t > 2.0 or att is None:
             return None
-        dt = (now - self.last_enc_recv_t)+self.siyi_settings.lag
-        dt = max(dt,0)
-        m1 = Matrix3()
+        m = Matrix3()
         # we use zero yaw as this is in vehicle frame
-        m1.from_euler(att.roll,att.pitch,0)
-        e312 = Vector3(radians(self.encoders[0]),radians(self.encoders[1]),radians(self.encoders[2]))
-        m2 = Matrix3()
-        m2.from_euler312(e312.x, e312.y, e312.z)
-        m = m2 * m1
+        m.from_euler(att.roll,att.pitch,0)
+        m.rotate_312(radians(self.encoders[0]),radians(self.encoders[1]),radians(self.encoders[2]))
         (r,p,y) = m.to_euler()
         return degrees(r),degrees(p),mp_util.wrap_180(degrees(y))
 
@@ -937,6 +942,9 @@ class SIYIModule(mp_module.MPModule):
                 self.logf.write('SIEA', 'Qfff', 'TimeUS,R,P,Y',
                                 self.micros64(),
                                 r,p,y)
+                self.send_named_float('EA_R', r)
+                self.send_named_float('EA_P', p)
+                self.send_named_float('EA_Y', y)
         if self.siyi_settings.use_encoders:
             if ret is not None:
                 return r,p,y
@@ -1207,6 +1215,26 @@ class SIYIModule(mp_module.MPModule):
         self.send_attitude()
         self.check_thermal_events()
         self.therm_capture()
+
+    def show_horizon_lines(self):
+        '''show horizon lines'''
+        if self.rgb_view is None or self.rgb_view.im is None:
+            return
+        att = self.master.messages.get('ATTITUDE',None)
+        if att is None:
+            return
+        r,p,y = self.get_encoder_attitude()
+        self.rgb_view.im.add_OSD(MPImageOSD_HorizonLine('hor1', r, p, self.siyi_settings.wide_fov, (255,0,255)))
+        # convert SIYI 312 to 321
+        m = Matrix3()
+        m.from_euler312(radians(self.attitude[0]), radians(self.attitude[1]), radians(self.attitude[2]))
+        r,p,y = m.to_euler()
+        self.rgb_view.im.add_OSD(MPImageOSD_HorizonLine('hor2', degrees(r), degrees(p), self.siyi_settings.wide_fov, (255,255,0)))
+
+    def remove_horizon_lines(self):
+        '''remove horizon lines'''
+        self.rgb_view.im.add_OSD(MPImageOSD_None('hor1'))
+        self.rgb_view.im.add_OSD(MPImageOSD_None('hor2'))
 
 def init(mpstate):
     '''initialise module'''
