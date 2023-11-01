@@ -14,6 +14,7 @@ import cv2
 import numpy as np
 import warnings
 from threading import Thread
+import math
 
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_widgets
@@ -75,6 +76,11 @@ class MPImageSeekPercent:
     '''seek video to given percentage'''
     def __init__(self, percent):
         self.percent = percent
+
+class MPImageSeekFrame:
+    '''seek video to given frame'''
+    def __init__(self, frame):
+        self.frame = frame
         
 class MPImageRecenter:
     '''recenter on location'''
@@ -122,7 +128,61 @@ class MPImageFrameCounter:
     '''frame counter'''
     def __init__(self, frame):
         self.frame = frame
-    
+
+class MPImageOSD_Element:
+    '''an OSD element'''
+    def __init__(self, label):
+        self.label = label
+
+    def draw(self, data):
+        pass
+
+class MPImageOSD_None(MPImageOSD_Element):
+    def __init__(self, label):
+        super().__init__(label)
+
+class MPImageOSD_Line(MPImageOSD_Element):
+    '''an OSD line.
+    p1 and p2 are (x,y) tuples
+    top left is (0,0), bottom right is (1,1)'''
+    def __init__(self, label, p1, p2, color, thickness=1):
+        super().__init__(label)
+        self.p1 = p1
+        self.p2 = p2
+        self.color = color
+        self.thickness = thickness
+
+    def draw(self, data):
+        height,width,_ = data.shape
+        start_point = (int(self.p1[0]*width), int(self.p1[1]*height))
+        end_point = (int(self.p2[0]*width), int(self.p2[1]*height))
+        return cv2.line(data, start_point, end_point, self.color, self.thickness)
+        
+
+class MPImageOSD_HorizonLine(MPImageOSD_Element):
+    '''an OSD horizon line from roll/pitch eulers in degrees and horizontal FOV'''
+    def __init__(self, label, roll_deg, pitch_deg, hfov, color, thickness=1):
+        super().__init__(label)
+        self.roll_deg = roll_deg
+        self.pitch_deg = pitch_deg
+        self.hfov = hfov
+        self.color = color
+        self.thickness = thickness
+
+    def draw(self, data):
+        height,width,_ = data.shape
+        vfov = (self.hfov * height) / width
+        pitch_line = 0.5 + 0.5 * self.pitch_deg / (0.5*vfov)
+        p1 = (0, pitch_line)
+        p2 = (1, pitch_line)
+        corner_angle_deg = math.degrees(math.atan(vfov / self.hfov))
+        roll_change = 0.5 * self.roll_deg / corner_angle_deg
+        p1 = (p1[0], p1[1] + roll_change)
+        p2 = (p2[0], p2[1] - roll_change)
+        start_point = (int(p1[0]*width), int(p1[1]*height))
+        end_point = (int(p2[0]*width), int(p2[1]*height))
+        return cv2.line(data, start_point, end_point, self.color, self.thickness)
+        
 class MPImage():
     '''
     a generic image viewer widget for use in MP tools
@@ -201,6 +261,10 @@ class MPImage():
     def seek_percentage(self, percent):
         '''seek to the given video percentage'''
         self.in_queue.put(MPImageSeekPercent(percent))
+
+    def seek_frame(self, frame):
+        '''seek to the given video frame'''
+        self.in_queue.put(MPImageSeekFrame(frame))
         
     def set_title(self, title):
         '''set the frame title'''
@@ -275,6 +339,10 @@ class MPImage():
     def end_tracking(self):
         '''end a tracker'''
         self.in_queue.put(MPImageEndTracker())
+
+    def add_OSD(self, osd_element):
+        '''add an OSD element'''
+        self.in_queue.put(osd_element)
         
     def events(self):
         '''check for events a list of events'''
@@ -348,6 +416,8 @@ class MPImagePanel(wx.Panel):
         self.last_frame_time = None
         self.vcap = None
         self.seek_percentage = None
+        self.seek_frame = None
+        self.osd_elements = None
         state.brightness = 1.0
 
         # dragpos is the top left position in image coordinates
@@ -446,6 +516,11 @@ class MPImagePanel(wx.Panel):
         print(h.heap())
         '''
 
+    def draw_osd(self, data):
+        '''draw OSD elements on the image'''
+        for obj in self.osd_elements.values():
+            data = obj.draw(data)
+        return data
 
     def set_image_data(self, data, width, height):
         '''set image data'''
@@ -471,6 +546,8 @@ class MPImagePanel(wx.Panel):
             else:
                 data = cv2.LUT(data, self.colormap)
 
+        if self.osd_elements is not None:
+            data = self.draw_osd(data)
 
         #cv2.imwrite("x.jpg", data)
         img.SetData(data)
@@ -485,6 +562,16 @@ class MPImagePanel(wx.Panel):
             self.fit_to_window()
         self.need_redraw = True
 
+    def handle_osd(self, obj):
+        '''handle an OSD element'''
+        if self.osd_elements is None:
+            from collections import OrderedDict
+            self.osd_elements = OrderedDict()
+        if isinstance(obj, MPImageOSD_None):
+            self.osd_elements.pop(obj.label,None)
+            return
+        self.osd_elements[obj.label] = obj
+
     def on_redraw_timer(self, event):
         '''the redraw timer ensures we show new map tiles as they
         are downloaded'''
@@ -495,6 +582,8 @@ class MPImagePanel(wx.Panel):
             except Exception:
                 time.sleep(0.05)
                 return
+            if isinstance(obj, MPImageOSD_Element):
+                self.handle_osd(obj)
             if isinstance(obj, MPImageData):
                 self.set_image_data(obj.data, obj.width, obj.height)
             if isinstance(obj, MPImageTitle):
@@ -523,6 +612,8 @@ class MPImagePanel(wx.Panel):
                 print("FPS_MAX: ", self.fps_max)
             if isinstance(obj, MPImageSeekPercent):
                 self.seek_video(obj.percent)
+            if isinstance(obj, MPImageSeekFrame):
+                self.seek_video_frame(obj.frame)
             if isinstance(obj, MPImageColormap):
                 self.colormap = obj.colormap
             if isinstance(obj, MPImageColormapIndex):
@@ -568,6 +659,10 @@ class MPImagePanel(wx.Panel):
         '''seek to given percentage'''
         self.seek_percentage = percentage
 
+    def seek_video_frame(self, frame):
+        '''seek to given frame'''
+        self.seek_frame = frame
+        
     def video_thread(self, url, cap_options):
         '''thread for video capture'''
         self.vcap = cv2.VideoCapture(url, cap_options)
@@ -582,6 +677,9 @@ class MPImagePanel(wx.Panel):
                     pos = int(frame_count*self.seek_percentage*0.01)
                     self.vcap.set(cv2.CAP_PROP_POS_FRAMES, pos)
                     self.seek_percentage = None
+            if self.seek_frame is not None:
+                self.vcap.set(cv2.CAP_PROP_POS_FRAMES, self.seek_frame)
+                self.seek_frame = None
             try:
                 _, frame = self.vcap.read()
             except Exception as ex:
