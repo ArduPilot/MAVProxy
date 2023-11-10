@@ -20,6 +20,7 @@ from math import radians, degrees
 from threading import Thread
 import cv2
 import traceback
+import copy
 
 import socket, time, os, struct
 
@@ -71,6 +72,30 @@ GET_TEMP_FRAME = 0x35
 SET_WEAK_CONTROL = 0x71
 GET_THERMAL_GAIN = 0x37
 SET_THERMAL_GAIN = 0x38
+GET_THERMAL_PARAM = 0x39
+SET_THERMAL_PARAM = 0x3A
+GET_THERMAL_ENVSWITCH = 0x3B
+SET_THERMAL_ENVSWITCH = 0x3C
+
+class ThermalParameters:
+    def __init__(self, distance, target_emissivity, humidity, air_temperature, reflection_temperature):
+        self.distance = distance
+        self.target_emissivity = target_emissivity
+        self.humidity = humidity
+        self.air_temperature = air_temperature
+        self.reflection_temperature = reflection_temperature
+
+    def __repr__(self):
+        return "Dist=%.2f Emiss=%.2f Hum=%.2f AirTemp=%.2f RefTemp=%.2f" % (self.distance,
+                                                                            self.target_emissivity,
+                                                                            self.humidity,
+                                                                            self.air_temperature,
+                                                                            self.reflection_temperature)
+
+    def args(self):
+        return [int(self.distance*100), int(self.target_emissivity*100),
+                int(self.humidity*100), int(self.air_temperature*100), int(self.reflection_temperature*100)]
+
 
 def crc16_from_bytes(bytes, initial=0):
     # CRC-16-CCITT
@@ -198,6 +223,7 @@ class SIYIModule(mp_module.MPModule):
 
         self.add_command('siyi', self.cmd_siyi, "SIYI camera control",
                          ["<rates|connect|autofocus|zoom|yaw|pitch|center|getconfig|angle|photo|recording|lock|follow|fpv|settarget|notarget|thermal|rgbview|tempsnap|get_thermal_mode|thermal_gain|get_thermal_gain>",
+                          "<therm_getenv|therm_set_distance|therm_set_emissivity|therm_set_humidity|therm_set_airtemp|therm_set_reftemp|therm_getswitch|therm_setswitch>",
                           "set (SIYISETTING)",
                           "imode <1|2|3|4|5|6|7|8|wide|zoom|split>",
                           "palette <WhiteHot|Sepia|Ironbow|Rainbow|Night|Aurora|RedHot|Jungle|Medical|BlackHot|GloryHot>",
@@ -315,6 +341,7 @@ class SIYIModule(mp_module.MPModule):
         self.recv_thread.daemon = True
         self.recv_thread.start()
         self.have_horizon_lines = False
+        self.thermal_param = None
 
         if mp_util.has_wxpython:
             menu = MPMenuSubMenu('SIYI',
@@ -419,6 +446,22 @@ class SIYIModule(mp_module.MPModule):
             self.cmd_thermal()
         elif args[0] == "rgbview":
             self.cmd_rgbview()
+        elif args[0] == "therm_getenv":
+            self.send_packet_fmt(GET_THERMAL_PARAM, None)
+        elif args[0] == "therm_set_distance":
+            self.therm_set_distance(float(args[1]))
+        elif args[0] == "therm_set_humidity":
+            self.therm_set_humidity(float(args[1]))
+        elif args[0] == "therm_set_emissivity":
+            self.therm_set_emissivity(float(args[1]))
+        elif args[0] == "therm_set_airtemp":
+            self.therm_set_airtemp(float(args[1]))
+        elif args[0] == "therm_set_reftemp":
+            self.therm_set_reftemp(float(args[1]))
+        elif args[0] == "therm_getswitch":
+            self.send_packet_fmt(GET_THERMAL_ENVSWITCH, None)
+        elif args[0] == "therm_setswitch":
+            self.send_packet_fmt(SET_THERMAL_ENVSWITCH, "<B", int(args[1]))
         else:
             print(usage)
 
@@ -553,6 +596,51 @@ class SIYIModule(mp_module.MPModule):
                                                         (lat, lon),
                                                         self.icon, layer='SIYI', rotation=0, follow=False))
 
+    def therm_set_distance(self, distance):
+        '''set thermal distance'''
+        if self.thermal_param is None:
+            print("Run therm_getenv first")
+            return
+        p = copy.copy(self.thermal_param)
+        p.distance = distance
+        self.send_packet_fmt(SET_THERMAL_PARAM, "<HHHHH", *p.args())
+
+    def therm_set_emissivity(self, emissivity):
+        '''set thermal emissivity'''
+        if self.thermal_param is None:
+            print("Run therm_getenv first")
+            return
+        p = copy.copy(self.thermal_param)
+        p.target_emissivity = emissivity
+        self.send_packet_fmt(SET_THERMAL_PARAM, "<HHHHH", *p.args())
+
+    def therm_set_humidity(self, humidity):
+        '''set thermal humidity'''
+        if self.thermal_param is None:
+            print("Run therm_getenv first")
+            return
+        p = copy.copy(self.thermal_param)
+        p.humidity = humidity
+        self.send_packet_fmt(SET_THERMAL_PARAM, "<HHHHH", *p.args())
+
+    def therm_set_airtemp(self, airtemp):
+        '''set thermal airtemp'''
+        if self.thermal_param is None:
+            print("Run therm_getenv first")
+            return
+        p = copy.copy(self.thermal_param)
+        p.air_temperature = airtemp
+        self.send_packet_fmt(SET_THERMAL_PARAM, "<HHHHH", *p.args())
+
+    def therm_set_reftemp(self, reftemp):
+        '''set thermal reftemp'''
+        if self.thermal_param is None:
+            print("Run therm_getenv first")
+            return
+        p = copy.copy(self.thermal_param)
+        p.reflection_temperature = reftemp
+        self.send_packet_fmt(SET_THERMAL_PARAM, "<HHHHH", *p.args())
+        
     def clear_target(self):
         '''clear target position'''
         self.target_pos = None
@@ -677,10 +765,13 @@ class SIYIModule(mp_module.MPModule):
     def unpack(self, command_id, fmt, data):
         '''unpack SIYI data and log'''
         fsize = struct.calcsize(fmt)
+        if fsize != len(data):
+            print("cmd 0x%02x needs %u bytes got %u" % (command_id, fsize, len(data)))
+            return None
         v = struct.unpack(fmt, data[:fsize])
         args = list(v)
-        args.extend([0]*(10-len(args)))
-        self.logf.write('SIIN', 'QBffffffffff', 'TimeUS,Cmd,P1,P2,P3,P4,P5,P6,P7,P8,P9,P10', self.micros64(), command_id, *args)
+        args.extend([0]*(12-len(args)))
+        self.logf.write('SIIN', 'QBffffffffffff', 'TimeUS,Cmd,P1,P2,P3,P4,P5,P6,P7,P8,P9,P10,P11,P12', self.micros64(), command_id, *args)
         return v
 
     def parse_data(self, pkt):
@@ -705,10 +796,11 @@ class SIYIModule(mp_module.MPModule):
             return
 
         if cmd == ACQUIRE_FIRMWARE_VERSION:
-            (patch,minor,major,gpatch,gminor,gmajor) = self.unpack(cmd, "<BBBBBB", data)
+            patch,minor,major,gpatch,gminor,gmajor,zpatch,zminor,zmajor,_,_,_ = self.unpack(cmd, "<BBBBBBBBBBBB", data)
             self.have_version = True
             print("SIYI CAM %u.%u.%u" % (major, minor, patch))
             print("SIYI Gimbal %u.%u.%u" % (gmajor, gminor, gpatch))
+            print("SIYI Zoom %u.%u.%u" % (zmajor, zminor, zpatch))
             # change to white hot
             self.send_packet_fmt(SET_THERMAL_PALETTE, "<B", 0)
 
@@ -882,6 +974,24 @@ class SIYIModule(mp_module.MPModule):
             ok, = self.unpack(cmd,"<B", data)
             if ok:
                 self.thermal_capture_count += 1
+
+        elif cmd == GET_THERMAL_ENVSWITCH:
+            ok, = self.unpack(cmd,"<B", data)
+            print("ThermalEnvSwitch: %u" % ok)
+
+        elif cmd == SET_THERMAL_ENVSWITCH:
+            ok, = self.unpack(cmd,"<B", data)
+            print("ThermalEnvSwitch: %u" % ok)
+
+        elif cmd == SET_THERMAL_PARAM:
+            ok, = self.unpack(cmd,"<B", data)
+            print("SetThermalParam: %u" % ok)
+            
+        elif cmd == GET_THERMAL_PARAM:
+            dist,emiss,humidity,airtemp,reftemp, = self.unpack(cmd,"<HHHHH", data)
+            self.thermal_param = ThermalParameters(dist*0.01, emiss*0.01, humidity*0.01, airtemp*0.01, reftemp*0.01)
+            print("ThermalParam: %s" % self.thermal_param)
+
         elif cmd in [SET_ANGLE, CENTER, GIMBAL_ROTATION, ABSOLUTE_ZOOM, SET_IMAGE_TYPE,
                      REQUEST_CONTINUOUS_DATA, SET_THERMAL_PALETTE, MANUAL_ZOOM_AND_AUTO_FOCUS]:
             # an ack
