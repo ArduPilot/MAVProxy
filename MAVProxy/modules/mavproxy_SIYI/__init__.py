@@ -68,6 +68,9 @@ TEMPERATURE_BOX = 0x13
 GET_THERMAL_MODE = 0x33
 SET_THERMAL_MODE = 0x34
 GET_TEMP_FRAME = 0x35
+SET_WEAK_CONTROL = 0x71
+GET_THERMAL_GAIN = 0x37
+SET_THERMAL_GAIN = 0x38
 
 def crc16_from_bytes(bytes, initial=0):
     # CRC-16-CCITT
@@ -194,7 +197,7 @@ class SIYIModule(mp_module.MPModule):
         super(SIYIModule, self).__init__(mpstate, "SIYI", "SIYI camera support")
 
         self.add_command('siyi', self.cmd_siyi, "SIYI camera control",
-                         ["<rates|connect|autofocus|zoom|yaw|pitch|center|getconfig|angle|photo|recording|lock|follow|fpv|settarget|notarget|thermal|rgbview|tempsnap|get_thermal_mode>",
+                         ["<rates|connect|autofocus|zoom|yaw|pitch|center|getconfig|angle|photo|recording|lock|follow|fpv|settarget|notarget|thermal|rgbview|tempsnap|get_thermal_mode|thermal_gain|get_thermal_gain>",
                           "set (SIYISETTING)",
                           "imode <1|2|3|4|5|6|7|8|wide|zoom|split>",
                           "palette <WhiteHot|Sepia|Ironbow|Rainbow|Night|Aurora|RedHot|Jungle|Medical|BlackHot|GloryHot>",
@@ -218,9 +221,9 @@ class SIYIModule(mp_module.MPModule):
                                                      ('mount_yaw', float, 0),
                                                      ('lag', float, 0),
                                                      ('target_rate', float, 10),
-                                                     ('telem_hz', float, 5),
                                                      ('telem_rate', float, 4),
-                                                     ('att_send_hz', float, 4),
+                                                     ('att_send_hz', float, 10),
+                                                     ('mode_hz', float, 0),
                                                      ('temp_hz', float, 5),
                                                      ('rtsp_rgb', str, 'rtsp://192.168.144.25:8554/video1'),
                                                      ('rtsp_thermal', str, 'rtsp://192.168.144.25:8554/video2'),
@@ -238,16 +241,16 @@ class SIYIModule(mp_module.MPModule):
                                                      ('track_size_pct', float, 5.0),
                                                      ('threshold_temp', int, 50),
                                                      ('threshold_min', int, 240),
-                                                     ('los_correction', int, 1),
+                                                     ('los_correction', int, 0),
                                                      ('att_control', int, 0),
                                                      ('therm_cap_rate', float, 0),
                                                      ('show_horizon', int, 0),
                                                      MPSetting('thresh_climit', int, 50, range=(10,50)),
-                                                     MPSetting('thresh_volt', int, 50, range=(20,50)),
-                                                     MPSetting('thresh_ang', int, 300, range=(30,300)),
+                                                     MPSetting('thresh_volt', int, 80, range=(20,80)),
+                                                     MPSetting('thresh_ang', int, 4000, range=(30,4000)),
                                                      MPSetting('thresh_climit_dis', int, 20, range=(10,50)),
-                                                     MPSetting('thresh_volt_dis', int, 40, range=(20,50)),
-                                                     MPSetting('thresh_ang_dis', int, 40, range=(30,300)),
+                                                     MPSetting('thresh_volt_dis', int, 40, range=(20,80)),
+                                                     MPSetting('thresh_ang_dis', int, 40, range=(30,4000)),
                                                          ])
         self.add_completion_function('(SIYISETTING)',
                                      self.siyi_settings.completion)
@@ -280,7 +283,7 @@ class SIYIModule(mp_module.MPModule):
         self.last_enc_t = None
         self.last_enc_recv_t = time.time()
         self.last_volt_t = None
-        self.last_mode_t = None
+        self.last_mode_t = time.time()
         self.last_thresh_t = None
         self.last_thresh_send_t = None
         self.GLOBAL_POSITION_INT = None
@@ -306,6 +309,7 @@ class SIYIModule(mp_module.MPModule):
         self.last_SIEA = time.time()
         self.last_therm_cap = time.time()
         self.thermal_capture_count = 0
+        self.last_therm_mode = time.time()
 
         self.recv_thread = Thread(target=self.receive_thread, name='SIYI_Receive')
         self.recv_thread.daemon = True
@@ -332,6 +336,10 @@ class SIYIModule(mp_module.MPModule):
                                      MPMenuItem('ResetAttitude', 'ResetAttitude', '# siyi resetattitude '),
                                      MPMenuSubMenu('Zoom',
                                                    items=[MPMenuItem('Zoom%u'%z, 'Zoom%u'%z, '# siyi zoom %u ' % z) for z in range(1,11)]),
+                                     MPMenuSubMenu('ThermalGain',
+                                                   items=[MPMenuItem('HighGain', 'HighGain', '# siyi thermal_gain 1'),
+                                                          MPMenuItem('LowGain', 'LowGain', '# siyi thermal_gain 0')]),
+
                                      MPMenuSubMenu('Threshold',
                                                   items=[MPMenuItem('Threshold%u'%z, 'Threshold%u'%z, '# siyi set threshold_temp %u ' % z) for z in range(20,115,5)])])
             map = self.module('map')
@@ -384,6 +392,10 @@ class SIYIModule(mp_module.MPModule):
             self.send_packet_fmt(SET_THERMAL_MODE, "<B", int(args[1]))
         elif args[0] == "get_thermal_mode":
             self.send_packet_fmt(GET_THERMAL_MODE, None)
+        elif args[0] == "get_thermal_gain":
+            self.send_packet_fmt(GET_THERMAL_GAIN, None)
+        elif args[0] == "thermal_gain":
+            self.send_packet_fmt(SET_THERMAL_GAIN, "<B", int(args[1]))
         elif args[0] == "recording":
             self.send_packet_fmt(PHOTO, "<B", 2)
             self.send_packet(FUNCTION_FEEDBACK_INFO, None)
@@ -616,11 +628,17 @@ class SIYIModule(mp_module.MPModule):
         if self.last_thresh_t is None or now - self.last_thresh_t > 10:
             self.last_thresh_t = now
             self.send_packet_fmt(READ_THRESHOLDS, None)
+        if self.siyi_settings.mode_hz > 0 and now - self.last_mode_t > 1.0/self.siyi_settings.mode_hz:
+            self.last_mode_t = now
+            self.send_packet_fmt(READ_CONTROL_MODE, None)
+        if self.siyi_settings.therm_cap_rate > 0 and now - self.last_therm_mode > 2:
+            self.last_therm_mode = now
+            self.send_packet_fmt(GET_THERMAL_MODE, None)
 
     def send_attitude(self):
         '''send attitude to gimbal'''
         now = time.time()
-        if self.siyi_settings.att_send_hz <= 0 or now - self.last_att_send_t < 1.0/self.siyi_settings.telem_hz:
+        if self.siyi_settings.att_send_hz <= 0 or now - self.last_att_send_t < 1.0/self.siyi_settings.att_send_hz:
             return
         self.last_att_send_t = now
         att = self.master.messages.get('ATTITUDE',None)
@@ -630,14 +648,6 @@ class SIYIModule(mp_module.MPModule):
                              self.millis32(),
                              att.roll, att.pitch, att.yaw,
                              att.rollspeed, att.pitchspeed, att.yawspeed)
-        gpi = self.master.messages.get('GLOBAL_POSITION_INT',None)
-        if gpi is None:
-            return
-        #self.send_packet_fmt(VELOCITY_EXTERNAL, "<Ifff",
-        #                     self.millis32(),
-        #                     gpi.vx*0.01,
-        #                     gpi.vy*0.01,
-        #                     gpi.vz*0.01)
 
 
     def send_packet(self, command_id, pkt):
@@ -789,15 +799,24 @@ class SIYIModule(mp_module.MPModule):
                 new_thresh = (self.siyi_settings.thresh_climit,
                               self.siyi_settings.thresh_volt,
                               self.siyi_settings.thresh_ang)
+                weak_control = 0
             else:
                 new_thresh = (self.siyi_settings.thresh_climit_dis,
                               self.siyi_settings.thresh_volt_dis,
                               self.siyi_settings.thresh_ang_dis)
+                weak_control = 1
             if (climit != new_thresh[0] or volt_thresh != new_thresh[1] or ang_thresh != new_thresh[2]):
                 print("SIYI: Setting thresholds (%u,%u,%u) -> (%u,%u,%u)" %
                       (climit,volt_thresh,ang_thresh,new_thresh[0],new_thresh[1],new_thresh[2]))
                 self.send_packet_fmt(SET_THRESHOLDS, "<hhh",
                                      new_thresh[0], new_thresh[1], new_thresh[2])
+                self.send_packet_fmt(SET_WEAK_CONTROL,"<B", weak_control)
+
+        elif cmd == READ_CONTROL_MODE:
+            self.control_mode, = self.unpack(cmd, "<B", data)
+            self.send_named_float('CMODE', self.control_mode)
+            self.logf.write('SIMO', 'QB', 'TimeUS,Mode',
+                            self.micros64(), self.control_mode)
 
         elif cmd == READ_TEMP_FULL_SCREEN:
             if len(data) < 12:
@@ -839,12 +858,26 @@ class SIYIModule(mp_module.MPModule):
             ok, = self.unpack(cmd, "<B", data)
             if ok != 1:
                 print("Threshold set failure")
+        elif cmd == SET_WEAK_CONTROL:
+            ok,weak_control, = self.unpack(cmd, "<BB", data)
+            if ok != 1:
+                print("Weak control set failure")
+            else:
+                print("Weak control is %u" % weak_control)
         elif cmd == GET_THERMAL_MODE:
             ok, = self.unpack(cmd,"<B", data)
-            print("ThermalMode: %u" % ok)
+            if self.siyi_settings.therm_cap_rate > 0 and ok != 1:
+                print("ThermalMode: %u" % ok)
+                self.send_packet_fmt(SET_THERMAL_MODE, "<B", 1)
+
         elif cmd == SET_THERMAL_MODE:
             ok, = self.unpack(cmd,"<B", data)
             print("SetThermalMode: %u" % ok)
+
+        elif cmd == SET_THERMAL_GAIN:
+            ok, = self.unpack(cmd,"<B", data)
+            print("SetThermalGain: %u" % ok)
+
         elif cmd == GET_TEMP_FRAME:
             ok, = self.unpack(cmd,"<B", data)
             if ok:
