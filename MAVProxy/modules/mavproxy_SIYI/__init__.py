@@ -76,6 +76,7 @@ GET_THERMAL_PARAM = 0x39
 SET_THERMAL_PARAM = 0x3A
 GET_THERMAL_ENVSWITCH = 0x3B
 SET_THERMAL_ENVSWITCH = 0x3C
+SET_TIME = 0x30
 
 class ThermalParameters:
     def __init__(self, distance, target_emissivity, humidity, air_temperature, reflection_temperature):
@@ -222,7 +223,7 @@ class SIYIModule(mp_module.MPModule):
         super(SIYIModule, self).__init__(mpstate, "SIYI", "SIYI camera support")
 
         self.add_command('siyi', self.cmd_siyi, "SIYI camera control",
-                         ["<rates|connect|autofocus|zoom|yaw|pitch|center|getconfig|angle|photo|recording|lock|follow|fpv|settarget|notarget|thermal|rgbview|tempsnap|get_thermal_mode|thermal_gain|get_thermal_gain>",
+                         ["<rates|connect|autofocus|zoom|yaw|pitch|center|getconfig|angle|photo|recording|lock|follow|fpv|settarget|notarget|thermal|rgbview|tempsnap|get_thermal_mode|thermal_gain|get_thermal_gain|settime>",
                           "<therm_getenv|therm_set_distance|therm_set_emissivity|therm_set_humidity|therm_set_airtemp|therm_set_reftemp|therm_getswitch|therm_setswitch>",
                           "set (SIYISETTING)",
                           "imode <1|2|3|4|5|6|7|8|wide|zoom|split>",
@@ -271,6 +272,7 @@ class SIYIModule(mp_module.MPModule):
                                                      ('att_control', int, 0),
                                                      ('therm_cap_rate', float, 0),
                                                      ('show_horizon', int, 0),
+                                                     ('track_ROI', int, 1),
                                                      MPSetting('thresh_climit', int, 50, range=(10,50)),
                                                      MPSetting('thresh_volt', int, 80, range=(20,80)),
                                                      MPSetting('thresh_ang', int, 4000, range=(30,4000)),
@@ -462,6 +464,8 @@ class SIYIModule(mp_module.MPModule):
             self.send_packet_fmt(GET_THERMAL_ENVSWITCH, None)
         elif args[0] == "therm_setswitch":
             self.send_packet_fmt(SET_THERMAL_ENVSWITCH, "<B", int(args[1]))
+        elif args[0] == "settime":
+            self.cmd_settime()
         else:
             print(usage)
 
@@ -531,6 +535,11 @@ class SIYIModule(mp_module.MPModule):
         if pal is None:
             pal = int(args[0])
         self.send_packet_fmt(SET_THERMAL_PALETTE, "<B", pal)
+
+    def cmd_settime(self):
+        '''set camera time'''
+        t_us = int(time.time()*1.0e6)
+        self.send_packet_fmt(SET_TIME, "<Q", t_us)
 
     def video_filename(self, base):
         '''get a video file name'''
@@ -992,6 +1001,10 @@ class SIYIModule(mp_module.MPModule):
             self.thermal_param = ThermalParameters(dist*0.01, emiss*0.01, humidity*0.01, airtemp*0.01, reftemp*0.01)
             print("ThermalParam: %s" % self.thermal_param)
 
+        elif cmd == SET_TIME:
+            ok, = self.unpack(cmd,"<B", data)
+            print("SetTime: %u" % ok)
+            
         elif cmd in [SET_ANGLE, CENTER, GIMBAL_ROTATION, ABSOLUTE_ZOOM, SET_IMAGE_TYPE,
                      REQUEST_CONTINUOUS_DATA, SET_THERMAL_PALETTE, MANUAL_ZOOM_AND_AUTO_FOCUS]:
             # an ack
@@ -1201,7 +1214,7 @@ class SIYIModule(mp_module.MPModule):
         # added rate of target update
 
         map_module = self.module('map')
-        if map_module is not None and map_module.current_ROI != self.last_map_ROI:
+        if self.siyi_settings.track_ROI == 1 and map_module is not None and map_module.current_ROI != self.last_map_ROI:
             self.last_map_ROI = map_module.current_ROI
             (lat, lon, alt) = self.last_map_ROI
             self.clear_target()

@@ -41,7 +41,7 @@ def display_file(fname):
 
 def find_newest(dname):
     flist = glob.glob(dname + "/siyi*bin")
-    return max(flist, key=os.path.getmtime)
+    return max(flist, key=os.path.getctime)
 
 last_file = None
 
