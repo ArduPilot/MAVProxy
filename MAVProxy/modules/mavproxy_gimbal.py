@@ -145,11 +145,16 @@ class GimbalModule(mp_module.MPModule):
             print("usage: gimbal rate ROLL PITCH YAW")
             return
         (roll, pitch, yaw) = (float(args[0]), float(args[1]), float(args[2]))
-        self.master.mav.gimbal_control_send(self.target_system,
-                                            mavutil.mavlink.MAV_COMP_ID_GIMBAL,
-                                            radians(roll),
-                                            radians(pitch),
-                                            radians(yaw))
+        self.master.mav.gimbal_manager_set_attitude_send(
+            self.target_system,
+            self.target_component,
+            0,  # flags
+            0,  # instance, 0 is primary
+            [float("NaN"), float("NaN"), float("NaN"), float("NaN")],
+            radians(roll),
+            radians(pitch),
+            radians(yaw)
+        )
 
     def cmd_gimbal_point(self, args):
         '''control gimbal pointing'''
