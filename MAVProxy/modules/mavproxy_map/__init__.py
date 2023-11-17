@@ -58,7 +58,8 @@ class MapModule(mp_module.MPModule):
               ('showclicktime',int, 2),
               ('showwpnum',bool, True),
               ('showdirection', bool, False),
-              ('setpos_accuracy', float, 50)])
+              ('setpos_accuracy', float, 50),
+              ('font_size', float, 0.5) ])
         
         service='MicrosoftHyb'
         if 'MAP_SERVICE' in os.environ:
@@ -287,6 +288,7 @@ class MapModule(mp_module.MPModule):
         self.map.add_object(mp_slipmap.SlipClearLayer('LoiterCircles'))
         if not self.map_settings.showwpnum:
             return
+        font_size = self.map_settings.font_size
         for i in range(len(self.mission_list)):
             next_list = self.mission_list[i]
             for j in range(len(next_list)):
@@ -295,7 +297,7 @@ class MapModule(mp_module.MPModule):
                     label = self.label_for_waypoint(next_list[j])
                     colour = self.colour_for_wp(next_list[j])
                     self.map.add_object(mp_slipmap.SlipLabel(
-                        'miss_cmd %u/%u' % (i,j), polygons[i][j], label, 'Mission', colour=colour))
+                        'miss_cmd %u/%u' % (i,j), polygons[i][j], label, 'Mission', colour=colour, size=font_size))
 
                     if (self.map_settings.loitercircle and
                         self.module('wp').wploader.wp_is_loiter(next_list[j])):
