@@ -91,15 +91,16 @@ class SlipObject:
 
 class SlipLabel(SlipObject):
     '''a text label to display on the map'''
-    def __init__(self, key, point, label, layer, colour):
+    def __init__(self, key, point, label, layer, colour, size=0.5):
         SlipObject.__init__(self, key, layer)
         self.point = point
         self.colour = colour
         self.label = label
+        self.size = size
 
     def draw_label(self, img, pixmapper):
         pix1 = pixmapper(self.point)
-        cv2.putText(img, self.label, pix1, cv2.FONT_HERSHEY_SIMPLEX, 0.5, self.colour)
+        cv2.putText(img, self.label, pix1, cv2.FONT_HERSHEY_SIMPLEX, self.size, self.colour)
 
     def draw(self, img, pixmapper, bounds):
         if self.hidden:
