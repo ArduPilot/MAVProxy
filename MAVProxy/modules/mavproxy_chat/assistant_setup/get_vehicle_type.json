@@ -1,0 +1,14 @@
+{
+    "type": "function",
+    "function": {
+      "name": "get_vehicle_type",
+      "description": "Get the vehicle type (e.g. Copter, Plane, Rover, Boat, etc)",
+      "parameters": {
+        "type": "object",
+        "properties": {
+            "vehicle_type": {"type": "string", "description": "the vehicle type. Unknown if not known"}
+        },
+        "required": []
+      }
+    }
+}

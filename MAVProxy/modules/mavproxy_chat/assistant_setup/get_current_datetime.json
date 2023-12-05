@@ -1,0 +1,12 @@
+{
+  "type": "function",
+  "function": {
+    "name": "get_current_datetime",
+    "description": "Get the current date and time, e.g. 'Saturday, June 24, 2023 6:14:14 PM'",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  }
+}

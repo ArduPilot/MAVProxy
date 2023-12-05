@@ -1,0 +1,18 @@
+{
+  "type": "function",
+  "function": {
+    "name": "get_vehicle_location_and_yaw",
+    "description": "Get the vehicle's current location including latitude, longitude, altitude above sea level and altitude above home",
+    "parameters": {
+      "type": "object",
+      "properties": {
+          "latitude": {"type": "number", "description": "latitude in degrees"},
+          "longitude": {"type": "number", "description": "longitude in degrees"},
+          "altitude_amsl": {"type": "number", "description": "altitude above sea level in meters (aka AMSL)"},
+          "altitude_above_home": {"type": "number", "description": "altitude above home in meters"},
+          "yaw": {"type": "number", "description": "vehicle yaw (aka heading) in degrees"}
+      },
+      "required": []
+    }
+  }
+}

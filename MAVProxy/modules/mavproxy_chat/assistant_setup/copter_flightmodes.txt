@@ -1,0 +1,29 @@
+This file holds the Copter flight mode name to number mapping
+
+STABILIZE =     0,  // pilot directly controls the airframe angle with roll, pitch and yaw stick inputs.  Pilot directly controls throttle
+ACRO =          1,  // pilot directly controls the body-frame angular rate.  pilot directly controls throttle
+ALT_HOLD =      2,  // pilot directly controls the vehicle roll, pitch and yaw angles.  Pilot's throttle control controls climb rate
+AUTO =          3,  // fully automatic waypoint control using mission commands
+GUIDED =        4,  // fully automatic fly to coordinate or fly at velocity/direction using mavlink commands.
+LOITER =        5,  // pilot controls the vehicle's 3D speed and acceleration with roll, pitch and throttle input.  Heading is controlled with the yaw stick
+RTL =           6,  // automatic return to launching point
+CIRCLE =        7,  // automatic circular flight with automatic throttle
+LAND =          9,  // automatic landing with horizontal position control
+DRIFT =        11,  // semi-autonomous position, yaw and throttle control.  rarely used.
+SPORT =        13,  // manual earth-frame angular rate control with manual throttle.  very rarely used
+FLIP =         14,  // automatically flip the vehicle 360 degrees
+AUTOTUNE =     15,  // automatically tune the vehicle's roll and pitch gains
+POSHOLD =      16,  // automatic position hold with manual override, with automatic throttle.  very similar to Loiter mode
+BRAKE =        17,  // full-brake using inertial/GPS system, no pilot input
+THROW =        18,  // throw to launch mode using inertial/GPS system, no pilot input
+AVOID_ADSB =   19,  // automatic avoidance of manned vehicle.  very rarely used
+GUIDED_NOGPS = 20,  // guided mode but only accepts attitude and altitude commands
+SMART_RTL =    21,  // SMART_RTL returns vehicle home by retracing its steps
+FLOWHOLD  =    22,  // FLOWHOLD holds position with optical flow without rangefinder.  similar to Loiter.  very rarely used
+FOLLOW    =    23,  // follow attempts to follow another vehicle or ground station
+ZIGZAG    =    24,  // ZIGZAG mode is able to fly in a zigzag manner with predefined point A and point B.  Normally used for crop spraying vehicles.
+SYSTEMID  =    25,  // System ID mode produces automated system identification signals in the controllers.  very rarely used
+AUTOROTATE =   26,  // Autonomous autorotation.  Used only for traditional helicopters
+AUTO_RTL =     27,  // return to launch but using an Auto mission starting from the DO_LAND_START command
+TURTLE =       28,  // Flip vehicle to recover after crash
+

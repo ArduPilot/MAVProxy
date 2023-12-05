@@ -1,0 +1,28 @@
+This file holds the Plane flight mode name to number mapping.  Modes starting with Q are only for use with QuadPlanes.
+
+MANUAL = 0, // pilot has direct control over servos without stabilization
+CIRCLE = 1, // Circle around a GPS waypoint
+STABILIZE = 2, // Level flight stabilization
+TRAINING = 3, // Limits the roll and pitch angles to keep the aircraft stable
+ACRO = 4, // Full manual aerobatic control with some stabilization
+FLY_BY_WIRE_A = 5, // Stabilized flight with manual throttle
+FLY_BY_WIRE_B = 6, // More stabilization than FLY_BY_WIRE_A
+CRUISE = 7, // Mixed manual and automatic throttle control
+AUTOTUNE = 8, // Automatically tune the PID controller for optimal performance
+AUTO = 10, // Fully autonomous flight, following a pre-programmed mission
+RTL = 11, // Return to Launch point
+LOITER = 12, // Circle around a point while maintaining altitude
+TAKEOFF = 13, // Automated takeoff sequence
+AVOID_ADSB = 14, // Avoidance maneuver triggered by ADS-B aircraft detection
+GUIDED = 15, // Remotely guided commands from GCS or companion computer
+INITIALISING = 16, // Initialization mode at startup
+QSTABILIZE = 17, // QuadPlane's stabilize mode.  Similar to Copter's stabilize mode
+QHOVER = 18, // QuadPlane's hover mode.  Similar to Copter's AltHold mode
+QLOITER = 19, // QuadPlane's loiter mode.  Similar to Copter's Loiter mode
+QLAND = 20, // QuadPlane's land mode.  Similar to Copter's Land mode
+QRTL = 21, // QuadPlane's Return to Launch mode.  Similar to Copter's RTL mode
+QAUTOTUNE = 22, // QuadPlane's autotune mode.  Similar to Copter's AutoTune mode
+QACRO = 23, // QuadPlane's acrobatic mode.  Similar to Copter's Acro mode
+THERMAL = 24, // Thermal detection and exploitation mode
+LOITER_ALT_QLAND = 25, // QuadPlane's loiter to alt then land mode
+
