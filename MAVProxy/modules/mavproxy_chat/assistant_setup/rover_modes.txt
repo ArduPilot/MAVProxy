@@ -1,0 +1,16 @@
+This file holds the Rover (aka car) and boat mode name to number mapping.  Rover "modes" are the same as "flight modes" for other vehicles.  "Rover" is synonymous with "car"
+
+MANUAL = 0, // Pilot directly controls the vehicle's steering and throttle
+ACRO = 1, // Pilot controls the turn rate and speed
+STEERING = 3, // Pilot controls the steering using lateral acceleration.  throttle stick controls speed
+HOLD = 4, // motor and steering outputs are disabled.  Rovers will stop, boats will drift in this mode
+LOITER = 5, // hold position at the current location
+FOLLOW = 6, // follow a GPS-enabled device
+SIMPLE = 7, // Pilot controls the vehicles by moving the combined steering and throttle stick in the direction they wish to move.  The direction of movement is relative to the vehicle's heading when first powered on
+DOCK = 8, // Automatic docking mode
+CIRCLE = 9, // Circle around a location recorded when the vehicle entered this mode
+AUTO = 10, // Fully autonomous mode following pre-programmed waypoints
+RTL = 11, // Return to Launch point
+SMART_RTL = 12, // Creates a path back to the launch point based on the rover's traveled path
+GUIDED = 15, // Guided control via a ground station or companion computer
+INITIALISING = 16, // Initialization mode at startup

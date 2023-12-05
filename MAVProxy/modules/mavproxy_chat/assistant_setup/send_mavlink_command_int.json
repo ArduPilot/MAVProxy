@@ -1,0 +1,26 @@
+{
+  "type": "function",
+  "function": {
+    "name": "send_mavlink_command_int",
+    "description": "Send a mavlink COMMAND_INT message to the vehicle.  Available commands including changing the flight mode, arming, disarming, takeoff and commanding the vehicle to fly to a specific location",
+    "parameters": {
+      "type": "object",
+      "properties": {
+          "target_system": {"type": "integer", "minimum":0, "maximum":255, "description": "vehicle autopilot System ID.  normally 1"},
+          "target_component": {"type": "integer",  "minimum":0, "maximum":255, "description": "vehicle autopilot Component ID.  normally 1"},
+          "frame": {"type": "integer", "minimum":0, "maximum":21, "description": "altitude type.  see MAV_FRAME.  0 for altitude above sea level, 3 for altitude above home, 10 for altitude above terrain"},
+          "command": {"type": "integer",  "minimum":0, "maximum":65535, "description": "MAVLink command id.  See MAV_CMD for a full list of available commands"},
+          "current": {"type": "integer",  "description": "not used.  always zero"},
+          "autocontinue": {"type": "integer",  "description": "not used.  always zero"},
+          "param1": {"type": "number", "description": "parameter 1. see MAV_CMD enum"},
+          "param2": {"type": "number", "description": "parameter 2. see MAV_CMD enum"},
+          "param3": {"type": "number", "description": "parameter 3. see MAV_CMD enum"},
+          "param4": {"type": "number", "description": "parameter 4. see MAV_CMD enum"},
+          "x": {"type": "integer", "description": "latitude in degrees * 10^7"},
+          "y": {"type": "integer", "description": "longitude in degrees * 10^7"},
+          "z": {"type": "number", "description": "altitude in meters (relative to sea level, home or terrain depending on frame field)."}
+      },
+      "required": ["frame", "command"]
+    }
+  }
+}

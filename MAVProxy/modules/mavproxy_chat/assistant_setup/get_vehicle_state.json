@@ -1,0 +1,15 @@
+{
+  "type": "function",
+  "function": {
+    "name": "get_vehicle_state",
+    "description": "Get the vehicle state including armed status and (flight) mode",
+    "parameters": {
+      "type": "object",
+      "properties": {
+          "armed": {"type": "boolean", "description": "vehicle armed status.  True means motors can spin and vehicle can move."},
+          "mode": {"type": "number", "description": "flight flight mode.  The number is specific to the vehicle type (e.g. Copter, Plane, Rover"}
+      },
+      "required": []
+    }
+  }
+}
