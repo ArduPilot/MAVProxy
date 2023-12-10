@@ -97,7 +97,7 @@ class ParamEditorFrame(wx.Frame):
         self.ro_attr = wx.grid.GridCellAttr()
         self.ro_attr.SetReadOnly(True)
         self.ce_attr = wx.grid.GridCellAttr()
-        self.ce_attr.SetAlignment(hAlign=wx.ALIGN_CENTER, vAlign=wx.ALIGN_CENTER)
+        self.ce_attr.SetAlignment(hAlign=wx.ALIGN_CENTER, vAlign=wx.ALIGN_TOP)
         self.display_list.SetColAttr(PE_PARAM, self.ro_attr)
         self.display_list.SetColAttr(PE_UNITS, self.ro_attr)
         self.display_list.SetColAttr(PE_DESC, self.ro_attr)
