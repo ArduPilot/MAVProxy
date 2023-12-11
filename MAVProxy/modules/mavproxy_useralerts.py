@@ -142,31 +142,24 @@ class UserAlertsModule(mp_module.MPModule):
         the checks for applicable User Alerts'''
         self.board = None
         self.version = None
-        for messageID in [mavutil.mavlink.MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES, mavutil.mavlink.MAV_CMD_DO_SEND_BANNER]:
-            self.master.mav.command_long_send(
-                self.settings.target_system,  # target_system
-                self.settings.target_component, # target_component
-                messageID, # command
-                1, # confirmation
-                1, # param1
-                0, # param2
-                0, # param3
-                0, # param4
-                0, # param5
-                0, # param6
-                0) # param7
-        #self.master.mav.command_long_send(
-        #    self.settings.target_system,  # target_system
-        #    self.settings.target_component, # target_component
-        #    mavutil.mavlink.MAV_CMD_DO_SEND_BANNER, # command
-        #    1, # confirmation
-        #    0, # param1
-        #    0, # param2
-        #    0, # param3
-        #    0, # param4
-        #    0, # param5
-        #    0, # param6
-        #    0) # param7
+        self.master.mav.command_long_send(
+            self.settings.target_system,  # target_system
+            self.settings.target_component, # target_component
+            mavutil.mavlink.MAV_CMD_DO_SEND_BANNER, # command
+            1, # confirmation
+            1, # param1
+            0, # param2
+            0, # param3
+            0, # param4
+            0, # param5
+            0, # param6
+            0) # param7
+        self.master.mav.command_long_send(
+            self.settings.target_system,
+            self.settings.target_component,
+            mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE,
+            0, # confirmation
+            mavutil.mavlink.MAVLINK_MSG_ID_AUTOPILOT_VERSION, 0, 0, 0, 0, 0, 0)
 
     def cmd_check(self, args):
         '''Useralert operations'''
