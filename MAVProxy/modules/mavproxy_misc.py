@@ -322,23 +322,22 @@ class MiscModule(mp_module.MPModule):
         else:
             print("Usage: land [abort]")
 
-    def cmd_version(self, args):
-        '''show version'''
+    def request_message(self, message_id, p1=0):
         self.master.mav.command_long_send(
             self.settings.target_system,
             self.settings.target_component,
             mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE,
             0, # confirmation
-            mavutil.mavlink.MAVLINK_MSG_ID_AUTOPILOT_VERSION, 0, 0, 0, 0, 0, 0)
+            message_id, 0, 0, 0, 0, 0, 0)
+
+    def cmd_version(self, args):
+        '''show version'''
+        self.request_message(mavutil.mavlink.MAVLINK_MSG_ID_AUTOPILOT_VERSION)
 
     def cmd_capabilities(self, args):
         '''show capabilities'''
-        self.master.mav.command_long_send(self.settings.target_system,
-                                          self.settings.target_component,
-                                          mavutil.mavlink.MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES,
-                                          0,
-                                          1, 0, 0, 0, 0, 0, 0)
-        
+        self.request_message(mavutil.mavlink.MAVLINK_MSG_ID_AUTOPILOT_VERSION)
+
     def cmd_rcbind(self, args):
         '''start RC bind'''
         if len(args) < 1:
