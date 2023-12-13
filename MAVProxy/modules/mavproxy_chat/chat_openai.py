@@ -11,6 +11,7 @@ from pymavlink import mavutil
 import time
 from datetime import datetime
 import json
+import math
 
 try:
     from openai import OpenAI
@@ -183,6 +184,20 @@ class chat_openai():
                 recognised_function = True
                 output = json.dumps(self.get_vehicle_location_and_yaw())
 
+            # get_location_plus_offset
+            if tool_call.function.name == "get_location_plus_offset":
+                recognised_function = True
+                try:
+                    arguments = json.loads(tool_call.function.arguments)
+                except:
+                    print("chat::handle_function_call: get_location_plus_offset: failed to parse arguments")
+                    output = "get_location_plus_offset: failed to parse arguments"
+                try:
+                    output = json.dumps(self.get_location_plus_offset(arguments))
+                except:
+                    print("chat::handle_function_call: get_location_plus_offset: failed to calc location")
+                    output = "get_location_plus_offset: failed to get location"
+
             # send mavlink command_int
             if tool_call.function.name == "send_mavlink_command_int":
                 recognised_function = True
@@ -294,6 +309,20 @@ class chat_openai():
         }
         return location
 
+    # Calculate the latitude and longitude given distances (in meters) North and East
+    def get_location_plus_offset(self, arguments):
+        lat = arguments.get("latitude", 0)
+        lon = arguments.get("longitude", 0)
+        dist_north = arguments.get("distance_north", 0)
+        dist_east = arguments.get("distance_east", 0)
+        lat_lon_to_meters_scaling = 89.8320495336892 * 1e-7
+        lat_diff = dist_north * lat_lon_to_meters_scaling
+        lon_diff = dist_east * lat_lon_to_meters_scaling / max(0.01, math.cos(math.radians((lat+lat_diff)/2)))
+        return {
+            "latitude": self.wrap_latitude(lat + lat_diff),
+            "longitude": self.wrap_longitude(lon + lon_diff)
+        }
+
     # send a mavlink command_int message to the vehicle
     def send_mavlink_command_int(self, arguments):
         target_system = arguments.get("target_system", 1)
@@ -336,3 +365,19 @@ class chat_openai():
         yaw_rate = arguments.get("yaw_rate", 0)
         self.mpstate.master().mav.set_position_target_global_int_send(time_boot_ms, target_system, target_component, coordinate_frame, type_mask, lat_int, lon_int, alt, vx, vy, vz, afx, afy, afz, yaw, yaw_rate)
         return "set_position_target_global_int sent"
+
+    # wrap latitude to range -90 to 90
+    def wrap_latitude(self, latitude_deg):
+        if latitude_deg > 90:
+            return 180 - latitude_deg
+        if latitude_deg < -90:
+            return -(180 + latitude_deg)
+        return latitude_deg
+    
+    # wrap longitude to range -180 to 180
+    def wrap_longitude(self, longitude_deg):
+        if longitude_deg > 180:
+            return longitude_deg - 360
+        if longitude_deg < -180:
+            return longitude_deg + 360
+        return longitude_deg
