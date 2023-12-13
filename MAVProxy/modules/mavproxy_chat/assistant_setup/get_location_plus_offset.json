@@ -1,0 +1,17 @@
+{
+  "type": "function",
+  "function": {
+    "name": "get_location_plus_offset",
+    "description": "Calculate the latitude and longitude given an existing latitude and longitude and distances (in meters) North and East",
+    "parameters": {
+      "type": "object",
+      "properties": {
+          "latitude": {"type": "number", "description": "latitude in degrees"},
+          "longitude": {"type": "number", "description": "longitude in degrees"},
+          "distance_north": {"type": "number", "description": "distance to move North in meters"},
+          "distance_east": {"type": "number", "description": "distance to move East in meters"}
+      },
+      "required": ["latitude", "longitude", "distance_north", "distance_east"]
+    }
+  }
+}
