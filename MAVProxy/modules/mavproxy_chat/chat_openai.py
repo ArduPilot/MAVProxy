@@ -20,9 +20,12 @@ except:
     exit()
 
 class chat_openai():
-    def __init__(self, mpstate):
+    def __init__(self, mpstate, status_cb=None):
         # keep reference to mpstate
         self.mpstate = mpstate
+
+        # keep reference to status callback
+        self.status_cb = status_cb
 
         # initialise OpenAI connection
         self.client = None
@@ -123,8 +126,11 @@ class chat_openai():
                 self.handle_function_call(latest_run)
                 run_done = False
             else:
-                print ("chat: unrecognised run status" + latest_run.status)
+                print("chat: unrecognised run status" + latest_run.status)
                 run_done = True
+
+            # send status to status callback
+            self.send_status(latest_run.status)
 
         # retrieve messages on the thread
         reply_messages = self.client.beta.threads.messages.list(self.assistant_thread.id, order = "asc", after=input_message.id)
@@ -381,3 +387,8 @@ class chat_openai():
         if longitude_deg < -180:
             return longitude_deg + 360
         return longitude_deg
+
+    # send status to chat window via callback
+    def send_status(self, status):
+        if self.status_cb is not None:
+            self.status_cb(status)

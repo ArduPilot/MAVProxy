@@ -18,7 +18,7 @@ class chat_window():
         self.send_lock = Lock()
 
         # create chat_openai object
-        self.chat_openai = chat_openai.chat_openai(self.mpstate)
+        self.chat_openai = chat_openai.chat_openai(self.mpstate, self.set_status_text)
 
         # create chat_voice_to_text object
         self.chat_voice_to_text = chat_voice_to_text.chat_voice_to_text()
@@ -65,9 +65,13 @@ class chat_window():
         # add a reply box and read-only text box
         self.text_reply = wx.TextCtrl(self.frame, id=-1, size=(600, 80), style=wx.TE_READONLY | wx.TE_MULTILINE)
 
+        # add a read-only status text box at the bottom
+        self.text_status = wx.TextCtrl(self.frame, id=-1, size=(600, -1), style=wx.TE_READONLY)
+
         # set size hints and add sizer to frame
         self.vert_sizer.Add(self.horiz_sizer, proportion=0, flag=wx.EXPAND)
         self.vert_sizer.Add(self.text_reply, proportion=1, flag=wx.EXPAND, border=5)
+        self.vert_sizer.Add(self.text_status, proportion=0, flag=wx.EXPAND, border=5)
         self.frame.SetSizer(self.vert_sizer)
 
         # show frame
@@ -114,12 +118,14 @@ class chat_window():
         rec_filename = self.chat_voice_to_text.record_audio()
         if rec_filename is None:
             print("chat: audio recording failed")
+            self.set_status_text("Audio recording failed")
             return
 
         # convert audio to text and place in input box
         text = self.chat_voice_to_text.convert_audio_to_text(rec_filename)
         if text is None:
             print("chat: audio to text conversion failed")
+            self.set_status_text("Audio to text conversion failed")
             return
         wx.CallAfter(self.text_input.SetValue, text)
 
@@ -164,3 +170,7 @@ class chat_window():
             wx.CallAfter(self.record_button.Enable)
             wx.CallAfter(self.text_input.Enable)
             wx.CallAfter(self.send_button.Enable)
+
+    # set status text
+    def set_status_text(self, text):
+        wx.CallAfter(self.text_status.SetValue, text)
