@@ -1,0 +1,12 @@
+{
+  "type": "function",
+  "function": {
+    "name": "get_available_mavlink_messages",
+    "description": "Get a list of mavlink message names that can be retrieved using the get_mavlink_message function",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  }
+}

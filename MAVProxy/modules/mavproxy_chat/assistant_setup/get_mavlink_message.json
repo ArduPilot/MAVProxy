@@ -1,0 +1,14 @@
+{
+  "type": "function",
+  "function": {
+    "name": "get_mavlink_message",
+    "description": "Get a mavlink message including all fields and values sent by the vehicle.  The list of available messages can be retrieved using the get_available_mavlink_messages",
+    "parameters": {
+      "type": "object",
+      "properties": {
+          "message": {"type": "string", "description": "mavlink message name (e.g. HEARTBEAT, VFR_HUD, GLOBAL_POSITION_INT, etc)"}
+      },
+      "required": ["message"]
+    }
+  }
+}
