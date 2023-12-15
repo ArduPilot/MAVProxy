@@ -222,6 +222,22 @@ class chat_openai():
                 except:
                     print("chat: send_mavlink_set_position_target_global_int: failed to parse arguments")
 
+
+            # get a list of mavlink message names that can be retrieved using the get_mavlink_message function
+            if tool_call.function.name == "get_available_mavlink_messages":
+                recognised_function = True
+                output = self.get_available_mavlink_messages()
+
+            # get mavlink message from vehicle
+            if tool_call.function.name == "get_mavlink_message":
+                recognised_function = True
+                try:
+                    arguments = json.loads(tool_call.function.arguments)
+                    output = self.get_mavlink_message(arguments)
+                except:
+                    output = "get_mavlink_message: failed to retrieve message"
+                    print("chat: get_mavlink_message: failed to retrieve message")
+
             if not recognised_function:
                 print("chat: handle_function_call: unrecognised function call: " + tool_call.function.name)
                 output = "unrecognised function call: " + tool_call.function.name
@@ -371,6 +387,46 @@ class chat_openai():
         yaw_rate = arguments.get("yaw_rate", 0)
         self.mpstate.master().mav.set_position_target_global_int_send(time_boot_ms, target_system, target_component, coordinate_frame, type_mask, lat_int, lon_int, alt, vx, vy, vz, afx, afy, afz, yaw, yaw_rate)
         return "set_position_target_global_int sent"
+
+    # get a list of mavlink message names that can be retrieved using the get_mavlink_message function
+    def get_available_mavlink_messages(self):
+        # check if no messages available
+        if self.mpstate.master().messages is None or len(self.mpstate.master().messages) == 0:
+            return "get_available_mavlink_messages: no messages available"
+
+        # retrieve each available message's name
+        mav_msg_names = []
+        for msg in self.mpstate.master().messages:
+            # append all message names except MAV
+            if msg != "MAV":
+                mav_msg_names.append(msg)
+
+        # return list of message names
+        try:
+            return json.dumps(mav_msg_names)
+        except:
+            return "get_available_mavlink_messages: failed to convert message name list to json"
+
+    # get a mavlink message including all fields and values sent by the vehicle
+    def get_mavlink_message(self, arguments):
+        if arguments is None:
+            return "get_mavlink_message: arguments is None"
+
+        # retrieve requested message's name
+        mav_msg_name = arguments.get("message", None)
+        if mav_msg_name is None:
+            return "get_mavlink_message: message not specified"
+
+        # retrieve message
+        mav_msg = self.mpstate.master().messages.get(mav_msg_name, None)
+        if mav_msg is None:
+            return "get_mavlink_message: message not found"
+
+        # convert message to json
+        try:
+            return json.dumps(mav_msg.to_dict())
+        except:
+            return "get_mavlink_message: failed to convert message to json"
 
     # wrap latitude to range -90 to 90
     def wrap_latitude(self, latitude_deg):
