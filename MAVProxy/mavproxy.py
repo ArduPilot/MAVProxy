@@ -1273,6 +1273,8 @@ if __name__ == '__main__':
     parser.add_option("--aircraft", dest="aircraft", help="aircraft name", default=None)
     parser.add_option("--cmd", dest="cmd", help="initial commands", default=None, action='append')
     parser.add_option("--console", action='store_true', help="use GUI console")
+    parser.add_option("--heartbeat-rate",dest="heartbeat", default=1, type='float',
+                      help="MAVLink HEARTBEAT rate")
     if platform.system() == 'Windows':
         parser.add_option("--no-console", action='store_true', help="don't use GUI console")
     parser.add_option("--map", action='store_true', help="load map module")
@@ -1431,6 +1433,8 @@ if __name__ == '__main__':
 
     mpstate.settings.streamrate = opts.streamrate
     mpstate.settings.streamrate2 = opts.streamrate
+
+    mpstate.settings.heartbeat = opts.heartbeat
 
     if opts.state_basedir is not None:
         mpstate.settings.state_basedir = opts.state_basedir
