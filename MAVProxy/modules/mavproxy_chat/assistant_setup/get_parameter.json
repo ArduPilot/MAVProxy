@@ -1,0 +1,15 @@
+{
+  "type": "function",
+  "function": {
+    "name": "get_parameter",
+    "description": "Get a vehicle parameter's value.  The full list of available parameters and their values is available using the get_all_parameters function",
+    "parameters": {
+      "type": "object",
+      "properties": {
+          "name": {"type": "string", "description": "parameter name (e.g. ARMING_CHECK, LOG_BITMASK).  Regex expressions are supported"},
+          "value": {"type": "number", "description": "parameter value"}
+      },
+      "required": ["name"]
+    }
+  }
+}

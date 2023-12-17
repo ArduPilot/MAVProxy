@@ -1,0 +1,12 @@
+{
+  "type": "function",
+  "function": {
+    "name": "get_all_parameters",
+    "description": "Get all available parameter names and values",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  }
+}
