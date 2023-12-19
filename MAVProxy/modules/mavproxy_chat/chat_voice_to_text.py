@@ -19,6 +19,10 @@ class chat_voice_to_text():
         self.client = None
         self.assistant = None
 
+    # set the OpenAI API key
+    def set_api_key(self, api_key_str):
+        self.client = OpenAI(api_key = api_key_str)
+
     # check connection to OpenAI assistant and connect if necessary
     # returns True if connection is good, False if not
     def check_connection(self):
