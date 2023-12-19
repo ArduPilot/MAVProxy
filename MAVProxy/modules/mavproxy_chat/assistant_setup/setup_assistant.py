@@ -140,25 +140,34 @@ def main(openai_api_key=None, assistant_name=None, model_name=None, upgrade=Fals
             print("setup_assistant: failed to open file: " + filename)
             exit()
 
-        # if OpenAI has existing files with the same name, delete them
-        # Note: this is slightly dangerous because files in use by another assistant could be deleted
+        # check if OpenAI has existing files with the same name
+        file_needs_uploading = True
         for existing_file in existing_files.data:
             if filename == existing_file.filename:
-                try:
-                    client.files.delete(existing_file.id)
-                    print("setup_assistant: deleted existing file: " + filename)
-                except:
-                    print("setup_assistant: failed to delete file from OpenAI: " + filename)
-                    exit()
+                # if not upgrading, we associate the existing file with our assistant
+                if not upgrade:
+                    uploaded_file_ids.append(existing_file.id)
+                    print("setup_assistant: using existing file: " + filename)
+                    file_needs_uploading = False
+                else:
+                    # if upgrading them we delete and re-upload the file
+                    # Note: this is slightly dangerous because files in use by another assistant could be deleted
+                    try:
+                        client.files.delete(existing_file.id)
+                        print("setup_assistant: deleted existing file: " + filename)
+                    except:
+                        print("setup_assistant: failed to delete file from OpenAI: " + filename)
+                        exit()
 
         # upload file to OpenAI
-        try:
-            uploaded_file = client.files.create(file=file, purpose="assistants")
-            uploaded_file_ids.append(uploaded_file.id)
-            print("setup_assistant: uploaded: " + filename)
-        except:
-            print("setup_assistant: failed to upload file to OpenAI: " + filename)
-            exit()
+        if file_needs_uploading:
+            try:
+                uploaded_file = client.files.create(file=file, purpose="assistants")
+                uploaded_file_ids.append(uploaded_file.id)
+                print("setup_assistant: uploaded: " + filename)
+            except:
+                print("setup_assistant: failed to upload file to OpenAI: " + filename)
+                exit()
 
     # update assistant's accessible files
     try:
