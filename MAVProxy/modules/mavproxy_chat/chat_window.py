@@ -96,6 +96,7 @@ class chat_window():
     # set API key set button clicked
     def apikey_set_button_click(self, event):
         self.chat_openai.set_api_key(self.apikey_text_input.GetValue())
+        self.chat_voice_to_text.set_api_key(self.apikey_text_input.GetValue())
         self.apikey_frame.Hide()
 
     # API key close button clicked
