@@ -411,7 +411,7 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
                 ekf_counter += 1
                 if ekf_counter % options.ekf_sample != 0:
                     continue
-                (lat, lng) = pos
+                (lat, lng, alt) = pos
             elif type in ['NKF1','XKF1']:
                 pos = mavextra.ekf1_pos(m)
                 if pos is None:
@@ -419,7 +419,7 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
                 nkf_counter += 1
                 if nkf_counter % options.nkf_sample != 0:
                     continue
-                (lat, lng) = pos
+                (lat, lng, alt) = pos
             elif type in ['ANU5']:
                 (lat, lng) = (m.Alat*1.0e-7, m.Alng*1.0e-7)
             elif type in ['AHR2', 'POS', 'CHEK']:
