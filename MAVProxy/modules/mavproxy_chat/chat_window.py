@@ -117,21 +117,22 @@ class chat_window():
     # record button clicked
     def record_button_click_execute(self, event):
         # record audio
+        self.set_status_text("recording audio")
         rec_filename = self.chat_voice_to_text.record_audio()
         if rec_filename is None:
-            print("chat: audio recording failed")
-            self.set_status_text("Audio recording failed")
+            self.set_status_text("audio recording failed")
             return
 
         # convert audio to text and place in input box
+        self.set_status_text("converting audio to text")
         text = self.chat_voice_to_text.convert_audio_to_text(rec_filename)
-        if text is None:
-            print("chat: audio to text conversion failed")
-            self.set_status_text("Audio to text conversion failed")
+        if text is None or len(text) == 0:
+            self.set_status_text("audio to text conversion failed")
             return
         wx.CallAfter(self.text_input.SetValue, text)
 
         # send text to assistant
+        self.set_status_text("sending text to assistasnt")
         self.send_text_to_assistant()
 
     # send button clicked
@@ -140,6 +141,9 @@ class chat_window():
 
     # handle text input
     def text_input_change(self, event):
+        # protect against sending empty text
+        if self.text_input.GetValue() == "":
+            return
         # send text to assistant in a separate thread
         th = Thread(target=self.send_text_to_assistant)
         th.start()
