@@ -26,6 +26,7 @@ class chat_window():
         # create chat window
         self.app = wx.App()
         self.frame = wx.Frame(None, title="Chat", size=(650, 200))
+        self.frame.SetBackgroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW))
 
         # add menu
         self.menu = wx.Menu()
@@ -63,7 +64,7 @@ class chat_window():
         self.horiz_sizer.Add(self.send_button, proportion = 0, flag = wx.ALIGN_TOP | wx.ALL, border = 5)
 
         # add a reply box and read-only text box
-        self.text_reply = wx.TextCtrl(self.frame, id=-1, size=(600, 80), style=wx.TE_READONLY | wx.TE_MULTILINE)
+        self.text_reply = wx.TextCtrl(self.frame, id=-1, size=(600, 80), style=wx.TE_READONLY | wx.TE_MULTILINE | wx.TE_RICH)
 
         # add a read-only status text box at the bottom
         self.text_status = wx.TextCtrl(self.frame, id=-1, size=(600, -1), style=wx.TE_READONLY)
@@ -158,7 +159,7 @@ class chat_window():
 
             # copy user input text to reply box
             orig_text_attr = self.text_reply.GetDefaultStyle()
-            wx.CallAfter(self.text_reply.SetDefaultStyle, wx.TextAttr(wx.RED, alignment=wx.TEXT_ALIGNMENT_RIGHT))
+            wx.CallAfter(self.text_reply.SetDefaultStyle, wx.TextAttr(wx.RED))
             wx.CallAfter(self.text_reply.AppendText, send_text + "\n")
 
             # send text to assistant and place reply in reply box
