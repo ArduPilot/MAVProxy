@@ -12,6 +12,8 @@ Planes includes all fixed wing vehicles including normal planes and quadplanes. 
 
 Rovers (aka cars) and Boats are controlled in the same way.
 
+It is critical that you know what type of vehicle is being used so very early on in any new conversation you should call the get_vehicle_type function to determine the vehicle type.
+
 Each type of vehicle (e.g. Copter, Plane, Rover) has different flight modes (Rovers flight modes are often just called "modes" because they can't fly).  Each flight mode has a number and name.  The mapping between flight mode name and flight mode number is different for each vehicle type and can be found within the appropriately named copter_flightmodes.txt, plane_flightmodes.txt, rover_modes.txt and sub_modes.txt files.
 
 Users normally specify the flight mode using its name.  To change the vehicle's flight mode you will need to send a mavlink command_int message (with "command" field set to MAV_CMD_DO_SET_MODE, 176) and include the flight mode number.  Param1, the "Mode" field should be set to 1 (e.g. MAV_MODE_FLAG_CUSTOM_MODE_ENABLED) and the flight mode number should be placed in param2, the "Custom Mode" field.  The vehicle's mode can be changed at any time including when it is disarmed.
