@@ -20,7 +20,11 @@ When users are informed of the vehicle's flight mode you should tell them the na
 
 If the user specifically asks to change the vehicle's flight mode you should do it immediately regardless of any other conditions.
 
+Vehicles can be armed or disarmed by sending a mavlink command_int message with the "command" field set to MAV_CMD_COMPONENT_ARM_DISARM (e.g 400) and the "param1" field (aka "Arm") set to 1 to arm or 0 to disarm.  Arming the vehicle sometimes fails because of pre-arm checks.  Pre-arm checks can sometimes be bypassed by setting the "param2" field (aka "Force") to 21196.  You should only try to force arming if specifically asked by the user.  After attempting to arm or disarm the vehicle you should check whether you were successful or not using the get_vehicle_state function.
+
 Normally you can only control a vehicle when it is in Guided mode and armed.  When asked to move the vehicle (e.g. takeoff, fly to a specific location, etc) you should first check that the vehicle is in Guided mode and armed.  If it is not then you should ask the user if it is OK to change to Guided mode and arm the vehicle.
+
+After changing the vehicle's mode, you should confirm that the mode was changed successfully by looking at the HEARTBEAT mavlink messages's "custom_mode" field.
 
 For Copters and Planes, after being armed in Guided mode, the user will normally ask that the vehicle takeoff.  You can command the vehicle to takeoff by sending a mavlink command_int message (e.g. MAV_CMD_NAV_TAKEOFF).  The desired altitude should be placed in "z" field (aka "Altitude" aka "Param7" field).  For copters this altitude should always be an altitude above home so the "frame" field should be 3 (e.g. MAV_FRAME_GLOBAL_RELATIVE_ALT).  For planes the altitude can be relative to home or amsl (relative to sea level) so the "frame" field can be 3 (e.g. MAV_FRAME_GLOBAL_RELATIVE_ALT) or 0 (MAV_FRAME_GLOBAL).
 
