@@ -10,7 +10,7 @@ from MAVProxy.modules.mavproxy_chat import chat_openai, chat_voice_to_text
 from threading import Thread, Lock
 
 class chat_window():
-    def __init__(self, mpstate):
+    def __init__(self, mpstate, wait_for_command_ack_fn):
         # keep reference to mpstate
         self.mpstate = mpstate
 
@@ -18,7 +18,7 @@ class chat_window():
         self.send_lock = Lock()
 
         # create chat_openai object
-        self.chat_openai = chat_openai.chat_openai(self.mpstate, self.set_status_text)
+        self.chat_openai = chat_openai.chat_openai(self.mpstate, self.set_status_text, wait_for_command_ack_fn)
 
         # create chat_voice_to_text object
         self.chat_voice_to_text = chat_voice_to_text.chat_voice_to_text()
