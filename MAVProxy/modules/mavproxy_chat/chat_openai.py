@@ -20,12 +20,15 @@ except:
     exit()
 
 class chat_openai():
-    def __init__(self, mpstate, status_cb=None):
+    def __init__(self, mpstate, status_cb=None, wait_for_command_ack_fn=None):
         # keep reference to mpstate
         self.mpstate = mpstate
 
         # keep reference to status callback
         self.status_cb = status_cb
+
+        # keep reference to wait_for_command_ack_fn
+        self.wait_for_command_ack_fn = wait_for_command_ack_fn
 
         # initialise OpenAI connection
         self.client = None
@@ -393,7 +396,28 @@ class chat_openai():
         y = arguments.get("y", 0)
         z = arguments.get("z", 0)
         self.mpstate.master().mav.command_int_send(target_system, target_component, frame, command, current, autocontinue, param1, param2, param3, param4, x, y, z)
-        return "command_int sent"
+
+        # wait for command ack
+        mav_result = self.wait_for_command_ack_fn(command)
+
+        # check for timeout
+        if mav_result is None:
+            print("send_mavlink_command_int: timed out")
+            return "command_int timed out"
+
+        # update assistant with result
+        if mav_result == mavutil.mavlink.MAV_RESULT_ACCEPTED:
+            return "command_int succeeded"
+        if mav_result == mavutil.mavlink.MAV_RESULT_FAILED:
+            return "command_int failed"
+        if mav_result == mavutil.mavlink.MAV_RESULT_DENIED:
+            return "command_int denied"
+        if mav_result == mavutil.mavlink.MAV_RESULT_UNSUPPORTED:
+            return "command_int unsupported"
+        if mav_result == mavutil.mavlink.MAV_RESULT_TEMPORARILY_REJECTED:
+            return "command_int temporarily rejected"
+        print("send_mavlink_command_int: received unexpected command ack result")
+        return "command_int unknown result"
 
     # send a mavlink send_mavlink_set_position_target_global_int message to the vehicle
     def send_mavlink_set_position_target_global_int(self, arguments):
