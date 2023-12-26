@@ -10,6 +10,7 @@ MAVProxy chat wiki: https://ardupilot.org/mavproxy/docs/modules/chat.html
 from pymavlink import mavutil
 import time, re
 from datetime import datetime
+from threading import Thread
 import json
 import math
 
@@ -29,6 +30,11 @@ class chat_openai():
 
         # keep reference to wait_for_command_ack_fn
         self.wait_for_command_ack_fn = wait_for_command_ack_fn
+
+        # wakeup timer array
+        self.wakeup_schedule = []
+        self.thread = Thread(target=self.check_wakeup_timers)
+        self.thread.start()
 
         # initialise OpenAI connection
         self.client = None
@@ -270,6 +276,36 @@ class chat_openai():
                 except:
                     output = "set_parameter: failed to set parameter value"
                     print("chat: set_parameter: failed to set parameter value")
+
+            # set a wakeup timer
+            if tool_call.function.name == "set_wakeup_timer":
+                recognised_function = True
+                try:
+                    arguments = json.loads(tool_call.function.arguments)
+                    output = self.set_wakeup_timer(arguments)
+                except:
+                    output = tool_call.function.name + ": failed"
+                    print("chat: " + output)
+
+            # get wakeup timers
+            if tool_call.function.name == "get_wakeup_timers":
+                recognised_function = True
+                try:
+                    arguments = json.loads(tool_call.function.arguments)
+                    output = self.get_wakeup_timers(arguments)
+                except:
+                    output = tool_call.function.name + ": failed"
+                    print("chat: " + output)
+
+            # delete wakeup timers
+            if tool_call.function.name == "delete_wakeup_timers":
+                recognised_function = True
+                try:
+                    arguments = json.loads(tool_call.function.arguments)
+                    output = self.delete_wakeup_timers(arguments)
+                except:
+                    output = tool_call.function.name + ": failed"
+                    print("chat: " + output)
 
             if not recognised_function:
                 print("chat: handle_function_call: unrecognised function call: " + tool_call.function.name)
@@ -537,6 +573,105 @@ class chat_openai():
             return "set_parameter: value not specified"
         self.mpstate.functions.param_set(param_name, param_value, retries=3)
         return "set_parameter: parameter value set"
+
+    # set a wakeup timer
+    def set_wakeup_timer(self, arguments):
+        # check required arguments are specified
+        seconds = arguments.get("seconds", -1)
+        if seconds < 0:
+            return "set_wakeup_timer: seconds not specified"
+        message = arguments.get("message", None)
+        if message is None:
+            return "set_wakeup_timer: message not specified"
+
+        # add timer to wakeup schedule
+        self.wakeup_schedule.append({"time": time.time() + seconds, "message": message})
+        return "set_wakeup_timer: wakeup timer set"
+
+    # get wake timers
+    def get_wakeup_timers(self, arguments):
+        # check message argument, default to None meaning all
+        message = arguments.get("message", None)
+
+        # prepare list of matching timers
+        matching_timers = []
+
+        # handle simple case of all timers
+        if message is None:
+            matching_timers = self.wakeup_schedule
+
+        # handle regex in message
+        elif self.contains_regex(message):
+            message_pattern = re.compile(message, re.IGNORECASE)
+            for wakeup_timer in self.wakeup_schedule:
+                if message_pattern.match(wakeup_timer["message"]) is not None:
+                    matching_timers.append(wakeup_timer)
+
+        # handle case of a specific message
+        else:
+            for wakeup_timer in self.wakeup_schedule:
+                if wakeup_timer["message"] == message:
+                    matching_timers.append(wakeup_timer)
+
+        # return matching timers
+        try:
+            return json.dumps(matching_timers)
+        except:
+            return "get_wakeup_timers: failed to convert wakeup timer list to json"
+
+    # delete wake timers
+    def delete_wakeup_timers(self, arguments):
+        # check message argument, default to all
+        message = arguments.get("message", None)
+
+        # find matching timers
+        num_timers_deleted = 0
+
+        # handle simple case of deleting all timers
+        if message is None:
+            num_timers_deleted = len(self.wakeup_schedule)
+            self.wakeup_schedule.clear()
+
+        # handle regex in message
+        elif self.contains_regex(message):
+            message_pattern = re.compile(message, re.IGNORECASE)
+            for wakeup_timer in self.wakeup_schedule:
+                if message_pattern.match(wakeup_timer["message"]) is not None:
+                    num_timers_deleted = num_timers_deleted + 1
+                    self.wakeup_schedule.remove(wakeup_timer)
+        else:
+            # handle simple case of a single message
+            for wakeup_timer in self.wakeup_schedule:
+                if wakeup_timer["message"] == message:
+                    num_timers_deleted = num_timers_deleted + 1
+                    self.wakeup_schedule.remove(wakeup_timer)
+
+        # return number deleted and remaining
+        return "delete_wakeup_timers: deleted " + str(num_timers_deleted) + " timers, " + str(len(self.wakeup_schedule)) + " remaining"
+
+    # check if any wakeup timers have expired and send messages if they have
+    # this function never returns so it should be called from a new thread
+    def check_wakeup_timers(self):
+        while True:
+            # wait for one second
+            time.sleep(1)
+
+            # check if any timers are set
+            if len(self.wakeup_schedule) == 0:
+                continue
+
+            # get current time
+            now = time.time()
+
+            # check if any timers have expired
+            for wakeup_timer in self.wakeup_schedule:
+                if now >= wakeup_timer["time"]:
+                    # send message to assistant
+                    message = "WAKEUP:" + wakeup_timer["message"]
+                    self.send_to_assistant(message)
+
+                    # remove from wakeup schedule
+                    self.wakeup_schedule.remove(wakeup_timer)
 
     # wrap latitude to range -90 to 90
     def wrap_latitude(self, latitude_deg):
