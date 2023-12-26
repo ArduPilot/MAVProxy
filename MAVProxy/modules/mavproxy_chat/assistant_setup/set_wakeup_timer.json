@@ -1,0 +1,15 @@
+{
+  "type": "function",
+  "function": {
+    "name": "set_wakeup_timer",
+    "description": "Set a timer to wake you up in a specified number of seconds in the future.  This allows taking actions in the future.  The wakeup message will appear with the user role but will look something like WAKEUP:<message>.  Multiple wakeup messages are supported",
+    "parameters": {
+      "type": "object",
+      "properties": {
+          "seconds": {"type": "number", "description": "number of seconds in the future that the timer will wake you up"},
+          "message": {"type": "string", "description": "wakeup message that will be sent to you"}
+      },
+      "required": ["seconds", "message"]
+    }
+  }
+}

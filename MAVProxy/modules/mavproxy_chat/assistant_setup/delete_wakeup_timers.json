@@ -1,0 +1,14 @@
+{
+  "type": "function",
+  "function": {
+    "name": "delete_wakeup_timers",
+    "description": "Delete all active wakeup timers. You can optionally provide a message parameter to filter which timers will be deleted based on their message. When specifying the message parameter, you can use regular expressions (regex) to match patterns within the timer messages. This is useful when you want to delete timers with specific keywords or patterns in their message. For example, to delete all timers containing the word 'hello', you can use the regex '.*hello.*', where the dot-star (.*) pattern matches any character sequence.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+          "message": {"type": "string", "description": "wakeup message of timers to be deleted.  regex values are accepted."}
+      },
+      "required": []
+    }
+  }
+}
