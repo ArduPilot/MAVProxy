@@ -1,0 +1,15 @@
+{
+  "type": "function",
+  "function": {
+    "name": "get_mode_mapping",
+    "description": "Get a list of mode names to mode numbers available for this vehicle.  If the name or number parameter is provided only that mode's name and number will be returned.  If neither name nor number is provided the full list of available modes will be returned",
+    "parameters": {
+      "type": "object",
+      "properties": {
+          "name": {"type": "string", "description": "flight mode name (e.g. Guided, Loiter, RTL)"},
+          "number": {"type": "number", "description": "flight mode number"}
+      },
+      "required": []
+    }
+  }
+}
