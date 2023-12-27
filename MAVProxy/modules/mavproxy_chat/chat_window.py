@@ -7,15 +7,12 @@ Chat window for input and output of AI chat
 
 from MAVProxy.modules.lib.wx_loader import wx
 from MAVProxy.modules.mavproxy_chat import chat_openai, chat_voice_to_text
-from threading import Thread, Lock
+from threading import Thread
 
 class chat_window():
     def __init__(self, mpstate, wait_for_command_ack_fn):
         # keep reference to mpstate
         self.mpstate = mpstate
-
-        # lock to prevent multiple threads sending text to the assistant at the same time
-        self.send_lock = Lock()
 
         # create chat_openai object
         self.chat_openai = chat_openai.chat_openai(self.mpstate, self.set_status_text, wait_for_command_ack_fn)
@@ -150,32 +147,30 @@ class chat_window():
 
     # send text to assistant.  should be called from a separate thread to avoid blocking
     def send_text_to_assistant(self):
-        # get lock
-        with self.send_lock:
-            # disable buttons and text input to stop multiple inputs (can't be done from a thread or must use CallAfter)
-            wx.CallAfter(self.record_button.Disable)
-            wx.CallAfter(self.text_input.Disable)
-            wx.CallAfter(self.send_button.Disable)
+        # disable buttons and text input to stop multiple inputs (can't be done from a thread or must use CallAfter)
+        wx.CallAfter(self.record_button.Disable)
+        wx.CallAfter(self.text_input.Disable)
+        wx.CallAfter(self.send_button.Disable)
 
-            # get text from text input and clear text input
-            send_text = self.text_input.GetValue()
-            wx.CallAfter(self.text_input.Clear)
+        # get text from text input and clear text input
+        send_text = self.text_input.GetValue()
+        wx.CallAfter(self.text_input.Clear)
 
-            # copy user input text to reply box
-            orig_text_attr = self.text_reply.GetDefaultStyle()
-            wx.CallAfter(self.text_reply.SetDefaultStyle, wx.TextAttr(wx.RED))
-            wx.CallAfter(self.text_reply.AppendText, send_text + "\n")
+        # copy user input text to reply box
+        orig_text_attr = self.text_reply.GetDefaultStyle()
+        wx.CallAfter(self.text_reply.SetDefaultStyle, wx.TextAttr(wx.RED))
+        wx.CallAfter(self.text_reply.AppendText, send_text + "\n")
 
-            # send text to assistant and place reply in reply box
-            reply = self.chat_openai.send_to_assistant(send_text)
-            if reply:
-                wx.CallAfter(self.text_reply.SetDefaultStyle, orig_text_attr)
-                wx.CallAfter(self.text_reply.AppendText, reply + "\n\n")
+        # send text to assistant and place reply in reply box
+        reply = self.chat_openai.send_to_assistant(send_text)
+        if reply:
+            wx.CallAfter(self.text_reply.SetDefaultStyle, orig_text_attr)
+            wx.CallAfter(self.text_reply.AppendText, reply + "\n\n")
 
-            # reenable buttons and text input (can't be done from a thread or must use CallAfter)
-            wx.CallAfter(self.record_button.Enable)
-            wx.CallAfter(self.text_input.Enable)
-            wx.CallAfter(self.send_button.Enable)
+        # reenable buttons and text input (can't be done from a thread or must use CallAfter)
+        wx.CallAfter(self.record_button.Enable)
+        wx.CallAfter(self.text_input.Enable)
+        wx.CallAfter(self.send_button.Enable)
 
     # set status text
     def set_status_text(self, text):

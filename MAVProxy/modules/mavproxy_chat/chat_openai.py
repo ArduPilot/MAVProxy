@@ -10,7 +10,7 @@ MAVProxy chat wiki: https://ardupilot.org/mavproxy/docs/modules/chat.html
 from pymavlink import mavutil
 import time, re
 from datetime import datetime
-from threading import Thread
+from threading import Thread, Lock
 import json
 import math
 
@@ -30,6 +30,9 @@ class chat_openai():
 
         # keep reference to wait_for_command_ack_fn
         self.wait_for_command_ack_fn = wait_for_command_ack_fn
+
+        # lock to prevent multiple threads sending text to the assistant at the same time
+        self.send_lock = Lock()
 
         # wakeup timer array
         self.wakeup_schedule = []
@@ -93,71 +96,74 @@ class chat_openai():
 
     # send text to assistant
     def send_to_assistant(self, text):
-        # check connection
-        if not self.check_connection():
-            return "chat: failed to connect to OpenAI"
+        # get lock
+        with self.send_lock:
 
-        # create a new message
-        input_message = self.client.beta.threads.messages.create(
-            thread_id=self.assistant_thread.id,
-            role="user",
-            content=text
-        )
-        if input_message is None:
-            return "chat: failed to create input message"
+            # check connection
+            if not self.check_connection():
+                return "chat: failed to connect to OpenAI"
 
-        # create a run
-        self.run = self.client.beta.threads.runs.create(
-            thread_id=self.assistant_thread.id,
-            assistant_id=self.assistant.id
-        )
-        if self.run is None:
-            return "chat: failed to create run"
-
-        # wait for run to complete
-        run_done = False
-        while not run_done:
-            # wait for one second
-            time.sleep(0.1)
-
-            # retrieve the run        
-            latest_run = self.client.beta.threads.runs.retrieve(
+            # create a new message
+            input_message = self.client.beta.threads.messages.create(
                 thread_id=self.assistant_thread.id,
-                run_id=self.run.id
+                role="user",
+                content=text
             )
+            if input_message is None:
+                return "chat: failed to create input message"
 
-            # check run status
-            if latest_run.status in ["queued", "in_progress", "cancelling"]:
-                run_done = False
-            elif latest_run.status in ["cancelled", "failed", "completed", "expired"]:
-                run_done = True
-            elif latest_run.status in ["requires_action"]:
-                self.handle_function_call(latest_run)
-                run_done = False
-            else:
-                print("chat: unrecognised run status" + latest_run.status)
-                run_done = True
+            # create a run
+            self.run = self.client.beta.threads.runs.create(
+                thread_id=self.assistant_thread.id,
+                assistant_id=self.assistant.id
+            )
+            if self.run is None:
+                return "chat: failed to create run"
 
-            # send status to status callback
-            self.send_status(latest_run.status)
+            # wait for run to complete
+            run_done = False
+            while not run_done:
+                # wait for one second
+                time.sleep(0.1)
 
-        # retrieve messages on the thread
-        reply_messages = self.client.beta.threads.messages.list(self.assistant_thread.id, order = "asc", after=input_message.id)
-        if reply_messages is None:
-            return "chat: failed to retrieve messages"
+                # retrieve the run        
+                latest_run = self.client.beta.threads.runs.retrieve(
+                    thread_id=self.assistant_thread.id,
+                    run_id=self.run.id
+                )
 
-        # concatenate all messages into a single reply skipping the first which is our question
-        reply = ""
-        need_newline = False
-        for message in reply_messages.data:
-            reply = reply + message.content[0].text.value
-            if need_newline:
-                reply = reply + "\n"
-            need_newline = True
+                # check run status
+                if latest_run.status in ["queued", "in_progress", "cancelling"]:
+                    run_done = False
+                elif latest_run.status in ["cancelled", "failed", "completed", "expired"]:
+                    run_done = True
+                elif latest_run.status in ["requires_action"]:
+                    self.handle_function_call(latest_run)
+                    run_done = False
+                else:
+                    print("chat: unrecognised run status" + latest_run.status)
+                    run_done = True
 
-        if reply is None or reply == "":
-            return "chat: failed to retrieve latest reply"
-        return reply
+                # send status to status callback
+                self.send_status(latest_run.status)
+
+            # retrieve messages on the thread
+            reply_messages = self.client.beta.threads.messages.list(self.assistant_thread.id, order = "asc", after=input_message.id)
+            if reply_messages is None:
+                return "chat: failed to retrieve messages"
+
+            # concatenate all messages into a single reply skipping the first which is our question
+            reply = ""
+            need_newline = False
+            for message in reply_messages.data:
+                reply = reply + message.content[0].text.value
+                if need_newline:
+                    reply = reply + "\n"
+                need_newline = True
+
+            if reply is None or reply == "":
+                return "chat: failed to retrieve latest reply"
+            return reply
 
     # handle function call request from assistant
     # on success this returns the text response that should be sent to the assistant, returns None on failure
