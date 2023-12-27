@@ -195,6 +195,16 @@ class chat_openai():
                 recognised_function = True
                 output = json.dumps(self.get_vehicle_type())
 
+            # get mode mapping
+            if tool_call.function.name == "get_mode_mapping":
+                recognised_function = True
+                try:
+                    arguments = json.loads(tool_call.function.arguments)
+                    output = self.get_mode_mapping(arguments)
+                except:
+                    output = tool_call.function.name + ": failed"
+                    print("chat: " + output)
+
             # get vehicle state including armed, mode
             if tool_call.function.name == "get_vehicle_state":
                 recognised_function = True
@@ -368,6 +378,49 @@ class chat_openai():
         return {
             "vehicle_type": vehicle_type_str
         }
+
+    # get mode mapping
+    def get_mode_mapping(self, arguments):
+        # get name and/or number arguments
+        mode_name = arguments.get("name", None)
+        if mode_name is not None:
+            mode_name = mode_name.upper()
+        mode_number = arguments.get("number", None)
+        if mode_number is not None:
+            mode_number = int(mode_number)
+
+        # check mode mapping is available
+        if self.mpstate.master() is None or self.mpstate.master().mode_mapping() is None:
+            return "get_mode_mapping: failed to retrieve mode mapping"
+
+        # prepare list of modes
+        mode_list = []
+        mode_mapping = self.mpstate.master().mode_mapping()
+        
+        # handle request for all modes
+        if mode_name is None and mode_number is None:
+            for mname in mode_mapping:
+                mnumber = mode_mapping[mname]
+                mode_list.append({"name": mname.upper(), "number": mnumber})
+
+        # handle request using mode name
+        elif mode_name is not None:
+            for mname in mode_mapping:
+                if mname.upper() == mode_name:
+                    mode_list.append({"name": mname.upper(), "number": mode_mapping[mname]})
+
+        # handle request using mode number
+        elif mode_number is not None:
+            for mname in mode_mapping:
+                mnumber = mode_mapping[mname]
+                if mnumber == mode_number:
+                    mode_list.append({"name": mname.upper(), "number": mnumber})
+
+        # return list of modes
+        try:
+            return json.dumps(mode_list)
+        except:
+            return "get_mode_mapping: failed to convert mode list to json"
 
     # get vehicle state including armed, mode
     def get_vehicle_state(self):
