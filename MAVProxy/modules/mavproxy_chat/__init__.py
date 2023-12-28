@@ -64,6 +64,9 @@ class chat(mp_module.MPModule):
 
     # handle mavlink packet
     def mavlink_packet(self, m):
+        # ignore messages that are not from our vehicle
+        if m.get_srcSystem() != self.mpstate.settings.target_system:
+            return
         if m.get_type() == 'COMMAND_ACK':
             self.handle_command_ack(m)
 

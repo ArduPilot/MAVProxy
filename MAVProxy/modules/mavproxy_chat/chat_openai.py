@@ -348,7 +348,7 @@ class chat_openai():
     # get vehicle vehicle type (e.g. "Copter", "Plane", "Rover", "Boat", etc)
     def get_vehicle_type(self):
         # get vehicle type from latest HEARTBEAT message
-        hearbeat_msg = self.mpstate.master().messages.get('HEARTBEAT', None)
+        hearbeat_msg = self.mpstate.master(self.mpstate.settings.target_system).messages.get('HEARTBEAT', None)
         vehicle_type_str = "unknown"
         if hearbeat_msg is not None:
             if hearbeat_msg.type in [mavutil.mavlink.MAV_TYPE_FIXED_WING,
@@ -390,12 +390,13 @@ class chat_openai():
             mode_number = int(mode_number)
 
         # check mode mapping is available
-        if self.mpstate.master() is None or self.mpstate.master().mode_mapping() is None:
+        vehicle_sysid = self.mpstate.settings.target_system
+        if self.mpstate.master(vehicle_sysid) is None or self.mpstate.master(vehicle_sysid).mode_mapping() is None:
             return "get_mode_mapping: failed to retrieve mode mapping"
 
         # prepare list of modes
         mode_list = []
-        mode_mapping = self.mpstate.master().mode_mapping()
+        mode_mapping = self.mpstate.master(vehicle_sysid).mode_mapping()
         
         # handle request for all modes
         if mode_name is None and mode_number is None:
@@ -424,15 +425,15 @@ class chat_openai():
 
     # get vehicle state including armed, mode
     def get_vehicle_state(self):
-        # get mode from latest HEARTBEAT message
-        hearbeat_msg = self.mpstate.master().messages.get('HEARTBEAT', None)
-        if hearbeat_msg is None:
+        vehicle_sysid = self.mpstate.settings.target_system
+        heartbeat_msg = self.mpstate.master(vehicle_sysid).messages.get('HEARTBEAT', None)
+        if heartbeat_msg is None:
             mode_number = 0
             print ("chat: get_vehicle_state: vehicle mode is unknown")
         else:
-            mode_number = hearbeat_msg.custom_mode
+            mode_number = heartbeat_msg.custom_mode
         return {
-            "armed": (self.mpstate.master().motors_armed() > 0),
+            "armed": (self.mpstate.master(vehicle_sysid).motors_armed() > 0),
             "mode": mode_number
         }
 
@@ -443,7 +444,7 @@ class chat_openai():
         alt_amsl_m = 0
         alt_rel_m = 0
         yaw_deg = 0
-        gpi = self.mpstate.master().messages.get('GLOBAL_POSITION_INT', None)
+        gpi = self.mpstate.master(self.mpstate.settings.target_system).messages.get('GLOBAL_POSITION_INT', None)
         if gpi:
             lat_deg = gpi.lat * 1e-7,
             lon_deg = gpi.lon * 1e-7,
@@ -475,7 +476,8 @@ class chat_openai():
 
     # send a mavlink command_int message to the vehicle
     def send_mavlink_command_int(self, arguments):
-        target_system = arguments.get("target_system", 1)
+        vehicle_sysid = self.mpstate.settings.target_system
+        target_system = arguments.get("target_system", vehicle_sysid)
         target_component = arguments.get("target_component", 1)
         frame = arguments.get("frame", 0)
         if ("command" not in arguments):
@@ -490,7 +492,7 @@ class chat_openai():
         x = arguments.get("x", 0)
         y = arguments.get("y", 0)
         z = arguments.get("z", 0)
-        self.mpstate.master().mav.command_int_send(target_system, target_component, frame, command, current, autocontinue, param1, param2, param3, param4, x, y, z)
+        self.mpstate.master(vehicle_sysid).mav.command_int_send(target_system, target_component, frame, command, current, autocontinue, param1, param2, param3, param4, x, y, z)
 
         # wait for command ack
         mav_result = self.wait_for_command_ack_fn(command)
@@ -518,8 +520,9 @@ class chat_openai():
     def send_mavlink_set_position_target_global_int(self, arguments):
         if arguments is None:
             return "send_mavlink_set_position_target_global_int: arguments is None"
+        vehicle_sysid = self.mpstate.settings.target_system
         time_boot_ms = arguments.get("time_boot_ms", 0)
-        target_system = arguments.get("target_system", 1)
+        target_system = arguments.get("target_system", vehicle_sysid)
         target_component = arguments.get("target_component", 1)
         coordinate_frame = arguments.get("coordinate_frame", 5)
         type_mask = arguments.get("type_mask", 0)
@@ -534,18 +537,19 @@ class chat_openai():
         afz = arguments.get("afz", 0)
         yaw = arguments.get("yaw", 0)
         yaw_rate = arguments.get("yaw_rate", 0)
-        self.mpstate.master().mav.set_position_target_global_int_send(time_boot_ms, target_system, target_component, coordinate_frame, type_mask, lat_int, lon_int, alt, vx, vy, vz, afx, afy, afz, yaw, yaw_rate)
+        self.mpstate.master(vehicle_sysid).mav.set_position_target_global_int_send(time_boot_ms, target_system, target_component, coordinate_frame, type_mask, lat_int, lon_int, alt, vx, vy, vz, afx, afy, afz, yaw, yaw_rate)
         return "set_position_target_global_int sent"
 
     # get a list of mavlink message names that can be retrieved using the get_mavlink_message function
     def get_available_mavlink_messages(self):
         # check if no messages available
-        if self.mpstate.master().messages is None or len(self.mpstate.master().messages) == 0:
+        vehicle_sysid = self.mpstate.settings.target_system
+        if self.mpstate.master(vehicle_sysid).messages is None or len(self.mpstate.master(vehicle_sysid).messages) == 0:
             return "get_available_mavlink_messages: no messages available"
 
         # retrieve each available message's name
         mav_msg_names = []
-        for msg in self.mpstate.master().messages:
+        for msg in self.mpstate.master(vehicle_sysid).messages:
             # append all message names except MAV
             if msg != "MAV":
                 mav_msg_names.append(msg)
@@ -567,7 +571,7 @@ class chat_openai():
             return "get_mavlink_message: message not specified"
 
         # retrieve message
-        mav_msg = self.mpstate.master().messages.get(mav_msg_name, None)
+        mav_msg = self.mpstate.master(self.mpstate.settings.target_system).messages.get(mav_msg_name, None)
         if mav_msg is None:
             return "get_mavlink_message: message not found"
 
