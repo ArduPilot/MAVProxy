@@ -1,0 +1,25 @@
+name: test Python cleanliness
+
+on: [push, pull_request, workflow_dispatch]
+
+concurrency:
+  group: ci-${{github.workflow}}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      # git checkout the PR
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -U flake8
+
+      - name: Check Python with Flake8
+        run: |
+            scripts/run_flake8.py MAVProxy
