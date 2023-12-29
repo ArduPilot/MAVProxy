@@ -12,6 +12,9 @@ TODO:
  - ensure parameters are correct
  - add check that battery is within tolerances (chemistry issues...)
  - autodetect numcells being incorrect
+
+AP_FLAKE8_CLEAN
+
 '''
 
 import math
@@ -30,6 +33,7 @@ import pkg_resources
 if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import MPMenuItem
     from MAVProxy.modules.lib.mp_menu import MPMenuSubMenu
+
 
 class FieldCheck(object):
     def __init__(self):
@@ -370,7 +374,7 @@ class FieldCheck(object):
         self.check_map_menu()
 
     def FC_MPSetting(self, name, atype, default, description):
-        xname = "fc_%s_%s" % (self.lc_name, name)
+        # xname = "fc_%s_%s" % (self.lc_name, name)
         return MPSetting(name, atype, default, description)
 
     def select(self):
@@ -443,17 +447,21 @@ class FieldCheck(object):
             print(usage)
             return
 
+
 class FieldCMAC(FieldCheck):
     lc_name = "cmac"
     location = mavutil.location(-35.363261, 149.165230, 584, 353)
+
 
 class FieldSpringValley(FieldCheck):
     location = mavutil.location(-35.281315, 149.005329, 581, 280)
     lc_name = "springvalley"
 
+
 class FieldSpringValleyBottom(FieldCheck):
     location = mavutil.location(-35.2824450, 149.0053668, 593, 0)
     lc_name = "springvalleybottom"
+
 
 class FieldCheckModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -489,7 +497,6 @@ class FieldCheckModule(mp_module.MPModule):
                 self.whinge("Selecting field (%s)" % field.lc_name)
                 self.select_field(field)
 
-
     def idle_task(self):
         '''run periodic tasks'''
         if self.field is not None:
@@ -509,6 +516,7 @@ class FieldCheckModule(mp_module.MPModule):
         if self.field is None:
             return
         self.field.mavlink_packet(m)
+
 
 def init(mpstate):
     '''initialise module'''
