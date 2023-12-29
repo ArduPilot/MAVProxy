@@ -130,6 +130,23 @@ class FieldCheck(object):
                     self.whinge('Setting %s to %f' % (key, want))
                     self.mav_param.mavset(self.master, key, want, retries=3)
 
+        # ensure there is a fence enable/disable switch configured:
+        required_options = {
+            11: "Fence Enable/Disable",
+        }
+        for required_option in required_options.keys():
+            found = False
+            for chan in range(1, 17):
+                rc_option_param_name = f"RC{chan}_OPTION"
+                got = self.mav_param.get(rc_option_param_name, None)
+                if got == required_option:
+                    found = True
+                    break
+            if not found:
+                self.whinge("RC channel option %u (%s) must be configured" %
+                            (required_option, required_options[required_option]))
+                ret = False
+
         return ret
 
     def check_fence_location(self):
