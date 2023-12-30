@@ -6,8 +6,8 @@
     "parameters": {
       "type": "object",
       "properties": {
-          "target_system": {"type": "integer", "minimum":0, "maximum":255, "description": "vehicle autopilot System ID.  normally 1"},
-          "target_component": {"type": "integer",  "minimum":0, "maximum":255, "description": "vehicle autopilot Component ID.  normally 1"},
+          "target_system": {"type": "integer", "minimum":0, "maximum":255, "description": "vehicle autopilot System ID.  can be omitted"},
+          "target_component": {"type": "integer",  "minimum":0, "maximum":255, "description": "vehicle autopilot Component ID.  can be omitted"},
           "frame": {"type": "integer", "minimum":0, "maximum":21, "description": "altitude type.  see MAV_FRAME.  0 for altitude above sea level, 3 for altitude above home, 10 for altitude above terrain"},
           "command": {"type": "integer",  "minimum":0, "maximum":65535, "description": "MAVLink command id.  See MAV_CMD for a full list of available commands"},
           "current": {"type": "integer",  "description": "not used.  always zero"},
