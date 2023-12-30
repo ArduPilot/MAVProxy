@@ -475,7 +475,7 @@ class chat_openai():
 
     # send a mavlink command_int message to the vehicle
     def send_mavlink_command_int(self, arguments):
-        target_system = arguments.get("target_system", 1)
+        target_system = arguments.get("target_system", self.mpstate.settings.target_system)
         target_component = arguments.get("target_component", 1)
         frame = arguments.get("frame", 0)
         if ("command" not in arguments):
@@ -519,7 +519,7 @@ class chat_openai():
         if arguments is None:
             return "send_mavlink_set_position_target_global_int: arguments is None"
         time_boot_ms = arguments.get("time_boot_ms", 0)
-        target_system = arguments.get("target_system", 1)
+        target_system = arguments.get("target_system", self.mpstate.settings.target_system)
         target_component = arguments.get("target_component", 1)
         coordinate_frame = arguments.get("coordinate_frame", 5)
         type_mask = arguments.get("type_mask", 0)
