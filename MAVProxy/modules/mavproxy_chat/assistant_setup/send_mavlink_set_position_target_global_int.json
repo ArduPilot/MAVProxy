@@ -10,7 +10,7 @@
           "target_system": {"type": "integer", "minimum":0, "maximum":255, "description": "vehicle autopilot System ID.  can be omitted"},
           "target_component": {"type": "integer",  "minimum":0, "maximum":255, "description": "vehicle autopilot Component ID.  can be omitted"},
           "coordinate_frame": {"type": "integer", "minimum":0, "maximum":21, "description": "altitude type.  see MAV_FRAME.  5 for altitude above sea level, 6 for altitude above home, 11 for altitude above terrain"},
-          "type_mask": {"type": "integer", "minimum":0, "maximum":65535, "description": "Bitmap to indicate which dimensions should be ignored by the vehicle.  see POSITION_TARGET_TYPEMASK.  If location (e.g. lat_int, lon_int and alt) are sent use 3576.  If a location (e.g. lat_int, lon_int and alt) and yaw are sent use 2552.  If velocity (e.g. vx, vy, vz) is sent use 2552. if velocity (e.g. vx, vy, vz) and yaw are sent use 2503.  If only yaw is sent use 2559"},
+          "type_mask": {"type": "integer", "minimum":0, "maximum":65535, "description": "Bitmap to indicate which dimensions should be ignored by the vehicle.  see POSITION_TARGET_TYPEMASK.  If only location (e.g. lat_int, lon_int and alt) is sent use 3576.  If location and yaw are sent use 2552.  If only velocity (e.g. vx, vy, vz) is sent use 2552. if velocity and yaw are sent use 2503.  If only yaw is sent use 2559"},
           "lat_int": {"type": "integer", "description": "latitude in degrees * 10^7"},
           "lon_int": {"type": "integer", "description": "longitude in degrees * 10^7"},
           "alt": {"type": "number", "description": "altitude in meters (relative to sea level, home or terrain depending on frame field)"},
