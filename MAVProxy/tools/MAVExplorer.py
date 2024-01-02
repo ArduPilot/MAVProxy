@@ -517,6 +517,8 @@ def cmd_dump(args):
             continue
         if verbose and "pymavlink.dialects" in str(type(msg)):
             mavutil.dump_message_verbose(sys.stdout, msg)
+        elif verbose and hasattr(msg,"dump_verbose"):
+            msg.dump_verbose(sys.stdout)
         else:
             print("%s %s" % (timestring(msg), msg))
     mlog.rewind()
