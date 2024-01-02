@@ -132,10 +132,16 @@ class chat_openai():
                     run_id=self.run.id
                 )
 
+                # init failure message
+                failure_message = None
+
                 # check run status
                 if latest_run.status in ["queued", "in_progress", "cancelling"]:
                     run_done = False
-                elif latest_run.status in ["cancelled", "failed", "completed", "expired"]:
+                elif latest_run.status in ["cancelled", "completed", "expired"]:
+                    run_done = True
+                elif latest_run.status in ["failed"]:
+                    failure_message = latest_run.last_error.message
                     run_done = True
                 elif latest_run.status in ["requires_action"]:
                     self.handle_function_call(latest_run)
@@ -145,7 +151,10 @@ class chat_openai():
                     run_done = True
 
                 # send status to status callback
-                self.send_status(latest_run.status)
+                status_message = latest_run.status
+                if failure_message is not None:
+                    status_message = status_message + ": " + failure_message
+                self.send_status(status_message)
 
             # retrieve messages on the thread
             reply_messages = self.client.beta.threads.messages.list(self.assistant_thread.id, order = "asc", after=input_message.id)
