@@ -7,6 +7,8 @@ This module allows MAVProxy to interface with OpenAI Assitants
 OpenAI Assistant API: https://platform.openai.com/docs/api-reference/assistants
 OpenAI Assistant Playground: https://platform.openai.com/playground
 MAVProxy chat wiki: https://ardupilot.org/mavproxy/docs/modules/chat.html
+
+AP_FLAKE8_CLEAN
 '''
 
 from MAVProxy.modules.lib import mp_module
@@ -15,6 +17,7 @@ from MAVProxy.modules.mavproxy_chat import chat_window
 from pymavlink import mavutil
 from threading import Thread
 import time
+
 
 class chat(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -109,6 +112,7 @@ class chat(mp_module.MPModule):
         # return False indicating timeout
         del self.command_ack_waiting[mav_cmd]
         return False
+
 
 # initialise module
 def init(mpstate):
