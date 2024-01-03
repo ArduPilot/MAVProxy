@@ -265,13 +265,13 @@ class chat_openai():
                                      mavutil.mavlink.MAV_TYPE_VTOL_DUOROTOR,
                                      mavutil.mavlink.MAV_TYPE_VTOL_QUADROTOR,
                                      mavutil.mavlink.MAV_TYPE_VTOL_TILTROTOR]:
-                vehicle_type_str = 'Plane'
+                vehicle_type_str = "Plane"
             if hearbeat_msg.type == mavutil.mavlink.MAV_TYPE_GROUND_ROVER:
-                vehicle_type_str = 'Rover'
+                vehicle_type_str = "Rover"
             if hearbeat_msg.type == mavutil.mavlink.MAV_TYPE_SURFACE_BOAT:
-                vehicle_type_str = 'Boat'
+                vehicle_type_str = "Boat"
             if hearbeat_msg.type == mavutil.mavlink.MAV_TYPE_SUBMARINE:
-                vehicle_type_str = 'Sub'
+                vehicle_type_str = "Sub"
             if hearbeat_msg.type in [mavutil.mavlink.MAV_TYPE_QUADROTOR,
                                      mavutil.mavlink.MAV_TYPE_COAXIAL,
                                      mavutil.mavlink.MAV_TYPE_HEXAROTOR,
