@@ -20,12 +20,22 @@ if platform.system() == 'Windows':
     # auto-detection is failing on windows, for an unknown reason
     has_wxpython = True
 else:
-    import imp
     try:
-        imp.find_module('wx')
-        has_wxpython = True
-    except ImportError as e:
-        pass
+        import importlib
+        try:
+            import importlib.util
+        except ImportError:
+            pass
+
+        if importlib.util.find_spec('wx') is not None:
+            has_wxpython = True
+    except (ImportError, ModuleNotFoundError):
+        import imp
+        try:
+            imp.find_module('wx')
+            has_wxpython = True
+        except ImportError as e:
+            pass
 
 radius_of_earth = 6378100.0 # in meters
 
