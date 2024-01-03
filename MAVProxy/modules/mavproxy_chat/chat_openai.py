@@ -5,10 +5,13 @@ Randy Mackay, December 2023
 OpenAI Assistant API: https://platform.openai.com/docs/api-reference/assistants
 OpenAI Assistant Playground: https://platform.openai.com/playground
 MAVProxy chat wiki: https://ardupilot.org/mavproxy/docs/modules/chat.html
+
+AP_FLAKE8_CLEAN
 '''
 
 from pymavlink import mavutil
-import time, re
+import time
+import re
 from datetime import datetime
 from threading import Thread, Lock
 import json
@@ -16,9 +19,10 @@ import math
 
 try:
     from openai import OpenAI
-except:
+except Exception:
     print("chat: failed to import openai. See https://ardupilot.org/mavproxy/docs/modules/chat.html")
     exit()
+
 
 class chat_openai():
     def __init__(self, mpstate, status_cb=None, wait_for_command_ack_fn=None):
@@ -51,7 +55,7 @@ class chat_openai():
         if self.client is None:
             try:
                 self.client = OpenAI()
-            except:
+            except Exception:
                 print("chat: failed to connect to OpenAI")
                 return False
 
@@ -90,7 +94,7 @@ class chat_openai():
 
     # set the OpenAI API key
     def set_api_key(self, api_key_str):
-        self.client = OpenAI(api_key = api_key_str)
+        self.client = OpenAI(api_key=api_key_str)
         self.assistant = None
         self.assistant_thread = None
 
@@ -126,7 +130,7 @@ class chat_openai():
                 # wait for one second
                 time.sleep(0.1)
 
-                # retrieve the run        
+                # retrieve the run
                 latest_run = self.client.beta.threads.runs.retrieve(
                     thread_id=self.assistant_thread.id,
                     run_id=self.run.id
@@ -157,7 +161,9 @@ class chat_openai():
                 self.send_status(status_message)
 
             # retrieve messages on the thread
-            reply_messages = self.client.beta.threads.messages.list(self.assistant_thread.id, order = "asc", after=input_message.id)
+            reply_messages = self.client.beta.threads.messages.list(self.assistant_thread.id,
+                                                                    order="asc",
+                                                                    after=input_message.id)
             if reply_messages is None:
                 return "chat: failed to retrieve messages"
 
@@ -228,7 +234,7 @@ class chat_openai():
                     # convert to json
                     stage_str = "convert output to json"
                     output = json.dumps(output)
-                except:
+                except Exception:
                     error_message = str(func_name) + ": " + stage_str + " failed"
                     print("chat: " + error_message)
                     output = error_message
@@ -242,12 +248,11 @@ class chat_openai():
 
         # send function replies to assistant
         try:
-            run_reply = self.client.beta.threads.runs.submit_tool_outputs(
+            self.client.beta.threads.runs.submit_tool_outputs(
                 thread_id=run.thread_id,
                 run_id=run.id,
-                tool_outputs=tool_outputs
-            )
-        except:
+                tool_outputs=tool_outputs)
+        except Exception:
             print("chat: error replying to function call")
             print(tool_outputs)
 
@@ -278,7 +283,7 @@ class chat_openai():
                                      mavutil.mavlink.MAV_TYPE_OCTOROTOR,
                                      mavutil.mavlink.MAV_TYPE_TRICOPTER,
                                      mavutil.mavlink.MAV_TYPE_DODECAROTOR]:
-                    vehicle_type_str = "Copter"
+                vehicle_type_str = "Copter"
             if hearbeat_msg.type == mavutil.mavlink.MAV_TYPE_HELICOPTER:
                 vehicle_type_str = "Heli"
             if hearbeat_msg.type == mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER:
@@ -306,7 +311,7 @@ class chat_openai():
         # prepare list of modes
         mode_list = []
         mode_mapping = self.mpstate.master().mode_mapping()
-        
+
         # handle request for all modes
         if mode_name is None and mode_number is None:
             for mname in mode_mapping:
@@ -335,7 +340,7 @@ class chat_openai():
         hearbeat_msg = self.mpstate.master().messages.get('HEARTBEAT', None)
         if hearbeat_msg is None:
             mode_number = 0
-            print ("chat: get_vehicle_state: vehicle mode is unknown")
+            print("chat: get_vehicle_state: vehicle mode is unknown")
         else:
             mode_number = hearbeat_msg.custom_mode
         return {
@@ -397,7 +402,10 @@ class chat_openai():
         x = arguments.get("x", 0)
         y = arguments.get("y", 0)
         z = arguments.get("z", 0)
-        self.mpstate.master().mav.command_int_send(target_system, target_component, frame, command, current, autocontinue, param1, param2, param3, param4, x, y, z)
+        self.mpstate.master().mav.command_int_send(target_system, target_component,
+                                                   frame, command, current, autocontinue,
+                                                   param1, param2, param3, param4,
+                                                   x, y, z)
 
         # wait for command ack
         mav_result = self.wait_for_command_ack_fn(command)
@@ -441,7 +449,12 @@ class chat_openai():
         afz = arguments.get("afz", 0)
         yaw = arguments.get("yaw", 0)
         yaw_rate = arguments.get("yaw_rate", 0)
-        self.mpstate.master().mav.set_position_target_global_int_send(time_boot_ms, target_system, target_component, coordinate_frame, type_mask, lat_int, lon_int, alt, vx, vy, vz, afx, afy, afz, yaw, yaw_rate)
+        self.mpstate.master().mav.set_position_target_global_int_send(time_boot_ms, target_system, target_component,
+                                                                      coordinate_frame, type_mask,
+                                                                      lat_int, lon_int, alt,
+                                                                      vx, vy, vz,
+                                                                      afx, afy, afz,
+                                                                      yaw, yaw_rate)
         return "set_position_target_global_int sent"
 
     # get a list of mavlink message names that can be retrieved using the get_mavlink_message function
@@ -598,7 +611,7 @@ class chat_openai():
                     self.wakeup_schedule.remove(wakeup_timer)
 
         # return number deleted and remaining
-        return "delete_wakeup_timers: deleted " + str(num_timers_deleted) + " timers, " + str(len(self.wakeup_schedule)) + " remaining"
+        return "delete_wakeup_timers: deleted " + str(num_timers_deleted) + " timers, " + str(len(self.wakeup_schedule)) + " remaining" # noqa
 
     # check if any wakeup timers have expired and send messages if they have
     # this function never returns so it should be called from a new thread
@@ -631,7 +644,7 @@ class chat_openai():
         if latitude_deg < -90:
             return -(180 + latitude_deg)
         return latitude_deg
-    
+
     # wrap longitude to range -180 to 180
     def wrap_longitude(self, longitude_deg):
         if longitude_deg > 180:
@@ -647,7 +660,7 @@ class chat_openai():
 
     # returns true if string contains regex characters
     def contains_regex(self, string):
-        regex_characters = ".^$*+?{}[]\|()"
+        regex_characters = ".^$*+?{}[]\\|()"
         for x in regex_characters:
             if string.count(x):
                 return True

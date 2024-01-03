@@ -3,11 +3,14 @@ AI Chat Module Window
 Randy Mackay, December 2023
 
 Chat window for input and output of AI chat
+
+AP_FLAKE8_CLEAN
 '''
 
 from MAVProxy.modules.lib.wx_loader import wx
 from MAVProxy.modules.mavproxy_chat import chat_openai, chat_voice_to_text
 from threading import Thread
+
 
 class chat_window():
     def __init__(self, mpstate, wait_for_command_ack_fn):
@@ -35,7 +38,7 @@ class chat_window():
 
         # add api key input window
         self.apikey_frame = wx.Frame(None, title="Input OpenAI API Key", size=(560, 50))
-        self.apikey_text_input = wx.TextCtrl(self.apikey_frame, id=-1, pos=(10, 10), size=(450, -1), style = wx.TE_PROCESS_ENTER)
+        self.apikey_text_input = wx.TextCtrl(self.apikey_frame, id=-1, pos=(10, 10), size=(450, -1), style=wx.TE_PROCESS_ENTER)
         self.apikey_set_button = wx.Button(self.apikey_frame, id=-1, label="Set", pos=(470, 10), size=(75, 25))
         self.apikey_frame.Bind(wx.EVT_BUTTON, self.apikey_set_button_click, self.apikey_set_button)
         self.apikey_frame.Bind(wx.EVT_TEXT_ENTER, self.apikey_set_button_click, self.apikey_text_input)
@@ -48,17 +51,17 @@ class chat_window():
         # add a record button
         self.record_button = wx.Button(self.frame, id=-1, label="Rec", size=(75, 25))
         self.frame.Bind(wx.EVT_BUTTON, self.record_button_click, self.record_button)
-        self.horiz_sizer.Add(self.record_button, proportion = 0, flag = wx.ALIGN_TOP | wx.ALL, border = 5)
+        self.horiz_sizer.Add(self.record_button, proportion=0, flag=wx.ALIGN_TOP | wx.ALL, border=5)
 
         # add an input text box
-        self.text_input = wx.TextCtrl(self.frame, id=-1, value="", size=(450, -1), style = wx.TE_PROCESS_ENTER)
+        self.text_input = wx.TextCtrl(self.frame, id=-1, value="", size=(450, -1), style=wx.TE_PROCESS_ENTER)
         self.frame.Bind(wx.EVT_TEXT_ENTER, self.text_input_change, self.text_input)
-        self.horiz_sizer.Add(self.text_input, proportion = 1, flag = wx.ALIGN_TOP | wx.ALL, border = 5)
+        self.horiz_sizer.Add(self.text_input, proportion=1, flag=wx.ALIGN_TOP | wx.ALL, border=5)
 
         # add a send button
         self.send_button = wx.Button(self.frame, id=-1, label="Send", size=(75, 25))
         self.frame.Bind(wx.EVT_BUTTON, self.send_button_click, self.send_button)
-        self.horiz_sizer.Add(self.send_button, proportion = 0, flag = wx.ALIGN_TOP | wx.ALL, border = 5)
+        self.horiz_sizer.Add(self.send_button, proportion=0, flag=wx.ALIGN_TOP | wx.ALL, border=5)
 
         # add a reply box and read-only text box
         self.text_reply = wx.TextCtrl(self.frame, id=-1, size=(600, 80), style=wx.TE_READONLY | wx.TE_MULTILINE | wx.TE_RICH)
