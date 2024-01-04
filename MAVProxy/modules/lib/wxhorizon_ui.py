@@ -173,7 +173,7 @@ class HorizonFrame(wx.Frame):
     
     def createHeadingPointer(self):
         '''Creates the pointer for the current heading.'''
-        self.headingTri = patches.RegularPolygon((0.0,0.80),3,0.05,color='k',zorder=4)
+        self.headingTri = patches.RegularPolygon((0.0,0.80),3,radius=0.05,color='k',zorder=4)
         self.axes.add_patch(self.headingTri)
         self.headingText = self.axes.text(0.0,0.675,'0',color='k',size=self.fontSize,horizontalalignment='center',verticalalignment='center',zorder=4)
     
@@ -184,7 +184,7 @@ class HorizonFrame(wx.Frame):
     
     def createNorthPointer(self):
         '''Creates the north pointer relative to current heading.'''
-        self.headingNorthTri = patches.RegularPolygon((0.0,0.80),3,0.05,color='k',zorder=4)
+        self.headingNorthTri = patches.RegularPolygon((0.0,0.80),3,radius=0.05,color='k',zorder=4)
         self.axes.add_patch(self.headingNorthTri)
         self.headingNorthText = self.axes.text(0.0,0.675,'N',color='k',size=self.fontSize,horizontalalignment='center',verticalalignment='center',zorder=4)    
 
@@ -434,7 +434,7 @@ class HorizonFrame(wx.Frame):
     
     def createWPPointer(self):
         '''Creates the waypoint pointer relative to current heading.'''
-        self.headingWPTri = patches.RegularPolygon((0.0,0.55),3,0.05,facecolor='lime',zorder=4,ec='k')
+        self.headingWPTri = patches.RegularPolygon((0.0,0.55),3,radius=0.05,facecolor='lime',zorder=4,ec='k')
         self.axes.add_patch(self.headingWPTri)
         self.headingWPText = self.axes.text(0.0,0.45,'1',color='lime',size=self.fontSize,horizontalalignment='center',verticalalignment='center',zorder=4)   
         self.headingWPText.set_path_effects([PathEffects.withStroke(linewidth=1,foreground='k')]) 
