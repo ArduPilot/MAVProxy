@@ -4,9 +4,9 @@ from matplotlib.figure import Figure
 
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.backends import backend_wx    # already uses wxversion.ensureMinimal('2.8')
-from matplotlib.backends.backend_wx import error_msg_wx, NavigationToolbar2Wx
-from matplotlib.backends.backend_wxagg import FigureManager, FigureCanvasWxAgg, \
-    FigureFrameWx, draw_if_interactive, show, backend_version
+from matplotlib.backends.backend_wx import FigureFrameWx
+from matplotlib.backends.backend_wx import NavigationToolbar2Wx
+from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg
 import wx
 
 class FigureFrameWxAgg(FigureFrameWx):
