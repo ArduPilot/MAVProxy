@@ -41,6 +41,7 @@ class rline(object):
             '(FILENAME)' : complete_filename,
             '(PARAMETER)' : complete_parameter,
             '(VARIABLE)' : complete_variable,
+            '(MESSAGETYPE)' : complete_messagetype,
             '(SETTING)' : rline_mpstate.settings.completion,
             '(COMMAND)' : complete_command,
             '(ALIAS)' : complete_alias,
@@ -231,6 +232,12 @@ def complete_variable(text):
         pass
 
     return []
+
+def complete_messagetype(text):
+    '''complete a MAVLink message type'''
+    global rline_mpstate
+
+    return list(filter(lambda x : x.startswith(text), rline_mpstate.status.msgs.keys()))
 
 def rule_expand(component, text):
     '''expand one rule component'''
