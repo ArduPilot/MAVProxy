@@ -206,6 +206,7 @@ class chat_openai():
                                "get_vehicle_state",
                                "get_vehicle_location_and_yaw",
                                "get_location_plus_offset",
+                               "get_location_plus_dist_at_bearing",
                                "send_mavlink_command_int",
                                "send_mavlink_set_position_target_global_int",
                                "get_available_mavlink_messages", "get_mavlink_message",
@@ -377,12 +378,24 @@ class chat_openai():
         lon = arguments.get("longitude", 0)
         dist_north = arguments.get("distance_north", 0)
         dist_east = arguments.get("distance_east", 0)
-        lat_lon_to_meters_scaling = 89.8320495336892 * 1e-7
-        lat_diff = dist_north * lat_lon_to_meters_scaling
-        lon_diff = dist_east * lat_lon_to_meters_scaling / max(0.01, math.cos(math.radians((lat+lat_diff)/2)))
+        lat_with_offset, lon_with_offset = self.get_latitude_longitude_given_offset(lat, lon, dist_north, dist_east)
         return {
-            "latitude": self.wrap_latitude(lat + lat_diff),
-            "longitude": self.wrap_longitude(lon + lon_diff)
+            "latitude": lat_with_offset,
+            "longitude": lon_with_offset
+        }
+
+    # Calculate the latitude and longitude given a distance (in meters) and bearing (in degrees)
+    def get_location_plus_dist_at_bearing(self, arguments):
+        lat = arguments.get("latitude", 0)
+        lon = arguments.get("longitude", 0)
+        distance = arguments.get("distance", 0)
+        bearing_deg = arguments.get("bearing", 0)
+        dist_north = math.cos(math.radians(bearing_deg)) * distance
+        dist_east  = math.sin(math.radians(bearing_deg)) * distance
+        lat_with_offset, lon_with_offset = self.get_latitude_longitude_given_offset(lat, lon, dist_north, dist_east)
+        return {
+            "latitude": lat_with_offset,
+            "longitude": lon_with_offset
         }
 
     # send a mavlink command_int message to the vehicle
@@ -666,6 +679,14 @@ class chat_openai():
         if longitude_deg < -180:
             return longitude_deg + 360
         return longitude_deg
+
+    # calculate latitude and longitude given distances (in meters) North and East
+    # returns latitude and longitude in degrees
+    def get_latitude_longitude_given_offset(self, latitude, longitude, dist_north, dist_east):
+        lat_lon_to_meters_scaling = 89.8320495336892 * 1e-7
+        lat_diff = dist_north * lat_lon_to_meters_scaling
+        lon_diff = dist_east * lat_lon_to_meters_scaling / max(0.01, math.cos(math.radians((latitude+lat_diff)/2)))
+        return self.wrap_latitude(latitude + lat_diff), self.wrap_longitude(longitude + lon_diff)
 
     # send status to chat window via callback
     def send_status(self, status):
