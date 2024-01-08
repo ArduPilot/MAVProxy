@@ -402,6 +402,9 @@ class chat_openai():
         x = arguments.get("x", 0)
         y = arguments.get("y", 0)
         z = arguments.get("z", 0)
+        # sanity check arguments
+        if command == mavutil.mavlink.MAV_CMD_NAV_TAKEOFF and z == 0:
+            return "command_int not sent.  MAV_CMD_NAV_TAKEOFF requires alt in z field"
         self.mpstate.master().mav.command_int_send(target_system, target_component,
                                                    frame, command, current, autocontinue,
                                                    param1, param2, param3, param4,
