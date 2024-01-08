@@ -48,6 +48,12 @@ class chat_window():
         self.vert_sizer = wx.BoxSizer(wx.VERTICAL)
         self.horiz_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
+        # add a read-only reply text box
+        self.text_reply = wx.TextCtrl(self.frame, id=-1, size=(600, 80), style=wx.TE_READONLY | wx.TE_MULTILINE | wx.TE_RICH)
+
+        # add a read-only status text box
+        self.text_status = wx.TextCtrl(self.frame, id=-1, size=(600, -1), style=wx.TE_READONLY)
+
         # add a record button
         self.record_button = wx.Button(self.frame, id=-1, label="Rec", size=(75, 25))
         self.frame.Bind(wx.EVT_BUTTON, self.record_button_click, self.record_button)
@@ -63,17 +69,14 @@ class chat_window():
         self.frame.Bind(wx.EVT_BUTTON, self.send_button_click, self.send_button)
         self.horiz_sizer.Add(self.send_button, proportion=0, flag=wx.ALIGN_TOP | wx.ALL, border=5)
 
-        # add a reply box and read-only text box
-        self.text_reply = wx.TextCtrl(self.frame, id=-1, size=(600, 80), style=wx.TE_READONLY | wx.TE_MULTILINE | wx.TE_RICH)
-
-        # add a read-only status text box at the bottom
-        self.text_status = wx.TextCtrl(self.frame, id=-1, size=(600, -1), style=wx.TE_READONLY)
-
         # set size hints and add sizer to frame
-        self.vert_sizer.Add(self.horiz_sizer, proportion=0, flag=wx.EXPAND)
         self.vert_sizer.Add(self.text_reply, proportion=1, flag=wx.EXPAND, border=5)
         self.vert_sizer.Add(self.text_status, proportion=0, flag=wx.EXPAND, border=5)
+        self.vert_sizer.Add(self.horiz_sizer, proportion=0, flag=wx.EXPAND)
         self.frame.SetSizer(self.vert_sizer)
+
+        # set focus on the input text box
+        self.text_input.SetFocus()
 
         # show frame
         self.frame.Show()
@@ -150,6 +153,12 @@ class chat_window():
 
     # send text to assistant.  should be called from a separate thread to avoid blocking
     def send_text_to_assistant(self):
+        # store current focus so it can be restored later
+        focus = wx.Window.FindFocus()
+        if focus is not None and focus == self.send_button:
+            # if send button has focus, override to text input
+            focus = self.text_input
+
         # disable buttons and text input to stop multiple inputs (can't be done from a thread or must use CallAfter)
         wx.CallAfter(self.record_button.Disable)
         wx.CallAfter(self.text_input.Disable)
@@ -174,6 +183,10 @@ class chat_window():
         wx.CallAfter(self.record_button.Enable)
         wx.CallAfter(self.text_input.Enable)
         wx.CallAfter(self.send_button.Enable)
+
+        # restore focus
+        if focus is not None:
+            wx.CallAfter(focus.SetFocus)
 
     # set status text
     def set_status_text(self, text):
