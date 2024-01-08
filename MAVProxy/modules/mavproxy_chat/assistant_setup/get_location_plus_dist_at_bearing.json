@@ -1,0 +1,17 @@
+{
+  "type": "function",
+  "function": {
+    "name": "get_location_plus_dist_at_bearing",
+    "description": "Calculate the latitude and longitude given an existing latitude and longitude and a distance in meters and a bearing in degrees",
+    "parameters": {
+      "type": "object",
+      "properties": {
+          "latitude": {"type": "number", "description": "latitude in degrees"},
+          "longitude": {"type": "number", "description": "longitude in degrees"},
+          "distance": {"type": "number", "description": "distance to move meters"},
+          "bearing": {"type": "number", "description": "bearing in degrees. 0 is North, 90 is East, etc"}
+      },
+      "required": ["latitude", "longitude", "distance", "bearing"]
+    }
+  }
+}
