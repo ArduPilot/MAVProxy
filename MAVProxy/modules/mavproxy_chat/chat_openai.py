@@ -16,6 +16,7 @@ from datetime import datetime
 from threading import Thread, Lock
 import json
 import math
+from MAVProxy.modules.lib import param_help
 
 try:
     from openai import OpenAI
@@ -213,6 +214,7 @@ class chat_openai():
                                "get_all_parameters",
                                "get_parameter",
                                "set_parameter",
+                               "get_parameter_description",
                                "set_wakeup_timer",
                                "get_wakeup_timers",
                                "delete_wakeup_timers"]
@@ -567,6 +569,88 @@ class chat_openai():
             return "set_parameter: value not specified"
         self.mpstate.functions.param_set(param_name, param_value, retries=3)
         return "set_parameter: parameter value set"
+
+    # get vehicle parameter descriptions including description, units, min and max
+    def get_parameter_description(self, arguments):
+        param_name = arguments.get("name", None)
+        if param_name is None:
+            return "get_parameter_description: name not specified"
+
+        # get parameter definitions
+        phelp = param_help.ParamHelp()
+        phelp.vehicle_name = "ArduCopter"
+        param_help_tree = phelp.param_help_tree(True)
+
+        # start with an empty parameter description dictionary
+        param_descriptions = {}
+
+        # handle param name containing regex
+        if self.contains_regex(param_name):
+            pattern = re.compile(param_name)
+            for existing_param_name in sorted(self.mpstate.mav_param.keys()):
+                if pattern.match(existing_param_name) is not None:
+                    param_desc = self.get_single_parameter_description(param_help_tree, existing_param_name)
+                    if param_desc is not None:
+                        param_descriptions[existing_param_name] = param_desc
+        else:
+            # handle simple case of a single parameter name
+            param_desc = self.get_single_parameter_description(param_help_tree, param_name)
+            if param_desc is None:
+                return "get_parameter_description: " + param_name + " parameter description not found"
+            param_descriptions[param_name] = param_desc
+
+        return param_descriptions
+
+    # get a single parameter's descriptions as a dictionary
+    # returns None if parameter description cannot be found
+    def get_single_parameter_description(self, param_help_tree, param_name):
+        # search for parameter
+        param_info = None
+        if param_name in param_help_tree.keys():
+            param_info = param_help_tree[param_name]
+        else:
+            # check each possible vehicle name
+            for vehicle_name in ["ArduCopter", "ArduPlane", "Rover", "Sub"]:
+                vehicle_param_name = vehicle_name + ":" + param_name
+                if vehicle_param_name in param_help_tree.keys():
+                    param_info = param_help_tree[vehicle_param_name]
+                    break
+            if param_info is None:
+                return None
+
+        # start with empty dictionary
+        param_desc_dict = {}
+
+        # add name
+        param_desc_dict['name'] = param_name
+
+        # get description
+        param_desc_dict['description'] = param_info.get('documentation')
+
+        # iterate over fields to get units and range
+        param_fields = param_info.find('field')
+        if param_fields is not None:
+            for field in param_info.field:
+                field_name = field.get('name')
+                if field_name == 'Units':
+                    param_desc_dict['units'] = str(field)
+                if field_name == 'Range':
+                    if ' ' in str(field):
+                        param_desc_dict['min'] = str(field).split(' ')[0]
+                        param_desc_dict['max'] = str(field).split(' ')[1]
+
+        # iterate over values
+        param_values = param_info.find('values')
+        if param_values is not None:
+            param_value_dict = {}
+            for c in param_values.getchildren():
+                value_int = int(c.get('code'))
+                param_value_dict[value_int] = str(c)
+            if len(param_value_dict) > 0:
+                param_desc_dict['values'] = param_value_dict
+
+        # return dictionary
+        return param_desc_dict
 
     # set a wakeup timer
     def set_wakeup_timer(self, arguments):
