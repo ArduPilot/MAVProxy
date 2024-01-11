@@ -1,0 +1,14 @@
+{
+  "type": "function",
+  "function": {
+    "name": "get_parameter_description",
+    "description": "Get vehicle parameter descriptions including description, units, min and max",
+    "parameters": {
+      "type": "object",
+      "properties": {
+          "name": {"type": "string", "description": "parameter name (e.g. ARMING_CHECK, LOG_BITMASK).  Regex expressions are supported. set to * to get all parameter descriptions"}
+      },
+      "required": ["name"]
+    }
+  }
+}
