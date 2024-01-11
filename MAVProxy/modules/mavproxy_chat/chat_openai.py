@@ -441,8 +441,8 @@ class chat_openai():
         target_component = arguments.get("target_component", 1)
         coordinate_frame = arguments.get("coordinate_frame", 5)
         type_mask = arguments.get("type_mask", 0)
-        lat_int = arguments.get("lat_int", 0)
-        lon_int = arguments.get("lon_int", 0)
+        lat_int = int(arguments.get("latitude", 0) * 1e7)
+        lon_int = int(arguments.get("longitude", 0) * 1e7)
         alt = arguments.get("alt", 0)
         vx = arguments.get("vx", 0)
         vy = arguments.get("vy", 0)
@@ -452,6 +452,17 @@ class chat_openai():
         afz = arguments.get("afz", 0)
         yaw = arguments.get("yaw", 0)
         yaw_rate = arguments.get("yaw_rate", 0)
+
+        # sanity check arguments
+        if type_mask == 3576:
+            # if position is specified check lat, lon, alt are provided
+            if "latitude" not in arguments.keys():
+                return "send_mavlink_set_position_target_global_int: latitude field required"
+            if "longitude" not in arguments.keys():
+                return "send_mavlink_set_position_target_global_int: longitude field required"
+            if "alt" not in arguments.keys():
+                return "send_mavlink_set_position_target_global_int: alt field required"
+
         self.mpstate.master().mav.set_position_target_global_int_send(time_boot_ms, target_system, target_component,
                                                                       coordinate_frame, type_mask,
                                                                       lat_int, lon_int, alt,
