@@ -189,7 +189,7 @@ def complete_variable(text):
     else:
         suffix = ''
 
-    m1 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*(\[[0-9A-Z_]+\])?)[.]([A-Za-z0-9_]*)$", text)
+    m1 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*(\\[[0-9A-Z_]+\\])?)[.]([A-Za-z0-9_]*)$", text)
     if m1 is not None:
         prefix = m1.group(1)
         mtype = m1.group(2)
@@ -204,7 +204,7 @@ def complete_variable(text):
         return []
 
     # handle partially open arrays, like 'NAMED_VALUE_FLOAT[A'
-    m1 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*(\[[0-9A-Z_]+))$", text)
+    m1 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*(\\[[0-9A-Z_]*))$", text)
     if m1 is not None:
         prefix = m1.group(1)
         mtype = m1.group(2)
@@ -215,7 +215,7 @@ def complete_variable(text):
         if len(ret):
             return ret
 
-    m2 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*(\[[0-9A-Z_]+\])?)$", text)
+    m2 = re.match("^(.*?)([A-Z0-9][A-Z0-9_]*(\\[[0-9A-Z_]+\\])?)$", text)
     prefix = m2.group(1)
     mtype = m2.group(2)
     ret = []
@@ -237,7 +237,7 @@ def complete_messagetype(text):
     '''complete a MAVLink message type'''
     global rline_mpstate
 
-    return list(filter(lambda x : x.startswith(text), rline_mpstate.status.msgs.keys()))
+    return list(filter(lambda x : x.startswith(text) and "[" not in x, rline_mpstate.status.msgs.keys()))
 
 def rule_expand(component, text):
     '''expand one rule component'''
