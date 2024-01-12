@@ -90,18 +90,6 @@ def main(openai_api_key=None, assistant_name=None, model_name=None, upgrade=Fals
         if not download_file("https://raw.githubusercontent.com/ArduPilot/mavlink/master/message_definitions/v1.0/" + mavlink_filename, mavlink_filename):  # noqa
             exit()
 
-    # download latest vehicle parameter definition files from ardupilot server
-    paramdef_file_info = [
-        {"url": "https://autotest.ardupilot.org/Parameters/ArduCopter/apm.pdef.xml", "filename": "copter_parameter_definitions.xml"},   # noqa
-        {"url": "https://autotest.ardupilot.org/Parameters/ArduPlane/apm.pdef.xml", "filename": "plane_parameter_definitions.xml"},     # noqa
-        {"url": "https://autotest.ardupilot.org/Parameters/APMrover2/apm.pdef.xml", "filename": "rover_parameter_definitions.xml"},     # noqa
-        {"url": "https://autotest.ardupilot.org/Parameters/ArduSub/apm.pdef.xml", "filename": "sub_parameter_definitions.xml"}]         # noqa
-    paramdef_filenames = []
-    for pdef_file_info in paramdef_file_info:
-        if not download_file(pdef_file_info["url"], pdef_file_info["filename"]):
-            exit()
-        paramdef_filenames.append(pdef_file_info["filename"])
-
     # variable to hold new assistant
     assistant = None
 
@@ -131,11 +119,11 @@ def main(openai_api_key=None, assistant_name=None, model_name=None, upgrade=Fals
         print("setup_assistant: failed to update assistant instructions")
         exit()
 
-    # upload MAVLink, text and parameter definition files
+    # upload MAVLink and text files
     # get our organisation's existing list of files on OpenAI
     existing_files = client.files.list()
     uploaded_file_ids = []
-    for filename in text_filenames + mavlink_filenames + paramdef_filenames:
+    for filename in text_filenames + mavlink_filenames:
         try:
             # open local file as read-only
             file = open(filename, 'rb')
@@ -180,7 +168,7 @@ def main(openai_api_key=None, assistant_name=None, model_name=None, upgrade=Fals
         exit()
 
     # delete downloaded mavlink files
-    for mavlink_filename in mavlink_filenames + paramdef_filenames:
+    for mavlink_filename in mavlink_filenames:
         try:
             os.remove(mavlink_filename)
             print("setup_assistant: deleted local file: " + mavlink_filename)
