@@ -218,7 +218,7 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
             self.console.set_status('Fence', 'FEN', row=0, fg='red')
 
     def mavlink_packet(self, m):
-        if m.get_type() == 'SYS_STATUS':
+        if m.get_type() == 'SYS_STATUS' and self.message_is_from_primary_vehicle(m):
             self.handle_sys_status(m)
         super(FenceModule, self).mavlink_packet(m)
 
