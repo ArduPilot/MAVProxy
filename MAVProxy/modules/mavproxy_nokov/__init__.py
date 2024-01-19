@@ -71,7 +71,7 @@ class NokovModule(mp_module.MPModule):
             return
         print('serverIp is %s' % self.nokov_settings.host)
         client = nokovsdk.PySDKClient()
-        ver = client.PySeekerVersion()
+        ver = client.PyNokovVersion()
         print('SeekerSDK ver. %d.%d.%d.%d' % (ver[0], ver[1], ver[2], ver[3]))
         client.PySetDataCallback(py_data_func, None)
         ret = client.Initialize(bytes(self.nokov_settings.host, encoding="utf8"))
