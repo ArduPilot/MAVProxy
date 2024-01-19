@@ -42,31 +42,52 @@ class MPMsgStats(MPDataLogChildTask):
 
 def show_stats(mlog):
     '''show stats on a file'''
-    if not hasattr(mlog, 'formats'):
-        print("Must be DF log")
-        return
     sizes = {}
     total_size = 0
     names = mlog.name_to_id.keys()
     pairs = []
+    maxnamelen = 4
 
     for name in names:
         sizes[name] = 0
 
     for name in names:
         mid = mlog.name_to_id[name]
-        count = mlog.counts[mid]
-        mlen = mlog.formats[mid].len
-        size = count * mlen
-        total_size += size
-        sizes[name] += size
-        pairs.append((name, count*mlen))
+        # DFReader_text logs use the name directly as the index to the dictionaries
+        if hasattr(mlog, 'formats') and mid not in mlog.formats:
+            mid = name
+        # In DFReader_text logs count is a dictionary, which is not set for
+        # messages that are never seen in the log.
+        if isinstance(mlog.counts,dict) and mid not in mlog.counts:
+            count = 0
+        else:
+            count = mlog.counts[mid]
+        # mavmmaplog class (tlogs) does not contain formats attribute, so instead of
+        # counting size in bytes, we count the number of messages
+        if hasattr(mlog, 'formats'):
+            mlen = mlog.formats[mid].len
+            size = count * mlen
+            total_size += size
+            sizes[name] += size
+            pairs.append((name, count*mlen))
+        else:
+            total_size += count
+            pairs.append((name, count))
+            if count>0 and len(name)>maxnamelen:
+                maxnamelen = len(name)
 
+    # mavmmaplog class (tlogs) does not contain formats attribute, so instead of
+    # counting size in bytes, we count the number of messages
+    if not hasattr(mlog, 'formats'):
+        print("Total number of messages: %u" % total_size)
+    else:
+        print("Total size: %u" % total_size)
+
+    # Print out the percentage for each message, from lowest to highest
     pairs = sorted(pairs, key = lambda p : p[1])
-    print("Total size: %u" % total_size)
     for (name,size) in pairs:
         if size > 0:
-            print("%-4s %.2f%%" % (name, 100.0 * size / total_size))
+            print("%-*s %.2f%%" % (maxnamelen, name, 100.0 * size / total_size))
 
     print("")
     category_total = 0
