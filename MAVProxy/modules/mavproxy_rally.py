@@ -101,7 +101,7 @@ class RallyModule(mission_item_protocol.MissionItemProtocolModule):
         return ret
 
     def mission_ftp_name(self):
-        return "@MISSION/fence.dat"
+        return "@MISSION/rally.dat"
 
     @staticmethod
     def loader_class():
