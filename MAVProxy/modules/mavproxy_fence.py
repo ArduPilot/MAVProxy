@@ -167,6 +167,9 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
             return p
         return None
 
+    def mission_ftp_name(self):
+        return "@MISSION/fence.dat"
+
     @staticmethod
     def loader_class():
         return mavwp.MissionItemProtocol_Fence

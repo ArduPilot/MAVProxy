@@ -23,7 +23,6 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
     def gui_menu_items(self):
         ret = super(WPModule, self).gui_menu_items()
         ret.extend([
-            MPMenuItem('FTP', 'FTP', '# %s ftp' % self.command_name()),
             MPMenuItem('Editor', 'Editor', '# wp editor'),
             MPMenuItem(
                 'Draw', 'Draw', '# wp draw ',
@@ -177,8 +176,6 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
             "add_landing": self.wp_add_landing,
             "add_rtl": self.wp_add_RTL,
             "add_dls": self.wp_add_dls,
-            "ftp": self.wp_ftp_download,
-            "ftpload": self.wp_ftp_upload,
             "update": (self.cmd_update, ["(FILENAME)"]),
             "undo": self.cmd_undo,
         })
