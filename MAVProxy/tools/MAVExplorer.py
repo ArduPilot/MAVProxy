@@ -105,7 +105,7 @@ class MEState(object):
               MPSetting('condition', str, None, 'condition'),
               MPSetting('xaxis', str, None, 'xaxis'),
               MPSetting('linestyle', str, None, 'linestyle'),
-              MPSetting('show_flightmode', bool, True, 'show flightmode'),
+              MPSetting('show_flightmode', int, 1, 'show flightmode'),
               MPSetting('sync_xzoom', bool, True, 'sync X-axis zoom'),
               MPSetting('sync_xmap', bool, True, 'sync X-axis zoom for map'),
               MPSetting('legend', str, 'upper left', 'legend position'),

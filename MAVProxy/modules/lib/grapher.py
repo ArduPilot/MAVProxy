@@ -381,7 +381,7 @@ class MavGraph(object):
         if self.grid:
             pylab.grid()
 
-        if self.show_flightmode:
+        if self.show_flightmode != 0:
             alpha = 0.3
             xlim = self.ax1.get_xlim()
             for i in range(len(self.flightmode_list)):
@@ -409,14 +409,14 @@ class MavGraph(object):
         else:
             self.fig.canvas.set_window_title(title)
 
-        if self.show_flightmode:
+        if self.show_flightmode != 0:
             mode_patches = []
             for mode in self.modes_plotted.keys():
                 (color, alpha) = self.modes_plotted[mode]
                 mode_patches.append(matplotlib.patches.Patch(color=color,
                                                              label=mode, alpha=alpha*1.5))
             labels = [patch.get_label() for patch in mode_patches]
-            if ax1_labels != []:
+            if ax1_labels != [] and self.show_flightmode != 2:
                 patches_legend = matplotlib.pyplot.legend(mode_patches, labels, loc=self.legend_flightmode)
                 self.fig.gca().add_artist(patches_legend)
             else:
