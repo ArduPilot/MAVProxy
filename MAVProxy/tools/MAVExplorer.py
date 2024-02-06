@@ -687,9 +687,17 @@ events = {
     71 : "DATA_ZIGZAG_STORE_A",
     72 : "DATA_ZIGZAG_STORE_B",
     73 : "DATA_LAND_REPO_ACTIVE",
+    74 : "DATA_STANDBY_ENABLE",
+    75 : "DATA_STANDBY_DISABLE",
 
     80 : "FENCE_FLOOR_ENABLE",
     81 : "FENCE_FLOOR_DISABLE",
+
+    85 : "EK3_SOURCES_SET_TO_PRIMARY",
+    86 : "EK3_SOURCES_SET_TO_SECONDARY",
+    87 : "EK3_SOURCES_SET_TO_TERTIARY",
+
+    90 : "AIRSPEED_PRIMARY_CHANGED",
 
     163 : "DATA_SURFACED",
     164 : "DATA_NOT_SURFACED",
@@ -727,42 +735,71 @@ subsystems = {
     27 : "FAILSAFE_LEAK",
     28 : "PILOT_INPUT",
     29 : "FAILSAFE_VIBE",
+    30 : "INTERNAL_ERROR",
+    31 : "FAILSAFE_DEADRECKON",
 }
 
-error_codes = { # not used yet
-    "ERROR_RESOLVED" : 0,
-    "FAILED_TO_INITIALISE" : 1,
-    "UNHEALTHY" : 4,
-    # subsystem specific error codes -- radio
-    "RADIO_LATE_FRAME" : 2,
-    # subsystem specific error codes -- failsafe_thr, batt, gps
-    "FAILSAFE_RESOLVED" : 0,
-    "FAILSAFE_OCCURRED" : 1,
-    # subsystem specific error codes -- main
-    "MAIN_INS_DELAY" : 1,
-    # subsystem specific error codes -- crash checker
-    "CRASH_CHECK_CRASH" : 1,
-    "CRASH_CHECK_LOSS_OF_CONTROL" : 2,
-    # subsystem specific error codes -- flip
-    "FLIP_ABANDONED" : 2,
-    # subsystem specific error codes -- terrain
-    "MISSING_TERRAIN_DATA" : 2,
-    # subsystem specific error codes -- navigation
-    "FAILED_TO_SET_DESTINATION" : 2,
-    "RESTARTED_RTL" : 3,
-    "FAILED_CIRCLE_INIT" : 4,
-    "DEST_OUTSIDE_FENCE" : 5,
-    # parachute failed to deploy because of low altitude or landed
-    "PARACHUTE_TOO_LOW" : 2,
-    "PARACHUTE_LANDED" : 3,
-    # EKF check definitions
-    "EKFCHECK_BAD_VARIANCE" : 2,
-    "EKFCHECK_VARIANCE_CLEARED" : 0,
-    # Baro specific error codes
-    "BARO_GLITCH" : 2,
-    "BAD_DEPTH" : 3,
-    # GPS specific error coces
-    "GPS_GLITCH" : 2,
+error_codes = {
+    "RADIO" : { # subsystem specific error codes -- radio
+        2: "RADIO_LATE_FRAME",
+    },
+    "FAILSAFE_FENCE" : { # for failsafe fence, non-zero is a bitmask
+        0: "FAILSAFE_RESOLVED",
+        '*': "Fence:#",
+    },
+    "FAILSAFE*" : { # subsystem specific error codes -- failsafe_thr, batt, gps
+        0: "FAILSAFE_RESOLVED",
+        1: "FAILSAFE_OCCURRED",
+    },
+    "MAIN" : { # subsystem specific error codes -- main
+        1: "MAIN_INS_DELAY",
+    },
+    "CRASH_CHECK" : { # subsystem specific error codes -- crash checker
+        1: "CRASH_CHECK_CRASH",
+        2: "CRASH_CHECK_LOSS_OF_CONTROL",
+    },
+    "FLIP" : { # subsystem specific error codes -- flip
+        2: "FLIP_ABANDONED",
+    },
+    "TERRAIN" : { # subsystem specific error codes -- terrain
+        2: "MISSING_TERRAIN_DATA",
+    },
+    "NAVIGATION" : { # subsystem specific error codes -- navigation
+        2: "FAILED_TO_SET_DESTINATION",
+        3: "RESTARTED_RTL",
+        4: "FAILED_CIRCLE_INIT",
+        5: "DEST_OUTSIDE_FENCE",
+        6: "RTL_MISSING_RNGFND",
+    },
+    "INTERNAL_ERROR" : { # subsystem specific error codes -- internal_error
+        1: "INTERNAL_ERRORS_DETECTED",
+    },
+    "PARACHUTES" : { # parachute failed to deploy because of low altitude or landed
+        2: "PARACHUTE_TOO_LOW",
+        3: "PARACHUTE_LANDED",
+    },
+    "EKFCHECK" : { # EKF check definitions
+        2: "EKFCHECK_BAD_VARIANCE",
+        0: "EKFCHECK_VARIANCE_CLEARED",
+    },
+    "BARO" : { # Baro specific error codes
+        2: "BARO_GLITCH",
+        3: "BAD_DEPTH", # sub-only
+    },
+    "GPS" : { # GPS specific error coces
+        2: "GPS_GLITCH",
+    },
+    "EKF_PRIMARY" : { # EKF primary - code is the EKF number
+        '*': "EKF:#",
+    },
+    "FLIGHT_MODE" : { # flight mode - code is the mode number
+        '*': "Mode:#",
+    },
+    "*" : { # general error codes
+        0: "ERROR_RESOLVED",
+        1: "FAILED_TO_INITIALISE",
+        4: "UNHEALTHY",
+    }
 }
     
 def cmd_messages(args):
@@ -792,6 +829,19 @@ def cmd_messages(args):
         if matches:
             print("%s %s" % (m_timestring, mstr))
 
+    def get_error_code(subsys, ecode):
+        for e in error_codes:
+            if e.endswith('*'):
+                subsys_match = subsys.startswith(e[:-1])
+            else:
+                subsys_match = subsys == e
+            if subsys_match:
+                if ecode in error_codes[e]:
+                    return error_codes[e][ecode]
+                elif "*" in error_codes[e]:
+                    return error_codes[e]['*'].replace("#",str(ecode))
+        return str(ecode)
+
     mestate.mlog.rewind()
     types = set(['MSG','EV','ERR', 'STATUSTEXT'])
     while True:
@@ -803,7 +853,9 @@ def cmd_messages(args):
         elif m.get_type() == 'EV':
             mstr = "Event: %s" % events.get(m.Id, str(m.Id))
         elif m.get_type() == 'ERR':
-            mstr = "Error: Subsys %s ECode %u " % (subsystems.get(m.Subsys, str(m.Subsys)), m.ECode)
+            subsys = subsystems.get(m.Subsys, str(m.Subsys))
+            ecode = get_error_code(subsys, m.ECode)
+            mstr = "Error: Subsys %s ECode %s " % (subsys, ecode)
         else:
             mstr = m.text
 
