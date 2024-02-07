@@ -90,6 +90,16 @@ class RCModule(mp_module.MPModule):
         '''this is a public method for use by drone API or other scripting'''
         return self.override[channel]
 
+    def cmd_rc_status(self):
+        print("")
+        for i in range(self.count):
+            value = "%u" % self.override[i]
+            if value == "65535":
+                value += "      (ignored)"
+            elif value == "0":
+                value += "      (no override)"
+            print("%2d: %s" % (i+1, value))
+
     def cmd_rc(self, args):
         '''handle RC value override'''
         if len(args) > 0 and args[0] == 'set':
@@ -101,8 +111,12 @@ class RCModule(mp_module.MPModule):
                 channels[i] = 0
             self.set_override(channels)
             return
+        if len(args) == 1 and args[0] == "status":
+            self.cmd_rc_status()
+            return
+
         if len(args) != 2:
-            print("Usage: rc <set|channel|all|clear> <pwmvalue>")
+            print("Usage: rc <set|channel|all|clear|status> <pwmvalue>")
             return
         value = int(args[1])
         if value > 65535 or value < -1:
