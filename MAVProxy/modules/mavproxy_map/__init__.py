@@ -33,6 +33,7 @@ class MapModule(mp_module.MPModule):
         self.moving_rally = None
         self.mission_list = None
         self.moving_polygon_point = None
+        self.moving_circle = None
         self.icon_counter = 0
         self.circle_counter = 0
         self.draw_line = None
@@ -325,6 +326,13 @@ class MapModule(mp_module.MPModule):
         (seq, type) = id.split(":")
         self.module('fence').removecircle(int(seq))
 
+    def polyfence_move_circle(self, id):
+        '''called when a fence is right-clicked and move circle is selected; start
+        moving the circle
+        '''
+        (seq, t) = id.split(":")
+        self.moving_circle = int(seq)
+
     def polyfence_remove_returnpoint(self, id):
         '''called when a returnpoint is right-clicked and remove is selected;
         removes the return point
@@ -371,6 +379,7 @@ class MapModule(mp_module.MPModule):
                 lng *= 1e-7
             items = [
                 MPMenuItem('Remove Circle', returnkey='popupPolyFenceRemoveCircle'),
+                MPMenuItem('Move Circle', returnkey='popupPolyFenceMoveCircle'),
             ]
             popup = MPMenuSubMenu('Popup', items)
             slipcircle = mp_slipmap.SlipCircle(
@@ -596,6 +605,8 @@ class MapModule(mp_module.MPModule):
             self.move_fencepoint(obj.selected[0].objkey, obj.selected[0].extra_info)
         elif menuitem.returnkey == 'popupPolyFenceRemoveCircle':
             self.polyfence_remove_circle(obj.selected[0].objkey)
+        elif menuitem.returnkey == 'popupPolyFenceMoveCircle':
+            self.polyfence_move_circle(obj.selected[0].objkey)
         elif menuitem.returnkey == 'popupPolyFenceRemoveReturnPoint':
             self.polyfence_remove_returnpoint(obj.selected[0].objkey)
         elif menuitem.returnkey == 'popupPolyFenceRemovePolygon':
@@ -671,6 +682,17 @@ class MapModule(mp_module.MPModule):
             if (self.mpstate.click_time is None or
                 time.time() - self.mpstate.click_time > 0.1):
                 self.mpstate.click(obj.latlon)
+
+        if obj.event.leftIsDown and self.moving_circle is not None:
+            self.mpstate.click(obj.latlon)
+            seq = self.moving_circle
+            self.mpstate.functions.process_stdin("fence movecircle %u" % int(seq))
+            self.moving_circle = None
+            return
+        if obj.event.rightIsDown and self.moving_circle is not None:
+            print("Cancelled circle move")
+            self.moving_circle = None
+            return
 
     def click_updated(self):
         '''called when the click position has changed'''
