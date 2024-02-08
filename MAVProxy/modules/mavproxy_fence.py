@@ -445,6 +445,9 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
         self.wploader.last_change = time.time()
         self.send_all_items()
 
+    def cmd_movecircle(self, args):
+        self.movecircle(int(args[0]))
+
     def removecircle(self, seq):
         '''remove circle at offset seq'''
         if not self.check_have_list():
@@ -461,6 +464,40 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
         self.wploader.expected_count -= 1
         self.wploader.last_change = time.time()
         self.send_all_items()
+
+    def movecircle(self, seq):
+        '''moves circle at polygon_start_seqence to map click point
+        '''
+        if not self.check_have_list():
+            return
+
+        item = self.wploader.item(seq)
+        if item is None:
+            print("No item %s" % str(seq))
+            return
+
+        if not self.is_circle_item(item):
+            print("Item %u is not a circle" % seq)
+            return
+
+        latlon = self.mpstate.click_location
+        if latlon is None:
+            print("No map click position available")
+            return
+
+        moving_item = self.wploader.item(seq)
+        moving_item.x = latlon[0]
+        moving_item.y = latlon[1]
+        if moving_item.get_type() == "MISSION_ITEM_INT":
+            moving_item.x *= 1e7
+            moving_item.y *= 1e7
+            moving_item.x = int(moving_item.x)
+            moving_item.y = int(moving_item.y)
+
+        self.wploader.set(moving_item, moving_item.seq)
+        self.wploader.last_change = time.time()
+
+        self.send_single_waypoint(moving_item.seq)
 
     def is_circle_item(self, item):
         return item.command in [
@@ -681,6 +718,7 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
         ret = super(FenceModule, self).commands()
         ret.update({
             'addcircle': (self.cmd_addcircle, ["<inclusion|inc|exclusion|exc>", "RADIUS"]),
+            'movecircle': (self.cmd_movecircle, []),
             'addpoly': (self.cmd_addpoly, ["<inclusion|inc|exclusion|exc>", "<radius>" "<pointcount>", "<rotation>"]),
             'movepolypoint': (self.cmd_movepolypoint, ["POLY_FIRSTPOINT", "POINT_OFFSET"]),
             'addreturnpoint': (self.cmd_addreturnpoint, []),
