@@ -34,6 +34,7 @@ class MapModule(mp_module.MPModule):
         self.mission_list = None
         self.moving_polygon_point = None
         self.moving_circle = None
+        self.setting_circle_radius = None
         self.icon_counter = 0
         self.circle_counter = 0
         self.draw_line = None
@@ -333,6 +334,12 @@ class MapModule(mp_module.MPModule):
         (seq, t) = id.split(":")
         self.moving_circle = int(seq)
 
+    def polyfence_set_circle_radius(self, id):
+        '''called when a fence is right-clicked and change-circle-radius is selected; next click sets the radius
+        '''
+        (seq, t) = id.split(":")
+        self.setting_circle_radius = int(seq)
+
     def polyfence_remove_returnpoint(self, id):
         '''called when a returnpoint is right-clicked and remove is selected;
         removes the return point
@@ -380,6 +387,7 @@ class MapModule(mp_module.MPModule):
             items = [
                 MPMenuItem('Remove Circle', returnkey='popupPolyFenceRemoveCircle'),
                 MPMenuItem('Move Circle', returnkey='popupPolyFenceMoveCircle'),
+                MPMenuItem('Set Circle Radius w/click', returnkey='popupPolyFenceSetCircleRadius'),
             ]
             popup = MPMenuSubMenu('Popup', items)
             slipcircle = mp_slipmap.SlipCircle(
@@ -607,6 +615,8 @@ class MapModule(mp_module.MPModule):
             self.polyfence_remove_circle(obj.selected[0].objkey)
         elif menuitem.returnkey == 'popupPolyFenceMoveCircle':
             self.polyfence_move_circle(obj.selected[0].objkey)
+        elif menuitem.returnkey == 'popupPolyFenceSetCircleRadius':
+            self.polyfence_set_circle_radius(obj.selected[0].objkey)
         elif menuitem.returnkey == 'popupPolyFenceRemoveReturnPoint':
             self.polyfence_remove_returnpoint(obj.selected[0].objkey)
         elif menuitem.returnkey == 'popupPolyFenceRemovePolygon':
@@ -692,6 +702,17 @@ class MapModule(mp_module.MPModule):
         if obj.event.rightIsDown and self.moving_circle is not None:
             print("Cancelled circle move")
             self.moving_circle = None
+            return
+
+        if obj.event.leftIsDown and self.setting_circle_radius is not None:
+            self.mpstate.click(obj.latlon)
+            seq = self.setting_circle_radius
+            self.mpstate.functions.process_stdin("fence setcircleradius %u" % int(seq))
+            self.setting_circle_radius = None
+            return
+        if obj.event.rightIsDown and self.setting_circle_radius is not None:
+            print("Cancelled circle move")
+            self.setting_circle_radius = None
             return
 
     def click_updated(self):
