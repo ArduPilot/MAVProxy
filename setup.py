@@ -28,7 +28,8 @@ package_data.extend(package_files('MAVProxy/modules/mavproxy_cesium/app'))
 # large numbers of modules like numpy etc which may be already installed
 requirements=['pymavlink>=2.4.14',
               'pyserial>=3.0',
-              'numpy']
+              'numpy',
+              'pynmeagps']
 
 if platform.system() == "Darwin":
     # on MacOS we can have a more complete requirements list
