@@ -85,8 +85,8 @@ class Axis (Control):
 class Hat (Control):
     '''A Hat maps one axis of a hat as if it were a toggle switch.
     When the axis goes negative, the corresponding channel value is
-    set to `outputlow`.  When the axis goes positive, the value is set
-    to `outputhigh`.  No change is made when the axis returns to 0.'''
+    set to `outlow`.  When the axis goes positive, the value is set
+    to `outhigh`.  No change is made when the axis returns to 0.'''
 
     def __init__(self, joystick, id, axis, **kwargs):
         super(Hat, self).__init__(joystick, **kwargs)
@@ -106,6 +106,45 @@ class Hat (Control):
 
         return self._value
 
+class Dial (Control):
+    '''Emulates a dial with a hat axis.
+    When the axis goes negative, the corresponding channel value is
+    decremented by `step` towards `outlow`. When the axis goes
+    positive, the value is incremented by `step` towards `outhigh`.
+    `invert` affects the direction of hat controls. The output is centered
+    by default, setting `centered` to false causes the output to start at
+    `outputlow`'''
+
+    def __init__(self, joystick, id, axis, step=100, invert=False, centered=True, **kwargs):
+        super(Dial, self).__init__(joystick, **kwargs)
+        self.id = id
+        self.axis = axis
+        self.step = step
+        self.invert = invert
+        # Center by default
+        self._value = (self.outlow + self.outhigh) // 2 if centered else self.outlow
+        # Flag to make sure we identify discrete presses
+        self._last_value = 0
+
+    @property
+    def value(self):
+        x, y = self.joystick.get_hat(self.id)
+
+        value = x if self.axis == 'x' else y
+
+        # Check if it's a new value we've not processed before
+        if value != self._last_value:
+            self._last_value = value
+            if value != 0:
+                if self.invert:
+                    value *= -1
+                # In my testing the hat is clamped to -1, 0, 1 values only
+                # NOTE: check if this universal
+                self._value += value * self.step
+                self._value = min(self._value, self.outhigh)
+                self._value = max(self._value, self.outlow)
+
+        return self._value
 
 class Joystick (object):
     '''A Joystick manages a collection of Controls.'''
@@ -144,7 +183,14 @@ class Joystick (object):
                           for k in control.keys()
                           if k in ['outlow', 'outhigh']}
 
-                handler = Hat(self.joystick, control['id'], control['axis'])
+                handler = Hat(self.joystick, control['id'], control['axis'], **kwargs)
+
+            elif control['type'] == 'dial':
+                kwargs = {k: control[k]
+                          for k in control.keys()
+                          if k in ['outlow', 'outhigh', 'invert', 'step', 'centered']}
+
+                handler = Dial(self.joystick, control['id'], control['axis'], **kwargs)
 
             self.channels[control['channel']-1] = handler
 
