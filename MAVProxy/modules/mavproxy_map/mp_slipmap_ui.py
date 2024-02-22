@@ -489,16 +489,23 @@ class MPSlipMapPanel(wx.Panel):
             newtext += ' SRTM Downloading '
         newtext += '\n'
 
-        self.update_click_position_text()
+        cpt = self.click_position_text()
+        if cpt is not None:
+            newtext += cpt
 
-    def update_click_position_text(self):
+        if newtext != self.state.oldtext:
+            self.position.Clear()
+            self.position.WriteText(newtext)
+            self.state.oldtext = newtext
+
+    def click_position_text(self):
         if self.click_pos is None:
-            return
+            return None
         if self.click_pos == self.last_click_pos:
-            return
+            return self.last_click_position_text
 
         if self.click_pos == self.last_click_pos_used_for_text:
-            return
+            return self.last_click_position_text
 
         terrain_height = None
         terrain_height_str = "?"
@@ -531,13 +538,11 @@ class MPSlipMapPanel(wx.Panel):
                     delta = terrain_height - self.last_terrain_height
                     newtext += " (height %f)" % (delta, )
         self.last_terrain_height = terrain_height
-
-        if newtext != self.state.oldtext:
-            self.position.Clear()
-            self.position.WriteText(newtext)
-            self.state.oldtext = newtext
-
         self.last_click_pos_used_for_text = self.click_pos
+
+        self.last_click_position_text = newtext
+
+        return newtext
 
     def pixel_coords(self, latlon, reverse=False):
         '''return pixel coordinates in the map image for a (lat,lon)
