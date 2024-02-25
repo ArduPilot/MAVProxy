@@ -125,7 +125,7 @@ class MEState(object):
             "set"       : ["(SETTING)"],
             "condition" : ["(VARIABLE)"],
             "graph"     : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)'],
-            "dump"      : ['(MESSAGETYPE)'],
+            "dump"      : ['(MESSAGETYPE)', '--verbose (MESSAGETYPE)'],
             "map"       : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)'],
             "param"     : ['download', 'check', 'help (PARAMETER)'],
             }
