@@ -87,7 +87,15 @@ def show_stats(mlog):
     pairs = sorted(pairs, key = lambda p : p[1])
     for (name,size) in pairs:
         if size > 0:
-            print("%-*s %.2f%%" % (maxnamelen, name, 100.0 * size / total_size))
+            descstr = ''
+            if hasattr(mlog, 'metadata'):
+                desc = mlog.metadata.get_description(name)
+                if desc:
+                    if len(desc) > (68 - maxnamelen):
+                        descstr = "  [%s...]" % desc[:(65 - maxnamelen)]
+                    else:
+                        descstr = "  [%s]" % desc
+            print("%-*s %5.2f%%%s" % (maxnamelen, name, 100.0 * size / total_size, descstr))
 
     print("")
     category_total = 0
