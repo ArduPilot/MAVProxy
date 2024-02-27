@@ -374,8 +374,8 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
             # may only be present for colour-source expressions to work
             continue
 
-        if type == 'GPS' and hasattr(m,'I'):
-            type = 'GPS[%u]' % m.I
+        if type in ['GPS','VEH'] and hasattr(m,'I'):
+            type = '%s[%u]' % (type, m.I)
 
         if not all_false and len(flightmode_selections) > 0 and idx < len(options._flightmodes) and m._timestamp >= options._flightmodes[idx][2]:
             idx += 1
