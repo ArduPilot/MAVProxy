@@ -202,6 +202,11 @@ class MissionEditorFrame(wx.Frame):
         self.grid_mission = wx.grid.Grid(self, wx.ID_ANY, size=(1, 1))
         self.button_add_wp = wx.Button(self, wx.ID_ANY, "Add Below")
         self.button_split = wx.Button(self, wx.ID_ANY, "Split")
+        self.button_add_yaw_foreach = wx.Button(self, wx.ID_ANY, "Add Yaw for each wp")
+        self.button_delete_yaw = wx.Button(self, wx.ID_ANY, "Delete yaw")
+        self.button_change_wp_alt = wx.Button(self, wx.ID_ANY, "Change WP Altitude")
+        self.button_change_frame = wx.Button(self, wx.ID_ANY, "Change Frame")
+
 
         self.__set_properties()
         self.__do_layout()
@@ -225,6 +230,14 @@ class MissionEditorFrame(wx.Frame):
         self.Bind(wx.grid.EVT_GRID_CMD_SELECT_CELL, self.on_mission_grid_cell_select, self.grid_mission)
         self.Bind(wx.EVT_BUTTON, self.add_wp_below_pushed, self.button_add_wp)
         self.Bind(wx.EVT_BUTTON, self.split_pushed, self.button_split)
+        self.Bind(wx.EVT_BUTTON, self.add_yaw_foreach_pushed, self.button_add_yaw_foreach)
+        self.Bind(wx.EVT_BUTTON, self.delete_yaw_pushed, self.button_delete_yaw)
+        self.Bind(wx.EVT_BUTTON, self.change_wp_alt_pushed, self.button_change_wp_alt)
+        self.Bind(wx.EVT_BUTTON, self.change_frame_pushed, self.button_change_frame)
+
+
+        ##self.Bind(wx.EVT_BUTTON, self.delete_yaw_foreach_pushed, self.button_delete_yaw_foreach)
+
         # end wxGlade
 
         #use a timer to facilitate event an event handlers for events
@@ -359,6 +372,10 @@ class MissionEditorFrame(wx.Frame):
         sizer_3.Add(self.grid_mission, 1, wx.EXPAND, 0)
         sizer_16.Add(self.button_add_wp, 0, 0, 0)
         sizer_16.Add(self.button_split, 0, 0, 0)
+        sizer_16.Add(self.button_add_yaw_foreach, 0, 0, 0)
+        sizer_16.Add(self.button_delete_yaw, 0, 0, 0)
+        sizer_16.Add(self.button_change_wp_alt, 0, 0, 0)
+        sizer_16.Add(self.button_change_frame, 0, 0, 0)
         sizer_3.Add(sizer_16, 0, wx.EXPAND, 0)
         self.SetSizer(sizer_3)
         self.Layout()
@@ -648,7 +665,6 @@ class MissionEditorFrame(wx.Frame):
         self.fix_jumps(row_selected+1, 1)
 
         event.Skip()
-
     def split_pushed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
         row_selected = self.grid_mission.GetGridCursorRow()
         if (row_selected < 2):
@@ -690,6 +706,139 @@ class MissionEditorFrame(wx.Frame):
 
         self.fix_jumps(row_selected, 1)
 
+        event.Skip()
+
+    def add_yaw_foreach_pushed(self, event):
+        def on_cancel(ev):
+            frame.Close()
+
+        def on_ok(ev):
+            yaw = text_box.GetValue()
+            row_selected = self.grid_mission.GetGridCursorRow()
+            if row_selected +1 == self.grid_mission.GetNumberRows():
+                row_selected = 0
+            print(row_selected)
+            row_start = row_selected + 1
+            added_num = 0
+            while row_selected < self.grid_mission.GetNumberRows():
+                command = self.grid_mission.GetCellValue(row_selected, ME_COMMAND_COL)
+                if command in ["NAV_WAYPOINT"]:
+                    self.grid_mission.InsertRows(row_selected)
+                    self.prep_new_row(row_selected)
+                    self.grid_mission.SelectRow(row_selected)
+                    self.fix_jumps(row_selected, 1)
+                    self.grid_mission.SetCellValue(row_selected, ME_COMMAND_COL, "CONDITION_YAW")
+                    self.grid_mission.SetCellValue(row_selected, ME_P1_COL, yaw)
+                    self.grid_mission.SetCellValue(row_selected, ME_ALT_COL, "0")
+                    self.set_modified_state(True)
+                    added_num += 1
+                    row_selected += 1
+                row_selected += 1
+            wx.MessageBox(f"Starting with row {row_start} , \nadded {added_num} yaw commands.",
+                          "Done",  wx.OK | wx.ICON_INFORMATION)
+            frame.Close()
+
+        frame = wx.Frame(None, wx.ID_ANY, "Enter target heading (Yaw)", size=(500, 150))
+        dlg = wx.Panel(frame)
+        text_box = wx.TextCtrl(dlg,style = wx.TE_PROCESS_ENTER, value="90")
+        ok_button = wx.Button(dlg, wx.ID_OK, "OK")
+        cancel_button = wx.Button(dlg, wx.ID_CANCEL, "Cancel")
+        ok_button.Bind(wx.EVT_BUTTON, on_ok)
+        cancel_button.Bind(wx.EVT_BUTTON, on_cancel)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(wx.StaticText(dlg,
+                                label="Add CONDITION_YAW prior to each NAV_WAYPOINT in mission,\n"
+                                      "starting with first or selected row."),
+                  0, wx.ALL, 5)
+        sizer.Add(text_box, 0, wx.ALIGN_CENTER)
+        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        button_sizer.Add(ok_button, 0, wx.ALL, 5)
+        button_sizer.Add(cancel_button, 0, wx.ALL, 5)
+        text_box.Bind(wx.EVT_TEXT_ENTER, on_ok)
+        sizer.Add(button_sizer, 0, wx.CENTER)
+        dlg.SetSizer(sizer)
+        frame.Show()
+        event.Skip()
+
+    def delete_yaw_pushed(self, event):
+        row_selected = 0
+        while row_selected < self.grid_mission.GetNumberRows():
+            command = self.grid_mission.GetCellValue(row_selected, ME_COMMAND_COL)
+            if command in ["CONDITION_YAW"]:
+                self.grid_mission.DeleteRows(row_selected)
+                self.set_modified_state(True)
+            self.grid_mission.SelectRow(row_selected)
+            row_selected += 1
+        event.Skip()
+
+    def change_wp_alt_pushed(self, event):
+        def on_cancel(ev):
+            frame.Close()
+
+        def on_ok(ev):
+            alt_offset = text_box.GetValue()
+            row_selected = 0
+            while row_selected < self.grid_mission.GetNumberRows():
+                command = self.grid_mission.GetCellValue(row_selected, ME_COMMAND_COL)
+                if command in ["NAV_WAYPOINT", "NAV_SPLINE_WAYPOINT"]:
+                    self.grid_mission.SetCellValue(row_selected, ME_ALT_COL, str(float(
+                        self.grid_mission.GetCellValue(row_selected, ME_ALT_COL)) + float(alt_offset)))
+                row_selected += 1
+            self.set_modified_state(True)
+            frame.Close()
+
+        frame = wx.Frame(None, wx.ID_ANY, "Altitude Offset", size=(350, 150))
+        dlg = wx.Panel(frame)
+        text_box = wx.TextCtrl(dlg,style = wx.TE_PROCESS_ENTER, value="20")
+        ok_button = wx.Button(dlg, wx.ID_OK, "OK")
+        cancel_button = wx.Button(dlg, wx.ID_CANCEL, "Cancel")
+        ok_button.Bind(wx.EVT_BUTTON, on_ok)
+        cancel_button.Bind(wx.EVT_BUTTON, on_cancel)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(wx.StaticText(dlg, label="Enter offset for all NAV_WAYPOINT and NAV_SPLINE_WAYPOINT"
+                                           " items. \n Enter altitude offset (+/- X meters)"),  0, wx.ALL, 5)
+        sizer.Add(text_box, 0, wx.ALIGN_CENTER)
+        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        button_sizer.Add(ok_button, 0, wx.ALL, 5)
+        button_sizer.Add(cancel_button, 0, wx.ALL, 5)
+        text_box.Bind(wx.EVT_TEXT_ENTER, on_ok)
+        sizer.Add(button_sizer, 0, wx.CENTER)
+        dlg.SetSizer(sizer)
+        frame.Show()
+        event.Skip()
+
+    def change_frame_pushed(self, event):
+        def on_cancel(ev):
+            frame.Close()
+
+        def on_ok(ev):
+            new_frame = dropdown.GetValue()
+            row_selected = 0
+            while row_selected < self.grid_mission.GetNumberRows():
+                self.grid_mission.SetCellValue(row_selected, ME_FRAME_COL, new_frame)
+                row_selected += 1
+            self.set_modified_state(True)
+            frame.Close()
+
+        frame = wx.Frame(None, wx.ID_ANY, "Change Frame", size=(300, 180))
+        dlg = wx.Panel(frame)
+        frame_list = ["Abs", "Rel", "AGL"]
+        dropdown = wx.ComboBox(dlg, wx.ID_ANY, choices=frame_list, style=wx.CB_READONLY)
+        dropdown.SetSelection(0)
+        ok_button = wx.Button(dlg, wx.ID_OK, "OK")
+        cancel_button = wx.Button(dlg, wx.ID_CANCEL, "Cancel")
+        ok_button.Bind(wx.EVT_BUTTON, on_ok)
+        cancel_button.Bind(wx.EVT_BUTTON, on_cancel)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(wx.StaticText(dlg, label="New frame will be applied to all mission items.\n"
+                                           " AGL may use Lidar if enabled."), 0, wx.ALL, 5)
+        sizer.Add(dropdown, 0, wx.ALL | wx.EXPAND, 5)
+        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        button_sizer.Add(ok_button, 0, wx.ALL, 5)
+        button_sizer.Add(cancel_button, 0, wx.ALL, 5)
+        sizer.Add(button_sizer, 0, wx.CENTER)
+        dlg.SetSizer(sizer)
+        frame.Show()
         event.Skip()
 
     def save_wp_file_pushed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
