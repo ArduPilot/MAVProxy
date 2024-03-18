@@ -6,6 +6,8 @@ AP_FLAKE8_CLEAN
 '''
 
 import time
+import math
+import struct
 
 try:
     import pyaudio  # install using, "sudo apt-get install python3-pyaudio"
@@ -15,6 +17,15 @@ except Exception:
     print("chat: failed to import pyaudio, wave or openai.  See https://ardupilot.org/mavproxy/docs/modules/chat.html")
     exit()
 
+def rms( data ):
+    count = len(data)/2
+    format = "%dh"%(count)
+    shorts = struct.unpack( format, data )
+    sum_squares = 0.0
+    for sample in shorts:
+        n = sample * (1.0/32768)
+        sum_squares += n*n
+    return math.sqrt( sum_squares / count )
 
 class chat_voice_to_text():
     def __init__(self):
@@ -34,7 +45,7 @@ class chat_voice_to_text():
             try:
                 self.client = OpenAI()
             except Exception:
-                print("chat: failed to connect to OpenAI")
+                print("chat: failed to connect to OpenAI - 4")
                 return False
 
         # return True if connected
@@ -55,15 +66,29 @@ class chat_voice_to_text():
 
         # calculate time recording should stop
         curr_time = time.time()
-        time_stop = curr_time + 5
+        time_stop = curr_time + 3
 
         # record until specified time
         frames = []
-        while curr_time < time_stop:
+
+        # logic for recording sound until someone is speaking.
+        isSpeaking = True
+        while curr_time < time_stop or isSpeaking:
             data = stream.read(1024)
             frames.append(data)
+            rms1 = rms(data)
+            if rms1!=0.0:
+                decibel = 20 * math.log10(rms1)
+                isSpeaking = decibel>-80.0  # -80 is the hardcoded threshold. higher number means louder. Set threshold in the range (-100,0)
+                if isSpeaking:
+                    time_stop = time.time()+3
+            else:
+                isSpeaking = False
             curr_time = time.time()
-
+            print(time_stop-curr_time)
+            if isSpeaking:
+                print("speaking")
+        print("recording ended")
         # Stop and close the stream
         stream.stop_stream()
         stream.close()
