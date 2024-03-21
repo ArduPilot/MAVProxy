@@ -85,10 +85,6 @@ class chat_voice_to_text():
             else:
                 isSpeaking = False
             curr_time = time.time()
-            print(time_stop-curr_time)
-            if isSpeaking:
-                print("speaking")
-        print("recording ended")
         # Stop and close the stream
         stream.stop_stream()
         stream.close()
