@@ -30,6 +30,7 @@ from MAVProxy.modules.lib.mp_menu import *
 import MAVProxy.modules.lib.mp_util as mp_util
 from pymavlink import mavutil
 from pymavlink import mavwp
+from pymavlink import DFReader
 from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
 from MAVProxy.modules.lib import wxsettings
 from MAVProxy.modules.lib.graphdefinition import GraphDefinition
@@ -128,6 +129,7 @@ class MEState(object):
             "dump"      : ['(MESSAGETYPE)', '--verbose (MESSAGETYPE)'],
             "map"       : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)'],
             "param"     : ['download', 'check', 'help (PARAMETER)'],
+            "logmessage": ['download', 'help (MESSAGETYPE)'],
             }
         self.aliases = {}
         self.graphs = []
@@ -332,6 +334,9 @@ def load_graphs():
     mestate.graphs = []
     gfiles = ['mavgraphs.xml']
     for dirname, dirnames, filenames in os.walk(mp_util.dot_mavproxy()):
+        # Skip XML files in the LogMessages subfolder
+        if os.path.basename(dirname) == "LogMessages":
+            continue
         for filename in filenames:
             if filename.lower().endswith('.xml'):
                 gfiles.append(os.path.join(dirname, filename))
@@ -1176,6 +1181,44 @@ def cmd_paramchange(args):
         vmap[pname] = pvalue
     mestate.mlog.rewind()
 
+
+def cmd_logmessage(args):
+    '''show log message information'''
+    mlog = mestate.mlog
+    usage = "Usage: logmessage <help|download>"
+    # Print usage and return, if we have no arguments
+    if len(args) <= 0:
+        print(usage)
+        return
+    # help: print help for the requested log message
+    if args[0] == 'help':
+        if len(args) < 2:
+            print(usage)
+            return
+        if hasattr(mlog, 'metadata'):
+            mlog.metadata.print_help(args[1])
+        elif isinstance(mlog, mavutil.mavlogfile):
+            print("logmessage help is not supported for telemetry log files")
+        else:
+            print("Incompatible pymavlink; upgrade pymavlink?")
+        return
+    # download: download XML files for log messages
+    if args[0] == 'download':
+        if not hasattr(DFReader, 'DFMetaData'):
+            print("Incompatible pymavlink; upgrade pymavlink?")
+            return
+        try:
+            child = multiproc.Process(target=DFReader.DFMetaData.download)
+            child.start()
+        except Exception as e:
+            print(e)
+        if hasattr(mlog, 'metadata'):
+            mlog.metadata.reset()
+        return
+    # Print usage if we've dropped through the ifs
+    print(usage)
+
+
 def cmd_mission(args):
     '''show mission'''
     if (len(args) == 1):
@@ -1463,6 +1506,7 @@ command_map = {
     'dump'       : (cmd_dump,      'dump messages from log'),
     'file'       : (cmd_file,      'show files'),
     'mission'    : (cmd_mission,   'show mission'),
+    'logmessage' : (cmd_logmessage, 'show log message information'),
     }
 
 def progress_bar(pct):
