@@ -1246,7 +1246,7 @@ def cmd_devid(args):
         if p.startswith('COMPASS_DEV_ID') or p.startswith('COMPASS_PRIO') or (
                 p.startswith('COMPASS') and p.endswith('DEV_ID')):
             mp_util.decode_devid(params[p], p)
-        if p.startswith('INS_') and p.endswith('_ID'):
+        if p.startswith('INS') and p.endswith('_ID'):
             mp_util.decode_devid(params[p], p)
         if p.startswith('GND_BARO') and p.endswith('_ID'):
             mp_util.decode_devid(params[p], p)
