@@ -38,7 +38,8 @@ class chat_window():
 
         # add api key input window
         self.apikey_frame = wx.Frame(None, title="Input OpenAI API Key", size=(560, 50))
-        self.apikey_text_input = wx.TextCtrl(self.apikey_frame, id=-1, pos=(10, 10), size=(450, -1), style=wx.TE_PROCESS_ENTER)
+        self.apikey_text_input = wx.TextCtrl(self.apikey_frame, id=-1, pos=(10, 10), size=(450, -1),
+                                             style=wx.TE_PASSWORD | wx.TE_PROCESS_ENTER)
         self.apikey_set_button = wx.Button(self.apikey_frame, id=-1, label="Set", pos=(470, 10), size=(75, 25))
         self.apikey_frame.Bind(wx.EVT_BUTTON, self.apikey_set_button_click, self.apikey_set_button)
         self.apikey_frame.Bind(wx.EVT_TEXT_ENTER, self.apikey_set_button_click, self.apikey_text_input)
