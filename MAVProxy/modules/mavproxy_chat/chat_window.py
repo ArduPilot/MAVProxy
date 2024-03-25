@@ -106,6 +106,13 @@ class chat_window():
         self.chat_openai.set_api_key(self.apikey_text_input.GetValue())
         self.chat_voice_to_text.set_api_key(self.apikey_text_input.GetValue())
         self.apikey_frame.Hide()
+        
+        #initially place all old messages
+        orig_text_attr = self.text_reply.GetDefaultStyle()
+        old_msgs = self.chat_openai.get_old_msg()
+        if old_msgs : 
+            wx.CallAfter(self.text_reply.SetDefaultStyle, orig_text_attr)
+            wx.CallAfter(self.text_reply.AppendText, old_msgs + "\n\n")
 
     # API key close button clicked
     def apikey_close_button_click(self, event):

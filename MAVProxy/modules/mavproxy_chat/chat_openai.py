@@ -83,7 +83,13 @@ class chat_openai():
             if self.assistant is None:
                 print("chat: failed to connect to OpenAI assistant")
                 return False
+       
+        # To initialize existing thread id
+        assistant_thread_id_existing = None
 
+        # Check for existing thread
+        if assistant_thread_id_existing is not None : 
+            self.assistant_thread = self.client.beta.threads.retrieve(assistant_thread_id_existing)
         # create new thread
         if self.assistant_thread is None:
             self.assistant_thread = self.client.beta.threads.create()
@@ -98,6 +104,32 @@ class chat_openai():
         self.client = OpenAI(api_key=api_key_str)
         self.assistant = None
         self.assistant_thread = None
+
+    # get the old thread and messages 
+    def get_old_msg(self):
+        with self.send_lock:
+
+            # check connection
+            if not self.check_connection():
+                return "chat: failed to connect to OpenAI"
+            
+            # retrieve messages on the thread
+            reply = ""
+            reply_messages = self.client.beta.threads.messages.list(self.assistant_thread.id,
+                                                                    order="asc",
+                                                                    limit = 20)
+                                                                    
+            if reply_messages is None:
+                return "chat: failed to retrieve messages"
+            
+            need_newline = False
+            for message in reply_messages.data:
+                reply = reply + message.content[0].text.value
+                if need_newline:
+                    reply = reply + "\n"
+                need_newline = True
+
+            return reply
 
     # send text to assistant
     def send_to_assistant(self, text):
