@@ -95,7 +95,8 @@ class MapModule(mp_module.MPModule):
 
         self.default_popup = MPMenuSubMenu('Popup', items=[])
         self.add_menu(MPMenuItem('Fly To', 'Fly To', '# guided ',
-                                 handler=MPMenuCallTextDialog(title='Altitude (m)', default=self.mpstate.settings.guidedalt)))
+                                 handler=MPMenuCallTextDialog(title='Altitude (FLYTOFRAMEUNITS)', default=self.mpstate.settings.guidedalt,
+                                                              settings=self.settings)))
         self.add_menu(MPMenuItem('Set Home', 'Set Home', '# confirm "Set HOME?" map sethomepos '))
         self.add_menu(MPMenuItem('Set Home (with height)', 'Set Home', '# confirm "Set HOME with height?" map sethome '))
         self.add_menu(MPMenuItem('Set Origin', 'Set Origin', '# confirm "Set ORIGIN?" map setoriginpos '))

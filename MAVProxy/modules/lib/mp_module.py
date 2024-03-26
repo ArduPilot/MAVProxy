@@ -1,4 +1,5 @@
 import time
+from pymavlink import mavutil
 
 class MPModule(object):
     '''
@@ -153,6 +154,18 @@ class MPModule(object):
     def add_completion_function(self, name, callback):
         self.mpstate.completion_functions[name] = callback
 
+    def flyto_frame_units(self):
+        '''return a frame string and unit'''
+        return "%s %s" % (self.settings.height_unit, self.settings.flytoframe)
+
+    def flyto_frame(self):
+        '''return mavlink frame flyto frame setting'''
+        if self.settings.flytoframe == "AGL":
+            return mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT
+        if self.settings.flytoframe == "AMSL":
+            return mavutil.mavlink.MAV_FRAME_GLOBAL
+        return mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT
+
     def dist_string(self, val_meters):
         '''return a distance as a string'''
         if self.settings.dist_unit == 'nm':
@@ -167,6 +180,12 @@ class MPModule(object):
             return val_meters * 3.28084
         return val_meters
 
+    def height_convert_from_units(self, val):
+        '''convert a height from configured units'''
+        if self.settings.height_unit == 'feet':
+            return val / 3.28084
+        return val
+    
     def height_string(self, val_meters):
         '''return a height as a string'''
         if self.settings.height_unit == 'feet':
