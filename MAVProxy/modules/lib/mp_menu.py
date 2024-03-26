@@ -336,17 +336,22 @@ class MPMenuCallFileDialog(object):
 
 class MPMenuCallTextDialog(object):
     '''used to create a value dialog callback'''
-    def __init__(self, title='Enter Value', default=''):
+    def __init__(self, title='Enter Value', default='', settings=None):
         self.title = title
         self.default = default
+        self.settings = settings
 
     def call(self):
         '''show a value dialog'''
         from MAVProxy.modules.lib.wx_loader import wx
+        title = self.title
+        if title.find('FLYTOFRAMEUNITS') != -1 and self.settings is not None:
+            frameunits = "%s %s" % (self.settings.flytoframe, self.settings.height_unit)
+            title = title.replace('FLYTOFRAMEUNITS', frameunits)
         try:
-            dlg = wx.TextEntryDialog(None, self.title, self.title, defaultValue=str(self.default))
+            dlg = wx.TextEntryDialog(None, title, title, defaultValue=str(self.default))
         except TypeError:
-            dlg = wx.TextEntryDialog(None, self.title, self.title, value=str(self.default))
+            dlg = wx.TextEntryDialog(None, title, title, value=str(self.default))
         if dlg.ShowModal() != wx.ID_OK:
             return None
         return dlg.GetValue()
