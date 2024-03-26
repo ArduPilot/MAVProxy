@@ -95,7 +95,8 @@ class MapModule(mp_module.MPModule):
 
         self.default_popup = MPMenuSubMenu('Popup', items=[])
         self.add_menu(MPMenuItem('Fly To', 'Fly To', '# guided ',
-                                 handler=MPMenuCallTextDialog(title='Altitude (m)', default=self.mpstate.settings.guidedalt)))
+                                 handler=MPMenuCallTextDialog(title='Altitude (FLYTOFRAMEUNITS)', default=self.mpstate.settings.guidedalt,
+                                                              settings=self.settings)))
         self.add_menu(MPMenuItem('Terrain Check', 'Terrain Check', '# terrain check'))
         self.add_menu(MPMenuItem('Show Position', 'Show Position', 'showPosition'))
         self.add_menu(MPMenuItem('Google Maps Link', 'Google Maps Link', 'printGoogleMapsLink'))
