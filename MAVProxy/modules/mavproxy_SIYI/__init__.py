@@ -78,6 +78,12 @@ SET_THERMAL_PARAM = 0x3A
 GET_THERMAL_ENVSWITCH = 0x3B
 SET_THERMAL_ENVSWITCH = 0x3C
 SET_TIME = 0x30
+GET_THERMAL_THRESH_STATE = 0x42
+SET_THERMAL_THRESH_STATE = 0x43
+GET_THERMAL_THRESH = 0x44
+SET_THERMAL_THRESH = 0x45
+GET_THERMAL_THRESH_PREC = 0x46
+SET_THERMAL_THRESH_PREC = 0x47
 
 class ThermalParameters:
     def __init__(self, distance, target_emissivity, humidity, air_temperature, reflection_temperature):
@@ -228,6 +234,7 @@ class SIYIModule(mp_module.MPModule):
         self.add_command('siyi', self.cmd_siyi, "SIYI camera control",
                          ["<rates|connect|autofocus|zoom|yaw|pitch|center|getconfig|angle|photo|recording|lock|follow|fpv|settarget|notarget|thermal|rgbview|tempsnap|get_thermal_mode|thermal_gain|get_thermal_gain|settime>",
                           "<therm_getenv|therm_set_distance|therm_set_emissivity|therm_set_humidity|therm_set_airtemp|therm_set_reftemp|therm_getswitch|therm_setswitch>",
+                          "<therm_getthresholds|therm_getthreshswitch|therm_setthresholds|therm_setthreshswitch>",
                           "set (SIYISETTING)",
                           "imode <1|2|3|4|5|6|7|8|wide|zoom|split>",
                           "palette <WhiteHot|Sepia|Ironbow|Rainbow|Night|Aurora|RedHot|Jungle|Medical|BlackHot|GloryHot>",
@@ -348,6 +355,7 @@ class SIYIModule(mp_module.MPModule):
         self.recv_thread.start()
         self.have_horizon_lines = False
         self.thermal_param = None
+        self.last_armed = False
 
         if mp_util.has_wxpython:
             menu = MPMenuSubMenu('SIYI',
@@ -472,6 +480,14 @@ class SIYIModule(mp_module.MPModule):
             self.send_packet_fmt(GET_THERMAL_ENVSWITCH, None)
         elif args[0] == "therm_setswitch":
             self.send_packet_fmt(SET_THERMAL_ENVSWITCH, "<B", int(args[1]))
+        elif args[0] == "therm_getthreshswitch":
+            self.send_packet_fmt(GET_THERMAL_THRESH_STATE, None)
+        elif args[0] == "therm_setthreshswitch":
+            self.send_packet_fmt(SET_THERMAL_THRESH_STATE, "<B", int(args[1]))
+        elif args[0] == "therm_getthresholds":
+            self.send_packet_fmt(GET_THERMAL_THRESH, None)
+        elif args[0] == "therm_setthresholds":
+            self.therm_set_thresholds(args[1:])
         elif args[0] == "settime":
             self.cmd_settime()
         else:
@@ -663,7 +679,23 @@ class SIYIModule(mp_module.MPModule):
         p = copy.copy(self.thermal_param)
         p.reflection_temperature = reftemp
         self.send_packet_fmt(SET_THERMAL_PARAM, "<HHHHH", *p.args())
-        
+
+    def therm_set_thresholds(self, args):
+        '''set thermal thresholds
+        format: therm_setthresholds 30 102,204,255 40 102,204,255 50 102,204,255 80
+        '''
+        if len(args) != 7:
+            print("Usage: therm_setthresholds T1 R,G,B T2 R,G,B T3 R,G,B T4")
+            return
+        temps = [int(args[0]), int(args[2]), int(args[4]), int(args[6])]
+        colors = []
+        for i in [1,3,5]:
+            colors.append([int(x) for x in args[i].split(',')])
+        self.send_packet_fmt(SET_THERMAL_THRESH, "<BhhBBBBhhBBBBhhBBB",
+                             1, temps[0], temps[1], *colors[0],
+                             1, temps[1], temps[2], *colors[1],
+                             1, temps[2], temps[3], *colors[2])
+
     def clear_target(self):
         '''clear target position'''
         self.target_pos = None
@@ -862,7 +894,7 @@ class SIYIModule(mp_module.MPModule):
             print("GimbalMotion: %u" % gim_motion)
             print("GimbalMount: %u" % gim_mount)
             print("Video: %u" % video)
-            print("X: %u" % x)
+            print("Unknown: %u" % x)
 
         elif cmd == READ_RANGEFINDER:
             r, = self.unpack(cmd, "<H", data)
@@ -1024,6 +1056,19 @@ class SIYIModule(mp_module.MPModule):
         elif cmd == SET_TIME:
             ok, = self.unpack(cmd,"<B", data)
             print("SetTime: %u" % ok)
+            
+        elif cmd in [GET_THERMAL_THRESH_STATE, SET_THERMAL_THRESH_STATE]:
+            ok, = self.unpack(cmd,"<B", data)
+            print("ThermalThreshState: %u" % ok)
+
+        elif cmd in [SET_THERMAL_THRESH]:
+            ok, = self.unpack(cmd,"<B", data)
+            print("SetThermThresh: %u" % ok)
+            
+        elif cmd == GET_THERMAL_THRESH:
+            sw1,t1min,t1max,r1,g1,b1,sw2,t2min,t2max,r2,g2,b2,sw3,t3min,t3max,r3,g3,b3, = self.unpack(cmd,"<BhhBBB BhhBBB BhhBBB", data)
+            print("ThermalThresh: %u(%d:%d %u,%u,%u) %u(%d:%d %u,%u,%u) %u(%d:%d %u,%u,%u)" % (
+                sw1,t1min,t1max,r1,g1,b1,sw2,t2min,t2max,r2,g2,b2,sw3,t3min,t3max,r3,g3,b3))
             
         elif cmd in [SET_ANGLE, CENTER, GIMBAL_ROTATION, ABSOLUTE_ZOOM, SET_IMAGE_TYPE,
                      REQUEST_CONTINUOUS_DATA, SET_THERMAL_PALETTE, MANUAL_ZOOM_AND_AUTO_FOCUS]:
