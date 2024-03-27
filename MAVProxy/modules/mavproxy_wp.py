@@ -161,6 +161,7 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
         ret.update({
             'add': self.cmd_add,
             "changealt": self.cmd_changealt,
+            "changeframe": self.cmd_changeframe,
             'draw': self.cmd_draw,
             'editor': self.cmd_editor,
             'loop': self.cmd_loop,
