@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# save images in therm cap
+
 import sys
 import numpy as np
 import cv2
@@ -40,7 +42,7 @@ def display_file(fname):
     cv2.imshow('Grey16', a)
 
 def find_newest(dname):
-    flist = glob.glob(dname + "/siyi*bin")
+    flist = glob.glob(dname + "/*bin")
     return max(flist, key=os.path.getctime)
 
 last_file = None
