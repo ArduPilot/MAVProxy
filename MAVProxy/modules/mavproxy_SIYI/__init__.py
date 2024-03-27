@@ -431,6 +431,7 @@ class SIYIModule(mp_module.MPModule):
         elif args[0] == "recording":
             self.send_packet_fmt(PHOTO, "<B", 2)
             self.send_packet(FUNCTION_FEEDBACK_INFO, None)
+            print("Toggled recording")
         elif args[0] == "resetattitude":
             self.send_packet(RESET_ATTITUDE, None)
         elif args[0] == "lock":
@@ -846,12 +847,13 @@ class SIYIModule(mp_module.MPModule):
                                 z,y,x,sz,sy,sx)
 
         elif cmd == ACQUIRE_GIMBAL_CONFIG_INFO:
-            res, hdr_sta, res2, record_sta, gim_motion, gim_mount, video = self.unpack(cmd, "<BBBBBBB", data)
+            res, hdr_sta, res2, record_sta, gim_motion, gim_mount, video, x = self.unpack(cmd, "<BBBBBBBB", data)
             print("HDR: %u" % hdr_sta)
             print("Recording: %u" % record_sta)
             print("GimbalMotion: %u" % gim_motion)
             print("GimbalMount: %u" % gim_mount)
             print("Video: %u" % video)
+            print("X: %u" % x)
 
         elif cmd == READ_RANGEFINDER:
             r, = self.unpack(cmd, "<H", data)
