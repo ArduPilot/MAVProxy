@@ -34,6 +34,7 @@ if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_image import MPImageOSD_None
 
 from MAVProxy.modules.mavproxy_SIYI.camera_view import CameraView
+from MAVProxy.modules.mavproxy_SIYI.raw_thermal import RawThermal
 
 SIYI_RATE_MAX_DPS = 90.0
 SIYI_HEADER1 = 0x55
@@ -329,6 +330,7 @@ class SIYIModule(mp_module.MPModule):
         self.last_att_send_t = time.time()
         self.last_temp_t = time.time()
         self.thermal_view = None
+        self.rawthermal_view = None
         self.rgb_view = None
         self.last_zoom = 1.0
         self.rgb_lens = "wide"
@@ -361,6 +363,7 @@ class SIYIModule(mp_module.MPModule):
                                      MPMenuItem('Recording', 'Recording', '# siyi recording '),
                                      MPMenuItem('ClearTarget', 'ClearTarget', '# siyi notarget '),
                                      MPMenuItem('ThermalView', 'Thermalview', '# siyi thermal '),
+                                     MPMenuItem('RawThermalView', 'RawThermalview', '# siyi rawthermal '),
                                      MPMenuItem('RGBView', 'RGBview', '# siyi rgbview '),
                                      MPMenuItem('ResetAttitude', 'ResetAttitude', '# siyi resetattitude '),
                                      MPMenuSubMenu('Zoom',
@@ -446,6 +449,8 @@ class SIYIModule(mp_module.MPModule):
             self.cmd_palette(args[1:])
         elif args[0] == "thermal":
             self.cmd_thermal()
+        elif args[0] == "rawthermal":
+            self.cmd_rawthermal()
         elif args[0] == "rgbview":
             self.cmd_rgbview()
         elif args[0] == "therm_getenv":
@@ -565,6 +570,10 @@ class SIYIModule(mp_module.MPModule):
                                        fps=self.siyi_settings.fps_thermal,
                                        video_idx=idx)
 
+    def cmd_rawthermal(self):
+        '''open raw thermal viewer'''
+        self.rawthermal_view = RawThermal(self, (640,512))
+
     def cmd_rgbview(self):
         '''open rgb viewer'''
         vidfile,idx = self.video_filename('rgb')
@@ -577,6 +586,8 @@ class SIYIModule(mp_module.MPModule):
         '''check for mouse events on thermal image'''
         if self.thermal_view is not None:
             self.thermal_view.check_events()
+        if self.rawthermal_view is not None:
+            self.rawthermal_view.check_events()
         if self.rgb_view is not None:
             self.rgb_view.check_events()
 
@@ -1014,6 +1025,8 @@ class SIYIModule(mp_module.MPModule):
         '''update thermal view title'''
         if self.thermal_view is not None:
             self.thermal_view.update_title()
+        if self.rawthermal_view is not None:
+            self.rawthermal_view.update_title()
         if self.rgb_view is not None:
             self.rgb_view.update_title()
 
@@ -1311,6 +1324,8 @@ class SIYIModule(mp_module.MPModule):
             self.rgb_view.end_tracking()
         if self.thermal_view is not None:
             self.thermal_view.end_tracking()
+        if self.rawthermal_view is not None:
+            self.rawthermal_view.end_tracking()
 
     def mavlink_packet(self, m):
         '''process a mavlink message'''
