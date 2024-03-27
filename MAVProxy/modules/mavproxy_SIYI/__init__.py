@@ -1386,6 +1386,18 @@ class SIYIModule(mp_module.MPModule):
     def mavlink_packet(self, m):
         '''process a mavlink message'''
         mtype = m.get_type()
+
+        armed = self.master.motors_armed()
+        if armed and not self.last_armed:
+            print("Setting SIYI time")
+            self.cmd_settime()
+            print("Enabling thermal capture")
+            self.siyi_settings.therm_cap_rate = 1.0
+        if not armed and self.last_armed:
+            print("Disabling thermal capture")
+            self.siyi_settings.therm_cap_rate = 0.0
+        self.last_armed = armed
+
         if mtype == 'GPS_RAW_INT':
             # ?!? why off by 18 hours
             gwk, gms = mp_util.get_gps_time(time.time()+18*3600)
