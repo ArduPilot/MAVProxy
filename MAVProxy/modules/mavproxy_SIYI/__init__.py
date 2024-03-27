@@ -174,7 +174,9 @@ class DF_logger:
         if not name in self.formats:
             self.formats[name] = self.mlog.add_format(DFReader.DFFormat(0, name, 0, fmt, fields))
             self.outf.write(self.mlog.make_format_msgbuf(self.formats[name]))
-        self.outf.write(self.mlog.make_msgbuf(self.formats[name], args))
+        nfields = len(fields.split(','))
+        if nfields <= 14:
+            self.outf.write(self.mlog.make_msgbuf(self.formats[name], args))
         now = time.time()
         if now - self.last_flush > 5:
             self.last_flush = now
@@ -778,8 +780,15 @@ class SIYIModule(mp_module.MPModule):
         if fmt is None:
             fmt = ""
             args = []
-        self.send_packet(command_id, struct.pack(fmt, *args))
+        try:
+            self.send_packet(command_id, struct.pack(fmt, *args))
+        except Exception as ex:
+            print(ex)
+            print(fmt, args)
+            return
         args = list(args)
+        if len(args) > 8:
+            args = args[:8]
         args.extend([0]*(8-len(args)))
         self.logf.write('SIOU', 'QBffffffff', 'TimeUS,Cmd,P1,P2,P3,P4,P5,P6,P7,P8', self.micros64(), command_id, *args)
 
