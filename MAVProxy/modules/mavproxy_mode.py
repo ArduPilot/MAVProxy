@@ -83,13 +83,17 @@ class ModeModule(mp_module.MPModule):
                 return
             altitude = float(args[0])
 
-        print("Guided %s %s" % (str(latlon), str(altitude)))
+        altitude = self.height_convert_from_units(altitude)
+
+        frame = self.flyto_frame()
+
+        print("Guided %s %s frame %u" % (str(latlon), str(altitude), frame))
 
         if self.settings.guided_use_reposition:
             self.master.mav.command_int_send(
                 self.settings.target_system,
                 self.settings.target_component,
-                self.module('wp').get_default_frame(),
+                frame,
                 mavutil.mavlink.MAV_CMD_DO_REPOSITION,
                 0,  # current
                 0,  # autocontinue
@@ -107,7 +111,7 @@ class ModeModule(mp_module.MPModule):
             self.settings.target_system,
             self.settings.target_component,
             0,
-            self.module('wp').get_default_frame(),
+            frame,
             mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
             2, 0, 0, 0, 0, 0,
             int(latlon[0]*1.0e7),

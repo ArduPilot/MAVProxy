@@ -281,6 +281,7 @@ class MPState(object):
               MPSetting('dist_unit', str, 'm', 'distance unit', choice=['m', 'nm', 'miles'], tab='Units'),
               MPSetting('height_unit', str, 'm', 'height unit', choice=['m', 'feet']),
               MPSetting('speed_unit', str, 'm/s', 'height unit', choice=['m/s', 'knots', 'mph']),
+              MPSetting('flytoframe', str, 'AboveHome', 'frame for FlyTo', choice=['AboveHome', 'AGL', 'AMSL']),
 
               MPSetting('fwdpos', bool, False, 'Forward GLOBAL_POSITION_INT on all links'),
               MPSetting('checkdelay', bool, True, 'check for link delay'),

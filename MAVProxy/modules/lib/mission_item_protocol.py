@@ -712,6 +712,47 @@ on'''
             mission_type=self.mav_mission_type())
         print("Changed alt for WPs %u:%u to %f" % (idx, idx+(count-1), newalt))
 
+    def cmd_changeframe(self, args):
+        '''handle wp change frame of multiple waypoints'''
+        if not self.check_have_list():
+            return
+        if len(args) < 2:
+            print("usage: %s changeframe WPNUM NEWFRAME <NUMWP>" % self.command_name())
+            return
+        idx = int(args[0])
+        if not self.good_item_num_to_manipulate(idx):
+            print("Invalid %s number %u" % (self.itemtype(), idx))
+            return
+        newframe = int(args[1])
+        if len(args) >= 3:
+            count = int(args[2])
+        else:
+            count = 1
+        if not self.good_item_num_to_manipulate(idx+count-1):
+            print("Invalid %s number %u" % (self.itemtype(), idx+count-1))
+            return
+
+        for wpnum in range(idx, idx+count):
+            offset = self.item_num_to_offset(wpnum)
+            wp = self.wploader.wp(offset)
+            if not self.wploader.is_location_command(wp.command):
+                continue
+            wp.frame = newframe
+            wp.target_system = self.target_system
+            wp.target_component = self.target_component
+            self.wploader.set(wp, offset)
+
+        self.wploader.last_change = time.time()
+        self.loading_waypoints = True
+        self.loading_waypoint_lasttime = time.time()
+        self.master.mav.mission_write_partial_list_send(
+            self.target_system,
+            self.target_component,
+            offset,
+            offset,
+            mission_type=self.mav_mission_type())
+        print("Changed frame for WPs %u:%u to %u" % (idx, idx+(count-1), newframe))
+        
     def fix_jumps(self, idx, delta):
         # nothing by default as only waypoints need worry
         pass
