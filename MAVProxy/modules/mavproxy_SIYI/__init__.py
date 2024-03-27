@@ -875,17 +875,15 @@ class SIYIModule(mp_module.MPModule):
                 self.have_horizon_lines = False
 
         elif cmd == READ_VOLTAGES:
-            y,p,r,mode,mode_ms, = self.unpack(cmd, "<hhhBI", data)
+            y,p,r, = self.unpack(cmd, "<hhh", data)
             self.last_volt_t = time.time()
             self.voltages = (r*0.001,p*0.001,y*0.001)
             self.send_named_float('VLT_R', self.voltages[0])
             self.send_named_float('VLT_P', self.voltages[1])
             self.send_named_float('VLT_Y', self.voltages[2])
-            self.logf.write('SIVL', 'QfffBI', 'TimeUS,R,P,Y,Mode,ModeMS',
+            self.logf.write('SIVL', 'Qfff', 'TimeUS,R,P,Y',
                             self.micros64(),
-                            self.voltages[0], self.voltages[1], self.voltages[2],
-                            mode, mode_ms)
-            self.control_mode = mode
+                            self.voltages[0], self.voltages[1], self.voltages[2])
 
         elif cmd == READ_THRESHOLDS:
             climit,volt_thresh,ang_thresh, = self.unpack(cmd, "<hhh", data)
