@@ -9,10 +9,37 @@ import time
 import glob
 import os
 from MAVProxy.modules.lib.mp_image import MPImage
+from pymavlink import mavutil
 
-DNAME=sys.argv[1]
+from argparse import ArgumentParser
+parser = ArgumentParser(description=__doc__)
+
+parser.add_argument("--min-temp", default=None, type=float, help="min temperature")
+parser.add_argument("--siyi-log", default=None, type=float, help="SIYI binlog")
+parser.add_argument("dirname", default=None, type=str, help="directory")
+args = parser.parse_args()
+
+DNAME=args.dirname
+mouse_temp=-1
+tmin = -1
+tmax = -1
+last_data = None
+C_TO_KELVIN = 273.15
+
+def update_title():
+    global tmin, tmax, mouse_temp
+    cv2.setWindowTitle('Thermal', "Thermal: (%.1fC to %.1fC) %.1fC" % (tmin, tmax, mouse_temp))
+
+def click_callback(event, x, y, flags, param):
+    global last_data, mouse_temp
+    if last_data is None:
+        return
+    p = last_data[y*640+x]
+    mouse_temp = p - C_TO_KELVIN
+    update_title()
 
 def display_file(fname):
+    global mouse_temp, tmin, tmax, last_data
     print('Importing: ', fname)
     a = np.fromfile(fname, dtype='>u2')
     if len(a) != 640 * 512:
@@ -23,14 +50,21 @@ def display_file(fname):
 
     C_TO_KELVIN = 273.15
 
-    #a = np.clip(a, C_TO_KELVIN+50, C_TO_KELVIN+200)
-
     maxv = a.max()
     minv = a.min()
-    print("Max=%.3fC Min=%.3fC" % (maxv-273.15, minv-273.15))
+
+    tmin = minv - C_TO_KELVIN
+    tmax = maxv - C_TO_KELVIN
+
+    if args.min_temp is not None and tmax < args.min_temp:
+        return
+
+    print("Max=%.3fC Min=%.3fC" % (tmax, tmin))
     if maxv <= minv:
         print("Bad range")
         return
+
+    last_data = a
 
     # convert to 0 to 255
     a = (a - minv) * 65535.0 / (maxv - minv)
@@ -39,17 +73,13 @@ def display_file(fname):
     a = a.astype(np.uint16)
     a = a.reshape(512, 640)
 
-    cv2.imshow('Grey16', a)
+    cv2.imshow('Thermal', a)
+    cv2.setMouseCallback('Thermal', click_callback)
+    cv2.setWindowTitle('Thermal', "Thermal: (%.1fC to %.1fC) %.1fC" % (tmin, tmax, mouse_temp))
 
-def find_newest(dname):
-    flist = glob.glob(dname + "/*bin")
-    return max(flist, key=os.path.getctime)
+    cv2.waitKey(0)
 
-last_file = None
+flist = sorted(glob.glob(DNAME + "/*bin"))
 
-while True:
-    fname = find_newest(DNAME)
-    if fname != last_file:
-        last_file = fname
-        display_file(fname)
-    cv2.waitKey(1)
+for f in flist:
+    display_file(f)
