@@ -356,6 +356,8 @@ class SIYIModule(mp_module.MPModule):
         self.have_horizon_lines = False
         self.thermal_param = None
         self.last_armed = False
+        self.getconfig_pending = False
+        self.last_getconfig = time.time()
 
         if mp_util.has_wxpython:
             menu = MPMenuSubMenu('SIYI',
@@ -424,6 +426,7 @@ class SIYIModule(mp_module.MPModule):
             self.cmd_zoom(args[1:])
         elif args[0] == "getconfig":
             self.send_packet(ACQUIRE_GIMBAL_CONFIG_INFO, None)
+            self.getconfig_pending = False
         elif args[0] == "angle":
             self.cmd_angle(args[1:])
         elif args[0] == "photo":
@@ -889,6 +892,17 @@ class SIYIModule(mp_module.MPModule):
 
         elif cmd == ACQUIRE_GIMBAL_CONFIG_INFO:
             res, hdr_sta, res2, record_sta, gim_motion, gim_mount, video, x = self.unpack(cmd, "<BBBBBBBB", data)
+            self.console.set_status('REC', 'REC %u' % record_sta, row=6)
+            if self.getconfig_pending:
+                self.getconfig_pending = False
+                armed = self.master.motors_armed()
+                if armed and record_sta == 0:
+                    print("Starting recording")
+                    self.send_packet_fmt(PHOTO, "<B", 2)
+                if not armed and record_sta == 1:
+                    print("Stopping recording")
+                    self.send_packet_fmt(PHOTO, "<B", 2)
+                return
             print("HDR: %u" % hdr_sta)
             print("Recording: %u" % record_sta)
             print("GimbalMotion: %u" % gim_motion)
@@ -1383,10 +1397,9 @@ class SIYIModule(mp_module.MPModule):
         if self.rawthermal_view is not None:
             self.rawthermal_view.end_tracking()
 
-    def mavlink_packet(self, m):
-        '''process a mavlink message'''
-        mtype = m.get_type()
-
+    def armed_checks(self):
+        '''checks for armed/disarmed'''
+        now = time.time()
         armed = self.master.motors_armed()
         if armed and not self.last_armed:
             print("Setting SIYI time")
@@ -1397,6 +1410,16 @@ class SIYIModule(mp_module.MPModule):
             print("Disabling thermal capture")
             self.siyi_settings.therm_cap_rate = 0.0
         self.last_armed = armed
+        if now - self.last_getconfig > 5:
+            self.getconfig_pending = True
+            self.last_getconfig = now
+            self.send_packet(ACQUIRE_GIMBAL_CONFIG_INFO, None)
+
+    def mavlink_packet(self, m):
+        '''process a mavlink message'''
+        mtype = m.get_type()
+
+        self.armed_checks()
 
         if mtype == 'GPS_RAW_INT':
             # ?!? why off by 18 hours
