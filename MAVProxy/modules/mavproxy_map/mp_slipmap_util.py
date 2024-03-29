@@ -226,6 +226,9 @@ class SlipPolygon(SlipObject):
         self._has_timestamps = False
         self._showlines = showlines
 
+    def set_colour(self, colour):
+        self.colour = colour
+
     def bounds(self):
         '''return bounding box'''
         if self.hidden:
