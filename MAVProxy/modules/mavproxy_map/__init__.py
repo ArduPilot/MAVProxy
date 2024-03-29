@@ -199,13 +199,15 @@ class MapModule(mp_module.MPModule):
             json = json.replace("{{" + k + "}}", str(value))
         open(fname, 'w').write(json)
 
-    def cmd_map_marker(self, args):
+    def cmd_map_marker(self, args, latlon=None):
         '''add a map marker'''
         usage = "Usage: map marker <icon>"
-        if self.mpstate.click_location is None:
+        if latlon is None:
+            latlon = self.mpstate.click_location
+        if latlon is None:
             print("Need click position for marker")
             return
-        (lat, lon) = self.mpstate.click_location
+        (lat, lon) = latlon
         marker = 'flag'
         text = ''
         if len(args) > 0:
