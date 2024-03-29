@@ -41,6 +41,7 @@ class RawThermal:
         self.tmax = -1
         self.mouse_temp = -1
         self.image_count = 0
+        self.marker_history = []
 
         if siyi is not None:
             self.logdir = self.siyi.logdir
@@ -86,6 +87,58 @@ class RawThermal:
             self.display_image(fname, data)
             self.save_image(fname, tstamp, data)
 
+    def in_history(self, latlon):
+        '''check if latlon in the history'''
+        autoflag_dist = self.siyi.siyi_settings.autoflag_dist
+        for (lat1,lon1) in self.marker_history:
+            dist = mp_util.gps_distance(lat1,lon1,latlon[0],latlon[1])
+            if dist < autoflag_dist:
+                return True
+
+        # add to history
+        self.marker_history.append(latlon)
+        if len(self.marker_history) > self.siyi.siyi_settings.autoflag_history:
+            self.marker_history.pop(0)
+        return False
+
+
+    def handle_auto_flag(self):
+        if not self.siyi.siyi_settings.autoflag_enable:
+            return
+        if self.tmax < self.siyi.siyi_settings.autoflag_temp:
+            return
+
+        map = self.siyi.module('map')
+        if not map:
+            return
+
+        width = self.res[0]
+        height = self.res[1]
+        latlonalt = self.xy_to_latlon(width//2, height//2)
+        if latlonalt is None:
+            return
+        slices = self.siyi.siyi_settings.autoflag_slices
+        slice_width = width // slices
+        slice_height = height // slices
+
+        data = self.last_data.reshape(height, width)
+
+        for sx in range(slices):
+            for sy in range(slices):
+                sub = data[sx*slice_width:(sx+1)*slice_width, sy*slice_height:(sy+1)*slice_height]
+                maxv = sub.max() - C_TO_KELVIN
+                if maxv < self.siyi.siyi_settings.autoflag_temp:
+                    continue
+                X = (sx*slice_width) + slice_width//2
+                Y = (sy*slice_height) + slice_height//2
+                latlonalt = self.xy_to_latlon(X, Y)
+                if latlonalt is None:
+                    continue
+                latlon = (latlonalt[0], latlonalt[1])
+                if self.in_history(latlon):
+                    continue
+                map.cmd_map_marker(["flame"], latlon=latlon)
+
     def display_image(self, fname, data):
         '''display an image'''
         a = np.frombuffer(data, dtype='>u2')
@@ -105,6 +158,8 @@ class RawThermal:
             return
 
         self.last_data = a
+
+        self.handle_auto_flag()
 
         # convert to 0 to 255
         a = (a - minv) * 255 / (maxv - minv)
