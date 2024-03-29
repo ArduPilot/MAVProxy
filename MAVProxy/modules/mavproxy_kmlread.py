@@ -7,6 +7,8 @@ Released under the GNU GPL version 3 or later
 '''
 
 import time, math, random
+import re
+
 from pymavlink import mavutil, mavwp
 
 from MAVProxy.modules.lib import mp_module
@@ -46,7 +48,7 @@ class KmlReadModule(mp_module.MPModule):
                           
     def cmd_param(self, args):
         '''control kml reading'''
-        usage = "Usage: kml <clear | load (filename) | layers | toggle (layername) | fence (layername)> | snapfence | snapwp"
+        usage = "Usage: kml <clear | load (filename) | layers | toggle (layername) | colour (layername) (colour) | fence (layername)> | snapfence | snapwp"
         if len(args) < 1:
             print(usage)
             return
@@ -66,6 +68,8 @@ class KmlReadModule(mp_module.MPModule):
                 print("Found layer: " + layer)
         elif args[0] == "toggle":
             self.togglekml(args[1])
+        elif args[0] == "colour" or args[0] == "color":
+            self.cmd_colour(args[1:])
         elif args[0] == "fence":
             self.fencekml(args[1])
         else:
@@ -136,6 +140,26 @@ class KmlReadModule(mp_module.MPModule):
 
         if changed:
             fencemod.send_fence()
+
+    def cmd_colour(self, args):
+        if len(args) < 2:
+            print("kml colour LAYERNAME 0xBBGGRR")
+            return
+        (layername, colour) = args
+        layer = self.find_layer(layername)
+        if layer is None:
+            print(f"No layer {layername}")
+            return
+        m = re.match(r"(?:0x)?(?P<red>[0-9A-Fa-f]{2})(?P<green>[0-9A-Fa-f]{2})(?P<blue>[0-9A-Fa-f]{2})", colour)
+        if m is None:
+            print("bad colour")
+            return
+        (red, green, blue) = (int(m.group("red"), 16),
+                              int(m.group("green"), 16),
+                              int(m.group("blue"), 16))
+        self.mpstate.map.remove_object(layer)
+        layer.set_colour((red, green, blue))
+        self.mpstate.map.add_object(layer)
 
     def fencekml(self, layername):
         '''set a layer as the geofence'''
@@ -232,7 +256,13 @@ class KmlReadModule(mp_module.MPModule):
                             self.mpstate.map.add_object(alayer)
                             self.curtextlayers.append(layername)
         self.menu_needs_refreshing = True
-        
+
+    def find_layer(self, layername):
+        for layer in self.allayers:
+            if layer.key == layername:
+                return layer
+        return None
+
     def clearkml(self):
         '''Clear the kmls from the map'''
         #go through all the current layers and remove them
