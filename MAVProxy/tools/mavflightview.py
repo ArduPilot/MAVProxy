@@ -287,12 +287,21 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
             types.extend(['AHR2', 'AHRS2', 'GPS'])
 
     # handle forms like GPS[0], mapping to GPS for recv_match_types
-    for i in range(len(types)):
-        bracket = types[i].find('[')
-        if bracket != -1:
-            types[i] = types[i][:bracket]
 
+    # it may be possible to pass conditions in to recv_match_types,
+    # but for now we filter to desired instances later.
+    want_instances = {}
     recv_match_types = types[:]
+    for i in range(len(recv_match_types)):
+        match = re.match('(?P<name>.*)\[(?P<instancenum>[^\]+])\]', recv_match_types[i])
+        if match is not None:
+            name = match.group("name")
+            number = match.group("instancenum")
+            if name not in want_instances:
+                want_instances[name] = set()
+            want_instances[name].add(number)
+            recv_match_types[i] = name
+
     colour_source = getattr(options, "colour_source")
     re_caps = re.compile('[A-Z_][A-Z0-9_]+')
 
@@ -365,17 +374,28 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
                 except Exception:
                     pass
             continue
+
         if not mlog.check_condition(options.condition):
             continue
         if options.mode is not None and mlog.flightmode.lower() != options.mode.lower():
             continue
 
-        if not type in types:
+        if not type in types and type not in want_instances:
             # may only be present for colour-source expressions to work
             continue
 
-        if type in ['GPS','VEH'] and hasattr(m,'I'):
-            type = '%s[%u]' % (type, m.I)
+        try:
+            # remember that "m" here might be a mavlink message.
+            instance_field = m.fmt.instance_field
+            m_instance_field_value = eval(f"m.{instance_field}")
+            if (type in want_instances and
+                str(m_instance_field_value) not in want_instances[type]
+                ):
+                continue
+
+            type = '%s[%u]' % (type, m_instance_field_value)
+        except Exception:
+            pass
 
         if not all_false and len(flightmode_selections) > 0 and idx < len(options._flightmodes) and m._timestamp >= options._flightmodes[idx][2]:
             idx += 1
