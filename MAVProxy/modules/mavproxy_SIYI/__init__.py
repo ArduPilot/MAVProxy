@@ -1388,6 +1388,26 @@ class SIYIModule(mp_module.MPModule):
             FOV2 = self.siyi_settings.zoom_fov / self.last_zoom
         self.show_fov1(FOV2, 'FOV_RGB', 1280.0/720.0, (0,128,128))
 
+    def camera_click(self, mode, latlonalt):
+        '''handle click on camera window'''
+        latlon = (latlonalt[0], latlonalt[1])
+
+        # set click location for other commands
+        self.mpstate.click_location = latlon
+
+        if mode == 'ClickTrack':
+            self.set_target(latlonalt[0], latlonalt[1], latlonalt[2])
+        else:
+            self.mpstate.map.add_object(
+                mp_slipmap.SlipIcon("SIYIClick", latlon, self.click_icon, layer="SIYI")
+                )
+
+    def handle_marker(self, marker):
+        '''handle marker menu on image'''
+        map = self.module('map')
+        if map:
+            map.cmd_map_marker([marker])
+
     def end_tracking(self):
         '''end all tracking'''
         if self.rgb_view is not None:
@@ -1495,6 +1515,7 @@ class SIYIModule(mp_module.MPModule):
         '''remove horizon lines'''
         self.rgb_view.im.add_OSD(MPImageOSD_None('hor1'))
         self.rgb_view.im.add_OSD(MPImageOSD_None('hor2'))
+
 
 def init(mpstate):
     '''initialise module'''

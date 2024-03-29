@@ -93,6 +93,9 @@ class CameraView:
                 popup.add_to_submenu(
                     ["Zoom"], MPMenuItem("%ux" % z, returnkey="Zoom:%u" % z)
                 )
+        popup.add_to_submenu(["Marker"], MPMenuItem("Flame", returnkey="Marker:flame"))
+        popup.add_to_submenu(["Marker"], MPMenuItem("Flag", returnkey="Marker:flag"))
+        popup.add_to_submenu(["Marker"], MPMenuItem("Barrell", returnkey="Marker:barrell"))
 
         gst_pipeline = "rtspsrc location={0} latency=0 buffer-mode=auto ! rtph265depay !  tee name=tee1 tee1. ! queue ! h265parse ! avdec_h265  ! videoconvert ! video/x-raw,format=BGRx ! appsink tee1. ! queue ! h265parse config-interval=15 ! video/x-h265 ! mpegtsmux ! filesink location={1}".format(
             self.rtsp_url, self.filename
@@ -212,6 +215,8 @@ class CameraView:
                 elif event.returnkey.startswith("Mode:"):
                     self.mode = event.returnkey[5:]
                     print("ViewMode: %s" % self.mode)
+                elif event.returnkey.startswith("Marker:"):
+                    self.siyi.handle_marker(event.returnkey[7:])
                 elif event.returnkey.startswith("Lens:") and self.siyi is not None:
                     self.siyi.cmd_imode([event.returnkey[5:]])
                 elif event.returnkey.startswith("Zoom:") and self.siyi is not None:
@@ -255,13 +260,8 @@ class CameraView:
                     self.tracking = True
                 elif event.controlDown:
                     self.siyi.end_tracking()
-                elif self.mode == "ClickTrack":
-                    self.siyi.set_target(latlonalt[0], latlonalt[1], latlonalt[2])
                 else:
-                    latlon = (latlonalt[0], latlonalt[1])
-                    self.siyi.mpstate.map.add_object(
-                        mp_slipmap.SlipIcon("SIYIClick", latlon, self.siyi.click_icon, layer="SIYI")
-                    )
+                    self.siyi.camera_click(self.mode, latlonalt)
 
 if __name__ == '__main__':
     from optparse import OptionParser
