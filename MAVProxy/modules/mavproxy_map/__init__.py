@@ -311,34 +311,7 @@ class MapModule(mp_module.MPModule):
                 self.vehicle_type_override[sysid] = vtype
                 print("Set sysid %u to vehicle type %u" % (sysid, vtype))
         elif args[0] == "circle":
-            if len(args) < 4:
-                # map circle -27.70533373 153.23404844 5 red
-                print("Usage: map circle <lat> <lon> <radius> <colour>")
-            else:
-                lat = args[1]
-                lon = args[2]
-                radius = args[3]
-                colour = 'red'
-                if len(args) > 4:
-                    colour = args[4]
-                if colour == "red":
-                    colour = (255,0,0)
-                elif colour == "green":
-                    colour = (0,255,0)
-                elif colour == "blue":
-                    colour = (0,0,255)
-                else:
-                    colour = eval(colour)
-                circle = mp_slipmap.SlipCircle(
-                    "circle %u" % self.circle_counter,
-                    3,
-                    (float(lat), float(lon)),
-                    float(radius),
-                    colour,
-                    linewidth=1,
-                )
-                self.map.add_object(circle)
-                self.circle_counter += 1
+            self.cmd_map_circle(args[1:])
         elif args[0] == "set":
             self.map_settings.command(args[1:])
             self.map.add_object(mp_slipmap.SlipBrightness(self.map_settings.brightness))
@@ -364,6 +337,64 @@ class MapModule(mp_module.MPModule):
             self.cmd_set_position(args)
         else:
             print("usage: map <icon|set>")
+
+    def cmd_map_circle(self, args):
+        usage = '''
+Usage: map circle <lat> <lon> <radius> <colour>
+Usage: map circle <radius> <colour>
+        '''
+
+        lat = None
+        colour = None
+        # syntax 1, lat/lon/radius/colour
+        if len(args) == 4:
+            colour = args[3]
+            args = args[0:3]
+        if len(args) == 3:
+            lat = args[0]
+            lon = args[1]
+            radius = args[2]
+
+        # syntax 2, radius/colour, uses click position
+        if len(args) == 2:
+            colour = args[1]
+            args = args[0:1]
+        if len(args) == 1:
+            pos = self.mpstate.click_location
+            if pos is None:
+                print("Need click or location")
+                print(usage)
+                return
+
+            (lat, lon) = pos
+            radius = args[0]
+
+        if lat is None:
+            print(usage)
+            return
+
+        if colour is None:
+            colour = "red"
+
+        if colour == "red":
+            colour = (255,0,0)
+        elif colour == "green":
+            colour = (0,255,0)
+        elif colour == "blue":
+            colour = (0,0,255)
+        else:
+            colour = eval(colour)
+
+        circle = mp_slipmap.SlipCircle(
+            "circle %u" % self.circle_counter,
+            3,
+            (float(lat), float(lon)),
+            float(radius),
+            colour,
+            linewidth=1,
+        )
+        self.map.add_object(circle)
+        self.circle_counter += 1
 
     def colour_for_wp(self, wp_num):
         '''return a tuple describing the colour a waypoint should appear on the map'''
