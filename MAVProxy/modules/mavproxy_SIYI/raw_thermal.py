@@ -40,6 +40,7 @@ class RawThermal:
         self.tmin = -1
         self.tmax = -1
         self.mouse_temp = -1
+        self.image_count = 0
 
         if siyi is not None:
             self.logdir = self.siyi.logdir
@@ -111,16 +112,24 @@ class RawThermal:
 
         a = cv2.cvtColor(a, cv2.COLOR_GRAY2RGB)
         self.im.set_image(a)
+        self.image_count += 1
         self.update_title()
             
     def fetch_latest(self):
         '''fetch a thermal image'''
         tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        tcp.connect(self.uri)
+        tcp.settimeout(2)
+        try:
+            tcp.connect(self.uri)
+        except Exception:
+            return None
         buf = bytearray()
 
         while True:
-            b = tcp.recv(1024)
+            try:
+                b = tcp.recv(1024)
+            except Exception:
+                break
             if not b:
                 break
             buf += b
@@ -200,7 +209,7 @@ class RawThermal:
 
     def update_title(self):
         """update thermal view title"""
-        self.set_title("RawThermal: (%.1fC to %.1fC) %.1fC" % (self.tmin, self.tmax, self.mouse_temp))
+        self.set_title("RawThermal(%u): (%.1fC to %.1fC) %.1fC" % (self.image_count, self.tmin, self.tmax, self.mouse_temp))
 
     def xy_to_latlon(self, x, y):
         '''convert x,y pixel coordinates to a latlon tuple'''
