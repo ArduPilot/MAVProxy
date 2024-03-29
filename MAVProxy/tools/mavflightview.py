@@ -384,6 +384,7 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
             # may only be present for colour-source expressions to work
             continue
 
+        type_with_instance = type
         try:
             # remember that "m" here might be a mavlink message.
             instance_field = m.fmt.instance_field
@@ -393,7 +394,7 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
                 ):
                 continue
 
-            type = '%s[%u]' % (type, m_instance_field_value)
+            type_with_instance = '%s[%u]' % (type, m_instance_field_value)
         except Exception:
             pass
 
@@ -473,11 +474,11 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
                 continue
 
             # automatically add new types to instances
-            if type not in instances:
-                instances[type] = len(instances)
+            if type_with_instance not in instances:
+                instances[type_with_instance] = len(instances)
                 while len(instances) >= len(path):
                     path.append([])
-            instance = instances[type]
+            instance = instances[type_with_instance]
 
             # only plot thing we have a valid-looking location for:
             if abs(lat)<=0.01 and abs(lng)<=0.01:
@@ -490,8 +491,8 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
             tdays = grapher.timestamp_to_days(m._timestamp)
             point = (lat, lng, colour, tdays)
 
-            if options.rate == 0 or not type in last_timestamps or m._timestamp - last_timestamps[type] > 1.0/options.rate:
-                last_timestamps[type] = m._timestamp
+            if options.rate == 0 or not type_with_instance in last_timestamps or m._timestamp - last_timestamps[type_with_instance] > 1.0/options.rate:
+                last_timestamps[type_with_instance] = m._timestamp
                 path[instance].append(point)
     if len(path[0]) == 0:
         print("No points to plot")
