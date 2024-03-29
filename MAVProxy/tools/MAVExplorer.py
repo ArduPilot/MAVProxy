@@ -430,7 +430,10 @@ def cmd_map(args):
         options.types = ','.join(args)
         if len(options.types) > 1:
             options.colour_source='type'
-    [path, wp, fen, used_flightmodes, mav_type, instances] = mavflightview.mavflightview_mav(mestate.mlog, options, mestate.flightmode_selections)
+    mfv_mav_ret = mavflightview.mavflightview_mav(mestate.mlog, options, mestate.flightmode_selections)
+    if mfv_mav_ret is None:
+        return
+    [path, wp, fen, used_flightmodes, mav_type, instances] = mfv_mav_ret
     global map_timelim_pipes
     timelim_pipe = multiproc.Pipe()
     child = multiproc.Process(target=mavflightview.mavflightview_show, args=[path, wp, fen, used_flightmodes, mav_type, options, instances, None, timelim_pipe])
