@@ -288,6 +288,7 @@ class SIYIModule(mp_module.MPModule):
                                                      ('autoflag_history', float, 50),
                                                      ('autoflag_slices', int, 4),
                                                      ('track_ROI', int, 1),
+                                                     ('fetch_timeout', float, 2.0),
                                                      MPSetting('thresh_climit', int, 50, range=(10,50)),
                                                      MPSetting('thresh_volt', int, 80, range=(20,80)),
                                                      MPSetting('thresh_ang', int, 4000, range=(30,4000)),

@@ -176,7 +176,9 @@ class RawThermal:
     def fetch_latest(self):
         '''fetch a thermal image'''
         tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        tcp.settimeout(2)
+        timeout = self.siyi.siyi_settings.fetch_timeout
+        if timeout >= 0:
+            tcp.settimeout(2)
         try:
             tcp.connect(self.uri)
         except Exception:
