@@ -61,6 +61,9 @@ class RawThermal:
         popup = self.im.get_popup_menu()
         popup.add_to_submenu(["Mode"], MPMenuItem("ClickTrack", returnkey="Mode:ClickTrack"))
         popup.add_to_submenu(["Mode"], MPMenuItem("Flag", returnkey="Mode:Flag"))
+        popup.add_to_submenu(["Marker"], MPMenuItem("Flame", returnkey="Marker:flame"))
+        popup.add_to_submenu(["Marker"], MPMenuItem("Flag", returnkey="Marker:flag"))
+        popup.add_to_submenu(["Marker"], MPMenuItem("Barrell", returnkey="Marker:barrell"))
 
         dname = os.path.join(self.logdir, 'thermal')
         try:
@@ -236,6 +239,8 @@ class RawThermal:
                 if event.returnkey.startswith("Mode:"):
                     self.mode = event.returnkey[5:]
                     print("ViewMode: %s" % self.mode)
+                elif event.returnkey.startswith("Marker:"):
+                    self.siyi.handle_marker(event.returnkey[7:])
                 elif event.returnkey == "fitWindow":
                     self.im.fit_to_window()
                 elif event.returnkey == "fullSize":
@@ -272,13 +277,8 @@ class RawThermal:
                     self.tracking = True
                 elif event.controlDown:
                     self.siyi.end_tracking()
-                elif self.mode == "ClickTrack":
-                    self.siyi.set_target(latlonalt[0], latlonalt[1], latlonalt[2])
                 else:
-                    latlon = (latlonalt[0], latlonalt[1])
-                    self.siyi.mpstate.map.add_object(
-                        mp_slipmap.SlipIcon("SIYIClick", latlon, self.siyi.click_icon, layer="SIYI")
-                    )
+                    self.siyi.camera_click(self.mode, latlonalt)
 
 if __name__ == '__main__':
     from optparse import OptionParser
