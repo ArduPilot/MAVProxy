@@ -42,6 +42,8 @@ class RawThermal:
         self.mouse_temp = -1
         self.image_count = 0
         self.marker_history = []
+        self.last_tstamp = None
+
 
         if siyi is not None:
             self.logdir = self.siyi.logdir
@@ -84,6 +86,9 @@ class RawThermal:
             if ret is None:
                 continue
             (fname, tstamp, data) = ret
+            if self.last_tstamp is not None and tstamp == self.last_tstamp:
+                continue
+            self.last_tstamp = tstamp
             self.display_image(fname, data)
             self.save_image(fname, tstamp, data)
 
@@ -258,8 +263,11 @@ class RawThermal:
         y = event.y
         if self.last_data is None:
             return -1
-        p = self.last_data[y*640+x]
-        return p - C_TO_KELVIN
+        try:
+            p = self.last_data[y*640+x]
+            return p - C_TO_KELVIN
+        except Exception:
+            return -1
 
     def end_tracking(self):
         '''end object tracking'''
