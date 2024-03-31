@@ -694,6 +694,8 @@ on'''
         for wpnum in range(idx, idx+count):
             offset = self.item_num_to_offset(wpnum)
             wp = self.wploader.wp(offset)
+            if wp is None:
+                continue
             if not self.wploader.is_location_command(wp.command):
                 continue
             wp.z = newalt
@@ -735,6 +737,8 @@ on'''
         for wpnum in range(idx, idx+count):
             offset = self.item_num_to_offset(wpnum)
             wp = self.wploader.wp(offset)
+            if wp is None:
+                continue
             if not self.wploader.is_location_command(wp.command):
                 continue
             wp.frame = newframe
