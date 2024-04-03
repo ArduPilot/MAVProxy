@@ -93,15 +93,17 @@ class MapModule(mp_module.MPModule):
         self.default_popup = MPMenuSubMenu('Popup', items=[])
         self.add_menu(MPMenuItem('Fly To', 'Fly To', '# guided ',
                                  handler=MPMenuCallTextDialog(title='Altitude (m)', default=self.mpstate.settings.guidedalt)))
-        self.add_menu(MPMenuItem('Set Home', 'Set Home', '# confirm "Set HOME?" map sethomepos '))
-        self.add_menu(MPMenuItem('Set Home (with height)', 'Set Home', '# confirm "Set HOME with height?" map sethome '))
-        self.add_menu(MPMenuItem('Set Origin', 'Set Origin', '# confirm "Set ORIGIN?" map setoriginpos '))
-        self.add_menu(MPMenuItem('Set Origin (with height)', 'Set Origin', '# confirm "Set ORIGIN with height?" map setorigin '))
         self.add_menu(MPMenuItem('Terrain Check', 'Terrain Check', '# terrain check'))
         self.add_menu(MPMenuItem('Show Position', 'Show Position', 'showPosition'))
         self.add_menu(MPMenuItem('Google Maps Link', 'Google Maps Link', 'printGoogleMapsLink'))
         self.add_menu(MPMenuItem('Set ROI', 'Set ROI', '# map setroi '))
         self.add_menu(MPMenuItem('Set Position', 'Set Position', '# map setposition '))
+        self.add_menu(MPMenuSubMenu('Home', items=[
+            MPMenuItem('Set Home', 'Set Home', '# confirm "Set HOME?" map sethomepos '),
+            MPMenuItem('Set Home (with height)', 'Set Home', '# confirm "Set HOME with height?" map sethome '),
+            MPMenuItem('Set Origin', 'Set Origin', '# confirm "Set ORIGIN?" map setoriginpos '),
+            MPMenuItem('Set Origin (with height)', 'Set Origin', '# confirm "Set ORIGIN with height?" map setorigin '),
+        ]))
 
         self._colour_for_wp_command = {
             # takeoff commands
