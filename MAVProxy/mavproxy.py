@@ -1301,6 +1301,7 @@ if __name__ == '__main__':
     parser.add_option("--version", action='store_true', help="version information")
     parser.add_option("--default-modules", default="log,signing,wp,rally,fence,ftp,param,relay,tuneopt,arm,mode,calibration,rc,auxopt,misc,cmdlong,battery,terrain,output,adsb,layout", help='default module list')
     parser.add_option("--udp-timeout",dest="udp_timeout", default=0.0, type='float', help="Timeout for udp clients in seconds")
+    parser.add_option("--retries", type=int, help="number of times to retry connection", default=3)
 
     (opts, args) = parser.parse_args()
     if len(args) != 0:
@@ -1402,9 +1403,9 @@ if __name__ == '__main__':
     for mdev in opts.master:
         if mdev.find('?') != -1 or mdev.find('*') != -1:
             for m in glob.glob(mdev):
-                if not mpstate.module('link').link_add(m, force_connected=opts.force_connected):
+                if not mpstate.module('link').link_add(m, force_connected=opts.force_connected, retries=opts.retries):
                     sys.exit(1)
-        elif not mpstate.module('link').link_add(mdev, force_connected=opts.force_connected):
+        elif not mpstate.module('link').link_add(mdev, force_connected=opts.force_connected, retries=opts.retries):
             sys.exit(1)
 
     if not opts.master and len(serial_list) == 1:
