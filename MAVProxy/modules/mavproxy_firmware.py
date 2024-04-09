@@ -279,14 +279,14 @@ fw download releasetype=OFFICIAL frame=quad platform=PX4-v2
                 print("Download timeout")
             if not child.is_alive():
                 break
-            print("Waiting for download to compliete...")
+            print("Waiting for download to complete...")
             time.sleep(1)
 
         return filename
 
     def fw_manifest_usage(self):
         '''return help on manifest subcommand'''
-        return("Usage: fw manifest <list|download|purge>")
+        return("Usage: fw manifest <list|download|purge|status>")
 
     def cmd_fw_manifest_help(self):
         '''show help on manifest subcommand'''
@@ -330,6 +330,8 @@ fw download releasetype=OFFICIAL frame=quad platform=PX4-v2
             return self.manifest_download()
         if args[0] == "list":
             return self.cmd_fw_manifest_list()
+        if args[0] == "status":
+            return self.cmd_fw_manifest_status()
         if args[0] == "load":
             return self.cmd_fw_manifest_load()
         if args[0] == "purge":
@@ -367,6 +369,11 @@ fw download releasetype=OFFICIAL frame=quad platform=PX4-v2
                 continue
             self.manifests.append(manifest)
 
+    def cmd_fw_manifest_status(self):
+        '''brief summary of manifest status'''
+        print(f"fw: {len(list(self.downloaders.keys()))} downloaders")
+        print(f"fw: {len(self.find_manifests())} manifests")
+
     def download_url(self, url, path):
         mp_util.download_files([(url,path)])
 
@@ -374,7 +381,7 @@ fw download releasetype=OFFICIAL frame=quad platform=PX4-v2
         '''called rapidly by mavproxy'''
         if self.downloaders_lock.acquire(False):
             removed_one = False
-            for url in self.downloaders.keys():
+            for url in list(self.downloaders.keys()):
                 if not self.downloaders[url].is_alive():
                     print("fw: Download thread for (%s) done" % url)
                     del self.downloaders[url]
