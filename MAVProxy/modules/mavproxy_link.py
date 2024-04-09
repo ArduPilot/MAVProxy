@@ -323,7 +323,7 @@ class LinkModule(mp_module.MPModule):
             print("Applying attribute to link: %s = %s" % (attr, optional_attributes[attr]))
             setattr(conn, attr, optional_attributes[attr])
 
-    def link_add(self, descriptor, force_connected=False):
+    def link_add(self, descriptor, force_connected=False, retries=3):
         '''add new link'''
         try:
             (device, optional_attributes) = self.parse_link_descriptor(descriptor)
@@ -342,13 +342,15 @@ class LinkModule(mp_module.MPModule):
                 conn = mavutil.mavlink_connection(device, autoreconnect=True,
                                                   source_system=self.settings.source_system,
                                                   baud=self.settings.baudrate,
-                                                  force_connected=force_connected)
+                                                  force_connected=force_connected,
+                                                  retries=retries)
             except Exception as e:
                 # try the same thing but without force-connected for
                 # backwards-compatability
                 conn = mavutil.mavlink_connection(device, autoreconnect=True,
                                                   source_system=self.settings.source_system,
-                                                  baud=self.settings.baudrate)
+                                                  baud=self.settings.baudrate,
+                                                  retries=retries)
             conn.mav.srcComponent = self.settings.source_component
         except Exception as msg:
             print("Failed to connect to %s : %s" % (descriptor, msg))
