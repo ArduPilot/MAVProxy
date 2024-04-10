@@ -115,6 +115,7 @@ class MEState(object):
               MPSetting('debug', int, 0, 'debug level'),
               MPSetting('paramdocs', bool, True, 'show param docs'),
               MPSetting('max_rate', float, 0, 'maximum display rate of graphs in Hz'),
+              MPSetting('vehicle_type', str, 'Auto', 'force vehicle type for mode handling'),
               ]
             )
 
@@ -385,12 +386,38 @@ def flightmode_colours():
                 idx = 0
     return mapping
 
+def check_vehicle_type():
+    '''check vehicle_type option'''
+    vtypes = { "Rover" : mavutil.mavlink.MAV_TYPE_GROUND_ROVER,
+               "Plane" : mavutil.mavlink.MAV_TYPE_FIXED_WING,
+               "Copter" : mavutil.mavlink.MAV_TYPE_QUADROTOR,
+               "Tracker" : mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER,
+               "Antenna" : mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER,
+               "Sub" : mavutil.mavlink.MAV_TYPE_SUBMARINE,
+               "Blimp" : mavutil.mavlink.MAV_TYPE_AIRSHIP
+    }
+    if mestate.settings.vehicle_type == 'Auto':
+        # let mavutil handle it
+        return
+    old_mav_type = mestate.mlog.mav_type
+    for k in vtypes.keys():
+        if mestate.settings.vehicle_type.lower().find(k.lower()) != -1:
+            mestate.mlog.mav_type = vtypes[k]
+            if old_mav_type != mestate.mlog.mav_type:
+                global flightmodes
+                mestate.mlog._flightmodes = None
+                flightmodes = mestate.mlog.flightmode_list()
+            return
+    print("Unknown vehicle type '%s'" % mestate.settings.vehicle_type)
+
+
 def cmd_graph(args):
     '''graph command'''
     usage = "usage: graph <FIELD...>"
     if len(args) < 1:
         print(usage)
         return
+    check_vehicle_type()
     if args[0][0] == ':':
         i = int(args[0][1:])
         g = mestate.graphs[i]
@@ -420,6 +447,7 @@ def cmd_map(args):
     import mavflightview
     #mestate.mlog.reduce_by_flightmodes(mestate.flightmode_selections)
     #setup and process the map
+    check_vehicle_type()
     options = mavflightview.mavflightview_options()
     options.condition = mestate.settings.condition
     options._flightmodes = mestate.mlog._flightmodes
