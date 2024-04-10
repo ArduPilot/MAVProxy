@@ -32,7 +32,6 @@ class RawThermal:
         self.cap = None
         self.res = res
         self.FOV = 24.2
-        self.mode = "Flag"
         self.last_frame_t = time.time()
         self.logdir = 'thermal'
         self.should_exit = False
@@ -81,6 +80,8 @@ class RawThermal:
     def fetch_loop(self):
         '''main thread'''
         while True:
+            if self.im is None:
+                break
             time.sleep(0.25)
             ret = self.fetch_latest()
             if ret is None:
@@ -159,8 +160,7 @@ class RawThermal:
         self.tmin = minv - C_TO_KELVIN
         self.tmax = maxv - C_TO_KELVIN
         if maxv <= minv:
-            print("Bad range")
-            return
+            maxv = minv + 1
 
         self.last_data = a
 
@@ -174,6 +174,8 @@ class RawThermal:
         a = a.reshape(512, 640)
 
         a = cv2.cvtColor(a, cv2.COLOR_GRAY2RGB)
+        if self.im is None:
+            return
         self.im.set_image(a)
         self.image_count += 1
         self.update_title()
@@ -277,7 +279,8 @@ class RawThermal:
 
     def update_title(self):
         """update thermal view title"""
-        self.set_title("RawThermal(%u): (%.1fC to %.1fC) %.1fC" % (self.image_count, self.tmin, self.tmax, self.mouse_temp))
+        self.set_title("RawThermal(%u): (%.1fC to %.1fC) %.1fC (mode %s)" % (self.image_count, self.tmin, self.tmax,
+                                                                                 self.mouse_temp, self.siyi.click_mode))
 
     def xy_to_latlon(self, x, y):
         '''convert x,y pixel coordinates to a latlon tuple'''
@@ -302,8 +305,8 @@ class RawThermal:
         for event in self.im.events():
             if isinstance(event, MPMenuItem):
                 if event.returnkey.startswith("Mode:"):
-                    self.mode = event.returnkey[5:]
-                    print("ViewMode: %s" % self.mode)
+                    self.siyi.click_mode = event.returnkey[5:]
+                    print("ViewMode: %s" % self.siyi.click_mode)
                 elif event.returnkey.startswith("Marker:"):
                     self.siyi.handle_marker(event.returnkey[7:])
                 elif event.returnkey == "fitWindow":
@@ -343,7 +346,7 @@ class RawThermal:
                 elif event.controlDown:
                     self.siyi.end_tracking()
                 else:
-                    self.siyi.camera_click(self.mode, latlonalt)
+                    self.siyi.camera_click(self.siyi.click_mode, latlonalt)
 
 if __name__ == '__main__':
     from optparse import OptionParser
