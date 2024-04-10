@@ -671,92 +671,67 @@ on'''
             wpend_offset)
         print("Moved %s %u:%u to %f, %f rotation=%.1f" % (self.itemstype(), wpstart, wpend, lat, lon, rotation))
 
-    def cmd_changealt(self, args):
-        '''handle wp change target alt of multiple waypoints'''
+    def change_mission_item_range(self, args, desc, changer, newvalstr):
         if not self.check_have_list():
             return
+        idx = int(args[0])
+        if not self.good_item_num_to_manipulate(idx):
+            print("Invalid %s number %u" % (self.itemtype(), idx))
+            return
+        if len(args) >= 2:
+            count = int(args[1])
+        else:
+            count = 1
+        if not self.good_item_num_to_manipulate(idx+count-1):
+            print("Invalid %s number %u" % (self.itemtype(), idx+count-1))
+            return
+
+        for wpnum in range(idx, idx+count):
+            offset = self.item_num_to_offset(wpnum)
+            wp = self.wploader.wp(offset)
+            if wp is None:
+                continue
+            if not self.wploader.is_location_command(wp.command):
+                continue
+            changer(wp)
+            wp.target_system = self.target_system
+            wp.target_component = self.target_component
+            self.wploader.set(wp, offset)
+
+        self.wploader.last_change = time.time()
+        self.upload_start = time.time()
+        self.loading_waypoints = True
+        self.loading_waypoint_lasttime = time.time()
+        self.master.mav.mission_write_partial_list_send(
+            self.target_system,
+            self.target_component,
+            self.item_num_to_offset(idx),
+            self.item_num_to_offset(idx+count),
+            mission_type=self.mav_mission_type())
+        print("Changed %s for WPs %u:%u to %s" % (desc, idx, idx+(count-1), newvalstr))
+
+    def cmd_changealt(self, args):
+        '''handle wp change target alt of multiple waypoints'''
         if len(args) < 2:
             print("usage: %s changealt WPNUM NEWALT <NUMWP>" % self.command_name())
             return
-        idx = int(args[0])
-        if not self.good_item_num_to_manipulate(idx):
-            print("Invalid %s number %u" % (self.itemtype(), idx))
-            return
-        newalt = float(args[1])
-        if len(args) >= 3:
-            count = int(args[2])
-        else:
-            count = 1
-        if not self.good_item_num_to_manipulate(idx+count-1):
-            print("Invalid %s number %u" % (self.itemtype(), idx+count-1))
-            return
-
-        for wpnum in range(idx, idx+count):
-            offset = self.item_num_to_offset(wpnum)
-            wp = self.wploader.wp(offset)
-            if wp is None:
-                continue
-            if not self.wploader.is_location_command(wp.command):
-                continue
-            wp.z = newalt
-            wp.target_system = self.target_system
-            wp.target_component = self.target_component
-            self.wploader.set(wp, offset)
-
-        self.wploader.last_change = time.time()
-        self.loading_waypoints = True
-        self.loading_waypoint_lasttime = time.time()
-        self.master.mav.mission_write_partial_list_send(
-            self.target_system,
-            self.target_component,
-            offset,
-            offset,
-            mission_type=self.mav_mission_type())
-        print("Changed alt for WPs %u:%u to %f" % (idx, idx+(count-1), newalt))
+        value = float(args[1])
+        del args[1]
+        def changer(wp):
+            wp.z = value
+        self.change_mission_item_range(args, "alt", changer, str(value))
 
     def cmd_changeframe(self, args):
         '''handle wp change frame of multiple waypoints'''
-        if not self.check_have_list():
-            return
         if len(args) < 2:
-            print("usage: %s changeframe WPNUM NEWFRAME <NUMWP>" % self.command_name())
+            print("usage: %s changealt WPNUM NEWALT <NUMWP>" % self.command_name())
             return
-        idx = int(args[0])
-        if not self.good_item_num_to_manipulate(idx):
-            print("Invalid %s number %u" % (self.itemtype(), idx))
-            return
-        newframe = int(args[1])
-        if len(args) >= 3:
-            count = int(args[2])
-        else:
-            count = 1
-        if not self.good_item_num_to_manipulate(idx+count-1):
-            print("Invalid %s number %u" % (self.itemtype(), idx+count-1))
-            return
+        value = int(args[1])
+        del args[1]
+        def changer(wp):
+            wp.frame = value
+        self.change_mission_item_range(args, "frame", changer, str(value))
 
-        for wpnum in range(idx, idx+count):
-            offset = self.item_num_to_offset(wpnum)
-            wp = self.wploader.wp(offset)
-            if wp is None:
-                continue
-            if not self.wploader.is_location_command(wp.command):
-                continue
-            wp.frame = newframe
-            wp.target_system = self.target_system
-            wp.target_component = self.target_component
-            self.wploader.set(wp, offset)
-
-        self.wploader.last_change = time.time()
-        self.loading_waypoints = True
-        self.loading_waypoint_lasttime = time.time()
-        self.master.mav.mission_write_partial_list_send(
-            self.target_system,
-            self.target_component,
-            offset,
-            offset,
-            mission_type=self.mav_mission_type())
-        print("Changed frame for WPs %u:%u to %u" % (idx, idx+(count-1), newframe))
-        
     def fix_jumps(self, idx, delta):
         # nothing by default as only waypoints need worry
         pass
