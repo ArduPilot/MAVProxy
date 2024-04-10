@@ -26,7 +26,6 @@ class CameraView:
         self.res = res
         self.rtsp_url = rtsp_url
         self.filename = filename
-        self.mode = "Flag"
         self.last_frame_t = time.time()
         self.fps = fps
         self.frame_counter = -1
@@ -140,6 +139,7 @@ class CameraView:
         """set image title"""
         if self.im is None:
             return
+        title += " (mode %s)" % self.siyi.click_mode
         self.im.set_title(title)
 
     def get_pixel_temp(self, event):
@@ -213,8 +213,8 @@ class CameraView:
                     self.im.set_colormap(event.returnkey[9:])
                     self.siyi.cmd_palette(["WhiteHot"])
                 elif event.returnkey.startswith("Mode:"):
-                    self.mode = event.returnkey[5:]
-                    print("ViewMode: %s" % self.mode)
+                    self.siyi.click_mode = event.returnkey[5:]
+                    print("ViewMode: %s" % self.siyi.click_mode)
                 elif event.returnkey.startswith("Marker:"):
                     self.siyi.handle_marker(event.returnkey[7:])
                 elif event.returnkey.startswith("Lens:") and self.siyi is not None:
@@ -261,7 +261,7 @@ class CameraView:
                 elif event.controlDown:
                     self.siyi.end_tracking()
                 else:
-                    self.siyi.camera_click(self.mode, latlonalt)
+                    self.siyi.camera_click(self.siyi.click_mode, latlonalt)
 
 if __name__ == '__main__':
     from optparse import OptionParser

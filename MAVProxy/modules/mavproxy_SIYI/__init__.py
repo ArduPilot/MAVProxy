@@ -364,6 +364,7 @@ class SIYIModule(mp_module.MPModule):
         self.last_armed = False
         self.getconfig_pending = False
         self.last_getconfig = time.time()
+        self.click_mode = "Flag"
 
         if mp_util.has_wxpython:
             menu = MPMenuSubMenu('SIYI',
@@ -1002,12 +1003,13 @@ class SIYIModule(mp_module.MPModule):
             self.send_named_float('TMAX', self.tmax)
             self.last_temp_t = time.time()
             frame_counter = -1 if self.thermal_view is None else self.thermal_view.frame_counter
-            self.logf.write('SITR', 'QffHHHHi', 'TimeUS,TMin,TMax,TMinX,TMinY,TMaxX,TMaxY,FC',
+            self.logf.write('SITR', 'QffHHHHiI', 'TimeUS,TMin,TMax,TMinX,TMinY,TMaxX,TMaxY,FC,TCAP',
                             self.micros64(),
                             self.tmin, self.tmax,
                             self.tmin_x, self.tmin_y,
                             self.tmax_x, self.tmax_y,
-                            frame_counter)
+                            frame_counter,
+                            self.thermal_capture_count)
             if self.thermal_view is not None:
                 threshold = self.siyi_settings.threshold_temp
                 threshold_value = int(255*(threshold - self.tmin)/max(1,(self.tmax-self.tmin)))
@@ -1254,8 +1256,15 @@ class SIYIModule(mp_module.MPModule):
         (roll,pitch,yaw) = (math.radians(fov_att[0]),math.radians(fov_att[1]),math.radians(fov_att[2]))
         yaw += att.yaw
         FOV_half = math.radians(0.5*FOV)
-        yaw += FOV_half*x
+
+        pitch = math.radians(-90)
+        aspect_ratio = 1.0
+
         pitch -= y*FOV_half/aspect_ratio
+        if pitch < math.radians(-90):
+            yaw -= FOV_half*x
+        else:
+            yaw += FOV_half*x
         m.from_euler(roll, pitch, yaw)
         v = m * v
         return v
@@ -1448,8 +1457,7 @@ class SIYIModule(mp_module.MPModule):
         self.armed_checks()
 
         if mtype == 'GPS_RAW_INT':
-            # ?!? why off by 18 hours
-            gwk, gms = mp_util.get_gps_time(time.time()+18*3600)
+            gwk, gms = mp_util.get_gps_time(time.time())
             self.logf.write('GPS', "QBIHLLff", "TimeUS,Status,GMS,GWk,Lat,Lng,Alt,Spd",
                             self.micros64(), m.fix_type, gms, gwk, m.lat, m.lon, m.alt*0.001, m.vel*0.01)
         if mtype == 'ATTITUDE':
