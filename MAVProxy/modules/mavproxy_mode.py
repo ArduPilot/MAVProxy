@@ -6,6 +6,10 @@ from pymavlink import mavutil
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
 
+'''
+AP_FLAKE8_CLEAN
+'''
+
 
 class ModeModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -67,8 +71,12 @@ class ModeModule(mp_module.MPModule):
 
     def cmd_guided(self, args):
         '''set GUIDED target'''
+        if len(args) > 0:
+            if args[0] == "forward":
+                return self.cmd_guided_forward(args[1:])
+
         if len(args) != 1 and len(args) != 3:
-            print("Usage: guided ALTITUDE | guided LAT LON ALTITUDE")
+            print("Usage: guided ALTITUDE | guided LAT LON ALTITUDE | guided forward METRES")
             return
 
         if len(args) == 3:
@@ -117,6 +125,61 @@ class ModeModule(mp_module.MPModule):
             int(latlon[0]*1.0e7),
             int(latlon[1]*1.0e7),
             altitude
+        )
+
+    def build_pt_ignoremask(self, bits, force_not_accel=False):
+        '''creates an ignore bitmask which ignores all bits except the ones passed in'''
+        ignore_bits = {
+            "X": 1,  # POSITION_TARGET_TYPEMASK_X_IGNORE
+            "Y": 2,
+            "Z": 4,
+            "VX": 8,
+            "VY": 16,
+            "VZ": 32,
+            "AX": 64,
+            "AY": 128,
+            "AZ": 256,
+            "YAW": 1024,
+            "YAWRATE": 2048,
+        }
+        value = 0
+        for (n, v) in ignore_bits.items():
+            if n not in bits:
+                value |= v
+
+        # as of ArduCopter 4.6.0-dev, you can't ignore any axis if you
+        # want the others to be honoured.
+        for prefix in "", "V", "A":
+            for axis in "X", "Y", "Z":
+                name = f"{prefix}{axis}"
+                if (value & ignore_bits[name]) == 0:
+                    # not ignoring this axis, so unmark the other axes as ignored
+                    for resetaxis in "X", "Y", "Z":
+                        resetname = f"{prefix}{resetaxis}"
+                        value = value & ~ignore_bits[resetname]
+                    break
+
+        if force_not_accel:
+            value |= 512  # POSITION_TARGET_TYPEMASK_FORCE_SET
+
+        return value
+
+    def cmd_guided_forward(self, args):
+        if len(args) != 1:
+            print("Usage: guided forward METRES")
+            return
+        offset = args[0]
+        # see also "cmd_position" in mavproxy_cmdlong.py
+        self.master.mav.set_position_target_local_ned_send(
+            0,  # system time in milliseconds
+            self.settings.target_system,  # target system
+            0,  # target component
+            mavutil.mavlink.MAV_FRAME_BODY_NED,
+            self.build_pt_ignoremask(["X", "YAWRATE"]),     # type mask (pos-x-only)
+            float(offset), 0, 0,  # position x,y,z
+            0, 0, 0,  # velocity x,y,z
+            0, 0, 0,  # accel x,y,z
+            0, 0      # yaw, yaw rate
         )
 
     def mavlink_packet(self, m):
