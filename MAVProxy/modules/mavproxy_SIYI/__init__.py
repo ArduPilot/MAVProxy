@@ -296,6 +296,9 @@ class SIYIModule(mp_module.MPModule):
                                                      MPSetting('thresh_volt_dis', int, 40, range=(20,80)),
                                                      MPSetting('thresh_ang_dis', int, 40, range=(30,4000)),
                                                      ('stow_on_landing', bool, True),
+                                                     ('stow_heuristics_enabled', bool, True),
+                                                     ('stow_heuristics_minalt', float, 20.0),  # metres above terrain
+                                                     ('stow_heuristics_maxhorvel', float, 2.0),  # metres/second
                                                          ])
         self.add_completion_function('(SIYISETTING)',
                                      self.siyi_settings.completion)
@@ -372,6 +375,13 @@ class SIYIModule(mp_module.MPModule):
         self.extended_sys_state_request_time = 0
         self.extended_sys_state_warn_time = 0  # last time we warned about not being able to auto-stow
         self.last_landed_state = None
+
+        # support retracting camera based on heuristics:
+        self.landing_heuristics = {
+            "armed": True,
+            "last_warning_ms": 0,
+            "current_terrain_alt": 0,
+        }
 
         if mp_util.has_wxpython:
             menu = MPMenuSubMenu('SIYI',
@@ -1554,6 +1564,47 @@ class SIYIModule(mp_module.MPModule):
             if delta_t > 60 and delta_warn_t > 60:
                 self.extended_sys_state_warn_time = now
                 print("SIYI: no EXTENDED_SYS_STATE, can't auto-stow")
+
+        if self.siyi_settings.stow_heuristics_enabled:
+            self.check_stow_on_landing_heuristics()
+
+    def check_stow_on_landing_heuristics(self):
+        tr = self.master.messages.get('TERRAIN_REPORT', None)
+        vfr_hud = self.master.messages.get('VFR_HUD', None)
+
+        if tr is None or vfr_hud is None:
+            now = time.time()
+            if now - self.landing_heuristics["last_warning_ms"] > 60:
+                self.landing_heuristics["last_warning_ms"] = now
+                print("SIYI: missing messages, hueristics-stow not available")
+            return
+
+        # first work out whether we should "arm" the stowing; must
+        # meet minimum conditions to do so:
+        current_terrain_alt = tr.current_height
+        if current_terrain_alt > self.siyi_settings.stow_heuristics_minalt + 1:
+            # above trigger altitude
+            self.landing_heuristics["armed"] = True
+
+        # now work out whether to stow:
+        if not self.landing_heuristics["armed"]:
+            return
+
+        if current_terrain_alt > self.siyi_settings.stow_heuristics_minalt:
+            # above the minimum altitude
+            return
+
+        if vfr_hud.groundspeed > self.siyi_settings.stow_heuristics_maxhorvel:
+            # travelling rapidly horizontally
+            return
+
+        if vfr_hud.climb > 0:
+            # climbing
+            return
+
+
+        self.landing_heuristics["armed"] = False
+        self.retract()
 
     def show_horizon_lines(self):
         '''show horizon lines'''
