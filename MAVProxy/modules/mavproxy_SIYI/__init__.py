@@ -11,6 +11,7 @@ from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib.mp_settings import MPSetting
 from MAVProxy.modules.lib import mp_util
+from MAVProxy.modules.lib import camera_projection
 from pymavlink import mavutil
 from pymavlink import DFReader
 from pymavlink.rotmat import Matrix3
@@ -940,7 +941,7 @@ class SIYIModule(mp_module.MPModule):
             self.last_rf_t = time.time()
             self.update_status()
             self.send_named_float('RFND', self.rf_dist)
-            SR = self.get_slantrange(0,0,0,1)
+            SR = self.get_slantrange(0,0,1,1)
             if SR is None:
                 SR = -1.0
             self.logf.write('SIRF', 'Qff', 'TimeUS,Dist,SR',
@@ -1222,87 +1223,30 @@ class SIYIModule(mp_module.MPModule):
          get range to ground
          x and y are from -1 to 1, relative to center of camera view
         '''
-        if self.rf_dist > 0 and self.siyi_settings.use_lidar > 0:
-            # use rangefinder if enabled
-            return self.rf_dist
-        gpi = self.master.messages.get('GLOBAL_POSITION_INT',None)
-        if not gpi:
-            return None
-        (lat,lon,alt) = gpi.lat*1.0e-7,gpi.lon*1.0e-7,gpi.alt*1.0e-3
-        ground_alt = self.module('terrain').ElevationModel.GetElevation(lat, lon)
-        if alt <= ground_alt:
-            return None
-        if self.attitude is None:
-            return None
+        C = camera_projection.CameraParams(xresolution=1024, yresolution=int(1024/aspect_ratio), FOV=FOV)
+        cproj = camera_projection.CameraProjection(C, elevation_model=self.module('terrain').ElevationModel)
         fov_att = self.get_fov_attitude()
-        pitch = fov_att[1]
-        if pitch >= 0:
-            return None
-        pitch -= y*FOV*0.5/aspect_ratio
-        pitch = min(pitch, -1)
-
-        # start with flat earth
-        sin_pitch = math.sin(abs(math.radians(pitch)))
-        sr = (alt-ground_alt) / sin_pitch
-
-        # iterate to make more accurate
-        for i in range(3):
-            (lat2,lon2,alt2) = self.get_latlonalt(sr,x,y,FOV,aspect_ratio)
-            ground_alt2 = self.module('terrain').ElevationModel.GetElevation(lat2, lon2)
-            if ground_alt2 is None:
-                return None
-            # adjust for height at this point
-            sr += (alt2 - ground_alt2) / sin_pitch
-        return sr
-
-
-
-    def get_view_vector(self, x, y, FOV, aspect_ratio):
-        '''
-        get ground lat/lon given vehicle orientation, camera orientation and slant range
-        x and y are from -1 to 1, relative to center of camera view
-        positive x is to the right
-        positive y is down
-        '''
         att = self.master.messages.get('ATTITUDE',None)
-        if att is None:
+        gpi = self.master.messages.get('GLOBAL_POSITION_INT',None)
+        if gpi is None or att is None:
             return None
-        v = Vector3(1, 0, 0)
-        m = Matrix3()
-        fov_att = self.get_fov_attitude()
-        (roll,pitch,yaw) = (math.radians(fov_att[0]),math.radians(fov_att[1]),math.radians(fov_att[2]))
-        yaw += att.yaw
-        FOV_half = math.radians(0.5*FOV)
-
-        pitch = math.radians(-90)
-        aspect_ratio = 1.0
-
-        pitch -= y*FOV_half/aspect_ratio
-        if pitch < math.radians(-90):
-            yaw -= FOV_half*x
-        else:
-            yaw += FOV_half*x
-        m.from_euler(roll, pitch, yaw)
-        v = m * v
-        return v
+        return cproj.get_slantrange(gpi.lat*1.0e-7,gpi.lon*1.0e-7,gpi.alt*1.0e-3,fov_att[0],fov_att[1],fov_att[2]+math.degrees(att.yaw))
 
     def get_latlonalt(self, slant_range, x, y, FOV, aspect_ratio):
         '''
         get ground lat/lon given vehicle orientation, camera orientation and slant range
         x and y are from -1 to 1, relative to center of camera view
         '''
-        if slant_range is None:
-            return None
-        v = self.get_view_vector(x,y,FOV,aspect_ratio)
-        if v is None:
-            return None
+        C = camera_projection.CameraParams(xresolution=1024, yresolution=int(1024/aspect_ratio), FOV=FOV)
+        cproj = camera_projection.CameraProjection(C, elevation_model=self.module('terrain').ElevationModel)
+        px = int(C.xresolution * 0.5*(1+x))
+        py = int(C.yresolution * 0.5*(1+y))
+        fov_att = self.get_fov_attitude()
+        att = self.master.messages.get('ATTITUDE',None)
         gpi = self.master.messages.get('GLOBAL_POSITION_INT',None)
-        if gpi is None:
+        if gpi is None or att is None:
             return None
-        v *= slant_range
-        (lat,lon,alt) = (gpi.lat*1.0e-7,gpi.lon*1.0e-7,gpi.alt*1.0e-3)
-        (lat,lon) = mp_util.gps_offset(lat,lon,v.y,v.x)
-        return (lat,lon,alt-v.z)
+        return cproj.get_latlonalt_for_pixel(px, py, gpi.lat*1.0e-7,gpi.lon*1.0e-7,gpi.alt*1.0e-3,fov_att[0],fov_att[1],fov_att[2]+math.degrees(att.yaw))
 
     def get_target_yaw_pitch(self, lat, lon, alt, mylat, mylon, myalt, vehicle_yaw_rad):
         '''get target yaw/pitch in vehicle frame for a target lat/lon'''
@@ -1402,15 +1346,17 @@ class SIYIModule(mp_module.MPModule):
     def show_fov1(self, FOV, name, aspect_ratio, color):
         '''show one FOV polygon'''
         points = []
-        for (x,y) in [(-1,-1),(1,-1),(1,1),(-1,1),(-1,-1)]:
-            latlonalt = self.get_latlonalt(self.get_slantrange(x,y,FOV,aspect_ratio),x,y,FOV,aspect_ratio)
-            if latlonalt is None:
-                self.mpstate.map.remove_object(name)
-                return
-            (lat,lon) = (latlonalt[0],latlonalt[1])
-            points.append((lat,lon))
-        self.mpstate.map.add_object(mp_slipmap.SlipPolygon(name, points, layer='SIYI',
-                                                           linewidth=2, colour=color))
+        C = camera_projection.CameraParams(xresolution=1024, yresolution=int(1024/aspect_ratio), FOV=FOV)
+        cproj = camera_projection.CameraProjection(C, elevation_model=self.module('terrain').ElevationModel)
+        fov_att = self.get_fov_attitude()
+        att = self.master.messages.get('ATTITUDE',None)
+        gpi = self.master.messages.get('GLOBAL_POSITION_INT',None)
+        if gpi is None or att is None:
+            return None
+        points = cproj.get_projection(gpi.lat*1.0e-7,gpi.lon*1.0e-7,gpi.alt*1.0e-3,fov_att[0],fov_att[1],fov_att[2]+math.degrees(att.yaw))
+        if points is not None:
+            self.mpstate.map.add_object(mp_slipmap.SlipPolygon(name, points, layer='SIYI',
+                                                               linewidth=2, colour=color))
 
     def show_fov(self):
         '''show FOV polygons'''
