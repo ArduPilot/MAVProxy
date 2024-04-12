@@ -881,6 +881,8 @@ class MissionEditorFrame(wx.Frame):
 
     def has_location_cmd(self, cmd_id):
         '''return True if a WP command has a location'''
+        if isinstance(cmd_id, str):
+            cmd_id = eval(f"mavutil.mavlink.MAV_CMD_{cmd_id}")
         if cmd_id in mavutil.mavlink.enums['MAV_CMD'].keys():
             cmd_enum = mavutil.mavlink.enums['MAV_CMD'][cmd_id]
             # default to having location for older installs of pymavlink
