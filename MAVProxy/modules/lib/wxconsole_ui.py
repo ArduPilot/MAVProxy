@@ -109,7 +109,7 @@ class ConsoleFrame(wx.Frame):
 
             try:
                 obj = state.child_pipe_recv.recv()
-            except EOFError:
+            except Exception:
                 break
                 
             if isinstance(obj, Value):
