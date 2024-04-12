@@ -295,6 +295,7 @@ class SIYIModule(mp_module.MPModule):
                                                      MPSetting('thresh_climit_dis', int, 20, range=(10,50)),
                                                      MPSetting('thresh_volt_dis', int, 40, range=(20,80)),
                                                      MPSetting('thresh_ang_dis', int, 40, range=(30,4000)),
+                                                     ('stow_on_landing', bool, True),
                                                          ])
         self.add_completion_function('(SIYISETTING)',
                                      self.siyi_settings.completion)
@@ -365,6 +366,12 @@ class SIYIModule(mp_module.MPModule):
         self.getconfig_pending = False
         self.last_getconfig = time.time()
         self.click_mode = "Flag"
+
+        # support for stowing the camera when we start to land:
+        self.extended_sys_state_received_time = 0
+        self.extended_sys_state_request_time = 0
+        self.extended_sys_state_warn_time = 0  # last time we warned about not being able to auto-stow
+        self.last_landed_state = None
 
         if mp_util.has_wxpython:
             menu = MPMenuSubMenu('SIYI',
@@ -1470,6 +1477,18 @@ class SIYIModule(mp_module.MPModule):
                 self.show_fov()
             except Exception as ex:
                 print(traceback.format_exc())
+        elif mtype == 'EXTENDED_SYS_STATE':
+            if self.siyi_settings.stow_on_landing:
+                self.extended_sys_state_received_time = time.time()
+                if (m.landed_state == mavutil.mavlink.MAV_LANDED_STATE_LANDING and
+                    self.last_landed_state != mavutil.mavlink.MAV_LANDED_STATE_LANDING):
+                    # we've just transition into landing
+                    self.retract()
+                self.last_landed_state = m.landed_state
+
+    def retract(self):
+        print("SIYI: stowing camera")
+        self.cmd_angle([0, 0])
 
     def receive_thread(self):
         '''thread for receiving UDP packets from SIYI'''
@@ -1509,6 +1528,32 @@ class SIYIModule(mp_module.MPModule):
         self.send_attitude()
         self.check_thermal_events()
         self.therm_capture()
+
+        # we need EXTENDED_SYS_STATE to work out if we're landing:
+        if self.siyi_settings.stow_on_landing:
+            now = time.time()
+            delta_t = now - self.extended_sys_state_received_time
+            delta_sent_t = now - self.extended_sys_state_request_time
+            if delta_t > 5 and delta_sent_t > 5:
+                self.extended_sys_state_request_time = now
+                print("requiesting")
+                self.master.mav.command_long_send(
+                    1,   # FIXME, target_system
+                    1,   # FIXME, target_component
+                    mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL,
+                    0,   # confirmation
+                    mavutil.mavlink.MAVLINK_MSG_ID_EXTENDED_SYS_STATE,  # p1
+                    1e6, #p2 interval (microseconds)
+                    0,   #p3 instance
+                    0,
+                    0,
+                    0,
+                    0
+                )
+            delta_warn_t = now - self.extended_sys_state_warn_time
+            if delta_t > 60 and delta_warn_t > 60:
+                self.extended_sys_state_warn_time = now
+                print("SIYI: no EXTENDED_SYS_STATE, can't auto-stow")
 
     def show_horizon_lines(self):
         '''show horizon lines'''
