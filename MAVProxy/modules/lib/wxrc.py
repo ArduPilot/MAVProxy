@@ -6,6 +6,7 @@
 from MAVProxy.modules.lib import multiproc
 from MAVProxy.modules.lib.wx_loader import wx
 import wx.lib.agw.pygauge as PG
+import wx.lib.scrolledpanel
 import time
 from enum import Enum
 
@@ -22,7 +23,7 @@ class PanelType(Enum):
         return obj
 
 
-class RCPanel(wx.Panel):
+class RCPanel(wx.lib.scrolledpanel.ScrolledPanel):
     def __init__(self, parent, panelType=PanelType.RC_IN):
         super().__init__(parent)
 
@@ -38,11 +39,13 @@ class RCPanel(wx.Panel):
         else:
             self.create_rc_widgets(16)
         self.SetSizer(self.sizer_main)
+        self.SetupScrolling()
 
-    def create_rc_widgets(self, num_channels):
+    def create_rc_widgets(self, num_channels, starting_id=0):
         for i in range(num_channels):
             curChanSizer = wx.BoxSizer(wx.HORIZONTAL)
-            label = wx.StaticText(self, label="{0} Channel {1}:".format(str(self.panelType.short_string), str(i+1)))
+            label = wx.StaticText(self, label="{0} Channel {1}:".format(str(self.panelType.short_string),
+                                                                        str(i+1+starting_id)))
             gauge = PG.PyGauge(self, range=2000, size=(200, 25), style=wx.GA_HORIZONTAL)  # Assuming RC values range from 1000 to 2000
             gauge.SetDrawValue(draw=True, drawPercent=False, font=None, colour=wx.BLACK, formatString=None)
             gauge.SetBarColour(wx.GREEN)
@@ -58,15 +61,32 @@ class RCPanel(wx.Panel):
 
     def update_gauges(self, msg):
         # Update the gauges based on the relevant mavlink packet info
+        # Returns 1 if the window needs to be resized to fit additional gauges
+
+        # If the vehicle is using >16 servo_outs, need to update the GUI
+        if len(self.rc_gauges) == 16 and self.panelType == PanelType.SERVO_OUT and getattr(msg, 'port', 0) == 1:
+            # add another 16 gauges
+            self.create_rc_widgets(16, starting_id=16)
+            self.Layout()
+            self.SetupScrolling()
+            return 1
         for i, gauge in enumerate(self.rc_gauges):
             if msg.get_type() == 'RC_CHANNELS' and self.panelType == PanelType.RC_IN:
                 value = getattr(msg, 'chan{0}_raw'.format(i+1), 0)
                 gauge.SetValue(value)
                 gauge.Refresh()
-            elif msg.get_type() == 'SERVO_OUTPUT_RAW' and self.panelType == PanelType.SERVO_OUT:
+            elif (msg.get_type() == 'SERVO_OUTPUT_RAW' and self.panelType == PanelType.SERVO_OUT and
+                  getattr(msg, 'port', 0) == 0) and i < 16:
                 value = getattr(msg, 'servo{0}_raw'.format(i+1), 0)
                 gauge.SetValue(value)
                 gauge.Refresh()
+            elif (msg.get_type() == 'SERVO_OUTPUT_RAW' and self.panelType == PanelType.SERVO_OUT and
+                  getattr(msg, 'port', 0) == 1) and i >= 17:
+                # 2nd bank of servos (17-32), if used
+                value = getattr(msg, 'servo{0}_raw'.format(i+1-16), 0)
+                gauge.SetValue(value)
+                gauge.Refresh()
+        return 0
 
 
 class RCFrame(wx.Frame):
@@ -90,7 +110,8 @@ class RCFrame(wx.Frame):
         while self.child_pipe_recv.poll():
             msg = self.child_pipe_recv.recv()
             if msg:
-                self.panel.update_gauges(msg)
+                if self.panel.update_gauges(msg) == 1:
+                    self.SetSize(self.GetSize()[0] + 30, self.GetSize()[1])
 
     def on_close(self, event):
         self.Destroy()
