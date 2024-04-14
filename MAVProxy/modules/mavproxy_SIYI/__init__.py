@@ -360,6 +360,7 @@ class SIYIModule(mp_module.MPModule):
         self.last_therm_cap = time.time()
         self.thermal_capture_count = 0
         self.last_therm_mode = time.time()
+        self.named_float_seq = 0
 
         self.recv_thread = Thread(target=self.receive_thread, name='SIYI_Receive')
         self.recv_thread.daemon = True
@@ -1150,26 +1151,6 @@ class SIYIModule(mp_module.MPModule):
             self.pitch_rate = 0
             self.pitch_end = None
 
-    def send_named_float(self, name, value):
-        '''inject a NAMED_VALUE_FLOAT into the local master input, so it becomes available
-           for graphs, logging and status command'''
-
-        # use the ATTITUDE message for srcsystem and time stamps
-        att = self.master.messages.get('ATTITUDE',None)
-        if att is None:
-            return
-        msec = att.time_boot_ms
-        ename = name.encode('ASCII')
-        if len(ename) < 10:
-            ename += bytes([0] * (10-len(ename)))
-        m = self.master.mav.named_value_float_encode(msec, bytearray(ename), value)
-        #m.name = ename
-        m.pack(self.master.mav)
-        m._header.srcSystem = att._header.srcSystem
-        m._header.srcComponent = mavutil.mavlink.MAV_COMP_ID_TELEMETRY_RADIO
-        m.name = name
-        self.mpstate.module('link').master_callback(m, self.master)
-
     def get_encoder_attitude(self):
         '''get attitude from encoders in vehicle frame'''
         now = time.time()
@@ -1492,7 +1473,6 @@ class SIYIModule(mp_module.MPModule):
             delta_sent_t = now - self.extended_sys_state_request_time
             if delta_t > 5 and delta_sent_t > 5:
                 self.extended_sys_state_request_time = now
-                print("requiesting")
                 self.master.mav.command_long_send(
                     1,   # FIXME, target_system
                     1,   # FIXME, target_component
