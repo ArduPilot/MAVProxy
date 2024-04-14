@@ -187,28 +187,6 @@ class SilvusModule(mp_module.MPModule):
         ip = ip.split('.')
         return ((int(ip[2]) * 256) + int(ip[3]))
 
-    def send_named_float(self, name, value):
-        '''inject a NAMED_VALUE_FLOAT into the local master input, so it becomes available
-           for graphs, logging and status command'''
-
-        # use the ATTITUDE message for srcsystem and time stamps
-        att = self.master.messages.get('ATTITUDE',None)
-        if att is None:
-            return
-        msec = att.time_boot_ms
-        ename = name.encode('ASCII')
-        if len(ename) < 10:
-            ename += bytes([0] * (10-len(ename)))
-        m = self.master.mav.named_value_float_encode(msec, bytearray(ename), value)
-        #m.name = ename
-        m.pack(self.master.mav)
-        m._header.srcSystem = att._header.srcSystem
-        m._header.srcComponent = mavutil.mavlink.MAV_COMP_ID_TELEMETRY_RADIO
-        m.name = name
-        self.mpstate.module('link').master_callback(m, self.master)
-        if self.silvus_settings.debug > 0:
-            print(m)
-
     def get_radio_data(self):
         now = time.time()
         if now - self.last_log_time < self.silvus_settings.log_dt:

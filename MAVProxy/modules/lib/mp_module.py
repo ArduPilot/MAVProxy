@@ -17,6 +17,7 @@ class MPModule(object):
         self.needs_unloading = False
         self.multi_instance = multi_instance
         self.multi_vehicle = multi_vehicle
+        self.named_float_seq = 0
 
         if description is None:
             self.description = name + " handling"
@@ -232,3 +233,25 @@ class MPModule(object):
            (self.target_component == 0 or self.target_component == compid)):
             return True
         return False
+
+    def send_named_float(self, name, value):
+        '''inject a NAMED_VALUE_FLOAT into the local master input, so it becomes available
+           for graphs, logging and status command'''
+
+        # use the ATTITUDE message for time stamp
+        att = self.master.messages.get('ATTITUDE',None)
+        if att is None:
+            return
+        msec = att.time_boot_ms
+        ename = name.encode('ASCII')
+        if len(ename) < 10:
+            ename += bytes([0] * (10-len(ename)))
+        m = self.master.mav.named_value_float_encode(msec, bytearray(ename), value)
+        m.pack(self.master.mav)
+        m._header.srcSystem = att._header.srcSystem
+        m._header.srcComponent = mavutil.mavlink.MAV_COMP_ID_TELEMETRY_RADIO
+        m._header.seq = self.named_float_seq
+        self.named_float_seq = (self.named_float_seq+1) % 256
+        m.name = name
+        self.mpstate.module('link').master_callback(m, self.master)
+    
