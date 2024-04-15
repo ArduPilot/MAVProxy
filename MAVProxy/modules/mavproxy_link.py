@@ -594,23 +594,28 @@ class LinkModule(mp_module.MPModule):
         if m.get_srcComponent() in component_ids_which_are_not_vehicles:
             return False
 
-        mav_types_which_are_not_vehicles = frozenset([
-            mavutil.mavlink.MAV_TYPE_GCS,
-            mavutil.mavlink.MAV_TYPE_ONBOARD_CONTROLLER,
-            mavutil.mavlink.MAV_TYPE_GIMBAL,
-            mavutil.mavlink.MAV_TYPE_ADSB,
-            mavutil.mavlink.MAV_TYPE_CAMERA,
-            mavutil.mavlink.MAV_TYPE_CHARGING_STATION,
-            mavutil.mavlink.MAV_TYPE_SERVO,
-            mavutil.mavlink.MAV_TYPE_ODID,
-            mavutil.mavlink.MAV_TYPE_BATTERY,
-            mavutil.mavlink.MAV_TYPE_LOG,
-            mavutil.mavlink.MAV_TYPE_OSD,
-            mavutil.mavlink.MAV_TYPE_IMU,
-            mavutil.mavlink.MAV_TYPE_GPS,
-            mavutil.mavlink.MAV_TYPE_WINCH,
-        ])
-        if m.type in mav_types_which_are_not_vehicles:
+        found_mav_type = False
+        # not all of these are present in all versions of mavlink:
+        for t in [ "MAV_TYPE_GCS",
+                   "MAV_TYPE_ONBOARD_CONTROLLER",
+                   "MAV_TYPE_GIMBAL",
+                   "MAV_TYPE_ADSB",
+                   "MAV_TYPE_CAMERA",
+                   "MAV_TYPE_CHARGING_STATION",
+                   "MAV_TYPE_SERVO",
+                   "MAV_TYPE_ODID",
+                   "MAV_TYPE_BATTERY",
+                   "MAV_TYPE_LOG",
+                   "MAV_TYPE_OSD",
+                   "MAV_TYPE_IMU",
+                   "MAV_TYPE_GPS",
+                   "MAV_TYPE_WINCH",
+                  ]:
+            if getattr(mavutil.mavlink, t, None) is not None:
+                found_mav_type = True
+                break
+
+        if not found_mav_type:
             return False
 
         return True
