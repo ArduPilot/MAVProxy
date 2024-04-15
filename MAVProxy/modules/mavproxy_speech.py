@@ -167,8 +167,9 @@ class SpeechModule(mp_module.MPModule):
             self.settings.set('speech_voice', '')
         except AttributeError:
             self.settings.append(('speech_voice', str, ''))
-        self.settings.set_callback(self.settings_callback)
         self.backend = SpeechBackend(self.settings)
+        self.settings_set_callback_installed = False
+        self.settings_set_callback_delay = None
 
     def settings_callback(self, setting):
         '''handle changes in settings'''
@@ -213,6 +214,21 @@ class SpeechModule(mp_module.MPModule):
             self.say(" ".join(args[1::]))
         if args[0] == "list_voices":
             self.backend.send(SpeechCommandListVoices())
+
+    def idle_task(self):
+        if not self.settings_set_callback_installed:
+            now = time.time()
+            if self.settings_set_callback_delay is None:
+                self.settings_set_callback_delay_start = now
+            if now - self.settings_set_callback_delay_start < 1:
+                return
+            self.settings_set_callback_delay = None
+
+            try:
+                self.settings.set_callback(self.settings_callback)
+                self.settings_set_callback_installed = True
+            except Exception as ex:
+                print("Caught exception (%s)" % str(ex))
 
 def init(mpstate):
     '''initialise module'''
