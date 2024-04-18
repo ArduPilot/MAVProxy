@@ -69,7 +69,19 @@ class BatteryModule(mp_module.MPModule):
             if batt_mon == 0:
                 continue
 
-            #report voltage level only
+            # show per-cell voltage if number of cells is set
+            if self.numcells(id) != 0:
+                #this is a workaround for the race condition since self.per_cell only gets filled in once the setting is set
+                if not id in self.per_cell:
+                    continue
+                if batt_mon == 3:
+                    battery_string += 'Batt%u: %.2fV*%uS ' % (id+1, self.per_cell[id], self.numcells(id))
+                    continue
+                if batt_mon >= 4:
+                    battery_string += 'Batt%u: %u%%/%.2fV*%uS %.1fA ' % (id+1, self.battery_level[id], self.per_cell[id], self.numcells(id), self.current_battery[id])
+                    continue
+
+            #show full battery voltage when number of cells is not set
             if batt_mon == 3:
                 battery_string += 'Batt%u: %.2fV ' % (id+1, self.voltage_level[id])
             elif batt_mon >= 4:
