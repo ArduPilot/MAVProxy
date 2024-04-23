@@ -103,6 +103,8 @@ class CameraView:
         self.im.set_gstreamer(gst_pipeline)
         if self.thermal:
             self.im.set_colormap(self.im_colormap)
+        self.im.set_colormap("None")
+        self.siyi.cmd_palette(["WhiteHot"])
 
     def create_colormap_threshold(self, threshold):
         '''create a yellow->red colormap for a given threshold'''
