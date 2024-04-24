@@ -132,7 +132,7 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
         dist = float(args[1])
         bearing = float(args[2])
 
-        home = self.get_home()
+        home = self.get_WP0(home_only=True)
         if home is None:
             print("Need home")
             return
@@ -233,20 +233,34 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
             return mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT
         return mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT
 
-    def get_home(self):
-        '''get home location'''
+
+    def get_WP0(self, home_only=False):
+        '''get a location for WP0 when building a mission
+        this ideally should be home, but if home is not available then use a click position
+        '''
+        (lat,lon,alt) = (None,None,None)
         if 'HOME_POSITION' in self.master.messages:
             h = self.master.messages['HOME_POSITION']
-            return mavutil.mavlink.MAVLink_mission_item_message(self.target_system,
-                                                                self.target_component,
-                                                                0,
-                                                                0,
-                                                                mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
-                                                                0, 0, 0, 0, 0, 0,
-                                                                h.latitude*1.0e-7, h.longitude*1.0e-7, h.altitude*1.0e-3)
-        if self.wploader.count() > 0:
+            (lat,lon,alt) = (h.latitude*1.0e-7, h.longitude*1.0e-7, h.altitude*1.0e-3)
+        elif home_only:
+            return None
+        elif self.wploader.count() > 0:
             return self.wploader.wp(0)
-        return None
+        else:
+            latlon = self.mpstate.click_location
+            if latlon is None:
+                return None
+            (lat,lon,alt) = (latlon[0],latlon[1],0)
+        if lat is None or lon is None:
+            return None
+        w = mavutil.mavlink.MAVLink_mission_item_message(self.target_system,
+                                                         self.target_component,
+                                                         0,
+                                                         0,
+                                                         mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
+                                                         0, 0, 0, 0, 0, 0,
+                                                         lat,lon,alt)
+        return w
 
     def wp_draw_callback(self, points):
         '''callback from drawing waypoints'''
@@ -255,7 +269,7 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
         self.wploader.target_system = self.target_system
         self.wploader.target_component = self.target_component
         if self.wploader.count() < 2:
-            home = self.get_home()
+            home = self.get_WP0()
             if home is None:
                 print("Need home location for draw - please run gethome")
                 return
@@ -273,7 +287,7 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
         if 'draw_lines' not in self.mpstate.map_functions:
             print("No map drawing available")
             return
-        if self.get_home() is None:
+        if self.get_WP0() is None:
             print("Need home location - please run gethome")
             return
         if len(args) > 1:
@@ -397,7 +411,7 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
                                                           wptype,
                                                           0, 1, 0, 0, 0, 0, latlon[0], latlon[1], takeoff_alt)
         if self.wploader.count() < 2:
-            home = self.get_home()
+            home = self.get_WP0()
             if home is None:
                 print("Need home location - please run gethome")
                 return
