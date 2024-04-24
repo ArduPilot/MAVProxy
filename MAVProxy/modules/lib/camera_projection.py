@@ -264,6 +264,8 @@ class CameraProjection:
             if ground_alt is None:
                 return None
             sr = pos_ned.length()
+            if sr <= 1:
+                return None
             posd2 = calt_amsl - ground_alt
             sin_pitch = pos_ned.z / sr
             # adjust for height at this point
