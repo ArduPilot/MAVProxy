@@ -489,7 +489,10 @@ class MPImagePanel(wx.Panel):
 
         scaled_image = self.img.Copy()
         scaled_image = scaled_image.GetSubImage(rect);
-        scaled_image = scaled_image.Rescale(int(rect.width*self.zoom), int(rect.height*self.zoom))
+        iw,ih = int(rect.width*self.zoom), int(rect.height*self.zoom)
+        if iw <= 0 or ih <= 0:
+            return
+        scaled_image = scaled_image.Rescale(iw, ih)
         if state.brightness != 1.0:
             try:
                 from PIL import Image
