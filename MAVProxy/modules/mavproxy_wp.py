@@ -262,6 +262,10 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
                                                          lat,lon,alt)
         return w
 
+    def get_home(self):
+        '''get a location for home'''
+        return self.get_WP0(home_only=True)
+    
     def wp_draw_callback(self, points):
         '''callback from drawing waypoints'''
         if len(points) < 2:
