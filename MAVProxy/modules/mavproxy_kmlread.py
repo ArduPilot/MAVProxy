@@ -282,6 +282,7 @@ class KmlReadModule(mp_module.MPModule):
         nodes = kmlread.readkmz(filename)
 
         self.snap_points = []
+        counter = 0
 
         #go through each object in the kml...
         if nodes is None:
@@ -295,14 +296,17 @@ class KmlReadModule(mp_module.MPModule):
             if point is None:
                 continue
 
+            counter += 1
+
             #and place any polygons on the map
             if self.mpstate.map is not None and point[0] == 'Polygon':
                 self.snap_points.extend(point[2])
 
                 #print("Adding " + point[1])
                 newcolour = (random.randint(0, 255), 0, random.randint(0, 255))
-                curpoly = mp_slipmap.SlipPolygon(point[1], point[2],
-                                                             layer=2, linewidth=2, colour=newcolour)
+                curpoly = mp_slipmap.SlipPolygon(point[1]+"-"+str(counter),
+                                                 point[2],
+                                                 layer=2, linewidth=2, colour=newcolour)
                 self.mpstate.map.add_object(curpoly)
                 self.allayers.append(curpoly)
                 self.curlayers.append(point[1])
