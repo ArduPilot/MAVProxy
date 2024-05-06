@@ -1041,8 +1041,8 @@ def periodic_tasks():
         for master in mpstate.mav_master:
             send_heartbeat(master)
 
-    if heartbeat_check_period.trigger():
-        check_link_status()
+    # if heartbeat_check_period.trigger():
+    #     check_link_status()
 
     set_stream_rates()
 
@@ -1406,7 +1406,7 @@ if __name__ == '__main__':
             for m in glob.glob(mdev):
                 if not mpstate.module('link').link_add(m, force_connected=opts.force_connected, retries=opts.retries):
                     sys.exit(1)
-        elif not mpstate.module('link').link_add(mdev, force_connected=opts.force_connected, retries=opts.retries):
+        elif not mpstate.module('link').link_add(mdev, force_connected=opts.force_connected):            
             sys.exit(1)
 
     if not opts.master and len(serial_list) == 1:
