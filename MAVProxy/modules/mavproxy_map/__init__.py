@@ -60,6 +60,7 @@ class MapModule(mp_module.MPModule):
               ('loitercircle',bool, False),
               ('showclicktime',int, 2),
               ('showwpnum',bool, True),
+              ('circle_linewidth', int, 1),
               ('showdirection', bool, False),
               ('setpos_accuracy', float, 50),
               ('font_size', float, 0.5) ])
@@ -391,7 +392,7 @@ Usage: map circle <radius> <colour>
             (float(lat), float(lon)),
             float(radius),
             colour,
-            linewidth=1,
+            linewidth=self.map_settings.circle_linewidth,
         )
         self.map.add_object(circle)
         self.circle_counter += 1
