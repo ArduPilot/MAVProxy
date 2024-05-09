@@ -756,6 +756,18 @@ def process_stdin(line):
         print("Caught shlex exception: %s" % e.message);
         return
 
+    # strip surrounding quotes - shlex leaves them in place
+    new_args = []
+    for arg in args:
+        done = False
+        new_arg = arg
+        for q in "'", '"':
+            if arg.startswith(q) and arg.endswith(q):
+                new_arg = arg[1:-1]
+                break
+        new_args.append(new_arg)
+    args = new_args
+
     cmd = args[0]
     while cmd in mpstate.aliases:
         line = mpstate.aliases[cmd]
