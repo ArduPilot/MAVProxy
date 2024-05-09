@@ -878,6 +878,9 @@ Usage: map circle <radius> <colour>
             if not self.map.is_alive():
                 self.needs_unloading = True
 
+        # check for any events from the map
+        self.map.check_events()
+
     def create_vehicle_icon(self, name, colour, follow=False, vehicle_type=None):
         '''add a vehicle to the map'''
         from MAVProxy.modules.mavproxy_map import mp_slipmap
