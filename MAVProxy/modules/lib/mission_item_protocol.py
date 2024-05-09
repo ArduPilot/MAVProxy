@@ -724,7 +724,7 @@ on'''
     def cmd_changeframe(self, args):
         '''handle wp change frame of multiple waypoints'''
         if len(args) < 2:
-            print("usage: %s changealt WPNUM NEWALT <NUMWP>" % self.command_name())
+            print("usage: %s changeframe WPNUM NEWFRAME <NUMWP>" % self.command_name())
             return
         value = int(args[1])
         del args[1]
