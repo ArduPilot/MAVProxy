@@ -3,6 +3,7 @@
 import lxml.etree as etree
 from io import BytesIO as SIO
 from zipfile import ZipFile
+import pathlib
 
 namespaces = {'kml': 'http://www.opengis.net/kml/2.2'}
 
@@ -11,20 +12,22 @@ def readkmz(filename):
     #Strip quotation marks if neccessary
     filename.strip('"')
     #Open the zip file (as applicable)    
-    if filename[-4:] == '.kml':
+    suffix = pathlib.Path(filename).suffix
+    if suffix == '.kml':
         fo = open(filename, "rb")
         fstring = fo.read()
         fo.close()
-    elif filename[-4:] == '.kmz':
+    elif suffix == '.kmz':
         zip=ZipFile(filename)
+        fstring = None
         for z in zip.filelist:
             if z.filename[-4:] == '.kml':
                 fstring=zip.read(z)
                 break
-            else:
-                raise Exception("Could not find kml file in %s" % filename)
-        else:
-            raise Exception("Is not a valid kml or kmz file in %s" % filename)
+        if fstring is None:
+            raise Exception("Could not find kml file in %s" % filename)
+    else:
+        raise Exception(f"load expects a .kml or .kmz file, got ({suffix}) from ({filename})")
 
     parser = etree.XMLParser(encoding='utf-8', recover=True)
     tree = etree.parse(SIO(fstring), parser)
