@@ -531,7 +531,7 @@ class MPSlipMapPanel(wx.Panel):
             bearing = mp_util.gps_bearing(self.last_click_pos[0], self.last_click_pos[1],
                                             self.click_pos[0], self.click_pos[1])
             newtext += '  Distance: %.3fm %.3fnm Bearing %.1f' % (distance, distance*0.000539957, bearing)
-            if terrain_height == "?":
+            if terrain_height_str == "?":
                 self.last_terrain_height = None
             else:
                 if self.last_terrain_height is not None:
