@@ -753,7 +753,7 @@ def process_stdin(line):
     try:
         args = shlex_quotes(line)
     except Exception as e:
-        print("Caught shlex exception: %s" % e.message);
+        print("Caught shlex exception: %s" % str(e));
         return
 
     # strip surrounding quotes - shlex leaves them in place
