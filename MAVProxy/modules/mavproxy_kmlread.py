@@ -7,6 +7,7 @@ Released under the GNU GPL version 3 or later
 AP_FLAKE8_CLEAN
 '''
 
+import copy
 import time
 import random
 import re
@@ -59,7 +60,7 @@ class KmlReadModule(mp_module.MPModule):
 
     def cmd_param(self, args):
         '''control kml reading'''
-        usage = "Usage: kml <clear | load (filename) | layers | toggle (layername) | colour (layername) (colour) | fence (layername)> | snapfence | snapwp"  # noqa
+        usage = "Usage: kml <clear | load (filename) | layers | toggle (layername) | colour (layername) (colour) | fence (inc|exc) (layername)> | snapfence | snapwp"  # noqa
         if len(args) < 1:
             print(usage)
             return
@@ -82,7 +83,7 @@ class KmlReadModule(mp_module.MPModule):
         elif args[0] == "colour" or args[0] == "color":
             self.cmd_colour(args[1:])
         elif args[0] == "fence":
-            self.fencekml(args[1])
+            self.fencekml(args[1:])
         else:
             print(usage)
             return
@@ -172,31 +173,40 @@ class KmlReadModule(mp_module.MPModule):
         layer.set_colour((red, green, blue))
         self.mpstate.map.add_object(layer)
 
-    def fencekml(self, layername):
-        '''set a layer as the geofence'''
-        # Strip quotation marks if neccessary
-        if layername.startswith('"') and layername.endswith('"'):
-            layername = layername[1:-1]
+    def fencekml(self, args):
+        '''create a geofence from a layername'''
+        usage = "kml fence inc|exc layername"
+        if len(args) != 2:
+            print(usage)
+            return
 
-        # for each point in the layer, add it in
+        fencemod = self.module('fence')
+        if fencemod is None:
+            print("fence module not loaded")
+            return
+
+        (inc_or_exc, layername) = (args[0], args[1])
+        if inc_or_exc in ["inc", "inclusion"]:
+            fence_type = mavutil.mavlink.MAV_CMD_NAV_FENCE_POLYGON_VERTEX_INCLUSION
+        elif inc_or_exc in ["exc", "exclusion"]:
+            fence_type = mavutil.mavlink.MAV_CMD_NAV_FENCE_POLYGON_VERTEX_EXCLUSION
+        else:
+            print(usage)
+            return
+
+        # find the layer, add it if found
         for layer in self.allayers:
-            if layer.key == layername:
-                # clear the current fence
-                self.fenceloader.clear()
-                if len(layer.points) < 3:
-                    return
-                self.fenceloader.target_system = self.target_system
-                self.fenceloader.target_component = self.target_component
-                # send centrepoint  to fence[0] as the return point
-                bounds = mp_util.polygon_bounds(layer.points)
-                (lat, lon, width, height) = bounds
-                center = (lat+width/2, lon+height/2)
-                self.fenceloader.add_latlon(center[0], center[1])
-                for lat, lon in layer.points:
-                    # add point
-                    self.fenceloader.add_latlon(lat, lon)
-                # and send
-                self.send_fence()
+            if layer.key != layername:
+                continue
+
+            points_copy = copy.copy(layer.points)
+            if points_copy[-1] == points_copy[0]:
+                points_copy.pop(-1)
+
+            fencemod.add_polyfence(fence_type, points_copy)
+            return
+
+        print("Layer not found")
 
     def send_fence(self):
         '''send fence points from fenceloader. Taken from fence module'''
