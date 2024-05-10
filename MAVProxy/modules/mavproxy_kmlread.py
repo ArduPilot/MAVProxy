@@ -8,7 +8,6 @@ AP_FLAKE8_CLEAN
 '''
 
 import copy
-import time
 import random
 import re
 
@@ -124,34 +123,58 @@ class KmlReadModule(mp_module.MPModule):
 
     def cmd_snap_fence(self, args):
         '''snap fence to KML'''
+
         threshold = 10.0
         if len(args) > 0:
             threshold = float(args[0])
+
         fencemod = self.module('fence')
-        loader = fencemod.fenceloader
-        changed = False
-        for i in range(0, loader.count()):
-            fp = loader.point(i)
-            lat = fp.lat
-            lon = fp.lng
+        if fencemod is None:
+            print("fence module not loaded")
+            return
+
+        def fencepoint_snapper(offset, point_obj):
             best = None
             best_dist = (threshold+1)*3
-            for (snap_lat, snap_lon) in self.snap_points:
-                dist = mp_util.gps_distance(lat, lon, snap_lat, snap_lon)
+            if isinstance(point_obj, mavutil.mavlink.MAVLink_mission_item_message):
+                point = (point_obj.x, point_obj.y)
+            elif isinstance(point_obj, mavutil.mavlink.MAVLink_mission_item_int_message):
+                point = (point_obj.x * 1e-7, point_obj.y * 1e-7)
+            else:
+                raise TypeError(f"What's a {type(point_obj)}?")
+
+            for snap_point in copy.copy(self.snap_points):
+                if point == snap_point:
+                    return
+
+                dist = mp_util.gps_distance(point[0], point[1], snap_point[0], snap_point[1])
                 if dist < best_dist:
                     best_dist = dist
-                    best = (snap_lat, snap_lon)
-            if best is not None and best_dist <= threshold:
-                if best[0] != lat or best[1] != lon:
-                    loader.move(i, best[0], best[1])
-                    print("Snapping fence point %u to %f %f" % (i, best[0], best[1]))
-                    changed = True
-            elif best is not None:
-                if best_dist <= (threshold+1)*3:
-                    print("Not snapping fence point %u dist %.1f" % (i, best_dist))
+                    best = snap_point
 
-        if changed:
-            fencemod.send_fence()
+            if best is None:
+                return
+
+            if best_dist <= threshold:
+                print("Snapping fence point %u to %f %f" % (offset, best[0], best[1]))
+                if isinstance(point_obj, mavutil.mavlink.MAVLink_mission_item_message):
+                    point_obj.x = best[0]
+                    point_obj.y = best[1]
+                elif isinstance(point_obj, mavutil.mavlink.MAVLink_mission_item_int_message):
+                    point_obj.x = best[0] * 1e7
+                    point_obj.y = best[1] * 1e7
+                else:
+                    raise TypeError(f"What's a {type(point_obj)}?")
+                self.snapped_fencepoint = True
+                return
+
+            if best_dist <= (threshold+1)*3:
+                print("Not snapping fence point %u dist %.1f" % (offset, best_dist))
+
+        self.snapped_fencepoint = False
+        fencemod.apply_function_to_points(fencepoint_snapper)
+        if self.snapped_fencepoint:
+            fencemod.push_to_vehicle()
 
     def cmd_colour(self, args):
         if len(args) < 2:
@@ -207,49 +230,6 @@ class KmlReadModule(mp_module.MPModule):
             return
 
         print("Layer not found")
-
-    def send_fence(self):
-        '''send fence points from fenceloader. Taken from fence module'''
-        # must disable geo-fencing when loading
-        self.fenceloader.target_system = self.target_system
-        self.fenceloader.target_component = self.target_component
-        self.fenceloader.reindex()
-        action = self.get_mav_param('FENCE_ACTION', mavutil.mavlink.FENCE_ACTION_NONE)
-        self.param_set('FENCE_ACTION', mavutil.mavlink.FENCE_ACTION_NONE, 3)
-        self.param_set('FENCE_TOTAL', self.fenceloader.count(), 3)
-        for i in range(self.fenceloader.count()):
-            p = self.fenceloader.point(i)
-            self.master.mav.send(p)
-            p2 = self.fetch_fence_point(i)
-            if p2 is None:
-                self.param_set('FENCE_ACTION', action, 3)
-                return False
-            if (p.idx != p2.idx or
-                    abs(p.lat - p2.lat) >= 0.00003 or
-                    abs(p.lng - p2.lng) >= 0.00003):
-                print("Failed to send fence point %u" % i)
-                self.param_set('FENCE_ACTION', action, 3)
-                return False
-        self.param_set('FENCE_ACTION', action, 3)
-        return True
-
-    def fetch_fence_point(self, i):
-        '''fetch one fence point. Taken from fence module'''
-        self.master.mav.fence_fetch_point_send(self.target_system,
-                                               self.target_component,
-                                               i)
-        tstart = time.time()
-        p = None
-        while time.time() - tstart < 3:
-            p = self.master.recv_match(type='FENCE_POINT', blocking=False)
-            if p is not None:
-                break
-            time.sleep(0.1)
-            continue
-        if p is None:
-            self.console.error("Failed to fetch point %u" % i)
-            return None
-        return p
 
     def togglekml(self, layername):
         '''toggle the display of a kml'''
