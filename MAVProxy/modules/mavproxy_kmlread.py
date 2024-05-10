@@ -389,14 +389,17 @@ class KmlReadModule(mp_module.MPModule):
                 # then add all the layers to the menu, ensuring to
                 # check the active layers text elements aren't
                 # included on the menu
-                if layer.key in self.curlayers and layer.key[-5:] != "-text":
+                if layer.key.endswith('-text'):
+                    continue
+
+                if layer.key in self.curlayers:
                     self.menu.items.append(MPMenuCheckbox(
                         layer.key,
                         layer.key,
                         '# kml toggle \"' + layer.key + '\"',
                         checked=True,
                     ))
-                elif layer.key[-5:] != "-text":
+                else:
                     self.menu.items.append(MPMenuCheckbox(
                         layer.key,
                         layer.key,
