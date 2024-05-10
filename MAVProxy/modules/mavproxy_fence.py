@@ -225,6 +225,12 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
             self.handle_sys_status(m)
         super(FenceModule, self).mavlink_packet(m)
 
+    def apply_function_to_points(self, function):
+        if not self.check_have_list():
+            return
+        for i in range(self.wploader.count()):
+            function(i, self.wploader.item(i))
+
     def fence_draw_callback(self, points):
         '''callback from drawing a fence'''
 
