@@ -392,20 +392,13 @@ class KmlReadModule(mp_module.MPModule):
                 if layer.key.endswith('-text'):
                     continue
 
-                if layer.key in self.curlayers:
-                    self.menu.items.append(MPMenuCheckbox(
-                        layer.key,
-                        layer.key,
-                        '# kml toggle \"' + layer.key + '\"',
-                        checked=True,
-                    ))
-                else:
-                    self.menu.items.append(MPMenuCheckbox(
-                        layer.key,
-                        layer.key,
-                        '# kml toggle \"' + layer.key + '\"',
-                        checked=False,
-                    ))
+                checked = layer.key in self.curlayers
+                self.menu.items.append(MPMenuCheckbox(
+                    layer.key,
+                    layer.key,
+                    f'# kml toggle \"{layer.key}\"',
+                    checked=checked,
+                ))
             # and add the menu to the map popu menu
             self.module('map').add_menu(self.menu)
         self.menu_needs_refreshing = False
