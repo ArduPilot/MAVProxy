@@ -227,8 +227,12 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
 
     def fence_draw_callback(self, points):
         '''callback from drawing a fence'''
+
+        self.add_polyfence(self.drawing_fence_type, points)
+
+    def add_polyfence(self, fence_type, points):
         if len(points) < 3:
-            print("Fence draw cancelled")
+            print("Too few points")
             return
         items = []
         for p in points:
@@ -237,7 +241,7 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
                 self.target_component,
                 0,    # seq
                 mavutil.mavlink.MAV_FRAME_GLOBAL,    # frame
-                self.drawing_fence_type,    # command
+                fence_type,    # command
                 0,    # current
                 0,    # autocontinue
                 len(points), # param1,
