@@ -316,8 +316,9 @@ class KmlReadModule(mp_module.MPModule):
 
                 # print("Adding " + point[1])
                 newcolour = (random.randint(0, 255), 0, random.randint(0, 255))
+                layer_name = point[1]+"-"+str(counter)
                 curpoly = mp_slipmap.SlipPolygon(
-                    point[1]+"-"+str(counter),
+                    layer_name,
                     point[2],
                     layer=2,
                     linewidth=2,
@@ -325,7 +326,7 @@ class KmlReadModule(mp_module.MPModule):
                 )
                 self.mpstate.map.add_object(curpoly)
                 self.allayers.append(curpoly)
-                self.curlayers.append(point[1])
+                self.curlayers.append(layer_name)
 
             # and points - barrell image and text
             if self.mpstate.map is not None and point[0] == 'Point':
