@@ -42,6 +42,7 @@ class KmlReadModule(mp_module.MPModule):
         self.curtextlayers = []
         self.initialised_map_module = False
         self.menu_needs_refreshing = True
+        self.map_objects = {}
 
         # the fence manager
         self.fenceloader = mavwp.MAVFenceLoader()
@@ -192,9 +193,47 @@ class KmlReadModule(mp_module.MPModule):
         (red, green, blue) = (int(m.group("red"), 16),
                               int(m.group("green"), 16),
                               int(m.group("blue"), 16))
-        self.mpstate.map.remove_object(layer)
+        self.remove_map_object(layer)
         layer.set_colour((red, green, blue))
-        self.mpstate.map.add_object(layer)
+        self.add_map_object(layer)
+
+    def remove_map_object(self, obj):
+        '''remove an object from our stored list of objects, and the map
+        module if it is loaded'''
+        if obj.layer not in self.map_objects:
+            raise ValueError(f"{obj.layer=} not in added map_objects")
+        if obj.key not in self.map_objects[obj.layer]:
+            raise ValueError(f"{obj.key=} not in added map_objects[{obj.key}] (map_objects[{obj.layer}][{obj.key}]")
+        del self.map_objects[obj.layer][obj.key]
+        if len(self.map_objects[obj.layer]) == 0:
+            del self.map_objects[obj.layer]
+        map_module = self.mpstate.map
+        if map_module is not None:
+            map_module.remove_object(obj.key)
+
+    def remove_all_map_objects(self):
+        for layer in copy.deepcopy(self.map_objects):
+            for key in copy.deepcopy(self.map_objects[layer]):
+                self.remove_map_object(self.map_objects[layer][key])
+
+    def add_map_object(self, obj):
+        '''add an object to our stored list of objects, and the map
+        module if it is loaded'''
+        if obj.layer in self.map_objects and obj.key in self.map_objects[obj.layer]:
+            raise ValueError(f"Already have self.map_objects[{obj.layer=}][{obj.key=}]")
+        if obj.layer not in self.map_objects:
+            self.map_objects[obj.layer] = {}
+        self.map_objects[obj.layer][obj.key] = obj
+
+        map_module = self.mpstate.map
+        if map_module is not None:
+            map_module.add_object(obj)
+
+    def add_objects_to_map_module_from_map_objects(self):
+        for layer in self.map_objects:
+            for obj in self.map_objects[layer].values():
+                map_module = self.mpstate.map
+                map_module.add_object(obj)
 
     def fencekml(self, args):
         '''create a geofence from a layername'''
@@ -240,22 +279,22 @@ class KmlReadModule(mp_module.MPModule):
         if layername in self.curlayers:
             for layer in self.curlayers:
                 if layer == layername:
-                    self.mpstate.map.remove_object(layer)
+                    self.remove_map_object(self.find_layer(layer))
                     self.curlayers.remove(layername)
                     if layername in self.curtextlayers:
                         for clayer in self.curtextlayers:
                             if clayer == layername:
-                                self.mpstate.map.remove_object(clayer)
+                                self.remove_map_object(self.find_layer(clayer))
                                 self.curtextlayers.remove(clayer)
         # toggle layer on (plus associated text element)
         else:
             for layer in self.allayers:
                 if layer.key == layername:
-                    self.mpstate.map.add_object(layer)
+                    self.add_map_object(layer)
                     self.curlayers.append(layername)
                     for alayer in self.alltextlayers:
                         if alayer.key == layername:
-                            self.mpstate.map.add_object(alayer)
+                            self.add_map_object(alayer)
                             self.curtextlayers.append(layername)
         self.menu_needs_refreshing = True
 
@@ -268,10 +307,7 @@ class KmlReadModule(mp_module.MPModule):
     def clearkml(self):
         '''Clear the kmls from the map'''
         # go through all the current layers and remove them
-        for layer in self.curlayers:
-            self.mpstate.map.remove_object(layer)
-        for layer in self.curtextlayers:
-            self.mpstate.map.remove_object(layer)
+        self.remove_all_map_objects()
         self.allayers = []
         self.curlayers = []
         self.alltextlayers = []
@@ -301,7 +337,7 @@ class KmlReadModule(mp_module.MPModule):
             counter += 1
 
             # and place any polygons on the map
-            if self.mpstate.map is not None and point[0] == 'Polygon':
+            if point[0] == 'Polygon':
                 self.snap_points.extend(point[2])
 
                 # print("Adding " + point[1])
@@ -314,19 +350,18 @@ class KmlReadModule(mp_module.MPModule):
                     linewidth=2,
                     colour=newcolour,
                 )
-                self.mpstate.map.add_object(curpoly)
+                self.add_map_object(curpoly)
                 self.allayers.append(curpoly)
                 self.curlayers.append(layer_name)
 
             # and points - barrell image and text
-            if self.mpstate.map is not None and point[0] == 'Point':
+            if point[0] == 'Point':
                 # print("Adding " + point[1])
-                icon = self.mpstate.map.icon('barrell.png')
                 curpoint = mp_slipmap.SlipIcon(
                     point[1],
                     latlon=(point[2][0][0], point[2][0][1]),
                     layer=3,
-                    img=icon,
+                    img='barrell.png',
                     rotation=0,
                     follow=False,
                 )
@@ -337,8 +372,8 @@ class KmlReadModule(mp_module.MPModule):
                     label=point[1],
                     colour=(0, 255, 255),
                 )
-                self.mpstate.map.add_object(curpoint)
-                self.mpstate.map.add_object(curtext)
+                self.add_map_object(curpoint)
+                self.add_map_object(curtext)
                 self.allayers.append(curpoint)
                 self.alltextlayers.append(curtext)
                 self.curlayers.append(point[1])
@@ -352,6 +387,7 @@ class KmlReadModule(mp_module.MPModule):
             return
         if not self.initialised_map_module:
             self.menu_needs_refreshing = True
+            self.add_objects_to_map_module_from_map_objects()
             self.initialised_map_module = True
 
         if self.menu_needs_refreshing:
