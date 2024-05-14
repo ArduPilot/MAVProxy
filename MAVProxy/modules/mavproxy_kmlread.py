@@ -40,7 +40,7 @@ class KmlReadModule(mp_module.MPModule):
         self.curlayers = []
         self.alltextlayers = []
         self.curtextlayers = []
-        self.menu_added_map = False
+        self.initialised_map_module = False
         self.menu_needs_refreshing = True
 
         # the fence manager
@@ -347,13 +347,23 @@ class KmlReadModule(mp_module.MPModule):
 
     def idle_task(self):
         '''handle GUI elements'''
-        if not self.menu_needs_refreshing:
+        if self.module('map') is None:
+            self.initialised_map_module = False
             return
-        if self.module('map') is not None and not self.menu_added_map:
-            self.menu_added_map = True
-            self.module('map').add_menu(self.menu)
-        # (re)create the menu
-        if mp_util.has_wxpython and self.menu_added_map:
+        if not self.initialised_map_module:
+            self.menu_needs_refreshing = True
+            self.initialised_map_module = True
+
+        if self.menu_needs_refreshing:
+            self.refresh_menu()
+            self.menu_needs_refreshing = False
+
+    def refresh_menu(self):
+        if True:
+            if not mp_util.has_wxpython:
+                return
+
+            # (re)create the menu
             # we don't dynamically update these yet due to a wx bug
             self.menu.items = [
                 MPMenuItem('Clear', 'Clear', '# kml clear'),
