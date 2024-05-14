@@ -457,6 +457,8 @@ class SlipThumbnail(SlipObject):
         SlipObject.__init__(self, key, layer, popup_menu=popup_menu)
         self.latlon = latlon
         self._img = None
+        if isinstance(img, str):
+            img = mp_tile.mp_icon(img)
         if not hasattr(img, 'shape'):
             img = np.asarray(img[:,:])
         self.original_img = img
