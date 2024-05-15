@@ -262,6 +262,9 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
             items.append(m)
 
         self.append(items)
+        self.push_to_vehicle()
+
+    def push_to_vehicle(self):
         self.send_all_items()
         self.wploader.last_change = time.time()
 
