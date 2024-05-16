@@ -11,7 +11,7 @@ import copy
 import random
 import re
 
-from pymavlink import mavutil, mavwp
+from pymavlink import mavutil
 
 from MAVProxy.modules.lib import mp_module
 # from MAVProxy.modules.lib.mp_settings import MPSetting
@@ -43,9 +43,9 @@ class KmlReadModule(mp_module.MPModule):
         self.initialised_map_module = False
         self.menu_needs_refreshing = True
         self.map_objects = {}
+        self.counter = 0
 
         # the fence manager
-        self.fenceloader = mavwp.MAVFenceLoader()
         self.snap_points = []
 
         # make the initial map menu
