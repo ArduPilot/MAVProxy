@@ -29,7 +29,7 @@ if mp_util.has_wxpython:
 
 class KmlReadModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(KmlReadModule, self).__init__(mpstate, "kmlread", "Add kml or kmz layers to map")
+        super(KmlReadModule, self).__init__(mpstate, "kmlread", "Add kml or kmz layers to map", public=True)
         self.add_command('kml', self.cmd_param, "kml map handling",
                          ["<clear|snapwp|snapfence>",
                           "<load> (FILENAME)", '<layers>'])
@@ -314,13 +314,31 @@ class KmlReadModule(mp_module.MPModule):
         self.curtextlayers = []
         self.menu_needs_refreshing = True
 
+    def add_polygon(self, name, coords):
+        '''add a polygon to the KML list.  coords is a list of lat/lng tuples in degrees'''
+        self.snap_points.extend(coords)
+
+        # print("Adding " + name)
+        newcolour = (random.randint(0, 255), 0, random.randint(0, 255))
+        layer_name = f"{name}-{self.counter}"
+        curpoly = mp_slipmap.SlipPolygon(
+            layer_name,
+            coords,
+            layer=2,
+            linewidth=2,
+            colour=newcolour,
+        )
+        self.add_map_object(curpoly)
+        self.allayers.append(curpoly)
+        self.curlayers.append(layer_name)
+        self.counter += 1
+
     def loadkml(self, filename):
         '''Load a kml from file and put it on the map'''
         # Open the zip file
         nodes = kmlread.readkmz(filename)
 
         self.snap_points = []
-        counter = 0
 
         # go through each object in the kml...
         if nodes is None:
@@ -334,28 +352,13 @@ class KmlReadModule(mp_module.MPModule):
             if point is None:
                 continue
 
-            counter += 1
-
             # and place any polygons on the map
-            if point[0] == 'Polygon':
-                self.snap_points.extend(point[2])
-
-                # print("Adding " + point[1])
-                newcolour = (random.randint(0, 255), 0, random.randint(0, 255))
-                layer_name = point[1]+"-"+str(counter)
-                curpoly = mp_slipmap.SlipPolygon(
-                    layer_name,
-                    point[2],
-                    layer=2,
-                    linewidth=2,
-                    colour=newcolour,
-                )
-                self.add_map_object(curpoly)
-                self.allayers.append(curpoly)
-                self.curlayers.append(layer_name)
+            (pointtype, name, coords) = point
+            if pointtype == 'Polygon':
+                self.add_polygon(name, coords)
 
             # and points - barrell image and text
-            if point[0] == 'Point':
+            if pointtype == 'Point':
                 # print("Adding " + point[1])
                 curpoint = mp_slipmap.SlipIcon(
                     point[1],
