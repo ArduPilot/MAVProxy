@@ -129,7 +129,7 @@ class MEState(object):
             "graph"     : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)'],
             "dump"      : ['(MESSAGETYPE)', '--verbose (MESSAGETYPE)'],
             "map"       : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)'],
-            "param"     : ['download', 'check', 'help (PARAMETER)'],
+            "param"     : ['download', 'check', 'help (PARAMETER)', 'save', 'savechanged', 'diff', 'show', 'check'],
             "logmessage": ['download', 'help (MESSAGETYPE)'],
             }
         self.aliases = {}
