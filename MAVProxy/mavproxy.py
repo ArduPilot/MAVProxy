@@ -999,6 +999,9 @@ def open_telemetry_logs(logpath_telem, logpath_telem_raw):
 
 def set_stream_rates():
     '''set mavlink stream rates'''
+    if opts.not_reset_streamrates:
+        return
+
     if (not msg_period.trigger() and
         mpstate.status.last_streamrate1 == mpstate.settings.streamrate and
         mpstate.status.last_streamrate2 == mpstate.settings.streamrate2):
@@ -1315,6 +1318,7 @@ if __name__ == '__main__':
     parser.add_option("--default-modules", default="log,signing,wp,rally,fence,ftp,param,relay,tuneopt,arm,mode,calibration,rc,auxopt,misc,cmdlong,battery,terrain,output,adsb,layout", help='default module list')
     parser.add_option("--udp-timeout",dest="udp_timeout", default=0.0, type='float', help="Timeout for udp clients in seconds")
     parser.add_option("--retries", type=int, help="number of times to retry connection", default=3)
+    parser.add_option("--not_reset_streamrates", action='store_true', default=False, help="Do not periodically reset streamrates (message intervals).")
 
     (opts, args) = parser.parse_args()
     if len(args) != 0:
