@@ -20,8 +20,8 @@ from MAVProxy.modules.lib.wx_loader import wx
 def get_vehicle_name(vehtype):
     '''return vehicle type string from a heartbeat'''
     if vehtype in [mavutil.mavlink.MAV_TYPE_FIXED_WING,
-                   mavutil.mavlink.MAV_TYPE_VTOL_DUOROTOR,
-                   mavutil.mavlink.MAV_TYPE_VTOL_QUADROTOR,
+                   mavutil.mavlink.MAV_TYPE_VTOL_TAILSITTER_DUOROTOR,
+                   mavutil.mavlink.MAV_TYPE_VTOL_TAILSITTER_QUADROTOR,
                    mavutil.mavlink.MAV_TYPE_VTOL_TILTROTOR]:
         return 'Plane'
     if vehtype == mavutil.mavlink.MAV_TYPE_GROUND_ROVER:
@@ -778,8 +778,8 @@ class swarm(mp_module.MPModule):
         self.allVehPos = {}
 
         self.validVehicles = frozenset([mavutil.mavlink.MAV_TYPE_FIXED_WING,
-                              mavutil.mavlink.MAV_TYPE_VTOL_DUOROTOR,
-                              mavutil.mavlink.MAV_TYPE_VTOL_QUADROTOR,
+                              mavutil.mavlink.MAV_TYPE_VTOL_TAILSITTER_DUOROTOR,
+                              mavutil.mavlink.MAV_TYPE_VTOL_TAILSITTER_QUADROTOR,
                               mavutil.mavlink.MAV_TYPE_VTOL_TILTROTOR,
                               mavutil.mavlink.MAV_TYPE_GROUND_ROVER,
                               mavutil.mavlink.MAV_TYPE_SURFACE_BOAT,
