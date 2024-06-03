@@ -119,6 +119,7 @@ class FieldCheck(object):
 
         if self.vehicle_type == mavutil.mavlink.MAV_TYPE_FIXED_WING:
             want_values["FENCE_ACTION"] = 1  # RTL
+            want_values["RTL_AUTOLAND"] = 2  # go directly to landing sequence
         elif self.vehicle_type == mavutil.mavlink.MAV_TYPE_QUADROTOR:
             want_values["FENCE_ACTION"] = 4  # Brake or RTL
 
