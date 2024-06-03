@@ -170,19 +170,39 @@ class FieldCheck(object):
                 fencemod.cmd_list(None)
             return False
 
-        count = fencemod.count()
-        if count < 6:
-            self.whinge("Too few fence points")
-            return False
-        ret = True
-        for i in range(fencemod.fenceloader.count()):
-            p = fencemod.fenceloader.point(i)
-            loc = mavutil.location(p.lat, p.lng)
+        global fencepoints_good
+        global count
+
+        fencepoints_good = True
+        count = 0
+
+        def fencepoint_checker(offset, p):
+            global fencepoints_good
+            global count
+            if isinstance(p, mavutil.mavlink.MAVLink_mission_item_message):
+                lat = p.x
+                lng = p.y
+            elif isinstance(p, mavutil.mavlink.MAVLink_mission_item_int_message):
+                lat = p.x * 1e-7
+                lng = p.y * 1e-7
+            else:
+                raise TypeError(f"What's a {type(p)}?")
+            loc = mavutil.location(lat, lng)
             dist = self.get_distance(self.location, loc)
             if dist > self.fc_settings.fence_maxdist:
-                self.whinge("Fencepoint %i too far away (%fm)" % (i, dist))
-                ret = False
-        return ret
+                if fencepoints_good:
+                    self.whinge("Fencepoint %i too far away (%fm)" % (offset, dist))
+                fencepoints_good = False
+            count += 1
+
+        fencemod.apply_function_to_points(fencepoint_checker)
+
+        min_fence_points = 6
+        if count < min_fence_points:
+            self.whinge(f"Too few fence points; {count} < {min_fence_points}")
+            return False
+
+        return fencepoints_good
 
     def check_rally(self):
         rallymod = self.module('rally')
