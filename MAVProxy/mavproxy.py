@@ -1244,6 +1244,29 @@ def set_mav_version(mav10, mav20, autoProtocol, mavversionArg):
         os.environ['MAVLINK20'] = '1'
         mavversion = "2"
 
+def run_startup_scripts():
+    start_scripts = []
+    if not opts.setup:
+        if 'HOME' in os.environ:
+            start_scripts.append(os.path.join(os.environ['HOME'], ".mavinit.scr"))
+        start_script = mp_util.dot_mavproxy("mavinit.scr")
+        start_scripts.append(start_script)
+    if (mpstate.settings.state_basedir is not None and
+        opts.aircraft is not None):
+        start_script = os.path.join(mpstate.aircraft_dir, "mavinit.scr")
+        start_scripts.append(start_script)
+    for start_script in start_scripts:
+        if os.path.exists(start_script):
+            print("Running script (%s)" % (start_script))
+            run_script(start_script)
+
+    if opts.aircraft is not None:
+        start_script = os.path.join(opts.aircraft, "mavinit.scr")
+        if os.path.exists(start_script):
+            run_script(start_script)
+        else:
+            print("no script %s" % start_script)
+
 if __name__ == '__main__':
     from optparse import OptionParser
     parser = OptionParser("mavproxy.py [options]")
@@ -1496,27 +1519,7 @@ if __name__ == '__main__':
     elif opts.aircraft is not None:
         mpstate.aircraft_dir = opts.aircraft
 
-    start_scripts = []
-    if not opts.setup:
-        if 'HOME' in os.environ:
-            start_scripts.append(os.path.join(os.environ['HOME'], ".mavinit.scr"))
-        start_script = mp_util.dot_mavproxy("mavinit.scr")
-        start_scripts.append(start_script)
-    if (mpstate.settings.state_basedir is not None and
-        opts.aircraft is not None):
-        start_script = os.path.join(mpstate.aircraft_dir, "mavinit.scr")
-        start_scripts.append(start_script)
-    for start_script in start_scripts:
-        if os.path.exists(start_script):
-            print("Running script (%s)" % (start_script))
-            run_script(start_script)
-
-    if opts.aircraft is not None:
-        start_script = os.path.join(opts.aircraft, "mavinit.scr")
-        if os.path.exists(start_script):
-            run_script(start_script)
-        else:
-            print("no script %s" % start_script)
+    run_startup_scripts()
 
     if opts.cmd is not None:
         for cstr in opts.cmd:
