@@ -894,6 +894,15 @@ Usage: map circle <radius> <colour>
         self.map.add_object(mp_slipmap.SlipIcon(name, (0,0), icon, layer=3, rotation=0, follow=follow,
                                                    trail=mp_slipmap.SlipTrail()))
 
+    def remove_vehicle_icon(self, name, vehicle_type=None):
+        from MAVProxy.modules.mavproxy_map import mp_slipmap
+        if vehicle_type is None:
+            vehicle_type = self.vehicle_type_name
+        if name not in self.have_vehicle or self.have_vehicle[name] != vehicle_type:
+            return
+        del self.have_vehicle[name]
+        self.map.remove_object(name)
+
     def drawing_update(self):
         '''update line drawing'''
         from MAVProxy.modules.mavproxy_map import mp_slipmap
@@ -1062,6 +1071,31 @@ Usage: map circle <radius> <colour>
         self.create_vehicle_icon('VehiclePos2', 'blue', follow=False, vehicle_type='plane')
         self.map.set_position('VehiclePos2', (lat, lon), rotation=heading, label=agl_s, colour=(0,255,255))
 
+    def update_vehicle_icon(self, name, vehicle, colour, m, display):
+        '''update display of a vehicle on the map.  m is expected to store
+        location in lat/lng *1e7
+        '''
+        latlon = (m.lat*1.0e-7, m.lng*1.0e-7)
+        yaw = math.degrees(m.yaw)
+        self.update_vehicle_icon_to_loc(name, vehicle, colour, display, latlon, yaw)
+
+    def update_vehicle_icon_to_loc(self, name, vehicle, colour, display, latlon, yaw):
+        '''update display of a vehicle on the map at latlon
+        '''
+        key = name + vehicle
+
+        # don't display this icon if the settings don't say so:
+        if not display:
+            # remove from display if it was being displayed:
+            self.remove_vehicle_icon(key)
+            return
+
+        # create the icon if we weren't displaying:
+        self.create_vehicle_icon(key, colour)
+
+        # update placement on map:
+        self.map.set_position(key, latlon, rotation=yaw)
+
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         from MAVProxy.modules.mavproxy_map import mp_slipmap
@@ -1108,34 +1142,24 @@ Usage: map circle <radius> <colour>
         # in the air at the same time
         vehicle = 'Vehicle%u' % m.get_srcSystem()
 
-        if mtype == "SIMSTATE" and self.map_settings.showsimpos:
-            self.create_vehicle_icon('Sim' + vehicle, 'green')
-            self.map.set_position('Sim' + vehicle, (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
-
+        if mtype == "SIMSTATE":
+            self.update_vehicle_icon('Sim', vehicle, 'green', m, self.map_settings.showsimpos)
         elif mtype == "AHRS2" and self.map_settings.showahrs2pos:
-            self.create_vehicle_icon('AHRS2' + vehicle, 'purple')
-            self.map.set_position('AHRS2' + vehicle, (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
-
+            self.update_vehicle_icon('AHRS2', vehicle, 'purple', m, self.map_settings.showahrs2pos)
         elif mtype == "AHRS3" and self.map_settings.showahrs3pos:
-            self.create_vehicle_icon('AHRS3' + vehicle, 'orange')
-            self.map.set_position('AHRS3' + vehicle, (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
-
-        elif mtype == "GPS_RAW_INT" and self.map_settings.showgpspos:
+            self.update_vehicle_icon('AHRS3', vehicle, 'orange', m, self.map_settings.showahrs3pos)
+        elif mtype == "GPS_RAW_INT":
             (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
             if lat != 0 or lon != 0:
                 if m.vel > 300 or m.get_srcSystem() not in self.lat_lon_heading:
                     heading = m.cog*0.01
                 else:
                     (_,_,heading) = self.lat_lon_heading[m.get_srcSystem()]
-                self.create_vehicle_icon('GPS' + vehicle, 'blue')
-                self.map.set_position('GPS' + vehicle, (lat, lon), rotation=heading)
-                            
-        elif mtype == "GPS2_RAW" and self.map_settings.showgps2pos:
+                self.update_vehicle_icon_to_loc('GPS', vehicle, 'blue', self.map_settings.showgpspos, (lat, lon), heading)
+        elif mtype == "GPS2_RAW":
             (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
             if lat != 0 or lon != 0:
-                self.create_vehicle_icon('GPS2' + vehicle, 'green')
-                self.map.set_position('GPS2' + vehicle, (lat, lon), rotation=m.cog*0.01)
-
+                self.update_vehicle_icon_to_loc('GPS2', vehicle, 'green', self.map_settings.showgps2pos, (lat, lon), m.cog*0.01)
         elif mtype == 'GLOBAL_POSITION_INT':
             (lat, lon, heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
             self.lat_lon_heading[m.get_srcSystem()] = (lat,lon,heading)
@@ -1149,6 +1173,8 @@ Usage: map circle <radius> <colour>
                         label = None
                     self.map.set_position('Pos' + vehicle, (lat, lon), rotation=heading, label=label, colour=(255,255,255))
                     self.map.set_follow_object('Pos' + vehicle, self.message_is_from_primary_vehicle(m))
+            else:
+                self.remove_vehicle_icon('Pos' + vehicle)
 
         elif mtype == "HIGH_LATENCY2" and self.map_settings.showahrspos:
             (lat, lon) = (m.latitude*1.0e-7, m.longitude*1.0e-7)
