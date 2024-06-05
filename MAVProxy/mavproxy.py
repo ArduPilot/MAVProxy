@@ -910,7 +910,7 @@ def mkdir_p(dir):
 
 def log_writer():
     '''log writing thread'''
-    while True:
+    while not mpstate.status.exit:
         mpstate.logfile_raw.write(bytearray(mpstate.logqueue_raw.get()))
         timeout = time.time() + 10
         while not mpstate.logqueue_raw.empty() and time.time() < timeout:
