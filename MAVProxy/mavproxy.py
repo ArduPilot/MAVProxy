@@ -531,7 +531,7 @@ def cmd_click(args):
         print(usage)
         return
     if args[0] == "show":
-        print("%f %f" % mpstate.click_location)
+        print("%.8f %.8f" % mpstate.click_location)
         return
     if len(args) < 2:
         print(usage)
