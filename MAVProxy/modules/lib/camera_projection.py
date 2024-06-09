@@ -11,7 +11,6 @@ from math import pi
 import math
 import cv2
 from MAVProxy.modules.lib import mp_elevation
-from MAVProxy.modules.lib import camera_projection
 from pymavlink.rotmat import Vector3
 from MAVProxy.modules.lib import mp_util
 import time
