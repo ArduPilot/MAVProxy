@@ -1113,7 +1113,7 @@ Usage: map circle <radius> <colour>
             self.map.set_position('Sim' + vehicle, (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
 
         elif mtype == "AHRS2" and self.map_settings.showahrs2pos:
-            self.create_vehicle_icon('AHRS2' + vehicle, 'blue')
+            self.create_vehicle_icon('AHRS2' + vehicle, 'purple')
             self.map.set_position('AHRS2' + vehicle, (m.lat*1.0e-7, m.lng*1.0e-7), rotation=math.degrees(m.yaw))
 
         elif mtype == "AHRS3" and self.map_settings.showahrs3pos:
