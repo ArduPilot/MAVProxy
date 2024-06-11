@@ -712,8 +712,9 @@ class ParamModule(mp_module.MPModule):
             return
         self.add_new_target_system(sysid)
 
-    def param_status(self):
-        sysid = self.get_sysid()
+    def param_status(self, sysid=None):
+        if sysid is None:
+            sysid = self.get_sysid()
         pset, pcount = self.pstate[sysid].status(self.master, self.mpstate)
         return (pset, pcount)
         
@@ -727,6 +728,11 @@ class ParamModule(mp_module.MPModule):
         '''handle missing parameters'''
         self.check_new_target_system()
         sysid = self.get_sysid()
+        if sysid[0] == 0:
+            # haven't seen a vehicle yet?  Note thecurrent
+            # implementation of get-sysid() won't return 0 in
+            # component id.
+            return
         self.pstate[sysid].vehicle_name = self.vehicle_name
         self.pstate[sysid].param_help.vehicle_name = self.vehicle_name
         self.pstate[sysid].fetch_check(self.master)
@@ -737,10 +743,11 @@ class ParamModule(mp_module.MPModule):
         else:
             self.menu_added_console = False
 
-    def cmd_param(self, args):
+    def cmd_param(self, args, sysid=None):
         '''control parameters'''
         self.check_new_target_system()
-        sysid = self.get_sysid()
+        if sysid is None:
+            sysid = self.get_sysid()
         self.pstate[sysid].handle_command(self.master, self.mpstate, args)
 
     def fetch_all(self):
