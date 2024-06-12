@@ -28,7 +28,7 @@ jobs:
           python -m pip install -U openai wave pyaudio
           python -m pip install -U pyinstaller==6.7.0 packaging 
       - name: Download Inno Setup installer
-        run: curl -L -o installer.exe http://files.jrsoftware.org/is/6/innosetup-6.2.0.exe
+        run: curl -L -o installer.exe http://files.jrsoftware.org/is/6/innosetup-6.3.1.exe
       - name: Install Inno Setup
         run: ./installer.exe /verysilent /allusers /dir=inst
       - name: Build MAVProxy
