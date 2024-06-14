@@ -5,12 +5,14 @@
 """
 
 import os, sys, math, time, re
+import traceback
 
 from MAVProxy.modules.lib import wxconsole
 from MAVProxy.modules.lib import textconsole
 from pymavlink import mavutil
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
+from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import wxsettings
 from MAVProxy.modules.lib.mp_menu import *
 
@@ -73,6 +75,10 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('Params', 'Param ---/---', row=3)
         mpstate.console.set_status('Mission', 'Mission --/--', row=3)
 
+        self.console_settings = mp_settings.MPSettings([
+            ('debug_level', int, 0),
+        ])
+
         self.vehicle_list = []
         self.vehicle_heartbeats = {}  # map from (sysid,compid) tuple to most recent HEARTBEAT nessage
         self.vehicle_menu = None
@@ -92,7 +98,7 @@ class ConsoleModule(mp_module.MPModule):
             self.add_menu(self.vehicle_menu)
 
     def cmd_console(self, args):
-        usage = 'usage: console <add|list|remove|menu>'
+        usage = 'usage: console <add|list|remove|menu|set>'
         if len(args) < 1:
             print(usage)
             return
@@ -120,6 +126,8 @@ class ConsoleModule(mp_module.MPModule):
                 self.user_added.pop(id)
         elif cmd == 'menu':
             self.cmd_menu(args[1:])
+        elif cmd == 'set':
+            self.cmd_set(args[1:])
         else:
             print(usage)
 
@@ -146,6 +154,10 @@ class ConsoleModule(mp_module.MPModule):
             return
         if args[0] == 'add':
             self.cmd_menu_add(args[1:])
+
+    def cmd_set(self, args):
+        '''set console options'''
+        self.console_settings.command(args)
 
     def remove_menu(self, menu):
         '''add a new menu'''
@@ -706,11 +718,26 @@ class ConsoleModule(mp_module.MPModule):
                 d = self.user_added[id]
                 try:
                     val = mavutil.evaluate_expression(d.expression, self.master.messages)
-                    self.console.set_status(id, d.format % val, row = d.row)
+                    console_string = d.format % val
                 except Exception as ex:
-                    if self.mpstate.settings.moddebug > 1:
-                        print(ex)
-                    pass
+                    console_string = "????"
+                    self.console.set_status(id, console_string, row = d.row)
+                    if self.console_settings.debug_level > 0:
+                        exc_type, exc_value, exc_traceback = sys.exc_info()
+                        if self.mpstate.settings.moddebug > 3:
+                            traceback.print_exception(
+                                exc_type,
+                                exc_value,
+                                exc_traceback,
+                                file=sys.stdout
+                            )
+                        elif self.mpstate.settings.moddebug > 1:
+                            traceback.print_exception(exc_type, exc_value, exc_traceback,
+                                                      limit=2, file=sys.stdout)
+                        elif self.mpstate.settings.moddebug == 1:
+                            print(ex)
+                        print(f"{id} failed")
+                self.console.set_status(id, console_string, row = d.row)
 
     def idle_task(self):
         now = time.time()
