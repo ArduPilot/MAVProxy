@@ -1,14 +1,25 @@
 #!/usr/bin/env python
-'''param command handling'''
+'''
+param command handling
 
-import time, os, fnmatch, struct, sys
+AP_FLAKE8_CLEAN
+'''
+
+import time
+import os
+import fnmatch
+import struct
+
 from pymavlink import mavutil, mavparm
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import param_help
 from MAVProxy.modules.lib import param_ftp
+
 if mp_util.has_wxpython:
-    from MAVProxy.modules.lib.mp_menu import *
+    from MAVProxy.modules.lib.mp_menu import MPMenuItem
+    from MAVProxy.modules.lib.mp_menu import MPMenuSubMenu
+    from MAVProxy.modules.lib.mp_menu import MPMenuCallFileDialog
 
 try:
     # py2
@@ -16,7 +27,8 @@ try:
 except ImportError:
     # py3
     from io import BytesIO as SIO
-    
+
+
 class ParamState:
     '''this class is separated to make it possible to use the parameter
        functions on a secondary connection'''
@@ -60,7 +72,7 @@ class ParamState:
             # ESP8266 uses PX4 style parameters
             is_px4_params = True
         sysid = m.get_srcSystem()
-        if self.autopilot_type_by_sysid.get(sysid,-1) in [mavutil.mavlink.MAV_AUTOPILOT_PX4]:
+        if self.autopilot_type_by_sysid.get(sysid, -1) in [mavutil.mavlink.MAV_AUTOPILOT_PX4]:
             is_px4_params = True
         if not is_px4_params:
             return m.param_value
@@ -154,7 +166,7 @@ class ParamState:
         self.param_use_xml_filepath(args[0])
 
     def status(self, master, mpstate):
-        return(len(self.mav_param_set), self.mav_param_count)
+        return (len(self.mav_param_set), self.mav_param_count)
 
     def ftp_start(self):
         '''start a ftp download of parameters'''
@@ -165,7 +177,12 @@ class ParamState:
             return
         self.ftp_started = True
         self.ftp_count = None
-        ftp.cmd_get(["@PARAM/param.pck?withdefaults=1"], callback=self.ftp_callback, callback_progress=self.ftp_callback_progress)
+        ftp.cmd_get([
+            "@PARAM/param.pck?withdefaults=1",
+        ],
+            callback=self.ftp_callback,
+            callback_progress=self.ftp_callback_progress,
+        )
 
     def log_params(self, params):
         '''log PARAM_VALUE messages so that we can extract parameters from a tlog when using ftp download'''
@@ -204,7 +221,7 @@ class ParamState:
             fh.seek(0)
             buf = fh.read(6)
             fh.seek(ofs)
-            magic2,num_params,total_params = struct.unpack("<HHH", buf)
+            magic2, num_params, total_params = struct.unpack("<HHH", buf)
             if magic2 == 0x671b or magic2 == 0x671c:
                 self.ftp_count = total_params
         # approximate count
@@ -222,8 +239,8 @@ class ParamState:
             self.ftp_failed = True
             return
 
-        magic = 0x671b
-        magic_defaults = 0x671c
+        # magic = 0x671b
+        # magic_defaults = 0x671c
         data = fh.read()
         pdata = param_ftp.ftp_param_decode(data)
         if pdata is None or len(pdata.params) == 0:
@@ -298,7 +315,7 @@ class ParamState:
         print("\nParameter        Current  Default")
         for p in self.mav_param:
             p = str(p).upper()
-            if not p in defaults:
+            if p not in defaults:
                 continue
             if self.mav_param[p] == defaults[p]:
                 continue
@@ -331,7 +348,7 @@ class ParamState:
         count = 0
         for p in self.mav_param:
             p = str(p).upper()
-            if not p in defaults:
+            if p not in defaults:
                 continue
             if self.mav_param[p] == defaults[p]:
                 continue
@@ -381,7 +398,7 @@ class ParamState:
             p = str(p).upper()
             if not fnmatch.fnmatch(p, wildcard):
                 continue
-            if not p in defaults:
+            if p not in defaults:
                 continue
             if self.mav_param[p] == defaults[p]:
                 continue
@@ -389,7 +406,6 @@ class ParamState:
             s2 = "%f" % defaults[p]
             if s1 == s2:
                 continue
-            s = "%-16.16s %s" % (str(p), s1)
             print("Reverting %-16.16s  %s -> %s" % (p, s1, s2))
             ptype = None
             if p in self.param_types:
@@ -397,12 +413,11 @@ class ParamState:
             self.mav_param.mavset(master, p, defaults[p], retries=3, parm_type=ptype)
             count += 1
         print("Reverted %u parameters" % count)
-        
-                
+
     def handle_command(self, master, mpstate, args):
         '''handle parameter commands'''
         param_wildcard = "*"
-        usage="Usage: param <fetch|ftp|save|savechanged|revert|set|show|load|preload|forceload|ftpload|diff|download|check|help|watch|unwatch|watchlist>"
+        usage="Usage: param <fetch|ftp|save|savechanged|revert|set|show|load|preload|forceload|ftpload|diff|download|check|help|watch|unwatch|watchlist>"  # noqa
         if len(args) < 1:
             print(usage)
             return
@@ -475,9 +490,9 @@ class ParamState:
             self.mav_param.mavset(master, uname, value, retries=3, parm_type=ptype)
 
             if (param.upper() == "WP_LOITER_RAD" or param.upper() == "LAND_BREAK_PATH"):
-                #need to redraw rally points
-                #mpstate.module('rally').set_last_change(time.time())
-                #need to redraw loiter points
+                # need to redraw rally points
+                # mpstate.module('rally').set_last_change(time.time())
+                # need to redraw loiter points
                 mpstate.module('wp').wploader.last_change = time.time()
 
         elif args[0] == "load":
@@ -585,7 +600,7 @@ class ParamState:
 
     def str_common_len(self, s1, s2):
         '''return common length between two strings'''
-        c = min(len(s1),len(s2))
+        c = min(len(s1), len(s2))
         for i in range(c):
             if s1[i] != s2[i]:
                 return i
@@ -618,7 +633,7 @@ class ParamState:
             vtype = self.best_type(v)
             common_len = self.str_common_len(last_param, k)
             b1 = vtype
-            b2 = common_len | ((len(k)-(common_len+1))<<4)
+            b2 = common_len | ((len(k) - (common_len + 1)) << 4)
             fh.write(struct.pack("<BB", b1, b2))
             fh.write(k[common_len:].encode("UTF-8"))
             if vtype == 1: # int8
@@ -644,37 +659,44 @@ class ParamState:
 
 class ParamModule(mp_module.MPModule):
     def __init__(self, mpstate, **kwargs):
-        super(ParamModule, self).__init__(mpstate, "param", "parameter handling", public = True, multi_vehicle=True)
+        super(ParamModule, self).__init__(mpstate, "param", "parameter handling", public=True, multi_vehicle=True)
         self.xml_filepath = kwargs.get("xml-filepath", None)
         self.pstate = {}
         self.check_new_target_system()
         self.menu_added_console = False
-        self.add_command('param', self.cmd_param, "parameter handling",
-                         ["<download|status>",
-                          "<set|show|fetch|ftp|help|apropos|revert> (PARAMETER)",
-                          "<load|save|savechanged|diff|forceload|ftpload> (FILENAME)",
-                          "<set_xml_filepath> (FILEPATH)"
-                         ])
+        self.add_command(
+            'param', self.cmd_param, "parameter handling", [
+                "<download|status>",
+                "<set|show|fetch|ftp|help|apropos|revert> (PARAMETER)",
+                "<load|save|savechanged|diff|forceload|ftpload> (FILENAME)",
+                "<set_xml_filepath> (FILEPATH)",
+            ],
+        )
         if mp_util.has_wxpython:
-            self.menu = MPMenuSubMenu('Parameter',
-                                  items=[MPMenuItem('Editor', 'Editor', '# module load paramedit'),
-                                         MPMenuItem('Fetch', 'Fetch', '# param fetch'),
-                                         MPMenuItem('Load', 'Load', '# param load ',
-                                                    handler=MPMenuCallFileDialog(flags=('open',),
-                                                                                 title='Param Load',
-                                                                                 wildcard='ParmFiles(*.parm,*.param)|*.parm;*.param')),
-                                         MPMenuItem('Save', 'Save', '# param save ',
-                                                    handler=MPMenuCallFileDialog(flags=('save', 'overwrite_prompt'),
-                                                                                 title='Param Save',
-                                                                                 wildcard='ParmFiles(*.parm,*.param)|*.parm;*.param')),
-                                         MPMenuItem('FTP', 'FTP', '# param ftp'),
-                                         MPMenuItem('Update Metadata', 'Update Metadata', '# param download'),
-                                             ])
+            self.menu = MPMenuSubMenu(
+                'Parameter',
+                items=[
+                    MPMenuItem('Editor', 'Editor', '# module load paramedit'),
+                    MPMenuItem('Fetch', 'Fetch', '# param fetch'),
+                    MPMenuItem('Load', 'Load', '# param load ',
+                               handler=MPMenuCallFileDialog(
+                                   flags=('open',),
+                                   title='Param Load',
+                                   wildcard='ParmFiles(*.parm,*.param)|*.parm;*.param')),
+                    MPMenuItem('Save', 'Save', '# param save ',
+                               handler=MPMenuCallFileDialog(
+                                   flags=('save', 'overwrite_prompt'),
+                                   title='Param Save',
+                                   wildcard='ParmFiles(*.parm,*.param)|*.parm;*.param')),
+                    MPMenuItem('FTP', 'FTP', '# param ftp'),
+                    MPMenuItem('Update Metadata', 'Update Metadata', '# param download'),
+                ],
+            )
 
     def get_component_id_list(self, system_id):
         '''get list of component IDs with parameters for a given system ID'''
         ret = []
-        for (s,c) in self.mpstate.mav_param_by_sysid.keys():
+        for (s, c) in self.mpstate.mav_param_by_sysid.keys():
             if s == system_id:
                 ret.append(c)
         return ret
@@ -683,14 +705,21 @@ class ParamModule(mp_module.MPModule):
         '''handle a new target_system'''
         if sysid in self.pstate:
             return
-        if not sysid in self.mpstate.mav_param_by_sysid:
+        if sysid not in self.mpstate.mav_param_by_sysid:
             self.mpstate.mav_param_by_sysid[sysid] = mavparm.MAVParmDict()
             self.new_sysid_timestamp = time.time()
         fname = 'mav.parm'
-        if sysid not in [(0,0),(1,1),(1,0)]:
+        if sysid not in [(0, 0), (1, 1), (1, 0)]:
 
             fname = 'mav_%u_%u.parm' % (sysid[0], sysid[1])
-        self.pstate[sysid] = ParamState(self.mpstate.mav_param_by_sysid[sysid], self.logdir, self.vehicle_name, fname, self.mpstate, sysid)
+        self.pstate[sysid] = ParamState(
+            self.mpstate.mav_param_by_sysid[sysid],
+            self.logdir,
+            self.vehicle_name,
+            fname,
+            self.mpstate,
+            sysid,
+        )
         if self.continue_mode and self.logdir is not None:
             parmfile = os.path.join(self.logdir, fname)
             if os.path.exists(parmfile):
@@ -716,10 +745,10 @@ class ParamModule(mp_module.MPModule):
         sysid = self.get_sysid()
         pset, pcount = self.pstate[sysid].status(self.master, self.mpstate)
         return (pset, pcount)
-        
+
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
-        sysid = (m.get_srcSystem(),m.get_srcComponent())
+        sysid = (m.get_srcSystem(), m.get_srcComponent())
         self.add_new_target_system(sysid)
         self.pstate[sysid].handle_mavlink_packet(self.master, m)
 
