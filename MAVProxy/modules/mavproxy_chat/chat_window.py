@@ -70,6 +70,12 @@ class chat_window():
         self.frame.Bind(wx.EVT_BUTTON, self.send_button_click, self.send_button)
         self.horiz_sizer.Add(self.send_button, proportion=0, flag=wx.ALIGN_TOP | wx.ALL, border=5)
 
+        # add a cancel button
+        self.cancel_button = wx.Button(self.frame, id=-1, label="cancel", size=(75, 25))
+        self.frame.Bind(wx.EVT_BUTTON, self.cancel_button_click , self.cancel_button)
+        self.horiz_sizer.Add(self.cancel_button, proportion=0, flag=wx.ALIGN_TOP | wx.ALL, border=5)
+        wx.CallAfter(self.cancel_button.Disable)
+
         # set size hints and add sizer to frame
         self.vert_sizer.Add(self.text_reply, proportion=1, flag=wx.EXPAND, border=5)
         self.vert_sizer.Add(self.text_status, proportion=0, flag=wx.EXPAND, border=5)
@@ -139,6 +145,10 @@ class chat_window():
         self.set_status_text("sending text to assistasnt")
         self.send_text_to_assistant()
 
+    # cancel button clicked
+    def cancel_button_click(self, event):
+        self.chat_openai.cancel_run()
+
     # send button clicked
     def send_button_click(self, event):
         self.text_input_change(event)
@@ -161,6 +171,8 @@ class chat_window():
             focus = self.text_input
 
         # disable buttons and text input to stop multiple inputs (can't be done from a thread or must use CallAfter)
+        # enable the cancel button to cancel the current run
+        wx.CallAfter(self.cancel_button.Enable)
         wx.CallAfter(self.record_button.Disable)
         wx.CallAfter(self.text_input.Disable)
         wx.CallAfter(self.send_button.Disable)
@@ -181,6 +193,8 @@ class chat_window():
             wx.CallAfter(self.text_reply.AppendText, reply + "\n\n")
 
         # reenable buttons and text input (can't be done from a thread or must use CallAfter)
+        # disable the cancel button
+        wx.CallAfter(self.cancel_button.Disable)
         wx.CallAfter(self.record_button.Enable)
         wx.CallAfter(self.text_input.Enable)
         wx.CallAfter(self.send_button.Enable)

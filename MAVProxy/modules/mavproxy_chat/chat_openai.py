@@ -48,6 +48,7 @@ class chat_openai():
         self.client = None
         self.assistant = None
         self.assistant_thread = None
+        self.latest_run = None
 
     # check connection to OpenAI assistant and connect if necessary
     # returns True if connection is good, False if not
@@ -99,6 +100,25 @@ class chat_openai():
         self.assistant = None
         self.assistant_thread = None
 
+    # cancel the active run
+    def cancel_run(self):
+        # check the active thread and run
+        if (self.assistant_thread and self.latest_run is not None):
+            run_status = self.latest_run.status
+            if (run_status != "completed" and run_status != "cancelled" and
+                    run_status != "cancelling"):
+
+                # cancel the active run
+                self.client.beta.threads.runs.cancel(
+                    thread_id=self.assistant_thread.id,
+                    run_id=self.run.id
+                )
+            else:
+                if (self.latest_run.status == "completed"):
+                    print("Chat is completed, cannot be cancelled")
+                elif (self.latest_run.status == "cancelled"):
+                    print("Chat is cancelled")
+
     # send text to assistant
     def send_to_assistant(self, text):
         # get lock
@@ -132,7 +152,7 @@ class chat_openai():
                 time.sleep(0.1)
 
                 # retrieve the run
-                latest_run = self.client.beta.threads.runs.retrieve(
+                self.latest_run = self.client.beta.threads.runs.retrieve(
                     thread_id=self.assistant_thread.id,
                     run_id=self.run.id
                 )
@@ -141,22 +161,22 @@ class chat_openai():
                 failure_message = None
 
                 # check run status
-                if latest_run.status in ["queued", "in_progress", "cancelling"]:
+                if self.latest_run.status in ["queued", "in_progress", "cancelling"]:
                     run_done = False
-                elif latest_run.status in ["cancelled", "completed", "expired"]:
+                elif self.latest_run.status in ["cancelled", "completed", "expired"]:
                     run_done = True
-                elif latest_run.status in ["failed"]:
-                    failure_message = latest_run.last_error.message
+                elif self.latest_run.status in ["failed"]:
+                    failure_message = self.latest_run.last_error.message
                     run_done = True
-                elif latest_run.status in ["requires_action"]:
-                    self.handle_function_call(latest_run)
+                elif self.latest_run.status in ["requires_action"]:
+                    self.handle_function_call(self.latest_run)
                     run_done = False
                 else:
-                    print("chat: unrecognised run status" + latest_run.status)
+                    print("chat: unrecognised run status" + self.latest_run.status)
                     run_done = True
 
                 # send status to status callback
-                status_message = latest_run.status
+                status_message = self.latest_run.status
                 if failure_message is not None:
                     status_message = status_message + ": " + failure_message
                 self.send_status(status_message)
@@ -165,7 +185,10 @@ class chat_openai():
             reply_messages = self.client.beta.threads.messages.list(self.assistant_thread.id,
                                                                     order="asc",
                                                                     after=input_message.id)
-            if reply_messages is None:
+
+            if (self.latest_run.status == "cancelled"):
+                return "cancelled successfully"
+            elif reply_messages is None:
                 return "chat: failed to retrieve messages"
 
             # concatenate all messages into a single reply skipping the first which is our question
