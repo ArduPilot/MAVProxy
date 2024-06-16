@@ -85,6 +85,7 @@ class LinkModule(mp_module.MPModule):
                           'hl (HLSTATE)'])
         self.add_command('vehicle', self.cmd_vehicle, "vehicle control")
         self.add_command('alllinks', self.cmd_alllinks, "send command on all links", ["(COMMAND)"])
+        self.add_command('ping', self.cmd_ping, "ping mavlink nodes")
         self.no_fwd_types = set()
         self.no_fwd_types.add("BAD_DATA")
         self.add_completion_function('(SERIALPORT)', self.complete_serial_ports)
@@ -99,6 +100,10 @@ class LinkModule(mp_module.MPModule):
         self.datarate_logging_timer = mavutil.periodic_event(1)
         self.old_streamrate = 0
         self.old_streamrate2 = 0
+
+        # a list of TimeSync requests which are listening for and
+        # sending TIMESYNC messages at the moment:
+        self.outstanding_timesyncs = []
 
         self.menu_added_console = False
         if mp_util.has_wxpython:
@@ -149,6 +154,16 @@ class LinkModule(mp_module.MPModule):
                                   str(self.status.bytecounters['MasterIn'][master.linknum].total()) + "," +
                                   str(linkdelay) + "," +
                                   str(100 * round(master.packet_loss(), 3)) + "\n")
+
+        # update outstanding TimeSyncRequest objects.  Reap any which
+        # are past their use-by date:
+        new_timesyncs = []
+        for ts in self.outstanding_timesyncs:
+            if ts.age_limit_exceeded():
+                continue
+            ts.update()
+            new_timesyncs.append(ts)
+        self.outstanding_timesyncs = new_timesyncs
 
     def complete_serial_ports(self, text):
         '''return list of serial ports'''
@@ -207,6 +222,8 @@ class LinkModule(mp_module.MPModule):
             self.cmd_link_remove(args[1:])
         elif args[0] == "resetstats":
             self.reset_link_stats()
+        elif args[0] == "ping":
+            self.cmd_ping(args[1:])
         else:
             print("usage: link <list|add|remove|attributes|hl|dataratelogging|resetstats>")
 
@@ -646,6 +663,11 @@ class LinkModule(mp_module.MPModule):
 
     def master_msg_handling(self, m, master):
         '''link message handling for an upstream link'''
+
+        # handle TIMESYNC messages from all mavlink nodes:
+        if m.get_type() == "TIMESYNC":
+            self.handle_TIMESYNC(m, master)
+
         if not self.message_is_from_primary_vehicle(m):
             # don't process messages not from our target
             if m.get_type() == "BAD_DATA":
@@ -895,6 +917,12 @@ class LinkModule(mp_module.MPModule):
 
         self.check_watched_message(m, '<')
 
+    def handle_TIMESYNC(self, m, master):
+        '''handle received TIMESYNC message m from link master'''
+        # pass to any outstanding TimeSyncRequest objects:
+        for ot in self.outstanding_timesyncs:
+            ot.handle_TIMESYNC(m, master)
+
     def mavlink_packet(self, msg):
         '''handle an incoming mavlink packet'''
         pass
@@ -1050,6 +1078,54 @@ class LinkModule(mp_module.MPModule):
             m.link_delayed = False
         self.mpstate.settings.link = best_link + 1
         print("Set vehicle %s (link %u)" % (args[0], best_link+1))
+
+    class TimeSyncRequest():
+        '''send and receive TIMESYNC mavlink messages, printing results'''
+        def __init__(self, master, max_attempts=1, console=None):
+            self.attempts_remaining = max_attempts
+            self.last_sent_ns = 0
+            self.sent_on_timestamps = []
+            self.mav = master
+            self.max_lifetime = 20  # seconds
+            self.response_received = False
+            self.console = console
+
+        def age_limit_exceeded(self):
+            '''true if this object should be reaped'''
+            if len(self.sent_on_timestamps) == 0:
+                return False
+            return int(time.time() * 1e9) - self.sent_on_timestamps[0] > self.max_lifetime*1e9
+
+        def update(self):
+            '''send timesync requests at intervals'''
+            now_ns = int(time.time() * 1e9)
+            if now_ns - self.last_sent_ns < 1e9:  # ping at 1s intervals
+                return
+            if self.attempts_remaining == 0:
+                return
+            self.attempts_remaining -= 1
+            self.last_sent_ns = now_ns
+            # encode outbound link in bottom 4 bits
+            now_ns = now_ns & ~ 0b1111
+            now_ns = now_ns | self.mav.linknum
+            self.sent_on_timestamps.append(now_ns)
+            self.mav.mav.timesync_send(0, now_ns)
+
+        def handle_TIMESYNC(self, m, master):
+            '''handle TIMESYNC message m received on link master'''
+            if m.ts1 not in self.sent_on_timestamps:
+                # we didn't send this one
+                return
+            now_ns = time.time() * 1e9
+            out_link = m.ts1 & 0b1111  # out link encoded in bottom four bits
+            if self.console is not None:
+                self.console.writeln(f"ping response: {(now_ns-m.ts1)*1e-6:.3f}ms from={m.get_srcSystem()}/{m.get_srcComponent()} in-link={master.linknum} out-link={out_link}")  # noqa
+
+    def cmd_ping(self, args):
+        '''create TimeSyncRequest objects to ping on each link'''
+        for m in self.mpstate.mav_master:
+            request = LinkModule.TimeSyncRequest(m, console=self.console)
+            self.outstanding_timesyncs.append(request)
 
 
 def init(mpstate):
