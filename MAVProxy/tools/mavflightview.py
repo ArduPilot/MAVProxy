@@ -465,6 +465,8 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
                     lat = m.lat * 1.0e-7
                 if hasattr(m,'lon'):
                     lng = m.lon * 1.0e-7
+                if hasattr(m,'lng'):
+                    lng = m.lng * 1.0e-7
                 if hasattr(m,'latitude'):
                     lat = m.latitude * 1.0e-7
                 if hasattr(m,'longitude'):
