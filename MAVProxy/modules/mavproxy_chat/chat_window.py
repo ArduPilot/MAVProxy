@@ -18,7 +18,8 @@ class chat_window():
         self.mpstate = mpstate
 
         # create chat_openai object
-        self.chat_openai = chat_openai.chat_openai(self.mpstate, self.set_status_text, wait_for_command_ack_fn)
+        self.chat_openai = chat_openai.chat_openai(self.mpstate, self.set_status_text, self.append_chat_replies,
+                                                   wait_for_command_ack_fn)
 
         # create chat_voice_to_text object
         self.chat_voice_to_text = chat_voice_to_text.chat_voice_to_text()
@@ -182,15 +183,11 @@ class chat_window():
         wx.CallAfter(self.text_input.Clear)
 
         # copy user input text to reply box
-        orig_text_attr = self.text_reply.GetDefaultStyle()
         wx.CallAfter(self.text_reply.SetDefaultStyle, wx.TextAttr(wx.RED))
-        wx.CallAfter(self.text_reply.AppendText, send_text + "\n")
+        wx.CallAfter(self.text_reply.AppendText, "\n" + send_text + "\n")
 
-        # send text to assistant and place reply in reply box
-        reply = self.chat_openai.send_to_assistant(send_text)
-        if reply:
-            wx.CallAfter(self.text_reply.SetDefaultStyle, orig_text_attr)
-            wx.CallAfter(self.text_reply.AppendText, reply + "\n\n")
+        # send text to assistant. replies will be handled by append_chat_replies
+        self.chat_openai.send_to_assistant(send_text)
 
         # reenable buttons and text input (can't be done from a thread or must use CallAfter)
         # disable the cancel button
@@ -206,3 +203,8 @@ class chat_window():
     # set status text
     def set_status_text(self, text):
         wx.CallAfter(self.text_status.SetValue, text)
+
+    # append chat to reply box
+    def append_chat_replies(self, text):
+        wx.CallAfter(self.text_reply.SetDefaultStyle, wx.TextAttr(wx.BLACK))
+        wx.CallAfter(self.text_reply.AppendText, text)
