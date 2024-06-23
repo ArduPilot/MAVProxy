@@ -13,6 +13,7 @@ AP_FLAKE8_CLEAN
 import requests
 import glob
 import json
+import xmltodict
 import os
 
 try:
@@ -47,7 +48,7 @@ def main(openai_api_key=None, assistant_name=None, model_name=None, upgrade=Fals
 
     # use model name if provided, otherwise use default
     if model_name is None:
-        model_name = "gpt-4-1106-preview"
+        model_name = "gpt-4o"
 
     # check that assistant_instructions.txt file exists
     instructions_filename = os.path.join(os.getcwd(), "assistant_instructions.txt")
@@ -68,9 +69,13 @@ def main(openai_api_key=None, assistant_name=None, model_name=None, upgrade=Fals
         exit()
 
     # parse function definition files
-    function_tools = [{"type": "code_interpreter"}, {"type": "retrieval"}]
+    function_tools = [{"type": "file_search"}]
     for function_filename in function_filenames:
         try:
+            # skip over files with xml in the name
+            if "xml" in function_filename:
+                print("skipping xml file: " + os.path.basename(function_filename))
+                continue
             function_file = open(function_filename, 'r')
             function_object = json.load(function_file)
             function_tools.append(function_object)
@@ -85,10 +90,15 @@ def main(openai_api_key=None, assistant_name=None, model_name=None, upgrade=Fals
         exit()
 
     # download latest MAVLink files from ardupilot MAVLink repo, minimal.xml, common.xml and ardupilotmega.xml
+    # convert to xml so they can be accessed by the assistant
     mavlink_filenames = ["minimal.xml", "common.xml", "ardupilotmega.xml"]
+    mavlink_filenames_json = []
     for mavlink_filename in mavlink_filenames:
         if not download_file("https://raw.githubusercontent.com/ArduPilot/mavlink/master/message_definitions/v1.0/" + mavlink_filename, mavlink_filename):  # noqa
             exit()
+        if not convert_xml_to_json(mavlink_filename):
+            exit()
+        mavlink_filenames_json.append(mavlink_filename + ".json")
 
     # variable to hold new assistant
     assistant = None
@@ -108,7 +118,7 @@ def main(openai_api_key=None, assistant_name=None, model_name=None, upgrade=Fals
 
     # if assistant was not found, create it
     if assistant is None:
-        assistant = client.beta.assistants.create(name=assistant_name, model=model_name)
+        assistant = client.beta.assistants.create(name=assistant_name, model=model_name, tools=function_tools)
         print("setup_assistant: created new assistant: " + assistant.name + " id:" + assistant.id)
 
     # update assistant's instructions
@@ -120,10 +130,9 @@ def main(openai_api_key=None, assistant_name=None, model_name=None, upgrade=Fals
         exit()
 
     # upload MAVLink and text files
-    # get our organisation's existing list of files on OpenAI
     existing_files = client.files.list()
     uploaded_file_ids = []
-    for filename in text_filenames + mavlink_filenames:
+    for filename in text_filenames + mavlink_filenames_json:
         try:
             # open local file as read-only
             file = open(filename, 'rb')
@@ -132,22 +141,23 @@ def main(openai_api_key=None, assistant_name=None, model_name=None, upgrade=Fals
             exit()
 
         # check if OpenAI has existing files with the same name
+        filename_short = os.path.basename(filename)
         file_needs_uploading = True
-        for existing_file in existing_files.data:
-            if filename == existing_file.filename:
+        for existing_file in existing_files:
+            if filename_short == existing_file.filename:
                 # if not upgrading, we associate the existing file with our assistant
                 if not upgrade:
                     uploaded_file_ids.append(existing_file.id)
-                    print("setup_assistant: using existing file: " + filename)
+                    print("setup_assistant: using existing file: " + existing_file.filename)
                     file_needs_uploading = False
                 else:
                     # if upgrading them we delete and re-upload the file
                     # Note: this is slightly dangerous because files in use by another assistant could be deleted
                     try:
                         client.files.delete(existing_file.id)
-                        print("setup_assistant: deleted existing file: " + filename)
+                        print("setup_assistant: deleted existing file: " + existing_file.filename)
                     except Exception:
-                        print("setup_assistant: failed to delete file from OpenAI: " + filename)
+                        print("setup_assistant: failed to delete file from OpenAI: " + existing_file.filename)
                         exit()
 
         # upload file to OpenAI
@@ -155,20 +165,54 @@ def main(openai_api_key=None, assistant_name=None, model_name=None, upgrade=Fals
             try:
                 uploaded_file = client.files.create(file=file, purpose="assistants")
                 uploaded_file_ids.append(uploaded_file.id)
-                print("setup_assistant: uploaded: " + filename)
+                print("setup_assistant: uploaded: " + filename_short)
             except Exception:
                 print("setup_assistant: failed to upload file to OpenAI: " + filename)
                 exit()
 
-    # update assistant's accessible files
+    # delete and recreate a vector store on OpenAI
+    vector_store_name = assistant_name + " vector_store"
     try:
-        client.beta.assistants.update(assistant.id, file_ids=uploaded_file_ids)
+        # retrieve list of vector stores
+        vector_store_list = client.beta.vector_stores.list()
+        for vs in vector_store_list:
+
+            # check for valid names
+            vs_name = vs.name
+            if vs_name is None:
+                vs_name = "no name"
+
+            # delete empty vector stores
+            if vs.file_counts.total == 0:
+                print("deleting empty vector store id:" + vs.id + " name:" + vs_name)
+                client.beta.vector_stores.delete(vector_store_id=vs.id)
+                continue
+
+            # delete our assistant's vector store if found
+            if vs_name == vector_store_name:
+                print("deleting existing vector store id:" + vs.id + " name:" + vs_name)
+                client.beta.vector_stores.delete(vector_store_id=vs.id)
+                break
+
+        # create vector store for our assistant
+        vector_store = client.beta.vector_stores.create(name=vector_store_name, file_ids=uploaded_file_ids)
+        print("setup_assistant: created vector store id: " + vector_store.id +
+              " name:" + vector_store_name + " files:" + str(vector_store.file_counts.total))
+
+    except Exception as e:
+        print("setup_assistant: failed to create vector store" + e)
+        exit()
+
+    # update assistant to use the vector store
+    try:
+        print("setup_assistant: updating assistant vector store to id:" + vector_store.id + " name:" + vector_store_name)
+        client.beta.assistants.update(assistant.id, tool_resources={"file_search": {"vector_store_ids": [vector_store.id]}})
     except Exception:
-        print("setup_assistant: failed to update assistant accessible files")
+        print("setup_assistant: failed to update assistant vector store")
         exit()
 
     # delete downloaded mavlink files
-    for mavlink_filename in mavlink_filenames:
+    for mavlink_filename in mavlink_filenames + mavlink_filenames_json:
         try:
             os.remove(mavlink_filename)
             print("setup_assistant: deleted local file: " + mavlink_filename)
@@ -195,6 +239,21 @@ def download_file(url, filename):
             return False
     except Exception:
         print("setup_assistant: failed to download file: " + url)
+        return False
+
+
+def convert_xml_to_json(filename):
+    # convert xml file to json file
+    # return True if successful, False if not
+    try:
+        xml_file = open(filename)
+        xml_file_dict = xmltodict.parse(xml_file.read())
+        xml_file_json = json.dumps(xml_file_dict)
+        json_file = open(filename + ".json", "w")
+        json_file.write(xml_file_json)
+        return True
+    except Exception:
+        print("setup_assistant: failed to convert xml to json: " + filename)
         return False
 
 
