@@ -1316,7 +1316,7 @@ class SIYIModule(mp_module.MPModule):
         err_pitch += self.siyi_settings.mount_pitch
 
         self.yaw_rate = self.yaw_controller.run(err_yaw, los_yaw_rate)
-        self.pitch_rate = self.yaw_controller.run(err_pitch, los_pitch_rate)
+        self.pitch_rate = self.pitch_controller.run(err_pitch, los_pitch_rate)
         self.send_named_float('EYAW', err_yaw)
         self.send_named_float('EPITCH', err_pitch)
         self.logf.write('SIPY', "Qfffff", "TimeUS,CYaw,TYaw,Yerr,I,FF",
