@@ -293,7 +293,7 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
     want_instances = {}
     recv_match_types = types[:]
     for i in range(len(recv_match_types)):
-        match = re.match('(?P<name>.*)\[(?P<instancenum>[^\]+])\]', recv_match_types[i])
+        match = re.match('(?P<name>.*)\[(?P<instancenum>[^\]]+)\]', recv_match_types[i])
         if match is not None:
             name = match.group("name")
             number = match.group("instancenum")
