@@ -28,6 +28,13 @@ except ImportError:
     # py3
     from io import BytesIO as SIO
 
+try:
+    import queue as Queue
+    from queue import Empty
+except ImportError:
+    import Queue
+    from Queue import Empty
+
 
 class ParamState:
     '''this class is separated to make it possible to use the parameter
@@ -55,6 +62,141 @@ class ParamState:
         self.param_help.vehicle_name = vehicle_name
         self.default_params = None
         self.watch_patterns = set()
+
+        # dictionary of ParamSet objects we are processing:
+        self.parameters_to_set = {}
+        # a Queue which onto which ParamSet objects can be pushed in a
+        # thread-safe manner:
+        self.parameters_to_set_input_queue = Queue.Queue()
+
+    class ParamSet():
+        '''class to hold information about a parameter set being attempted'''
+        def __init__(self, master, name, value, param_type=None, attempts=None):
+            self.master = master
+            self.name = name
+            self.value = value
+            self.param_type = param_type
+            self.attempts_remaining = attempts
+            self.retry_interval = 1  # seconds
+            self.last_value_received = None
+
+            if self.attempts_remaining is None:
+                self.attempts_remaining = 3
+
+            self.request_sent = 0  # this is a timestamp
+
+        def normalize_parameter_for_param_set_send(self, name, value, param_type):
+            '''uses param_type to convert value into a value suitable for passing
+            into the mavlink param_set_send binding.  Note that this
+            is a copy of a method in pymavlink, in case the user has
+            an older version of that library.
+            '''
+            if param_type is not None and param_type != mavutil.mavlink.MAV_PARAM_TYPE_REAL32:
+                # need to encode as a float for sending
+                if param_type == mavutil.mavlink.MAV_PARAM_TYPE_UINT8:
+                    vstr = struct.pack(">xxxB", int(value))
+                elif param_type == mavutil.mavlink.MAV_PARAM_TYPE_INT8:
+                    vstr = struct.pack(">xxxb", int(value))
+                elif param_type == mavutil.mavlink.MAV_PARAM_TYPE_UINT16:
+                    vstr = struct.pack(">xxH", int(value))
+                elif param_type == mavutil.mavlink.MAV_PARAM_TYPE_INT16:
+                    vstr = struct.pack(">xxh", int(value))
+                elif param_type == mavutil.mavlink.MAV_PARAM_TYPE_UINT32:
+                    vstr = struct.pack(">I", int(value))
+                elif param_type == mavutil.mavlink.MAV_PARAM_TYPE_INT32:
+                    vstr = struct.pack(">i", int(value))
+                else:
+                    print("can't send %s of type %u" % (name, param_type))
+                    return None
+                numeric_value, = struct.unpack(">f", vstr)
+            else:
+                if isinstance(value, str) and value.lower().startswith('0x'):
+                    numeric_value = int(value[2:], 16)
+                else:
+                    try:
+                        numeric_value = float(value)
+                    except ValueError:
+                        print(f"can't convert {name} ({value}, {type(value)}) to float")
+                        return None
+
+            return numeric_value
+
+        def send_set(self):
+            numeric_value = self.normalize_parameter_for_param_set_send(self.name, self.value, self.param_type)
+            if numeric_value is None:
+                print(f"can't send {self.name} of type {self.param_type}")
+                self.attempts_remaining = 0
+                return
+            # print(f"Sending set attempts-remaining={self.attempts_remaining}")
+            self.master.param_set_send(
+                self.name.upper(),
+                numeric_value,
+                parm_type=self.param_type,
+            )
+            self.request_sent = time.time()
+            self.attempts_remaining -= 1
+
+        def expired(self):
+            if self.attempts_remaining > 0:
+                return False
+            return time.time() - self.request_sent > self.retry_interval
+
+        def due_for_retry(self):
+            if self.attempts_remaining <= 0:
+                return False
+            return time.time() - self.request_sent > self.retry_interval
+
+        def handle_PARAM_VALUE(self, m, value):
+            '''handle PARAM_VALUE packet m which has already been checked for a
+            match against self.name.  Returns true if this Set is now
+            satisfied.  value is the value extracted and potentially
+            manipulated from the packet
+            '''
+            self.last_value_received = value
+            if abs(value - float(self.value)) > 0.00001:
+                return False
+
+            return True
+
+        def print_expired_message(self):
+            reason = ""
+            if self.last_value_received is None:
+                reason = " (no PARAM_VALUE received)"
+            else:
+                reason = f" (invalid returned value {self.last_value_received})"
+            print(f"Failed to set {self.name} to {self.value}{reason}")
+
+    def run_parameter_set_queue(self):
+        # firstly move anything from the input queue into our
+        # collection of things to send:
+        try:
+            while True:
+                new_parameter_to_set = self.parameters_to_set_input_queue.get(block=False)
+                self.parameters_to_set[new_parameter_to_set.name] = new_parameter_to_set
+        except Empty:
+            pass
+
+        # now send any parameter-sets which are due to be sent out,
+        # either because they are new or because we need to retry:
+        count = 0
+        keys_to_remove = []  # remove entries after iterating the dict
+        for (key, parameter_to_set) in self.parameters_to_set.items():
+            if parameter_to_set.expired():
+                parameter_to_set.print_expired_message()
+                keys_to_remove.append(key)
+                continue
+            if not parameter_to_set.due_for_retry():
+                continue
+            # send parameter set:
+            parameter_to_set.send_set()
+            # rate-limit to 10 items per call:
+            count += 1
+            if count > 10:
+                break
+
+        # complete purging of expired parameter-sets:
+        for key in keys_to_remove:
+            del self.parameters_to_set[key]
 
     def use_ftp(self):
         '''return true if we should try ftp for download'''
@@ -132,6 +274,16 @@ class ParamState:
                 self.fetch_set = None
             if self.fetch_set is not None and len(self.fetch_set) == 0:
                 self.fetch_check(master, force=True)
+
+            # if we were setting this parameter then check it's the
+            # value we want and, if so, stop setting the parameter
+            try:
+                if self.parameters_to_set[param_id].handle_PARAM_VALUE(m, value):
+                    # print(f"removing set of param_id ({self.parameters_to_set[param_id].value} vs {value})")
+                    del self.parameters_to_set[param_id]
+            except KeyError:
+                pass
+
         elif m.get_type() == 'HEARTBEAT':
             if m.get_srcComponent() == 1:
                 # remember autopilot types so we can handle PX4 parameters
@@ -383,6 +535,20 @@ class ParamState:
         for pattern in self.watch_patterns:
             self.mpstate.console.writeln("> %s" % (pattern))
 
+    def set_parameter(self, master, name, value, attempts=None, param_type=None):
+        '''convenient intermediate method which determines parameter type for
+        lazy callers'''
+        if param_type is None:
+            param_type = self.param_types.get(name, None)
+
+        self.parameters_to_set_input_queue.put(ParamState.ParamSet(
+            master,
+            name,
+            value,
+            attempts=attempts,
+            param_type=param_type,
+        ))
+
     def param_revert(self, master, args):
         '''handle param revert'''
         defaults = self.default_params
@@ -407,10 +573,7 @@ class ParamState:
             if s1 == s2:
                 continue
             print("Reverting %-16.16s  %s -> %s" % (p, s1, s2))
-            ptype = None
-            if p in self.param_types:
-                ptype = self.param_types[p]
-            self.mav_param.mavset(master, p, defaults[p], retries=3, parm_type=ptype)
+            self.set_parameter(master, p, defaults[p], attempts=3)
             count += 1
         print("Reverted %u parameters" % count)
 
@@ -484,10 +647,7 @@ class ParamState:
                 print("Unable to find parameter '%s'" % param)
                 return
             uname = param.upper()
-            ptype = None
-            if uname in self.param_types:
-                ptype = self.param_types[uname]
-            self.mav_param.mavset(master, uname, value, retries=3, parm_type=ptype)
+            self.set_parameter(master, uname, value, attempts=3)
 
             if (param.upper() == "WP_LOITER_RAD" or param.upper() == "LAND_BREAK_PATH"):
                 # need to redraw rally points
@@ -765,6 +925,12 @@ class ParamModule(mp_module.MPModule):
                 self.module('console').add_menu(self.menu)
         else:
             self.menu_added_console = False
+
+        self.run_parameter_set_queues()
+
+    def run_parameter_set_queues(self):
+        for pstate in self.pstate.values():
+            pstate.run_parameter_set_queue()
 
     def cmd_param(self, args):
         '''control parameters'''
