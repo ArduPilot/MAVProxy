@@ -455,7 +455,7 @@ def cmd_map(args):
     options.colour_source='flightmode'
     options.nkf_sample = 1
     if len(args) > 0:
-        options.types = ','.join(args)
+        options.types = ':'.join(args)
         if len(options.types) > 1:
             options.colour_source='type'
     mfv_mav_ret = mavflightview.mavflightview_mav(mestate.mlog, options, mestate.flightmode_selections)
