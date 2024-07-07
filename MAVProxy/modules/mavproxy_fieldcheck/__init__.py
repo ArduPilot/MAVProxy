@@ -198,7 +198,7 @@ class FieldCheck(object):
 
         fencemod.apply_function_to_points(fencepoint_checker)
 
-        min_fence_points = 6
+        min_fence_points = 5
         if count < min_fence_points:
             self.whinge(f"Too few fence points; {count} < {min_fence_points}")
             return False
