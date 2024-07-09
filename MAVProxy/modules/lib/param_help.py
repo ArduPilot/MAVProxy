@@ -173,7 +173,7 @@ class ParamHelp:
                     if len(values):
                         print("\nValues: ")
                         for v in values:
-                            print("\t%s : %s" % (v.get('code'), str(v)))
+                            print("\t%3u : %s" % (int(v.get('code')), str(v)))
                 except Exception as e:
                     print("Caught exception %s" % repr(e))
                     pass
