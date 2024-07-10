@@ -296,6 +296,7 @@ class SIYIModule(mp_module.MPModule):
                                                      MPSetting('thresh_climit_dis', int, 20, range=(10,50)),
                                                      MPSetting('thresh_volt_dis', int, 40, range=(20,80)),
                                                      MPSetting('thresh_ang_dis', int, 40, range=(30,4000)),
+                                                     ('force_strong_gimballing', bool, False),
                                                      ('stow_on_landing', bool, True),
                                                      ('stow_heuristics_enabled', bool, True),
                                                      ('stow_heuristics_minalt', float, 20.0),  # metres above terrain
@@ -988,7 +989,11 @@ class SIYIModule(mp_module.MPModule):
             self.logf.write('SITH', 'Qhhh', 'TimeUS,WLimit,VThresh,AErr',
                             self.micros64(),
                             climit, volt_thresh, ang_thresh)
-            if self.master.motors_armed():
+
+            do_strong_gimballing = self.master.motors_armed()
+            if self.siyi_settings.force_strong_gimballing:
+                do_strong_gimballing = True
+            if do_strong_gimballing:
                 new_thresh = (self.siyi_settings.thresh_climit,
                               self.siyi_settings.thresh_volt,
                               self.siyi_settings.thresh_ang)
