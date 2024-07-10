@@ -1,10 +1,11 @@
 '''
 control SIYI camera over UDP
-'''
 
-'''
 TODO:
   circle hottest area?
+
+AP_FLAKE8_CLEAN
+
 '''
 
 from MAVProxy.modules.lib import mp_module
@@ -15,21 +16,20 @@ from MAVProxy.modules.lib import camera_projection
 from pymavlink import mavutil
 from pymavlink import DFReader
 from pymavlink.rotmat import Matrix3
-from pymavlink.rotmat import Vector3
+
+import copy
 import math
+import os
+import socket
+import struct
+import time
+
 from math import radians, degrees
 from threading import Thread
-import cv2
-import traceback
-import copy
-
-import socket, time, os, struct
 
 if mp_util.has_wxpython:
-    from MAVProxy.modules.lib.mp_menu import MPMenuCallTextDialog
     from MAVProxy.modules.lib.mp_menu import MPMenuItem
     from MAVProxy.modules.lib.mp_menu import MPMenuSubMenu
-    from MAVProxy.modules.lib.mp_image import MPImage
     from MAVProxy.modules.mavproxy_map import mp_slipmap
     from MAVProxy.modules.lib.mp_image import MPImageOSD_HorizonLine
     from MAVProxy.modules.lib.mp_image import MPImageOSD_None
@@ -86,6 +86,7 @@ SET_THERMAL_THRESH = 0x45
 GET_THERMAL_THRESH_PREC = 0x46
 SET_THERMAL_THRESH_PREC = 0x47
 
+
 class ThermalParameters:
     def __init__(self, distance, target_emissivity, humidity, air_temperature, reflection_temperature):
         self.distance = distance
@@ -132,13 +133,14 @@ def crc16_from_bytes(bytes, initial=0):
                 crc = (crc << 1) & 0xFFFF
     return crc & 0xFFFF
 
+
 class PI_controller:
     '''simple PI controller'''
     def __init__(self, settings, Pgain, Igain, IMAX):
         self.Pgain = Pgain
         self.Igain = Igain
         self.IMAX = IMAX
-        self.I = 0.0
+        self.integrator = 0.0
         self.settings = settings
         self.last_t = time.time()
 
@@ -150,26 +152,27 @@ class PI_controller:
             dt = 0
         self.last_t = now
         P = self.settings.get(self.Pgain) * self.settings.gain_mul
-        I = self.settings.get(self.Igain) * self.settings.gain_mul
+        integrator = self.settings.get(self.Igain) * self.settings.gain_mul
         IMAX = self.settings.get(self.IMAX)
         max_rate = self.settings.max_rate
 
         out = P*err
-        saturated = err > 0 and (out + self.I) >= max_rate
-        saturated |= err < 0 and (out + self.I) <= -max_rate
+        saturated = err > 0 and (out + self.integrator) >= max_rate
+        saturated |= err < 0 and (out + self.integrator) <= -max_rate
         if not saturated:
-            self.I += I*err*dt
-        self.I = mp_util.constrain(self.I, -IMAX, IMAX)
-        ret = out + self.I + ff_rate
+            self.integrator += integrator * err * dt
+        self.integrator = mp_util.constrain(self.integrator, -IMAX, IMAX)
+        ret = out + self.integrator + ff_rate
         return mp_util.constrain(ret, -max_rate, max_rate)
 
     def reset_I(self):
-        self.I = 0
+        self.integrator = 0
+
 
 class DF_logger:
     '''write to a DF format log'''
     def __init__(self, filename):
-        self.outf = open(filename,'wb')
+        self.outf = open(filename, 'wb')
         self.outf.write(bytes([0]))
         self.outf.flush()
         self.mlog = DFReader.DFReader_binary(filename)
@@ -178,7 +181,7 @@ class DF_logger:
         self.last_flush = time.time()
 
     def write(self, name, fmt, fields, *args):
-        if not name in self.formats:
+        if name not in self.formats:
             self.formats[name] = self.mlog.add_format(DFReader.DFFormat(0, name, 0, fmt, fields))
             self.outf.write(self.mlog.make_format_msgbuf(self.formats[name]))
         nfields = len(fields.split(','))
@@ -210,7 +213,7 @@ def rate_mapping(desired_rate):
         (5.0, 1.75),
         (4.0, 0.0),
         (0.0, 0.0),
-        ]
+    ]
     if drate >= rate_map[0][1]:
         ret = rate_map[0][0]
         if desired_rate < 0:
@@ -227,81 +230,91 @@ def rate_mapping(desired_rate):
             return ret
     return 0.0
 
+
 class SIYIModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
         super(SIYIModule, self).__init__(mpstate, "SIYI", "SIYI camera support")
 
-        self.add_command('siyi', self.cmd_siyi, "SIYI camera control",
-                         ["<rates|connect|autofocus|zoom|yaw|pitch|center|getconfig|angle|photo|recording|lock|follow|fpv|settarget|notarget|thermal|rgbview|tempsnap|get_thermal_mode|thermal_gain|get_thermal_gain|settime>",
-                          "<therm_getenv|therm_set_distance|therm_set_emissivity|therm_set_humidity|therm_set_airtemp|therm_set_reftemp|therm_getswitch|therm_setswitch>",
-                          "<therm_getthresholds|therm_getthreshswitch|therm_setthresholds|therm_setthreshswitch>",
-                          "set (SIYISETTING)",
-                          "imode <1|2|3|4|5|6|7|8|wide|zoom|split>",
-                          "palette <WhiteHot|Sepia|Ironbow|Rainbow|Night|Aurora|RedHot|Jungle|Medical|BlackHot|GloryHot>",
-                          "thermal_mode <0|1>",
-                          ])
+        self.add_command(
+            'siyi', self.cmd_siyi, "SIYI camera control",
+            ["<rates|connect|autofocus|zoom|yaw|pitch|center|"
+             "getconfig|angle|photo|recording|lock|follow|fpv|"
+             "settarget|notarget|thermal|rgbview|tempsnap|"
+             "get_thermal_mode|thermal_gain|get_thermal_gain|"
+             "settime>",
+             "<therm_getenv|therm_set_distance|therm_set_emissivity|"
+             "therm_set_humidity|therm_set_airtemp|therm_set_reftemp|"
+             "therm_getswitch|therm_setswitch>",
+             "<therm_getthresholds|therm_getthreshswitch|therm_setthresholds|therm_setthreshswitch>",
+             "set (SIYISETTING)",
+             "imode <1|2|3|4|5|6|7|8|wide|zoom|split>",
+             "palette <WhiteHot|Sepia|Ironbow|Rainbow|Night|Aurora|RedHot|Jungle|Medical|BlackHot|GloryHot>",
+             "thermal_mode <0|1>",
+             ]
+        )
 
         # filter_dist is distance in metres
-        self.siyi_settings = mp_settings.MPSettings([("port", int, 37260),
-                                                     ('ip', str, "192.168.144.25"),
-                                                     ('yaw_rate', float, 10),
-                                                     ('pitch_rate', float, 10),
-                                                     ('rates_hz', float, 5),
-                                                     ('gain_mul', float, 1.0),
-                                                     ('yaw_gain_P', float, 1),
-                                                     ('yaw_gain_I', float, 1),
-                                                     ('yaw_gain_IMAX', float, 5),
-                                                     ('pitch_gain_P', float, 1),
-                                                     ('pitch_gain_I', float, 1),
-                                                     ('pitch_gain_IMAX', float, 5),
-                                                     ('mount_pitch', float, 0),
-                                                     ('mount_yaw', float, 0),
-                                                     ('lag', float, 0),
-                                                     ('target_rate', float, 10),
-                                                     ('telem_rate', float, 4),
-                                                     ('att_send_hz', float, 10),
-                                                     ('mode_hz', float, 0),
-                                                     ('temp_hz', float, 5),
-                                                     ('rtsp_rgb', str, 'rtsp://192.168.144.25:8554/video1'),
-                                                     ('rtsp_thermal', str, 'rtsp://192.168.144.25:8554/video2'),
-                                                     #('rtsp_rgb', str, 'rtsp://127.0.0.1:8554/video1'),
-                                                     #('rtsp_thermal', str, 'rtsp://127.0.0.1:8554/video2'),
-                                                     ('fps_thermal', int, 20),
-                                                     ('fps_rgb', int, 20),
-                                                     ('logfile', str, 'SIYI_log.bin'),
-                                                     ('thermal_fov', float, 24.2),
-                                                     ('zoom_fov', float, 62.0),
-                                                     ('wide_fov', float, 88.0),
-                                                     ('use_lidar', int, 0),
-                                                     ('use_encoders', int, 0),
-                                                     ('max_rate', float, 30.0),
-                                                     ('track_size_pct', float, 5.0),
-                                                     ('threshold_temp', int, 50),
-                                                     ('threshold_min', int, 240),
-                                                     ('los_correction', int, 0),
-                                                     ('att_control', int, 0),
-                                                     ('therm_cap_rate', float, 0),
-                                                     ('show_horizon', int, 0),
-                                                     ('autoflag_temp', float, 120),
-                                                     ('autoflag_enable', bool, False),
-                                                     ('autoflag_dist', float, 30),
-                                                     ('autoflag_history', float, 50),
-                                                     ('autoflag_slices', int, 4),
-                                                     ('track_ROI', int, 1),
-                                                     ('fetch_timeout', float, 2.0),
-                                                     MPSetting('thresh_climit', int, 50, range=(10,50)),
-                                                     MPSetting('thresh_volt', int, 80, range=(20,80)),
-                                                     MPSetting('thresh_ang', int, 4000, range=(30,4000)),
-                                                     MPSetting('thresh_climit_dis', int, 20, range=(10,50)),
-                                                     MPSetting('thresh_volt_dis', int, 40, range=(20,80)),
-                                                     MPSetting('thresh_ang_dis', int, 40, range=(30,4000)),
-                                                     ('force_strong_gimballing', bool, False),
-                                                     ('stow_on_landing', bool, True),
-                                                     ('stow_heuristics_enabled', bool, True),
-                                                     ('stow_heuristics_minalt', float, 20.0),  # metres above terrain
-                                                     ('stow_heuristics_maxhorvel', float, 2.0),  # metres/second
-                                                         ])
+        self.siyi_settings = mp_settings.MPSettings([
+            ("port", int, 37260),
+            ('ip', str, "192.168.144.25"),
+            ('yaw_rate', float, 10),
+            ('pitch_rate', float, 10),
+            ('rates_hz', float, 5),
+            ('gain_mul', float, 1.0),
+            ('yaw_gain_P', float, 1),
+            ('yaw_gain_I', float, 1),
+            ('yaw_gain_IMAX', float, 5),
+            ('pitch_gain_P', float, 1),
+            ('pitch_gain_I', float, 1),
+            ('pitch_gain_IMAX', float, 5),
+            ('mount_pitch', float, 0),
+            ('mount_yaw', float, 0),
+            ('lag', float, 0),
+            ('target_rate', float, 10),
+            ('telem_rate', float, 4),
+            ('att_send_hz', float, 10),
+            ('mode_hz', float, 0),
+            ('temp_hz', float, 5),
+            ('rtsp_rgb', str, 'rtsp://192.168.144.25:8554/video1'),
+            ('rtsp_thermal', str, 'rtsp://192.168.144.25:8554/video2'),
+            # ('rtsp_rgb', str, 'rtsp://127.0.0.1:8554/video1'),
+            # ('rtsp_thermal', str, 'rtsp://127.0.0.1:8554/video2'),
+            ('fps_thermal', int, 20),
+            ('fps_rgb', int, 20),
+            ('logfile', str, 'SIYI_log.bin'),
+            ('thermal_fov', float, 24.2),
+            ('zoom_fov', float, 62.0),
+            ('wide_fov', float, 88.0),
+            ('use_lidar', int, 0),
+            ('use_encoders', int, 0),
+            ('max_rate', float, 30.0),
+            ('track_size_pct', float, 5.0),
+            ('threshold_temp', int, 50),
+            ('threshold_min', int, 240),
+            ('los_correction', int, 0),
+            ('att_control', int, 0),
+            ('therm_cap_rate', float, 0),
+            ('show_horizon', int, 0),
+            ('autoflag_temp', float, 120),
+            ('autoflag_enable', bool, False),
+            ('autoflag_dist', float, 30),
+            ('autoflag_history', float, 50),
+            ('autoflag_slices', int, 4),
+            ('track_ROI', int, 1),
+            ('fetch_timeout', float, 2.0),
+            MPSetting('thresh_climit', int, 50, range=(10, 50)),
+            MPSetting('thresh_volt', int, 80, range=(20, 80)),
+            MPSetting('thresh_ang', int, 4000, range=(30, 4000)),
+            MPSetting('thresh_climit_dis', int, 20, range=(10, 50)),
+            MPSetting('thresh_volt_dis', int, 40, range=(20, 80)),
+            MPSetting('thresh_ang_dis', int, 40, range=(30, 4000)),
+            ('force_strong_gimballing', bool, False),
+            ('stow_on_landing', bool, True),
+            ('stow_heuristics_enabled', bool, True),
+            ('stow_heuristics_minalt', float, 20.0),  # metres above terrain
+            ('stow_heuristics_maxhorvel', float, 2.0),  # metres/second
+        ])
         self.add_completion_function('(SIYISETTING)',
                                      self.siyi_settings.completion)
         self.sock = None
@@ -316,8 +329,8 @@ class SIYIModule(mp_module.MPModule):
         self.yaw_end = None
         self.pitch_end = None
         self.rf_dist = 0
-        self.attitude = (0,0,0,0,0,0)
-        self.encoders = (0,0,0)
+        self.attitude = (0, 0, 0, 0, 0, 0)
+        self.encoders = (0, 0, 0)
         self.voltages = None
         self.tmax = -1
         self.tmin = -1
@@ -387,32 +400,34 @@ class SIYIModule(mp_module.MPModule):
         }
 
         if mp_util.has_wxpython:
-            menu = MPMenuSubMenu('SIYI',
-                                 items=[
-                                     MPMenuItem('Center', 'Center', '# siyi center '),
-                                     MPMenuItem('ModeFollow', 'ModeFollow', '# siyi follow '),
-                                     MPMenuItem('ModeLock', 'ModeLock', '# siyi lock '),
-                                     MPMenuItem('ModeFPV', 'ModeFPV', '# siyi fpv '),
-                                     MPMenuItem('GetConfig', 'GetConfig', '# siyi getconfig '),
-                                     MPMenuItem('TakePhoto', 'TakePhoto', '# siyi photo '),
-                                     MPMenuItem('AutoFocus', 'AutoFocus', '# siyi autofocus '),
-                                     MPMenuItem('ImageSplit', 'ImageSplit', '# siyi imode split '),
-                                     MPMenuItem('ImageWide', 'ImageWide', '# siyi imode wide '),
-                                     MPMenuItem('ImageZoom', 'ImageZoom', '# siyi imode zoom '),
-                                     MPMenuItem('Recording', 'Recording', '# siyi recording '),
-                                     MPMenuItem('ClearTarget', 'ClearTarget', '# siyi notarget '),
-                                     MPMenuItem('ThermalView', 'Thermalview', '# siyi thermal '),
-                                     MPMenuItem('RawThermalView', 'RawThermalview', '# siyi rawthermal '),
-                                     MPMenuItem('RGBView', 'RGBview', '# siyi rgbview '),
-                                     MPMenuItem('ResetAttitude', 'ResetAttitude', '# siyi resetattitude '),
-                                     MPMenuSubMenu('Zoom',
-                                                   items=[MPMenuItem('Zoom%u'%z, 'Zoom%u'%z, '# siyi zoom %u ' % z) for z in range(1,11)]),
-                                     MPMenuSubMenu('ThermalGain',
-                                                   items=[MPMenuItem('HighGain', 'HighGain', '# siyi thermal_gain 1'),
-                                                          MPMenuItem('LowGain', 'LowGain', '# siyi thermal_gain 0')]),
-
-                                     MPMenuSubMenu('Threshold',
-                                                  items=[MPMenuItem('Threshold%u'%z, 'Threshold%u'%z, '# siyi set threshold_temp %u ' % z) for z in range(20,115,5)])])
+            menu = MPMenuSubMenu('SIYI', items=[
+                MPMenuItem('Center', 'Center', '# siyi center '),
+                MPMenuItem('ModeFollow', 'ModeFollow', '# siyi follow '),
+                MPMenuItem('ModeLock', 'ModeLock', '# siyi lock '),
+                MPMenuItem('ModeFPV', 'ModeFPV', '# siyi fpv '),
+                MPMenuItem('GetConfig', 'GetConfig', '# siyi getconfig '),
+                MPMenuItem('TakePhoto', 'TakePhoto', '# siyi photo '),
+                MPMenuItem('AutoFocus', 'AutoFocus', '# siyi autofocus '),
+                MPMenuItem('ImageSplit', 'ImageSplit', '# siyi imode split '),
+                MPMenuItem('ImageWide', 'ImageWide', '# siyi imode wide '),
+                MPMenuItem('ImageZoom', 'ImageZoom', '# siyi imode zoom '),
+                MPMenuItem('Recording', 'Recording', '# siyi recording '),
+                MPMenuItem('ClearTarget', 'ClearTarget', '# siyi notarget '),
+                MPMenuItem('ThermalView', 'Thermalview', '# siyi thermal '),
+                MPMenuItem('RawThermalView', 'RawThermalview', '# siyi rawthermal '),
+                MPMenuItem('RGBView', 'RGBview', '# siyi rgbview '),
+                MPMenuItem('ResetAttitude', 'ResetAttitude', '# siyi resetattitude '),
+                MPMenuSubMenu('Zoom', items=[
+                    MPMenuItem('Zoom%u' % z, 'Zoom%u' % z, '# siyi zoom %u ' % z) for z in range(1, 11)
+                ]),
+                MPMenuSubMenu('ThermalGain', items=[
+                    MPMenuItem('HighGain', 'HighGain', '# siyi thermal_gain 1'),
+                    MPMenuItem('LowGain', 'LowGain', '# siyi thermal_gain 0'),
+                ]),
+                MPMenuSubMenu('Threshold', items=[
+                    MPMenuItem('Threshold%u' % z, 'Threshold%u' % z, '# siyi set threshold_temp %u ' % z) for z in range(20, 115, 5)  # noqa:E501
+                ]),
+            ])
             map = self.module('map')
             if map is not None:
                 map.add_menu(menu)
@@ -425,7 +440,7 @@ class SIYIModule(mp_module.MPModule):
 
     def millis32(self):
         return int((time.time()-self.start_time)*1.0e3)
-    
+
     def cmd_siyi(self, args):
         '''siyi command parser'''
         usage = "usage: siyi <set|rates>"
@@ -569,9 +584,9 @@ class SIYIModule(mp_module.MPModule):
         if len(args) < 1:
             print("Usage: siyi imode MODENUM")
             return
-        imode_map = { "wide" : 5, "zoom" : 3, "split" : 2 }
+        imode_map = {"wide": 5, "zoom": 3, "split": 2}
         self.rgb_lens = args[0]
-        mode = imode_map.get(self.rgb_lens,None)
+        mode = imode_map.get(self.rgb_lens, None)
         if mode is None:
             mode = int(args[0])
         self.send_packet_fmt(SET_IMAGE_TYPE, "<B", mode)
@@ -582,10 +597,20 @@ class SIYIModule(mp_module.MPModule):
         if len(args) < 1:
             print("Usage: siyi palette PALETTENUM")
             return
-        pal_map = { "WhiteHot" : 0, "Sepia" : 2, "Ironbow" : 3, "Rainbow" : 4,
-                    "Night" : 5, "Aurora" : 6, "RedHot" : 7, "Jungle" : 8 , "Medical" : 9,
-                    "BlackHot" : 10, "GloryHot" : 11}
-        pal = pal_map.get(args[0],None)
+        pal_map = {
+            "WhiteHot": 0,
+            "Sepia": 2,
+            "Ironbow": 3,
+            "Rainbow": 4,
+            "Night": 5,
+            "Aurora": 6,
+            "RedHot": 7,
+            "Jungle": 8 ,
+            "Medical": 9,
+            "BlackHot": 10,
+            "GloryHot": 11,
+        }
+        pal = pal_map.get(args[0], None)
         if pal is None:
             pal = int(args[0])
         self.send_packet_fmt(SET_THERMAL_PALETTE, "<B", pal)
@@ -601,11 +626,11 @@ class SIYIModule(mp_module.MPModule):
             return base + ".mts"
         i = 1
         while True:
-            vidfile = os.path.join(self.logdir, "%s%u.mts" % (base,i))
+            vidfile = os.path.join(self.logdir, "%s%u.mts" % (base, i))
             if not os.path.exists(vidfile):
                 self.logf.write('SIVI', 'QBB', 'TimeUS,Type,Idx',
                                 self.micros64(),
-                                1 if base=='thermal' else 0,
+                                1 if base == 'thermal' else 0,
                                 i)
                 break
             i += 1
@@ -613,21 +638,21 @@ class SIYIModule(mp_module.MPModule):
 
     def cmd_thermal(self):
         '''open thermal viewer'''
-        vidfile,idx = self.video_filename('thermal')
+        vidfile, idx = self.video_filename('thermal')
         self.thermal_view = CameraView(self, self.siyi_settings.rtsp_thermal,
-                                       vidfile, (640,512), thermal=True,
+                                       vidfile, (640, 512), thermal=True,
                                        fps=self.siyi_settings.fps_thermal,
                                        video_idx=idx)
 
     def cmd_rawthermal(self):
         '''open raw thermal viewer'''
-        self.rawthermal_view = RawThermal(self, (640,512))
+        self.rawthermal_view = RawThermal(self, (640, 512))
 
     def cmd_rgbview(self):
         '''open rgb viewer'''
-        vidfile,idx = self.video_filename('rgb')
+        vidfile, idx = self.video_filename('rgb')
         self.rgb_view = CameraView(self, self.siyi_settings.rtsp_rgb,
-                                   vidfile, (1280,720), thermal=False,
+                                   vidfile, (1280, 720), thermal=False,
                                    fps=self.siyi_settings.fps_rgb,
                                    video_idx=idx)
 
@@ -719,7 +744,7 @@ class SIYIModule(mp_module.MPModule):
             return
         temps = [int(args[0]), int(args[2]), int(args[4]), int(args[6])]
         colors = []
-        for i in [1,3,5]:
+        for i in [1, 3, 5]:
             colors.append([int(x) for x in args[i].split(',')])
         self.send_packet_fmt(SET_THERMAL_THRESH, "<BhhBBBBhhBBBBhhBBB",
                              1, temps[0], temps[1], *colors[0],
@@ -744,7 +769,7 @@ class SIYIModule(mp_module.MPModule):
         self.target_pos = None
         self.clear_target()
         self.send_packet_fmt(SET_ANGLE, "<hh", int(yaw*10), int(pitch*10))
-        
+
     def send_rates(self):
         '''send rates packet'''
         now = time.time()
@@ -814,14 +839,13 @@ class SIYIModule(mp_module.MPModule):
         if self.siyi_settings.att_send_hz <= 0 or now - self.last_att_send_t < 1.0/self.siyi_settings.att_send_hz:
             return
         self.last_att_send_t = now
-        att = self.master.messages.get('ATTITUDE',None)
+        att = self.master.messages.get('ATTITUDE', None)
         if att is None:
             return
         self.send_packet_fmt(ATTITUDE_EXTERNAL, "<Iffffff",
                              self.millis32(),
                              att.roll, att.pitch, att.yaw,
                              att.rollspeed, att.pitchspeed, att.yawspeed)
-
 
     def send_packet(self, command_id, pkt):
         '''send SIYI packet'''
@@ -863,32 +887,32 @@ class SIYIModule(mp_module.MPModule):
         v = struct.unpack(fmt, data[:fsize])
         args = list(v)
         args.extend([0]*(12-len(args)))
-        self.logf.write('SIIN', 'QBffffffffffff', 'TimeUS,Cmd,P1,P2,P3,P4,P5,P6,P7,P8,P9,P10,P11,P12', self.micros64(), command_id, *args)
+        self.logf.write('SIIN', 'QBffffffffffff', 'TimeUS,Cmd,P1,P2,P3,P4,P5,P6,P7,P8,P9,P10,P11,P12', self.micros64(), command_id, *args)  # noqa:E501
         return v
 
     def parse_data(self, pkt):
         '''parse SIYI packet'''
         while len(pkt) >= 10:
-            (h1,h2,rack,plen,seq,cmd) = struct.unpack("<BBBHHB", pkt[:8])
+            (h1, h2, rack, plen, seq, cmd) = struct.unpack("<BBBHHB", pkt[:8])
             if plen+10 > len(pkt):
-                #print("SIYI: short packet", plen+10, len(pkt))
+                # print("SIYI: short packet", plen+10, len(pkt))
                 break
             self.parse_packet(pkt[:plen+10])
             pkt = pkt[plen+10:]
 
     def parse_packet(self, pkt):
         '''parse SIYI packet'''
-        (h1,h2,rack,plen,seq,cmd) = struct.unpack("<BBBHHB", pkt[:8])
+        (h1, h2, rack, plen, seq, cmd) = struct.unpack("<BBBHHB", pkt[:8])
         data = pkt[8:-2]
         crc, = struct.unpack("<H", pkt[-2:])
         crc2 = crc16_from_bytes(pkt[:-2])
         if crc != crc2:
             self.bad_crc += 1
-            #print("SIYI: BAD CRC", crc, crc2, self.bad_crc)
+            # print("SIYI: BAD CRC", crc, crc2, self.bad_crc)
             return
 
         if cmd == ACQUIRE_FIRMWARE_VERSION:
-            patch,minor,major,gpatch,gminor,gmajor,zpatch,zminor,zmajor,_,_,_ = self.unpack(cmd, "<BBBBBBBBBBBB", data)
+            patch, minor, major, gpatch, gminor, gmajor, zpatch, zminor, zmajor, _, _, _ = self.unpack(cmd, "<BBBBBBBBBBBB", data)  # noqa:E501
             self.have_version = True
             print("SIYI CAM %u.%u.%u" % (major, minor, patch))
             print("SIYI Gimbal %u.%u.%u" % (gmajor, gminor, gpatch))
@@ -897,13 +921,13 @@ class SIYIModule(mp_module.MPModule):
             self.send_packet_fmt(SET_THERMAL_PALETTE, "<B", 0)
 
         elif cmd == ACQUIRE_GIMBAL_ATTITUDE:
-            (z,y,x,sz,sy,sx) = self.unpack(cmd, "<hhhhhh", data)
+            (z, y, x, sz, sy, sx) = self.unpack(cmd, "<hhhhhh", data)
             now = time.time()
             dt = now - self.last_att_t
-            self.att_dt_lpf = 0.95 * self.att_dt_lpf + 0.05 * max(dt,0.01)
+            self.att_dt_lpf = 0.95 * self.att_dt_lpf + 0.05 * max(dt, 0.01)
             self.last_att_t = now
-            (roll,pitch,yaw) = (x*0.1, y*0.1, mp_util.wrap_180(-z*0.1))
-            self.attitude = (roll,pitch,yaw, sx*0.1, sy*0.1, -sz*0.1)
+            (roll, pitch, yaw) = (x*0.1, y*0.1, mp_util.wrap_180(-z*0.1))
+            self.attitude = (roll, pitch, yaw, sx*0.1, sy*0.1, -sz*0.1)
             self.send_named_float('CROLL', self.attitude[0])
             self.send_named_float('CPITCH', self.attitude[1])
             self.send_named_float('CYAW', self.attitude[2])
@@ -911,11 +935,12 @@ class SIYIModule(mp_module.MPModule):
             self.send_named_float('CPITCH_RT', self.attitude[4])
             self.send_named_float('CYAW_RT', self.attitude[5])
             self.update_status()
-            self.logf.write('SIGA', 'Qffffffhhhhhh', 'TimeUS,Y,P,R,Yr,Pr,Rr,z,y,x,sz,sy,sx',
-                            self.micros64(),
-                                self.attitude[2], self.attitude[1], self.attitude[0],
-                                self.attitude[5], self.attitude[4], self.attitude[3],
-                                z,y,x,sz,sy,sx)
+            self.logf.write(
+                'SIGA', 'Qffffffhhhhhh', 'TimeUS,Y,P,R,Yr,Pr,Rr,z,y,x,sz,sy,sx',
+                self.micros64(),
+                self.attitude[2], self.attitude[1], self.attitude[0],
+                self.attitude[5], self.attitude[4], self.attitude[3],
+                z, y, x, sz, sy, sx)
 
         elif cmd == ACQUIRE_GIMBAL_CONFIG_INFO:
             res, hdr_sta, res2, record_sta, gim_motion, gim_mount, video, x = self.unpack(cmd, "<BBBBBBBB", data)
@@ -943,7 +968,7 @@ class SIYIModule(mp_module.MPModule):
             self.last_rf_t = time.time()
             self.update_status()
             self.send_named_float('RFND', self.rf_dist)
-            SR = self.get_slantrange(0,0,1,1)
+            SR = self.get_slantrange(0, 0, 1, 1)
             if SR is None:
                 SR = -1.0
             self.logf.write('SIRF', 'Qff', 'TimeUS,Dist,SR',
@@ -952,10 +977,10 @@ class SIYIModule(mp_module.MPModule):
                             SR)
 
         elif cmd == READ_ENCODERS:
-            y,p,r, = self.unpack(cmd, "<hhh", data)
+            y, p, r, = self.unpack(cmd, "<hhh", data)
             self.last_enc_t = time.time()
             self.last_enc_recv_t = time.time()
-            self.encoders = (r*0.1,p*0.1,-y*0.1)
+            self.encoders = (r*0.1, p*0.1, -y*0.1)
             self.send_named_float('ENC_R', self.encoders[0])
             self.send_named_float('ENC_P', self.encoders[1])
             self.send_named_float('ENC_Y', self.encoders[2])
@@ -971,11 +996,11 @@ class SIYIModule(mp_module.MPModule):
 
         elif cmd == READ_VOLTAGES:
             if len(data) == 11:
-                y,p,r,_,_,_ = self.unpack(cmd, "<hhhhhb", data)
+                y, p, r, _, _, _ = self.unpack(cmd, "<hhhhhb", data)
             else:
-                y,p,r = self.unpack(cmd, "<hhh", data)
+                y, p, r = self.unpack(cmd, "<hhh", data)
             self.last_volt_t = time.time()
-            self.voltages = (r*0.001,p*0.001,y*0.001)
+            self.voltages = (r*0.001, p*0.001, y*0.001)
             self.send_named_float('VLT_R', self.voltages[0])
             self.send_named_float('VLT_P', self.voltages[1])
             self.send_named_float('VLT_Y', self.voltages[2])
@@ -984,7 +1009,7 @@ class SIYIModule(mp_module.MPModule):
                             self.voltages[0], self.voltages[1], self.voltages[2])
 
         elif cmd == READ_THRESHOLDS:
-            climit,volt_thresh,ang_thresh, = self.unpack(cmd, "<hhh", data)
+            climit, volt_thresh, ang_thresh, = self.unpack(cmd, "<hhh", data)
             self.last_thresh_t = time.time()
             self.send_named_float('CLIMIT', climit)
             self.send_named_float('VTHRESH', volt_thresh)
@@ -1008,10 +1033,10 @@ class SIYIModule(mp_module.MPModule):
                 weak_control = 1
             if (climit != new_thresh[0] or volt_thresh != new_thresh[1] or ang_thresh != new_thresh[2]):
                 print("SIYI: Setting thresholds (%u,%u,%u) -> (%u,%u,%u)" %
-                      (climit,volt_thresh,ang_thresh,new_thresh[0],new_thresh[1],new_thresh[2]))
+                      (climit, volt_thresh, ang_thresh, new_thresh[0], new_thresh[1], new_thresh[2]))
                 self.send_packet_fmt(SET_THRESHOLDS, "<hhh",
                                      new_thresh[0], new_thresh[1], new_thresh[2])
-                self.send_packet_fmt(SET_WEAK_CONTROL,"<B", weak_control)
+                self.send_packet_fmt(SET_WEAK_CONTROL, "<B", weak_control)
 
         elif cmd == READ_CONTROL_MODE:
             self.control_mode, = self.unpack(cmd, "<B", data)
@@ -1023,7 +1048,7 @@ class SIYIModule(mp_module.MPModule):
             if len(data) < 12:
                 print("READ_TEMP_FULL_SCREEN: Expected 12 bytes, got %u" % len(data))
                 return
-            self.tmax,self.tmin,self.tmax_x,self.tmax_y,self.tmin_x,self.tmin_y = self.unpack(cmd, "<HHHHHH", data)
+            self.tmax, self.tmin, self.tmax_x, self.tmax_y, self.tmin_x, self.tmin_y = self.unpack(cmd, "<HHHHHH", data)
             self.tmax = self.tmax * 0.01
             self.tmin = self.tmin * 0.01
             self.send_named_float('TMIN', self.tmin)
@@ -1039,7 +1064,7 @@ class SIYIModule(mp_module.MPModule):
                             self.thermal_capture_count)
             if self.thermal_view is not None:
                 threshold = self.siyi_settings.threshold_temp
-                threshold_value = int(255*(threshold - self.tmin)/max(1,(self.tmax-self.tmin)))
+                threshold_value = int(255*(threshold - self.tmin)/max(1, (self.tmax-self.tmin)))
                 threshold_value = mp_util.constrain(threshold_value, 0, 255)
                 if self.tmax < threshold:
                     threshold_value = -1
@@ -1061,64 +1086,64 @@ class SIYIModule(mp_module.MPModule):
             if ok != 1:
                 print("Threshold set failure")
         elif cmd == SET_WEAK_CONTROL:
-            ok,weak_control, = self.unpack(cmd, "<BB", data)
+            ok, weak_control, = self.unpack(cmd, "<BB", data)
             if ok != 1:
                 print("Weak control set failure")
             else:
                 print("Weak control is %u" % weak_control)
         elif cmd == GET_THERMAL_MODE:
-            ok, = self.unpack(cmd,"<B", data)
+            ok, = self.unpack(cmd, "<B", data)
             if self.siyi_settings.therm_cap_rate > 0 and ok != 1:
                 print("ThermalMode: %u" % ok)
                 self.send_packet_fmt(SET_THERMAL_MODE, "<B", 1)
 
         elif cmd == SET_THERMAL_MODE:
-            ok, = self.unpack(cmd,"<B", data)
+            ok, = self.unpack(cmd, "<B", data)
             print("SetThermalMode: %u" % ok)
 
         elif cmd == SET_THERMAL_GAIN:
-            ok, = self.unpack(cmd,"<B", data)
+            ok, = self.unpack(cmd, "<B", data)
             print("SetThermalGain: %u" % ok)
 
         elif cmd == GET_TEMP_FRAME:
-            ok, = self.unpack(cmd,"<B", data)
+            ok, = self.unpack(cmd, "<B", data)
             if ok:
                 self.thermal_capture_count += 1
 
         elif cmd == GET_THERMAL_ENVSWITCH:
-            ok, = self.unpack(cmd,"<B", data)
+            ok, = self.unpack(cmd, "<B", data)
             print("ThermalEnvSwitch: %u" % ok)
 
         elif cmd == SET_THERMAL_ENVSWITCH:
-            ok, = self.unpack(cmd,"<B", data)
+            ok, = self.unpack(cmd, "<B", data)
             print("ThermalEnvSwitch: %u" % ok)
 
         elif cmd == SET_THERMAL_PARAM:
-            ok, = self.unpack(cmd,"<B", data)
+            ok, = self.unpack(cmd, "<B", data)
             print("SetThermalParam: %u" % ok)
-            
+
         elif cmd == GET_THERMAL_PARAM:
-            dist,emiss,humidity,airtemp,reftemp, = self.unpack(cmd,"<HHHHH", data)
+            dist, emiss, humidity, airtemp, reftemp, = self.unpack(cmd, "<HHHHH", data)
             self.thermal_param = ThermalParameters(dist*0.01, emiss*0.01, humidity*0.01, airtemp*0.01, reftemp*0.01)
             print("ThermalParam: %s" % self.thermal_param)
 
         elif cmd == SET_TIME:
-            ok, = self.unpack(cmd,"<B", data)
+            ok, = self.unpack(cmd, "<B", data)
             print("SetTime: %u" % ok)
-            
+
         elif cmd in [GET_THERMAL_THRESH_STATE, SET_THERMAL_THRESH_STATE]:
-            ok, = self.unpack(cmd,"<B", data)
+            ok, = self.unpack(cmd, "<B", data)
             print("ThermalThreshState: %u" % ok)
 
         elif cmd in [SET_THERMAL_THRESH]:
-            ok, = self.unpack(cmd,"<B", data)
+            ok, = self.unpack(cmd, "<B", data)
             print("SetThermThresh: %u" % ok)
-            
+
         elif cmd == GET_THERMAL_THRESH:
-            sw1,t1min,t1max,r1,g1,b1,sw2,t2min,t2max,r2,g2,b2,sw3,t3min,t3max,r3,g3,b3, = self.unpack(cmd,"<BhhBBB BhhBBB BhhBBB", data)
+            sw1, t1min, t1max, r1, g1, b1, sw2, t2min, t2max, r2, g2, b2, sw3, t3min, t3max, r3, g3, b3, = self.unpack(cmd, "<BhhBBB BhhBBB BhhBBB", data)  # noqa:E501
             print("ThermalThresh: %u(%d:%d %u,%u,%u) %u(%d:%d %u,%u,%u) %u(%d:%d %u,%u,%u)" % (
-                sw1,t1min,t1max,r1,g1,b1,sw2,t2min,t2max,r2,g2,b2,sw3,t3min,t3max,r3,g3,b3))
-            
+                sw1, t1min, t1max, r1, g1, b1, sw2, t2min, t2max, r2, g2, b2, sw3, t3min, t3max, r3, g3, b3))
+
         elif cmd in [SET_ANGLE, CENTER, GIMBAL_ROTATION, ABSOLUTE_ZOOM, SET_IMAGE_TYPE,
                      REQUEST_CONTINUOUS_DATA, SET_THERMAL_PALETTE, MANUAL_ZOOM_AND_AUTO_FOCUS]:
             # an ack
@@ -1138,16 +1163,15 @@ class SIYIModule(mp_module.MPModule):
     def update_status(self):
         if self.attitude is None:
             return
-        (r,p,y) = self.get_gimbal_attitude()
+        (r, p, y) = self.get_gimbal_attitude()
         self.console.set_status('SIYI', 'SIYI (%.1f,%.1f,%.1f) %.1fHz SR=%.1f M=%d' % (
-            r,p,y,
+            r, p, y,
             1.0/self.att_dt_lpf,
             self.rf_dist, self.control_mode), row=6)
         if self.tmin is not None:
             self.console.set_status('TEMP', 'TEMP %.2f/%.2f' % (self.tmin, self.tmax), row=6)
             self.update_title()
         self.console.set_status('TCAP', 'TCAP %u' % self.thermal_capture_count, row=6)
-
 
     def check_rate_end(self):
         '''check for ending yaw/pitch command'''
@@ -1162,21 +1186,21 @@ class SIYIModule(mp_module.MPModule):
     def get_encoder_attitude(self):
         '''get attitude from encoders in vehicle frame'''
         now = time.time()
-        att = self.master.messages.get('ATTITUDE',None)
+        att = self.master.messages.get('ATTITUDE', None)
         if now - self.last_enc_recv_t > 2.0 or att is None:
             return None
         m = Matrix3()
         # we use zero yaw as this is in vehicle frame
-        m.from_euler(att.roll,att.pitch,0)
-        m.rotate_312(radians(self.encoders[0]),radians(self.encoders[1]),radians(self.encoders[2]))
-        (r,p,y) = m.to_euler()
-        return degrees(r),degrees(p),mp_util.wrap_180(degrees(y))
+        m.from_euler(att.roll, att.pitch, 0)
+        m.rotate_312(radians(self.encoders[0]), radians(self.encoders[1]), radians(self.encoders[2]))
+        (r, p, y) = m.to_euler()
+        return degrees(r), degrees(p), mp_util.wrap_180(degrees(y))
 
     def get_direct_attitude(self):
         '''get extrapolated gimbal attitude, returning r,p,y in degrees in vehicle frame'''
         now = time.time()
         dt = (now - self.last_att_t)+self.siyi_settings.lag
-        dt = max(dt,0)
+        dt = max(dt, 0)
         yaw = self.attitude[2]+self.attitude[5]*dt
         pitch = self.attitude[1]+self.attitude[4]*dt
         yaw = mp_util.wrap_180(yaw)
@@ -1187,27 +1211,27 @@ class SIYIModule(mp_module.MPModule):
         '''get extrapolated gimbal attitude, returning yaw and pitch'''
         ret = self.get_encoder_attitude()
         if ret is not None:
-            (r,p,y) = ret
+            (r, p, y) = ret
             now = time.time()
             if now - self.last_SIEA >= 0.2:
                 self.last_SIEA = now
                 self.logf.write('SIEA', 'Qfff', 'TimeUS,R,P,Y',
                                 self.micros64(),
-                                r,p,y)
+                                r, p, y)
                 self.send_named_float('EA_R', r)
                 self.send_named_float('EA_P', p)
                 self.send_named_float('EA_Y', y)
         if self.siyi_settings.use_encoders:
             if ret is not None:
-                return r,p,y
+                return r, p, y
         return self.get_direct_attitude()
 
     def get_fov_attitude(self):
         '''get attitude for FOV calculations'''
-        (r,p,y) = self.get_gimbal_attitude()
-        return (r,p-self.siyi_settings.mount_pitch,mp_util.wrap_180(y-self.siyi_settings.mount_yaw))
+        (r, p, y) = self.get_gimbal_attitude()
+        return (r, p-self.siyi_settings.mount_pitch, mp_util.wrap_180(y-self.siyi_settings.mount_yaw))
 
-    def get_slantrange(self,x,y,FOV,aspect_ratio):
+    def get_slantrange(self, x, y, FOV, aspect_ratio):
         '''
          get range to ground
          x and y are from -1 to 1, relative to center of camera view
@@ -1215,11 +1239,14 @@ class SIYIModule(mp_module.MPModule):
         C = camera_projection.CameraParams(xresolution=1024, yresolution=int(1024/aspect_ratio), FOV=FOV)
         cproj = camera_projection.CameraProjection(C, elevation_model=self.module('terrain').ElevationModel)
         fov_att = self.get_fov_attitude()
-        att = self.master.messages.get('ATTITUDE',None)
-        gpi = self.master.messages.get('GLOBAL_POSITION_INT',None)
+        att = self.master.messages.get('ATTITUDE', None)
+        gpi = self.master.messages.get('GLOBAL_POSITION_INT', None)
         if gpi is None or att is None:
             return None
-        return cproj.get_slantrange(gpi.lat*1.0e-7,gpi.lon*1.0e-7,gpi.alt*1.0e-3,fov_att[0],fov_att[1],fov_att[2]+math.degrees(att.yaw))
+        return cproj.get_slantrange(
+            gpi.lat*1.0e-7, gpi.lon*1.0e-7, gpi.alt*1.0e-3,
+            fov_att[0], fov_att[1], fov_att[2]+math.degrees(att.yaw)
+        )
 
     def get_latlonalt(self, slant_range, x, y, FOV, aspect_ratio):
         '''
@@ -1231,11 +1258,15 @@ class SIYIModule(mp_module.MPModule):
         px = int(C.xresolution * 0.5*(1+x))
         py = int(C.yresolution * 0.5*(1+y))
         fov_att = self.get_fov_attitude()
-        att = self.master.messages.get('ATTITUDE',None)
-        gpi = self.master.messages.get('GLOBAL_POSITION_INT',None)
+        att = self.master.messages.get('ATTITUDE', None)
+        gpi = self.master.messages.get('GLOBAL_POSITION_INT', None)
         if gpi is None or att is None:
             return None
-        return cproj.get_latlonalt_for_pixel(px, py, gpi.lat*1.0e-7,gpi.lon*1.0e-7,gpi.alt*1.0e-3,fov_att[0],fov_att[1],fov_att[2]+math.degrees(att.yaw))
+        return cproj.get_latlonalt_for_pixel(
+            px, py,
+            gpi.lat*1.0e-7, gpi.lon*1.0e-7, gpi.alt*1.0e-3,
+            fov_att[0], fov_att[1], fov_att[2]+math.degrees(att.yaw)
+        )
 
     def get_target_yaw_pitch(self, lat, lon, alt, mylat, mylon, myalt, vehicle_yaw_rad):
         '''get target yaw/pitch in vehicle frame for a target lat/lon'''
@@ -1251,10 +1282,10 @@ class SIYIModule(mp_module.MPModule):
         yaw_deg = mp_util.wrap_180(math.degrees(yaw))
         pitch_deg = math.degrees(pitch)
         return yaw_deg, pitch_deg
-    
+
     def update_target(self):
         '''update position targetting'''
-        if not 'GLOBAL_POSITION_INT' in self.master.messages or not 'ATTITUDE' in self.master.messages:
+        if 'GLOBAL_POSITION_INT' not in self.master.messages or 'ATTITUDE' not in self.master.messages:
             return
 
         # added rate of target update
@@ -1295,7 +1326,7 @@ class SIYIModule(mp_module.MPModule):
 
         self.send_named_float('TYAW', yaw_deg)
         self.send_named_float('TPITCH', pitch_deg)
-        
+
         if self.siyi_settings.att_control == 1:
             self.yaw_rate = None
             self.pitch_rate = None
@@ -1313,7 +1344,7 @@ class SIYIModule(mp_module.MPModule):
         else:
             los_yaw_rate = 0.0
             los_pitch_rate = 0.0
-        #print(los_yaw_rate, los_pitch_rate)
+        # print(los_yaw_rate, los_pitch_rate)
 
         cam_roll, cam_pitch, cam_yaw = self.get_gimbal_attitude()
         err_yaw = mp_util.wrap_180(yaw_deg - cam_yaw)
@@ -1338,22 +1369,25 @@ class SIYIModule(mp_module.MPModule):
         C = camera_projection.CameraParams(xresolution=1024, yresolution=int(1024/aspect_ratio), FOV=FOV)
         cproj = camera_projection.CameraProjection(C, elevation_model=self.module('terrain').ElevationModel)
         fov_att = self.get_fov_attitude()
-        att = self.master.messages.get('ATTITUDE',None)
-        gpi = self.master.messages.get('GLOBAL_POSITION_INT',None)
+        att = self.master.messages.get('ATTITUDE', None)
+        gpi = self.master.messages.get('GLOBAL_POSITION_INT', None)
         if gpi is None or att is None:
             return None
-        points = cproj.get_projection(gpi.lat*1.0e-7,gpi.lon*1.0e-7,gpi.alt*1.0e-3,fov_att[0],fov_att[1],fov_att[2]+math.degrees(att.yaw))
+        points = cproj.get_projection(
+            gpi.lat*1.0e-7, gpi.lon*1.0e-7, gpi.alt*1.0e-3,
+            fov_att[0], fov_att[1], fov_att[2]+math.degrees(att.yaw)
+        )
         if points is not None:
             self.mpstate.map.add_object(mp_slipmap.SlipPolygon(name, points, layer='SIYI',
                                                                linewidth=2, colour=color))
 
     def show_fov(self):
         '''show FOV polygons'''
-        self.show_fov1(self.siyi_settings.thermal_fov, 'FOV_thermal', 640.0/512.0, (0,0,128))
+        self.show_fov1(self.siyi_settings.thermal_fov, 'FOV_thermal', 640.0/512.0, (0, 0, 128))
         FOV2 = self.siyi_settings.wide_fov
         if self.rgb_lens == "zoom":
             FOV2 = self.siyi_settings.zoom_fov / self.last_zoom
-        self.show_fov1(FOV2, 'FOV_RGB', 1280.0/720.0, (0,128,128))
+        self.show_fov1(FOV2, 'FOV_RGB', 1280.0/720.0, (0, 128, 128))
 
     def camera_click(self, mode, latlonalt):
         '''handle click on camera window'''
@@ -1367,7 +1401,7 @@ class SIYIModule(mp_module.MPModule):
         else:
             self.mpstate.map.add_object(
                 mp_slipmap.SlipIcon("SIYIClick", latlon, self.click_icon, layer="SIYI")
-                )
+            )
 
     def handle_marker(self, marker):
         '''handle marker menu on image'''
@@ -1421,12 +1455,13 @@ class SIYIModule(mp_module.MPModule):
             try:
                 self.show_fov()
             except Exception as ex:
-                print(traceback.format_exc())
+                self.print_caught_exception(ex)
+
         elif mtype == 'EXTENDED_SYS_STATE':
             if self.siyi_settings.stow_on_landing:
                 self.extended_sys_state_received_time = time.time()
                 if (m.landed_state == mavutil.mavlink.MAV_LANDED_STATE_LANDING and
-                    self.last_landed_state != mavutil.mavlink.MAV_LANDED_STATE_LANDING):
+                        self.last_landed_state != mavutil.mavlink.MAV_LANDED_STATE_LANDING):
                     # we've just transition into landing
                     self.retract()
                 self.last_landed_state = m.landed_state
@@ -1487,8 +1522,8 @@ class SIYIModule(mp_module.MPModule):
                     mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL,
                     0,   # confirmation
                     mavutil.mavlink.MAVLINK_MSG_ID_EXTENDED_SYS_STATE,  # p1
-                    1e6, #p2 interval (microseconds)
-                    0,   #p3 instance
+                    1e6, # p2 interval (microseconds)
+                    0,   # p3 instance
                     0,
                     0,
                     0,
@@ -1536,7 +1571,6 @@ class SIYIModule(mp_module.MPModule):
             # climbing
             return
 
-
         self.landing_heuristics["armed"] = False
         self.retract()
 
@@ -1544,16 +1578,16 @@ class SIYIModule(mp_module.MPModule):
         '''show horizon lines'''
         if self.rgb_view is None or self.rgb_view.im is None:
             return
-        att = self.master.messages.get('ATTITUDE',None)
+        att = self.master.messages.get('ATTITUDE', None)
         if att is None:
             return
-        r,p,y = self.get_encoder_attitude()
-        self.rgb_view.im.add_OSD(MPImageOSD_HorizonLine('hor1', r, p, self.siyi_settings.wide_fov, (255,0,255)))
+        r, p, y = self.get_encoder_attitude()
+        self.rgb_view.im.add_OSD(MPImageOSD_HorizonLine('hor1', r, p, self.siyi_settings.wide_fov, (255, 0, 255)))
         # convert SIYI 312 to 321
         m = Matrix3()
         m.from_euler312(radians(self.attitude[0]), radians(self.attitude[1]), radians(self.attitude[2]))
-        r,p,y = m.to_euler()
-        self.rgb_view.im.add_OSD(MPImageOSD_HorizonLine('hor2', degrees(r), degrees(p), self.siyi_settings.wide_fov, (255,255,0)))
+        r, p, y = m.to_euler()
+        self.rgb_view.im.add_OSD(MPImageOSD_HorizonLine('hor2', degrees(r), degrees(p), self.siyi_settings.wide_fov, (255, 255, 0)))  # noqa:E501
 
     def remove_horizon_lines(self):
         '''remove horizon lines'''
