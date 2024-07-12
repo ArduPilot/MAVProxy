@@ -970,7 +970,10 @@ class SIYIModule(mp_module.MPModule):
                 self.have_horizon_lines = False
 
         elif cmd == READ_VOLTAGES:
-            y,p,r, = self.unpack(cmd, "<hhh", data)
+            if len(data) == 11:
+                y,p,r,_,_,_ = self.unpack(cmd, "<hhhhhb", data)
+            else:
+                y,p,r = self.unpack(cmd, "<hhh", data)
             self.last_volt_t = time.time()
             self.voltages = (r*0.001,p*0.001,y*0.001)
             self.send_named_float('VLT_R', self.voltages[0])
