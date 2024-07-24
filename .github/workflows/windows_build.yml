@@ -33,7 +33,7 @@ jobs:
         run: ./installer.exe /verysilent /allusers /dir=inst
       - name: Build MAVProxy
         run: |
-          python -m pip install . --user
+          python -m pip install .[recommended] --user
           python -m pip list
       - name: Prepare installer
         run: |
