@@ -98,6 +98,9 @@ on how to use MAVProxy.''',
       extras_require={
         # restserver module
         'server': ['flask'],
+        'recommended': ['flask', 'PyYAML', 'lxml', 'wxpython',
+                        'pymonocypher', 'openai', 'paho-mqtt',
+                        'piexif', 'pynmea2', 'Pygame', 'Pillow']
       },
       scripts=['MAVProxy/mavproxy.py',
                'MAVProxy/tools/mavflightview.py',
