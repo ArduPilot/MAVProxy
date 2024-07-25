@@ -52,7 +52,7 @@ class TileException(Exception):
 TILE_SERVICES = {
     # thanks to http://go2log.com/2011/09/26/fetching-tiles-for-offline-map/
     # for the URL mapping info
-    "GoogleSat"      : "https://khm${GOOG_DIGIT}.google.com/kh/v=812&hl=pt-PT&x=${X}&y=${Y}&z=${ZOOM}&s=${GALILEO}",
+    "GoogleSat"      : "https://mt${GOOG_DIGIT}.google.com/vt/lyrs=s@812&hl=pt-PT&x=${X}&y=${Y}&z=${ZOOM}&s=${GALILEO}",
     "GoogleMap"      : "https://mt${GOOG_DIGIT}.google.com/vt/lyrs=m@132&hl=pt-PT&x=${X}&y=${Y}&z=${ZOOM}&s=${GALILEO}",
     "GoogleTer"      : "https://mt${GOOG_DIGIT}.google.com/vt/v=t@132,r@249&hl=pt-PT&x=${X}&y=${Y}&z=${ZOOM}&s=${GALILEO}",
     "GoogleChina"    : "http://mt${GOOG_DIGIT}.google.cn/vt/lyrs=m@121&hl=en&gl=cn&x=${X}&y=${Y}&z=${ZOOM}&s=${GALILEO}",
@@ -62,9 +62,6 @@ TILE_SERVICES = {
     "MicrosoftMap"   : "http://ecn.t${MS_DIGIT}.tiles.virtualearth.net/tiles/r${QUAD}.png?g=441&mkt=en-us&n=z",
     "MicrosoftTer"   : "http://ecn.t${MS_DIGIT}.tiles.virtualearth.net/tiles/r${QUAD}.png?g=441&mkt=en-us&shading=hill&n=z",
     "OpenStreetMap"  : "http://tile.openstreetmap.org/${ZOOM}/${X}/${Y}.png",
-    "OSMARender"     : "http://tah.openstreetmap.org/Tiles/tile/${ZOOM}/${X}/${Y}.png",
-    "OpenAerialMap"  : "http://tile.openaerialmap.org/tiles/?v=mgm&layer=openaerialmap-900913&x=${X}&y=${Y}&zoom=${OAM_ZOOM}",
-    "OpenCycleMap"   : "http://andy.sandbox.cloudmade.com/tiles/cycle/${ZOOM}/${X}/${Y}.png",
     "Eniro DK,NO,SE,FI,PL" : "http://map.eniro.com/geowebcache/service/tms1.0.0/map/${ZOOM}/${X}/${ENI_Y}.png",
     "StatkartTopo" : "http://opencache.statkart.no/gatekeeper/gk/gk.open_gmaps?layers=topo4&zoom=${ZOOM}&x=${X}&y=${Y}",
     "StatkartBasemap" : "http://opencache.statkart.no/gatekeeper/gk/gk.open_gmaps?layers=norgeskart_bakgrunn&zoom=${ZOOM}&x=${X}&y=${Y}"
@@ -286,6 +283,7 @@ class MPTile:
                 if self.debug:
                     print("Downloading %s [%u left]" % (url, len(keys)))
                 req = url_request(url)
+                req.add_header('User-Agent', 'MAVProxy')
                 if url.find('google') != -1:
                     req.add_header('Referer', 'https://maps.google.com/')
                 resp = url_open(req)
