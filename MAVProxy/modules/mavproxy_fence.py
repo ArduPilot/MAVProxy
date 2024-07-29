@@ -1,5 +1,7 @@
 """
     MAVProxy geofence module
+
+AP_FLAKE8_CLEAN
 """
 import copy
 import time
@@ -589,7 +591,7 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
             return None, None
 
         return first_item, item_offset
-    
+
     def removepolygon_point(self, polygon_start_seq, item_offset):
         '''removes item at offset item_offset from the polygon starting at
         polygon_start_seq'''
