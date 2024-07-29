@@ -1,4 +1,8 @@
-'''rally point handling via MissionItemProtocol'''
+'''
+rally point handling via MissionItemProtocol
+
+AP_FLAKE8_CLEAN
+'''
 
 from MAVProxy.modules.lib import mission_item_protocol
 

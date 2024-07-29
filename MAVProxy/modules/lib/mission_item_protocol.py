@@ -2,6 +2,8 @@
 
 '''
 base class for modules generally transfering items using the MISSION_ITEM protocol
+
+AP_FLAKE8_CLEAN
 '''
 
 import copy
@@ -108,7 +110,7 @@ on'''
         command_argument_buckets = {}
         for c in cs:
             value = cs[c]
-            if type(value) == tuple:
+            if isinstance(value, tuple):
                 (function, arguments) = value
                 args_string = " ".join(arguments)
                 if args_string not in command_argument_buckets:
@@ -204,7 +206,7 @@ on'''
         '''append an item to the held item list'''
         if not self.check_have_list():
             return
-        if type(item) == list:
+        if isinstance(item, list):
             for i in item:
                 self.wploader.add(i)
                 self.wploader.expected_count += 1
@@ -717,6 +719,7 @@ on'''
             return
         value = float(args[1])
         del args[1]
+
         def changer(wp):
             wp.z = value
         self.change_mission_item_range(args, "alt", changer, str(value))
@@ -728,6 +731,7 @@ on'''
             return
         value = int(args[1])
         del args[1]
+
         def changer(wp):
             wp.frame = value
         self.change_mission_item_range(args, "frame", changer, str(value))
@@ -913,7 +917,7 @@ on'''
             return
 
         function = commands[args[0]]
-        if type(function) == tuple:
+        if isinstance(function, tuple):
             (function, function_arguments) = function
             # TODO: do some argument validation here, remove same from
             # cmd_*
@@ -952,7 +956,7 @@ on'''
     def savecsv(self, filename):
         '''save waypoints to a file in human-readable CSV file'''
         f = open(filename, mode='w')
-        headers = ["Seq", "Frame", "Cmd", "P1", "P2", "P3", "P4", "X", "Y", "Z"]
+        # headers = ["Seq", "Frame", "Cmd", "P1", "P2", "P3", "P4", "X", "Y", "Z"]
         for w in self.wploader.wpoints:
             if getattr(w, 'comment', None):
                 #                f.write("# %s\n" % w.comment)
@@ -1111,4 +1115,5 @@ on'''
         else:
             mavmsg = mavutil.mavlink.MAVLink_mission_item_int_message
             item_size = mavmsg.unpacker.size
-            print("Sent %s of length %u in %.2fs" % (self.itemtype(), (dlen - 10) // item_size, time.time() - self.upload_start))
+            print("Sent %s of length %u in %.2fs" %
+                  (self.itemtype(), (dlen - 10) // item_size, time.time() - self.upload_start))
