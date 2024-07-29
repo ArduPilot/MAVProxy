@@ -258,7 +258,7 @@ class MissionEditorMain(object):
             m.mission_type != mavutil.mavlink.MAV_MISSION_TYPE_MISSION):
             return
         mtype = m.get_type()
-        if mtype in ['WAYPOINT_COUNT','MISSION_COUNT', 'WAYPOINT', 'MISSION_ITEM', 'MISSION_ITEM_INT']:
+        if mtype in ['MISSION_COUNT', 'MISSION_ITEM', 'MISSION_ITEM_INT']:
             if mtype == 'MISSION_ITEM_INT':
                 m = self.mpstate.module('wp').wp_from_mission_item_int(m)
             self.mavlink_message_queue.put(m)
@@ -272,7 +272,7 @@ class MissionEditorMain(object):
         if (getattr(m, 'mission_type', None) is not None and
             m.mission_type != mavutil.mavlink.MAV_MISSION_TYPE_MISSION):
             return
-        if mtype in ['WAYPOINT_COUNT','MISSION_COUNT']:
+        if mtype in ['MISSION_COUNT']:
             if (self.num_wps_expected == 0):
                 #I haven't asked for WPs, or these messages are duplicates
                 #of msgs I've already received.
@@ -294,7 +294,7 @@ class MissionEditorMain(object):
                 #since this is a write operation from the Editor there
                 #should be no need to update number of table rows
 
-        elif mtype in ['WAYPOINT', 'MISSION_ITEM']:
+        elif mtype in ['MISSION_ITEM']:
             #still expecting wps?
             if (len(self.wps_received) < self.num_wps_expected):
                 #if we haven't already received this wp, write it to the GUI:

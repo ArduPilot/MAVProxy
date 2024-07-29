@@ -84,7 +84,7 @@ class HorizonModule(mp_module.MPModule):
         elif msgType == 'SYS_STATUS':
             # Mode and Arm State
             self.msgList.append(BatteryInfo(msg))
-        elif msgType in ['WAYPOINT_CURRENT', 'MISSION_CURRENT']:
+        elif msgType in ['MISSION_CURRENT']:
             # Waypoints
             self.currentWP = msg.seq
             self.finalWP = self.module('wp').wploader.count()

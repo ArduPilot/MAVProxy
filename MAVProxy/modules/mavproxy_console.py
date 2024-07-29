@@ -619,7 +619,7 @@ class ConsoleModule(mp_module.MPModule):
                         fg = 'orange'
 
                 self.console.set_status('Link%u'%m.linknum, linkline, row=1, fg=fg)
-        elif type in ['WAYPOINT_CURRENT', 'MISSION_CURRENT']:
+        elif type in ['MISSION_CURRENT']:
             wpmax = self.module('wp').wploader.count()
             if wpmax > 0:
                 wpmax = "/%u" % wpmax
