@@ -75,7 +75,7 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
         '''handle an incoming mavlink packet'''
         mtype = m.get_type()
 
-        if mtype in ["WAYPOINT_CURRENT", "MISSION_CURRENT"]:
+        if mtype in ["MISSION_CURRENT"]:
             if m.seq != self.last_waypoint:
                 self.last_waypoint = m.seq
                 if self.settings.wpupdates:

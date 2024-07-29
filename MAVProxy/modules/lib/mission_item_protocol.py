@@ -245,7 +245,7 @@ on'''
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         mtype = m.get_type()
-        if mtype in ['WAYPOINT_COUNT', 'MISSION_COUNT']:
+        if mtype in ['MISSION_COUNT']:
             if getattr(m, 'mission_type', 0) != self.mav_mission_type():
                 return
             if self.wp_op is None:
@@ -261,7 +261,7 @@ on'''
                 self.wploader.expected_count = m.count
                 self.send_wp_requests()
 
-        elif mtype in ['WAYPOINT', 'MISSION_ITEM', 'MISSION_ITEM_INT'] and self.wp_op is not None:
+        elif mtype in ['MISSION_ITEM', 'MISSION_ITEM_INT'] and self.wp_op is not None:
             if m.get_type() == 'MISSION_ITEM_INT':
                 if getattr(m, 'mission_type', 0) != self.mav_mission_type():
                     # this is not a mission item, likely fence
@@ -292,7 +292,7 @@ on'''
             self.wp_requested = {}
             self.wp_received = {}
 
-        elif mtype in ["WAYPOINT_REQUEST", "MISSION_REQUEST"]:
+        elif mtype in ["MISSION_REQUEST"]:
             self.process_waypoint_request(m, self.master)
 
     def idle_task(self):
