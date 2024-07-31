@@ -1116,8 +1116,11 @@ def main_loop():
 
         for master in mpstate.mav_master:
             if master.fd is None:
-                if master.port.inWaiting() > 0:
-                    process_master(master)
+                try:
+                    if master.port.inWaiting() > 0:
+                        process_master(master)
+                except serial.SerialException as e:
+                    pass
 
         periodic_tasks()
 
