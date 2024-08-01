@@ -8,12 +8,15 @@ import ast
 import sys, struct, time, os, datetime, platform
 import math, re
 import matplotlib
-if platform.system() != "Darwin" and os.getenv("MPLBACKEND") is None:
+if platform.system() == "Windows":
+    # wxAgg doesn't properly show the graph values in the lower right on Windows
+    matplotlib.use('TkAgg')
+elif platform.system() != "Darwin" and os.getenv("MPLBACKEND") is None:
     # on MacOS we can't set WxAgg here as it conflicts with the MacOS version
     matplotlib.use('WXAgg')
 from math import *
 from pymavlink.mavextra import *
-import pylab
+import matplotlib.pyplot as plt
 from pymavlink import mavutil
 import threading
 import numpy as np
@@ -266,8 +269,8 @@ class MavGraph(object):
     def plotit(self, x, y, fields, colors=[], title=None, interactive=True):
         '''plot a set of graphs using date for x axis'''
         if interactive:
-            pylab.ion()
-        self.fig = pylab.figure(num=1, figsize=(12,6))
+            plt.ion()
+        self.fig = plt.figure(num=1, figsize=(12,6))
         self.ax1 = self.fig.gca()
         self.ax2 = None
         for i in range(0, len(fields)):
@@ -287,6 +290,8 @@ class MavGraph(object):
             self.fig.canvas.mpl_connect('draw_event', self.draw_event)
             self.fig.canvas.mpl_connect('close_event', self.close_event)
         self.fig.canvas.mpl_connect('button_press_event', self.button_click)
+        self.fig.canvas.get_default_filename = lambda: ''.join("graph" if self.title is None else
+                                                               (x if x.isalnum() else '_' for x in self.title)) + '.png'
         empty = True
         ax1_labels = []
         ax2_labels = []
@@ -379,7 +384,7 @@ class MavGraph(object):
             empty = False
             
         if self.grid:
-            pylab.grid()
+            plt.grid()
 
         if self.show_flightmode != 0:
             alpha = 0.3
@@ -401,7 +406,7 @@ class MavGraph(object):
             return
 
         if title is not None:
-            pylab.title(title)
+            plt.title(title)
         else:
             title = fields[0]
         if self.fig.canvas.manager is not None:
@@ -417,10 +422,10 @@ class MavGraph(object):
                                                              label=mode, alpha=alpha*1.5))
             labels = [patch.get_label() for patch in mode_patches]
             if ax1_labels != [] and self.show_flightmode != 2:
-                patches_legend = matplotlib.pyplot.legend(mode_patches, labels, loc=self.legend_flightmode)
+                patches_legend = plt.legend(mode_patches, labels, loc=self.legend_flightmode)
                 self.fig.gca().add_artist(patches_legend)
             else:
-                pylab.legend(mode_patches, labels)
+                plt.legend(mode_patches, labels)
 
         if ax1_labels != []:
             self.ax1.legend(ax1_labels,loc=self.legend)
@@ -674,8 +679,8 @@ class MavGraph(object):
                 self.xlim_t.start()
 
         if output is None:
-            pylab.draw()
-            pylab.show(block=block)
+            plt.draw()
+            plt.show(block=block)
         elif output.endswith(".html"):
             import mpld3
             html = mpld3.fig_to_html(self.fig)
@@ -683,7 +688,7 @@ class MavGraph(object):
             f_out.write(html)
             f_out.close()
         else:
-            pylab.savefig(output, bbox_inches='tight', dpi=200)
+            plt.savefig(output, bbox_inches='tight', dpi=200)
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
