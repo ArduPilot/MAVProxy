@@ -36,7 +36,7 @@ MAVExpAny = Analysis(['.\\tools\\MAVExplorer.py'],
              datas= [ ('tools\\graphs\\*.*', 'MAVProxy\\tools\\graphs' ) ],
              hookspath=None,
              runtime_hooks=None,
-             excludes= ['sphinx', 'docutils', 'alabaster', 'FixTk', 'tcl', 'tk', '_tkinter', 'tkinter', 'Tkinter'])
+             excludes= ['sphinx', 'docutils', 'alabaster', 'FixTk', 'tcl', 'tk', 'Tkinter'])
 MAVPicViewerAny = Analysis(['.\\tools\\mavpicviewer\\mavpicviewer.py'],
              pathex=[os.path.abspath('.')],
              # for some unknown reason these hidden imports don't pull in
