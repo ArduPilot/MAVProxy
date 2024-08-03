@@ -44,7 +44,7 @@ If the user asks to change the yaw (aka heading) of the vehicle, you should firs
 
 The short form of "altitude" is "alt".
 The short form of "latitude" is "lat".
-The short form of "longitude" is "lat".
+The short form of "longitude" is "lon".
 The words "position" and "location" are often used synonymously.
 
 Rovers and Boats cannot control their altitude
