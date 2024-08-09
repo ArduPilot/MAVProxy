@@ -334,6 +334,22 @@ class MPMenuCallFileDialog(object):
             return None
         return "\"" + dlg.GetPath() + "\""
 
+
+class MPMenuCallDirDialog(object):
+    '''used to create a file folder dialog callback'''
+    def __init__(self, flags=None, title='Directory'):
+        self.title = title
+
+    def call(self):
+        '''show a directory chooser dialog'''
+        from MAVProxy.modules.lib.wx_loader import wx
+
+        dlg = wx.DirDialog(None, self.title, '')
+        if dlg.ShowModal() != wx.ID_OK:
+            return None
+        return "\"" + dlg.GetPath() + "\""
+
+
 class MPMenuCallTextDialog(object):
     '''used to create a value dialog callback'''
     def __init__(self, title='Enter Value', default='', settings=None):
