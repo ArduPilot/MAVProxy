@@ -5,7 +5,6 @@ Randy Mackay, December 2023
 AP_FLAKE8_CLEAN
 '''
 
-import time
 
 try:
     import pyaudio  # install using, "sudo apt-get install python3-pyaudio"
@@ -15,10 +14,13 @@ except Exception:
     print("chat: failed to import pyaudio, wave or openai.  See https://ardupilot.org/mavproxy/docs/modules/chat.html")
     exit()
 
+# initializing the global list to keep and update the stop_recording state
+stop_recording = [False]
+
 
 class chat_voice_to_text():
     def __init__(self):
-        # initialise OpenAI connection
+        # initialise variables
         self.client = None
         self.assistant = None
 
@@ -53,21 +55,19 @@ class chat_voice_to_text():
             print("chat: failed to connect to microphone")
             return None
 
-        # calculate time recording should stop
-        curr_time = time.time()
-        time_stop = curr_time + 5
-
         # record until specified time
         frames = []
-        while curr_time < time_stop:
+        while not stop_recording[0]:
             data = stream.read(1024)
             frames.append(data)
-            curr_time = time.time()
 
         # Stop and close the stream
         stream.stop_stream()
         stream.close()
         p.terminate()
+
+        # update the recording state back to false globally
+        stop_recording[0] = False
 
         # Save audio file
         wf = wave.open("recording.wav", "wb")
