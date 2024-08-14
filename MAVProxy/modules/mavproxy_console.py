@@ -311,33 +311,26 @@ class ConsoleModule(mp_module.MPModule):
             self.component_name[sysid][compid] = name
             self.update_vehicle_menu()
 
-    def mavlink_packet(self, msg):
-        '''handle an incoming mavlink packet'''
-        if not isinstance(self.console, wxconsole.MessageConsole):
-            return
-        if not self.console.is_alive():
-            self.mpstate.console = textconsole.SimpleConsole()
-            return
-        type = msg.get_type()
-        sysid = msg.get_srcSystem()
-        compid = msg.get_srcComponent()
-
-        if type in frozenset(['HEARTBEAT', 'HIGH_LATENCY2']):
+    # this method is called when a HEARTBEAT arrives from any source:
+    def handle_heartbeat_anysource(self, msg):
+            sysid = msg.get_srcSystem()
+            compid = msg.get_srcComponent()
+            type = msg.get_type()
             if type == 'HEARTBEAT':
                 self.vehicle_heartbeats[(sysid, compid)] = msg
             if not sysid in self.vehicle_list:
                 self.add_new_vehicle(msg)
             self.set_component_name(sysid, compid, self.component_type_string(msg))
-        elif type == 'GIMBAL_DEVICE_INFORMATION':
+
+    # this method is called when a GIMBAL_DEVICE_INFORMATION arrives
+    # from any source:
+    def handle_gimbal_device_information_anysource(self, msg):
+            sysid = msg.get_srcSystem()
+            compid = msg.get_srcComponent()
             self.set_component_name(sysid, compid, "%s-%s" %
                                     (msg.vendor_name, msg.model_name))
 
-        if self.last_param_sysid_timestamp != self.module('param').new_sysid_timestamp:
-            '''a new component ID has appeared for parameters'''
-            self.last_param_sysid_timestamp = self.module('param').new_sysid_timestamp
-            self.update_vehicle_menu()
-
-        if type in ['RADIO', 'RADIO_STATUS']:
+    def handle_radio_status(self, msg):
             # handle RADIO msgs from all vehicles
             if msg.rssi < msg.noise+10 or msg.remrssi < msg.remnoise+10:
                 fg = 'red'
@@ -345,17 +338,9 @@ class ConsoleModule(mp_module.MPModule):
                 fg = 'black'
             self.console.set_status('Radio', 'Radio %u/%u %u/%u' % (msg.rssi, msg.noise, msg.remrssi, msg.remnoise), fg=fg)
 
-        if type == 'SYS_STATUS':
-            self.check_critical_error(msg)
-
-        if not self.message_is_from_primary_vehicle(msg):
-            # don't process msgs from other than primary vehicle, other than
-            # updating vehicle list
-            return
-
-        master = self.master
-        # add some status fields
-        if type in [ 'GPS_RAW_INT', 'GPS2_RAW' ]:
+    def handle_gps_raw(self, msg):
+            master = self.master
+            type = msg.get_type()
             if type == 'GPS_RAW_INT':
                 field = 'GPS'
                 prefix = 'GPS:'
@@ -385,7 +370,10 @@ class ConsoleModule(mp_module.MPModule):
                     vfr_hud_heading = '%3u' % vfr_hud_heading
                 self.console.set_status('Heading', 'Hdg %s/%3u' %
                                         (vfr_hud_heading, gps_heading))
-        elif type == 'VFR_HUD':
+
+    def handle_vfr_hud(self, msg):
+            master = self.master
+
             if master.mavlink10():
                 alt = master.field('GPS_RAW_INT', 'alt', 0) / 1.0e3
             else:
@@ -443,10 +431,13 @@ class ConsoleModule(mp_module.MPModule):
                 self.in_air = False
                 self.total_time = time.mktime(t) - self.start_time
                 self.console.set_status('FlightTime', 'FlightTime %u:%02u' % (int(self.total_time)/60, int(self.total_time)%60))
-        elif type == 'ATTITUDE':
+
+    def handle_attitude(self, msg):
             self.console.set_status('Roll', 'Roll %u' % math.degrees(msg.roll))
             self.console.set_status('Pitch', 'Pitch %u' % math.degrees(msg.pitch))
-        elif type in ['SYS_STATUS']:
+
+    def handle_sys_status(self, msg):
+            master = self.master
             sensors = { 'AS'   : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_DIFFERENTIAL_PRESSURE,
                         'MAG'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_MAG,
                         'INS'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_ACCEL | mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_GYRO,
@@ -507,10 +498,10 @@ class ConsoleModule(mp_module.MPModule):
             else:
                 self.safety_on = False                
 
-        elif type == 'WIND':
+    def handle_wind(self, msg):
             self.console.set_status('Wind', 'Wind %u/%s' % (msg.direction, self.speed_string(msg.speed)))
 
-        elif type == 'EKF_STATUS_REPORT':
+    def handle_ekf_status_report(self, msg):
             highest = 0.0
             vars = ['velocity_variance',
                     'pos_horiz_variance',
@@ -528,7 +519,7 @@ class ConsoleModule(mp_module.MPModule):
                 fg = 'green'
             self.console.set_status('EKF', 'EKF', fg=fg)
 
-        elif type == 'POWER_STATUS':
+    def handle_power_status(self, msg):
             if msg.Vcc >= 4600 and msg.Vcc <= 5300:
                 fg = 'green'
             else:
@@ -551,7 +542,14 @@ class ConsoleModule(mp_module.MPModule):
                 status += 'O2'
             self.console.set_status('PWR', status, fg=fg)
             self.console.set_status('Srv', 'Srv %.2f' % (msg.Vservo*0.001), fg='green')
-        elif type in ['HEARTBEAT', 'HIGH_LATENCY2']:
+
+    # this method is called on receipt of any HEARTBEAT so long as it
+    # comes from the device we are interested in
+    def handle_heartbeat(self, msg):
+            sysid = msg.get_srcSystem()
+            compid = msg.get_srcComponent()
+            master = self.master
+
             fmode = master.flightmode
             if self.settings.vehicle_name:
                 fmode = self.settings.vehicle_name + ':' + fmode
@@ -619,7 +617,9 @@ class ConsoleModule(mp_module.MPModule):
                         fg = 'orange'
 
                 self.console.set_status('Link%u'%m.linknum, linkline, row=1, fg=fg)
-        elif type in ['MISSION_CURRENT']:
+
+    def handle_mission_current(self, msg):
+            master = self.master
             wpmax = self.module('wp').wploader.count()
             if wpmax > 0:
                 wpmax = "/%u" % wpmax
@@ -638,7 +638,7 @@ class ConsoleModule(mp_module.MPModule):
                 time_remaining = int(self.estimated_time_remaining(lat, lng, msg.seq, self.speed))
                 self.console.set_status('ETR', 'ETR %u:%02u' % (time_remaining/60, time_remaining%60))
 
-        elif type == 'NAV_CONTROLLER_OUTPUT':
+    def handle_nav_controller_output(self, msg):
             self.console.set_status('WPDist', 'Distance %s' % self.dist_string(msg.wp_dist))
             self.console.set_status('WPBearing', 'Bearing %u' % msg.target_bearing)
             if msg.alt_error > 0:
@@ -656,11 +656,11 @@ class ConsoleModule(mp_module.MPModule):
             self.console.set_status('AltError', 'AltError %s' % alt_error)
             self.console.set_status('AspdError', 'AspdError %s%s' % (self.speed_string(msg.aspd_error*0.01), aspd_error_sign))
 
-        elif type == 'PARAM_VALUE':
+    def handle_param_value(self, msg):
             rec, tot = self.module('param').param_status()
             self.console.set_status('Params', 'Param %u/%u' % (rec,tot))
-            
-        if type == 'HIGH_LATENCY2':
+
+    def handle_high_latency2(self, msg):
             self.console.set_status('WPDist', 'Distance %s' % self.dist_string(msg.target_distance * 10))
             # The -180 here for for consistency with NAV_CONTROLLER_OUTPUT (-180->180), whereas HIGH_LATENCY2 is (0->360)
             self.console.set_status('WPBearing', 'Bearing %u' % ((msg.target_heading * 2) - 180))
@@ -711,8 +711,12 @@ class ConsoleModule(mp_module.MPModule):
             if batt_failed:
                 self.console.set_status('PWR', 'PWR FAILED', fg='red')
             else:
-                self.console.set_status('PWR', 'PWR OK', fg='green')            
-                                                                        
+                self.console.set_status('PWR', 'PWR OK', fg='green')
+
+    # update user-added console entries; called after a mavlink packet
+    # is received:
+    def update_user_added_keys(self, msg):
+        type = msg.get_type()
         for id in self.user_added.keys():
             if type in self.user_added[id].msg_types:
                 d = self.user_added[id]
@@ -738,6 +742,76 @@ class ConsoleModule(mp_module.MPModule):
                             print(ex)
                         print(f"{id} failed")
                 self.console.set_status(id, console_string, row = d.row)
+
+    def mavlink_packet(self, msg):
+        '''handle an incoming mavlink packet'''
+        if not isinstance(self.console, wxconsole.MessageConsole):
+            return
+        if not self.console.is_alive():
+            self.mpstate.console = textconsole.SimpleConsole()
+            return
+        type = msg.get_type()
+
+        if type in frozenset(['HEARTBEAT', 'HIGH_LATENCY2']):
+            self.handle_heartbeat_anysource(msg)
+
+        elif type == 'GIMBAL_DEVICE_INFORMATION':
+            self.handle_gimbal_device_information_anysource(msg)
+
+        if self.last_param_sysid_timestamp != self.module('param').new_sysid_timestamp:
+            '''a new component ID has appeared for parameters'''
+            self.last_param_sysid_timestamp = self.module('param').new_sysid_timestamp
+            self.update_vehicle_menu()
+
+        if type in ['RADIO', 'RADIO_STATUS']:
+            self.handle_radio_status(msg)
+
+        if type == 'SYS_STATUS':
+            self.check_critical_error(msg)
+
+        if not self.message_is_from_primary_vehicle(msg):
+            # don't process msgs from other than primary vehicle, other than
+            # updating vehicle list
+            return
+
+        # add some status fields
+        if type in [ 'GPS_RAW_INT', 'GPS2_RAW' ]:
+            self.handle_gps_raw(msg)
+
+        elif type == 'VFR_HUD':
+            self.handle_vfr_hud(msg)
+
+        elif type == 'ATTITUDE':
+            self.handle_attitude(msg)
+
+        elif type in ['SYS_STATUS']:
+            self.handle_sys_status(msg)
+
+        elif type == 'WIND':
+            self.handle_wind(msg)
+
+        elif type == 'EKF_STATUS_REPORT':
+            self.handle_ekf_status_report(msg)
+
+        elif type == 'POWER_STATUS':
+            self.handle_power_status(msg)
+
+        elif type in ['HEARTBEAT', 'HIGH_LATENCY2']:
+            self.handle_heartbeat(msg)
+
+        elif type in ['MISSION_CURRENT']:
+            self.handle_mission_current(msg)
+
+        elif type == 'NAV_CONTROLLER_OUTPUT':
+            self.handle_nav_controller_output(msg)
+
+        elif type == 'PARAM_VALUE':
+            self.handle_param_value(msg)
+
+        if type == 'HIGH_LATENCY2':
+            self.handle_high_latency2(msg)
+
+        self.update_user_added_keys(msg)
 
     def idle_task(self):
         now = time.time()
