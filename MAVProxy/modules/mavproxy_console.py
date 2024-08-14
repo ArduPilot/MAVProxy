@@ -87,6 +87,7 @@ class ConsoleModule(mp_module.MPModule):
         self.vehicle_name_by_sysid = {}
         self.component_name = {}
         self.last_param_sysid_timestamp = None
+        self.flight_information = {}
 
         # create the main menu
         if mp_util.has_wxpython:
@@ -429,6 +430,13 @@ class ConsoleModule(mp_module.MPModule):
             self.console.set_status('AirSpeed', 'AirSpeed %s' % self.speed_string(msg.airspeed))
             self.console.set_status('GPSSpeed', 'GPSSpeed %s' % self.speed_string(msg.groundspeed))
             self.console.set_status('Thr', 'Thr %u' % msg.throttle)
+
+            sysid = msg.get_srcSystem()
+            if (sysid not in self.flight_information or
+                self.flight_information[sysid].supported != True):
+                    self.update_flight_time_from_vfr_hud(msg)
+
+    def update_flight_time_from_vfr_hud(self, msg):
             t = time.localtime(msg._timestamp)
             flying = False
             if self.mpstate.vehicle_type == 'copter':
@@ -730,6 +738,36 @@ class ConsoleModule(mp_module.MPModule):
             else:
                 self.console.set_status('PWR', 'PWR OK', fg=green)
 
+    def handle_flight_information(self, msg):
+        sysid = msg.get_srcSystem()
+        if sysid not in self.flight_information:
+            self.flight_information[sysid] = ConsoleModule.FlightInformation(sysid)
+        self.flight_information[sysid].last_seen = time.time()
+
+        # NOTE! the takeoff_time_utc field is misnamed in the XML!
+        if msg.takeoff_time_utc == 0:
+            # 0 is "landed", so don't update so we preserve the last
+            # flight tiem in the display
+            return
+        total_time = (msg.time_boot_ms - msg.takeoff_time_utc*0.001) * 0.001
+        self.console.set_status('FlightTime', 'FlightTime %u:%02u' % (int(total_time)/60, int(total_time)%60))
+
+    def handle_command_ack(self, msg):
+        sysid = msg.get_srcSystem()
+
+        if msg.command != mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL:
+            return
+
+        if sysid not in self.flight_information:
+            return
+
+        fi = self.flight_information[sysid]
+
+        if msg.result == mavutil.mavlink.MAV_RESULT_ACCEPTED:
+            fi.supported = True
+        elif msg.result in [mavutil.mavlink.MAV_RESULT_DENIED, mavutil.mavlink.MAV_RESULT_FAILED]:
+            fi.supported = False
+
     # update user-added console entries; called after a mavlink packet
     # is received:
     def update_user_added_keys(self, msg):
@@ -825,10 +863,65 @@ class ConsoleModule(mp_module.MPModule):
         elif type == 'PARAM_VALUE':
             self.handle_param_value(msg)
 
+        # note that we also process this as a HEARTBEAT message above!
         if type == 'HIGH_LATENCY2':
             self.handle_high_latency2(msg)
 
+        elif type == 'FLIGHT_INFORMATION':
+            self.handle_flight_information(msg)
+
+        elif type == 'COMMAND_ACK':
+            self.handle_command_ack(msg)
+
         self.update_user_added_keys(msg)
+
+        # we've received a packet from the vehicle; probe for
+        # FLIGHT_INFORMATION support:
+        self.probe_for_flight_information(msg.get_srcSystem(), msg.get_srcComponent())
+
+    class FlightInformation():
+        def __init__(self, sysid):
+            self.sysid = sysid
+            self.supported = None  # don't know
+            self.last_seen = None  # last time we saw FLIGHT_INFORMATION
+            self.last_set_message_interval_sent = None  # last time we sent set-interval
+
+    def probe_for_flight_information(self, sysid, compid):
+        '''if we don't know if this vehicle supports flight information,
+        request it'''
+        if sysid not in self.flight_information:
+            self.flight_information[sysid] = ConsoleModule.FlightInformation(sysid)
+
+        fi = self.flight_information[sysid]
+
+        now  = time.time()
+
+        if fi.supported is not False and (fi.last_seen is None or now - fi.last_seen > 10):
+            # if we stop getting FLIGHT_INFORMATION, re-request it:
+            fi.supported = None
+
+        if fi.supported is True or fi.supported is False:
+            # we know one way or the other
+            return
+
+        # only probe once every 10 seconds
+        if (fi.last_set_message_interval_sent is not None and
+            now - fi.last_set_message_interval_sent < 10):
+            return
+        fi.last_set_message_interval_sent = now
+
+        self.master.mav.command_long_send(
+            sysid,
+            compid,
+            mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL,
+            0,  # confirmation
+            mavutil.mavlink.MAVLINK_MSG_ID_FLIGHT_INFORMATION,  # msg id
+            500000,  # interval - 2Hz
+            0,  # p3
+            0,  # p4
+            0,  # p5
+            0,  # p6
+            0)  # p7
 
     def idle_task(self):
         now = time.time()
