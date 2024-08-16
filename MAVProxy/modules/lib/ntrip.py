@@ -154,6 +154,7 @@ class NtripClient(object):
                 # Ignore non ascii characters in HTTP response
                 casterResponse = str(casterResponse, 'ascii', 'ignore')
             header_lines = casterResponse.split("\r\n")
+            is_ntrip_rev1 = False
             for line in header_lines:
                 if line == "":
                     self.found_header = True
@@ -165,7 +166,14 @@ class NtripClient(object):
                     raise NtripError("Mount Point does not exist")
                 elif line.find(" 200 OK") != -1:
                     # Request was valid
+                    if line == "ICY 200 OK":
+                        is_ntrip_rev1 = True
                     self.send_gga()
+
+            # NTRIP Rev1 allows for responses that do not contain headers and an extra blank line.
+            if is_ntrip_rev1 and not self.found_header:
+                self.found_header = True
+
             return None
         # normal data read
         while True:
