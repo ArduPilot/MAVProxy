@@ -21,7 +21,6 @@
 # and receive data via a NatNet connection and decode it using the NatNetClient library.
 
 
-
 import copy
 import hashlib
 import random
@@ -60,7 +59,7 @@ def test_hash(test_name, test_hash_str, test_object):
         ret_value=False
     return ret_value
 
-def test_hash2(test_name, test_hash_str, test_object, run_test=True):
+def test_hash2(test_name, test_hash_str, test_object, generator_string, run_test=True):
     ret_value = K_FAIL
     out_str = "FAIL"
     out_str2=""
@@ -85,6 +84,8 @@ def test_hash2(test_name, test_hash_str, test_object, run_test=True):
             out_str2+="%s%s test_hash_str != out_hash_str\n"%(indent_string,test_name)
             out_str2+="%stest_hash_str=%s\n"%(indent_string,test_hash_str)
             out_str2+="%sobj_out_hash_str=%s\n"%(indent_string,obj_out_hash_str)
+            out_str2+="%sUpdated Test Entry:\n"%(indent_string)
+            out_str2 += "%s[\"%s\", \"%s\", \"%s\", True],\n"%(indent_string,test_name,obj_out_hash_str,generator_string)
             out_str2+="%sobj_out_str =\n%s"%(indent_string,obj_out_str)
             ret_value = K_FAIL
     print("[%s]:%s"%(out_str,test_name))
@@ -117,6 +118,8 @@ def get_data_sub_packet_type(new_data):
         out_string="Type: 4 Device\n"
     elif data_type == CameraDescription:
         out_string="Type: 5 Camera\n"
+    elif data_type == AssetDescription:
+        out_string="Type: 6 Asset\n"
     elif data_type == None:
         out_string="Type: None\n"
     else:
@@ -144,7 +147,7 @@ class MarkerSetDescription:
         out_tab_str2 = get_tab_str(tab_str, level+1)
         out_tab_str3 = get_tab_str(tab_str, level+2)
         out_string=""
-        out_string+="%sMarker Set Name: %s\n"%(out_tab_str,get_as_string(self.marker_set_name))
+        out_string+="%sMarkerset Name: %s\n"%(out_tab_str,get_as_string(self.marker_set_name))
         num_markers = len(self.marker_names_list)
         out_string+="%sMarker Count   : %d\n"%(out_tab_str2, num_markers)
         for i in range(num_markers):
@@ -160,7 +163,7 @@ class RBMarker:
     def get_as_string(self, tab_str="  ", level=0):
         out_tab_str = get_tab_str(tab_str, level)
         out_string=""
-        out_string += "%sMarker Label: %s Position: [%f %f %f] %s\n" % \
+        out_string += "%sMarker Label: %s Position: [%3.2f %3.2f %3.2f] %s\n" % \
             (out_tab_str, self.active_label, self.pos[0],self.pos[1],self.pos[2],self.marker_name )
         return out_string
 
@@ -172,6 +175,7 @@ class RigidBodyDescription:
         self.parent_id = parent_id
         self.pos=pos
         self.rb_marker_list=[]
+        self.rb_num = -1
 
 
     def set_name(self,new_name):
@@ -198,8 +202,12 @@ class RigidBodyDescription:
         out_tab_str = get_tab_str(tab_str, level)
         out_tab_str2 = get_tab_str(tab_str, level+1)
         out_string=""
+        out_string += "%sRigid Body        :"%(out_tab_str)
+        if(self.rb_num > -1):
+            out_string += " %d\n"%(self.rb_num)
+        out_string += "\n"
         out_string += "%sRigid Body Name   : %s\n"%(out_tab_str, get_as_string(self.sz_name))
-        out_string += "%sID                : %d\n"%(out_tab_str, self.id_num)
+        out_string += "%sRigid Body ID     : %d\n"%(out_tab_str, self.id_num)
         out_string += "%sParent ID         : %d\n"%(out_tab_str, self.parent_id)
         out_string += "%sPosition          : [%3.2f, %3.2f, %3.2f]\n"%(out_tab_str, self.pos[0],self.pos[1],self.pos[2])
         num_markers= len(self.rb_marker_list)
@@ -323,7 +331,7 @@ class ForcePlateDescription:
             get_as_string(self.serial_number))
         out_string += "%sWidth                   : %3.2f\n"%(out_tab_str, self.width)
         out_string += "%sLength                  : %3.2f\n"%(out_tab_str, self.length)
-        out_string += "%sOrigin                  : %3.2f, %3.2f, %3.2f\n"%(out_tab_str,
+        out_string += "%sOrigin                  : [%3.2f, %3.2f, %3.2f]\n"%(out_tab_str,
                                                                        self.position[0],
                                                                        self.position[1],
                                                                        self.position[2])
@@ -402,6 +410,62 @@ class CameraDescription:
             self.orientation[2], self.orientation[3] )
         return out_string
 
+class MarkerDescription:
+    """Marker Description class"""
+    def __init__(self, name, marker_id, position, marker_size, marker_params):
+        self.name=name
+        self.marker_id=marker_id
+        self.position=position
+        self.marker_size=marker_size
+        self.marker_params=marker_params
+
+    def get_as_string(self, tab_str="..", level=0):
+        """Get Marker Description as a string"""
+        out_tab_str = get_tab_str(tab_str, level)
+        out_string = ""
+        out_string += "%sName        : %s\n"%(out_tab_str,get_as_string(self.name))
+        out_string += "%sID          : %d\n"%(out_tab_str,self.marker_id)
+        out_string += "%sPosition    : [%3.2f, %3.2f, %3.2f]\n"% \
+            (out_tab_str,self.position[0], self.position[1], self.position[2] )
+        out_string += "%sSize          : %3.2f\n"%(out_tab_str,self.marker_size[0])
+        out_string += "%sParams        : %d\n"%(out_tab_str,self.marker_params)
+
+        return out_string
+
+class AssetDescription:
+    """Asset Description class"""
+    def __init__(self, name, assetType, assetID, rigidbodyArray, markerArray):
+        self.name=name
+        self.assetType=assetType
+        self.assetID=assetID
+        self.rigidbodyArray=rigidbodyArray
+        self.markerArray=markerArray
+
+    def get_as_string(self, tab_str="..", level=0):
+        """Get Asset Description as a string"""
+        out_tab_str = get_tab_str(tab_str, level)
+        out_string = ""
+        #out_string += "Asset Description\n"
+        out_string += "%sName       : %s\n"%(out_tab_str,get_as_string(self.name))
+        out_string += "%sType       : %d\n"%(out_tab_str,self.assetType)
+        out_string += "%sID         : %d\n"%(out_tab_str,self.assetID)
+
+        rbCount=0
+        out_string += "%sRigidBody (Bone) Count : %d\n"%(out_tab_str,len(self.rigidbodyArray))
+        for rigidbody in self.rigidbodyArray:
+            out_string += "%sRigidBody (Bone) %d:\n"%(out_tab_str,rbCount)
+            out_string += rigidbody.get_as_string(tab_str,level+1)
+            rbCount+=1
+
+        markerCount=0
+        out_string += "%sMarker Count : %d\n"%(out_tab_str,len(self.markerArray))
+        for marker in self.markerArray:
+            out_string += "%sMarker %d:\n"%(out_tab_str,markerCount)
+            out_string += marker.get_as_string(tab_str,level+1)
+            markerCount+=1
+
+
+        return out_string
 
 
 # cDataDescriptions
@@ -414,6 +478,7 @@ class DataDescriptions():
         self.marker_set_list=[]
         self.rigid_body_list=[]
         self.skeleton_list=[]
+        self.asset_list=[]
         self.force_plate_list=[]
         self.device_list=[]
         self.camera_list=[]
@@ -425,9 +490,9 @@ class DataDescriptions():
         self.order_num += 1
         return order_name
 
-    # Add Marker Set
+    # Add Markerset
     def add_marker_set(self, new_marker_set):
-        """Add a marker set"""
+        """Add a Markerset"""
         order_name = self.generate_order_name()
 
         # generate order entry
@@ -455,6 +520,17 @@ class DataDescriptions():
         pos = len(self.skeleton_list)
         self.data_order_dict[order_name]=("skeleton_list", pos)
         self.skeleton_list.append(copy.deepcopy(new_skeleton))
+
+
+    # Add an asset
+    def add_asset(self, new_asset):
+        """Add an asset"""
+        order_name = self.generate_order_name()
+
+        # generate order entry
+        pos = len(self.asset_list)
+        self.data_order_dict[order_name]=("asset_list", pos)
+        self.asset_list.append(copy.deepcopy(new_asset))
 
 
     # Add a force plate
@@ -502,6 +578,8 @@ class DataDescriptions():
             self.add_device(new_data)
         elif data_type == CameraDescription:
             self.add_camera(new_data)
+        elif data_type == AssetDescription:
+            self.add_asset(new_data)
         elif data_type is None:
             data_type = None
         else:
@@ -521,6 +599,10 @@ class DataDescriptions():
         elif (list_name =="skeleton_list") and \
             (pos_num < len(self.skeleton_list)):
             ret_value = self.skeleton_list[pos_num]
+
+        elif (list_name =="asset_list") and \
+            (pos_num < len(self.asset_list)):
+            ret_value = self.asset_list[pos_num]
 
         elif (list_name =="force_plate_list") and \
             (pos_num < len(self.force_plate_list)):
@@ -546,7 +628,7 @@ class DataDescriptions():
         out_tab_str3 = get_tab_str(tab_str,level+2)
         out_string=""
         num_data_sets=len(self.data_order_dict)
-        out_string+="%sNumber of Data Sets: %d\n"%(out_tab_str, num_data_sets)
+        out_string+="%sDataset Count: %d\n"%(out_tab_str, num_data_sets)
         i=0
         for tmp_key,tmp_value in self.data_order_dict.items():
             #tmp_name,tmp_num=self.data_order_dict[data_set]
@@ -557,8 +639,8 @@ class DataDescriptions():
             tmp_string = get_data_sub_packet_type(tmp_object)
             if tmp_string != "":
                 out_string += "%s%s"%(out_tab_str2, tmp_string)
+            #outputs keys for looking up objects
             #out_string += "%s%s %s %d\n"%(out_tab_str2, data_set, tmp_name,tmp_num)
-            out_string += "%s%s %s %s\n"%(out_tab_str2,tmp_key, tmp_name,tmp_num)
             if tmp_object is not None:
                 out_string += tmp_object.get_as_string(tab_str,level+2)
             else:
@@ -699,27 +781,20 @@ def test_all(run_test=True):
     """Test all the Data Description classes"""
     totals=[0,0,0]
     if run_test is True:
-        test_cases=[["Test Marker Set Description 0",  "754fe535286ca84bd054d9aca5e9906ab9384d92",
-                        "generate_marker_set_description(0)",True],
-                    ["Test RB Marker 0",               "0f2612abf2ce70e479d7b9912f646f12910b3310",
-                        "generate_rb_marker(0)",True],
-                    ["Test Rigid Body Description 0",  "7a4e93dcda442c1d9c5dcc5c01a247e4a6c01b66",
-                        "generate_rigid_body_description(0)",True],
-                    ["Test Skeleton Description 0",    "b4d1a031dd7c323e3d316b5312329881a6a552ca",
-                        "generate_skeleton_description(0)",True],
-                    ["Test Force Plate Description 0", "b385dd1096bdd9f521eb48bb9cbfb3414ea075bd",
-                        "generate_force_plate_description(0)",True],
-                    ["Test Device Description 0",      "39b4fdda402bc73c0b1cd5c7f61599476aa9a926",
-                        "generate_device_description(0)",True],
-                    ["Test Camera Description 0",      "614602c5d290bda3b288138d5e25516dd1e1e85a",
-                        "generate_camera_description(0)",True],
-                    ["Test Data Description 0",        "e5f448d10087ac818a65934710a85fc7ebfdf89e",
-                        "generate_data_descriptions(0)",True],
+        test_cases=[
+                    ["Test Markerset Description 0", "d918228cc347bd0dac69dd02b1a5375a4421364f", "generate_marker_set_description(0)", True],
+                    ["Test RB Marker 0", "df582ca7b764d889041b59ceb6a43251b68ca3be", "generate_rb_marker(0)", True],
+                    ["Test Rigid Body Description 0", "0ea7085657c391efe2fd349cc03f242247efbbe4", "generate_rigid_body_description(0)", True],
+                    ["Test Skeleton Description 0", "fa2a59e76f31c1d884f6554fe13e5cfcf31e703c", "generate_skeleton_description(0)", True],
+                    ["Test Force Plate Description 0", "798793a2fed302bc472b2636beff959901214be2", "generate_force_plate_description(0)", True],
+                    ["Test Device Description 0",      "39b4fdda402bc73c0b1cd5c7f61599476aa9a926",    "generate_device_description(0)",True],
+                    ["Test Camera Description 0",      "614602c5d290bda3b288138d5e25516dd1e1e85a", "generate_camera_description(0)",True],
+                    ["Test Data Description 0", "b2fcffb251ae526e91ec9f65f5f2137f0d74db49", "generate_data_descriptions(0)", True],
                     ]
         num_tests = len(test_cases)
         for i in range(num_tests):
             data = eval(test_cases[i][2])
-            totals_tmp = test_hash2(test_cases[i][0],test_cases[i][1],data,test_cases[i][3])
+            totals_tmp = test_hash2(test_cases[i][0],test_cases[i][1],data,test_cases[i][2],test_cases[i][3])
             totals=add_lists(totals, totals_tmp)
 
     print("--------------------")
