@@ -60,7 +60,7 @@ def test_hash(test_name, test_hash_str, test_object):
     return ret_value
 
 
-def test_hash2(test_name, test_hash_str, test_object, run_test=True):
+def test_hash2(test_name, test_hash_str, test_object, generator_string, run_test):
     ret_value = K_FAIL
     out_str = "FAIL"
     out_str2=""
@@ -85,7 +85,11 @@ def test_hash2(test_name, test_hash_str, test_object, run_test=True):
             out_str2+="%s%s test_hash_str != out_hash_str\n"%(indent_string,test_name)
             out_str2+="%stest_hash_str=%s\n"%(indent_string,test_hash_str)
             out_str2+="%sobj_out_hash_str=%s\n"%(indent_string,obj_out_hash_str)
+            out_str2+="%sUpdated Test Entry:\n"%(indent_string)
+            out_str2 += "%s[\"%s\", \"%s\", \"%s\", True],\n"%(indent_string,test_name,obj_out_hash_str,generator_string)
             out_str2+="%sobj_out_str =\n%s"%(indent_string,obj_out_str)
+
+
             ret_value = K_FAIL
     print("[%s]:%s"%(out_str,test_name))
 
@@ -102,6 +106,8 @@ def get_as_string(input_str):
         return ""
     elif type_input_str == "<class 'bytes'>":
         return input_str.decode('utf-8')
+    elif type_input_str == "<class 'int'>":
+        return str(input_str)
     else:
         print("type_input_str = %s NOT HANDLED"%type_input_str)
         return input_str
@@ -138,13 +144,14 @@ class MarkerData:
         out_tab_str = get_tab_str(tab_str, level)
         out_tab_str2 = get_tab_str(tab_str, level+1)
         out_str=""
+        out_str+="%sMarkerData:\n"%out_tab_str
         if self.model_name != "":
             out_str+="%sModel Name : %s\n"%(out_tab_str, get_as_string(self.model_name))
         marker_count = len(self.marker_pos_list)
         out_str+="%sMarker Count :%3.1d\n"%(out_tab_str, marker_count)
         for i in range(marker_count):
             pos = self.marker_pos_list[i]
-            out_str+="%sMarker %3.1d pos : [%3.2f,%3.2f,%3.2f]\n"%(out_tab_str2,i,pos[0], pos[1], pos[2])
+            out_str+="%sMarker %3.1d pos : [x=%3.2f,y=%3.2f,z=%3.2f]\n"%(out_tab_str2,i,pos[0], pos[1], pos[2])
         return out_str
 
 class MarkerSetData:
@@ -173,14 +180,36 @@ class MarkerSetData:
 
         # Labeled markers count
         marker_data_count = len(self.marker_data_list)
-        out_str+= "%sMarker Set Count:%3.1d\n"% (out_tab_str,marker_data_count)
+        out_str+= "%sMarkerset Count:%3.1d\n"% (out_tab_str,marker_data_count)
         for marker_data in self.marker_data_list:
             out_str += marker_data.get_as_string(tab_str,level+1)
 
         # Unlabeled markers count (4 bytes)
         unlabeled_markers_count = self.unlabeled_markers.get_num_points()
-        out_str += "%sUnlabeled Markers Count:%3.1d\n"%(out_tab_str, unlabeled_markers_count )
+        out_str += "%sUnlabeled Marker Count:%3.1d\n"%(out_tab_str, unlabeled_markers_count )
         out_str += self.unlabeled_markers.get_as_string(tab_str,level+1)
+        return out_str
+
+class LegacyMarkerData:
+    def __init__(self):
+        self.marker_pos_list=[]
+
+    def add_pos(self, pos):
+        self.marker_pos_list.append(copy.deepcopy(pos))
+        return len(self.marker_pos_list)
+
+    def get_marker_count(self):
+        return len(self.marker_pos_list)
+
+    def get_as_string(self, tab_str="  ", level=0):
+        out_tab_str = get_tab_str(tab_str, level)
+        out_tab_str2 = get_tab_str(tab_str, level+1)
+        out_str=""
+        marker_count = len(self.marker_pos_list)
+        out_str+="%sLegacy Marker Count :%3.1d\n"%(out_tab_str, marker_count)
+        for i in range(marker_count):
+            pos = self.marker_pos_list[i]
+            out_str+="%sMarker %3.1d pos : [x=%3.2f,y=%3.2f,z=%3.2f]\n"%(out_tab_str2,i,pos[0], pos[1], pos[2])
         return out_str
 
 class RigidBodyMarker:
@@ -189,10 +218,15 @@ class RigidBodyMarker:
         self.id_num = 0
         self.size = 0
         self.error = 0
+        self.marker_num = -1;
 
     def get_as_string(self, tab_str="  ", level=0):
         out_tab_str = get_tab_str(tab_str, level)
         out_str = ""
+        out_str += "%sRBMarker:"%( out_tab_str)
+        if ( self.marker_num > -1 ):
+            out_str += " %3.1d"%( self.marker_num )
+        out_str += "\n"
 
         out_str += "%sPosition: [%3.2f %3.2f %3.2f]\n"%( out_tab_str, self.pos[0], self.pos[1], self.pos[2] )
         out_str += "%sID      : %3.1d\n"%(out_tab_str, self.id_num)
@@ -208,6 +242,7 @@ class RigidBody:
         self.rb_marker_list=[]
         self.tracking_valid = False
         self.error = 0.0
+        self.marker_num = -1
 
     def add_rigid_body_marker(self, rigid_body_marker):
         self.rb_marker_list.append(copy.deepcopy(rigid_body_marker))
@@ -221,23 +256,27 @@ class RigidBody:
         out_str=""
 
         # header
-        out_str += "%sID            : %3.1d\n"% (out_tab_str, self.id_num)
+        out_str += "%sRigid Body    :"% (out_tab_str)
+        if ( self.marker_num > -1 ):
+            out_str += " %3.1d"% (self.marker_num)
+        out_str += "\n"
+        out_str += "%s  ID            : %3.1d\n"% (out_tab_str, self.id_num)
         # Position and orientation
-        out_str += "%sPosition      : [%3.2f, %3.2f, %3.2f]\n"% (out_tab_str, self.pos[0], self.pos[1], self.pos[2] )
-        out_str += "%sOrientation   : [%3.2f, %3.2f, %3.2f, %3.2f]\n"% (out_tab_str, self.rot[0], self.rot[1], self.rot[2], self.rot[3] )
+        out_str += "%s  Position      : [%3.2f, %3.2f, %3.2f]\n"% (out_tab_str, self.pos[0], self.pos[1], self.pos[2] )
+        out_str += "%s  Orientation   : [%3.2f, %3.2f, %3.2f, %3.2f]\n"% (out_tab_str, self.rot[0], self.rot[1], self.rot[2], self.rot[3] )
 
         marker_count = len(self.rb_marker_list)
         marker_count_range = range( 0, marker_count )
 
         # Marker Data
         if marker_count > 0:
-            out_str += "%sMarker Count: %3.1d\n"%(out_tab_str, marker_count )
+            out_str += "%s  Marker Count  : %3.1d\n"%(out_tab_str, marker_count )
             for i in marker_count_range:
-                out_str += "%sMarker %3.1d\n"%(out_tab_str2, i)
                 rbmarker = self.rb_marker_list[i]
+                rbmarker.marker_num=i
                 out_str += rbmarker.get_as_string(tab_str, level+2)
 
-        out_str += "%sMarker Error  : %3.2f\n"% (out_tab_str, self.error)
+        out_str += "%s  Marker Error  : %3.2f\n"% (out_tab_str, self.error)
 
         # Valid Tracking
         tf_string = 'False'
@@ -267,9 +306,13 @@ class RigidBodyData:
         out_str=""
         rigid_body_count=len(self.rigid_body_list)
         out_str += "%sRigid Body Count: %3.1d\n"%(out_tab_str, rigid_body_count)
+        rb_num=0
         for rigid_body in self.rigid_body_list:
+            rigid_body.marker_num=rb_num
             out_str += rigid_body.get_as_string(tab_str, level+1)
+            rb_num+=1
         return out_str
+
 
 class Skeleton:
     def __init__(self, new_id=0):
@@ -290,7 +333,7 @@ class Skeleton:
         rigid_body_count=len(self.rigid_body_list)
         out_str += "%sRigid Body Count: %3.1d\n"%(out_tab_str, rigid_body_count)
         for rb_num in range(rigid_body_count):
-            out_str += "%sRigid Body %3.1d\n"%(out_tab_str2, rb_num)
+            self.rigid_body_list[rb_num].marker_num = rb_num
             out_str += self.rigid_body_list[rb_num].get_as_string(tab_str, level+2)
         return out_str
 
@@ -320,6 +363,136 @@ class SkeletonData:
             out_str += self.skeleton_list[skeleton_num].get_as_string(tab_str, level+2)
         return out_str
 
+class AssetMarkerData:
+    def __init__(self, marker_id, pos, marker_size=0.0, marker_params=0, residual=0.0, marker_num=-1):
+        self.marker_id=marker_id
+        self.pos=pos
+        self.marker_size=marker_size
+        self.marker_params=marker_params
+        self.residual=residual
+        self.marker_num=marker_num
+
+    def get_as_string(self, tab_str="  ", level=0):
+        out_tab_str = get_tab_str(tab_str, level)
+        out_tab_str2 = get_tab_str(tab_str, level+1)
+        out_str=""
+        if( False ):
+            out_str+="%sID       : %s\n"%(out_tab_str, get_as_string(self.marker_id))
+            out_str+="%sPos      : %3.2f %3.2f %3.2f\n"%(out_tab_str, self.pos[0], self.pos[1], self.pos[2])
+            out_str+="%sSize     : %3.2f\n"%(out_tab_str, self.marker_size)
+            out_str+="%sParams   : %s\n"%(out_tab_str, self.marker_params)
+            out_str+="%sResidual : %3.2f\n"%(out_tab_str, self.residual)
+        else:
+            out_str+="%s"%(out_tab_str)
+            if(self.marker_num > -1):
+                out_str+="%3.1d "%(self.marker_num)
+            else:
+                out_str+="    "
+            out_str+="Marker %7.1d"%(self.marker_id)
+            out_str+=" pos : [%3.2f, %3.2f, %3.2f] "%(self.pos[0], self.pos[1], self.pos[2])
+            out_str+="       size=%3.2f"%(self.marker_size)
+            out_str+="       err=%3.2f"%(self.residual)
+            out_str+="        params=%d"%(self.marker_params)
+            out_str+="\n"
+            
+
+        return out_str
+
+class AssetRigidBodyData:
+    def __init__(self, new_id, pos, rot, mean_error=0.0, param=0):
+        self.id_num=new_id
+        self.pos = pos
+        self.rot = rot
+        self.mean_error = mean_error
+        self.param = param
+        self.rb_num = -1
+
+    def get_as_string(self, tab_str="  ", level=0):
+        out_tab_str = get_tab_str(tab_str, level)
+        out_str=""
+        out_str += "%sRigid Body :"%(out_tab_str)
+        if(self.rb_num > -1):
+            out_str += "%3.1d"%(self.rb_num)
+        out_str += "\n"
+        out_str += "%sID          : %s\n"%(out_tab_str, get_as_string(self.id_num))
+        out_str += "%sPosition    : [%3.2f, %3.2f, %3.2f]\n"%(out_tab_str, self.pos[0], self.pos[1], self.pos[2])
+        out_str += "%sOrientation : [%3.2f, %3.2f, %3.2f, %3.2f]\n"%(out_tab_str, self.rot[0], self.rot[1], self.rot[2], self.rot[3])
+        out_str += "%sMean Error  : %3.2f\n"%(out_tab_str, self.mean_error)
+        out_str += "%sParams      : %3.1d\n"%(out_tab_str, self.param)
+
+        return out_str
+
+class Asset:
+    def __init__(self):
+        self.asset_id=0
+        self.rigid_body_list=[]
+        self.marker_list=[]
+
+    def set_id(self, new_id):
+        self.asset_id=new_id
+
+    def add_rigid_body(self, rigid_body):
+        self.rigid_body_list.append(copy.deepcopy(rigid_body))
+        return len(self.rigid_body_list)
+
+    def add_marker(self, marker):
+        self.marker_list.append(copy.deepcopy(marker))
+        return len(self.marker_list)
+
+    def get_rigid_body_count(self):
+        return len(self.rigid_body_list)
+
+    def get_marker_count(self):
+        return len(self.marker_list)
+
+    def get_as_string(self, tab_str = "  ", level = 0):
+        out_tab_str = get_tab_str(tab_str, level)
+
+        out_str = ""
+        out_str += "%sAsset ID        : %d\n"%(out_tab_str,self.asset_id)
+        rigid_body_count = len(self.rigid_body_list)
+        out_str += "%sRigid Body Count: %3.1d\n"%(out_tab_str, rigid_body_count)
+        rb_num=0
+        for rigid_body in self.rigid_body_list:
+            rigid_body.rb_num=rb_num
+            out_str += rigid_body.get_as_string(tab_str, level+1)
+            rb_num+=1
+
+        marker_count = len(self.marker_list)
+        out_str += "%sMarker Count: %3.1d\n"%(out_tab_str, marker_count)
+        marker_num = 0
+        for marker in self.marker_list:
+            marker.marker_num = marker_num
+            out_str += marker.get_as_string(tab_str, level+1)
+            marker_num+=1
+        return out_str
+
+
+
+class AssetData:
+    def __init__(self):
+        self.asset_list=[]
+
+    def add_asset(self, new_asset):
+        self.asset_list.append(copy.deepcopy(new_asset))
+
+    def get_asset_count(self):
+        return len(self.asset_list)
+
+    def get_as_string(self, tab_str = "  ", level=0):
+        out_tab_str = get_tab_str(tab_str, level)
+        out_tab_str2 = get_tab_str(tab_str, level+1)
+
+        out_str = ""
+        asset_count = self.get_asset_count()
+        out_str += "%sAsset Count: %3.1d\n"%(out_tab_str, asset_count)
+        for asset_num in range(asset_count):
+            out_str += "%sAsset %3.1d\n"%(out_tab_str2, asset_num)
+            out_str += self.asset_list[asset_num].get_as_string(tab_str, level+2)
+        return out_str
+
+
+
 class LabeledMarker:
     def __init__(self, new_id, pos, size=0.0, param = 0, residual=0.0):
         self.id_num=new_id
@@ -327,9 +500,9 @@ class LabeledMarker:
         self.size = size
         self.param = param
         self.residual = residual
+        self.marker_num=-1
         if str(type(size)) == "<class 'tuple'>":
             self.size=size[0]
-
 
     def __decode_marker_id(self):
         model_id = self.id_num >> 16
@@ -346,15 +519,19 @@ class LabeledMarker:
         out_tab_str = get_tab_str(tab_str, level)
         model_id, marker_id = self.__decode_marker_id()
         out_str = ""
+        out_str+="%sLabeled Marker"%out_tab_str
+        if(self.marker_num > -1):
+            out_str+=" %d"%self.marker_num
+        out_str+=":\n"
         out_str += "%sID                 : [MarkerID: %3.1d] [ModelID: %3.1d]\n"%(out_tab_str, marker_id,model_id)
         out_str += "%spos                : [%3.2f, %3.2f, %3.2f]\n"%(out_tab_str, self.pos[0],self.pos[1],self.pos[2])
         out_str += "%ssize               : [%3.2f]\n"%(out_tab_str, self.size)
+        out_str += "%serr                : [%3.2f]\n"%(out_tab_str, self.residual)
 
         occluded, point_cloud_solved, model_solved = self.__decode_param()
         out_str += "%soccluded           : [%3.1d]\n"%(out_tab_str, occluded)
         out_str += "%spoint_cloud_solved : [%3.1d]\n"%(out_tab_str, point_cloud_solved)
         out_str += "%smodel_solved       : [%3.1d]\n"%(out_tab_str, model_solved)
-        out_str += "%serr                : [%3.2f]\n"%(out_tab_str, self.residual)
 
         return out_str
 
@@ -378,8 +555,8 @@ class LabeledMarkerData:
         labeled_marker_count = len(self.labeled_marker_list)
         out_str += "%sLabeled Marker Count:%3.1d\n"%(out_tab_str, labeled_marker_count )
         for i in range( 0, labeled_marker_count ):
-            out_str += "%sLabeled Marker %3.1d\n"%(out_tab_str2,i)
             labeled_marker = self.labeled_marker_list[i]
+            labeled_marker.marker_num=i
             out_str += labeled_marker.get_as_string(tab_str, level+2)
         return out_str
 
@@ -427,7 +604,7 @@ class ForcePlate:
 
         out_str += "%sID           : %3.1d"%(out_tab_str, self.id_num)
         num_channels = len(self.channel_data_list)
-        out_str += "%sChannel Count: %3.1d\n"%(out_tab_str, num_channels)
+        out_str += "  Channel Count: %3.1d\n"%( num_channels)
         for i in range(num_channels):
             out_str += self.channel_data_list[i].get_as_string(tab_str, level+1,i)
         return out_str
@@ -542,6 +719,8 @@ class FrameSuffixData:
         self.stamp_camera_mid_exposure = -1
         self.stamp_data_received = -1
         self.stamp_transmit = -1
+        self.prec_timestamp_secs = -1
+        self.prec_timestamp_frac_secs = -1
         self.param = 0
         self.is_recording = False
         self.tracked_models_changed = True
@@ -552,13 +731,22 @@ class FrameSuffixData:
 
         out_str = ""
         if not self.timestamp == -1:
-            out_str += "%sTimestamp : %3.2f\n"%(out_tab_str, self.timestamp)
+            out_str += "%sTimestamp                      : %3.3f\n"%(out_tab_str, self.timestamp)
         if not self.stamp_camera_mid_exposure == -1:
-            out_str += "%sMid-exposure timestamp : %3.1d\n"%(out_tab_str, self.stamp_camera_mid_exposure)
+            out_str += "%sMid-exposure timestamp         : %3.1d\n"%(out_tab_str, self.stamp_camera_mid_exposure)
         if not self.stamp_data_received == -1:
             out_str += "%sCamera data received timestamp : %3.1d\n"%(out_tab_str, self.stamp_data_received)
         if not self.stamp_transmit == -1:
-            out_str += "%sTransmit timestamp : %3.1d\n"%(out_tab_str, self.stamp_transmit)
+            out_str += "%sTransmit timestamp             : %3.1d\n"%(out_tab_str, self.stamp_transmit)
+        if not self.prec_timestamp_secs == -1:
+            #hours = int(self.prec_timestamp_secs/3600)
+            #minutes=int(self.prec_timestamp_secs/60)%60
+            #seconds=self.prec_timestamp_secs%60
+            #hms_string="%sPrecision timestamp (hh:mm:ss) : %2.1d:%2.2d:%2.2d\n"%(out_tab_str,hours, minutes, seconds)
+            #out_str += hms_string
+            out_str += "%sPrecision timestamp (seconds)  : %3.1d\n"%(out_tab_str, self.prec_timestamp_secs)
+            if not self.prec_timestamp_frac_secs == -1:
+                out_str += "%sPrecision timestamp (fractional seconds) : %3.1d\n"%(out_tab_str, self.prec_timestamp_frac_secs)
 
         return out_str
 
@@ -567,7 +755,9 @@ class MoCapData:
         #Packet Parts
         self.prefix_data = None
         self.marker_set_data = None
+        self.legacy_other_markers = None
         self.rigid_body_data = None
+        self.asset_data = None
         self.skeleton_data = None
         self.labeled_marker_data = None
         self.force_plate_data = None
@@ -580,11 +770,17 @@ class MoCapData:
     def set_marker_set_data(self, new_marker_set_data):
         self.marker_set_data = new_marker_set_data
 
+    def set_legacy_other_markers(self, new_marker_set_data):
+        self.legacy_other_markers = new_marker_set_data
+
     def set_rigid_body_data(self, new_rigid_body_data):
         self.rigid_body_data = new_rigid_body_data
 
     def set_skeleton_data(self, new_skeleton_data):
         self.skeleton_data = new_skeleton_data
+
+    def set_asset_data(self, new_asset_data):
+        self.asset_data=new_asset_data
 
     def set_labeled_marker_data(self, new_labeled_marker_data):
         self.labeled_marker_data = new_labeled_marker_data
@@ -611,7 +807,7 @@ class MoCapData:
         if not self.marker_set_data == None:
             out_str+=self.marker_set_data.get_as_string(tab_str, level+1)
         else:
-            out_str+="%sNo Marker Set Data Set\n"%(out_tab_str)
+            out_str+="%sNo Markerset Data Set\n"%(out_tab_str)
 
         if not self.rigid_body_data == None:
             out_str+=self.rigid_body_data.get_as_string(tab_str, level+1)
@@ -622,6 +818,11 @@ class MoCapData:
             out_str+=self.skeleton_data.get_as_string(tab_str, level+1)
         else:
             out_str+="%sNo Skeleton Data Set\n"%(out_tab_str)
+
+        if not self.asset_data == None:
+            out_str+=self.asset_data.get_as_string(tab_str, level+1)
+        else:
+            out_str+="%sNo Asset Data Set\n"%(out_tab_str)
 
         if not self.labeled_marker_data == None:
             out_str+=self.labeled_marker_data.get_as_string(tab_str, level+1)
@@ -813,6 +1014,8 @@ def generate_suffix_data(frame_num = 0):
     frame_suffix_data.stamp_camera_mid_exposure = 5844402979291+frame_num
     frame_suffix_data.stamp_data_received = 0
     frame_suffix_data.stamp_transmit = 5844403268753+ frame_num
+    frame_suffix_data.prec_timestamp_secs = 0
+    frame_suffix_data.prec_timestamp_frac_secs = 0
     frame_suffix_data.timecode = 0
     frame_suffix_data.timecode_sub = 0
     frame_suffix_data.timestamp = 762.63
@@ -836,29 +1039,20 @@ def generate_mocap_data(frame_num=0):
 def test_all(run_test=True):
     totals=[0,0,0]
     if run_test is True:
-        test_cases=[["Test Prefix Data 0",          "bffba016d02cf2167780df31aee697e1ec746b4c",
-                     "generate_prefix_data(0)",True],
-                    ["Test Marker Set Data 0",      "d2550194fed1b1fc525f4f4d06bf584f291f41c7",
-                     "generate_marker_set_data(0)",True],
-                    ["Test Rigid Body Data 0",      "abd1a48a476eaa9b5c4fae6e705e03aa75f85624",
-                     "generate_rigid_body_data(0)",True],
-                    ["Test Skeleton Data 0",        "1e36e3334e291cebfaa530d7aab2122d6983ecab",
-                     "generate_skeleton_data(0)",True],
-                    ["Test Labeled Marker Data 0",  "25f3ee026c3c8fc716fbb05c34138ef5afd95d75",
-                     "generate_labeled_marker_data(0)",True],
-                    ["Test Force Plate Data 0",    "b83d04a1b89169bdcefee3bc3951c3bdcb6b792e",
-                     "generate_force_plate_data(0)",True],
-                    ["Test Device Data 0",         "be10f0b93a7ba3858dce976b7868c1f79fd719c3",
-                     "generate_device_data(0)",True],
-                    ["Test Suffix Data 0",         "6aa02c434bdb53a418ae1b1f73317dc80a5f887d",
-                     "generate_suffix_data(0)",True],
-                    ["Test MoCap Data 0",          "09930ecf665d9eb3ca61616f9bcc55890373f414",
-                     "generate_mocap_data(0)",True]
+        test_cases=[["Test Prefix Data 0",          "bffba016d02cf2167780df31aee697e1ec746b4c", "generate_prefix_data(0)",True],
+                    ["Test Markerset Data 0",       "e56eb605b7b583252f644ca67118aafb7642f49f", "generate_marker_set_data(0)", True],
+                    ["Test Rigid Body Data 0", "5357b7146719aca7df226dab585b15d1d6096e35", "generate_rigid_body_data(0)", True],
+                    ["Test Skeleton Data 0", "19b6b8e2f4b4c68d5c67f353bea0b09d10343074", "generate_skeleton_data(0)", True],
+                    ["Test Labeled Marker Data 0", "e0dd01035424e8e927a4956c21819a1f0ed18355", "generate_labeled_marker_data(0)", True],
+                    ["Test Force Plate Data 0", "2bb1000049a98b3c4ff8c48c7560af94dcdd32b3", "generate_force_plate_data(0)", True],
+                    ["Test Device Data 0",          "be10f0b93a7ba3858dce976b7868c1f79fd719c3", "generate_device_data(0)",True],
+                    ["Test Suffix Data 0", "005a1b3e1f9e7530255ca75f34e4786cef29fcdb", "generate_suffix_data(0)", True],
+                    ["Test MoCap Data 0", "1f85afac1eb790d431a4f5936b44a8555a316122", "generate_mocap_data(0)", True],
                     ]
         num_tests = len(test_cases)
         for i in range(num_tests):
             data = eval(test_cases[i][2])
-            totals_tmp = test_hash2(test_cases[i][0],test_cases[i][1],data,test_cases[i][3])
+            totals_tmp = test_hash2(test_cases[i][0],test_cases[i][1],data,test_cases[i][2],test_cases[i][3])
             totals=add_lists(totals, totals_tmp)
 
     print("--------------------")
