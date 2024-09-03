@@ -133,15 +133,6 @@ class AsterixModule(mp_module.MPModule):
             self.sock = None
         self.tracks = {}
 
-    def set_secondary_vehicle_position(self, m):
-        '''store second vehicle position for filtering purposes'''
-        if m.get_type() != 'GLOBAL_POSITION_INT':
-            return
-        (lat, lon, heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
-        if abs(lat) < 1.0e-3 and abs(lon) < 1.0e-3:
-            return
-        self.vehicle2_pos = VehiclePos(m)
-
     def could_collide_hor(self, vpos, adsb_pkt):
         '''return true if vehicle could come within filter_dist_xy meters of adsb vehicle in timeout seconds'''
         margin = self.asterix_settings.filter_dist_xy
