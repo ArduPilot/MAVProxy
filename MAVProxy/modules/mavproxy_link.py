@@ -622,8 +622,8 @@ class LinkModule(mp_module.MPModule):
             return False
 
         mav_autopilots_which_are_not_vehicles = frozenset([
-            'MAV_AUTOPILOT_INVALID',
-            'MAV_AUTOPILOT_RESERVED',
+            mavutil.mavlink.MAV_AUTOPILOT_INVALID,
+            mavutil.mavlink.MAV_AUTOPILOT_RESERVED,
         ])
         if m.autopilot in mav_autopilots_which_are_not_vehicles:
             return False
