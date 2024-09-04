@@ -69,6 +69,7 @@ preferred_ports = [
     '*Serial*',
     '*CubePilot*',
     '*Qiotek*',
+    '*Sierra*',
 ]
 
 
