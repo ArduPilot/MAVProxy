@@ -51,6 +51,9 @@ class BatteryModule(mp_module.MPModule):
 
     def cmd_bat(self, args):
         '''show battery levels'''
+        if 0 not in self.battery_level:
+            print("No battery information")
+            return
         print("Flight battery:   %u%%" % self.battery_level[0])
         for id in range(9):
             if self.numcells(id) != 0 and id in self.voltage_level:
