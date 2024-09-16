@@ -601,7 +601,7 @@ class MavGraph(object):
         self.axes = []
         self.first_only = []
         re_caps = re.compile('[A-Z_][A-Z0-9_]+')
-        re_instance = re.compile('([A-Z_][A-Z0-9_]+)\[([0-9A-Z_]+)\]')
+        re_instance = re.compile(r'([A-Z_][A-Z0-9_]+)\[([0-9A-Z_]+)\]')
         for f in self.fields:
             caps = set(re.findall(re_caps, f))
             self.msg_types = self.msg_types.union(caps)
