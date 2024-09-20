@@ -7,6 +7,7 @@ import socket
 import struct
 import datetime
 import math
+import zlib
 
 import time, sys
 
@@ -82,8 +83,8 @@ class RawThermal:
         while True:
             if self.im is None:
                 break
-            time.sleep(0.25)
-            ret = self.fetch_latest()
+            time.sleep(0.1)
+            ret = self.fetch_latest_compressed()
             if ret is None:
                 continue
             (fname, tstamp, data) = ret
@@ -180,6 +181,55 @@ class RawThermal:
         self.image_count += 1
         self.update_title()
             
+    def decompress_zlib_buffer(self, compressed_buffer):
+        try:
+            # Decompress the buffer using zlib
+            uncompressed_buffer = zlib.decompress(compressed_buffer)
+            return uncompressed_buffer
+        except zlib.error as e:
+            # Handle any errors during decompression
+            return None
+
+    def fetch_latest_compressed(self):
+        '''fetch a compressed thermal image'''
+        tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        timeout = self.siyi.siyi_settings.fetch_timeout
+        if timeout >= 0:
+            tcp.settimeout(2)
+        try:
+            tcp.connect(self.uri)
+        except Exception:
+            return None
+        buf = bytearray()
+
+        while True:
+            try:
+                b = tcp.recv(1024)
+            except Exception:
+                break
+            if not b:
+                break
+            buf += b
+
+        header_len = 128 + 12
+        if len(buf) < header_len:
+            return None
+
+        fname = buf[:128].decode("utf-8").strip('\x00')
+        compressed_size,tstamp = struct.unpack("<Id", buf[128:128+12])
+
+        compressed_data = buf[header_len:]
+
+        if compressed_size != len(compressed_data):
+            return None
+
+        uncompressed_data = self.decompress_zlib_buffer(compressed_data)
+
+        if len(uncompressed_data) != EXPECTED_DATA_SIZE:
+            return None
+
+        return fname, tstamp, uncompressed_data
+
     def fetch_latest(self):
         '''fetch a thermal image'''
         tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
