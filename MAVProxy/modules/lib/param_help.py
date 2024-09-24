@@ -97,6 +97,17 @@ class ParamHelp:
         return []
 
     def get_bitmask_from_help(self, help):
+        # check for presence of "bitmask" subtree, use it by preference:
+        children = help.getchildren()
+        for c in children:
+            if str(c).startswith("bitmask"):
+                ret = {}
+                for entry in c.getchildren():
+                    ret[int(entry.get('code'))] = str(entry)
+                return ret
+
+        # "bitmask" subtree not present, split the traditional
+        # "Bitmask" field ourselves:
         if not hasattr(help, 'field'):
             return None
         field = help.field
