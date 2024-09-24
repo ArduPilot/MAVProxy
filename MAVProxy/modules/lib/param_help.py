@@ -165,6 +165,9 @@ class ParamHelp:
                 try:
                     print("\n")
                     for f in help.field:
+                        if f.get('name') == 'Bitmask':
+                            # handled specially below
+                            continue
                         print("%s : %s" % (f.get('name'), str(f)))
                 except Exception as e:
                     pass
@@ -174,6 +177,16 @@ class ParamHelp:
                         print("\nValues: ")
                         for v in values:
                             print("\t%3u : %s" % (int(v.get('code')), str(v)))
+                except Exception as e:
+                    print("Caught exception %s" % repr(e))
+                    pass
+                try:
+                    # note this is a dictionary:
+                    values = self.get_bitmask_from_help(help)
+                    if values is not None and len(values):
+                        print("\nBitmask: ")
+                        for (n, v) in values.items():
+                            print(f"\t{int(n):3d} : {v}")
                 except Exception as e:
                     print("Caught exception %s" % repr(e))
                     pass
