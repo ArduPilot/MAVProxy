@@ -453,10 +453,10 @@ def cmd_map(args):
     options._flightmodes = mestate.mlog._flightmodes
     options.show_flightmode_legend = mestate.settings.show_flightmode
     options.colour_source='flightmode'
-    options.nkf_sample = 1
     if len(args) > 0:
         options.types = ':'.join(args)
-        if len(options.types) > 1:
+        filtered_args = list(filter(lambda x : x != "CMD", options.types))
+        if len(filtered_args) > 1:
             options.colour_source='type'
     mfv_mav_ret = mavflightview.mavflightview_mav(mestate.mlog, options, mestate.flightmode_selections)
     if mfv_mav_ret is None:
