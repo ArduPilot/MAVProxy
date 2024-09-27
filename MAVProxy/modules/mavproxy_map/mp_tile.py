@@ -24,6 +24,7 @@ import sys
 import math
 import threading
 import os
+import pathlib
 import string
 import time
 import cv2
@@ -284,11 +285,28 @@ class MPTile:
                     print("Downloading %s [%u left]" % (url, len(keys)))
                 req = url_request(url)
                 req.add_header('User-Agent', 'MAVProxy')
+
+                # try to re-use our cached data:
+                try:
+                    mtime = os.path.getmtime(path)
+                    req.add_header('If-Modified-Since', time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(mtime)))
+                except Exception:
+                    pass
+
                 if url.find('google') != -1:
                     req.add_header('Referer', 'https://maps.google.com/')
                 resp = url_open(req)
                 headers = resp.info()
             except url_error as e:
+                try:
+                    if e.getcode() == 304:
+                        # cache hit; touch the file to reset its refresh time
+                        pathlib.Path(path).touch()
+                        self._download_pending.pop(key)
+                        continue
+                except Exception as ex:
+                    pass
+
                 #print('Error loading %s' % url)
                 if not key in self._tile_cache:
                     self._tile_cache[key] = self._unavailable
