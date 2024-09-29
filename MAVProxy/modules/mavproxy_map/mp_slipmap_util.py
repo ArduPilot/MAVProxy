@@ -357,11 +357,10 @@ class SlipGrid(SlipObject):
         (lat,lon,w,h) = bounds
         # note that w and h are in degrees
         spacing = 1000
+        lat2 = mp_util.constrain(lat+h*0.5,-85,85)
+        lon2 = mp_util.wrap_180(lon+w)
+        dist = mp_util.gps_distance(lat2,lon,lat2,lon2)
         while True:
-            start = mp_util.latlon_round((lat,lon), spacing)
-            lat2 = mp_util.constrain(lat+h*0.5,-85,85)
-            lon2 = mp_util.wrap_180(lon+w)
-            dist = mp_util.gps_distance(lat2,lon,lat2,lon2)
             count = int(dist / spacing)
             if count < 2:
                 spacing /= 10.0
@@ -371,6 +370,8 @@ class SlipGrid(SlipObject):
                 break
 
         count += 10
+
+        start = mp_util.latlon_round((lat,lon), spacing)
 
         for i in range(count):
             # draw vertical lines of constant longitude
