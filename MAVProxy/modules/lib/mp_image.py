@@ -697,8 +697,11 @@ class MPImagePanel(wx.Panel):
 
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             (width, height) = (frame.shape[1], frame.shape[0])
-            if self.tracker:
+            if self.tracker is not None:
                 self.tracker.update(frame)
+            # TODO: may need a lock? tracker may be set to None after update()
+            # but before get_position().
+            if self.tracker is not None:
                 pos = self.tracker.get_position()
                 if pos is not None:
                     startX = int(pos.left())
