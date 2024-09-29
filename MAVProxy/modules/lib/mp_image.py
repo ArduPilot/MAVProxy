@@ -9,6 +9,7 @@ June 2012
 '''
 
 import time
+from MAVProxy.modules.lib import wx_processguard
 from MAVProxy.modules.lib.wx_loader import wx
 import cv2
 import numpy as np
@@ -953,11 +954,17 @@ if __name__ == "__main__":
                 continue
             if isinstance(event, MPImageTrackPos):
                 continue
-            if event.ClassName == 'wxMouseEvent':
+            if (
+                hasattr(event, "ClassName")
+                and event.ClassName == 'wxMouseEvent'
+            ):
                 if event.leftIsDown and event.shiftDown:
                     im.start_tracker(event.X, event.Y, 50, 50)
                 if event.leftIsDown and event.controlDown:
                     im.end_tracking()
-            if event.ClassName == 'wxKeyEvent':
+            if (  
+                hasattr(event, "ClassName")
+                and event.ClassName == 'wxKeyEvent'
+            ):
                 print('key %u' % event.KeyCode)
         time.sleep(0.1)
