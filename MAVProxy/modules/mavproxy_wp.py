@@ -307,8 +307,15 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
             self.mpstate.functions.process_stdin("module load misseditor", immediate=True)
 
     def cmd_set(self, args):
-        if len(args) != 1:
-            print("usage: wp set <wpindex>")
+        usage = "usage: wp set <wpindex> [reset]"
+        reset = False
+        if len(args) == 2:
+            if args[1] != "reset":
+                print(usage)
+                return
+            reset = True
+        elif len(args) != 1:
+            print(usage)
             return
 
         wp_num = int(args[0])
@@ -324,14 +331,20 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
         # we "know" because we hook receipt of COMMAND_ACK.
 
         if self.settings.wp_use_waypoint_set_current or supports is False:
+            if reset:
+                print("Reset unavailable, wp command NOT executed")
+                return
             self.master.waypoint_set_current_send(wp_num)
         else:
+            p2 = 0
+            if reset:
+                p2 = 1
             self.master.mav.command_long_send(
                 self.target_system,
                 self.target_component,
                 mavutil.mavlink.MAV_CMD_DO_SET_MISSION_CURRENT,
                 0,
-                wp_num, 0, 0, 0, 0, 0, 0
+                wp_num, p2, 0, 0, 0, 0, 0
             )
 
     def cmd_add(self, args):
