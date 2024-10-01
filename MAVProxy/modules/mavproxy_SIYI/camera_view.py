@@ -96,7 +96,7 @@ class CameraView:
         popup.add_to_submenu(["Marker"], MPMenuItem("Flag", returnkey="Marker:flag"))
         popup.add_to_submenu(["Marker"], MPMenuItem("Barrell", returnkey="Marker:barrell"))
 
-        gst_pipeline = "rtspsrc location={0} latency=0 buffer-mode=auto ! rtph265depay !  tee name=tee1 tee1. ! queue ! h265parse ! avdec_h265  ! videoconvert ! video/x-raw,format=BGRx ! appsink tee1. ! queue ! h265parse config-interval=15 ! video/x-h265 ! mpegtsmux ! filesink location={1}".format(
+        gst_pipeline = "rtspsrc location={0} latency=0 protocols=tcp tcp-timeout=3000000 buffer-mode=auto ! rtph265depay !  tee name=tee1 tee1. ! queue ! h265parse ! avdec_h265  ! videoconvert ! video/x-raw,format=BGRx ! appsink tee1. ! queue ! h265parse config-interval=15 ! video/x-h265 ! mpegtsmux ! filesink location={1}".format(
             self.rtsp_url, self.filename
         )
 
@@ -175,7 +175,7 @@ class CameraView:
         elif self.siyi.rgb_lens == "zoom":
             self.set_title("Zoom View %.1fx" % self.siyi.last_zoom)
         else:
-            self.set_title("Wide View")
+            self.set_title("Wide View (frame %u)" % self.frame_counter)
 
     def xy_to_latlon(self, x, y, shape):
         '''convert x,y pixel coordinates to a latlon tuple'''
