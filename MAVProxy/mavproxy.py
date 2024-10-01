@@ -24,13 +24,7 @@ import threading
 import time
 import traceback
 
-try:
-    reload
-except NameError:
-    try:
-        from importlib import reload
-    except ImportError:
-        from imp import reload
+from importlib import reload
 
 from pymavlink import mavutil
 
@@ -1400,14 +1394,8 @@ if __name__ == '__main__':
 
     # version information
     if opts.version:
-        # pkg_resources doesn't work in the windows exe build, so read the version file
-        try:
-            import pkg_resources
-            version = pkg_resources.require("mavproxy")[0].version
-        except Exception:
-            start_script = mp_util.dot_mavproxy("version.txt")
-            f = open(start_script, 'r')
-            version = f.readline()
+        import importlib.metadata
+        version = importlib.metadata.version("mavproxy")
 
         print("MAVProxy is a modular ground station using the mavlink protocol")
         print("MAVProxy Version: " + version)
