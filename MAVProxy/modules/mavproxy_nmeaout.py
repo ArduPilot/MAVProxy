@@ -16,9 +16,9 @@ It is highly desirable that teams provide:
 import sys, os, serial
 from MAVProxy.modules.lib import mp_module
 
-class NMEAMOutModule(mp_module.MPModule):
+class NMEAOutModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(NMEAModule, self).__init__(mpstate, "NMEAOUT", "NMEA output")
+        super(NMEAOutModule, self).__init__(mpstate, "nmeaout", "NMEA output")
         self.port = None
         self.baudrate = 4800
         self.data = 8
@@ -57,7 +57,7 @@ class NMEAMOutModule(mp_module.MPModule):
                 try:
                     self.serial = serial.Serial(self.port, self.baudrate, self.data, self.parity, self.stop)
                 except serial.SerialException as se:
-                    print("Failed to open output port %s:%s" % (self.port, se.message))
+                    print("Failed to open output port %s:%s" % (self.port, se))
             else:
                 self.serial = open(self.port, mode='w')
             
