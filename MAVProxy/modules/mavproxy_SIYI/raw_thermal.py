@@ -110,7 +110,7 @@ class RawThermal:
 
 
     def handle_auto_flag(self):
-        if not self.siyi.siyi_settings.autoflag_enable:
+        if not self.siyi.siyi_settings.autoflag_enable or self.siyi.have_DATA96:
             return
         if self.tmax < self.siyi.siyi_settings.autoflag_temp:
             return

@@ -22,6 +22,7 @@ from threading import Thread
 import cv2
 import traceback
 import copy
+import datetime
 
 import socket, time, os, struct
 
@@ -238,7 +239,7 @@ class SIYIModule(mp_module.MPModule):
                           "<therm_getthresholds|therm_getthreshswitch|therm_setthresholds|therm_setthreshswitch>",
                           "set (SIYISETTING)",
                           "imode <1|2|3|4|5|6|7|8|wide|zoom|split>",
-                          "palette <WhiteHot|Sepia|Ironbow|Rainbow|Night|Aurora|RedHot|Jungle|Medical|BlackHot|GloryHot>",
+                          "palette <WhiteHot|GloryHot>",
                           "thermal_mode <0|1>",
                           ])
 
@@ -288,6 +289,7 @@ class SIYIModule(mp_module.MPModule):
                                                      ('autoflag_dist', float, 30),
                                                      ('autoflag_history', float, 50),
                                                      ('autoflag_slices', int, 4),
+                                                     ('autoflag_radius', int, 100),
                                                      ('track_ROI', int, 1),
                                                      ('fetch_timeout', float, 2.0),
                                                      MPSetting('thresh_climit', int, 50, range=(10,50)),
@@ -360,6 +362,7 @@ class SIYIModule(mp_module.MPModule):
         self.last_SIEA = time.time()
         self.last_therm_cap = time.time()
         self.thermal_capture_count = 0
+        self.thermal_data_count = 0
         self.last_therm_mode = time.time()
         self.named_float_seq = 0
 
@@ -378,6 +381,8 @@ class SIYIModule(mp_module.MPModule):
         self.extended_sys_state_request_time = 0
         self.extended_sys_state_warn_time = 0  # last time we warned about not being able to auto-stow
         self.last_landed_state = None
+
+        self.have_DATA96 = False
 
         # support retracting camera based on heuristics:
         self.landing_heuristics = {
@@ -408,11 +413,19 @@ class SIYIModule(mp_module.MPModule):
                                      MPMenuSubMenu('Zoom',
                                                    items=[MPMenuItem('Zoom%u'%z, 'Zoom%u'%z, '# siyi zoom %u ' % z) for z in range(1,11)]),
                                      MPMenuSubMenu('ThermalGain',
-                                                   items=[MPMenuItem('HighGain', 'HighGain', '# siyi thermal_gain 1'),
-                                                          MPMenuItem('LowGain', 'LowGain', '# siyi thermal_gain 0')]),
+                                                   items=[MPMenuItem('HighGain(LowTemp)', 'HighGain', '# siyi thermal_gain 1'),
+                                                          MPMenuItem('LowGain(HighTemp)', 'LowGain', '# siyi thermal_gain 0'),
+                                                          MPMenuItem('ThreshOff', 'ThreshOff', '# siyi therm_setthreshswitch 0')]),
 
                                      MPMenuSubMenu('Threshold',
-                                                  items=[MPMenuItem('Threshold%u'%z, 'Threshold%u'%z, '# siyi set threshold_temp %u ' % z) for z in range(20,115,5)])])
+                                                  items=[MPMenuItem('Threshold%u'%z, 'Threshold%u'%z, '# siyi set threshold_temp %u ' % z) for z in range(20,115,5)]),
+                                     MPMenuSubMenu('AutoFlag',
+                                                   items=[MPMenuItem('Enable', 'AutoFlagEnable', '# siyi set autoflag_enable 1'),
+                                                          MPMenuItem('Disable', 'AutoFlagDisable', '# siyi set autoflag_enable 0'),
+                                                          MPMenuItem('Clear', 'AutoFlagClear', '# siyi autoflag_clear'),
+                                                          MPMenuItem('Reload', 'AutoFlagReload', '# siyi autoflag_reload'),
+                                                          ]),
+                                     ])
             map = self.module('map')
             if map is not None:
                 map.add_menu(menu)
@@ -520,6 +533,10 @@ class SIYIModule(mp_module.MPModule):
             self.therm_set_thresholds(args[1:])
         elif args[0] == "settime":
             self.cmd_settime()
+        elif args[0] == "autoflag_clear":
+            self.autoflag_clear()
+        elif args[0] == "autoflag_reload":
+            self.autoflag_reload()
         else:
             print(usage)
 
@@ -1221,7 +1238,7 @@ class SIYIModule(mp_module.MPModule):
             return None
         return cproj.get_slantrange(gpi.lat*1.0e-7,gpi.lon*1.0e-7,gpi.alt*1.0e-3,fov_att[0],fov_att[1],fov_att[2]+math.degrees(att.yaw))
 
-    def get_latlonalt(self, slant_range, x, y, FOV, aspect_ratio):
+    def get_latlonalt(self, slant_range, x, y, FOV, aspect_ratio, fov_att=None):
         '''
         get ground lat/lon given vehicle orientation, camera orientation and slant range
         x and y are from -1 to 1, relative to center of camera view
@@ -1402,6 +1419,89 @@ class SIYIModule(mp_module.MPModule):
             self.last_getconfig = now
             self.send_packet(ACQUIRE_GIMBAL_CONFIG_INFO, None)
 
+    def save_DATA96(self, data):
+        '''save data from a DATA96 message'''
+        dname = os.path.join(self.logdir, 'thermal_data')
+        try:
+            os.mkdir(dname)
+        except Exception as ex:
+            pass
+        now = time.time()
+        tstr = datetime.datetime.fromtimestamp(now).strftime("%Y_%m_%d_%H_%M_%S")
+        subsec = now - math.floor(now)
+        millis = int(subsec * 1000)
+        fname = "data_%s_%03u.dat" % (tstr, millis)
+        open(os.path.join(dname, fname),'wb').write(data)
+
+    def process_DATA96(self, data):
+        '''handle data from SIYI_control.lua'''
+        msec,lat, lon, alt, gps_alt, tmax, tmax_x, tmax_y, siyi_roll, siyi_pitch, siyi_yaw, roll, pitch, yaw = struct.unpack("<iiifffHHffffff", data)
+        if not self.siyi_settings.autoflag_enable or tmax < self.siyi_settings.autoflag_temp:
+            return
+
+        lat = lat * 1.0e-7
+        lon = lon * 1.0e-7
+
+        if self.last_map_ROI:
+            (roi_lat, roi_lon, roi_alt) = self.last_map_ROI
+            roi_dist = mp_util.gps_distance(lat, lon, roi_lat, roi_lon)
+            if roi_dist > self.siyi_settings.autoflag_radius:
+                #print("roi_dist: ", roi_dist, lat, lon, roi_lat, roi_lon)
+                return
+
+        thermal_width = 640
+        thermal_height = 512
+        aspect_ratio = thermal_width / float(thermal_height)
+        FOV = self.siyi_settings.thermal_fov
+        C = camera_projection.CameraParams(xresolution=thermal_width, yresolution=thermal_height, FOV=FOV)
+        cproj = camera_projection.CameraProjection(C, elevation_model=self.module('terrain').ElevationModel)
+        slant_range = cproj.get_slantrange(lat,lon,gps_alt,siyi_roll,siyi_pitch-self.siyi_settings.mount_pitch,siyi_yaw+yaw-self.siyi_settings.mount_yaw)
+        if slant_range is None:
+            return
+        x = (tmax_x/thermal_width) * 2 - 1.0
+        y = (tmax_y/thermal_height) * 2 - 1.0
+        fov_att = (siyi_roll, siyi_pitch-self.siyi_settings.mount_pitch, mp_util.wrap_180(siyi_yaw-self.siyi_settings.mount_yaw))
+        latlonalt = cproj.get_latlonalt_for_pixel(tmax_x, tmax_y, lat, lon, gps_alt, fov_att[0], fov_att[1], fov_att[2]+yaw)
+        if latlonalt is None:
+            return
+        latlon = latlonalt[0], latlonalt[1]
+
+        icon = self.mpstate.map.icon('flame.png')
+        self.mpstate.map.add_object(mp_slipmap.SlipIcon(
+            'icon [%u]' % msec,
+            (float(latlon[0]),float(latlon[1])),
+            icon, layer='thermal_flag', rotation=0, follow=False))
+
+    def handle_DATA96(self, m):
+        '''handle data from SIYI_control.lua'''
+        self.have_DATA96 = True
+        data = bytes(m.data[:m.len])
+        self.thermal_data_count = self.thermal_data_count + 1
+        self.console.set_status('TDAT', 'TDAT %u' % self.thermal_data_count, row=6)
+        self.save_DATA96(data)
+        self.process_DATA96(data)
+
+    def autoflag_clear(self):
+        '''clear auto flagged locations'''
+        self.mpstate.map.add_object(mp_slipmap.SlipClearLayer('thermal_flag'))
+
+    def autoflag_reload(self):
+        '''reload auto flagged locations'''
+        dname = os.path.join(self.logdir, 'thermal_data')
+        try:
+            dlist = os.listdir(dname)
+        except Exception as ex:
+            print(ex)
+            return
+        self.autoflag_clear()
+        for d in sorted(dlist):
+            if not d.startswith('data_') or not d.endswith('.dat'):
+                continue
+            data = open(os.path.join(dname, d),'rb').read()
+            if len(data) != 52:
+                continue
+            self.process_DATA96(data)
+        
     def mavlink_packet(self, m):
         '''process a mavlink message'''
         mtype = m.get_type()
@@ -1430,6 +1530,8 @@ class SIYIModule(mp_module.MPModule):
                     # we've just transition into landing
                     self.retract()
                 self.last_landed_state = m.landed_state
+        elif mtype == 'DATA96' and m.type == 71:
+            self.handle_DATA96(m)
 
     def retract(self):
         print("SIYI: stowing camera")
@@ -1470,7 +1572,8 @@ class SIYIModule(mp_module.MPModule):
         self.update_target()
         self.send_rates()
         self.request_telem()
-        self.send_attitude()
+        if not self.have_DATA96:
+            self.send_attitude()
         self.check_thermal_events()
         self.therm_capture()
 
