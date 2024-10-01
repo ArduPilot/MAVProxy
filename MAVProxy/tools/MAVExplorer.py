@@ -33,7 +33,10 @@ from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
 from MAVProxy.modules.lib import wxsettings
 from MAVProxy.modules.lib.graphdefinition import GraphDefinition
 from lxml import objectify
-import pkg_resources
+
+import importlib
+import importlib.resources
+
 from builtins import input
 import datetime
 import matplotlib
@@ -355,30 +358,26 @@ def load_graphs():
         if graphs:
             mestate.graphs.extend(graphs)
             mestate.console.writeln("Loaded %s" % file)
+
     # also load the built in graphs
-    try:
-        dlist = pkg_resources.resource_listdir("MAVProxy", "tools/graphs")
-        for f in dlist:
-            raw = pkg_resources.resource_stream("MAVProxy", "tools/graphs/%s" % f).read()
-            graphs = load_graph_xml(raw, None)
-            if graphs:
-                mestate.graphs.extend(graphs)
-                mestate.console.writeln("Loaded %s" % f)
-    except Exception:
-        #we're in a Windows exe, where pkg_resources doesn't work
-        import pkgutil
-        for f in ["ekf3Graphs.xml", "ekfGraphs.xml", "mavgraphs.xml", "mavgraphs2.xml"]:
-            raw = pkgutil.get_data( 'MAVProxy', 'tools//graphs//' + f)
-            graphs = load_graph_xml(raw, None)
-            if graphs:
-                mestate.graphs.extend(graphs)
-                mestate.console.writeln("Loaded %s" % f)
+    load_built_in_graphs()
+
     mestate.graphs = sorted(mestate.graphs, key=lambda g: g.name)
     # Update completions with actual graph names
     if len(mestate.graphs) > 0:
         # Some default graph names have spaces: replace with -
         graph_names = [g.name.replace(' ', '-') for g in mestate.graphs]
         mestate.completions["graphs"] = graph_names
+
+def load_built_in_graphs():
+    '''load graph definitions from packaged resources'''
+    dlist = importlib.resources.files("MAVProxy.tools.graphs")
+    for f in dlist.iterdir():
+        raw = importlib.resources.files("MAVProxy.tools.graphs").joinpath(f).open('r').read()
+        graphs = load_graph_xml(raw, None)
+        if graphs:
+            mestate.graphs.extend(graphs)
+            mestate.console.writeln("Loaded %s" % f)
 
 def flightmode_colours():
     '''return mapping of flight mode to colours'''
@@ -1763,16 +1762,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.version:
-        #pkg_resources doesn't work in the windows exe build, so read the version file
-        try:
-            version = pkg_resources.require("mavproxy")[0].version
-        except Exception as e:
-            start_script = mp_util.dot_mavproxy("version.txt")
-            f = open(start_script, 'r')
-            version = f.readline()
+        import importlib.metadata
+        version = importlib.metadata.version("mavproxy")
         print("MAVExplorer Version: " + version)
         sys.exit(1)
-    
+
     mestate = MEState()
     setup_file_menu()
 
