@@ -337,7 +337,7 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
             type_list = options.types.split(',')
         expressions.extend(pos_expressions(type_list))
     else:
-        expressions.extend(pos_expressions(['POS', 'GLOBAL_POSITION_INT']))
+        expressions.extend(pos_expressions(['POS', 'GLOBAL_POSITION_INT', 'CMD']))
         if options.rawgps or options.dualgps:
             expressions.extend(pos_expressions(['GPS', 'GPS_RAW_INT']))
         if options.rawgps2 or options.dualgps:

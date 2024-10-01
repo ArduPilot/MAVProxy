@@ -97,6 +97,17 @@ class ParamHelp:
         return []
 
     def get_bitmask_from_help(self, help):
+        # check for presence of "bitmask" subtree, use it by preference:
+        children = help.getchildren()
+        for c in children:
+            if str(c).startswith("bitmask"):
+                ret = {}
+                for entry in c.getchildren():
+                    ret[int(entry.get('code'))] = str(entry)
+                return ret
+
+        # "bitmask" subtree not present, split the traditional
+        # "Bitmask" field ourselves:
         if not hasattr(help, 'field'):
             return None
         field = help.field
@@ -165,6 +176,9 @@ class ParamHelp:
                 try:
                     print("\n")
                     for f in help.field:
+                        if f.get('name') == 'Bitmask':
+                            # handled specially below
+                            continue
                         print("%s : %s" % (f.get('name'), str(f)))
                 except Exception as e:
                     pass
@@ -174,6 +188,16 @@ class ParamHelp:
                         print("\nValues: ")
                         for v in values:
                             print("\t%3u : %s" % (int(v.get('code')), str(v)))
+                except Exception as e:
+                    print("Caught exception %s" % repr(e))
+                    pass
+                try:
+                    # note this is a dictionary:
+                    values = self.get_bitmask_from_help(help)
+                    if values is not None and len(values):
+                        print("\nBitmask: ")
+                        for (n, v) in values.items():
+                            print(f"\t{int(n):3d} : {v}")
                 except Exception as e:
                     print("Caught exception %s" % repr(e))
                     pass

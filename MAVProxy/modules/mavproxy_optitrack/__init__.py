@@ -17,9 +17,11 @@ class optitrack(mp_module.MPModule):
             [('server', str, '127.0.0.1'),
             ('client', str, '127.0.0.1'),
             ('msg_intvl_ms', int, 75),
-            ('obj_id', int, 1)]
+            ('obj_id', int, 1),
+            ('print_lv', int, 0),
+            ('multicast', bool, True)]
         )
-        self.add_command('optitrack', self.cmd_optitrack, "optitrack control", ['<start>', 'set (OPTITRACKSETTING)'])
+        self.add_command('optitrack', self.cmd_optitrack, "optitrack control", ['<start>', '<stop>', 'set (OPTITRACKSETTING)'])
         self.streaming_client = NatNetClient.NatNetClient()
         # Configure the streaming client to call our rigid body handler on the emulator to send data out.
         self.streaming_client.rigid_body_listener = self.receive_rigid_body_frame
@@ -27,8 +29,8 @@ class optitrack(mp_module.MPModule):
         self.started = False
 
     # This is a callback function that gets connected to the NatNet client. It is called once per rigid body per frame
-    def receive_rigid_body_frame(self, new_id, position, rotation, tracking_valid):
-        if (tracking_valid and new_id == self.optitrack_settings.obj_id):
+    def receive_rigid_body_frame(self, new_id, position, rotation):
+        if (new_id == self.optitrack_settings.obj_id):
             now = time.time()
             if (now - self.last_msg_time) > (self.optitrack_settings.msg_intvl_ms * 0.001):
                 time_us = int(now * 1.0e6)
@@ -37,12 +39,14 @@ class optitrack(mp_module.MPModule):
 
     def usage(self):
         '''show help on command line options'''
-        return "Usage: optitrack <start|set>"
+        return "Usage: optitrack <start|stop|set>"
 
     def cmd_start(self):
         self.streaming_client.set_client_address(self.optitrack_settings.client)
         self.streaming_client.set_server_address(self.optitrack_settings.server)
-        self.streaming_client.setup_sdk()
+        self.streaming_client.set_print_level(self.optitrack_settings.print_lv)
+        self.streaming_client.set_use_multicast(self.optitrack_settings.multicast)
+        self.streaming_client.run()
         self.started = True
 
     def cmd_optitrack(self, args):
@@ -51,15 +55,14 @@ class optitrack(mp_module.MPModule):
             print(self.usage())
         elif args[0] == "start":
             self.cmd_start()
+        elif args[0] == "stop":
+            if self.started:
+                self.started = False
+                self.streaming_client.shutdown()
         elif args[0] == "set":
             self.optitrack_settings.command(args[1:])
         else:
             print(self.usage())
-
-    def idle_task(self):
-        '''called rapidly by mavproxy'''
-        if self.started:
-            self.streaming_client.process_data_and_cmd()
 
 def init(mpstate):
     '''initialise module'''
