@@ -257,6 +257,7 @@ class SIYIModule(mp_module.MPModule):
                                                      ('pitch_gain_I', float, 1),
                                                      ('pitch_gain_IMAX', float, 5),
                                                      ('mount_pitch', float, 0),
+                                                     ('mount_alt', float, 0),
                                                      ('mount_yaw', float, 0),
                                                      ('lag', float, 0),
                                                      ('target_rate', float, 10),
@@ -424,6 +425,7 @@ class SIYIModule(mp_module.MPModule):
                                                           MPMenuItem('Disable', 'AutoFlagDisable', '# siyi set autoflag_enable 0'),
                                                           MPMenuItem('Clear', 'AutoFlagClear', '# siyi autoflag_clear'),
                                                           MPMenuItem('Reload', 'AutoFlagReload', '# siyi autoflag_reload'),
+                                                          MPMenuItem('Discard', 'AutoFlagDiscard', '# siyi autoflag_discard'),
                                                           ]),
                                      ])
             map = self.module('map')
@@ -537,6 +539,8 @@ class SIYIModule(mp_module.MPModule):
             self.autoflag_clear()
         elif args[0] == "autoflag_reload":
             self.autoflag_reload()
+        elif args[0] == "autoflag_discard":
+            self.autoflag_discard()
         else:
             print(usage)
 
@@ -1234,9 +1238,11 @@ class SIYIModule(mp_module.MPModule):
         fov_att = self.get_fov_attitude()
         att = self.master.messages.get('ATTITUDE',None)
         gpi = self.master.messages.get('GLOBAL_POSITION_INT',None)
-        if gpi is None or att is None:
+        GPS_RAW_INT = self.master.messages['GPS_RAW_INT']
+        if gpi is None or att is None or GPS_RAW_INT is None:
             return None
-        return cproj.get_slantrange(gpi.lat*1.0e-7,gpi.lon*1.0e-7,gpi.alt*1.0e-3,fov_att[0],fov_att[1],fov_att[2]+math.degrees(att.yaw))
+        myalt = GPS_RAW_INT.alt*1.0e-3 + self.siyi_settings.mount_alt
+        return cproj.get_slantrange(gpi.lat*1.0e-7,gpi.lon*1.0e-7,myalt,fov_att[0],fov_att[1],fov_att[2]+math.degrees(att.yaw))
 
     def get_latlonalt(self, slant_range, x, y, FOV, aspect_ratio, fov_att=None):
         '''
@@ -1250,9 +1256,11 @@ class SIYIModule(mp_module.MPModule):
         fov_att = self.get_fov_attitude()
         att = self.master.messages.get('ATTITUDE',None)
         gpi = self.master.messages.get('GLOBAL_POSITION_INT',None)
-        if gpi is None or att is None:
+        GPS_RAW_INT = self.master.messages['GPS_RAW_INT']
+        if gpi is None or att is None or GPS_RAW_INT is None:
             return None
-        return cproj.get_latlonalt_for_pixel(px, py, gpi.lat*1.0e-7,gpi.lon*1.0e-7,gpi.alt*1.0e-3,fov_att[0],fov_att[1],fov_att[2]+math.degrees(att.yaw))
+        myalt = GPS_RAW_INT.alt*1.0e-3 + self.siyi_settings.mount_alt
+        return cproj.get_latlonalt_for_pixel(px, py, gpi.lat*1.0e-7,gpi.lon*1.0e-7,myalt,fov_att[0],fov_att[1],fov_att[2]+math.degrees(att.yaw))
 
     def get_target_yaw_pitch(self, lat, lon, alt, mylat, mylon, myalt, vehicle_yaw_rad):
         '''get target yaw/pitch in vehicle frame for a target lat/lon'''
@@ -1292,11 +1300,12 @@ class SIYIModule(mp_module.MPModule):
         self.last_target_send = now
 
         GLOBAL_POSITION_INT = self.master.messages['GLOBAL_POSITION_INT']
+        GPS_RAW_INT = self.master.messages['GPS_RAW_INT']
         ATTITUDE = self.master.messages['ATTITUDE']
         lat, lon, alt = self.target_pos
         mylat = GLOBAL_POSITION_INT.lat*1.0e-7
         mylon = GLOBAL_POSITION_INT.lon*1.0e-7
-        myalt = GLOBAL_POSITION_INT.alt*1.0e-3
+        myalt = GPS_RAW_INT.alt*1.0e-3 + self.siyi_settings.mount_alt
 
         dt = now - GLOBAL_POSITION_INT._timestamp
         vn = GLOBAL_POSITION_INT.vx*0.01
@@ -1357,9 +1366,11 @@ class SIYIModule(mp_module.MPModule):
         fov_att = self.get_fov_attitude()
         att = self.master.messages.get('ATTITUDE',None)
         gpi = self.master.messages.get('GLOBAL_POSITION_INT',None)
-        if gpi is None or att is None:
+        GPS_RAW_INT = self.master.messages['GPS_RAW_INT']
+        if gpi is None or att is None or GPS_RAW_INT is None:
             return None
-        points = cproj.get_projection(gpi.lat*1.0e-7,gpi.lon*1.0e-7,gpi.alt*1.0e-3,fov_att[0],fov_att[1],fov_att[2]+math.degrees(att.yaw))
+        myalt = GPS_RAW_INT.alt*1.0e-3 + self.siyi_settings.mount_alt
+        points = cproj.get_projection(gpi.lat*1.0e-7,gpi.lon*1.0e-7,myalt,fov_att[0],fov_att[1],fov_att[2]+math.degrees(att.yaw))
         if points is not None:
             self.mpstate.map.add_object(mp_slipmap.SlipPolygon(name, points, layer='SIYI',
                                                                linewidth=2, colour=color))
@@ -1442,20 +1453,13 @@ class SIYIModule(mp_module.MPModule):
         lat = lat * 1.0e-7
         lon = lon * 1.0e-7
 
-        if self.last_map_ROI:
-            (roi_lat, roi_lon, roi_alt) = self.last_map_ROI
-            roi_dist = mp_util.gps_distance(lat, lon, roi_lat, roi_lon)
-            if roi_dist > self.siyi_settings.autoflag_radius:
-                #print("roi_dist: ", roi_dist, lat, lon, roi_lat, roi_lon)
-                return
-
         thermal_width = 640
         thermal_height = 512
         aspect_ratio = thermal_width / float(thermal_height)
         FOV = self.siyi_settings.thermal_fov
         C = camera_projection.CameraParams(xresolution=thermal_width, yresolution=thermal_height, FOV=FOV)
         cproj = camera_projection.CameraProjection(C, elevation_model=self.module('terrain').ElevationModel)
-        slant_range = cproj.get_slantrange(lat,lon,gps_alt,siyi_roll,siyi_pitch-self.siyi_settings.mount_pitch,siyi_yaw+yaw-self.siyi_settings.mount_yaw)
+        slant_range = cproj.get_slantrange(lat,lon,gps_alt+self.siyi_settings.mount_alt,siyi_roll,siyi_pitch-self.siyi_settings.mount_pitch,siyi_yaw+yaw-self.siyi_settings.mount_yaw)
         if slant_range is None:
             return
         x = (tmax_x/thermal_width) * 2 - 1.0
@@ -1465,6 +1469,12 @@ class SIYIModule(mp_module.MPModule):
         if latlonalt is None:
             return
         latlon = latlonalt[0], latlonalt[1]
+        if self.last_map_ROI:
+            (roi_lat, roi_lon, roi_alt) = self.last_map_ROI
+            roi_dist = mp_util.gps_distance(latlon[0], latlon[1], roi_lat, roi_lon)
+            if roi_dist > self.siyi_settings.autoflag_radius:
+                #print("roi_dist: ", roi_dist, lat, lon, roi_lat, roi_lon)
+                return
 
         icon = self.mpstate.map.icon('flame.png')
         self.mpstate.map.add_object(mp_slipmap.SlipIcon(
@@ -1501,7 +1511,19 @@ class SIYIModule(mp_module.MPModule):
             if len(data) != 52:
                 continue
             self.process_DATA96(data)
-        
+
+    def autoflag_discard(self):
+        '''discard flagged locations'''
+        dname = os.path.join(self.logdir, 'thermal_data')
+        try:
+            dlist = os.listdir(dname)
+        except Exception as ex:
+            print(ex)
+            return
+        self.autoflag_clear()
+        for d in dlist:
+            os.unlink(os.path.join(dname, d))
+
     def mavlink_packet(self, m):
         '''process a mavlink message'''
         mtype = m.get_type()
