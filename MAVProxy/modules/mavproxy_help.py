@@ -5,8 +5,7 @@ AP_FLAKE8_CLEAN
 """
 import platform
 import re
-import socket
-import sys
+import requests
 
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_module
@@ -16,12 +15,6 @@ if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import MPMenuSubMenu
     from MAVProxy.modules.lib.mp_menu import MPMenuOpenWeblink
     from MAVProxy.modules.lib.mp_menu import MPMenuChildMessageDialog
-
-if sys.version_info.major < 3:
-    import xmlrpclib
-else:
-    basestring = str
-    import xmlrpc.client as xmlrpclib
 
 
 class HelpModule(mp_module.MPModule):
@@ -48,27 +41,7 @@ class HelpModule(mp_module.MPModule):
             self.wxVersion = ''
 
         #  check for updates, if able
-        pypi = xmlrpclib.ServerProxy('https://pypi.python.org/pypi')
-        available = None
-        try:
-            available = pypi.package_releases('MAVProxy')
-        except socket.gaierror:
-            pass
-
-        if available:
-            self.newversion = available[0]
-        else:
-            self.newversion = 'Error finding update'
-
-        #  and format the update string
-        if not isinstance(self.newversion, basestring):
-            self.newversion = "Error finding update"
-        elif re.search('[a-zA-Z]', self.newversion):
-            self.newversion = "Error finding update: " + self.newversion
-        elif self.newversion.strip() == self.version.strip():
-            self.newversion = "Running latest version"
-        else:
-            self.newversion = "New version " + self.newversion + " available (currently running " + self.version + ")"
+        self.check_for_updates()
 
         if mp_util.has_wxpython:
             self.menu_added_console = False
@@ -100,8 +73,39 @@ class HelpModule(mp_module.MPModule):
                         ))
                 ])
 
+    def check_for_updates(self):
+        url = "https://pypi.org/pypi/MAVProxy/json"
+        try:
+            response = requests.get(url)
+        except requests.exceptions.RequestException as e:
+            self.newversion = f"Error finding update: {e}"
+            return
+
+        if response.status_code != 200:
+            self.newversion = f"HTTP error getting update ({response.status_code})"
+            return
+
+        self.newversion = response.json()['info']['version']
+
+        #  and format the update string
+        if not isinstance(self.newversion, str):
+            self.newversion = "Error finding update"
+        elif re.search('[a-zA-Z]', self.newversion):
+            self.newversion = "Error finding update: " + self.newversion
+        elif self.newversion.strip() == self.version.strip():
+            self.newversion = "Running latest version"
+        else:
+            self.newversion = "New version " + self.newversion + " available (currently running " + self.version + ")"
+
     def about_string(self):
-        return "MAVProxy Version " + self.version + "\nOS: " + self.host + "\nPython " + self.pythonversion + "\nWXPython " + self.wxVersion  # noqa
+        bits = {
+            "MAVProxy Version": self.version,
+            "OS": self.host,
+            "Python": self.pythonversion,
+            "WXPython": self.wxVersion,
+            "LatestVersion": self.newversion,
+        }
+        return "".join([f"{x[0]}: {x[1]}\n" for x in bits.items()])
 
     def idle_task(self):
         '''called on idle'''
