@@ -556,18 +556,23 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
             print("wp is not a location command")
             return
 
-        prev = num - 1
-        if prev < 1 or prev > self.wploader.count():
-            print("Bad item %u" % num)
-            return
-        prev_wp = self.wploader.wp(prev)
-        if prev_wp is None:
-            print("Could not get previous wp %u" % prev)
-            return
-        prev_loc = self.get_loc(prev_wp)
-        if prev_loc is None:
-            print("previous wp is not a location command")
-            return
+        prev = num
+        while True:
+            prev = prev - 1
+            if prev < 1 or prev > self.wploader.count():
+                print("Bad item %u" % num)
+                return
+            prev_wp = self.wploader.wp(prev)
+            if prev_wp is None:
+                print("Could not get previous wp %u" % prev)
+                return
+            if prev_wp.command == mavutil.mavlink.MAV_CMD_DO_LAND_START:
+                continue
+            prev_loc = self.get_loc(prev_wp)
+            if prev_loc is None:
+                print("previous wp is not a location command")
+                return
+            break
 
         if wp.frame != prev_wp.frame:
             print("waypoints differ in frame (%u vs %u)" %
