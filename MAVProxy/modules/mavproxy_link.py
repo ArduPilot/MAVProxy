@@ -566,6 +566,9 @@ class LinkModule(mp_module.MPModule):
             master.link_delayed = False
 
     def colors_for_severity(self, severity):
+        # Windows and Linux have wildly difference concepts of
+        # "green",so use specific RGB values:
+        green = (0, 128, 0)
         severity_colors = {
             # tuple is (fg, bg) (as in "white on red")
             mavutil.mavlink.MAV_SEVERITY_EMERGENCY: ('white', 'red'),
@@ -574,8 +577,8 @@ class LinkModule(mp_module.MPModule):
             mavutil.mavlink.MAV_SEVERITY_ERROR: ('black', 'orange'),
             mavutil.mavlink.MAV_SEVERITY_WARNING: ('black', 'orange'),
             mavutil.mavlink.MAV_SEVERITY_NOTICE: ('black', 'yellow'),
-            mavutil.mavlink.MAV_SEVERITY_INFO: ('white', 'green'),
-            mavutil.mavlink.MAV_SEVERITY_DEBUG: ('white', 'green'),
+            mavutil.mavlink.MAV_SEVERITY_INFO: ('white', green),
+            mavutil.mavlink.MAV_SEVERITY_DEBUG: ('white', green),
         }
         try:
             return severity_colors[severity]
