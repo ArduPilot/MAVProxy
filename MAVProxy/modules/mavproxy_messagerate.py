@@ -61,6 +61,8 @@ class messagerate(mp_module.MPModule):
                 return
             message_name = args[1]
             message_rate = float(args[2])
+            # Special handling for -1 and 0 which correspond to "stop sending" and "reset to default rate"
+            message_rate = message_rate if message_rate <= 0 else 1E6/message_rate
             priority = 0
             if len(args) > 3:
               priority = int(args[3])
@@ -74,7 +76,7 @@ class messagerate(mp_module.MPModule):
                         self.settings.target_component,
                         mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL,
                         0,
-                        msg_id, (int) (1E6/message_rate), priority, 0, 0, 0, 0)
+                        msg_id, (int) (message_rate), priority, 0, 0, 0, 0)
                     return
             print("Unknown message ID:%s" % message_name)
 
