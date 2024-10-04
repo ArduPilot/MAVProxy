@@ -35,6 +35,7 @@ python.exe -m pip install -U wheel setuptools pip
 python.exe -m pip install pywin32 lxml pymavlink numpy matplotlib pyserial opencv-python PyYAML Pygame Pillow wxpython prompt-toolkit scipy
 python.exe -m pip install -U openai wave pyaudio
 python.exe -m pip install -U pyinstaller==6.7.0 packaging 
+python.exe -m pip install -U requests
 
 rem -----Build MAVProxy-----
 cd ..\
