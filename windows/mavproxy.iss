@@ -43,20 +43,25 @@ Source: "..\MAVProxy\dist\mavproxy\mavproxy.exe"; DestDir: "{app}"; Flags: ignor
 Source: "..\MAVProxy\dist\mavproxy\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\MAVProxy\dist\MAVExplorer\MAVExplorer.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\MAVProxy\dist\MAVExplorer\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\MAVProxy\dist\mavpicviewer\mavpicviewer.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\MAVProxy\dist\mavpicviewer\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 Source: "..\Parameters\*"; DestDir: "{localappdata}\.mavproxy"; Flags: ignoreversion
 Source: "..\windows\mavinit.scr"; DestDir: "{localappdata}\.mavproxy"; Flags: ignoreversion
 Source: "..\windows\version.txt"; DestDir: "{localappdata}\.mavproxy"; Flags: ignoreversion
 Source: "..\windows\MAVProxy.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\windows\MAVExplorer.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\windows\mavpicviewer.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\windows\Startup Examples\MAVProxyLogput.bat"; DestDir: "{app}\Examples"; Flags: ignoreversion
 Source: "..\windows\Startup Examples\MAVProxyMultiOutput.bat"; DestDir: "{app}\Examples"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName} (No GUI)"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{commondocs}"; IconFilename: "{app}\MAVProxy.ico"
 Name: "{group}\MAVExplorer"; Filename: "{app}\MAVExplorer.exe"; WorkingDir: "{commondocs}"; IconFilename: "{app}\MAVExplorer.ico"
+Name: "{group}\MAVPicViewer"; Filename: "{app}\mavpicviewer.exe"; WorkingDir: "{commondocs}"; IconFilename: "{app}\mavpicviewer.ico"
 Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--map --console --load-module=graph"; WorkingDir: "{commondocs}"; Tasks: desktopicon; IconFilename: "{app}\MAVProxy.ico"
 Name: "{commondesktop}\MAVExplorer"; Filename: "{app}\MAVExplorer.exe"; WorkingDir: "{commondocs}"; Tasks: desktopicon; IconFilename: "{app}\MAVExplorer.ico"
+Name: "{commondesktop}\MAVPicViewer"; Filename: "{app}\mavpicviewer.exe"; WorkingDir: "{commondocs}"; Tasks: desktopicon; IconFilename: "{app}\mavpicviewer.ico"
 Name: "{group}\Documentation"; Filename: "https://ardupilot.org/mavproxy/index.html"
 Name: "{group}\Startup Examples"; Filename: "{app}\Examples"
 Name: "{group}\Ardupilot MAVProxy Forum"; Filename: "http://discuss.ardupilot.org/c/ground-control-software/mavproxy"
