@@ -42,8 +42,9 @@ if platform.system() == "Darwin":
                          'wxPython'])
 
 if platform.system() == "Windows" and sys.version_info >= (3, 0):
-    # on MacOS we can have a more complete requirements list
+    # on Windows we can have a more complete requirements list
     requirements.extend(['prompt_toolkit'])
+    requirements.append('requests')
 elif platform.system() == "Windows":
     requirements.extend(['pyreadline'])
 
