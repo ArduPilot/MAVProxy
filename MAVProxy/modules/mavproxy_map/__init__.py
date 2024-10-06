@@ -1057,20 +1057,6 @@ Usage: map circle <radius> <colour>
         self.map.add_object(mp_slipmap.SlipClearLayer(3))
         self.have_vehicle = {}
 
-    def set_secondary_vehicle_position(self, m):
-        '''show 2nd vehicle on map'''
-        if m.get_type() != 'GLOBAL_POSITION_INT':
-            return
-        (lat, lon, heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
-        if abs(lat) < 1.0e-3 and abs(lon) > 1.0e-3:
-            return
-        # hack for OBC2016
-        alt = self.module('terrain').ElevationModel.GetElevation(lat, lon)
-        agl = m.alt * 0.001 - alt
-        agl_s = str(int(agl)) + 'm'
-        self.create_vehicle_icon('VehiclePos2', 'blue', follow=False, vehicle_type='plane')
-        self.map.set_position('VehiclePos2', (lat, lon), rotation=heading, label=agl_s, colour=(0,255,255))
-
     def update_vehicle_icon(self, name, vehicle, colour, m, display):
         '''update display of a vehicle on the map.  m is expected to store
         location in lat/lng *1e7
