@@ -34,7 +34,7 @@ MAVExpAny = Analysis(['.\\tools\\MAVExplorer.py'],
              datas= [ ('tools\\graphs\\*.*', 'MAVProxy\\tools\\graphs' ) ],
              hookspath=None,
              runtime_hooks=None,
-             excludes= ['sphinx', 'docutils', 'alabaster', 'FixTk', 'tcl', 'tk', '_tkinter', 'tkinter', 'Tkinter'])
+             excludes= ['sphinx', 'docutils', 'alabaster', 'FixTk', 'tcl', 'tk', 'Tkinter'])
 # MERGE( (MAVProxyAny, 'mavproxy', 'mavproxy'), (MAVExpAny, 'MAVExplorer', 'MAVExplorer') )
 MAVProxy_pyz = PYZ(MAVProxyAny.pure)
 MAVProxy_exe = EXE(MAVProxy_pyz,
