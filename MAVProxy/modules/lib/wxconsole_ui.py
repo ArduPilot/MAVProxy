@@ -1,6 +1,6 @@
 import errno
 import time
-import os
+import platform
 import socket
 from MAVProxy.modules.lib import mp_menu
 from MAVProxy.modules.lib.wxconsole_util import Value, Text
@@ -131,6 +131,11 @@ class ConsoleFrame(wx.Frame):
                 # workaround wx bug on windows
                 value._foregroundColour = obj.fg
                 value.SetLabel(obj.text)
+                if platform.system() == 'Windows':
+                    # more working around wx bugs in windows; without
+                    # these the display does not update on colour change
+                    value.Refresh()
+                    value.Update()
                 self.panel.Layout()
             elif isinstance(obj, Text):
                 '''request to add text to the console'''
