@@ -188,14 +188,7 @@ class OnboardController:
             def __process_message():
                 msg = self._connection.recv_match(blocking=True)
                 # Apply filters
-                if (
-                    msg is None
-                    or msg.get_type() == "BAD_DATA"
-                    # or not hasattr(msg, "target_system")
-                    # or not hasattr(msg, "target_component")
-                    # or msg.target_system != sysid
-                    # or msg.target_component != cmpid
-                ):
+                if msg is None or msg.get_type() == "BAD_DATA":
                     return
 
                 for controller in self._controllers:
@@ -221,10 +214,15 @@ class OnboardController:
         # Connect to video stream
         video_stream = VideoStream(self._rtsp_url)
 
-        # TODO: add retry limit and timeout
+        # Timeout if video not available
+        video_last_update_time = time.time()
+        video_timeout_period = 5.0
         print("Waiting for video stream")
         while not video_stream.frame_available():
             print(".", end="")
+            if (time.time() - video_last_update_time) > video_timeout_period:
+                print("\nVideo stream not available - restarting")
+                return
             time.sleep(0.1)
         print("\nVideo stream available")
 
@@ -249,12 +247,12 @@ class OnboardController:
         tracking_rect = None
         tracking_rect_changed = True
 
-        # TODO: ensure consistency of frame updates with GCS.
+        # TODO: how to ensure consistency of frame updates with GCS?
         fps = 50
         update_rate = fps
         update_period = 1.0 / update_rate
+
         frame_count = 0
-        av_update_time = 0.0
         while True:
             start_time = time.time()
 
@@ -269,7 +267,6 @@ class OnboardController:
                         self._gimbal_controller.reset()
 
                 elif track_type is CameraTrackType.RECTANGLE:
-                    # TODO: not handling when the tracking rectange changes
                     if tracking_rect is not None:
 
                         def __compare_rect(rect1, rect2):
@@ -304,22 +301,27 @@ class OnboardController:
                         u = x + w // 2
                         v = y + h // 2
                         self._gimbal_controller.update_center(u, v, frame.shape)
+
+                        # update camera controller current tracking state
+                        frame_height, frame_width, _ = frame.shape
+                        top_left_x = x / frame_width
+                        top_left_y = y / frame_height
+                        bot_right_x = (x + w) / frame_width
+                        bot_right_y = (y + h) / frame_height
+                        self._camera_controller.set_curr_track_rectangle(
+                            CameraTrackRectangle(
+                                top_left_x, top_left_y, bot_right_x, bot_right_y
+                            )
+                        )
                     else:
                         print("Tracking failure detected.")
                         tracking_rect = None
                         self._gimbal_controller.reset()
 
-                # TODO: profiling stats
-                # if frame_count % 10 == 0:
-                #     av_update_time = av_update_time / 10.0 * 1000
-                #     print(f"gimbal controller update: {av_update_time:.0f} ms")
-                #     av_update_time = 0.0
-
             # Rate limit
             elapsed_time = time.time() - start_time
             sleep_time = max(0.0, update_period - elapsed_time)
             time.sleep(sleep_time)
-            av_update_time += elapsed_time
 
 
 class VideoStream:
@@ -507,11 +509,15 @@ class CameraTrackController:
         self._resolution_v = 0
         self._gimbal_device_id = 1
 
-        # tracking details
+        # Tracking details - tracking requested
         self._lock = threading.Lock()
         self._track_type = CameraTrackType.NONE
         self._track_point = None
         self._track_rect = None
+
+        # Current track state
+        self._curr_track_point = None
+        self._curr_track_rect = None
 
         # Start the mavlink thread
         self._mavlink_in_queue = queue.Queue()
@@ -549,6 +555,20 @@ class CameraTrackController:
             track_rect = copy.deepcopy(self._track_rect)
         return track_rect
 
+    def set_curr_track_point(self, point):
+        """
+        Set the currently tracked point.
+        """
+        with self._lock:
+            self._curr_track_point = copy.deepcopy(point)
+
+    def set_curr_track_rectangle(self, rect):
+        """
+        Set the currently tracked rectangle.
+        """
+        with self._lock:
+            self._curr_track_rect = copy.deepcopy(rect)
+
     def mavlink_packet(self, msg):
         """
         Process a mavlink packet.
@@ -582,8 +602,6 @@ class CameraTrackController:
             string_encode = string.encode("utf-8")
             return string_encode + b"\0" * (32 - len(string))
 
-        # print(to_uint8_t(self.vendor_name), len(to_uint8_t(self.vendor_name)))
-
         self._connection.mav.camera_information_send(
             int(time.time() * 1000) & 0xFFFFFFFF,  # time_boot_ms
             to_uint8_t(self._vendor_name),  # vendor_name
@@ -605,43 +623,41 @@ class CameraTrackController:
     def _send_camera_tracking_image_status(self):
         with self._lock:
             track_type = self._track_type
-            track_point = self._track_point
-            track_rect = self._track_rect
+            track_point = self._curr_track_point
+            track_rect = self._curr_track_rect
 
-        # TODO: use trackers bounding box instead of initial target
+        # Set default values
+        point_x = float("nan")
+        point_y = float("nan")
+        radius = float("nan")
+        rec_top_x = float("nan")
+        rec_top_y = float("nan")
+        rec_bottom_x = float("nan")
+        rec_bottom_y = float("nan")
+
+        # TODO: track_point and track_rect should not be None
+        #       if track_type is not NONE - poss sync issue?
         if track_type is CameraTrackType.NONE:
             tracking_status = CameraTrackingStatusFlags.IDLE.value
             tracking_mode = CameraTrackingMode.NONE.value
             target_data = CameraTrackingTargetData.NONE.value
-            point_x = float("nan")
-            point_y = float("nan")
-            radius = float("nan")
-            rec_top_x = float("nan")
-            rec_top_y = float("nan")
-            rec_bottom_x = float("nan")
-            rec_bottom_y = float("nan")
-        elif track_type is CameraTrackType.POINT:
+        elif track_type is CameraTrackType.POINT and track_point is not None:
             tracking_status = CameraTrackingStatusFlags.ACTIVE.value
             tracking_mode = CameraTrackingMode.POINT.value
             target_data = CameraTrackingTargetData.IN_STATUS.value
             point_x = track_point.point_x
             point_y = track_point.point_y
             radius = track_point.radius
-            rec_top_x = float("nan")
-            rec_top_y = float("nan")
-            rec_bottom_x = float("nan")
-            rec_bottom_y = float("nan")
-        elif track_type is CameraTrackType.RECTANGLE:
+        elif track_type is CameraTrackType.RECTANGLE and track_rect is not None:
             tracking_status = CameraTrackingStatusFlags.ACTIVE.value
             tracking_mode = CameraTrackingMode.RECTANGLE.value
             target_data = CameraTrackingTargetData.IN_STATUS.value
-            point_x = float("nan")
-            point_y = float("nan")
-            radius = float("nan")
             rec_top_x = track_rect.top_left_x
             rec_top_y = track_rect.top_left_y
             rec_bottom_x = track_rect.bot_right_x
             rec_bottom_y = track_rect.bot_right_y
+        else:
+            return
 
         msg = self._connection.mav.camera_tracking_image_status_encode(
             tracking_status,
@@ -658,26 +674,27 @@ class CameraTrackController:
         self._connection.mav.send(msg)
 
     def _handle_camera_track_point(self, msg):
-        print("Got COMMAND_LONG: CAMERA_TRACK_POINT")
         # Parameters are a normalised point.
         point_x = msg.param1
         point_y = msg.param2
         radius = msg.param3
-        print(f"Track point: x: {point_x}, y: {point_y}, radius: {radius}")
+        print(
+            f"CAMERA_TRACK_POINT: x: {point_x:.3f}, y: {point_y:.3f}, "
+            f"radius: {radius:.3f}"
+        )
         with self._lock:
             self._track_type = CameraTrackType.POINT
             self._track_point = CameraTrackPoint(point_x, point_y, radius)
 
     def _handle_camera_track_rectangle(self, msg):
-        print("Got COMMAND_LONG: CAMERA_TRACK_RECTANGLE")
         # Parameters are a normalised rectangle.
         top_left_x = msg.param1
         top_left_y = msg.param2
         bot_right_x = msg.param3
         bot_right_y = msg.param4
         print(
-            f"Track rectangle: x1: {top_left_x}, y1: {top_left_y}, "
-            f"x2: {bot_right_x}, y2: {bot_right_y}"
+            f"CAMERA_TRACK_RECTANGLE: x1: {top_left_x:.3f}, y1: {top_left_y:.3f}, "
+            f"x2: {bot_right_x:.3f}, y2: {bot_right_y:.3f}"
         )
         with self._lock:
             self._track_type = CameraTrackType.RECTANGLE
@@ -686,11 +703,13 @@ class CameraTrackController:
             )
 
     def _handle_camera_stop_tracking(self, msg):
-        print("Got COMMAND_LONG: CAMERA_STOP_TRACKING")
+        print("CAMERA_STOP_TRACKING")
         with self._lock:
             self._track_type = CameraTrackType.NONE
             self._track_point = None
             self._track_rect = None
+            self._curr_track_point = None
+            self._curr_track_rect = None
 
     def _mavlink_task(self):
         """
@@ -774,7 +793,7 @@ class GimbalController:
         self._height = None
         self._tracking = False
 
-        # gimbal state
+        # Gimbal state
         # TODO: obtain the mount neutral angles from params
         # NOTE: q = [w, x, y, z]
         self._mavlink_lock = threading.Lock()
@@ -808,7 +827,6 @@ class GimbalController:
             self._center_x = x
             self._center_y = y
             self._height, self._width, _ = shape
-            # print(f"width: {self._width}, height: {self._height}, center: [{x}, {y}]")
 
     def reset(self):
         with self._control_lock:
@@ -896,11 +914,6 @@ class GimbalController:
 
                 err_yaw = math.radians(err_x)
                 yaw_rate_rads = self._yaw_controller.run(err_yaw)
-
-                # print(
-                #     f"err_x: {err_x}, err_y: {err_y}, "
-                #     f"pitch_rate: {pitch_rate_rads}, yaw_rate: {yaw_rate_rads}"
-                # )
 
                 self._send_gimbal_manager_pitch_yaw_angles(
                     float("nan"),
@@ -1002,7 +1015,7 @@ class TrackerCSTR:
 
         if self._nroi_changed:
             self._tracker = cv2.legacy.TrackerCSRT_create()
-            # denormalise the roi
+            # Denormalise the roi
             height, width, _ = frame.shape
             roi = [
                 int(self._nroi[0] * width),  # x
@@ -1010,9 +1023,9 @@ class TrackerCSTR:
                 int(self._nroi[2] * width),  # w
                 int(self._nroi[3] * height),  # h
             ]
-            print(
-                f"TrackerCSTR: nroi: {self._nroi}, roi: {roi}, frame_width: {width}, frame_height: {height}"
-            )
+            # print(
+            #     f"TrackerCSTR: nroi: {self._nroi}, roi: {roi}, frame_width: {width}, frame_height: {height}"
+            # )
             self._tracker.init(frame, roi)
             self._nroi_changed = False
 
@@ -1029,6 +1042,8 @@ class TrackerCSTR:
 
 
 if __name__ == "__main__":
+    import os
+    import sys
     from optparse import OptionParser
 
     parser = OptionParser("onboard_controller.py [options]")
@@ -1053,4 +1068,10 @@ if __name__ == "__main__":
     controller = OnboardController(
         opts.master, opts.sysid, opts.cmpid, opts.rtsp_server
     )
-    controller.run()
+
+    while True:
+        try:
+            controller.run()
+        except KeyboardInterrupt:
+            EXIT_CODE_CTRL_C = 130
+            sys.exit(EXIT_CODE_CTRL_C)

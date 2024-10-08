@@ -69,6 +69,10 @@ class CameraView:
         )
         self.im.set_gstreamer(gst_pipeline)
 
+    def set_tracked_rectangle(self, top_left_x, top_left_y, bot_right_x, bot_right_y):
+        """Set the tracked rectangle (normalised coords)"""
+        self.im.set_tracked_rectangle(top_left_x, top_left_y, bot_right_x, bot_right_y)
+
     def close(self):
         """Close the GUI"""
         # TODO: MPImage does not have a close_event
@@ -96,13 +100,6 @@ class CameraView:
             if isinstance(event, MPImageFrameCounter):
                 self.frame_counter = event.frame
                 continue
-
-            # if isinstance(event, MPImageTrackPoint):
-            #     continue
-
-            # if isinstance(event, MPImageTrackRectangle):
-            #     continue
-
             if (
                 hasattr(event, "ClassName")
                 and event.ClassName == "wxMouseEvent"
@@ -119,8 +116,8 @@ class CameraView:
                     self.im.start_tracker(event.X, event.Y, twidth, twidth)
 
                     # TODO: move / encapsulate
-                    print(f"xres: {xres}, yres: {yres}")
-                    print(f"event.X: {event.X}, event.Y: {event.X}, twidth: {twidth}")
+                    # print(f"xres: {xres}, yres: {yres}")
+                    # print(f"event.X: {event.X}, event.Y: {event.X}, twidth: {twidth}")
                     top_left_x = event.X / xres
                     top_left_y = event.Y / yres
                     bot_right_x = (event.X + twidth) / xres
@@ -135,8 +132,6 @@ class CameraView:
                 else:
                     pass
 
-    # Camera tracking commands. Communication is GCS -> FC
-
     def send_camera_track_point(self, point_x, point_y, radius):
         """
         https://mavlink.io/en/messages/common.html#MAV_CMD_CAMERA_TRACK_POINT
@@ -147,11 +142,11 @@ class CameraView:
         src_cmp = self.mpstate.master().source_component
         tgt_sys = self.camera_sysid
         tgt_cmp = self.camera_cmpid
-        print(
-            f"Send COMMAND_LONG: CAMERA_TRACK_POINT: "
-            f"src_sys: {src_sys}, src_cmp: {src_cmp} "
-            f"tgt_sys: {tgt_sys}, tgt_cmp: {tgt_cmp}"
-        )
+        # print(
+        #     f"Send COMMAND_LONG: CAMERA_TRACK_POINT: "
+        #     f"src_sys: {src_sys}, src_cmp: {src_cmp} "
+        #     f"tgt_sys: {tgt_sys}, tgt_cmp: {tgt_cmp}"
+        # )
         target_camera = 0
         self.mpstate.master().mav.command_long_send(
             tgt_sys,  # target_system
@@ -179,11 +174,11 @@ class CameraView:
         src_cmp = self.mpstate.master().source_component
         tgt_sys = self.camera_sysid
         tgt_cmp = self.camera_cmpid
-        print(
-            f"Send COMMAND_LONG: CAMERA_TRACK_RECTANGLE: "
-            f"src_sys: {src_sys}, src_cmp: {src_cmp} "
-            f"tgt_sys: {tgt_sys}, tgt_cmp: {tgt_cmp}"
-        )
+        # print(
+        #     f"Send COMMAND_LONG: CAMERA_TRACK_RECTANGLE: "
+        #     f"src_sys: {src_sys}, src_cmp: {src_cmp} "
+        #     f"tgt_sys: {tgt_sys}, tgt_cmp: {tgt_cmp}"
+        # )
         target_camera = 0
         self.mpstate.master().mav.command_long_send(
             tgt_sys,  # target_system
@@ -207,11 +202,11 @@ class CameraView:
         src_cmp = self.mpstate.master().source_component
         tgt_sys = self.camera_sysid
         tgt_cmp = self.camera_cmpid
-        print(
-            f"Send COMMAND_LONG: CAMERA_STOP_TRACKING: "
-            f"src_sys: {src_sys}, src_cmp: {src_cmp} "
-            f"tgt_sys: {tgt_sys}, tgt_cmp: {tgt_cmp}"
-        )
+        # print(
+        #     f"Send COMMAND_LONG: CAMERA_STOP_TRACKING: "
+        #     f"src_sys: {src_sys}, src_cmp: {src_cmp} "
+        #     f"tgt_sys: {tgt_sys}, tgt_cmp: {tgt_cmp}"
+        # )
         target_camera = 0
         self.mpstate.master().mav.command_long_send(
             tgt_sys,  # target_system
@@ -225,34 +220,6 @@ class CameraView:
             0,  # param5
             0,  # param6
             0,  # param7
-        )
-
-    def set_message_interval_image_status(self):
-        """
-        https://mavlink.io/en/messages/common.html#CAMERA_TRACKING_IMAGE_STATUS
-        https://mavlink.io/en/messages/common.html#MAV_CMD_SET_MESSAGE_INTERVAL
-        """
-        tgt_sys = self.camera_sysid
-        tgt_comp = self.camera_cmpid
-        print(
-            f"Send COMMAND_LONG: SET_MESSAGE_INTERVAL: CAMERA_TRACKING_IMAGE_STATUS: "
-            f"tgt_sys: {tgt_sys}, tgt_comp: {tgt_comp}"
-        )
-        message_id = mavutil.mavlink.CAMERA_TRACKING_IMAGE_STATUS
-        interval = 0  # default rate
-        response_target = 1  # address of requestor
-        self.mpstate.master().mav.command_long_send(
-            tgt_sys,  # target_system
-            tgt_comp,  # target_component
-            mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL,  # command
-            0,  # confirmation
-            message_id,  # param1
-            interval,  # param2
-            0,  # param3
-            0,  # param4
-            0,  # param5
-            0,  # param6
-            response_target,  # param7
         )
 
 

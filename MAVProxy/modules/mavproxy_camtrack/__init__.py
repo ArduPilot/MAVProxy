@@ -59,24 +59,22 @@ class CamTrackModule(mp_module.MPModule):
 
         self.camera_view = CameraView(self.mpstate, "Camera Tracking", rtsp_url)
 
-        # TODO: NOTE: unused
+        # NOTE: unused except for status
         # mavlink messages
         self._last_gimbal_device_information = None
         self._last_gimbal_manager_status = None
         self._last_gimbal_device_information = None
         self._last_gimbal_device_attitude_status = None
         self._last_autopilot_state_for_gimbal_device = None
-        self._last_camera_tracking_image_status = None
+        self._last_camera_information = None
 
-        # Discovery
+        # discovery
         self._do_request_gimbal_manager_information = True
         self._do_request_gimbal_manager_status = True
         self._do_request_gimbal_device_information = True
         self._do_request_autopilot_state_for_gimbal_device = True
         self._do_request_camera_information = True
         self._do_request_camera_tracking_image_status = True
-
-        # data
 
         # control update rate to GUI
         self._msg_list = []
@@ -129,11 +127,11 @@ class CamTrackModule(mp_module.MPModule):
         if mtype == "HEARTBEAT":
             self.handle_heartbeat(msg)
 
-        # working - must be requested
+        # must be requested
         elif mtype == "GIMBAL_MANAGER_INFORMATION":
             self.handle_gimbal_manager_information(msg)
 
-        # working - must be requested (should be broadcast)
+        # must be requested (should be broadcast)
         elif mtype == "GIMBAL_MANAGER_STATUS":
             self.handle_gimbal_manager_status(msg)
 
@@ -141,21 +139,21 @@ class CamTrackModule(mp_module.MPModule):
         elif mtype == "GIMBAL_DEVICE_INFORMATION":
             self.handle_gimbal_device_information(msg)
 
-        # working - boradcast
+        # broadcast
         elif mtype == "GIMBAL_DEVICE_ATTITUDE_STATUS":
             self.handle_gimbal_device_attitude_status(msg)
 
-        # working - must be requested
+        # must be requested
         elif mtype == "AUTOPILOT_STATE_FOR_GIMBAL_DEVICE":
             self.handle_autopilot_state_for_gimbal_device(msg)
 
-        # working - must be requested
+        # must be requested
         elif mtype == "CAMERA_INFORMATION":
             self.handle_camera_information(msg)
 
+        # must be requested
         elif mtype == "CAMERA_TRACKING_IMAGE_STATUS":
-            # TODO: add handler
-            print(msg)
+            self.handle_camera_tracking_image_status(msg)
 
         # TODO: NOTE: disabled
         # check command_ack
@@ -272,8 +270,18 @@ class CamTrackModule(mp_module.MPModule):
         self._last_autopilot_state_for_gimbal_device = msg
 
     def handle_camera_information(self, msg):
-        # print(msg)
-        pass
+        self._last_camera_information = msg
+
+    def handle_camera_tracking_image_status(self, msg):
+        # TODO: refactor to use enums in onboard_controller.py
+        if (
+            msg.tracking_status == mavutil.mavlink.CAMERA_TRACKING_STATUS_FLAGS_ACTIVE
+            and msg.tracking_mode == mavutil.mavlink.CAMERA_TRACKING_MODE_RECTANGLE
+            and msg.target_data == mavutil.mavlink.CAMERA_TRACKING_TARGET_DATA_IN_STATUS
+        ):
+            self.camera_view.set_tracked_rectangle(
+                msg.rec_top_x, msg.rec_top_y, msg.rec_bottom_x, msg.rec_bottom_y
+            )
 
     def check_events(self):
         """Check for events on the camera view"""
@@ -329,7 +337,7 @@ class CamTrackModule(mp_module.MPModule):
         if self._do_request_camera_tracking_image_status:
             self.send_set_message_interval_message(
                 mavutil.mavlink.MAVLINK_MSG_ID_CAMERA_TRACKING_IMAGE_STATUS,
-                1000 * 1000,  # 1Hz
+                1000 * 50,  # 20Hz
                 response_target=1,  # flight-stack default
             )
             self._do_request_camera_tracking_image_status = False
@@ -355,7 +363,6 @@ class CamTrackModule(mp_module.MPModule):
             gimbal_devid,  # param7
         )
 
-    # MAVProxy.modules.mavproxy_misc.py
     def send_request_message(self, message_id, p1=0):
         self.master.mav.command_long_send(
             self.settings.target_system,  # target_system
@@ -387,23 +394,6 @@ class CamTrackModule(mp_module.MPModule):
             0,  # param6
             response_target,  # param7
         )
-
-    def request_camera_information(self):
-        # send CAMERA_INFORMATION request
-        # mavutil.mavlink.MAVLINK_MSG_ID_GIMBAL_MANAGER_INFORMATION
-        pass
-
-    def request_gimbal_manager_information(self):
-        pass
-
-    def request_gimbal_manager_status(self):
-        pass
-
-    def request_gimbal_device_information(self):
-        pass
-
-    def request_autopilot_state_for_gimbal_device(self):
-        pass
 
     def idle_task(self):
         """Idle tasks"""

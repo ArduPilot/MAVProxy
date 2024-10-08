@@ -18,6 +18,15 @@ from MAVProxy.modules.lib.mp_image import MPImageFrame
 from MAVProxy.modules.lib.mp_image import MPImagePanel
 
 
+# Events
+class MPImageTrackedRectangle:
+    def __init__(self, top_left_x, top_left_y, bot_right_x, bot_right_y):
+        self.top_left_x = top_left_x
+        self.top_left_y = top_left_y
+        self.bot_right_x = bot_right_x
+        self.bot_right_y = bot_right_y
+
+
 class TrackerImage(MPImage):
     """An MPImage class that allows the tracker type to be overridden"""
 
@@ -64,6 +73,12 @@ class TrackerImage(MPImage):
         self.app.frame.Show()
         self.app.MainLoop()
 
+    def set_tracked_rectangle(self, top_left_x, top_left_y, bot_right_x, bot_right_y):
+        """Set the tracked rectangle (normalised coords)"""
+        self.in_queue.put(
+            MPImageTrackedRectangle(top_left_x, top_left_y, bot_right_x, bot_right_y)
+        )
+
 
 class TrackerImageFrame(wx.Frame):
     """Main frame for an image with object tracking"""
@@ -97,7 +112,7 @@ class TrackerImagePanel(MPImagePanel):
         super(TrackerImagePanel, self).__init__(parent, state)
 
     def start_tracker(self, box):
-        """Start a tracker on an object identified by a box"""
+        """Start a tracker on an object identified by a box (override)"""
         if self.raw_img is None:
             return
         self.tracker = None
@@ -108,6 +123,23 @@ class TrackerImagePanel(MPImagePanel):
         tracker = create_tracker(tracker_name, self.state)
         tracker.start_track(self.raw_img, box)
         self.tracker = tracker
+
+    def process_event(self, obj):
+        """Process a single event (override)"""
+        super().process_event(obj)
+
+        # handle events defined for this class
+        if isinstance(obj, MPImageTrackedRectangle):
+            if self.tracker is not None:
+                height, width, _ = self.raw_img.shape
+                self.tracker.set_position(
+                    TrackerPos(
+                        obj.top_left_x * width,
+                        obj.bot_right_x * width,
+                        obj.top_left_x * height,
+                        obj.bot_right_y * height,
+                    )
+                )
 
 
 class TrackerPos:
@@ -153,6 +185,10 @@ class Tracker:
     def get_position(self):
         """Return a rectangle at the position of the tracked object"""
         return TrackerPos(0, 0, 0, 0)
+
+    def set_position(self, tracker_pos):
+        """Set the tracker position"""
+        pass
 
 
 class TrackerDlibCorrelation(Tracker):
@@ -235,24 +271,14 @@ class TrackerMAVLink(Tracker):
         bottom_right_y = (y + box.height) / h
         self._tracker_pos = TrackerPos(x, x + w, y, y + h)
 
-        # print("Starting MAVLink tracker")
-        # self.event_queue.put(
-        #     TrackerImageEvent(
-        #         TrackerImageEventType.TRACK_RECTANGLE,
-        #         track_rectangle=[
-        #             top_left_x,
-        #             top_left_y,
-        #             bottom_right_x,
-        #             bottom_right_y,
-        #         ],
-        #     )
-        # )
-
     def update(self, frame):
         pass
 
     def get_position(self):
         return self._tracker_pos
+
+    def set_position(self, tracker_pos):
+        self._tracker_pos = tracker_pos
 
 
 def create_tracker(name, state):
