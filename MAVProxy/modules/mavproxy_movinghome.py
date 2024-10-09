@@ -120,7 +120,7 @@ class movinghome(mp_module.MPModule):
                     print("movinghome: decode error; baudrate issue?")
                     self.last_decode_error_print = now
                 return
-            if (data.startswith("$GPGGA")):
+            if (data.startswith("$GPGGA") or data.startswith("$GNGGA")):
                 msg = pynmea2.parse(data)
                 if int(msg.num_sats) > 5:
                     #convert LAT
@@ -147,10 +147,10 @@ class movinghome(mp_module.MPModule):
                             self.fresh = False
                         else:
                             message = "GCS moved "
-                            message2 = message + "%.0f" % self.dist + "meters"
+                            message2 = message + "%.1f" % self.dist + " meters"
                             self.say("%s: %s" % (self.name,message2))
-                            message2_enc = message2.encode(bytes)
-                            self.master.mav.statustext_send(mavutil.mavlink.MAV_SEVERITY_NOTICE, message2)
+                            message2_enc = message2.encode("utf-8")
+                            self.master.mav.statustext_send(mavutil.mavlink.MAV_SEVERITY_NOTICE, message2_enc)
                         self.console.writeln("home position updated")
 
                         self.master.mav.command_int_send(
