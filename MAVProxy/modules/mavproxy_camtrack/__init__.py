@@ -1,6 +1,22 @@
 """
 MAVProxy camera tracking module
 
+Examples
+---------
+
+localhost simulation
+rtsp_url = "rtsp://127.0.0.1:8554/camera"
+
+home wifi
+rtsp_url = "rtsp://192.168.1.204:8554/fpv_stream"
+
+herelink wifi access point
+rtsp_url = "rtsp://192.168.43.1:8554/fpv_stream"
+
+SIYI A8 camera
+rtsp_url = "rtsp://192.168.144.25:8554/main.264"
+
+
 Reference
 ---------
 
@@ -36,6 +52,10 @@ from pymavlink import mavutil
 class CamTrackModule(mp_module.MPModule):
     """A tool to control camera tracking"""
 
+    # Module defaults
+    DEFAULT_RTSP_URL = "rtsp://127.0.0.1:8554/camera"
+    DEFAULT_IMAGE_STATUS_RATE = 20.0
+
     def __init__(self, mpstate):
         super(CamTrackModule, self).__init__(
             mpstate, "camtrack", "camera tracking module"
@@ -44,23 +64,22 @@ class CamTrackModule(mp_module.MPModule):
         self.mpstate = mpstate
 
         # Settings
-        # TODO: provide args to set RTSP server location
-        # localhost simulation
-        rtsp_url = "rtsp://127.0.0.1:8554/camera"
+        self.camtrack_settings = mp_settings.MPSettings(
+            [
+                ("rtsp_url", str, CamTrackModule.DEFAULT_RTSP_URL),
+                ("image_status_rate", float, CamTrackModule.DEFAULT_IMAGE_STATUS_RATE),
+            ]
+        )
 
-        # home wifi
-        # rtsp_url = "rtsp://192.168.1.204:8554/fpv_stream"
+        # Commands
+        self.add_command("camtrack", self.cmd_camtrack, "camera tracking")
 
-        # herelink wifi access point
-        # rtsp_url = "rtsp://192.168.43.1:8554/fpv_stream"
-
-        # SIYI A8 camera
-        # rtsp_url = "rtsp://192.168.144.25:8554/main.264"
-
-        self._camera_tracking_image_status_rate = 50  # Hz
+        self._camera_tracking_image_status_rate = (
+            self.camtrack_settings.image_status_rate
+        )
 
         # GUI
-        self.camera_view = CameraView(self.mpstate, "Camera Tracking", rtsp_url)
+        self.camera_view = None
 
         # NOTE: unused except for status
         # mavlink messages
@@ -79,32 +98,36 @@ class CamTrackModule(mp_module.MPModule):
         self._do_request_camera_information = True
         self._do_request_camera_tracking_image_status = True
 
-        # commands
-        self.add_command("camtrack", self.cmd_camtrack, "camera tracking")
-
     def cmd_camtrack(self, args):
-        """Control behaviour of commands"""
+        """Command parser"""
         if len(args) <= 0:
             print(self.usage())
             return
-
-        if args[0] == "status":
+        if args[0] == "set":
+            if len(args) < 3:
+                self.camtrack_settings.show_all()
+                return
+            self.camtrack_settings.command(args[1:])
+        elif args[0] == "status":
             print(self.status())
+        elif args[0] == "view":
+            self.cmd_view()
+        else:
+            print(self.usage())
+
+    def cmd_view(self):
+        """Open camera view"""
+        if self.camera_view is not None:
+            print("camtrack view already open")
             return
 
-        if args[0] == "start":
-            print("start tracking")
-            return
-
-        if args[0] == "stop":
-            print("stop tracking")
-            return
-
-        print(self.usage())
+        self.camera_view = CameraView(
+            self.mpstate, "Camera Tracking", self.camtrack_settings.rtsp_url
+        )
 
     def usage(self):
         """Show help on command line options."""
-        return "Usage: camtrack <status|start|stop>"
+        return "Usage: camtrack <set|status|view>"
 
     def status(self):
         """Return information about the camera tracking state"""
@@ -272,7 +295,9 @@ class CamTrackModule(mp_module.MPModule):
     def handle_camera_tracking_image_status(self, msg):
         # TODO: refactor to use enums in onboard_controller.py
         if (
-            msg.tracking_status == mavutil.mavlink.CAMERA_TRACKING_STATUS_FLAGS_ACTIVE
+            self.camera_view is not None
+            and msg.tracking_status
+            == mavutil.mavlink.CAMERA_TRACKING_STATUS_FLAGS_ACTIVE
             and msg.tracking_mode == mavutil.mavlink.CAMERA_TRACKING_MODE_RECTANGLE
             and msg.target_data == mavutil.mavlink.CAMERA_TRACKING_TARGET_DATA_IN_STATUS
         ):
@@ -282,7 +307,8 @@ class CamTrackModule(mp_module.MPModule):
 
     def check_events(self):
         """Check for events on the camera view"""
-        self.camera_view.check_events()
+        if self.camera_view is not None:
+            self.camera_view.check_events()
 
         # TODO: check which shutdown events are available in MPImage
         # tell mavproxy to unload the module if the GUI is closed
@@ -328,7 +354,7 @@ class CamTrackModule(mp_module.MPModule):
             self.send_set_message_interval_message(
                 mavutil.mavlink.MAVLINK_MSG_ID_CAMERA_TRACKING_IMAGE_STATUS,
                 interval_us,  # requested interval in microseconds
-                response_target=1,  # flight-stack default
+                response_target=0,  # flight-stack default
             )
             self._do_request_camera_tracking_image_status = False
 
@@ -369,9 +395,9 @@ class CamTrackModule(mp_module.MPModule):
         )
 
     def send_set_message_interval_message(
-        self, message_id, interval_us, response_target=1
+        self, message_id, interval_us, response_target=0
     ):
-        self.master.mav.command_long_send(
+        msg = self.master.mav.command_long_encode(
             self.settings.target_system,  # target_system
             self.settings.target_component,  # target_component
             mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL,  # command
@@ -384,6 +410,7 @@ class CamTrackModule(mp_module.MPModule):
             0,  # param6
             response_target,  # param7
         )
+        self.master.mav.send(msg)
 
     def idle_task(self):
         """Idle tasks"""
@@ -392,7 +419,9 @@ class CamTrackModule(mp_module.MPModule):
 
     def unload(self):
         """Close the GUI and unload module"""
-        self.camera_view.close()
+        if self.camera_view is not None:
+            self.camera_view.close()
+            self.camera_view = None
 
 
 def init(mpstate):

@@ -279,6 +279,13 @@ class TrackerMAVLink(Tracker):
 
     def set_position(self, tracker_pos):
         self._tracker_pos = tracker_pos
+        # NOTE: leave for debugging
+        # print(
+        #     f"tracker_pos: x: {self._tracker_pos.left():.2f}, "
+        #     f"y: {self._tracker_pos.top():.2f}, "
+        #     f"w: {(self._tracker_pos.right() - self._tracker_pos.left()):.2f}, "
+        #     f"h: {(self._tracker_pos.bottom() - self._tracker_pos.top()):.2f}"
+        # )
 
 
 def create_tracker(name, state):

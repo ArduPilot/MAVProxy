@@ -60,10 +60,15 @@ import time
 from enum import Enum
 from pymavlink import mavutil
 
+# TODO: remember to add to requirements.txt / setup.py
 from transforms3d import euler
 from transforms3d import quaternions
 
-from MAVProxy.modules.lib import mp_util
+from MAVProxy.modules.lib import live_graph
+
+from MAVProxy.modules.mavproxy_camtrack.pid_basic import AC_PID_Basic
+from MAVProxy.modules.mavproxy_camtrack.pid_basic import AP_PIDInfo
+
 
 gi.require_version("Gst", "1.0")
 from gi.repository import Gst
@@ -124,11 +129,12 @@ class CameraTrackingTargetData(Enum):
 
 
 class OnboardController:
-    def __init__(self, device, sysid, cmpid, rtsp_url):
+    def __init__(self, device, sysid, cmpid, rtsp_url, enable_graphs=False):
         self._device = device
         self._sysid = sysid
         self._cmpid = cmpid
         self._rtsp_url = rtsp_url
+        self._enable_graphs = enable_graphs
 
         # mavlink connection
         self._connection = None
@@ -139,6 +145,9 @@ class OnboardController:
         self._gimbal_controller = None
 
         print(f"Onboard Controller: src_sys: {self._sysid}, src_cmp: {self._cmpid})")
+
+    def __del__(self):
+        self._connection.close()
 
     def _connect_to_mavlink(self):
         """
@@ -228,7 +237,9 @@ class OnboardController:
 
         # Create and register controllers
         self._camera_controller = CameraTrackController(self._connection)
-        self._gimbal_controller = GimbalController(self._connection)
+        self._gimbal_controller = GimbalController(
+            self._connection, self._enable_graphs
+        )
         self._controllers.append(self._camera_controller)
         self._controllers.append(self._gimbal_controller)
 
@@ -697,6 +708,12 @@ class CameraTrackController:
             rec_bottom_x,
             rec_bottom_y,
         )
+        # NOTE: leave for debugging
+        # print(
+        #     f"image_status: x: {rec_top_x:.2f}, y: {rec_top_y:.2f}, "
+        #     f"w: {(rec_bottom_x - rec_top_x):.2f}, "
+        #     f"h: {(rec_bottom_y - rec_top_y):.2f}"
+        # )
         self._connection.mav.send(msg)
 
     def _handle_camera_track_point(self, msg):
@@ -804,9 +821,9 @@ class GimbalController:
     Gimbal controller for onboard camera tracking.
     """
 
-    def __init__(self, connection):
+    def __init__(self, connection, enable_graphs=False):
         self._connection = connection
-        self._sysid = self._connection.source_system # system id matches vehicle
+        self._sysid = self._connection.source_system  # system id matches vehicle
         self._cmpid = 1  # component id matches autopilot
 
         print(f"Gimbal Controller: src_sys: {self._sysid}, src_cmp: {self._cmpid})")
@@ -830,9 +847,57 @@ class GimbalController:
         self._gimbal_orientation = None
         self._gimbal_failure_flags = None
 
-        # TODO: add options for PI controller gains
-        self._pitch_controller = PI_controller(Pgain=0.1, Igain=0.01, IMAX=0.1)
-        self._yaw_controller = PI_controller(Pgain=0.1, Igain=0.1, IMAX=1.0)
+        # TODO: add options for PID controller gains
+
+        # Pitch controller for centring gimbal
+        self._pit_controller = AC_PID_Basic(
+            initial_p=2.0,
+            initial_i=0.0,
+            initial_d=0.0,
+            initial_ff=0.0,
+            initial_imax=1.0,
+            initial_filt_E_hz=0.0,
+            initial_filt_D_hz=20.0,
+        )
+
+        # Yaw controller for centring gimbal
+        self._yaw_controller = AC_PID_Basic(
+            initial_p=2.0,
+            initial_i=0.0,
+            initial_d=0.0,
+            initial_ff=0.0,
+            initial_imax=1.0,
+            initial_filt_E_hz=0.0,
+            initial_filt_D_hz=20.0,
+        )
+
+        # Gimbal pitch controller for tracking
+        self._pit_track_controller = AC_PID_Basic(
+            initial_p=2.0,
+            initial_i=0.2,
+            initial_d=0.01,
+            initial_ff=0.0,
+            initial_imax=1.0,
+            initial_filt_E_hz=0.0,
+            initial_filt_D_hz=20.0,
+        )
+
+        # Gimbal yaw controller for tracking
+        self._yaw_track_controller = AC_PID_Basic(
+            initial_p=2.0,
+            initial_i=0.2,
+            initial_d=0.01,
+            initial_ff=0.0,
+            initial_imax=1.0,
+            initial_filt_E_hz=0.0,
+            initial_filt_D_hz=20.0,
+        )
+
+        # Analysis
+        self._enable_graphs = enable_graphs
+        self._graph_pid_tune = None
+        self._graph_pid_pit = None
+        self._graph_pid_yaw = None
 
         # Start the control thread
         self._control_in_queue = queue.Queue()
@@ -858,8 +923,10 @@ class GimbalController:
             self._tracking = False
             self._center_x = 0.0
             self._center_y = 0.0
-            self._pitch_controller.reset_I()
-            self._yaw_controller.reset_I()
+            self._pit_track_controller.reset_I()
+            self._pit_track_controller.reset_filter()
+            self._yaw_track_controller.reset_I()
+            self._yaw_track_controller.reset_filter()
 
     def mavlink_packet(self, msg):
         self._control_in_queue.put(msg)
@@ -889,6 +956,10 @@ class GimbalController:
 
         When not tracking, return the gimbal to its neutral position.
         """
+        if self._enable_graphs:
+            self._add_livegraphs()
+
+        last_time_s = time.time()
         while True:
             # Record the start time of the loop
             start_time = time.time()
@@ -905,53 +976,60 @@ class GimbalController:
             with self._mavlink_lock:
                 gimbal_orientation = self._gimbal_orientation
 
+            # Update dt for the controller I and D terms
+            time_now_s = time.time()
+            dt = time_now_s - last_time_s
+            last_time_s = time_now_s
+
             if not tracking and gimbal_orientation is not None:
                 # NOTE: to centre the gimbal when not tracking, we need to know
                 # the neutral angles from the MNT1_NEUTRAL_x params, and also
                 # the current mount orientation.
                 _, ay, az = euler.quat2euler(gimbal_orientation)
 
-                self._pitch_controller.gain_mul = 4.0
-                self._yaw_controller.gain_mul = 40.0
+                pit_rate_rads = self._pit_controller.update_all(self._neutral_y, ay, dt)
+                yaw_rate_rads = self._yaw_controller.update_all(self._neutral_z, az, dt)
 
-                err_pitch = self._neutral_y - ay
-                pitch_rate_rads = self._pitch_controller.run(err_pitch)
-
-                err_yaw = self._neutral_z - az
-                yaw_rate_rads = self._yaw_controller.run(err_yaw)
+                pit_pid_info = self._pit_controller.pid_info
+                yaw_pid_info = self._yaw_controller.pid_info
 
                 self._send_gimbal_manager_pitch_yaw_angles(
                     float("nan"),
                     float("nan"),
-                    pitch_rate_rads,
+                    pit_rate_rads,
                     yaw_rate_rads,
                 )
+
+                if self._enable_graphs:
+                    self._update_livegraphs(pit_pid_info, yaw_pid_info)
+
             elif frame_width is not None and frame_height is not None:
-                tgt_x = 0.5 * frame_width
-                tgt_y = 0.5 * frame_height
+                # work with normalised screen [-1, 1]
+                tgt_x = 0.0
+                tgt_y = 0.0
 
                 if math.isclose(act_x, 0.0) and math.isclose(act_y, 0.0):
-                    err_x = 0.0
-                    err_y = 0.0
+                    act_x = 0.0
+                    act_y = 0.0
                 else:
-                    err_x = act_x - tgt_x
-                    err_y = -(act_y - tgt_y)
+                    act_x = (act_x / frame_width - 0.5) * -1.0
+                    act_y = act_y / frame_height - 0.5
 
-                self._pitch_controller.gain_mul = 1.0
-                self._yaw_controller.gain_mul = 2.0
+                pit_rate_rads = self._pit_track_controller.update_all(tgt_y, act_y, dt)
+                yaw_rate_rads = self._yaw_track_controller.update_all(tgt_x, act_x, dt)
 
-                err_pitch = math.radians(err_y)
-                pitch_rate_rads = self._pitch_controller.run(err_pitch)
-
-                err_yaw = math.radians(err_x)
-                yaw_rate_rads = self._yaw_controller.run(err_yaw)
+                pit_pid_info = self._pit_track_controller.pid_info
+                yaw_pid_info = self._yaw_track_controller.pid_info
 
                 self._send_gimbal_manager_pitch_yaw_angles(
                     float("nan"),
                     float("nan"),
-                    pitch_rate_rads,
+                    pit_rate_rads,
                     yaw_rate_rads,
                 )
+
+                if self._enable_graphs:
+                    self._update_livegraphs(pit_pid_info, yaw_pid_info)
 
             # Update at 50Hz
             update_period = 0.02
@@ -985,47 +1063,61 @@ class GimbalController:
             sleep_time = max(0.0, update_period - elapsed_time)
             time.sleep(sleep_time)
 
+    def _add_livegraphs(self):
+        self._graph_pid_tune = live_graph.LiveGraph(
+            ["PID.PitTgt", "PID.PitAct", "PID.YawTgt", "PID.YawAct"],
+            timespan=30,
+            title="PID_TUNING",
+        )
+        self._graph_pid_pit = live_graph.LiveGraph(
+            [
+                "PID.Out",
+                "PID.P",
+                "PID.I",
+                "PID.D",
+            ],
+            timespan=30,
+            title="PID_TUNING: Pitch",
+        )
+        self._graph_pid_yaw = live_graph.LiveGraph(
+            [
+                "PID.Out",
+                "PID.P",
+                "PID.I",
+                "PID.D",
+            ],
+            timespan=30,
+            title="PID_TUNING: Yaw",
+        )
 
-class PI_controller:
-    """
-    Simple PI controller
-
-    MAVProxy/modules/mavproxy_SIYI/PI_controller (modified)
-    """
-
-    def __init__(self, Pgain, Igain, IMAX, gain_mul=1.0, max_rate=math.radians(30.0)):
-        self.Pgain = Pgain
-        self.Igain = Igain
-        self.IMAX = IMAX
-        self.gain_mul = gain_mul
-        self.max_rate = max_rate
-        self.I = 0.0
-
-        self.last_t = time.time()
-
-    def run(self, err, ff_rate=0.0):
-        now = time.time()
-        dt = now - self.last_t
-        if now - self.last_t > 1.0:
-            self.reset_I()
-            dt = 0
-        self.last_t = now
-        P = self.Pgain * self.gain_mul
-        I = self.Igain * self.gain_mul
-        IMAX = self.IMAX
-        max_rate = self.max_rate
-
-        out = P * err
-        saturated = err > 0 and (out + self.I) >= max_rate
-        saturated |= err < 0 and (out + self.I) <= -max_rate
-        if not saturated:
-            self.I += I * err * dt
-        self.I = mp_util.constrain(self.I, -IMAX, IMAX)
-        ret = out + self.I + ff_rate
-        return mp_util.constrain(ret, -max_rate, max_rate)
-
-    def reset_I(self):
-        self.I = 0
+    def _update_livegraphs(self, pit_pid_info, yaw_pid_info):
+        if self._graph_pid_tune.is_alive():
+            self._graph_pid_tune.add_values(
+                [
+                    pit_pid_info.target,
+                    pit_pid_info.actual,
+                    yaw_pid_info.target,
+                    yaw_pid_info.actual,
+                ]
+            )
+        if self._graph_pid_pit.is_alive():
+            self._graph_pid_pit.add_values(
+                [
+                    pit_pid_info.out,
+                    pit_pid_info.P,
+                    pit_pid_info.I,
+                    pit_pid_info.D,
+                ]
+            )
+        if self._graph_pid_yaw.is_alive():
+            self._graph_pid_yaw.add_values(
+                [
+                    yaw_pid_info.out,
+                    yaw_pid_info.P,
+                    yaw_pid_info.I,
+                    yaw_pid_info.D,
+                ]
+            )
 
 
 class TrackerCSTR:
@@ -1073,34 +1165,37 @@ class TrackerCSTR:
 if __name__ == "__main__":
     import os
     import sys
-    from optparse import OptionParser
+    from argparse import ArgumentParser
 
-    parser = OptionParser("onboard_controller.py [options]")
-    parser.add_option("--master", default=None, type=str, help="MAVLink device")
-    parser.add_option("--rtsp-server", default=None, type=str, help="RTSP server URL")
-    parser.add_option("--sysid", default=1, type=int, help="Source system ID")
-    parser.add_option(
+    parser = ArgumentParser("onboard_controller.py [options]")
+    parser.add_argument("--master", required=True, type=str, help="MAVLink device")
+    parser.add_argument(
+        "--rtsp-server", required=True, type=str, help="RTSP server URL"
+    )
+    parser.add_argument("--sysid", default=1, type=int, help="Source system ID")
+    parser.add_argument(
         "--cmpid",
         default=mavutil.mavlink.MAV_COMP_ID_ONBOARD_COMPUTER,
         type=int,
         help="Source component ID",
     )
-
-    (opts, args) = parser.parse_args()
-    if opts.master is None:
-        print("Must specify a MAVLink device")
-        sys.exit(1)
-    if opts.rtsp_server is None:
-        print("Must specify an RTSP server URL")
-        sys.exit(1)
+    parser.add_argument(
+        "--enable-graphs",
+        action="store_const",
+        default=False,
+        const=True,
+        help="Enable live graphs",
+    )
+    args = parser.parse_args()
 
     controller = OnboardController(
-        opts.master, opts.sysid, opts.cmpid, opts.rtsp_server
+        args.master, args.sysid, args.cmpid, args.rtsp_server, args.enable_graphs
     )
 
     while True:
         try:
             controller.run()
         except KeyboardInterrupt:
+            controller = None
             EXIT_CODE_CTRL_C = 130
             sys.exit(EXIT_CODE_CTRL_C)
