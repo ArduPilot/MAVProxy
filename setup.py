@@ -106,6 +106,7 @@ on how to use MAVProxy.''',
       scripts=['MAVProxy/mavproxy.py',
                'MAVProxy/tools/mavflightview.py',
                'MAVProxy/tools/MAVExplorer.py',
+               'MAVProxy/tools/mavpicviewer/mavpicviewer.py',
                'MAVProxy/modules/mavproxy_map/mp_slipmap.py',
                'MAVProxy/modules/mavproxy_map/mp_tile.py'],
       package_data={'MAVProxy':

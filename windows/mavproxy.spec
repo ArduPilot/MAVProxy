@@ -37,7 +37,21 @@ MAVExpAny = Analysis(['.\\tools\\MAVExplorer.py'],
              hookspath=None,
              runtime_hooks=None,
              excludes= ['sphinx', 'docutils', 'alabaster', 'FixTk', 'tcl', 'tk', '_tkinter', 'tkinter', 'Tkinter'])
-# MERGE( (MAVProxyAny, 'mavproxy', 'mavproxy'), (MAVExpAny, 'MAVExplorer', 'MAVExplorer') )
+MAVPicViewerAny = Analysis(['.\\tools\\mavpicviewer\\mavpicviewer.py'],
+             pathex=[os.path.abspath('.')],
+             # for some unknown reason these hidden imports don't pull in
+             # all the needed pieces, so we also import them in mavproxy.py
+             hiddenimports=['cv2', 'wx', 
+                            'numpy', 'dateutil', 
+                            'wx.lib.agw.genericmessagedialog', 'wx.lib.wordwrap', 'wx.lib.buttons',
+                            'wx.lib.embeddedimage', 'wx.lib.imageutils', 'wx.lib.agw.aquabutton', 
+                            'wx.lib.agw.gradientbutton', 'FileDialog', 'Dialog',
+                            ] + collect_submodules('pymavlink'),
+             datas= [],
+             hookspath=None,
+             runtime_hooks=None,
+             excludes= ['sphinx', 'docutils', 'alabaster', 'FixTk', 'tcl', 'tk', '_tkinter', 'tkinter', 'Tkinter'])
+# MERGE( (MAVProxyAny, 'mavproxy', 'mavproxy'), (MAVExpAny, 'MAVExplorer', 'MAVExplorer'), (MAVPicViewerAny, 'mavpicviewer', 'mavpicviewer') )
 MAVProxy_pyz = PYZ(MAVProxyAny.pure)
 MAVProxy_exe = EXE(MAVProxy_pyz,
           MAVProxyAny.scripts,
@@ -71,3 +85,20 @@ MAVExp_coll = COLLECT(MAVExp_exe,
                strip=None,
                upx=True,
                name='MAVExplorer')
+
+MAVPicViewer_pyz = PYZ(MAVPicViewerAny.pure)
+MAVPicViewer_exe = EXE(MAVPicViewer_pyz,
+            MAVPicViewerAny.scripts,
+            exclude_binaries=True,
+            name='mavpicviewer.exe',
+            debug=False,
+            strip=None,
+            upx=True,
+            console=True )
+MAVPicViewer_coll = COLLECT(MAVPicViewer_exe,
+               MAVPicViewerAny.binaries,
+               MAVPicViewerAny.zipfiles,
+               MAVPicViewerAny.datas,
+               strip=None,
+               upx=True,
+               name='mavpicviewer')

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Terminal=true
+Exec=bash -c 'export PATH="$PATH:~/.local/bin"; mavpicviewer.py %F'
+Name=MAVPicViewer
+Icon=mavpicviewer
+Comment=Picture Review Tool
+

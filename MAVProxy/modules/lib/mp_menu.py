@@ -330,6 +330,16 @@ class MPMenuCallFileDialog(object):
             dlg = wx.FileDialog(None, self.title, '', "", self.wildcard, flagsMapped[0])
         else:
             dlg = wx.FileDialog(None, self.title, '', "", self.wildcard, flagsMapped[0]|flagsMapped[1])
+class MPMenuCallDirDialog(object):
+    '''used to create a file folder dialog callback'''
+    def __init__(self, flags=None, title='Directory'):
+        self.title = title
+
+    def call(self):
+        '''show a directory chooser dialog'''
+        from MAVProxy.modules.lib.wx_loader import wx
+
+        dlg = wx.DirDialog(None, self.title, '')
         if dlg.ShowModal() != wx.ID_OK:
             return None
         return "\"" + dlg.GetPath() + "\""
