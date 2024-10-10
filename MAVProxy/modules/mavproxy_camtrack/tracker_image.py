@@ -136,7 +136,7 @@ class TrackerImagePanel(MPImagePanel):
                     TrackerPos(
                         obj.top_left_x * width,
                         obj.bot_right_x * width,
-                        obj.top_left_x * height,
+                        obj.top_left_y * height,
                         obj.bot_right_y * height,
                     )
                 )
