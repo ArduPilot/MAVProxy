@@ -320,10 +320,6 @@ class mavpicviewer_mosaic:
             wx.CallAfter(self.set_filenunmber, self.filenumber-5)
         elif keycode == wx.WXK_DOWN:
             wx.CallAfter(self.set_filenunmber, self.filenumber+5)
-        elif keycode == ord('p') or keycode == ord('P'):
-            wx.CallAfter(self.add_poi, self.filenumber)
-        elif keycode == ord('c') or keycode == ord('C'):
-            wx.CallAfter(self.clear_poi, self.filenumber)
 
     # process window events
     def on_image_click(self, event):
@@ -357,32 +353,6 @@ class mavpicviewer_mosaic:
 
         # notify image viewer
         self.send_comm_object(mpv.SetFilenumber(self.filenumber))
-
-    # add POI to image
-    def add_poi(self, filenumber):
-        """add POI to image"""
-        # return immediately if filenumber is invalid
-        if filenumber < 0 or filenumber >= len(self.filelist):
-            return
-
-        # update POI dictionary -- FIXME!
-        self.poi_dict[filenumber] = True
-
-        # update highlighting
-        self.update_highlighting(filenumber)
-
-    # clear POI from image
-    def clear_poi(self, filenumber):
-        """clear POI from image"""
-        # return immediately if filenumber is invalid
-        if filenumber < 0 or filenumber >= len(self.filelist):
-            return
-
-        # update POI dictionary -- FIXME!
-        self.poi_dict[filenumber] = False
-
-        # update highlighting and scroll into view
-        self.update_highlighting(filenumber)
 
     # update highlighting for an image
     def update_highlighting(self, filenumber):

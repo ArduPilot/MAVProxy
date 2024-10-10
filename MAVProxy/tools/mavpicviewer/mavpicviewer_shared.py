@@ -96,7 +96,6 @@ class SetImageLoc:
 
 
 # set POI for the given filenumber
-# if poi is None then the entire image should be used
 class SetPOI:
     def __init__(self, filenumber, poi):
         self.filenumber = filenumber
