@@ -18,7 +18,7 @@ connected to a home WiFi network.
       --rtsp-server rtsp://192.168.1.204:8554/fpv_stream
 
 3. Run controller on RPi4 companion computer using an RTSP stream from
-a SIYI A8 camea. 
+a SIYI A8 camera. 
 
   python ./onboard_controller.py
       --master 192.168.144.171:15001
@@ -133,7 +133,7 @@ class OnboardController:
         # mavlink connection
         self._connection = None
 
-        # list of controllers to forward mavlink message to
+        # list of controllers to forward mavlink messages
         self._controllers = []
         self._camera_controller = None
         self._gimbal_controller = None
@@ -180,7 +180,7 @@ class OnboardController:
         """
         Task to receive a mavlink message and forwward to controllers.
         """
-        update_rate = 1000.0
+        update_rate = 1000.0  # Hz
         update_period = 1.0 / update_rate
 
         while True:
@@ -248,9 +248,18 @@ class OnboardController:
         tracking_rect_changed = True
 
         # TODO: how to ensure consistency of frame updates with GCS?
-        fps = 50
-        update_rate = fps
+        update_rate = 50.0  # Hz
         update_period = 1.0 / update_rate
+
+        # TODO: consolidate common code - also used in GUI
+        # request gimbal device attitude status
+        gimbal_device_attitude_status_rate = 50.0  # Hz
+        interval_us = int(1e6 / gimbal_device_attitude_status_rate)
+        self.send_set_message_interval_message(
+            mavutil.mavlink.MAVLINK_MSG_ID_GIMBAL_DEVICE_ATTITUDE_STATUS,
+            interval_us,  # requested interval in microseconds
+            response_target=1,  # flight-stack default
+        )
 
         frame_count = 0
         while True:
@@ -322,6 +331,23 @@ class OnboardController:
             elapsed_time = time.time() - start_time
             sleep_time = max(0.0, update_period - elapsed_time)
             time.sleep(sleep_time)
+
+    def send_set_message_interval_message(
+        self, message_id, interval_us, response_target=1
+    ):
+        self._connection.mav.command_long_send(
+            self._connection.target_system,  # target_system
+            self._connection.target_component,  # target_component
+            mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL,  # command
+            0,  # confirmation
+            message_id,  # param1
+            interval_us,  # param2
+            0,  # param3
+            0,  # param4
+            0,  # param5
+            0,  # param6
+            response_target,  # param7
+        )
 
 
 class VideoStream:
@@ -490,8 +516,8 @@ class CameraTrackController:
 
     def __init__(self, connection):
         self._connection = connection
-        self._sysid = self._connection.source_system
-        self._cmpid = self._connection.source_component
+        self._sysid = self._connection.source_system  # system id matches vehicle
+        self._cmpid = 1  # component id matches autopilot
 
         print(
             f"Camera Track Controller: "
@@ -721,7 +747,7 @@ class CameraTrackController:
             sysid = self._sysid
             cmpid = self._cmpid
 
-        update_rate = 1000.0
+        update_rate = 1000.0  # Hz
         update_period = 1.0 / update_rate
 
         while True:
@@ -758,7 +784,7 @@ class CameraTrackController:
         # TODO: stop sending image status when tracking stopped
         # TODO: set streaming rate using MAV_CMD_SET_MESSAGE_INTERVAL
 
-        update_rate = 2.0
+        update_rate = 20.0  # Hz
         update_period = 1.0 / update_rate
 
         while True:
@@ -780,8 +806,8 @@ class GimbalController:
 
     def __init__(self, connection):
         self._connection = connection
-        self._sysid = self._connection.source_system
-        self._cmpid = self._connection.source_component
+        self._sysid = self._connection.source_system # system id matches vehicle
+        self._cmpid = 1  # component id matches autopilot
 
         print(f"Gimbal Controller: src_sys: {self._sysid}, src_cmp: {self._cmpid})")
 
@@ -805,9 +831,8 @@ class GimbalController:
         self._gimbal_failure_flags = None
 
         # TODO: add options for PI controller gains
-        # PI controllers: SIYI A8: 0.1, Gazebo: 0.3
-        self._pitch_controller = PI_controller(Pgain=0.5, Igain=0.01, IMAX=1.0)
-        self._yaw_controller = PI_controller(Pgain=0.5, Igain=0.01, IMAX=1.0)
+        self._pitch_controller = PI_controller(Pgain=0.1, Igain=0.01, IMAX=0.1)
+        self._yaw_controller = PI_controller(Pgain=0.1, Igain=0.1, IMAX=1.0)
 
         # Start the control thread
         self._control_in_queue = queue.Queue()
@@ -886,6 +911,9 @@ class GimbalController:
                 # the current mount orientation.
                 _, ay, az = euler.quat2euler(gimbal_orientation)
 
+                self._pitch_controller.gain_mul = 4.0
+                self._yaw_controller.gain_mul = 40.0
+
                 err_pitch = self._neutral_y - ay
                 pitch_rate_rads = self._pitch_controller.run(err_pitch)
 
@@ -908,6 +936,9 @@ class GimbalController:
                 else:
                     err_x = act_x - tgt_x
                     err_y = -(act_y - tgt_y)
+
+                self._pitch_controller.gain_mul = 1.0
+                self._yaw_controller.gain_mul = 2.0
 
                 err_pitch = math.radians(err_y)
                 pitch_rate_rads = self._pitch_controller.run(err_pitch)
@@ -942,8 +973,6 @@ class GimbalController:
                     return
                 msg = self._control_in_queue.get()
                 mtype = msg.get_type()
-                # NOTE: GIMBAL_DEVICE_ATTITUDE_STATUS is broadcast
-                #       (sysid=0, cmpid=0)
                 if msg and mtype == "GIMBAL_DEVICE_ATTITUDE_STATUS":
                     with self._mavlink_lock:
                         self._gimbal_device_flags = msg.flags
