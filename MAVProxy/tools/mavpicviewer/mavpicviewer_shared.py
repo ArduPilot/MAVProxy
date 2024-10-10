@@ -82,6 +82,12 @@ class SetFOV:
         self.fov = fov
 
 
+# set the Yaw in degrees
+class SetYaw:
+    def __init__(self, yaw):
+        self.yaw = yaw
+
+
 # close the application
 class Close:
     def __init__(self):

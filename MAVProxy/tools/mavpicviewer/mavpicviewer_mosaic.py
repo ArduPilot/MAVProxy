@@ -431,6 +431,8 @@ class mavpicviewer_mosaic:
         """handle settings changes callback"""
         if name == "FOV":
             self.send_comm_object(mpv.SetFOV(float(value)))
+        if name == "YAW":
+            self.send_comm_object(mpv.SetYaw(float(value)))
 
 
 # main function

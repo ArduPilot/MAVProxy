@@ -139,6 +139,8 @@ class mavpicviewer_image:
             self.set_filenumber(obj.filenumber, False)
         elif isinstance(obj, mpv.SetFOV):
             self.set_fov(obj.fov)
+        elif isinstance(obj, mpv.SetYaw):
+            self.set_yaw(obj.yaw)
         elif isinstance(obj, mpv.ClearAllPOI):
             self.poi_clear_all()
         elif isinstance(obj, mpv.Close):
@@ -176,8 +178,14 @@ class mavpicviewer_image:
 
     # set FOV
     def set_fov(self, fov_deg):
-        """set image title"""
+        """set image FOV"""
         self.update_camera_settings(fov_deg)
+        self.update_map()
+
+    # set Yaw
+    def set_yaw(self, yaw_deg):
+        """set image yaw"""
+        self.yaw = yaw_deg
         self.update_map()
 
     # process window events
