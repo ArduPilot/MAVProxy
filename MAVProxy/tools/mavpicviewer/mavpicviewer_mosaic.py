@@ -71,8 +71,10 @@ class mavpicviewer_mosaic:
         self.frame.Bind(wx.EVT_MENU, self.menu_display_poi_images, id=3)
         self.menu.Append(4, "Settings", "Settings")
         self.frame.Bind(wx.EVT_MENU, self.mavpicviewer_settings.show_settings_window, id=4)
-        self.menu.Append(5, "Quit", "Quit")
-        self.frame.Bind(wx.EVT_MENU, self.menu_quit, id=5)
+        self.menu.Append(5, "Clear All POI", "Clear POI from all images")
+        self.frame.Bind(wx.EVT_MENU, self.menu_clear_all_poi, id=5)
+        self.menu.Append(6, "Quit", "Quit")
+        self.frame.Bind(wx.EVT_MENU, self.menu_quit, id=6)
         self.menu_bar = wx.MenuBar()
         self.menu_bar.Append(self.menu, "Menu")
         self.frame.SetMenuBar(self.menu_bar)
@@ -175,6 +177,13 @@ class mavpicviewer_mosaic:
         """display POI images only"""
         wx.CallAfter(self.display_all_images, poi_only=True)
 
+    # clear all POI
+    def menu_clear_all_poi(self, event):
+        """clear all POI"""
+        for filenumber in list(self.poi_dict.keys()):
+            self.clear_image_poi(filenumber)
+        self.send_comm_object(mpv.ClearAllPOI())
+
     # process menu quit event
     def menu_quit(self, event, notify_image_viewer=True):
         """process menu quit event"""
@@ -207,7 +216,6 @@ class mavpicviewer_mosaic:
             self.update_status_text()
         elif isinstance(obj, mpv.ClearPOI):
             self.clear_image_poi(obj.filenumber)
-            self.update_status_text()
         elif isinstance(obj, mpv.SetTempAndPos):
             if obj.temp_max is not None:
                 self.image_temp_dict[obj.filenumber] = mpv.TempAndPos(obj.temp_max, obj.temp_pos_x, obj.temp_pos_y)
@@ -294,10 +302,11 @@ class mavpicviewer_mosaic:
     # clear image poi
     def clear_image_poi(self, filenumber):
         """set image poi"""
-        print(f"clear_image_poi: {filenumber}")
         if filenumber in self.poi_dict:
             del self.poi_dict[filenumber]
-            self.update_status_text()
+            if filenumber == self.filenumber:
+                self.update_status_text()
+            self.update_highlighting(filenumber)
 
     # process key events
     def on_key(self, event):

@@ -96,6 +96,7 @@ class SetImageLoc:
 
 
 # set POI for the given filenumber
+# if poi is None then the entire image should be used
 class SetPOI:
     def __init__(self, filenumber, poi):
         self.filenumber = filenumber
@@ -107,6 +108,11 @@ class ClearPOI:
     def __init__(self, filenumber):
         self.filenumber = filenumber
 
+
+# clear ALL POIs for all images
+class ClearAllPOI:
+    def __init__(self):
+        pass
 
 # set Temp data for the given filenumber
 class SetTempAndPos:

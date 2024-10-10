@@ -132,12 +132,15 @@ class mavpicviewer_image:
         """process an object received on the communication pipe"""
         if isinstance(obj, mpv.SetFilelist):
             self.filelist = obj.filelist
+            self.poi_clear_all()
             self.update_image()
             self.update_map()
         elif isinstance(obj, mpv.SetFilenumber):
             self.set_filenumber(obj.filenumber, False)
         elif isinstance(obj, mpv.SetFOV):
             self.set_fov(obj.fov)
+        elif isinstance(obj, mpv.ClearAllPOI):
+            self.poi_clear_all()
         elif isinstance(obj, mpv.Close):
             self.close(False)
 
@@ -254,6 +257,20 @@ class mavpicviewer_image:
     # camcel capturing box around part of image.  should be called if mouse leaves window, next image is loaded, etc
     def poi_cancel(self):
         self.poi_start_pos = None
+
+    # clear all POI points from dictionary and map and current image
+    def poi_clear_all(self):
+        self.poi_cancel()
+        update_image_required = False
+        for filenumber in self.poi_dict.keys():
+            filename = self.filelist[filenumber]
+            if filename is not None:
+                self.remove_rectangle_from_map(filename)
+            if self.filenumber == filenumber:
+                update_image_required = True
+        self.poi_dict.clear()
+        if update_image_required:
+            self.update_image()
 
     # clear poi from current image
     def cmd_clear_poi(self):
