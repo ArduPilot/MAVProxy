@@ -32,16 +32,15 @@ class CameraView:
 
         self.frame_counter = -1
 
-        # TODO: gimbal and camera system ids
+        # Commands to autopilot attached cameras and gimbals are addressed
+        # to the autopilot component.
+        self.camera_sysid = 1  # system id matches vehicle
+        self.camera_cmpid = 1  # component id matches autopilot
+        self.camera_deviceid = 1  # first flight-stack connected camera
 
-        # autopilot component may proxy up to 6 cameras
-        self.camera_sysid = 1
-        self.camera_cmpid = mavutil.mavlink.MAV_COMP_ID_ONBOARD_COMPUTER
-        self.camera_deviceid = 1  # first autopilot attached camera
-
-        self.gimbal_sysid = 1
-        self.gimbal_cmpid = mavutil.mavlink.MAV_COMP_ID_ONBOARD_COMPUTER
-        self.gimbal_deviceid = 1  # first autopilot attached gimbal
+        self.gimbal_sysid = 1  # system id matches vehicle
+        self.gimbal_cmpid = 1  # component id matches autopilot
+        self.gimbal_deviceid = 1  # first flight-stack connected gimbal
 
         self.im = TrackerImage(
             title=title,
@@ -75,13 +74,6 @@ class CameraView:
 
     def close(self):
         """Close the GUI"""
-        # TODO: MPImage does not have a close_event
-        # trigger a close event which is monitored by the
-        # child gui process - it will close allowing the
-        # process to be joined
-        # self.im.close_event.set()
-        # if self.im.is_alive():
-        #     self.im.child.join(timeout=2.0)
         self.im.terminate()
 
     def is_alive(self):

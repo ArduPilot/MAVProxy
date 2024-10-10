@@ -43,7 +43,7 @@ class CamTrackModule(mp_module.MPModule):
 
         self.mpstate = mpstate
 
-        # GUI
+        # Settings
         # TODO: provide args to set RTSP server location
         # localhost simulation
         rtsp_url = "rtsp://127.0.0.1:8554/camera"
@@ -57,6 +57,9 @@ class CamTrackModule(mp_module.MPModule):
         # SIYI A8 camera
         # rtsp_url = "rtsp://192.168.144.25:8554/main.264"
 
+        self._camera_tracking_image_status_rate = 50  # Hz
+
+        # GUI
         self.camera_view = CameraView(self.mpstate, "Camera Tracking", rtsp_url)
 
         # NOTE: unused except for status
@@ -75,12 +78,6 @@ class CamTrackModule(mp_module.MPModule):
         self._do_request_autopilot_state_for_gimbal_device = True
         self._do_request_camera_information = True
         self._do_request_camera_tracking_image_status = True
-
-        # control update rate to GUI
-        self._msg_list = []
-        self._fps = 30.0
-        self._last_send = 0.0
-        self._send_delay = (1.0 / self._fps) * 0.9
 
         # commands
         self.add_command("camtrack", self.cmd_camtrack, "camera tracking")
@@ -155,7 +152,7 @@ class CamTrackModule(mp_module.MPModule):
         elif mtype == "CAMERA_TRACKING_IMAGE_STATUS":
             self.handle_camera_tracking_image_status(msg)
 
-        # TODO: NOTE: disabled
+        # TODO: NOTE: ack checks are disabled
         # check command_ack
         elif False:  # mtype == "COMMAND_ACK":
             if msg.command == mavutil.mavlink.MAV_CMD_CAMERA_TRACK_POINT:
@@ -215,7 +212,7 @@ class CamTrackModule(mp_module.MPModule):
             elif msg.command == mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL:
                 print("Got COMMAND_ACK: MAV_CMD_SET_MESSAGE_INTERVAL")
 
-        # TODO: NOTE: disabled
+        # TODO: NOTE: command processing disabled
         # check command_long
         elif False:  # mtype == "COMMAND_LONG":
             # TODO: check target_system is for offboard control
@@ -293,15 +290,7 @@ class CamTrackModule(mp_module.MPModule):
         #     self.needs_unloading = True
 
     def send_messages(self):
-        """Send message list via pipe to GUI at desired update rate"""
-        if (time.time() - self._last_send) > self._send_delay:
-            # pipe data to GUI
-            # TODO: check interface in view for pipe updates
-            # self.camera_view.parent_pipe_send.send(self._msg_list)
-            # reset counters etc
-            self._msg_list = []
-            self._last_send = time.time()
-
+        """Send messages"""
         # TODO: implement camera and gimbal discovery correctly
         # Discovery - most of these requests are handled in the FC
         #             by GCS_MAVLINK::try_send_message
@@ -335,9 +324,10 @@ class CamTrackModule(mp_module.MPModule):
             self._do_request_camera_information = False
 
         if self._do_request_camera_tracking_image_status:
+            interval_us = int(1e6 / self._camera_tracking_image_status_rate)
             self.send_set_message_interval_message(
                 mavutil.mavlink.MAVLINK_MSG_ID_CAMERA_TRACKING_IMAGE_STATUS,
-                1000 * 50,  # 20Hz
+                interval_us,  # requested interval in microseconds
                 response_target=1,  # flight-stack default
             )
             self._do_request_camera_tracking_image_status = False
@@ -402,12 +392,9 @@ class CamTrackModule(mp_module.MPModule):
 
     def unload(self):
         """Close the GUI and unload module"""
-
-        # close the GUI
         self.camera_view.close()
 
 
 def init(mpstate):
     """Initialise module"""
-
     return CamTrackModule(mpstate)
