@@ -119,6 +119,7 @@ class ClearAllPOI:
     def __init__(self):
         pass
 
+
 # set Temp data for the given filenumber
 class SetTempAndPos:
     def __init__(self, filenumber, temp_max, temp_pos_x, temp_pos_y):
