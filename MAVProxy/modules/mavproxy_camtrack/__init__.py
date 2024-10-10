@@ -57,7 +57,7 @@ class CamTrackModule(mp_module.MPModule):
         # SIYI A8 camera
         # rtsp_url = "rtsp://192.168.144.25:8554/main.264"
 
-        self._camera_tracking_image_status_rate = 50  # Hz
+        self._camera_tracking_image_status_rate = 20  # Hz
 
         # GUI
         self.camera_view = CameraView(self.mpstate, "Camera Tracking", rtsp_url)
@@ -328,7 +328,7 @@ class CamTrackModule(mp_module.MPModule):
             self.send_set_message_interval_message(
                 mavutil.mavlink.MAVLINK_MSG_ID_CAMERA_TRACKING_IMAGE_STATUS,
                 interval_us,  # requested interval in microseconds
-                response_target=1,  # flight-stack default
+                response_target=0,  # flight-stack default
             )
             self._do_request_camera_tracking_image_status = False
 
@@ -369,9 +369,9 @@ class CamTrackModule(mp_module.MPModule):
         )
 
     def send_set_message_interval_message(
-        self, message_id, interval_us, response_target=1
+        self, message_id, interval_us, response_target=0
     ):
-        self.master.mav.command_long_send(
+        msg = self.master.mav.command_long_encode(
             self.settings.target_system,  # target_system
             self.settings.target_component,  # target_component
             mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL,  # command
@@ -384,6 +384,7 @@ class CamTrackModule(mp_module.MPModule):
             0,  # param6
             response_target,  # param7
         )
+        self.master.mav.send(msg)
 
     def idle_task(self):
         """Idle tasks"""

@@ -697,6 +697,12 @@ class CameraTrackController:
             rec_bottom_x,
             rec_bottom_y,
         )
+        # NOTE: leave for debugging
+        # print(
+        #     f"image_status: x: {rec_top_x:.2f}, y: {rec_top_y:.2f}, "
+        #     f"w: {(rec_bottom_x - rec_top_x):.2f}, "
+        #     f"h: {(rec_bottom_y - rec_top_y):.2f}"
+        # )
         self._connection.mav.send(msg)
 
     def _handle_camera_track_point(self, msg):
@@ -806,7 +812,7 @@ class GimbalController:
 
     def __init__(self, connection):
         self._connection = connection
-        self._sysid = self._connection.source_system # system id matches vehicle
+        self._sysid = self._connection.source_system  # system id matches vehicle
         self._cmpid = 1  # component id matches autopilot
 
         print(f"Gimbal Controller: src_sys: {self._sysid}, src_cmp: {self._cmpid})")
@@ -831,8 +837,8 @@ class GimbalController:
         self._gimbal_failure_flags = None
 
         # TODO: add options for PI controller gains
-        self._pitch_controller = PI_controller(Pgain=0.1, Igain=0.01, IMAX=0.1)
-        self._yaw_controller = PI_controller(Pgain=0.1, Igain=0.1, IMAX=1.0)
+        self._pitch_controller = PI_controller(Pgain=0.1, Igain=0.02, IMAX=0.3)
+        self._yaw_controller = PI_controller(Pgain=0.1, Igain=0.02, IMAX=0.3)
 
         # Start the control thread
         self._control_in_queue = queue.Queue()
@@ -911,8 +917,8 @@ class GimbalController:
                 # the current mount orientation.
                 _, ay, az = euler.quat2euler(gimbal_orientation)
 
-                self._pitch_controller.gain_mul = 4.0
-                self._yaw_controller.gain_mul = 40.0
+                self._pitch_controller.gain_mul = 5.0
+                self._yaw_controller.gain_mul = 5.0
 
                 err_pitch = self._neutral_y - ay
                 pitch_rate_rads = self._pitch_controller.run(err_pitch)
@@ -937,8 +943,8 @@ class GimbalController:
                     err_x = act_x - tgt_x
                     err_y = -(act_y - tgt_y)
 
-                self._pitch_controller.gain_mul = 1.0
-                self._yaw_controller.gain_mul = 2.0
+                self._pitch_controller.gain_mul = 0.5
+                self._yaw_controller.gain_mul = 0.5
 
                 err_pitch = math.radians(err_y)
                 pitch_rate_rads = self._pitch_controller.run(err_pitch)
@@ -993,7 +999,7 @@ class PI_controller:
     MAVProxy/modules/mavproxy_SIYI/PI_controller (modified)
     """
 
-    def __init__(self, Pgain, Igain, IMAX, gain_mul=1.0, max_rate=math.radians(30.0)):
+    def __init__(self, Pgain, Igain, IMAX, gain_mul=1.0, max_rate=math.radians(90.0)):
         self.Pgain = Pgain
         self.Igain = Igain
         self.IMAX = IMAX
