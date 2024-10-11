@@ -709,4 +709,15 @@
   <description></description>
   <expression>VISP.PX VISP.PY VISP.PZ</expression>
  </graph>
+
+ <graph name='Wind/EKF3 vs DCM'>
+  <description>Compares EKF estimate vs DCM estimate</description>
+  <expression>XKF2[0].VWN DCM.VWN XKF2[0].VWE DCM.VWE sqrt(XKF2[0].VWN**2+XKF2[0].VWE**2) sqrt(DCM.VWN**2+DCM.VWE**2)</expression>
+ </graph>
+
+ <graph name='Plane/FlyForward'>
+  <description>If Replay is enabled, the flag fly-forward flag as set in the AHRS</description>
+  <expression>RFRN.Flags&amp;(1&lt;&lt;2)</expression>
+ </graph>
+
 </graphs>
