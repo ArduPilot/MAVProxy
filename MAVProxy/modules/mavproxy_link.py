@@ -675,6 +675,19 @@ class LinkModule(mp_module.MPModule):
 
         return True
 
+    mav_type_planes = [
+        mavutil.mavlink.MAV_TYPE_FIXED_WING,
+        mavutil.mavlink.MAV_TYPE_VTOL_QUADROTOR,
+        mavutil.mavlink.MAV_TYPE_VTOL_TILTROTOR,
+    ]
+    # VTOL_DUOROTOR was renamed to VTOL_TAILSITTER_DUOROTOR
+    for possible_plane_type in "VTOL_DUOROTOR", "VTOL_TAILSITTER_DUOROTOR":
+        t = f"MAV_TYPE_{possible_plane_type}"
+        attr = getattr(mavutil.mavlink, t, None)
+        if attr is None:
+            continue
+        mav_type_planes.append(attr)
+
     def master_msg_handling(self, m, master):
         '''link message handling for an upstream link'''
 
@@ -739,11 +752,7 @@ class LinkModule(mp_module.MPModule):
                 self.status.last_mode_announced = master.flightmode
                 self.say("Mode " + self.status.flightmode)
 
-            if m.type in [
-                    mavutil.mavlink.MAV_TYPE_FIXED_WING,
-                    mavutil.mavlink.MAV_TYPE_VTOL_DUOROTOR,
-                    mavutil.mavlink.MAV_TYPE_VTOL_QUADROTOR,
-                    mavutil.mavlink.MAV_TYPE_VTOL_TILTROTOR]:
+            if m.type in self.mav_type_planes:
                 self.mpstate.vehicle_type = 'plane'
                 self.mpstate.vehicle_name = 'ArduPlane'
             elif m.type in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER,
