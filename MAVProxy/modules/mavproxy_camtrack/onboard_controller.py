@@ -66,8 +66,8 @@ from transforms3d import quaternions
 
 from MAVProxy.modules.lib import live_graph
 
-from MAVProxy.modules.mavproxy_camtrack.pid_basic import AC_PID_Basic
-from MAVProxy.modules.mavproxy_camtrack.pid_basic import AP_PIDInfo
+from MAVProxy.modules.lib.pid_basic import AC_PID_Basic
+from MAVProxy.modules.lib.pid_basic import AP_PIDInfo
 
 
 gi.require_version("Gst", "1.0")
@@ -129,11 +129,14 @@ class CameraTrackingTargetData(Enum):
 
 
 class OnboardController:
-    def __init__(self, device, sysid, cmpid, rtsp_url, enable_graphs=False):
+    def __init__(
+        self, device, sysid, cmpid, rtsp_url, tracker_name="CSTR", enable_graphs=False
+    ):
         self._device = device
         self._sysid = sysid
         self._cmpid = cmpid
         self._rtsp_url = rtsp_url
+        self._tracker_name = tracker_name
         self._enable_graphs = enable_graphs
 
         # mavlink connection
@@ -147,7 +150,8 @@ class OnboardController:
         print(f"Onboard Controller: src_sys: {self._sysid}, src_cmp: {self._cmpid})")
 
     def __del__(self):
-        self._connection.close()
+        if self._connection is not None:
+            self._connection.close()
 
     def _connect_to_mavlink(self):
         """
@@ -211,6 +215,14 @@ class OnboardController:
             sleep_time = max(0.0, update_period - elapsed_time)
             time.sleep(sleep_time)
 
+    def _create_tracker(self, name):
+        if name == "CSTR":
+            return TrackerCSTR()
+        elif name == "KCF":
+            return TrackerKCF()
+        else:
+            raise Exception(f"Invalid tracker name: {name}")
+
     def run(self):
         """
         Run the onboard controller.
@@ -221,6 +233,7 @@ class OnboardController:
         self._connect_to_mavlink()
 
         # Connect to video stream
+        print(f"Using RTSP server: {self._rtsp_url}")
         video_stream = VideoStream(self._rtsp_url)
 
         # Timeout if video not available
@@ -254,7 +267,8 @@ class OnboardController:
         mavlink_recv_thread.start()
 
         # Create tracker
-        tracker = TrackerCSTR()
+        print(f"Using tracker: {self._tracker_name}")
+        tracker = self._create_tracker(self._tracker_name)
         tracking_rect = None
         tracking_rect_changed = True
 
@@ -336,6 +350,7 @@ class OnboardController:
                     else:
                         print("Tracking failure detected.")
                         tracking_rect = None
+                        self._camera_controller.stop_tracking()
                         self._gimbal_controller.reset()
 
             # Rate limit
@@ -606,6 +621,15 @@ class CameraTrackController:
         with self._lock:
             self._curr_track_rect = copy.deepcopy(rect)
 
+    def stop_tracking(self):
+        print("CAMERA_STOP_TRACKING")
+        with self._lock:
+            self._track_type = CameraTrackType.NONE
+            self._track_point = None
+            self._track_rect = None
+            self._curr_track_point = None
+            self._curr_track_rect = None
+
     def mavlink_packet(self, msg):
         """
         Process a mavlink packet.
@@ -746,13 +770,7 @@ class CameraTrackController:
             )
 
     def _handle_camera_stop_tracking(self, msg):
-        print("CAMERA_STOP_TRACKING")
-        with self._lock:
-            self._track_type = CameraTrackType.NONE
-            self._track_point = None
-            self._track_rect = None
-            self._curr_track_point = None
-            self._curr_track_rect = None
+        self.stop_tracking()
 
     def _mavlink_task(self):
         """
@@ -832,17 +850,17 @@ class GimbalController:
         self._control_lock = threading.Lock()
         self._center_x = 0
         self._center_y = 0
-        self._width = None
-        self._height = None
+        self._frame_width = None
+        self._frame_height = None
         self._tracking = False
 
         # Gimbal state
         # TODO: obtain the mount neutral angles from params
         # NOTE: q = [w, x, y, z]
         self._mavlink_lock = threading.Lock()
-        self._neutral_x = 0.0
-        self._neutral_y = 0.0
-        self._neutral_z = 0.0
+        self._mnt1_neutral_x = 0.0  # roll
+        self._mnt1_neutral_y = 0.0  # pitch
+        self._mnt1_neutral_z = 0.0  # yaw
         self._gimbal_device_flags = None
         self._gimbal_orientation = None
         self._gimbal_failure_flags = None
@@ -916,7 +934,7 @@ class GimbalController:
             self._tracking = True
             self._center_x = x
             self._center_y = y
-            self._height, self._width, _ = shape
+            self._frame_height, self._frame_width, _ = shape
 
     def reset(self):
         with self._control_lock:
@@ -968,12 +986,14 @@ class GimbalController:
             with self._control_lock:
                 act_x = self._center_x
                 act_y = self._center_y
-                frame_width = self._width
-                frame_height = self._height
+                frame_width = self._frame_width
+                frame_height = self._frame_height
                 tracking = self._tracking
 
             # Return gimbal to its neutral orientation when not tracking
             with self._mavlink_lock:
+                pit_tgt_rad = self._mnt1_neutral_y
+                yaw_tgt_rad = self._mnt1_neutral_z
                 gimbal_orientation = self._gimbal_orientation
 
             # Update dt for the controller I and D terms
@@ -985,13 +1005,31 @@ class GimbalController:
                 # NOTE: to centre the gimbal when not tracking, we need to know
                 # the neutral angles from the MNT1_NEUTRAL_x params, and also
                 # the current mount orientation.
-                _, ay, az = euler.quat2euler(gimbal_orientation)
+                _, pit_act_rad, yaw_act_rad = euler.quat2euler(gimbal_orientation)
 
-                pit_rate_rads = self._pit_controller.update_all(self._neutral_y, ay, dt)
-                yaw_rate_rads = self._yaw_controller.update_all(self._neutral_z, az, dt)
+                pit_rate_rads = self._pit_controller.update_all(
+                    pit_tgt_rad, pit_act_rad, dt
+                )
+                yaw_rate_rads = self._yaw_controller.update_all(
+                    yaw_tgt_rad, yaw_act_rad, dt
+                )
 
                 pit_pid_info = self._pit_controller.pid_info
                 yaw_pid_info = self._yaw_controller.pid_info
+
+                # NOTE: leave for debugging
+                # print(
+                #     f"Pit: Tgt: {pit_pid_info.target:.2f}, "
+                #     f"Act: {pit_pid_info.actual:.2f}, "
+                #     f"Out: {pit_pid_info.out:.2f}"
+                # )
+
+                # NOTE: leave for debugging
+                # print(
+                #     f"Yaw: Tgt: {yaw_pid_info.target:.2f}, "
+                #     f"Act: {yaw_pid_info.actual:.2f}, "
+                #     f"Out: {yaw_pid_info.out:.2f}"
+                # )
 
                 self._send_gimbal_manager_pitch_yaw_angles(
                     float("nan"),
@@ -1120,13 +1158,13 @@ class GimbalController:
             )
 
 
-class TrackerCSTR:
+class TrackerOpenCV:
     """
-    Wrapper for cv2.legacy.TrackerCSRT
+    Base class for wrappers of OpenCV trackers
     """
 
     def __init__(self):
-        self._tracker = cv2.legacy.TrackerCSRT_create()
+        self._tracker = self._create()
         self._nroi = None
         self._nroi_changed = False
 
@@ -1135,17 +1173,17 @@ class TrackerCSTR:
             return False, None
 
         if self._nroi_changed:
-            self._tracker = cv2.legacy.TrackerCSRT_create()
+            self._tracker = self._create()
             # Denormalise the roi
-            height, width, _ = frame.shape
+            frame_height, frame_width, _ = frame.shape
             roi = [
-                int(self._nroi[0] * width),  # x
-                int(self._nroi[1] * height),  # y
-                int(self._nroi[2] * width),  # w
-                int(self._nroi[3] * height),  # h
+                int(self._nroi[0] * frame_width),  # x
+                int(self._nroi[1] * frame_height),  # y
+                int(self._nroi[2] * frame_width),  # w
+                int(self._nroi[3] * frame_height),  # h
             ]
             # print(
-            #     f"TrackerCSTR: nroi: {self._nroi}, roi: {roi}, frame_width: {width}, frame_height: {height}"
+            #     f"Tracker: nroi: {self._nroi}, roi: {roi}, frame_width: {frame_width}, frame_height: {frame_height}"
             # )
             self._tracker.init(frame, roi)
             self._nroi_changed = False
@@ -1161,6 +1199,33 @@ class TrackerCSTR:
         self._nroi = nroi
         self._nroi_changed = True
 
+    def _create(self):
+        raise Exception("TrackerOpenCV must not be used directly.")
+
+
+class TrackerCSTR(TrackerOpenCV):
+    """
+    Wrapper for cv2.legacy.TrackerCSRT
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def _create(self):
+        return cv2.legacy.TrackerCSRT_create()
+
+
+class TrackerKCF(TrackerOpenCV):
+    """
+    Wrapper for cv2.legacy.TrackerKCF
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def _create(self):
+        return cv2.legacy.TrackerKCF_create()
+
 
 if __name__ == "__main__":
     import os
@@ -1168,28 +1233,34 @@ if __name__ == "__main__":
     from argparse import ArgumentParser
 
     parser = ArgumentParser("onboard_controller.py [options]")
-    parser.add_argument("--master", required=True, type=str, help="MAVLink device")
+    parser.add_argument("--master", required=True, type=str, help="mavlink device")
     parser.add_argument(
-        "--rtsp-server", required=True, type=str, help="RTSP server URL"
+        "--rtsp-server", required=True, type=str, help="rtsp server url"
     )
-    parser.add_argument("--sysid", default=1, type=int, help="Source system ID")
+    parser.add_argument("--sysid", default=1, type=int, help="source system id")
     parser.add_argument(
         "--cmpid",
         default=mavutil.mavlink.MAV_COMP_ID_ONBOARD_COMPUTER,
         type=int,
-        help="Source component ID",
+        help="source component id",
     )
+    parser.add_argument("--tracker-name", default="CSTR", type=str, help="tracker name")
     parser.add_argument(
         "--enable-graphs",
         action="store_const",
         default=False,
         const=True,
-        help="Enable live graphs",
+        help="enable live graphs",
     )
     args = parser.parse_args()
 
     controller = OnboardController(
-        args.master, args.sysid, args.cmpid, args.rtsp_server, args.enable_graphs
+        args.master,
+        args.sysid,
+        args.cmpid,
+        args.rtsp_server,
+        args.tracker_name,
+        args.enable_graphs,
     )
 
     while True:
