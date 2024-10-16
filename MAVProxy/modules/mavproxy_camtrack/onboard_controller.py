@@ -73,6 +73,12 @@ from MAVProxy.modules.lib.pid_basic import AP_PIDInfo
 gi.require_version("Gst", "1.0")
 from gi.repository import Gst
 
+# TODO: move update rate constants to CLI options
+MAIN_LOOP_RATE = 30.0
+GIMBAL_CONTROL_LOOP_RATE = 30.0
+CAMERA_SEND_IMAGE_STATUS_RATE = 5.0
+MAVLINK_RECV_RATE = 1000.0
+
 
 class CameraCapFlags(Enum):
     """
@@ -259,7 +265,7 @@ class OnboardController:
         """
         Task to receive a mavlink message and forwward to controllers.
         """
-        update_rate = 1000.0  # Hz
+        update_rate = MAVLINK_RECV_RATE  # Hz
         update_period = 1.0 / update_rate
 
         while True:
@@ -280,14 +286,6 @@ class OnboardController:
             elapsed_time = time.time() - start_time
             sleep_time = max(0.0, update_period - elapsed_time)
             time.sleep(sleep_time)
-
-    def _create_tracker(self, name):
-        if name == "CSTR":
-            return TrackerCSTR()
-        elif name == "KCF":
-            return TrackerKCF()
-        else:
-            raise Exception(f"Invalid tracker name: {name}")
 
     def run(self):
         """
@@ -334,12 +332,12 @@ class OnboardController:
 
         # Create tracker
         print(f"Using tracker: {self._tracker_name}")
-        tracker = self._create_tracker(self._tracker_name)
+        tracker = TrackerFactory.create_tracker(self._tracker_name)
         tracking_rect = None
         tracking_rect_changed = True
 
         # TODO: how to ensure consistency of frame updates with GCS?
-        update_rate = 50.0  # Hz
+        update_rate = MAIN_LOOP_RATE  # Hz
         update_period = 1.0 / update_rate
 
         # TODO: consolidate common code - also used in GUI
@@ -890,7 +888,7 @@ class CameraTrackController:
             sysid = self._sysid
             cmpid = self._cmpid
 
-        update_rate = 1000.0  # Hz
+        update_rate = MAVLINK_RECV_RATE  # Hz
         update_period = 1.0 / update_rate
 
         while True:
@@ -927,7 +925,7 @@ class CameraTrackController:
         # TODO: stop sending image status when tracking stopped
         # TODO: set streaming rate using MAV_CMD_SET_MESSAGE_INTERVAL
 
-        update_rate = 20.0  # Hz
+        update_rate = CAMERA_SEND_IMAGE_STATUS_RATE  # Hz
         update_period = 1.0 / update_rate
 
         while True:
@@ -977,9 +975,9 @@ class GimbalController:
 
         # Pitch controller for centring gimbal
         self._pit_controller = AC_PID_Basic(
-            initial_p=2.0,
-            initial_i=0.0,
-            initial_d=0.0,
+            initial_p=1.0,
+            initial_i=0.01,
+            initial_d=0.01,
             initial_ff=0.0,
             initial_imax=1.0,
             initial_filt_E_hz=0.0,
@@ -988,9 +986,9 @@ class GimbalController:
 
         # Yaw controller for centring gimbal
         self._yaw_controller = AC_PID_Basic(
-            initial_p=2.0,
-            initial_i=0.0,
-            initial_d=0.0,
+            initial_p=1.0,
+            initial_i=0.01,
+            initial_d=0.01,
             initial_ff=0.0,
             initial_imax=1.0,
             initial_filt_E_hz=0.0,
@@ -999,9 +997,9 @@ class GimbalController:
 
         # Gimbal pitch controller for tracking
         self._pit_track_controller = AC_PID_Basic(
-            initial_p=2.0,
-            initial_i=0.2,
-            initial_d=0.01,
+            initial_p=1.0,
+            initial_i=0.01,
+            initial_d=0.02,
             initial_ff=0.0,
             initial_imax=1.0,
             initial_filt_E_hz=0.0,
@@ -1010,9 +1008,9 @@ class GimbalController:
 
         # Gimbal yaw controller for tracking
         self._yaw_track_controller = AC_PID_Basic(
-            initial_p=2.0,
-            initial_i=0.2,
-            initial_d=0.01,
+            initial_p=1.0,
+            initial_i=0.01,
+            initial_d=0.02,
             initial_ff=0.0,
             initial_imax=1.0,
             initial_filt_E_hz=0.0,
@@ -1057,7 +1055,7 @@ class GimbalController:
     def mavlink_packet(self, msg):
         self._control_in_queue.put(msg)
 
-    def _send_gimbal_manager_pitch_yaw_angles(self, pitch, yaw, pitch_rate, yaw_rate):
+    def _send_gimbal_manager_pitch_yaw_angle(self, pitch, yaw):
         """
         Send a mavlink message to set the gimbal pitch and yaw (radians).
         """
@@ -1068,6 +1066,22 @@ class GimbalController:
             0,
             pitch,
             yaw,
+            float("nan"),
+            float("nan"),
+        )
+        self._connection.mav.send(msg)
+
+    def _send_gimbal_manager_pitch_yaw_rate(self, pitch_rate, yaw_rate):
+        """
+        Send a mavlink message to set the gimbal pitch and yaw (radians).
+        """
+        msg = self._connection.mav.gimbal_manager_set_pitchyaw_encode(
+            self._connection.target_system,
+            self._connection.target_component,
+            0,
+            0,
+            float("nan"),
+            float("nan"),
             pitch_rate,
             yaw_rate,
         )
@@ -1082,6 +1096,9 @@ class GimbalController:
 
         When not tracking, return the gimbal to its neutral position.
         """
+        update_rate = GIMBAL_CONTROL_LOOP_RATE
+        update_period = 1.0 / update_rate
+
         if self._enable_graphs:
             self._add_livegraphs()
 
@@ -1139,12 +1156,11 @@ class GimbalController:
                 #     f"Out: {yaw_pid_info.out:.2f}"
                 # )
 
-                self._send_gimbal_manager_pitch_yaw_angles(
-                    float("nan"),
-                    float("nan"),
-                    pit_rate_rads,
-                    yaw_rate_rads,
-                )
+                # NOTE: Set pitch and yaw rates to help determine PID gains for tracking
+                self._send_gimbal_manager_pitch_yaw_rate(pit_rate_rads, yaw_rate_rads)
+
+                # NOTE: Set pitch and yaw angles directly (no PID controller needed)
+                # self._send_gimbal_manager_pitch_yaw_angle(pit_tgt_rad, yaw_tgt_rad)
 
                 if self._enable_graphs:
                     self._update_livegraphs(pit_pid_info, yaw_pid_info)
@@ -1167,18 +1183,11 @@ class GimbalController:
                 pit_pid_info = self._pit_track_controller.pid_info
                 yaw_pid_info = self._yaw_track_controller.pid_info
 
-                self._send_gimbal_manager_pitch_yaw_angles(
-                    float("nan"),
-                    float("nan"),
-                    pit_rate_rads,
-                    yaw_rate_rads,
-                )
+                self._send_gimbal_manager_pitch_yaw_rate(pit_rate_rads, yaw_rate_rads)
 
                 if self._enable_graphs:
                     self._update_livegraphs(pit_pid_info, yaw_pid_info)
 
-            # Update at 50Hz
-            update_period = 0.02
             elapsed_time = time.time() - start_time
             sleep_time = max(0.0, update_period - elapsed_time)
             time.sleep(sleep_time)
@@ -1187,7 +1196,7 @@ class GimbalController:
         """
         Process mavlink messages relevant to gimbal management.
         """
-        update_rate = 1000.0
+        update_rate = MAVLINK_RECV_RATE
         update_period = 1.0 / update_rate
 
         while True:
@@ -1335,6 +1344,22 @@ class TrackerKCF(TrackerOpenCV):
         return cv2.legacy.TrackerKCF_create()
 
 
+class TrackerFactory:
+
+    @staticmethod
+    def choices():
+        return ["CSTR", "KCF"]
+
+    @staticmethod
+    def create_tracker(name):
+        if name == "CSTR":
+            return TrackerCSTR()
+        elif name == "KCF":
+            return TrackerKCF()
+        else:
+            raise Exception(f"Invalid tracker name: {name}")
+
+
 if __name__ == "__main__":
     import os
     import sys
@@ -1352,7 +1377,13 @@ if __name__ == "__main__":
         type=int,
         help="source component id",
     )
-    parser.add_argument("--tracker-name", default="CSTR", type=str, help="tracker name")
+    parser.add_argument(
+        "--tracker-name",
+        choices=TrackerFactory.choices(),
+        default="CSTR",
+        type=str,
+        help="tracker name",
+    )
     parser.add_argument(
         "--enable-graphs",
         action="store_const",
