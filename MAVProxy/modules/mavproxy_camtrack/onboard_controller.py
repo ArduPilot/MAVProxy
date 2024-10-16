@@ -128,9 +128,74 @@ class CameraTrackingTargetData(Enum):
     IN_STATUS = mavutil.mavlink.CAMERA_TRACKING_TARGET_DATA_IN_STATUS
 
 
+class Profiler:
+    """
+    Basic profiler for measuring execution times.
+    """
+
+    def __init__(self):
+        self._has_started = False
+        self._has_ended = True
+        self._start_time_s = 0
+
+        self._count = 0
+        self._last_duration_s = -1.0
+        self._total_duration_s = 0.0
+
+    def start(self):
+        if self._has_started or not self._has_ended:
+            raise Exception(f"Profiler already in progress")
+            return
+
+        self._has_started = True
+        self._has_ended = False
+        self._start_time_s = time.time()
+
+    def end(self):
+        if not self._has_started or self._has_ended:
+            raise Exception(f"Profiler cannot end before start")
+            return
+
+        self._has_started = False
+        self._has_ended = True
+        dt = time.time() - self._start_time_s
+        self._count += 1
+        self._last_duration_s = dt
+        self._total_duration_s += dt
+
+    @property
+    def count(self):
+        return self._count
+
+    @property
+    def last_duration_ms(self):
+        if self._last_duration_s >= 0:
+            return int(self._last_duration_s * 1e3)
+        else:
+            return int(-1)
+
+    @property
+    def avg_duration_ms(self):
+        if self._count > 0:
+            return int(self._total_duration_s / self._count * 1e3)
+        else:
+            return int(-1)
+
+
 class OnboardController:
+    """
+    Onboard gimbal controller.
+    """
+
     def __init__(
-        self, device, sysid, cmpid, rtsp_url, tracker_name="CSTR", enable_graphs=False
+        self,
+        device,
+        sysid,
+        cmpid,
+        rtsp_url,
+        tracker_name="CSTR",
+        enable_graphs=False,
+        enable_profiler=False,
     ):
         self._device = device
         self._sysid = sysid
@@ -138,6 +203,7 @@ class OnboardController:
         self._rtsp_url = rtsp_url
         self._tracker_name = tracker_name
         self._enable_graphs = enable_graphs
+        self._enable_profiler = enable_profiler
 
         # mavlink connection
         self._connection = None
@@ -286,12 +352,18 @@ class OnboardController:
             response_target=1,  # flight-stack default
         )
 
-        frame_count = 0
+        # Always collect profile data (low-cost)
+        tracker_profiler = Profiler()
+        loop_profiler = Profiler()
+        loop_with_tracker_profiler = Profiler()
+        profile_print_last_time = time.time()
+        profile_print_period = 2
+
         while True:
             start_time = time.time()
 
             if video_stream.frame_available():
-                frame_count += 1
+                loop_profiler.start()
                 frame = copy.deepcopy(video_stream.frame())
 
                 track_type = self._camera_controller.track_type()
@@ -329,7 +401,11 @@ class OnboardController:
 
                 # update tracker and gimbal if tracking active
                 if tracking_rect is not None:
+                    loop_with_tracker_profiler.start()
+                    tracker_profiler.start()
                     success, box = tracker.update(frame)
+                    tracker_profiler.end()
+
                     if success:
                         (x, y, w, h) = [int(v) for v in box]
                         u = x + w // 2
@@ -352,6 +428,38 @@ class OnboardController:
                         tracking_rect = None
                         self._camera_controller.stop_tracking()
                         self._gimbal_controller.reset()
+                    loop_with_tracker_profiler.end()
+
+                loop_profiler.end()
+
+            # Profile
+            if self._enable_profiler and (
+                (time.time() - profile_print_last_time) > profile_print_period
+            ):
+                profile_print_last_time = time.time()
+                print("Onboard controller main loop profile")
+                print("-------------------------------------")
+                print("time in ms      avg\tlast\tcount")
+                print(
+                    f"loop:            "
+                    f"{loop_profiler.avg_duration_ms}\t"
+                    f"{loop_profiler.last_duration_ms}\t"
+                    f"{loop_profiler.count}"
+                )
+                print(
+                    f"loop_with_track: "
+                    f"{loop_with_tracker_profiler.avg_duration_ms}\t"
+                    f"{loop_with_tracker_profiler.last_duration_ms}\t"
+                    f"{loop_with_tracker_profiler.count}"
+                )
+                print(
+                    f"tracker:         "
+                    f"{tracker_profiler.avg_duration_ms}\t"
+                    f"{tracker_profiler.last_duration_ms}\t"
+                    f"{tracker_profiler.count}"
+                )
+                print("-------------------------------------")
+                print()
 
             # Rate limit
             elapsed_time = time.time() - start_time
@@ -1252,6 +1360,13 @@ if __name__ == "__main__":
         const=True,
         help="enable live graphs",
     )
+    parser.add_argument(
+        "--enable-profiler",
+        action="store_const",
+        default=False,
+        const=True,
+        help="enable main loop profiler",
+    )
     args = parser.parse_args()
 
     controller = OnboardController(
@@ -1261,6 +1376,7 @@ if __name__ == "__main__":
         args.rtsp_server,
         args.tracker_name,
         args.enable_graphs,
+        args.enable_profiler,
     )
 
     while True:
