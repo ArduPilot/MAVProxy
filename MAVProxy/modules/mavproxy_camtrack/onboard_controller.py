@@ -182,9 +182,23 @@ class Profiler:
             return int(-1)
 
     @property
+    def last_duration_us(self):
+        if self._last_duration_s >= 0:
+            return int(self._last_duration_s * 1e6)
+        else:
+            return int(-1)
+
+    @property
     def avg_duration_ms(self):
         if self._count > 0:
             return int(self._total_duration_s / self._count * 1e3)
+        else:
+            return int(-1)
+
+    @property
+    def avg_duration_us(self):
+        if self._count > 0:
+            return int(self._total_duration_s / self._count * 1e6)
         else:
             return int(-1)
 
