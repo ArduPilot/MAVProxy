@@ -1213,6 +1213,17 @@ class GimbalController:
                 pit_rate_rads = self._pit_track_controller.update_all(tgt_y, act_y, dt)
                 yaw_rate_rads = self._yaw_track_controller.update_all(tgt_x, act_x, dt)
 
+                # Apply rate limits (30 deg/s)
+                MAX_RATE_RAD_S = math.radians(30.0)
+                pit_rate_rads = constrain_float(
+                    pit_rate_rads, -MAX_RATE_RAD_S, MAX_RATE_RAD_S
+                )
+                pit_pid_info.out = pit_rate_rads
+                yaw_rate_rads = constrain_float(
+                    yaw_rate_rads, -MAX_RATE_RAD_S, MAX_RATE_RAD_S
+                )
+                yaw_pid_info.out = yaw_rate_rads
+
                 pit_pid_info = self._pit_track_controller.pid_info
                 yaw_pid_info = self._yaw_track_controller.pid_info
 
