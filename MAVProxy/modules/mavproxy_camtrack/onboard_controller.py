@@ -330,7 +330,7 @@ class OnboardController:
         # Create and register controllers
         self._camera_controller = CameraTrackController(self._connection)
         self._gimbal_controller = GimbalController(
-            self._connection, self._enable_graphs
+            self._connection, self._enable_graphs, self._enable_profiler
         )
         self._controllers.append(self._camera_controller)
         self._controllers.append(self._gimbal_controller)
@@ -959,7 +959,7 @@ class GimbalController:
     Gimbal controller for onboard camera tracking.
     """
 
-    def __init__(self, connection, enable_graphs=False):
+    def __init__(self, connection, enable_graphs=False, enable_profiler=False):
         self._connection = connection
         self._sysid = self._connection.source_system  # system id matches vehicle
         self._cmpid = 1  # component id matches autopilot
@@ -1030,6 +1030,9 @@ class GimbalController:
             initial_filt_E_hz=0.0,
             initial_filt_D_hz=20.0,
         )
+
+        # Profiler
+        self._enable_profiler = enable_profiler
 
         # Analysis
         self._enable_graphs = enable_graphs
@@ -1113,8 +1116,18 @@ class GimbalController:
         update_rate = GIMBAL_CONTROL_LOOP_RATE
         update_period = 1.0 / update_rate
 
-        if self._enable_graphs:
+        with self._control_lock:
+            enable_graphs = self._enable_graphs
+            enable_profiler = self._enable_profiler
+
+        if enable_graphs:
             self._add_livegraphs()
+
+        # Profiler - two activities are centring and tracking
+        centring_profiler = Profiler()
+        tracking_profiler = Profiler()
+        profile_print_last_time = time.time()
+        profile_print_period = 2
 
         last_time_s = time.time()
         while True:
@@ -1141,6 +1154,8 @@ class GimbalController:
             last_time_s = time_now_s
 
             if not tracking and gimbal_orientation is not None:
+                centring_profiler.start()
+
                 # NOTE: to centre the gimbal when not tracking, we need to know
                 # the neutral angles from the MNT1_NEUTRAL_x params, and also
                 # the current mount orientation.
@@ -1176,10 +1191,14 @@ class GimbalController:
                 # NOTE: Set pitch and yaw angles directly (no PID controller needed)
                 # self._send_gimbal_manager_pitch_yaw_angle(pit_tgt_rad, yaw_tgt_rad)
 
-                if self._enable_graphs:
+                centring_profiler.end()
+
+                if enable_graphs:
                     self._update_livegraphs(pit_pid_info, yaw_pid_info)
 
             elif frame_width is not None and frame_height is not None:
+                tracking_profiler.start()
+
                 # work with normalised screen [-1, 1]
                 tgt_x = 0.0
                 tgt_y = 0.0
@@ -1199,8 +1218,33 @@ class GimbalController:
 
                 self._send_gimbal_manager_pitch_yaw_rate(pit_rate_rads, yaw_rate_rads)
 
-                if self._enable_graphs:
+                tracking_profiler.end()
+
+                if enable_graphs:
                     self._update_livegraphs(pit_pid_info, yaw_pid_info)
+
+            # Profile
+            if enable_profiler and (
+                (time.time() - profile_print_last_time) > profile_print_period
+            ):
+                profile_print_last_time = time.time()
+                print("Gimbal controller control loop profile")
+                print("-------------------------------------")
+                print("time in us      avg\tlast\tcount")
+                print(
+                    f"centring:        "
+                    f"{centring_profiler.avg_duration_us}\t"
+                    f"{centring_profiler.last_duration_us}\t"
+                    f"{centring_profiler.count}"
+                )
+                print(
+                    f"tracking:        "
+                    f"{tracking_profiler.avg_duration_us}\t"
+                    f"{tracking_profiler.last_duration_us}\t"
+                    f"{tracking_profiler.count}"
+                )
+                print("-------------------------------------")
+                print()
 
             elapsed_time = time.time() - start_time
             sleep_time = max(0.0, update_period - elapsed_time)
