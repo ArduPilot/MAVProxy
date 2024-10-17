@@ -339,19 +339,34 @@ class OnboardController:
 
         # Connect to video stream
         print(f"Using RTSP server: {self._rtsp_url}")
-        video_stream = VideoStream(self._rtsp_url)
-
-        # Timeout if video not available
-        video_last_update_time = time.time()
-        video_timeout_period = 5.0
-        print("Waiting for video stream")
-        while not video_stream.frame_available():
-            print(".", end="")
-            if (time.time() - video_last_update_time) > video_timeout_period:
+        if self._cv2_has_gstreamer:
+            gst_pipeline = (
+                f"rtspsrc location={self._rtsp_url} latency=50 "
+                "! decodebin "
+                "! videoconvert "
+                "! video/x-raw,format=(string)BGR "
+                "! videoconvert "
+                "! appsink emit-signals=true sync=false max-buffers=2 drop=true"
+            )
+            cap_options = cv2.CAP_GSTREAMER
+            video_stream = cv2.VideoCapture(gst_pipeline, cap_options)
+            if not video_stream or not video_stream.isOpened():
                 print("\nVideo stream not available - restarting")
                 return
-            time.sleep(0.1)
-        print("\nVideo stream available")
+            print("\nVideo stream available")
+        else:
+            video_stream = VideoStream(self._rtsp_url)
+            # Timeout if video not available
+            video_last_update_time = time.time()
+            video_timeout_period = 5.0
+            print("Waiting for video stream")
+            while not video_stream.frame_available():
+                print(".", end="")
+                if (time.time() - video_last_update_time) > video_timeout_period:
+                    print("\nVideo stream not available - restarting")
+                    return
+                time.sleep(0.1)
+            print("\nVideo stream available")
 
         # Create and register controllers
         self._camera_controller = CameraTrackController(self._connection)
@@ -400,10 +415,21 @@ class OnboardController:
         while True:
             start_time = time.time()
 
-            if video_stream.frame_available():
-                loop_profiler.start()
-                frame = copy.deepcopy(video_stream.frame())
+            # Check next frame available
+            if self._cv2_has_gstreamer:
+                frame_available, frame = video_stream.read()
+            else:
+                frame_available = video_stream.frame_available()
 
+            if frame_available:
+                loop_profiler.start()
+
+                # Get RGB frame
+                if self._cv2_has_gstreamer:
+                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                else:
+                    frame = video_stream.frame()
+    
                 track_type = self._camera_controller.track_type()
                 if track_type is CameraTrackType.NONE:
                     if tracking_rect is not None:
