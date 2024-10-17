@@ -68,6 +68,7 @@ from MAVProxy.modules.lib import live_graph
 
 from MAVProxy.modules.lib.pid_basic import AC_PID_Basic
 from MAVProxy.modules.lib.pid_basic import AP_PIDInfo
+from MAVProxy.modules.lib.pid_basic import constrain_float
 
 
 gi.require_version("Gst", "1.0")
