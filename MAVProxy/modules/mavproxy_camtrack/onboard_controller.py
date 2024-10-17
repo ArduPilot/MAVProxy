@@ -76,6 +76,7 @@ from gi.repository import Gst
 # TODO: move update rate constants to CLI options
 MAIN_LOOP_RATE = 30.0
 GIMBAL_CONTROL_LOOP_RATE = 30.0
+GIMBAL_DEVICE_ATTITUDE_STATUS_RATE = 30.0
 CAMERA_SEND_IMAGE_STATUS_RATE = 5.0
 MAVLINK_RECV_RATE = 1000.0
 
@@ -342,8 +343,7 @@ class OnboardController:
 
         # TODO: consolidate common code - also used in GUI
         # request gimbal device attitude status
-        gimbal_device_attitude_status_rate = 50.0  # Hz
-        interval_us = int(1e6 / gimbal_device_attitude_status_rate)
+        interval_us = int(1e6 / GIMBAL_DEVICE_ATTITUDE_STATUS_RATE)
         self.send_set_message_interval_message(
             mavutil.mavlink.MAVLINK_MSG_ID_GIMBAL_DEVICE_ATTITUDE_STATUS,
             interval_us,  # requested interval in microseconds
