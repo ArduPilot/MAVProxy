@@ -1380,26 +1380,26 @@ class TrackerOpenCV:
 
 class TrackerCSTR(TrackerOpenCV):
     """
-    Wrapper for cv2.legacy.TrackerCSRT
+    Wrapper for cv2.TrackerCSRT
     """
 
     def __init__(self):
         super().__init__()
 
     def _create(self):
-        return cv2.legacy.TrackerCSRT_create()
+        return cv2.TrackerCSRT.create()
 
 
 class TrackerKCF(TrackerOpenCV):
     """
-    Wrapper for cv2.legacy.TrackerKCF
+    Wrapper for cv2.TrackerKCF
     """
 
     def __init__(self):
         super().__init__()
 
     def _create(self):
-        return cv2.legacy.TrackerKCF_create()
+        return cv2.TrackerKCF.create()
 
 
 class TrackerFactory:
