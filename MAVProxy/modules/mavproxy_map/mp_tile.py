@@ -66,8 +66,10 @@ TILE_SERVICES = {
     "Gulesider DK,NO,SE,FI" : "https://map.eniro.com/geowebcache/service/tms1.0.0/map/${ZOOM}/${X}/${ENI_Y}.png",
     "StatkartTopo" : "https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/${ZOOM}/${Y}/${X}",
     "StatkartTopoRaster" : "https://cache.kartverket.no/v1/wmts/1.0.0/toporaster/default/webmercator/${ZOOM}/${Y}/${X}",
-    "Svalbard" : "https://geodata.npolar.no/arcgis/rest/services/Basisdata/NP_Basiskart_Svalbard_WMTS_3857/MapServer/WMTS/tile/1.0.0/Basisdata_NP_Basiskart_Svalbard_WMTS_3857/default/default028mm/${ZOOM}/${Y}/${X}"
-    }
+    "Svalbard" : "https://geodata.npolar.no/arcgis/rest/services/Basisdata/NP_Basiskart_Svalbard_WMTS_3857/MapServer/WMTS/tile/1.0.0/Basisdata_NP_Basiskart_Svalbard_WMTS_3857/default/default028mm/${ZOOM}/${Y}/${X}",
+    "MapsNSW" : "http://maps.six.nsw.gov.au/arcgis/rest/services/public/NSW_Topo_Map/MapServer/tile/${Z}/${Y}/${X}/jpg",
+    "OpenTopoMapA": "https://a.tile.opentopomap.org/${Z}/${X}/${Y}.png",
+}
 
 # these are the md5sums of "unavailable" tiles
 BLANK_TILES = set(["d16657bbee25d7f15c583f5c5bf23f50",
