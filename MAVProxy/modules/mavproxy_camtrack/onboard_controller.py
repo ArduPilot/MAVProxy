@@ -54,6 +54,7 @@ import gi
 import math
 import numpy as np
 import queue
+import re
 import threading
 import time
 
@@ -204,6 +205,27 @@ class Profiler:
             return int(-1)
 
 
+def cv2_has_gstreamer():
+    """
+    Check whether cv2 was compiled with GStreamer support.
+
+    The check involves searching the cv2 build information for a line
+    such as:
+
+    GStreamer:                   YES (1.24.7)
+    """
+    build_info = cv2.getBuildInformation()
+    match = re.search(".*GStreamer.*", build_info)
+    if match is None:
+        return False
+
+    match = re.search("YES", match.group(0))
+    if match is None:
+        return False
+
+    return match.group(0) == "YES"
+
+
 class OnboardController:
     """
     Onboard gimbal controller.
@@ -236,6 +258,9 @@ class OnboardController:
         self._gimbal_controller = None
 
         print(f"Onboard Controller: src_sys: {self._sysid}, src_cmp: {self._cmpid})")
+
+        self._cv2_has_gstreamer = cv2_has_gstreamer()
+        print(f"OpenCV has GStreamer: {self._cv2_has_gstreamer}")
 
     def __del__(self):
         if self._connection is not None:
