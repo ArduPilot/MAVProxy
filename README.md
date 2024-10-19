@@ -10,7 +10,7 @@ This ground station was developed as part of the CanberraUAV OBC team
 entry 
 
 License
--------
+------- 
 
 MAVProxy is released under the GNU General Public License v3 or later
 
