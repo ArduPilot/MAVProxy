@@ -518,7 +518,7 @@ class OnboardController:
                         self._gimbal_controller.update_center(u, v, frame.shape)
 
                         # update camera controller current tracking state
-                        frame_height, frame_width, _ = frame.shape
+                        frame_height, frame_width = frame.shape[:2]
                         top_left_x = x / frame_width
                         top_left_y = y / frame_height
                         bot_right_x = (x + w) / frame_width
@@ -1150,7 +1150,7 @@ class GimbalController:
             self._tracking = True
             self._center_x = x
             self._center_y = y
-            self._frame_height, self._frame_width, _ = shape
+            self._frame_height, self._frame_width = shape[:2]
 
     def reset(self):
         with self._control_lock:
@@ -1454,7 +1454,7 @@ class TrackerOpenCV:
         if self._nroi_changed:
             self._tracker = self._create()
             # Denormalise the roi
-            frame_height, frame_width, _ = frame.shape
+            frame_height, frame_width = frame.shape[:2]
             roi = [
                 int(self._nroi[0] * frame_width),  # x
                 int(self._nroi[1] * frame_height),  # y
