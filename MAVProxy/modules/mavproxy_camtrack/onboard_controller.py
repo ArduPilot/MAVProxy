@@ -453,6 +453,11 @@ class OnboardController:
         profile_print_last_time = time.time()
         profile_print_period = 2
 
+        fps_print_last_time = time.time()
+        fps_print_period = 2
+        fps_start_time = time.time()
+        frame_count = 0
+
         while True:
             loop_start_time = time.time()
 
@@ -463,6 +468,8 @@ class OnboardController:
                 frame_available = video_stream.frame_available()
 
             if frame_available:
+                frame_count += 1
+
                 loop_profiler.start()
 
                 # Get RGB frame
@@ -566,6 +573,12 @@ class OnboardController:
                 )
                 print("-------------------------------------")
                 print()
+
+            # FPS
+            if (time.time() - fps_print_last_time) > fps_print_period:
+                fps_print_last_time = time.time()
+                fps = frame_count / (time.time() - fps_start_time)
+                print(f"fps: {fps:.1f}, count: {frame_count}, shape: {frame.shape}")
 
             # Rate limit
             elapsed_time = time.time() - loop_start_time
