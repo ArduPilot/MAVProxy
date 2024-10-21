@@ -75,11 +75,19 @@ from MAVProxy.modules.lib.pid_basic import constrain_float
 gi.require_version("Gst", "1.0")
 from gi.repository import Gst
 
-# TODO: move update rate constants to CLI options
-MAIN_LOOP_RATE = 30.0
+# The main loop rate (Hz) is max rate that the main loop will run at.
+# In practice it is limited by the video framerate and tracker update time.
+MAIN_LOOP_RATE = 100.0
+
+# The requested rates (Hz) for the current gimbal attitude and rate at which
+# the commands to update the gimbal pitch and yaw are sent.
 GIMBAL_CONTROL_LOOP_RATE = 30.0
 GIMBAL_DEVICE_ATTITUDE_STATUS_RATE = 30.0
-CAMERA_SEND_IMAGE_STATUS_RATE = 5.0
+
+# The rate (Hz) to send information about the camera image.
+CAMERA_SEND_IMAGE_STATUS_RATE = 10.0
+
+# The rate (Hz) at which mavlink messages are pulled off the input queues.
 MAVLINK_RECV_RATE = 1000.0
 
 
@@ -240,6 +248,7 @@ class OnboardController:
         tracker_name="CSTR",
         enable_graphs=False,
         enable_profiler=False,
+        enable_rpi_pipeline=False,
     ):
         self._device = device
         self._sysid = sysid
@@ -248,6 +257,7 @@ class OnboardController:
         self._tracker_name = tracker_name
         self._enable_graphs = enable_graphs
         self._enable_profiler = enable_profiler
+        self._enable_rpi_pipeline = enable_rpi_pipeline
 
         # mavlink connection
         self._connection = None
@@ -340,20 +350,49 @@ class OnboardController:
         # Connect to video stream
         print(f"Using RTSP server: {self._rtsp_url}")
         if self._cv2_has_gstreamer:
-            gst_pipeline = (
-                f"rtspsrc location={self._rtsp_url} latency=50 "
-                "! decodebin "
-                "! videoconvert "
-                "! video/x-raw,format=(string)BGR "
-                "! videoconvert "
-                "! appsink emit-signals=true sync=false max-buffers=2 drop=true"
-            )
+            if self._enable_rpi_pipeline:
+                # Pipeline for RPi4 using hardware decode / convert
+                gst_pipeline = (
+                    f"rtspsrc location={self._rtsp_url} latency=50 "
+                    f"! rtph264depay "
+                    f"! h264parse "
+                    f"! v4l2h264dec "
+                    f"! v4l2convert "
+                    f"! videoscale "
+                    f"! videorate "
+                    f"! video/x-raw,format=BGR,width=640,height=360,framerate=20/1 "
+                    f"! appsink emit-signals=true sync=false max-buffers=2 drop=true"
+                )
+            else:
+                # Generic autodetected pipeline
+                gst_pipeline = (
+                    f"rtspsrc location={self._rtsp_url} latency=50 "
+                    "! decodebin "
+                    "! videoconvert "
+                    "! video/x-raw,format=(string)BGR "
+                    "! videoconvert "
+                    "! appsink emit-signals=true sync=false max-buffers=2 drop=true"
+                )
+
+            # From mavproxy_SIYI for H.265.
+            # NOTE: RPi4 does not have a hardware decoder for H.265 suitable for
+            #       GStreamer.
+            # gst_pipeline = (
+            #     f"rtspsrc location={self.rtsp_url} latency=0 buffer-mode=auto "
+            #     f"! rtph265depay "
+            #     f"! queue "
+            #     f"! h265parse "
+            #     f"! avdec_h265  "
+            #     f"! videoconvert "
+            #     f"! video/x-raw,format=BGRx "
+            #     f"! appsink"
+            # )
+
             cap_options = cv2.CAP_GSTREAMER
             video_stream = cv2.VideoCapture(gst_pipeline, cap_options)
             if not video_stream or not video_stream.isOpened():
-                print("\nVideo stream not available - restarting")
+                print("\nVideo stream not available")
                 return
-            print("\nVideo stream available")
         else:
             video_stream = VideoStream(self._rtsp_url)
             # Timeout if video not available
@@ -363,10 +402,11 @@ class OnboardController:
             while not video_stream.frame_available():
                 print(".", end="")
                 if (time.time() - video_last_update_time) > video_timeout_period:
-                    print("\nVideo stream not available - restarting")
+                    print("\nVideo stream not available")
                     return
                 time.sleep(0.1)
-            print("\nVideo stream available")
+
+        print("\nVideo stream available")
 
         # Create and register controllers
         self._camera_controller = CameraTrackController(self._connection)
@@ -413,7 +453,7 @@ class OnboardController:
         profile_print_period = 2
 
         while True:
-            start_time = time.time()
+            loop_start_time = time.time()
 
             # Check next frame available
             if self._cv2_has_gstreamer:
@@ -466,6 +506,7 @@ class OnboardController:
                 # update tracker and gimbal if tracking active
                 if tracking_rect is not None:
                     loop_with_tracker_profiler.start()
+
                     tracker_profiler.start()
                     success, box = tracker.update(frame)
                     tracker_profiler.end()
@@ -526,7 +567,7 @@ class OnboardController:
                 print()
 
             # Rate limit
-            elapsed_time = time.time() - start_time
+            elapsed_time = time.time() - loop_start_time
             sleep_time = max(0.0, update_period - elapsed_time)
             time.sleep(sleep_time)
 
@@ -1519,6 +1560,13 @@ if __name__ == "__main__":
         const=True,
         help="enable main loop profiler",
     )
+    parser.add_argument(
+        "--enable-rpi-pipeline",
+        action="store_const",
+        default=False,
+        const=True,
+        help="enable hardware pipelane for rpi4",
+    )
     args = parser.parse_args()
 
     controller = OnboardController(
@@ -1529,6 +1577,7 @@ if __name__ == "__main__":
         args.tracker_name,
         args.enable_graphs,
         args.enable_profiler,
+        args.enable_rpi_pipeline,
     )
 
     while True:
