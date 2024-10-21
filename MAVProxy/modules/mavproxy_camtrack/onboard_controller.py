@@ -1507,11 +1507,23 @@ class TrackerKCF(TrackerOpenCV):
         return cv2.TrackerKCF.create()
 
 
+class TrackerMOSSE(TrackerOpenCV):
+    """
+    Wrapper for cv2.legacy.TrackerMOSSE
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def _create(self):
+        return cv2.legacy.TrackerMOSSE_create()
+
+
 class TrackerFactory:
 
     @staticmethod
     def choices():
-        return ["CSTR", "KCF"]
+        return ["CSTR", "KCF", "MOSSE"]
 
     @staticmethod
     def create_tracker(name):
@@ -1519,6 +1531,8 @@ class TrackerFactory:
             return TrackerCSTR()
         elif name == "KCF":
             return TrackerKCF()
+        elif name == "MOSSE":
+            return TrackerMOSSE()
         else:
             raise Exception(f"Invalid tracker name: {name}")
 
