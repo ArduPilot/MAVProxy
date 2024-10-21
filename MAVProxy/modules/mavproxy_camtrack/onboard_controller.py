@@ -1105,9 +1105,9 @@ class GimbalController:
 
         # Gimbal pitch controller for tracking
         self._pit_track_controller = AC_PID_Basic(
-            initial_p=1.0,
+            initial_p=0.75,
             initial_i=0.01,
-            initial_d=0.02,
+            initial_d=0.01,
             initial_ff=0.0,
             initial_imax=1.0,
             initial_filt_E_hz=0.0,
@@ -1116,9 +1116,9 @@ class GimbalController:
 
         # Gimbal yaw controller for tracking
         self._yaw_track_controller = AC_PID_Basic(
-            initial_p=1.0,
+            initial_p=0.7,
             initial_i=0.01,
-            initial_d=0.02,
+            initial_d=0.01,
             initial_ff=0.0,
             initial_imax=1.0,
             initial_filt_E_hz=0.0,
