@@ -367,10 +367,11 @@ class OnboardController:
                 # Generic autodetected pipeline
                 gst_pipeline = (
                     f"rtspsrc location={self._rtsp_url} latency=50 "
-                    "! decodebin "
-                    "! videoconvert "
-                    "! video/x-raw,format=(string)BGR "
-                    "! videoconvert "
+                    f"! decodebin "
+                    f"! videoconvert "
+                    f"! videoscale "
+                    f"! videorate "
+                    f"! video/x-raw,format=BGR,width=640,height=360,framerate=20/1 "
                     "! appsink emit-signals=true sync=false max-buffers=2 drop=true"
                 )
 
