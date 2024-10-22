@@ -81,7 +81,7 @@ MAIN_LOOP_RATE = 100.0
 
 # The requested rates (Hz) for the current gimbal attitude and rate at which
 # the commands to update the gimbal pitch and yaw are sent.
-GIMBAL_CONTROL_LOOP_RATE = 30.0
+GIMBAL_CONTROL_LOOP_RATE = 20.0
 GIMBAL_DEVICE_ATTITUDE_STATUS_RATE = 30.0
 
 # The rate (Hz) to send information about the camera image.
@@ -360,7 +360,7 @@ class OnboardController:
                     f"! v4l2convert "
                     f"! videoscale "
                     f"! videorate "
-                    f"! video/x-raw,format=BGR,width=640,height=360,framerate=20/1 "
+                    f"! video/x-raw,format=BGR,width=640,height=360,framerate=10/1 "
                     f"! appsink emit-signals=true sync=false max-buffers=2 drop=true"
                 )
             else:
@@ -371,7 +371,7 @@ class OnboardController:
                     f"! videoconvert "
                     f"! videoscale "
                     f"! videorate "
-                    f"! video/x-raw,format=BGR,width=640,height=360,framerate=20/1 "
+                    f"! video/x-raw,format=BGR,width=640,height=360,framerate=10/1 "
                     "! appsink emit-signals=true sync=false max-buffers=2 drop=true"
                 )
 
@@ -1096,45 +1096,45 @@ class GimbalController:
 
         # Pitch controller for centring gimbal
         self._pit_controller = AC_PID_Basic(
-            initial_p=1.0,
+            initial_p=2.0,
             initial_i=0.01,
-            initial_d=0.01,
+            initial_d=0.05,
             initial_ff=0.0,
             initial_imax=1.0,
-            initial_filt_E_hz=0.0,
+            initial_filt_E_hz=20.0,
             initial_filt_D_hz=20.0,
         )
 
         # Yaw controller for centring gimbal
         self._yaw_controller = AC_PID_Basic(
-            initial_p=1.0,
+            initial_p=2.0,
             initial_i=0.01,
-            initial_d=0.01,
+            initial_d=0.05,
             initial_ff=0.0,
             initial_imax=1.0,
-            initial_filt_E_hz=0.0,
+            initial_filt_E_hz=20.0,
             initial_filt_D_hz=20.0,
         )
 
         # Gimbal pitch controller for tracking
         self._pit_track_controller = AC_PID_Basic(
-            initial_p=0.75,
+            initial_p=1.5,
             initial_i=0.01,
-            initial_d=0.01,
+            initial_d=0.05,
             initial_ff=0.0,
             initial_imax=1.0,
-            initial_filt_E_hz=0.0,
+            initial_filt_E_hz=20.0,
             initial_filt_D_hz=20.0,
         )
 
         # Gimbal yaw controller for tracking
         self._yaw_track_controller = AC_PID_Basic(
-            initial_p=0.7,
+            initial_p=1.5,
             initial_i=0.01,
-            initial_d=0.01,
+            initial_d=0.05,
             initial_ff=0.0,
             initial_imax=1.0,
-            initial_filt_E_hz=0.0,
+            initial_filt_E_hz=20.0,
             initial_filt_D_hz=20.0,
         )
 
@@ -1320,8 +1320,8 @@ class GimbalController:
                 pit_rate_rads = self._pit_track_controller.update_all(tgt_y, act_y, dt)
                 yaw_rate_rads = self._yaw_track_controller.update_all(tgt_x, act_x, dt)
 
-                # Apply rate limits (30 deg/s)
-                MAX_RATE_RAD_S = math.radians(30.0)
+                # Apply rate limits (90 deg/s)
+                MAX_RATE_RAD_S = math.radians(90.0)
                 pit_rate_rads = constrain_float(
                     pit_rate_rads, -MAX_RATE_RAD_S, MAX_RATE_RAD_S
                 )
