@@ -33,7 +33,8 @@ class dataflash_logger(mp_module.MPModule):
         super(dataflash_logger, self).__init__(
             mpstate,
             "dataflash_logger",
-            "logging of mavlink dataflash messages"
+            "logging of mavlink dataflash messages",
+            public=True
         )
         self.sender = None
         self.stopped = False
