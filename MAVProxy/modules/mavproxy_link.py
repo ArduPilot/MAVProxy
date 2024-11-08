@@ -109,12 +109,24 @@ class LinkModule(mp_module.MPModule):
         self.menu_added_console = False
         if mp_util.has_wxpython:
             self.menu_rm = MPMenuSubMenu('Remove', items=[])
-            self.menu = MPMenuSubMenu('Link',
-                                      items=[MPMenuItem('Add...', 'Add...', '# link add ', handler=MPMenulinkAddDialog()),
-                                             self.menu_rm,
-                                             MPMenuItem('Ports', 'Ports', '# link ports'),
-                                             MPMenuItem('List', 'List', '# link list'),
-                                             MPMenuItem('Status', 'Status', '# link')])
+
+            items = [
+                MPMenuItem('Add...', 'Add...', '# link add ', handler=MPMenulinkAddDialog()),
+                self.menu_rm,
+                MPMenuItem('Ports', 'Ports', '# link ports'),
+                MPMenuItem('List', 'List', '# link list'),
+                MPMenuItem('Status', 'Status', '# link')]
+            # wsproto is not installed by default.
+            # Only add the menu if it's available.
+            try:
+                import wsproto  # noqa: F401
+            except ImportError:
+                pass
+            else:
+                items.append(
+                    MPMenuItem('Start Websocket Server', 'Start Websocket Server', '# output add wsserver:0.0.0.0:56781'))
+
+            self.menu = MPMenuSubMenu('Link', items=items)
             self.last_menu_update = 0
 
     def idle_task(self):
