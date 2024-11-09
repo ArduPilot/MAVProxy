@@ -1,7 +1,11 @@
-#!/usr/bin/env python
-'''RC min/max setup'''
+'''
+RC min/max setup
+
+AP_FLAKE8_CLEAN
+'''
 
 from MAVProxy.modules.lib import mp_module
+
 
 class RCSetupModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -17,15 +21,15 @@ class RCSetupModule(mp_module.MPModule):
     def clear_rc_cal(self):
         self.rc_cal = []
         self.rc_cal.append("") # 0 will be empty
-        for i in range(1,self.num_channels+1):
-            #min, max, modified
+        for i in range(1, self.num_channels+1):
+            # min, max, modified
             self.rc_cal.append([1500, 1500, False])
 
     def apply_rc_cal(self):
         for i in range(1, len(self.rc_cal)):
-            #only apply calibration changes to channels that
-            #were modified during calibration
-            if (self.rc_cal[i][2] == False):
+            # only apply calibration changes to channels that
+            # were modified during calibration
+            if self.rc_cal[i][2] is False:
                 continue
 
             self.param_set('RC%u_MIN' % i, self.rc_cal[i][0], 5)
@@ -80,13 +84,12 @@ class RCSetupModule(mp_module.MPModule):
 
     def cmd_rctrim(self, args):
         '''set RCx_TRIM'''
-        if not 'RC_CHANNELS' in self.status.msgs:
+        if 'RC_CHANNELS' not in self.status.msgs:
             print("No RC_CHANNELS to trim with")
             return
         m = self.status.msgs['RC_CHANNELS']
-        for ch in range(1,5):
+        for ch in range(1, 5):
             self.param_set('RC%u_TRIM' % ch, getattr(m, 'chan%u_raw' % ch))
-
 
     def unload(self):
         if 'rcreset' in self.mpstate.command_map:
@@ -94,26 +97,26 @@ class RCSetupModule(mp_module.MPModule):
         if 'rctrim' in self.mpstate.command_map:
             self.mpstate.command_map.pop('rctrim')
 
-
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
-        #do nothing if not caibrating
-        if (self.calibrating == False):
+        # do nothing if not caibrating
+        if self.calibrating is False:
             return
 
         if m.get_type() == 'RC_CHANNELS':
-            for i in range(1,self.num_channels+1):
+            for i in range(1, self.num_channels+1):
                 v = getattr(m, 'chan%u_raw' % i)
 
                 if self.get_cal_min(i) > v:
-                    self.set_cal_min(i,v)
+                    self.set_cal_min(i, v)
                     self.console.writeln("Calibrating: RC%u_MIN=%u" % (i, v))
                 if self.get_cal_max(i) < v:
-                    self.set_cal_max(i,v)
+                    self.set_cal_max(i, v)
                     self.console.writeln("Calibrating: RC%u_MAX=%u" % (i, v))
 
     def print_cal_usage(self):
         print("Usage rccal <start|done>")
+
 
 def init(mpstate):
     '''initialise module'''
