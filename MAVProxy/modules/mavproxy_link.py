@@ -38,6 +38,7 @@ if mp_util.has_wxpython:
 dataPackets = frozenset(['BAD_DATA', 'LOG_DATA'])
 delayedPackets = frozenset([
     'GLOBAL_POSITION_INT',
+    'GNSS',
     'GPS_RAW_INT',
     'MISSION_CURRENT',
     'NAV_CONTROLLER_OUTPUT',
@@ -923,7 +924,8 @@ class LinkModule(mp_module.MPModule):
                 if m.fix_type == 2:
                     self.status.last_gps_lock = time.time()
 
-        elif mtype == "GPS_RAW_INT":
+        elif mtype == "GPS_RAW_INT" or (mtype == "GNSS" and m.id == 0):
+            # GPS_RAW_INT is the first GPS; GNSS is sent for every GPS
             if self.status.have_gps_lock:
                 if m.fix_type < 3 and not self.status.lost_gps_lock and (time.time() - self.status.last_gps_lock) > 3:
                     self.say("GPS fix lost")

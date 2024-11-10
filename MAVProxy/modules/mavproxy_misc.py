@@ -140,6 +140,10 @@ class MiscModule(mp_module.MPModule):
     def qnh_estimate(self):
         '''estimate QNH pressure from GPS altitude and scaled pressure'''
         alt_gps = self.master.field('GPS_RAW_INT', 'alt', 0) * 0.001
+        if alt_gps == 0:
+            alt_gps = self.master.field('GNSS[0]', 'height_above_geoid', 0)
+            if math.isnan(alt_gps):
+                alt_gps = 0
         pressure2 = self.master.field('SCALED_PRESSURE', 'press_abs', 0)
         ground_temp = self.get_mav_param('GND_TEMP', 21)
         temp = ground_temp + 273.15

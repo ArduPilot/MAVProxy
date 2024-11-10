@@ -2,6 +2,7 @@
 send NTRIP data to flight controller
 """
 
+import math
 import random
 import time
 
@@ -49,6 +50,9 @@ class NtripModule(mp_module.MPModule):
         if msg.get_type() in ['GPS_RAW_INT', 'GPS2_RAW']:
             if msg.fix_type >= 3:
                 self.pos = (msg.lat*1.0e-7, msg.lon*1.0e-7, msg.alt*1.0e-3)
+        elif msg.get_type() == 'GNSS':
+            if msg.fix_type >= 3 and not math.isnan(msg.height_above_geoid):
+                self.pos = (msg.lat*1.0e-7, msg.lon*1.0e-7, msg.height_above_geoid)
 
     def log_rtcm(self, data):
         '''optionally log rtcm data'''

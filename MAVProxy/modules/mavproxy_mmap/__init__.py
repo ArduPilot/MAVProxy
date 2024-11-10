@@ -33,7 +33,7 @@ class MMapModule(mp_module.MPModule):
         mtype = m.get_type()
         if mtype == 'GPS_RAW':
             (self.lat, self.lon) = (m.lat, m.lon)
-        elif mtype == 'GPS_RAW_INT':
+        elif mtype in frozenset(['GPS_RAW_INT', 'GNSS']):
             (self.lat, self.lon) = (m.lat / 1.0e7, m.lon / 1.0e7)
         elif mtype == "VFR_HUD":
             self.heading = m.heading

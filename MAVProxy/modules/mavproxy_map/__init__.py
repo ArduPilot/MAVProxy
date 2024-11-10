@@ -1002,7 +1002,10 @@ Usage: map circle <radius> <colour>
         if name in self.have_vehicle and self.have_vehicle[name] == vehicle_type:
             return
         self.have_vehicle[name] = vehicle_type
-        icon = self.map.icon(colour + vehicle_type + '.png')
+        if isinstance(colour, tuple):
+            icon = self.tinted_vehicle_icon(colour, vehicle_type)
+        else:
+            icon = self.map.icon(colour + vehicle_type + '.png')
         self.map.add_object(mp_slipmap.SlipIcon(
             name,
             (0, 0),
@@ -1208,6 +1211,45 @@ Usage: map circle <radius> <colour>
         yaw = math.degrees(m.yaw)
         self.update_vehicle_icon_to_loc(name, vehicle, colour, display, latlon, yaw)
 
+    # tints (BGR) for the icons of GNSS receivers after the first
+    # two, chosen to differ from the colours of the other vehicle icons
+    gnss_tints = [
+        (0, 255, 255),    # yellow
+        (255, 255, 0),    # cyan
+        (255, 0, 255),    # magenta
+        (203, 192, 255),  # pink
+        (160, 160, 160),  # grey
+        (255, 255, 255),  # white
+    ]
+
+    def gnss_icon_colour(self, gnss_id):
+        '''return the icon colour for GNSS receiver gnss_id: a colour
+        name, or a BGR tuple to tint the blue icon with.  The first two
+        match the GPS_RAW_INT and GPS2_RAW icons'''
+        named = [('blue', (255, 0, 0)), ('green', (0, 255, 0))]
+        if gnss_id < len(named):
+            (colour, tint) = named[gnss_id]
+            filename = colour + self.vehicle_type_name + '.png'
+            if os.path.exists(os.path.join(os.path.dirname(__file__), 'data', filename)):
+                return colour
+            # not every colour has an icon for every vehicle type
+            return tint
+        return self.gnss_tints[(gnss_id - len(named)) % len(self.gnss_tints)]
+
+    def tinted_vehicle_icon(self, tint, vehicle_type):
+        '''return the blue icon for vehicle_type with its blue parts
+        recoloured to tint (BGR)'''
+        import numpy as np
+        icon = self.map.icon('blue' + vehicle_type + '.png').copy()
+        b = icon[:, :, 0].astype(np.float32)
+        others = np.maximum(icon[:, :, 1], icon[:, :, 2]).astype(np.float32)
+        blue = (b > 100) & (b - others > 80)
+        # keep the shading of the original blue:
+        scale = b[blue] / 255.0
+        for channel in range(3):
+            icon[:, :, channel][blue] = (tint[channel] * scale).astype(np.uint8)
+        return icon
+
     def update_vehicle_icon_to_loc(self, name, vehicle, colour, display, latlon, yaw):
         '''update display of a vehicle on the map at latlon
         '''
@@ -1251,6 +1293,22 @@ Usage: map circle <radius> <colour>
             self.update_vehicle_icon('AHRS2', vehicle, 'purple', m, self.map_settings.showahrs2pos)
         elif mtype == "AHRS3" and self.map_settings.showahrs3pos:
             self.update_vehicle_icon('AHRS3', vehicle, 'orange', m, self.map_settings.showahrs3pos)
+        elif mtype == "GNSS":
+            (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
+            if lat != 0 or lon != 0:
+                if m.cog != 65535 and (m.ground_speed > 3 or m.get_srcSystem() not in self.lat_lon_heading):
+                    heading = m.cog*0.01
+                elif m.get_srcSystem() in self.lat_lon_heading:
+                    (_, _, heading) = self.lat_lon_heading[m.get_srcSystem()]
+                else:
+                    heading = 0
+                label = 'GPS'
+                if m.id > 0:
+                    label += str(m.id+1)
+                display = self.map_settings.showgpspos
+                if m.id == 1:
+                    display = self.map_settings.showgps2pos
+                self.update_vehicle_icon_to_loc(label, vehicle, self.gnss_icon_colour(m.id), display, (lat, lon), heading)
         elif mtype == "GPS_RAW_INT":
             (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
             if lat != 0 or lon != 0:
