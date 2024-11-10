@@ -284,20 +284,23 @@ class MiscModule(mp_module.MPModule):
             return
         print("%s (%s)\n" % (time.ctime(tusec * 1.0e-6), time.ctime()))
 
+    def _cmd_changealt(self, alt, frame):
+        self.master.mav.mission_item_send(self.settings.target_system,
+                                          self.settings.target_component,
+                                          0,
+                                          frame,
+                                          mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
+                                          3, 1, 0, 0, 0, 0,
+                                          0, 0, alt)
+        print("Sent change altitude command for %.1f meters" % alt)
+
     def cmd_changealt(self, args):
         '''change target altitude'''
         if len(args) < 1:
             print("usage: changealt <relaltitude>")
             return
         relalt = float(args[0])
-        self.master.mav.mission_item_send(self.settings.target_system,
-                                          self.settings.target_component,
-                                          0,
-                                          3,
-                                          mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
-                                          3, 1, 0, 0, 0, 0,
-                                          0, 0, relalt)
-        print("Sent change altitude command for %.1f meters" % relalt)
+        self._cmd_changealt(relalt, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT)
 
     def cmd_changealt_abs(self, args):
         '''change target altitude'''
@@ -305,14 +308,7 @@ class MiscModule(mp_module.MPModule):
             print("usage: changealt_abs <absaltitude>")
             return
         absalt = float(args[0])
-        self.master.mav.mission_item_send(self.settings.target_system,
-                                          self.settings.target_component,
-                                          0,
-                                          0,
-                                          mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
-                                          3, 1, 0, 0, 0, 0,
-                                          0, 0, absalt)
-        print("Sent change altitude command for %.1f meters" % absalt)
+        self._cmd_changealt(absalt, mavutil.mavlink.MAV_FRAME_GLOBAL)
 
     def cmd_land(self, args):
         '''auto land commands'''
