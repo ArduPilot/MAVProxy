@@ -30,6 +30,7 @@ from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
 
 if mp_util.has_wxpython:
+    from MAVProxy.modules.lib.mp_menu import MPMenuCallTextDialog
     from MAVProxy.modules.lib.mp_menu import MPMenuSubMenu
     from MAVProxy.modules.lib.mp_menu import MPMenuItem
     from MAVProxy.modules.lib.wx_addlink import MPMenulinkAddDialog
@@ -124,7 +125,11 @@ class LinkModule(mp_module.MPModule):
                 pass
             else:
                 items.append(
-                    MPMenuItem('Start Websocket Server', 'Start Websocket Server', '# output add wsserver:0.0.0.0:56781'))
+                    MPMenuItem('Start Websocket Server', 'Start Websocket Server', '# output add wsserver:0.0.0.0:',
+                               handler=MPMenuCallTextDialog(
+                                   title='Websocket Port',
+                                   default=56781
+                               )))
 
             self.menu = MPMenuSubMenu('Link', items=items)
             self.last_menu_update = 0
