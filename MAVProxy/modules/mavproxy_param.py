@@ -383,6 +383,112 @@ class ParamState:
         for pattern in self.watch_patterns:
             self.mpstate.console.writeln("> %s" % (pattern))
 
+    def param_bitmask_modify(self, master, args):
+        '''command for performing bitmask actions on a parameter'''
+
+        BITMASK_ACTIONS = ['toggle', 'set', 'clear']
+
+        # Ensure we have at least an action and a parameter
+        if len(args) < 2:
+            print("Not enough arguments")
+            print(f"param bitmask <{'/'.join(BITMASK_ACTIONS)}> <parameter> [bit-index]")
+            return
+
+        action = args[0]
+        if action not in BITMASK_ACTIONS:
+            print(f"action must be one of: {', '.join(BITMASK_ACTIONS)}")
+            return
+
+        # Grab the parameter argument, and check it exists
+        param = args[1]
+        if not param.upper() in self.mav_param:
+            print(f"Unable to find parameter {param.upper()}")
+            return
+        uname = param.upper()
+
+        htree = self.param_help.param_help_tree()
+        if htree is None:
+            # No help tree is available
+            print("Download parameters first")
+            return
+
+        # Take the help tree and check if parameter is a bitmask
+        phelp = htree[uname]
+        bitmask_values = self.param_help.get_bitmask_from_help(phelp)
+        if bitmask_values is None:
+            print(f"Parameter {uname} is not a bitmask")
+            return
+
+        # Find the type of the parameter
+        ptype = None
+        if uname in self.param_types:
+            # Get the type of the parameter
+            ptype = self.param_types[uname]
+
+        # Now grab the value for the parameter
+        value = int(self.mav_param.get(uname))
+        if value is None:
+            print(f"Could not get a value for parameter {uname}")
+            return
+
+        # The next argument is the bit_index - if it exists, handle it
+        bit_index = None
+        if len(args) >= 3:
+            try:
+                # If the bit index is available lets grab it
+                arg_bit_index = args[2]
+                # Try to convert it to int
+                bit_index = int(arg_bit_index)
+            except ValueError:
+                print(f"Invalid bit index: {arg_bit_index}\n")
+
+        if bit_index is None:
+            # No bit index was specified, but the parameter and action was.
+            # Print the available bitmask information.
+            print("%s: %s" % (uname, phelp.get('humanName')))
+            s = "%-16.16s %s" % (uname, value)
+            print(s)
+
+            # Generate the bitmask enabled list
+            remaining_bits = value
+            out_v = []
+            if bitmask_values is not None and len(bitmask_values):
+                for (n, v) in bitmask_values.items():
+                    if bit_index is None or bit_index == int(n):
+                        out_v.append(f"\t{int(n):3d} [{'x' if value & (1<<int(n)) else ' '}] : {v}")
+                    remaining_bits &= ~(1 << int(n))
+
+                # Loop bits 0 to 31, checking if they are remaining, and append
+                for i in range(32):
+                    if (remaining_bits & (1 << i)) and ((bit_index is None) or (bit_index == i)):
+                        out_v.append(f"\t{i:3d} [{'x' if value & (1 << i) else ' '}] : Unknownbit{i}")
+
+            if out_v is not None and len(out_v) > 0:
+                print("\nBitmask: ")
+                print("\n".join(out_v))
+
+            # Finally, inform user of the error we experienced
+            if bit_index is None:
+                print("bit index is not specified")
+
+            # We don't have enough information to modify the bitmask, so bail
+            return
+
+        # We have enough information to try perform an action
+        if action == "toggle":
+            value = value ^ (1 << bit_index)
+        elif action == "set":
+            value = value | (1 << bit_index)
+        elif action == "clear":
+            value = value & ~(1 << bit_index)
+        else:
+            # We cannot toggle, set or clear
+            print("Invalid bitmask action")
+            return
+
+        # Update the parameter
+        self.mav_param.mavset(master, uname, value, retries=3, parm_type=ptype)
+
     def param_revert(self, master, args):
         '''handle param revert'''
         defaults = self.default_params
@@ -417,7 +523,7 @@ class ParamState:
     def handle_command(self, master, mpstate, args):
         '''handle parameter commands'''
         param_wildcard = "*"
-        usage="Usage: param <fetch|ftp|save|savechanged|revert|set|show|load|preload|forceload|ftpload|diff|download|check|help|watch|unwatch|watchlist>"  # noqa
+        usage="Usage: param <fetch|ftp|save|savechanged|revert|set|show|load|preload|forceload|ftpload|diff|download|check|help|watch|unwatch|watchlist|bitmask>"  # noqa
         if len(args) < 1:
             print(usage)
             return
@@ -494,7 +600,8 @@ class ParamState:
                 # mpstate.module('rally').set_last_change(time.time())
                 # need to redraw loiter points
                 mpstate.module('wp').wploader.last_change = time.time()
-
+        elif args[0] == "bitmask":
+            self.param_bitmask_modify(master, args[1:])
         elif args[0] == "load":
             if len(args) < 2:
                 print("Usage: param load <filename> [wildcard]")
@@ -664,12 +771,14 @@ class ParamModule(mp_module.MPModule):
         self.pstate = {}
         self.check_new_target_system()
         self.menu_added_console = False
+        bitmask_indexes = "|".join(str(x) for x in range(32))
         self.add_command(
             'param', self.cmd_param, "parameter handling", [
                 "<download|status>",
                 "<set|show|fetch|ftp|help|apropos|revert> (PARAMETER)",
                 "<load|save|savechanged|diff|forceload|ftpload> (FILENAME)",
                 "<set_xml_filepath> (FILEPATH)",
+                f"<bitmask> <toggle|set|clear> (PARAMETER) <{bitmask_indexes}>"
             ],
         )
         if mp_util.has_wxpython:
