@@ -544,7 +544,7 @@ class ParamEditorFrame(wx.Frame):
     def param_help_download(self):
         '''download XML files for parameters'''
         files = []
-        for vehicle in ['APMrover2', 'ArduCopter', 'ArduPlane', 'ArduSub', 'AntennaTracker']:
+        for vehicle in ['APMrover2', 'ArduCopter', 'ArduPlane', 'ArduSub', 'AntennaTracker', 'Heli']:
             url = 'http://autotest.ardupilot.org/Parameters/%s/apm.pdef.xml' % vehicle
             path = mp_util.dot_mavproxy("%s.xml" % vehicle)
             files.append((url, path))
