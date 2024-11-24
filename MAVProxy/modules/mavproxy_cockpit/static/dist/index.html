@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="theme-color" content="#ffffff" />
+    <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
+    <link rel="manifest" href="./site.webmanifest">
+    <link rel="mask-icon" href="./safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="apple-mobile-web-app-title" content="Cockpit">
+    <meta name="application-name" content="Cockpit">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Cockpit</title>
+    <meta name="description" content="An intuitive and customizable cross-platform ground control station for remote vehicles of all types.">
+  <script type="module" crossorigin src="./assets/index-BUkzlHeJ.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DCMSTTGt.css">
+<link rel="manifest" href="./manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="./registerSW.js"></script></head>
+
+<body>
+    <div id="non-app-main">
+        <div id="browser-overlay">
+            <p>Please use Google Chrome or Microsoft Edge for the best experience on our website.</p>
+            <button id="proceed-browser-overlay">Proceed Anyway</button>
+        </div>
+        <div id="underlying-fallback">
+            <p>It looks like something went wrong while loading Cockpit. Resetting the settings can solve the problem.</p>
+            <button id="clear-settings-btn">Reset Cockpit settings</button>
+        </div>
+    </div>
+    <div id="app"></div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const overlay = document.getElementById('browser-overlay')
+            const content = document.getElementById('app')
+            const proceedButton = document.getElementById('proceed-browser-overlay');
+            const underlyingFallback = document.getElementById('underlying-fallback');
+            const clearSettingsButton = document.getElementById('clear-settings-btn');
+
+            const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor)
+            const isEdge = /Edg/.test(navigator.userAgent)
+
+            if (!isChrome && !isEdge) {
+                overlay.style.display = 'flex'
+                content.style.display = 'none'
+            } else {
+                underlyingFallback.style.display = 'flex';
+            }
+
+            proceedButton.addEventListener('click', function() {
+                overlay.style.display = 'none';
+                content.style.display = 'block';
+                underlyingFallback.style.display = 'flex';
+            });
+
+            clearSettingsButton.addEventListener('click', async function() {
+                if (!confirm("Are you sure you want to reset Cockpit settings?")) {
+                    return;
+                }
+
+                localStorage.clear();
+                // We are also going to clear the cache to ensure a fresh access to all files as well
+                if (caches) {
+                    const keys = await caches.keys();
+                    await Promise.allSettled(keys.map((key) => caches.delete(key)));
+                }
+                location.reload();
+            });
+        })
+    </script>
+
+    <style>
+        #non-app-main {
+            color: #fff;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            font-size: 20px;
+            text-align: center;
+        }
+
+        #browser-overlay {
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            border: #fff solid 1px;
+            border-radius: 5px;
+            margin: 1.5rem;
+            padding: 1.5rem;
+        }
+
+        #underlying-fallback {
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            border: #fff solid 1px;
+            border-radius: 5px;
+            margin: 1.5rem;
+            padding: 1.5rem;
+        }
+        #non-app-main button {
+            background-color: #0486aa;
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin-top: 1.5rem;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        #clear-settings-btn {
+            background-color: #a12626 !important;
+        }
+    </style>
+</body>
+</html>
