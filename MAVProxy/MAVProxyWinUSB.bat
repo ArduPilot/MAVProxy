@@ -1,4 +1,4 @@
 cd ..\
-python setup.py build install --user
-python .\MAVProxy\mavproxy.py --console
+python.exe -m pip install --upgrade build . --user
+python.exe .\MAVProxy\mavproxy.py --console
 pause

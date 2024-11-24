@@ -1,4 +1,4 @@
 cd ..\..\
-python setup.py build install --user
-python .\MAVProxy\tools\MAVExplorer.py
+python.exe -m pip install --upgrade build . --user
+python.exe .\MAVProxy\tools\MAVExplorer.py
 pause
