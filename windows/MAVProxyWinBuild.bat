@@ -58,6 +58,7 @@ powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parame
 powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/ArduPlane/apm.pdef.xml' -Destination 'Parameters\ArduPlane.xml'"
 powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/ArduSub/apm.pdef.xml' -Destination 'Parameters\ArduSub.xml'"
 powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/AntennaTracker/apm.pdef.xml' -Destination 'Parameters\AntennaTracker.xml'"
+powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/Heli/apm.pdef.xml' -Destination 'Parameters\Heli.xml'"
 
 rem -----Build the Installer-----
 cd .\windows

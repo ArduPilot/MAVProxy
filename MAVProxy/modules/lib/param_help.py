@@ -13,7 +13,7 @@ class ParamHelp:
     def param_help_download(self):
         '''download XML files for parameters'''
         files = []
-        for vehicle in ['Rover', 'ArduCopter', 'ArduPlane', 'ArduSub', 'AntennaTracker', 'Blimp']:
+        for vehicle in ['Rover', 'ArduCopter', 'ArduPlane', 'ArduSub', 'AntennaTracker', 'Blimp', 'Heli']:
             url = 'http://autotest.ardupilot.org/Parameters/%s/apm.pdef.xml.gz' % vehicle
             path = mp_util.dot_mavproxy("%s.xml" % vehicle)
             files.append((url, path))

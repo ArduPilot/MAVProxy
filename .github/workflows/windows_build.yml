@@ -50,6 +50,7 @@ jobs:
           $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/ArduPlane/apm.pdef.xml', 'Parameters\ArduPlane.xml')
           $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/ArduSub/apm.pdef.xml', 'Parameters\ArduSub.xml')
           $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/AntennaTracker/apm.pdef.xml', 'Parameters\AntennaTracker.xml')
+          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/Heli/apm.pdef.xml', 'Parameters\Heli.xml')
       - name: Build installer
         run: |
           cd  windows
