@@ -515,7 +515,7 @@ class HorizonFrame(wx.Frame):
         # Display Plot
         self.altHistRect.set_x(self.leftPos+(self.vertSize/10.0))
         self.altPlot.set_data(x,y)
-        self.altMarker.set_data(self.leftPos+(self.vertSize/10.0)+0.5,val)
+        self.altMarker.set_data([self.leftPos+(self.vertSize/10.0)+0.5],[val])
         self.altText2.set_position((self.leftPos+(4*self.vertSize/10.0)+0.5,val))
         self.altText2.set_size(self.fontSize)
         self.altText2.set_text('%.f m' % self.relAlt)
