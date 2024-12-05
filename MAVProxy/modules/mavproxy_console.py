@@ -188,6 +188,8 @@ class ConsoleModule(mp_module.MPModule):
 
     def estimated_time_remaining(self, lat, lon, wpnum, speed):
         '''estimate time remaining in mission in seconds'''
+        if self.module('wp') is None:
+            return 0
         idx = wpnum
         if wpnum >= self.module('wp').wploader.count():
             return 0
@@ -382,13 +384,14 @@ class ConsoleModule(mp_module.MPModule):
                 alt = master.field('GPS_RAW_INT', 'alt', 0) / 1.0e3
             else:
                 alt = master.field('GPS_RAW', 'alt', 0)
-            home = self.module('wp').get_home()
-            if home is not None:
-                home_lat = home.x
-                home_lng = home.y
-            else:
-                home_lat = None
-                home_lng = None
+            home_lat = None
+            home_lng = None
+            if  self.module('wp') is not None:
+                home = self.module('wp').get_home()
+                if home is not None:
+                    home_lat = home.x
+                    home_lng = home.y
+
             lat = master.field('GLOBAL_POSITION_INT', 'lat', 0) * 1.0e-7
             lng = master.field('GLOBAL_POSITION_INT', 'lon', 0) * 1.0e-7
             rel_alt = master.field('GLOBAL_POSITION_INT', 'relative_alt', 0) * 1.0e-3
@@ -631,7 +634,10 @@ class ConsoleModule(mp_module.MPModule):
 
     def handle_mission_current(self, msg):
             master = self.master
-            wpmax = self.module('wp').wploader.count()
+            if self.module('wp') is not None:
+                wpmax = self.module('wp').wploader.count()
+            else:
+                wpmax = 0
             if wpmax > 0:
                 wpmax = "/%u" % wpmax
             else:
