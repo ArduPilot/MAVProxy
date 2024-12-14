@@ -72,6 +72,8 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('GPS', 'GPS: --', fg='red', row=0)
         mpstate.console.set_status('GPS2', '', fg='red', row=0)
         mpstate.console.set_status('GPS3', '', fg='red', row=0)
+        mpstate.console.set_status('GPS4', '', fg='red', row=0)
+        mpstate.console.set_status('GPS5', '', fg='red', row=0)
         mpstate.console.set_status('Vcc', 'Vcc: --', fg='red', row=0)
         mpstate.console.set_status('Radio', 'Radio: --', row=0)
         mpstate.console.set_status('INS', 'INS', fg='grey', row=0)
