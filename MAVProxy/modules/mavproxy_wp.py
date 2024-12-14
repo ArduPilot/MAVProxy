@@ -1,5 +1,8 @@
-#!/usr/bin/env python3
-'''waypoint command handling'''
+'''
+waypoint command handling
+
+AP_FLAKE8_CLEAN
+'''
 
 from MAVProxy.modules.lib import mission_item_protocol
 from MAVProxy.modules.lib import mp_util
@@ -233,15 +236,14 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
             return mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT
         return mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT
 
-
     def get_WP0(self, home_only=False):
         '''get a location for WP0 when building a mission
         this ideally should be home, but if home is not available then use a click position
         '''
-        (lat,lon,alt) = (None,None,None)
+        (lat, lon, alt) = (None, None, None)
         if 'HOME_POSITION' in self.master.messages:
             h = self.master.messages['HOME_POSITION']
-            (lat,lon,alt) = (h.latitude*1.0e-7, h.longitude*1.0e-7, h.altitude*1.0e-3)
+            (lat, lon, alt) = (h.latitude*1.0e-7, h.longitude*1.0e-7, h.altitude*1.0e-3)
         elif home_only:
             return None
         elif self.wploader.count() > 0:
@@ -250,7 +252,7 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
             latlon = self.mpstate.click_location
             if latlon is None:
                 return None
-            (lat,lon,alt) = (latlon[0],latlon[1],0)
+            (lat, lon, alt) = (latlon[0], latlon[1], 0)
         if lat is None or lon is None:
             return None
         w = mavutil.mavlink.MAVLink_mission_item_message(self.target_system,
@@ -259,13 +261,13 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
                                                          0,
                                                          mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
                                                          0, 0, 0, 0, 0, 0,
-                                                         lat,lon,alt)
+                                                         lat, lon, alt)
         return w
 
     def get_home(self):
         '''get a location for home'''
         return self.get_WP0(home_only=True)
-    
+
     def wp_draw_callback(self, points):
         '''callback from drawing waypoints'''
         if len(points) < 2:
