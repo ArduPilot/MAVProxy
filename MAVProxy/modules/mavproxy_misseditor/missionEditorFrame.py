@@ -185,7 +185,8 @@ class MissionEditorFrame(wx.Frame):
         self.label_loiter_rad = wx.StaticText(self, wx.ID_ANY, "Loiter Radius")
         self.text_ctrl_loiter_radius = wx.TextCtrl(self, wx.ID_ANY, "", style=wx.TE_PROCESS_ENTER | wx.TE_PROCESS_TAB)
         self.checkbox_loiter_dir = wx.CheckBox(self, wx.ID_ANY, "CW")
-        self.checkbox_agl = wx.CheckBox(self, wx.ID_ANY, "AGL")
+        # The AGL checkbox is not yet implemented.
+        # self.checkbox_agl = wx.CheckBox(self, wx.ID_ANY, "AGL")
         self.label_default_alt = wx.StaticText(self, wx.ID_ANY, "Default Alt")
         self.text_ctrl_wp_default_alt = wx.TextCtrl(self, wx.ID_ANY, "", style=wx.TE_PROCESS_ENTER | wx.TE_PROCESS_TAB)
         self.label_home_location = wx.StaticText(self, wx.ID_ANY, "Home Location")
