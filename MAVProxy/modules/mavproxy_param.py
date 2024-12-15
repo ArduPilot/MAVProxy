@@ -387,6 +387,7 @@ class ParamState:
         '''command for performing bitmask actions on a parameter'''
 
         BITMASK_ACTIONS = ['toggle', 'set', 'clear']
+        NUM_BITS_MAX = 32
 
         # Ensure we have at least an action and a parameter
         if len(args) < 2:
@@ -472,6 +473,11 @@ class ParamState:
                 print("bit index is not specified")
 
             # We don't have enough information to modify the bitmask, so bail
+            return
+
+        # Sanity check the bit index
+        if bit_index >= NUM_BITS_MAX:
+            print(f"Cannot perform bitmask action '{action}' on bit index {bit_index}.")
             return
 
         # We have enough information to try perform an action
