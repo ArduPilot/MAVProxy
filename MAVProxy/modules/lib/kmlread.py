@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import lxml.etree as etree
 from io import BytesIO as SIO

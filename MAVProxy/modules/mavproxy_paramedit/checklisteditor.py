@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import wx
 import wx.grid as gridlib
 import math

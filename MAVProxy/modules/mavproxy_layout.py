@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''window layout command handling'''
 
 from MAVProxy.modules.lib import mp_module

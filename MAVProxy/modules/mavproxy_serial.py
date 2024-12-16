@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''serial_control MAVLink handling'''
 
 import time, os, fnmatch, sys

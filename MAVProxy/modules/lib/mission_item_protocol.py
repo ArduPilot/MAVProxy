@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 '''
 base class for modules generally transfering items using the MISSION_ITEM protocol

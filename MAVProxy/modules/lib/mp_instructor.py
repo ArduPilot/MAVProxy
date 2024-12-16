@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
   MAVProxy instructor station, UI runs in a child process

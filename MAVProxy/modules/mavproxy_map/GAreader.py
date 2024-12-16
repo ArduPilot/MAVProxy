@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''
 Module to read DTM files published by Geoscience Australia
 Written by Stephen Dade (stephen_dade@hotmail.com

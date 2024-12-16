@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
  NTRIP client module
  based on client from http://github.com/jcmb/NTRIP

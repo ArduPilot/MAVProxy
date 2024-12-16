@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Lat Long - UTM, UTM - Lat Long conversions
 #

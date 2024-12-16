@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
   MAVProxy instructor station module
   André Kjellstrup @ NORCE

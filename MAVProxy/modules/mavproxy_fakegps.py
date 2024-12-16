@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''fake GPS input using GPS_INPUT packet'''
 
 import time

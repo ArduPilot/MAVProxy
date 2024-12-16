@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''
 Arbitrary Message Module
 Peter Barker, September 2017

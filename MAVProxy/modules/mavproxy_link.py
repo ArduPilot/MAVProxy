@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 '''enable run-time addition and removal of master link, just like --master on the cnd line
 

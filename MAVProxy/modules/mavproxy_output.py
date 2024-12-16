@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''enable run-time addition and removal of UDP clients , just like --out on the cnd line'''
 ''' TO USE:
     output add 10.11.12.13:14550

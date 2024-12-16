@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 '''This is a script that will help you identify controls on your joystick
 in order to create an appropriate joystick definition for the joystick
