@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''
 Generator Module - module for generators reporting via the GENERATOR_STATUS message
 Peter Barker, Jun 2020

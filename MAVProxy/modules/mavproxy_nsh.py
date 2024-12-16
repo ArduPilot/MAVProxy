@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''remote nsh console handling'''
 
 import time, os, fnmatch, sys, time

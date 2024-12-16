@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''Module to add or clear kml layers on the map
 
 Copyright Stephen Dade 2016

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''Decode RTCM v3 messages'''
 
 RTCMv3_PREAMBLE = 0xD3

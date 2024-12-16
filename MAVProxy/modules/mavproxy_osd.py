@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''
 OSD Module
 Andy Piper, August 2020, Vendee, France

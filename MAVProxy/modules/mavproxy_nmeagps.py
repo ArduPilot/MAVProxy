@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''
 nmea GPS connector
 connect to a NMEA GPS on a serial port and provide this as location position

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''gopro control over mavlink for the solo-gimbal
 
 To use this module connect to a Solo with a GoPro installed on the gimbal.

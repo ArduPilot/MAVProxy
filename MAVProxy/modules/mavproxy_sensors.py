@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''monitor sensor consistancy'''
 
 import time, math

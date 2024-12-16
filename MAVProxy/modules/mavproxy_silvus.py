@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''
 silvus radio support
 To use add this in mavinit.scr for vehicle:

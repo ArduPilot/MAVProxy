@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''rc command handling'''
 
 import time, os, struct, sys

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''waypoint command handling'''
 
 from MAVProxy.modules.lib import mission_item_protocol

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''
 UBX UBLOX Module
 Peter Barker, April 2017

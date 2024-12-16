@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''remote low level device operations'''
 
 import time, os, sys

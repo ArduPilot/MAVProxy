@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''
 Antenna tracker control module
 This module catches MAVLINK_MSG_ID_GLOBAL_POSITION_INT

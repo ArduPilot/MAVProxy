@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 '''
 Wrapper for the SRTM module (srtm.py)
 It will grab the altitude of a long,lat pair from the SRTM database
