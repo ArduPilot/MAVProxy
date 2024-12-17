@@ -14,9 +14,12 @@ AP_FLAKE8_CLEAN
 class ModeModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(ModeModule, self).__init__(mpstate, "mode", public=True)
-        self.add_command('mode', self.cmd_mode, "mode change", self.available_modes())
+        self.add_command('mode', self.cmd_mode, "mode change", [
+            '(MODE)'
+        ])
         self.add_command('guided', self.cmd_guided, "fly to a clicked location on map")
         self.add_command('confirm', self.cmd_confirm, "confirm a command")
+        self.add_completion_function('(MODE)', self.complete_available_modes)
 
     def cmd_mode(self, args):
         '''set arbitrary mode'''
@@ -25,7 +28,7 @@ class ModeModule(mp_module.MPModule):
             print('No mode mapping available')
             return
         if len(args) != 1:
-            print('Available modes: ', mode_mapping.keys())
+            print('Available modes: ', ', '.join(self.available_modes()))
             return
         if args[0].isdigit():
             modenum = int(args[0])
@@ -49,6 +52,9 @@ class ModeModule(mp_module.MPModule):
             return
         from MAVProxy.modules.lib import mp_menu
         mp_menu.MPMenuConfirmDialog(question, callback=self.mpstate.functions.process_stdin, args=command)
+
+    def complete_available_modes(self, text):
+        return self.available_modes()
 
     def available_modes(self):
         if self.master is None:
