@@ -13,6 +13,7 @@ import glob
 import json
 import os
 import platform
+import queue
 import select
 import serial
 import shlex
@@ -87,7 +88,10 @@ class MPStatus(object):
         self.mav_error = 0
         self.altitude = 0
         self.last_distance_announce = 0.0
+        # True when thread should exit, deprecated
         self.exit = False
+        # A newer thread event to stop MAVProxy
+        self.stop_event = threading.Event()
         self.flightmode = 'MAV'
         self.last_mode_announce = 0
         self.last_mode_announced = 'MAV'
@@ -936,8 +940,16 @@ def mkdir_p(dir):
 
 def log_writer():
     '''log writing thread'''
-    while not mpstate.status.exit:
-        mpstate.logfile_raw.write(bytearray(mpstate.logqueue_raw.get()))
+    print("Starting logs thread...")
+    while not mpstate.status.stop_event.is_set():
+        try:
+            bytes = mpstate.logqueue_raw.get(block=False)
+        except queue.Empty:
+            pass
+        else:
+            mpstate.logfile_raw.write(bytearray(bytes))
+            
+        # TODO consider wait() the stop event instead
         timeout = time.time() + 10
         while not mpstate.logqueue_raw.empty() and time.time() < timeout:
             mpstate.logfile_raw.write(mpstate.logqueue_raw.get())
@@ -946,6 +958,7 @@ def log_writer():
         if mpstate.settings.flushlogs or time.time() >= timeout:
             mpstate.logfile.flush()
             mpstate.logfile_raw.flush()
+    print("log_writer finished cleanly")
 
 
 # If state_basedir is NOT set then paths for logs and aircraft
@@ -1012,11 +1025,10 @@ def open_telemetry_logs(logpath_telem, logpath_telem_raw):
                 mpstate.status.exit = True
                 return
 
-        # use a separate thread for writing to the logfile to prevent
+        # Use a separate thread for writing to the logfile to prevent
         # delays during disk writes (important as delays can be long if camera
-        # app is running)
+        # app is running).
         t = threading.Thread(target=log_writer, name='log_writer')
-        t.daemon = True
         t.start()
     except Exception as e:
         print("ERROR: opening log file for writing: %s" % e)
@@ -1452,6 +1464,8 @@ if __name__ == '__main__':
             sys.exit(0)
         else:
             mpstate.status.exit = True
+            mpstate.status.stop_event.set()
+            #TODO
 
     # Listen for kill signals to cleanly shutdown modules
     fatalsignals = [signal.SIGTERM]
@@ -1584,7 +1598,7 @@ if __name__ == '__main__':
 
     # use main program for input. This ensures the terminal cleans
     # up on exit
-    while (mpstate.status.exit is not True):
+    while (not mpstate.status.stop_event.is_set()):
         try:
             if opts.daemon or opts.non_interactive:
                 time.sleep(0.1)
@@ -1606,7 +1620,7 @@ if __name__ == '__main__':
                         m.init(mpstate)
 
             else:
-                mpstate.status.exit = True
+                mpstate.status.stop_event.set()
                 sys.exit(1)
 
     if opts.profile:
