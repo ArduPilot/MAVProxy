@@ -940,6 +940,7 @@ def log_writer():
         if not mpstate.logqueue_raw.empty():
             bytes = mpstate.logqueue_raw.get(block=False)
             mpstate.logfile_raw.write(bytearray(bytes))
+        time.sleep(0.001)
 
         # TODO consider wait() the stop event instead
         timeout = time.time() + 10
