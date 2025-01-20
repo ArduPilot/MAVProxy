@@ -645,7 +645,7 @@ class ParamState:
             return
 
         # Update the parameter
-        self.set_parameter(master, uname, value, attempts=3, parm_type=ptype)
+        self.set_parameter(master, uname, value, attempts=3, param_type=ptype)
 
     def set_parameter(self, master, name, value, attempts=None, param_type=None):
         '''convenient intermediate method which determines parameter type for
