@@ -73,17 +73,23 @@ class RCPanel(wx.lib.scrolledpanel.ScrolledPanel):
         for i, gauge in enumerate(self.rc_gauges):
             if msg.get_type() == 'RC_CHANNELS' and self.panelType == PanelType.RC_IN:
                 value = getattr(msg, 'chan{0}_raw'.format(i+1), 0)
+                if value > gauge.GetRange():
+                    gauge.SetRange(value + 50)
                 gauge.SetValue(value)
                 gauge.Refresh()
             elif (msg.get_type() == 'SERVO_OUTPUT_RAW' and self.panelType == PanelType.SERVO_OUT and
                   getattr(msg, 'port', 0) == 0) and i < 16:
                 value = getattr(msg, 'servo{0}_raw'.format(i+1), 0)
+                if value > gauge.GetRange():
+                    gauge.SetRange(value + 50)
                 gauge.SetValue(value)
                 gauge.Refresh()
             elif (msg.get_type() == 'SERVO_OUTPUT_RAW' and self.panelType == PanelType.SERVO_OUT and
                   getattr(msg, 'port', 0) == 1) and i >= 17:
                 # 2nd bank of servos (17-32), if used
                 value = getattr(msg, 'servo{0}_raw'.format(i+1-16), 0)
+                if value > gauge.GetRange():
+                    gauge.SetRange(value + 50)
                 gauge.SetValue(value)
                 gauge.Refresh()
         return 0
