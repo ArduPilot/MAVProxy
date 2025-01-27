@@ -56,6 +56,16 @@
   <expression>BARO.Alt RFND.Dist1*cos(radians(ATT.Roll))*cos(radians(ATT.Pitch))</expression>
  </graph>
 
+ <graph name='Sensors/MCU/Voltages'>
+  <description>MCU Voltage Information</description>
+   <expression>MCU.MVolt MCU.MVmax MCU.MVmin</expression>
+ </graph>
+
+ <graph name='Sensors/MCU/Temperature'>
+  <description>MCU Tepmerature Information</description>
+   <expression>MCU.MTemp</expression>
+ </graph>
+
  <graph name='Radio/RSSI_Distance'>
   <description></description>
   <expression>RADIO_STATUS.rssi RADIO_STATUS.noise RADIO_STATUS.remrssi RADIO_STATUS.remnoise distance_home(GPS_RAW_INT):2</expression>
