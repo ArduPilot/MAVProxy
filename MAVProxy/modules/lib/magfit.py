@@ -579,6 +579,8 @@ class MagFitUI(wx.Dialog):
             att_choices.append('XKF1')
         if self.have_msg('XKY0'):
             att_choices.append('XKY0')
+        if self.have_msg('DCM'):
+            att_choices.append('DCM')
 
         orientation_choices = [ r.name for r in rotations ]
 
