@@ -102,6 +102,7 @@ class MiscModule(mp_module.MPModule):
         self.add_command('hardfault_autopilot', self.cmd_hardfault_autopilot, "hardfault autopilot")
         self.add_command('panic_autopilot', self.cmd_panic_autopilot, "panic autopilot")
         self.add_command('longloop_autopilot', self.cmd_longloop_autopilot, "cause long loop in autopilot")
+        self.add_command('configerror_autopilot', self.cmd_config_error_autopilot, "ask autopilot to jump to its config error loop")  # noqa:E501
         self.add_command('internalerror_autopilot', self.cmd_internalerror_autopilot, "cause internal error in autopilot")
         self.add_command('dfu_boot', self.cmd_dfu_boot, "boot into DFU mode")
         self.add_command('deadlock', self.cmd_deadlock, "trigger deadlock")
@@ -259,6 +260,10 @@ class MiscModule(mp_module.MPModule):
     def cmd_dfu_boot(self, args):
         '''boot into DFU bootloader without hold'''
         self.cmd_dosomethingreallynastyto_autopilot(args, 'DFU-boot-without-hold', 99)
+
+    def cmd_config_error_autopilot(self, args):
+        '''Ask the autopilot to jump into its config error loop'''
+        self.cmd_dosomethingreallynastyto_autopilot(args, 'config-loop', 101)
 
     def cmd_deadlock(self, args):
         '''trigger a mutex deadlock'''
