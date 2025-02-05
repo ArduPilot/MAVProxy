@@ -1,5 +1,6 @@
 import time
 from pymavlink import mavutil
+import traceback
 
 class MPModule(object):
     '''
@@ -254,4 +255,15 @@ class MPModule(object):
         self.named_float_seq = (self.named_float_seq+1) % 256
         m.name = name
         self.mpstate.module('link').master_callback(m, self.master)
-    
+
+    def get_exception_stacktrace(self, e):
+        if sys.version_info[0] >= 3:
+            ret = "%s\n" % e
+            ret += ''.join(traceback.format_exception(type(e),
+                                                      e,
+                                                      tb=e.__traceback__))
+            return ret
+        return traceback.format_exc(e)
+
+    def print_caught_exception(self, e):
+        print(self.get_exception_stacktrace(e))
