@@ -1374,6 +1374,7 @@ if __name__ == '__main__':
     parser.add_option("--default-modules", default="log,signing,wp,rally,fence,ftp,param,relay,tuneopt,arm,mode,calibration,rc,auxopt,misc,cmdlong,battery,terrain,output,adsb,layout", help='default module list')  # noqa:E501
     parser.add_option("--udp-timeout", dest="udp_timeout", default=0.0, type='float', help="Timeout for udp clients in seconds")  # noqa:E501
     parser.add_option("--retries", type=int, help="number of times to retry connection", default=3)
+    parser.add_option("--no-startup-scripts", action='store_true', help="Do not run .mavinit.scr and other startup scripts")
 
     (opts, args) = parser.parse_args()
     if len(args) != 0:
@@ -1559,7 +1560,8 @@ if __name__ == '__main__':
     elif opts.aircraft is not None:
         mpstate.aircraft_dir = opts.aircraft
 
-    run_startup_scripts()
+    if not opts.no_startup_scripts:
+        run_startup_scripts()
 
     if opts.cmd is not None:
         for cstr in opts.cmd:
