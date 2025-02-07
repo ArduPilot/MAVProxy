@@ -365,6 +365,9 @@ on'''
         '''the vehicle may return an identifier for its onboard mission.
         Check it against what we think is on the vehicle, emit stale
         message if we detect a mismatch'''
+        if self.opaque.autopilot_id == 0:
+            # no opaque ID available from autopilot
+            return
         if self.opaque.have_id == self.opaque.autopilot_id:
             # reset so we work on things straight away:
             self.opaque.mission_stale_warn_time = 0
