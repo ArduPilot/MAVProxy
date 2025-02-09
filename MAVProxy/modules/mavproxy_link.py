@@ -983,22 +983,12 @@ class LinkModule(mp_module.MPModule):
         # see if it is handled by a specialised sysid connection
         if sysid in self.mpstate.sysid_outputs:
             self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
-            if mtype == "GLOBAL_POSITION_INT":
-                for modname in 'map', 'asterix', 'NMEA', 'NMEA2':
-                    mod = self.module(modname)
-                    if mod is not None:
-                        mod.set_secondary_vehicle_position(m)
-            return
 
         if getattr(m, '_timestamp', None) is None:
             master.post_message(m)
         self.status.counters['MasterIn'][master.linknum] += 1
 
         if mtype == 'GLOBAL_POSITION_INT':
-            # send GLOBAL_POSITION_INT to 2nd GCS for 2nd vehicle display
-            for sysid in self.mpstate.sysid_outputs:
-                self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
-
             if self.mpstate.settings.fwdpos:
                 for link in self.mpstate.mav_master:
                     if link != master:
