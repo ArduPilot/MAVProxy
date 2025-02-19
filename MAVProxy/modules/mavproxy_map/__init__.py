@@ -1446,7 +1446,8 @@ Usage: map circle <radius> <colour>
                     self.map.add_object(mp_slipmap.SlipPolygon(
                         f"terrain {i} {j}", p,
                         layer='Terrain', linewidth=1,
-                        colour=contour_colour
+                        colour=contour_colour,
+                        showcircles=False
                     ))
 
 
