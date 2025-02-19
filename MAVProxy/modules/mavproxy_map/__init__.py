@@ -27,6 +27,7 @@ class MapModule(mp_module.MPModule):
         self.wp_change_time = 0
         self.fence_change_time = 0
         self.rally_change_time = 0
+        self.terrain_contour_ids = []
         self.have_simstate = False
         self.have_vehicle = {}
         self.move_wp = -1
@@ -65,8 +66,12 @@ class MapModule(mp_module.MPModule):
               ('showdirection', bool, False),
               ('setpos_accuracy', float, 50),
               ('mission_color', str, "white"),
-              ('font_size', float, 0.5) ])
-
+              ('font_size', float, 0.5),
+              ('contour_levels', int, 20),
+              ('contour_grid_spacing', float, 30.0),
+              ('contour_grid_extent', float, 20000.0),
+            ])
+        
         service='MicrosoftHyb'
         if 'MAP_SERVICE' in os.environ:
             service = os.environ['MAP_SERVICE']
@@ -141,6 +146,12 @@ class MapModule(mp_module.MPModule):
             mavutil.mavlink.MAV_CMD_NAV_VTOL_LAND: "VL",
         }
 
+        self.add_menu(MPMenuSubMenu('Terrain', items=[
+            MPMenuItem('Show Contours', returnkey='showTerrainContours'),
+            MPMenuItem('Hide Contours', returnkey='hideTerrainContours'),
+            MPMenuItem('Remove Contours', returnkey='removeTerrainContours'),
+        ]))
+
     def add_menu(self, menu):
         '''add to the default popup menu'''
         from MAVProxy.modules.mavproxy_map import mp_slipmap
@@ -191,7 +202,6 @@ class MapModule(mp_module.MPModule):
         '''show map position click information'''
         pos = self.mpstate.click_location
         print("https://www.google.com/maps/search/?api=1&query=%f,%f" % (pos[0], pos[1]))
-
 
     def write_JSON(self, fname, template, vardict):
         '''write a JSON file in log directory'''
@@ -268,8 +278,6 @@ class MapModule(mp_module.MPModule):
 
         print("Wrote marker %s" % fname)
 
-            
-        
     def cmd_map(self, args):
         '''map commands'''
         from MAVProxy.modules.mavproxy_map import mp_slipmap
@@ -650,7 +658,6 @@ Usage: map circle <radius> <colour>
         else:
             self.map.remove_object('Fence')
 
-
     def closest_waypoint(self, latlon):
         '''find closest waypoint to a position'''
         (lat, lon) = latlon
@@ -778,6 +785,12 @@ Usage: map circle <radius> <colour>
             self.print_google_maps_link()
         elif menuitem.returnkey == 'setServiceTerrain':
             self.module('terrain').cmd_terrain(['set', 'source', menuitem.get_choice()])
+        elif menuitem.returnkey == 'showTerrainContours':
+            self.display_terrain_contours()
+        elif menuitem.returnkey == 'hideTerrainContours':
+            self.hide_terrain_contours()
+        elif menuitem.returnkey == 'removeTerrainContours':
+            self.remove_terrain_contours()
 
     def map_callback(self, obj):
         '''called when an event happens on the slipmap'''
@@ -1322,6 +1335,134 @@ Usage: map circle <radius> <colour>
 
                     points.append((nearest_land_wp.x, nearest_land_wp.y))
                     self.map.add_object(mp_slipmap.SlipPolygon('Rally Land %u' % (i+1), points, 'RallyPoints', (255,255,0), 2))
+
+    def display_terrain_contours(self):
+        """
+        Show terrain contours
+        """
+        from MAVProxy.modules.mavproxy_map import mp_slipmap
+        import numpy as np
+
+        # configure matplotlib for non-gui use
+        import matplotlib
+        matplotlib.use('Agg') 
+
+        # disable interactive plotting mode
+        import matplotlib.pyplot as plt
+        plt.ioff()
+
+        terrain_module = self.module('terrain')
+        if terrain_module is None:
+            return
+
+        elevation_model = terrain_module.ElevationModel
+
+        # show contours if they have already been calculated
+        if len(self.terrain_contour_ids) > 0:
+            self.show_terrain_contours()
+            return
+
+        # centre terrain grid about clicked location
+        if self.mpstate.click_location is None:
+            return
+
+        (lat, lon) = self.mpstate.click_location
+
+        # retrieve grid options from map settings
+        grid_spacing = self.map_settings.contour_grid_spacing
+        grid_extent = self.map_settings.contour_grid_extent
+        levels = self.map_settings.contour_levels
+
+        # create mesh grid
+        x = np.arange(-0.5 * grid_extent, 0.5 * grid_extent, grid_spacing)
+        y = np.arange(-0.5 * grid_extent, 0.5 * grid_extent, grid_spacing)
+        x_grid, y_grid = np.meshgrid(x, y)
+
+        def terrain_surface(lat, lon, x, y):
+            """
+            Calculate terrain altitudes for the NED offsets (x, y)
+            centred on (lat, lon).
+            """
+            alt = []
+            for east in y:
+                alt_y = []
+                for north in x:
+                    (lat2, lon2) = mp_util.gps_offset(lat, lon, east, north)
+                    alt_y.append(elevation_model.GetElevation(lat2, lon2))
+                alt.append(alt_y)
+            return alt
+
+        def ned_to_latlon(contours, lat, lon):
+            """
+            Convert contour polygons in NED coordinates offset from (lat, lon)
+            to polygons in orthometric coordinates.
+            """
+            contours_latlon = []
+            for polygons in contours:
+                polygons_latlon = []
+                for polygon in polygons:
+                    polygon_latlon = []
+                    for point in polygon:
+                        (north, east) = point
+                        (lat2, lon2) = mp_util.gps_offset(lat, lon, east, north)
+                        polygon_latlon.append([lat2, lon2])
+                    polygons_latlon.append(polygon_latlon)
+                contours_latlon.append(polygons_latlon)
+            return contours_latlon
+
+        # generate surface and contours
+        z_grid = np.array(terrain_surface(lat, lon, x, y))
+        _, (ax1) = plt.subplots(1, 1, figsize=(10,10))
+        cs = ax1.contour(x_grid, y_grid, z_grid, levels=levels)
+        contours = ned_to_latlon(cs.allsegs, lat, lon)
+
+        # add terrain layer and contour polygons
+        self.map.add_object(mp_slipmap.SlipClearLayer('Terrain'))
+
+        self.terrain_contour_ids.clear()
+        num_contours = len(contours)
+        for i in range(num_contours):
+            polygons = contours[i]
+            for j in range(len(polygons)):
+                p = polygons[j]
+                if len(p) > 1:
+                    id = f"terrain {i} {j}" 
+                    self.terrain_contour_ids.append(id)
+                    contour_colour = (255, 255, 255)
+                    self.map.add_object(mp_slipmap.SlipPolygon(
+                        id, p,
+                        layer='Terrain', linewidth=1,
+                        colour=contour_colour,
+                        showcircles=False
+                    ))
+
+    def show_terrain_contours(self):
+        """
+        Show terrain contours.
+        """
+        # unhide polygons
+        for id in self.terrain_contour_ids:
+            self.map.hide_object(id, hide=False)
+
+    def hide_terrain_contours(self):
+        """
+        Hide terrain contours.
+        """
+        # hide polygons
+        for id in self.terrain_contour_ids:
+            self.map.hide_object(id, hide=True)
+
+    def remove_terrain_contours(self):
+        """
+        Remove terrain contours and the terrain clear layer.
+        """
+        # remove polygons
+        for id in self.terrain_contour_ids:
+            self.map.remove_object(id)
+        # remove layer
+        self.map.remove_object('Terrain')
+        self.terrain_contour_ids.clear()
+
 
 def init(mpstate):
     '''initialise module'''
