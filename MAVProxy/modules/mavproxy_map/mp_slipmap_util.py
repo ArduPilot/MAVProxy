@@ -214,7 +214,7 @@ class SlipCircle(SlipObject):
 
 class SlipPolygon(SlipObject):
     '''a polygon to display on the map'''
-    def __init__(self, key, points, layer, colour, linewidth, arrow = False, popup_menu=None, showlines=True):
+    def __init__(self, key, points, layer, colour, linewidth, arrow = False, popup_menu=None, showlines=True, showcircles=True):
         SlipObject.__init__(self, key, layer, popup_menu=popup_menu)
         self.points = points
         self.colour = colour
@@ -225,6 +225,7 @@ class SlipPolygon(SlipObject):
         self._selected_vertex = None
         self._has_timestamps = False
         self._showlines = showlines
+        self._showcircles = showcircles
 
     def set_colour(self, colour):
         self.colour = colour
@@ -250,7 +251,8 @@ class SlipPolygon(SlipObject):
             return
         if self._showlines:
             cv2.line(img, pix1, pix2, colour, linewidth)
-        cv2.circle(img, pix2, linewidth*2, colour)
+        if self._showcircles:
+            cv2.circle(img, pix2, linewidth*2, colour)
         if len(self._pix_points) == 0:
             self._pix_points.append(pix1)
         self._pix_points.append(pix2)
