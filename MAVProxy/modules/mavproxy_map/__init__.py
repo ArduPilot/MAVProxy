@@ -26,6 +26,9 @@ class MapModule(mp_module.MPModule):
         self.wp_change_time = 0
         self.fence_change_time = 0
         self.rally_change_time = 0
+
+        self.terrain_contour_change_time = 0
+
         self.have_simstate = False
         self.have_vehicle = {}
         self.move_wp = -1
@@ -1238,6 +1241,7 @@ Usage: map circle <radius> <colour>
         self.check_redisplay_waypoints()
         self.check_redisplay_fencepoints()
         self.check_redisplay_rallypoints()
+        self.check_redisplay_terrain_contours()
 
         # check for any events from the map
         self.map.check_events()
@@ -1320,6 +1324,148 @@ Usage: map circle <radius> <colour>
 
                     points.append((nearest_land_wp.x, nearest_land_wp.y))
                     self.map.add_object(mp_slipmap.SlipPolygon('Rally Land %u' % (i+1), points, 'RallyPoints', (255,255,0), 2))
+
+    def display_terrain_contours(self):
+        """
+        Display the terrain contours
+        """
+        from MAVProxy.modules.mavproxy_map import mp_slipmap
+        import numpy as np
+
+        # TODO: use ContourPy directly rather than via matplotlib
+        # https://contourpy.readthedocs.io/en/v1.3.1/
+
+        # configure matplotlib for non-gui use
+        import matplotlib
+        matplotlib.use('Agg') 
+
+        # disable interactive plotting mode
+        import matplotlib.pyplot as plt
+        plt.ioff()
+
+        terrain_module = self.module('terrain')
+        if terrain_module is None:
+            return
+
+        elevation_model = terrain_module.ElevationModel
+        terrain_source = terrain_module.ElevationModel.database
+
+        # TODO: get from FC using TERRAIN_REPORT msg, or `terrain` module
+        grid_spacing = None
+        if terrain_source == "SRTM1":
+            grid_spacing = 30.0
+        elif terrain_source == "SRTM3":
+            grid_spacing = 100.0
+        else:
+            # no valid elevation model
+            return
+
+        if self.mpstate.click_location is None:
+            # no valid click location
+            return
+
+        (lat, lon) = self.mpstate.click_location
+
+        print("lat: {}, lon: {}".format(lat, lon))
+
+        # grids for contour plots
+        # a terrain tile comprises a row major 8 x 7 grid, with each
+        # grid element containing a 4 x 4 array of terrain data. The individual
+        # entries are float altitude above mean sea level
+        # (i.e. the orthometric altitude referencing the geoid).
+
+        num_tiles_x = 10
+        num_tiles_y = 10
+
+        # NED: (lat, lon) <=> (x, y)
+        TERRAIN_TILE_NX = 7 * num_tiles_x
+        TERRAIN_TILE_NY = 8 * num_tiles_y
+        TERRAIN_DATA_NX = 4
+        TERRAIN_DATA_NY = 4
+        x_max = TERRAIN_DATA_NX * TERRAIN_TILE_NX * grid_spacing
+        y_max = TERRAIN_DATA_NY * TERRAIN_TILE_NY * grid_spacing
+        x = np.arange(-x_max, x_max, grid_spacing)
+        y = np.arange(-y_max, y_max, grid_spacing)
+        x_grid, y_grid = np.meshgrid(x, y)
+
+        def terrain_surface(lat, lon, x, y):
+            """
+            Calculate terrain altitudes for the NED offsets (x, y)
+            centred on (lat, lon).
+            """
+            alt = []
+            for east in y:
+                alt_y = []
+                for north in x:
+                    (lat2, lon2) = mp_util.gps_offset(lat, lon, east, north)
+                    alt_y.append(elevation_model.GetElevation(lat2, lon2))
+                alt.append(alt_y)
+            return alt
+
+        # TODO: not efficient...
+        # TODO: (lat, lon) origin should be argument.
+        def ned_to_latlon(allsegs):
+            """
+            Convert contour polygons in NED coordinates offset from (lat, lon)
+            to polygons in orthometric coordinates.
+            """
+            allsegs_out = []
+            for levelsegs in allsegs:
+                levelsegs_out = []
+                for polygon in levelsegs:
+                    polygon_out = []
+                    for point in polygon:
+                        (north, east) = point
+                        (lat2, lon2) = mp_util.gps_offset(lat, lon, east, north)
+                        polygon_out.append([lat2, lon2])
+                    levelsegs_out.append(polygon_out)
+                allsegs_out.append(levelsegs_out)
+            return allsegs_out
+
+        # generate surface and contours
+        levels = 10
+        z_grid = np.array(terrain_surface(lat, lon, x, y))
+        _, (ax1) = plt.subplots(1, 1, figsize=(10,10))
+        cs = ax1.contour(x_grid, y_grid, z_grid, levels=levels)
+        contours = ned_to_latlon(cs.allsegs)
+
+        # TODO: support colour map for terrain
+        # terrain_cm = [
+        #     (0.2, 0.2, 0.6),
+        #     (0.0, 0.6, 1.0),
+        #     (0.0, 0.8, 0.4),
+        #     (1.0, 1.0, 0.6),
+        #     (0.5, 0.36, 0.33),
+        #     (1.0, 1.0, 1.0)
+        # ]
+
+        self.map.add_object(mp_slipmap.SlipClearLayer('Terrain'))
+
+        num_contours = len(contours)
+        for i in range(num_contours):
+            polygons = contours[i]
+            for j in range(len(polygons)):
+                p = polygons[j]
+                if len(p) > 1:
+                    contour_colour = (255, 255, 255)
+                    self.map.add_object(mp_slipmap.SlipPolygon(
+                        f"terrain {i} {j}", p,
+                        layer='Terrain', linewidth=1,
+                        colour=contour_colour,
+                        showcircles=False
+                    ))
+
+
+    def check_redisplay_terrain_contours(self):
+        """
+        Redisplay the terrain contours if changed
+        """   
+        # if self.terrain_contour_change_time != last_terrain_contour_change and abs(time.time() - last_terrain_contour_change) > 1:
+        #     self.terrain_contour_change_time = last_terrain_contour_change
+        if self.terrain_contour_change_time == 0 and self.mpstate.click_location is not None:
+            self.terrain_contour_change_time = time.time()
+            self.display_terrain_contours()
+
 
 def init(mpstate):
     '''initialise module'''
