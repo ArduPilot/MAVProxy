@@ -1332,6 +1332,9 @@ Usage: map circle <radius> <colour>
         from MAVProxy.modules.mavproxy_map import mp_slipmap
         import numpy as np
 
+        # TODO: use ContourPy directly rather than via matplotlib
+        # https://contourpy.readthedocs.io/en/v1.3.1/
+
         # configure matplotlib for non-gui use
         import matplotlib
         matplotlib.use('Agg') 
@@ -1371,11 +1374,12 @@ Usage: map circle <radius> <colour>
         # entries are float altitude above mean sea level
         # (i.e. the orthometric altitude referencing the geoid).
 
-        zoom = 2
+        num_tiles_x = 10
+        num_tiles_y = 10
 
         # NED: (lat, lon) <=> (x, y)
-        TERRAIN_TILE_NX = 7 * zoom
-        TERRAIN_TILE_NY = 8 * zoom
+        TERRAIN_TILE_NX = 7 * num_tiles_x
+        TERRAIN_TILE_NY = 8 * num_tiles_y
         TERRAIN_DATA_NX = 4
         TERRAIN_DATA_NY = 4
         x_max = TERRAIN_DATA_NX * TERRAIN_TILE_NX * grid_spacing
@@ -1419,9 +1423,10 @@ Usage: map circle <radius> <colour>
             return allsegs_out
 
         # generate surface and contours
+        levels = 10
         z_grid = np.array(terrain_surface(lat, lon, x, y))
         _, (ax1) = plt.subplots(1, 1, figsize=(10,10))
-        cs = ax1.contour(x_grid, y_grid, z_grid)
+        cs = ax1.contour(x_grid, y_grid, z_grid, levels=levels)
         contours = ned_to_latlon(cs.allsegs)
 
         # TODO: support colour map for terrain
