@@ -13,11 +13,11 @@ def readkmz(filename):
     filename.strip('"')
     #Open the zip file (as applicable)    
     suffix = pathlib.Path(filename).suffix
-    if suffix == '.kml':
+    if suffix.lower() == '.kml':
         fo = open(filename, "rb")
         fstring = fo.read()
         fo.close()
-    elif suffix == '.kmz':
+    elif suffix.lower() == '.kmz':
         zip=ZipFile(filename)
         fstring = None
         for z in zip.filelist:
