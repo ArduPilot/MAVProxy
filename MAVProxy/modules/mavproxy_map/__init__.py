@@ -14,6 +14,7 @@ from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib.mp_menu import *
 from pymavlink import mavutil
+from PIL import ImageColor
 
 class MapModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -63,8 +64,9 @@ class MapModule(mp_module.MPModule):
               ('circle_linewidth', int, 1),
               ('showdirection', bool, False),
               ('setpos_accuracy', float, 50),
+              ('mission_color', str, "white"),
               ('font_size', float, 0.5) ])
-        
+
         service='MicrosoftHyb'
         if 'MAP_SERVICE' in os.environ:
             service = os.environ['MAP_SERVICE']
@@ -427,7 +429,7 @@ Usage: map circle <radius> <colour>
             if len(p) > 1:
                 popup = MPMenuSubMenu('Popup', items)
                 self.map.add_object(mp_slipmap.SlipPolygon('mission %u' % i, p,
-                                                                   layer='Mission', linewidth=2, colour=(255,255,255),
+                                                                   layer='Mission', linewidth=2, colour=ImageColor.getrgb(self.map_settings.mission_color),
                                                                    arrow = self.map_settings.showdirection, popup_menu=popup))
         labeled_wps = {}
         self.map.add_object(mp_slipmap.SlipClearLayer('LoiterCircles'))
