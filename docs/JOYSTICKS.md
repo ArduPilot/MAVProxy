@@ -127,6 +127,40 @@ Example:
       type: button
       id: 1
 
+### toggle
+
+A `toggle` button acts like a toggle switch. When pressed, the
+corresponding channel value is set to the first value in `values`;
+when pressed consecutively, the values are cycled through.
+When the last value is reached, the first value is set again.
+
+Example:
+
+    - channel: 1
+      type: toggle
+      id: 2
+      values:
+        - 1000
+        - 2000
+
+This example will set the value of channel 1 to 1000 initially. 
+When button 2 is pressed and released, it will be set to 2000. When button 2 is pressed/released again, 1000 will be set again (and so on).
+
+Example 2:
+
+    - channel: 1
+      type: toggle
+      id: 2
+      values:
+        - 1000
+        - 1500
+        - 2000
+
+This example will set the value of channel 1 to 1000 initially.
+The next press/release will set value 1500.
+The next press/release will set value 2000.
+The next press/release will start over and set value 1000 again.
+
 ### multibutton
 
 A `multibutton` maps multiple buttons to the same channel like a
