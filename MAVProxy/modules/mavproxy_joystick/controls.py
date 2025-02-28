@@ -16,12 +16,14 @@ class Control (object):
     '''Base class for all controls'''
     def __init__(self, joystick,
                  inlow=-1, inhigh=1,
-                 outlow=1000, outhigh=2000):
+                 outlow=1000, outhigh=2000,
+                 values=[]):
         self.joystick = joystick
         self.inlow = inlow
         self.inhigh = inhigh
         self.outlow = outlow
         self.outhigh = outhigh
+        self.values = values
 
 
 class Button (Control):
@@ -40,6 +42,35 @@ class Button (Control):
             return self.outhigh
         else:
             return self.outlow
+
+
+class ToggleButton (Control):
+    '''A ToggleButton acts like a toggle or rotary switch.
+    Initially, the corresponding channel value is set to the first value in `values`;
+    when button `id` is pressed consecutively, the values are iterated on each press.
+    Iteration is looped by starting from the beginning when last value is reached.'''
+
+    def __init__(self, joystick, id, **kwargs):
+        super(ToggleButton, self).__init__(joystick, **kwargs)
+        self.id = id
+        # index of value to set next
+        self._current_value_index = 0
+
+    @property
+    def value(self):
+        state = self.joystick.get_button(self.id)
+        value = self.values[self._current_value_index]
+        # button was pressed
+        if state:
+            # choose new value for next press
+            if self._current_value_index >= len(self.values)-1:
+                # start over with first value
+                self._current_value_index = 0
+            else:
+                # choose next value
+                self._current_value_index += 1
+
+        return value
 
 
 class MultiButton (Control):
@@ -128,6 +159,13 @@ class Joystick (object):
 
                 handler = Button(self.joystick, control['id'], **kwargs)
 
+            elif control['type'] == 'toggle':
+                kwargs = {k: control[k]
+                          for k in control.keys()
+                          if k in ['values']}
+
+                handler = ToggleButton(self.joystick, control['id'], **kwargs)
+                      
             elif control['type'] == 'axis':
                 kwargs = {k: control[k]
                           for k in control.keys()
