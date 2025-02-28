@@ -1501,9 +1501,11 @@ if __name__ == '__main__':
                 baud=int(opts.baudrate),
                 input=False,
                 udp_timeout=opts.udp_timeout,
+                autoreconnect=True
             ))
         else:
-            mpstate.mav_outputs.append(mavutil.mavlink_connection(port, baud=int(opts.baudrate), input=False))
+            mpstate.mav_outputs.append(mavutil.mavlink_connection(port, baud=int(opts.baudrate),
+                                                                  input=False, autoreconnect=True))
 
     if opts.sitl:
         mpstate.sitl_output = mavutil.mavudp(opts.sitl, input=False)
