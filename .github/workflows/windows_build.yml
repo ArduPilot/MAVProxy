@@ -23,18 +23,18 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
-          python -m pip install -U wheel setuptools pip
-          python -m pip install -U pywin32 lxml pymavlink numpy matplotlib pyserial opencv-python PyYAML Pygame Pillow wxpython prompt-toolkit scipy
-          python -m pip install -U openai wave pyaudio
-          python -m pip install -U pyinstaller==6.7.0 packaging 
+          python3 -m pip install -U wheel setuptools pip
+          python3 -m pip install -U pywin32 lxml pymavlink numpy matplotlib pyserial opencv-python PyYAML Pygame Pillow wxpython prompt-toolkit scipy
+          python3 -m pip install -U openai wave pyaudio
+          python3 -m pip install -U pyinstaller==6.7.0 packaging 
       - name: Download Inno Setup installer
         run: curl -L -o installer.exe http://files.jrsoftware.org/is/6/innosetup-6.3.1.exe
       - name: Install Inno Setup
         run: ./installer.exe /verysilent /allusers /dir=inst
       - name: Build MAVProxy
         run: |
-          python -m pip install .[recommended] --user
-          python -m pip list
+          python3 -m pip install .[recommended] --user
+          python3 -m pip list
       - name: Prepare installer
         run: |
           cd MAVProxy
@@ -55,7 +55,7 @@ jobs:
         run: |
           cd  windows
           $env:VERSION=$(python returnVersion.py)
-          python returnVersion.py > version.txt
+          python3 returnVersion.py > version.txt
           ISCC.exe /dMyAppVersion=$env:VERSION mavproxy.iss
           ls Output
       - name: Archive build
