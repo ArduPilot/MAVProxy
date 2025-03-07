@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
-'''rc command handling'''
+'''
+rc command handling
 
-import time, os, struct, sys
+AP_FLAKE8_CLEAN
+'''
+
+import struct
+import sys
+
 from pymavlink import mavutil
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
@@ -14,10 +20,10 @@ if mp_util.has_wxpython:
 
 class RCModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(RCModule, self).__init__(mpstate, "rc", "rc command handling", public = True)
+        super(RCModule, self).__init__(mpstate, "rc", "rc command handling", public=True)
         self.count = 18
-        self.override = [ 0 ] * self.count
-        self.last_override = [ 0 ] * self.count
+        self.override = [0] * self.count
+        self.last_override = [0] * self.count
         self.override_counter = 0
         x = "|".join(str(x) for x in range(1, (self.count+1)))
         self.add_command('rc', self.cmd_rc, "RC input control", ['<%s|all>' % x])
@@ -83,9 +89,9 @@ class RCModule(mp_module.MPModule):
     def idle_task(self):
         self.override_period.frequency = self.rc_settings.override_hz
         if self.override_period.trigger():
-            if (self.override != [ 0 ] * self.count or
-                self.override != self.last_override or
-                self.override_counter > 0):
+            if (self.override != [0] * self.count or
+                    self.override != self.last_override or
+                    self.override_counter > 0):
                 self.last_override = self.override[:]
                 self.send_rc_override()
                 if self.override_counter > 0:
@@ -118,7 +124,7 @@ class RCModule(mp_module.MPModule):
 
     def cmd_switch(self, args):
         '''handle RC switch changes'''
-        mapping = [ 0, 1165, 1295, 1425, 1555, 1685, 1815 ]
+        mapping = [0, 1165, 1295, 1425, 1555, 1685, 1815]
         if len(args) != 1:
             print("Usage: switch <pwmvalue>")
             return
