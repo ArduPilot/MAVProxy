@@ -93,7 +93,7 @@ class RCModule(mp_module.MPModule):
                     self.override != self.last_override or
                     self.override_counter > 0):
                 self.last_override = self.override[:]
-                self.send_rc_override()
+                self.send_rc()
                 if self.override_counter > 0:
                     self.override_counter -= 1
         self.idle_task_add_menu_items()
@@ -110,7 +110,7 @@ class RCModule(mp_module.MPModule):
         elif m.get_type() == 'SERVO_OUTPUT_RAW' and self.servoout_gui:
             self.servoout_gui.processPacket(m)
 
-    def send_rc_override(self):
+    def send_rc(self):
         '''send RC override packet'''
         if self.sitl_output:
             chan16 = self.override[:16]
@@ -142,7 +142,7 @@ class RCModule(mp_module.MPModule):
             flite_mode_ch_parm = int(self.get_mav_param("FLTMODE_CH", default_channel))
         self.override[flite_mode_ch_parm - 1] = mapping[value]
         self.override_counter = 10
-        self.send_rc_override()
+        self.send_rc()
         if value == 0:
             print("Disabled RC switch override")
         else:
@@ -153,13 +153,13 @@ class RCModule(mp_module.MPModule):
         '''this is a public method for use by drone API or other scripting'''
         self.override = newchannels
         self.override_counter = 10
-        self.send_rc_override()
+        self.send_rc()
 
     def set_override_chan(self, channel, value):
         '''this is a public method for use by drone API or other scripting'''
         self.override[channel] = value
         self.override_counter = 10
-        self.send_rc_override()
+        self.send_rc()
 
     def get_override_chan(self, channel):
         '''this is a public method for use by drone API or other scripting'''
