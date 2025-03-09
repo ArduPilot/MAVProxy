@@ -55,13 +55,16 @@ class ToggleButton (Control):
         self.id = id
         # index of value to set next
         self._current_value_index = 0
+        # current value
+        self._current_value = self.values[self._current_value_index]
+        # last button state
+        self._last_state = False
 
     @property
     def value(self):
         state = self.joystick.get_button(self.id)
-        value = self.values[self._current_value_index]
-        # button was pressed
-        if state:
+        # button is pressed and last call it was not?
+        if state and state != self._last_state:
             # choose new value for next press
             if self._current_value_index >= len(self.values)-1:
                 # start over with first value
@@ -70,7 +73,13 @@ class ToggleButton (Control):
                 # choose next value
                 self._current_value_index += 1
 
-        return value
+            # get next value from "values" list
+            self._current_value = self.values[self._current_value_index]
+
+        # save new button state
+        self._last_state = state
+
+        return self._current_value
 
 
 class MultiButton (Control):
@@ -165,7 +174,7 @@ class Joystick (object):
                           if k in ['values']}
 
                 handler = ToggleButton(self.joystick, control['id'], **kwargs)
-                      
+
             elif control['type'] == 'axis':
                 kwargs = {k: control[k]
                           for k in control.keys()
