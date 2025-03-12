@@ -106,6 +106,8 @@ class MiscModule(mp_module.MPModule):
         self.add_command('internalerror_autopilot', self.cmd_internalerror_autopilot, "cause internal error in autopilot")
         self.add_command('dfu_boot', self.cmd_dfu_boot, "boot into DFU mode")
         self.add_command('deadlock', self.cmd_deadlock, "trigger deadlock")
+        self.add_command('nullptr_read', self.cmd_nullptr_read, "read from a very low address")
+        self.add_command('nullptr_write', self.cmd_nullptr_write, "write to a very low address")
         self.add_command('batreset', self.cmd_battery_reset, "reset battery remaining")
         self.add_command('setorigin', self.cmd_setorigin, "set global origin")
         self.add_command('magsetfield', self.cmd_magset_field, "set expected mag field by field")
@@ -268,6 +270,14 @@ class MiscModule(mp_module.MPModule):
     def cmd_deadlock(self, args):
         '''trigger a mutex deadlock'''
         self.cmd_dosomethingreallynastyto_autopilot(args, 'mutex-deadlock', 100)
+
+    def cmd_nullptr_write(self, args):
+        '''write to a low address (nullptr-deref)'''
+        self.cmd_dosomethingreallynastyto_autopilot(args, 'nullptr-deref-write', 102)
+
+    def cmd_nullptr_read(self, args):
+        '''read from a low address (nullptr-deref)'''
+        self.cmd_dosomethingreallynastyto_autopilot(args, 'nullptr-deref-read', 103)
 
     def cmd_battery_reset(self, args):
         '''reset battery remaining'''
