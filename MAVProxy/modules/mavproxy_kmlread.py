@@ -220,7 +220,8 @@ class KmlReadModule(mp_module.MPModule):
         '''add an object to our stored list of objects, and the map
         module if it is loaded'''
         if obj.layer in self.map_objects and obj.key in self.map_objects[obj.layer]:
-            raise ValueError(f"Already have self.map_objects[{obj.layer=}][{obj.key=}]")
+            print(f"Already have self.map_objects[{obj.layer=}][{obj.key=}]")
+            return
         if obj.layer not in self.map_objects:
             self.map_objects[obj.layer] = {}
         self.map_objects[obj.layer][obj.key] = obj
