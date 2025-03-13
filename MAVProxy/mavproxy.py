@@ -897,8 +897,21 @@ def process_mavlink(slave):
     if msgs is None:
         return
     allow_fwd = mpstate.settings.mavfwd
-    if not allow_fwd and mpstate.settings.mavfwd_disarmed and not mpstate.master(-1).motors_armed():
+    is_armed = mpstate.master(-1).motors_armed()
+    if not allow_fwd and mpstate.settings.mavfwd_disarmed and not is_armed:
         allow_fwd = True
+
+    # check this specific link to see if it has a more-specific
+    # setting for denying (or allowing!) forwarding.
+    if hasattr(slave, "mavproxy_attributes"):
+        link_allows_mavfwd = getattr(slave.mavproxy_attributes, "mavproxy_mavfwd", None)
+        if link_allows_mavfwd is not None:
+            allow_fwd = link_allows_mavfwd
+        if not allow_fwd and not is_armed:
+            link_allows_mavfwd_disarmed = getattr(slave.mavproxy_attributes, "mavproxy_mavfwd_disarmed", None)
+            if link_allows_mavfwd_disarmed is not None:
+                allow_fwd = link_allows_mavfwd_disarmed
+
     if mpstate.status.setup_mode:
         allow_fwd = False
     if allow_fwd:
