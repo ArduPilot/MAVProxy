@@ -169,7 +169,6 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
             "movemulti": self.cmd_movemulti,
             "moverelhome": self.cmd_moverelhome,
             'set': self.cmd_set,
-            'sethome': self.cmd_sethome,
             'slope': self.cmd_slope,
             'split': self.cmd_split,
             "move": self.cmd_move,  # handled in parent class
@@ -485,28 +484,6 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
         # assume last waypoint
         self.wploader.add(wp)
         self.send_all_waypoints()
-
-    def cmd_sethome(self, args):
-        '''set home location from last map click'''
-        latlon = self.mpstate.click_location
-        if latlon is None:
-            print("No position available")
-            return
-        lat = float(latlon[0])
-        lon = float(latlon[1])
-        if self.wploader.count() == 0:
-            self.wploader.add_latlonalt(lat, lon, 0)
-        w = self.wploader.wp(0)
-        w.x = lat
-        w.y = lon
-        self.wploader.set(w, 0)
-        self.loading_waypoints = True
-        self.loading_waypoint_lasttime = time.time()
-        self.master.mav.mission_write_partial_list_send(
-            self.target_system,
-            self.target_component,
-            0, 0
-        )
 
     def fix_jumps(self, idx, delta):
         '''fix up jumps when we add/remove rows'''
