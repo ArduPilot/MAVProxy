@@ -569,8 +569,12 @@ on'''
             alt2 = self.module('terrain').ElevationModel.GetElevation(wp.x, wp.y)
             if alt1 is not None and alt2 is not None:
                 wp.z += alt1 - alt2
-        wp.x = lat
-        wp.y = lon
+        if isinstance(wp, pymavlink.dialects.v20.ardupilotmega.MAVLink_mission_item_int_message):
+            wp.x = int(lat * 1e7)
+            wp.y = int(lon * 1e7)
+        else:
+            wp.x = lat
+            wp.y = lon
 
         wp.target_system    = self.target_system
         wp.target_component = self.target_component
