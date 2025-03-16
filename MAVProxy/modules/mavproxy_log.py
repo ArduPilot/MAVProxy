@@ -1,9 +1,14 @@
-#!/usr/bin/env python3
-'''log command handling'''
+'''
+log command handling
 
-import time, os
+AP_FLAKE8_CLEAN
+'''
+
+import os
+import time
 
 from MAVProxy.modules.lib import mp_module
+
 
 class LogModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -43,7 +48,6 @@ class LogModule(mp_module.MPModule):
         self.entries[m.id] = m
         print("Log %u  numLogs %u lastLog %u size %u %s" % (m.id, m.num_logs, m.last_log_num, m.size, tstring))
 
-
     def handle_log_data(self, m):
         '''handling incoming log data'''
         if self.download_file is None:
@@ -67,17 +71,21 @@ class LogModule(mp_module.MPModule):
             self.download_file.close()
             size = os.path.getsize(self.download_filename)
             speed = size / (1000.0 * dt)
-            status = "Finished downloading %s (%u bytes %u seconds, %.1f kbyte/sec %u retries)" % (self.download_filename,
-                                                                                                   size,
-                                                                                                   dt, speed,
-                                                                                                   self.retries)
-            self.console.set_status('LogDownload',status, row=4)
+            status = (
+                f"Finished downloading {self.download_filename} " +
+                f"({size} bytes {dt:0.1f} seconds, " +
+                f"{speed:.1f} kbyte/sec " +
+                f"{self.retries} retries)"
+            )
+            self.console.set_status('LogDownload', status, row=4)
             print(status)
             self.download_file = None
             self.download_filename = None
             self.download_set = set()
-            self.master.mav.log_request_end_send(self.target_system,
-                                                 self.target_component)
+            self.master.mav.log_request_end_send(
+                self.target_system,
+                self.target_component
+            )
             if len(self.download_queue):
                 self.log_download_next()
         self.update_status()
@@ -89,9 +97,13 @@ class LogModule(mp_module.MPModule):
         highest = max(self.download_set)
         diff = set(range(highest)).difference(self.download_set)
         if len(diff) == 0:
-            self.master.mav.log_request_data_send(self.target_system,
-                                                       self.target_component,
-                                                       self.download_lognum, (1 + highest) * 90, 0xffffffff)
+            self.master.mav.log_request_data_send(
+                self.target_system,
+                self.target_component,
+                self.download_lognum,
+                (1 + highest) * 90,
+                0xffffffff
+            )
             self.retries += 1
         else:
             num_requests = 0
@@ -102,14 +114,17 @@ class LogModule(mp_module.MPModule):
                 while end + 1 in diff:
                     end += 1
                     diff.remove(end)
-                self.master.mav.log_request_data_send(self.target_system,
-                                                           self.target_component,
-                                                           self.download_lognum, start * 90, (end + 1 - start) * 90)
+                self.master.mav.log_request_data_send(
+                    self.target_system,
+                    self.target_component,
+                    self.download_lognum,
+                    start * 90,
+                    (end + 1 - start) * 90
+                )
                 num_requests += 1
                 self.retries += 1
                 if len(diff) == 0:
                     break
-
 
     def log_status(self, console=False):
         '''show download status'''
@@ -133,13 +148,12 @@ class LogModule(mp_module.MPModule):
         if len(self.download_set):
             highest = max(self.download_set)
         diff = set(range(highest)).difference(self.download_set)
-        status = "Downloading %s - %u/%u bytes %.1f%% %.1f kbyte/s (%u retries %u missing)" % (self.download_filename,
-                                                                                            os.path.getsize(self.download_filename),
-                                                                                        size,
-                                                                                        pct,
-                                                                                        speed,
-                                                                                        self.retries,
-                                                                                            len(diff))
+        status = (
+            f"Downloading {self.download_filename} - " +
+            f"{os.path.getsize(self.download_filename)}/{size} bytes " +
+            f"{pct:.1f}% {speed:.1f} kbyte/s " +
+            f"({self.retries} retries {len(diff)} missing)"
+        )
         if console:
             self.console.set_status('LogDownload', status, row=4)
         else:
@@ -164,11 +178,11 @@ class LogModule(mp_module.MPModule):
         self.log_download_next()
 
     def log_download_range(self, first, last):
-        self.download_queue = sorted(list(range(first,last+1)),reverse=True)
+        self.download_queue = sorted(list(range(first, last+1)), reverse=True)
         print(self.download_queue)
         self.log_download_next()
 
-    def log_download_from(self,fromnum = 0):
+    def log_download_from(self, fromnum=0):
         if len(self.entries.keys()) == 0:
             print("Please use log list first")
             return
@@ -181,9 +195,13 @@ class LogModule(mp_module.MPModule):
         print("Downloading log %u as %s" % (log_num, filename))
         self.download_lognum = log_num
         self.download_file = open(filename, "wb")
-        self.master.mav.log_request_data_send(self.target_system,
-                                                   self.target_component,
-                                                   log_num, 0, 0xFFFFFFFF)
+        self.master.mav.log_request_data_send(
+            self.target_system,
+            self.target_component,
+            log_num,
+            0,
+            0xFFFFFFFF
+        )
         self.download_filename = filename
         self.download_set = set()
         self.download_start = time.time()
@@ -206,17 +224,24 @@ class LogModule(mp_module.MPModule):
         elif args[0] == "list":
             print("Requesting log list")
             self.download_set = set()
-            self.master.mav.log_request_list_send(self.target_system,
-                                                       self.target_component,
-                                                       0, 0xffff)
+            self.master.mav.log_request_list_send(
+                self.target_system,
+                self.target_component,
+                0,
+                0xffff
+            )
 
         elif args[0] == "erase":
-            self.master.mav.log_erase_send(self.target_system,
-                                                self.target_component)
+            self.master.mav.log_erase_send(
+                self.target_system,
+                self.target_component
+            )
 
         elif args[0] == "resume":
-            self.master.mav.log_request_end_send(self.target_system,
-                                                      self.target_component)
+            self.master.mav.log_request_end_send(
+                self.target_system,
+                self.target_component
+            )
 
         elif args[0] == "cancel":
             if self.download_file is not None:
@@ -225,7 +250,7 @@ class LogModule(mp_module.MPModule):
 
         elif args[0] == "download":
             if len(args) < 2:
-                print("usage: log download all | log download <lognumber> <filename> | log download from <lognumber>|log download range FIRST LAST")
+                print("usage: log download all | log download <lognumber> <filename> | log download from <lognumber>|log download range FIRST LAST") # noqa:E501
                 return
             if args[1] == 'all':
                 self.log_download_all()
@@ -256,20 +281,20 @@ class LogModule(mp_module.MPModule):
         else:
             print(usage)
 
-
     def update_status(self):
         '''update log download status in console'''
         now = time.time()
         if self.download_file is not None and now - self.last_status > 0.5:
             self.last_status = now
             self.log_status(True)
-            
+
     def idle_task(self):
         '''handle missing log data'''
         if self.download_last_timestamp is not None and time.time() - self.download_last_timestamp > 0.7:
             self.download_last_timestamp = time.time()
             self.handle_log_data_missing()
         self.update_status()
+
 
 def init(mpstate):
     '''initialise module'''
