@@ -10,8 +10,10 @@ import copy
 import os
 import re
 import struct
+import sys
 import time
 
+import pymavlink
 from pymavlink import mavutil
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
@@ -345,6 +347,10 @@ on'''
            MISSION_ITEM_INT to give cm level accuracy
         '''
         if wp.get_type() == 'MISSION_ITEM_INT':
+            if not isinstance(wp.x, int):
+                print("BUG! wp.x is not integer")
+            if not isinstance(wp.y, int):
+                print("BUG! wp.y is not integer")
             return wp
         if self.has_location(wp.command):
             p5 = int(wp.x*1.0e7)
@@ -428,7 +434,12 @@ on'''
         if wp.mission_type != self.mav_mission_type():
             print("Wrong mission type in (%s)" % str(wp))
 
-        self.master.mav.send(wp_send)
+        try:
+            self.master.mav.send(wp_send)
+        except struct.error:
+            # this is often "required argument is not an integer"
+            mavutil.dump_message_verbose(sys.stderr, wp_send)
+            raise
 
         self.loading_waypoint_lasttime = time.time()
 
