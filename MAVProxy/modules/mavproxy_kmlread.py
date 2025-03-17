@@ -354,34 +354,33 @@ class KmlReadModule(mp_module.MPModule):
                 continue
 
             # and place any polygons on the map
-            (pointtype, name, coords) = point
-            if pointtype == 'Polygon':
-                self.add_polygon(name, coords)
+            if isinstance(point, kmlread.Polygon):
+                self.add_polygon(point.name, point.vertexes)
 
             # and points - barrell image and text
-            if pointtype == 'Point':
-                # print("Adding " + point[1])
+            if isinstance(point, kmlread.Point):
+                # print("Adding " + point.name)
                 curpoint = mp_slipmap.SlipIcon(
-                    point[1],
-                    latlon=(point[2][0][0], point[2][0][1]),
+                    point.name,
+                    latlon=point.latlon,
                     layer=3,
                     img='barrell.png',
                     rotation=0,
                     follow=False,
                 )
                 curtext = mp_slipmap.SlipLabel(
-                    point[1],
-                    point=(point[2][0][0], point[2][0][1]),
+                    point.name,
+                    point=point.latlon,
                     layer=4,
-                    label=point[1],
+                    label=point.name,
                     colour=(0, 255, 255),
                 )
                 self.add_map_object(curpoint)
                 self.add_map_object(curtext)
                 self.allayers.append(curpoint)
                 self.alltextlayers.append(curtext)
-                self.curlayers.append(point[1])
-                self.curtextlayers.append(point[1])
+                self.curlayers.append(point.name)
+                self.curtextlayers.append(point.name)
         self.menu_needs_refreshing = True
 
     def idle_task(self):

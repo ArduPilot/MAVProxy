@@ -13,6 +13,18 @@ import pathlib
 namespaces = {'kml': 'http://www.opengis.net/kml/2.2'}
 
 
+class Polygon():
+    def __init__(self, name, latlon):
+        self.name = name
+        self.vertexes = latlon
+
+
+class Point():
+    def __init__(self, name, latlon):
+        self.name = name
+        self.latlon = latlon
+
+
 def readkmz(filename):
     '''reads in a kmz file and returns xml nodes'''
     # Strip quotation marks if neccessary
@@ -72,7 +84,7 @@ def readObject(innode):
         if coordinates is None:
             return None
         s = coordinates.text.split(',')
-        return ("Point", name.text, [(float(s[1]), float(s[0]))])
+        return Point(name.text, (float(s[1]), float(s[0])))
 
     coordinates = find_tag_recursive(innode, 'coordinates')
     if coordinates is not None:
@@ -80,7 +92,7 @@ def readObject(innode):
         for c in coordinates.text.split():
             s = c.split(',')
             latlon.append((float(s[1]), float(s[0])))
-        return ("Polygon", name.text, latlon)
+        return Polygon(name.text, latlon)
 
     return ('Unknown', None, None)
 
