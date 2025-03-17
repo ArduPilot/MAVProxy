@@ -680,27 +680,27 @@ def load_kml(kml):
         except Exception:
             continue
 
-        if point[0] == 'Polygon':
+        if isinstance(point, kmlread.Polygon):
             newcolour = (random.randint(0, 255), 0, random.randint(0, 255))
-            curpoly = mp_slipmap.SlipPolygon(point[1], point[2],
+            curpoly = mp_slipmap.SlipPolygon(point.name, point.vertexes,
                                              layer=2, linewidth=2, colour=newcolour)
             ret.append(curpoly)
 
-        if point[0] == 'Point':
+        if isinstance(point, kmlread.Point):
             icon = mp_tile.mp_icon('barrell.png')
             curpoint = mp_slipmap.SlipIcon(
-                point[1],
-                latlon=(point[2][0][0], point[2][0][1]),
+                point.name,
+                latlon=point.latlon,
                 layer=3,
                 img=icon,
                 rotation=0,
                 follow=False,
             )
             curtext = mp_slipmap.SlipLabel(
-                point[1],
-                point=(point[2][0][0], point[2][0][1]),
+                point.name,
+                point=point.latlon,
                 layer=4,
-                label=point[1],
+                label=point.name,
                 colour=(0, 255, 255),
             )
             ret.append(curpoint)
