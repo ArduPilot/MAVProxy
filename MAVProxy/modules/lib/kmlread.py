@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+'''
+AP_FLAKE8_CLEAN
+'''
+
+
 import lxml.etree as etree
 from io import BytesIO as SIO
 from zipfile import ZipFile
@@ -7,22 +12,23 @@ import pathlib
 
 namespaces = {'kml': 'http://www.opengis.net/kml/2.2'}
 
+
 def readkmz(filename):
     '''reads in a kmz file and returns xml nodes'''
-    #Strip quotation marks if neccessary
+    # Strip quotation marks if neccessary
     filename.strip('"')
-    #Open the zip file (as applicable)    
+    # Open the zip file (as applicable)
     suffix = pathlib.Path(filename).suffix
     if suffix.lower() == '.kml':
         fo = open(filename, "rb")
         fstring = fo.read()
         fo.close()
     elif suffix.lower() == '.kmz':
-        zip=ZipFile(filename)
+        zip = ZipFile(filename)
         fstring = None
         for z in zip.filelist:
             if z.filename[-4:] == '.kml':
-                fstring=zip.read(z)
+                fstring = zip.read(z)
                 break
         if fstring is None:
             raise Exception("Could not find kml file in %s" % filename)
@@ -35,11 +41,13 @@ def readkmz(filename):
 
     return tree.findall(xpath, namespaces)
 
+
 def find_tag(node, tagname):
     for c in node.getchildren():
         if c.tag == "{" + namespaces['kml'] + "}" + tagname:
             return c
     return None
+
 
 def find_tag_recursive(node, tagname):
     for c in node.getchildren():
@@ -54,7 +62,7 @@ def find_tag_recursive(node, tagname):
 
 def readObject(innode):
     '''reads in a node and returns as a tuple: (type, name, points[])'''
-    #get name
+    # get name
     name = find_tag(innode, 'name')
     if name is None:
         return None
@@ -75,6 +83,7 @@ def readObject(innode):
         return ("Polygon", name.text, latlon)
 
     return ('Unknown', None, None)
+
 
 if __name__ == '__main__':
     import sys
