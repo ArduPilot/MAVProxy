@@ -11,8 +11,6 @@ class WarningModule(mp_module.MPModule):
         super(WarningModule, self).__init__(mpstate, "warning", "warning module")
         self.add_command('warning', self.cmd_warning, "warning")
         self.prev_call = time.time()
-        self.esc_fwd_err = 0
-        self.num_escs = 4
         self.sensor_present = dict()
         self.sensor_enabled = dict()
         self.sensor_healthy = dict()
@@ -20,14 +18,16 @@ class WarningModule(mp_module.MPModule):
         self.warning_settings = mp_settings.MPSettings(
             [ ('check_freq', int, 5),
               ('details', bool, True),
+              ('debug', bool, True),
               ('min_sat', int, 9),
               ('sat_diff', int, 5),
               ('rpm_diff', int, 1000),
               ('airspd_diff', float, 5),
               ('max_wind', float, 10),
               ('max_agl_alt', float, 123),
+              ('fwd_escs', int, 5),
+              ('vtol_escs', int, 10),
           ])
-
 
     def cmd_warning(self, args):
         '''warning commands'''
@@ -40,10 +40,13 @@ class WarningModule(mp_module.MPModule):
         else:
             print('usage: warning set')
 
-
     def monitor(self): 
-        fwd_escs = [ 0, 2 ]
-        vtol_escs = [ 1, 3 ]
+        fwd_escs = list(f'{self.warning_settings.fwd_escs:04b}')
+        fwd_escs.reverse()
+        vtol_escs = list(f'{self.warning_settings.vtol_escs:04b}')
+        vtol_escs.reverse()
+        self.debug(fwd_escs)
+        self.debug(vtol_escs)
 
         gps1 = self.master.messages.get("GPS_RAW_INT", None)
         gps2 = self.master.messages.get("GPS2_RAW", None)
@@ -79,12 +82,13 @@ class WarningModule(mp_module.MPModule):
         else:
             max_esc = 0
             min_esc = 1e9
-            for no in fwd_escs:
-                # print("ESC number: " + str(no))
-                if esc.rpm[no] > max_esc:
-                    max_esc = esc.rpm[no]
-                if esc.rpm[no] < min_esc:
-                    min_esc = esc.rpm[no]
+            for no, act in enumerate(fwd_escs):
+                if act == '1':
+                    self.debug("FWD ESC number: " + str(no))
+                    if esc.rpm[no] > max_esc:
+                        max_esc = esc.rpm[no]
+                    if esc.rpm[no] < min_esc:
+                        min_esc = esc.rpm[no]
 
             if (max_esc - min_esc) > self.warning_settings.rpm_diff:
                 self.details = "FWD ESC difference between max and min RPM more than " + str(self.warning_settings.rpm_diff)
@@ -93,12 +97,13 @@ class WarningModule(mp_module.MPModule):
             #check vtol esc rpms
             max_esc = 0
             min_esc = 1e9
-            for no in vtol_escs:
-                # print("ESC number: " + str(no))
-                if esc.rpm[no] > max_esc:
-                    max_esc = esc.rpm[no]
-                if esc.rpm[no] < min_esc:
-                    min_esc = esc.rpm[no]
+            for no, act in enumerate(vtol_escs):
+                if act == '1':
+                    self.debug("VTOL ESC number: " + str(no))
+                    if esc.rpm[no] > max_esc:
+                        max_esc = esc.rpm[no]
+                    if esc.rpm[no] < min_esc:
+                        min_esc = esc.rpm[no]
 
             if (max_esc - min_esc) > self.warning_settings.rpm_diff:
                 self.details = "VTOL ESC difference between max and min RPM more than " + str(self.warning_settings.rpm_diff)
@@ -132,7 +137,6 @@ class WarningModule(mp_module.MPModule):
                 self.details = "AGL Alt more than " + str(self.warning_settings.max_agl_alt)
                 self.warn("Terrain")
 
-
     def update_status(self):
         sys_status = self.master.messages["SYS_STATUS"]
         sensors = { 'AS'   : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_DIFFERENTIAL_PRESSURE,
@@ -153,13 +157,15 @@ class WarningModule(mp_module.MPModule):
             self.sensor_enabled[s] = ((sys_status.onboard_control_sensors_enabled & bits) == bits)
             self.sensor_healthy[s] = ((sys_status.onboard_control_sensors_health & bits) == bits)
             
-
     def warn(self, err):
         self.say("Warning " + err + " failure")
         if self.warning_settings.details == True and self.details != "":
             self.console.writeln(self.details, fg = 'grey')
             self.details = ""
 
+    def debug(self, msg):
+        if self.warning_settings.debug == True:
+            self.console.writeln(msg, fg = 'blue')
 
     def idle_task(self):
         '''called on idle'''
