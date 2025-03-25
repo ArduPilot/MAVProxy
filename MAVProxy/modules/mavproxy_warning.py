@@ -1,180 +1,145 @@
 #!/usr/bin/env python
-'''Warning'''
+'''module to display and announce warnings about system failures'''
 
 import time
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
-from pymavlink import mavutil
 
 class WarningModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(WarningModule, self).__init__(mpstate, "warning", "warning module")
-        self.add_command('warning', self.cmd_warning, "warning")
-        self.prev_call = time.time()
-        self.sensor_present = dict()
-        self.sensor_enabled = dict()
-        self.sensor_healthy = dict()
+        self.add_command('warning', self.cmd_warning, "warning", ["details", "set (WARNINGSETTING)"])
+        self.check_time = time.time()
+        self.warn_time = time.time()
+        self.failure = None
         self.details = ""
         self.warning_settings = mp_settings.MPSettings(
-            [ ('check_freq', int, 5),
+            [ ('warn_time', int, 5),
               ('details', bool, True),
-              ('debug', bool, False),
               ('min_sat', int, 10),
               ('sat_diff', int, 5),
-              ('rpm_diff', int, 1000),
               ('airspd_diff', float, 5),
-              ('max_wind', float, 10),
-              ('max_agl_alt', float, 123),
-              ('fwd_escs', int, 5),
-              ('vtol_escs', int, 10),
+              ('esc_group1', int, 0),
+              ('esc_group2', int, 0),
+              ('esc_min_rpm', int, 100),
           ])
+        self.add_completion_function('(WARNINGSETTING)',
+                                     self.warning_settings.completion)
 
     def cmd_warning(self, args):
         '''warning commands'''
         state = self
-        if args and args[0] == 'set':
-            if len(args) < 3:
-                state.warning_settings.show_all()
-            else:
-                state.warning_settings.set(args[1], args[2])
+        if len(args) > 0:
+            if args[0] == 'set':
+                state.warning_settings.command(args[1:])
+            if args[0] == 'details':
+                print("warning: %s" % self.details)
         else:
-            print('usage: warning set')
+            print('usage: warning set|details')
 
-    def monitor(self): 
-        fwd_escs = list(f'{self.warning_settings.fwd_escs:04b}')
-        fwd_escs.reverse()
-        vtol_escs = list(f'{self.warning_settings.vtol_escs:04b}')
-        vtol_escs.reverse()
-        self.debug(fwd_escs)
-        self.debug(vtol_escs)
+    def get_esc_rpms(self):
+        '''get a dictionary of ESC RPMs'''
+        ret = {}
+        esc_messages = [ ('ESC_TELEMETRY_1_TO_4', 1),
+                         ('ESC_TELEMETRY_5_TO_8', 5),
+                         ('ESC_TELEMETRY_9_TO_12', 9),
+                         ('ESC_TELEMETRY_13_TO_16', 13) ]
+        for (mname, base) in esc_messages:
+            m = self.master.messages.get(mname, None)
+            if m:
+                for i in range(4):
+                    ret[base+i] = m.rpm[i]
+        return ret
 
-        gps1 = self.master.messages.get("GPS_RAW_INT")
-        gps2 = self.master.messages.get("GPS2_RAW")
-        esc = self.master.messages.get("ESC_TELEMETRY_1_TO_4")
-        vfr_hud = self.master.messages.get("VFR_HUD")
-        terr = self.master.messages.get("TERRAIN_REPORT")
-        nvf_as2 = self.master.messages.get("NAMED_VALUE_FLOAT")
-        if nvf_as2 != None:
-            nvf_as2 = nvf_as2['AS2']
 
-        if gps1 is None or gps2 is None:
-            self.details = "No GPS1 and/or GPS2 message"
-            self.warn("GPS")
-        else:
-            #check min visible sat
-            if gps1.satellites_visible < self.warning_settings.min_sat:
-                self.details = "GPS1 satellites less than " + str(self.warning_settings.min_sat)
-                self.warn("GPS") 
+    def check_esc_group(self, group_mask, rpms):
+        '''check one ESC group for consistency. Either all running or none running'''
+        escs = []
+        for i in range(16):
+            if group_mask & (1<<i):
+                escs.append(i+1)
+        num_running = 0
+        for e in escs:
+            rpm = rpms.get(e,0)
+            if rpm >= self.warning_settings.esc_min_rpm:
+                num_running += 1
+        return num_running != 0 and num_running != len(escs)
 
-            if gps2.satellites_visible < self.warning_settings.min_sat:
-                self.details = "GPS2 satellites less than " + str(self.warning_settings.min_sat)
-                self.warn("GPS") 
+    def check_escs(self):
+        '''check for ESC consistency'''
+        rpms = self.get_esc_rpms()
+        if self.check_esc_group(self.warning_settings.esc_group1, rpms):
+            self.details = "ESC group1 fail"
+            return True
+        if self.check_esc_group(self.warning_settings.esc_group2, rpms):
+            self.details = "ESC group2 fail"
+            return True
+        return False
 
-            #check difference in sat counts
-            if abs(gps1.satellites_visible - gps2.satellites_visible) > self.warning_settings.sat_diff: 
-                self.details = "Satellite diff between GPS1 and GPS2 more than " + str(self.warning_settings.sat_diff)
-                self.warn("GPS")
+    def check_gps(self):
+        '''check GPS issues'''
+        gps1 = self.master.messages.get("GPS_RAW_INT", None)
+        gps2 = self.master.messages.get("GPS2_RAW", None)
+        if gps1 and gps2:
+            if abs(gps1.satellites_visible - gps2.satellites_visible) > self.warning_settings.sat_diff:
+                self.details = "GPS sat diff"
+                return True
+        if gps1 and gps1.satellites_visible < self.warning_settings.min_sat:
+            self.details = "GPS1 low sat count"
+            return True
+        if gps2 and gps2.satellites_visible < self.warning_settings.min_sat:
+            self.details = "GPS2 low sat count"
+            return True
+        return False
 
-        #check fwd esc rpms
-        if esc is None:
-            self.details = "No ESC message"
-            self.warn("ESC")
-        else:
-            max_esc = 0
-            min_esc = 1e9
-            for no, act in enumerate(fwd_escs):
-                if act == '1':
-                    self.debug("FWD ESC number: " + str(no))
-                    if esc.rpm[no] > max_esc:
-                        max_esc = esc.rpm[no]
-                    if esc.rpm[no] < min_esc:
-                        min_esc = esc.rpm[no]
-
-            if (max_esc - min_esc) > self.warning_settings.rpm_diff:
-                self.details = "FWD ESC difference between max and min RPM more than " + str(self.warning_settings.rpm_diff)
-                self.warn("ESC")
-
-            #check vtol esc rpms
-            max_esc = 0
-            min_esc = 1e9
-            for no, act in enumerate(vtol_escs):
-                if act == '1':
-                    self.debug("VTOL ESC number: " + str(no))
-                    if esc.rpm[no] > max_esc:
-                        max_esc = esc.rpm[no]
-                    if esc.rpm[no] < min_esc:
-                        min_esc = esc.rpm[no]
-
-            if (max_esc - min_esc) > self.warning_settings.rpm_diff:
-                self.details = "VTOL ESC difference between max and min RPM more than " + str(self.warning_settings.rpm_diff)
-                self.warn("ESC")
-
-        if not (self.sensor_enabled['AS'] and self.sensor_present['AS'] and self.sensor_healthy['AS']):
-            self.details = "Airspeed sensor issue: Enabled: " + str(self.sensor_enabled['AS']) + ", Present: " + str(self.sensor_present['AS']) + ", Healthy: " + str(self.sensor_healthy['AS'])
-            self.warn("Airspeed")
-
-        if vfr_hud is None or nvf_as2 is None:
-            self.details = "No HUD and/or AS2 message"
-            self.warn("Airspeed")
-        else:
+    def check_airspeed(self):
+        '''check airspeed sensors'''
+        vfr_hud = self.master.messages.get("VFR_HUD", None)
+        nvf_as2 = self.master.messages.get("NAMED_VALUE_FLOAT[AS2]", None)
+        if vfr_hud and nvf_as2:
             if abs(vfr_hud.airspeed - nvf_as2.value) > self.warning_settings.airspd_diff:
-                self.details = "Airspeed 1 vs airspeed 2 difference greater than " + str(self.warning_settings.airspd_diff)
-                self.warn("Airspeed")
+                self.details = "Airspeed difference"
+                return True
+        return False
 
-            if abs(vfr_hud.groundspeed - (vfr_hud.airspeed + nvf_as2.value)/2) > self.warning_settings.max_wind:
-                self.details = "Airspeed vs groundspeed difference more than " + str(self.warning_settings.max_wind)
-                self.warn("Airspeed")
-            
-        if terr is None:
-            self.details = "No terrain message."
-            self.warn("Terrain")
+    def check_all(self):
+        if self.check_escs():
+            self.failure = 'ESC'
+        elif self.check_gps():
+            self.failure = 'GPS'
+        elif self.check_airspeed():
+            self.failure = 'AIRSPEED'
+
+    def monitor(self):
+        last_fail = self.failure
+        self.failure = None
+        self.check_all()
+        if self.failure and self.failure != last_fail:
+            self.warn(self.failure)
+        if not self.failure:
+            self.console.set_status('WARN', 'WARN:OK', fg='green', row=2)
         else:
-            if terr.pending > 0:
-                self.details = "Pending terrain items."
-                self.warn("Terrain")
+            self.console.set_status('WARN', 'WARN:%s' % self.failure, fg='red', row=2)
 
-            if terr.current_height > self.warning_settings.max_agl_alt:
-                self.details = "AGL Alt more than " + str(self.warning_settings.max_agl_alt)
-                self.warn("Terrain")
-
-    def update_status(self):
-        sys_status = self.master.messages.get("SYS_STATUS")
-        sensors = { 'AS'   : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_DIFFERENTIAL_PRESSURE,
-                    'MAG'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_MAG,
-                    'INS'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_ACCEL | mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_GYRO,
-                    'AHRS' : mavutil.mavlink.MAV_SYS_STATUS_AHRS,
-                    'RC'   : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_RC_RECEIVER,
-                    'TERR' : mavutil.mavlink.MAV_SYS_STATUS_TERRAIN,
-                    'RNG'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_LASER_POSITION,
-                    'LOG'  : mavutil.mavlink.MAV_SYS_STATUS_LOGGING,
-                    'PRX'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_PROXIMITY,
-                    'PRE'  : mavutil.mavlink.MAV_SYS_STATUS_PREARM_CHECK,
-                    'FLO'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_OPTICAL_FLOW,
-        }
-        for s in sensors.keys():
-            bits = sensors[s]
-            self.sensor_present[s] = ((sys_status.onboard_control_sensors_present & bits) == bits)
-            self.sensor_enabled[s] = ((sys_status.onboard_control_sensors_enabled & bits) == bits)
-            self.sensor_healthy[s] = ((sys_status.onboard_control_sensors_health & bits) == bits)
-            
     def warn(self, err):
-        self.say("Warning " + err + " failure")
-        if self.warning_settings.details == True and self.details != "":
-            self.console.writeln(self.details, fg = 'grey')
-            self.details = ""
-
-    def debug(self, msg):
-        if self.warning_settings.debug == True:
-            self.console.writeln(msg, fg = 'blue')
+        self.say("Warning " + err)
+        self.warn_time = time.time()
 
     def idle_task(self):
         '''called on idle'''
         now = time.time()
-        if (now - self.prev_call) > self.warning_settings.check_freq:
-            self.prev_call = now
-            self.update_status()
+
+        # at 1Hz update status. If status changes warn immediately
+        if (now - self.check_time) >= 1:
+            self.check_time = now
             self.monitor()
 
+        # periodically announce the failure if any
+        if (self.failure and
+            self.warning_settings.warn_time > 0 and
+            (now - self.warn_time) >= self.warning_settings.warn_time):
+            self.warn(self.failure)
+            
 
 def init(mpstate):
     '''initialise module'''
