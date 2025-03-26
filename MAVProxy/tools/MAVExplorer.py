@@ -1171,7 +1171,7 @@ def cmd_param(args):
             verbose = True
     else:
         wildcard = '*'
-    k = sorted(mlog.params.keys())
+    k = mp_util.sorted_natural(mlog.params.keys())
     for p in k:
         if fnmatch.fnmatch(str(p).upper(), wildcard.upper()):
             s = "%-16.16s %f" % (str(p), mlog.params[p])

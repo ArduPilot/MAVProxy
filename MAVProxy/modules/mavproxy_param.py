@@ -829,7 +829,7 @@ class ParamState:
 
     def param_show(self, pattern, verbose):
         '''show parameters'''
-        k = sorted(self.mav_param.keys())
+        k = mp_util.sorted_natural(self.mav_param.keys())
         for p in k:
             name = str(p).upper()
             if fnmatch.fnmatch(name, pattern.upper()):
@@ -847,7 +847,7 @@ class ParamState:
             print("Failed to send parameters")
         else:
             if self.ftp_send_param is not None:
-                for k in sorted(self.ftp_send_param.keys()):
+                for k in mp_util.sorted_natural(self.ftp_send_param.keys()):
                     v = self.ftp_send_param.get(k)
                     self.mav_param[k] = v
                 self.ftp_send_param = None
@@ -888,7 +888,7 @@ class ParamState:
         newparm = mavparm.MAVParmDict()
         newparm.load(filename, param_wildcard, check=False)
         fh = SIO()
-        for k in sorted(newparm.keys()):
+        for k in mp_util.sorted_natural(newparm.keys()):
             v = newparm.get(k)
             oldv = self.mav_param.get(k, None)
             if oldv is not None and abs(oldv - v) <= newparm.mindelta:
@@ -901,7 +901,7 @@ class ParamState:
 
         fh.write(struct.pack("<HHH", 0x671b, count, count))
         last_param = ""
-        for k in sorted(newparm.keys()):
+        for k in mp_util.sorted_natural(newparm.keys()):
             v = newparm.get(k)
             vtype = self.best_type(v)
             common_len = self.str_common_len(last_param, k)
