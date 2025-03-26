@@ -18,8 +18,8 @@ class WarningModule(mp_module.MPModule):
         self.warning_settings = mp_settings.MPSettings(
             [ ('check_freq', int, 5),
               ('details', bool, True),
-              ('debug', bool, True),
-              ('min_sat', int, 9),
+              ('debug', bool, False),
+              ('min_sat', int, 10),
               ('sat_diff', int, 5),
               ('rpm_diff', int, 1000),
               ('airspd_diff', float, 5),
