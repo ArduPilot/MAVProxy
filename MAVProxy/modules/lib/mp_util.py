@@ -10,6 +10,7 @@ import sys
 import platform
 import warnings
 import time
+import re
 from math import cos, sin, tan, atan2, sqrt, radians, degrees, pi, log, fmod
 
 # Some platforms (CYGWIN and others) many not have the wx library
@@ -570,3 +571,14 @@ def get_gps_time(tnow):
     t_ms = int(tnow * 1000) % 1000
     week_ms = (epoch_seconds % SEC_PER_WEEK) * 1000 + ((t_ms//200) * 200)
     return week, week_ms
+
+    
+
+def natural_sort_key(s):
+    '''a sort key for natural sorting, where embedded integers are sorted separately'''
+    return [int(text) if text.isdigit() else text.lower()
+                for text in re.split('([0-9]+)', s)]
+
+def sorted_natural(lst):
+    '''sort using a 'natural' sort order'''
+    return sorted(lst, key=natural_sort_key)

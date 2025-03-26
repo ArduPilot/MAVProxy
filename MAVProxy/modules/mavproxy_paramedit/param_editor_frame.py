@@ -304,13 +304,18 @@ class ParamEditorFrame(wx.Frame):
                 self.selected_fltmode = 6
             self.requires_redraw = True
 
+    def natural_key(self, item):
+        '''sort key for natural order'''
+        paramname, paramvalue = item
+        return mp_util.natural_sort_key(paramname)
+
     def redraw_grid(self, datalist):
         self.display_list.ClearGrid()
         if (self.display_list.GetNumberRows() > 0):
             self.display_list.DeleteRows(0, self.display_list.GetNumberRows())
         self.display_list.AppendRows(len(datalist))
         row = 0
-        for paramname, paramvalue in sorted(datalist.items()):
+        for paramname, paramvalue in sorted(datalist.items(), key=self.natural_key):
             self.add_new_row(row, paramname, paramvalue)
             row = row + 1
         self.display_list.ForceRefresh()
