@@ -48,12 +48,12 @@ class WarningModule(mp_module.MPModule):
         self.debug(fwd_escs)
         self.debug(vtol_escs)
 
-        gps1 = self.master.messages.get("GPS_RAW_INT", None)
-        gps2 = self.master.messages.get("GPS2_RAW", None)
-        esc = self.master.messages.get("ESC_TELEMETRY_1_TO_4", None)
-        vfr_hud = self.master.messages.get("VFR_HUD", None)
-        terr = self.master.messages.get("TERRAIN_REPORT", None)
-        nvf_as2 = self.master.messages.get("NAMED_VALUE_FLOAT", None)
+        gps1 = self.master.messages.get("GPS_RAW_INT")
+        gps2 = self.master.messages.get("GPS2_RAW")
+        esc = self.master.messages.get("ESC_TELEMETRY_1_TO_4")
+        vfr_hud = self.master.messages.get("VFR_HUD")
+        terr = self.master.messages.get("TERRAIN_REPORT")
+        nvf_as2 = self.master.messages.get("NAMED_VALUE_FLOAT")
         if nvf_as2 != None:
             nvf_as2 = nvf_as2['AS2']
 
@@ -138,7 +138,7 @@ class WarningModule(mp_module.MPModule):
                 self.warn("Terrain")
 
     def update_status(self):
-        sys_status = self.master.messages["SYS_STATUS"]
+        sys_status = self.master.messages.get("SYS_STATUS")
         sensors = { 'AS'   : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_DIFFERENTIAL_PRESSURE,
                     'MAG'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_MAG,
                     'INS'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_ACCEL | mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_GYRO,
