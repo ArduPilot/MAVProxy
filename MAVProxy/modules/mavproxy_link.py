@@ -171,7 +171,7 @@ class LinkModule(mp_module.MPModule):
                                   str(self.status.counters['MasterIn'][master.linknum]) + "," +
                                   str(self.status.bytecounters['MasterIn'][master.linknum].total()) + "," +
                                   str(linkdelay) + "," +
-                                  str(100 * round(master.packet_loss(), 3)) + "\n")
+                                  str(round(master.packet_loss(), 3)) + "\n")
 
         # update outstanding TimeSyncRequest objects.  Reap any which
         # are past their use-by date:
