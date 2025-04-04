@@ -209,7 +209,7 @@ colour_over_255 = 0
 
 
 def colour_for_point(mlog, point, instance, options):
-    global colour_expression_exceptions, colour_source_max, colour_source_min, colour_over_255
+    global colour_source_max, colour_source_min, colour_over_255
     '''indicate a colour to be used to plot point'''
     source = getattr(options, "colour_source", "flightmode")
     if source == "flightmode":
