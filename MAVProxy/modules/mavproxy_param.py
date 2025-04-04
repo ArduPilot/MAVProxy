@@ -608,7 +608,7 @@ class ParamState:
             if bitmask_values is not None and len(bitmask_values):
                 for (n, v) in bitmask_values.items():
                     if bit_index is None or bit_index == int(n):
-                        out_v.append(f"\t{int(n):3d} [{'x' if value & (1<<int(n)) else ' '}] : {v}")
+                        out_v.append(f"\t{int(n):3d} [{'x' if value & (1 << int(n)) else ' '}] : {v}")
                     remaining_bits &= ~(1 << int(n))
 
                 # Loop bits 0 to 31, checking if they are remaining, and append
