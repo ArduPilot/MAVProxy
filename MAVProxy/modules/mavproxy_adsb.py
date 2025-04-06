@@ -9,6 +9,7 @@ from math import *
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
 from pymavlink import mavutil
+from PIL import ImageColor
 
 obc_icons = {
     100 : 'greenplane.png',
@@ -80,7 +81,10 @@ class ADSBModule(mp_module.MPModule):
                                                      ("show_threat_radius", bool, False),
                                                      # threat_radius_clear = threat_radius*threat_radius_clear_multiplier
                                                      ("threat_radius_clear_multiplier", int, 2),
-                                                     ("show_threat_radius_clear", bool, False)])
+                                                     ("show_threat_radius_clear", bool, False),
+                                                     ("alt_color1", str, "blue"),
+                                                     ("alt_color2", str, "red"),
+                                                     ("alt_color_thresh", int, 300)])
         self.add_completion_function('(ADSBSETTING)',
                                      self.ADSB_settings.completion)
         
@@ -217,17 +221,21 @@ class ADSBModule(mp_module.MPModule):
             else:  # the vehicle is in the dict
                 # update the dict entry
                 self.threat_vehicles[id].update(m.to_dict(), self.get_time())
-                for mp in self.module_matching('map*'):
-                    # update the map
-                    ground_alt = self.module('terrain').ElevationModel.GetElevation(m.lat*1e-7, m.lon*1e-7)
-                    alt_amsl = m.altitude * 0.001
-                    if alt_amsl > 0:
-                        alt = int(alt_amsl - ground_alt)
-                        label = str(alt) + "m"
-                    else:
-                        label = None
-                    mp.map.set_position(id, (m.lat * 1e-7, m.lon * 1e-7), rotation=m.heading*0.01, label=label, colour=(0,250,250))
-                    mp.map.set_position(id+":circle", (m.lat * 1e-7, m.lon * 1e-7))
+
+            for mp in self.module_matching('map*'):
+                # update the map, labelling alt above/below our alt
+                ground_alt = self.module('terrain').ElevationModel.GetElevation(m.lat*1e-7, m.lon*1e-7)
+                alt_amsl = m.altitude * 0.001
+                color = ImageColor.getrgb(self.ADSB_settings.alt_color1)
+                label = None
+                if alt_amsl > 0:
+                    alt = int(alt_amsl - ground_alt)
+                    label = self.height_string(alt)
+                    if abs(alt) < self.ADSB_settings.alt_color_thresh:
+                        color = ImageColor.getrgb(self.ADSB_settings.alt_color2)
+
+                mp.map.set_position(id, (m.lat * 1e-7, m.lon * 1e-7), rotation=m.heading*0.01, label=label, colour=color)
+                mp.map.set_position(id+":circle", (m.lat * 1e-7, m.lon * 1e-7))
 
     def idle_task(self):
         '''called on idle'''
