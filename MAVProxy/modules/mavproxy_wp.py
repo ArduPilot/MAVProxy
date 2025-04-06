@@ -241,7 +241,7 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
         this ideally should be home, but if home is not available then use a click position
         '''
         (lat, lon, alt) = (None, None, None)
-        if 'HOME_POSITION' in self.master.messages:
+        if self.master is not None and 'HOME_POSITION' in self.master.messages:
             h = self.master.messages['HOME_POSITION']
             (lat, lon, alt) = (h.latitude*1.0e-7, h.longitude*1.0e-7, h.altitude*1.0e-3)
         elif home_only:
