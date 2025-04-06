@@ -315,19 +315,20 @@ class KmlReadModule(mp_module.MPModule):
         self.curtextlayers = []
         self.menu_needs_refreshing = True
 
-    def add_polygon(self, name, coords):
+    def add_polygon(self, name, coords, line_colour=None):
         '''add a polygon to the KML list.  coords is a list of lat/lng tuples in degrees'''
         self.snap_points.extend(coords)
 
         # print("Adding " + name)
-        newcolour = (random.randint(0, 255), 0, random.randint(0, 255))
+        if line_colour is None:
+            line_colour = (random.randint(0, 255), 0, random.randint(0, 255))
         layer_name = f"{name}-{self.counter}"
         curpoly = mp_slipmap.SlipPolygon(
             layer_name,
             coords,
             layer=2,
             linewidth=2,
-            colour=newcolour,
+            colour=line_colour,
         )
         self.add_map_object(curpoly)
         self.allayers.append(curpoly)
@@ -337,7 +338,9 @@ class KmlReadModule(mp_module.MPModule):
     def loadkml(self, filename):
         '''Load a kml from file and put it on the map'''
         # Open the zip file
-        nodes = kmlread.readkmz(filename)
+        kml = kmlread.KMLRead(filename)
+        kml.parse()
+        nodes = kml.placemark_nodes()
 
         self.snap_points = []
 
@@ -347,7 +350,7 @@ class KmlReadModule(mp_module.MPModule):
             return
         for n in nodes:
             try:
-                point = kmlread.readObject(n)
+                point = kml.readObject(n)
             except Exception:
                 continue
             if point is None:
@@ -355,7 +358,7 @@ class KmlReadModule(mp_module.MPModule):
 
             # and place any polygons on the map
             if isinstance(point, kmlread.Polygon):
-                self.add_polygon(point.name, point.vertexes)
+                self.add_polygon(point.name, point.vertexes, point.line_colour)
 
             # and points - barrell image and text
             if isinstance(point, kmlread.Point):
