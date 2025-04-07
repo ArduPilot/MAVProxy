@@ -82,6 +82,7 @@ class ADSBModule(mp_module.MPModule):
                                                      # threat_radius_clear = threat_radius*threat_radius_clear_multiplier
                                                      ("threat_radius_clear_multiplier", int, 2),
                                                      ("show_threat_radius_clear", bool, False),
+                                                     ("show_callsign", bool, True),
                                                      ("alt_color1", str, "blue"),
                                                      ("alt_color2", str, "red"),
                                                      ("alt_color_thresh", int, 300)])
@@ -227,10 +228,12 @@ class ADSBModule(mp_module.MPModule):
                 ground_alt = self.module('terrain').ElevationModel.GetElevation(m.lat*1e-7, m.lon*1e-7)
                 alt_amsl = m.altitude * 0.001
                 color = ImageColor.getrgb(self.ADSB_settings.alt_color1)
-                label = None
+                label = ""
+                if self.ADSB_settings.show_callsign:
+                    label = "[%s] " % m.callsign
                 if alt_amsl > 0:
                     alt = int(alt_amsl - ground_alt)
-                    label = self.height_string(alt)
+                    label += self.height_string(alt)
                     if abs(alt) < self.ADSB_settings.alt_color_thresh:
                         color = ImageColor.getrgb(self.ADSB_settings.alt_color2)
 
