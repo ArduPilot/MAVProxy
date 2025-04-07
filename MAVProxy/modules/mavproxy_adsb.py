@@ -8,6 +8,7 @@ from math import *
 
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
+from MAVProxy.modules.lib import mp_util
 from pymavlink import mavutil
 from PIL import ImageColor
 
@@ -27,11 +28,11 @@ obc_radius = {
     104 : 200
 }
     
-def get_threat_radius(emitter_type):
+def get_threat_radius(emitter_type, squawk):
 
     if emitter_type == 255:
         ''' objectAvoidance Database item, squawk contains radius in cm'''
-        return m.squawk * 0.01
+        return squawk * 0.01
     '''get threat radius for an OBC item'''
     return obc_radius.get(emitter_type,0)
 
@@ -83,15 +84,18 @@ class ADSBModule(mp_module.MPModule):
                                                      ("threat_radius_clear_multiplier", int, 2),
                                                      ("show_threat_radius_clear", bool, False),
                                                      ("show_callsign", bool, True),
+                                                     ("traffic_warning", bool, False),
                                                      ("alt_color1", str, "blue"),
                                                      ("alt_color2", str, "red"),
-                                                     ("alt_color_thresh", int, 300)])
+                                                     ("alt_color_alt_thresh", int, 300),
+                                                     ("alt_color_dist_thresh", int, 3000)])
         self.add_completion_function('(ADSBSETTING)',
                                      self.ADSB_settings.completion)
         
         self.threat_detection_timer = mavutil.periodic_event(2)
         self.threat_timeout_timer = mavutil.periodic_event(2)
         self.tnow = self.get_time()
+        self.last_traffic = self.tnow
 
     def cmd_ADSB(self, args):
         '''adsb command parser'''
@@ -201,19 +205,23 @@ class ADSBModule(mp_module.MPModule):
         callsign = state['callsign']
         heading = state['heading']
         emitter_type = state['emitter_type']
+        squawk = state['squawk']
 
         if id not in self.threat_vehicles.keys():  # check to see if the vehicle is in the dict
+            #print("NEW: ", state)
             # if not then add it
             self.threat_vehicles[id] = ADSBVehicle(id=id, state=state)
+            #print("NEW: ", state)
             for mp in self.module_matching('map*'):
                 from MAVProxy.modules.lib import mp_menu
                 from MAVProxy.modules.mavproxy_map import mp_slipmap
                 self.threat_vehicles[id].menu_item = mp_menu.MPMenuItem(name=id, returnkey=None)
 
-                threat_radius = get_threat_radius(emitter_type)
+                threat_radius = get_threat_radius(emitter_type, squawk)
                 selected_icon = get_threat_icon(emitter_type, self.threat_vehicles[id].icon)
                     
                 if selected_icon is not None:
+                    #print("map add ", state)
                     # draw the vehicle on the map
                     popup = mp_menu.MPMenuSubMenu('ADSB', items=[self.threat_vehicles[id].menu_item])
                     icon = mp.map.icon(selected_icon)
@@ -231,20 +239,33 @@ class ADSBModule(mp_module.MPModule):
 
         for mp in self.module_matching('map*'):
             # update the map, labelling alt above/below our alt
-            ground_alt = self.module('terrain').ElevationModel.GetElevation(lat*1e-7, lon*1e-7)
+            GPI = self.master.messages.get("GLOBAL_POSITION_INT", None)
+            if GPI is None:
+                return
+            ref_alt = GPI.alt*0.001
+            lat_deg = lat * 1.0e-7
+            lon_deg = lon * 1.0e-7
+            our_lat_deg = GPI.lat*1.0e-7
+            our_lon_deg = GPI.lon*1.0e-7
+
+            dist = mp_util.gps_distance(our_lat_deg, our_lon_deg, lat_deg, lon_deg)
             alt_amsl = altitude_km * 0.001
             color = ImageColor.getrgb(self.ADSB_settings.alt_color1)
             label = ""
             if self.ADSB_settings.show_callsign:
-                label = "[%s] " % callsign
+                label = "[%s] " % callsign.rstrip()
             if alt_amsl > 0:
-                alt = int(alt_amsl - ground_alt)
+                alt = int(alt_amsl - ref_alt)
                 label += self.height_string(alt)
-                if abs(alt) < self.ADSB_settings.alt_color_thresh:
+                if abs(alt) < self.ADSB_settings.alt_color_alt_thresh and dist < self.ADSB_settings.alt_color_dist_thresh:
+                    tnow = self.get_time()
+                    if self.ADSB_settings.traffic_warning and tnow - self.last_traffic > 5:
+                        self.last_traffic = tnow
+                        self.say("traffic")
                     color = ImageColor.getrgb(self.ADSB_settings.alt_color2)
 
-            mp.map.set_position(id, (lat * 1e-7, lon * 1e-7), rotation=heading*0.01, label=label, colour=color)
-            mp.map.set_position(id+":circle", (lat * 1e-7, lon * 1e-7))
+            mp.map.set_position(id, (lat_deg, lon_deg), rotation=heading*0.01, label=label, colour=color)
+            mp.map.set_position(id+":circle", (lat_deg, lon_deg))
 
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
