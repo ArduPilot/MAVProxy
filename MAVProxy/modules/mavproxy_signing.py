@@ -94,7 +94,8 @@ class SigningModule(mp_module.MPModule):
             return
         passphrase = args[0]
         key = self.passphrase_to_key(passphrase)
-        self.master.setup_signing(key, sign_outgoing=True, allow_unsigned_callback=self.allow_unsigned)
+        for m in self.mpstate.mav_master:
+            m.setup_signing(key, sign_outgoing=True, allow_unsigned_callback=self.allow_unsigned)
         print("Setup signing key")
 
     def cmd_signing_disable(self, args):
