@@ -446,13 +446,9 @@ class ParamState:
         wildcard = '*'
         if len(args) < 1 or args[0].find('*') != -1:
             defaults = self.default_params
-            if defaults is None and self.vehicle_name is not None:
-                filename = mp_util.dot_mavproxy("%s-defaults.parm" % self.vehicle_name)
-                if not os.path.exists(filename):
-                    print("Please run 'param download' first (vehicle_name=%s)" % self.vehicle_name)
-                    return
-                defaults = mavparm.MAVParmDict()
-                defaults.load(filename)
+            if defaults is None:
+                print("Cannot find default parameters")
+                return
             if len(args) >= 1:
                 wildcard = args[0]
         else:

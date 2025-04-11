@@ -13,7 +13,7 @@ class ParamHelp:
     def param_help_download(self):
         '''download XML files for parameters'''
         files = []
-        for vehicle in ['Rover', 'ArduCopter', 'ArduPlane', 'ArduSub', 'AntennaTracker', 'Blimp', 'Heli']:
+        for vehicle in ['Rover', 'Copter', 'Plane', 'Sub', 'AntennaTracker', 'Blimp', 'Heli']:
             url = 'http://autotest.ardupilot.org/Parameters/%s/apm.pdef.xml.gz' % vehicle
             path = mp_util.dot_mavproxy("%s.xml" % vehicle)
             files.append((url, path))
@@ -25,6 +25,21 @@ class ParamHelp:
 
     def param_use_xml_filepath(self, filepath):
         self.xml_filepath = filepath
+
+    def convert_vehicle_name(self):
+        '''convert vehicle name new format'''
+        if self.vehicle_name is None:
+            return None
+        if self.vehicle_name == 'APMrover2':
+            return 'Rover'
+        elif self.vehicle_name == 'ArduPlane':
+            return 'Plane'
+        elif self.vehicle_name == 'ArduSub':
+            return 'Sub'
+        elif self.vehicle_name == 'ArduCopter':
+            return 'Copter'
+        else:
+            return self.vehicle_name
 
     def param_help_tree(self, verbose=False):
         '''return a "help tree", a map between a parameter and its metadata.  May return None if help is not available'''
@@ -39,13 +54,14 @@ class ParamHelp:
                 if verbose:
                     print("Unknown vehicle type")
                 return None
-            path = mp_util.dot_mavproxy("%s.xml" % self.vehicle_name)
+            # Map between new and old names
+            path = mp_util.dot_mavproxy("%s.xml" % self.convert_vehicle_name())
+            # Otherwise try legacy name
             if not os.path.exists(path):
-                if self.vehicle_name == 'APMrover2':
-                    path = mp_util.dot_mavproxy("%s.xml" % "Rover")
+                path = mp_util.dot_mavproxy("%s.xml" % self.vehicle_name)
             if not os.path.exists(path):
                 if verbose:
-                    print("Please run 'param download' first (vehicle_name=%s)" % self.vehicle_name)
+                    print("Please run 'param download' first (vehicle_name=%s)" % self.convert_vehicle_name())
                 return None
         if not os.path.exists(path):
             if verbose:
