@@ -361,9 +361,6 @@ class MPMenuCallTextDialog(object):
         '''show a value dialog'''
         from MAVProxy.modules.lib.wx_loader import wx
         title = self.title
-        if title.find('FLYTOFRAMEUNITS') != -1 and self.settings is not None:
-            frameunits = "%s %s" % (self.settings.flytoframe, self.settings.height_unit)
-            title = title.replace('FLYTOFRAMEUNITS', frameunits)
         try:
             dlg = wx.TextEntryDialog(None, title, title, defaultValue=str(self.default))
         except TypeError:
@@ -371,6 +368,87 @@ class MPMenuCallTextDialog(object):
         if dlg.ShowModal() != wx.ID_OK:
             return None
         return dlg.GetValue()
+
+# memory of last dropdowns
+last_dropdown_selection = {}
+last_value_selection = {}
+
+class MPMenuCallTextDropdownDialog(object):
+    '''used to create a value dialog with dropdown callback'''
+    def __init__(self, title='Enter Value', default='',
+                 dropdown_options=None,
+                 dropdown_label='Select option',
+                 default_dropdown=None):
+        self.title = title
+        self.default = default
+        self.default_dropdown = default_dropdown
+        self.dropdown_options = dropdown_options or []
+        self.dropdown_label = dropdown_label
+
+    def call(self):
+        '''show a value dialog with dropdown'''
+        from MAVProxy.modules.lib.wx_loader import wx
+        
+        # Create a custom dialog
+        dlg = wx.Dialog(None, title=self.title, size=(400, 150))
+        
+        # Create a vertical box sizer for the dialog
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        # Create a horizontal sizer for the text entry and dropdown
+        input_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        
+        # Text entry label and control
+        text_label = wx.StaticText(dlg, label="Value:")
+        default = last_value_selection.get(self.title, self.default)
+        text_ctrl = wx.TextCtrl(dlg, value=str(default), size=(200, -1))
+        
+        # Add text control components to input sizer
+        input_sizer.Add(text_label, 0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 5)
+        input_sizer.Add(text_ctrl, 1, wx.ALL | wx.EXPAND, 5)
+        
+        # Dropdown label and control
+        dropdown_label = wx.StaticText(dlg, label=self.dropdown_label)
+        dropdown_ctrl = wx.Choice(dlg, choices=self.dropdown_options)
+        
+        # Select first item by default if options exist
+        if self.dropdown_options:
+            default_idx = 0
+            for i in range(len(self.dropdown_options)):
+                if self.dropdown_options[i] == self.default_dropdown:
+                    default_idx = i
+            dropdown_ctrl.SetSelection(last_dropdown_selection.get(self.title,default_idx))
+
+        # Add dropdown components to input sizer
+        input_sizer.Add(dropdown_label, 0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 5)
+        input_sizer.Add(dropdown_ctrl, 0, wx.ALL | wx.EXPAND, 5)
+        
+        # Add the input sizer to the main sizer
+        main_sizer.Add(input_sizer, 0, wx.ALL | wx.EXPAND, 5)
+        
+        # Create button sizer with OK and Cancel buttons
+        button_sizer = dlg.CreateButtonSizer(wx.OK | wx.CANCEL)
+        main_sizer.Add(button_sizer, 0, wx.ALL | wx.ALIGN_CENTER, 10)
+        
+        # Set the sizer for the dialog
+        dlg.SetSizer(main_sizer)
+        
+        # Fit the dialog to its contents
+        dlg.Fit()
+        
+        # Show the dialog and get the result
+        if dlg.ShowModal() != wx.ID_OK:
+            return None
+        
+        text_value = text_ctrl.GetValue()
+        dropdown_index = dropdown_ctrl.GetSelection()
+        dropdown_value = self.dropdown_options[dropdown_index] if dropdown_index != -1 and self.dropdown_options else ""
+
+        last_dropdown_selection[self.title] = dropdown_index
+        last_value_selection[self.title] = text_value
+
+        # Return tuple with text value and selected dropdown value
+        return text_value + " " + dropdown_value
 
 class MPMenuConfirmDialog(object):
     '''used to create a confirmation dialog'''
