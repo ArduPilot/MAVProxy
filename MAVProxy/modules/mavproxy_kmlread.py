@@ -197,6 +197,16 @@ class KmlReadModule(mp_module.MPModule):
         layer.set_colour((red, green, blue))
         self.add_map_object(layer)
 
+    def add_object_to_maps(self, obj):
+        '''add an object to all maps'''
+        for mp in self.module_matching('map*'):
+            mp.map.add_object(obj)
+
+    def remove_object_from_maps(self, obj):
+        '''remove an object from all maps'''
+        for mp in self.module_matching('map*'):
+            mp.map.remove_object(obj.key)
+
     def remove_map_object(self, obj):
         '''remove an object from our stored list of objects, and the map
         module if it is loaded'''
@@ -207,9 +217,7 @@ class KmlReadModule(mp_module.MPModule):
         del self.map_objects[obj.layer][obj.key]
         if len(self.map_objects[obj.layer]) == 0:
             del self.map_objects[obj.layer]
-        map_module = self.mpstate.map
-        if map_module is not None:
-            map_module.remove_object(obj.key)
+        self.remove_object_from_maps(obj.key)
 
     def remove_all_map_objects(self):
         for layer in copy.deepcopy(self.map_objects):
@@ -225,16 +233,12 @@ class KmlReadModule(mp_module.MPModule):
         if obj.layer not in self.map_objects:
             self.map_objects[obj.layer] = {}
         self.map_objects[obj.layer][obj.key] = obj
-
-        map_module = self.mpstate.map
-        if map_module is not None:
-            map_module.add_object(obj)
+        self.add_object_to_maps(obj)
 
     def add_objects_to_map_module_from_map_objects(self):
         for layer in self.map_objects:
             for obj in self.map_objects[layer].values():
-                map_module = self.mpstate.map
-                map_module.add_object(obj)
+                self.add_object_to_maps(obj)
 
     def fencekml(self, args):
         '''create a geofence from a layername'''
