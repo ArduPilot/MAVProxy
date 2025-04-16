@@ -20,7 +20,7 @@ class AISVehicle():
     def __init__(self, id, state):
         self.id = id
         self.state = state
-        self.vehicle_colour = 'green'  # use boat icon for now
+        self.vehicle_colour = 'blue'  # use boat icon for now
         self.vehicle_type = 'boat'
         self.icon = self.vehicle_colour + self.vehicle_type + '.png'
         self.update_time = 0
@@ -42,6 +42,7 @@ class AISVehicle():
         #default to threat_radius setting
         if threat_radius == 0:
             return default_radius
+        return threat_radius
 
 class AISModule(mp_module.MPModule):
 
