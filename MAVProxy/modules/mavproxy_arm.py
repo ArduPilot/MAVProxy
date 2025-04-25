@@ -58,6 +58,10 @@ class ArmModule(mp_module.MPModule):
         self.add_command('disarm', self.cmd_disarm,   'disarm motors')
         self.was_armed = False
 
+        # support for setting safety switch position via COMMAND_*
+        # rather than the "set_mode" message:
+        self.accepts_DO_SET_SAFETY_SWITCH_STATE = {}  # keyed by (sysid, compid)
+
     def checkables(self):
         return "<" + "|".join(arming_masks.keys()) + ">"
 
@@ -156,6 +160,14 @@ class ArmModule(mp_module.MPModule):
             return
 
         if args[0] == "safetyon":
+            key = (self.target_system, self.target_component)
+            supports = self.accepts_DO_SET_SAFETY_SWITCH_STATE.get(key, None)
+            if supports or supports is None:
+                self.send_DO_SET_SAFETY_SWITCH_STATE(mavutil.mavlink.SAFETY_SWITCH_STATE_SAFE)
+
+            if supports is True:
+                return
+
             self.master.mav.set_mode_send(self.target_system,
                                           mavutil.mavlink.MAV_MODE_FLAG_DECODE_POSITION_SAFETY,
                                           1)
@@ -174,12 +186,35 @@ class ArmModule(mp_module.MPModule):
             return
 
         if args[0] == "safetyoff":
+            key = (self.target_system, self.target_component)
+            supports = self.accepts_DO_SET_SAFETY_SWITCH_STATE.get(key, None)
+            if supports or supports is None:
+                self.send_DO_SET_SAFETY_SWITCH_STATE(mavutil.mavlink.SAFETY_SWITCH_STATE_DANGEROUS)
+
+            if supports is True:
+                return
+
             self.master.mav.set_mode_send(self.target_system,
                                           mavutil.mavlink.MAV_MODE_FLAG_DECODE_POSITION_SAFETY,
                                           0)
             return
 
         print(usage)
+
+    def send_DO_SET_SAFETY_SWITCH_STATE(self, state):
+        self.master.mav.command_long_send(
+            self.target_system,  # target_system
+            self.target_component,
+            mavutil.mavlink.MAV_CMD_DO_SET_SAFETY_SWITCH_STATE, # command
+            0, # confirmation
+            state, # param1
+            0, # param2 (all other params meaningless)
+            0, # param3
+            0, # param4
+            0, # param5
+            0, # param6
+            0  # param7
+        )
 
     def cmd_disarm(self, args):
         '''disarm motors'''
@@ -230,7 +265,22 @@ class ArmModule(mp_module.MPModule):
                     v = getattr(rc, 'chan%u_raw' % v)
                     if v <= 1300:
                         self.say("ICE Disabled")
+            return
 
+        if mtype == "COMMAND_ACK":
+            # check to see if the vehicle has bounced our attempts to
+            # change vehicle state via mavlink command (as opposed to
+            # old messages which changed state):
+            accepts_dict = None
+            if m.command == mavutil.mavlink.MAV_CMD_DO_SET_SAFETY_SWITCH_STATE:
+                accepts_dict = self.accepts_DO_SET_SAFETY_SWITCH_STATE
+            if accepts_dict is not None:
+                key = (m.get_srcSystem(), m.get_srcComponent())
+                if m.result == mavutil.mavlink.MAV_RESULT_UNSUPPORTED:
+                    # stop sending the commands:
+                    accepts_dict[key] = False
+                elif m.result in [mavutil.mavlink.MAV_RESULT_ACCEPTED]:
+                    accepts_dict[key] = True
 
 def init(mpstate):
     '''initialise module'''
