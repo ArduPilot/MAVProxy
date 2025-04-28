@@ -40,14 +40,12 @@
     "maxAmsl": 2000
   },
   "vehicle": {
-    "id": "",
+    "id": "genFixed",
     "cruiseSpeed": 12,
     "maxFlightSpeed": 30,
     "minFlightSpeed": 8,
     "maxClimbRate": 3.5,
-    "maxDescentRate": -5,
-    "value": "genFixed",
-    "title": "Generic Fixed Wing"
+    "maxDescentRate": -5
   },
   "departure": {
     "latitude": 0.3718333545048341,

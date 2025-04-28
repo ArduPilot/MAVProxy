@@ -75,9 +75,6 @@ class Vehicle:
     minFlightSpeed: float
     maxClimbRate: float
     maxDescentRate: float
-    value: str
-    title: str
-
 
 @dataclass
 class Coordinate:
