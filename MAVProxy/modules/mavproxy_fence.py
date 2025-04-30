@@ -69,6 +69,9 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
         '''return number of waypoints'''
         return self.wploader.count()
 
+    def MISSION_CURRENT_opaque_id_attribute(self):
+        return "fence_id"
+
     def circles_of_type(self, t):
         '''return a list of Circle fences of a specific type - a single
         MISSION_ITEM'''
@@ -223,8 +226,10 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
             self.console.set_status('Fence', 'FEN', row=0, fg='red')
 
     def mavlink_packet(self, m):
-        if m.get_type() == 'SYS_STATUS' and self.message_is_from_primary_vehicle(m):
+        mtype = m.get_type()
+        if mtype == 'SYS_STATUS' and self.message_is_from_primary_vehicle(m):
             self.handle_sys_status(m)
+
         super(FenceModule, self).mavlink_packet(m)
 
     def apply_function_to_points(self, function):
