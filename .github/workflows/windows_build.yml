@@ -45,12 +45,13 @@ jobs:
         run: |          
           mkdir Parameters
           $wc = New-Object System.Net.WebClient
-          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/APMrover2/apm.pdef.xml', 'Parameters\Rover.xml')
-          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/ArduCopter/apm.pdef.xml', 'Parameters\ArduCopter.xml')
-          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/ArduPlane/apm.pdef.xml', 'Parameters\ArduPlane.xml')
-          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/ArduSub/apm.pdef.xml', 'Parameters\ArduSub.xml')
+          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/Rover/apm.pdef.xml', 'Parameters\Rover.xml')
+          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/Copter/apm.pdef.xml', 'Parameters\Copter.xml')
+          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/Plane/apm.pdef.xml', 'Parameters\Plane.xml')
+          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/Sub/apm.pdef.xml', 'Parameters\Sub.xml')
           $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/AntennaTracker/apm.pdef.xml', 'Parameters\AntennaTracker.xml')
           $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/Heli/apm.pdef.xml', 'Parameters\Heli.xml')
+          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/Blimp/apm.pdef.xml', 'Parameters\Blimp.xml')
       - name: Build installer
         run: |
           cd  windows

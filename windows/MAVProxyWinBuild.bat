@@ -53,12 +53,13 @@ rem -----Create version Info-----
 rem -----Download parameter files-----
 cd  ..\
 mkdir Parameters
-powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/APMrover2/apm.pdef.xml' -Destination 'Parameters\Rover.xml'"
-powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/ArduCopter/apm.pdef.xml' -Destination 'Parameters\ArduCopter.xml'"
-powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/ArduPlane/apm.pdef.xml' -Destination 'Parameters\ArduPlane.xml'"
-powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/ArduSub/apm.pdef.xml' -Destination 'Parameters\ArduSub.xml'"
+powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/Rover/apm.pdef.xml' -Destination 'Parameters\Rover.xml'"
+powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/Copter/apm.pdef.xml' -Destination 'Parameters\Copter.xml'"
+powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/Plane/apm.pdef.xml' -Destination 'Parameters\Plane.xml'"
+powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/Sub/apm.pdef.xml' -Destination 'Parameters\Sub.xml'"
 powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/AntennaTracker/apm.pdef.xml' -Destination 'Parameters\AntennaTracker.xml'"
 powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/Heli/apm.pdef.xml' -Destination 'Parameters\Heli.xml'"
+powershell.exe "Start-BitsTransfer -Source 'http://autotest.ardupilot.org/Parameters/Blimp/apm.pdef.xml' -Destination 'Parameters\Blimp.xml'"
 
 rem -----Build the Installer-----
 cd .\windows

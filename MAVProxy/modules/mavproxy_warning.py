@@ -19,7 +19,7 @@ class WarningModule(mp_module.MPModule):
               ('details', bool, True),
               ('min_sat', int, 10),
               ('sat_diff', int, 5),
-              ('alt_diff', int, 20),
+              ('alt_diff', float, 20),
               ('airspd_diff', float, 5),
               ('airspd_age', float, 5),
               ('esc_group1', int, 0),

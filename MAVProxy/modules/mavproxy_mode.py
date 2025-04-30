@@ -81,9 +81,18 @@ class ModeModule(mp_module.MPModule):
             if args[0] == "forward":
                 return self.cmd_guided_forward(args[1:])
 
-        if len(args) != 1 and len(args) != 3:
+        if len(args) == 2:
+            frames = ['AboveHome', 'AGL', 'AMSL']
+            if args[1] in frames:
+                self.settings.flytoframe = args[1]
+            else:
+                print("Usage: guided ALTITUDE %s" % '|'.join(frames))
+                return
+        elif len(args) != 1 and len(args) != 3:
             print("Usage: guided ALTITUDE | guided LAT LON ALTITUDE | guided forward METRES")
             return
+
+        frame = self.flyto_frame()
 
         if len(args) == 3:
             latitude = float(args[0])
@@ -98,8 +107,6 @@ class ModeModule(mp_module.MPModule):
             altitude = float(args[0])
 
         altitude = self.height_convert_from_units(altitude)
-
-        frame = self.flyto_frame()
 
         print("Guided %s %s frame %u" % (str(latlon), str(altitude), frame))
 

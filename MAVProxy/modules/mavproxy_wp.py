@@ -322,11 +322,6 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
 
         wp_num = int(args[0])
 
-        # At time of writing MAVProxy sends to (1, 0) by default,
-        # but ArduPilot will respond from (1,1) by default -and
-        # that means COMMAND_ACK handling will fill
-        # self.accepts_DO_SET_MISSION_CURRENT for (1, 1) and we
-        # will not get that value here:
         key = (self.target_system, self.target_component)
         supports = self.accepts_DO_SET_MISSION_CURRENT.get(key, None)
         # if we don't know, send both.  If we do know, send only one.
