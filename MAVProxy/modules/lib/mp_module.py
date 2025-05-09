@@ -1,5 +1,7 @@
 import time
 from pymavlink import mavutil
+import traceback
+import sys
 
 class MPModule(object):
     '''
@@ -255,3 +257,8 @@ class MPModule(object):
         m.name = name
         self.mpstate.module('link').master_callback(m, self.master)
     
+    def get_exception_stacktrace(self, e):
+        ret = "%s\n" % e
+        ret += ''.join(traceback.format_exception(type(e), e, tb=e.__traceback__))
+        return ret
+
