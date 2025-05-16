@@ -11,7 +11,10 @@ from zipfile import ZipFile
 import pathlib
 import re
 
-namespaces = {'kml': 'http://www.opengis.net/kml/2.2'}
+namespaces = {
+    'kml': 'http://www.opengis.net/kml/2.2',
+    'gx': 'http://www.google.com/kml/ext/2.2',
+}
 
 
 class Style():
@@ -167,8 +170,9 @@ class KMLRead():
 
         # extract styles:
         self.style = {}
-        for s in self.tree.findall(".//kml:Style", namespaces):
-            _id = s.get("id")
+        for s in self.tree.findall(".//gx:CascadingStyle", namespaces):
+            idname = f"{{{namespaces['kml']}}}id"
+            _id = s.get(idname)
             style = Style(_id)
             self.style[_id] = style
             line_style = find_tag_recursive(s, 'LineStyle')
