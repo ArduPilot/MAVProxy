@@ -7,12 +7,8 @@ import struct
 import random
 from pymavlink import mavutil
 
-try:
-    # py2
-    from StringIO import StringIO as SIO
-except ImportError:
-    # py3
-    from io import BytesIO as SIO
+
+from io import BytesIO as SIO
 
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
@@ -247,10 +243,7 @@ class FTPModule(mp_module.MPModule):
                     continue
                 self.dir_offset += 1
                 try:
-                    if sys.version_info.major >= 3:
-                        d = str(d, 'ascii')
-                    else:
-                        d = str(d)
+                    d = str(d, 'ascii')
                 except Exception:
                     continue
                 if d[0] == 'D':
@@ -335,10 +328,7 @@ class FTPModule(mp_module.MPModule):
                 self.callback = None
             elif self.filename == "-":
                 self.fh.seek(0)
-                if sys.version_info.major < 3:
-                    print(self.fh.read())
-                else:
-                    print(self.fh.read().decode('utf-8'))
+                print(self.fh.read())
             else:
                 print("Wrote %u bytes to %s in %.2fs %.1fkByte/s" % (ofs, self.filename, dt, rate))
             self.terminate_session()

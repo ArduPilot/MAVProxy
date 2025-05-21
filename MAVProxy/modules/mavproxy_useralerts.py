@@ -10,14 +10,9 @@ import string
 from packaging import version
 from pymavlink import mavutil
 
-if sys.version_info.major < 3:
-    from urllib2 import Request
-    from urllib2 import urlopen
-    from urllib2 import URLError
-else:
-    from urllib.request import Request
-    from urllib.request import urlopen
-    from urllib.error import URLError
+from urllib.request import Request
+from urllib.request import urlopen
+from urllib.error import URLError
 
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings

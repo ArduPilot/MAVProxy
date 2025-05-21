@@ -36,12 +36,9 @@ ignored_directives attribute.
 from __future__ import print_function
 
 import os
-try:
-    import cPickle as pickle
-except ImportError:
-    import pickle
-import threading
+import pickle
 import sys
+import threading
 
 class Parser(object):
     def __init__(self, filename=None, string='', enable_cache=False):

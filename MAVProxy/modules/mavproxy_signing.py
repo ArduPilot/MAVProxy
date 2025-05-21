@@ -40,8 +40,7 @@ class SigningModule(mp_module.MPModule):
         '''convert a passphrase to a 32 byte key'''
         import hashlib
         h = hashlib.new('sha256')
-        if sys.version_info[0] >= 3:
-            passphrase = passphrase.encode('ascii')
+        passphrase = passphrase.encode('ascii')
         h.update(passphrase)
         return h.digest()
 
@@ -57,10 +56,7 @@ class SigningModule(mp_module.MPModule):
         key = self.passphrase_to_key(passphrase)
         secret_key = []
         for b in key:
-            if sys.version_info[0] >= 3:
-                secret_key.append(b)
-            else:
-                secret_key.append(ord(b))
+            secret_key.append(b)
 
         epoch_offset = 1420070400
         now = max(time.time(), epoch_offset)

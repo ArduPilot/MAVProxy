@@ -45,13 +45,8 @@ def ftp_param_decode(data):
     }
 
     count = 0
-
-    if sys.version_info.major < 3:
-        pad_byte = chr(0)
-        last_name = ''
-    else:
-        pad_byte = 0
-        last_name = bytes()
+    pad_byte = 0
+    last_name = bytes()
 
     while True:
         while len(data) > 0 and data[0] == pad_byte:

@@ -11,7 +11,7 @@ from pymavlink import mavutil
 # with a try/except
 if platform.system() == 'Darwin':
     import gnureadline as readline
-elif platform.system() == 'Windows' and sys.version_info >= (3, 0):
+elif platform.system() == 'Windows':
     # Python 3.8 defaults to Proactor event loop, which doesn't work well
     if sys.version_info >= (3, 8):
         import asyncio
@@ -49,7 +49,7 @@ class rline(object):
             '(LOADEDMODULES)' : complete_loadedmodules
             }
 
-        if platform.system() == 'Windows' and sys.version_info >= (3, 0):
+        if platform.system() == 'Windows':
             # Create key bindings registry with a custom binding for the Tab key that
             # displays completions like GNU readline.
             self.session = PromptSession()
@@ -58,13 +58,13 @@ class rline(object):
     def set_prompt(self, prompt):
         if prompt != self.prompt:
             self.prompt = prompt
-            if platform.system() != 'Windows' or sys.version_info < (3, 0):
+            if platform.system() != 'Windows' or sys.version_info < (3, 0): #??
                 sys.stdout.write(prompt)
                 self.redisplay()
 
     def add_history(self, line):
         '''add a line to the history'''
-        if platform.system() == 'Windows' and sys.version_info >= (3, 0):
+        if platform.system() == 'Windows':
             self.session.history.append_string(line)
         else:
             readline.add_history(line)
@@ -84,14 +84,14 @@ class rline(object):
     def input(self):
         ''' get user input'''
         ret = ""
-        if platform.system() == 'Windows' and sys.version_info >= (3, 0):
+        if platform.system() == 'Windows':
             global rline_mpstate
             with patch_stdout():
                 return self.session.prompt(self.get_prompt,completer=rline_mpstate.completor, complete_while_typing=False, complete_style=CompleteStyle.READLINE_LIKE, refresh_interval=0.5)
         else:
             return input(self.get_prompt())
 
-if platform.system() == 'Windows' and sys.version_info >= (3, 0):
+if platform.system() == 'Windows':
     # This is the prompt-toolkit setup for Windows
     class MAVPromptCompleter(Completer):
         '''Completion generator for commands'''
@@ -273,7 +273,7 @@ def complete_rule(rule, cmd):
 
     # expand the next rule component
     expanded = []
-    if platform.system() == 'Windows' and sys.version_info >= (3, 0):
+    if platform.system() == 'Windows':
         if len(rule_components) >= len(cmd):
             expanded = rule_expand(rule_components[len(cmd)-1], cmd[-1])
     else:
@@ -327,7 +327,7 @@ def complete(text, state):
     return last_clist[state]
 
 # Configure readline for linux/mac systems
-if platform.system() != 'Windows' or sys.version_info < (3, 0):
+if platform.system() != 'Windows':
     readline.set_completer_delims(' \t\n;')
     readline.parse_and_bind("tab: complete")
     readline.set_completer(complete)

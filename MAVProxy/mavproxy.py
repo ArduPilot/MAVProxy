@@ -23,14 +23,7 @@ import sys
 import threading
 import time
 import traceback
-
-try:
-    reload
-except NameError:
-    try:
-        from importlib import reload
-    except ImportError:
-        from imp import reload
+from importlib import reload
 
 from pymavlink import mavutil
 
@@ -592,13 +585,11 @@ def generate_kwargs(args):
 
 
 def get_exception_stacktrace(e):
-    if sys.version_info[0] >= 3:
-        ret = "%s\n" % e
-        ret += ''.join(traceback.format_exception(type(e),
-                                                  e,
-                                                  tb=e.__traceback__))
-        return ret
-    return traceback.format_exc(e)
+    ret = "%s\n" % e
+    ret += ''.join(traceback.format_exception(type(e),
+                                              e,
+                                              tb=e.__traceback__))
+    return ret
 
 
 def cmd_module(args):
@@ -767,10 +758,7 @@ def process_stdin(line):
             line += '\r'
         for c in line:
             time.sleep(0.01)
-            if sys.version_info.major >= 3:
-                mpstate.master().write(bytes(c, "ascii"))
-            else:
-                mpstate.master().write(c)
+            mpstate.master().write(bytes(c, "ascii"))
         return
 
     if not line:
@@ -854,10 +842,8 @@ def process_master(m):
         if mpstate.system == 'Windows':
             # strip nsh ansi codes
             s = s.replace("\033[K", "")
-        if sys.version_info.major >= 3:
-            sys.stdout.write(str(s, "ascii", "ignore"))
-        else:
-            sys.stdout.write(str(s))
+
+        sys.stdout.write(str(s, "ascii", "ignore"))
         sys.stdout.flush()
         return
 
