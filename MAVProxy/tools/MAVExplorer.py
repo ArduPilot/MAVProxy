@@ -454,6 +454,13 @@ def cmd_map(args):
     options._flightmodes = mestate.mlog._flightmodes
     options.show_flightmode_legend = mestate.settings.show_flightmode
     options.colour_source='flightmode'
+
+    # check for kml or kmz
+    for a in args:
+        if a.endswith('.kml') or a.endswith('.kmz'):
+            options.kml = a
+            args = list(filter(lambda x : x != a, args))
+            break
     if len(args) > 0:
         options.types = ':'.join(args)
         filtered_args = list(filter(lambda x : x != "CMD", options.types))
