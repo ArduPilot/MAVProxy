@@ -29,6 +29,8 @@ class SilvusModule(mp_module.MPModule):
                                                        ("air_ip", str, ""),
                                                        ("air_node", int, 0),
                                                        ("gnd_node", int, 0),
+                                                       ("aux_node1", int, 0),
+                                                       ("aux_node2", int, 0),
                                                        ("nmea_ip", str, ""),
                                                        ("nmea_port", int, -1),
                                                        ('log_dt', float, 1.0),
@@ -207,14 +209,21 @@ class SilvusModule(mp_module.MPModule):
         if len(rssi) >= 4:
             self.values['TXRSSI1'] = float(rssi[0])
             self.values['TXRSSI2'] = float(rssi[1])
-            self.values['TXRSSI3'] = float(rssi[2])
-            self.values['TXRSSI4'] = float(rssi[3])
         rssi = self.get_rssi(remoteip, localnode)
         if len(rssi) >= 4:
             self.values['RXRSSI1'] = float(rssi[0])
             self.values['RXRSSI2'] = float(rssi[1])
-            self.values['RXRSSI3'] = float(rssi[2])
-            self.values['RXRSSI4'] = float(rssi[3])
+        if self.silvus_settings.aux_node1 > 0:
+            rssi = self.get_rssi(remoteip, str(self.silvus_settings.aux_node1))
+            if len(rssi) >= 4:
+                self.values['A1RSSI1'] = float(rssi[0])
+                self.values['A1RSSI2'] = float(rssi[1])
+        if self.silvus_settings.aux_node2 > 0:
+            rssi = self.get_rssi(remoteip, str(self.silvus_settings.aux_node2))
+            if len(rssi) >= 4:
+                self.values['A2RSSI1'] = float(rssi[0])
+                self.values['A2RSSI2'] = float(rssi[1])
+
         self.values['LOCNSE'] = float(self.get_noise(localip))
         self.values['REMNSE'] = float(self.get_noise(remoteip))
         self.values['LINKSNR'] = float(self.network_status(localip)[2])
