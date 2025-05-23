@@ -296,6 +296,8 @@ class SmartFlightPlannerModule(mp_module.MPModule):
             self.uuid = uuid4()
             print(f"Created new plan with UUID: {self.uuid}")
         self._plan = self.post_plan() # TODO parse return
+        if self._plan is None:
+            return
 
         if len(self._plan["paths"]) == 0:
             notifications = self._plan["notifications"]
