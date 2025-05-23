@@ -35,12 +35,8 @@ def run_command(args, cwd=None, shell=False, timeout=None, env=None):
     Run a shell command with a timeout.
     See http://stackoverflow.com/questions/1191374/subprocess-with-timeout
     '''
-    try:
-        # py2
-        from StringIO import StringIO
-    except ImportError:
-        # py3
-        from io import StringIO
+
+    from io import StringIO
     import fcntl
     p = Popen(args, shell=shell, cwd=cwd, stdout=PIPE, stderr=PIPE, env=env)
     tstart = time.time()
@@ -56,9 +52,7 @@ def run_command(args, cwd=None, shell=False, timeout=None, env=None):
         time.sleep(0.1)
         retcode = p.poll()
         try:
-            s = p.stdout.read()
-            if sys.version_info.major >= 3:
-                s = s.decode('utf-8')
+            s = p.stdout.read().decode('utf-8')
             buf.write(s)
         except Exception:
             pass
@@ -491,9 +485,9 @@ class MiscModule(mp_module.MPModule):
         tune = args[0]
         str1 = tune[0:30]
         str2 = tune[30:]
-        if sys.version_info.major >= 3 and not isinstance(str1, bytes):
+        if not isinstance(str1, bytes):
             str1 = bytes(str1, "ascii")
-        if sys.version_info.major >= 3 and not isinstance(str2, bytes):
+        if not isinstance(str2, bytes):
             str2 = bytes(str2, "ascii")
         self.master.mav.play_tune_send(self.settings.target_system,
                                        self.settings.target_component,

@@ -1383,14 +1383,12 @@ def loadfile(args):
     setup_menus()
 
 def print_caught_exception(e):
-    if sys.version_info[0] >= 3:
-        ret = "%s\n" % e
-        ret += ''.join(traceback.format_exception(type(e),
-                                                  value=e,
-                                                  tb=e.__traceback__))
-        print(ret)
-    else:
-        print(traceback.format_exc(e))
+    ret = "%s\n" % e
+    ret += ''.join(traceback.format_exception(type(e),
+                                                value=e,
+                                                tb=e.__traceback__))
+    print(ret)
+
 
 def cmd_help(args):
     '''help command'''

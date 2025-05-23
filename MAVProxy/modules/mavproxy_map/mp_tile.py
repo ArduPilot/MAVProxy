@@ -32,16 +32,11 @@ import numpy as np
 
 from math import log, tan, radians, degrees, sin, cos, exp, pi, asin, atan
 
-if sys.version_info.major < 3:
-    from urllib2 import Request as url_request
-    from urllib2 import urlopen as url_open
-    from urllib2 import URLError as url_error
-else:
-    from urllib.request import Request as url_request
-    from urllib.request import urlopen as url_open
-    from urllib.error import URLError as actual_url_error
-    from http.client import RemoteDisconnected
-    url_error = (RemoteDisconnected, actual_url_error)
+from urllib.request import Request as url_request
+from urllib.request import urlopen as url_open
+from urllib.error import URLError as actual_url_error
+from http.client import RemoteDisconnected
+url_error = (RemoteDisconnected, actual_url_error)
 
 from MAVProxy.modules.lib import mp_util
 
@@ -212,13 +207,7 @@ class MPTile:
         self._download_thread = None
         self._loading = mp_icon('loading.jpg')
         self._unavailable = mp_icon('unavailable.jpg')
-        try:
-            self._tile_cache = collections.OrderedDict()
-        except AttributeError:
-            # OrderedDicts in python 2.6 come from the ordereddict module
-            # which is a 3rd party package, not in python2.6 distribution
-            import ordereddict
-            self._tile_cache = ordereddict.OrderedDict()
+        self._tile_cache = collections.OrderedDict()
 
     def set_service(self, service):
         '''set tile service'''
