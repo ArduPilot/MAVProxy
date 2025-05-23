@@ -97,6 +97,7 @@ on how to use MAVProxy.''',
                 'MAVProxy.modules.lib.optparse_gui'],
       install_requires=requirements,
       extras_require={
+        'cesium': ['tornado'],
         # restserver module
         'server': ['flask'],
         'recommended': ['flask', 'PyYAML', 'lxml', 'wxpython',
