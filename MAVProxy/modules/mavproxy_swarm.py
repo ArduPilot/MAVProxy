@@ -197,6 +197,11 @@ class VehiclePanel(wx.Panel):
 
         self.doGuided = wx.Button(
             self, label="Mode GUIDED", size=wx.Size(100, 50))
+        
+        self.doAUTO = wx.Button(
+            self, label="Mode AUTO", size=wx.Size(100, 50))
+        self.Bind(wx.EVT_BUTTON, self.auto, self.doAUTO)
+
         self.Bind(wx.EVT_BUTTON, self.guided, self.doGuided)
         if self.isLeader:
             self.guidedSizer = wx.BoxSizer(wx.HORIZONTAL)
