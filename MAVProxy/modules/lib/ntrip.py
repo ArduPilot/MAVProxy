@@ -43,8 +43,7 @@ class NtripClient(object):
                  ssl=False,
                  V2=False,
                  ):
-        if sys.version_info.major >= 3:
-            user = bytearray(user, 'ascii')
+        user = bytearray(user, 'ascii')
         self.user = base64.b64encode(user)
         self.port = port
         self.caster = caster
@@ -75,9 +74,7 @@ class NtripClient(object):
         self.lat = lat
 
     def getMountPointString(self):
-        userstr = self.user
-        if sys.version_info.major >= 3:
-            userstr = str(userstr, 'ascii')
+        userstr = str(self.user, 'ascii')
         mountPointString = "GET %s HTTP/1.0\r\nUser-Agent: %s\r\nAuthorization: Basic %s\r\n" % (
             self.mountpoint, useragent, userstr)
         if self.host or self.V2:
@@ -131,8 +128,7 @@ class NtripClient(object):
                 self.sent_header = True
                 time.sleep(0.1)
                 mps = self.getMountPointString()
-                if sys.version_info.major >= 3:
-                    mps = bytearray(mps, 'ascii')
+                mps = bytearray(mps, 'ascii')
                 try:
                     self.socket.sendall(mps)
                 except ssl.SSLWantReadError:
@@ -150,9 +146,9 @@ class NtripClient(object):
                     return None
                 self.socket = None
                 casterResponse = ''
-            if sys.version_info.major >= 3:
-                # Ignore non ascii characters in HTTP response
-                casterResponse = str(casterResponse, 'ascii', 'ignore')
+
+            # Ignore non ascii characters in HTTP response
+            casterResponse = str(casterResponse, 'ascii', 'ignore')
             header_lines = casterResponse.split("\r\n")
             is_ntrip_rev1 = False
             for line in header_lines:
