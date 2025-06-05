@@ -18,6 +18,7 @@ class GraphFrame(wx.Frame):
         for i in range(len(state.fields)):
             self.data.append([])
         self.paused = False
+        self.clear_data = False
 
         self.create_main_panel()
 
@@ -49,10 +50,18 @@ class GraphFrame(wx.Frame):
         self.Bind(wx.EVT_BUTTON, self.on_pause_button, self.pause_button)
         self.Bind(wx.EVT_UPDATE_UI, self.on_update_pause_button, self.pause_button)
 
+        self.clear_button = wx.Button(self.panel, -1, "Clear")
+        self.Bind(wx.EVT_BUTTON, self.on_clear_button, self.clear_button)
+        self.Bind(wx.EVT_UPDATE_UI, self.on_update_clear_button, self.clear_button)
+
+        did_one = False
         self.hbox1 = wx.BoxSizer(wx.HORIZONTAL)
-        self.hbox1.Add(self.close_button, border=5, flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL)
-        self.hbox1.AddSpacer(1)
-        self.hbox1.Add(self.pause_button, border=5, flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL)
+        for button in self.close_button, self.pause_button, self.clear_button:
+            if did_one:
+                self.hbox1.Add(self.close_button, border=5, flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL)
+                self.hbox1.AddSpacer(1)
+                did_one = True
+            self.hbox1.Add(button, border=5, flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL)
 
         self.vbox = wx.BoxSizer(wx.VERTICAL)
         self.vbox.Add(self.canvas, 1, flag=wx.LEFT | wx.TOP | wx.GROW)
@@ -162,6 +171,12 @@ class GraphFrame(wx.Frame):
         label = "Resume" if self.paused else "Pause"
         self.pause_button.SetLabel(label)
 
+    def on_update_clear_button(self, event):
+        pass
+
+    def on_clear_button(self, event):
+        self.clear_data = True
+
     def on_close_button(self, event):
         self.redraw_timer.Stop()
         self.Destroy()
@@ -182,6 +197,14 @@ class GraphFrame(wx.Frame):
             state.values = state.child_pipe.recv()
         if self.paused:
             return
+
+        if self.clear_data:
+            self.clear_data = False
+            for i in range(len(self.plot_data)):
+                if state.values[i] is not None:
+                    while len(self.data[i]):
+                        self.data[i].pop(0)
+
         for i in range(len(self.plot_data)):
             if (type(state.values[i]) == list):
                 print("ERROR: Cannot plot array of length %d. Use 'graph %s[index]' instead"%(len(state.values[i]), state.fields[i]))
