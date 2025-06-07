@@ -403,7 +403,7 @@ def decode_devid(devid, pname):
         0x05 : "BMM150 ",
         0x06 : "LSM9DS1",
         0x08 : "LIS3MDL",
-        0x09 : "AK09916",
+        0x09 : "AK0991x",
         0x0A : "IST8310",
         0x0B : "ICM20948",
         0x0C : "MMC3416",
