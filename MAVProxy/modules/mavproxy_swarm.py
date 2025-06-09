@@ -198,9 +198,13 @@ class VehiclePanel(wx.Panel):
         self.doGuided = wx.Button(
             self, label="Mode GUIDED", size=wx.Size(100, 50))
         
-        self.doAUTO = wx.Button(
-            self, label="Mode AUTO", size=wx.Size(100, 50))
-        self.Bind(wx.EVT_BUTTON, self.auto, self.doAUTO)
+        if not self.isLeader:
+            self.doAUTO = wx.Button(
+                self, label="Mode AUTO", size=wx.Size(100, 50))
+            self.Bind(wx.EVT_BUTTON, self.auto, self.doAUTO)
+            self.doLaunch = wx.Button(
+                self, label="Launch", size=wx.Size(100, 50))
+            self.Bind(wx.EVT_BUTTON, self.launch, self.doLaunch)         
 
         self.Bind(wx.EVT_BUTTON, self.guided, self.doGuided)
         if self.isLeader:
@@ -273,6 +277,10 @@ class VehiclePanel(wx.Panel):
             self.sizer.Add(self.armSizer)
         else:
             self.sizer.Add(self.doArm)
+
+        if not self.isLeader:
+            self.sizer.Add(self.doAUTO)
+            self.sizer.Add(self.doLaunch)
 
         if self.vehtype != mavutil.mavlink.MAV_TYPE_GROUND_ROVER:
             if self.isLeader:
@@ -472,6 +480,11 @@ class VehiclePanel(wx.Panel):
     def auto(self, event):
         '''switch to mode AUTO'''
         self.state.child_pipe.send(("AUTO", self.sysid, self.compid))
+
+    def launch(self, event):
+        '''Launch'''
+        if self.doLaunch.GetLabel() == "Launch":
+            self.state.child_pipe.send(("launch", self.sysid, self.compid))
 
     def updateOffset(self, param, value):
         '''get offset param'''
@@ -929,6 +942,19 @@ class swarm(mp_module.MPModule):
                     for parm in self.parmsToShow:
                         self.mpstate.foreach_mav(sysid, compid, lambda mav: mav.param_request_read_send(
                             sysid, compid, parmString(parm), -1))
+            elif cmd == 'launch':
+                self.mpstate.foreach_mav(sysid, compid, lambda mav: mav.command_long_send(
+                    sysid,  # target_system
+                    compid,
+                    mavutil.mavlink.MAV_CMD_DO_SET_RELAY,  # command
+                    0,  # confirmation
+                    0,  # !!! Relay number
+                    1,  # ON (1) or OFF (0)
+                    0,  # param3
+                    0,  # param4
+                    0,  # param5
+                    0,  # param6
+                    0))  # param7
 
     def mavlink_packet(self, m):
         '''handle incoming mavlink packets'''
