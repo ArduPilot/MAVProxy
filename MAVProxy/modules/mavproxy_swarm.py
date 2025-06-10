@@ -148,6 +148,8 @@ class VehiclePanel(wx.Panel):
     '''
     A wx.panel to hold a single vehicle (leader or follower)
     '''
+    RPM_NOT_ALLOWED_LAUNCH_VALUE = -1 # -1 RPM not allowed
+    RPM_MIN_ALLOWED_LAUNCH_VALUE = 4000 # RPM min low value for launch
 
     def __init__(self, state, parent, sysid, compid, vehtype, isLeader, listFollowers, takeoffalt):
         wx.Panel.__init__(self, parent)
@@ -259,6 +261,22 @@ class VehiclePanel(wx.Panel):
         time.sleep(0.05)
         self.state.child_pipe.send(("getoffsets", self.sysid, self.compid))
 
+        self.rpm = VehiclePanel.RPM_NOT_ALLOWED_LAUNCH_VALUE
+        self.isArmed = False
+
+        self.timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.on_timer, self.timer)
+        self.timer.Start(1000)
+
+    def on_timer(self, event):
+        '''on new mavlink packet'''
+        while self.state.child_pipe.poll():
+            obj = self.state.child_pipe.recv()
+            if obj[0] == 'onmavlinkpacket':
+                msg = obj[1]
+                if msg.get_type() == 'RPM' and self.sysid == msg.get_srcSystem() and self.compid == msg.get_srcComponent():
+                    self.rpm = msg.rpm1
+
     def doSizer(self):
         '''Sort out all the sizers and layout'''
         self.sizer.Add(self.title)
@@ -339,6 +357,8 @@ class VehiclePanel(wx.Panel):
             self.armmode.SetForegroundColour((200, 0, 0))
             self.armmode.SetLabel("Disarmed" + "/" + str(mode))
             self.doArm.SetLabel("ARM")
+
+        self.isArmed = armed
 
     def updatethralt(self, throttle, alt):
         '''update throttle and altitude status'''
@@ -481,10 +501,31 @@ class VehiclePanel(wx.Panel):
         '''switch to mode AUTO'''
         self.state.child_pipe.send(("AUTO", self.sysid, self.compid))
 
+    def is_launch_available(self):
+        return self.is_rpm_allowed() and self.isArmed
+    
+    def is_rpm_allowed(self):
+        return self.rpm >= VehiclePanel.RPM_MIN_ALLOWED_LAUNCH_VALUE
+
     def launch(self, event):
         '''Launch'''
-        if self.doLaunch.GetLabel() == "Launch":
+        if self.is_launch_available():
             self.state.child_pipe.send(("launch", self.sysid, self.compid))
+        else:
+            self.addstatustext(self.get_launch_err_message())
+    
+    def get_launch_err_message(self):
+        launch_err_message = '\n- Launch can\'t be started:'
+        counter = 1
+
+        if self.is_rpm_allowed:
+            launch_err_message += '\n' + str(counter) + '. ' + 'RPM not allowed value: ' + 'current RPM = ' + str(self.rpm) + ', min low value = ' + str(VehiclePanel.RPM_MIN_ALLOWED_LAUNCH_VALUE)
+            counter += 1
+
+        if not self.isArmed:
+            launch_err_message += '\n' + str(counter) + '. ' + 'Vehicle not armed'
+
+        return launch_err_message
 
     def updateOffset(self, param, value):
         '''get offset param'''
