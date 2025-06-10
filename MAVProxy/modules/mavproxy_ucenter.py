@@ -80,17 +80,13 @@ class UcenterModule(mp_module.MPModule):
 
     def write(self, b):
         '''write some bytes to remove port'''
-        if len(b) > 0:
-            self.debug("sending '%s' (0x%02x) of len %u" % (b, ord(b[0]), len(b)))
-        elif self.ucenter_settings.debug > 1:
-            self.debug("sending empty request")
         while True:
             # note that we send a single empty buffer on len(b)==0
             n = len(b)
             if n > 70:
                 n = 70
-            buf = [ord(x) for x in b[:n]]
-            buf.extend([0]*(70-len(buf)))
+            buf = bytes(b[:n])
+            buf += b'\x00' * (70-len(buf))
 
             if self.last_baudrate != self.ucenter_settings.baudrate or self.last_devnum != self.ucenter_settings.devnum:
                 baudrate = self.ucenter_settings.baudrate
@@ -140,7 +136,7 @@ class UcenterModule(mp_module.MPModule):
                 self.sock = None
                 return
             # send empty packet if idle
-            pkt = ''
+            pkt = bytes()
         if len(pkt) == 0 and now - self.last_write < self.ucenter_settings.delay:
             return
         self.write(pkt)
@@ -155,7 +151,7 @@ class UcenterModule(mp_module.MPModule):
             return
         data = m.data
         data = m.data[:m.count]
-        buf = ''.join(str(chr(x)) for x in data)
+        buf = bytes(data)
         self.debug("got reply len %u" % len(buf))
         try:
             self.sock.send(buf)
