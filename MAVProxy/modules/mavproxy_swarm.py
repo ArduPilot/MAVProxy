@@ -149,7 +149,7 @@ class VehiclePanel(wx.Panel):
     A wx.panel to hold a single vehicle (leader or follower)
     '''
     RPM_NOT_ALLOWED_LAUNCH_VALUE = -1 # -1 RPM not allowed
-    RPM_MIN_ALLOWED_LAUNCH_VALUE = 4000 # RPM min low value for launch
+    RPM_MIN_ALLOWED_LAUNCH_VALUE = 5100 # RPM min low value for launch
 
     def __init__(self, state, parent, sysid, compid, vehtype, isLeader, listFollowers, takeoffalt):
         wx.Panel.__init__(self, parent)
@@ -186,6 +186,7 @@ class VehiclePanel(wx.Panel):
         self.battery = wx.StaticText(self, label="Battery: {0}V".format(0))
         self.status = wx.StaticText(self, label="Status: N/A")
         self.prearm = wx.StaticText(self, label="Prearm: N/A")
+        self.rpm_val = wx.StaticText(self, label="RPM: N/A")
         self.statusText = wx.TextCtrl(
             self, style=wx.TE_READONLY | wx.TE_MULTILINE, size=wx.Size(140, 100))
 
@@ -284,6 +285,7 @@ class VehiclePanel(wx.Panel):
         self.sizer.Add(self.thrAlt)
         self.sizer.Add(self.altRel)
         self.sizer.Add(self.battery)
+        self.sizer.Add(self.rpm_val)
         self.sizer.Add(self.status)
         self.sizer.Add(self.prearm)
         self.sizer.Add(self.offsets)
@@ -519,7 +521,7 @@ class VehiclePanel(wx.Panel):
         counter = 1
 
         if self.is_rpm_allowed:
-            launch_err_message += '\n' + str(counter) + '. ' + 'RPM not allowed value: ' + 'current RPM = ' + str(self.rpm) + ', min low value = ' + str(VehiclePanel.RPM_MIN_ALLOWED_LAUNCH_VALUE)
+            launch_err_message += '\n' + str(counter) + '. ' + 'RPM not allowed value: ' + 'current RPM = ' + str(self.rpm) + ', min RPM allowed = ' + str(VehiclePanel.RPM_MIN_ALLOWED_LAUNCH_VALUE)
             counter += 1
 
         if not self.isArmed:
@@ -543,6 +545,10 @@ class VehiclePanel(wx.Panel):
         if self.offsetValues[0] != None and self.offsetValues[1] != None and self.offsetValues[2] != None:
             self.offsets.SetLabel("Offset: {0}m,{1}m,{2}m".format(
                 self.offsetValues[0], self.offsetValues[1], self.offsetValues[2]))
+    
+    def updaterpm(self, rpm):
+        '''update rpm value'''
+        self.rpm_val.SetLabel("RPM: {0:.1f}".format(rpm))
 
 
 class SwarmFrame(wx.Frame):
@@ -791,6 +797,8 @@ class SwarmFrame(wx.Frame):
                     widget.addstatustext(msg.text)
                 elif mtype == 'PARAM_VALUE' and msg.param_id in self.parmsToShow:
                     widget.updateOffset(msg.param_id, int(msg.param_value))
+                elif mtype == 'RPM':
+                    widget.updaterpm(msg.rpm1)
 
 
 class swarm(mp_module.MPModule):
@@ -1011,6 +1019,8 @@ class swarm(mp_module.MPModule):
             self.needGUIupdate = True
             self.vehicleLastHB[(sysid, compid)] = time.time()
         # Only send these packets on if the vehicle is already in the list
+        elif mtype == 'RPM':
+            self.gui.onmavlinkpacket(m)
         elif (sysid, compid) in self.vehicleLastHB.keys():
             # update time vehicle was last seen
             if mtype == 'HEARTBEAT':
