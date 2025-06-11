@@ -293,12 +293,8 @@ def dot_mavproxy(name=None):
 
 def download_url(url):
     '''download a URL and return the content'''
-    if sys.version_info.major < 3:
-        from urllib2 import urlopen as url_open
-        from urllib2 import URLError as url_error
-    else:
-        from urllib.request import urlopen as url_open
-        from urllib.error import URLError as url_error
+    from urllib.request import urlopen as url_open
+    from urllib.error import URLError as url_error
     try:
         resp = url_open(url)
         headers = resp.info()
@@ -365,8 +361,6 @@ def quaternion_to_axis_angle(q):
 
 def null_term(str):
     '''null terminate a string for py3'''
-    if sys.version_info.major < 3:
-        return str
     if isinstance(str, bytes):
         str = str.decode("utf-8")
     idx = str.find("\0")

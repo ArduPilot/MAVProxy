@@ -47,8 +47,6 @@ def get_vehicle_name(vehtype):
 
 def parmString(str):
     '''convert string to bytes in python3'''
-    if sys.version_info.major < 3:
-        return str   
     return bytes(str, 'ascii')
 
 class SwarmUI():
