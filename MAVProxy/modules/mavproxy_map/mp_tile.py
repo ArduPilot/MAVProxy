@@ -626,7 +626,7 @@ def mp_icon(filename):
         raw = np.fromstring(stream, dtype=np.uint8)
     except Exception:
         try:
-            stream = open(os.path.join(__file__, 'data', filename)).read()
+            stream = open(os.path.join(os.path.dirname(__file__), 'data', filename)).read()
             raw = np.fromstring(stream, dtype=np.uint8)
         except Exception:
             #we're in a Windows exe, where pkg_resources doesn't work
