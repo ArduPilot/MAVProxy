@@ -7,6 +7,6 @@
 with open("../setup.py") as f:
     searchlines = f.readlines()
     for i, line in enumerate(searchlines):
-        if "version = " in line: 
+        if "version = " in line:
             print(line[11:len(line)-2])
             break

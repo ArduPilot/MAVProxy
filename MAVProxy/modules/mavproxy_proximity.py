@@ -9,6 +9,8 @@ vehicle.  Plots them on the map, for example.
 
 '''
 
+# flake8: noqa
+
 import os
 import os.path
 import sys

@@ -6,6 +6,8 @@ Patrick Jose Pereira
 April 2018
 '''
 
+# flake8: noqa
+
 import time
 import json
 import socket

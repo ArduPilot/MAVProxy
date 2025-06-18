@@ -7,6 +7,8 @@ This module notifies the user if the vehicle moves more than a preset distance(d
 in lateral or vertical direction from the "parked" point.
 """
 
+# flake8: noqa
+
 from pymavlink import mavutil
 import time
 from MAVProxy.modules.lib import mp_module

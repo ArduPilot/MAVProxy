@@ -4,6 +4,8 @@ Samuel Dudley
 Dec 2015
 '''
 
+# flake8: noqa
+
 from math import *
 
 from MAVProxy.modules.lib import mp_module

@@ -4,6 +4,8 @@ support for asterix SDPS data, setup for OBC 2018
 This listens for SDPS on UDP and translates to ADSB_VEHICLE messages
 '''
 
+# flake8: noqa
+
 import pickle
 from math import *
 
