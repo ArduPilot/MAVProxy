@@ -5,13 +5,12 @@ Randy Mackay, December 2023
 AP_FLAKE8_CLEAN
 '''
 
-
+import wave
 try:
     import pyaudio  # install using, "sudo apt-get install python3-pyaudio"
-    import wave     # install with "pip3 install wave"
     from openai import OpenAI
 except Exception:
-    print("chat: failed to import pyaudio, wave or openai.  See https://ardupilot.org/mavproxy/docs/modules/chat.html")
+    print("chat: failed to import pyaudio or openai.  See https://ardupilot.org/mavproxy/docs/modules/chat.html")
     exit()
 
 # initializing the global list to keep and update the stop_recording state
