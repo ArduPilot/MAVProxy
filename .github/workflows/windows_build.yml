@@ -25,7 +25,7 @@ jobs:
         run: |
           python3 -m pip install -U wheel setuptools pip
           python3 -m pip install -U pywin32 lxml pymavlink numpy matplotlib pyserial opencv-python PyYAML Pygame Pillow wxpython prompt-toolkit scipy
-          python3 -m pip install -U openai wave pyaudio
+          python3 -m pip install -U openai pyaudio
           python3 -m pip install -U pyinstaller==6.7.0 packaging 
       - name: Download Inno Setup installer
         run: curl -L -o installer.exe http://files.jrsoftware.org/is/6/innosetup-6.3.1.exe
