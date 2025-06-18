@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 '''serial_control MAVLink handling'''
 
+# flake8: noqa
+
 import time, os, fnmatch, sys
 from pymavlink import mavutil, mavwp
 from MAVProxy.modules.lib import mp_settings

@@ -7,6 +7,8 @@ log analysis program
 Andrew Tridgell December 2014
 '''
 
+# flake8: noqa
+
 import copy
 import sys
 import time

@@ -7,6 +7,8 @@ module.  You can run it like this:
     python -m MAVProxy.modules.mavproxy_joystick.findjoy
 '''
 
+# flake8: noqa
+
 from __future__ import print_function
 
 import argparse

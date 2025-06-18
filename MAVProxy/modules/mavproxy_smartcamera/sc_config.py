@@ -8,6 +8,8 @@ other classes or files wishing to use this class should add
 
 """
 
+# flake8: noqa
+
 from os.path import expanduser
 import ConfigParser
 

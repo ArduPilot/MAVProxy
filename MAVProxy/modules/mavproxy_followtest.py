@@ -5,6 +5,8 @@
  September 2016
 '''
 
+# flake8: noqa
+
 import sys, os, time, math
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util

@@ -5,6 +5,8 @@ Andrew Tridgell
 June 2012
 '''
 
+# flake8: noqa
+
 import sys, os, time
 from cuav.lib import cuav_util
 from MAVProxy.modules.lib import mp_module

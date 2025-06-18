@@ -2,6 +2,8 @@
 control EMU ECU system
 """
 
+# flake8: noqa
+
 import time
 
 from MAVProxy.modules.lib import mp_module
