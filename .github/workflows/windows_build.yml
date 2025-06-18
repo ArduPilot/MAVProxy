@@ -22,7 +22,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
-        run: |
+        run: >
           python3 -m pip install --upgrade pip
           python3 -m pip install --upgrade build lxml matplotlib numpy openai opencv-python \
                                            packaging Pillow prompt-toolkit pyaudio Pygame \
