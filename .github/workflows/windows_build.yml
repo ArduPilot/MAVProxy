@@ -16,14 +16,13 @@ jobs:
       - uses: actions/checkout@v5
         with:
           submodules: 'recursive'
-      - uses: actions/checkout@v5
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
-          python3 -m pip install -U wheel setuptools pip
+          python3 -m pip install -U build pip setuptools wheel
           python3 -m pip install -U pywin32 lxml pymavlink numpy matplotlib pyserial opencv-python PyYAML Pygame Pillow wxpython prompt-toolkit scipy
           python3 -m pip install -U openai pyaudio
           python3 -m pip install -U pyinstaller==6.7.0 packaging 
@@ -33,7 +32,7 @@ jobs:
         run: ./installer.exe /verysilent /allusers /dir=inst
       - name: Build MAVProxy
         run: |
-          python3 -m pip install .[recommended] --user
+          python3 -m build --no-build-isolation --skip-dependency-check --use-pep517
           python3 -m pip list
       - name: Prepare installer
         run: |
