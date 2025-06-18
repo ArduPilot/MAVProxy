@@ -3,6 +3,8 @@ inject data to GPS modules from a file or URL
 primarily used to inject uBlox AssistNow data
 """
 
+# flake8: noqa
+
 import random
 import time
 import os

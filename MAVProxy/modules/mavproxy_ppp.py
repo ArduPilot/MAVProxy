@@ -5,6 +5,8 @@ Andrew Tridgell
 May 2012
 '''
 
+# flake8: noqa
+
 import time, os, fcntl, pty
 
 from MAVProxy.modules.lib import mp_module

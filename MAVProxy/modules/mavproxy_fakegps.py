@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 '''fake GPS input using GPS_INPUT packet'''
 
+# flake8: noqa
+
 import time
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings

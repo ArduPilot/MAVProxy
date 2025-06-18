@@ -8,6 +8,8 @@ This file includes functions to:
 Image size is held in the smart_camera.cnf
 """
 
+# flake8: noqa
+
 import sys
 from os.path import expanduser
 import time

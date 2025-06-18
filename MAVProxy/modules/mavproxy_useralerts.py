@@ -4,6 +4,8 @@ https://github.com/ArduPilot/useralerts and
 https://ardupilot.org/dev/docs/user-alerts-developer.html '''
 
 
+# flake8: noqa
+
 import sys
 import json
 import string

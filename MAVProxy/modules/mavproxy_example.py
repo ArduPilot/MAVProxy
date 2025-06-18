@@ -12,6 +12,8 @@ This module simply serves as a starting point for your own MAVProxy module.
 3. trim (or comment) out any functionality you do not need
 '''
 
+# flake8: noqa
+
 import os
 import os.path
 import sys

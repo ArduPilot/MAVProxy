@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 '''arm/disarm command handling'''
 
+# flake8: noqa
+
 import time, os
 
 from MAVProxy.modules.lib import mp_module
