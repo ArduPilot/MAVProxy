@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 '''remote low level device operations'''
 
+# flake8: noqa
+
 import time, os, sys
 from pymavlink import mavutil
 

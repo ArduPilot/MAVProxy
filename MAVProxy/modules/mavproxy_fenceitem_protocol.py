@@ -1,6 +1,8 @@
 """
     MAVProxy geofence module
 """
+# flake8: noqa
+
 import os, time, platform
 from pymavlink import mavwp, mavutil
 from MAVProxy.modules.lib import mp_util

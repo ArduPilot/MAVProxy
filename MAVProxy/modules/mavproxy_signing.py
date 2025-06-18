@@ -3,6 +3,8 @@
 control MAVLink2 signing
 '''
 
+# flake8: noqa
+
 from pymavlink import mavutil
 import time, struct, math, sys
 import os

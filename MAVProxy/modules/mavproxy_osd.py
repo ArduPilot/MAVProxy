@@ -5,6 +5,8 @@ Andy Piper, August 2020, Vendee, France
 
 '''
 
+# flake8: noqa
+
 import os
 import os.path
 import sys

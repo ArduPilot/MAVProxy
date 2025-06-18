@@ -13,6 +13,8 @@ It is highly desirable that teams provide:
 
 '''
 
+# flake8: noqa
+
 import sys, os, serial
 from MAVProxy.modules.lib import mp_module
 

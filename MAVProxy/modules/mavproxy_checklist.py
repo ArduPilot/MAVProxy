@@ -5,6 +5,8 @@ Stephen Dade
 July 2014
 '''
 
+# flake8: noqa
+
 import math, sys, os, time
 from MAVProxy.modules.lib import mp_checklist
 from MAVProxy.modules.lib import mp_module

@@ -1,3 +1,5 @@
+# flake8: noqa
+
 import functools
 import math
 from MAVProxy.modules.lib import mp_elevation

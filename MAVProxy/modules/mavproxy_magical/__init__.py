@@ -17,6 +17,9 @@ Compass calibration helper. This is adapted from Ardupilot's local MAVProxy
 module magcal_graph. Some people read it "magical_graph" at the time of
 release, thus the silly reason for the name of this module.
 """
+
+# flake8: noqa
+
 from __future__ import print_function
 
 import sys
