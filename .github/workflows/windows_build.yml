@@ -21,13 +21,12 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - run: python3 -m pip install --upgrade pip
       - name: Install dependencies
-        run: >
-          python3 -m pip install --upgrade pip
-          python3 -m pip install --upgrade build lxml matplotlib numpy openai opencv-python \
-                                           packaging Pillow prompt-toolkit pyaudio Pygame \
-                                           pyinstaller==6.7.0 pymavlink pyserial pywin32 \
-                                           PyYAML scipy setuptools wheel wxpython
+        run: python3 -m pip install --upgrade build lxml matplotlib numpy openai opencv-python
+                                              packaging Pillow prompt-toolkit pyaudio Pygame
+                                              pyinstaller==6.7.0 pymavlink pyserial pywin32
+                                              PyYAML scipy setuptools wheel wxpython
       - name: Download Inno Setup installer
         run: curl -L -o installer.exe http://files.jrsoftware.org/is/6/innosetup-6.3.1.exe
       - name: Install Inno Setup
@@ -35,7 +34,7 @@ jobs:
       - name: Build MAVProxy
         run: |
           # python3 -m pip install .[recommended] --user  # Fails!
-          python3 -m build --no-build-isolation --use-pep517
+          python3 -m build --no-build-isolation --skip-dependency-check --use-pep517
           python3 -m pip list
       - name: Prepare installer
         run: |
