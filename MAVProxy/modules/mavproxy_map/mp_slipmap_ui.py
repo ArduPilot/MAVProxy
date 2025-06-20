@@ -355,6 +355,7 @@ class MPSlipMapPanel(wx.Panel):
         self.last_click_pos = None
         self.last_click_pos_used_for_text = None
         self.last_terrain_height = None
+        self.grid_spacing = None
         if state.elevation != "None":
             state.ElevationMap = mp_elevation.ElevationModel(database=state.elevation)
 
@@ -479,6 +480,10 @@ class MPSlipMapPanel(wx.Panel):
                 alt = state.ElevationMap.GetElevation(lat, lon)
                 if alt is not None:
                     newtext += ' %.1fm %uft' % (alt, alt*3.28084)
+        
+        if self.grid_spacing is not None:
+            newtext += f" Grid Spacing: {self.grid_spacing:.0f}m"
+
         state.mt.set_download(state.download)
         pending = 0
         if state.download:
@@ -594,7 +599,9 @@ class MPSlipMapPanel(wx.Panel):
 
         # possibly draw a grid
         if state.grid:
-            SlipGrid('grid', layer=3, linewidth=1, colour=(255,255,0)).draw(img, self.pixmapper, bounds)
+            self.grid_spacing = SlipGrid('grid', layer=3, linewidth=1, colour=(255,255,0)).draw(img, self.pixmapper, bounds)
+        else:
+            self.grid_spacing = None
 
         # draw layer objects
         keys = state.layers.keys()
