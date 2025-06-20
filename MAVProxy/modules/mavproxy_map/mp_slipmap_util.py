@@ -357,7 +357,7 @@ class SlipGrid(SlipObject):
     def draw(self, img, pixmapper, bounds):
         '''draw a polygon on the image'''
         if self.hidden:
-            return
+            return None
         (lat,lon,w,h) = bounds
         # note that w and h are in degrees
         spacing = 1000
@@ -387,6 +387,8 @@ class SlipGrid(SlipObject):
             pos1 = mp_util.gps_newpos(start[0], start[1], 0, i*spacing)
             pos3 = (pos1[0], pos1[1]+w*2)
             self.draw_line(img, pixmapper, pos1, pos3, self.colour, self.linewidth)
+        
+        return spacing
 
 
 class SlipFlightModeLegend(SlipObject):
