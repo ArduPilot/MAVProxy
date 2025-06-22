@@ -902,12 +902,17 @@ def process_mavlink(slave):
     if allow_fwd:
         for m in msgs:
             target_sysid = getattr(m, 'target_system', -1)
-            mbuf = m.get_msgbuf()
             if mpstate.settings.mavfwd_link > 0 and mpstate.settings.mavfwd_link <= len(mpstate.mav_master):
-                mpstate.mav_master[mpstate.settings.mavfwd_link-1].write(mbuf)
+                output = mpstate.mav_master[mpstate.settings.mavfwd_link-1]
             else:
                 # find best link by sysid
-                mpstate.master(target_sysid).write(mbuf)
+                output = mpstate.master(target_sysid)
+            if (output.mav.signing.sign_outgoing and
+                    (m._header.incompat_flags & mavutil.mavlink.MAVLINK_IFLAG_SIGNED) == 0):
+                # repack the message if this is a signed link and not already signed
+                m.pack(output.mav)
+
+            output.write(m.get_msgbuf())
             if mpstate.logqueue:
                 usec = int(time.time() * 1.0e6)
                 mpstate.logqueue.put(bytearray(struct.pack('>Q', usec) + m.get_msgbuf()))
