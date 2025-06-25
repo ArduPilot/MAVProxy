@@ -1097,18 +1097,25 @@ def cmd_messages(args):
             mstr = m.text
 
         # special handling for statustext:
-        if hasattr(m, 'id') and hasattr(m, 'chunk_seq') and m.chunk_seq != 0:  # assume STATUSTEXT
-            if m.id != statustext_current_id:
+        chunking_id = getattr(m, "id", getattr(m, "ID", None))
+        chunking_seq = getattr(m, "chunk_seq", getattr(m, "Seq", None))
+
+        if chunking_id is not None and chunking_seq is not None and chunking_id != 0:
+            if chunking_id != statustext_current_id:
                 if statustext_accumulation is not None:
                     print_if_match(statustext_timestring, statustext_accumulation)
                 statustext_accumulation = ""
-                statustext_current_id = m.id
+                statustext_current_id = chunking_id
                 statustext_next_seq = 0
                 statustext_timestring = timestring(m)
-            if m.chunk_seq != statustext_next_seq:
+            if chunking_seq != statustext_next_seq:
                 statustext_accumulation += "..."
-            statustext_next_seq = m.chunk_seq + 1
-            statustext_accumulation += m.text
+            statustext_next_seq = chunking_seq + 1
+            t_str = getattr(m, "text", None)
+            if t_str is None:
+                t_str = getattr(m, 'Message')
+            statustext_accumulation += t_str
+
             continue
 
         print_if_match(timestring(m), mstr)
