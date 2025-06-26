@@ -24,15 +24,8 @@ class HelpModule(mp_module.MPModule):
         self.add_command('mavhelp', self.cmd_help, "help and version information", "<about|site>")
         self.have_list = False
 
-        #  versioning info
-        #  pkg_resources doesn't work in the windows exe build, so read the version file
-        try:
-            import pkg_resources
-            self.version = pkg_resources.Environment()["mavproxy"][0].version
-        except Exception:
-            start_script = mp_util.dot_mavproxy("version.txt")
-            f = open(start_script, 'r')
-            self.version = f.readline()
+        import importlib.metadata
+        self.version = importlib.metadata.version("mavproxy")
         self.host = platform.system() + platform.release()
         self.pythonversion = str(platform.python_version())
         if mp_util.has_wxpython:
@@ -99,7 +92,7 @@ class HelpModule(mp_module.MPModule):
 
     def about_string(self):
         bits = {
-            "MAVProxy Version": self.version,
+            "MAVProxy": self.version,
             "OS": self.host,
             "Python": self.pythonversion,
             "WXPython": self.wxVersion,
