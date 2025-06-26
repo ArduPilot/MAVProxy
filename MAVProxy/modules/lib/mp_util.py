@@ -475,10 +475,13 @@ def decode_devid(devid, pname):
         0x0F : "BARO_ICP101XX",
         0x10 : "BARO_ICP201XX",
         0x11 : "BARO_MS5607",
-        0x12 : "BARO_MS5837",
+        0x12 : "BARO_MS5837_30BA",
         0x13 : "BARO_MS5637",
         0x14 : "BARO_BMP390",
         0x15 : "BARO_BMP581",
+        0x16 : "BARO_SPA06",
+        0x17 : "BARO_AUAV",
+        0x18 : "BARO_MS5837_02BA",
     }
 
     airspeed_types = {
