@@ -5,6 +5,8 @@ Michael Day
 June 2104
 '''
 
+# flake8: noqa
+
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import multiproc
 from MAVProxy.modules.lib import win_layout

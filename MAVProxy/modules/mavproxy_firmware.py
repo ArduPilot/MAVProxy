@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# flake8: noqa
+
 from __future__ import print_function
 
 '''firmware handling'''

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# flake8: noqa
+
 import wx
 import wx.grid as gridlib
 import math

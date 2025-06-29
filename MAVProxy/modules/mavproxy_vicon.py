@@ -2,6 +2,8 @@
 use vicon data to provide VISION_POSITION_ESTIMATE and GPS_INPUT data
 """
 
+# flake8: noqa
+
 import math
 import threading
 import time

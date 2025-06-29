@@ -6,6 +6,8 @@ Helper GUI for managing leader-follower swarms
 
 '''
 
+# flake8: noqa
+
 import sys
 import time
 import wx.lib.scrolledpanel as scrolled
