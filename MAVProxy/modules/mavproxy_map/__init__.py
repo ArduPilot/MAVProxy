@@ -165,6 +165,7 @@ class MapModule(mp_module.MPModule):
 
             # other commands
             mavutil.mavlink.MAV_CMD_DO_LAND_START: (255, 127, 0),
+            mp_util.MAV_CMD_DO_RETURN_PATH_START: (127, 255, 0),
         }
         # what each kind of item is called, which the 3D map labels with too,
         # so it is not to be changed from here
