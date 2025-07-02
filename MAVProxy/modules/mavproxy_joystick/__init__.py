@@ -2,9 +2,10 @@ from __future__ import print_function
 
 import os
 import pygame
-import pkg_resources
 import yaml
 import fnmatch
+
+import importlib.resources
 
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
@@ -66,8 +67,6 @@ class Joystick(mp_module.MPModule):
         if userjoysticks is not None and os.path.isdir(userjoysticks):
             search.append(userjoysticks)
 
-        search.append(pkg_resources.resource_filename(__name__, 'joysticks'))
-
         for path in search:
             self.log('Looking for joystick definitions in {}'.format(path),
                      2)
@@ -84,6 +83,15 @@ class Joystick(mp_module.MPModule):
                         joydef = yaml.safe_load(fd)
                         joydef['path'] = joypath
                         self.joydefs.append(joydef)
+
+        # now look for joystick definitions shipped with MAVProxy:
+        with importlib.resources.path(__package__, 'joysticks') as p:
+            print(f"Joystick directory path: {p}")
+            for joypath in p.iterdir():
+                with open(joypath, 'r') as fd:
+                    joydef = yaml.safe_load(fd)
+                    joydef['path'] = joypath
+                    self.joydefs.append(joydef)
 
     def probe(self):
         self.load_definitions()

@@ -28,7 +28,7 @@ from MAVProxy.modules.lib.mp_settings import MPSetting
 from pymavlink import mavutil
 from MAVProxy.modules.lib import mp_util
 
-import pkg_resources
+import importlib.resources
 
 if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import MPMenuItem
@@ -69,7 +69,8 @@ class FieldCheck(object):
     def flightdata_filepath(self, filename):
         if os.path.exists(filename):
             return filename
-        return pkg_resources.resource_filename(__name__, filename)
+        with importlib.resources.path(__package__, filename) as p:
+            return str(p)
 
     def loadRally(self):
         filepath = self.flightdata_filepath(self.fc_settings.rally_filename)
