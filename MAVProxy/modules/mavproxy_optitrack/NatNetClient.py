@@ -14,6 +14,8 @@
 
 # OptiTrack NatNet direct depacketization library for Python 3.x
 
+# flake8: noqa
+
 import sys
 import socket
 import struct

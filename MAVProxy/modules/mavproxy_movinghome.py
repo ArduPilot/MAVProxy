@@ -8,6 +8,8 @@ requires package python-nmea2
 
 '''
 
+# flake8: noqa
+
 import os
 import os.path
 import sys

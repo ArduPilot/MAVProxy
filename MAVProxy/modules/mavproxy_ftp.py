@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 '''mavlink file transfer support'''
 
+# flake8: noqa
+
 import io
 import time, os, sys
 import struct
