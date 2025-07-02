@@ -623,15 +623,16 @@ def mp_icon(filename):
         if name == "__main__":
             name = "MAVProxy.modules.mavproxy_map.mp_tile"
         stream = pkg_resources.resource_stream(name, "data/%s" % filename).read()
-        raw = np.fromstring(stream, dtype=np.uint8)
+        raw = np.frombuffer(stream, dtype=np.uint8)
     except Exception:
         try:
-            stream = open(os.path.join(os.path.dirname(__file__), 'data', filename)).read()
-            raw = np.fromstring(stream, dtype=np.uint8)
+            with open(os.path.join(os.path.dirname(__file__), 'data', filename), 'rb') as f:
+                raw = np.frombuffer(f.read(), dtype=np.uint8)
         except Exception:
             #we're in a Windows exe, where pkg_resources doesn't work
             import pkgutil
             raw = pkgutil.get_data( 'MAVProxy', 'modules//mavproxy_map//data//' + filename)
+            raw = np.frombuffer(raw, dtype=np.uint8)
     img = cv2.imdecode(raw, cv2.IMREAD_COLOR)
     return img
 
