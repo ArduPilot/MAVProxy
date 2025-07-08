@@ -19,6 +19,7 @@ class SigningModule(mp_module.MPModule):
         self.add_command('signing', self.cmd_signing, "signing control",
                          ["<setup|remove|disable|key>"])
         self.allow = None
+        self.saved_key = None
 
     def cmd_signing(self, args):
         '''handle link commands'''
@@ -84,6 +85,11 @@ class SigningModule(mp_module.MPModule):
             return True
         return False
 
+    def setup_signing_link(self, m):
+        '''add signing to a link'''
+        if self.saved_key is not None:
+            m.setup_signing(self.saved_key, sign_outgoing=True, allow_unsigned_callback=self.allow_unsigned)
+
     def cmd_signing_key(self, args):
         '''set signing key on connection'''
         if len(args) == 0:
@@ -94,17 +100,20 @@ class SigningModule(mp_module.MPModule):
             return
         passphrase = args[0]
         key = self.passphrase_to_key(passphrase)
+        self.saved_key = key
         for m in self.mpstate.mav_master:
-            m.setup_signing(key, sign_outgoing=True, allow_unsigned_callback=self.allow_unsigned)
+            self.setup_signing_link(m)
         print("Setup signing key")
 
     def cmd_signing_disable(self, args):
         '''disable signing locally'''
+        self.saved_key = None
         self.master.disable_signing()
         print("Disabled signing")
 
     def cmd_signing_remove(self, args):
         '''remove signing from server'''
+        self.saved_key = None
         if not self.master.mavlink20():
             print("You must be using MAVLink2 for signing")
             return
