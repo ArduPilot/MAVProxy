@@ -13,7 +13,6 @@ import struct
 import sys
 import time
 
-import pymavlink
 from pymavlink import mavutil
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
@@ -569,7 +568,7 @@ on'''
             alt2 = self.module('terrain').ElevationModel.GetElevation(wp.x, wp.y)
             if alt1 is not None and alt2 is not None:
                 wp.z += alt1 - alt2
-        if isinstance(wp, pymavlink.dialects.v20.ardupilotmega.MAVLink_mission_item_int_message):
+        if isinstance(wp, mavutil.mavlink.MAVLink_mission_item_int_message):
             wp.x = int(lat * 1e7)
             wp.y = int(lon * 1e7)
         else:
