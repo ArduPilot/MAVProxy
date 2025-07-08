@@ -433,6 +433,12 @@ class LinkModule(mp_module.MPModule):
         conn.highest_msec = {}
         conn.target_system = self.settings.target_system
         self.apply_link_attributes(conn, optional_attributes)
+
+        # if we are using signing then sign the new link
+        signing = self.mpstate.module('signing')
+        if signing:
+            signing.setup_signing_link(conn)
+
         self.mpstate.mav_master.append(conn)
         self.status.counters['MasterIn'].append(0)
         self.status.bytecounters['MasterIn'].append(self.status.ByteCounter())
