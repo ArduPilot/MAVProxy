@@ -20,6 +20,7 @@ class SigningModule(mp_module.MPModule):
                          ["<setup|remove|disable|key>"])
         self.allow = None
         self.saved_key = None
+        self.last_timestamp_update = time.time()
 
     def cmd_signing(self, args):
         '''handle link commands'''
@@ -63,14 +64,17 @@ class SigningModule(mp_module.MPModule):
             else:
                 secret_key.append(ord(b))
 
-        epoch_offset = 1420070400
-        now = max(time.time(), epoch_offset)
-        initial_timestamp = int((now - epoch_offset)*1e5)
+        initial_timestamp = self.get_signing_timestamp()
         self.master.mav.setup_signing_send(self.target_system, self.target_component,
                                            secret_key, initial_timestamp)
         print("Sent secret_key")
         self.cmd_signing_key([passphrase])
 
+    def get_signing_timestamp(self):
+        '''get a timestamp from current clock in units for signing'''
+        epoch_offset = 1420070400
+        now = max(time.time(), epoch_offset)
+        return int((now - epoch_offset)*1e5)
 
     def allow_unsigned(self, mav, msgId):
         '''see if an unsigned packet should be allowed'''
@@ -120,6 +124,19 @@ class SigningModule(mp_module.MPModule):
         self.master.mav.setup_signing_send(self.target_system, self.target_component, [0]*32, 0)
         self.master.disable_signing()
         print("Removed signing")
+
+    def idle_task(self):
+        now = time.time()
+        # every 10 seconds ensure our signing timestamps are at least the
+        # current clock, this ensures if we have an idle link we don't fall
+        # behind in the timestamp too far and send packets that will be
+        # rejected
+        if now - self.last_timestamp_update > 10:
+            self.last_timestamp_update = now
+            signing_timestamp = self.get_signing_timestamp()
+            for m in self.mpstate.mav_master:
+                if m.mav.signing and m.mav.signing.sign_outgoing:
+                    m.mav.signing.timestamp = max(m.mav.signing.timestamp, signing_timestamp)
 
 def init(mpstate):
     '''initialise module'''
