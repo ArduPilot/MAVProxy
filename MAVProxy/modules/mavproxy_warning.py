@@ -25,6 +25,7 @@ class WarningModule(mp_module.MPModule):
               ('esc_group1', int, 0),
               ('esc_group2', int, 0),
               ('esc_min_rpm', int, 100),
+              ('max_wind', int, 10),
           ])
         self.add_completion_function('(WARNINGSETTING)',
                                      self.warning_settings.completion)
@@ -148,7 +149,16 @@ class WarningModule(mp_module.MPModule):
                 self.details.append("status %s" % sname)
                 return True
         return False
-    
+
+    def check_wind(self):
+        '''check wind level'''
+        wind = self.master.messages.get("WIND", None)
+        if wind:
+            if wind.speed > self.warning_settings.max_wind:
+                self.details.append("Wind %.1f" % wind.speed)
+                return True
+        return False
+
     def check_all(self):
         failures = []
         if self.check_escs():
@@ -159,6 +169,8 @@ class WarningModule(mp_module.MPModule):
             failures.append('AIRSPEED')
         if self.check_status():
             failures.append('STATUS')
+        if self.check_wind():
+            failures.append('WIND')
         if len(failures) > 0:
             self.failure = '|'.join(failures)
 
