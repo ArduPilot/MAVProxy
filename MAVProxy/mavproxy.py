@@ -1473,6 +1473,11 @@ if __name__ == '__main__':
 
     mpstate.load_module('link', quiet=True)
 
+    # load signing early to allow for use of ~/.mavproxy/signing.keys
+    standard_modules = opts.default_modules.split(',')
+    if 'signing' in standard_modules:
+        mpstate.load_module('signing', quiet=True)
+
     mpstate.settings.source_system = opts.SOURCE_SYSTEM
     mpstate.settings.source_component = opts.SOURCE_COMPONENT
 
@@ -1544,7 +1549,6 @@ if __name__ == '__main__':
 
     if not opts.setup:
         # some core functionality is in modules
-        standard_modules = opts.default_modules.split(',')
         for m in standard_modules:
             if m:
                 mpstate.load_module(m, quiet=True)
