@@ -5,6 +5,7 @@ control MAVLink2 signing
 
 from pymavlink import mavutil
 import time, struct, math, sys
+import os
 
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
@@ -94,6 +95,31 @@ class SigningModule(mp_module.MPModule):
         if self.saved_key is not None:
             m.setup_signing(self.saved_key, sign_outgoing=True, allow_unsigned_callback=self.allow_unsigned)
 
+    def find_signing_passphrase(self, device):
+        '''
+        look for a signing passphrase in ~/.mavproxy/signing.keys
+        file format is lines of form "device passphrase"
+        '''
+        path = mp_util.dot_mavproxy("signing.keys")
+        try:
+            lines = open(path,'r').readlines()
+        except Exception:
+            return None
+        for line in lines:
+            a = line.split()
+            if len(a) == 2 and a[0].lower() == device.lower():
+                return a[1]
+        return None
+
+    def setup_signing_device(self, m, device):
+        '''add signing to a link, with a device name'''
+        passphrase = self.find_signing_passphrase(device)
+        key = self.saved_key
+        if passphrase:
+            key = self.passphrase_to_key(passphrase)
+        if key is not None:
+            m.setup_signing(key, sign_outgoing=True, allow_unsigned_callback=self.allow_unsigned)
+            
     def cmd_signing_key(self, args):
         '''set signing key on connection'''
         if len(args) == 0:
