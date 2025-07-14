@@ -617,21 +617,27 @@ def mp_icon(filename):
     '''load an icon from the data directory'''
     # we have to jump through a lot of hoops to get an OpenCV image
     # when we may be in a package zip file
+    raw = None
     try:
         import pkg_resources
         name = __name__
         if name == "__main__":
             name = "MAVProxy.modules.mavproxy_map.mp_tile"
-        stream = pkg_resources.resource_stream(name, "data/%s" % filename).read()
-        raw = np.fromstring(stream, dtype=np.uint8)
+        stream = pkg_resources.resource_stream(name, f"data/{filename}")
+        raw = np.frombuffer(stream.read(), dtype=np.uint8)
     except Exception:
         try:
-            stream = open(os.path.join(os.path.dirname(__file__), 'data', filename)).read()
-            raw = np.fromstring(stream, dtype=np.uint8)
+            with open(os.path.join(os.path.dirname(__file__), 'data', filename), 'rb') as f:
+                raw = np.frombuffer(f.read(), dtype=np.uint8)
         except Exception:
-            #we're in a Windows exe, where pkg_resources doesn't work
-            import pkgutil
-            raw = pkgutil.get_data( 'MAVProxy', 'modules//mavproxy_map//data//' + filename)
+            try:
+                import pkgutil
+                stream = pkgutil.get_data('MAVProxy', f'modules/mavproxy_map/data/{filename}')
+                raw = np.frombuffer(stream, dtype=np.uint8)
+            except Exception as e:
+                print(f"Failed to load image '{filename}': {e}")
+                return None
+
     img = cv2.imdecode(raw, cv2.IMREAD_COLOR)
     return img
 
