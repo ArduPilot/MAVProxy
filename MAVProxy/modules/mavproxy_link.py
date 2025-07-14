@@ -929,7 +929,10 @@ class LinkModule(mp_module.MPModule):
                 res = res[11:]
                 if (m.target_component not in [mavutil.mavlink.MAV_COMP_ID_MAVCAN] and
                     m.command not in [mavutil.mavlink.MAV_CMD_GET_HOME_POSITION,
-                                      mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONTROL]):
+                                      mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONTROL,
+                                      mavutil.mavlink.MAV_CMD_SET_CAMERA_MODE,
+                                      mavutil.mavlink.MAV_CMD_SET_CAMERA_ZOOM,
+                                      mavutil.mavlink.MAV_CMD_SET_CAMERA_FOCUS]):
                     self.mpstate.console.writeln("Got COMMAND_ACK: %s: %s" % (cmd, res))
             except Exception:
                 self.mpstate.console.writeln("Got MAVLink msg: %s" % m)
