@@ -3,17 +3,19 @@
 class to project a camera view onto the map
 '''
 
+import json
+import math
+import time
+
 import numpy
 from numpy import array, eye, zeros, uint64
 from numpy import linalg, dot, transpose
 from numpy import sin, cos, pi
 from math import pi
-import math
 import cv2
 from MAVProxy.modules.lib import mp_elevation
 from pymavlink.rotmat import Vector3
 from MAVProxy.modules.lib import mp_util
-import time
 
 class CameraParams:
     '''
@@ -80,8 +82,7 @@ class CameraParams:
             data['D'] = self.D.tolist()
         return data
 
-    @staticmethod
-    def fromdict(data):
+    def fromdict(self, data):
         if data['version'] != 0:
             raise Exception('version %d of camera params unsupported' % (self.version))
         try:
