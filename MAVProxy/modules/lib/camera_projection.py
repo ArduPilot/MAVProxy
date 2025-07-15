@@ -82,9 +82,10 @@ class CameraParams:
             data['D'] = self.D.tolist()
         return data
 
-    def fromdict(self, data):
+    @staticmethod
+    def fromdict(data):
         if data['version'] != 0:
-            raise Exception('version %d of camera params unsupported' % (self.version))
+            raise Exception('version %d of camera params unsupported' % (data['version']))
         try:
             K = array(data['K'])
             D = array(data['D'])
