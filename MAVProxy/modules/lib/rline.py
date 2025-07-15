@@ -74,7 +74,7 @@ class rline(object):
         '''redisplay prompt'''
         try:
             redisplay()
-        except (Exception, NameError) as ex:
+        except NameError:
             pass
             
     def get_prompt(self):
