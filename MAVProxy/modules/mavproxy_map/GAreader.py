@@ -4,6 +4,8 @@ Module to read DTM files published by Geoscience Australia
 Written by Stephen Dade (stephen_dade@hotmail.com
 '''
 
+# flake8: noqa
+
 import os
 import sys
 

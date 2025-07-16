@@ -3,6 +3,8 @@ use nokov data to provide motion capture data
 it works with nokov software
 """
 
+# flake8: noqa
+
 import time
 
 from MAVProxy.modules.lib import mp_module

@@ -12,6 +12,8 @@ To use add this in mavinit.scr for vehicle:
 thanks to Felix from Amber Technologies for the code this came from
 '''
 
+# flake8: noqa
+
 import time
 import datetime
 import socket

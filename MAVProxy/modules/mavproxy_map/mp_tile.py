@@ -17,6 +17,8 @@ see also:
 '''
 
 
+# flake8: noqa
+
 import collections
 import errno
 import hashlib

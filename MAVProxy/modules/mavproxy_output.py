@@ -6,6 +6,8 @@
     output remove 3      # to remove 3rd output
 '''
 
+# flake8: noqa
+
 from pymavlink import mavutil
 
 

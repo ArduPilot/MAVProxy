@@ -2,6 +2,8 @@
 Support for MAVLink SECURE_COMMAND
 '''
 
+# flake8: noqa
+
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
 from pymavlink import mavutil
