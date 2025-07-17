@@ -3,8 +3,10 @@ readline handling for mavproxy
 '''
 
 import sys, glob, os, platform
-from future.builtins import input
 import re
+if platform.system() != 'Windows':
+    from future.builtins import input
+
 from pymavlink import mavutil
 
 # some python distributions don't have readline, so handle that case
