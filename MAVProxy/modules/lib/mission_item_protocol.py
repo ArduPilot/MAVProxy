@@ -21,12 +21,7 @@ if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import MPMenuItem
     from MAVProxy.modules.lib.mp_menu import MPMenuSubMenu
 
-try:
-    # py2
-    from StringIO import StringIO as SIO
-except ImportError:
-    # py3
-    from io import BytesIO as SIO
+from io import BytesIO as SIO
 
 
 class MissionItemProtocolModule(mp_module.MPModule):

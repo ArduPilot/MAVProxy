@@ -7,12 +7,8 @@
 Edited by CanberraUAV"""
 
 import sys
-if sys.version_info.major < 3:
-    from HTMLParser import HTMLParser
-    import httplib
-else:
-    from html.parser import HTMLParser
-    import http.client as httplib
+from html.parser import HTMLParser
+import http.client as httplib
 
 import re
 import pickle
@@ -160,16 +156,13 @@ class SRTMDownloader():
                     continue
                 data = r1.read()
                 conn.close()
-                if sys.version_info.major < 3:
+                encoding = r1.headers.get_content_charset()
+                if encoding is not None:
+                    return data.decode(encoding)
+                elif ".zip" in url or ".hgt" in url:
                     return data
                 else:
-                    encoding = r1.headers.get_content_charset()
-                    if encoding is not None:
-                        return data.decode(encoding)
-                    elif ".zip" in url or ".hgt" in url:
-                        return data
-                    else:
-                        return data.decode('utf-8')
+                    return data.decode('utf-8')
         return None
 
     def createFileListHTTP(self):
