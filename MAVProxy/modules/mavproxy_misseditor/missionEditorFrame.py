@@ -38,6 +38,7 @@ ME_UP_COL = 10
 ME_DOWN_COL = 11
 ME_DIST_COL = 12
 ME_ANGLE_COL = 13
+ME_AGL_COL = 14
 
 
 class ListCtrlComboPopup(wx.ComboPopup):
@@ -260,6 +261,7 @@ class MissionEditorFrame(wx.Frame):
         self.grid_mission.SetColAttr(ME_DOWN_COL, self.down_attr)
         self.grid_mission.SetColAttr(ME_DIST_COL, self.read_only_attr)
         self.grid_mission.SetColAttr(ME_ANGLE_COL, self.read_only_attr)
+        self.grid_mission.SetColAttr(ME_AGL_COL, self.read_only_attr)
         self.grid_mission.SetRowLabelSize(50)
 
         #remember what mission we opened/saved last
@@ -282,7 +284,7 @@ class MissionEditorFrame(wx.Frame):
         self.label_home_lon_value.SetMinSize((100, 17))
         self.label_home_lon_value.SetForegroundColour(wx.Colour(0, 127, 255))
         self.label_home_alt_value.SetForegroundColour(wx.Colour(0, 127, 255))
-        self.grid_mission.CreateGrid(0, 14)
+        self.grid_mission.CreateGrid(0, 15)
         self.grid_mission.SetRowLabelSize(20)
         self.grid_mission.SetColLabelSize(20)
         self.grid_mission.SetColLabelValue(0, "Command")
@@ -301,6 +303,7 @@ class MissionEditorFrame(wx.Frame):
         self.grid_mission.SetDefaultColSize(-1)
         self.grid_mission.SetColLabelValue(12, "Distance")
         self.grid_mission.SetColLabelValue(13, "Grad (deg)")
+        self.grid_mission.SetColLabelValue(14, "AGL")
         # end wxGlade
 
     def __do_layout(self):
@@ -412,6 +415,7 @@ class MissionEditorFrame(wx.Frame):
             self.grid_mission.SetColSize(ME_ALT_COL, 75)
             self.grid_mission.SetColSize(ME_DIST_COL, 1)
             self.grid_mission.SetColSize(ME_ANGLE_COL, 1)
+            self.grid_mission.SetColSize(ME_AGL_COL, 1)
 
             self.grid_mission.ForceRefresh()
         elif event.get_type() == me_event.MEGE_ADD_MISS_TABLE_ROWS:
@@ -458,6 +462,7 @@ class MissionEditorFrame(wx.Frame):
                 self.grid_mission.SetCellValue(row, ME_ALT_COL,
                         "%.2f" % event.get_arg("alt"))
                 self.set_grad_dist()
+                self.set_agl()
 
                 frame_num = event.get_arg("frame")
                 if frame_num in me_defines.frame_enum:
@@ -532,6 +537,7 @@ class MissionEditorFrame(wx.Frame):
     def set_modified_state(self, modified):
         if (modified):
             self.set_grad_dist()
+            self.set_agl()
             self.label_sync_state.SetLabel("MODIFIED")
             self.label_sync_state.SetForegroundColour(wx.Colour(255, 0, 0))
         else:
@@ -720,6 +726,7 @@ class MissionEditorFrame(wx.Frame):
         self.grid_mission.SetColLabelValue(ME_ALT_COL, "Alt")
         self.grid_mission.SetColLabelValue(ME_DIST_COL, "Distance")
         self.grid_mission.SetColLabelValue(ME_ANGLE_COL, "Grad (deg)")
+        self.grid_mission.SetColLabelValue(ME_AGL_COL, "AGL")
 
         if event.GetRow() == self.grid_mission.GetNumberRows():
             # this event fires when last row is deleted; ignore
@@ -941,6 +948,30 @@ class MissionEditorFrame(wx.Frame):
             grad = format(grad, '.1f')
             self.grid_mission.SetCellValue(row, ME_DIST_COL, str(dist))
             self.grid_mission.SetCellValue(row, ME_ANGLE_COL, str(grad))
+            
+    def set_agl(self):
+        '''update agl altitude when changing cell values'''
+        home_def_alt = float(self.label_home_alt_value.GetLabel())
+        numrows = self.grid_mission.GetNumberRows()
+        for row in range(0,numrows):
+            command = self.grid_mission.GetCellValue(row, ME_COMMAND_COL)
+            lat = float(self.grid_mission.GetCellValue(row, ME_LAT_COL))
+            lon = float(self.grid_mission.GetCellValue(row, ME_LON_COL))
+            agl = 0.0
+            elevation = self.ElevationModel.GetElevation(lat, lon)
+            if elevation == None:
+                continue
+            if self.has_location(lat, lon, command) and "NAV" in command:
+                agl = float(self.grid_mission.GetCellValue(row, ME_ALT_COL))
+                frame = self.grid_mission.GetCellValue(row, ME_FRAME_COL)
+                if frame == "Rel":
+                    agl = agl + home_def_alt - elevation
+                elif self.grid_mission.GetCellValue(row, ME_FRAME_COL) == "Abs":
+                    agl = agl - elevation
+            else:
+                continue
+            agl = format(float(agl), '.1f')
+            self.grid_mission.SetCellValue(row, ME_AGL_COL, agl)
 
     def on_idle(self, event):
         now = time.time()
