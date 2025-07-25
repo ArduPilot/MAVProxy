@@ -9,6 +9,7 @@ June 2012
 '''
 
 import time
+from MAVProxy.modules.lib import wx_processguard
 from MAVProxy.modules.lib.wx_loader import wx
 import cv2
 import numpy as np
@@ -575,6 +576,49 @@ class MPImagePanel(wx.Panel):
             return
         self.osd_elements[obj.label] = obj
 
+    def process_event(self, obj):
+        """Process a single event"""
+        if isinstance(obj, MPImageOSD_Element):
+            self.handle_osd(obj)
+        if isinstance(obj, MPImageData):
+            self.set_image_data(obj.data, obj.width, obj.height)
+        if isinstance(obj, MPImageTitle):
+            state.frame.SetTitle(obj.title)
+        if isinstance(obj, MPImageRecenter):
+            self.on_recenter(obj.location)
+        if isinstance(obj, MPImageMenu):
+            self.set_menu(obj.menu)
+        if isinstance(obj, MPImagePopupMenu):
+            self.set_popup_menu(obj.menu)
+        if isinstance(obj, MPImageBrightness):
+            state.brightness = obj.brightness
+            self.need_redraw = True
+        if isinstance(obj, MPImageFullSize):
+            self.full_size()
+        if isinstance(obj, MPImageFitToWindow):
+            self.fit_to_window()
+        if isinstance(obj, win_layout.WinLayout):
+            win_layout.set_wx_window_layout(state.frame, obj)
+        if isinstance(obj, MPImageGStreamer):
+            self.start_gstreamer(obj.pipeline)
+        if isinstance(obj, MPImageVideo):
+            self.start_video(obj.filename)
+        if isinstance(obj, MPImageFPSMax):
+            self.fps_max = obj.fps_max
+            print("FPS_MAX: ", self.fps_max)
+        if isinstance(obj, MPImageSeekPercent):
+            self.seek_video(obj.percent)
+        if isinstance(obj, MPImageSeekFrame):
+            self.seek_video_frame(obj.frame)
+        if isinstance(obj, MPImageColormap):
+            self.colormap = obj.colormap
+        if isinstance(obj, MPImageColormapIndex):
+            self.colormap_index = obj.colormap_index
+        if isinstance(obj, MPImageStartTracker):
+            self.start_tracker(obj)
+        if isinstance(obj, MPImageEndTracker):
+            self.tracker = None
+
     def on_redraw_timer(self, event):
         '''the redraw timer ensures we show new map tiles as they
         are downloaded'''
@@ -585,46 +629,8 @@ class MPImagePanel(wx.Panel):
             except Exception:
                 time.sleep(0.05)
                 return
-            if isinstance(obj, MPImageOSD_Element):
-                self.handle_osd(obj)
-            if isinstance(obj, MPImageData):
-                self.set_image_data(obj.data, obj.width, obj.height)
-            if isinstance(obj, MPImageTitle):
-                state.frame.SetTitle(obj.title)
-            if isinstance(obj, MPImageRecenter):
-                self.on_recenter(obj.location)
-            if isinstance(obj, MPImageMenu):
-                self.set_menu(obj.menu)
-            if isinstance(obj, MPImagePopupMenu):
-                self.set_popup_menu(obj.menu)
-            if isinstance(obj, MPImageBrightness):
-                state.brightness = obj.brightness
-                self.need_redraw = True
-            if isinstance(obj, MPImageFullSize):
-                self.full_size()
-            if isinstance(obj, MPImageFitToWindow):
-                self.fit_to_window()
-            if isinstance(obj, win_layout.WinLayout):
-                win_layout.set_wx_window_layout(state.frame, obj)
-            if isinstance(obj, MPImageGStreamer):
-                self.start_gstreamer(obj.pipeline)
-            if isinstance(obj, MPImageVideo):
-                self.start_video(obj.filename)
-            if isinstance(obj, MPImageFPSMax):
-                self.fps_max = obj.fps_max
-                print("FPS_MAX: ", self.fps_max)
-            if isinstance(obj, MPImageSeekPercent):
-                self.seek_video(obj.percent)
-            if isinstance(obj, MPImageSeekFrame):
-                self.seek_video_frame(obj.frame)
-            if isinstance(obj, MPImageColormap):
-                self.colormap = obj.colormap
-            if isinstance(obj, MPImageColormapIndex):
-                self.colormap_index = obj.colormap_index
-            if isinstance(obj, MPImageStartTracker):
-                self.start_tracker(obj)
-            if isinstance(obj, MPImageEndTracker):
-                self.tracker = None
+
+            self.process_event(obj)
 
         if self.need_redraw:
             self.redraw()
@@ -696,8 +702,11 @@ class MPImagePanel(wx.Panel):
 
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             (width, height) = (frame.shape[1], frame.shape[0])
-            if self.tracker:
+            if self.tracker is not None:
                 self.tracker.update(frame)
+            # TODO: may need a lock? tracker may be set to None after update()
+            # but before get_position().
+            if self.tracker is not None:
                 pos = self.tracker.get_position()
                 if pos is not None:
                     startX = int(pos.left())
@@ -953,11 +962,17 @@ if __name__ == "__main__":
                 continue
             if isinstance(event, MPImageTrackPos):
                 continue
-            if event.ClassName == 'wxMouseEvent':
+            if (
+                hasattr(event, "ClassName")
+                and event.ClassName == 'wxMouseEvent'
+            ):
                 if event.leftIsDown and event.shiftDown:
                     im.start_tracker(event.X, event.Y, 50, 50)
                 if event.leftIsDown and event.controlDown:
                     im.end_tracking()
-            if event.ClassName == 'wxKeyEvent':
+            if (  
+                hasattr(event, "ClassName")
+                and event.ClassName == 'wxKeyEvent'
+            ):
                 print('key %u' % event.KeyCode)
         time.sleep(0.1)
