@@ -1165,16 +1165,19 @@ def main_loop():
             if master.fd is not None and not master.portdead:
                 rin.append(master.fd)
         for m in mpstate.mav_outputs:
-            rin.append(m.fd)
+            if m.fd is not None:
+                rin.append(m.fd)
         for sysid in mpstate.sysid_outputs:
             m = mpstate.sysid_outputs[sysid]
-            rin.append(m.fd)
+            if m.fd is not None:
+                rin.append(m.fd)
         if rin == []:
             time.sleep(0.0001)
             continue
 
         for fd in mpstate.select_extra:
-            rin.append(fd)
+            if fd is not None:
+                rin.append(fd)
         try:
             (rin, win, xin) = select.select(rin, [], [], mpstate.settings.select_timeout)
         except select.error:
