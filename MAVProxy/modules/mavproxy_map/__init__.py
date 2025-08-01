@@ -140,10 +140,12 @@ class MapModule(mp_module.MPModule):
 
             # other commands
             mavutil.mavlink.MAV_CMD_DO_LAND_START: (255,127,0),
+            mavutil.mavlink.MAV_CMD_DO_RETURN_PATH_START: (127, 255, 0),
         }
         self._label_suffix_for_wp_command = {
             mavutil.mavlink.MAV_CMD_NAV_TAKEOFF: "TOff",
             mavutil.mavlink.MAV_CMD_DO_LAND_START: "DLS",
+            mavutil.mavlink.MAV_CMD_DO_RETURN_PATH_START: "DRPS",
             mavutil.mavlink.MAV_CMD_NAV_SPLINE_WAYPOINT: "SW",
             mavutil.mavlink.MAV_CMD_NAV_VTOL_LAND: "VL",
         }
