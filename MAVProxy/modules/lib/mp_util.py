@@ -417,6 +417,8 @@ def decode_devid(devid, pname):
         0x14 : "AK09918",
         0x15 : "AK09915",
         0x16 : "QMC5883P",
+        0x17 : "BMM350",
+        0x18 : "IIS2MDC",
         }
 
     imu_types = {
@@ -455,6 +457,7 @@ def decode_devid(devid, pname):
         0x3A : "INS_ICM42670",
         0x3B : "INS_ICM45686",
         0x3C : "INS_SCHA63T",
+        0x3D : "INS_IIM42653",
         }
 
     baro_types = {
@@ -495,6 +498,7 @@ def decode_devid(devid, pname):
         0x08 : "AIRSPEED_ANALOG",
         0x09 : "AIRSPEED_NMEA",
         0x0A : "AIRSPEED_ASP5033",
+        0x0B : "AIRSPEED_AUAV",
     }
         
     decoded_devname = ""
