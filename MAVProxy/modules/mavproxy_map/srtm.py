@@ -5,4 +5,4 @@ but we don't want to break existing users
 '''
 
 
-from MAVProxy.modules.lib.srtm import *
+from MAVProxy.modules.lib.srtm import *  # noqa: F401,F403

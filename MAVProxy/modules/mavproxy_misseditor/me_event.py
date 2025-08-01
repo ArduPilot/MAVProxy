@@ -4,6 +4,8 @@ Event class and enums for Mission Editor
 Michael Day
 June 2014
 '''
+# flake8: noqa
+
 #MissionEditorEvents come FROM the GUI (with a few exceptions where the Mission Editor Module sends a message to itself, e.g., MEE_TIME_TO_QUIT)
 #MissionEditorGUIEvents go TO the GUI
 #enum for MissionEditorEvent types

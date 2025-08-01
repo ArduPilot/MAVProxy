@@ -4,6 +4,8 @@ nmea GPS connector
 connect to a NMEA GPS on a serial port and provide this as location position
 '''
 
+# flake8: noqa
+
 import sys, os, serial, time
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings

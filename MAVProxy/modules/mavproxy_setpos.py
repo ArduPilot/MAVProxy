@@ -2,6 +2,8 @@
 setpos command for SET_POSITION_TARGET_LOCAL_NED
 """
 
+# flake8: noqa
+
 import math
 import time
 

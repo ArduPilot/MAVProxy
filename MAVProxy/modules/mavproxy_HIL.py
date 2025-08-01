@@ -7,6 +7,8 @@ December 2012
 This interfaces to Tools/autotest/jsbsim/runsim.py to run the JSBSim flight simulator
 '''
 
+# flake8: noqa
+
 import sys, os, time, socket, errno, struct, math
 from math import degrees, radians
 from MAVProxy.modules.lib import mp_module
