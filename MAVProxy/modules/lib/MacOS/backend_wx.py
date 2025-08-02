@@ -1,4 +1,3 @@
-from __future__ import division, print_function
 """
  A wxPython backend for matplotlib, based (very heavily) on
  backend_template.py and backend_gtk.py

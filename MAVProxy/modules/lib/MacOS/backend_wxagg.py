@@ -1,4 +1,3 @@
-from __future__ import division, print_function
 import matplotlib
 from matplotlib.figure import Figure
 

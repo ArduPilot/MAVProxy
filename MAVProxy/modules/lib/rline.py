@@ -4,8 +4,6 @@ readline handling for mavproxy
 
 import sys, glob, os, platform
 import re
-if platform.system() != 'Windows':
-    from future.builtins import input
 
 from pymavlink import mavutil
 
