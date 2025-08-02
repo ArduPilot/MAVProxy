@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from __future__ import print_function
 import os, wx, pickle
 from MAVProxy.modules.lib import mp_util
 

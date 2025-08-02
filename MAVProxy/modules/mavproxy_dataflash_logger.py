@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-from __future__ import print_function
-
 '''
 DataFlash Logging Module
 June 2015

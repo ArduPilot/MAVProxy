@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-from __future__ import print_function
-
 '''
 log analysis program
 Andrew Tridgell December 2014

@@ -38,7 +38,6 @@ if platform.system() == "Darwin":
                          'matplotlib',
                          'opencv-python',
                          'lxml',
-                         'future',
                          'wxPython'])
 
 if platform.system() == "Windows" and sys.version_info >= (3, 0):

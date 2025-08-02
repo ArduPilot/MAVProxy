@@ -7,8 +7,6 @@ module.  You can run it like this:
     python -m MAVProxy.modules.mavproxy_joystick.findjoy
 '''
 
-from __future__ import print_function
-
 import argparse
 import collections
 import pygame

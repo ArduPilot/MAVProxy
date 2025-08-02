@@ -19,7 +19,6 @@ TODO:
   * integrate screen dpi w/ ppi and text
 
 """
-from __future__ import division
 import threading
 import numpy as np
 

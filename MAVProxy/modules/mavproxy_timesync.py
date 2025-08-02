@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-from __future__ import print_function
-
 """
 Currently what I do is run a sync every second and keep the following:
 time_send
