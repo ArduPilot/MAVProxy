@@ -104,7 +104,7 @@ class GraphFrame(wx.Frame):
             p = self.axes.plot(
                 self.data[i],
                 linewidth=1,
-                color=self.state.colors[i],
+                color=self.state.colors[i%len(self.state.colors)],
                 label=label
                 )[0]
             self.plot_data.append(p)
