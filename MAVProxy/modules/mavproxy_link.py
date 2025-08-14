@@ -231,6 +231,11 @@ class LinkModule(mp_module.MPModule):
                 print('Usage: e.g. link attributes rfd900 {"label":"bob"}')
                 return
             self.cmd_link_attributes(args[1:])
+        elif args[0] == "label":
+            if len(args) != 3:
+                print("Usage: link label LINK LABEL")
+                return
+            self.cmd_link_label(args[1:])
         elif args[0] == "ports":
             self.cmd_link_ports()
         elif args[0] == "remove":
@@ -470,6 +475,12 @@ class LinkModule(mp_module.MPModule):
         attributes = args[1]
         print("Setting link %s attributes (%s)" % (link, attributes))
         self.link_attributes(link, attributes)
+
+    def cmd_link_label(self, args):
+        '''change optional link label'''
+        link = args[0]
+        label = args[1]
+        self.link_attributes(link, '{"label":"%s"}' % label)
 
     def cmd_link_ports(self):
         '''show available ports'''
