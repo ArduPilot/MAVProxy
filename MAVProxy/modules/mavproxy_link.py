@@ -324,7 +324,18 @@ class LinkModule(mp_module.MPModule):
             except AttributeError:
                 # some mav objects may not have a "signing" attribute
                 pass
-            print("link %s %s (%u packets, %u bytes, %.2fs delay, %u lost, %.1f%% loss, rate:%uB/s%s)" % (
+
+            # add an entry for bytes-available-to-read:
+            bytes_available = ""
+            try:
+                import fcntl
+                sock = master.port
+                bytes_available = struct.unpack('I', fcntl.ioctl(sock, 0x541B, struct.pack('I', 0)))[0]
+                bytes_available = f" avail={bytes_available}"
+            except (AttributeError, ImportError):
+                pass
+
+            print("link %s %s (%u packets, %u bytes, %.2fs delay, %u lost, %.1f%% loss, rate:%uB/s%s%s)" % (
                 self.link_label(master),
                 status,
                 self.status.counters['MasterIn'][master.linknum],
@@ -334,6 +345,7 @@ class LinkModule(mp_module.MPModule):
                 master.packet_loss(),
                 self.status.bytecounters['MasterIn'][master.linknum].rate(),
                 sign_string,
+                bytes_available
             ))
 
     def reset_link_stats(self):
