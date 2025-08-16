@@ -72,11 +72,7 @@ class TabbedDialog(wx.Dialog):
             ctrl = self.controls[label]
             value = ctrl.GetValue()
 
-            # Python 2 compatiblility - alternative is:
-            # import six
-            # isinstance(value, six.string_types)
-            if isinstance(value, str) \
-                or isinstance(value, str if sys.version_info[0] >= 3 else unicode):
+            if isinstance(value, str):
                 ctrl.SetValue(str(setting.value))
             else:
                 ctrl.SetValue(setting.value)

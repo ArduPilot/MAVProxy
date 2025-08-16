@@ -34,12 +34,9 @@ Unsupported directives found while parsing are stored in the parser's
 ignored_directives attribute.
 '''
 import os
-try:
-    import cPickle as pickle
-except ImportError:
-    import pickle
-import threading
+import pickle
 import sys
+import threading
 
 class Parser(object):
     def __init__(self, filename=None, string='', enable_cache=False):

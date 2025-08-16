@@ -101,10 +101,7 @@ class dataflash_logger(mp_module.MPModule):
             log_cnt = 1
 
         self.lastlog_file = open(ll_filepath, 'w+b')
-        if sys.version_info[0] >= 3:
-            self.lastlog_file.write(str.encode(log_cnt.__str__()))
-        else:
-            self.lastlog_file.write(log_cnt.__str__())
+        self.lastlog_file.write(str.encode(log_cnt.__str__()))
         self.lastlog_file.close()
 
         return os.path.join(self.dataflash_dir, '%u.BIN' % (log_cnt,))

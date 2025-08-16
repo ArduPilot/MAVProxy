@@ -120,10 +120,7 @@ class MavGraph(object):
         self.title = None
         self.grid = False
         self.xlim_t = None
-        if sys.version_info[0] >= 3:
-            self.text_types = frozenset([str,])
-        else:
-            self.text_types = frozenset([unicode, str])
+        self.text_types = frozenset([str,])
         self.max_message_rate = 0
 
     def set_max_message_rate(self, rate_hz):

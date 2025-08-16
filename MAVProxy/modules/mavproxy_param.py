@@ -21,19 +21,11 @@ if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import MPMenuSubMenu
     from MAVProxy.modules.lib.mp_menu import MPMenuCallFileDialog
 
-try:
-    # py2
-    from StringIO import StringIO as SIO
-except ImportError:
-    # py3
-    from io import BytesIO as SIO
 
-try:
-    import queue as Queue
-    from queue import Empty
-except ImportError:
-    import Queue
-    from Queue import Empty
+from io import BytesIO as SIO
+
+import queue as Queue
+from queue import Empty
 
 
 class ParamState:

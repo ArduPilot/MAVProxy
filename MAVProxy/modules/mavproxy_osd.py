@@ -82,8 +82,7 @@ class osd(mp_module.MPModule):
             if len(args) > 5:
                 increment = float(args[5])
 
-        if sys.version_info.major >= 3:
-            name = bytearray(name, 'ascii')
+        name = bytearray(name, 'ascii')
 
         self.master.mav.osd_param_config_send(self.target_system,
                                         self.target_component,
