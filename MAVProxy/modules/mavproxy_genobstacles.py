@@ -2,6 +2,8 @@
 generate dynamic obstacles for OBC 2018
 '''
 
+# flake8: noqa
+
 import time, pickle
 from math import *
 

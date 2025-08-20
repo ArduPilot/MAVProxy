@@ -4,6 +4,8 @@
   uses lib/console.py for display
 """
 
+# flake8: noqa
+
 import os, sys, math, time, re
 import traceback
 

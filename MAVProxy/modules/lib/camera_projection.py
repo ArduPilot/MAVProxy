@@ -3,6 +3,8 @@
 class to project a camera view onto the map
 '''
 
+# flake8: noqa
+
 import json
 import math
 import time

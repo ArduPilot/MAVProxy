@@ -14,6 +14,8 @@
 
 """
 
+# flake8: noqa
+
 import sys
 import os
 import os.path

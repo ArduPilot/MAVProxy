@@ -4,6 +4,8 @@
     custom pickle functions and class wrappers
 '''
 
+# flake8: noqa
+
 from MAVProxy.modules.lib import multiproc
 
 import copyreg

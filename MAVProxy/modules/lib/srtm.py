@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# flake8: noqa
+
 # Pylint: Disable name warnings
 # pylint: disable-msg=C0103
 

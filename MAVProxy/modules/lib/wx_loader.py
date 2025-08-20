@@ -1,3 +1,5 @@
+# flake8: noqa
+
 from MAVProxy.modules.lib import wx_util
 
 if not wx_util.safe:

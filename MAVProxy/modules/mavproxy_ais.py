@@ -4,6 +4,8 @@ Stephen Dade
 June 2021
 '''
 
+# flake8: noqa
+
 from pymavlink import mavutil
 
 from MAVProxy.modules.lib import mp_module

@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 '''common mavproxy utility functions'''
 
+# flake8: noqa
+
 import gzip
 import math
 import os

@@ -4,6 +4,8 @@ Rhys Mainwaring
 November 2020
 '''
 
+# flake8: noqa
+
 from pymavlink import mavutil
 
 from MAVProxy.modules.lib import mp_module

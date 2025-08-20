@@ -1,3 +1,5 @@
+# flake8: noqa
+
 from pymavlink import mavutil
 import fnmatch
 

@@ -4,6 +4,8 @@
   uses lib/console.py for display
 """
 
+# flake8: noqa
+
 from MAVProxy.modules.lib import wxhorizon
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib.wxhorizon_util import Attitude, VFR_HUD, Global_Position_INT, BatteryInfo, FlightState, WaypointInfo, FPS

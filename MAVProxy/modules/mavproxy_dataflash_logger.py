@@ -13,6 +13,8 @@ The relevant code in the ArduPilot code base can be found in
 libraries/DataFlash/DataFlash_MAVLink.*
 '''
 
+# flake8: noqa
+
 import os
 import os.path
 from pymavlink import mavutil

@@ -1,5 +1,4 @@
-
-
+# flake8: noqa
 
 import threading, sys, traceback
 

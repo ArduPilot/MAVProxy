@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 '''calibration command handling'''
 
+# flake8: noqa
+
 import time, os
 from pymavlink import mavutil
 

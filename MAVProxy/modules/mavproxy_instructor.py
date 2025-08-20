@@ -4,6 +4,8 @@
   André Kjellstrup @ NORCE
 """
 
+# flake8: noqa
+
 import math
 from MAVProxy.modules.lib import mp_instructor
 from MAVProxy.modules.lib import mp_module

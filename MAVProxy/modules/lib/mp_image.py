@@ -6,6 +6,8 @@ Andrew Tridgell
 June 2012
 '''
 
+# flake8: noqa
+
 import time
 from MAVProxy.modules.lib.wx_loader import wx
 import cv2

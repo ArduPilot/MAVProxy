@@ -12,6 +12,8 @@ downloaded from INTERGOVERNMENTAL COMMITTEE ON SURVEYING & MAPPING (ICSM)
 http://www.icsm.gov.au/icsm/
 
 """
+# flake8: noqa
+
 from MAVProxy.modules.lib.ANUGA.geo_reference import Geo_reference, DEFAULT_ZONE
 
 

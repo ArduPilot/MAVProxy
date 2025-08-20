@@ -6,6 +6,8 @@ Andrew Tridgell
 June 2012
 '''
 
+# flake8: noqa
+
 import time
 import cv2
 

@@ -2,6 +2,8 @@
 send NTRIP data to flight controller
 """
 
+# flake8: noqa
+
 import random
 import time
 

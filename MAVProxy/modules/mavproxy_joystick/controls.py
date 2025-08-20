@@ -1,6 +1,8 @@
 '''Joystick control classes'''
 
 
+# flake8: noqa
+
 def scale(val,
           inlow=-1, inhigh=1,
           outlow=1000, outhigh=2000):

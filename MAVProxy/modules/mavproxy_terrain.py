@@ -2,6 +2,8 @@
   MAVProxy terrain handling module
 """
 
+# flake8: noqa
+
 import time
 
 from MAVProxy.modules.lib import mp_elevation

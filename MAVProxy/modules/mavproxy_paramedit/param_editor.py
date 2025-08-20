@@ -5,6 +5,8 @@ Akshath Singhal
 June 2019
 '''
 
+# flake8: noqa
+
 import platform
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import multiproc

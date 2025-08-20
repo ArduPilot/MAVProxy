@@ -5,6 +5,8 @@ But displays an automatically generated wx dialog in order to enter the
 options/args, instead of parsing command line arguments
 '''
 
+# flake8: noqa
+
 import os
 import sys
 import re

@@ -6,6 +6,8 @@ Peter Barker, December 2018
 Simply display message rates
 '''
 
+# flake8: noqa
+
 import time
 
 from MAVProxy.modules.lib import mp_module

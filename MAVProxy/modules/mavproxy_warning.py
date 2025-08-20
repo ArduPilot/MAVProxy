@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 '''module to display and announce warnings about system failures'''
 
+# flake8: noqa
+
 import time
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings

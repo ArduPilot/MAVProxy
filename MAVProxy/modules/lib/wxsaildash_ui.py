@@ -2,6 +2,8 @@
   MAVProxy sailing dashboard gui elements
 """
 
+# flake8: noqa
+
 from MAVProxy.modules.lib.wx_loader import wx
 from MAVProxy.modules.lib.wxsaildash_util import WindReference, SpeedUnit, WindAngleAndSpeed, WaterSpeedAndHeading
 

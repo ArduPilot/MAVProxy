@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 '''settings object for MAVProxy modules'''
 
+# flake8: noqa
+
 import time
 import fnmatch
 

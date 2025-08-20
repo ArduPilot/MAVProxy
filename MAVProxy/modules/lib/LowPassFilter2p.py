@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# flake8: noqa
+
 from math import *
 
 class LowPassFilter2p:

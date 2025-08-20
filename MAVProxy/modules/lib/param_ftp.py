@@ -3,6 +3,8 @@
 decode ftp parameter protocol data
 '''
 
+# flake8: noqa
+
 import struct
 import sys
 

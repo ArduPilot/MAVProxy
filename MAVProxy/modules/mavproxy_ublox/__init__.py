@@ -8,6 +8,8 @@ This module allows one to interact with the UBlox GPS's "Multi-GNSS-Assist" ("MG
 To use the uBlox API you will need to create a file containing your API token in ~/.mavproxy/ublox/api_token
 '''
 
+# flake8: noqa
+
 import os
 import struct
 import time

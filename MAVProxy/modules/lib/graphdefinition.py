@@ -2,6 +2,8 @@
 GraphDefinition class
 '''
 
+# flake8: noqa
+
 class GraphDefinition(object):
     '''a pre-defined graph'''
     def __init__(self, name, expression, description, expressions, filename):

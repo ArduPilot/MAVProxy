@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 '''relay handling module'''
 
+# flake8: noqa
+
 import time
 from pymavlink import mavutil
 from MAVProxy.modules.lib import mp_module

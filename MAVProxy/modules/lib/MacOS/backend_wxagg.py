@@ -1,3 +1,5 @@
+# flake8: noqa
+
 import matplotlib
 from matplotlib.figure import Figure
 

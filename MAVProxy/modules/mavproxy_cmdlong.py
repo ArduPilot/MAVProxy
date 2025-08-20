@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 '''command long'''
 
+# flake8: noqa
+
 import time, os
 from numpy import equal
 from pymavlink import mavutil

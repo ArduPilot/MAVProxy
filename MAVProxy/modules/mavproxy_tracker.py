@@ -8,6 +8,8 @@ Mike McCauley, based on earlier work by Andrew Tridgell
 June 2012
 '''
 
+# flake8: noqa
+
 import sys, os, time
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules import mavproxy_map

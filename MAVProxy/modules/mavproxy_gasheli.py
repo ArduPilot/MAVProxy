@@ -2,6 +2,8 @@
 helicopter monitoring and control module gas helicopters
 """
 
+# flake8: noqa
+
 import os, sys, math, time
 
 from pymavlink import mavutil

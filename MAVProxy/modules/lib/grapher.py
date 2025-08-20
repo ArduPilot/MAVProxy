@@ -4,6 +4,8 @@
  core library for graphing in mavexplorer
 '''
 
+# flake8: noqa
+
 import ast
 import sys, struct, time, os, datetime, platform
 import math, re

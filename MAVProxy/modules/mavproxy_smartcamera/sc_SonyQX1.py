@@ -24,6 +24,8 @@
 # HEADER-FILES (Only those that are needed in this file)
 #****************************************************************************
 
+# flake8: noqa
+
 # System Header files and Module Headers
 import os, sys, time, math, cv2, struct, fcntl
 from datetime import datetime

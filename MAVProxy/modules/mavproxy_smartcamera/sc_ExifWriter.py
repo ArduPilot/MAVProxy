@@ -37,6 +37,8 @@
 # HEADER-FILES (Only those that are needed in this file)
 #****************************************************************************
 
+# flake8: noqa
+
 # System Header files and Module Headers
 
 # Module Dependent Headers

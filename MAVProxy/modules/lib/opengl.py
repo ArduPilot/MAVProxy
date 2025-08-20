@@ -15,6 +15,8 @@
 '''
 Module with helpers for OpenGL rendering.
 '''
+# flake8: noqa
+
 import math
 
 from ctypes import *

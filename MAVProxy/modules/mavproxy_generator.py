@@ -4,6 +4,8 @@ Generator Module - module for generators reporting via the GENERATOR_STATUS mess
 Peter Barker, Jun 2020
 '''
 
+# flake8: noqa
+
 import os
 import os.path
 import sys

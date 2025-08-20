@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 '''window layout command handling'''
 
+# flake8: noqa
+
 from MAVProxy.modules.lib import mp_module
 
 class LayoutModule(mp_module.MPModule):

@@ -3,6 +3,8 @@
 """
   MAVProxy default console
 """
+# flake8: noqa
+
 import sys
 
 class SimpleConsole():

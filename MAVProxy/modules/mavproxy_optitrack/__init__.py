@@ -2,6 +2,8 @@
 # it works with optitrack motion capture cameras and optitrack motive tracker software (https://optitrack.com/software/motive/)
 # yuan-chu tai
 
+# flake8: noqa
+
 import time
 from pymavlink import mavutil
 from MAVProxy.modules.lib import mp_module

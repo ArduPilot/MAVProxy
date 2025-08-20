@@ -2,6 +2,8 @@
 monitoring of heliplane
 """
 
+# flake8: noqa
+
 import os, sys, math, time
 
 from pymavlink import mavutil

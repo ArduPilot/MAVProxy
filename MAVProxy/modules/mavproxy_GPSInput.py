@@ -3,6 +3,8 @@
 support for GPS_INPUT message
 '''
 
+# flake8: noqa
+
 import socket, errno
 import json
 from pymavlink import mavutil

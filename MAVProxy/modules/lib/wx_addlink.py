@@ -3,6 +3,8 @@
 GUI for adding new links to MAVProxy
 '''
 
+# flake8: noqa
+
 import wx
 from pymavlink import mavutil
 

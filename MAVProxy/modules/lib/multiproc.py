@@ -10,6 +10,8 @@ the script in the child. It is horrible, but it seems to be the only way to
 make things work on MacOS
 '''
 
+# flake8: noqa
+
 class PipeQueue(object):
     '''simulate a queue using a pipe. This is used to avoid a problem with
     pipes on MacOS, while still keeping similar syntax'''

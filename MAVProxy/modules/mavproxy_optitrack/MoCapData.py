@@ -22,6 +22,8 @@
 
 #Utility functions
 
+# flake8: noqa
+
 import copy
 import hashlib
 import random

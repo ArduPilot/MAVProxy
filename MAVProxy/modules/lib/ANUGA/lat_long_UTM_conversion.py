@@ -5,6 +5,8 @@
 # see http://www.pygps.org
 #
 
+# flake8: noqa
+
 from math import pi, sin, cos, tan, sqrt
 
 #LatLong- UTM conversion..h

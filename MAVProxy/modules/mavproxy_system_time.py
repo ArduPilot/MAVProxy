@@ -7,6 +7,8 @@ Send mavlink SYSTEM_TIME messages via mavlink
 
 '''
 
+# flake8: noqa
+
 import time
 
 from MAVProxy.modules.lib import mp_module

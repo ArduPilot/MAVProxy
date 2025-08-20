@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 '''test flight for DCM noise'''
 
+# flake8: noqa
+
 import time, math
 
 def enum(**enums):

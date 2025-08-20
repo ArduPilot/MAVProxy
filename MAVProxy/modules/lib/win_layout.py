@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# flake8: noqa
+
 import os, wx, pickle
 from MAVProxy.modules.lib import mp_util
 

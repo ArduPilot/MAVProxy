@@ -4,6 +4,8 @@
   uses lib/live_graph.py for display
 """
 
+# flake8: noqa
+
 from pymavlink import mavutil
 import re, os, sys
 

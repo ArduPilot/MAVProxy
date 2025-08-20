@@ -8,6 +8,8 @@
   http://eli.thegreenplace.net/files/prog_code/wx_mpl_dynamic_graph.py.txt
 """
 
+# flake8: noqa
+
 import platform
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import multiproc

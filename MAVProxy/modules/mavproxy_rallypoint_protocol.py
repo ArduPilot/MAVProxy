@@ -2,6 +2,8 @@
     MAVProxy rally module
 """
 
+# flake8: noqa
+
 from pymavlink import mavwp
 from pymavlink import mavutil
 import time, os, platform

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 '''monitor sensor consistancy'''
 
+# flake8: noqa
+
 import time, math
 from pymavlink import mavutil
 

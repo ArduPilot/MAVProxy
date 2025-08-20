@@ -7,6 +7,8 @@ Simple "msg" command sends statustext
 
 '''
 
+# flake8: noqa
+
 from pymavlink import mavutil
 import time
 

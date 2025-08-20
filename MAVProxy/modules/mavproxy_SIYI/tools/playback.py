@@ -3,6 +3,8 @@
 playback videos with temperature data
 '''
 
+# flake8: noqa
+
 from MAVProxy.modules.lib.mp_image import MPImage
 from MAVProxy.modules.lib.mp_image import MPImageFrameCounter
 from MAVProxy.modules.lib.mp_image import MPImageOSD_HorizonLine

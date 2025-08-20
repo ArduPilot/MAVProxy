@@ -5,6 +5,8 @@ It will grab the altitude of a long,lat pair from the SRTM database
 Created by Stephen Dade (stephen_dade@hotmail.com)
 '''
 
+# flake8: noqa
+
 import os
 import sys
 import time

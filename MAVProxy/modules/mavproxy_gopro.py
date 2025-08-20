@@ -4,6 +4,8 @@
 To use this module connect to a Solo with a GoPro installed on the gimbal.
 '''
 
+# flake8: noqa
+
 import time, os
 
 from MAVProxy.modules.lib import mp_module

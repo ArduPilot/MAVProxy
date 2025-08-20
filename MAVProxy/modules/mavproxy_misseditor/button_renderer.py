@@ -6,6 +6,8 @@ Michael Day
 June 2014
 '''
 
+# flake8: noqa
+
 from ..lib.wx_loader import wx
 from wx import grid
 import copy

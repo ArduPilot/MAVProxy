@@ -5,6 +5,8 @@ Malcolm Gill
 Feb 2014
 '''
 
+# flake8: noqa
+
 import math
 from MAVProxy.modules.mavproxy_map import mp_slipmap
 from MAVProxy.modules.lib import mp_util

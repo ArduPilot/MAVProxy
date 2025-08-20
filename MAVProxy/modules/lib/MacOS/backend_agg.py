@@ -19,6 +19,8 @@ TODO:
   * integrate screen dpi w/ ppi and text
 
 """
+# flake8: noqa
+
 import threading
 import numpy as np
 

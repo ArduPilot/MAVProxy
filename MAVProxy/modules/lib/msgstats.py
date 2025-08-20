@@ -4,6 +4,8 @@
 show stats on messages in a log in MAVExplorer
 '''
 
+# flake8: noqa
+
 import fnmatch
 from MAVProxy.modules.lib.multiproc_util import MPDataLogChildTask
 

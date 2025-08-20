@@ -1,3 +1,5 @@
+# flake8: noqa
+
 class Text():
     '''text to write to console'''
     def __init__(self, text, fg='black', bg='white'):

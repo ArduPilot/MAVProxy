@@ -7,6 +7,8 @@ TODO:
   circle hottest area?
 '''
 
+# flake8: noqa
+
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib.mp_settings import MPSetting

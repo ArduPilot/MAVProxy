@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 '''remote nsh console handling'''
 
+# flake8: noqa
+
 import time, os, fnmatch, sys, time
 from pymavlink import mavutil, mavwp
 from MAVProxy.modules.lib import mp_settings
