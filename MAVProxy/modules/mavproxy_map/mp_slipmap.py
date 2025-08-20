@@ -73,6 +73,7 @@ class MPSlipMap():
         '''child process - this holds all the GUI elements'''
         mp_util.child_close_fds()
 
+        from MAVProxy.modules.lib import wx_processguard # noqa:F401
         from MAVProxy.modules.lib.wx_loader import wx
         from MAVProxy.modules.mavproxy_map.mp_slipmap_ui import MPSlipMapFrame
 
