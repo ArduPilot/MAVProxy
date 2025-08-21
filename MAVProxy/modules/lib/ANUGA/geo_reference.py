@@ -4,6 +4,7 @@ https://anuga.anu.edu.au/
 
 """
 
+# flake8: noqa
 
 #FIXME: Ensure that all attributes of a georef are treated everywhere
 #and unit test

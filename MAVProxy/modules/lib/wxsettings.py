@@ -1,6 +1,8 @@
 '''
 Graphical editing of mp_settings object
 '''
+# flake8: noqa
+
 import os, sys
 from MAVProxy.modules.lib import multiproc
 import threading

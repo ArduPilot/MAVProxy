@@ -2,6 +2,8 @@
 MAVProxy sailing dashboard utility classes
 '''
 
+# flake8: noqa
+
 import enum
 
 class WindReference(enum.Enum):

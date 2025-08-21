@@ -3,6 +3,8 @@
 """
   MAVProxy horizon indicator.
 """
+# flake8: noqa
+ 
 from MAVProxy.modules.lib import multiproc
 import time
 

@@ -5,6 +5,8 @@ Andrew Tridgell
 June 2012
 '''
 
+# flake8: noqa
+
 import os
 import math
 import functools

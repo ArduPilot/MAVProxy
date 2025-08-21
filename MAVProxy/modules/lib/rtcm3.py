@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 '''Decode RTCM v3 messages'''
 
+# flake8: noqa
+
 RTCMv3_PREAMBLE = 0xD3
 POLYCRC24 = 0x1864CFB
 

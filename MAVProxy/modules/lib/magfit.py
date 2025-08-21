@@ -4,6 +4,8 @@
 fit best estimate of magnetometer offsets, diagonals, off-diagonals, cmot and scaling using WMM target
 '''
 
+# flake8: noqa
+
 from MAVProxy.modules.lib import wx_processguard
 from MAVProxy.modules.lib.wx_loader import wx
 

@@ -6,6 +6,8 @@ Andrew Tridgell
 November 2013
 '''
 
+# flake8: noqa
+
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import multiproc
 import platform

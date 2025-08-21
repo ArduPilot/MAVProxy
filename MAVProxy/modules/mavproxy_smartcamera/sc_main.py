@@ -1,3 +1,5 @@
+# flake8: noqa
+
 import time
 import math
 import cv2

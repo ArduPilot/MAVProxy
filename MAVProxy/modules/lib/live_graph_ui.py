@@ -1,3 +1,5 @@
+# flake8: noqa
+
 from MAVProxy.modules.lib.wx_loader import wx
 from MAVProxy.modules.lib import icon
 import time

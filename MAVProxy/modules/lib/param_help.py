@@ -1,3 +1,5 @@
+# flake8: noqa
+
 import time, os
 from pymavlink import mavutil, mavparm
 from MAVProxy.modules.lib import mp_util

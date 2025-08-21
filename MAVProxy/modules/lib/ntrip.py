@@ -4,6 +4,8 @@
  based on client from http://github.com/jcmb/NTRIP
 """
 
+# flake8: noqa
+
 import socket
 import sys
 import datetime

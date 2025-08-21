@@ -1,3 +1,5 @@
+# flake8: noqa
+
 import sys
 from MAVProxy.modules.lib.wx_loader import wx
 

@@ -2,6 +2,8 @@
 
 '''firmware handling'''
 
+# flake8: noqa
+
 import time, os, fnmatch
 import json
 import threading

@@ -2,6 +2,8 @@
 readline handling for mavproxy
 '''
 
+# flake8: noqa
+
 import sys, glob, os, platform
 import re
 

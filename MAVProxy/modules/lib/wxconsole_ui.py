@@ -1,3 +1,5 @@
+# flake8: noqa
+
 import errno
 import time
 import platform

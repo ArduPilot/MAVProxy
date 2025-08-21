@@ -33,6 +33,8 @@ The directives supported by the material library parser are:
 Unsupported directives found while parsing are stored in the parser's
 ignored_directives attribute.
 '''
+# flake8: noqa
+
 import os
 try:
     import cPickle as pickle

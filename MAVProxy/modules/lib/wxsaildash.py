@@ -4,6 +4,8 @@
   MAVProxy sailing dashboard
 """
 
+# flake8: noqa
+
 from MAVProxy.modules.lib import multiproc
 import time
 

@@ -1,3 +1,5 @@
+# flake8: noqa
+
 import time
 from pymavlink import mavutil
 import traceback

@@ -4,6 +4,8 @@
 extract ISBH and ISBD messages from AP_Logging files and produce FFT plots
 '''
 
+# flake8: noqa
+
 import numpy
 import os
 import pylab

@@ -5,6 +5,8 @@ Michael Day
 June 2104
 '''
 
+# flake8: noqa
+
 from MAVProxy.modules.lib import mp_module
 
 class MissionEditorModule(mp_module.MPModule):

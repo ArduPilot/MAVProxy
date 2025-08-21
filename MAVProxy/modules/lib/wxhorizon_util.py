@@ -1,3 +1,5 @@
+# flake8: noqa
+
 class Attitude():
     '''The current Attitude Data'''
     def __init__(self, attitudeMsg):

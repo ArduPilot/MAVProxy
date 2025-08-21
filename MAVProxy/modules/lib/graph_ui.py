@@ -1,3 +1,5 @@
+# flake8: noqa
+
 from MAVProxy.modules.lib import grapher
 from MAVProxy.modules.lib import multiproc
 

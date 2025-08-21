@@ -74,6 +74,8 @@ found at: http://wiki.wxpython.org/index.cgi/MultiVersionInstalls
 
 """
 
+# flake8: noqa
+
 import re, sys, os, glob, fnmatch
 
 

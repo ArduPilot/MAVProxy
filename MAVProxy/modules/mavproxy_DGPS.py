@@ -3,6 +3,8 @@
 support for a GCS attached DGPS system
 '''
 
+# flake8: noqa
+
 import socket, errno
 from pymavlink import mavutil
 from MAVProxy.modules.lib import mp_module

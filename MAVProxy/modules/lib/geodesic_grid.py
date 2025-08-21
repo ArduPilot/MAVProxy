@@ -20,6 +20,8 @@ https://github.com/ArduPilot/ardupilot/blob/master/libraries/AP_Math/AP_Geodesic
 as reference for defining the geodesic sections and implementing almost all
 functions. Those files should be consulted for implementation details.
 '''
+# flake8: noqa
+
 import math
 
 from pymavlink.rotmat import Matrix3, Vector3

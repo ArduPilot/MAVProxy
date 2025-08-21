@@ -1,3 +1,5 @@
+# flake8: noqa
+
 import time
 from MAVProxy.modules.lib.wxhorizon_util import Attitude, VFR_HUD, Global_Position_INT, BatteryInfo, FlightState, WaypointInfo, FPS
 from MAVProxy.modules.lib.wx_loader import wx

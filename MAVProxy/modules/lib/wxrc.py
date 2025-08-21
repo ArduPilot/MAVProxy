@@ -3,6 +3,8 @@
 """
   MAVProxy RC GUI
 """
+# flake8: noqa
+
 from MAVProxy.modules.lib import multiproc
 from MAVProxy.modules.lib.wx_loader import wx
 import wx.lib.agw.pygauge as PG

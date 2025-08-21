@@ -21,6 +21,8 @@
 # and receive data via a NatNet connection and decode it using the NatNetClient library.
 
 
+# flake8: noqa
+
 import copy
 import hashlib
 import random

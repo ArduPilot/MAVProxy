@@ -11,15 +11,17 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      # git checkout the PR
       - uses: actions/checkout@v5
         with:
           submodules: 'recursive'
 
+      # Run flake8 but exclude git submodules and third-party libraries
+      - run: pipx run flake8 --show-source --exclude=MAVProxy/modules/mavproxy_cesium
+
       - name: Install dependencies
         run: |
-          python -m pip install -U flake8
+          python -m pip install --upgrade flake8
 
       - name: Check Python with Flake8
         run: |
-            scripts/run_flake8.py MAVProxy
+          scripts/run_flake8.py MAVProxy

@@ -2,6 +2,8 @@
 variable substitution in strings using a dictionary
 '''
 
+# flake8: noqa
+
 import sys
 
 class MAVSubstituteError(Exception):

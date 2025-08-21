@@ -5,6 +5,8 @@
   Created by Stephen Dade (stephen_dade@hotmail.com)
 """
 
+# flake8: noqa
+
 import sys
 import os
 import time

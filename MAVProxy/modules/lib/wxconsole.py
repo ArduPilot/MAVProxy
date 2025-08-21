@@ -3,6 +3,8 @@
 """
   MAVProxy message console, implemented in a child process
 """
+# flake8: noqa
+
 import threading
 import sys, time
 
