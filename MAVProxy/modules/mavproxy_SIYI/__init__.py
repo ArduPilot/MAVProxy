@@ -116,13 +116,8 @@ def crc16_from_bytes(bytes, initial=0):
     # Check string: '123456789'
     # Check value: 0x29B1
 
-    try:
-        if isinstance(bytes, basestring):  # Python 2.7 compatibility
-            bytes = map(ord, bytes)
-    except NameError:
-        if isinstance(bytes, str):  # This branch will be taken on Python 3
-            bytes = map(ord, bytes)
-
+    if isinstance(bytes, str):
+        bytes = map(ord, bytes)
     crc = initial
     for byte in bytes:
         crc ^= byte << 8
