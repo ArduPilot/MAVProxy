@@ -12,7 +12,7 @@ MAVProxyAny = Analysis(['mavproxy.py'],
                             'wx.lib.agw.genericmessagedialog', 'wx.lib.wordwrap', 'wx.lib.buttons',
                             'wx.lib.embeddedimage', 'wx.lib.imageutils', 'wx.lib.agw.aquabutton', 
                             'wx.lib.agw.gradientbutton',
-                            'six','packaging', 'packaging.version', 'packaging.specifiers',
+                            'packaging', 'packaging.version', 'packaging.specifiers',
                             'requests',
                             ] + collect_submodules('MAVProxy.modules') + 
                             collect_submodules('pymavlink') + collect_submodules('yaml') + collect_submodules('pygame'),

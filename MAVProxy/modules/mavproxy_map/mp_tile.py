@@ -216,13 +216,7 @@ class MPTile:
         self._download_thread = None
         self._loading = mp_icon('loading.jpg')
         self._unavailable = mp_icon('unavailable.jpg')
-        try:
-            self._tile_cache = collections.OrderedDict()
-        except AttributeError:
-            # OrderedDicts in python 2.6 come from the ordereddict module
-            # which is a 3rd party package, not in python2.6 distribution
-            import ordereddict
-            self._tile_cache = ordereddict.OrderedDict()
+        self._tile_cache = collections.OrderedDict()
 
     def set_service(self, service):
         '''set tile service'''

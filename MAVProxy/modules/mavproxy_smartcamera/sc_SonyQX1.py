@@ -10,7 +10,7 @@
 #                have support for triggering the camera, and downloading the
 #                latest image file. Other functions will be added gradually.
 #
-# Environment  : Python 2.7 Code. Intended to be included in a Mavproxy Module
+# Environment  : Intended to be included in a Mavproxy Module
 #
 # Responsible  : Jaime Machuca
 #

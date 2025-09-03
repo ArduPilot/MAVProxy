@@ -12,7 +12,7 @@
 #                it what cameras are connected, it then tries to connect to the
 #                cameras and populates a list of available cameras.
 #
-# Environment  : Python 2.7 Code. Intended to be included in MAVproxy as a Module
+# Environment  : Intended to be included in MAVproxy as a Module
 #
 # Responsible  : Jaime Machuca
 #
