@@ -25,9 +25,10 @@ class RepeatCommand(object):
         self.period = period
         self.cmd = cmd
         self.event = mavutil.periodic_event(1.0/period)
+        self.enabled = True
 
     def __str__(self):
-        return "Every %.1f seconds: %s" % (self.period, self.cmd)
+        return "[%s] Every %.1f seconds: %s" % (("x" if self.enabled else " "), self.period, self.cmd)
 
 
 def run_command(args, cwd=None, shell=False, timeout=None, env=None):
@@ -523,6 +524,23 @@ class MiscModule(mp_module.MPModule):
                 return
             self.repeats.pop(i)
             return
+        elif args[0] == 'toggle':
+            if len(args) < 2:
+                print("Usage: repeat toggle INDEX..")
+                return
+
+            for i in range(1, len(args)):
+                try:
+                    i = int(args[i])
+                except ValueError:
+                    print(f"Unable to toggle: Index {args[i]} is not a number")
+                    continue
+                if i < 0 or i >= len(self.repeats):
+                    print(f"Unable to toggle: Invalid index {i}")
+                    continue
+                self.repeats[i].enabled = not self.repeats[i].enabled
+                print(f"{i}: {self.repeats[i]}")
+            return
         elif args[0] == 'clean':
             self.repeats = []
         else:
@@ -706,7 +724,7 @@ Alt: gear <extend|retract> [ID]'''
     def idle_task(self):
         '''called on idle'''
         for r in self.repeats:
-            if r.event.trigger():
+            if r.enabled and r.event.trigger():
                 self.mpstate.functions.process_stdin(r.cmd, immediate=True)
 
 
