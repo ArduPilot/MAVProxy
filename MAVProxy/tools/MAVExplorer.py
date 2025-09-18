@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-from __future__ import print_function
-
 '''
 log analysis program
 Andrew Tridgell December 2014
@@ -454,6 +452,13 @@ def cmd_map(args):
     options._flightmodes = mestate.mlog._flightmodes
     options.show_flightmode_legend = mestate.settings.show_flightmode
     options.colour_source='flightmode'
+
+    # check for kml or kmz
+    for a in args:
+        if a.endswith('.kml') or a.endswith('.kmz'):
+            options.kml = a
+            args = list(filter(lambda x : x != a, args))
+            break
     if len(args) > 0:
         options.types = ':'.join(args)
         filtered_args = list(filter(lambda x : x != "CMD", options.types))
@@ -523,6 +528,7 @@ def cmd_stats(args):
 
 def cmd_dump(args):
     '''dump messages from log'''
+    import re
     global xlimits
 
     # understand --verbose to give as much information about message as possible
@@ -534,17 +540,27 @@ def cmd_dump(args):
     if len(args) > 0:
         wildcard = args[0]
     else:
-        print("Usage: dump PATTERN")
+        print("Usage: dump MSG1,MSG2[0]...")
         return
     mlog = mestate.mlog
     mlog.rewind()
-    types = []
-    for p in wildcard.split(','):
-        for t in mlog.name_to_id.keys():
-            if fnmatch.fnmatch(t, p):
-                types.extend([t])
+    types_inst = []
+    types_filt_inst_id = []
+    types_inst_no_id = []
+    for t in wildcard.split(','):
+                #remove instance id if it exists
+                t2 = re.sub(r'\[.*\]', '', t)
+                types_filt_inst_id.extend([t2])
+                if t.find('[') != -1:
+                    # add message with instance id to instances list
+                    types_inst.extend([t])
+                    types_inst_no_id.extend([t2])
+
+    #begin first dump msg on new line
+    print("")
+    ext = False
     while True:
-        msg = mlog.recv_match(type=types, condition=mestate.settings.condition)
+        msg = mlog.recv_match(type=types_filt_inst_id, condition=mestate.settings.condition)
         if msg is None:
             break
         in_range = xlimits.timestamp_in_range(msg._timestamp)
@@ -552,12 +568,31 @@ def cmd_dump(args):
             continue
         if in_range > 0:
             continue
+
+        instid = None
+        if msg.get_type() in types_inst_no_id:
+            if msg.fmt.instance_field is not None:
+                idx = types_inst_no_id.index(msg.get_type())
+                type_inst = types_inst[idx]
+                instid = re.sub(r'.*\[', '', type_inst)
+                instid = re.sub(r'\]', '', instid)
+            else:
+                print(f"{msg.get_type()} is not instance.")
+                ext = True
+        if ext:
+            break
+
         if verbose and "pymavlink.dialects" in str(type(msg)):
             mavutil.dump_message_verbose(sys.stdout, msg)
         elif verbose and hasattr(msg,"dump_verbose"):
             msg.dump_verbose(sys.stdout)
         else:
-            print("%s %s" % (timestring(msg), msg))
+            if instid is not None:
+                inst = getattr(msg, msg.fmt.instance_field, None)
+                if str(inst) == instid:
+                    print("%s %s" % (timestring(msg), msg))  
+            else:
+                print("%s %s" % (timestring(msg), msg))
     mlog.rewind()
 
 mfit_tool = None

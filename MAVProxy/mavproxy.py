@@ -256,6 +256,7 @@ class MPState(object):
             MPSetting('mavfwd_disarmed', bool, True, 'Allow forwarded control when disarmed'),
             MPSetting('mavfwd_rate', bool, False, 'Allow forwarded rate control'),
             MPSetting('mavfwd_link', int, -1, 'Forward to a specific link'),
+            MPSetting('mavfwd_signing', bool, True, 'Sign forwarded messages'),
             MPSetting('shownoise', bool, True, 'Show non-MAVLink data'),
             MPSetting('baudrate', int, opts.baudrate, 'baudrate for new links', range=(0, 10000000), increment=1),
             MPSetting('rtscts', bool, opts.rtscts, 'enable flow control'),
@@ -902,12 +903,18 @@ def process_mavlink(slave):
     if allow_fwd:
         for m in msgs:
             target_sysid = getattr(m, 'target_system', -1)
-            mbuf = m.get_msgbuf()
             if mpstate.settings.mavfwd_link > 0 and mpstate.settings.mavfwd_link <= len(mpstate.mav_master):
-                mpstate.mav_master[mpstate.settings.mavfwd_link-1].write(mbuf)
+                output = mpstate.mav_master[mpstate.settings.mavfwd_link-1]
             else:
                 # find best link by sysid
-                mpstate.master(target_sysid).write(mbuf)
+                output = mpstate.master(target_sysid)
+            if (mpstate.settings.mavfwd_signing and
+                    output.mav.signing.sign_outgoing and
+                    (m._header.incompat_flags & mavutil.mavlink.MAVLINK_IFLAG_SIGNED) == 0):
+                # repack the message if this is a signed link and not already signed
+                m.pack(output.mav)
+
+            output.write(m.get_msgbuf())
             if mpstate.logqueue:
                 usec = int(time.time() * 1.0e6)
                 mpstate.logqueue.put(bytearray(struct.pack('>Q', usec) + m.get_msgbuf()))
@@ -1158,16 +1165,19 @@ def main_loop():
             if master.fd is not None and not master.portdead:
                 rin.append(master.fd)
         for m in mpstate.mav_outputs:
-            rin.append(m.fd)
+            if m.fd is not None:
+                rin.append(m.fd)
         for sysid in mpstate.sysid_outputs:
             m = mpstate.sysid_outputs[sysid]
-            rin.append(m.fd)
+            if m.fd is not None:
+                rin.append(m.fd)
         if rin == []:
             time.sleep(0.0001)
             continue
 
         for fd in mpstate.select_extra:
-            rin.append(fd)
+            if fd is not None:
+                rin.append(fd)
         try:
             (rin, win, xin) = select.select(rin, [], [], mpstate.settings.select_timeout)
         except select.error:
@@ -1359,7 +1369,7 @@ if __name__ == '__main__':
     parser.add_option("--mavversion", type='choice', choices=['1.0', '2.0'] , help="Force MAVLink Version (1.0, 2.0). Otherwise autodetect version")  # noqa:E501
     parser.add_option("--nowait", action='store_true', default=False, help="don't wait for HEARTBEAT on startup")
     parser.add_option("-c", "--continue", dest='continue_mode', action='store_true', default=False, help="continue logs")
-    parser.add_option("--dialect", default="ardupilotmega", help="MAVLink dialect")
+    parser.add_option("--dialect", default="all", help="MAVLink dialect")
     parser.add_option("--rtscts", action='store_true', help="enable hardware RTS/CTS flow control")
     parser.add_option("--moddebug", type=int, help="module debug level", default=0)
     parser.add_option("--mission", dest="mission", help="mission name", default=None)
@@ -1466,6 +1476,11 @@ if __name__ == '__main__':
 
     mpstate.load_module('link', quiet=True)
 
+    # load signing early to allow for use of ~/.mavproxy/signing.keys
+    standard_modules = opts.default_modules.split(',')
+    if 'signing' in standard_modules:
+        mpstate.load_module('signing', quiet=True)
+
     mpstate.settings.source_system = opts.SOURCE_SYSTEM
     mpstate.settings.source_component = opts.SOURCE_COMPONENT
 
@@ -1537,7 +1552,6 @@ if __name__ == '__main__':
 
     if not opts.setup:
         # some core functionality is in modules
-        standard_modules = opts.default_modules.split(',')
         for m in standard_modules:
             if m:
                 mpstate.load_module(m, quiet=True)

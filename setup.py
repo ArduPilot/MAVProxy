@@ -1,7 +1,7 @@
 from setuptools import setup
 import os, platform, sys
 
-version = "1.8.71"
+version = "1.8.74"
 
 def package_files(directory):
     paths = []
@@ -38,7 +38,6 @@ if platform.system() == "Darwin":
                          'matplotlib',
                          'opencv-python',
                          'lxml',
-                         'future',
                          'wxPython'])
 
 if platform.system() == "Windows" and sys.version_info >= (3, 0):
@@ -97,6 +96,7 @@ on how to use MAVProxy.''',
                 'MAVProxy.modules.lib.optparse_gui'],
       install_requires=requirements,
       extras_require={
+        'cesium': ['tornado'],
         # restserver module
         'server': ['flask'],
         'recommended': ['flask', 'PyYAML', 'lxml', 'wxpython',

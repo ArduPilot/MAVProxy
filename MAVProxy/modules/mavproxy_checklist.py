@@ -18,7 +18,7 @@ class ChecklistModule(mp_module.MPModule):
             path = os.path.join(mpstate.aircraft_dir, "checklist.txt")
             if os.path.exists(path):
                 checklist_file = path
-        self.checklist = mp_checklist.CheckUI(checklist_file=checklist_file)
+        self.checklist = mp_checklist.CheckUI(checklist_file=checklist_file, logdir=self.logdir)
 
     def mavlink_packet(self, msg):
         '''handle an incoming mavlink packet'''

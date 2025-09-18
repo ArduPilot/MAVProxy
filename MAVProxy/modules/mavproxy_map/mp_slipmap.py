@@ -6,14 +6,9 @@ Andrew Tridgell
 June 2012
 '''
 
-import functools
-import math
-import os, sys
 import time
 import cv2
-import numpy as np
 
-from MAVProxy.modules.lib import mp_elevation
 from MAVProxy.modules.mavproxy_map import mp_tile
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import win_layout
@@ -78,7 +73,7 @@ class MPSlipMap():
         '''child process - this holds all the GUI elements'''
         mp_util.child_close_fds()
 
-        from MAVProxy.modules.lib import wx_processguard
+        from MAVProxy.modules.lib import wx_processguard # noqa:F401
         from MAVProxy.modules.lib.wx_loader import wx
         from MAVProxy.modules.mavproxy_map.mp_slipmap_ui import MPSlipMapFrame
 
@@ -103,10 +98,10 @@ class MPSlipMap():
     def close(self):
         '''close the window'''
         self.close_window.release()
-        count=0
+        count = 0
         while self.child.is_alive() and count < 30: # 3 seconds to die...
-            time.sleep(0.1) #?
-            count+=1
+            time.sleep(0.1)  # ?
+            count += 1
 
         if self.child.is_alive():
             self.child.terminate()
@@ -131,7 +126,7 @@ class MPSlipMap():
 
     def set_center(self, lat, lon):
         '''set center of view'''
-        self.object_queue.put(SlipCenter((lat,lon)))
+        self.object_queue.put(SlipCenter((lat, lon)))
 
     def set_follow(self, enable):
         '''set follow on/off'''
@@ -140,7 +135,7 @@ class MPSlipMap():
     def set_follow_object(self, key, enable):
         '''set follow on/off on an object'''
         self.object_queue.put(SlipFollowObject(key, enable))
-        
+
     def hide_object(self, key, hide=True):
         '''hide an object on the map by key'''
         self.object_queue.put(SlipHideObject(key, hide))
@@ -156,7 +151,7 @@ class MPSlipMap():
     def set_layout(self, layout):
         '''set window layout'''
         self.object_queue.put(layout)
-    
+
     def get_event(self):
         '''return next event or None'''
         if self.event_queue.empty():
@@ -201,9 +196,9 @@ class MPSlipMap():
             time.sleep(0.1)
         return False
 
+
 if __name__ == "__main__":
     multiproc.freeze_support()
-    import time
 
     from argparse import ArgumentParser
     parser = ArgumentParser("mp_slipmap.py [options]")
@@ -235,7 +230,7 @@ if __name__ == "__main__":
 
     if args.boundary:
         boundary = mp_util.polygon_load(args.boundary)
-        sm.add_object(SlipPolygon('boundary', boundary, layer=1, linewidth=2, colour=(0,255,0)))
+        sm.add_object(SlipPolygon('boundary', boundary, layer=1, linewidth=2, colour=(0, 255, 0)))
 
     if args.mission:
         from pymavlink import mavwp
@@ -243,26 +238,33 @@ if __name__ == "__main__":
             wp = mavwp.MAVWPLoader()
             wp.load(file)
             boundary = wp.polygon()
-            sm.add_object(SlipPolygon('mission-%s' % file, boundary, layer=1, linewidth=1, colour=(255,255,255)))
+            sm.add_object(SlipPolygon('mission-%s' % file, boundary, layer=1, linewidth=1, colour=(255, 255, 255)))
 
     if args.grid:
-        sm.add_object(SlipGrid('grid', layer=3, linewidth=1, colour=(255,255,0)))
+        sm.add_object(SlipGrid('grid', layer=3, linewidth=1, colour=(255, 255, 0)))
 
     if args.thumbnail:
         thumb = cv2.imread(args.thumbnail)
-        sm.add_object(SlipThumbnail('thumb', (args.lat,args.lon), layer=1, img=thumb, border_width=2, border_colour=(255,0,0)))
+        sm.add_object(SlipThumbnail(
+            'thumb',
+            (args.lat, args.lon),
+            layer=1,
+            img=thumb,
+            border_width=2,
+            border_colour=(255, 0, 0),
+        ))
 
     if args.icon:
         icon = cv2.imread(args.icon)
-        sm.add_object(SlipIcon('icon', (args.lat,args.lon), icon, layer=3, rotation=90, follow=True))
-        sm.set_position('icon', mp_util.gps_newpos(args.lat,args.lon, 180, 100), rotation=45)
+        sm.add_object(SlipIcon('icon', (args.lat, args.lon), icon, layer=3, rotation=90, follow=True))
+        sm.set_position('icon', mp_util.gps_newpos(args.lat, args.lon, 180, 100), rotation=45)
         sm.add_object(SlipInfoImage('detail', icon))
         sm.add_object(SlipInfoText('detail text', 'test text'))
 
     for flag in args.flag:
-        (lat,lon) = flag.split(',')
+        (lat, lon) = flag.split(',')
         icon = sm.icon('flag.png')
-        sm.add_object(SlipIcon('icon - %s' % str(flag), (float(lat),float(lon)), icon, layer=3, rotation=0, follow=False))
+        sm.add_object(SlipIcon('icon - %s' % str(flag), (float(lat), float(lon)), icon, layer=3, rotation=0, follow=False))
 
     while sm.is_alive():
         while not sm.event_queue_empty():

@@ -13,10 +13,10 @@ jobs:
         python-version: ['3.10']
         
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: 'recursive'
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
@@ -25,7 +25,7 @@ jobs:
         run: |
           python3 -m pip install -U wheel setuptools pip
           python3 -m pip install -U pywin32 lxml pymavlink numpy matplotlib pyserial opencv-python PyYAML Pygame Pillow wxpython prompt-toolkit scipy
-          python3 -m pip install -U openai wave pyaudio
+          python3 -m pip install -U openai pyaudio
           python3 -m pip install -U pyinstaller==6.7.0 packaging 
       - name: Download Inno Setup installer
         run: curl -L -o installer.exe http://files.jrsoftware.org/is/6/innosetup-6.3.1.exe
@@ -45,12 +45,13 @@ jobs:
         run: |          
           mkdir Parameters
           $wc = New-Object System.Net.WebClient
-          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/APMrover2/apm.pdef.xml', 'Parameters\Rover.xml')
-          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/ArduCopter/apm.pdef.xml', 'Parameters\ArduCopter.xml')
-          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/ArduPlane/apm.pdef.xml', 'Parameters\ArduPlane.xml')
-          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/ArduSub/apm.pdef.xml', 'Parameters\ArduSub.xml')
+          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/Rover/apm.pdef.xml', 'Parameters\Rover.xml')
+          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/Copter/apm.pdef.xml', 'Parameters\Copter.xml')
+          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/Plane/apm.pdef.xml', 'Parameters\Plane.xml')
+          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/Sub/apm.pdef.xml', 'Parameters\Sub.xml')
           $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/AntennaTracker/apm.pdef.xml', 'Parameters\AntennaTracker.xml')
           $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/Heli/apm.pdef.xml', 'Parameters\Heli.xml')
+          $wc.DownloadFile('https://autotest.ardupilot.org/Parameters/Blimp/apm.pdef.xml', 'Parameters\Blimp.xml')
       - name: Build installer
         run: |
           cd  windows

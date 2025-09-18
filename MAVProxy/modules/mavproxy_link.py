@@ -231,6 +231,11 @@ class LinkModule(mp_module.MPModule):
                 print('Usage: e.g. link attributes rfd900 {"label":"bob"}')
                 return
             self.cmd_link_attributes(args[1:])
+        elif args[0] == "label":
+            if len(args) != 3:
+                print("Usage: link label LINK LABEL")
+                return
+            self.cmd_link_label(args[1:])
         elif args[0] == "ports":
             self.cmd_link_ports()
         elif args[0] == "remove":
@@ -433,6 +438,12 @@ class LinkModule(mp_module.MPModule):
         conn.highest_msec = {}
         conn.target_system = self.settings.target_system
         self.apply_link_attributes(conn, optional_attributes)
+
+        # if we are using signing then sign the new link
+        signing = self.mpstate.module('signing')
+        if signing:
+            signing.setup_signing_device(conn, device)
+
         self.mpstate.mav_master.append(conn)
         self.status.counters['MasterIn'].append(0)
         self.status.bytecounters['MasterIn'].append(self.status.ByteCounter())
@@ -464,6 +475,12 @@ class LinkModule(mp_module.MPModule):
         attributes = args[1]
         print("Setting link %s attributes (%s)" % (link, attributes))
         self.link_attributes(link, attributes)
+
+    def cmd_link_label(self, args):
+        '''change optional link label'''
+        link = args[0]
+        label = args[1]
+        self.link_attributes(link, '{"label":"%s"}' % label)
 
     def cmd_link_ports(self):
         '''show available ports'''
@@ -923,7 +940,10 @@ class LinkModule(mp_module.MPModule):
                 res = res[11:]
                 if (m.target_component not in [mavutil.mavlink.MAV_COMP_ID_MAVCAN] and
                     m.command not in [mavutil.mavlink.MAV_CMD_GET_HOME_POSITION,
-                                      mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONTROL]):
+                                      mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONTROL,
+                                      mavutil.mavlink.MAV_CMD_SET_CAMERA_MODE,
+                                      mavutil.mavlink.MAV_CMD_SET_CAMERA_ZOOM,
+                                      mavutil.mavlink.MAV_CMD_SET_CAMERA_FOCUS]):
                     self.mpstate.console.writeln("Got COMMAND_ACK: %s: %s" % (cmd, res))
             except Exception:
                 self.mpstate.console.writeln("Got MAVLink msg: %s" % m)

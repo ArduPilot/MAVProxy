@@ -403,7 +403,7 @@ def decode_devid(devid, pname):
         0x05 : "BMM150 ",
         0x06 : "LSM9DS1",
         0x08 : "LIS3MDL",
-        0x09 : "AK09916",
+        0x09 : "AK0991x",
         0x0A : "IST8310",
         0x0B : "ICM20948",
         0x0C : "MMC3416",
@@ -415,6 +415,10 @@ def decode_devid(devid, pname):
         0x12 : "RM3100_2",
         0x13 : "MMC5883",
         0x14 : "AK09918",
+        0x15 : "AK09915",
+        0x16 : "QMC5883P",
+        0x17 : "BMM350",
+        0x18 : "IIS2MDC",
         }
 
     imu_types = {
@@ -453,6 +457,7 @@ def decode_devid(devid, pname):
         0x3A : "INS_ICM42670",
         0x3B : "INS_ICM45686",
         0x3C : "INS_SCHA63T",
+        0x3D : "INS_IIM42653",
         }
 
     baro_types = {
@@ -473,10 +478,13 @@ def decode_devid(devid, pname):
         0x0F : "BARO_ICP101XX",
         0x10 : "BARO_ICP201XX",
         0x11 : "BARO_MS5607",
-        0x12 : "BARO_MS5837",
+        0x12 : "BARO_MS5837_30BA",
         0x13 : "BARO_MS5637",
         0x14 : "BARO_BMP390",
         0x15 : "BARO_BMP581",
+        0x16 : "BARO_SPA06",
+        0x17 : "BARO_AUAV",
+        0x18 : "BARO_MS5837_02BA",
     }
 
     airspeed_types = {
@@ -490,6 +498,7 @@ def decode_devid(devid, pname):
         0x08 : "AIRSPEED_ANALOG",
         0x09 : "AIRSPEED_NMEA",
         0x0A : "AIRSPEED_ASP5033",
+        0x0B : "AIRSPEED_AUAV",
     }
         
     decoded_devname = ""

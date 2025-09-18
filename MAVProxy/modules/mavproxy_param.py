@@ -446,13 +446,9 @@ class ParamState:
         wildcard = '*'
         if len(args) < 1 or args[0].find('*') != -1:
             defaults = self.default_params
-            if defaults is None and self.vehicle_name is not None:
-                filename = mp_util.dot_mavproxy("%s-defaults.parm" % self.vehicle_name)
-                if not os.path.exists(filename):
-                    print("Please run 'param download' first (vehicle_name=%s)" % self.vehicle_name)
-                    return
-                defaults = mavparm.MAVParmDict()
-                defaults.load(filename)
+            if defaults is None:
+                print("Cannot find default parameters")
+                return
             if len(args) >= 1:
                 wildcard = args[0]
         else:
@@ -544,7 +540,7 @@ class ParamState:
         # Ensure we have at least an action and a parameter
         if len(args) < 2:
             print("Not enough arguments")
-            print(f"param bitmask <{'/'.join(BITMASK_ACTIONS)}> <parameter> [bit-index]")
+            print(f"param bitmask <{'/'.join(BITMASK_ACTIONS)}> <parameter> [bit-index-1 ... bit-index-n]")
             return
 
         action = args[0]
@@ -585,17 +581,19 @@ class ParamState:
             return
 
         # The next argument is the bit_index - if it exists, handle it
-        bit_index = None
-        if len(args) >= 3:
+        bit_indices = []
+        while len(args) >= 3:
             try:
                 # If the bit index is available lets grab it
                 arg_bit_index = args[2]
+                # Remove the bit index from the args list
+                args.pop(2)
                 # Try to convert it to int
-                bit_index = int(arg_bit_index)
+                bit_indices.append(int(arg_bit_index))
             except ValueError:
-                print(f"Invalid bit index: {arg_bit_index}\n")
+                print(f"Invalid bit index: {arg_bit_index}")
 
-        if bit_index is None:
+        if bit_indices == []:
             # No bit index was specified, but the parameter and action was.
             # Print the available bitmask information.
             print("%s: %s" % (uname, phelp.get('humanName')))
@@ -607,13 +605,12 @@ class ParamState:
             out_v = []
             if bitmask_values is not None and len(bitmask_values):
                 for (n, v) in bitmask_values.items():
-                    if bit_index is None or bit_index == int(n):
-                        out_v.append(f"\t{int(n):3d} [{'x' if value & (1 << int(n)) else ' '}] : {v}")
+                    out_v.append(f"\t{int(n):3d} [{'x' if value & (1 << int(n)) else ' '}] : {v}")
                     remaining_bits &= ~(1 << int(n))
 
                 # Loop bits 0 to 31, checking if they are remaining, and append
                 for i in range(32):
-                    if (remaining_bits & (1 << i)) and ((bit_index is None) or (bit_index == i)):
+                    if (remaining_bits & (1 << i)):
                         out_v.append(f"\t{i:3d} [{'x' if value & (1 << i) else ' '}] : Unknownbit{i}")
 
             if out_v is not None and len(out_v) > 0:
@@ -621,28 +618,30 @@ class ParamState:
                 print("\n".join(out_v))
 
             # Finally, inform user of the error we experienced
-            if bit_index is None:
-                print("bit index is not specified")
+            print("bit index is not specified")
 
             # We don't have enough information to modify the bitmask, so bail
             return
 
-        # Sanity check the bit index
-        if bit_index >= NUM_BITS_MAX:
-            print(f"Cannot perform bitmask action '{action}' on bit index {bit_index}.")
+        # Sanity check the bit indices
+        invalid_bits = [bit_index for bit_index in bit_indices if bit_index >= NUM_BITS_MAX]
+        if invalid_bits:
+            print(f"Cannot perform bitmask action '{action}' on bit(s) {', '.join(str(bit) for bit in invalid_bits)}.")
             return
 
-        # We have enough information to try perform an action
-        if action == "toggle":
-            value = value ^ (1 << bit_index)
-        elif action == "set":
-            value = value | (1 << bit_index)
-        elif action == "clear":
-            value = value & ~(1 << bit_index)
-        else:
-            # We cannot toggle, set or clear
-            print("Invalid bitmask action")
-            return
+        # Cycle through the bit indices
+        for bit_index in bit_indices:
+            # We have enough information to perform an action
+            if action == BITMASK_ACTIONS[0]:  # "toggle"
+                value = value ^ (1 << bit_index)
+            elif action == BITMASK_ACTIONS[1]:  # "set"
+                value = value | (1 << bit_index)
+            elif action == BITMASK_ACTIONS[2]:  # "clear"
+                value = value & ~(1 << bit_index)
+            else:
+                # We cannot toggle, set or clear
+                print("Invalid bitmask action")
+                return
 
         # Update the parameter
         self.set_parameter(master, uname, value, attempts=3, param_type=ptype)

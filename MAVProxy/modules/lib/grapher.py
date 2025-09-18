@@ -708,7 +708,7 @@ if __name__ == "__main__":
     parser.add_argument("--zero-time-base", action='store_true', help="use Z time base for DF logs")
     parser.add_argument("--show-flightmode", default=True,
                         help="Add background colour to plot corresponding to current flight mode.  Cannot be specified with --xaxis.")
-    parser.add_argument("--dialect", default="ardupilotmega", help="MAVLink dialect")
+    parser.add_argument("--dialect", default="all", help="MAVLink dialect")
     parser.add_argument("--output", default=None, help="provide an output format")
     parser.add_argument("--timeshift", type=float, default=0, help="shift time on first graph in seconds")
     parser.add_argument("--grid", action='store_true', help="show a grid")

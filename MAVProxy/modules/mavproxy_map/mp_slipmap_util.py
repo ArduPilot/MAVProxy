@@ -4,11 +4,11 @@
 slipmap based on mp_tile
 Andrew Tridgell
 June 2012
+
+AP_FLAKE8_CLEAN
 '''
 
-import functools
 import math
-import os, sys
 import time
 import cv2
 import numpy as np
@@ -19,12 +19,13 @@ from MAVProxy.modules.lib import mp_util
 
 font = cv2.FONT_HERSHEY_DUPLEX
 
+
 def image_shape(img):
     '''handle different image formats, returning (width,height) tuple'''
     if hasattr(img, 'shape'):
         return (img.shape[1], img.shape[0])
     return (img.width, img.height)
-    
+
 
 class SlipObject:
     '''an object to display on the map'''
@@ -91,6 +92,7 @@ class SlipObject:
         '''set timestamp range for display'''
         self._timestamp_range = trange
 
+
 class SlipLabel(SlipObject):
     '''a text label to display on the map'''
     def __init__(self, key, point, label, layer, colour, size=0.5):
@@ -115,9 +117,10 @@ class SlipLabel(SlipObject):
             return None
         return (self.point[0], self.point[1], 0, 0)
 
+
 class SlipArrow(SlipObject):
     '''an arrow to display direction of movement'''
-    def __init__(self, key, layer, xy_pix, colour, linewidth, rotation, reverse = False, arrow_size = 7, popup_menu=None):
+    def __init__(self, key, layer, xy_pix, colour, linewidth, rotation, reverse=False, arrow_size=7, popup_menu=None):
         SlipObject.__init__(self, key, layer, popup_menu=popup_menu)
         self.xy_pix = xy_pix
         self.colour = colour
@@ -142,9 +145,10 @@ class SlipArrow(SlipObject):
         cv2.line(img, pix1, self.xy_pix, self.colour, self.linewidth)
         cv2.line(img, pix2, self.xy_pix, self.colour, self.linewidth)
 
+
 class SlipCircle(SlipObject):
     '''a circle to display on the map'''
-    def __init__(self, key, layer, latlon, radius, color, linewidth, arrow = False, popup_menu=None, start_angle=None, end_angle=None, rotation=None, add_radii=False):
+    def __init__(self, key, layer, latlon, radius, color, linewidth, arrow=False, popup_menu=None, start_angle=None, end_angle=None, rotation=None, add_radii=False):  # noqa:E501
         SlipObject.__init__(self, key, layer, popup_menu=popup_menu)
         self.latlon = latlon
         if radius < 0:
@@ -185,9 +189,9 @@ class SlipCircle(SlipObject):
             cv2.circle(img, center_px, radius_px, self.color, self.linewidth)
         if self.arrow:
             SlipArrow(self.key, self.layer, (center_px[0]-radius_px, center_px[1]),
-                      self.color, self.linewidth, 0, reverse = self.reverse).draw(img)
+                      self.color, self.linewidth, 0, reverse=self.reverse).draw(img)
             SlipArrow(self.key, self.layer, (center_px[0]+radius_px, center_px[1]),
-                      self.color, self.linewidth, math.pi, reverse = self.reverse).draw(img)
+                      self.color, self.linewidth, math.pi, reverse=self.reverse).draw(img)
         # stash some values for determining closest click location
         self.radius_px = radius_px
         self.center_px = center_px
@@ -214,9 +218,10 @@ class SlipCircle(SlipObject):
             return None
         return ret
 
+
 class SlipPolygon(SlipObject):
     '''a polygon to display on the map'''
-    def __init__(self, key, points, layer, colour, linewidth, arrow = False, popup_menu=None, showlines=True, showcircles=True):
+    def __init__(self, key, points, layer, colour, linewidth, arrow=False, popup_menu=None, showlines=True, showcircles=True):  # noqa:E501
         SlipObject.__init__(self, key, layer, popup_menu=popup_menu)
         self.points = points
         self.colour = colour
@@ -299,7 +304,7 @@ class SlipPolygon(SlipObject):
             i = (idx+1) % num_points
             if self._pix_points[i] is None:
                 continue
-            (pixx,pixy) = self._pix_points[i]
+            (pixx, pixy) = self._pix_points[i]
             if abs(px - pixx) < 6 and abs(py - pixy) < 6:
                 self._selected_vertex = i
                 return math.sqrt((px - pixx)**2 + (py - pixy)**2)
@@ -309,10 +314,11 @@ class SlipPolygon(SlipObject):
         '''extra selection information sent when object is selected'''
         return self._selected_vertex
 
+
 class UnclosedSlipPolygon(SlipPolygon):
     '''a polygon to display on the map - but one with no return point or
     closing vertex'''
-    def draw(self, img, pixmapper, bounds, colour=(0,0,0)):
+    def draw(self, img, pixmapper, bounds, colour=(0, 0, 0)):
         '''draw a polygon on the image'''
         if self.hidden:
             return
@@ -334,6 +340,7 @@ class UnclosedSlipPolygon(SlipPolygon):
                 _to,
                 colour,
                 self.linewidth)
+
 
 class SlipGrid(SlipObject):
     '''a map grid'''
@@ -357,13 +364,13 @@ class SlipGrid(SlipObject):
     def draw(self, img, pixmapper, bounds):
         '''draw a polygon on the image'''
         if self.hidden:
-            return
-        (lat,lon,w,h) = bounds
+            return None
+        (lat, lon, w, h) = bounds
         # note that w and h are in degrees
         spacing = 1000
-        lat2 = mp_util.constrain(lat+h*0.5,-85,85)
+        lat2 = mp_util.constrain(lat+h*0.5, -85, 85)
         lon2 = mp_util.wrap_180(lon+w)
-        dist = mp_util.gps_distance(lat2,lon,lat2,lon2)
+        dist = mp_util.gps_distance(lat2, lon, lat2, lon2)
         while True:
             count = int(dist / spacing)
             if count < 2:
@@ -375,7 +382,7 @@ class SlipGrid(SlipObject):
 
         count += 10
 
-        start = mp_util.latlon_round((lat,lon), spacing)
+        start = mp_util.latlon_round((lat, lon), spacing)
 
         for i in range(count):
             # draw vertical lines of constant longitude
@@ -387,6 +394,8 @@ class SlipGrid(SlipObject):
             pos1 = mp_util.gps_newpos(start[0], start[1], 0, i*spacing)
             pos3 = (pos1[0], pos1[1]+w*2)
             self.draw_line(img, pixmapper, pos1, pos3, self.colour, self.linewidth)
+
+        return spacing
 
 
 class SlipFlightModeLegend(SlipObject):
@@ -404,8 +413,8 @@ class SlipFlightModeLegend(SlipObject):
         self.swatch_text_gap = 2
         self.row_gap = 2
         self.border_width = 1
-        self.border_colour = (255,0,0)
-        self.text_colour = (0,0,0)
+        self.border_colour = (255, 0, 0)
+        self.text_colour = (0, 0, 0)
         self.font_scale = 0.5
 
     def draw_legend(self):
@@ -416,7 +425,7 @@ class SlipFlightModeLegend(SlipObject):
         for (mode, colour) in self.tuples:
             if mode is None:
                 mode = "Unknown"
-            ((tw,th),tb) = cv2.getTextSize(mode, font, fontscale, 1)
+            ((tw, th), tb) = cv2.getTextSize(mode, font, fontscale, 1)
             width = max(width, tw)
             row_height_max = max(row_height_max, th)
         row_count = len(self.tuples)
@@ -425,10 +434,14 @@ class SlipFlightModeLegend(SlipObject):
         swatch_width = max(self.swatch_min_width, swatch_height)
         width += self.left_margin + self.right_margin
         width += swatch_width + self.swatch_text_gap
-        img = np.zeros((height,width,3),np.uint8)
-        img[:] = (255,255,255)
-        cv2.rectangle(img, (0, 0), (width-1, height-1),
-                     self.border_colour, self.border_width)
+        img = np.zeros((height, width, 3), np.uint8)
+        img[:] = (255, 255, 255)
+        cv2.rectangle(
+            img,
+            (0, 0), (width-1, height-1),
+            self.border_colour,
+            self.border_width
+        )
         y = self.top_margin
         for (mode, colour) in self.tuples:
             if mode is None:
@@ -451,7 +464,8 @@ class SlipFlightModeLegend(SlipObject):
         h = self._img.shape[0]
         px = 5
         py = 5
-        img[py:py+h,px:px+w] = self._img
+        img[py:py+h, px:px+w] = self._img
+
 
 class SlipThumbnail(SlipObject):
     '''a thumbnail to display on the map'''
@@ -464,7 +478,7 @@ class SlipThumbnail(SlipObject):
         if isinstance(img, str):
             img = mp_tile.mp_icon(img)
         if not hasattr(img, 'shape'):
-            img = np.asarray(img[:,:])
+            img = np.asarray(img[:, :])
         self.original_img = img
         (self.width, self.height) = image_shape(img)
         self.border_width = border_width
@@ -481,7 +495,7 @@ class SlipThumbnail(SlipObject):
     def img(self):
         '''return a cv image for the thumbnail'''
         if self._img is not None:
-            return self._img 
+            return self._img
         self._img = cv2.cvtColor(self.original_img, cv2.COLOR_BGR2RGB)
         if self.border_width and self.border_colour is not None:
             cv2.rectangle(self._img, (0, 0), (self.width-1, self.height-1),
@@ -493,7 +507,7 @@ class SlipThumbnail(SlipObject):
         if self.hidden:
             return
         thumb = self.img()
-        (px,py) = pixmapper(self.latlon)
+        (px, py) = pixmapper(self.latlon)
 
         # find top left
         (w, h) = image_shape(thumb)
@@ -514,13 +528,14 @@ class SlipThumbnail(SlipObject):
         if self.hidden:
             return None
         if (abs(px - self.posx) > self.width/2 or
-            abs(py - self.posy) > self.height/2):
+                abs(py - self.posy) > self.height/2):
             return None
         return math.sqrt((px-self.posx)**2 + (py-self.posy)**2)
 
+
 class SlipTrail:
     '''trail information for a moving icon'''
-    def __init__(self, timestep=0.2, colour=(255,255,0), count=60, points=[]):
+    def __init__(self, timestep=0.2, colour=(255, 255, 0), count=60, points=[]):
         self.timestep = timestep
         self.colour = colour
         self.count = count
@@ -539,16 +554,16 @@ class SlipTrail:
     def draw(self, img, pixmapper, bounds):
         '''draw the trail'''
         for p in self.points:
-            (px,py) = pixmapper(p)
+            (px, py) = pixmapper(p)
             (width, height) = image_shape(img)
             if px >= 0 and py >= 0 and px < width and py < height:
-                cv2.circle(img, (px,py), 1, self.colour)
+                cv2.circle(img, (px, py), 1, self.colour)
 
 
 class SlipIcon(SlipThumbnail):
     '''a icon to display on the map'''
     def __init__(self, key, latlon, img, layer=1, rotation=0,
-                 follow=False, trail=None, popup_menu=None, label=None, colour=(255,255,255)):
+                 follow=False, trail=None, popup_menu=None, label=None, colour=(255, 255, 255)):
         SlipThumbnail.__init__(self, key, latlon, layer, img, popup_menu=popup_menu)
         self.rotation = rotation
         self.follow = follow
@@ -578,7 +593,7 @@ class SlipIcon(SlipThumbnail):
             self.trail.draw(img, pixmapper, bounds)
 
         icon = self.img()
-        (px,py) = pixmapper(self.latlon)
+        (px, py) = pixmapper(self.latlon)
 
         # find top left
         (w, h) = image_shape(icon)
@@ -590,11 +605,12 @@ class SlipIcon(SlipThumbnail):
         img[py:py + h, px:px + w] = cv2.add(img[py:py+h, px:px+w], icon[sy:sy+h, sx:sx+w])
 
         if self.label is not None:
-            cv2.putText(img, self.label, (px,py), font, 1.0, self.colour)
-        
+            cv2.putText(img, self.label, (px, py), font, 1.0, self.colour)
+
         # remember where we placed it for clicked()
         self.posx = px+w//2
         self.posy = py+h//2
+
 
 class SlipPosition:
     '''an position object to move an existing object on the map'''
@@ -605,6 +621,7 @@ class SlipPosition:
         self.rotation = rotation
         self.label = label
         self.colour = colour
+
 
 class SlipClickLocation(SlipObject):
     '''current click location tuple'''
@@ -625,7 +642,7 @@ class SlipClickLocation(SlipObject):
         if self.timeout != -1 and time.time() - self.start > self.timeout:
             return
 
-        (px,py) = pixmapper(self.location)
+        (px, py) = pixmapper(self.location)
 
         p1 = (px-self.length, py-self.length)
         p2 = (px+self.length, py+self.length)
@@ -635,20 +652,24 @@ class SlipClickLocation(SlipObject):
         cv2.line(img, p1, p2, self.colour, self.linewidth)
         cv2.line(img, p3, p4, self.colour, self.linewidth)
 
+
 class SlipCenter:
     '''an object to move the view center'''
     def __init__(self, latlon):
         self.latlon = latlon
+
 
 class SlipZoom:
     '''an object to change ground width'''
     def __init__(self, ground_width):
         self.ground_width = ground_width
 
+
 class SlipFollow:
     '''enable/disable follow'''
     def __init__(self, enable):
         self.enable = enable
+
 
 class SlipFollowObject:
     '''enable/disable follow for an object'''
@@ -656,20 +677,24 @@ class SlipFollowObject:
         self.key = key
         self.enable = enable
 
+
 class SlipBrightness:
     '''an object to change map brightness'''
     def __init__(self, brightness):
         self.brightness = brightness
+
 
 class SlipClearLayer:
     '''remove all objects in a layer'''
     def __init__(self, layer):
         self.layer = str(layer)
 
+
 class SlipRemoveObject:
     '''remove an object by key'''
     def __init__(self, key):
         self.key = key
+
 
 class SlipHideObject:
     '''hide an object by key'''
@@ -691,11 +716,13 @@ class SlipInformation:
         '''update the information'''
         pass
 
+
 class SlipDefaultPopup:
     '''an object to hold a default popup menu'''
     def __init__(self, popup, combine=False):
         self.popup = popup
         self.combine = combine
+
 
 class SlipInfoImage(SlipInformation):
     '''an image to display in the info box'''
@@ -751,12 +778,11 @@ class SlipInfoText(SlipInformation):
         self.textctrl.SetSize((xsize, ysize))
         self.textctrl.SetMinSize((xsize, ysize))
 
-
     def draw(self, parent, box):
         '''redraw the text'''
         import wx
         if self.textctrl is None:
-            self.textctrl = wx.TextCtrl(parent, style=wx.TE_MULTILINE|wx.TE_READONLY)
+            self.textctrl = wx.TextCtrl(parent, style=wx.TE_MULTILINE | wx.TE_READONLY)
             self.textctrl.WriteText(self.text)
             self._resize()
             box.Add(self.textctrl, flag=wx.LEFT, border=0)
@@ -770,6 +796,7 @@ class SlipInfoText(SlipInformation):
             self.textctrl.WriteText(self.text)
             self._resize()
 
+
 class SlipObjectSelection:
     '''description of a object under the cursor during an event'''
     def __init__(self, objkey, distance, layer, extra_info=None):
@@ -777,6 +804,7 @@ class SlipObjectSelection:
         self.objkey = objkey
         self.layer = str(layer)
         self.extra_info = extra_info
+
 
 class SlipEvent:
     '''an event sent to the parent.
@@ -790,15 +818,18 @@ class SlipEvent:
         self.event = mp_util.object_container(event)
         self.selected = selected
 
+
 class SlipMouseEvent(SlipEvent):
     '''a mouse event sent to the parent'''
     def __init__(self, latlon, event, selected):
         SlipEvent.__init__(self, latlon, event, selected)
 
+
 class SlipKeyEvent(SlipEvent):
     '''a key event sent to the parent'''
     def __init__(self, latlon, event, selected):
         SlipEvent.__init__(self, latlon, event, selected)
+
 
 class SlipMenuEvent(SlipEvent):
     '''a menu event sent to the parent'''

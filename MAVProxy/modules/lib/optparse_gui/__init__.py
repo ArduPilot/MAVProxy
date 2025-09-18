@@ -15,6 +15,11 @@ from MAVProxy.modules.lib import multiproc
 __version__ = 0.1
 __revision__ = '$Id$'
 
+try:
+    unicode  # Removed in Python 3
+except NameError:
+    unicode = str
+
 class OptparseDialog( wx.Dialog ):
     '''The dialog presented to the user with dynamically generated controls,
     to fill in the required options.

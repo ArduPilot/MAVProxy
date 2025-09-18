@@ -25,9 +25,10 @@ class RepeatCommand(object):
         self.period = period
         self.cmd = cmd
         self.event = mavutil.periodic_event(1.0/period)
+        self.enabled = True
 
     def __str__(self):
-        return "Every %.1f seconds: %s" % (self.period, self.cmd)
+        return "[%s] Every %.1f seconds: %s" % (("x" if self.enabled else " "), self.period, self.cmd)
 
 
 def run_command(args, cwd=None, shell=False, timeout=None, env=None):
@@ -120,6 +121,9 @@ class MiscModule(mp_module.MPModule):
         self.add_command('gear', self.cmd_landing_gear, "landing gear control")
 
         self.repeats = []
+
+        # support for changing altitude via command rather than mission item:
+        self.accepts_DO_CMD_CHANGE_ALTITUDE = {}  # keyed by (sysid, compid)
 
     def altitude_difference(self, pressure1, pressure2, ground_temp):
         '''calculate barometric altitude'''
@@ -300,6 +304,29 @@ class MiscModule(mp_module.MPModule):
         print("%s (%s)\n" % (time.ctime(tusec * 1.0e-6), time.ctime()))
 
     def _cmd_changealt(self, alt, frame):
+        '''send commands.  May send both if we don't know which is the
+        right one to set'''
+        key = (self.target_system, self.target_component)
+        supports = self.accepts_DO_CMD_CHANGE_ALTITUDE.get(key, None)
+        if supports or supports is None:
+            self.master.mav.command_long_send(
+                self.settings.target_system,
+                self.settings.target_component,
+                mavutil.mavlink.MAV_CMD_DO_CHANGE_ALTITUDE,
+                0,        # confirmation
+                alt,      # p1
+                frame,    # p2
+                0,
+                0,
+                0,
+                0,
+                0
+            )
+            print(f"Sent change altitude command for {alt:.2f} meters")
+
+        if supports is True:
+            return
+
         self.master.mav.mission_item_send(self.settings.target_system,
                                           self.settings.target_component,
                                           0,
@@ -307,7 +334,7 @@ class MiscModule(mp_module.MPModule):
                                           mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
                                           3, 1, 0, 0, 0, 0,
                                           0, 0, alt)
-        print("Sent change altitude command for %.1f meters" % alt)
+        print("Sent change altitude mission item command for %.1f meters" % alt)
 
     def cmd_changealt(self, args):
         '''change target altitude'''
@@ -497,6 +524,23 @@ class MiscModule(mp_module.MPModule):
                 return
             self.repeats.pop(i)
             return
+        elif args[0] == 'toggle':
+            if len(args) < 2:
+                print("Usage: repeat toggle INDEX..")
+                return
+
+            for i in range(1, len(args)):
+                try:
+                    i = int(args[i])
+                except ValueError:
+                    print(f"Unable to toggle: Index {args[i]} is not a number")
+                    continue
+                if i < 0 or i >= len(self.repeats):
+                    print(f"Unable to toggle: Invalid index {i}")
+                    continue
+                self.repeats[i].enabled = not self.repeats[i].enabled
+                print(f"{i}: {self.repeats[i]}")
+            return
         elif args[0] == 'clean':
             self.repeats = []
         else:
@@ -661,10 +705,26 @@ Alt: gear <extend|retract> [ID]'''
             0, 0, 0, 0, 0, 0
         )
 
+    def mavlink_packet(self, m):
+        '''handle an incoming mavlink packet'''
+        mtype = m.get_type()
+
+        if mtype == "COMMAND_ACK":
+            # check to see if the vehicle has bounced our attempts to
+            # set the current mission item via mavlink command (as
+            # opposed to the old message):
+            if m.command == mavutil.mavlink.MAV_CMD_DO_CHANGE_ALTITUDE:
+                key = (m.get_srcSystem(), m.get_srcComponent())
+                if m.result == mavutil.mavlink.MAV_RESULT_UNSUPPORTED:
+                    # stop sending the commands:
+                    self.accepts_DO_CMD_CHANGE_ALTITUDE[key] = False
+                elif m.result in [mavutil.mavlink.MAV_RESULT_ACCEPTED]:
+                    self.accepts_DO_CMD_CHANGE_ALTITUDE[key] = True
+
     def idle_task(self):
         '''called on idle'''
         for r in self.repeats:
-            if r.event.trigger():
+            if r.enabled and r.event.trigger():
                 self.mpstate.functions.process_stdin(r.cmd, immediate=True)
 
 

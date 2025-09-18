@@ -4,6 +4,7 @@
 import time
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
+from pymavlink import mavutil
 
 class WarningModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -12,19 +13,27 @@ class WarningModule(mp_module.MPModule):
         self.check_time = time.time()
         self.warn_time = time.time()
         self.failure = None
-        self.details = ""
+        self.details = []
         self.warning_settings = mp_settings.MPSettings(
             [ ('warn_time', int, 5),
               ('details', bool, True),
               ('min_sat', int, 10),
               ('sat_diff', int, 5),
+              ('alt_diff', float, 20),
               ('airspd_diff', float, 5),
+              ('airspd_age', float, 5),
               ('esc_group1', int, 0),
               ('esc_group2', int, 0),
               ('esc_min_rpm', int, 100),
+              ('max_wind', int, 10),
           ])
         self.add_completion_function('(WARNINGSETTING)',
                                      self.warning_settings.completion)
+        # variables for monitoring airspeed changes
+        self.last_as1 = 0
+        self.last_as2 = 0
+        self.last_as1_change = time.time()
+        self.last_as2_change = time.time()
 
     def cmd_warning(self, args):
         '''warning commands'''
@@ -33,7 +42,7 @@ class WarningModule(mp_module.MPModule):
             if args[0] == 'set':
                 state.warning_settings.command(args[1:])
             if args[0] == 'details':
-                print("warning: %s" % self.details)
+                print("warning: %s" % '|'.join(self.details))
         else:
             print('usage: warning set|details')
 
@@ -69,10 +78,10 @@ class WarningModule(mp_module.MPModule):
         '''check for ESC consistency'''
         rpms = self.get_esc_rpms()
         if self.check_esc_group(self.warning_settings.esc_group1, rpms):
-            self.details = "ESC group1 fail"
+            self.details.append("ESC group1 fail")
             return True
         if self.check_esc_group(self.warning_settings.esc_group2, rpms):
-            self.details = "ESC group2 fail"
+            self.details.append("ESC group2 fail")
             return True
         return False
 
@@ -82,13 +91,16 @@ class WarningModule(mp_module.MPModule):
         gps2 = self.master.messages.get("GPS2_RAW", None)
         if gps1 and gps2:
             if abs(gps1.satellites_visible - gps2.satellites_visible) > self.warning_settings.sat_diff:
-                self.details = "GPS sat diff"
+                self.details.append("GPS sat diff")
+                return True
+            if abs(gps1.alt*0.001 - gps2.alt*0.001) > self.warning_settings.alt_diff:
+                self.details.append("GPS alt diff")
                 return True
         if gps1 and gps1.satellites_visible < self.warning_settings.min_sat:
-            self.details = "GPS1 low sat count"
+            self.details.append("GPS1 low sat count")
             return True
         if gps2 and gps2.satellites_visible < self.warning_settings.min_sat:
-            self.details = "GPS2 low sat count"
+            self.details.append("GPS2 low sat count")
             return True
         return False
 
@@ -97,22 +109,75 @@ class WarningModule(mp_module.MPModule):
         vfr_hud = self.master.messages.get("VFR_HUD", None)
         nvf_as2 = self.master.messages.get("NAMED_VALUE_FLOAT[AS2]", None)
         if vfr_hud and nvf_as2:
-            if abs(vfr_hud.airspeed - nvf_as2.value) > self.warning_settings.airspd_diff:
-                self.details = "Airspeed difference"
+            as1 = vfr_hud.airspeed
+            as2 = nvf_as2.value
+            if abs(as1 - as2) > self.warning_settings.airspd_diff:
+                self.details.append("Airspeed difference")
+                return True
+            now = time.time()
+            if as1 != self.last_as1:
+                self.last_as1 = as1
+                self.last_as1_change = now
+            if as2 != self.last_as2:
+                self.last_as2 = as2
+                self.last_as2_change = now
+            if as1 > 0 and now - self.last_as1_change > self.warning_settings.airspd_age:
+                self.details.append("Airspeed1 age")
+                return True
+            if as2 > 0 and now - self.last_as2_change > self.warning_settings.airspd_age:
+                self.details.append("Airspeed2 age")
+                return True
+        return False
+
+    def check_status(self):
+        '''check SYS_STATUS health bits'''
+        status = self.master.messages.get("SYS_STATUS", None)
+        if not status:
+            return False
+        sensors = { 'AS'   : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_DIFFERENTIAL_PRESSURE,
+                    'MAG'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_MAG,
+                    'INS'  : mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_ACCEL | mavutil.mavlink.MAV_SYS_STATUS_SENSOR_3D_GYRO,
+                    'AHRS' : mavutil.mavlink.MAV_SYS_STATUS_AHRS,
+                    'TERR' : mavutil.mavlink.MAV_SYS_STATUS_TERRAIN,
+                    'LOG'  : mavutil.mavlink.MAV_SYS_STATUS_LOGGING,
+                    'FEN'  : mavutil.mavlink.MAV_SYS_STATUS_GEOFENCE,
+        }
+        health = status.onboard_control_sensors_health
+        for sname in sensors:
+            bits = sensors[sname]
+            if health & bits != bits:
+                self.details.append("status %s" % sname)
+                return True
+        return False
+
+    def check_wind(self):
+        '''check wind level'''
+        wind = self.master.messages.get("WIND", None)
+        if wind:
+            if wind.speed > self.warning_settings.max_wind:
+                self.details.append("Wind %.1f" % wind.speed)
                 return True
         return False
 
     def check_all(self):
+        failures = []
         if self.check_escs():
-            self.failure = 'ESC'
-        elif self.check_gps():
-            self.failure = 'GPS'
-        elif self.check_airspeed():
-            self.failure = 'AIRSPEED'
+            failures.append('ESC')
+        if self.check_gps():
+            failures.append('GPS')
+        if self.check_airspeed():
+            failures.append('AIRSPEED')
+        if self.check_status():
+            failures.append('STATUS')
+        if self.check_wind():
+            failures.append('WIND')
+        if len(failures) > 0:
+            self.failure = '|'.join(failures)
 
     def monitor(self):
         last_fail = self.failure
         self.failure = None
+        self.details = []
         self.check_all()
         if self.failure and self.failure != last_fail:
             self.warn(self.failure)

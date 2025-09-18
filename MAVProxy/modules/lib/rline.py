@@ -3,8 +3,8 @@ readline handling for mavproxy
 '''
 
 import sys, glob, os, platform
-from future.builtins import input
 import re
+
 from pymavlink import mavutil
 
 # some python distributions don't have readline, so handle that case
@@ -74,7 +74,7 @@ class rline(object):
         '''redisplay prompt'''
         try:
             redisplay()
-        except Exception as ex:
+        except NameError:
             pass
             
     def get_prompt(self):

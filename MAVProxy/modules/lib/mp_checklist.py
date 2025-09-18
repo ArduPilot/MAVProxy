@@ -6,6 +6,9 @@
 """
 
 import sys
+import os
+import time
+import datetime
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import multiproc
 from MAVProxy.modules.lib.wx_loader import wx
@@ -23,12 +26,13 @@ class CheckUI():
     '''
     a checklist UI for MAVProxy
     '''
-    def __init__(self, title='MAVProxy: Checklist', checklist_file=None):
+    def __init__(self, title='MAVProxy: Checklist', checklist_file=None, logdir=None):
         import threading
-        self.title  = title
+        self.title = title
         self.menu_callback = None
         self.checklist_file = checklist_file
-        self.parent_pipe,self.child_pipe = multiproc.Pipe()
+        self.logdir = logdir
+        self.parent_pipe, self.child_pipe = multiproc.Pipe()
         self.close_event = multiproc.Event()
         self.close_event.clear()
         self.child = multiproc.Process(target=self.child_task)
@@ -65,7 +69,10 @@ class ChecklistFrame(wx.Frame):
 
     def __init__(self, state, title):
         self.state = state
-        wx.Frame.__init__(self, None, title=title, size=(600,600), style=wx.DEFAULT_FRAME_STYLE ^ wx.RESIZE_BORDER)
+        wx.Frame.__init__(self, None, title=title, size=(600,600), style=wx.DEFAULT_FRAME_STYLE)
+
+        # Track previously checked states to detect changes
+        self.previous_states = {}
 
         #use tabs for the individual checklists
         self.createLists()
@@ -77,7 +84,6 @@ class ChecklistFrame(wx.Frame):
 
         #add in the pipe from MAVProxy
         self.timer = wx.Timer(self)
-        #self.Bind(wx.EVT_TIMER, self.on_timer, self.timer)
         self.Bind(wx.EVT_TIMER, lambda evt, notebook=self.nb: self.on_timer(evt, notebook), self.timer)
         self.timer.Start(100)
 
@@ -132,46 +138,113 @@ class ChecklistFrame(wx.Frame):
             'GCS stable'
             ]
 
+    def log_check_item(self, item_name, state):
+        '''Log a checkbox state change to file'''
+        if self.state.logdir is not None:
+            log_path = os.path.join(self.state.logdir, "checklist_log.txt")
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            statestr = "CHECKED" if state else "UNCHECKED"
+            try:
+                with open(log_path, 'a') as f:
+                    f.write(f"{timestamp}: {item_name} - {statestr}\n")
+            except Exception as e:
+                print(f"Error writing to checklist log: {e}")
+
     # create controls on form - labels, buttons, etc
     def createWidgets(self):
         #create the panels for the tabs
 
         for name in self.lists.keys():
+            # Create the panel for this tab
             panel = wx.Panel(self.nb)
+            
+            # Create a scrolled window within the panel
+            scrolled_window = wx.ScrolledWindow(panel, wx.ID_ANY, style=wx.VSCROLL)
+            scrolled_window.SetScrollRate(0, 10)
+            
+            # Create a vertical box sizer for the scrolled window
             box = wx.BoxSizer(wx.VERTICAL)
-            panel.SetAutoLayout(True)
-            panel.SetSizer(box)
+            scrolled_window.SetSizer(box)
 
+            # Add each checkbox to the scrolled window
             for key in self.lists[name]:
-                CheckBox = wx.CheckBox(panel, wx.ID_ANY, key)
-                box.Add(CheckBox)
+                checkbox = wx.CheckBox(scrolled_window, wx.ID_ANY, key)
+                box.Add(checkbox, 0, wx.ALL, 5)
+                
+                # Setup the event handler for manual checkbox changes
+                checkbox.Bind(wx.EVT_CHECKBOX, self.on_checkbox_change)
+                
+                # Initialize previous state tracking
+                checkbox_id = f"{name}:{key}"
+                self.previous_states[checkbox_id] = False
 
-            panel.Layout()
+            # Create a sizer for the panel and add the scrolled window to it
+            panel_sizer = wx.BoxSizer(wx.VERTICAL)
+            panel_sizer.Add(scrolled_window, 1, wx.EXPAND|wx.ALL, 0)
+            panel.SetSizer(panel_sizer)
+            
+            # Add the panel to the notebook
             self.nb.AddPage(panel, name)
+
+    def on_checkbox_change(self, event):
+        '''Handle manual checkbox changes'''
+        checkbox = event.GetEventObject()
+        is_checked = checkbox.GetValue()
+        checkbox_text = checkbox.GetLabel()
+        
+        # Get current tab name
+        tab_idx = self.nb.GetSelection()
+        tab_name = self.nb.GetPageText(tab_idx)
+        
+        # Log the check if it's newly checked
+        self.log_check_item(checkbox_text, is_checked)
 
     #Receive messages from MAVProxy and process them
     def on_timer(self, event, notebook):
         state = self.state
-        win = notebook.GetPage(notebook.GetSelection())
+        page = notebook.GetPage(notebook.GetSelection())
+        tab_name = notebook.GetPageText(notebook.GetSelection())
+        
         if state.close_event.wait(0.001):
             self.timer.Stop()
             self.Destroy()
             return
+        
         while state.child_pipe.poll():
             obj = state.child_pipe.recv()
             if isinstance(obj, CheckItem):
-                #go through each item in the current tab and (un)check as needed
-                #print(obj.name + ", " + str(obj.state))
-                for widget in win.GetChildren():
-                    if type(widget) is wx.CheckBox and widget.GetLabel() == obj.name:
-                        widget.SetValue(obj.state)
+                # Find the scrolled window which is the first child of the page
+                for child in page.GetChildren():
+                    if isinstance(child, wx.ScrolledWindow):
+                        scrolled_window = child
+                        # Go through each item in the current tab and (un)check as needed
+                        for widget in scrolled_window.GetChildren():
+                            if isinstance(widget, wx.CheckBox) and widget.GetLabel() == obj.name:
+                                # Check if this is a change from unchecked to checked
+                                checkbox_id = f"{tab_name}:{obj.name}"
+                                was_checked = self.previous_states.get(checkbox_id, False)
+                                
+                                # Update the checkbox
+                                widget.SetValue(obj.state)
+                                
+                                # Update previous state
+                                self.previous_states[checkbox_id] = obj.state
+                                break
+                        break
 
 
 if __name__ == "__main__":
     # test the console
     import time
-
-    checklist = CheckUI()
+    
+    # Create a test log directory if it doesn't exist
+    test_logdir = os.path.join(os.getcwd(), "checklist_logs")
+    if not os.path.exists(test_logdir):
+        os.makedirs(test_logdir)
+    
+    # Initialize with the log directory
+    checklist = CheckUI(logdir=test_logdir)
 
     #example auto-tick in second tab page
     while checklist.is_alive():

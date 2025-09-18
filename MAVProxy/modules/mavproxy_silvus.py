@@ -27,6 +27,10 @@ class SilvusModule(mp_module.MPModule):
         # filter_dist is distance in metres
         self.silvus_settings = mp_settings.MPSettings([("gnd_ip", str, ""),
                                                        ("air_ip", str, ""),
+                                                       ("air_node", int, 0),
+                                                       ("gnd_node", int, 0),
+                                                       ("aux_node1", int, 0),
+                                                       ("aux_node2", int, 0),
                                                        ("nmea_ip", str, ""),
                                                        ("nmea_port", int, -1),
                                                        ('log_dt', float, 1.0),
@@ -182,11 +186,6 @@ class SilvusModule(mp_module.MPModule):
         coords = (response.json()["result"])
         return coords
 
-    # convert last 2 octets of IP to a nodeid
-    def ip_to_id(self, ip):
-        ip = ip.split('.')
-        return ((int(ip[2]) * 256) + int(ip[3]))
-
     def get_radio_data(self):
         now = time.time()
         if now - self.last_log_time < self.silvus_settings.log_dt:
@@ -201,21 +200,30 @@ class SilvusModule(mp_module.MPModule):
         if len(remoteip.split('.')) != 4:
             return
 
-        localnode = str(self.ip_to_id(localip))
-        remotenode = str(self.ip_to_id(remoteip))
+        localnode = str(self.silvus_settings.gnd_node)
+        remotenode = str(self.silvus_settings.air_node)
 
         self.values['TXMCS'] = float(self.get_neighbor_mcs(localip, remotenode))
         self.values['RXMCS'] = float(self.get_neighbor_mcs_rx(localip, remotenode))
         rssi = self.get_rssi(localip, remotenode)
-        self.values['TXRSSI1'] = float(rssi[0])
-        self.values['TXRSSI2'] = float(rssi[1])
-        self.values['TXRSSI3'] = float(rssi[2])
-        self.values['TXRSSI4'] = float(rssi[3])
+        if len(rssi) >= 4:
+            self.values['TXRSSI1'] = float(rssi[0])
+            self.values['TXRSSI2'] = float(rssi[1])
         rssi = self.get_rssi(remoteip, localnode)
-        self.values['RXRSSI1'] = float(rssi[0])
-        self.values['RXRSSI2'] = float(rssi[1])
-        self.values['RXRSSI3'] = float(rssi[2])
-        self.values['RXRSSI4'] = float(rssi[3])
+        if len(rssi) >= 4:
+            self.values['RXRSSI1'] = float(rssi[0])
+            self.values['RXRSSI2'] = float(rssi[1])
+        if self.silvus_settings.aux_node1 > 0:
+            rssi = self.get_rssi(remoteip, str(self.silvus_settings.aux_node1))
+            if len(rssi) >= 4:
+                self.values['A1RSSI1'] = float(rssi[0])
+                self.values['A1RSSI2'] = float(rssi[1])
+        if self.silvus_settings.aux_node2 > 0:
+            rssi = self.get_rssi(remoteip, str(self.silvus_settings.aux_node2))
+            if len(rssi) >= 4:
+                self.values['A2RSSI1'] = float(rssi[0])
+                self.values['A2RSSI2'] = float(rssi[1])
+
         self.values['LOCNSE'] = float(self.get_noise(localip))
         self.values['REMNSE'] = float(self.get_noise(remoteip))
         self.values['LINKSNR'] = float(self.network_status(localip)[2])
@@ -238,6 +246,8 @@ class SilvusModule(mp_module.MPModule):
             except Exception as ex:
                 if self.silvus_settings.debug > 0:
                     print(ex)
+                if self.silvus_settings.debug > 1:
+                    print(self.get_exception_stacktrace(ex))
 
 
 def init(mpstate):
