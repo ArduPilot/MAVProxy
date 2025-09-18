@@ -42,6 +42,7 @@ class NtripClient(object):
                  height=1212,
                  ssl=False,
                  V2=False,
+                 sendgga=True,
                  ):
         if sys.version_info.major >= 3:
             user = bytearray(user, 'ascii')
@@ -248,6 +249,9 @@ class NtripClient(object):
             print("got: ", len(data))
 
     def send_gga(self):
+        if not self.send_gga:
+            return
+            
         gga = self.getGGAByteString()
 
         try:
