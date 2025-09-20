@@ -65,9 +65,8 @@ TILE_SERVICES = {
     "MicrosoftTer"   : "http://ecn.t${MS_DIGIT}.tiles.virtualearth.net/tiles/r${QUAD}.png?g=441&mkt=en-us&shading=hill&n=z",
     "OpenStreetMap"  : "http://tile.openstreetmap.org/${ZOOM}/${X}/${Y}.png",
     "Gulesider DK,NO,SE,FI" : "https://map.eniro.com/geowebcache/service/tms1.0.0/map/${ZOOM}/${X}/${ENI_Y}.png",
-    "StatkartTopo" : "https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/${ZOOM}/${Y}/${X}",
-    "StatkartTopoRaster" : "https://cache.kartverket.no/v1/wmts/1.0.0/toporaster/default/webmercator/${ZOOM}/${Y}/${X}",
-    "Svalbard" : "https://geodata.npolar.no/arcgis/rest/services/Basisdata/NP_Basiskart_Svalbard_WMTS_3857/MapServer/WMTS/tile/1.0.0/Basisdata_NP_Basiskart_Svalbard_WMTS_3857/default/default028mm/${ZOOM}/${Y}/${X}",  # noqa:E501
+    "Kartverket(Norway-Topo)": "https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/${ZOOM}/${Y}/${X}.png",
+    "Svalbard" : "https://geodata.npolar.no/arcgis/rest/services/Basisdata/NP_Basiskart_Svalbard_WMTS_3857/MapServer/WMTS/tile/1.0.0/Basisdata_NP_Basiskart_Svalbard_WMTS_3857/default/default028mm/${ZOOM}/${Y}/${X}", # noqa:E501
     "MapsNSW" : "http://maps.six.nsw.gov.au/arcgis/rest/services/public/NSW_Topo_Map/MapServer/tile/${Z}/${Y}/${X}/jpg",
     "OpenTopoMapA": "https://a.tile.opentopomap.org/${Z}/${X}/${Y}.png",
 }
