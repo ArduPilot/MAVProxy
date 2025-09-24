@@ -576,6 +576,7 @@ Usage: map circle <radius> <colour>
     def display_polyfences_inclusion_circles(self):
         '''draws inclusion circles in the PolyFence layer with colour colour'''
         inclusions = self.module('fence').inclusion_circles()
+        print("display_polyfences_inclusion_circles", inclusions)
         self.display_polyfences_circles(inclusions, (0, 255, 0))
 
     def display_polyfences_exclusion_circles(self):
