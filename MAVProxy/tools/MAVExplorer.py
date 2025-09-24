@@ -125,6 +125,7 @@ class MEState(object):
             "set"       : ["(SETTING)"],
             "condition" : ["(VARIABLE)"],
             "graph"     : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)'],
+            "graphs"    : ['(PREDEFINED_GRAPH)'],
             "dump"      : ['(MESSAGETYPE)', '--verbose (MESSAGETYPE)'],
             "map"       : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)'],
             "param"     : ['download', 'check', 'help (PARAMETER)', 'save', 'savechanged', 'diff', 'show', 'check'],
@@ -371,6 +372,11 @@ def load_graphs():
                 mestate.graphs.extend(graphs)
                 mestate.console.writeln("Loaded %s" % f)
     mestate.graphs = sorted(mestate.graphs, key=lambda g: g.name)
+    # Update completions with actual graph names
+    if len(mestate.graphs) > 0:
+        # Some default graph names have spaces: replace with -
+        graph_names = [g.name.replace(' ', '-') for g in mestate.graphs]
+        mestate.completions["graphs"] = graph_names
 
 def flightmode_colours():
     '''return mapping of flight mode to colours'''
@@ -430,6 +436,40 @@ def cmd_graph(args):
     else:
         expression = ' '.join(args)
         mestate.last_graph = GraphDefinition(mestate.settings.title, expression, '', [expression], None)
+    if mestate.settings.debug > 0:
+        print("Adding graph: %s" % mestate.last_graph.expression)
+    grui.append(Graph_UI(mestate))
+    grui[-1].display_graph(mestate.last_graph, flightmode_colours())
+    global xlimits
+    if xlimits.last_xlim is not None and mestate.settings.sync_xzoom:
+        #print("initial: ", xlimits.last_xlim)
+        grui[-1].set_xlim(xlimits.last_xlim)
+
+def cmd_graphs(args):
+    '''graphs command'''
+    usage = "usage: graphs <PREDEFINED_GRAPH_NAME>"
+    if len(args) < 1:
+        print(usage)
+        return
+    check_vehicle_type()
+    graph_name = ' '.join(args)
+
+    # Normalize search term and graph names by replacing spaces with dashes
+    normalized_search = graph_name.replace(' ', '-').upper()
+
+    # Find matching predefined graph
+    matching_graphs = [g for g in mestate.graphs if normalized_search in g.name.replace(' ', '-').upper()]
+    if not matching_graphs:
+        print("No predefined graph found matching: %s" % graph_name)
+        return
+
+    # Display the first matching graph
+    g = matching_graphs[0]
+    mestate.console.write("Added predefined graph: %s\n" % g.name)
+    if g.description:
+        mestate.console.write("%s\n" % g.description, fg='blue')
+    mestate.rl.add_history("graphs %s" % g.name)
+    mestate.last_graph = g
     if mestate.settings.debug > 0:
         print("Adding graph: %s" % mestate.last_graph.expression)
     grui.append(Graph_UI(mestate))
@@ -1561,6 +1601,7 @@ def main_loop():
 
 command_map = {
     'graph'      : (cmd_graph,     'display a graph'),
+    'graphs'     : (cmd_graphs,    'display a predefined graph'),
     'set'        : (cmd_set,       'control settings'),
     'reload'     : (cmd_reload,    'reload graphs'),
     'save'       : (cmd_save,      'save a graph'),
