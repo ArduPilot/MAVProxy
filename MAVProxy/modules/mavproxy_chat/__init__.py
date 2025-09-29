@@ -26,7 +26,7 @@ class chat(mp_module.MPModule):
         super(chat, self).__init__(mpstate, "chat", "OpenAI chat support")
 
         # register module and commands
-        self.add_command('chat', self.cmd_chat, "chat module", ["show"])
+        self.add_command('chat', self.cmd_chat, "chat module", ["hide", "show"])
 
         # keep reference to mpstate
         self.mpstate = mpstate
@@ -42,15 +42,18 @@ class chat(mp_module.MPModule):
 
     # create chat window (should be called from a new thread)
     def create_chat_window(self):
+        print("Trying to create chat window")
         if mp_util.has_wxpython:
-            # create chat window
+            # create chat window, and return the chat_window object created
             self.chat_window = chat_window.chat_window(self.mpstate, self.wait_for_command_ack)
+            # Call main loop of chat window
+            self.chat_window.start()
         else:
             print("chat: wx support required")
 
     # show help on command line options
     def usage(self):
-        return "Usage: chat <show>"
+        return "Usage: chat <hide|show>"
 
     # control behaviour of the module
     def cmd_chat(self, args):
@@ -58,12 +61,27 @@ class chat(mp_module.MPModule):
             print(self.usage())
         elif args[0] == "show":
             self.show()
+        elif args[0] == "hide":
+            self.hide()
         else:
             print(self.usage())
 
     # show chat input window
     def show(self):
         self.chat_window.show()
+
+    def hide(self):
+        self.chat_window.hide()
+
+    def close(self):
+        self.chat_window.close()
+
+    # unload function override for module interface
+    def unload(self):
+        # Close the chat window
+        self.close()
+        # Call the unload function of super class, to include its functionality
+        super(chat, self).unload()
 
     # handle mavlink packet
     def mavlink_packet(self, m):
