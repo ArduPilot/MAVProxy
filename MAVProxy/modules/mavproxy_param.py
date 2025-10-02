@@ -289,6 +289,16 @@ class ParamState:
                 # remember autopilot types so we can handle PX4 parameters
                 self.autopilot_type_by_sysid[m.get_srcSystem()] = m.autopilot
 
+        elif m.get_type() == 'PARAM_ERROR':
+            if self.fetch_set is not None:
+                if m.param_index in self.fetch_set:
+                    self.fetch_set.discard(m.param_index)
+                    try:
+                        error_desc = mavutil.mavlink.enums['MAV_PARAM_ERROR'][m.error].name
+                    except KeyError:
+                        error_desc = m.error
+                    self.mestate.console.write(f"Parameter fetch failed: {error_desc}")
+
     def fetch_check(self, master, force=False):
         '''check for missing parameters periodically'''
         if self.param_period.trigger() or force:
