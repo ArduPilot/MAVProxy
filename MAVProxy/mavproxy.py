@@ -336,6 +336,8 @@ class MPState(object):
 
         # SITL output
         self.sitl_output = None
+        # "sololink" (used by intel aero) UDP RC protocol
+        self.rc_sololink_output = None
 
         self.mav_param_by_sysid = {}
         self.mav_param_by_sysid[(self.settings.target_system, self.settings.target_component)] = mavparm.MAVParmDict()
@@ -1326,6 +1328,7 @@ if __name__ == '__main__':
     parser.add_option("--baudrate", dest="baudrate", type='int',
                       help="default serial baud rate", default=57600)
     parser.add_option("--sitl", dest="sitl", default=None, help="SITL output port")
+    parser.add_option("--rc-sololink", dest="rc_sololink", default=None, help="Connection string for 'SoloLink'-style UDP RC")
     parser.add_option("--streamrate", dest="streamrate", default=4, type='int',
                       help="MAVLink stream rate")
     parser.add_option("--source-system", dest='SOURCE_SYSTEM', type='int',
@@ -1522,6 +1525,9 @@ if __name__ == '__main__':
 
     if opts.sitl:
         mpstate.sitl_output = mavutil.mavudp(opts.sitl, input=False)
+
+    if opts.rc_sololink:
+        mpstate.rc_sololink_output = mavutil.mavudp(opts.rc_sololink, input=False)
 
     mpstate.settings.streamrate = opts.streamrate
     mpstate.settings.streamrate2 = opts.streamrate
