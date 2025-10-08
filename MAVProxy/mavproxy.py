@@ -40,7 +40,7 @@ from MAVProxy.modules.lib import rline
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_substitute
 from MAVProxy.modules.lib import multiproc
-from MAVProxy.modules.mavproxy_link import preferred_ports
+from MAVProxy.modules.mavproxy_link import preferred_ports, clone_mavlink_message
 
 # adding all this allows pyinstaller to build a working windows executable
 # note that using --hidden-import does not work for these modules
@@ -902,19 +902,41 @@ def process_mavlink(slave):
         allow_fwd = False
     if allow_fwd:
         for m in msgs:
-            target_sysid = getattr(m, 'target_system', -1)
-            if mpstate.settings.mavfwd_link > 0 and mpstate.settings.mavfwd_link <= len(mpstate.mav_master):
-                output = mpstate.mav_master[mpstate.settings.mavfwd_link-1]
+            if mpstate.module('router') is not None and mpstate.module('router').router_enabled:
+                for link in mpstate.mav_master:
+                    if mpstate.module('router').check(m, link.address):
+                        if (mpstate.settings.mavfwd_signing and
+                                link.mav.signing.sign_outgoing and
+                                (m._header.incompat_flags & mavutil.mavlink.MAVLINK_IFLAG_SIGNED) == 0):
+                            # repack the message if this is a signed link and not already signed
+                            msg_to_send = clone_mavlink_message(m) # We copy the message for not signing m
+                            msg_to_send.pack(link.mav)
+                        else:
+                            msg_to_send = m # We never copy if we don't have to
+                        link.write(msg_to_send.get_msgbuf())
+                for slave_e in mpstate.mav_outputs:
+                    if slave_e.fd != slave.fd:  # We check that we aren't going to send the msg to the expeditor
+                        if mpstate.module('router').check(m, slave_e.address):
+                            if hasattr(slave_e, 'ws') and slave_e.ws is not None:
+                                from wsproto.connection import ConnectionState
+                                if slave_e.ws.state != ConnectionState.OPEN:  # Ensure Websocket handshake is done
+                                    continue
+                            slave_e.write(m.get_msgbuf())
             else:
-                # find best link by sysid
-                output = mpstate.master(target_sysid)
-            if (mpstate.settings.mavfwd_signing and
-                    output.mav.signing.sign_outgoing and
-                    (m._header.incompat_flags & mavutil.mavlink.MAVLINK_IFLAG_SIGNED) == 0):
-                # repack the message if this is a signed link and not already signed
-                m.pack(output.mav)
+                # Fallback (pas de routeur): code de base
+                target_sysid = getattr(m, 'target_system', -1)
+                if mpstate.settings.mavfwd_link > 0 and mpstate.settings.mavfwd_link <= len(mpstate.mav_master):
+                    output = mpstate.mav_master[mpstate.settings.mavfwd_link-1]
+                else:
+                    # find best link by sysid
+                    output = mpstate.master(target_sysid)
+                if (mpstate.settings.mavfwd_signing and
+                        output.mav.signing.sign_outgoing and
+                        (m._header.incompat_flags & mavutil.mavlink.MAVLINK_IFLAG_SIGNED) == 0):
+                    # repack the message if this is a signed link and not already signed
+                    m.pack(output.mav)
 
-            output.write(m.get_msgbuf())
+                output.write(m.get_msgbuf())
             if mpstate.logqueue:
                 usec = int(time.time() * 1.0e6)
                 mpstate.logqueue.put(bytearray(struct.pack('>Q', usec) + m.get_msgbuf()))
@@ -1382,6 +1404,8 @@ if __name__ == '__main__':
     parser.add_option("--default-modules", default="log,signing,wp,rally,fence,ftp,param,relay,tuneopt,arm,mode,calibration,rc,auxopt,misc,cmdlong,battery,terrain,output,adsb,layout", help='default module list')  # noqa:E501
     parser.add_option("--udp-timeout", dest="udp_timeout", default=0.0, type='float', help="Timeout for udp clients in seconds")  # noqa:E501
     parser.add_option("--retries", type=int, help="number of times to retry connection", default=3)
+    parser.add_option("--router-config", dest="router_config", help="Indicates a router_config.json file to load at the start")
+    parser.add_option("--router-use-dir", dest="router_use_dir", help="Indicates directory with JSON files (instead of ../MAVProxy/router_config/ by default)")
 
     (opts, args) = parser.parse_args()
     if len(args) != 0:
@@ -1474,6 +1498,12 @@ if __name__ == '__main__':
     for sig in fatalsignals:
         signal.signal(sig, quit_handler)
 
+    if opts.router_config or opts.router_use_dir:
+        if mpstate.load_module('router', quiet=False):
+            if opts.router_use_dir:
+                mpstate.module('router').router_config_dir = opts.router_use_dir
+            if opts.router_config and mpstate.module('router').load(opts.router_config):
+                mpstate.module('router').start()
     mpstate.load_module('link', quiet=True)
 
     # load signing early to allow for use of ~/.mavproxy/signing.keys
