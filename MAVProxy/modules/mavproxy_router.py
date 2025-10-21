@@ -888,6 +888,7 @@ class RouterModule(mp_module.MPModule):
                                     for msgtype in filter:
                                         if not isinstance(msgtype, str):
                                             raise ValueError(f"MSG_TYPE {msgtype} related to (address, sysid, srcComponent) ({address}, {sysid}, {compid}) is not a string")
+                                    router_config[address][sysid][compid].set(filter)
                                 else: # Not an str or None or a list of str
                                     raise ValueError(f"filter {filter} related to (address, sysid, srcComponent) ({address}, {sysid}, {compid}) is not a string, None or a list of strings")
                         else:
@@ -901,6 +902,7 @@ class RouterModule(mp_module.MPModule):
                                 for msgtype in filter:
                                     if not isinstance(msgtype, str):
                                         raise ValueError(f"MSG_TYPE {msgtype} related to (address, sysid) ({address}, {sysid}) is not a string")
+                                router_config[address][sysid][compid].set(filter)
                             else: # Not an str or None or a list of str
                                 raise ValueError(f"filter {filter} related to (address, sysid) ({address}, {sysid}) is not a string, None or a list of strings")
 
