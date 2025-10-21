@@ -356,8 +356,16 @@ class ConsoleModule(mp_module.MPModule):
                 prefix = 'GPS2'
             nsats = msg.satellites_visible
             fix_type = msg.fix_type
+            yaw = msg.yaw
             if fix_type >= 3:
-                self.console.set_status(field, '%s OK%s (%u)' % (prefix, fix_type, nsats), fg=green)
+                gnss_heading_status = ''
+                if yaw > 0 and yaw < 65535:
+                    # GNSS heading
+                    gnss_heading_status = ' H'
+                elif yaw == 65535:
+                    # GNSS heading but no valid data
+                    gnss_heading_status = ' h'
+                self.console.set_status(field, '%s OK%s (%u)%s' % (prefix, fix_type, nsats, gnss_heading_status), fg=green)
             else:
                 self.console.set_status(field, '%s %u (%u)' % (prefix, fix_type, nsats), fg='red')
             if type == 'GPS_RAW_INT':

@@ -64,7 +64,7 @@ class RelayModule(mp_module.MPModule):
     def cmd_motortest(self, args):
         '''run motortests on copter'''
         if len(args) < 4:
-            print("Usage: motortest motornum type(0=percent, 1=PWM, 2=RC-passthru) value timeout(s) <count>")
+            print("Usage: motortest motor-test-sequence-number type(0=percent, 1=PWM, 2=RC-passthru) value timeout(s) <count>")
             return
         if len(args) == 5:
             count = int(args[4])
