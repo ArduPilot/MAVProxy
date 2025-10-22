@@ -1405,6 +1405,10 @@ if __name__ == '__main__':
     parser.add_option("--default-modules", default="log,signing,wp,rally,fence,ftp,param,relay,tuneopt,arm,mode,calibration,rc,auxopt,misc,cmdlong,battery,terrain,output,adsb,layout", help='default module list')  # noqa:E501
     parser.add_option("--udp-timeout", dest="udp_timeout", default=0.0, type='float', help="Timeout for udp clients in seconds")  # noqa:E501
     parser.add_option("--retries", type=int, help="number of times to retry connection", default=3)
+    parser.add_option("--router-config", dest="router_config",
+                      help="Indicates a router_config.json file to load at the start")
+    parser.add_option("--router-use-dir", dest="router_use_dir",
+                      help="Indicates directory with JSON files (instead of ../MAVProxy/router_config/ by default)")
 
     (opts, args) = parser.parse_args()
     if len(args) != 0:
@@ -1497,6 +1501,12 @@ if __name__ == '__main__':
     for sig in fatalsignals:
         signal.signal(sig, quit_handler)
 
+    if opts.router_config or opts.router_use_dir:
+        if mpstate.load_module('router', quiet=False):
+            if opts.router_use_dir:
+                mpstate.module('router').router_config_dir = opts.router_use_dir
+            if opts.router_config and mpstate.module('router').load(opts.router_config):
+                mpstate.module('router').start()
     mpstate.load_module('link', quiet=True)
 
     # load signing early to allow for use of ~/.mavproxy/signing.keys
