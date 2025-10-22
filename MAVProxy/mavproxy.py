@@ -40,7 +40,7 @@ from MAVProxy.modules.lib import rline
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_substitute
 from MAVProxy.modules.lib import multiproc
-from MAVProxy.modules.mavproxy_link import preferred_ports
+from MAVProxy.modules.mavproxy_link import preferred_ports, clone_mavlink_message
 
 # adding all this allows pyinstaller to build a working windows executable
 # note that using --hidden-import does not work for these modules
@@ -895,6 +895,7 @@ def process_mavlink(slave):
         return
     if msgs is None:
         return
+    router_module = mpstate.module('router')
     allow_fwd = mpstate.settings.mavfwd
     if not allow_fwd and mpstate.settings.mavfwd_disarmed and not mpstate.master(-1).motors_armed():
         allow_fwd = True
@@ -902,19 +903,41 @@ def process_mavlink(slave):
         allow_fwd = False
     if allow_fwd:
         for m in msgs:
-            target_sysid = getattr(m, 'target_system', -1)
-            if mpstate.settings.mavfwd_link > 0 and mpstate.settings.mavfwd_link <= len(mpstate.mav_master):
-                output = mpstate.mav_master[mpstate.settings.mavfwd_link-1]
+            if router_module is not None and router_module.router_enabled:
+                for link in mpstate.mav_master:
+                    if router_module.check(m, link.address):
+                        if (mpstate.settings.mavfwd_signing and
+                                link.mav.signing.sign_outgoing and
+                                (m._header.incompat_flags & mavutil.mavlink.MAVLINK_IFLAG_SIGNED) == 0):
+                            # repack the message if this is a signed link and not already signed
+                            msg_to_send = clone_mavlink_message(m) # We copy the message for not signing m
+                            msg_to_send.pack(link.mav)
+                        else:
+                            msg_to_send = m # We never copy if we don't have to
+                        link.write(msg_to_send.get_msgbuf())
+                for slave_e in mpstate.mav_outputs:
+                    if slave_e.fd != slave.fd:  # We check that we aren't going to send the msg to the expeditor
+                        if router_module.check(m, slave_e.address):
+                            if hasattr(slave_e, 'ws') and slave_e.ws is not None:
+                                from wsproto.connection import ConnectionState
+                                if slave_e.ws.state != ConnectionState.OPEN:  # Ensure Websocket handshake is done
+                                    continue
+                            slave_e.write(m.get_msgbuf())
             else:
-                # find best link by sysid
-                output = mpstate.master(target_sysid)
-            if (mpstate.settings.mavfwd_signing and
-                    output.mav.signing.sign_outgoing and
-                    (m._header.incompat_flags & mavutil.mavlink.MAVLINK_IFLAG_SIGNED) == 0):
-                # repack the message if this is a signed link and not already signed
-                m.pack(output.mav)
+                # Fallback (no router)
+                target_sysid = getattr(m, 'target_system', -1)
+                if mpstate.settings.mavfwd_link > 0 and mpstate.settings.mavfwd_link <= len(mpstate.mav_master):
+                    output = mpstate.mav_master[mpstate.settings.mavfwd_link-1]
+                else:
+                    # find best link by sysid
+                    output = mpstate.master(target_sysid)
+                if (mpstate.settings.mavfwd_signing and
+                        output.mav.signing.sign_outgoing and
+                        (m._header.incompat_flags & mavutil.mavlink.MAVLINK_IFLAG_SIGNED) == 0):
+                    # repack the message if this is a signed link and not already signed
+                    m.pack(output.mav)
 
-            output.write(m.get_msgbuf())
+                output.write(m.get_msgbuf())
             if mpstate.logqueue:
                 usec = int(time.time() * 1.0e6)
                 mpstate.logqueue.put(bytearray(struct.pack('>Q', usec) + m.get_msgbuf()))
