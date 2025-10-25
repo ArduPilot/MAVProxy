@@ -943,6 +943,7 @@ class LinkModule(mp_module.MPModule):
                                       mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONTROL,
                                       mavutil.mavlink.MAV_CMD_SET_CAMERA_MODE,
                                       mavutil.mavlink.MAV_CMD_SET_CAMERA_ZOOM,
+                                      mavutil.mavlink.MAV_CMD_CAN_FORWARD,
                                       mavutil.mavlink.MAV_CMD_SET_CAMERA_FOCUS]):
                     self.mpstate.console.writeln("Got COMMAND_ACK: %s: %s" % (cmd, res))
             except Exception:
