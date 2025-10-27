@@ -60,7 +60,7 @@ jobs:
           ISCC.exe /dMyAppVersion=$env:VERSION mavproxy.iss
           ls Output
       - name: Archive build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
            name: MAVProxyInstaller
            path: windows/Output
