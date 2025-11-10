@@ -20,6 +20,7 @@ import struct
 import sys
 import time
 import traceback
+import copy
 
 if sys.version_info[0] >= 3:
     import io as StringIO
@@ -72,23 +73,6 @@ preferred_ports = [
     '*Qiotek*',
     '*Sierra*',
 ]
-
-def clone_mavlink_message(msg):
-    try:
-        cls = type(msg)
-        fields = {f: getattr(msg, f) for f in msg.fieldnames}
-        cloned = cls(**fields)
-        # Header copy
-        cloned._header.seq = msg._header.seq
-        cloned._header.srcSystem = msg._header.srcSystem
-        cloned._header.srcComponent = msg._header.srcComponent
-        cloned._header.incompat_flags = msg._header.incompat_flags
-        cloned._header.compat_flags = msg._header.compat_flags
-        return cloned
-    except (TypeError, AttributeError):
-        import copy
-        cloned = copy.deepcopy(msg)
-        return cloned
 
 
 class LinkModule(mp_module.MPModule):
@@ -1112,7 +1096,7 @@ class LinkModule(mp_module.MPModule):
                                             link.mav.signing.sign_outgoing and
                                             (m._header.incompat_flags & mavutil.mavlink.MAVLINK_IFLAG_SIGNED) == 0):
                                         # repack the message if this is a signed link and not already signed
-                                        msg_to_send = clone_mavlink_message(m) # We copy the message for not signing m
+                                        msg_to_send = copy.copy(m) # We copy the message for not signing m
                                         msg_to_send.pack(link.mav)
                                     else:
                                         msg_to_send = m # We never copy if we don't have to

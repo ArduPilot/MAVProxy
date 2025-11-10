@@ -23,6 +23,7 @@ import sys
 import threading
 import time
 import traceback
+import copy
 
 try:
     reload
@@ -40,7 +41,7 @@ from MAVProxy.modules.lib import rline
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_substitute
 from MAVProxy.modules.lib import multiproc
-from MAVProxy.modules.mavproxy_link import preferred_ports, clone_mavlink_message
+from MAVProxy.modules.mavproxy_link import preferred_ports
 
 # adding all this allows pyinstaller to build a working windows executable
 # note that using --hidden-import does not work for these modules
@@ -910,7 +911,7 @@ def process_mavlink(slave):
                                 link.mav.signing.sign_outgoing and
                                 (m._header.incompat_flags & mavutil.mavlink.MAVLINK_IFLAG_SIGNED) == 0):
                             # repack the message if this is a signed link and not already signed
-                            msg_to_send = clone_mavlink_message(m) # We copy the message for not signing m
+                            msg_to_send = copy.copy(m) # We copy the message for not signing m
                             msg_to_send.pack(link.mav)
                         else:
                             msg_to_send = m # We never copy if we don't have to
