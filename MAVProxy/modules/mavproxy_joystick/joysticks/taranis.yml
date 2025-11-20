@@ -3,6 +3,9 @@ description: >
 
 match:
   - 'FrSky FrSky Taranis*'
+  - 'OpenTX FrSky Taranis*'
+  - 'EdgeTX FrSky Taranis*'
+  - 'FrSky Taranis*'
 
 controls:
   - channel: 1
