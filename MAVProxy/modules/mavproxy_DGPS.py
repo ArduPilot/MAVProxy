@@ -6,21 +6,70 @@ support for a GCS attached DGPS system
 import socket, errno
 from pymavlink import mavutil
 from MAVProxy.modules.lib import mp_module
+from MAVProxy.modules.lib import mp_settings
+from MAVProxy.modules.lib.mp_settings import MPSetting
 
 class DGPSModule(mp_module.MPModule):
+
+    @staticmethod
+    def default_settings():
+        return mp_settings.MPSettings([
+                MPSetting("portnum", int, 13320),
+                MPSetting("ip", str, "127.0.0.1"),
+            ])
+
     def __init__(self, mpstate):
         super(DGPSModule, self).__init__(mpstate, "DGPS", "DGPS injection support for SBP/RTCP/UBC")
-        self.portnum = 13320
+        self.dgps_settings = DGPSModule.default_settings()
+        self.inject_seq_nr = 0
+        self.cmdname = "dgps"
+        
+        self.create_port()
+        self.add_command(
+            self.cmdname,
+            self.cmd_dgps,
+            f"{self.cmdname} control",
+            [
+                "set (DGPS_SETTING)",
+            ],
+        )
+        self.add_completion_function(
+            "(DGPS_SETTING)", self.dgps_settings.completion
+        )
+        self.dgps_settings.set_callback(self.on_setting_set)
+
+    def create_port(self):
+        print(f"DGPS: Listening for RTCM packets on UDP://{self.dgps_settings.get('ip')}:{self.dgps_settings.get('portnum')}")
         self.port = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.port.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.port.bind(("127.0.0.1", self.portnum))
+        self.port.bind((self.dgps_settings.get('ip'), self.dgps_settings.get("portnum")))
         mavutil.set_close_on_exec(self.port.fileno())
         self.port.setblocking(0)
-        self.inject_seq_nr = 0
-        print("DGPS: Listening for RTCM packets on UDP://%s:%s" % ("127.0.0.1", self.portnum))
+
+    def cmd_dgps(self, args):
+        """
+        dgps commands
+        """
+        usage = f"usage: {self.cmdname} <set>"
+        if len(args) < 1:
+            print(usage)
+        elif args[0] == "set":
+            self.cmd_set(args[1:])
+        else:
+            print(usage)
+
+    def cmd_set(self, args):
+        """
+        Modify a setting
+        """
+        self.dgps_settings.command(args)
     
     def send_rtcm_msg(self, data):
-        msglen = 180;
+
+        if self.master is None:
+            return
+
+        msglen = 180
         
         if (len(data) > msglen * 4):
             print("DGPS: Message too large", len(data))
@@ -66,7 +115,12 @@ class DGPSModule(mp_module.MPModule):
             
         self.inject_seq_nr += 1
 
-
+    def on_setting_set(self, setting):
+        print("Settings changed:", setting.name)
+        if setting.name == "portnum" or setting.name == "ip":
+            if self.port:
+                self.port.close()
+            self.create_port()
 
     def idle_task(self):
         '''called in idle time'''
