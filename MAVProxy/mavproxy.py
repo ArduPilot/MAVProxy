@@ -917,7 +917,7 @@ def process_mavlink(slave):
                             msg_to_send = m # We never copy if we don't have to
                         link.write(msg_to_send.get_msgbuf())
                 for slave_e in mpstate.mav_outputs:
-                    if slave_e.fd != slave.fd:  # We check that we aren't going to send the msg to the expeditor
+                    if slave_e.address != slave.address:  # We check that we aren't going to send the msg to the expeditor
                         if router_module.check(m, slave_e.address):
                             if hasattr(slave_e, 'ws') and slave_e.ws is not None:
                                 from wsproto.connection import ConnectionState
