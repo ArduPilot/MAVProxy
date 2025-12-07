@@ -1409,7 +1409,7 @@ if __name__ == '__main__':
     parser.add_option("--router-config", dest="router_config",
                       help="Indicates a router_config.json file to load at the start")
     parser.add_option("--router-use-dir", dest="router_use_dir",
-                      help="Indicates directory with JSON files (instead of ../MAVProxy/router_config/ by default)")
+                      help="Indicates directory with JSON files (instead of Current Working Directory by default)")
 
     (opts, args) = parser.parse_args()
     if len(args) != 0:
