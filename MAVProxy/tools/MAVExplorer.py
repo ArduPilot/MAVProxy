@@ -130,6 +130,7 @@ class MEState(object):
             "map"       : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)'],
             "param"     : ['download', 'check', 'help (PARAMETER)', 'save', 'savechanged', 'diff', 'show', 'check'],
             "logmessage": ['download', 'help (MESSAGETYPE)'],
+            "locationAnalysis"  : [],
             }
         self.aliases = {}
         self.graphs = []
@@ -253,7 +254,8 @@ def setup_menus():
     TopMenu.add(MPMenuSubMenu('Tools',
                               items=[MPMenuItem('MagFit', 'MagFit', '# magfit'),
                                      MPMenuItem('Stats', 'Stats', '# stats'),
-                                     MPMenuItem('FFT', 'FFT', '# fft')]))
+                                     MPMenuItem('FFT', 'FFT', '# fft'),
+                                     MPMenuItem('Location Analysis', 'Location', '# locationAnalysis')]))
 
     mestate.console.set_menu(TopMenu, menu_callback)
 
@@ -390,6 +392,125 @@ def flightmode_colours():
             if idx >= len(flightmode_colours):
                 idx = 0
     return mapping
+
+def cmd_location(args):
+    '''analyze GPS locations and identify nearest cities/countries'''
+    try:
+        from geopy.geocoders import Nominatim
+        from geopy.distance import geodesic
+        from geopy.exc import GeocoderTimedOut, GeocoderServiceError
+    except ImportError:
+        print("Error: geopy library not installed. Install with: pip install geopy")
+        return
+
+    # Initialize geocoder
+    geolocator = Nominatim(user_agent="MAVExplorer")
+
+    # Sample every 5km
+    sample_distance_km = 5.0
+
+    mestate.mlog.rewind()
+
+    # Track sampled positions
+    last_sampled_pos = None
+    sampled_positions = []
+    locations = set()  # Store display_name strings
+
+    print("Scanning log for GPS coordinates...")    # Read all GPS messages
+    msg_types = ['GPS', 'GPS_RAW_INT', 'GLOBAL_POSITION_INT']
+    while True:
+        msg = mestate.mlog.recv_match(type=msg_types, condition=mestate.settings.condition)
+        if msg is None:
+            break
+
+        msg_type = msg.get_type()
+        lat = None
+        lon = None
+
+        # Extract coordinates based on message type
+        if msg_type == 'GPS':
+            # Binary log format - uppercase Lat/Lng
+            if hasattr(msg, 'Lat') and hasattr(msg, 'Lng'):
+                lat = msg.Lat
+                lon = msg.Lng
+        elif msg_type in ['GPS_RAW_INT', 'GLOBAL_POSITION_INT']:
+            # MAVLink format - degE7
+            if hasattr(msg, 'lat') and hasattr(msg, 'lon'):
+                lat = msg.lat * 1.0e-7
+                lon = msg.lon * 1.0e-7
+
+        # Validate coordinates
+        if lat is None or lon is None:
+            continue
+        if lat == 0 and lon == 0:
+            continue
+
+        # Always sample first valid coordinate
+        if last_sampled_pos is None:
+            last_sampled_pos = (lat, lon, msg._timestamp)
+            sampled_positions.append((lat, lon, msg._timestamp))
+            continue
+
+        # Calculate distance from last sampled position
+        distance_km = geodesic(last_sampled_pos[:2], (lat, lon)).kilometers
+
+        # Sample if distance >= 5km
+        if distance_km >= sample_distance_km:
+            last_sampled_pos = (lat, lon, msg._timestamp)
+            sampled_positions.append((lat, lon, msg._timestamp))
+
+    mestate.mlog.rewind()
+
+    if len(sampled_positions) == 0:
+        print("No valid GPS coordinates found in log.")
+        return
+
+    print("Found %d GPS samples, performing reverse geocoding..." % len(sampled_positions))
+
+    # Geocode sampled positions
+    for idx, (lat, lon, timestamp) in enumerate(sampled_positions):
+        print("Geocoding sample %d/%d..." % (idx + 1, len(sampled_positions)))
+
+        try:
+            # Use 50km search radius to find nearest city
+            location = geolocator.reverse((lat, lon), timeout=10, language='en', addressdetails=True, zoom=8)
+
+            if location and location.raw:
+                # Use display_name from location.raw
+                display_name = location.raw.get('display_name', '')
+
+                if display_name:
+                    locations.add(display_name)
+
+                    # Show location for first and last samples
+                    if idx == 0:
+                        ts_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
+                        print("  Start location: %s at %s" % (display_name, ts_str))
+                    elif idx == len(sampled_positions) - 1:
+                        ts_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
+                        print("  End location: %s at %s" % (display_name, ts_str))
+
+            # Rate limiting: 1 second between requests
+            time.sleep(1)
+
+        except GeocoderTimedOut:
+            print("  Geocoding timeout for sample %d, skipping..." % (idx + 1))
+            continue
+        except GeocoderServiceError as e:
+            print("  Geocoding service error for sample %d: %s" % (idx + 1, str(e)))
+            continue
+        except Exception as e:
+            print("  Error geocoding sample %d: %s" % (idx + 1, str(e)))
+            continue
+
+    # Display summary
+    print("\n=== Location Summary ===")
+    if len(locations) > 0:
+        print("Locations visited:")
+        for location_name in sorted(locations):
+            print("  %s" % location_name)
+    else:
+        print("No location information could be retrieved.")
 
 def check_vehicle_type():
     '''check vehicle_type option'''
@@ -1619,6 +1740,7 @@ command_map = {
     'file'       : (cmd_file,      'show files'),
     'mission'    : (cmd_mission,   'show mission'),
     'logmessage' : (cmd_logmessage, 'show log message information'),
+    'locationAnalysis'   : (cmd_location,  'Output a descriptive list of locations from the log' ),
     }
 
 def progress_bar(pct):
