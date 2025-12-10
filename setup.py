@@ -29,7 +29,8 @@ package_data.extend(package_files('MAVProxy/modules/mavproxy_cesium/app'))
 requirements=['pymavlink>=2.4.14',
               'pyserial>=3.0',
               'numpy',
-              'pynmeagps']
+              'pynmeagps',
+              'future']
 
 if platform.system() == "Darwin":
     # on MacOS we can have a more complete requirements list
