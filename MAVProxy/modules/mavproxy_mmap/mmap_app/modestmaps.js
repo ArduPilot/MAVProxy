@@ -352,7 +352,7 @@ var MM = com.modestmaps = {
     // Interpolates along a great circle, f between 0 and 1
     //
     // * FIXME: could be heavily optimized (lots of trig calls to cache)
-    // * FIXME: could be inmproved for calculating a full path
+    // * FIXME: could be improved for calculating a full path
     MM.Location.interpolate = function(l1, l2, f) {
         if (l1.lat === l2.lat && l1.lon === l2.lon) {
             return new MM.Location(l1.lat, l1.lon);
