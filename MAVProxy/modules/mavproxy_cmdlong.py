@@ -41,26 +41,89 @@ class CmdlongModule(mp_module.MPModule):
         return ret
 
     def cmd_takeoff(self, args):
-        '''take off'''
-        if ( len(args) != 1):
+        '''take off ALTITUDE_IN_METERS'''
+        if len(args) != 1:
             print("Usage: takeoff ALTITUDE_IN_METERS")
             return
 
-        if (len(args) == 1):
+        # Parse and validate altitude first
+        try:
             altitude = float(args[0])
-            print("Take Off started")
-            self.master.mav.command_long_send(
-                self.settings.target_system,  # target_system
-                self.settings.target_component, # target_component
-                mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, # command
-                0, # confirmation
-                0, # param1
-                0, # param2
-                0, # param3
-                0, # param4
-                0, # param5
-                0, # param6
-                altitude) # param7
+            if altitude <= 0:
+                print("Error: Altitude must be greater than 0")
+                return
+        except ValueError:
+            print("Error: Invalid altitude value")
+            print("Usage: takeoff ALTITUDE_IN_METERS")
+            return
+
+        # --- Pre-flight validation checks ---
+        
+        # 1. Connection check
+        if not hasattr(self.master, 'flightmode') or self.master.flightmode is None:
+            print("Takeoff refused: No vehicle connected")
+            return
+
+        # 2. Armed status check
+        try:
+            if not self.master.motors_armed():
+                print("Takeoff refused: Vehicle is DISARMED")
+                print("Arm motors first using: arm throttle")
+                return
+        except (AttributeError, TypeError):
+            # motors_armed() might not exist on all vehicle types
+            # Proceed with caution - let firmware reject if needed
+            pass
+
+        # 3. Flight mode validation (copter-specific)
+        try:
+            vehicle_type = self.master.vehicle_type.lower()
+        except (AttributeError, TypeError):
+            # If we can't determine vehicle type, skip mode validation
+            vehicle_type = None
+
+        if vehicle_type:
+            # Include 'unknown' because SITL sometimes reports this at startup
+            copter_types = ['copter', 'quadrotor', 'hexarotor', 'octocopter', 
+                           'tricopter', 'helicopter', 'coaxcopter', 'unknown']
+
+            if vehicle_type in copter_types:
+                try:
+                    available_modes = self.master.mode_mapping()
+                    
+                    # If vehicle has a dedicated TAKEOFF mode (like planes/VTOLs),
+                    # skip validation and let firmware handle mode requirements
+                    if available_modes and 'TAKEOFF' in available_modes:
+                        pass
+                    else:
+                        # Standard copter - must be in GUIDED or AUTO mode
+                        current_mode = self.master.flightmode.upper()
+                        
+                        if current_mode not in ['GUIDED', 'AUTO']:
+                            print("Takeoff refused: Current mode is %s" % current_mode)
+                            print("Copter takeoff requires GUIDED or AUTO mode")
+                            print("Switch mode first using: mode GUIDED")
+                            return
+                except (AttributeError, TypeError):
+                    # If mode_mapping() fails, proceed anyway
+                    pass
+
+        # --- End validation ---
+
+        # Send takeoff command
+        print("Taking off to %u meters" % altitude)
+        self.master.mav.command_long_send(
+            self.settings.target_system,  # target_system
+            self.settings.target_component, # target_component
+            mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, # command
+            0, # confirmation
+            0, # param1
+            0, # param2
+            0, # param3
+            0, # param4
+            0, # param5
+            0, # param6
+            altitude) # param7
 
     def cmd_parachute(self, args):
         '''parachute control'''
