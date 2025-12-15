@@ -73,10 +73,20 @@ class GimbalModule(mp_module.MPModule):
             mode = mavutil.mavlink.MAV_MOUNT_MODE_RC_TARGETING
         else:
             print("Unsupported mode %s" % args[0])
-        self.master.mav.mount_configure_send(self.target_system,
-                                             self.target_component,
-                                             mode,
-                                             1, 1, 1)
+            return
+        self.master.mav.command_long_send(
+            self.target_system,
+            self.target_component,
+            mavutil.mavlink.MAV_CMD_DO_MOUNT_CONFIGURE,
+            1,     # confirmation
+            mode,  # p1
+            1,     # p2 stabilize roll
+            1,     # p3 stabilize pitch
+            1,     # p4 stalize yaw
+            0,     # p5 roll input mode (0 is angle body)
+            0,     # p6 pitch input mode
+            0,     # p7 yaw input mode
+        )
 
     def cmd_gimbal_roi(self, args):
         '''control roi position'''
