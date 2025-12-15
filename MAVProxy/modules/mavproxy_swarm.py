@@ -383,7 +383,7 @@ class VehiclePanel(wx.Panel):
                     ("GUIDED", sysidFollow, compidFollow))
 
     def addstatustext(self, text):
-        '''have recieved statustext, update relevant control'''
+        '''have received statustext, update relevant control'''
         self.statusText.AppendText('\n' + text)
 
     def guidedTakeoff(self, event):
