@@ -202,16 +202,27 @@ class ArmModule(mp_module.MPModule):
     def all_checks_enabled(self):
         ''' returns true if the UAV is skipping any arming checks'''
         arming_check = self.get_mav_param("ARMING_CHECK")
-        if arming_check is None:
-            # AntennaTracker doesn't have arming checks
-            return False
-        arming_mask = int(arming_check)
+        if arming_check is not None:
+            return self.all_checks_enabled_ARMING_CHECK()
+        skipchk = self.get_mav_param("ARMING_SKIPCHK")
+        if skipchk is not None:
+            return self.all_checks_enabled_ARMING_SKIPCHK()
+
+        # antenna tracker doesn't have either parameter
+        return False
+
+    def all_checks_enabled_ARMING_CHECK(self):
+        arming_mask = int(self.get_mav_param("ARMING_CHECK"))
         if arming_mask == 1:
             return True
         for bit in arming_masks.values():
             if not arming_mask & bit and bit != 1:
                 return False
         return True
+
+    def all_checks_enabled_ARMING_SKIPCHK(self):
+        arming_skip_mask = int(self.get_mav_param("ARMING_SKIPCHK"))
+        return arming_skip_mask == 0
 
     def mavlink_packet(self, m):
         mtype = m.get_type()
