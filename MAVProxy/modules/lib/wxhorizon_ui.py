@@ -153,8 +153,10 @@ class HorizonFrame(wx.Frame):
         
     def calcFontScaling(self):
         '''Calculates the current font size and left position for the current window.'''
-        self.ypx = self.figure.get_size_inches()[1]*self.figure.dpi
-        self.xpx = self.figure.get_size_inches()[0]*self.figure.dpi
+        # use fixed DPI to avoid scaling on HiDPI displays
+        dpi = 100.0
+        self.ypx = self.figure.get_size_inches()[1]*dpi
+        self.xpx = self.figure.get_size_inches()[0]*dpi
         self.fontSize = self.vertSize*(self.ypx/2.0)
         self.leftPos = self.axes.get_xlim()[0]
         self.rightPos = self.axes.get_xlim()[1]
