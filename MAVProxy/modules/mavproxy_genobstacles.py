@@ -16,12 +16,35 @@ import socket, time, random, math
 
 track_count = 0
 
-# object types
+# object types based on real world ICAO ranges
+# 000000 - 0003FFF - unallocated
+# 000000 – 003FFF: Unallocated.
+# 004000 – 0043FF: Zimbabwe.
+# 008000 – 00FFFF: South Africa.
+# 0D0000 – 0D7FFF: Mexico.
+# A00000 - AFFFFFF - USA
+# B00000 - BFFFFFF - reserved
+# C00000 - C3FFFFF - Canada
+# 780000 - 7BFFFFF - China
+# 7C0000 - 7FFFFFF - Australia
+
+# So lets put the codes for our fake generated obstacles  in the reserved B00000 range
+# and put aircraft > 0xA00000 which is actually where "real" aircraft should be
+# 'Aircraft'        : 0xA00000,
+# 'Weather'         : 0xB00000,
+# 'BirdMigrating'   : 0xB10000,
+# 'BirdOfPrey'      : 0xB20000
+# 'Drone'           : 0x0000000 - 0x003FFF (16383)
+
+# due to MAV_SYSID being sent as an ICAO code in ADSB_VEHILE we want to avoid using (at least) numbers < 256
+# this allows for MAV_SYSID to be up to 0x00BFFF - which is 16 bits. Something to keep in mind when extend MAV_SYSID
+# for some reason this breaks if the ICAO code is >= 0x00A000
 DNFZ_types = {
-    'Aircraft' : 1,
-    'Weather' : 20000,
-    'BirdMigrating' : 30000,
-    'BirdOfPrey' : 40000
+    'Aircraft'      : 0xA00000,
+    'Weather'       : 0xB00000,
+    'BirdMigrating' : 0xB10000,
+    'BirdOfPrey'    : 0xB20000,
+    'Drone'         : 0x000000,
 }
 
 gen_settings = mp_settings.MPSettings([("port", int, 45454),
@@ -43,7 +66,19 @@ class DNFZ:
         if not DNFZ_type in DNFZ_types:
             raise('Bad DNFZ type %s' % DNFZ_type)
         self.DNFZ_type = DNFZ_type
-        self.pkt = {'category': 0, 'I010': {'SAC': {'val': 4, 'desc': 'System Area Code'}, 'SIC': {'val': 0, 'desc': 'System Identification Code'}}, 'I040': {'TrkN': {'val': 0, 'desc': 'Track number'}}, 'ts': 0, 'len': 25, 'I220': {'RoC': {'val': 0.0, 'desc': 'Rate of Climb/Descent'}}, 'crc': 'B52DA163', 'I130': {'Alt': {'max': 150000.0, 'min': -1500.0, 'val': 0.0, 'desc': 'Altitude'}}, 'I070': {'ToT': {'val': 0.0, 'desc': 'Time Of Track Information'}}, 'I105': {'Lat': {'val': 0, 'desc': 'Latitude in WGS.84 in twos complement. Range -90 < latitude < 90 deg.'}, 'Lon': {'val': 0.0, 'desc': 'Longitude in WGS.84 in twos complement. Range -180 < longitude < 180 deg.'}}, 'I080': {'SRC': {'meaning': '3D radar', 'val': 2, 'desc': 'Source of calculated track altitude for I062/130'}, 'FX': {'meaning': 'end of data item', 'val': 0, 'desc': ''}, 'CNF': {'meaning': 'Confirmed track', 'val': 0, 'desc': ''}, 'SPI': {'meaning': 'default value', 'val': 0, 'desc': ''}, 'MRH': {'meaning': 'Geometric altitude more reliable', 'val': 1, 'desc': 'Most Reliable Height'}, 'MON': {'meaning': 'Multisensor track', 'val': 0, 'desc': ''}}}
+        self.pkt = {'category': 0, 'I010': {'SAC': {'val': 4, 'desc': 'System Area Code'}, 'SIC': {'val': 0, 'desc': 'System Identification Code'}},
+                                    'I040': {'TrkN': {'val': 0, 'desc': 'Track number'}}, 'ts': 0, 'len': 25,
+                                    'I220': {'RoC': {'val': 0.0, 'desc': 'Rate of Climb/Descent'}}, 'crc': 'B52DA163',
+                                    'I130': {'Alt': {'max': 150000.0, 'min': -1500.0, 'val': 0.0, 'desc': 'Altitude'}},
+                                    'I070': {'ToT': {'val': 0.0, 'desc': 'Time Of Track Information'}},
+                                    'I105': {'Lat': {'val': 0, 'desc': 'Latitude in WGS.84 in twos complement. Range -90 < latitude < 90 deg.'},
+                                             'Lon': {'val': 0.0, 'desc': 'Longitude in WGS.84 in twos complement. Range -180 < longitude < 180 deg.'}},
+                                    'I080': {'SRC': {'meaning': '3D radar', 'val': 2, 'desc': 'Source of calculated track altitude for I062/130'},
+                                             'FX':  {'meaning': 'end of data item', 'val': 0, 'desc': ''},
+                                             'CNF': {'meaning': 'Confirmed track', 'val': 0, 'desc': ''},
+                                             'SPI': {'meaning': 'default value', 'val': 0, 'desc': ''},
+                                             'MRH': {'meaning': 'Geometric altitude more reliable', 'val': 1, 'desc': 'Most Reliable Height'},
+                                             'MON': {'meaning': 'Multisensor track', 'val': 0, 'desc': ''}}}
         self.speed = 0.0 # m/s
         self.heading = 0.0 # degrees
         self.desired_heading = None
@@ -180,7 +215,8 @@ class Aircraft(DNFZ):
         if self.dist_flown > self.circuit_width:
             self.desired_heading = self.heading + 90
             self.dist_flown = 0
-        if self.getalt() < self.ground_height() or self.getalt() > self.ground_height() + 2000:
+        ''' limit the altitude to ground_height + 100:2000 '''
+        if self.getalt() < (self.ground_height()) or self.getalt() > self.ground_height() + 2000:
             self.randpos()
             self.randalt()
 
