@@ -230,7 +230,32 @@ class AsterixModule(mp_module.MPModule):
             sic = m['I010']['SIC']['val']
             trkn = m['I040']['TrkN']['val']
             # fake ICAO_address
-            icao_address = trkn & 0xFFFF
+            icao_address = trkn & 0xFFFFFF
+            # object types based on real world ICAO ranges
+            # 000000 - 0003FFF - unallocated    - use for MAVLINK SYSID (up to 16838)
+            # A00000 - AFFFFFF - USA            - use for generated aircraft
+            # B00000 - BFFFFFF - reserved       - use for dummy obstacles
+            # C00000 - C3FFFFF - Canada
+            # 780000 - 7BFFFFF - China
+            # 7C0000 - 7FFFFFF - Australia
+            # from genobstacles:
+            # 'Aircraft'        : 0xA00000,
+            # 'Weather'         : 0xB00000,
+            # 'BirdMigrating'   : 0xB10000,
+            # 'BirdOfPrey'      : 0xB20000
+            # 'Drone'           : 0x000000 - 0x003FFF (16383)
+            if trkn >= 0xB00000 and  trkn < 0xB10000:
+                emitter_type = 102	# weather
+            elif trkn >= 0xB10000 and  trkn < 0xB20000:
+                emitter_type = 103	# Migratory Bird
+            elif trkn >= 0xB20000 and  trkn < 0xB30000:
+                emitter_type = 104	# Predatory Bird
+            elif trkn < 0x003FFF:
+                emitter_type = 14	# drone
+            elif trkn >= 0xA00000:
+                emitter_type = 1	# aircraft
+            else:
+                emitter_type = 99	# dummy it for now
 
             # use squawk for time in 0.1 second increments. This allows for old msgs to be discarded on vehicle
             # when using more than one link to vehicle
@@ -251,8 +276,8 @@ class AsterixModule(mp_module.MPModule):
                                                            0, # heading
                                                            0, # hor vel
                                                            int(climb_rate_fps * 0.3048 * 100), # cm/s
-                                                           ("%08x" % icao_address).encode("ascii"),
-                                                           100 + (trkn // 10000),
+                                                           ("%06X" % icao_address).encode("ascii"),
+                                                           emitter_type, # 100 + (trkn // 10000),
                                                            1,
                                                            (mavutil.mavlink.ADSB_FLAGS_VALID_COORDS |
                                                             mavutil.mavlink.ADSB_FLAGS_VALID_ALTITUDE |

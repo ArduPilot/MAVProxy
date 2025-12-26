@@ -13,38 +13,73 @@ from pymavlink import mavutil
 from PIL import ImageColor
 
 obc_icons = {
+     99 : 'flag.png',
     100 : 'greenplane.png',
-    101 : 'greenplane.png',
+    101 : 'bluecopter.png',
     102 : 'cloud.png',
     103 : 'migbird.png',
     104 : 'hawk.png'
 }
 
 obc_radius = {
-    100 : 300,
+     99 : 25,
+    100 : 609.6, # F3442M-23 standard boundary for "Well Clear" of aircraft = 2000ft
     101 : 300,
     102 : 173,
     103 : 100,
     104 : 200
 }
-    
+
+obc_height = {
+     14 : 25,
+     99 : 25,
+    100 : 76,   # F3442M-23 standard vertical boundary for "Well Clear" of aircraft = 250ft
+    101 : 100,
+    102 : 173,
+    103 : 100,
+    104 : 200
+}
+
 def get_threat_radius(emitter_type, squawk):
 
     if emitter_type == 255:
         ''' objectAvoidance Database item, squawk contains radius in cm'''
         return squawk * 0.01
-    '''get threat radius for an OBC item'''
-    return obc_radius.get(emitter_type,0)
+    if emitter_type < 14:
+        ''' adsb emitters for all crude vehicles are < 14 (UAV) '''
+        return 609.6
+    '''get threat height for an OBC item'''
+    return obc_radius.get(emitter_type,609.6)
 
+def get_threat_height(emitter_type):
+    if emitter_type < 14:
+        ''' adsb emitters for all crude vehicles are < 14 (UAV) '''
+        return 76
+    return obc_height.get(emitter_type)
 
 def get_threat_icon(emitter_type, default_icon):
 
     if emitter_type == 255:
         ''' objectAvoidance Database item, do not draw an icon'''
-        return None
+        return obc_icons.get(99, default_icon)
     '''get threat radius for an OBC item, else the true ADSB icon'''
     return obc_icons.get(emitter_type, default_icon)
 
+''' internally we use these special (invalid according to the ADS-B spec) emitter types for test obstacles '''
+def get_internal_emitter(trkn):
+
+    if trkn >= 0xB00000 and  trkn < 0xB10000:
+        return 102        # weather
+    elif trkn >= 0xB10000 and trkn < 0xB20000:
+        return 103        # Migratory Bird
+    elif trkn >= 0xB20000 and  trkn < 0xB30000:
+        return 104        # Predatory Bird
+    elif trkn <= 0x003FFF:
+        return 101       # drone
+    elif trkn >= 0xA00000:
+        return 100       # aircraft
+    else:
+        return 99        # dummy it for now
 
 class ADSBVehicle(object):
     '''a generic ADS-B threat'''
@@ -204,7 +239,7 @@ class ADSBModule(mp_module.MPModule):
         altitude_km = state['altitude']
         callsign = state['callsign']
         heading = state['heading']
-        emitter_type = state['emitter_type']
+        emitter_type = get_internal_emitter(state['ICAO_address'])
         squawk = state['squawk']
 
         if id not in self.threat_vehicles.keys():  # check to see if the vehicle is in the dict
@@ -252,12 +287,13 @@ class ADSBModule(mp_module.MPModule):
             alt_amsl = altitude_km * 0.001
             color = ImageColor.getrgb(self.ADSB_settings.alt_color1)
             label = ""
-            if self.ADSB_settings.show_callsign:
+            if self.ADSB_settings.show_callsign and (emitter_type < 14 or emitter_type == 100 or emitter_type == 101):
                 label = "[%s] " % callsign.rstrip()
             if alt_amsl > 0:
                 alt = int(alt_amsl - ref_alt)
                 label += self.height_string(alt)
-                if abs(alt) < self.ADSB_settings.alt_color_alt_thresh and dist < self.ADSB_settings.alt_color_dist_thresh:
+                label += " (AMSL: %s) " % self.height_string(alt_amsl)
+                if abs(dist) < get_threat_radius(emitter_type, squawk) and abs(alt) < get_threat_height(emitter_type):
                     tnow = self.get_time()
                     if self.ADSB_settings.traffic_warning and tnow - self.last_traffic > 5:
                         self.last_traffic = tnow
