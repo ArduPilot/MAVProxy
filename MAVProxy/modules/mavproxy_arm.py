@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 '''arm/disarm command handling'''
 
-import time, os
+import copy
 
 from MAVProxy.modules.lib import mp_module
 from pymavlink import mavutil
@@ -37,6 +37,9 @@ arming_masks = {
     "unknown23":   1 << 23,
     "unknown24":   1 << 24,
 }
+arming_skpcheck_bits = copy.copy(arming_masks)
+del arming_skpcheck_bits["all"]
+
 # on the assumption we may not always know about all arming bits, we
 # use this "full" mask to transition from using 0x1 (all checks
 # enabled) to having checks disabled by turning its bit off.
@@ -45,36 +48,55 @@ full_arming_mask = 0b1111111111111111111111110
 class ArmModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(ArmModule, self).__init__(mpstate, "arm", "arm/disarm handling", public=True)
-        checkables = "<" + "|".join(arming_masks.keys()) + ">"
-        self.add_command('arm', self.cmd_arm,      'arm motors', ['check ' + self.checkables(),
-                                      'uncheck ' + self.checkables(),
-                                      'list',
-                                      'throttle',
-                                      'safetyon',
-                                      'safetystatus',
-                                      'safetyoff',
-                                      'bits',
-                                      'prearms'])
+        self.add_command(
+            'arm',
+            self.cmd_arm,
+            'arm motors', [
+                'check ' + self.checkables(),
+                'uncheck ' + self.checkables(),
+                'skip ' + self.skip_checkables(),
+                'unskip ' + self.skip_checkables(),
+                'list',
+                'throttle',
+                'safetyon',
+                'safetystatus',
+                'safetyoff',
+                'bits',
+                'prearms',
+            ])
         self.add_command('disarm', self.cmd_disarm,   'disarm motors')
         self.was_armed = False
 
     def checkables(self):
         return "<" + "|".join(arming_masks.keys()) + ">"
 
+    def skip_checkables(self):
+        return "<" + "|".join(arming_skpcheck_bits.keys()) + ">"
+
     def cmd_arm(self, args):
         '''arm commands'''
-        usage = "usage: arm <check|uncheck|list|throttle|safetyon|safetyoff|safetystatus|bits|prearms>"
+        usage = "usage: arm <check|uncheck|skip|unskip|list|throttle|safetyon|safetyoff|safetystatus|bits|prearms>"
 
         if len(args) <= 0:
             print(usage)
             return
+
+        if args[0] == "skip":
+            return self.arm_skip(args[1:])
+
+        if args[0] == "unskip":
+            return self.arm_unskip(args[1:])
 
         if args[0] == "check":
             if (len(args) < 2):
                 print("usage: arm check " + self.checkables())
                 return
 
-            arming_mask = int(self.get_mav_param("ARMING_CHECK"))
+            arming_mask = self.get_mav_param("ARMING_CHECK")
+            if arming_mask is None:
+                print("ARMING_CHECK parameter not available")
+                return
+            arming_mask = int(arming_mask)
             name = args[1].lower()
             if name == 'all':
                 arming_mask = 1
@@ -93,7 +115,11 @@ class ArmModule(mp_module.MPModule):
                 print("usage: arm uncheck " + self.checkables())
                 return
 
-            arming_mask = int(self.get_mav_param("ARMING_CHECK"))
+            arming_mask = self.get_mav_param("ARMING_CHECK")
+            if arming_mask is None:
+                print("ARMING_CHECK parameter not available")
+                return
+            arming_mask = int(arming_mask)
             name = args[1].lower()
             if name == 'all':
                 arming_mask = 0
@@ -109,13 +135,13 @@ class ArmModule(mp_module.MPModule):
             return
 
         if args[0] == "list":
-            arming_mask = int(self.get_mav_param("ARMING_CHECK"))
-            if arming_mask == 0:
-                print("NONE")
-            for name in sorted(arming_masks, key=lambda x : arming_masks[x]):
-                if arming_masks[name] & arming_mask:
-                    print(name)
-            return
+            arming_check = self.get_mav_param("ARMING_CHECK")
+            if arming_check is not None:
+                return self.arming_list_ARMING_CHECK()
+            arming_skip = self.get_mav_param("ARMING_SKIPCHK")
+            if arming_skip is not None:
+                return self.arming_list_ARMING_SKIPCHK()
+
 
         if args[0] == "bits":
             for mask in sorted(arming_masks, key=lambda x : arming_masks[x]):
@@ -180,6 +206,51 @@ class ArmModule(mp_module.MPModule):
             return
 
         print(usage)
+
+    def arming_list_ARMING_CHECK(self):
+        arming_mask = int(self.get_mav_param("ARMING_CHECK"))
+        if arming_mask == 0:
+            print("NONE")
+        for name in sorted(arming_masks, key=lambda x : arming_masks[x]):
+            if arming_masks[name] & arming_mask:
+                print(name)
+
+    def arming_list_ARMING_SKIPCHK(self):
+        arming_skip = int(self.get_mav_param("ARMING_SKIPCHK"))
+        for name in sorted(arming_masks, key=lambda x : arming_masks[x]):
+            bang = ""
+            if arming_masks[name] & arming_skip:
+                bang = "!"
+            print(f"{bang}{name}")
+
+    def _arm_skip(self, what, args):
+        if (len(args) != 1):
+            print(f"usage: arm {what} {self.skip_checkables()}")
+            return
+
+        arming_skip = self.get_mav_param("ARMING_SKIPCHK")
+        if arming_skip is None:
+            print("ARMING_SKIPCHK parameter not available")
+            return
+        arming_skip = int(arming_skip)
+        name = args[0].lower()
+        if name not in arming_masks:
+            print(f"unrecognized arm check: {name}")
+            return
+        if what == "skip":
+            arming_skip |= arming_masks[name]
+        elif what == "unskip":
+            arming_skip &= ~arming_masks[name]
+        else:
+            raise ValueError(what)
+
+        self.param_set("ARMING_SKIPCHK", arming_skip)
+
+    def arm_skip(self, args):
+        return self._arm_skip("skip", args)
+
+    def arm_unskip(self, args):
+        return self._arm_skip("unskip", args)
 
     def cmd_disarm(self, args):
         '''disarm motors'''
