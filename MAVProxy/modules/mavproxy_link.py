@@ -20,6 +20,7 @@ import struct
 import sys
 import time
 import traceback
+import copy
 
 if sys.version_info[0] >= 3:
     import io as StringIO
@@ -992,6 +993,7 @@ class LinkModule(mp_module.MPModule):
         '''process mavlink message m on master, sending any messages to recipients'''
         sysid = m.get_srcSystem()
         mtype = m.get_type()
+        router_module = self.mpstate.module('router')
 
         if mtype in ['HEARTBEAT', 'HIGH_LATENCY2'] and m.type != mavutil.mavlink.MAV_TYPE_GCS:
             compid = m.get_srcComponent()
@@ -1003,7 +1005,11 @@ class LinkModule(mp_module.MPModule):
 
         # see if it is handled by a specialised sysid connection
         if sysid in self.mpstate.sysid_outputs:
-            self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
+            if router_module is not None and router_module.router_enabled:
+                if router_module.check(m, self.mpstate.sysid_outputs[sysid].address):
+                    self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
+            else:
+                self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
             if mtype == "GLOBAL_POSITION_INT":
                 for modname in 'map', 'asterix', 'NMEA', 'NMEA2':
                     mod = self.module(modname)
@@ -1015,7 +1021,8 @@ class LinkModule(mp_module.MPModule):
             master.post_message(m)
         self.status.counters['MasterIn'][master.linknum] += 1
 
-        if mtype == 'GLOBAL_POSITION_INT':
+        if mtype == 'GLOBAL_POSITION_INT' and \
+            (router_module is None or not router_module.router_enabled):
             # send GLOBAL_POSITION_INT to 2nd GCS for 2nd vehicle display
             for sysid in self.mpstate.sysid_outputs:
                 self.mpstate.sysid_outputs[sysid].write(m.get_msgbuf())
@@ -1074,12 +1081,33 @@ class LinkModule(mp_module.MPModule):
             # GCS
             if self.mpstate.settings.mavfwd_rate or mtype != 'REQUEST_DATA_STREAM':
                 if mtype not in self.no_fwd_types:
-                    for r in self.mpstate.mav_outputs:
-                        if hasattr(r, 'ws') and r.ws is not None:
-                            from wsproto.connection import ConnectionState
-                            if r.ws.state != ConnectionState.OPEN:  # Ensure Websocket handshake is done
-                                continue
-                        r.write(m.get_msgbuf())
+                    if router_module is not None and router_module.router_enabled:
+                        for r in self.mpstate.mav_outputs:
+                            if router_module.check(m, r.address):
+                                if hasattr(r, 'ws') and r.ws is not None:
+                                    from wsproto.connection import ConnectionState
+                                    if r.ws.state != ConnectionState.OPEN:  # Ensure Websocket handshake is done
+                                        continue
+                                r.write(m.get_msgbuf())
+                        for link in self.mpstate.mav_master:
+                            if link != master:
+                                if router_module.check(m, link.address):
+                                    if (self.mpstate.settings.mavfwd_signing and
+                                            link.mav.signing.sign_outgoing and
+                                            (m._header.incompat_flags & mavutil.mavlink.MAVLINK_IFLAG_SIGNED) == 0):
+                                        # repack the message if this is a signed link and not already signed
+                                        msg_to_send = copy.copy(m) # We copy the message for not signing m
+                                        msg_to_send.pack(link.mav)
+                                    else:
+                                        msg_to_send = m # We never copy if we don't have to
+                                    link.write(msg_to_send.get_msgbuf())
+                    else:
+                        for r in self.mpstate.mav_outputs:
+                            if hasattr(r, 'ws') and r.ws is not None:
+                                from wsproto.connection import ConnectionState
+                                if r.ws.state != ConnectionState.OPEN:  # Ensure Websocket handshake is done
+                                    continue
+                            r.write(m.get_msgbuf())
 
             sysid = m.get_srcSystem()
             target_sysid = self.target_system
