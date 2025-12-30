@@ -166,8 +166,10 @@ class HorizonFrame(wx.Frame):
         if not self.resized:
             oldypx = self.ypx
             oldxpx = self.xpx
-            self.ypx = self.figure.get_size_inches()[1]*self.figure.dpi
-            self.xpx = self.figure.get_size_inches()[0]*self.figure.dpi
+            # use fixed DPI to match calcFontScaling()
+            dpi = 100.0
+            self.ypx = self.figure.get_size_inches()[1]*dpi
+            self.xpx = self.figure.get_size_inches()[0]*dpi
             if (oldypx != self.ypx) or (oldxpx != self.xpx):
                 self.resized = True
             else:
