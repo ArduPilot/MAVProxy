@@ -75,40 +75,6 @@ class CmdlongModule(mp_module.MPModule):
             # Proceed with caution - let firmware reject if needed
             pass
 
-        # 3. Flight mode validation (copter-specific)
-        try:
-            vehicle_type = self.master.vehicle_type.lower()
-        except (AttributeError, TypeError):
-            # If we can't determine vehicle type, skip mode validation
-            vehicle_type = None
-
-        if vehicle_type:
-            # Include 'unknown' because SITL sometimes reports this at startup
-            copter_types = ['copter', 'quadrotor', 'hexarotor', 'octocopter', 
-                           'tricopter', 'helicopter', 'coaxcopter', 'unknown']
-
-            if vehicle_type in copter_types:
-                try:
-                    available_modes = self.master.mode_mapping()
-                    
-                    # If vehicle has a dedicated TAKEOFF mode (like planes/VTOLs),
-                    # skip validation and let firmware handle mode requirements
-                    if available_modes and 'TAKEOFF' in available_modes:
-                        pass
-                    else:
-                        # Standard copter - must be in GUIDED or AUTO mode
-                        current_mode = self.master.flightmode.upper()
-                        
-                        if current_mode not in ['GUIDED', 'AUTO']:
-                            print("Takeoff refused: Current mode is %s" % current_mode)
-                            print("Copter takeoff requires GUIDED or AUTO mode")
-                            print("Switch mode first using: mode GUIDED")
-                            return
-                except (AttributeError, TypeError):
-                    # If mode_mapping() fails, proceed anyway
-                    pass
-
-        # --- End validation ---
 
         # Send takeoff command
         print("Taking off to %u meters" % altitude)
