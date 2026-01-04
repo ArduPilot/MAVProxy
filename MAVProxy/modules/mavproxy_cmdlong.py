@@ -46,50 +46,30 @@ class CmdlongModule(mp_module.MPModule):
             print("Usage: takeoff ALTITUDE_IN_METERS")
             return
 
-        # Parse and validate altitude first
         try:
             altitude = float(args[0])
-            if altitude <= 0:
-                print("Error: Altitude must be greater than 0")
-                return
         except ValueError:
             print("Error: Invalid altitude value")
             print("Usage: takeoff ALTITUDE_IN_METERS")
             return
 
-        # --- Pre-flight validation checks ---
-        
-        # 1. Connection check
-        if not hasattr(self.master, 'flightmode') or self.master.flightmode is None:
-            print("Takeoff refused: No vehicle connected")
-            return
+        # Warn if disarmed
+        if not self.master.motors_armed():
+            print("Warning: Vehicle is DISARMED - use 'arm throttle' first")
 
-        # 2. Armed status check
-        try:
-            if not self.master.motors_armed():
-                print("Takeoff refused: Vehicle is DISARMED")
-                print("Arm motors first using: arm throttle")
-                return
-        except (AttributeError, TypeError):
-            # motors_armed() might not exist on all vehicle types
-            # Proceed with caution - let firmware reject if needed
-            pass
-
-
-        # Send takeoff command
-        print("Taking off to %u meters" % altitude)
+        print("Taking off to %s meters" % altitude)
         self.master.mav.command_long_send(
             self.settings.target_system,  # target_system
-            self.settings.target_component, # target_component
-            mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, # command
-            0, # confirmation
-            0, # param1
-            0, # param2
-            0, # param3
-            0, # param4
-            0, # param5
-            0, # param6
-            altitude) # param7
+            self.settings.target_component,  # target_component
+            mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,  # command
+            0,  # confirmation
+            0,  # param1
+            0,  # param2
+            0,  # param3
+            0,  # param4
+            0,  # param5
+            0,  # param6
+            altitude)  # param7
 
     def cmd_parachute(self, args):
         '''parachute control'''
