@@ -66,6 +66,7 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('Thr', 'Thr ---', row=2)
         mpstate.console.set_status('Roll', 'Roll ---', row=2)
         mpstate.console.set_status('Pitch', 'Pitch ---', row=2)
+        mpstate.console.set_status('Yaw', 'Yaw ---', row=2)
         mpstate.console.set_status('Wind', 'Wind ---/---', row=2)
         mpstate.console.set_status('WP', 'WP --', row=3)
         mpstate.console.set_status('WPDist', 'Distance ---', row=3)
@@ -465,6 +466,7 @@ class ConsoleModule(mp_module.MPModule):
     def handle_attitude(self, msg):
             self.console.set_status('Roll', 'Roll %u' % math.degrees(msg.roll))
             self.console.set_status('Pitch', 'Pitch %u' % math.degrees(msg.pitch))
+            self.console.set_status('Yaw', 'Yaw %u' % math.degrees(msg.yaw))
 
     def handle_sys_status(self, msg):
             master = self.master
