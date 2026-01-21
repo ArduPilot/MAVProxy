@@ -74,6 +74,9 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
     def command_name(self):
         return "wp"
 
+    def MISSION_CURRENT_opaque_id_attribute(self):
+        return "mission_id"
+
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         mtype = m.get_type()
