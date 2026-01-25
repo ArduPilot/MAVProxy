@@ -7,6 +7,9 @@
 PY3VERS	:= $(shell py3versions -vs)
 PY3VER	:= $(shell py3versions -vd)
 
+# Extract version from setup.py to keep debian package version in sync
+UPSTREAM_VERSION := $(shell grep '^version = ' setup.py | head -1 | cut -d'"' -f2)
+
 include /usr/share/dpkg/pkg-info.mk
 
 include /usr/share/python3/python.mk
@@ -62,13 +65,13 @@ binary-indep: build install
 	dh_testroot
 	dh_installchangelogs -i
 	dh_installdocs -i
-	dh_installexamples -i samples/*
+#	dh_installexamples -i samples/*
 	dh_compress -i -X.xml -X.py \
 	    -X.html -X.css -X.asc -X.png -Xapi-objects.txt
 	dh_fixperms -i
 	dh_installdeb -i
 	dh_shlibdeps -i
-	dh_gencontrol -i
+	dh_gencontrol -i -- -v$(UPSTREAM_VERSION)
 	dh_md5sums -i
 	dh_builddeb -i
 
@@ -87,7 +90,7 @@ binary-arch: build install
 	dh_fixperms -a
 	dh_installdeb -a
 	dh_shlibdeps -a
-	dh_gencontrol -a
+	dh_gencontrol -a -- -v$(UPSTREAM_VERSION)
 	dh_md5sums -a
 	dh_builddeb -a
 
