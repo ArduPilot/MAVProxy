@@ -16,4 +16,5 @@ MANIFEST
 windows/version.txt
 /.vscode
 venv/
+feature.md
 __pycache__/
