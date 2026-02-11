@@ -335,7 +335,7 @@ class MPState(object):
         self.vehicle_link_map = {}
 
         # SITL output
-        self.sitl_output = None
+        self.sitl_outputs = {}
 
         self.mav_param_by_sysid = {}
         self.mav_param_by_sysid[(self.settings.target_system, self.settings.target_component)] = mavparm.MAVParmDict()
@@ -1325,7 +1325,7 @@ if __name__ == '__main__':
                       default=[])
     parser.add_option("--baudrate", dest="baudrate", type='int',
                       help="default serial baud rate", default=57600)
-    parser.add_option("--sitl", dest="sitl", default=None, help="SITL output port")
+    parser.add_option("--sitl", dest="sitl", action='append', default=[], help="SITL output port")
     parser.add_option("--streamrate", dest="streamrate", default=4, type='int',
                       help="MAVLink stream rate")
     parser.add_option("--source-system", dest='SOURCE_SYSTEM', type='int',
@@ -1520,8 +1520,14 @@ if __name__ == '__main__':
             mpstate.mav_outputs.append(mavutil.mavlink_connection(port, baud=int(opts.baudrate),
                                                                   input=False, autoreconnect=True))
 
-    if opts.sitl:
-        mpstate.sitl_output = mavutil.mavudp(opts.sitl, input=False)
+    for sitl in opts.sitl:
+        # Deduce the sitl instance from the port
+        SITL_PORT_0 = 5501
+        SITL_PORT_OFFSET = 10
+        sitl_split = sitl.split(":")
+        sitl_port = int(sitl_split[-1])
+        sitl_instance = (sitl_port - SITL_PORT_0) // SITL_PORT_OFFSET
+        mpstate.sitl_outputs[sitl_instance] = mavutil.mavudp(sitl, input=False)
 
     mpstate.settings.streamrate = opts.streamrate
     mpstate.settings.streamrate2 = opts.streamrate

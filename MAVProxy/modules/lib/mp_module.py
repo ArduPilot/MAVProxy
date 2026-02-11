@@ -111,8 +111,8 @@ class MPModule(object):
         return self.mpstate.vehicle_name
 
     @property
-    def sitl_output(self):
-        return self.mpstate.sitl_output
+    def sitl_outputs(self):
+        return self.mpstate.sitl_outputs
 
     @property
     def target_system(self):
