@@ -87,7 +87,7 @@ class MPStatus(object):
         self.mav_error = 0
         self.altitude = 0
         self.last_distance_announce = 0.0
-        self.exit = False
+        self.stop_event = threading.Event()
         self.flightmode = 'MAV'
         self.last_mode_announce = 0
         self.last_mode_announced = 'MAV'
@@ -808,7 +808,7 @@ def process_stdin(line):
             print("%-15s : %s" % (cmd, help))
         return
     if cmd == 'exit' and mpstate.settings.requireexit:
-        mpstate.status.exit = True
+        mpstate.status.stop_event.set()
         return
 
     if cmd not in command_map:
@@ -941,8 +941,13 @@ def mkdir_p(dir):
 
 def log_writer():
     '''log writing thread'''
-    while not mpstate.status.exit:
-        mpstate.logfile_raw.write(bytearray(mpstate.logqueue_raw.get()))
+    while not mpstate.status.stop_event.is_set():
+        if not mpstate.logqueue_raw.empty():
+            bytes = mpstate.logqueue_raw.get(block=False)
+            mpstate.logfile_raw.write(bytearray(bytes))
+        time.sleep(0.001)
+
+        # TODO consider wait() the stop event instead
         timeout = time.time() + 10
         while not mpstate.logqueue_raw.empty() and time.time() < timeout:
             mpstate.logfile_raw.write(mpstate.logqueue_raw.get())
@@ -1014,18 +1019,17 @@ def open_telemetry_logs(logpath_telem, logpath_telem_raw):
             stat = os.statvfs(logpath_telem)
             if stat.f_bfree*stat.f_bsize < 209715200:
                 print("ERROR: Not enough free disk space for logfile")
-                mpstate.status.exit = True
+                mpstate.status.stop_event.set()
                 return
 
         # use a separate thread for writing to the logfile to prevent
         # delays during disk writes (important as delays can be long if camera
         # app is running)
         t = threading.Thread(target=log_writer, name='log_writer')
-        t.daemon = True
         t.start()
     except Exception as e:
         print("ERROR: opening log file for writing: %s" % e)
-        mpstate.status.exit = True
+        mpstate.status.stop_event.set()
         return
 
 
@@ -1126,7 +1130,7 @@ def main_loop():
         set_stream_rates()
 
     while True:
-        if mpstate is None or mpstate.status.exit:
+        if mpstate is None or mpstate.status.stop_event.is_set():
             return
 
         # enable or disable screensaver:
@@ -1226,12 +1230,12 @@ def main_loop():
 
 def input_loop():
     '''wait for user input'''
-    while mpstate.status.exit is not True:
+    while not mpstate.status.stop_event.is_set():
         try:
             line = mpstate.rl.input()
             mpstate.input_queue.put(line)
         except (EOFError, IOError):
-            mpstate.status.exit = True
+            mpstate.status.stop_event.set()
 
 
 def run_script(scriptfile):
@@ -1415,7 +1419,6 @@ if __name__ == '__main__':
 
     # global mavproxy state
     mpstate = MPState()
-    mpstate.status.exit = False
     mpstate.command_map = command_map
     mpstate.continue_mode = opts.continue_mode
     # queues for logging
@@ -1455,11 +1458,11 @@ if __name__ == '__main__':
 
     def quit_handler(signum=None, frame=None):
         # print('Signal handler called with signal', signum)
-        if mpstate.status.exit:
+        if mpstate.status.stop_event.is_set():
             print('Clean shutdown impossible, forcing an exit')
             sys.exit(0)
         else:
-            mpstate.status.exit = True
+            mpstate.status.stop_event.set()
 
     # Listen for kill signals to cleanly shutdown modules
     fatalsignals = [signal.SIGTERM]
@@ -1598,7 +1601,7 @@ if __name__ == '__main__':
 
     # use main program for input. This ensures the terminal cleans
     # up on exit
-    while (mpstate.status.exit is not True):
+    while not mpstate.status.stop_event.is_set():
         try:
             if opts.daemon or opts.non_interactive:
                 time.sleep(0.1)
@@ -1620,7 +1623,7 @@ if __name__ == '__main__':
                         m.init(mpstate)
 
             else:
-                mpstate.status.exit = True
+                mpstate.status.stop_event.set()
                 sys.exit(1)
 
     if opts.profile:
