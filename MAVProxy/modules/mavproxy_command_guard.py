@@ -160,6 +160,9 @@ class CommandGuardModule(mp_module.MPModule):
 
         if msg_type == 'SET_POSITION_TARGET_GLOBAL_INT':
             if hasattr(msg, 'lat_int') and hasattr(msg, 'lon_int'):
+                if not self._geofence_initialized and (abs(self.guard_settings.geofence_lat) < 1e-6 and abs(self.guard_settings.geofence_lon) < 1e-6):
+                    return True
+                
                 lat = msg.lat_int / 1e7
                 lon = msg.lon_int / 1e7
                 
@@ -174,7 +177,14 @@ class CommandGuardModule(mp_module.MPModule):
                     return False
                 
                 if hasattr(msg, 'alt'):
-                    if msg.alt > self.guard_settings.geofence_max_alt:
+                    altitude = msg.alt
+                    if hasattr(msg, 'coordinate_frame'):
+                        if msg.coordinate_frame in (
+                            mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                        ) and self._home_alt is not None:
+                            altitude += self._home_alt
+                    
+                    if altitude > self.guard_settings.geofence_max_alt:
                         return False
             return True
 
