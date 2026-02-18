@@ -48,7 +48,7 @@ class optitrack(mp_module.MPModule):
             if (now - self.last_msg_time) > (self.optitrack_settings.msg_intvl_ms * 0.001):
                 time_us = int(now * 1.0e6)
                 if self.axis == 'z':
-                    self.master.mav.att_pos_mocap_send(time_us, (rotation[3], rotation[1], rotation[0], -rotation[2]), position[1], position[0], -position[2])
+                    self.master.mav.att_pos_mocap_send(time_us, (rotation[3], rotation[0], rotation[1], rotation[2]), position[0], -position[1], -position[2])
                 else:
                     self.master.mav.att_pos_mocap_send(time_us, (rotation[3], rotation[0], rotation[2], -rotation[1]), position[0], position[2], -position[1])
                 self.last_msg_time = now
