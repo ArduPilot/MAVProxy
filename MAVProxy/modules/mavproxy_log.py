@@ -68,6 +68,8 @@ class LogModule(mp_module.MPModule):
         self.download_last_timestamp = time.time()
         if m.count == 0 or (m.count < 90 and len(self.download_set) == 1 + (m.ofs // 90)):
             dt = time.time() - self.download_start
+            if dt == 0:
+                dt = 0.0000001
             self.download_file.close()
             size = os.path.getsize(self.download_filename)
             speed = size / (1000.0 * dt)
@@ -132,6 +134,8 @@ class LogModule(mp_module.MPModule):
             print("No download")
             return
         dt = time.time() - self.download_start
+        if dt == 0:
+            dt = 0.0000001
         speed = os.path.getsize(self.download_filename) / (1000.0 * dt)
         m = self.entries.get(self.download_lognum, None)
         file_size = os.path.getsize(self.download_filename)
