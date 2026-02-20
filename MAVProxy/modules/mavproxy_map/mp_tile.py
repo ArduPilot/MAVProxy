@@ -614,25 +614,15 @@ def mp_icon(filename):
     # when we may be in a package zip file
     raw = None
     try:
-        import pkg_resources
-        name = __name__
-        if name == "__main__":
-            name = "MAVProxy.modules.mavproxy_map.mp_tile"
-        stream = pkg_resources.resource_stream(name, f"data/{filename}")
-        raw = np.frombuffer(stream.read(), dtype=np.uint8)
+        import importlib.resources
+        package = __package__ + ".data"
+        if __name__ == "__main__":
+            package = "MAVProxy.modules.mavproxy_map.data"
+        with importlib.resources.open_binary(package, filename) as stream:
+            raw = np.frombuffer(stream.read(), dtype=np.uint8)
     except Exception:
-        try:
-            with open(os.path.join(os.path.dirname(__file__), 'data', filename), 'rb') as f:
-                raw = np.frombuffer(f.read(), dtype=np.uint8)
-        except Exception:
-            try:
-                import pkgutil
-                stream = pkgutil.get_data('MAVProxy', f'modules/mavproxy_map/data/{filename}')
-                raw = np.frombuffer(stream, dtype=np.uint8)
-            except Exception as e:
-                print(f"Failed to load image '{filename}': {e}")
-                return None
-
+        with open(os.path.join(os.path.dirname(__file__), 'data', filename)).read() as stream:
+            raw = np.frombuffer(stream.read(), dtype=np.uint8)
     img = cv2.imdecode(raw, cv2.IMREAD_COLOR)
     return img
 
