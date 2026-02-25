@@ -348,8 +348,20 @@ def load_graphs():
             continue
         # skip parameter files.  They specify an encoding, and under
         # Python3 this leads to a warning from etree
-        if os.path.basename(file) in ["ArduSub.xml", "ArduPlane.xml", "APMrover2.xml", "ArduCopter.xml",
-                                      "AntennaTracker.xml", "Blimp.xml", "Rover.xml", "Heli.xml"]:
+        parameter_files = frozenset([
+            "AntennaTracker.xml",
+            "APMrover2.xml",
+            "ArduCopter.xml",
+            "ArduPlane.xml",
+            "ArduSub.xml",
+            "Blimp.xml",
+            "Copter.xml",
+            "Heli.xml",
+            "Plane.xml",
+            "Rover.xml",
+            "Sub.xml",
+        ])
+        if os.path.basename(file) in parameter_files:
             continue
         graphs = load_graph_xml(open(file).read(), file)
         if graphs:
