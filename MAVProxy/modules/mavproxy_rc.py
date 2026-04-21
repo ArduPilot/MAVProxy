@@ -30,7 +30,7 @@ class RCModule(mp_module.MPModule):
         self.add_command('switch', self.cmd_switch, "flight mode switch control", ['<0|1|2|3|4|5|6>'])
         self.rc_settings = mp_settings.MPSettings(
             [('override_hz', float, 10.0)])
-        if self.sitl_output:
+        if self.sitl_outputs:
             self.rc_settings.override_hz = 20.0
         self.add_completion_function('(RCSETTING)',
                                      self.rc_settings.completion)
@@ -110,12 +110,52 @@ class RCModule(mp_module.MPModule):
         elif m.get_type() == 'SERVO_OUTPUT_RAW' and self.servoout_gui:
             self.servoout_gui.processPacket(m)
 
+    def sitl_instance(self):
+        # Scan the vehicle_link_map for matching (sysid, compid)
+        sysid = self.mpstate.settings.target_system
+        compid = self.mpstate.settings.target_component
+        linknum = None
+        for k, v in self.mpstate.vehicle_link_map.items():
+            if (sysid, compid) in v:
+                linknum = k
+                break
+
+        if linknum is None:
+            return None
+
+        # Find the corresponding connection
+        master = None
+        for m in self.mpstate.mav_master:
+            if m.linknum == linknum:
+                master = m
+                break
+
+        if master is None:
+            return None
+
+        # Determine the sitl instance
+        MASTER_PORT_0 = 5760
+        MASTER_PORT_OFFSET = 10
+        address = master.address
+        address_split = address.split(":")
+        # Check this is a tcp connection.
+        if len(address_split) != 3 or address_split[0] != "tcp":
+            return None
+        port = int(address_split[-1])
+        instance = (port - MASTER_PORT_0) // MASTER_PORT_OFFSET
+        return instance
+
     def send_rc(self):
         '''send RC override packet'''
-        if self.sitl_output:
+        # Skip calculating the sitl instance if no sitl outputs are set
+        if self.sitl_outputs:
+            sitl_instance = self.sitl_instance()
+
+        if self.sitl_outputs and sitl_instance in self.sitl_outputs:
             chan16 = self.override[:16]
             buf = struct.pack('<HHHHHHHHHHHHHHHH', *chan16)
-            self.sitl_output.write(buf)
+            sitl_output = self.sitl_outputs[sitl_instance]
+            sitl_output.write(buf)
         else:
             chan18 = self.override[:18]
             self.master.mav.rc_channels_override_send(self.target_system,
