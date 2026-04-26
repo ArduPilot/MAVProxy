@@ -106,6 +106,8 @@ class MavGraph(object):
             self.flightmode_colourmap = {}
         self.flightmode_list = None
         self.ax1 = None
+        self.ax2 = None
+        self.ax_by_num = {}
         self.locator = None
         global graph_num
         self.graph_num = graph_num
@@ -125,6 +127,15 @@ class MavGraph(object):
         else:
             self.text_types = frozenset([unicode, str])
         self.max_message_rate = 0
+        self.axis_mode = 'auto'
+
+    def set_axis_mode(self, mode):
+        '''set y-axis layout mode: 'auto' (dual for 1-2 axes, multi for 3+),
+        'dual' (legacy 2-axis) or 'multi' (all extra axes stacked on the left
+        with vertical labels)'''
+        if mode not in ('auto', 'dual', 'multi'):
+            raise ValueError("axis_mode must be 'auto', 'dual' or 'multi'")
+        self.axis_mode = mode
 
     def set_max_message_rate(self, rate_hz):
         '''set maximum rate we will graph any message'''
@@ -183,21 +194,49 @@ class MavGraph(object):
         '''set multiple graph option'''
         self.multi = multi
 
-    def make_format(self, current, other):
-        # current and other are axes
+    def _set_multicolor_ylabel(self, ax_n, labels, lines):
+        '''attach a y-axis label whose comma-separated parts are each coloured
+        to match the line they refer to'''
+        from matplotlib.offsetbox import (AnchoredOffsetbox, TextArea, VPacker)
+        children = []
+        for i, (lbl, line) in enumerate(zip(labels, lines)):
+            if i > 0:
+                children.append(TextArea(", ", textprops=dict(
+                    color='black', rotation=90, ha='center', va='bottom')))
+            children.append(TextArea(lbl, textprops=dict(
+                color=line.get_color(), rotation=90, ha='center', va='bottom')))
+        # VPacker stacks first child on top; reverse so visual order matches
+        # the default y-label direction (text reads bottom-to-top)
+        vp = VPacker(children=list(reversed(children)),
+                     pad=0, sep=2, align='center')
+        spine_pos = ax_n.spines['left'].get_position()
+        if isinstance(spine_pos, tuple) and spine_pos[0] == 'axes':
+            x_axes = spine_pos[1] - 0.04
+        else:
+            x_axes = -0.04
+        box = AnchoredOffsetbox(loc='center right', child=vp, frameon=False,
+                                bbox_to_anchor=(x_axes, 0.5),
+                                bbox_transform=ax_n.transAxes, borderpad=0)
+        ax_n.add_artist(box)
+        ax_n.set_ylabel('')
+
+    def make_format(self, current_axis):
+        '''build a format_coord that reports y for every active axis'''
         def format_coord(x, y):
-            # x, y are data coordinates
-            # convert to display coords
-            display_coord = current.transData.transform((x,y))
-            inv = other.transData.inverted()
-            # convert back to data coords with respect to ax
-            ax_coord = inv.transform(display_coord)
-            xstr = self.formatter(x)
-            y2 = ax_coord[1]
+            # x, y are data coords on current_axis; project to every other axis
+            display_coord = current_axis.transData.transform((x, y))
             if self.xaxis:
-                return ('x=%.3f Left=%.3f Right=%.3f' % (x, y2, y))
+                parts = ['x=%.3f' % x]
             else:
-                return ('x=%s Left=%.3f Right=%.3f' % (xstr, y2, y))
+                parts = ['x=%s' % self.formatter(x)]
+            for n in sorted(self.ax_by_num.keys()):
+                ax = self.ax_by_num[n]
+                if ax is current_axis:
+                    yv = y
+                else:
+                    yv = ax.transData.inverted().transform(display_coord)[1]
+                parts.append('ax%d=%.3f' % (n, yv))
+            return ' '.join(parts)
         return format_coord
 
     def next_flightmode_colour(self):
@@ -262,9 +301,8 @@ class MavGraph(object):
     def button_click(self, event):
         '''handle button clicks'''
         if getattr(event, 'dblclick', False) and event.button==1:
-            self.rescale_yaxis(self.ax1)
-            if self.ax2:
-                self.rescale_yaxis(self.ax2)
+            for ax in self.ax_by_num.values():
+                self.rescale_yaxis(ax)
 
     def plotit(self, x, y, fields, colors=[], title=None, interactive=True):
         '''plot a set of graphs using date for x axis'''
@@ -272,7 +310,14 @@ class MavGraph(object):
             plt.ion()
         self.fig = plt.figure(num=1, figsize=(12,6))
         self.ax1 = self.fig.gca()
+        self.ax_by_num = {1: self.ax1}
         self.ax2 = None
+        # resolve 'auto' to 'dual' (1-2 axes) or 'multi' (3+ axes) up front
+        if self.axis_mode == 'auto':
+            max_axis = max(self.axes) if self.axes else 1
+            axis_mode = 'multi' if max_axis >= 3 else 'dual'
+        else:
+            axis_mode = self.axis_mode
         for i in range(0, len(fields)):
             if len(x[i]) == 0: continue
             if self.lowest_x is None or x[i][0] < self.lowest_x:
@@ -293,8 +338,9 @@ class MavGraph(object):
         self.fig.canvas.get_default_filename = lambda: ''.join("graph" if self.title is None else
                                                                (x if x.isalnum() else '_' for x in self.title)) + '.png'
         empty = True
-        ax1_labels = []
-        ax2_labels = []
+        labels_by_axis = {1: []}
+        lines_by_axis = {1: []}
+        label_strip_re = re.compile(r'^(.*):[2-9]$')
 
         for i in range(len(fields)):
             if len(x[i]) == 0:
@@ -306,29 +352,41 @@ class MavGraph(object):
                 color = 'red'
                 (tz, tzdst) = time.tzname
 
-            if self.axes[i] == 2:
-                if self.ax2 is None:
-                    self.ax2 = self.ax1.twinx()
-                    if self.grid:
-                        self.ax2.grid(None)
-                        self.ax1.grid(True)
-                    self.ax2.format_coord = self.make_format(self.ax2, self.ax1)
-                ax = self.ax2
+            axis_num = self.axes[i]
+            if axis_mode == 'dual' and axis_num > 2:
+                # legacy 2-axis layout: anything above axis 1 goes on the right
+                axis_num = 2
+            if axis_num not in self.ax_by_num:
+                new_ax = self.ax1.twinx()
+                self.ax_by_num[axis_num] = new_ax
+                labels_by_axis[axis_num] = []
+                lines_by_axis[axis_num] = []
+                if self.grid:
+                    new_ax.grid(None)
+                    self.ax1.grid(True)
                 if not self.xaxis:
-                    self.ax2.xaxis.set_major_locator(self.locator)
-                    self.ax2.xaxis.set_major_formatter(self.formatter)
-                label = fields[i]
-                if label.endswith(":2"):
-                    label = label[:-2]
-                ax2_labels.append(label)
-                if self.custom_labels[i] is not None:
-                    ax2_labels[-1] = self.custom_labels[i]
-            else:
-                ax1_labels.append(fields[i])
-                if self.custom_labels[i] is not None:
-                    ax1_labels[-1] = self.custom_labels[i]
-                ax = self.ax1
+                    new_ax.xaxis.set_major_locator(self.locator)
+                    new_ax.xaxis.set_major_formatter(self.formatter)
+                if axis_mode == 'multi' and axis_num >= 2:
+                    # stack additional axes on the LEFT instead of the right
+                    new_ax.yaxis.set_ticks_position('left')
+                    new_ax.yaxis.set_label_position('left')
+                    new_ax.spines['right'].set_visible(False)
+                    new_ax.spines['left'].set_visible(True)
+            ax = self.ax_by_num[axis_num]
 
+            label = fields[i]
+            m = label_strip_re.match(label)
+            if m is not None:
+                label = m.group(1)
+            labels_by_axis[axis_num].append(label)
+            if self.custom_labels[i] is not None:
+                labels_by_axis[axis_num][-1] = self.custom_labels[i]
+            if axis_num == 2 and self.ax2 is None:
+                # back-compat alias
+                self.ax2 = ax
+
+            new_lines = []
             if self.xaxis:
                 if self.marker is not None:
                     marker = self.marker
@@ -338,8 +396,8 @@ class MavGraph(object):
                     linestyle = self.linestyle
                 else:
                     linestyle = 'None'
-                ax.plot(x[i], y[i], color=color, label=fields[i],
-                        linestyle=linestyle, marker=marker)
+                new_lines = ax.plot(x[i], y[i], color=color, label=fields[i],
+                                    linestyle=linestyle, marker=marker)
             else:
                 if self.marker is not None:
                     marker = self.marker
@@ -378,11 +436,30 @@ class MavGraph(object):
                                 alpha=0.6,
                                 verticalalignment='center')
                 else:
-                    ax.plot_date(x[i], y[i], fmt=color, label=fields[i],
-                                 linestyle=linestyle, marker=marker, tz=None)
+                    new_lines = ax.plot_date(x[i], y[i], fmt=color, label=fields[i],
+                                             linestyle=linestyle, marker=marker, tz=None)
+            if new_lines:
+                lines_by_axis[axis_num].extend(new_lines)
 
             empty = False
-            
+
+        # in 'multi' mode stack each extra axis further LEFT and reserve room
+        if axis_mode == 'multi':
+            extra_nums = sorted(n for n in self.ax_by_num.keys() if n >= 2)
+            offset_step = 0.10
+            for idx, n in enumerate(extra_nums):
+                self.ax_by_num[n].spines['left'].set_position(
+                    ("axes", -(idx + 1) * offset_step))
+            if extra_nums:
+                self.fig.subplots_adjust(
+                    left=min(0.5, 0.08 + len(extra_nums) * offset_step))
+
+        # install hover readout on every twinx axis when there are multiple axes
+        if len(self.ax_by_num) > 1:
+            for n, ax_n in self.ax_by_num.items():
+                if n >= 2:
+                    ax_n.format_coord = self.make_format(ax_n)
+
         if self.grid:
             plt.grid()
 
@@ -414,6 +491,28 @@ class MavGraph(object):
         else:
             self.fig.canvas.set_window_title(title)
 
+        # in 'multi' mode label each axis vertically; when several fields share
+        # an axis use a per-piece coloured composite label so each name appears
+        # in its line's colour. Single-field axes additionally get the spine
+        # and ticks coloured to match.
+        if axis_mode == 'multi':
+            for n, ax_n in self.ax_by_num.items():
+                labels_n = labels_by_axis.get(n, [])
+                lines_n = lines_by_axis.get(n, [])
+                if not labels_n:
+                    continue
+                if len(lines_n) >= 2 and len(lines_n) == len(labels_n):
+                    self._set_multicolor_ylabel(ax_n, labels_n, lines_n)
+                else:
+                    ax_n.set_ylabel(", ".join(labels_n))
+                if len(lines_n) == 1:
+                    line_color = lines_n[0].get_color()
+                    ax_n.tick_params(axis='y', colors=line_color)
+                    ax_n.spines['left'].set_color(line_color)
+                    ax_n.yaxis.label.set_color(line_color)
+
+        any_data_labels = any(labels_by_axis.get(n) for n in self.ax_by_num)
+
         if self.show_flightmode != 0:
             mode_patches = []
             for mode in self.modes_plotted.keys():
@@ -421,16 +520,22 @@ class MavGraph(object):
                 mode_patches.append(matplotlib.patches.Patch(color=color,
                                                              label=mode, alpha=alpha*1.5))
             labels = [patch.get_label() for patch in mode_patches]
-            if ax1_labels != [] and self.show_flightmode != 2:
+            if any_data_labels and self.show_flightmode != 2:
                 patches_legend = plt.legend(mode_patches, labels, loc=self.legend_flightmode)
                 self.fig.gca().add_artist(patches_legend)
             else:
                 plt.legend(mode_patches, labels)
 
-        if ax1_labels != []:
-            self.ax1.legend(ax1_labels,loc=self.legend)
-        if ax2_labels != []:
-            self.ax2.legend(ax2_labels,loc=self.legend2)
+        # in 'dual' mode keep the legacy per-axis legend; in 'multi' mode the
+        # vertical y-labels (per-piece coloured when shared) do the job
+        if axis_mode == 'dual':
+            legend_positions = {1: self.legend, 2: self.legend2}
+            for n in sorted(self.ax_by_num.keys()):
+                labels_n = labels_by_axis.get(n, [])
+                if not labels_n:
+                    continue
+                self.ax_by_num[n].legend(
+                    labels_n, loc=legend_positions.get(n, self.legend2))
 
     def add_data(self, t, msg, vars):
         '''add some data'''
@@ -513,12 +618,15 @@ class MavGraph(object):
                     self.custom_labels[i] = self.fields[i][a2+1:-1]
                     self.fields[i] = self.fields[i][:a2]
 
-        # pre-calc right/left axes
+        # pre-calc which y-axis each field uses (digit suffix :2..:9, with
+        # axes >= 3 rendered as additional offset right-hand spines)
+        axis_re = re.compile(r'^(.*):([2-9])$')
         for i in range(self.num_fields):
             f = self.fields[i]
-            if f.endswith(":2"):
-                self.axes[i] = 2
-                f = f[:-2]
+            m = axis_re.match(f)
+            if m is not None:
+                self.axes[i] = int(m.group(2))
+                f = m.group(1)
             if f.endswith(":1"):
                 self.first_only[i] = True
                 f = f[:-2]
@@ -712,6 +820,12 @@ if __name__ == "__main__":
     parser.add_argument("--output", default=None, help="provide an output format")
     parser.add_argument("--timeshift", type=float, default=0, help="shift time on first graph in seconds")
     parser.add_argument("--grid", action='store_true', help="show a grid")
+    parser.add_argument("--axis-mode", default='auto',
+                        choices=['auto', 'dual', 'multi'],
+                        help="y-axis layout: 'auto' picks dual for 1-2 axes "
+                             "and multi for 3+, 'dual' forces the legacy 2-axis "
+                             "layout, 'multi' stacks each :N axis on the left "
+                             "with vertical labels")
     parser.add_argument("logs_fields", metavar="<LOG or FIELD>", nargs="+")
     args = parser.parse_args()
 
@@ -735,5 +849,6 @@ if __name__ == "__main__":
     mg.set_title(args.title)
     mg.set_grid(args.grid)
     mg.set_show_flightmode(args.show_flightmode)
+    mg.set_axis_mode(args.axis_mode)
     mg.process([],[],0)
     mg.show(len(mg.mav_list), output=args.output)

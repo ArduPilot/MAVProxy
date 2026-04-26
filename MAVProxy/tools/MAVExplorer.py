@@ -112,6 +112,8 @@ class MEState(object):
               MPSetting('sync_xmap', bool, True, 'sync X-axis zoom for map'),
               MPSetting('legend', str, 'upper left', 'legend position'),
               MPSetting('legend2', str, 'upper right', 'legend2 position'),
+              MPSetting('axis_mode', str, 'auto', 'y-axis layout mode',
+                        choice=['auto', 'dual', 'multi']),
               MPSetting('title', str, None, 'Graph title'),
               MPSetting('debug', int, 0, 'debug level'),
               MPSetting('paramdocs', bool, True, 'show param docs'),
@@ -276,7 +278,7 @@ def expression_ok(expression, msgs=None):
                 a2 = f.rfind("<")
                 if a2 != -1:
                     f = f[:a2]
-            if f.endswith(':2'):
+            if len(f) >= 2 and f[-2] == ':' and f[-1] in '23456789':
                 f = f[:-2]
             if f[-1] == '}':
                 # avoid passing nocondition unless needed to allow us to work witih older
