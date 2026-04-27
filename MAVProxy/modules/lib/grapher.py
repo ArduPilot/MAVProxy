@@ -17,6 +17,7 @@ elif platform.system() != "Darwin" and os.getenv("MPLBACKEND") is None:
 from math import *
 from pymavlink.mavextra import *
 import matplotlib.pyplot as plt
+import matplotlib.ticker
 from pymavlink import mavutil
 import threading
 import numpy as np
@@ -797,6 +798,129 @@ class MavGraph(object):
             f_out.close()
         else:
             plt.savefig(output, bbox_inches='tight', dpi=200)
+
+
+class MavHistogram(MavGraph):
+    '''Histogram of a single log data field with live time-range filtering.'''
+
+    def __init__(self, flightmode_colourmap=None):
+        super().__init__(flightmode_colourmap)
+        self.bins = 50
+        self.show_stats = True
+        self._all_x = None
+        self._all_y = None
+
+    def set_bins(self, bins):
+        '''set number of histogram bins'''
+        self.bins = bins
+
+    def set_show_stats(self, show_stats):
+        '''set whether to overlay median and std dev lines'''
+        self.show_stats = show_stats
+
+    def _draw_histogram(self, y_data):
+        '''redraw histogram axes with the supplied data'''
+        self.ax1.cla()
+        label = self.fields[0] if self.fields else ''
+        title = self.title if self.title else 'Histogram: ' + label
+        self.ax1.set_title(title)
+        self.ax1.hist(y_data, bins=self.bins, color=colors[0], alpha=0.7, label=label,
+                      weights=np.ones(len(y_data)) / len(y_data) * 100.0)
+        self.ax1.set_xlabel(label)
+        self.ax1.set_ylabel('Frequency (%)')
+        self.ax1.yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.1f%%'))
+        self.ax1.xaxis.set_major_locator(matplotlib.ticker.MaxNLocator(nbins=15))
+        self.ax1.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+        self.ax1.tick_params(axis='x', which='major', labelrotation=45)
+
+        if self.show_stats and len(y_data) > 0:
+            median = np.median(y_data)
+            mean   = np.mean(y_data)
+            std    = np.std(y_data)
+
+            stat_styles = [
+                (median, 'black',  '-',  2.0, 'Median %.3g' % median),
+                (mean - std,   'orange', '--', 1.5, u'\u00b11\u03c3 (%.3g)' % std),
+                (mean + std,   'orange', '--', 1.5, None),
+                (mean - 2*std, 'red',    ':',  1.5, u'\u00b12\u03c3 (%.3g)' % (2*std)),
+                (mean + 2*std, 'red',    ':',  1.5, None),
+                (mean - 3*std, 'purple', '-.',  1.2, u'\u00b13\u03c3 (%.3g)' % (3*std)),
+                (mean + 3*std, 'purple', '-.',  1.2, None),
+            ]
+            for (xval, col, ls, lw, lbl) in stat_styles:
+                self.ax1.axvline(x=xval, color=col, linestyle=ls,
+                                 linewidth=lw, label=lbl)
+
+        self.ax1.legend(loc=self.legend)
+        self.fig.tight_layout()
+        self.fig.canvas.draw_idle()
+
+    def _hist_xlim_timer(self):
+        '''called every 100 ms to check for time-range updates from other graphs'''
+        if self.closing or self.xlim_pipe is None:
+            return
+        try:
+            if not self.xlim_pipe[1].poll():
+                return
+            xlim = self.xlim_pipe[1].recv()
+        except Exception:
+            return
+        if xlim == self.xlim or xlim is None:
+            return
+        self.xlim = xlim
+        mask = (self._all_x >= xlim[0]) & (self._all_x <= xlim[1])
+        y_filtered = self._all_y[mask]
+        if len(y_filtered) == 0:
+            return
+        self._draw_histogram(y_filtered)
+
+    def show(self, lenmavlist, block=True, xlim_pipe=None, output=None):
+        '''show histogram plot in a new figure'''
+        if xlim_pipe is not None:
+            xlim_pipe[0].close()
+        self.xlim_pipe = xlim_pipe
+
+        if not self.x or len(self.x[0]) == 0:
+            print("No data for histogram")
+            return
+
+        self._all_x = np.array(self.x[0])
+        self._all_y = np.array(self.y[0])
+
+        label = self.fields[0] if self.fields else ''
+        title = self.title if self.title else 'Histogram: ' + label
+
+        interactive = output is None
+        if interactive:
+            plt.ion()
+
+        self.fig, ax = plt.subplots(figsize=(10, 6))
+        self.ax1 = ax
+
+        self._draw_histogram(self._all_y)
+
+        self.fig.canvas.get_default_filename = lambda: ''.join(
+            'histogram' if self.title is None else
+            (c if c.isalnum() else '_' for c in title)) + '.png'
+        if self.fig.canvas.manager is not None:
+            self.fig.canvas.manager.set_window_title(title)
+        self.fig.canvas.mpl_connect('close_event', self.close_event)
+
+        if output is None:
+            if xlim_pipe is not None:
+                self.xlim_t = self.fig.canvas.new_timer(interval=100)
+                self.xlim_t.add_callback(self._hist_xlim_timer)
+                self.xlim_t.start()
+            plt.draw()
+            plt.show(block=block)
+        elif output.endswith('.html'):
+            import mpld3
+            html = mpld3.fig_to_html(self.fig)
+            with open(output, 'w') as f_out:
+                f_out.write(html)
+        else:
+            plt.savefig(output, bbox_inches='tight', dpi=200)
+
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
