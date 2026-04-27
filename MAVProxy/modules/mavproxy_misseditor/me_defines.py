@@ -63,6 +63,13 @@ def get_column_labels(command_name):
         return {}
     labels = {}
     enum = mavutil.mavlink.enums['MAV_CMD'][cmd]
+    # pymavlink >= label-emitting versions expose enum.label[i]; older
+    # installs lack it, so fall back to the description-based heuristic
+    enum_labels = getattr(enum, 'label', {})
     for col in enum.param.keys():
-        labels[col] = make_column_label(command_name, enum.param[col], "P%u" % col)
+        if col in enum_labels:
+            labels[col] = enum_labels[col]
+        else:
+            labels[col] = make_column_label(
+                command_name, enum.param[col], "P%u" % col)
     return labels
