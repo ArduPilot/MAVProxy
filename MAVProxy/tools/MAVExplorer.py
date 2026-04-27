@@ -112,6 +112,8 @@ class MEState(object):
               MPSetting('sync_xmap', bool, True, 'sync X-axis zoom for map'),
               MPSetting('legend', str, 'upper left', 'legend position'),
               MPSetting('legend2', str, 'upper right', 'legend2 position'),
+              MPSetting('hist_bins', int, 50, 'histogram bin count', tab='Graph'),
+              MPSetting('hist_show_stats', bool, True, 'show median/std dev on histogram', tab='Graph'),
               MPSetting('axis_mode', str, 'auto', 'y-axis layout mode',
                         choice=['auto', 'dual', 'multi']),
               MPSetting('title', str, None, 'Graph title'),
@@ -131,6 +133,7 @@ class MEState(object):
             "condition" : ["(VARIABLE)"],
             "graph"     : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)'],
             "graphs"    : ['(PREDEFINED_GRAPH)'],
+            "histogram" : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)', '--bins (VARIABLE) (VARIABLE)'],
             "dump"      : ['(MESSAGETYPE)', '--verbose (MESSAGETYPE)'],
             "map"       : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)'],
             "param"     : ['download', 'check', 'help (PARAMETER)', 'save', 'savechanged', 'diff', 'show', 'check'],
@@ -260,6 +263,7 @@ def setup_menus():
                               items=[MPMenuItem('MagFit', 'MagFit', '# magfit'),
                                      MPMenuItem('Stats', 'Stats', '# stats'),
                                      MPMenuItem('FFT', 'FFT', '# fft'),
+                                     MPMenuItem('Histogram', 'Histogram', '# histogram'),
                                      MPMenuItem('Location Analysis', 'Location', '# locationAnalysis')]))
 
     mestate.console.set_menu(TopMenu, menu_callback)
@@ -578,6 +582,48 @@ def cmd_graph(args):
     if xlimits.last_xlim is not None and mestate.settings.sync_xzoom:
         #print("initial: ", xlimits.last_xlim)
         grui[-1].set_xlim(xlimits.last_xlim)
+
+def cmd_histogram(args):
+    '''plot histogram of a single log data field'''
+    usage = "usage: histogram [--bins N] <FIELD>"
+    if len(args) < 1:
+        print(usage)
+        return
+
+    bins = mestate.settings.hist_bins
+    fields = []
+    i = 0
+    while i < len(args):
+        if args[i] == '--bins':
+            if i + 1 < len(args):
+                try:
+                    bins = int(args[i+1])
+                    i += 2
+                    continue
+                except ValueError:
+                    print("Invalid bins value: %s" % args[i+1])
+                    return
+        fields.append(args[i])
+        i += 1
+
+    if not fields:
+        print(usage)
+        return
+    if len(fields) > 1:
+        print("histogram only accepts one field at a time (got: %s)" % ', '.join(fields))
+        return
+
+    check_vehicle_type()
+    from MAVProxy.modules.lib.graph_ui import Histogram_UI
+    expression = fields[0]
+    graphdef = GraphDefinition(mestate.settings.title, expression, '', [expression], None)
+    hui = Histogram_UI(mestate)
+    hui.display_histogram(graphdef, bins=bins, show_stats=mestate.settings.hist_show_stats)
+    grui.append(hui)
+    global xlimits
+    if xlimits.last_xlim is not None and mestate.settings.sync_xzoom:
+        grui[-1].set_xlim(xlimits.last_xlim)
+
 
 def cmd_graphs(args):
     '''graphs command'''
@@ -1743,6 +1789,7 @@ def main_loop():
 command_map = {
     'graph'      : (cmd_graph,     'display a graph'),
     'graphs'     : (cmd_graphs,    'display a predefined graph'),
+    'histogram'  : (cmd_histogram, 'plot histogram of log data fields'),
     'set'        : (cmd_set,       'control settings'),
     'reload'     : (cmd_reload,    'reload graphs'),
     'save'       : (cmd_save,      'save a graph'),
