@@ -73,6 +73,8 @@ class MapModule(mp_module.MPModule):
             ('contour_grid_spacing', float, 30.0),
             ('contour_grid_extent', float, 20000.0),
         ])
+        self.home_pos = ()
+        self.last_rendered_home_pos = ()
 
         service = 'MicrosoftHyb'
         if 'MAP_SERVICE' in os.environ:
@@ -552,11 +554,14 @@ Usage: map circle <radius> <colour>
     def display_polyfences_circles(self, circles, colour):
         '''draws circles in the PolyFence layer with colour colour'''
         for circle in circles:
-            lat = circle.x
-            lng = circle.y
-            if circle.get_type() == 'MISSION_ITEM_INT':
-                lat *= 1e-7
-                lng *= 1e-7
+            if circle.command == mavutil.mavlink.MAV_CMD_NAV_FENCE_HOME_CIRCLE_INCLUSION:
+                (lat, lng) = self.home_pos
+            else:
+                lat = circle.x
+                lng = circle.y
+                if circle.get_type() == 'MISSION_ITEM_INT':
+                    lat *= 1e-7
+                    lng *= 1e-7
             items = [
                 MPMenuItem('Remove Circle', returnkey='popupPolyFenceRemoveCircle'),
                 MPMenuItem('Move Circle', returnkey='popupPolyFenceMoveCircle'),
@@ -577,6 +582,11 @@ Usage: map circle <radius> <colour>
         '''draws inclusion circles in the PolyFence layer with colour colour'''
         inclusions = self.module('fence').inclusion_circles()
         self.display_polyfences_circles(inclusions, (0, 255, 0))
+
+    def display_polyfences_home_inclusion_circles(self):
+        '''draws around-inclusion circles in the PolyFence layer'''
+        inclusions = self.module('fence').home_inclusion_circles()
+        self.display_polyfences_circles(inclusions, (0, 255, 96))
 
     def display_polyfences_exclusion_circles(self):
         '''draws exclusion circles in the PolyFence layer with colour colour'''
@@ -652,6 +662,7 @@ Usage: map circle <radius> <colour>
         '''draws PolyFence items in the PolyFence layer'''
         self.map.add_object(mp_slipmap.SlipClearLayer('PolyFence'))
         self.display_polyfences_inclusion_circles()
+        self.display_polyfences_home_inclusion_circles()
         self.display_polyfences_exclusion_circles()
         self.display_polyfences_inclusion_polygons()
         self.display_polyfences_exclusion_polygons()
@@ -1251,11 +1262,11 @@ Usage: map circle <radius> <colour>
                 self.map.set_follow_object('Pos' + vehicle, self.message_is_from_primary_vehicle(m))
 
         elif mtype == 'HOME_POSITION':
-            (lat, lon) = (m.latitude*1.0e-7, m.longitude*1.0e-7)
+            self.home_pos = (m.latitude*1.0e-7, m.longitude*1.0e-7)
             icon = self.map.icon('home.png')
             self.map.add_object(mp_slipmap.SlipIcon(
                 'HOME_POSITION',
-                (lat, lon),
+                self.home_pos,
                 icon,
                 layer=3,
                 rotation=0,
@@ -1337,8 +1348,10 @@ Usage: map circle <radius> <colour>
             else:
                 # old fence module
                 last_change = fence_module.fenceloader.last_change
-            if self.fence_change_time != last_change:
+            if (self.fence_change_time != last_change or
+                    self.home_pos != self.last_rendered_home_pos):
                 self.fence_change_time = last_change
+                self.last_rendered_home_pos = self.home_pos
                 self.display_fence()
 
     def check_redisplay_rallypoints(self):
