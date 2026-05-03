@@ -1434,6 +1434,20 @@ def cmd_paramchange(args):
     mestate.mlog.rewind()
 
 
+def show_mavlink_message_help(name):
+    '''print MAVLink message help by introspecting the pymavlink-generated
+    <msgname>_encode docstring (used for telemetry .tlog files where the
+    DFMetaData XML doesn't apply)'''
+    import textwrap
+    method = getattr(mavutil.mavlink.MAVLink, name.lower() + '_encode', None)
+    doc = getattr(method, '__doc__', None) if method is not None else None
+    if not doc:
+        print("No help found for message: %s" % name)
+        return
+    print("Log Message: %s" % name)
+    print(textwrap.dedent(doc).strip())
+
+
 def cmd_logmessage(args):
     '''show log message information'''
     mlog = mestate.mlog
@@ -1447,12 +1461,12 @@ def cmd_logmessage(args):
         if len(args) < 2:
             print(usage)
             return
-        if hasattr(mlog, 'metadata'):
+        if isinstance(mlog, DFReader.DFReader):
             mlog.metadata.print_help(args[1])
         elif isinstance(mlog, mavutil.mavlogfile):
-            print("logmessage help is not supported for telemetry log files")
+            show_mavlink_message_help(args[1])
         else:
-            print("Incompatible pymavlink; upgrade pymavlink?")
+            print("unsupported log type")
         return
     # download: download XML files for log messages
     if args[0] == 'download':
@@ -1464,7 +1478,7 @@ def cmd_logmessage(args):
             child.start()
         except Exception as e:
             print(e)
-        if hasattr(mlog, 'metadata'):
+        if isinstance(mlog, DFReader.DFReader):
             mlog.metadata.reset()
         return
     # Print usage if we've dropped through the ifs
@@ -1617,6 +1631,17 @@ def cmd_help(args):
             print("%-15s : %s" % (cmd, help))
         return
     cmd = args[0]
+    # an all-caps token is treated as a log message name and produces the
+    # same output as 'logmessage help <MSG>'
+    if cmd.isupper() and all(c.isalnum() or c == '_' for c in cmd):
+        mlog = mestate.mlog
+        if isinstance(mlog, DFReader.DFReader):
+            mlog.metadata.print_help(cmd)
+        elif isinstance(mlog, mavutil.mavlogfile):
+            show_mavlink_message_help(cmd)
+        else:
+            print("Incompatible pymavlink; upgrade pymavlink?")
+        return
     if cmd in command_map.keys():
         (fn, help) = command_map[cmd]
         print("%-15s : %s" % (cmd, help))
