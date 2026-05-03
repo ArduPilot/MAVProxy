@@ -1434,6 +1434,38 @@ def cmd_paramchange(args):
     mestate.mlog.rewind()
 
 
+def present_message_types(mlog):
+    '''return a set of message names that have at least one instance in
+    the currently loaded log. Uses mlog.counts (combined with
+    id_to_name where the dict is keyed by msg id) because mlog.messages
+    is cleared whenever DFReader rewinds, which happens during normal
+    MAVExplorer load (flightmode_list, etc.).'''
+    counts = getattr(mlog, 'counts', None)
+    if counts is None:
+        return set()
+    id_to_name = getattr(mlog, 'id_to_name', {}) or {}
+    out = set()
+    if isinstance(counts, dict):
+        # tlog -> {msg_id: count}; DFReader_text -> {name: count}
+        for k, v in counts.items():
+            if not v:
+                continue
+            if isinstance(k, str):
+                out.add(k)
+            else:
+                n = id_to_name.get(k)
+                if n:
+                    out.add(n)
+    else:
+        # DFReader_binary -> list[count] indexed by msg id
+        for mid, v in enumerate(counts):
+            if v:
+                n = id_to_name.get(mid)
+                if n:
+                    out.add(n)
+    return out
+
+
 def show_mavlink_message_help(name):
     '''print MAVLink message help by introspecting the pymavlink-generated
     <msgname>_encode docstring (used for telemetry .tlog files where the
@@ -1461,6 +1493,10 @@ def cmd_logmessage(args):
         if len(args) < 2:
             print(usage)
             return
+        present = present_message_types(mlog)
+        if present and args[1] not in present:
+            print("Message %s is not present in this log" % args[1])
+            return
         if isinstance(mlog, DFReader.DFReader):
             mlog.metadata.print_help(args[1])
         elif isinstance(mlog, mavutil.mavlogfile):
@@ -1483,6 +1519,94 @@ def cmd_logmessage(args):
         return
     # Print usage if we've dropped through the ifs
     print(usage)
+
+
+def mavlink_message_fields(msgname):
+    '''return [(field_name, units, description), ...] for a MAVLink message
+    by parsing the pymavlink-generated <msgname>_encode docstring; used by
+    find/help when the master is a telemetry log'''
+    import re
+    import textwrap
+    method = getattr(mavutil.mavlink.MAVLink, msgname.lower() + '_encode', None)
+    doc = getattr(method, '__doc__', None) if method is not None else None
+    if not doc:
+        return []
+    line_re = re.compile(
+        r'^(\S+)\s+:\s+(.*?)(?:\s*\[([^\]]+)\])?\s*\(type:[^)]+\)\s*$'
+    )
+    out = []
+    for line in textwrap.dedent(doc).splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        m = line_re.match(line)
+        if not m:
+            continue
+        name = m.group(1)
+        desc = m.group(2).strip()
+        units = (m.group(3) or '').strip()
+        out.append((name, units, desc))
+    return out
+
+
+def cmd_find(args):
+    '''find log message fields whose name or description contains a
+    case-insensitive substring; prints MSG.field [units] : description'''
+    if len(args) == 0:
+        print("Usage: find <substring>")
+        return
+    query = ' '.join(args).lower()
+    mlog = mestate.mlog
+    matches = []
+    present = present_message_types(mlog)
+
+    if isinstance(mlog, DFReader.DFReader):
+        # DataFlash log: walk the LogMessages XML metadata tree, skipping
+        # any messages that don't actually appear in this log
+        data = mlog.metadata.metadata_tree(verbose=True)
+        if data is None:
+            return
+        for msg_name in sorted(data.keys()):
+            if present and msg_name not in present:
+                continue
+            node = data[msg_name]
+            if not hasattr(node, 'fields') or not hasattr(node.fields, 'field'):
+                continue
+            msg_match = query in msg_name.lower()
+            for f in node.fields.field:
+                fname = f.get('name') or ''
+                try:
+                    desc = f.description.text or ''
+                except AttributeError:
+                    desc = ''
+                if (not msg_match and query not in fname.lower()
+                        and query not in desc.lower()):
+                    continue
+                units = f.get('units') or ''
+                matches.append((msg_name, fname, units, desc))
+    elif isinstance(mlog, mavutil.mavlogfile):
+        # telemetry tlog: introspect every MAVLink message that actually
+        # appears in this log via pymavlink class metadata
+        for msg_name in sorted(present):
+            msg_match = query in msg_name.lower()
+            for (fname, units, desc) in mavlink_message_fields(msg_name):
+                if (not msg_match and query not in fname.lower()
+                        and query not in desc.lower()):
+                    continue
+                matches.append((msg_name, fname, units, desc))
+    else:
+        print("unsupported log type")
+        return
+
+    if not matches:
+        print("No fields matching %r" % query)
+        return
+    full_names = ['%s.%s' % (m, fn) for (m, fn, _, _) in matches]
+    unit_strs = ['[%s]' % u if u else '' for (_, _, u, _) in matches]
+    name_w = max(len(s) for s in full_names)
+    unit_w = max(len(s) for s in unit_strs) if any(unit_strs) else 0
+    for (full, ustr, (_, _, _, desc)) in zip(full_names, unit_strs, matches):
+        print("%-*s %-*s : %s" % (name_w, full, unit_w, ustr, desc))
 
 
 def cmd_mission(args):
@@ -1635,6 +1759,10 @@ def cmd_help(args):
     # same output as 'logmessage help <MSG>'
     if cmd.isupper() and all(c.isalnum() or c == '_' for c in cmd):
         mlog = mestate.mlog
+        present = present_message_types(mlog)
+        if present and cmd not in present:
+            print("Message %s is not present in this log" % cmd)
+            return
         if isinstance(mlog, DFReader.DFReader):
             mlog.metadata.print_help(cmd)
         elif isinstance(mlog, mavutil.mavlogfile):
@@ -1785,6 +1913,7 @@ command_map = {
     'file'       : (cmd_file,      'show files'),
     'mission'    : (cmd_mission,   'show mission'),
     'logmessage' : (cmd_logmessage, 'show log message information'),
+    'find'       : (cmd_find,       'find log message fields by name or description'),
     'locationAnalysis'   : (cmd_location,  'Output a descriptive list of locations from the log' ),
     }
 
