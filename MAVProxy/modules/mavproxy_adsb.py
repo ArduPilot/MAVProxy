@@ -239,7 +239,17 @@ class ADSBModule(mp_module.MPModule):
         altitude_km = state['altitude']
         callsign = state['callsign']
         heading = state['heading']
-        emitter_type = get_internal_emitter(state['ICAO_address'])
+        # OBC test framework reserves specific ICAO bands for synthetic
+        # obstacles (drones/aircraft/birds/clouds) and maps them to
+        # internal emitter types via get_internal_emitter(); for real
+        # ADSB addresses (0x004000..0x9FFFFF) trust the supplied
+        # emitter_type so we don't render every live aircraft as the
+        # placeholder "flag" icon.
+        icao = state['ICAO_address']
+        if icao <= 0x003FFF or icao >= 0xA00000:
+            emitter_type = get_internal_emitter(icao)
+        else:
+            emitter_type = state.get('emitter_type', 0) or 0
         squawk = state['squawk']
 
         if id not in self.threat_vehicles.keys():  # check to see if the vehicle is in the dict
