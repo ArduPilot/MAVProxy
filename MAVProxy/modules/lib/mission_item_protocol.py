@@ -925,6 +925,10 @@ on'''
             print(self.usage())
             return
 
+        if self.master is None:
+            print("%s: no vehicle connected" % self.command_name())
+            return
+
         commands = self.commands()
         if args[0] not in commands:
             print(self.usage())
@@ -992,11 +996,17 @@ on'''
 
     def fetch(self):
         """Download wpts from vehicle (this operation is public to support other modules)"""
+        if self.master is None:
+            print("%s: no vehicle connected" % self.command_name())
+            return
         if self.wp_op is None:  # If we were already doing a list or save, just restart the fetch without changing the operation  # noqa
             self.wp_op = "fetch"
         self.request_list_send()
 
     def request_list_send(self):
+        if self.master is None:
+            print("%s: no vehicle connected" % self.command_name())
+            return
         self.master.mav.mission_request_list_send(
             self.target_system,
             self.target_component,
