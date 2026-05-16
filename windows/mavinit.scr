@@ -20,8 +20,8 @@ module load help
 @alias add gpsdisable param set SIM_GPS_DISABLE
 @alias add bb status gps* scaled* raw*
 @alias add g graph
-@alias add grc3 g RC_CHANNELS_RAW.chan3_raw SERVO_OUTPUT_RAW.servo3_raw
-@alias add grc25 g RC_CHANNELS_RAW.chan2_raw SERVO_OUTPUT_RAW.servo2_raw SERVO_OUTPUT_RAW.servo5_raw
+@alias add grc3 g RC_CHANNELS.chan3_raw SERVO_OUTPUT_RAW.servo3_raw
+@alias add grc25 g RC_CHANNELS.chan2_raw SERVO_OUTPUT_RAW.servo2_raw SERVO_OUTPUT_RAW.servo5_raw
 @alias add gflaperon g SERVO_OUTPUT_RAW.servo1_raw SERVO_OUTPUT_RAW.servo7_raw SERVO_OUTPUT_RAW.servo8_raw
 @alias add gtracker g wrap_360(degrees(ATTITUDE.yaw)) NAV_CONTROLLER_OUTPUT.target_bearing degrees(ATTITUDE.pitch) NAV_CONTROLLER_OUTPUT.nav_pitch
 @alias add gtrackerror g angle_diff(degrees(ATTITUDE.yaw),NAV_CONTROLLER_OUTPUT.target_bearing) angle_diff(degrees(ATTITUDE.pitch),NAV_CONTROLLER_OUTPUT.nav_pitch)
@@ -58,7 +58,7 @@ module load help
 @alias add gradio g RADIO.rssi RADIO.noise RADIO.remrssi RADIO.remnoise 
 @alias add gbatt g SYS_STATUS.current_battery
 @alias add gnavroll g NAV_CONTROLLER_OUTPUT.nav_roll-degrees(ATTITUDE.roll) (SERVO_OUTPUT_RAW.servo1_raw-MAV.params['RC1_TRIM'])*0.1
-@alias add gcontrol g RC_CHANNELS_RAW.chan1_raw RC_CHANNELS_RAW.chan2_raw SERVO_OUTPUT_RAW.servo1_raw SERVO_OUTPUT_RAW.servo2_raw
+@alias add gcontrol g RC_CHANNELS.chan1_raw RC_CHANNELS.chan2_raw SERVO_OUTPUT_RAW.servo1_raw SERVO_OUTPUT_RAW.servo2_raw
 @alias add gmag g RAW_IMU.xmag RAW_IMU.ymag RAW_IMU.zmag mag_field(RAW_IMU)
 @alias add gmagcmp g RAW_IMU.xmag RAW_IMU.ymag RAW_IMU.zmag SCALED_IMU2.xmag SCALED_IMU2.ymag SCALED_IMU2.zmag
 @alias add gmag2 g SCALED_IMU2.xmag SCALED_IMU2.ymag SCALED_IMU2.zmag mag_field(SCALED_IMU2)
@@ -69,9 +69,9 @@ module load help
 @alias add gservo12 g SERVO_OUTPUT_RAW.servo1_raw SERVO_OUTPUT_RAW.servo2_raw
 @alias add gthr g VFR_HUD.throttle
 @alias add ggs g VFR_HUD.groundspeed
-@alias add grc g RC_CHANNELS_RAW.chan1_raw RC_CHANNELS_RAW.chan2_raw RC_CHANNELS_RAW.chan3_raw RC_CHANNELS_RAW.chan4_raw RC_CHANNELS_RAW.chan5_raw RC_CHANNELS_RAW.chan6_raw RC_CHANNELS_RAW.chan7_raw RC_CHANNELS_RAW.chan8_raw
-@alias add grc4 g RC_CHANNELS_RAW.chan1_raw RC_CHANNELS_RAW.chan2_raw RC_CHANNELS_RAW.chan3_raw RC_CHANNELS_RAW.chan4_raw
-@alias add grc12 g RC_CHANNELS_RAW.chan1_raw RC_CHANNELS_RAW.chan2_raw
+@alias add grc g RC_CHANNELS.chan1_raw RC_CHANNELS.chan2_raw RC_CHANNELS.chan3_raw RC_CHANNELS.chan4_raw RC_CHANNELS.chan5_raw RC_CHANNELS.chan6_raw RC_CHANNELS.chan7_raw RC_CHANNELS.chan8_raw
+@alias add grc4 g RC_CHANNELS.chan1_raw RC_CHANNELS.chan2_raw RC_CHANNELS.chan3_raw RC_CHANNELS.chan4_raw
+@alias add grc12 g RC_CHANNELS.chan1_raw RC_CHANNELS.chan2_raw
 @alias add galt g GLOBAL_POSITION_INT.relative_alt*0.001 altitude(SCALED_PRESSURE)
 @alias add gpress g SCALED_PRESSURE.press_abs
 @alias add gclimb g lowpass(delta(altitude(SCALED_PRESSURE),"a"),"a2",0.9) VFR_HUD.climb GLOBAL_POSITION_INT.vz*0.01
