@@ -99,16 +99,36 @@ class SigningModule(mp_module.MPModule):
         '''
         look for a signing passphrase in ~/.mavproxy/signing.keys
         file format is lines of form "device passphrase"
+        an entry of the form "host:port" (no protocol) matches a device
+        of the form "proto:host:port" for any protocol
         '''
         path = mp_util.dot_mavproxy("signing.keys")
         try:
             lines = open(path,'r').readlines()
         except Exception:
             return None
+        device = device.lower()
+        device_parts = device.split(':')
         for line in lines:
             a = line.split()
-            if len(a) == 2 and a[0].lower() == device.lower():
-                return a[1]
+            if len(a) != 2:
+                continue
+            entry = a[0].lower()
+            entry_parts = entry.split(':')
+            if len(entry_parts) == 3:
+                # "proto:host:port" - exact match against device
+                if entry == device:
+                    return a[1]
+            elif len(entry_parts) == 2:
+                # "host:port" - match the host:port of device, any protocol
+                if len(device_parts) == 3 and entry_parts == device_parts[1:]:
+                    return a[1]
+                if len(device_parts) == 2 and entry_parts == device_parts:
+                    return a[1]
+            else:
+                # other forms (e.g. serial device "/dev/ttyUSB0") - exact match
+                if entry == device:
+                    return a[1]
         return None
 
     def setup_signing_device(self, m, device):
