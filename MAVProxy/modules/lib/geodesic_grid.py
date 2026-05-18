@@ -331,7 +331,7 @@ def _triangle_index(v):
     elif m == 2:
         w.x, w.y, w.z = w.z, w.x, -w.y
 
-    return _from_neighbor_umbrella(umbrella, v, w, inclusive)
+    return _from_neighbor_umbrella(umbrella, v, w)
 
 def _subtriangle_index(triangle_index, v):
     w = _mid_inverses[triangle_index % 10] * v
