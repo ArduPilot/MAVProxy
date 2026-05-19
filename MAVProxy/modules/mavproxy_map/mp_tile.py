@@ -58,6 +58,13 @@ TILE_SERVICES = {
     "GoogleMap"      : "https://mt${GOOG_DIGIT}.google.com/vt/lyrs=m@132&hl=pt-PT&x=${X}&y=${Y}&z=${ZOOM}&s=${GALILEO}",
     "GoogleTer"      : "https://mt${GOOG_DIGIT}.google.com/vt/v=t@132,r@249&hl=pt-PT&x=${X}&y=${Y}&z=${ZOOM}&s=${GALILEO}",
     "GoogleChina"    : "http://mt${GOOG_DIGIT}.google.cn/vt/lyrs=m@121&hl=en&gl=cn&x=${X}&y=${Y}&z=${ZOOM}&s=${GALILEO}",
+    "GoogleChinaSat" : "http://mt${GOOG_DIGIT}.google.cn/vt/lyrs=s@121&hl=en&gl=cn&x=${X}&y=${Y}&z=${ZOOM}&s=${GALILEO}",
+    # Tianditu (天地图) - WGS-84, fast in China mainland; set TIANDITU_KEY env variable
+    # Register free key at: https://console.tianditu.gov.cn/
+    # URL format reference: http://lbs.tianditu.gov.cn/server/MapService.html
+    "TiandituSat"    : "https://t${TD_DIGIT}.tianditu.gov.cn/img_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=img&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX=${ZOOM}&TILEROW=${Y}&TILECOL=${X}&tk=${TIANDITU_KEY}",  # noqa:E501
+    "TiandituMap"    : "https://t${TD_DIGIT}.tianditu.gov.cn/vec_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=vec&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX=${ZOOM}&TILEROW=${Y}&TILECOL=${X}&tk=${TIANDITU_KEY}",  # noqa:E501
+    "TiandituTer"    : "https://t${TD_DIGIT}.tianditu.gov.cn/ter_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ter&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX=${ZOOM}&TILEROW=${Y}&TILECOL=${X}&tk=${TIANDITU_KEY}",  # noqa:E501
     "MicrosoftBrMap" : "http://imakm${MS_DIGITBR}.maplink3.com.br/maps.ashx?v=${QUAD}|t&call=2.2.4",
     "MicrosoftHyb"   : "http://ecn.t${MS_DIGIT}.tiles.virtualearth.net/tiles/h${QUAD}.png?g=441&mkt=en-us&n=z",
     "MicrosoftSat"   : "http://ecn.t${MS_DIGIT}.tiles.virtualearth.net/tiles/a${QUAD}.png?g=441&mkt=en-us&n=z",
@@ -102,6 +109,8 @@ class TileServiceInfo:
         self.Y_DIGIT = (x + y + zoom) % 3 + 1
         self.GALILEO = "Galileo"[0:(3 * x + y) & 7]
         self.ENI_Y = (1 << zoom)-1-y
+        self.TD_DIGIT = (x + y) & 7
+        self.TIANDITU_KEY = os.environ.get('TIANDITU_KEY', '')
 
     def __getitem__(self, a):
         return str(getattr(self, a))
