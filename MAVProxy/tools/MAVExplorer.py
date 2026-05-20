@@ -1177,6 +1177,18 @@ def cmd_file(args):
             print("%s (length %u)" % (n, len(files[n])))
         return
     fname = args[0]
+    if any(c in fname for c in '*?['):
+        # wildcard: extract all matching files to a directory (default cwd)
+        matches = sorted(n for n in files if fnmatch.fnmatch(n, fname))
+        if not matches:
+            print("No files match %s" % fname)
+            return
+        destdir = args[1] if len(args) > 1 else '.'
+        for n in matches:
+            dest = os.path.join(destdir, os.path.basename(n))
+            open(dest, "wb").write(files[n])
+            print("Saved %s to %s" % (n, dest))
+        return
     if not fname in files:
         print("File %s not found" % fname)
         return
