@@ -7,6 +7,7 @@ AP_FLAKE8_CLEAN
 
 import struct
 import sys
+import time
 
 from pymavlink import mavutil
 from MAVProxy.modules.lib import mp_module
@@ -39,6 +40,8 @@ class RCModule(mp_module.MPModule):
         self.servoout_gui = None
         self.rcin_gui = None
         self.init_gui_menus()
+
+        self.rc_sololink_oputput_seq = 0
 
     def init_gui_menus(self):
         '''initialise menus for console'''
@@ -112,11 +115,29 @@ class RCModule(mp_module.MPModule):
 
     def send_rc(self):
         '''send RC override packet'''
+        sent : bool = False
         if self.sitl_output:
             chan16 = self.override[:16]
             buf = struct.pack('<HHHHHHHHHHHHHHHH', *chan16)
             self.sitl_output.write(buf)
-        else:
+            sent = True
+
+        if self.rc_sololink_output:
+            chan8 = self.override[:8]
+            # this is the inverse of a transform done to the inputs by
+            # SoloLink backend:
+            tmp0 = chan8[0]
+            chan8[0] = chan8[2]
+            chan8[2] = chan8[1]
+            chan8[1] = tmp0
+            buf = struct.pack('<QHHHHHHHHH', int(time.time()*1000000), self.rc_sololink_oputput_seq, *chan8)
+            self.rc_sololink_oputput_seq += 1
+            if self.rc_sololink_oputput_seq > 65535:
+                self.rc_sololink_oputput_seq = 0
+            self.rc_sololink_output.write(buf)
+            sent = True
+
+        if not sent:
             chan18 = self.override[:18]
             self.master.mav.rc_channels_override_send(self.target_system,
                                                       self.target_component,
