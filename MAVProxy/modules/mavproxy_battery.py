@@ -125,6 +125,9 @@ class BatteryModule(mp_module.MPModule):
         for vraw in BATTERY_STATUS.voltages:
             if vraw != 65535:
                 self.voltage_level[id] += vraw * 0.001
+        for vraw in BATTERY_STATUS.voltages_ext:
+            if vraw != 0:
+                self.voltage_level[id] += vraw * 0.001
         self.current_battery[id] = BATTERY_STATUS.current_battery*0.01
         if self.numcells(id) > 0:
             self.per_cell[id] = self.voltage_level[id] / self.numcells(id)
