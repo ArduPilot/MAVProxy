@@ -93,6 +93,7 @@ on how to use MAVProxy.''',
                 'MAVProxy.modules.lib',
                 'MAVProxy.modules.lib.ANUGA',
                 'MAVProxy.modules.lib.MacOS',
+                'MAVProxy.modules.mavproxy_fleet',
                 'MAVProxy.modules.lib.optparse_gui'],
       install_requires=requirements,
       extras_require={
