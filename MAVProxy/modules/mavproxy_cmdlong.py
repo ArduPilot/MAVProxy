@@ -93,7 +93,7 @@ class CmdlongModule(mp_module.MPModule):
         cmd = cmds[args[0]]
         self.master.mav.command_long_send(
             self.settings.target_system,  # target_system
-            0, # target_component
+            self.settings.target_component, # target_component
             mavutil.mavlink.MAV_CMD_DO_PARACHUTE,
             0,
             cmd,
@@ -105,7 +105,7 @@ class CmdlongModule(mp_module.MPModule):
         print("Sent DIGICAM_CONFIGURE CMD_LONG")
         self.master.mav.command_long_send(
             self.settings.target_system,  # target_system
-            0, # target_component
+            self.settings.target_component, # target_component
             mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONFIGURE, # command
             0, # confirmation
             10, # param1
@@ -128,7 +128,7 @@ class CmdlongModule(mp_module.MPModule):
         print("Sent DIGICAM_CONTROL CMD_LONG")
         self.master.mav.command_long_send(
             self.settings.target_system,  # target_system
-            0, # target_component
+            self.settings.target_component, # target_component
             mavutil.mavlink.MAV_CMD_DO_DIGICAM_CONTROL, # command
             0, # confirmation
             params[0], # param1
@@ -157,7 +157,7 @@ class CmdlongModule(mp_module.MPModule):
 
         self.master.mav.command_long_send(
             self.settings.target_system,  # target_system
-            0, # target_component
+            self.settings.target_component, # target_component
             mavutil.mavlink.MAV_CMD_DO_ENGINE_CONTROL, # command
             0, # confirmation
             params[0], # param1
@@ -174,7 +174,7 @@ class CmdlongModule(mp_module.MPModule):
         print("Sent old DIGICAM_CONTROL")
         self.master.mav.digicam_control_send(
             self.settings.target_system,  # target_system
-            0, # target_component
+            self.settings.target_component, # target_component
             0, 0, 0, 0, 1, 0, 0, 0)
 
     def cmd_do_change_speed(self, args):
@@ -237,7 +237,7 @@ class CmdlongModule(mp_module.MPModule):
             self.master.mav.set_position_target_local_ned_send(
                 0,  # system time in milliseconds
                 self.settings.target_system,  # target system
-                0,  # target component
+                self.settings.target_component,  # target component
                 8,  # coordinate frame MAV_FRAME_BODY_NED
                 4039,     # type mask (vel only)
                 0, 0, 0,  # position x,y,z
@@ -259,7 +259,7 @@ class CmdlongModule(mp_module.MPModule):
             self.master.mav.set_position_target_local_ned_send(
                 0,  # system time in milliseconds
                 self.settings.target_system,  # target system
-                0,  # target component
+                self.settings.target_component,  # target component
                 8,  # coordinate frame MAV_FRAME_BODY_NED
                 3576,     # type mask (pos only)
                 x_m, y_m, z_m,  # position x,y,z
@@ -314,7 +314,7 @@ class CmdlongModule(mp_module.MPModule):
         self.master.mav.set_attitude_target_send(
             0,  # system time in milliseconds
             self.settings.target_system,  # target system
-            0,            # target component
+            self.settings.target_component,  # target component
             mask,         # type mask
             att_target,   # quaternion attitude
             math.radians(roll_rate),    # body roll rate
@@ -347,7 +347,7 @@ class CmdlongModule(mp_module.MPModule):
         self.master.mav.set_position_target_global_int_send(
             0,  # system time in ms
             self.settings.target_system,  # target system
-            0,  # target component
+            self.settings.target_component,  # target component
             mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
             ignoremask, # ignore
             int(latlon[0] * 1e7),
