@@ -17,6 +17,12 @@ from MAVProxy.modules.lib.mp_menu import *
 from pymavlink import mavutil
 from PIL import ImageColor
 
+# pymavlink may not yet carry the enumeration entry for the
+# home-centred inclusion circle.  Fall back to its known value (from
+# development.xml) so we don't raise AttributeError on older pymavlink:
+MAV_CMD_NAV_FENCE_HOME_CIRCLE_INCLUSION = getattr(
+    mavutil.mavlink, "MAV_CMD_NAV_FENCE_HOME_CIRCLE_INCLUSION", 5005)
+
 
 class MapModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -554,7 +560,7 @@ Usage: map circle <radius> <colour>
     def display_polyfences_circles(self, circles, colour):
         '''draws circles in the PolyFence layer with colour colour'''
         for circle in circles:
-            if circle.command == mavutil.mavlink.MAV_CMD_NAV_FENCE_HOME_CIRCLE_INCLUSION:
+            if circle.command == MAV_CMD_NAV_FENCE_HOME_CIRCLE_INCLUSION:
                 (lat, lng) = self.home_pos
             else:
                 lat = circle.x
