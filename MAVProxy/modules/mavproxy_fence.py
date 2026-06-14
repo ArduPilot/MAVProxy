@@ -19,6 +19,12 @@ if mp_util.has_wxpython:
 
 DEFAULT_CIRCLE_SIZE = 500
 
+# pymavlink may not yet carry the enumeration entry for the
+# home-centred inclusion circle.  Fall back to its known value (from
+# development.xml) so we don't raise AttributeError on older pymavlink:
+MAV_CMD_NAV_FENCE_HOME_CIRCLE_INCLUSION = getattr(
+    mavutil.mavlink, "MAV_CMD_NAV_FENCE_HOME_CIRCLE_INCLUSION", 5005)
+
 
 class FenceModule(mission_item_protocol.MissionItemProtocolModule):
     '''uses common MISSION_ITEM protocol base class to provide fence
@@ -100,7 +106,7 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
 
     def home_inclusion_circles(self):
         '''return a list of around-home Circle inclusion fences - a single MISSION_ITEM each'''
-        return self.circles_of_type(mavutil.mavlink.MAV_CMD_NAV_FENCE_HOME_CIRCLE_INCLUSION)
+        return self.circles_of_type(MAV_CMD_NAV_FENCE_HOME_CIRCLE_INCLUSION)
 
     def exclusion_circles(self):
         '''return a list of Circle exclusion fences - a single MISSION_ITEM each'''
@@ -369,7 +375,7 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
             self.target_component,
             0,  # seq
             mavutil.mavlink.MAV_FRAME_GLOBAL,  # frame
-            mavutil.mavlink.MAV_CMD_NAV_FENCE_HOME_CIRCLE_INCLUSION,  # command
+            MAV_CMD_NAV_FENCE_HOME_CIRCLE_INCLUSION,  # command
             0,    # current
             0,    # autocontinue
             radius, # param1,
@@ -612,7 +618,7 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
         return item.command in [
             mavutil.mavlink.MAV_CMD_NAV_FENCE_CIRCLE_EXCLUSION,
             mavutil.mavlink.MAV_CMD_NAV_FENCE_CIRCLE_INCLUSION,
-            mavutil.mavlink.MAV_CMD_NAV_FENCE_HOME_CIRCLE_INCLUSION,
+            MAV_CMD_NAV_FENCE_HOME_CIRCLE_INCLUSION,
         ]
 
     def find_polygon_point(self, polygon_start_seq, item_offset):
