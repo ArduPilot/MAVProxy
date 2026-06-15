@@ -1728,7 +1728,7 @@ def main_loop():
                 from dateutil.tz import tzlocal
                 localtimezone = tzlocal()
                 tbase = epoch_time(xlim[0])
-                tzofs = localtimezone.utcoffset(datetime.datetime.utcfromtimestamp(tbase)).total_seconds()
+                tzofs = localtimezone.utcoffset(datetime.datetime.fromtimestamp(tbase, datetime.timezone.utc)).total_seconds()
                 xlimits.xlim_low = epoch_time(xlim[0]) - tzofs
                 xlimits.xlim_high = epoch_time(xlim[1]) - tzofs
                 
