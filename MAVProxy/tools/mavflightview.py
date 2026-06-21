@@ -8,6 +8,8 @@ AP_FLAKE8_CLEAN
 
 import cv2
 import functools
+import math
+import os
 import random
 import re
 import sys
@@ -32,6 +34,32 @@ def pixel_coords(latlon, ground_width=0, mt=None, topleft=None, width=None):
     '''return pixel coordinates in the map image for a (lat,lon)'''
     (lat, lon) = (latlon[0], latlon[1])
     return mt.coord_to_pixel(topleft[0], topleft[1], width, ground_width, lat, lon)
+
+
+def view_from_center(clat, clon, view_width, width, height):
+    '''return (topleft_lat, topleft_lon, ground_width_at_topleft) for a view
+    of view_width metres (measured at the center latitude) centered on
+    clat,clon. Uses exact Web Mercator and clamps to the +-85 deg bound and
+    one-world width so it stays valid right out to a whole-planet view.'''
+    R = mp_util.radius_of_earth
+    world = 2 * math.pi * R
+    top_lim = mp_tile.mercator_y(85)
+    # convert the requested width-at-center to an equator-equivalent width,
+    # capped at one world
+    eq_width = min(view_width / max(1.0e-9, math.cos(math.radians(clat))), world)
+    pwe = eq_width / float(width)  # metres per pixel at the equator
+    # also cap so the view is no taller than the world (+-85 deg); this keeps
+    # the top-left latitude within +-85 for any window aspect ratio
+    pwe = min(pwe, 2 * top_lim * R / float(height))
+    C = R / pwe
+    my_half = (height / 2.0) / C
+    my_top = mp_tile.mercator_y(clat) + my_half
+    my_top = min(my_top, top_lim)
+    my_top = max(my_top, -top_lim + 2 * my_half)
+    tlat = mp_tile.mercator_lat(my_top)
+    tlon = mp_util.wrap_180(clon - math.degrees((width / 2.0) / C))
+    gw = pwe * math.cos(math.radians(tlat)) * width
+    return (tlat, tlon, gw)
 
 
 def create_imagefile(options,
@@ -59,6 +87,11 @@ def create_imagefile(options,
                                width, height, ground_width)
     # a function to convert from (lat,lon) to (px,py) on the map
     pixmapper = functools.partial(pixel_coords, ground_width=ground_width, mt=mt, topleft=latlon, width=width)
+
+    if getattr(options, 'grid', False):
+        (blat, blon) = mt.coord_from_area(width-1, height-1, latlon[0], latlon[1], width, ground_width)
+        bounds = (blat, latlon[1], latlon[0]-blat, mp_util.wrap_180(blon-latlon[1]))
+        mp_slipmap.SlipGrid('grid', layer=3, linewidth=1, colour=(255, 255, 0)).draw(map_img, pixmapper, bounds)
     for path_obj in path_objs:
         path_obj.draw(map_img, pixmapper, None)
     if mission_obj is not None:
@@ -572,6 +605,19 @@ def mavflightview_show(path,
            mp_util.gps_distance(lat, lon, lat, bounds[1]+bounds[3]) >= ground_width-20):
         ground_width += 10
 
+    # allow the view center/width to be forced (for testing at any zoom level)
+    img_width = getattr(options, 'width', 600) or 600
+    img_height = getattr(options, 'height', 600) or 600
+    (clat, _) = mp_util.gps_newpos(lat, lon, 180, ground_width * (img_height / float(img_width)) / 2.0)
+    (_, clon) = mp_util.gps_newpos(lat, lon, 90, ground_width / 2.0)
+    if getattr(options, 'center', None):
+        a = options.center.split(',')
+        (clat, clon) = (float(a[0]), float(a[1]))
+    if getattr(options, 'ground_width', None):
+        ground_width = options.ground_width
+    if getattr(options, 'center', None) or getattr(options, 'ground_width', None):
+        (lat, lon, ground_width) = view_from_center(clat, clon, ground_width, img_width, img_height)
+
     path_objs = []
     for i in range(len(path)):
         if len(path[i]) != 0:
@@ -612,7 +658,24 @@ def mavflightview_show(path,
         kml_objects = None
 
     if options.imagefile:
-        create_imagefile(options, options.imagefile, (lat, lon), ground_width, path_objs, mission_obj, fence_obj, kml_objects, used_flightmodes=used_flightmodes, mav_type=mav_type)  # noqa:E501
+        sweep = getattr(options, 'zoom_sweep', None)
+        if sweep:
+            # a zoom sweep captures the same centre at several view widths
+            for w in [float(x) for x in sweep.split(',')]:
+                (tl_lat, tl_lon, w_gw) = view_from_center(clat, clon, w, img_width, img_height)
+                base, ext = os.path.splitext(options.imagefile)
+                fname = "%s_%d%s" % (base, int(round(w)), ext)
+                print("Capturing %s at view width=%.0fm" % (fname, w))
+                create_imagefile(options, fname, (tl_lat, tl_lon), w_gw, path_objs, mission_obj, fence_obj,
+                                 kml_objects, width=img_width, height=img_height,
+                                 used_flightmodes=used_flightmodes, mav_type=mav_type)
+        else:
+            # single image: lat/lon/ground_width already reflect the auto-fit
+            # (or any --center / --ground-width override applied above), so use
+            # them directly and keep the existing top-left ground_width convention
+            create_imagefile(options, options.imagefile, (lat, lon), ground_width, path_objs, mission_obj,
+                             fence_obj, kml_objects, width=img_width, height=img_height,
+                             used_flightmodes=used_flightmodes, mav_type=mav_type)
     else:
         global multi_map
         if options.multi and multi_map is not None:
@@ -742,6 +805,12 @@ class mavflightview_options(object):
         self._flightmodes = []
         self.colour_source = 'flightmode'
         self.show_waypoints = True
+        self.ground_width = None
+        self.center = None
+        self.width = 600
+        self.height = 600
+        self.zoom_sweep = None
+        self.grid = False
 
 
 if __name__ == "__main__":
@@ -772,6 +841,12 @@ if __name__ == "__main__":
     parser.add_option("--kml", default=None, help="add kml overlay")
     parser.add_option("--hide-waypoints", dest='show_waypoints', action='store_false', help="do not show waypoints", default=True)  # noqa:E501
     parser.add_option("--no-show-lines", action="store_true", default=False)
+    parser.add_option("--ground-width", type='float', default=None, help="force view ground width in metres")
+    parser.add_option("--center", default=None, help="force view center as LAT,LON")
+    parser.add_option("--width", type='int', default=600, help="output image width in pixels")
+    parser.add_option("--height", type='int', default=600, help="output image height in pixels")
+    parser.add_option("--zoom-sweep", default=None, help="comma separated list of ground widths (m) to capture as separate images")  # noqa:E501
+    parser.add_option("--grid", action='store_true', default=False, help="draw lat/lon grid on captured image")
 
     (opts, args) = parser.parse_args()
 
