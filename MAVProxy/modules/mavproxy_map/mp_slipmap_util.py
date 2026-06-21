@@ -362,38 +362,79 @@ class SlipGrid(SlipObject):
         cv2.line(img, pix1, pix2, colour, linewidth)
 
     def draw(self, img, pixmapper, bounds):
-        '''draw a polygon on the image'''
+        '''draw a lat/lon grid on the image.
+
+        In Web Mercator meridians and parallels are straight lines (vertical
+        and horizontal respectively), so each grid line is drawn as a single
+        straight line. Line positions are derived from the projection itself,
+        which keeps the grid correct at any zoom level, from metres-wide up to
+        a whole-planet view.
+        '''
         if self.hidden:
             return None
-        (lat, lon, w, h) = bounds
-        # note that w and h are in degrees
-        spacing = 1000
-        lat2 = mp_util.constrain(lat+h*0.5, -85, 85)
-        lon2 = mp_util.wrap_180(lon+w)
-        dist = mp_util.gps_distance(lat2, lon, lat2, lon2)
-        while True:
-            count = int(dist / spacing)
-            if count < 2:
-                spacing /= 10.0
-            elif count > 50:
-                spacing *= 10.0
-            else:
+        (width_img, height_img) = image_shape(img)
+        (bottom_lat, left_lon, lat_span, lon_span) = bounds
+        top_lat = bottom_lat + lat_span
+        mid_lat = mp_util.constrain(bottom_lat + lat_span*0.5, -85, 85)
+
+        # pixels per degree of longitude (linear in Mercator). Sample over a
+        # wide (90 deg) baseline so the integer pixel rounding from pixmapper is
+        # negligible even at world zoom; a 1 degree step rounds too coarsely
+        # (e.g. ~1.67px/deg -> 2px/deg) and misplaces the meridians.
+        base_deg = 90.0
+        x0 = pixmapper((mid_lat, left_lon))[0]
+        xb = pixmapper((mid_lat, left_lon + base_deg))[0]
+        px_per_deg_lon = (xb - x0) / base_deg
+        if abs(px_per_deg_lon) < 1.0e-9:
+            return None
+        lon_span_deg = width_img / px_per_deg_lon
+
+        # ground distances spanned by the view
+        R = mp_util.radius_of_earth
+        width_m = abs(math.radians(lon_span_deg) * R * math.cos(math.radians(mid_lat)))
+        height_m = mp_util.gps_distance(bottom_lat, left_lon, top_lat, left_lon)
+
+        # choose a nice grid spacing in metres giving roughly 2..50 lines
+        extent = max(width_m, height_m, 1.0)
+        spacing = 1000.0
+        while extent / spacing > 50:
+            spacing *= 10.0
+        while extent / spacing < 2 and spacing > 1.0e-6:
+            spacing /= 10.0
+
+        dlat_deg = math.degrees(spacing / R)
+        dlon_deg = math.degrees(spacing / (R * max(0.01, math.cos(math.radians(mid_lat)))))
+
+        colour = self.colour
+        lw = self.linewidth
+
+        # vertical lines (meridians), placed by linear pixel position so wrap
+        # around the antimeridian cannot fold them onto the wrong side
+        i = int(math.floor(left_lon / dlon_deg))
+        for _ in range(2000):
+            lon_i = i * dlon_deg
+            x = int(round(x0 + (lon_i - left_lon) * px_per_deg_lon))
+            i += 1
+            if x < 0:
+                continue
+            if x > width_img:
                 break
+            cv2.line(img, (x, 0), (x, height_img), colour, lw)
 
-        count += 10
-
-        start = mp_util.latlon_round((lat, lon), spacing)
-
-        for i in range(count):
-            # draw vertical lines of constant longitude
-            pos1 = mp_util.gps_newpos(start[0], start[1], 90, i*spacing)
-            pos3 = (pos1[0]+h*2, pos1[1])
-            self.draw_line(img, pixmapper, pos1, pos3, self.colour, self.linewidth)
-
-            # draw horizontal lines of constant latitude
-            pos1 = mp_util.gps_newpos(start[0], start[1], 0, i*spacing)
-            pos3 = (pos1[0], pos1[1]+w*2)
-            self.draw_line(img, pixmapper, pos1, pos3, self.colour, self.linewidth)
+        # horizontal lines (parallels). Use the pixmapper for y so the Mercator
+        # latitude compression is handled exactly.
+        j = int(math.floor(bottom_lat / dlat_deg))
+        for _ in range(2000):
+            lat_j = j * dlat_deg
+            j += 1
+            if lat_j < -85:
+                continue
+            if lat_j > top_lat or lat_j > 85:
+                break
+            y = int(round(pixmapper((lat_j, left_lon))[1]))
+            if y < 0 or y > height_img:
+                continue
+            cv2.line(img, (0, y), (width_img, y), colour, lw)
 
         return spacing
 
