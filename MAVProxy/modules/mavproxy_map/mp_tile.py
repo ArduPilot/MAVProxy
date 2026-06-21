@@ -79,6 +79,37 @@ TILE_SERVICES = {
 }
 
 
+# minimum usable zoom level per service. Most services serve a single
+# whole-world tile at zoom 0, but Bing/Microsoft quadkey tiles start at
+# zoom 1 (there is no quadkey for zoom 0).
+SERVICE_MIN_ZOOM = {
+    "GoogleSat": 0,
+    "GoogleMap": 0,
+    "GoogleTer": 0,
+    "GoogleChina": 0,
+    "GoogleChinaSat": 0,
+    "OpenStreetMap": 0,
+    "OpenTopoMapA": 0,
+}
+DEFAULT_MIN_ZOOM = 1
+
+
+def service_min_zoom(service):
+    '''return the minimum usable zoom level for a tile service'''
+    return SERVICE_MIN_ZOOM.get(service, DEFAULT_MIN_ZOOM)
+
+
+def mercator_y(lat):
+    '''Web Mercator projected y for a latitude (dimensionless, unbounded)'''
+    lat = mp_util.constrain(lat, -89.9999, 89.9999)
+    return log(tan(pi/4 + radians(lat)/2))
+
+
+def mercator_lat(y):
+    '''inverse Web Mercator: latitude in degrees for a projected y'''
+    return degrees(2*atan(exp(y)) - pi/2)
+
+
 # these are the md5sums of "unavailable" tiles
 BLANK_TILES = set([
     "d16657bbee25d7f15c583f5c5bf23f50",
@@ -208,7 +239,7 @@ class MPTile:
 
         self.cache_path = cache_path
         self.max_zoom = max_zoom
-        self.min_zoom = 4
+        self.min_zoom = service_min_zoom(service)
         self.download = download
         self.cache_size = cache_size
         self.tile_delay = tile_delay
@@ -229,6 +260,7 @@ class MPTile:
     def set_service(self, service):
         '''set tile service'''
         self.service = service
+        self.min_zoom = service_min_zoom(service)
 
     def get_service(self):
         '''get tile service'''
@@ -482,46 +514,78 @@ class MPTile:
         '''return (lat,lon) for a pixel in an area image
         x is pixel coord to the right from top,left
         y is pixel coord down from top left
+
+        This is the exact inverse of coord_to_pixel, using a consistent
+        Web Mercator projection so it works at any scale.
         '''
-
-        # scale1 = mp_util.constrain(cos(radians(lat)), 1.0e-15, 1)
-        # pixel_width = ground_width / float(width)
-
         pixel_width_equator = (ground_width / float(width)) / cos(radians(lat))
+        C = mp_util.radius_of_earth / pixel_width_equator
 
-        latr = radians(lat)
-        y0 = abs(1.0/cos(latr) + tan(latr))
-        lat2 = 2 * atan(y0 * exp(-(y * pixel_width_equator) / mp_util.radius_of_earth)) - pi/2.0
-        lat2 = degrees(lat2)
-
-        dx = pixel_width_equator * cos(radians(lat2)) * x
-
-        (lat2, lon2) = mp_util.gps_offset(lat2, lon, dx, 0)
-
+        lat2 = mercator_lat(mercator_y(lat) - y / C)
+        lon2 = mp_util.wrap_180(lon + degrees(x / C))
         return (lat2, lon2)
 
     def coord_to_pixel(self, lat, lon, width, ground_width, lat2, lon2):
         '''return pixel coordinate (px,py) for position (lat2,lon2)
         in an area image. Note that the results are relative to top,left
         and may be outside the image
-        ground_width is with at lat,lon
+        ground_width is width at lat,lon
         px is pixel coord to the right from top,left
         py is pixel coord down from top left
+
+        Uses the exact Web Mercator projection (matching the tile imagery),
+        so overlays and clicks line up at any scale.
         '''
-
         pixel_width_equator = (ground_width / float(width)) / cos(radians(lat))
-        latr = radians(lat)
-        lat2r = radians(lat2)
-
         C = mp_util.radius_of_earth / pixel_width_equator
-        y = C * (log(abs(1.0/cos(latr) + tan(latr))) - log(abs(1.0/cos(lat2r) + tan(lat2r))))
-        y = int(y+0.5)
 
-        dx = mp_util.gps_distance(lat2, lon, lat2, lon2)
-        if mp_util.gps_bearing(lat2, lon, lat2, lon2) > 180:
-            dx = -dx
-        x = int(0.5 + dx / (pixel_width_equator * cos(radians(lat2))))
-        return (x, y)
+        y = C * (mercator_y(lat) - mercator_y(lat2))
+        x = C * radians(mp_util.wrap_180(lon2 - lon))
+        # for views wider than 180 deg (near whole-planet) a point can be more
+        # than half a world east/west of the top-left; pick the wrap nearest
+        # the view so it lands on the correct side instead of folding over
+        world_px = 2 * pi * C
+        if world_px > 0:
+            x += round((width / 2.0 - x) / world_px) * world_px
+        return (int(round(x)), int(round(y)))
+
+    def choose_zoom(self, lat, lon, width, ground_width, zoom=None):
+        '''choose a tile zoom level and the scale factor (native tile pixels
+        per screen pixel) for an area of the given ground_width in metres.
+        The smallest zoom whose tiles do not need upscaling is chosen.
+
+        scale is derived directly from the Web Mercator projection at the
+        top-left latitude so it matches coord_to_pixel exactly (using
+        tile.size(), which measures at the tile's own latitude, gives an
+        inconsistent scale and breaks down near the poles).'''
+        pixel_width = ground_width / float(width)
+        coslat = max(1.0e-9, cos(radians(lat)))
+        if zoom is None:
+            zooms = range(self.min_zoom, self.max_zoom+1)
+        else:
+            zooms = [zoom]
+        scale = 1.0
+        for zoom in zooms:
+            world_tiles = 1 << zoom
+            # metres per native tile pixel at this latitude
+            tile_pixel_width = (2*pi*mp_util.radius_of_earth*coslat) / (world_tiles * TILES_WIDTH)
+            scale = pixel_width / tile_pixel_width
+            if scale >= 1.0:
+                break
+        return (zoom, scale)
+
+    def area_tile_grid(self, lat, lon, width, height, ground_width, zoom=None):
+        '''return (zoom, scale, tile_min, count_x, count_y) describing the
+        grid of tiles covering an area. lat/lon is the top left corner.'''
+        (zoom, scale) = self.choose_zoom(lat, lon, width, ground_width, zoom)
+        tile_min = self.coord_to_tile(lat, lon, zoom)
+
+        # native (full tile resolution) size of the area
+        nat_w = max(1, int(round(width * scale)))
+        nat_h = max(1, int(round(height * scale)))
+        count_x = (nat_w + tile_min.offsetx + TILES_WIDTH - 1) // TILES_WIDTH
+        count_y = (nat_h + tile_min.offsety + TILES_HEIGHT - 1) // TILES_HEIGHT
+        return (zoom, scale, tile_min, nat_w, nat_h, count_x, count_y)
 
     def area_to_tile_list(self, lat, lon, width, height, ground_width, zoom=None):
         '''return a list of TileInfoScaled objects needed for
@@ -532,85 +596,86 @@ class MPTile:
         zoom is automatically chosen to avoid having to grow
         the tiles
         '''
-
-        pixel_width = ground_width / float(width)
-        ground_height = ground_width * (height/(float(width)))
-        # top_right = mp_util.gps_newpos(lat, lon, 90, ground_width)
-        bottom_left = mp_util.gps_newpos(lat, lon, 180, ground_height)
-        ground_width_bottom = ground_width * cos(radians(lat)) / max(1.0e-15, cos(radians(bottom_left[0])))
-        bottom_right = mp_util.gps_newpos(bottom_left[0], bottom_left[1], 90, ground_width_bottom)
-
-        # choose a zoom level if not provided
-        if zoom is None:
-            zooms = range(self.min_zoom, self.max_zoom+1)
-        else:
-            zooms = [zoom]
-        for zoom in zooms:
-            tile_min = self.coord_to_tile(lat, lon, zoom)
-            (twidth, theight) = tile_min.size()
-            tile_pixel_width = twidth / float(TILES_WIDTH)
-            scale = pixel_width / tile_pixel_width
-            if scale >= 1.0:
-                break
-
-        scaled_tile_width = int(TILES_WIDTH / scale)
-        scaled_tile_height = int(TILES_HEIGHT / scale)
-
-        # work out the bottom right tile
-        tile_max = self.coord_to_tile(bottom_right[0], bottom_right[1], zoom)
-
-        ofsx = int(tile_min.offsetx / scale)
-        ofsy = int(tile_min.offsety / scale)
-        srcy = ofsy
-        dsty = 0
+        (zoom, scale, tile_min, nat_w, nat_h,
+         count_x, count_y) = self.area_tile_grid(lat, lon, width, height, ground_width, zoom)
+        world_tiles = 1 << zoom
 
         ret = []
-
-        # place the tiles
-        for y in range(tile_min.y, tile_max.y+1):
-            srcx = ofsx
-            dstx = 0
-            world_tiles = 1 << zoom
-            lim_x = (tile_max.x+1) % world_tiles
-            x = tile_min.x
-            while x != lim_x:
-                if dstx < width and dsty < height:
-                    ret.append(TileInfoScaled((x, y), zoom, scale,
-                                              (srcx, srcy), (dstx, dsty), self.service))
-                dstx += scaled_tile_width-srcx
-                srcx = 0
-                x = (x+1) % world_tiles
-            dsty += scaled_tile_height-srcy
-            srcy = 0
+        for iy in range(count_y):
+            ty = tile_min.y + iy
+            if ty < 0 or ty >= world_tiles:
+                continue
+            # screen placement derived independently per tile (no drift).
+            # src/dst are both in screen pixels, matching scaled_tile().
+            edge_y = (iy * TILES_HEIGHT - tile_min.offsety) / scale
+            srcy = int(round(max(0.0, -edge_y)))
+            dsty = int(round(max(0.0, edge_y)))
+            for ix in range(count_x):
+                tx = (tile_min.x + ix) % world_tiles
+                edge_x = (ix * TILES_WIDTH - tile_min.offsetx) / scale
+                srcx = int(round(max(0.0, -edge_x)))
+                dstx = int(round(max(0.0, edge_x)))
+                ret.append(TileInfoScaled((tx, ty), zoom, scale,
+                                          (srcx, srcy), (dstx, dsty), self.service))
         return ret
 
     def area_to_image(self, lat, lon, width, height, ground_width, zoom=None, ordered=True):
         '''return an RGB image for an area of land, with ground_width
         in meters, and width/height in pixels.
 
-        lat/lon is the top left corner. The zoom is automatically
-        chosen to avoid having to grow the tiles'''
+        lat/lon is the top left corner. The zoom level is chosen
+        automatically.
 
-        img = np.zeros((height, width, 3), np.uint8)
+        Tiles are composited at full tile resolution into a single mosaic
+        which is then resized once to the requested size. Doing the resize
+        once (instead of per tile) avoids the rounding seams and breakup
+        that appeared when zoomed a long way out.'''
+        (zoom, scale, tile_min, nat_w, nat_h,
+         count_x, count_y) = self.area_tile_grid(lat, lon, width, height, ground_width, zoom)
+        world_tiles = 1 << zoom
 
-        tlist = self.area_to_tile_list(lat, lon, width, height, ground_width, zoom)
+        mosaic = np.zeros((nat_h, nat_w, 3), np.uint8)
 
-        # order the display by distance from the middle, so the download happens
-        # close to the middle of the image first
+        # collect the tiles and their position in the native mosaic
+        tiles = []
+        for iy in range(count_y):
+            ty = tile_min.y + iy
+            if ty < 0 or ty >= world_tiles:
+                continue
+            for ix in range(count_x):
+                tx = (tile_min.x + ix) % world_tiles
+                tiles.append((ix, iy, TileInfo((tx, ty), zoom, self.service)))
+
+        # request the tiles nearest the middle last so they get the most
+        # recent download request and are fetched first
         if ordered:
             (midlat, midlon) = self.coord_from_area(width/2, height/2, lat, lon, width, ground_width)
-            tlist.sort(key=lambda d: d.distance(midlat, midlon), reverse=True)
+            tiles.sort(key=lambda t: t[2].distance(midlat, midlon), reverse=True)
 
-        for t in tlist:
-            scaled_tile = self.scaled_tile(t)
+        for (ix, iy, tinfo) in tiles:
+            tile_img = self.load_tile(tinfo)
+            if tile_img is None:
+                continue
+            if tile_img.shape[0] != TILES_HEIGHT or tile_img.shape[1] != TILES_WIDTH:
+                tile_img = cv2.resize(tile_img, (TILES_WIDTH, TILES_HEIGHT))
+            dst_left = ix * TILES_WIDTH - tile_min.offsetx
+            dst_top = iy * TILES_HEIGHT - tile_min.offsety
+            sx0 = max(0, -dst_left)
+            sy0 = max(0, -dst_top)
+            dx0 = max(0, dst_left)
+            dy0 = max(0, dst_top)
+            w = min(TILES_WIDTH - sx0, nat_w - dx0)
+            h = min(TILES_HEIGHT - sy0, nat_h - dy0)
+            if w <= 0 or h <= 0:
+                continue
+            mosaic[dy0:dy0+h, dx0:dx0+w] = tile_img[sy0:sy0+h, sx0:sx0+w]
 
-            w = width - t.dstx
-            h = height - t.dsty
-            if w > 0 and h > 0:
-                scaled_tile_roi = scaled_tile[t.srcy:t.srcy+h, t.srcx:t.srcx+w]
-                h = scaled_tile_roi.shape[0]
-                w = scaled_tile_roi.shape[1]
-                img[t.dsty:t.dsty+h, t.dstx:t.dstx+w] = scaled_tile_roi.copy()
+        # resize the assembled mosaic to the requested size in one operation
+        if (nat_w, nat_h) != (width, height):
+            interp = cv2.INTER_AREA if nat_w >= width else cv2.INTER_LINEAR
+            img = cv2.resize(mosaic, (width, height), interpolation=interp)
+        else:
+            img = mosaic
 
         # return as an RGB image
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
