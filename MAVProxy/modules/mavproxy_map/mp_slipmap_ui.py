@@ -12,6 +12,7 @@ import copy
 
 from ..lib.wx_loader import wx
 
+from MAVProxy.modules.mavproxy_map import mp_tile
 from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipBrightness
 from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipCenter
 from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipClearLayer
@@ -446,20 +447,46 @@ class MPSlipMapPanel(wx.Panel):
         state.panel.re_center(state.width/2, state.height/2, state.lat, state.lon)
 
     def change_zoom(self, zoom):
-        '''zoom in or out by zoom factor, keeping centered'''
+        '''zoom in or out by zoom factor, keeping the point under the cursor
+        fixed.
+
+        The maths is done in latitude-independent equator metres-per-pixel and
+        clamped to the valid Web Mercator world (one world wide, +-85 deg
+        tall). The old code scaled by the top-left latitude, which coupled to
+        the +-85 deg clamp and made the view jump around and never settle once
+        you zoomed out past the whole world.'''
         state = self.state
+        R = mp_util.radius_of_earth
+        W = float(state.width)
+        H = float(state.height)
+        ylim = mp_tile.mercator_y(85)
+
+        # cursor pixel and the geographic point under it
         if self.mouse_pos:
             (x, y) = (self.mouse_pos.x, self.mouse_pos.y)
         else:
-            (x, y) = (state.width/2, state.height/2)
-        (lat, lon) = self.coordinates(x, y)
-        lat = mp_util.constrain(lat, -85, 85)
-        lon = mp_util.constrain(lon, -180, 180)
-        state.ground_width *= zoom
-        # limit ground_width to sane values
-        state.ground_width = max(state.ground_width, 2)
-        state.ground_width = min(state.ground_width, 20000000)
-        self.re_center(x, y, lat, lon)
+            (x, y) = (W/2.0, H/2.0)
+        (plat, plon) = self.coordinates(x, y)
+
+        # equator metres-per-pixel for the current view (latitude independent)
+        e = (state.ground_width / W) / math.cos(math.radians(state.lat))
+        e *= zoom
+
+        # clamp so the view never exceeds one world wide or +-85 deg tall, and
+        # never goes below ~2m wide
+        e_max = min(2*math.pi*R / W, 2*ylim*R / H)
+        e_min = 2.0 / W
+        e = max(e_min, min(e, e_max))
+        C = R / e
+
+        # keep (plat,plon) under the cursor, clamped to stay within the world
+        top = mp_tile.mercator_y(plat) + y / C
+        top = min(top, ylim)
+        top = max(top, -ylim + H / C)
+        state.lat = mp_tile.mercator_lat(top)
+        state.lon = mp_util.wrap_180(plon - math.degrees(x / C))
+        state.ground_width = e * math.cos(math.radians(state.lat)) * W
+        self.constrain_latlon()
 
     def enter_position(self):
         '''enter new position'''
@@ -749,14 +776,27 @@ class MPSlipMapPanel(wx.Panel):
             # drag map to new position
             newpos = pos
             if self.mouse_down and newpos:
-                dx = (self.mouse_down.x - newpos.x)
-                dy = -(self.mouse_down.y - newpos.y)
-                pdist = math.sqrt(dx**2 + dy**2)
+                mdx = newpos.x - self.mouse_down.x
+                mdy = newpos.y - self.mouse_down.y
+                pdist = math.sqrt(mdx**2 + mdy**2)
                 if pdist > state.drag_step:
-                    bearing = math.degrees(math.atan2(dx, dy))
-                    distance = (state.ground_width/float(state.width)) * pdist
-                    newlatlon = mp_util.gps_newpos(state.lat, state.lon, bearing, distance)
-                    (state.lat, state.lon) = newlatlon
+                    # move the top-left by the pixel delta using exact Web
+                    # Mercator and a latitude-independent scale, so the grabbed
+                    # point stays under the cursor and the zoom does not drift
+                    # as you pan north/south (matches change_zoom)
+                    R = mp_util.radius_of_earth
+                    W = float(state.width)
+                    H = float(state.height)
+                    ylim = mp_tile.mercator_y(85)
+                    e = (state.ground_width / W) / math.cos(math.radians(state.lat))
+                    C = R / e
+                    myl = mp_tile.mercator_y(state.lat) + mdy / C
+                    myl = min(myl, ylim)
+                    myl = max(myl, -ylim + H / C)
+                    state.lat = mp_tile.mercator_lat(myl)
+                    state.lon = mp_util.wrap_180(state.lon - math.degrees(mdx / C))
+                    # keep the same zoom (equator scale) at the new latitude
+                    state.ground_width = e * math.cos(math.radians(state.lat)) * W
                     self.constrain_latlon()
                     self.mouse_down = newpos
                     self.redraw_map()
