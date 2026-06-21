@@ -240,7 +240,7 @@ def remove_offsets(MAG, BAT, c):
     MAG.MagZ = int(field.z)
     return MAG
 
-def magfit(mlog, timestamp_in_range):
+def magfit(mlog, timestamp_in_range, save_plot=None):
     '''find best magnetometer offset fit to a log file'''
 
     global earth_field, declination
@@ -470,7 +470,78 @@ def magfit(mlog, timestamp_in_range):
     axs[2].set_title('Yaw Change (degrees)')
     axs[2].legend(loc='upper left')
 
-    pyplot.show(block=False)
+    if save_plot is not None:
+        fig.savefig(save_plot)
+        print("Saved plot to %s" % save_plot)
+    else:
+        pyplot.show(block=False)
+
+
+def main():
+    '''run magfit headless from the command line, saving the result plot to a file.
+
+    This exposes the same fit used by the MAVExplorer magfit GUI panel without
+    needing a display, so it can be scripted or run on a headless machine.
+    '''
+    global margs
+    from argparse import ArgumentParser
+    parser = ArgumentParser(description='magnetometer fit (headless)')
+    parser.add_argument('log', help='log file to process')
+    parser.add_argument('--mag', default='MAG[0]', help='magnetometer source, eg MAG[0]')
+    parser.add_argument('--attitude', default='ATT', help='attitude source: ATT, XKF1, GYRO or XKY0')
+    parser.add_argument('--orientation', default='ROTATION_NONE',
+                        help='sensor orientation, eg ROTATION_YAW_180')
+    parser.add_argument('--lat', type=float, default=0.0, help='latitude (0 to take from GPS)')
+    parser.add_argument('--lon', type=float, default=0.0, help='longitude (0 to take from GPS)')
+    parser.add_argument('--battery', type=int, default=1, help='battery instance for motor-current fit')
+    parser.add_argument('--reduce', type=int, default=1, help='use every Nth sample')
+    parser.add_argument('--offset-max', type=int, default=1500)
+    parser.add_argument('--scale-min', type=float, default=1.0)
+    parser.add_argument('--scale-max', type=float, default=1.0)
+    parser.add_argument('--elliptical', action='store_true', help='also fit diagonals/off-diagonals')
+    parser.add_argument('--diagonal-min', type=float, default=0.8)
+    parser.add_argument('--diagonal-max', type=float, default=1.2)
+    parser.add_argument('--offdiag-min', type=float, default=-0.2)
+    parser.add_argument('--offdiag-max', type=float, default=0.2)
+    parser.add_argument('--cmot', action='store_true', help='also fit motor-current interference')
+    parser.add_argument('--cmot-nochange', action='store_true')
+    parser.add_argument('--cmot-max', type=float, default=10.0)
+    parser.add_argument('--save-plot', default='magfit.png',
+                        help='save the result plot to this file instead of displaying it')
+    args = parser.parse_args()
+
+    if args.save_plot is not None:
+        pyplot.switch_backend('Agg')
+
+    margs = {
+        'Magnetometer': args.mag,
+        'Attitude': args.attitude,
+        'Orientation': args.orientation,
+        'Lattitude': args.lat,
+        'Longitude': args.lon,
+        'BatteryNum': args.battery,
+        'Reduce': args.reduce,
+        'Offsets': True,
+        'OffsetMax': args.offset_max,
+        'ScaleMin': args.scale_min,
+        'ScaleMax': args.scale_max,
+        'Elliptical': args.elliptical,
+        'DiagonalMin': args.diagonal_min,
+        'DiagonalMax': args.diagonal_max,
+        'OffDiagMin': args.offdiag_min,
+        'OffDiagMax': args.offdiag_max,
+        'CMOT': args.cmot,
+        'CMOT NoChange': args.cmot_nochange,
+        'CMOT Max': args.cmot_max,
+    }
+
+    mlog = mavutil.mavlink_connection(args.log)
+    # process the whole log
+    magfit(mlog, lambda timestamp: 0, save_plot=args.save_plot)
+
+
+if __name__ == '__main__':
+    main()
 
 class MagFit(MPDataLogChildTask):
     '''A class used to launch the MagFitUI in a child process'''
