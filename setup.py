@@ -79,6 +79,7 @@ on how to use MAVProxy.''',
                 'MAVProxy.modules.mavproxy_anufireproject',
                 'MAVProxy.modules.mavproxy_fieldcheck',
                 'MAVProxy.modules.mavproxy_map',
+                'MAVProxy.modules.mavproxy_map3d',
                 'MAVProxy.modules.mavproxy_mmap',
                 'MAVProxy.modules.mavproxy_misseditor',
                 'MAVProxy.modules.mavproxy_paramedit',
@@ -97,6 +98,8 @@ on how to use MAVProxy.''',
       install_requires=requirements,
       extras_require={
         'cesium': ['tornado'],
+        # map3d module (native 3D terrain map)
+        'map3d': ['vtk', 'quantized-mesh-tile'],
         # restserver module
         'server': ['flask'],
         'recommended': ['flask', 'PyYAML', 'lxml', 'wxpython',

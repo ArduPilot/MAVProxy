@@ -1,0 +1,4 @@
+# Optional dependencies for the 3D map module (mavproxy_map3d).
+# Install with:  pip install vtk quantized-mesh-tile
+vtk>=9.2
+quantized-mesh-tile>=0.7.0
