@@ -133,6 +133,7 @@ class MEState(object):
             "graphs"    : ['(PREDEFINED_GRAPH)'],
             "dump"      : ['(MESSAGETYPE)', '--verbose (MESSAGETYPE)'],
             "map"       : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)'],
+            "map3d"     : [],
             "param"     : ['download', 'check', 'help (PARAMETER)', 'save', 'savechanged', 'diff', 'show', 'check'],
             "logmessage": ['download', 'help (MESSAGETYPE)'],
             "locationAnalysis"  : [],
@@ -654,6 +655,104 @@ def cmd_map(args):
             pass
     child.start()
     mestate.mlog.rewind()
+
+map3d_views = []
+
+def cmd_map3d(args):
+    '''show a 3D map view: draped satellite imagery over terrain'''
+    try:
+        from MAVProxy.modules.mavproxy_map3d.map3d import Map3D
+    except ImportError as ex:
+        print("map3d needs extra packages: pip install vtk quantized-mesh-tile (%s)" % ex)
+        return
+
+    mlog = mestate.mlog
+    path = []
+    mission = []
+    while True:
+        m = mlog.recv_match(type=['POS', 'CMD'], condition=mestate.settings.condition)
+        if m is None:
+            break
+        mtype = m.get_type()
+        if mtype == 'POS':
+            path.append((m.Lat, m.Lng, m.Alt))
+        elif mtype == 'CMD' and (m.Lat != 0 or m.Lng != 0):
+            mission.append((m.Lat, m.Lng, m.Alt, getattr(m, 'Frame', 3), m.CId, m.CNum))
+    mlog.rewind()
+
+    if len(path) == 0:
+        print("No POS messages found for 3D map")
+        return
+
+    # note: sum/min/max are shadowed in this namespace (mavextra import *), so
+    # accumulate explicitly
+    sumlat = sumlon = 0.0
+    minlat = maxlat = path[0][0]
+    minlon = maxlon = path[0][1]
+    ground0 = path[0][2]
+    for (la, lo, al) in path:
+        sumlat += la
+        sumlon += lo
+        if al < ground0:
+            ground0 = al
+        minlat = la if la < minlat else minlat
+        maxlat = la if la > maxlat else maxlat
+        minlon = lo if lo < minlon else minlon
+        maxlon = lo if lo > maxlon else maxlon
+    lat0 = sumlat / len(path)
+    lon0 = sumlon / len(path)
+    span_ns = mp_util.gps_distance(minlat, minlon, maxlat, minlon)
+    span_ew = mp_util.gps_distance(minlat, minlon, minlat, maxlon)
+    span = span_ns if span_ns > span_ew else span_ew
+    if span < 1000.0:
+        span = 1000.0
+
+    # resolve mission item altitudes to AMSL before sending. Terrain-frame
+    # waypoints (MAV_FRAME_GLOBAL_TERRAIN_ALT = 10/11) are "z above terrain", so
+    # they need the terrain elevation at the waypoint, not home + z.
+    if mission:
+        mission = resolve_mission_amsl(mission, ground0)
+
+    m3d = Map3D(title="MAVExplorer 3D Map")
+    map3d_views.append(m3d)
+    m3d.set_origin(lat0, lon0, ground0)
+    m3d.set_home(ground0)
+    m3d.set_path(path)
+    if mission:
+        m3d.set_mission(mission)
+    m3d.look_at(lat0, lon0, ground0, dist=1.6 * span)
+
+def resolve_mission_amsl(mission, ground0):
+    '''convert mission items to AMSL. mission items are
+    (lat, lon, z, frame, cmd, seq); returns items with frame 0 (AMSL).
+
+    Terrain-frame waypoints are resolved using the quantized terrain mesh (the
+    same source rendered in the 3D view), which is fetched per 1-degree tile and
+    cached, so it never stalls the command thread per waypoint.'''
+    # home AMSL: the home item (seq 0) altitude, else takeoff ground
+    home_amsl = ground0
+    for (la, lo, z, frame, cid, seq) in mission:
+        if seq == 0:
+            home_amsl = z
+            break
+    sampler = None
+    if any(frame in (10, 11) for (_, _, _, frame, _, _) in mission):
+        try:
+            from MAVProxy.modules.mavproxy_map3d.terrain import sample_terrain
+            sampler = sample_terrain
+        except Exception as ex:
+            print("map3d: terrain elevation unavailable (%s)" % ex)
+    out = []
+    for (la, lo, z, frame, cid, seq) in mission:
+        if frame in (0, 5):
+            amsl = z
+        elif frame in (10, 11):
+            terr = sampler(la, lo) if sampler is not None else None
+            amsl = (terr if terr is not None else home_amsl) + z
+        else:
+            amsl = home_amsl + z
+        out.append((la, lo, amsl, 0, cid, seq))
+    return out
 
 def cmd_set(args):
     '''control MAVExporer options'''
@@ -1764,6 +1863,7 @@ command_map = {
     'messages'   : (cmd_messages,  'show messages'),
     'devid'      : (cmd_devid,     'show device IDs'),
     'map'        : (cmd_map,       'show map view'),
+    'map3d'      : (cmd_map3d,     'show 3D map view'),
     'fft'        : (cmd_fft,       'show a FFT (if available)'),
     'loadLog'    : (cmd_loadfile,  'load a log file'),
     'stats'      : (cmd_stats,     'show statistics on the log'),
