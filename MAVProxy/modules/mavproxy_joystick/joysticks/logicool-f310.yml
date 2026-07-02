@@ -2,6 +2,8 @@ description: >
   Support for the Logicool F310 joystick.
 match:
   - 'Logicool Logicool Dual Action'
+  # SDL >= 2.0.6 strips the duplicated vendor prefix from the name
+  - 'Logicool Dual Action'
 controls:
   - channel: 1
     type: axis

@@ -2,6 +2,8 @@ description: >
   Support for the Logitech F310 joystick in "D" mode.
 match:
   - Logitech Logitech Dual Action
+  # SDL >= 2.0.6 strips the duplicated vendor prefix from the name
+  - Logitech Dual Action
 controls:
   - channel: 1
     type: axis
