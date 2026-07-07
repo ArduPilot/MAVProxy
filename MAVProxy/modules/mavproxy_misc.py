@@ -120,6 +120,7 @@ class MiscModule(mp_module.MPModule):
 
         self.add_command('gear', self.cmd_landing_gear, "landing gear control")
 
+        self.add_command('clear', self.cmd_clear, "clears the terminal screen")
         self.repeats = []
 
         # support for changing altitude via command rather than mission item:
@@ -704,6 +705,19 @@ Alt: gear <extend|retract> [ID]'''
             DesiredState,
             0, 0, 0, 0, 0, 0
         )
+
+    def cmd_clear(self, args):
+        # https://stackoverflow.com/questions/2084508/clear-the-terminal-in-python
+        usage = "clear <|help>"
+        if len(args) != 0:
+            print(usage)
+            return
+        # This will only print if \033c breaks something this will make bug fixing easier
+        print("This command ANCI escape codes to clear the terminal.")
+        print("These quite widespread this is likely a issue with your terminal not MAVproxy.")
+        print("If you think there is a better ANCI command that will be better supported make a issue")
+        print("\033c") # this ANCI will scroll up leaving the screen blank you keep history
+        return
 
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
