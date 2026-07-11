@@ -450,6 +450,124 @@ class MPMenuCallTextDropdownDialog(object):
         # Return tuple with text value and selected dropdown value
         return text_value + " " + dropdown_value
 
+class MPMenuCallMultiTextDropdownDialog(object):
+    '''used to create a dialog callback with multiple values and optional dropdowns.
+
+    Each field is a (label, default) tuple, and each dropdown a
+    (label, options, default) tuple.  An extra trailing element - a key -
+    may be added to either (i.e. (label, default, key) or
+    (label, options, default, key)); when present the corresponding value
+    is emitted as "key=value", otherwise the bare value is emitted.
+    '''
+    def __init__(self, title='Enter Values', fields=None, dropdowns=None):
+        self.title = title
+        self.fields = fields or []
+        self.dropdowns = dropdowns or []
+
+    @classmethod
+    def from_arg_spec(cls, title, spec, ctx=None):
+        '''build a dialog from a command argument spec.
+
+        spec is an ordered dict of key->facets (see
+        MPModule.parse_key_value_spec).  Each entry that carries a 'label'
+        becomes a widget emitting "key=value": a dropdown when it has an
+        'options' list, otherwise a text field.  Entries without a 'label'
+        (e.g. keys entered another way) are skipped.  A 'default' facet may
+        be a plain value or a callable which is passed ctx to produce a
+        live default.
+        '''
+        fields = []
+        dropdowns = []
+        for (key, facets) in spec.items():
+            if 'label' not in facets:
+                continue
+            default = facets.get('default', '')
+            if callable(default):
+                default = default(ctx)
+            if 'options' in facets:
+                dropdowns.append((facets['label'], facets['options'], default, key))
+            else:
+                fields.append((facets['label'], default, key))
+        return cls(title=title, fields=fields, dropdowns=dropdowns)
+
+    def call(self):
+        '''show a dialog with multiple value entries and optional dropdowns'''
+        from MAVProxy.modules.lib.wx_loader import wx
+
+        # Create a custom dialog
+        dlg = wx.Dialog(None, title=self.title, size=(400, 150))
+
+        # Create a vertical box sizer for the dialog
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        # One row of label plus text entry per field
+        text_ctrls = []
+        for field in self.fields:
+            (label, default) = field[0], field[1]
+            input_sizer = wx.BoxSizer(wx.HORIZONTAL)
+            text_label = wx.StaticText(dlg, label=label + ":")
+            memory_key = self.title + ":" + label
+            default = last_value_selection.get(memory_key, default)
+            text_ctrl = wx.TextCtrl(dlg, value=str(default), size=(200, -1))
+            text_ctrls.append(text_ctrl)
+            input_sizer.Add(text_label, 1, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 5)
+            input_sizer.Add(text_ctrl, 0, wx.ALL | wx.EXPAND, 5)
+            main_sizer.Add(input_sizer, 0, wx.ALL | wx.EXPAND, 5)
+
+        # One row of label plus choice control per dropdown
+        dropdown_ctrls = []
+        for dropdown in self.dropdowns:
+            (label, options, default) = dropdown[0], dropdown[1], dropdown[2]
+            input_sizer = wx.BoxSizer(wx.HORIZONTAL)
+            dropdown_label = wx.StaticText(dlg, label=label)
+            dropdown_ctrl = wx.Choice(dlg, choices=options)
+            dropdown_ctrls.append(dropdown_ctrl)
+
+            default_idx = 0
+            for i in range(len(options)):
+                if options[i] == default:
+                    default_idx = i
+            memory_key = self.title + ":" + label
+            dropdown_ctrl.SetSelection(last_dropdown_selection.get(memory_key, default_idx))
+
+            input_sizer.Add(dropdown_label, 1, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 5)
+            input_sizer.Add(dropdown_ctrl, 0, wx.ALL | wx.EXPAND, 5)
+            main_sizer.Add(input_sizer, 0, wx.ALL | wx.EXPAND, 5)
+
+        # Create button sizer with OK and Cancel buttons
+        button_sizer = dlg.CreateButtonSizer(wx.OK | wx.CANCEL)
+        main_sizer.Add(button_sizer, 0, wx.ALL | wx.ALIGN_CENTER, 10)
+
+        # Set the sizer for the dialog
+        dlg.SetSizer(main_sizer)
+
+        # Fit the dialog to its contents
+        dlg.Fit()
+
+        # Show the dialog and get the result
+        if dlg.ShowModal() != wx.ID_OK:
+            return None
+
+        values = []
+        for (field, text_ctrl) in zip(self.fields, text_ctrls):
+            label = field[0]
+            key = field[2] if len(field) > 2 else None
+            text_value = text_ctrl.GetValue()
+            last_value_selection[self.title + ":" + label] = text_value
+            values.append("%s=%s" % (key, text_value) if key else text_value)
+
+        for (dropdown, dropdown_ctrl) in zip(self.dropdowns, dropdown_ctrls):
+            (label, options) = dropdown[0], dropdown[1]
+            key = dropdown[3] if len(dropdown) > 3 else None
+            dropdown_index = dropdown_ctrl.GetSelection()
+            if dropdown_index != -1:
+                dropdown_value = options[dropdown_index]
+                last_dropdown_selection[self.title + ":" + label] = dropdown_index
+                values.append("%s=%s" % (key, dropdown_value) if key else dropdown_value)
+
+        # Return the entered values, space-separated, dropdown values last
+        return " ".join(values)
+
 class MPMenuConfirmDialog(object):
     '''used to create a confirmation dialog'''
     def __init__(self, title='Confirmation', message='', callback=None, args=None):

@@ -14,6 +14,7 @@ from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib.mp_menu import *
+from MAVProxy.modules.mavproxy_mode import orbit_arg_spec
 from pymavlink import mavutil
 from PIL import ImageColor
 
@@ -119,6 +120,15 @@ class MapModule(mp_module.MPModule):
                 dropdown_options=['AboveHome', 'AGL', 'AMSL'],
                 default_dropdown=self.settings.flytoframe,
             )
+        ))
+        self.add_menu(MPMenuItem(
+            'Orbit Here', 'Orbit Here', '# orbit ',
+            handler=MPMenuCallMultiTextDropdownDialog.from_arg_spec(
+                'Orbit', orbit_arg_spec,
+                ctx={
+                    'guidedalt': self.mpstate.settings.guidedalt,
+                    'flytoframe': self.settings.flytoframe,
+                })
         ))
         self.add_menu(MPMenuItem('Terrain Check', 'Terrain Check', '# terrain check'))
         self.add_menu(MPMenuItem('Show Position', 'Show Position', 'showPosition'))

@@ -157,6 +157,82 @@ class MPModule(object):
     def add_completion_function(self, name, callback):
         self.mpstate.completion_functions[name] = callback
 
+    def parse_key_value_args(self, args, valid_keys, values):
+        '''split "key=value" arguments into the values dict.
+
+        valid_keys maps each accepted (lower-case) key to a callable used
+        to convert its value (e.g. int, float, str), so values ends up
+        holding correctly-typed entries.  Returns True on success, or
+        prints an error and returns False for an argument which is not in
+        key=value form, an unknown key, or a value which will not convert.
+        '''
+        for arg in args:
+            if '=' not in arg:
+                print("Argument '%s' is not in key=value form" % arg)
+                return False
+            (key, value) = arg.split('=', 1)
+            key = key.lower()
+            if key not in valid_keys:
+                print("Unknown argument '%s'" % key)
+                return False
+            try:
+                values[key] = valid_keys[key](value)
+            except ValueError:
+                print("Invalid value '%s' for argument '%s'" % (value, key))
+                return False
+        return True
+
+    def parse_key_value_spec(self, args, spec, values):
+        '''parse "key=value" arguments according to an argument spec.
+
+        spec is an ordered dict mapping each canonical key to a dict of
+        facets; the facets used here are:
+          type      callable used to convert the value (required)
+          synonyms  list of alternative spellings folded onto this key
+          required  if True, the key must be supplied
+        Converted, synonym-folded values are stored in the values dict.
+        Returns True on success, or prints an error and returns False.
+        See parse_key_value_args() and format_key_value_help().
+        '''
+        valid_keys = {}
+        for (key, facets) in spec.items():
+            valid_keys[key] = facets['type']
+            for synonym in facets.get('synonyms', []):
+                valid_keys[synonym] = facets['type']
+
+        if not self.parse_key_value_args(args, valid_keys, values):
+            return False
+
+        # fold each synonym onto its canonical key
+        for (key, facets) in spec.items():
+            for synonym in facets.get('synonyms', []):
+                if synonym in values:
+                    values[key] = values.pop(synonym)
+
+        for (key, facets) in spec.items():
+            if facets.get('required') and key not in values:
+                print("%s is required" % key)
+                return False
+        return True
+
+    def format_key_value_help(self, spec):
+        '''return a list of aligned description lines for an argument spec.
+
+        Each line describes one key (with any synonyms) and its help text,
+        marking required keys.  See parse_key_value_spec().
+        '''
+        names = {}
+        for (key, facets) in spec.items():
+            names[key] = '/'.join([key] + facets.get('synonyms', []))
+        width = max(len(n) for n in names.values())
+        lines = []
+        for (key, facets) in spec.items():
+            text = facets.get('help', '')
+            if facets.get('required'):
+                text += ' (required)'
+            lines.append("  %-*s  %s" % (width, names[key], text))
+        return lines
+
     def flyto_frame_units(self):
         '''return a frame string and unit'''
         return "%s %s" % (self.settings.height_unit, self.settings.flytoframe)
