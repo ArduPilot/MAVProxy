@@ -7,6 +7,8 @@ Peter Barker, September 2017
 
 import time
 
+from pymavlink import mavutil
+
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
 
@@ -43,6 +45,18 @@ class message(mp_module.MPModule):
             except AttributeError:
                 print("Unable to find %s" % methodname)
                 return
+            # pymavlink requires bytes for char-array fields; encode
+            # any str supplied for one of those:
+            msg_class = getattr(
+                mavutil.mavlink,
+                "MAVLink_%s_message" % packettype.lower(),
+                None)
+            if msg_class is not None:
+                for i, fieldtype in enumerate(msg_class.fieldtypes):
+                    if (fieldtype == "char" and
+                            i < len(transformed) and
+                            isinstance(transformed[i], str)):
+                        transformed[i] = transformed[i].encode("utf8")
             method(*transformed)
 
 
