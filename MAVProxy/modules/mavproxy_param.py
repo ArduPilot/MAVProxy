@@ -5,6 +5,7 @@ param command handling
 AP_FLAKE8_CLEAN
 '''
 
+import math
 import time
 import os
 import fnmatch
@@ -52,6 +53,12 @@ class ParamState:
         self.new_sysid_timestamp = time.time()
         self.autopilot_type_by_sysid = {}
         self.param_types = {}
+        # params known to use PX4-style byte-wise encoding for plain
+        # int types (from handle_px4_param_value)
+        self.px4_style_params = set()
+        # whether each sysid advertises MAV_PROTOCOL_CAPABILITY_PARAM_EXTENDED
+        self.supports_extended_by_sysid = {}
+        self.autopilot_version_requests = {}
         self.ftp_failed = False
         self.ftp_started = False
         self.ftp_count = None
@@ -69,6 +76,33 @@ class ParamState:
         # thread-safe manner:
         self.parameters_to_set_input_queue = Queue.Queue()
 
+    # extended parameter encoding: values that don't fit exactly in the
+    # float field travel in the extended_type/extended_data extension
+    # fields. Numeric fallbacks in case pymavlink predates them
+    EXTENDED = getattr(mavutil.mavlink, 'MAV_PARAM_TYPE_EXTENDED', 11)
+    EXT_TYPE_INT32 = getattr(mavutil.mavlink, 'MAV_PARAM_EXTENDED_TYPE_INT32', 1)
+
+    @staticmethod
+    def int32_needs_extended(value):
+        '''return an int if value is an int32 not exactly representable
+        as a 32-bit float, else None. Copy of the pymavlink method in
+        case the user has an older version of that library'''
+        try:
+            if isinstance(value, str) and value.lower().startswith('0x'):
+                fv = float(int(value[2:], 16))
+            else:
+                fv = float(value)
+        except (TypeError, ValueError):
+            return None
+        if not fv.is_integer():
+            return None
+        iv = int(fv)
+        if iv < -2**31 or iv >= 2**31:
+            return None
+        if struct.unpack("<f", struct.pack("<f", fv))[0] == fv:
+            return None
+        return iv
+
     class ParamSet():
         '''class to hold information about a parameter set being attempted'''
         def __init__(self, master, name, value, param_type=None, attempts=None):
@@ -79,11 +113,21 @@ class ParamState:
             self.attempts_remaining = attempts
             self.retry_interval = 1  # seconds
             self.last_value_received = None
+            # extended encoding fields for values that don't fit exactly
+            # in the float param_value
+            self.extended_type = None
+            self.extended_data = None
 
             if self.attempts_remaining is None:
                 self.attempts_remaining = 3
 
             self.request_sent = 0  # this is a timestamp
+
+        def target_value(self):
+            '''the requested value as a float (doubles hold int32 exactly)'''
+            if isinstance(self.value, str) and self.value.lower().startswith('0x'):
+                return float(int(self.value[2:], 16))
+            return float(self.value)
 
         def normalize_parameter_for_param_set_send(self, name, value, param_type):
             '''uses param_type to convert value into a value suitable for passing
@@ -91,6 +135,23 @@ class ParamState:
             is a copy of a method in pymavlink, in case the user has
             an older version of that library.
             '''
+            self.extended_type = None
+            self.extended_data = None
+            if param_type == ParamState.EXTENDED:
+                # int32 in the extended_data extension field
+                if isinstance(value, str) and value.lower().startswith('0x'):
+                    int_value = int(value[2:], 16)
+                else:
+                    int_value = int(float(value))
+                try:
+                    self.extended_data = struct.pack("<i", int_value)
+                except struct.error:
+                    print("can't send %s: value %d out of range" % (name, int_value))
+                    return None
+                self.extended_type = ParamState.EXT_TYPE_INT32
+                # NaN in the float field so extension-unaware consumers
+                # see an obviously invalid value, not a rounded one
+                return float('nan')
             if param_type is not None and param_type != mavutil.mavlink.MAV_PARAM_TYPE_REAL32:
                 # need to encode as a float for sending
                 if param_type == mavutil.mavlink.MAV_PARAM_TYPE_UINT8:
@@ -128,6 +189,24 @@ class ParamState:
                 self.attempts_remaining = 0
                 return
             # print(f"Sending set attempts-remaining={self.attempts_remaining}")
+            if self.extended_type is not None:
+                try:
+                    self.master.param_set_send(
+                        self.name.upper(),
+                        numeric_value,
+                        parm_type=self.param_type,
+                        extended_type=self.extended_type,
+                        extended_data=self.extended_data,
+                    )
+                    self.request_sent = time.time()
+                    self.attempts_remaining -= 1
+                    return
+                except TypeError:
+                    # older pymavlink without extended support; sending
+                    # the float would silently store a wrong value
+                    print("Failed to set %s: pymavlink too old for this value, please upgrade" % self.name)
+                    self.attempts_remaining = 0
+                    return
             self.master.param_set_send(
                 self.name.upper(),
                 numeric_value,
@@ -153,7 +232,11 @@ class ParamState:
             manipulated from the packet
             '''
             self.last_value_received = value
-            if abs(value - float(self.value)) > 0.00001:
+            if isinstance(value, float) and math.isnan(value):
+                # undecodable extended ack (unknown extended type or old
+                # pymavlink); never treat as a successful set
+                return math.isnan(self.target_value())
+            if abs(value - self.target_value()) > 0.00001:
                 return False
 
             return True
@@ -240,13 +323,66 @@ class ParamState:
 
         # remember type for param set
         self.param_types[m.param_id.upper()] = m.param_type
+        self.px4_style_params.add(m.param_id.upper())
         return value
+
+    def handle_extended_param_value(self, m):
+        '''decode a MAV_PARAM_TYPE_EXTENDED PARAM_VALUE to its exact value'''
+        value = None
+        if hasattr(mavutil, 'decode_param_value'):
+            value = mavutil.decode_param_value(m)
+        else:
+            # older pymavlink mavutil: decode directly from the fields
+            ext_data = getattr(m, 'extended_data', None)
+            if ext_data is not None and getattr(m, 'extended_type', 0) == self.EXT_TYPE_INT32:
+                value, = struct.unpack("<i", bytes(bytearray(ext_data[0:4])))
+            else:
+                # dialect predates the extension fields, or unknown
+                # extended type; the float is the closest representation
+                value = m.param_value
+        if getattr(m, 'extended_type', 0) == self.EXT_TYPE_INT32:
+            # remember the logical type; the wire encoding is chosen per set
+            # and receiving an extended type proves the vehicle support
+            self.supports_extended_by_sysid[m.get_srcSystem()] = True
+            self.update_mavparm_extended_support()
+            self.record_logical_type(m.param_id.upper(), mavutil.mavlink.MAV_PARAM_TYPE_INT32)
+        return value
+
+    def is_cast_encoded_vehicle(self):
+        '''true unless the target uses PX4-style byte-wise param encoding'''
+        return self.autopilot_type_by_sysid.get(self.sysid[0], -1) != mavutil.mavlink.MAV_AUTOPILOT_PX4
+
+    def update_mavparm_extended_support(self):
+        '''keep MAVParmDict informed so that direct mavset() callers
+        (param load, scripts) also use the extended encoding when appropriate'''
+        self.mav_param.target_supports_extended = (
+            self.is_cast_encoded_vehicle() and
+            self.supports_extended_by_sysid.get(self.sysid[0], False))
+
+    def record_logical_type(self, uname, ptype):
+        '''remember the logical type of an int32/uint32 parameter on a
+        C-cast vehicle, both for our own sends and for direct mavset()'''
+        if uname in self.px4_style_params or not self.is_cast_encoded_vehicle():
+            return
+        self.param_types[uname] = ptype
+        if not hasattr(self.mav_param, 'param_types'):
+            self.mav_param.param_types = {}
+        self.mav_param.param_types[uname] = ptype
 
     def handle_mavlink_packet(self, master, m):
         '''handle an incoming mavlink packet'''
         if m.get_type() == 'PARAM_VALUE':
-            self.handle_mavlink_watch_param_value(master, m)
-            value = self.handle_px4_param_value(m)
+            if m.param_type == self.EXTENDED:
+                value = self.handle_extended_param_value(m)
+            else:
+                value = self.handle_px4_param_value(m)
+                if (m.param_type == mavutil.mavlink.MAV_PARAM_TYPE_INT32 and
+                        m.get_srcComponent() != mavutil.mavlink.MAV_COMP_ID_UDP_BRIDGE):
+                    # C-cast vehicles report honest types with cast float
+                    # values; remember the logical type so a later set of
+                    # a large value can use the extended encoding
+                    self.record_logical_type(m.param_id.upper(), m.param_type)
+            self.handle_mavlink_watch_param_value(master, m, value)
             param_id = "%.16s" % m.param_id
             # Note: the xml specifies param_index is a uint16, so -1 in that field will show as 65535
             # We accept both -1 and 65535 as 'unknown index' to future proof us against someday having that
@@ -289,11 +425,26 @@ class ParamState:
                 # remember autopilot types so we can handle PX4 parameters
                 self.autopilot_type_by_sysid[m.get_srcSystem()] = m.autopilot
 
+        elif m.get_type() == 'AUTOPILOT_VERSION':
+            cap = getattr(mavutil.mavlink, 'MAV_PROTOCOL_CAPABILITY_PARAM_EXTENDED', 2097152)
+            self.supports_extended_by_sysid[m.get_srcSystem()] = (m.capabilities & cap) != 0
+            self.update_mavparm_extended_support()
+
     def fetch_check(self, master, force=False):
         '''check for missing parameters periodically'''
         if self.param_period.trigger() or force:
             if master is None:
                 return
+            sysid = self.sysid[0]
+            if sysid not in self.supports_extended_by_sysid and self.autopilot_version_requests.get(sysid, 0) < 3:
+                # learn whether the vehicle supports the extended param
+                # encoding; if this never arrives we stay lossy (safe)
+                self.autopilot_version_requests[sysid] = self.autopilot_version_requests.get(sysid, 0) + 1
+                master.mav.command_long_send(
+                    sysid, 1,
+                    mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE, 0,
+                    mavutil.mavlink.MAVLINK_MSG_ID_AUTOPILOT_VERSION,
+                    0, 0, 0, 0, 0, 0)
             if len(self.mav_param_set) == 0 and not self.ftp_started:
                 if not self.use_ftp():
                     master.param_fetch_all()
@@ -345,11 +496,23 @@ class ParamState:
         mav = self.mpstate.master().mav
         editor = self.mpstate.module('paramedit')
         for (name, v, ptype) in params:
-            p = mavutil.mavlink.MAVLink_param_value_message(name,
-                                                            float(v),
-                                                            mavutil.mavlink.MAV_PARAM_TYPE_REAL32,
-                                                            len(params),
-                                                            idx)
+            p = None
+            if ptype == 3 and self.int32_needs_extended(v) is not None:
+                # int32 (@PARAM/param.pck type code) that a REAL32 float
+                # would round: log with the lossless extended encoding
+                try:
+                    p = mavutil.mavlink.MAVLink_param_value_message(
+                        name, float('nan'), self.EXTENDED, len(params), idx,
+                        self.EXT_TYPE_INT32, struct.pack('<i', int(v)) + b'\x00' * 28)
+                except TypeError:
+                    # pymavlink dialect predates the extension fields
+                    p = None
+            if p is None:
+                p = mavutil.mavlink.MAVLink_param_value_message(name,
+                                                                float(v),
+                                                                mavutil.mavlink.MAV_PARAM_TYPE_REAL32,
+                                                                len(params),
+                                                                idx)
             idx += 1
             # log PARAM_VALUE using the source vehicles sysid but MAV_COMP_ID_MISSIONPLANNER, to allow
             # us to tell that it came from the GCS, but to not corrupt the sequence numbers
@@ -407,14 +570,26 @@ class ParamState:
         total_params = len(pdata.params)
         self.mav_param_count = total_params
 
+        # rebuild the exported logical-type map from scratch
+        self.mav_param.param_types = {}
         idx = 0
         for (name, v, ptype) in pdata.params:
-            # we need to set it to REAL32 to ensure we use write value for param_set
             name = str(name.decode('utf-8'))
-            self.param_types[name] = mavutil.mavlink.MAV_PARAM_TYPE_REAL32
+            if ptype == 3:
+                # int32 (@PARAM/param.pck type code): remember the
+                # logical type so param set can use the extended
+                # encoding for values that don't fit exactly in a float
+                self.record_logical_type(name, mavutil.mavlink.MAV_PARAM_TYPE_INT32)
+                if name not in self.param_types:
+                    # PX4-style entry took precedence
+                    self.param_types[name] = mavutil.mavlink.MAV_PARAM_TYPE_REAL32
+            else:
+                # we need to set it to REAL32 to ensure we use write value for param_set
+                self.param_types[name] = mavutil.mavlink.MAV_PARAM_TYPE_REAL32
             self.mav_param_set.add(idx)
             self.mav_param[name] = v
             idx += 1
+        self.update_mavparm_extended_support()
 
         self.ftp_failed = False
         self.mpstate.console.set_status('Params', 'Param %u/%u' % (total_params, total_params))
@@ -510,11 +685,14 @@ class ParamState:
         f.close()
         print("Saved %u parameters to %s" % (count, filename))
 
-    def handle_mavlink_watch_param_value(self, master, m):
+    def handle_mavlink_watch_param_value(self, master, m, value):
         param_id = "%.16s" % m.param_id
         for pattern in self.watch_patterns:
             if fnmatch.fnmatch(param_id, pattern):
-                self.mpstate.console.writeln("> %s=%f" % (param_id, m.param_value))
+                if isinstance(value, float):
+                    self.mpstate.console.writeln("> %s=%f" % (param_id, value))
+                else:
+                    self.mpstate.console.writeln("> %s=%s" % (param_id, str(value)))
 
     def param_watch(self, master, args):
         '''command to allow addition of watches for parameter changes'''
@@ -646,11 +824,34 @@ class ParamState:
         # Update the parameter
         self.set_parameter(master, uname, value, attempts=3, param_type=ptype)
 
+    def wire_param_type(self, master, name, value, param_type):
+        '''choose the wire param_type for setting a parameter. Plain
+        INT32/UINT32 means byte-wise encoding on PX4-style systems; on
+        C-cast systems (ArduPilot) those are logical types only and the
+        value goes as a plain float, upgraded to the extended encoding
+        when the value needs it and the vehicle supports it'''
+        if param_type not in (mavutil.mavlink.MAV_PARAM_TYPE_INT32, mavutil.mavlink.MAV_PARAM_TYPE_UINT32):
+            return param_type
+        uname = str(name).upper()
+        sysid = self.sysid[0]
+        if self.autopilot_type_by_sysid.get(sysid, -1) == mavutil.mavlink.MAV_AUTOPILOT_PX4:
+            return param_type
+        if uname in self.px4_style_params:
+            return param_type
+        if (param_type == mavutil.mavlink.MAV_PARAM_TYPE_INT32 and
+                self.supports_extended_by_sysid.get(sysid, False) and
+                master is not None and master.mavlink20() and
+                self.int32_needs_extended(value) is not None):
+            return self.EXTENDED
+        # plain C-cast float
+        return None
+
     def set_parameter(self, master, name, value, attempts=None, param_type=None):
         '''convenient intermediate method which determines parameter type for
         lazy callers'''
         if param_type is None:
             param_type = self.param_types.get(name, None)
+        param_type = self.wire_param_type(master, name, value, param_type)
 
         self.parameters_to_set_input_queue.put(ParamState.ParamSet(
             master,
@@ -1051,6 +1252,13 @@ class ParamModule(mp_module.MPModule):
         self.check_new_target_system()
         sysid = self.get_sysid()
         self.pstate[sysid].handle_command(self.master, self.mpstate, args)
+
+    def set_parameter(self, name, value, attempts=None):
+        '''set a parameter on the current target system through the
+        parameter-set queue, choosing the best wire encoding'''
+        self.check_new_target_system()
+        sysid = self.get_sysid()
+        self.pstate[sysid].set_parameter(self.master, str(name).upper(), value, attempts=attempts)
 
     def fetch_all(self):
         '''force fetch of all parameters'''

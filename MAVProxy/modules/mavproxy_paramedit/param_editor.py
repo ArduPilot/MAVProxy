@@ -178,8 +178,12 @@ class ParamEditorMain(object):
         if mtype == 'PARAM_VALUE':
             if m.param_id in self.paramchanged:
                 del self.paramchanged[m.param_id.upper()]
+            if hasattr(mavutil, 'decode_param_value'):
+                value = mavutil.decode_param_value(m)
+            else:
+                value = m.param_value
             self.gui_event_queue.put(ParamEditorEvent(
-                ph_event.PEGE_WRITE_SUCC, paramid=m.param_id.upper(), paramvalue=m.param_value, pstatus = self.mpstate.module('param').param_status()))
+                ph_event.PEGE_WRITE_SUCC, paramid=m.param_id.upper(), paramvalue=value, pstatus = self.mpstate.module('param').param_status()))
         if mtype in ['RC_CHANNELS_RAW', 'RC_CHANNELS']:
             if self.mpstate.vehicle_name == 'APMrover2':
                 fltmode_ch = int(self.mpstate.module('param').mav_param['MODE_CH'])
@@ -353,8 +357,14 @@ class ParamEditorMain(object):
             os.close(drain_fd)
 
     def set_params(self):
+        param_module = self.mpstate.module('param')
         for param, value in self.paramchanged.items():
-            self.mpstate.mav_master[0].param_set_send(param, float(value))
+            if param_module is not None:
+                # route through the param module so int32 parameters can
+                # use the lossless extended encoding
+                param_module.set_parameter(param, value)
+            else:
+                self.mpstate.mav_master[0].param_set_send(param, float(value))
 
 
 def init(mpstate):
