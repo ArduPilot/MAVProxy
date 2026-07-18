@@ -375,20 +375,21 @@ class MPTile:
                 continue
 
             mp_util.mkdir_p(os.path.dirname(path))
-            h = open(path+'.tmp', 'wb')
-            h.write(img)
-            h.close()
+            # use a unique tmp name so concurrent downloaders (eg. two
+            # MAVProxy instances sharing the cache) can't race on the rename
+            tmppath = "%s.tmp.%u.%u" % (path, os.getpid(), threading.get_ident())
             try:
-                os.unlink(path)
-            except Exception:
+                with open(tmppath, 'wb') as h:
+                    h.write(img)
+                os.replace(tmppath, path)
+            except OSError:
                 pass
-            os.rename(path+'.tmp', path)
             self._download_pending.pop(key)
         self._download_thread = None
 
     def start_download_thread(self):
         '''start the downloader'''
-        if self._download_thread:
+        if self._download_thread and self._download_thread.is_alive():
             return
         t = threading.Thread(target=self.downloader)
         t.daemon = True
