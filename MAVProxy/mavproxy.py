@@ -279,9 +279,9 @@ class MPState(object):
             MPSetting('rally_breakalt', int, 40, 'Default Rally Break Altitude', range=(0, 10000), increment=1),
             MPSetting('rally_flags', int, 0, 'Default Rally Flags', range=(0, 10000), increment=1),
 
-            MPSetting('source_system', int, 255, 'MAVLink Source system', range=(0, 255), increment=1, tab='MAVLink'),
+            MPSetting('source_system', int, 255, 'MAVLink Source system', range=(0, 0xFFFFFFFF), increment=1, tab='MAVLink'),
             MPSetting('source_component', int, 230, 'MAVLink Source component', range=(0, 255), increment=1),
-            MPSetting('target_system', int, 0, 'MAVLink target system', range=(0, 255), increment=1),
+            MPSetting('target_system', int, 0, 'MAVLink target system', range=(0, 0xFFFFFFFF), increment=1),
             MPSetting('target_component', int, 0, 'MAVLink target component', range=(0, 255), increment=1),
             MPSetting('state_basedir', str, None, 'base directory for logs and aircraft directories'),
             MPSetting('allow_unsigned', bool, True, 'whether unsigned packets will be accepted'),
