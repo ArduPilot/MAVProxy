@@ -751,7 +751,7 @@
 
  <!-- ============================== EKF Diagnostics ============================== -->
 
- <graph name="EKF/Variance/Velocity">
+ <graph name="EKF3/Variance/Velocity">
     <expression>XKF4[0].SV</expression>
     <expression>XKF4[1].SV</expression>
     <expression>NKF4[0].SV</expression>
@@ -759,7 +759,7 @@
     <expression>1.0+0*XKF4[0].SV</expression>
  </graph>
 
- <graph name="EKF/Variance/Position">
+ <graph name="EKF3/Variance/Position">
     <expression>XKF4[0].SP</expression>
     <expression>XKF4[1].SP</expression>
     <expression>NKF4[0].SP</expression>
@@ -767,7 +767,7 @@
     <expression>1.0+0*XKF4[0].SP</expression>
  </graph>
 
- <graph name="EKF/Variance/Height">
+ <graph name="EKF3/Variance/Height">
     <expression>XKF4[0].SH</expression>
     <expression>XKF4[1].SH</expression>
     <expression>NKF4[0].SH</expression>
@@ -775,7 +775,7 @@
     <expression>1.0+0*XKF4[0].SH</expression>
  </graph>
 
- <graph name="EKF/Variance/Magnetometer">
+ <graph name="EKF3/Variance/Magnetometer">
     <expression>XKF4[0].SM</expression>
     <expression>XKF4[1].SM</expression>
     <expression>NKF4[0].SM</expression>
@@ -783,7 +783,7 @@
     <expression>1.0+0*XKF4[0].SM</expression>
  </graph>
 
- <graph name="EKF/Variance/Terrain">
+ <graph name="EKF3/Variance/Terrain">
     <expression>XKF4[0].SVT</expression>
     <expression>XKF4[1].SVT</expression>
     <expression>NKF4[0].SVT</expression>
@@ -791,7 +791,7 @@
     <expression>1.0+0*XKF4[0].SVT</expression>
  </graph>
 
- <graph name="EKF/Variance/Overview">
+ <graph name="EKF3/Variance/Overview">
     <expression>XKF4[0].SV</expression>
     <expression>XKF4[0].SP</expression>
     <expression>XKF4[0].SH</expression>
@@ -799,7 +799,7 @@
     <expression>1.0+0*XKF4[0].SV</expression>
  </graph>
 
- <graph name="EKF/Innovations/Velocity">
+ <graph name="EKF3/Innovations/Velocity">
     <expression>XKF3[0].IVN</expression>
     <expression>XKF3[0].IVE</expression>
     <expression>XKF3[0].IVD</expression>
@@ -808,7 +808,7 @@
     <expression>NKF3[0].IVD</expression>
  </graph>
 
- <graph name="EKF/Innovations/Position">
+ <graph name="EKF3/Innovations/Position">
     <expression>XKF3[0].IPN</expression>
     <expression>XKF3[0].IPE</expression>
     <expression>XKF3[0].IPD</expression>
@@ -817,7 +817,7 @@
     <expression>NKF3[0].IPD</expression>
  </graph>
 
- <graph name="EKF/Innovations/Magnetometer">
+ <graph name="EKF3/Innovations/Magnetometer">
     <expression>XKF3[0].IMX</expression>
     <expression>XKF3[0].IMY</expression>
     <expression>XKF3[0].IMZ</expression>
@@ -826,18 +826,18 @@
     <expression>NKF3[0].IMZ</expression>
  </graph>
 
- <graph name="EKF/Innovations/Yaw">
+ <graph name="EKF3/Innovations/Yaw">
     <expression>XKF3[0].IYAW</expression>
     <expression>NKF3[0].IYAW</expression>
  </graph>
 
- <graph name="EKF/Status/Flags">
+ <graph name="EKF3/Status/Flags">
     <expression>XKF4[0].SS</expression>
     <expression>XKF4[1].SS</expression>
     <expression>NKF4[0].SS</expression>
  </graph>
 
- <graph name="EKF/Status/AttitudeError">
+ <graph name="EKF3/Status/AttitudeError">
     <expression>degrees(XKF4[0].errRP)</expression>
     <expression>degrees(XKF4[1].errRP)</expression>
     <expression>degrees(NKF4[0].errRP)</expression>
