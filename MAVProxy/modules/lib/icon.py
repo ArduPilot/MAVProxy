@@ -49,8 +49,7 @@ class SimpleIcon():
             wp_y = [4.2, 2.6, 4.6, 1.4, 3.2]
             ax.plot(wp_x, wp_y, color='black', linewidth=1.6, linestyle='--')
             for i, (x, y) in enumerate(zip(wp_x, wp_y)):
-                circ = mpatches.Circle((x, y), 0.42, facecolor='red',
-                                        edgecolor='black', linewidth=1.2, zorder=3)
+                circ = mpatches.Circle((x, y), 0.42, facecolor='red', edgecolor='black', linewidth=1.2, zorder=3)
                 ax.add_patch(circ)
                 ax.text(x, y, str(i + 1), ha='center', va='center', fontsize=7,
                         weight='bold', color='white', zorder=4)
