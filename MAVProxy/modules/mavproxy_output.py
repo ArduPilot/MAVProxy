@@ -4,6 +4,8 @@
     output add 10.11.12.13:14550
     output list
     output remove 3      # to remove 3rd output
+    output discardcompid 1 155   # don't send messages from component 155 to output 1
+    output discardcompid 1 clear # send everything to output 1 again
 '''
 
 from pymavlink import mavutil
@@ -16,7 +18,7 @@ class OutputModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(OutputModule, self).__init__(mpstate, "output", "output control", public=True)
         self.add_command('output', self.cmd_output, "output control",
-                         ["<list|add|remove|sysid>"])
+                         ["<list|add|remove|sysid|discardcompid>"])
 
     def cmd_output(self, args):
         '''handle output commands'''
@@ -37,15 +39,25 @@ class OutputModule(mp_module.MPModule):
                 print("Usage: output sysid SYSID OUTPUT")
                 return
             self.cmd_output_sysid(args[1:])
+        elif args[0] == "discardcompid":
+            if len(args) != 3:
+                print("Usage: output discardcompid OUTPUT <COMPID|clear>")
+                return
+            self.cmd_output_discardcompid(args[1:])
         else:
-            print("usage: output <list|add|remove|sysid>")
+            print("usage: output <list|add|remove|sysid|discardcompid>")
 
     def cmd_output_list(self):
         '''list outputs'''
         print("%u outputs" % len(self.mpstate.mav_outputs))
         for i in range(len(self.mpstate.mav_outputs)):
             conn = self.mpstate.mav_outputs[i]
-            print("%u: %s" % (i, conn.address))
+            discard = getattr(conn, 'discard_comps', None)
+            if discard:
+                print("%u: %s discardcompid=%s" % (i, conn.address,
+                                                   ','.join(str(c) for c in sorted(discard))))
+            else:
+                print("%u: %s" % (i, conn.address))
         if len(self.mpstate.sysid_outputs) > 0:
             print("%u sysid outputs" % len(self.mpstate.sysid_outputs))
             for sysid in self.mpstate.sysid_outputs:
@@ -86,6 +98,45 @@ class OutputModule(mp_module.MPModule):
         if sysid in self.mpstate.sysid_outputs:
             self.mpstate.sysid_outputs[sysid].close()
         self.mpstate.sysid_outputs[sysid] = conn
+
+    def cmd_output_discardcompid(self, args):
+        '''discard messages from a component ID on one output
+
+        Per-output, so high-rate traffic (eg MAV_COMP_ID_LOG 155 from LOG_BACKEND_TYPE=3 remote
+        logging) can be kept off a bandwidth-limited link while still going out the others. The
+        list is attached to the connection object, so it follows that output if earlier ones are
+        removed and indices shift. Modules still see the messages, so local logging is unaffected.
+        '''
+        outputs = self.mpstate.mav_outputs
+        try:
+            idx = int(args[0])
+        except ValueError:
+            print("output discardcompid: '%s' is not an output number" % args[0])
+            return
+        if idx < 0 or idx >= len(outputs):
+            if len(outputs) == 0:
+                print("output discardcompid: no outputs")
+            else:
+                print("output discardcompid: no output %u (valid: 0..%u)" % (idx, len(outputs)-1))
+            return
+        conn = outputs[idx]
+        if args[1] == "clear":
+            conn.discard_comps = set()
+            print("Output %u (%s) discarding no component IDs" % (idx, conn.address))
+            return
+        try:
+            compid = int(args[1])
+        except ValueError:
+            print("output discardcompid: '%s' is not a component ID" % args[1])
+            return
+        # --out connections are created without this attribute, so never assume it exists
+        discard = getattr(conn, 'discard_comps', None)
+        if discard is None:
+            discard = set()
+        discard.add(compid)
+        conn.discard_comps = discard
+        print("Output %u (%s) discarding component IDs %s" % (
+            idx, conn.address, ','.join(str(c) for c in sorted(discard))))
 
     def cmd_output_remove(self, args):
         '''remove an output'''
