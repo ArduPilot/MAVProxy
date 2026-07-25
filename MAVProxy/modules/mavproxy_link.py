@@ -1104,6 +1104,11 @@ class LinkModule(mp_module.MPModule):
             if self.mpstate.settings.mavfwd_rate or mtype != 'REQUEST_DATA_STREAM':
                 if mtype not in self.no_fwd_types:
                     for r in self.mpstate.mav_outputs:
+                        # per-output component discard ("output discardcompid N X"). The
+                        # attribute is absent on --out connections, so read it defensively.
+                        discard = getattr(r, 'discard_comps', None)
+                        if discard and m.get_srcComponent() in discard:
+                            continue
                         if hasattr(r, 'ws') and r.ws is not None:
                             from wsproto.connection import ConnectionState
                             if r.ws.state != ConnectionState.OPEN:  # Ensure Websocket handshake is done
