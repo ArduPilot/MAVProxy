@@ -55,8 +55,9 @@ ERR_FileNotFound = 10
 HDR_Len = 12
 MAX_Payload = 239
 
-# the vehicle reads the whole file to answer a CRC request, so allow plenty
-CRCCMP_TIMEOUT = 30.0
+# the server null terminates the last byte of its name buffer, so a name
+# filling the payload exactly would be silently truncated
+MAX_FTP_NAME = MAX_Payload - 1
 
 class FTP_OP:
     def __init__(self, seq, session, opcode, size, req_opcode, burst_complete, offset, payload):
@@ -116,7 +117,8 @@ class FTPModule(mp_module.MPModule):
              ('burst_read_size', int, 80),
              ('write_size', int, 80),
              ('write_qsize', int, 5),
-             ('retry_time', float, 0.5)])
+             ('retry_time', float, 0.5),
+             ('crccmp_timeout', float, 120.0)])
         self.add_completion_function('(FTPSETTING)',
                                      self.ftp_settings.completion)
         self.seq = 0
@@ -171,12 +173,19 @@ class FTPModule(mp_module.MPModule):
         self.crccmp_local_crc = None
         self.crccmp_sent = None
         self.crccmp_start = 0
+        self.crccmp_expect = None
 
     def cmd_ftp(self, args):
         '''FTP operations'''
         usage = "Usage: ftp <list|get|put|rm|rmdir|rename|mkdir|crc|crclocal|crccmp>"
         if len(args) < 1:
             print(usage)
+            return
+        # these all talk to the vehicle and would have their replies consumed
+        # by a running comparison, or clobber the op it is waiting on
+        if self.crccmp_dest is not None and args[0] in (
+                'list', 'crc', 'rm', 'rmdir', 'rename', 'mkdir', 'put'):
+            print("crccmp in progress, use 'ftp cancel' to stop it")
             return
         if args[0] == 'list':
             self.cmd_list(args[1:])
@@ -799,6 +808,7 @@ class FTPModule(mp_module.MPModule):
         self.crccmp_local = None
         self.crccmp_local_crc = None
         self.crccmp_sent = None
+        self.crccmp_expect = None
         self.transfer_active = False
 
     def cmd_crccmp(self, args):
@@ -810,9 +820,24 @@ class FTPModule(mp_module.MPModule):
             print("FTP transfer already in progress")
             return
         (pattern, dest) = (args[0], args[1])
+        if dest == '':
+            print("crccmp: empty DESTDIR, use / for the vehicle's root")
+            return
         files = sorted(f for f in glob.glob(pattern) if os.path.isfile(f))
         if len(files) == 0:
             print("crccmp: no files matching %s" % pattern)
+            return
+        # only the basename is used remotely, so duplicates would compare two
+        # local files against one remote file and double count the result
+        seen = {}
+        for f in files:
+            seen.setdefault(os.path.basename(f), []).append(f)
+        clashes = {b: v for (b, v) in seen.items() if len(v) > 1}
+        if clashes:
+            for (b, v) in sorted(clashes.items()):
+                print("crccmp: %s matches %u local files: %s" %
+                      (b, len(v), ' '.join(v)))
+            print("crccmp: duplicate names, narrow the wildcard")
             return
         self.crccmp_dest = dest.rstrip('/')
         self.crccmp_pending = files
@@ -828,22 +853,35 @@ class FTPModule(mp_module.MPModule):
         '''ask for the next remote CRC, or finish if the list is done'''
         while self.crccmp_pending:
             local = self.crccmp_pending.pop(0)
+            base = os.path.basename(local)
+            name = "%s/%s" % (self.crccmp_dest, base)
+            # encode and length check before anything is marked in flight, so a
+            # bad name is an immediate error rather than a timeout later on
+            try:
+                enc_name = bytearray(name, 'ascii')
+            except UnicodeEncodeError:
+                self.crccmp_record('ERROR', base, ' (non-ascii remote path)')
+                continue
+            if len(enc_name) > MAX_FTP_NAME:
+                self.crccmp_record('ERROR', base, ' (remote path over %u bytes)' %
+                                   MAX_FTP_NAME)
+                continue
             try:
                 # done one file at a time rather than all up front, so a long
                 # list doesn't stall the main loop in one go
                 self.crccmp_local_crc = self.local_file_crc(local)
             except Exception as ex:
-                print("  ERROR   %s (%s)" % (os.path.basename(local), ex))
-                self.crccmp_results.append('ERROR')
+                self.crccmp_record('ERROR', base, ' (%s)' % ex)
                 continue
             self.crccmp_local = local
-            name = "%s/%s" % (self.crccmp_dest, os.path.basename(local))
             self.filename = name
             self.op_start = time.time()
             self.crccmp_sent = time.time()
-            enc_name = bytearray(name, 'ascii')
             self.send(FTP_OP(self.seq, self.session, OP_CalcFileCRC32,
                              len(enc_name), 0, 0, 0, enc_name))
+            # send() has already advanced self.seq, and the server replies with
+            # the request sequence plus one, so this is the reply we expect
+            self.crccmp_expect = (self.session, self.seq)
             return
         self.crccmp_finish()
 
@@ -853,6 +891,15 @@ class FTPModule(mp_module.MPModule):
 
     def crccmp_reply(self, op):
         '''one remote CRC came back: compare and move on'''
+        if self.crccmp_expect is not None and \
+           (op.session, op.seq) != self.crccmp_expect:
+            # a late reply for a file we already timed out, or a duplicate.
+            # attributing it to the file now in flight would report a result
+            # for a CRC that was never asked for. it does tell us the vehicle
+            # is still working, so give the current request its time back.
+            if self.crccmp_sent is not None:
+                self.crccmp_sent = time.time()
+            return
         name = os.path.basename(self.crccmp_local)
         crc = None
         if op.opcode == OP_Ack and op.size == 4:
@@ -871,6 +918,7 @@ class FTPModule(mp_module.MPModule):
         else:
             self.crccmp_record('ERROR', name, ' (%s)' % op)
         self.crccmp_sent = None
+        self.crccmp_expect = None
         self.crccmp_next()
 
     def crccmp_finish(self):
@@ -1067,9 +1115,11 @@ class FTPModule(mp_module.MPModule):
         # ahead of the early returns below, which skip idle transfers
         self.update_status()
 
-        if self.crccmp_sent is not None and now - self.crccmp_sent > CRCCMP_TIMEOUT:
+        if self.crccmp_sent is not None and \
+           now - self.crccmp_sent > self.ftp_settings.crccmp_timeout:
             self.crccmp_record('TIMEOUT', os.path.basename(self.crccmp_local))
             self.crccmp_sent = None
+            self.crccmp_expect = None
             self.crccmp_next()
 
         # see if we lost an open reply
