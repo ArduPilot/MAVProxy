@@ -1,7 +1,8 @@
 '''
 VTK actors for the map elements drawn over the 3D terrain: flight path / trail,
-mission, fence, rally points and the vehicle. All positions are converted to the
-same local ENU frame used by the terrain (origin lat0,lon0, up = AMSL * zexag).
+mission, fence, KML, rally points and the vehicle. All positions are converted
+to the same local ENU frame used by the terrain (origin lat0,lon0, up = AMSL *
+zexag).
 '''
 
 import math
@@ -119,6 +120,9 @@ class ElementManager:
         self.terrain_height = None
         self.fence = []
         self.fence_ring = None
+        self.kml_features = []
+        self.kml_geometry = None
+        self.kml_height_cache = {}
 
     def _enu(self, lat, lon, amsl):
         e, n, u = enu(lat, lon, amsl, self.lat0, self.lon0)
@@ -141,6 +145,8 @@ class ElementManager:
         self.home_amsl = amsl
         if self.fence:
             self.refresh_fence()
+        if self.kml_features:
+            self.refresh_kml()
 
     def set_terrain_height(self, terrain_height):
         self.terrain_height = terrain_height
@@ -182,13 +188,15 @@ class ElementManager:
             actors.append(_points(markers, (1.0, 1.0, 1.0), 9))
         self._replace('mission', actors)
 
-    def _fence_samples(self):
-        '''Yield a closed, densified fence ring so it follows terrain ridges.'''
-        fence = self.fence
-        if len(fence) > 2 and fence[0] == fence[-1]:
-            fence = fence[:-1]
-        for i, (lat1, lon1) in enumerate(fence):
-            lat2, lon2 = fence[(i + 1) % len(fence)]
+    def _terrain_samples(self, points, closed):
+        '''Densify a lat/lon polyline so it follows terrain between vertices.'''
+        points = list(points)
+        if closed and len(points) > 2 and points[0] == points[-1]:
+            points = points[:-1]
+        segment_count = len(points) if closed else len(points) - 1
+        for i in range(max(0, segment_count)):
+            lat1, lon1 = points[i]
+            lat2, lon2 = points[(i + 1) % len(points)]
             e1, n1, _ = enu(lat1, lon1, 0.0, self.lat0, self.lon0)
             e2, n2, _ = enu(lat2, lon2, 0.0, self.lat0, self.lon0)
             distance = math.hypot(e2 - e1, n2 - n1)
@@ -198,6 +206,26 @@ class ElementManager:
                 t = float(j) / count
                 yield (lat1 + (lat2 - lat1) * t,
                        lon1 + (lon2 - lon1) * t)
+        if points:
+            yield points[0] if closed else points[-1]
+
+    def _terrain_draped_line(self, points, closed, height_cache=None):
+        fallback = self.home_amsl * self.zexag
+        clearance = FENCE_CLEARANCE * self.zexag
+        line = []
+        for lat, lon in self._terrain_samples(points, closed):
+            e, n, _ = enu(lat, lon, 0.0, self.lat0, self.lon0)
+            cache_key = (lat, lon)
+            ground = (height_cache.get(cache_key)
+                      if height_cache is not None else None)
+            if ground is None and self.terrain_height is not None:
+                ground = self.terrain_height(lat, lon)
+                if ground is not None and height_cache is not None:
+                    height_cache[cache_key] = ground
+            if ground is None:
+                ground = fallback
+            line.append((e, n, ground + clearance))
+        return line
 
     def refresh_fence(self, terrain_height=None):
         '''Rebuild the fence just above the currently loaded terrain.
@@ -213,18 +241,7 @@ class ElementManager:
             self.fence_ring = None
             return
 
-        ring = []
-        fallback = self.home_amsl * self.zexag
-        clearance = FENCE_CLEARANCE * self.zexag
-        for lat, lon in self._fence_samples():
-            e, n, _ = enu(lat, lon, 0.0, self.lat0, self.lon0)
-            ground = None
-            if self.terrain_height is not None:
-                ground = self.terrain_height(lat, lon)
-            if ground is None:
-                ground = fallback
-            ring.append((e, n, ground + clearance))
-        ring.append(ring[0])
+        ring = self._terrain_draped_line(self.fence, closed=True)
 
         if ring == self.fence_ring:
             return
@@ -237,6 +254,37 @@ class ElementManager:
         if terrain_height is not None:
             self.set_terrain_height(terrain_height)
         self.refresh_fence()
+
+    def refresh_kml(self, terrain_height=None):
+        '''Rebuild visible KML lines just above the loaded terrain.'''
+        if terrain_height is not None:
+            self.set_terrain_height(terrain_height)
+        geometry = []
+        for key, points, colour, width in self.kml_features:
+            closed = len(points) > 2 and points[0] == points[-1]
+            line = self._terrain_draped_line(
+                points, closed, self.kml_height_cache)
+            if len(line) >= 2:
+                geometry.append((key, line, colour, width))
+        if geometry == self.kml_geometry:
+            return
+        self.kml_geometry = geometry
+        actors = [_polyline(line, colour, width)
+                  for _key, line, colour, width in geometry]
+        self._replace('kml', actors)
+
+    def set_kml(self, features, terrain_height=None, refresh=True):
+        '''features: visible (key, [(lat,lon)], RGB colour, line width).'''
+        self.kml_features = list(features)
+        if terrain_height is not None:
+            self.set_terrain_height(terrain_height)
+        self.kml_geometry = None
+        if not self.kml_features:
+            self.kml_height_cache = {}
+            self.kml_geometry = []
+            self._replace('kml', [])
+        elif refresh:
+            self.refresh_kml()
 
     def set_rally(self, pts):
         '''pts: list of (lat,lon,alt_rel)'''

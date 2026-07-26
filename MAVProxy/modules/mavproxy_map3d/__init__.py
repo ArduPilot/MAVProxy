@@ -45,6 +45,7 @@ class Map3DModule(mp_module.MPModule):
         self.last_attitude = (0.0, 0.0, 0.0)
         self.home_amsl = None
         self.follow = True
+        self.kml_change_state = None
         self.start_map()
 
     # ------------------------------------------------------------------ command
@@ -97,6 +98,7 @@ class Map3DModule(mp_module.MPModule):
         self.send_fence()
         self.send_rally()
         self.send_cached_state()
+        self.send_kml()
 
     def stop_map(self):
         if self.map is not None:
@@ -211,6 +213,46 @@ class Map3DModule(mp_module.MPModule):
             return
         self.map.set_rally(pts)
 
+    @staticmethod
+    def _kml_state(kml_mod):
+        if kml_mod is None:
+            return None
+        return (id(kml_mod), getattr(kml_mod, 'last_change', 0))
+
+    def send_kml(self, kml_mod=None):
+        '''Mirror the visible KML polylines, using their 2D map colours.'''
+        if self.map is None:
+            return
+        if kml_mod is None:
+            kml_mod = self.module('kmlread')
+        features = []
+        if kml_mod is not None:
+            for layer, objects in kml_mod.map_objects.items():
+                for key, obj in objects.items():
+                    points = getattr(obj, 'points', None)
+                    if points is None or getattr(obj, 'hidden', False):
+                        continue
+                    try:
+                        points = [(float(p[0]), float(p[1]))
+                                  for p in points]
+                    except (IndexError, TypeError, ValueError):
+                        continue
+                    if len(points) < 2:
+                        continue
+                    # SlipMap/OpenCV colours are BGR; VTK expects RGB.
+                    bgr = getattr(obj, 'colour', (255, 0, 255))
+                    try:
+                        rgb = tuple(max(0, min(255, int(bgr[i]))) / 255.0
+                                    for i in (2, 1, 0))
+                    except (IndexError, TypeError, ValueError):
+                        rgb = (1.0, 0.0, 1.0)
+                    width = max(1.0, float(getattr(obj, 'linewidth', 2.0)))
+                    features.append(("%s:%s" % (layer, key), points,
+                                     rgb, width))
+        features.sort(key=lambda feature: feature[0])
+        self.map.set_kml(features)
+        self.kml_change_state = self._kml_state(kml_mod)
+
     def idle_task(self):
         if self.map is None:
             return
@@ -226,6 +268,9 @@ class Map3DModule(mp_module.MPModule):
                 self.map3d_settings.fpvfov = fpvfov
             elif event[0] == 'follow':
                 self.follow = bool(event[1])
+        kml_mod = self.module('kmlread')
+        if self._kml_state(kml_mod) != self.kml_change_state:
+            self.send_kml(kml_mod)
         # poll change times like the 2D map / cesium modules
         try:
             wp_change = self.module('wp').wploader.last_change

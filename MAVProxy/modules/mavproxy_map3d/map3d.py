@@ -79,6 +79,9 @@ class Map3D:
     def set_fence(self, pts):
         self._put(('fence', list(pts)))
 
+    def set_kml(self, features):
+        self._put(('kml', list(features)))
+
     def set_rally(self, pts):
         self._put(('rally', list(pts)))
 
