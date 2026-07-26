@@ -88,16 +88,21 @@ def decode_terrain(z, x, y):
 _sample_cache = {}
 
 
-def sample_terrain(lat, lon, zoom=12):
+def sample_terrain(lat, lon, zoom=12, cache_only=False):
     '''return terrain elevation (m AMSL) at lat/lon from the quantized mesh
     (same source we render), or None. Decoded tiles are cached. Assumes the
     regular grid mesh ArduPilot publishes; falls back to the tile mean for a
-    non-grid tile.'''
+    non-grid tile.
+
+    cache_only returns None rather than fetching/decoding a missing tile, so
+    callers on a latency-sensitive thread can defer the work.'''
     g = GlobalGeodetic(True)
     x, y = g.LonLatToTile(lon, lat, zoom)
     key = (zoom, x, y)
     dec = _sample_cache.get(key)
     if dec is None:
+        if cache_only:
+            return None
         try:
             dec = decode_terrain(zoom, x, y)
         except Exception:

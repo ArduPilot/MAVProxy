@@ -7,11 +7,28 @@ Andrew Tridgell / CanberraUAV
 '''
 
 import math
+import queue
+import threading
 import time
 
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.mavproxy_map3d.map3d import Map3D
+
+# fence colours as the 2D map's PolyFence layer uses them (OpenCV BGR)
+FENCE_INCLUSION_BGR = (0, 255, 0)
+FENCE_HOME_INCLUSION_BGR = (0, 255, 96)
+FENCE_EXCLUSION_BGR = (255, 0, 0)
+FENCE_RETURN_BGR = (255, 127, 127)
+FENCE_RETURN_RADIUS = 10.0
+
+
+def bgr_to_rgb(bgr, default=(1.0, 0.0, 1.0)):
+    '''SlipMap/OpenCV colours are BGR; VTK wants RGB floats'''
+    try:
+        return tuple(max(0, min(255, int(bgr[i]))) / 255.0 for i in (2, 1, 0))
+    except (IndexError, TypeError, ValueError):
+        return default
 
 
 class Map3DModule(mp_module.MPModule):
@@ -44,8 +61,14 @@ class Map3DModule(mp_module.MPModule):
         self.last_global_position = 0
         self.last_attitude = (0.0, 0.0, 0.0)
         self.home_amsl = None
+        self.home_position = None
         self.follow = True
         self.kml_change_state = None
+        self.terrain_lock = threading.Lock()
+        self.terrain_lookups = queue.Queue()
+        self.terrain_requested = set()
+        self.terrain_running = False
+        self.terrain_resolved = False
         self.start_map()
 
     # ------------------------------------------------------------------ command
@@ -127,6 +150,8 @@ class Map3DModule(mp_module.MPModule):
         home = messages.get('HOME_POSITION')
         if home is not None:
             self.home_amsl = home.altitude * 1.0e-3
+            self.set_home_position(home.latitude * 1.0e-7,
+                                   home.longitude * 1.0e-7)
 
         # Prefer the estimator position, then DataFlash POS, then raw GPS.
         position = (messages.get('GLOBAL_POSITION_INT') or
@@ -162,18 +187,57 @@ class Map3DModule(mp_module.MPModule):
 
     def terrain_alt(self, lat, lon):
         '''terrain elevation (m AMSL) at lat/lon. Prefer the quantized mesh (same
-        source rendered in 3D); fall back to the terrain module's SRTM model.'''
+        source rendered in 3D); fall back to the terrain module's SRTM model.
+
+        This runs on the main loop, so it never fetches: an uncached mesh tile is
+        handed to a background thread and the mission is re-sent once it lands.
+        The SRTM fallback is already non-blocking (timeout=0 returns None until
+        the terrain module has downloaded the tile).
+        '''
         try:
             from MAVProxy.modules.mavproxy_map3d.terrain import sample_terrain
-            alt = sample_terrain(lat, lon)
+            alt = sample_terrain(lat, lon, cache_only=True)
             if alt is not None:
                 return alt
+            self.request_terrain_lookup(lat, lon)
         except Exception:
             pass
         tm = self.module('terrain')
         if tm is not None and getattr(tm, 'ElevationModel', None) is not None:
             return tm.ElevationModel.GetElevation(lat, lon)
         return None
+
+    def request_terrain_lookup(self, lat, lon):
+        '''queue an uncached terrain sample for the background resolver'''
+        with self.terrain_lock:
+            if (lat, lon) in self.terrain_requested:
+                return
+            self.terrain_requested.add((lat, lon))
+            self.terrain_lookups.put((lat, lon))
+            if self.terrain_running:
+                return
+            self.terrain_running = True
+        threading.Thread(target=self.terrain_resolver, daemon=True).start()
+
+    def terrain_resolver(self):
+        '''background: fetch/decode mesh tiles so the main loop never blocks'''
+        from MAVProxy.modules.mavproxy_map3d.terrain import sample_terrain
+        while True:
+            with self.terrain_lock:
+                try:
+                    (lat, lon) = self.terrain_lookups.get_nowait()
+                except queue.Empty:
+                    self.terrain_running = False
+                    return
+            try:
+                resolved = sample_terrain(lat, lon) is not None
+            except Exception:
+                resolved = False
+            if resolved:
+                # terrain is reachable, so let points that failed earlier retry
+                with self.terrain_lock:
+                    self.terrain_requested.clear()
+                self.terrain_resolved = True
 
     def send_mission(self):
         try:
@@ -194,13 +258,64 @@ class Map3DModule(mp_module.MPModule):
             items.append((w.x, w.y, z, frame, w.command, w.seq))
         self.map.set_mission(items)
 
+    def set_home_position(self, lat, lon):
+        '''home moved: around-home fence circles are centred on it'''
+        if (lat, lon) == self.home_position:
+            return
+        self.home_position = (lat, lon)
+        self.send_fence()
+
+    @staticmethod
+    def _fence_latlon(item):
+        '''fence items are MISSION_ITEM_INT (1e7 scaled); MISSION_ITEM is degrees'''
+        (lat, lon) = (item.x, item.y)
+        if item.get_type() == 'MISSION_ITEM_INT':
+            lat *= 1.0e-7
+            lon *= 1.0e-7
+        return (lat, lon)
+
     def send_fence(self):
+        '''Mirror the 2D map's PolyFence layer: each inclusion/exclusion polygon
+        and circle is its own shape, not one flattened ring.'''
+        if self.map is None:
+            return
+        fence_mod = self.module('fence')
+        if fence_mod is None:
+            return
+        shapes = []
         try:
-            fence_mod = self.module('fence')
-            pts = [(p.x, p.y) for p in fence_mod.wploader.wpoints]
+            for (polygons, bgr) in ((fence_mod.inclusion_polygons(),
+                                     FENCE_INCLUSION_BGR),
+                                    (fence_mod.exclusion_polygons(),
+                                     FENCE_EXCLUSION_BGR)):
+                for polygon in polygons:
+                    points = [self._fence_latlon(p) for p in polygon]
+                    if len(points) >= 2:
+                        shapes.append(('polygon', points, bgr_to_rgb(bgr)))
+
+            for (circles, bgr) in ((fence_mod.inclusion_circles(),
+                                    FENCE_INCLUSION_BGR),
+                                   (fence_mod.exclusion_circles(),
+                                    FENCE_EXCLUSION_BGR)):
+                for circle in circles:
+                    shapes.append(('circle', self._fence_latlon(circle),
+                                   circle.param1, bgr_to_rgb(bgr)))
+
+            # home circles are centred on home, not on their own lat/lon
+            home_circles = fence_mod.home_inclusion_circles()
+            if home_circles and self.home_position is not None:
+                for circle in home_circles:
+                    shapes.append(('circle', self.home_position, circle.param1,
+                                   bgr_to_rgb(FENCE_HOME_INCLUSION_BGR)))
+
+            returnpoint = fence_mod.returnpoint()
+            if returnpoint is not None:
+                shapes.append(('circle', self._fence_latlon(returnpoint),
+                               FENCE_RETURN_RADIUS,
+                               bgr_to_rgb(FENCE_RETURN_BGR)))
         except Exception:
             return
-        self.map.set_fence(pts)
+        self.map.set_fence(shapes)
 
     def send_rally(self):
         try:
@@ -239,13 +354,7 @@ class Map3DModule(mp_module.MPModule):
                         continue
                     if len(points) < 2:
                         continue
-                    # SlipMap/OpenCV colours are BGR; VTK expects RGB.
-                    bgr = getattr(obj, 'colour', (255, 0, 255))
-                    try:
-                        rgb = tuple(max(0, min(255, int(bgr[i]))) / 255.0
-                                    for i in (2, 1, 0))
-                    except (IndexError, TypeError, ValueError):
-                        rgb = (1.0, 0.0, 1.0)
+                    rgb = bgr_to_rgb(getattr(obj, 'colour', (255, 0, 255)))
                     width = max(1.0, float(getattr(obj, 'linewidth', 2.0)))
                     features.append(("%s:%s" % (layer, key), points,
                                      rgb, width))
@@ -286,6 +395,17 @@ class Map3DModule(mp_module.MPModule):
                 self.send_fence()
         except Exception:
             pass
+        try:
+            rally_change = self.module('rally').rallyloader.last_change
+            if rally_change != self.rally_change_time:
+                self.rally_change_time = rally_change
+                self.send_rally()
+        except Exception:
+            pass
+        if self.terrain_resolved:
+            # a deferred terrain lookup landed: redo the terrain-frame items
+            self.terrain_resolved = False
+            self.send_mission()
 
     def mavlink_packet(self, m, force=False):
         if self.map is None or not self.map.is_alive():
@@ -294,6 +414,7 @@ class Map3DModule(mp_module.MPModule):
         if mtype == 'HOME_POSITION':
             self.home_amsl = m.altitude * 1.0e-3     # AMSL (mm -> m)
             self.map.set_home(self.home_amsl)
+            self.set_home_position(m.latitude * 1.0e-7, m.longitude * 1.0e-7)
         elif mtype == 'ATTITUDE':
             self.last_attitude = (m.roll, m.pitch, m.yaw)
         elif mtype == 'ATT':
