@@ -292,6 +292,7 @@ class TerrainManager:
         self.brightness = brightness
         self.shading = shading
         self.wireframe = wireframe
+        self.mesh_revision = 0
         self.g = GlobalGeodetic(True)
         self.tiles = {}                 # (z,x,y) -> Tile
         self.inflight = set()           # jobs queued/running
@@ -387,10 +388,14 @@ class TerrainManager:
                 self.inflight.add(jid)
                 self.jobs.put(("decode", jid, (z, x, y)))
         # page out far tiles
+        removed_tile = False
         for key in list(self.tiles.keys()):
             if key not in want:
                 self.ren.RemoveActor(self.tiles[key].actor)
                 del self.tiles[key]
+                removed_tile = True
+        if removed_tile:
+            self.mesh_revision += 1
         # request textures for present tiles (at most one outstanding per tile)
         fov_deg = tc.cam.GetViewAngle()
         for key, tile in self.tiles.items():
@@ -436,6 +441,7 @@ class TerrainManager:
                     continue
                 self.tiles[(z, x, y)] = tile
                 self.ren.AddActor(tile.actor)
+                self.mesh_revision += 1
                 changed = True
             elif kind == "texture":
                 img, (tilekey, tkey, params) = payload

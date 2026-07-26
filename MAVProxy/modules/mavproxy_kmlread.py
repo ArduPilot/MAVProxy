@@ -44,6 +44,7 @@ class KmlReadModule(mp_module.MPModule):
         self.menu_needs_refreshing = True
         self.map_objects = {}
         self.counter = 0
+        self.last_change = 0
 
         # the fence manager
         self.snap_points = []
@@ -217,7 +218,8 @@ class KmlReadModule(mp_module.MPModule):
         del self.map_objects[obj.layer][obj.key]
         if len(self.map_objects[obj.layer]) == 0:
             del self.map_objects[obj.layer]
-        self.remove_object_from_maps(obj.key)
+        self.last_change += 1
+        self.remove_object_from_maps(obj)
 
     def remove_all_map_objects(self):
         for layer in copy.deepcopy(self.map_objects):
@@ -233,6 +235,7 @@ class KmlReadModule(mp_module.MPModule):
         if obj.layer not in self.map_objects:
             self.map_objects[obj.layer] = {}
         self.map_objects[obj.layer][obj.key] = obj
+        self.last_change += 1
         self.add_object_to_maps(obj)
 
     def add_objects_to_map_module_from_map_objects(self):

@@ -6,6 +6,7 @@ manager's async results, then renders.
 
 import math
 import queue
+import time
 
 from MAVProxy.modules.lib.wx_loader import wx
 from vtk.wx.wxVTKRenderWindowInteractor import wxVTKRenderWindowInteractor
@@ -16,6 +17,8 @@ from MAVProxy.modules.mavproxy_map3d.terrain import TerrainManager, R
 from MAVProxy.modules.mavproxy_map3d.elements import ElementManager
 
 import vtk
+
+KML_REFRESH_DELAY = 0.5
 
 
 class RenderSettingsDialog(wx.Dialog):
@@ -87,6 +90,9 @@ class Map3DFrame(wx.Frame):
         self.follow = bool(state.follow)
         self.last_vehicle = None
         self.last_vehicle_pose = None
+        self.kml_features = []
+        self.kml_refresh_due = None
+        self.overlay_mesh_revision = -1
         self.fpv_enabled = False
         self.fpv_fov = min(150.0, max(20.0, float(state.fpvfov)))
         self.terrain_brightness = min(
@@ -148,6 +154,10 @@ class Map3DFrame(wx.Frame):
         self.elements = ElementManager(self.ren, lat0, lon0, self.state.zexag)
         self.elements.set_terrain_height(self.terrain.height_at)
         self.elements.set_home(amsl_ref)
+        self.elements.set_kml(self.kml_features, self.terrain.height_at,
+                              refresh=False)
+        self.overlay_mesh_revision = self.terrain.mesh_revision
+        self.schedule_kml_refresh()
         span = 4000.0
         self.tc = TerrainCamera(self.ren.GetActiveCamera(),
                                 focal=(0.0, 0.0, amsl_ref * self.state.zexag),
@@ -169,6 +179,12 @@ class Map3DFrame(wx.Frame):
 
     def on_follow_toggle(self, event):
         self.set_follow_enabled(self.follow_button.GetValue(), notify=True)
+
+    def schedule_kml_refresh(self):
+        if self.elements is None or not self.kml_features:
+            self.kml_refresh_due = None
+            return
+        self.kml_refresh_due = time.monotonic() + KML_REFRESH_DELAY
 
     def render_settings(self):
         return (self.terrain_brightness, self.terrain_shading,
@@ -229,18 +245,41 @@ class Map3DFrame(wx.Frame):
                 self.tc.look_at(focal, dist=dist, yaw=yaw, pitch=pitch)
                 camera.SetViewAngle(fov)
                 self.saved_map_view = None
-            if self.follow and self.last_vehicle is not None:
-                self.look_at_latlon(*self.last_vehicle)
-            else:
-                self.on_camera_change()
+            if self.follow and self.elements is not None:
+                self.follow_vehicle(self.elements.refresh_vehicle())
+            self.on_camera_change()
 
     def set_follow_enabled(self, enable, notify=False):
         self.follow = bool(enable)
         self.follow_button.SetValue(self.follow)
-        if self.follow and not self.fpv_enabled and self.last_vehicle is not None:
-            self.look_at_latlon(*self.last_vehicle)
+        if self.follow and not self.fpv_enabled and self.elements is not None:
+            if self.follow_vehicle(self.elements.refresh_vehicle()):
+                self.on_camera_change()
         if notify:
             self.state.event_queue.put(('follow', self.follow))
+
+    def vehicle_in_follow_region(self, vehicle_enu):
+        '''Match the 2D map follow dead zone: the middle half of the view.'''
+        if vehicle_enu is None:
+            return False
+        width, height = self.ren.GetSize()
+        if width <= 0 or height <= 0:
+            return False
+        self.ren.SetWorldPoint(*vehicle_enu, 1.0)
+        self.ren.WorldToDisplay()
+        px, py, depth = self.ren.GetDisplayPoint()
+        ratio = 0.25
+        return (0.0 <= depth <= 1.0 and
+                ratio * width < px < (1.0 - ratio) * width and
+                ratio * height < py < (1.0 - ratio) * height)
+
+    def follow_vehicle(self, vehicle_enu):
+        '''Recenter only after the vehicle leaves the central follow region.'''
+        if (not self.follow or self.fpv_enabled or vehicle_enu is None or
+                self.vehicle_in_follow_region(vehicle_enu)):
+            return False
+        self.tc.look_at(vehicle_enu)
+        return True
 
     def set_fpv_fov(self, fov):
         self.fpv_fov = min(150.0, max(20.0, float(fov)))
@@ -285,6 +324,13 @@ class Map3DFrame(wx.Frame):
         if kind == 'follow':
             self.set_follow_enabled(msg[1])
             return
+        if kind == 'kml':
+            self.kml_features = list(msg[1])
+            if self.elements is not None:
+                self.elements.set_kml(self.kml_features,
+                                      self.terrain.height_at, refresh=False)
+                self.schedule_kml_refresh()
+            return
         if kind == 'origin':
             if self.terrain is None:
                 self.init_scene(msg[1], msg[2], msg[3])
@@ -300,8 +346,7 @@ class Map3DFrame(wx.Frame):
             self.last_vehicle_pose = (lat, lon, amsl, roll, pitch, yaw)
             if self.fpv_enabled:
                 self.update_fpv_camera(enu)
-            elif self.follow:
-                self.tc.look_at((enu[0], enu[1], enu[2]))
+            elif self.follow_vehicle(enu):
                 self.terrain.update(self.tc)
         elif kind == 'path':
             self.elements.set_path(msg[1])
@@ -332,14 +377,24 @@ class Map3DFrame(wx.Frame):
             drained = True
         # drain terrain worker results
         if self.terrain is not None:
-            if self.terrain.process(self.tc):
+            terrain_changed = self.terrain.process(self.tc)
+            if self.terrain.mesh_revision != self.overlay_mesh_revision:
+                self.overlay_mesh_revision = self.terrain.mesh_revision
                 self.elements.refresh_fence(self.terrain.height_at)
+                self.schedule_kml_refresh()
+                drained = True
+            if terrain_changed:
                 vehicle_enu = self.elements.refresh_vehicle()
                 if self.fpv_enabled:
                     self.update_fpv_camera(vehicle_enu)
                 if self.status_actor is not None and self.terrain.tiles:
                     self.ren.RemoveActor2D(self.status_actor)
                     self.status_actor = None
+                drained = True
+            if (self.kml_refresh_due is not None and
+                    time.monotonic() >= self.kml_refresh_due):
+                self.kml_refresh_due = None
+                self.elements.refresh_kml(self.terrain.height_at)
                 drained = True
         if drained:
             self.render()
