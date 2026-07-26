@@ -156,6 +156,9 @@ class FTPModule(mp_module.MPModule):
         self.show_progress = False
         self.last_status_time = 0
         self.remote_file_size = None
+        # a get or put is running, including the open handshake before any
+        # file handle exists
+        self.transfer_active = False
 
     def cmd_ftp(self, args):
         '''FTP operations'''
@@ -212,6 +215,7 @@ class FTPModule(mp_module.MPModule):
         '''terminate current session. outcome describes an incomplete transfer
         for the status line: "cancelled" when the user or a new command ended
         it, "failed" for an error'''
+        self.transfer_active = False
         if self.show_progress:
             # only reached when a transfer ends without completing, as the
             # completion paths clear show_progress first
@@ -312,6 +316,7 @@ class FTPModule(mp_module.MPModule):
         self.callback_progress = callback_progress
         self.show_progress = callback is None
         self.remote_file_size = None
+        self.transfer_active = True
         self.read_retries = 0
         self.duplicates = 0
         self.reached_eof = False
@@ -517,12 +522,16 @@ class FTPModule(mp_module.MPModule):
         if len(args) == 0:
             print("Usage: put FILENAME <REMOTENAME>")
             return
-        if self.write_list is not None or self.fh is not None:
-            # a download owns self.fh too, so checking write_list alone would
-            # let a put overwrite an in-flight get and read from its handle
+        if self.transfer_active:
+            # fh and write_list are both still None while a get waits for its
+            # open reply, so they can't stand in for "a transfer is running"
             print("FTP transfer already in progress")
             if callback is not None:
                 callback(None)
+            if progress_callback is not None:
+                # this is what publishes "Params ERR"/"Mission ERR", so
+                # skipping it leaves a stale percentage on the console
+                progress_callback(None)
             return
         fname = args[0]
         self.fh = fh
@@ -568,6 +577,7 @@ class FTPModule(mp_module.MPModule):
         self.put_callback = callback
         self.put_callback_progress = progress_callback
         self.show_progress = callback is None
+        self.transfer_active = True
         self.read_retries = 0
         self.op_start = time.time()
         enc_fname = bytearray(self.filename, 'ascii')
