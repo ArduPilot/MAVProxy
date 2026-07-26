@@ -14,6 +14,9 @@ from MAVProxy.modules.mavproxy_map3d.terrain import enu
 FRAME_GLOBAL = (0, 5)            # AMSL
 FRAME_RELATIVE = (3, 6)          # relative to home
 FRAME_TERRAIN = (10, 11)         # above terrain
+FENCE_CLEARANCE = 3.0
+FENCE_SAMPLE_SPACING = 20.0
+FENCE_MAX_SAMPLES_PER_EDGE = 1000
 
 
 def _polyline(points_enu, colour, width, dashed=False):
@@ -30,6 +33,8 @@ def _polyline(points_enu, colour, width, dashed=False):
     poly.SetLines(cells)
     mapper = vtk.vtkPolyDataMapper()
     mapper.SetInputData(poly)
+    mapper.SetResolveCoincidentTopologyToPolygonOffset()
+    mapper.SetRelativeCoincidentTopologyLineOffsetParameters(-1.0, -1.0)
     actor = vtk.vtkActor()
     actor.SetMapper(mapper)
     actor.GetProperty().SetColor(*colour)
@@ -37,6 +42,46 @@ def _polyline(points_enu, colour, width, dashed=False):
     actor.GetProperty().SetLighting(False)
     if dashed:
         actor.GetProperty().SetLineStipplePattern(0xF0F0)
+    return actor
+
+
+def _vehicle_icon():
+    '''Return an opaque aircraft glyph in the local horizontal plane.
+
+    Using native geometry avoids platform-dependent PNG alpha/texture issues.
+    The outline coordinates describe a unit aircraft pointing towards +Y.
+    '''
+    outline = [
+        (0.00, 0.50), (-0.07, 0.24), (-0.48, 0.02), (-0.48, -0.07),
+        (-0.08, 0.00), (-0.07, -0.30), (-0.22, -0.43), (-0.22, -0.50),
+        (0.00, -0.42), (0.22, -0.50), (0.22, -0.43), (0.07, -0.30),
+        (0.08, 0.00), (0.48, -0.07), (0.48, 0.02), (0.07, 0.24),
+    ]
+    points = vtk.vtkPoints()
+    polygon = vtk.vtkPolygon()
+    polygon.GetPointIds().SetNumberOfIds(len(outline))
+    for i, (x, y) in enumerate(outline):
+        points.InsertNextPoint(x, y, 0.0)
+        polygon.GetPointIds().SetId(i, i)
+    cells = vtk.vtkCellArray()
+    cells.InsertNextCell(polygon)
+    poly = vtk.vtkPolyData()
+    poly.SetPoints(points)
+    poly.SetPolys(cells)
+    triangles = vtk.vtkTriangleFilter()
+    triangles.SetInputData(poly)
+    mapper = vtk.vtkPolyDataMapper()
+    mapper.SetInputConnection(triangles.GetOutputPort())
+    actor = vtk.vtkActor()
+    actor.SetMapper(mapper)
+    actor.GetProperty().SetLighting(False)
+    actor.GetProperty().SetAmbient(1.0)
+    actor.GetProperty().SetDiffuse(0.0)
+    actor.GetProperty().SetColor(1.0, 0.05, 0.0)
+    actor.ForceOpaqueOn()
+
+    # Keep the pipeline alive for the lifetime of the actor.
+    actor._map3d_triangles = triangles
     return actor
 
 
@@ -69,6 +114,11 @@ class ElementManager:
         self.actors = {}            # key -> list of actors
         self.trail = []             # accumulated live positions (enu)
         self.vehicle = None
+        self.vehicle_pose = None
+        self.vehicle_visible = True
+        self.terrain_height = None
+        self.fence = []
+        self.fence_ring = None
 
     def _enu(self, lat, lon, amsl):
         e, n, u = enu(lat, lon, amsl, self.lat0, self.lon0)
@@ -89,6 +139,16 @@ class ElementManager:
 
     def set_home(self, amsl):
         self.home_amsl = amsl
+        if self.fence:
+            self.refresh_fence()
+
+    def set_terrain_height(self, terrain_height):
+        self.terrain_height = terrain_height
+
+    def set_vehicle_visible(self, visible):
+        self.vehicle_visible = bool(visible)
+        if self.vehicle is not None:
+            self.vehicle.SetVisibility(self.vehicle_visible)
 
     def set_path(self, path):
         '''path: list of (lat,lon,amsl)'''
@@ -122,14 +182,61 @@ class ElementManager:
             actors.append(_points(markers, (1.0, 1.0, 1.0), 9))
         self._replace('mission', actors)
 
-    def set_fence(self, pts):
-        '''pts: list of (lat,lon) polygon (drawn near ground)'''
-        if len(pts) < 2:
+    def _fence_samples(self):
+        '''Yield a closed, densified fence ring so it follows terrain ridges.'''
+        fence = self.fence
+        if len(fence) > 2 and fence[0] == fence[-1]:
+            fence = fence[:-1]
+        for i, (lat1, lon1) in enumerate(fence):
+            lat2, lon2 = fence[(i + 1) % len(fence)]
+            e1, n1, _ = enu(lat1, lon1, 0.0, self.lat0, self.lon0)
+            e2, n2, _ = enu(lat2, lon2, 0.0, self.lat0, self.lon0)
+            distance = math.hypot(e2 - e1, n2 - n1)
+            count = max(1, int(math.ceil(distance / FENCE_SAMPLE_SPACING)))
+            count = min(count, FENCE_MAX_SAMPLES_PER_EDGE)
+            for j in range(count):
+                t = float(j) / count
+                yield (lat1 + (lat2 - lat1) * t,
+                       lon1 + (lon2 - lon1) * t)
+
+    def refresh_fence(self, terrain_height=None):
+        '''Rebuild the fence just above the currently loaded terrain.
+
+        terrain_height returns rendered world Z for a lat/lon, or None where
+        terrain has not arrived yet. In that case home AMSL is a safe temporary
+        fallback; the UI calls this again whenever terrain tiles arrive.
+        '''
+        if terrain_height is not None:
+            self.set_terrain_height(terrain_height)
+        if len(self.fence) < 2:
             self._replace('fence', [])
+            self.fence_ring = None
             return
-        ring = [self._enu(lat, lon, self.home_amsl + 1.0) for (lat, lon) in pts]
+
+        ring = []
+        fallback = self.home_amsl * self.zexag
+        clearance = FENCE_CLEARANCE * self.zexag
+        for lat, lon in self._fence_samples():
+            e, n, _ = enu(lat, lon, 0.0, self.lat0, self.lon0)
+            ground = None
+            if self.terrain_height is not None:
+                ground = self.terrain_height(lat, lon)
+            if ground is None:
+                ground = fallback
+            ring.append((e, n, ground + clearance))
         ring.append(ring[0])
+
+        if ring == self.fence_ring:
+            return
+        self.fence_ring = ring
         self._replace('fence', [_polyline(ring, (0.0, 1.0, 0.0), 2.0)])
+
+    def set_fence(self, pts, terrain_height=None):
+        '''pts: list of (lat,lon) polygon, clamped above loaded terrain'''
+        self.fence = [(lat, lon) for lat, lon in pts]
+        if terrain_height is not None:
+            self.set_terrain_height(terrain_height)
+        self.refresh_fence()
 
     def set_rally(self, pts):
         '''pts: list of (lat,lon,alt_rel)'''
@@ -139,24 +246,36 @@ class ElementManager:
         markers = [self._enu(lat, lon, self.home_amsl + alt) for (lat, lon, alt) in pts]
         self._replace('rally', [_points(markers, (0.4, 0.8, 1.0), 12)])
 
-    def set_vehicle(self, lat, lon, amsl, roll, pitch, yaw):
+    def refresh_vehicle(self):
+        if self.vehicle_pose is None:
+            return None
+        lat, lon, amsl, roll, pitch, yaw = self.vehicle_pose
         if self.vehicle is None:
-            cone = vtk.vtkConeSource()
-            cone.SetHeight(40.0)
-            cone.SetRadius(14.0)
-            cone.SetResolution(16)
-            cone.SetDirection(0, 1, 0)         # base orientation: north
-            mapper = vtk.vtkPolyDataMapper()
-            mapper.SetInputConnection(cone.GetOutputPort())
-            self.vehicle = vtk.vtkActor()
-            self.vehicle.SetMapper(mapper)
-            self.vehicle.GetProperty().SetColor(1.0, 0.2, 0.0)
+            self.vehicle = _vehicle_icon()
+            self.vehicle.SetVisibility(self.vehicle_visible)
             self.ren.AddActor(self.vehicle)
         e, n, u = self._enu(lat, lon, amsl)
+        if self.terrain_height is not None:
+            ground = self.terrain_height(lat, lon)
+            if ground is not None:
+                u = max(u, ground + 5.0 * self.zexag)
         self.vehicle.SetPosition(e, n, u)
-        # yaw about Z (heading), then pitch/roll best-effort
-        self.vehicle.SetOrientation(0, 0, 0)
+        camera = self.ren.GetActiveCamera()
+        cx, cy, cz = camera.GetPosition()
+        distance = math.sqrt((cx - e) ** 2 + (cy - n) ** 2 + (cz - u) ** 2)
+        # Scale with camera distance for a stable screen size. These values are
+        # half the original marker size.
+        display_size = max(22.5, distance * 0.03)
+        self.vehicle.SetScale(display_size)
+        # The glyph starts level, pointing north (+Y). Apply the aircraft
+        # attitude in the local east/north/up frame so a level aircraft remains
+        # parallel to the terrain rather than facing the camera.
+        self.vehicle.SetOrientation(0.0, 0.0, 0.0)
         self.vehicle.RotateZ(-math.degrees(yaw))
         self.vehicle.RotateX(math.degrees(pitch))
         self.vehicle.RotateY(math.degrees(roll))
         return (e, n, u)
+
+    def set_vehicle(self, lat, lon, amsl, roll, pitch, yaw):
+        self.vehicle_pose = (lat, lon, amsl, roll, pitch, yaw)
+        return self.refresh_vehicle()

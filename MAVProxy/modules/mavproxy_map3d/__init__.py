@@ -6,6 +6,7 @@ mission, fence, rally, vehicle) for both live telemetry and log review.
 Andrew Tridgell / CanberraUAV
 '''
 
+import math
 import time
 
 from MAVProxy.modules.lib import mp_module
@@ -15,21 +16,36 @@ from MAVProxy.modules.mavproxy_map3d.map3d import Map3D
 
 class Map3DModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(Map3DModule, self).__init__(mpstate, "map3d", "3D map display", public=True)
+        # Do not register as a public "map*" module. ADS-B, AIS, KML and other
+        # modules use that wildcard for the 2D SlipMap API (add_object,
+        # remove_object, set_position), which Map3D intentionally does not
+        # implement.
+        super(Map3DModule, self).__init__(mpstate, "map3d", "3D map display")
         self.map3d_settings = mp_settings.MPSettings([
             ('service', str, 'MicrosoftSat'),
             ('zexag', float, 1.0),
             ('debug', bool, False),
+            mp_settings.MPSetting('fpvfov', float, 90.0, range=(20.0, 150.0)),
+            mp_settings.MPSetting('terrainbrightness', float, 1.25,
+                                  range=(0.25, 2.0)),
+            ('terrainshading', bool, True),
+            ('terrainwireframe', bool, False),
         ])
         self.add_command('map3d', self.cmd_map3d,
                          "3D map control", ['<start|stop|follow|nofollow|center>',
                                             'set (MAP3DSETTING)'])
+        self.add_completion_function('(MAP3DSETTING)',
+                                     self.map3d_settings.completion)
         self.map = None
         self.wp_change_time = 0
         self.fence_change_time = 0
         self.rally_change_time = 0
         self.last_vehicle_send = 0
+        self.last_global_position = 0
         self.last_attitude = (0.0, 0.0, 0.0)
+        self.home_amsl = None
+        self.follow = True
+        self.start_map()
 
     # ------------------------------------------------------------------ command
     def cmd_map3d(self, args):
@@ -42,9 +58,11 @@ class Map3DModule(mp_module.MPModule):
         elif cmd == "stop":
             self.stop_map()
         elif cmd == "follow":
+            self.follow = True
             if self.map:
                 self.map.set_follow(True)
         elif cmd == "nofollow":
+            self.follow = False
             if self.map:
                 self.map.set_follow(False)
         elif cmd == "center":
@@ -52,6 +70,12 @@ class Map3DModule(mp_module.MPModule):
                 self.map.center_on_vehicle()
         elif cmd == "set":
             self.map3d_settings.command(args[1:])
+            if self.map is not None and self.map.is_alive():
+                self.map.set_fpv_fov(self.map3d_settings.fpvfov)
+                self.map.set_render_settings(
+                    self.map3d_settings.terrainbrightness,
+                    self.map3d_settings.terrainshading,
+                    self.map3d_settings.terrainwireframe)
         else:
             print("unknown map3d command: %s" % cmd)
 
@@ -62,11 +86,17 @@ class Map3DModule(mp_module.MPModule):
         self.map = Map3D(title="MAVProxy 3D Map",
                          service=self.map3d_settings.service,
                          zexag=self.map3d_settings.zexag,
-                         debug=self.map3d_settings.debug)
+                         debug=self.map3d_settings.debug,
+                         fpvfov=self.map3d_settings.fpvfov,
+                         terrain_brightness=self.map3d_settings.terrainbrightness,
+                         terrain_shading=self.map3d_settings.terrainshading,
+                         terrain_wireframe=self.map3d_settings.terrainwireframe,
+                         follow=self.follow)
         # push whatever we already know
         self.send_mission()
         self.send_fence()
         self.send_rally()
+        self.send_cached_state()
 
     def stop_map(self):
         if self.map is not None:
@@ -74,6 +104,60 @@ class Map3DModule(mp_module.MPModule):
             self.map = None
 
     # --------------------------------------------------------------- data feeds
+    def send_cached_state(self):
+        '''Seed an auto-started map from MAVProxy's latest known state.'''
+        try:
+            messages = self.master.messages
+        except Exception:
+            return
+
+        attitude = messages.get('ATTITUDE')
+        if attitude is not None:
+            self.last_attitude = (attitude.roll, attitude.pitch, attitude.yaw)
+        else:
+            # DataFlash ATT angles are in degrees.
+            attitude = messages.get('ATT')
+            if attitude is not None:
+                self.last_attitude = tuple(math.radians(v) for v in
+                                           (attitude.Roll, attitude.Pitch,
+                                            attitude.Yaw))
+
+        home = messages.get('HOME_POSITION')
+        if home is not None:
+            self.home_amsl = home.altitude * 1.0e-3
+
+        # Prefer the estimator position, then DataFlash POS, then raw GPS.
+        position = (messages.get('GLOBAL_POSITION_INT') or
+                    messages.get('POS') or
+                    messages.get('GPS_RAW_INT'))
+        if position is not None:
+            self.mavlink_packet(position, force=True)
+
+    def send_vehicle_position(self, lat, lon, alt, home_amsl=None,
+                              attitude=None, force=False):
+        if lat == 0 and lon == 0:
+            return
+        now = time.time()
+        if not force and now - self.last_vehicle_send < 0.1:
+            return
+        self.last_vehicle_send = now
+
+        if not self.map.origin_set():
+            self.map.set_origin(lat, lon, alt)
+            if home_amsl is None:
+                home_amsl = self.home_amsl
+            if home_amsl is None:
+                home_amsl = alt
+            self.home_amsl = home_amsl
+            self.map.set_home(home_amsl)
+            self.send_mission()
+            self.send_fence()
+            self.send_rally()
+
+        if attitude is None:
+            attitude = self.last_attitude
+        self.map.set_vehicle(lat, lon, alt, *attitude)
+
     def terrain_alt(self, lat, lon):
         '''terrain elevation (m AMSL) at lat/lon. Prefer the quantized mesh (same
         source rendered in 3D); fall back to the terrain module's SRTM model.'''
@@ -133,6 +217,15 @@ class Map3DModule(mp_module.MPModule):
         if not self.map.is_alive():
             self.map = None
             return
+        for event in self.map.check_events():
+            if event[0] == 'render_settings':
+                (_, brightness, shading, wireframe, fpvfov) = event
+                self.map3d_settings.terrainbrightness = brightness
+                self.map3d_settings.terrainshading = shading
+                self.map3d_settings.terrainwireframe = wireframe
+                self.map3d_settings.fpvfov = fpvfov
+            elif event[0] == 'follow':
+                self.follow = bool(event[1])
         # poll change times like the 2D map / cesium modules
         try:
             wp_change = self.module('wp').wploader.last_change
@@ -149,31 +242,46 @@ class Map3DModule(mp_module.MPModule):
         except Exception:
             pass
 
-    def mavlink_packet(self, m):
+    def mavlink_packet(self, m, force=False):
         if self.map is None or not self.map.is_alive():
             return
         mtype = m.get_type()
         if mtype == 'HOME_POSITION':
-            self.map.set_home(m.altitude * 1.0e-3)   # AMSL (mm -> m)
+            self.home_amsl = m.altitude * 1.0e-3     # AMSL (mm -> m)
+            self.map.set_home(self.home_amsl)
         elif mtype == 'ATTITUDE':
             self.last_attitude = (m.roll, m.pitch, m.yaw)
+        elif mtype == 'ATT':
+            # ArduPilot DataFlash attitude is recorded in degrees.
+            self.last_attitude = tuple(math.radians(v) for v in
+                                       (m.Roll, m.Pitch, m.Yaw))
         elif mtype == 'GLOBAL_POSITION_INT':
-            now = time.time()
-            if now - self.last_vehicle_send < 0.1:
-                return
-            self.last_vehicle_send = now
+            self.last_global_position = time.time()
             lat = m.lat * 1.0e-7
             lon = m.lon * 1.0e-7
             alt = m.alt * 1.0e-3            # AMSL (mm -> m)
             rel = m.relative_alt * 1.0e-3   # above home
-            if not self.map.origin_set():
-                self.map.set_origin(lat, lon, alt)
-                self.map.set_home(alt - rel)   # home AMSL = current AMSL - relative
-                self.send_mission()
-                self.send_fence()
-                self.send_rally()
-            (roll, pitch, yaw) = self.last_attitude
-            self.map.set_vehicle(lat, lon, alt, roll, pitch, yaw)
+            self.send_vehicle_position(lat, lon, alt, alt - rel, force=force)
+        elif mtype == 'POS':
+            # DataFlash log playback does not contain GLOBAL_POSITION_INT.
+            if not force and time.time() - self.last_global_position < 1.0:
+                return
+            rel = getattr(m, 'RelHomeAlt', 0.0)
+            self.send_vehicle_position(m.Lat, m.Lng, m.Alt, m.Alt - rel,
+                                       force=force)
+        elif mtype == 'GPS_RAW_INT':
+            # Raw GPS is a live fallback until estimator position is available.
+            if not force and time.time() - self.last_global_position < 1.0:
+                return
+            if getattr(m, 'fix_type', 0) < 2:
+                return
+            lat = m.lat * 1.0e-7
+            lon = m.lon * 1.0e-7
+            alt = m.alt * 1.0e-3
+            yaw = math.radians(m.cog * 0.01)
+            attitude = (self.last_attitude[0], self.last_attitude[1], yaw)
+            self.send_vehicle_position(lat, lon, alt, attitude=attitude,
+                                       force=force)
 
     def unload(self):
         self.stop_map()
