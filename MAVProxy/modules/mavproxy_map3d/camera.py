@@ -62,6 +62,27 @@ class TerrainCamera:
             self.pitch = pitch
         self.apply()
 
+    def set_fpv(self, position, yaw, pitch, lookahead=5000.0):
+        '''Place the camera at the vehicle and look along its yaw/pitch.
+
+        yaw and pitch are radians from MAVLink. Roll is deliberately omitted;
+        world-up remains camera-up so the FPV horizon is always level.
+        '''
+        pitch = min(math.radians(85.0), max(math.radians(-85.0), pitch))
+        cp = math.cos(pitch)
+        direction = (math.sin(yaw) * cp,
+                     math.cos(yaw) * cp,
+                     math.sin(pitch))
+        self.pos = tuple(position)
+        self.focal = [position[i] + lookahead * direction[i] for i in range(3)]
+        self.dist = lookahead
+        self.yaw = math.degrees(yaw)
+        self.pitch = math.degrees(pitch)
+        self.cam.SetPosition(*self.pos)
+        self.cam.SetFocalPoint(*self.focal)
+        self.cam.SetViewUp(0, 0, 1)
+        self.cam.SetClippingRange(0.5, lookahead * 100.0)
+
 
 class TerrainStyle(vtk.vtkInteractorStyleUser):
     '''default drag = pan, Ctrl+drag = yaw/pitch, wheel = zoom'''
@@ -70,6 +91,9 @@ class TerrainStyle(vtk.vtkInteractorStyleUser):
         self.on_change = on_change
         self.last = None
         self.moved = False
+        # Do not call this "enabled": vtkInteractorStyle exposes an enabled
+        # property that attempts to enable the style immediately.
+        self.interaction_enabled = True
         self.AddObserver("LeftButtonPressEvent", self._down)
         self.AddObserver("LeftButtonReleaseEvent", self._up)
         self.AddObserver("MouseMoveEvent", self._move)
@@ -80,16 +104,20 @@ class TerrainStyle(vtk.vtkInteractorStyleUser):
         self.GetInteractor().GetRenderWindow().Render()
 
     def _down(self, o, e):
+        if not self.interaction_enabled:
+            return
         self.last = self.GetInteractor().GetEventPosition()
         self.moved = False
 
     def _up(self, o, e):
         self.last = None
+        if not self.interaction_enabled:
+            return
         if self.moved and self.on_change:
             self.on_change()
 
     def _move(self, o, e):
-        if self.last is None:
+        if not self.interaction_enabled or self.last is None:
             return
         it = self.GetInteractor()
         x, y = it.GetEventPosition()
@@ -103,12 +131,16 @@ class TerrainStyle(vtk.vtkInteractorStyleUser):
         self._render()
 
     def _wf(self, o, e):
+        if not self.interaction_enabled:
+            return
         self.tc.zoom(1.0 / 1.2)
         if self.on_change:
             self.on_change()
         self._render()
 
     def _wb(self, o, e):
+        if not self.interaction_enabled:
+            return
         self.tc.zoom(1.2)
         if self.on_change:
             self.on_change()

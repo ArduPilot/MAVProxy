@@ -4,19 +4,27 @@ Parent-side handle for the 3D map. Spawns the VTK/wx viewer in a child process
 '''
 
 import time
+import queue
 
 from MAVProxy.modules.lib import multiproc
 
 
 class Map3D:
     def __init__(self, title="3D Map", service="MicrosoftSat", zexag=1.0,
-                 width=1100, height=800, debug=False):
+                 width=1100, height=800, debug=False, fpvfov=90.0,
+                 terrain_brightness=1.25, terrain_shading=True,
+                 terrain_wireframe=False, follow=True):
         self.title = title
         self.service = service
         self.zexag = zexag
         self.width = width
         self.height = height
         self.debug = debug
+        self.fpvfov = fpvfov
+        self.terrain_brightness = terrain_brightness
+        self.terrain_shading = terrain_shading
+        self.terrain_wireframe = terrain_wireframe
+        self.follow = bool(follow)
 
         self.object_queue = multiproc.Queue()
         self.event_queue = multiproc.Queue()
@@ -76,6 +84,21 @@ class Map3D:
 
     def set_follow(self, enable):
         self._put(('follow', bool(enable)))
+
+    def set_fpv_fov(self, fov):
+        self._put(('fpvfov', float(fov)))
+
+    def set_render_settings(self, brightness, shading, wireframe):
+        self._put(('render_settings', float(brightness), bool(shading),
+                   bool(wireframe)))
+
+    def check_events(self):
+        events = []
+        while True:
+            try:
+                events.append(self.event_queue.get_nowait())
+            except queue.Empty:
+                return events
 
     def center_on_vehicle(self):
         self._put(('center', None))

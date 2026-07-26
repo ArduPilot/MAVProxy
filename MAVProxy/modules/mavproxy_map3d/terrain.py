@@ -12,6 +12,7 @@ import os
 import queue
 import threading
 import urllib.request
+import warnings
 
 import numpy as np
 import vtk
@@ -25,6 +26,14 @@ from MAVProxy.modules.mavproxy_map import mp_tile
 R = 6378137.0
 QUANTIZED_BASE = "https://plot.ardupilot.org/quantized"
 CACHE_DIR = os.path.join(os.environ.get("HOME", "."), ".tilecache", "quantized")
+
+# ArduPilot tiles include the optional lighting extension. This decoder warns
+# when it skips that extension, but map3d computes its own VTK normals anyway.
+warnings.filterwarnings(
+    "ignore",
+    message=r"Skipping unsupported terrain tile extension \(id=1, length=\d+ bytes\).*",
+    category=UserWarning,
+    module=r"quantized_mesh_tile\.terrain")
 
 
 def enu(lat, lon, h, lat0, lon0):
@@ -134,7 +143,8 @@ def lod_tile_set(g, z_fine, fx0, fx1, fy0, fy1, z_min, ring):
 
 class Tile:
     '''one terrain tile (main-thread VTK objects + view-dependent drape)'''
-    def __init__(self, decoded, lat0, lon0, zexag, z_offset):
+    def __init__(self, decoded, lat0, lon0, zexag, z_offset,
+                 brightness=1.25, shading=True, wireframe=False):
         self.bbox = decoded["bbox"]                 # (W,S,E,N)
         self.verts = decoded["verts"]
         idx = decoded["idx"]
@@ -163,6 +173,10 @@ class Tile:
         normals.SplittingOff()
         normals.Update()
         self.geo = normals.GetOutput()
+        self.locator = None
+        bounds = self.geo.GetBounds()
+        self.z_min = bounds[4]
+        self.z_max = bounds[5]
         self.tcoords = vtk.vtkFloatArray()
         self.tcoords.SetNumberOfComponents(2)
         self.tcoords.SetNumberOfTuples(nv)
@@ -171,34 +185,64 @@ class Tile:
         mapper.SetInputData(self.geo)
         self.actor = vtk.vtkActor()
         self.actor.SetMapper(mapper)
-        self.actor.GetProperty().SetAmbient(0.35)
-        self.actor.GetProperty().SetDiffuse(0.8)
-        self.actor.GetProperty().SetColor(0.55, 0.6, 0.5)   # muted land until textured
+        self.apply_render_settings(brightness, shading, wireframe)
         self.tex_key = None     # currently applied drape key
         self.want_key = None    # most recently requested drape key
 
-    def texture_request(self, campos, foclat, foclon, ext_m, screen_h, mt, fov_deg=30.0):
-        '''compute the desired drape (cheap, main thread). Returns (key, params)
-        or None if unchanged.'''
+    def apply_render_settings(self, brightness, shading, wireframe):
+        prop = self.actor.GetProperty()
+        brightness = min(2.0, max(0.25, float(brightness)))
+        prop.SetAmbient(min(1.0, 0.35 * brightness))
+        prop.SetDiffuse(min(1.0, 0.8 * brightness))
+        prop.SetColor(*(min(1.0, c * brightness)
+                        for c in (0.55, 0.6, 0.5)))
+        prop.SetLighting(bool(shading))
+        if shading:
+            prop.SetInterpolationToPhong()
+        if wireframe:
+            prop.SetRepresentationToWireframe()
+        else:
+            prop.SetRepresentationToSurface()
+
+    def height_at(self, e, n):
+        '''Return the rendered world Z at an east/north point, or None.'''
+        if self.locator is None:
+            self.locator = vtk.vtkStaticCellLocator()
+            self.locator.SetDataSet(self.geo)
+            self.locator.BuildLocator()
+        intersections = vtk.vtkPoints()
+        cell_ids = vtk.vtkIdList()
+        margin = max(1000.0, self.z_max - self.z_min)
+        found = self.locator.IntersectWithLine(
+            (e, n, self.z_max + margin),
+            (e, n, self.z_min - margin),
+            1.0e-6, intersections, cell_ids)
+        if not found or intersections.GetNumberOfPoints() == 0:
+            return None
+        return max(intersections.GetPoint(i)[2]
+                   for i in range(intersections.GetNumberOfPoints()))
+
+    def texture_request(self, campos, screen_h, mt, fov_deg=30.0):
+        '''Compute the desired full-tile drape (cheap, main thread).
+
+        A texture must cover the complete mesh tile. Applying imagery for only
+        the camera-visible subsection makes VTK clamp the texture coordinates
+        of the remaining vertices to an edge pixel, producing long stretched
+        streaks in low-angle and FPV views.
+        '''
         W, S, E, N = self.bbox
-        ext_lat = math.degrees(ext_m / R)
-        ext_lon = math.degrees(ext_m / (R * math.cos(math.radians(foclat))))
-        vw, ve = max(W, foclon - ext_lon), min(E, foclon + ext_lon)
-        vs, vn = max(S, foclat - ext_lat), min(N, foclat + ext_lat)
-        if ve <= vw or vn <= vs:
-            vw, ve, vs, vn = W, E, S, N
-        mid = 0.5 * (vn + vs)
+        mid = 0.5 * (N + S)
         dist = math.sqrt(sum((campos[i] - self.center[i]) ** 2 for i in range(3)))
         gsd = max(0.3, dist * 2.0 * math.tan(math.radians(fov_deg) / 2.0) / screen_h)
         img_zoom = int(round(math.log2(
             2 * math.pi * R * math.cos(math.radians(mid)) / (gsd * 256))))
         img_zoom = max(mt.min_zoom, min(mt.max_zoom, img_zoom))
-        sub_w_m = math.radians(ve - vw) * R * math.cos(math.radians(mid))
-        tex_w = min(1024, max(256, int(sub_w_m / gsd)))
-        key = (round(vw, 4), round(vs, 4), round(ve, 4), round(vn, 4), img_zoom, tex_w)
+        tile_w_m = math.radians(E - W) * R * math.cos(math.radians(mid))
+        tex_w = min(1024, max(256, int(tile_w_m / gsd)))
+        key = (img_zoom, tex_w)
         if key == self.tex_key:
             return None
-        return key, (vw, vs, ve, vn, img_zoom, tex_w)
+        return key, (W, S, E, N, img_zoom, tex_w)
 
     def apply_texture(self, img, vw, vs, ve, vn, tex_w, key):
         '''main thread: attach the draped image and recompute UVs'''
@@ -219,7 +263,7 @@ class Tile:
 
 
 def build_texture_image(mt, lock, vw, vs, ve, vn, img_zoom, tex_w):
-    '''worker thread: assemble the draped Mercator image for a sub-rect. Does NOT
+    '''worker thread: assemble the draped Mercator image for a tile. Does NOT
     block on downloads (mp_tile fetches imagery on its own thread); missing
     imagery comes back as placeholders and is refreshed once downloads settle.'''
     dlon = math.radians(ve - vw)
@@ -233,7 +277,8 @@ def build_texture_image(mt, lock, vw, vs, ve, vn, img_zoom, tex_w):
 
 class TerrainManager:
     def __init__(self, renderer, mt, lat0, lon0, zexag=1.0,
-                 zoom_fine=12, lod_min=8, ring=1, fine_radius=2, screen_h=800):
+                 zoom_fine=12, lod_min=8, ring=1, fine_radius=2, screen_h=800,
+                 brightness=1.25, shading=True, wireframe=False):
         self.ren = renderer
         self.mt = mt
         self.lat0 = lat0
@@ -244,6 +289,9 @@ class TerrainManager:
         self.ring = ring
         self.fine_radius = fine_radius
         self.screen_h = screen_h
+        self.brightness = brightness
+        self.shading = shading
+        self.wireframe = wireframe
         self.g = GlobalGeodetic(True)
         self.tiles = {}                 # (z,x,y) -> Tile
         self.inflight = set()           # jobs queued/running
@@ -257,6 +305,14 @@ class TerrainManager:
                         for _ in range(6)]
         for w in self.workers:
             w.start()
+
+    def set_render_settings(self, brightness, shading, wireframe):
+        self.brightness = min(2.0, max(0.25, float(brightness)))
+        self.shading = bool(shading)
+        self.wireframe = bool(wireframe)
+        for tile in self.tiles.values():
+            tile.apply_render_settings(self.brightness, self.shading,
+                                       self.wireframe)
 
     def _worker(self):
         while not self.stop:
@@ -298,12 +354,34 @@ class TerrainManager:
             out.add((z, x % nx, y))
         return out
 
+    def height_at(self, lat, lon):
+        '''Return rendered terrain world Z at lat/lon, preferring fine tiles.'''
+        e, n, _ = enu(lat, lon, 0.0, self.lat0, self.lon0)
+        for key, tile in sorted(self.tiles.items(), reverse=True):
+            west, south, east, north = tile.bbox
+            if not (west <= lon <= east and south <= lat <= north):
+                continue
+            height = tile.height_at(e, n)
+            if height is not None:
+                return height
+        return None
+
     def update(self, tc):
         '''called on camera settle: page in/out terrain + request textures'''
         foclat, foclon = self.focal_latlon(tc)
         want = self.desired_set(foclat, foclon)
         # page in missing terrain
-        for (z, x, y) in want:
+
+        def tile_priority(key):
+            z, x, y = key
+            west, south, east, north = self.g.TileBounds(x, y, z)
+            clat = 0.5 * (south + north)
+            clon = 0.5 * (west + east)
+            dlat = clat - foclat
+            dlon = (clon - foclon) * math.cos(math.radians(foclat))
+            return (-z, dlat * dlat + dlon * dlon)
+
+        for (z, x, y) in sorted(want, key=tile_priority):
             jid = ("D", z, x, y)
             if (z, x, y) not in self.tiles and jid not in self.inflight:
                 self.inflight.add(jid)
@@ -314,9 +392,9 @@ class TerrainManager:
                 self.ren.RemoveActor(self.tiles[key].actor)
                 del self.tiles[key]
         # request textures for present tiles (at most one outstanding per tile)
-        ext_m = tc.dist * 0.8
+        fov_deg = tc.cam.GetViewAngle()
         for key, tile in self.tiles.items():
-            req = tile.texture_request(tc.pos, foclat, foclon, ext_m, self.screen_h, self.mt)
+            req = tile.texture_request(tc.pos, self.screen_h, self.mt, fov_deg)
             if req is None:
                 continue
             tkey, params = req
@@ -352,7 +430,8 @@ class TerrainManager:
                     continue   # camera moved on; don't build a tile we'll drop
                 zoff = -(self.zoom_fine - z) * 3.0
                 try:
-                    tile = Tile(payload, self.lat0, self.lon0, self.zexag, zoff)
+                    tile = Tile(payload, self.lat0, self.lon0, self.zexag, zoff,
+                                self.brightness, self.shading, self.wireframe)
                 except Exception:
                     continue
                 self.tiles[(z, x, y)] = tile
