@@ -5,6 +5,7 @@ import io
 import time, os, sys
 import struct
 import random
+import zlib
 from pymavlink import mavutil
 
 try:
@@ -100,7 +101,8 @@ class FTPModule(mp_module.MPModule):
         self.add_command('ftp', self.cmd_ftp, "file transfer",
                          ["<list|get|rm|rmdir|rename|mkdir|crc|cancel|status>",
                           "set (FTPSETTING)",
-                          "put (FILENAME) (FILENAME)"])
+                          "put (FILENAME) (FILENAME)",
+                          "crclocal (FILENAME)"])
         self.ftp_settings = mp_settings.MPSettings(
             [('debug', int, 0),
              ('pkt_loss_tx', int, 0),
@@ -156,7 +158,7 @@ class FTPModule(mp_module.MPModule):
 
     def cmd_ftp(self, args):
         '''FTP operations'''
-        usage = "Usage: ftp <list|get|put|rm|rmdir|rename|mkdir|crc>"
+        usage = "Usage: ftp <list|get|put|rm|rmdir|rename|mkdir|crc|crclocal>"
         if len(args) < 1:
             print(usage)
             return
@@ -178,6 +180,8 @@ class FTPModule(mp_module.MPModule):
             self.cmd_mkdir(args[1:])
         elif args[0] == 'crc':
             self.cmd_crc(args[1:])
+        elif args[0] == 'crclocal':
+            self.cmd_crclocal(args[1:])
         elif args[0] == 'status':
             self.cmd_status()
         elif args[0] == 'cancel':
@@ -703,6 +707,37 @@ class FTPModule(mp_module.MPModule):
         enc_name = bytearray(name, 'ascii')
         op = FTP_OP(self.seq, self.session, OP_CalcFileCRC32, len(enc_name), 0, 0, 0, bytearray(enc_name))
         self.send(op)
+
+    def local_file_crc(self, name):
+        '''CRC32 of a local file as the vehicle would compute it.
+
+        ArduPilot's crc_crc32() runs the standard reflected CRC32 table from a
+        zero seed with no final inversion, which is not what zlib.crc32() gives.
+        Seeding with 0xffffffff and inverting the result cancels zlib's own
+        inversions and leaves the raw value the vehicle reports.
+        '''
+        crc = 0xffffffff
+        with open(name, 'rb') as f:
+            while True:
+                buf = f.read(65536)
+                if not buf:
+                    break
+                crc = zlib.crc32(buf, crc)
+        return crc ^ 0xffffffff
+
+    def cmd_crclocal(self, args):
+        '''get crc of a local file, for comparison with "ftp crc"'''
+        if len(args) < 1:
+            print("Usage: crclocal NAME")
+            return
+        name = args[0]
+        start = time.time()
+        try:
+            crc = self.local_file_crc(name)
+        except Exception as ex:
+            print("crclocal failed %s: %s" % (name, ex))
+            return
+        print("crclocal: %s 0x%08x in %.1fs" % (name, crc, time.time() - start))
 
     def handle_crc_reply(self, op, m):
         '''handle crc reply'''
