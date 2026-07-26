@@ -9,7 +9,7 @@ import math
 
 import vtk
 
-from MAVProxy.modules.mavproxy_map3d.terrain import enu
+from MAVProxy.modules.mavproxy_map3d.terrain import enu, R
 
 # MAV_FRAME altitude conventions
 FRAME_GLOBAL = (0, 5)            # AMSL
@@ -18,6 +18,21 @@ FRAME_TERRAIN = (10, 11)         # above terrain
 FENCE_CLEARANCE = 3.0
 FENCE_SAMPLE_SPACING = 20.0
 FENCE_MAX_SAMPLES_PER_EDGE = 1000
+FENCE_CIRCLE_SEGMENTS = 64
+
+
+def circle_latlon(centre, radius, segments=FENCE_CIRCLE_SEGMENTS):
+    '''lat/lon ring approximating a circle of radius metres about centre'''
+    (lat, lon) = centre
+    dlat = math.degrees(max(0.0, float(radius)) / R)
+    coslat = math.cos(math.radians(lat))
+    dlon = dlat / coslat if abs(coslat) > 1.0e-9 else 0.0
+    points = []
+    for i in range(segments):
+        angle = 2.0 * math.pi * i / segments
+        points.append((lat + dlat * math.cos(angle),
+                       lon + dlon * math.sin(angle)))
+    return points
 
 
 def _polyline(points_enu, colour, width, dashed=False):
@@ -119,7 +134,7 @@ class ElementManager:
         self.vehicle_visible = True
         self.terrain_height = None
         self.fence = []
-        self.fence_ring = None
+        self.fence_geometry = None
         self.kml_features = []
         self.kml_geometry = None
         self.kml_height_cache = {}
@@ -228,7 +243,7 @@ class ElementManager:
         return line
 
     def refresh_fence(self, terrain_height=None):
-        '''Rebuild the fence just above the currently loaded terrain.
+        '''Rebuild the fence shapes just above the currently loaded terrain.
 
         terrain_height returns rendered world Z for a lat/lon, or None where
         terrain has not arrived yet. In that case home AMSL is a safe temporary
@@ -236,21 +251,29 @@ class ElementManager:
         '''
         if terrain_height is not None:
             self.set_terrain_height(terrain_height)
-        if len(self.fence) < 2:
-            self._replace('fence', [])
-            self.fence_ring = None
+        geometry = []
+        for shape in self.fence:
+            if shape[0] == 'circle':
+                (_, centre, radius, colour) = shape
+                points = circle_latlon(centre, radius)
+            else:
+                (_, points, colour) = shape
+            if len(points) < 2:
+                continue
+            ring = self._terrain_draped_line(points, closed=True)
+            if len(ring) >= 2:
+                geometry.append((ring, colour))
+
+        if geometry == self.fence_geometry:
             return
+        self.fence_geometry = geometry
+        self._replace('fence', [_polyline(ring, colour, 2.0)
+                                for (ring, colour) in geometry])
 
-        ring = self._terrain_draped_line(self.fence, closed=True)
-
-        if ring == self.fence_ring:
-            return
-        self.fence_ring = ring
-        self._replace('fence', [_polyline(ring, (0.0, 1.0, 0.0), 2.0)])
-
-    def set_fence(self, pts, terrain_height=None):
-        '''pts: list of (lat,lon) polygon, clamped above loaded terrain'''
-        self.fence = [(lat, lon) for lat, lon in pts]
+    def set_fence(self, shapes, terrain_height=None):
+        '''shapes: list of ('polygon', [(lat,lon), ...], rgb) or
+        ('circle', (lat,lon), radius_m, rgb), each clamped above loaded terrain'''
+        self.fence = list(shapes)
         if terrain_height is not None:
             self.set_terrain_height(terrain_height)
         self.refresh_fence()

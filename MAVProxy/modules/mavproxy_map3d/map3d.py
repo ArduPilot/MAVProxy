@@ -76,8 +76,9 @@ class Map3D:
     def set_mission(self, items):
         self._put(('mission', list(items)))
 
-    def set_fence(self, pts):
-        self._put(('fence', list(pts)))
+    def set_fence(self, shapes):
+        '''shapes: ('polygon', [(lat,lon), ...], rgb) / ('circle', (lat,lon), radius_m, rgb)'''
+        self._put(('fence', list(shapes)))
 
     def set_kml(self, features):
         self._put(('kml', list(features)))
