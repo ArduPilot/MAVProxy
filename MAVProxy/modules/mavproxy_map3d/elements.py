@@ -22,16 +22,32 @@ FENCE_CIRCLE_SEGMENTS = 64
 
 
 def circle_latlon(centre, radius, segments=FENCE_CIRCLE_SEGMENTS):
-    '''lat/lon ring approximating a circle of radius metres about centre'''
+    '''lat/lon ring approximating a circle of radius metres about centre.
+
+    Great-circle destination points, so the ring stays a circle at high latitude
+    instead of blowing up as a flat-earth 1/cos(lat) would. Longitudes are left
+    unwrapped (centre longitude plus an offset) so the ring stays continuous for
+    the ENU projection rather than jumping at the 180th meridian.
+    '''
     (lat, lon) = centre
-    dlat = math.degrees(max(0.0, float(radius)) / R)
-    coslat = math.cos(math.radians(lat))
-    dlon = dlat / coslat if abs(coslat) > 1.0e-9 else 0.0
+    delta = max(0.0, float(radius)) / R
+    lat1 = math.radians(lat)
+    (sin_lat1, cos_lat1) = (math.sin(lat1), math.cos(lat1))
+    (sin_d, cos_d) = (math.sin(delta), math.cos(delta))
+    if abs(cos_lat1) < 1.0e-12:
+        # exactly on a pole the bearing terms cancel, so sweep longitude instead
+        polar_lat = math.degrees(math.copysign(math.pi / 2 - delta, lat1))
+        return [(polar_lat, lon - 180.0 + 360.0 * i / segments)
+                for i in range(segments)]
     points = []
     for i in range(segments):
-        angle = 2.0 * math.pi * i / segments
-        points.append((lat + dlat * math.cos(angle),
-                       lon + dlon * math.sin(angle)))
+        bearing = 2.0 * math.pi * i / segments
+        sin_lat2 = min(1.0, max(-1.0, sin_lat1 * cos_d +
+                                cos_lat1 * sin_d * math.cos(bearing)))
+        lat2 = math.asin(sin_lat2)
+        dlon = math.atan2(math.sin(bearing) * sin_d * cos_lat1,
+                          cos_d - sin_lat1 * sin_lat2)
+        points.append((math.degrees(lat2), lon + math.degrees(dlon)))
     return points
 
 
