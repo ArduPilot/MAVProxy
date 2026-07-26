@@ -65,8 +65,12 @@ def fetch_terrain_tile(z, x, y):
         url = "%s/%d/%d/%d.terrain" % (QUANTIZED_BASE, z, x, y)
         req = urllib.request.Request(url, headers={"Accept": "application/octet-stream"})
         data = urllib.request.urlopen(req, timeout=30).read()
-        with open(path, "wb") as f:
+        # publish atomically under a unique name: the viewer child process and
+        # the module share this cache, so a reader must never see a partial tile
+        tmppath = "%s.tmp.%u.%u" % (path, os.getpid(), threading.get_ident())
+        with open(tmppath, "wb") as f:
             f.write(data)
+        os.replace(tmppath, path)
     with open(path, "rb") as f:
         gz = f.read(2) == b"\x1f\x8b"
     return path, gz
