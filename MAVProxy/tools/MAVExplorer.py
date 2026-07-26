@@ -713,6 +713,11 @@ def cmd_map3d(args):
     if mission:
         mission = resolve_mission_amsl(mission, ground0)
 
+    # drop views the user has already closed, so their child processes are reaped
+    for old in [v for v in map3d_views if not v.is_alive()]:
+        old.close()
+        map3d_views.remove(old)
+
     m3d = Map3D(title="MAVExplorer 3D Map")
     map3d_views.append(m3d)
     m3d.set_origin(lat0, lon0, ground0)
