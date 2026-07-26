@@ -148,6 +148,11 @@ class FTPModule(mp_module.MPModule):
         self.write_pending = 0
         self.write_last_send = None
         self.warned_component = False
+        # console progress is only for interactive ftp get/put, not for the
+        # callback-driven transfers behind "param ftp" and "wp ftp"
+        self.show_progress = False
+        self.last_status_time = 0
+        self.remote_file_size = None
 
     def cmd_ftp(self, args):
         '''FTP operations'''
@@ -200,6 +205,13 @@ class FTPModule(mp_module.MPModule):
 
     def terminate_session(self):
         '''terminate current session'''
+        if self.show_progress:
+            # only reached when a transfer ends without completing, as the
+            # completion paths clear show_progress first
+            self.show_progress = False
+            self.set_progress_status("%s %s cancelled" % (
+                "Uploading" if self.write_list is not None else "Downloading",
+                self.filename))
         self.send(FTP_OP(self.seq, self.session, OP_TerminateSession, 0, 0, 0, 0, None))
         self.fh = None
         self.filename = None
@@ -291,6 +303,8 @@ class FTPModule(mp_module.MPModule):
         self.op_start = time.time()
         self.callback = callback
         self.callback_progress = callback_progress
+        self.show_progress = callback is None
+        self.remote_file_size = None
         self.read_retries = 0
         self.duplicates = 0
         self.reached_eof = False
@@ -309,6 +323,9 @@ class FTPModule(mp_module.MPModule):
         if op.opcode == OP_Ack:
             if self.filename is None:
                 return
+            if op.size == 4 and op.payload is not None and len(op.payload) >= 4:
+                # servers report the file size here, giving us a progress total
+                self.remote_file_size = struct.unpack("<I", bytes(op.payload[:4]))[0]
             try:
                 if self.callback is not None or self.filename == '-':
                     self.fh = SIO()
@@ -344,6 +361,7 @@ class FTPModule(mp_module.MPModule):
                     print(self.fh.read().decode('utf-8'))
             else:
                 print("Wrote %u bytes to %s in %.2fs %.1fkByte/s" % (ofs, self.filename, dt, rate))
+            self.finished_status("downloading", self.filename, ofs)
             self.terminate_session()
             return True
         return False
@@ -528,6 +546,7 @@ class FTPModule(mp_module.MPModule):
 
         self.put_callback = callback
         self.put_callback_progress = progress_callback
+        self.show_progress = callback is None
         self.read_retries = 0
         self.op_start = time.time()
         enc_fname = bytearray(self.filename, 'ascii')
@@ -544,6 +563,7 @@ class FTPModule(mp_module.MPModule):
             self.put_callback = None
         else:
             print("Sent file of length ", flen)
+        self.finished_status("uploading", self.filename, flen)
         
     def handle_create_file_reply(self, op, m):
         '''handle OP_CreateFile reply'''
@@ -697,6 +717,58 @@ class FTPModule(mp_module.MPModule):
         '''cancel any pending op'''
         self.terminate_session()
 
+    def set_progress_status(self, status):
+        '''show a transfer status line in the console, where log download shows its own'''
+        self.console.set_status('FTP', status, row=4)
+
+    def transfer_status(self):
+        '''describe the transfer in progress, or None if there isn't one'''
+        if self.op_start is None:
+            return None
+        dt = max(time.time() - self.op_start, 1.0e-6)
+        if self.write_list is not None:
+            # an upload is paced by acks, so count acked blocks rather than
+            # what we have pushed at the vehicle
+            done = min(self.write_acks * self.write_block_size, self.write_file_size)
+            pct = 100.0 * self.write_acks / max(self.write_total, 1)
+            return "Uploading %s - %u/%u bytes %.1f%% %.1f kbyte/s" % (
+                self.filename, done, self.write_file_size, min(pct, 100.0),
+                (done / dt) / 1024.0)
+        if self.fh is None:
+            return None
+        if self.remote_file_size:
+            # servers that don't report a size leave us without a percentage
+            progress = "%u/%u bytes %.1f%%" % (
+                self.read_total, self.remote_file_size,
+                min(100.0 * self.read_total / self.remote_file_size, 100.0))
+        else:
+            progress = "%u bytes" % self.read_total
+        return "Downloading %s - %s %.1f kbyte/s (%u retries %u gaps)" % (
+            self.filename, progress, (self.read_total / dt) / 1024.0,
+            self.read_retries, len(self.read_gaps))
+
+    def update_status(self):
+        '''update the console transfer status, rate limited like log download'''
+        if not self.show_progress:
+            return
+        now = time.time()
+        if now - self.last_status_time < 0.5:
+            return
+        self.last_status_time = now
+        status = self.transfer_status()
+        if status is not None:
+            self.set_progress_status(status)
+
+    def finished_status(self, verb, filename, size):
+        '''final line for a completed interactive transfer'''
+        if not self.show_progress:
+            return
+        self.show_progress = False
+        dt = max(time.time() - self.op_start, 1.0e-6)
+        self.set_progress_status(
+            "Finished %s %s (%u bytes %.1f seconds, %.1f kbyte/sec)" % (
+                verb, filename, size, dt, (size / dt) / 1024.0))
+
     def cmd_status(self):
         '''show status'''
         if self.fh is None:
@@ -809,6 +881,9 @@ class FTPModule(mp_module.MPModule):
     def idle_task(self):
         '''check for file gaps and lost requests'''
         now = time.time()
+
+        # ahead of the early returns below, which skip idle transfers
+        self.update_status()
 
         # see if we lost an open reply
         if self.op_start is not None and now - self.op_start > 1.0 and self.last_op.opcode == OP_OpenFileRO:
