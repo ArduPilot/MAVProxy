@@ -546,6 +546,10 @@ class FTPModule(mp_module.MPModule):
 
         # setup write list
         self.write_block_size = self.ftp_settings.write_size
+        if self.write_block_size < 1 or self.write_block_size > MAX_Payload:
+            # an oversized block silently overflows the 251 byte payload, and
+            # the size field is only 8 bits. clamp as the read path does.
+            self.write_block_size = MAX_Payload
         self.write_file_size = file_size
 
         write_blockcount = file_size // self.write_block_size
