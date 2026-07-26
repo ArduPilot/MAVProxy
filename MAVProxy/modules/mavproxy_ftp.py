@@ -143,6 +143,7 @@ class FTPModule(mp_module.MPModule):
         self.write_list = None
         self.write_block_size = 0
         self.write_acks = 0
+        self.write_acked_bytes = 0
         self.write_total = 0
         self.write_file_size = 0
         self.write_idx = 0
@@ -207,15 +208,17 @@ class FTPModule(mp_module.MPModule):
             print("> %s dt=%.2f" % (op, now - self.last_op_time))
         self.last_op_time = time.time()
 
-    def terminate_session(self):
-        '''terminate current session'''
+    def terminate_session(self, outcome="failed"):
+        '''terminate current session. outcome describes an incomplete transfer
+        for the status line: "cancelled" when the user or a new command ended
+        it, "failed" for an error'''
         if self.show_progress:
             # only reached when a transfer ends without completing, as the
             # completion paths clear show_progress first
             self.show_progress = False
-            self.set_progress_status("%s %s cancelled" % (
+            self.set_progress_status("%s %s %s" % (
                 "Uploading" if self.write_list is not None else "Downloading",
-                self.filename))
+                self.filename, outcome))
         self.send(FTP_OP(self.seq, self.session, OP_TerminateSession, 0, 0, 0, 0, None))
         self.fh = None
         self.filename = None
@@ -296,7 +299,7 @@ class FTPModule(mp_module.MPModule):
         if len(args) == 0:
             print("Usage: get FILENAME <LOCALNAME>")
             return
-        self.terminate_session()
+        self.terminate_session("cancelled")
         fname = args[0]
         if len(args) > 1:
             self.filename = args[1]
@@ -362,7 +365,9 @@ class FTPModule(mp_module.MPModule):
                 if sys.version_info.major < 3:
                     print(self.fh.read())
                 else:
-                    print(self.fh.read().decode('utf-8'))
+                    # a non-UTF-8 file must not raise here, or the session
+                    # teardown and status cleanup below never run
+                    print(self.fh.read().decode('utf-8', errors='replace'))
             else:
                 print("Wrote %u bytes to %s in %.2fs %.1fkByte/s" % (ofs, self.filename, dt, rate))
             self.finished_status("downloading", self.filename, ofs)
@@ -466,8 +471,11 @@ class FTPModule(mp_module.MPModule):
                 if self.check_read_finished():
                     return
                 self.check_read_send()
-            elif self.ftp_settings.debug > 0:
+            else:
+                # not recoverable, and without ending the session here the
+                # idle_task retry would re-request the burst forever
                 print("FTP: burst Nack (ecode:%u): %s" % (ecode, op))
+                self.terminate_session()
         else:
             print("FTP: burst error: %s" % op)
 
@@ -509,8 +517,12 @@ class FTPModule(mp_module.MPModule):
         if len(args) == 0:
             print("Usage: put FILENAME <REMOTENAME>")
             return
-        if self.write_list is not None:
-            print("put already in progress")
+        if self.write_list is not None or self.fh is not None:
+            # a download owns self.fh too, so checking write_list alone would
+            # let a put overwrite an in-flight get and read from its handle
+            print("FTP transfer already in progress")
+            if callback is not None:
+                callback(None)
             return
         fname = args[0]
         self.fh = fh
@@ -542,6 +554,7 @@ class FTPModule(mp_module.MPModule):
 
         self.write_list = set(range(write_blockcount))
         self.write_acks = 0
+        self.write_acked_bytes = 0
         self.write_total = write_blockcount
         self.write_idx = 0
         self.write_recv_idx = -1
@@ -556,6 +569,11 @@ class FTPModule(mp_module.MPModule):
         enc_fname = bytearray(self.filename, 'ascii')
         op = FTP_OP(self.seq, self.session, OP_CreateFile, len(enc_fname), 0, 0, 0, enc_fname)
         self.send(op)
+
+    def write_block_len(self, idx):
+        '''length of upload block idx, which is short for the final block'''
+        ofs = idx * self.write_block_size
+        return max(0, min(self.write_block_size, self.write_file_size - ofs))
 
     def put_finished(self, flen):
         '''finish a put'''
@@ -627,8 +645,12 @@ class FTPModule(mp_module.MPModule):
 
         self.write_pending = max(0, self.write_pending - count)
         self.write_recv_idx = idx
-        self.write_list.discard(idx)
-        self.write_acks += 1
+        if idx in self.write_list:
+            # servers are required to resend replies to repeated requests, so
+            # only count a block the first time it is acked
+            self.write_list.discard(idx)
+            self.write_acks += 1
+            self.write_acked_bytes += self.write_block_len(idx)
         if self.put_callback_progress:
             self.put_callback_progress(self.write_acks/float(self.write_total))
         self.send_more_writes()
@@ -750,7 +772,7 @@ class FTPModule(mp_module.MPModule):
 
     def cmd_cancel(self):
         '''cancel any pending op'''
-        self.terminate_session()
+        self.terminate_session("cancelled")
 
     def set_progress_status(self, status):
         '''show a transfer status line in the console, where log download shows its own'''
@@ -762,12 +784,12 @@ class FTPModule(mp_module.MPModule):
             return None
         dt = max(time.time() - self.op_start, 1.0e-6)
         if self.write_list is not None:
-            # an upload is paced by acks, so count acked blocks rather than
-            # what we have pushed at the vehicle
-            done = min(self.write_acks * self.write_block_size, self.write_file_size)
-            pct = 100.0 * self.write_acks / max(self.write_total, 1)
+            # an upload is paced by acks, so count bytes the vehicle has
+            # actually stored rather than what we have pushed at it
+            done = min(self.write_acked_bytes, self.write_file_size)
+            pct = 100.0 * done / self.write_file_size if self.write_file_size else 100.0
             return "Uploading %s - %u/%u bytes %.1f%% %.1f kbyte/s" % (
-                self.filename, done, self.write_file_size, min(pct, 100.0),
+                self.filename, done, self.write_file_size, pct,
                 (done / dt) / 1024.0)
         if self.fh is None:
             return None
