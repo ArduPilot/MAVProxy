@@ -233,10 +233,11 @@ class Map3DModule(mp_module.MPModule):
                 resolved = sample_terrain(lat, lon) is not None
             except Exception:
                 resolved = False
+            # drop it either way: a success is cached from here on, and a
+            # failure must stay retryable rather than blocking the point forever
+            with self.terrain_lock:
+                self.terrain_requested.discard((lat, lon))
             if resolved:
-                # terrain is reachable, so let points that failed earlier retry
-                with self.terrain_lock:
-                    self.terrain_requested.clear()
                 self.terrain_resolved = True
 
     def send_mission(self):
