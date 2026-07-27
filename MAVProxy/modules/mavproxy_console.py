@@ -18,6 +18,27 @@ from MAVProxy.modules.lib.mp_menu import *
 
 green = (0, 128, 0)
 
+# navigation commands that move the vehicle to the item location, used for
+# estimating the distance remaining in a mission
+nav_commands = frozenset([
+    mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
+    mavutil.mavlink.MAV_CMD_NAV_LOITER_UNLIM,
+    mavutil.mavlink.MAV_CMD_NAV_LOITER_TURNS,
+    mavutil.mavlink.MAV_CMD_NAV_LOITER_TIME,
+    mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT,
+    mavutil.mavlink.MAV_CMD_NAV_SPLINE_WAYPOINT,
+    mavutil.mavlink.MAV_CMD_NAV_LAND,
+    mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
+    mavutil.mavlink.MAV_CMD_NAV_VTOL_LAND,
+    mavutil.mavlink.MAV_CMD_NAV_VTOL_TAKEOFF,
+    mavutil.mavlink.MAV_CMD_NAV_PAYLOAD_PLACE,
+])
+
+land_commands = frozenset([
+    mavutil.mavlink.MAV_CMD_NAV_LAND,
+    mavutil.mavlink.MAV_CMD_NAV_VTOL_LAND,
+])
+
 class DisplayItem:
     def __init__(self, fmt, expression, row):
         self.expression = expression.strip('"\'')
@@ -202,20 +223,22 @@ class ConsoleModule(mp_module.MPModule):
             done.add(idx)
             w = self.module('wp').wploader.wp(idx)
             if w.command == mavutil.mavlink.MAV_CMD_DO_JUMP:
+                if w.param2 == 0:
+                    # no repeats, so the jump is never taken
+                    idx += 1
+                    continue
                 idx = int(w.param1)
                 continue
             idx += 1
-            if (w.x != 0 or w.y != 0) and w.command in [mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
-                                                        mavutil.mavlink.MAV_CMD_NAV_LOITER_UNLIM,
-                                                        mavutil.mavlink.MAV_CMD_NAV_LOITER_TURNS,
-                                                        mavutil.mavlink.MAV_CMD_NAV_LOITER_TIME,
-                                                        mavutil.mavlink.MAV_CMD_NAV_LAND,
-                                                        mavutil.mavlink.MAV_CMD_NAV_TAKEOFF]:
+            if (w.x != 0 or w.y != 0) and w.command in nav_commands:
                 distance += mp_util.gps_distance(lat, lon, w.x, w.y)
                 lat = w.x
                 lon = w.y
-                if w.command == mavutil.mavlink.MAV_CMD_NAV_LAND:
-                    break
+            if w.command in land_commands:
+                # the mission is over once we land; anything past the landing
+                # is only reached via an operator jump. Checked outside the
+                # location test as a land with no location means "land here"
+                break
         return distance / speed
 
     def vehicle_type_string(self, hb):
