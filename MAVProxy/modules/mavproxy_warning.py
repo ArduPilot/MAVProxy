@@ -106,11 +106,11 @@ class WarningModule(mp_module.MPModule):
 
     def check_airspeed(self):
         '''check airspeed sensors'''
-        vfr_hud = self.master.messages.get("VFR_HUD", None)
-        nvf_as2 = self.master.messages.get("NAMED_VALUE_FLOAT[AS2]", None)
-        if vfr_hud and nvf_as2:
-            as1 = vfr_hud.airspeed
-            as2 = nvf_as2.value
+        as1_msg = self.master.messages.get("AIRSPEED[0]", None)
+        as2_msg = self.master.messages.get("AIRSPEED[1]", None)
+        if as1 and as2:
+            as1 = as1.airspeed
+            as2 = as2.airspeed
             if abs(as1 - as2) > self.warning_settings.airspd_diff:
                 self.details.append("Airspeed difference")
                 return True
