@@ -108,9 +108,9 @@ class WarningModule(mp_module.MPModule):
         '''check airspeed sensors'''
         as1_msg = self.master.messages.get("AIRSPEED[0]", None)
         as2_msg = self.master.messages.get("AIRSPEED[1]", None)
-        if as1 and as2:
-            as1 = as1.airspeed
-            as2 = as2.airspeed
+        if as1_msg and as2_msg:
+            as1 = as1_msg.airspeed
+            as2 = as2_msg.airspeed
             if abs(as1 - as2) > self.warning_settings.airspd_diff:
                 self.details.append("Airspeed difference")
                 return True
