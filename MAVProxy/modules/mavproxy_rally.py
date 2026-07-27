@@ -30,6 +30,9 @@ class RallyModule(mission_item_protocol.MissionItemProtocolModule):
         '''command-line command name'''
         return "rally"
 
+    def MISSION_CURRENT_opaque_id_attribute(self):
+        return "rally_point"
+
     def cmd_rally_add(self, args):
         '''add a rally point at the last map click position'''
         if not self.check_have_list():
@@ -121,9 +124,6 @@ class RallyModule(mission_item_protocol.MissionItemProtocolModule):
     def itemtype(self):
         '''returns description of item'''
         return 'rally item'
-
-    def mavlink_packet(self, p):
-        super(RallyModule, self).mavlink_packet(p)
 
     def gui_menu_items(self):
         ret = super(RallyModule, self).gui_menu_items()
