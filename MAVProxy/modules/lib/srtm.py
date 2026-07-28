@@ -158,6 +158,13 @@ class SRTMDownloader():
                     conn.close()
                     tries += 1
                     continue
+                if r1.status != 200:
+                    # don't hand back an error page, as the caller may cache
+                    # it as if it were a tile
+                    if self.debug:
+                        print("fetch of %s failed with %u" % (url, r1.status))
+                    conn.close()
+                    return None
                 data = r1.read()
                 conn.close()
                 if sys.version_info.major < 3:
