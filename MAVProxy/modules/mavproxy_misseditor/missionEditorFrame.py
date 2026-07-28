@@ -928,7 +928,11 @@ class MissionEditorFrame(wx.Frame):
                 if (self.grid_mission.GetCellValue(row_prev, ME_FRAME_COL) == "Rel"):
                     prev_alt = prev_alt + home_def_alt
                 elif (self.grid_mission.GetCellValue(row_prev, ME_FRAME_COL) == "AGL"):
-                    prev_alt = self.ElevationModel.GetElevation(prev_lat, prev_lon) + prev_alt
+                    elevation = self.ElevationModel.GetElevation(prev_lat, prev_lon)
+                    if elevation is None:
+                        # terrain not downloaded yet, try again next time
+                        continue
+                    prev_alt = elevation + prev_alt
                 while not self.has_location(prev_lat,prev_lon,command_prev) and (row_prev > 0):
                     prev_lat = float(self.grid_mission.GetCellValue(row_prev - 1, ME_LAT_COL))
                     prev_lon = float(self.grid_mission.GetCellValue(row_prev - 1, ME_LON_COL))
@@ -939,7 +943,11 @@ class MissionEditorFrame(wx.Frame):
                 if (self.grid_mission.GetCellValue(row, ME_FRAME_COL) == "Rel"):
                     curr_alt = curr_alt + home_def_alt
                 elif(self.grid_mission.GetCellValue(row, ME_FRAME_COL) == "AGL"):
-                    curr_alt = curr_alt + self.ElevationModel.GetElevation(lat, lon)
+                    elevation = self.ElevationModel.GetElevation(lat, lon)
+                    if elevation is None:
+                        # terrain not downloaded yet, try again next time
+                        continue
+                    curr_alt = curr_alt + elevation
                 grad = math.atan2(curr_alt - prev_alt, dist) *180 / math.pi
               else:
                 grad = 0.0
