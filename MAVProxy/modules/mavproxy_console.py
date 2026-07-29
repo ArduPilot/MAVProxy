@@ -173,13 +173,24 @@ class ConsoleModule(mp_module.MPModule):
         self.menu.add_to_submenu(menupath[:-1], MPMenuItem(name, name, cmd))
         self.mpstate.console.set_menu(self.menu, self.menu_callback)
 
+    def cmd_menu_remove(self, args):
+        '''remove an item from the console menus'''
+        if len(args) < 1:
+            print("Usage: console menu remove MenuPath")
+            return
+        menupath = args[0].strip('"').split(':')
+        self.menu.remove_from_submenu(menupath[:-1], menupath[-1])
+        self.mpstate.console.set_menu(self.menu, self.menu_callback)
+
     def cmd_menu(self, args):
         '''control console menus'''
         if len(args) < 2:
-            print("Usage: console menu <add>")
+            print("Usage: console menu <add|remove>")
             return
         if args[0] == 'add':
             self.cmd_menu_add(args[1:])
+        elif args[0] == 'remove':
+            self.cmd_menu_remove(args[1:])
 
     def cmd_set(self, args):
         '''set console options'''
