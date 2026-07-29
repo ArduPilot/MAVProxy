@@ -219,6 +219,17 @@ class MPMenuSubMenu(MPMenuGeneric):
         self.add(MPMenuSubMenu(submenu_path[0], []))
         self.add_to_submenu(submenu_path, item)
 
+    def remove_from_submenu(self, submenu_path, name):
+        '''remove a named item from a submenu using a menu path array'''
+        if len(submenu_path) == 0:
+            # separators have no name, so don't assume the attribute
+            self.items = [i for i in self.items if getattr(i, 'name', None) != name]
+            return
+        for m in self.items:
+            if isinstance(m, MPMenuSubMenu) and submenu_path[0] == m.name:
+                m.remove_from_submenu(submenu_path[1:], name)
+                return
+
     def combine(self, submenu):
         '''combine a new menu with an existing one'''
         self.items.extend(submenu.items)
@@ -271,6 +282,16 @@ class MPMenuTop(object):
             items = [items]
         names = set([x.name for x in items])
         self.items = list(filter(lambda x : x.name not in names, self.items))
+
+    def remove_from_submenu(self, submenu_path, name):
+        '''remove a named item from a submenu using a menu path array'''
+        if len(submenu_path) == 0:
+            self.remove(MPMenuSubMenu(name, []))
+            return
+        for m in self.items:
+            if isinstance(m, MPMenuSubMenu) and m.name == submenu_path[0]:
+                m.remove_from_submenu(submenu_path[1:], name)
+                return
 
     def add_to_submenu(self, submenu_path, item):
         '''
