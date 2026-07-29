@@ -217,6 +217,10 @@ class MissionEditorFrame(wx.Frame):
         self.height_profile_frame = None
         self.height_profile_dirty = False
         self.height_profile_last_draw = 0
+        # set when a terrain lookup came back empty, so the derived grid
+        # columns are recalculated once the tile has downloaded
+        self.terrain_pending = False
+        self.last_terrain_retry = 0
 
 
         self.Bind(wx.EVT_TEXT_ENTER, self.on_wp_radius_enter, self.text_ctrl_wp_radius)
@@ -413,6 +417,7 @@ class MissionEditorFrame(wx.Frame):
             self.Refresh()
             self.Update()
 
+        self.check_terrain_pending()
         self.check_height_profile()
 
     def process_gui_event(self, event):
@@ -920,6 +925,13 @@ class MissionEditorFrame(wx.Frame):
             return False
         return self.has_location_cmd(cmd_id)
 
+    def set_dist_only(self, row, lat, lon, prev_lat, prev_lon):
+        '''fill in the distance for a row whose gradient needs terrain we do
+           not have yet, so the column is not left showing a stale value'''
+        dist = mp_util.gps_distance(lat, lon, prev_lat, prev_lon)
+        self.grid_mission.SetCellValue(row, ME_DIST_COL, format(dist, '.1f'))
+        self.grid_mission.SetCellValue(row, ME_ANGLE_COL, "?")
+
     def set_grad_dist(self):
         '''fix up distance and gradient when changing cell values'''
         home_def_alt = float(self.label_home_alt_value.GetLabel())
@@ -946,7 +958,10 @@ class MissionEditorFrame(wx.Frame):
                 elif (self.grid_mission.GetCellValue(row_prev, ME_FRAME_COL) == "AGL"):
                     elevation = self.ElevationModel.GetElevation(prev_lat, prev_lon)
                     if elevation is None:
-                        # terrain not downloaded yet, try again next time
+                        # terrain not in yet: the distance is still known, but
+                        # the gradient is not
+                        self.terrain_pending = True
+                        self.set_dist_only(row, lat, lon, prev_lat, prev_lon)
                         continue
                     prev_alt = elevation + prev_alt
                 while not self.has_location(prev_lat,prev_lon,command_prev) and (row_prev > 0):
@@ -961,7 +976,10 @@ class MissionEditorFrame(wx.Frame):
                 elif(self.grid_mission.GetCellValue(row, ME_FRAME_COL) == "AGL"):
                     elevation = self.ElevationModel.GetElevation(lat, lon)
                     if elevation is None:
-                        # terrain not downloaded yet, try again next time
+                        # terrain not in yet: the distance is still known, but
+                        # the gradient is not
+                        self.terrain_pending = True
+                        self.set_dist_only(row, lat, lon, prev_lat, prev_lon)
                         continue
                     curr_alt = curr_alt + elevation
                 grad = math.atan2(curr_alt - prev_alt, dist) *180 / math.pi
@@ -983,7 +1001,8 @@ class MissionEditorFrame(wx.Frame):
             lon = float(self.grid_mission.GetCellValue(row, ME_LON_COL))
             agl = 0.0
             elevation = self.ElevationModel.GetElevation(lat, lon)
-            if elevation == None:
+            if elevation is None:
+                self.terrain_pending = True
                 continue
             if self.has_location(lat, lon, command) and "NAV" in command:
                 agl = float(self.grid_mission.GetCellValue(row, ME_ALT_COL))
@@ -997,6 +1016,23 @@ class MissionEditorFrame(wx.Frame):
             agl = format(float(agl), '.1f')
             self.grid_mission.SetCellValue(row, ME_AGL_COL, agl)
         self.height_profile_changed()
+
+    def check_terrain_pending(self):
+        '''recalculate the derived columns once terrain that was missing has
+           had a chance to download'''
+        if not self.terrain_pending:
+            return
+        now = time.time()
+        if now - self.last_terrain_retry < 2:
+            return
+        self.last_terrain_retry = now
+        self.terrain_pending = False
+        try:
+            self.set_grad_dist()
+            self.set_agl()
+        except Exception:
+            # a cell is mid-edit, try again on the next tick
+            self.terrain_pending = True
 
     def height_profile_pushed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
         '''open the height profile window, or raise it if already open'''
@@ -1059,8 +1095,10 @@ class MissionEditorFrame(wx.Frame):
             return False
         if points is None:
             return False
-        self.height_profile_last_draw = time.time()
         self.height_profile_frame.set_mission(points, home_amsl)
+        # the frame timestamps the end of its own draw, so a slow redraw does
+        # not immediately become due again
+        self.height_profile_last_draw = self.height_profile_frame.last_draw
         return True
 
     def height_profile_changed(self):
@@ -1075,6 +1113,10 @@ class MissionEditorFrame(wx.Frame):
         if self.height_profile_frame is None:
             return
         now = time.time()
+        # the window redraws itself when its controls change, so take the
+        # later of the two as the last draw
+        self.height_profile_last_draw = max(self.height_profile_last_draw,
+                                            self.height_profile_frame.last_draw)
         if now - self.height_profile_last_draw < 0.5:
             return
         if not self.height_profile_dirty:

@@ -11,6 +11,7 @@ BVLOS missions.
 
 import bisect
 import math
+import time
 
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_elevation
@@ -49,6 +50,24 @@ MAX_PROFILE_WIDTH = 5000
 LABEL_SEPARATION = 0.012
 
 NAN = float('nan')
+
+# closest a latitude is allowed to get to a pole. The rhumb line helpers
+# take a log of tan(lat/2 + pi/4), which is zero at the pole
+POLE_LIMIT = 89.9999
+
+# a turn sharper than this at a waypoint has its corner sampled using the
+# bearing of both legs, so the outside of the turn is not left out of the
+# corridor
+CORNER_ANGLE = 20.0
+
+# most cross track lines sampled at any one waypoint. The ends of the track
+# get a rosette to cover the cap of the corridor, a corner gets one line per
+# leg, and everything else a single line
+MAX_CORNER_BEARINGS = 4
+
+# how many times the spacing may be scaled up trying to land inside the
+# lookup budget
+BUDGET_STEPS = 20
 
 
 class ProfilePoint(object):
@@ -94,6 +113,11 @@ class HeightProfileFrame(wx.Frame):
         self.plot_vehicle = []
         self.plot_terrain = []
         self.plot_agl = []
+        # cursor artists, replaced on each draw. Created here as well so that
+        # the cursor is safe before anything has been drawn
+        self.readouts = []
+        self.cursor_lines = []
+        self.last_draw = 0
 
         self.create_main_panel()
         self.Bind(wx.EVT_CLOSE, self.on_close)
@@ -207,25 +231,31 @@ class HeightProfileFrame(wx.Frame):
         step = half / steps
         return [i * step for i in range(-steps, steps+1)]
 
-    def worst_terrain(self, model, lat, lon, bearing):
-        '''highest terrain in the corridor across the track at this point,
-           which is the worst case for clearance. Returns None if any part
-           of the corridor has no terrain, as the worst case is not known'''
+    def worst_terrain(self, model, lat, lon, bearings, centre):
+        '''highest terrain in the corridor at this point, which is the worst
+           case for clearance. One cross track line is sampled per bearing,
+           so a corner or an end of the track can cover the part of the
+           corridor a single line would miss. Returns None if any part has
+           no terrain, as the worst case is not known there'''
         offsets = self.cross_offsets()
         if len(offsets) == 1:
-            return model.GetElevation(lat, lon)
-        worst = None
-        for offset in offsets:
-            if offset == 0:
-                (slat, slon) = (lat, lon)
-            else:
+            return centre
+        if centre is None:
+            return None
+        worst = centre
+        lat = self.safe_lat(lat)
+        for bearing in bearings:
+            for offset in offsets:
+                if offset == 0:
+                    # already have the centreline
+                    continue
                 side = bearing + (90 if offset > 0 else -90)
                 (slat, slon) = mp_util.gps_newpos(lat, lon, side, abs(offset))
-            elevation = model.GetElevation(slat, slon)
-            if elevation is None:
-                return None
-            if worst is None or elevation > worst:
-                worst = elevation
+                elevation = model.GetElevation(slat, slon)
+                if elevation is None:
+                    return None
+                if elevation > worst:
+                    worst = elevation
         return worst
 
     def height_convert(self, val_metres):
@@ -269,12 +299,19 @@ class HeightProfileFrame(wx.Frame):
             return lon2 + 360
         return lon2
 
+    def safe_lat(self, lat):
+        '''keep a latitude off the poles, where the rhumb line helpers
+           divide by zero'''
+        return mp_util.constrain(lat, -POLE_LIMIT, POLE_LIMIT)
+
     def leg_distance(self, prev, p):
-        return mp_util.gps_distance(prev.lat, prev.lon, p.lat,
+        return mp_util.gps_distance(self.safe_lat(prev.lat), prev.lon,
+                                    self.safe_lat(p.lat),
                                     self.leg_lon(prev.lon, p.lon))
 
     def leg_bearing(self, prev, p):
-        return mp_util.gps_bearing(prev.lat, prev.lon, p.lat,
+        return mp_util.gps_bearing(self.safe_lat(prev.lat), prev.lon,
+                                   self.safe_lat(p.lat),
                                    self.leg_lon(prev.lon, p.lon))
 
     def sample_spacing(self, points):
@@ -290,16 +327,27 @@ class HeightProfileFrame(wx.Frame):
         for i in range(1, len(points)):
             total += self.leg_distance(points[i-1], points[i])
 
-        along = max(1.0, total / spacing)
-        across = 2.0 * math.ceil(self.profile_width / spacing) + 1
-        lookups = along * across
         self.subsampled = False
-        if lookups > MAX_LOOKUPS:
-            # scale both directions so the total lands within the budget
-            spacing *= math.sqrt(lookups / MAX_LOOKUPS)
-            self.subsampled = True
-        elif total > 0 and total / spacing > MAX_SAMPLES:
+        if total > 0 and total / spacing > MAX_SAMPLES:
             spacing = total / MAX_SAMPLES
+            self.subsampled = True
+
+        def lookups_for(sp):
+            '''elevation lookups a redraw at this spacing would need. Every
+               waypoint is sampled whatever the spacing, and a corner is
+               sampled for both of its legs'''
+            along = (total / sp) + len(points) * MAX_CORNER_BEARINGS
+            across = 2 * math.ceil(self.profile_width / sp) + 1
+            return along * across
+
+        # the cross track sample count is discrete and bottoms out at one, so
+        # scaling once is not enough to land inside the budget. Repeat until
+        # it fits, rather than reporting full coverage we did not do
+        for _ in range(BUDGET_STEPS):
+            lookups = lookups_for(spacing)
+            if lookups <= MAX_LOOKUPS:
+                break
+            spacing *= math.sqrt(lookups / MAX_LOOKUPS)
             self.subsampled = True
         return spacing
 
@@ -343,22 +391,37 @@ class HeightProfileFrame(wx.Frame):
             terrain.append(ground)
             vehicle.append(amsl)
 
-        def ground_at(lat, lon, bearing):
+        def ground_at(lat, lon, bearings):
             '''centreline terrain, and the worst in the corridor'''
-            centre = model.GetElevation(lat, lon)
+            centre = model.GetElevation(self.safe_lat(lat), lon)
             if self.profile_width <= 0:
                 return (centre, centre)
-            return (centre, self.worst_terrain(model, lat, lon, bearing))
+            return (centre, self.worst_terrain(model, lat, lon, bearings, centre))
 
-        # bearing at each waypoint, used for the corridor across it
-        bearings = []
-        for i in range(len(points)):
-            if i > 0 and self.leg_distance(points[i-1], points[i]) > 0:
-                bearings.append(self.leg_bearing(points[i-1], points[i]))
-            elif i+1 < len(points) and self.leg_distance(points[i], points[i+1]) > 0:
-                bearings.append(self.leg_bearing(points[i], points[i+1]))
-            else:
-                bearings.append(0.0)
+        def leg_bearing_or_none(i, j):
+            if 0 <= i < len(points) and 0 <= j < len(points):
+                if self.leg_distance(points[i], points[j]) > 0:
+                    return self.leg_bearing(points[i], points[j])
+            return None
+
+        def waypoint_bearings(i):
+            '''cross track lines to sample at waypoint i. A corner is covered
+               for both of its legs, and the ends of the track get a rosette
+               so the cap of the corridor is not left out'''
+            incoming = leg_bearing_or_none(i-1, i)
+            outgoing = leg_bearing_or_none(i, i+1)
+            if incoming is None and outgoing is None:
+                # a lone point, or every leg zero length: cover all round
+                return [0.0, 45.0, 90.0, 135.0]
+            if incoming is None or outgoing is None:
+                # start or end of the track, sample the cap as well
+                base = incoming if incoming is not None else outgoing
+                return [base, base + 45, base + 90, base + 135]
+            if abs(mp_util.wrap_180(outgoing - incoming)) > CORNER_ANGLE:
+                return [incoming, outgoing]
+            return [incoming]
+
+        bearings = [waypoint_bearings(i) for i in range(len(points))]
 
         prev_ground = None
         for i in range(len(points)):
@@ -374,20 +437,24 @@ class HeightProfileFrame(wx.Frame):
                         # height above ground at the start of the leg, so a
                         # climb or descent to the new AGL height is spread
                         # along the leg the way the vehicle flies it
-                        if prev_ground is None or prev_amsl != prev_amsl:
-                            start_agl = p.alt
+                        if prev.is_terrain_frame():
+                            # already a height above ground, no terrain needed
+                            start_agl = prev.alt
+                        elif prev_ground is None or prev_amsl != prev_amsl:
+                            # cannot place the start of the climb yet
+                            start_agl = None
                         else:
                             start_agl = prev_amsl - prev_ground
                     else:
                         end_amsl = self.point_amsl(p, ground)
                     along = spacing
                     while along < leg:
-                        (slat, slon) = mp_util.gps_newpos(prev.lat, prev.lon,
-                                                          bearing, along)
-                        (sground, sworst) = ground_at(slat, slon, bearing)
+                        (slat, slon) = mp_util.gps_newpos(self.safe_lat(prev.lat),
+                                                          prev.lon, bearing, along)
+                        (sground, sworst) = ground_at(slat, slon, [bearing])
                         ratio = along / leg
                         if p.is_terrain_frame():
-                            if sground is None:
+                            if sground is None or start_agl is None:
                                 samsl = NAN
                             else:
                                 samsl = sground + start_agl + (p.alt - start_agl) * ratio
@@ -495,6 +562,7 @@ class HeightProfileFrame(wx.Frame):
             self.terrain_incomplete = False
             self.make_readouts()
             self.canvas.draw()
+            self.last_draw = time.time()
             return
 
         (dists, terrain, vehicle, wp_index) = self.sample_track()
@@ -526,7 +594,8 @@ class HeightProfileFrame(wx.Frame):
 
         # label waypoints on the height pane, dropping labels that would sit
         # on top of each other on a long mission
-        min_sep = (xs[-1] - xs[0]) * LABEL_SEPARATION if len(xs) > 1 else 0
+        span = (xs[-1] - xs[0]) if len(xs) > 1 else 0
+        min_sep = span * LABEL_SEPARATION
         last_label_x = None
         for (i, idx) in enumerate(wp_index):
             if idx >= len(xs) or veh_plot[idx] != veh_plot[idx]:
@@ -534,8 +603,13 @@ class HeightProfileFrame(wx.Frame):
                 continue
             x = xs[idx]
             is_end = (i == 0 or i == len(wp_index)-1)
-            if not is_end and last_label_x is not None and x - last_label_x < min_sep:
-                continue
+            if last_label_x is not None:
+                if x - last_label_x < min_sep and not is_end:
+                    continue
+                if span <= 0 and i != 0:
+                    # every waypoint is at the same place, so one label is
+                    # all that can be read
+                    continue
             last_label_x = x
             self.axes_height.annotate(str(self.points[i].seq),
                                       xy=(x, veh_plot[idx]),
@@ -576,3 +650,4 @@ class HeightProfileFrame(wx.Frame):
             self.label_status.SetLabel("")
 
         self.canvas.draw()
+        self.last_draw = time.time()
