@@ -191,6 +191,10 @@ class SRTMDownloader():
             data = self.getURIWithRedirect(self.directory)
         except Exception:
             return
+        if data is None:
+            if self.debug:
+                print("Failed to list %s" % self.directory)
+            return
         parser = parseHTMLDirectoryListing()
         parser.feed(data)
         continents = parser.getDirListing()
@@ -218,6 +222,10 @@ class SRTMDownloader():
                     data = self.getURIWithRedirect(url)
                 except Exception as ex:
                     print("Failed to download %s : %s" % (url, ex))
+                    continue
+                if data is None:
+                    if self.debug:
+                        print("Failed to list %s" % url)
                     continue
                 parser = parseHTMLDirectoryListing()
                 parser.feed(data)
