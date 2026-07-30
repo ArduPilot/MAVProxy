@@ -1566,6 +1566,11 @@ if __name__ == '__main__':
     elif opts.aircraft is not None:
         mpstate.aircraft_dir = opts.aircraft
 
+    if opts.aircraft is not None and not opts.no_state:
+        # flight notes are stored per aircraft, so are only useful with --aircraft,
+        # and are state, so are not wanted with --no-state
+        mpstate.load_module('notes', quiet=True)
+
     run_startup_scripts()
 
     if opts.cmd is not None:
