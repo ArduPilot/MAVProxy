@@ -18,6 +18,7 @@ from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_util
 
+from MAVProxy.modules.mavproxy_bvlos_plan import add_return_paths
 from MAVProxy.modules.mavproxy_bvlos_plan import mission_model
 from MAVProxy.modules.mavproxy_bvlos_plan import return_path
 
@@ -49,6 +50,8 @@ class BvlosPlanModule(mp_module.MPModule):
                 items=[
                     MPMenuItem('Return Path Check', 'Return Path Check',
                                '# bvlos_plan returncheck'),
+                    MPMenuItem('Add Return Paths', 'Add Return Paths',
+                               '# bvlos_plan addreturnpaths'),
                     MPMenuItem('Clear Highlight', 'Clear Highlight',
                                '# bvlos_plan clear'),
                 ])
@@ -60,15 +63,19 @@ class BvlosPlanModule(mp_module.MPModule):
             # if set, the distance either side of the mission path that the
             # return may use, in metres, instead of the turn radius
             ('return_path_width', float, 0.0),
+            # if set, how far to one side an added return path is put, in
+            # metres, instead of the turn radius
+            ('return_path_sep', float, 0.0),
         ])
         self.add_command('bvlos_plan', self.cmd_bvlos_plan,
-                         "BVLOS planning", ['returncheck', 'clear',
+                         "BVLOS planning", ['returncheck', 'addreturnpaths',
+                                            'clear',
                                             'set (BVLOSPLANSETTING)'])
         self.add_completion_function('(BVLOSPLANSETTING)',
                                      self.bvlos_settings.completion)
 
     def usage(self):
-        return "Usage: bvlos_plan <returncheck|clear|set>"
+        return "Usage: bvlos_plan <returncheck|addreturnpaths|clear|set>"
 
     def cmd_bvlos_plan(self, args):
         if len(args) == 0:
@@ -76,6 +83,8 @@ class BvlosPlanModule(mp_module.MPModule):
             return
         if args[0] == "returncheck":
             self.cmd_returncheck()
+        elif args[0] == "addreturnpaths":
+            self.cmd_addreturnpaths()
         elif args[0] == "clear":
             self.clear_highlight()
         elif args[0] == "set":
@@ -172,6 +181,103 @@ class BvlosPlanModule(mp_module.MPModule):
         items = self.mission_items()
         if items is None:
             return
+        run = self.run_check(items)
+        if run is None:
+            return
+        (mission, result, cruise, roll) = run
+        self.report(result, mission, cruise, roll)
+        self.highlight(result, mission)
+
+    def cmd_addreturnpaths(self):
+        '''add return paths covering the parts of the mission that fail'''
+        items = self.mission_items()
+        if items is None:
+            return
+        # the new legs are offset by the turn radius, never by the return
+        # path width, which is only a check tolerance. return_path_sep
+        # overrides that offset
+        separation = self.bvlos_settings.return_path_sep
+        cruise = self.cruise_airspeed()
+        roll = self.roll_limit()
+        if separation <= 0 and (cruise is None or roll is None):
+            print("bvlos_plan: adding return paths needs the cruise airspeed "
+                  "and bank limit, as the new legs are offset by the turn "
+                  "radius. Connect to a vehicle, set them with 'bvlos_plan "
+                  "set cruise_airspeed' and 'bvlos_plan set roll_limit', or "
+                  "give the offset directly with 'bvlos_plan set "
+                  "return_path_sep'")
+            return
+        run = self.run_check(items)
+        if run is None:
+            return
+        (mission, result, _, _) = run
+        if len(result.errors) > 0:
+            for err in result.errors:
+                print("bvlos_plan: %s" % err)
+            return
+        if result.failed == 0:
+            print("bvlos_plan: the mission already passes, nothing to add")
+            return
+        if mission.terrain_missing:
+            print("bvlos_plan: not changing the mission while %u items need "
+                  "terrain that is not available, as the new legs would be "
+                  "placed from guessed altitudes. Try 'terrain set source "
+                  "SRTM1'" % mission.terrain_missing)
+            return
+        if not mission.ends_in_landing():
+            # new navigation items after a mission that does not end at a
+            # landing would be flown as part of the mission
+            print("bvlos_plan: the mission does not end at a landing, so "
+                  "adding items to the end would change the mission as "
+                  "flown. Not changing it")
+            return
+
+        added = add_return_paths.build(mission, items, result, cruise, roll,
+                                       separation=separation)
+        if len(added) == 0:
+            print("bvlos_plan: could not work out a return path to add")
+            return
+
+        # check what we are about to do before doing it, so a fix that does
+        # not help cannot be left behind in the mission
+        new_items = []
+        for new_path in added:
+            new_items.extend(new_path.items)
+        trial = self.run_check(items + new_items)
+        if trial is None:
+            return
+        (trial_mission, trial_result, _, _) = trial
+        if len(trial_result.errors) > 0 or trial_result.failed >= result.failed:
+            print("bvlos_plan: the return paths this would add do not improve "
+                  "the mission (%u failing points before, %u after), so it has "
+                  "not been changed" % (result.failed, trial_result.failed))
+            for err in trial_result.errors:
+                print("  would give: %s" % err)
+            if trial_result.failed >= result.failed and separation > 0:
+                print("  a smaller 'bvlos_plan set return_path_sep' may help")
+            return
+
+        loader = self.module('wp').wploader
+        count = 0
+        for new_path in added:
+            for item in new_path.items:
+                loader.add(item)
+                count += 1
+        # keep the loader self consistent for anything watching it
+        loader.expected_count = loader.count()
+        print("Added %u return path(s), %u mission items:" % (len(added), count))
+        for new_path in added:
+            source = ("the return_path_sep setting" if new_path.from_setting
+                      else "the turn radius")
+            print("  mission %u..%u now has a return path offset %.0fm to one "
+                  "side, %s, rejoining the existing return path at waypoint %u"
+                  % (new_path.from_seq, new_path.to_seq, new_path.separation,
+                     source, new_path.rejoin_seq))
+        print("  the mission is changed here only, use 'wp save' to keep it "
+              "or 'wp list' to go back to the vehicle's copy")
+
+        # show what the mission looks like now
+        items = [loader.wp(i) for i in range(loader.count())]
         run = self.run_check(items)
         if run is None:
             return
