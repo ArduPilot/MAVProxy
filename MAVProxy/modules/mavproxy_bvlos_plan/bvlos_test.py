@@ -109,8 +109,11 @@ def test_path_index():
         if len(index.segments) == 0:
             continue
         for _ in range(20):
-            (px, py) = (random.uniform(-2 * scale, 2 * scale),
-                        random.uniform(-2 * scale, 2 * scale))
+            # including far outside the grid, where the ring search has to
+            # walk past every marked cell before it can stop
+            far = random.choice([1.0, 2.0, 10.0, 50.0])
+            (px, py) = (random.uniform(-far * scale, far * scale),
+                        random.uniform(-far * scale, far * scale))
             got = index.distance(px, py)
             want = math.sqrt(min(index._segment_d2(i, px, py)
                                  for i in range(len(index.segments))))
@@ -145,6 +148,25 @@ def test_capture_turn():
         index, Sample(0.0, 0.0, 0.0, 1.0), Point(150.0, 50.0), 2.0, radius)
     check("a waypoint inside the turning circle costs a whole circle",
           abs(inside - 2 * radius) < 5.0, "%.1f" % inside)
+
+    # the arc and the run in have to join, or the aircraft is being credited
+    # with a jump it cannot make
+    for (name, target) in (("outside", Point(3000.0, -1000.0)),
+                           ("inside", Point(150.0, 50.0))):
+        for direction in (1.0, -1.0):
+            turn = return_path.turn_onto(0.0, 0.0, 0.0, 1.0, radius,
+                                         direction, target.x, target.y)
+            (sweep, cx, cy, start, qx, qy, _, length) = turn
+            end = (cx + radius * math.cos(start + direction * sweep),
+                   cy + radius * math.sin(start + direction * sweep))
+            gap = math.hypot(end[0] - qx, end[1] - qy)
+            check("the turn to a target %s joins its run in (%+.0f)"
+                  % (name, direction), gap < 1e-6, "%.3e" % gap)
+            check("its length is the arc plus the run in (%s %+.0f)"
+                  % (name, direction),
+                  abs(length - (radius * sweep +
+                                math.hypot(target.x - qx,
+                                           target.y - qy))) < 1e-6)
 
     # whatever the geometry, flying the turn cannot be closer to the path than
     # pretending the aircraft snaps onto the straight line
@@ -186,11 +208,40 @@ def test_sampling_bound():
     check("sampling never misses more than half the granularity",
           worst <= 1e-6, "%.4f over" % worst)
 
-    # a granularity of zero must not divide by zero
-    mission = simple_mission()
-    result = return_path.check_return_path(mission, 20.0, 30.0,
+    # a granularity of zero must not divide by zero, and must not turn into a
+    # request for an unbounded amount of work either
+    result = return_path.check_return_path(tiny_mission(), 20.0, 30.0,
                                            granularity=0.0)
     check("a granularity of zero is survivable", result.checked > 0)
+
+    long_way = simple_mission()
+    spacing = mission_model.usable_spacing(long_way.flown_path(), 0.001)
+    samples = mission_model.path_length(long_way.flown_path()) / spacing
+    check("an absurd granularity is held to a workable number of samples",
+          samples <= mission_model.MAX_SAMPLES + 1, "%.0f" % samples)
+
+    # the verdict has to use the bound, not just know about it. A path that
+    # bends sharply between two samples is where a coarse pass reads low
+    # the path meets the cut at each sample and swings away between them, so
+    # the samples all read zero while the truth in between is not
+    index = mission_model.PathIndex([Point(0.0, -35.0), Point(200.0, -17.5),
+                                     Point(0.0, 0.0), Point(200.0, 17.5),
+                                     Point(0.0, 35.0)])
+    sample = Sample(0.0, -35.0, 0.0, 1.0)
+    target = Point(0.0, 35.0)
+    dense = return_path.capture_deviation(index, sample, target, 0.05, 0.0)
+    coarse = return_path.capture_deviation(index, sample, target, 50.0, 0.0)
+    check("a coarse pass really can read low on a path that bends",
+          dense > coarse + 1.0, "%.2f vs %.2f" % (dense, coarse))
+    refined = return_path.capture_deviation(index, sample, target, 50.0, 0.0,
+                                            fine=1.0, limit=dense - 1.0)
+    check("but a limit inside that gap makes it look closer and find it",
+          refined >= dense - 1.0, "%.2f vs %.2f" % (refined, dense))
+    # and it must not pay for that everywhere: a limit far above is left alone
+    cheap = return_path.capture_deviation(index, sample, target, 50.0, 0.0,
+                                          fine=1.0, limit=dense + 1000.0)
+    check("a limit nowhere near is not paid for", cheap == coarse,
+          "%.2f vs %.2f" % (cheap, coarse))
 
 
 def simple_mission(extra=None):
@@ -204,6 +255,34 @@ def simple_mission(extra=None):
     if extra:
         items += extra
     return build(items)
+
+
+def tiny_mission():
+    '''the same shape as simple_mission but a few hundred metres across, for
+       tests that sample it very finely'''
+    items = [home()]
+    items += waypoints([(-35.000, 149.0), (-35.001, 149.0), (-35.002, 149.0)])
+    items.append(item(4, mavlink.MAV_CMD_DO_RETURN_PATH_START,
+                      -35.002, 149.0))
+    items += waypoints([(-35.001, 149.0), (-35.000, 149.0)], start=5)
+    items.append(item(7, mavlink.MAV_CMD_NAV_LAND, -35.0, 149.0, 0.0))
+    return build(items)
+
+
+def detour_items():
+    """out a long way and back by a different route, so an RTL from the far
+       end cuts across country the mission never covers"""
+    items = [home(-35.0, 149.0)]
+    items += waypoints([(-35.0, 149.0), (-35.10, 149.0), (-35.20, 149.0)])
+    items.append(item(4, mavlink.MAV_CMD_DO_RETURN_PATH_START,
+                      -35.20, 149.20))
+    items += waypoints([(-35.10, 149.20), (-35.0, 149.0)], start=5)
+    items.append(item(7, mavlink.MAV_CMD_NAV_LAND, -35.0, 149.0, 0.0))
+    return items
+
+
+def detour_mission():
+    return build(detour_items())
 
 
 def test_arduplane_walk():
@@ -321,15 +400,38 @@ def test_unmodelled():
     check("a waypoint with no position is inconclusive",
           len(nowhere.unmodelled()) > 0, str(nowhere.unmodelled()))
 
-    loiter = simple_mission()
-    loiter.point(2).command = mavlink.MAV_CMD_NAV_LOITER_TURNS
+    # off to one side, so nothing else in the mission runs through where its
+    # circle goes
+    loiter_items = [home()]
+    loiter_items += waypoints([(-35.00, 149.00)])
+    loiter_items.append(item(2, mavlink.MAV_CMD_NAV_LOITER_TURNS,
+                             -35.02, 149.05))
+    loiter_items += waypoints([(-35.04, 149.00)], start=3)
+    loiter_items.append(item(4, mavlink.MAV_CMD_DO_RETURN_PATH_START,
+                             -35.04, 149.00))
+    loiter_items += waypoints([(-35.00, 149.00)], start=5)
+    loiter_items.append(item(6, mavlink.MAV_CMD_NAV_LAND, -35.0, 149.0, 0.0))
+    loiter = build(loiter_items)
     check("a loiter with no radius anywhere is inconclusive",
           len(loiter.unmodelled(0.0)) > 0)
     check("a loiter is fine once a radius is known",
           len(loiter.unmodelled(120.0)) == 0, str(loiter.unmodelled(120.0)))
-    (circles, _) = loiter.loiter_circles(120.0)
-    check("the loiter circle joins the corridor",
-          len(circles) == 1 and circles[0][2] == 120.0, str(circles))
+    # the orbit has to be the corridor, not the point at its centre: a
+    # straight line through the middle of a circle is ground never flown
+    orbit = loiter.flown_path(loiter_radius=120.0)
+    centre = loiter.point(2)
+    offsets = [math.hypot(p.x - centre.x, p.y - centre.y)
+               for p in orbit if p.seq == centre.seq]
+    check("the loiter is flown as its orbit",
+          len(offsets) > 8 and all(abs(d - 120.0) < 1.0 for d in offsets),
+          "%u points, %.1f..%.1f" % (len(offsets), min(offsets),
+                                     max(offsets)) if offsets else "none")
+    check("nothing is left sitting at the centre of the circle",
+          all(d > 1.0 for d in offsets))
+    index = loiter.corridor_index(120.0)
+    check("the middle of the circle is not corridor",
+          index.distance(centre.x, centre.y) > 100.0,
+          "%.1fm" % index.distance(centre.x, centre.y))
 
     result = return_path.check_return_path(loiter, 20.0, 30.0,
                                            loiter_radius=0.0)
@@ -367,14 +469,7 @@ def test_terrain_reporting():
 
 def test_fix_generator():
     print("adding return paths")
-    # a mission that goes a long way out and returns by a different route, so
-    # an RTL from the far end cuts across country
-    items = [home(-35.0, 149.0)]
-    items += waypoints([(-35.0, 149.0), (-35.10, 149.0), (-35.20, 149.0)])
-    items.append(item(4, mavlink.MAV_CMD_DO_RETURN_PATH_START,
-                      -35.20, 149.20))
-    items += waypoints([(-35.10, 149.20), (-35.0, 149.0)], start=5)
-    items.append(item(7, mavlink.MAV_CMD_NAV_LAND, -35.0, 149.0, 0.0))
+    items = detour_items()
     mission = build(items)
     result = return_path.check_return_path(mission, 20.0, 30.0)
     check("the detour is caught", result.failed > 0,
@@ -404,19 +499,9 @@ def test_fix_generator():
     # a proposal is only worth taking if nothing that passes now stops
     # passing. An extra DO_RETURN_PATH_START changes which return the rest of
     # the mission gets sent to, so a fix in one place can undo another
-    broken = trial.failed_at - result.failed_at
-    if len(broken) > 0:
-        check("a proposal that breaks points that pass now is caught",
-              trial.failed >= result.failed or len(broken) > 0,
-              "%u broken" % len(broken))
-    else:
-        check("a proposal that breaks nothing is an improvement",
-              trial.failed < result.failed,
-              "%u -> %u" % (result.failed, trial.failed))
-
-    # and somewhere in the range of separations there should be one that does
-    # better than doing nothing
-    best = None
+    # what a proposal is judged on: which samples it breaks, not how many
+    # fail in total. Both have to be answerable for the gate to mean anything
+    scores = {}
     for separation in (100.0, 200.0, 400.0, 800.0):
         proposal = add_return_paths.build(mission, items, result, 20.0, 30.0,
                                           separation=separation)
@@ -427,11 +512,25 @@ def test_fix_generator():
             candidate.extend(path.items)
         outcome = return_path.check_return_path(build(items + candidate),
                                                 20.0, 30.0)
-        score = (len(outcome.failed_at - result.failed_at), outcome.failed)
-        if best is None or score < best:
-            best = score
-    check("searching the separations finds something better than the worst",
-          best is not None, str(best))
+        scores[separation] = (len(outcome.failed_at - result.failed_at),
+                              outcome.failed)
+    check("every separation gives an answer that can be judged",
+          len(scores) == 4, str(sorted(scores)))
+    check("the separations do not all behave the same, so the search has "
+          "something to choose between",
+          len(set(scores.values())) > 1, str(scores))
+
+    # the gate itself: a proposal that breaks a sample which passes now must
+    # be refused however much it improves the total
+    breaks = [sep for (sep, (broken, _)) in scores.items() if broken > 0]
+    clean = [sep for (sep, (broken, _)) in scores.items() if broken == 0]
+    for sep in breaks:
+        check("separation %.0f breaks %u passing points and must be refused"
+              % (sep, scores[sep][0]), scores[sep][0] > 0)
+    for sep in clean:
+        check("separation %.0f breaks nothing, so its total is what counts"
+              % sep, scores[sep][1] <= result.failed,
+              "%u vs %u" % (scores[sep][1], result.failed))
 
 
 def test_landing_guard():
@@ -457,11 +556,134 @@ def test_landing_guard():
           not simple_mission().takeoff_after_landing())
 
 
+class FakeSettings(object):
+    state_basedir = None
+
+
+class FakeMPState(object):
+    """just enough of MAVProxy for the module to be built and driven"""
+
+    def __init__(self):
+        self.command_map = {}
+        self.completions = {}
+        self.completion_functions = {}
+        self.public_modules = {}
+        self.modules = []
+        self.settings = FakeSettings()
+        self.mav_param = {}
+        self.functions = None
+        self.mods = {}
+
+    def module(self, name):
+        return self.mods.get(name)
+
+
+class FakeLoader(object):
+    def __init__(self, items):
+        self.items = list(items)
+        self.last_change = 1.0
+        self.expected_count = 0
+
+    def count(self):
+        return len(self.items)
+
+    def wp(self, i):
+        return self.items[i]
+
+    def add(self, wp):
+        self.items.append(wp)
+        self.last_change += 1.0
+
+
+class FakeWP(object):
+    def __init__(self, items):
+        self.wploader = FakeLoader(items)
+
+
+def make_module(items=None):
+    from MAVProxy.modules import mavproxy_bvlos_plan
+    state = FakeMPState()
+    if items is not None:
+        state.mods['wp'] = FakeWP(items)
+    state.public_modules = dict(state.mods)
+    return (state, mavproxy_bvlos_plan.init(state))
+
+
+def drive(module, limit=60.0):
+    """run idle_task until the worker has been picked up"""
+    import time
+    started = time.time()
+    while module.job is not None and time.time() - started < limit:
+        module.idle_task()
+        time.sleep(0.01)
+    module.idle_task()
+    return module.job is None
+
+
+def test_module():
+    print("the module")
+    from MAVProxy.modules import mavproxy_bvlos_plan as bvlos
+
+    job = bvlos.Job('a job', lambda: 'the answer')
+    check("a job runs and hands its answer back", drive_job(job) == 'the answer')
+    failing = bvlos.Job('a job', lambda: 1 / 0)
+    drive_job(failing)
+    check("a job that throws keeps the error rather than the traceback",
+          failing.error is not None and failing.value is None)
+
+    items = detour_items()
+    (state, module) = make_module(items)
+    snapshot = module.mission_items()
+    check("the worker gets a snapshot, not the live mission",
+          all(not isinstance(s, type(items[0])) for s in snapshot))
+    original = items[0].x
+    items[0].x = 12.0
+    check("changing the mission does not change what the worker holds",
+          snapshot[0].x == original)
+    items[0].x = original
+
+    # a mission that changes while a check runs must not have an answer about
+    # the old one applied to it
+    stamp = module.mission_stamp()
+    state.mods['wp'].wploader.add(items[-1])
+    check("a mission changing under a running job is noticed",
+          module.mission_stamp() != stamp)
+
+    # the gate
+    before = return_path.CheckResult()
+    before.failed = 10
+    before.failed_at = set(range(10))
+    better = return_path.CheckResult()
+    better.failed = 4
+    better.failed_at = set(range(4))
+    check("a proposal that only fixes things is taken",
+          module.improves(before, better))
+    worse = return_path.CheckResult()
+    worse.failed = 2
+    worse.failed_at = set([0, 99])
+    check("a proposal that breaks something new is refused however much it "
+          "fixes", not module.improves(before, worse))
+    same = return_path.CheckResult()
+    same.failed = 10
+    same.failed_at = set(range(10))
+    check("a proposal that changes nothing is refused",
+          not module.improves(before, same))
+    module.unload()
+
+
+def drive_job(job):
+    import time
+    started = time.time()
+    while not job.done and time.time() - started < 30.0:
+        time.sleep(0.01)
+    return job.value
+
+
 def main():
     for test in (test_units, test_path_index, test_capture_turn,
                  test_sampling_bound, test_arduplane_walk, test_jump_states,
                  test_flown_path, test_unmodelled, test_terrain_reporting,
-                 test_fix_generator, test_landing_guard):
+                 test_fix_generator, test_landing_guard, test_module):
         test()
     print("")
     if FAILURES:

@@ -88,6 +88,27 @@ LANDING_COMMANDS = frozenset([
 # zero or ask for an unbounded amount of work
 MIN_SPACING = 1.0
 
+# most samples we will take along a mission. A granularity far too small for
+# the mission is a typo, and without this it asks for hours of work
+MAX_SAMPLES = 20000
+
+
+def path_length(path):
+    '''length of a path in metres'''
+    total = 0.0
+    for i in range(1, len(path)):
+        total += math.hypot(path[i].x - path[i - 1].x,
+                            path[i].y - path[i - 1].y)
+    return total
+
+
+def usable_spacing(path, spacing):
+    '''the given spacing, held to something that can actually be worked
+       through on the mission in hand'''
+    spacing = max(float(spacing), MIN_SPACING)
+    return max(spacing, path_length(path) / MAX_SAMPLES)
+
+
 NAV_LAST = mavlink.MAV_CMD_NAV_LAST
 EXTRA_NAV_COMMANDS = frozenset([
     mavlink.MAV_CMD_NAV_SET_YAW_SPEED,
@@ -277,6 +298,10 @@ class PathIndex(object):
         self.grid = grid
         self.seen = [-1] * count
         self.query = 0
+        self.cell_lo = (min(key[0] for key in grid),
+                        min(key[1] for key in grid))
+        self.cell_hi = (max(key[0] for key in grid),
+                        max(key[1] for key in grid))
 
     def _mark(self, index, seg, grid):
         '''mark every cell the segment passes through, walking it cell by
@@ -353,7 +378,11 @@ class PathIndex(object):
         grid = self.grid
         best = None
         ring = 0
-        limit = 2 * self.across + 2
+        # far enough to have reached every marked cell from wherever the query
+        # landed, which for a query outside the grid is further than the grid
+        # is wide
+        limit = (max(abs(cx - self.cell_lo[0]), abs(cx - self.cell_hi[0])) +
+                 max(abs(cy - self.cell_lo[1]), abs(cy - self.cell_hi[1])))
         while True:
             for key in self._ring(cx, cy, ring):
                 for index in grid.get(key, ()):
@@ -370,9 +399,10 @@ class PathIndex(object):
                 break
             ring += 1
             if ring > limit:
-                if best is None:
-                    best = min(self._segment_d2(i, px, py)
-                               for i in range(len(self.segments)))
+                # past every marked cell. Falling back to all of them keeps
+                # the answer exact whatever the ring bookkeeping did
+                best = min(self._segment_d2(i, px, py)
+                           for i in range(len(self.segments)))
                 break
         return math.sqrt(best)
 
@@ -406,6 +436,9 @@ class MissionPoint(object):
         self.param1 = param1
         self.param2 = param2
         self.param3 = param3
+        # True for a point we invented, such as one on a loiter orbit, which
+        # must never be written back into a mission
+        self.synthetic = False
         # resolved by build_mission()
         self.amsl = None
         self.ground = None
@@ -500,7 +533,12 @@ def next_command(mission, index, jump_counts, dont_zero_counter=False):
             return (None, index)
         num_times = int(point.param2)
         run = jump_counts.get(index, 0)
-        if num_times == JUMP_REPEAT_FOREVER or run < num_times:
+        if num_times == JUMP_REPEAT_FOREVER:
+            # ArduPilot counts these too, but never looks at the count. Not
+            # counting them keeps the walk state finite, which is what lets a
+            # loop be recognised as one rather than run until a step limit
+            index = target
+        elif run < num_times:
             jump_counts[index] = run + 1
             index = target
         elif dont_zero_counter:
@@ -576,7 +614,7 @@ class Mission(object):
         return False
 
     def flown_path(self, jump_counts=None, dont_zero_counter=False,
-                   continue_after_land=False):
+                   continue_after_land=False, loiter_radius=0.0):
         '''where the aircraft actually goes: the navigation items with a
            location that AUTO would fly, after home, up to and including the
            first landing.
@@ -599,27 +637,31 @@ class Mission(object):
            the landing.
         '''
         path = []
-        flown = {}
         counts = dict(jump_counts or {})
+        seen = set()
         index = 1
         while True:
+            # the walk is decided entirely by where we are and what the jump
+            # counters hold, so meeting the same pair twice means a loop that
+            # never ends. A loop with a repeat count is not one: its counters
+            # move on every time round, so it runs to its exit and out the
+            # other side
+            state = (index, tuple(sorted(counts.items())))
+            if state in seen:
+                break
+            seen.add(state)
             (point, index) = next_command(self, index, counts,
                                           dont_zero_counter)
             if point is None:
                 break
             index = point.seq + 1
             if point.is_nav() and point.has_location():
-                run = flown.get(point.seq, 0) + 1
-                if run > MAX_REPEATS:
-                    # going round a loop again adds no new ground
-                    break
-                flown[point.seq] = run
                 path.append(point)
             if point.is_landing():
                 if not (continue_after_land and
                         self.takeoff_next(index, counts, dont_zero_counter)):
                     break
-        return path
+        return self.expand_loiters(path, loiter_radius)
 
     def ends_in_landing(self):
         '''True if the flown path finishes at a landing'''
@@ -636,29 +678,34 @@ class Mission(object):
             return False
         return self.takeoff_next(path[-1].seq + 1)
 
-    def loiter_circles(self, default_radius=0.0):
-        '''(x, y, radius) of every loiter the aircraft flies, and the
-           sequence numbers of any whose radius is unknown'''
-        circles = []
-        unknown = []
-        for point in self.flown_path():
-            if not point.is_loiter():
-                continue
-            radius = point.loiter_radius(default_radius)
-            if radius is None:
-                unknown.append(point.seq)
-            else:
-                circles.append((point.x, point.y, radius))
-        return (circles, unknown)
+    def loiters_without_radius(self, default_radius=0.0, path=None):
+        """sequence numbers of loiters whose circle we cannot work out.
 
-    def unmodelled(self, default_radius=0.0):
+           One with a radius has already been expanded into its orbit by the
+           time the path gets here, so anything still a bare loiter point is
+           one we could not place.
+        """
+        if path is None:
+            path = self.flown_path(loiter_radius=default_radius)
+        seqs = []
+        for point in path:
+            if not point.is_loiter() or point.synthetic:
+                continue
+            if point.loiter_radius(default_radius) is None and \
+                    point.seq not in seqs:
+                seqs.append(point.seq)
+        return seqs
+
+    def unmodelled(self, default_radius=0.0, path=None):
         '''reasons the corridor is not where the aircraft actually goes.
 
            These make a result inconclusive rather than a pass: the check can
            only compare against the ground it believes the mission covers.
         '''
         reasons = []
-        for point in self.flown_path():
+        if path is None:
+            path = self.flown_path(loiter_radius=default_radius)
+        for point in path:
             if not point.position_known():
                 reasons.append(
                     "item %u (%s) has no stored position, so where it is "
@@ -669,31 +716,88 @@ class Mission(object):
                     "item %u is a %s, which is flown as a curve rather than "
                     "the straight leg used here"
                     % (point.seq, command_name(point.command)))
-        (_, unknown) = self.loiter_circles(default_radius)
-        for seq in unknown:
+        for seq in self.loiters_without_radius(default_radius, path):
             reasons.append(
                 "item %u is a loiter with no radius of its own, so its circle "
                 "is not known without the vehicle's WP_LOITER_RAD" % seq)
         return reasons
 
     def corridor_index(self, default_radius=0.0, path=None):
-        '''a PathIndex over the ground the mission covers, the flown legs plus
-           the circle of every loiter'''
+        '''a PathIndex over the ground the mission covers.
+
+           The loiter orbits are already part of the path, so there is nothing
+           to add: the corridor is exactly what gets flown.
+        '''
         if path is None:
-            path = self.flown_path()
-        (circles, _) = self.loiter_circles(default_radius)
-        extra = []
-        for (cx, cy, radius) in circles:
-            previous = None
-            for i in range(LOITER_POINTS + 1):
-                angle = 2.0 * math.pi * i / LOITER_POINTS
-                point = (cx + radius * math.cos(angle),
-                         cy + radius * math.sin(angle))
-                if previous is not None:
-                    extra.append((previous[0], previous[1],
-                                  point[0], point[1]))
-                previous = point
-        return PathIndex(path, extra_segments=extra)
+            path = self.flown_path(loiter_radius=default_radius)
+        return PathIndex(path)
+
+    def expand_loiters(self, path, default_radius):
+        '''replace each loiter with the orbit it actually flies.
+
+           A loiter stored as one point made the corridor run straight through
+           the middle of the circle, which is ground the aircraft never covers,
+           and left every sample on that line rather than round the orbit, so
+           an RTL was never started from where the aircraft would really be.
+        '''
+        out = []
+        for (i, point) in enumerate(path):
+            if not point.is_loiter():
+                out.append(point)
+                continue
+            radius = point.loiter_radius(default_radius)
+            if radius is None:
+                # unknown radius, left as it was and reported by unmodelled()
+                out.append(point)
+                continue
+            before = out[-1] if len(out) > 0 else None
+            after = path[i + 1] if i + 1 < len(path) else None
+            out.extend(self.orbit_points(point, radius, before, after))
+        return out
+
+    def orbit_points(self, loiter, radius, before, after):
+        '''the circle a loiter flies, as points on it.
+
+           Entered from wherever the aircraft came in and left towards
+           wherever it goes next, so the whole orbit is covered and the legs
+           either side meet it rather than its centre.
+        '''
+        def angle_towards(other, fallback):
+            if other is None:
+                return fallback
+            (dx, dy) = (other.x - loiter.x, other.y - loiter.y)
+            if dx == 0.0 and dy == 0.0:
+                return fallback
+            return math.atan2(dy, dx)
+
+        entry = angle_towards(before, 0.0)
+        exit_angle = angle_towards(after, entry + math.pi)
+        points = []
+        # once round from where it joined, then along to where it leaves
+        sweep = (exit_angle - entry) % (2.0 * math.pi)
+        steps = LOITER_POINTS
+        for step in range(steps + 1):
+            points.append(entry + 2.0 * math.pi * step / steps)
+        extra = max(1, int(math.ceil(sweep / (2.0 * math.pi / steps))))
+        for step in range(1, extra + 1):
+            points.append(entry + sweep * step / extra)
+        return [self.orbit_point(loiter, radius, angle) for angle in points]
+
+    def orbit_point(self, loiter, radius, angle):
+        '''one point on a loiter orbit, as a mission point the checks can use
+           like any other'''
+        x = loiter.x + radius * math.cos(angle)
+        y = loiter.y + radius * math.sin(angle)
+        (lat, lon) = self.projector.unproject(x, y)
+        point = MissionPoint(loiter.seq, loiter.command, loiter.frame,
+                             lat, lon, loiter.alt,
+                             loiter.param1, loiter.param2, loiter.param3)
+        (point.x, point.y) = (x, y)
+        point.amsl = loiter.amsl
+        point.ground = loiter.ground
+        # not a stored mission item, so nothing may turn it back into one
+        point.synthetic = True
+        return point
 
 
 def build_mission(items, terrain_fn=None):

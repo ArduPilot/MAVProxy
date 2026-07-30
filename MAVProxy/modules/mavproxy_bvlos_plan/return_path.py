@@ -19,6 +19,15 @@ altitude of that point of the mission.
 The model of the ArduPilot behaviour follows
 libraries/AP_Mission/AP_Mission.cpp jump_to_closest_mission_leg() and
 distance_to_mission_leg().
+
+Two things bound how much this can claim. Along one return, how far it gets
+from the mission path varies no faster than distance along it, so sampling
+every so far can miss at most half of that, and anywhere near the limit is
+measured again closely until what is left is small. Between one starting point
+along the mission and the next there is no such bound: a step of a few metres
+can put the aircraft nearer a different leg and send it somewhere else
+entirely. A finer granularity is the only answer to that, so a result is only
+as good as the granularity it was run at.
 '''
 
 # AP_FLAKE8_CLEAN
@@ -34,6 +43,15 @@ mavlink = mavutil.mavlink
 # AP_Mission::jump_to_closest_mission_leg() budget, shared across all of the
 # DO_RETURN_PATH_START candidates
 SEARCH_BUDGET = 1000
+
+# how much finer a stretch that could cross the limit is re-measured at
+REFINE_RATIO = 0.02
+
+# a sweep this close to a whole circle is really no turn at all
+ANGLE_EPS = 1e-9
+
+# turns whose paths are this close in length are both treated as possible
+TURN_TIE = 1e-6
 
 # how many DO_JUMP counter states we are prepared to check before giving up
 # and calling the result inconclusive
@@ -189,7 +207,8 @@ def closest_in_path(path, x, y, amsl):
     return (best_point, best_distance)
 
 
-def capture_deviation(index, sample, target, granularity, radius):
+def capture_deviation(index, sample, target, granularity, radius,
+                      fine=None, limit=None):
     '''how far the aircraft actually gets from the mission path flying an RTL
        from this point, in metres.
 
@@ -210,27 +229,44 @@ def capture_deviation(index, sample, target, granularity, radius):
     if radius <= 0 or (ux == 0.0 and uy == 0.0):
         # no heading to turn from, so the straight line is all there is
         return max(worst, straight_deviation(index, sample.x, sample.y,
-                                             target.x, target.y, granularity))
+                                             target.x, target.y, granularity,
+                                             fine, limit))
 
-    # the aircraft turns whichever way is shorter, so work out both and keep
-    # the one that gets onto the line with less turning
-    best = None
-    for direction in (1.0, -1.0):
-        turn = turn_onto(sample.x, sample.y, ux, uy, radius, direction,
-                         target.x, target.y)
-        if best is None or turn[0] < best[0]:
-            best = turn
-    (sweep, cx, cy, start, qx, qy, direction) = best
+    # the aircraft turns whichever way gets it there sooner, which is the
+    # shorter path and not the smaller turn: a wider turn can roll out onto a
+    # much shorter run in
+    turns = [turn_onto(sample.x, sample.y, ux, uy, radius, direction,
+                       target.x, target.y)
+             for direction in (1.0, -1.0)]
+    shortest = min(turn[7] for turn in turns)
+    for turn in turns:
+        # a reversal makes the two sides the same length, and they can cover
+        # very different ground, so anything as short as the best is flown as
+        # far as we know and has to be allowed for
+        if turn[7] > shortest + TURN_TIE:
+            continue
+        got = turn_deviation(index, turn, radius, target, granularity,
+                             fine, limit)
+        if got > worst:
+            worst = got
+    return worst
 
-    steps = max(1, int(math.ceil(radius * sweep / granularity)))
-    for step in range(steps + 1):
-        angle = start + direction * sweep * step / steps
-        d = index.distance(cx + radius * math.cos(angle),
-                           cy + radius * math.sin(angle))
-        if d > worst:
-            worst = d
-    return max(worst, straight_deviation(index, qx, qy,
-                                         target.x, target.y, granularity))
+
+def turn_deviation(index, turn, radius, target, granularity,
+                   fine=None, limit=None):
+    '''how far one candidate turn and the run in after it get from the path'''
+    (sweep, cx, cy, start, qx, qy, direction, _) = turn
+    arc = radius * sweep
+    steps = max(1, int(math.ceil(arc / granularity)))
+
+    def at(frac):
+        angle = start + direction * sweep * frac
+        return index.distance(cx + radius * math.cos(angle),
+                              cy + radius * math.sin(angle))
+
+    worst = sampled_max(at, steps, arc / steps if steps else 0.0, fine, limit)
+    return max(worst, straight_deviation(index, qx, qy, target.x, target.y,
+                                         granularity, fine, limit))
 
 
 def turn_onto(px, py, ux, uy, radius, direction, tx, ty):
@@ -249,18 +285,26 @@ def turn_onto(px, py, ux, uy, radius, direction, tx, ty):
     span = math.hypot(tx - cx, ty - cy)
     if span <= radius:
         # the waypoint is inside the turning circle, so the aircraft cannot
-        # roll straight out onto it and has to come the whole way round
-        (qx, qy) = nearest_on_circle(cx, cy, radius, tx, ty)
-        return (2.0 * math.pi, cx, cy, start, qx, qy, direction)
+        # roll out onto it at all and comes the whole way round. The circle
+        # ends where it began, which is where the run at the target starts
+        # from, so the path stays joined up
+        length = 2.0 * math.pi * radius + math.hypot(tx - px, ty - py)
+        return (2.0 * math.pi, cx, cy, start, px, py, direction, length)
     to_target = math.atan2(ty - cy, tx - cx)
     offset = math.acos(max(-1.0, min(1.0, radius / span)))
     # of the two tangent points, the one where continuing round this way
     # heads at the target rather than away from it
     angle = to_target - direction * offset
     sweep = (direction * (angle - start)) % (2.0 * math.pi)
+    if sweep > 2.0 * math.pi - ANGLE_EPS:
+        # already pointing at it: the subtraction can land a hair below zero
+        # and wrap to a whole circle, which would invent a 2R excursion out of
+        # a manoeuvre that needs no turn at all
+        sweep = 0.0
+    run = math.sqrt(max(0.0, span * span - radius * radius))
     return (sweep, cx, cy, start,
             cx + radius * math.cos(angle), cy + radius * math.sin(angle),
-            direction)
+            direction, radius * sweep + run)
 
 
 def nearest_on_circle(cx, cy, radius, px, py):
@@ -272,19 +316,43 @@ def nearest_on_circle(cx, cy, radius, px, py):
     return (cx + radius * dx / length, cy + radius * dy / length)
 
 
-def straight_deviation(index, ax, ay, bx, by, granularity):
+def straight_deviation(index, ax, ay, bx, by, granularity,
+                       fine=None, limit=None):
     '''how far a straight run between two points gets from the mission path'''
     (dx, dy) = (bx - ax, by - ay)
     length = math.hypot(dx, dy)
     if length <= 0:
         return index.distance(ax, ay)
     steps = max(1, int(math.ceil(length / granularity)))
-    worst = 0.0
-    for step in range(steps + 1):
-        frac = float(step) / steps
-        d = index.distance(ax + dx * frac, ay + dy * frac)
-        if d > worst:
-            worst = d
+
+    def at(frac):
+        return index.distance(ax + dx * frac, ay + dy * frac)
+
+    return sampled_max(at, steps, length / steps, fine, limit)
+
+
+def sampled_max(at, steps, spacing, fine, limit):
+    '''the largest value of a 1-Lipschitz function sampled along a path.
+
+       Sampling every so far can miss up to half of that, so where a stretch
+       could be hiding something over the limit it is measured again closely.
+       Everywhere else the samples already prove it cannot be, so there is
+       nothing to gain by looking harder.
+    '''
+    seen = [at(float(step) / steps) for step in range(steps + 1)]
+    worst = max(seen)
+    if fine is None or limit is None or worst > limit:
+        # already over the limit, and looking closer can only make it worse,
+        # so there is nothing a finer measurement would change
+        return worst
+    for step in range(steps):
+        if max(seen[step], seen[step + 1]) + spacing * 0.5 <= limit:
+            continue
+        inner = max(1, int(math.ceil(spacing / fine)))
+        for k in range(1, inner):
+            got = at((step + float(k) / inner) / steps)
+            if got > worst:
+                worst = got
     return worst
 
 
@@ -390,11 +458,15 @@ def check_return_path(mission, cruise_eas, roll_limit_deg, granularity=50.0,
         result.fixed_width = width
     result.terrain_missing = mission.terrain_missing
     result.return_path_starts = mission.return_path_starts()
-    result.unmodelled = mission.unmodelled(loiter_radius)
     result.continue_after_land = continue_after_land
 
     path = mission.flown_path(dont_zero_counter=dont_zero_counter,
-                              continue_after_land=continue_after_land)
+                              continue_after_land=continue_after_land,
+                              loiter_radius=loiter_radius)
+    # against the path actually being checked, not the default one. A mission
+    # that carries on past its landing flies items the default walk stops
+    # before, and they were going unreported
+    result.unmodelled = mission.unmodelled(loiter_radius, path)
     if len(path) < 2:
         result.errors.append("mission has no flyable path")
         return result
@@ -411,17 +483,38 @@ def check_return_path(mission, cruise_eas, roll_limit_deg, granularity=50.0,
         return result
 
     path_sets = []
+    barren = 0
     for state in states:
         found = build_return_paths(mission, state, dont_zero_counter)
         if len(found) > 0:
             path_sets.append((state, found))
+        else:
+            # an RTL with the counters in this state finds no return path at
+            # all. Quietly leaving the state out would check only the states
+            # that happen to work and call the mission safe
+            barren += 1
     if len(path_sets) == 0:
         result.errors.append(
             "no return path found after DO_RETURN_PATH_START")
         return result
+    if barren > 0:
+        result.errors.append(
+            "%u of the %u DO_JUMP counter states an RTL could find have no "
+            "return path at all, so an RTL with a loop part run would not "
+            "follow one" % (barren, len(states)))
+        return result
     result.jump_states = len(path_sets)
 
-    granularity = max(float(granularity), mission_model.MIN_SPACING)
+    asked = max(float(granularity), mission_model.MIN_SPACING)
+    granularity = mission_model.usable_spacing(path, asked)
+    if granularity > asked:
+        result.warnings.append(
+            "sampled every %.0fm rather than the %.0fm asked for, which would "
+            "have taken more than %u samples on a mission this long"
+            % (granularity, asked, mission_model.MAX_SAMPLES))
+    # what a near miss is re-measured at, whose own error is small enough to
+    # carry as an allowance rather than hide
+    fine = max(granularity * REFINE_RATIO, mission_model.MIN_SPACING)
     index = mission.corridor_index(loiter_radius, path)
     stats = mission_model.SampleStats()
     samples = mission_model.sample_path(path, granularity,
@@ -452,7 +545,11 @@ def check_return_path(mission, cruise_eas, roll_limit_deg, granularity=50.0,
                 # from this point does not get a return path at all
                 missing = True
                 break
-            got = capture_deviation(index, sample, target, granularity, turn)
+            got = capture_deviation(index, sample, target, granularity, turn,
+                                    fine, radius)
+            # what is left unmeasured is only ever in a stretch already shown
+            # to stay under the limit, bar the closest sampling's own half step
+            got += fine * 0.5
             if deviation is None or got > deviation:
                 deviation = got
                 rejoin = target.seq

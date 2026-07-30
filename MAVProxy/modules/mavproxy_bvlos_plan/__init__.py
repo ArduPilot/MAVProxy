@@ -64,6 +64,23 @@ REFUSALS = {
 }
 
 
+class MissionItem(object):
+    """a snapshot of one mission item.
+
+       The worker must not read the live wploader: a mission download or
+       another command can change it while a check runs, and the answer would
+       then be about a mission that no longer exists.
+    """
+
+    __slots__ = ('seq', 'command', 'frame', 'x', 'y', 'z',
+                 'param1', 'param2', 'param3',
+                 'target_system', 'target_component')
+
+    def __init__(self, item):
+        for name in self.__slots__:
+            setattr(self, name, getattr(item, name, 0))
+
+
 class Job(object):
     '''a check running away from the main loop.
 
@@ -76,6 +93,7 @@ class Job(object):
 
     def __init__(self, name, func):
         self.name = name
+        self.stamp = None
         self.done = False
         self.value = None
         self.error = None
@@ -149,18 +167,26 @@ class BvlosPlanModule(mp_module.MPModule):
             print(self.usage())
 
     def terrain_function(self):
-        '''terrain lookup, or None if the terrain module is not loaded.
+        '''terrain lookup for a worker, or None if terrain is not available.
 
-           The terrain module owns the elevation model and rebuilds it when
-           the source is changed, so go through the module each time rather
-           than holding onto the model.
+           The elevation model is ours alone rather than the terrain module's.
+           Sharing that one would mean two threads in the same unlocked tile
+           cache, and a "terrain set" could swap it half way through a check.
         '''
         terrain = self.module('terrain')
         if terrain is None:
             return None
+        try:
+            from MAVProxy.modules.mavproxy_map import mp_elevation
+            settings = terrain.terrain_settings
+            model = mp_elevation.ElevationModel(database=settings.source,
+                                                offline=settings.offline)
+        except Exception as ex:
+            print("bvlos_plan: no terrain available (%s)" % ex)
+            return None
 
         def lookup(lat, lon):
-            return terrain.ElevationModel.GetElevation(lat, lon)
+            return model.GetElevation(lat, lon)
 
         return lookup
 
@@ -227,7 +253,15 @@ class BvlosPlanModule(mp_module.MPModule):
             print("bvlos_plan: only have %u of %u mission items, still loading"
                   % (count, expected))
             return None
-        return [loader.wp(i) for i in range(count)]
+        return [MissionItem(loader.wp(i)) for i in range(count)]
+
+    def mission_stamp(self):
+        '''enough to tell whether the mission changed under a running job'''
+        wp = self.module('wp')
+        if wp is None:
+            return None
+        loader = wp.wploader
+        return (loader.count(), getattr(loader, 'last_change', None))
 
     def check_inputs(self):
         '''everything a check needs from the vehicle, gathered on the main
@@ -287,6 +321,7 @@ class BvlosPlanModule(mp_module.MPModule):
         print("Return path check: working through the mission...")
         self.job = Job('the return path check',
                        lambda: ('check',) + self.run_check(items, inputs))
+        self.job.stamp = self.mission_stamp()
 
     def cmd_addreturnpaths(self):
         '''add return paths covering the parts of the mission that fail'''
@@ -302,6 +337,7 @@ class BvlosPlanModule(mp_module.MPModule):
         print("Add Return Paths: working out what to add...")
         self.job = Job('adding return paths',
                        lambda: self.build_paths(items, inputs, separation))
+        self.job.stamp = self.mission_stamp()
 
     def build_paths(self, items, inputs, separation):
         '''work out what to add, and check the mission with it before
@@ -359,7 +395,7 @@ class BvlosPlanModule(mp_module.MPModule):
             if job.error is not None:
                 print("bvlos_plan: %s failed: %s" % (job.name, job.error))
             else:
-                self.finished(job.value)
+                self.finished(job.value, job.stamp)
         if self.menu is None:
             return
         if self.module('map') is not None:
@@ -369,8 +405,12 @@ class BvlosPlanModule(mp_module.MPModule):
         else:
             self.menu_added_map = False
 
-    def finished(self, value):
+    def finished(self, value, stamp):
         '''handle a completed job, back on the main loop'''
+        if stamp != self.mission_stamp():
+            print("bvlos_plan: the mission changed while that was running, so "
+                  "the answer is about the mission as it was. Run it again")
+            return
         if value[0] == 'check':
             (_, mission, result) = value
             self.report(result, mission)
@@ -470,6 +510,8 @@ class BvlosPlanModule(mp_module.MPModule):
             print("  INCONCLUSIVE: %u points need terrain that is not "
                   "available, so their altitudes are guesses. Try 'terrain "
                   "set source SRTM1'" % result.terrain_missing)
+        for warning in result.warnings:
+            print("  note: %s" % warning)
         for reason in result.unmodelled:
             print("  INCONCLUSIVE: %s" % reason)
         autoland = self.get_mav_param('RTL_AUTOLAND', None)
@@ -499,6 +541,10 @@ class BvlosPlanModule(mp_module.MPModule):
                 print("  PASS: all %u points along the mission return within "
                       "%s of the mission path"
                       % (result.checked, self.metric_name(result)))
+                print("  (checked every %.0fm along the mission. Between one "
+                      "point and the next an RTL can pick a different leg, so "
+                      "a finer granularity checks more)"
+                      % self.bvlos_settings.granularity)
             else:
                 print("  INCONCLUSIVE: none of the %u points checked failed, "
                       "but the mission is not all modelled, see above"
