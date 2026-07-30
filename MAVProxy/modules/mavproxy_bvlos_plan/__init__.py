@@ -14,6 +14,8 @@ path. See return_path.py.
 
 # AP_FLAKE8_CLEAN
 
+import threading
+
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_util
@@ -37,6 +39,58 @@ FAIL_LINEWIDTH = 4
 # RtlAutoland in ArduPlane/defines.h
 RTL_AUTOLAND_RETURN_PATH = 4
 
+# MIS_OPTIONS bits, AP_Mission::Option
+MIS_OPTION_CONTINUE_AFTER_LAND = (1 << 2)
+MIS_OPTION_DONT_ZERO_COUNTER = (1 << 3)
+
+# why we would not touch a mission. Adding items to one we do not fully
+# understand could change what it flies
+REFUSALS = {
+    'passes': "bvlos_plan: the mission already passes, nothing to add",
+    'nothing': "bvlos_plan: could not work out a return path to add",
+    'terrain': "bvlos_plan: not changing the mission while %(n)u points need "
+               "terrain that is not available, as the new legs would be "
+               "placed from guessed altitudes. Try 'terrain set source SRTM1'",
+    'unmodelled': "bvlos_plan: not changing a mission whose flown path is not "
+                  "all known, see above. The new legs are placed against that "
+                  "path, so they would be in the wrong place",
+    'noland': "bvlos_plan: the mission does not end at a landing, so adding "
+              "items to the end would change the mission as flown. Not "
+              "changing it",
+    'continues': "bvlos_plan: a takeoff follows the landing, so with "
+                 "MIS_OPTIONS CONTINUE_AFTER_LAND the mission carries on past "
+                 "it and appended items would be flown as part of it. Not "
+                 "changing it",
+}
+
+
+class Job(object):
+    '''a check running away from the main loop.
+
+       A check on a long mission takes seconds, and MAVProxy's main loop is
+       what services the MAVLink links, so running one inline stops talking to
+       the aircraft for that whole time. The work is pure computation on a
+       list of mission items, so it runs on a thread and the answer is picked
+       up from idle_task.
+    '''
+
+    def __init__(self, name, func):
+        self.name = name
+        self.done = False
+        self.value = None
+        self.error = None
+        self.thread = threading.Thread(target=self.run, args=(func,))
+        self.thread.daemon = True
+        self.thread.start()
+
+    def run(self, func):
+        try:
+            self.value = func()
+        except Exception as ex:
+            self.error = ex
+        finally:
+            self.done = True
+
 
 class BvlosPlanModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -44,6 +98,7 @@ class BvlosPlanModule(mp_module.MPModule):
                                               "BVLOS planning")
         self.menu_added_map = False
         self.menu = None
+        self.job = None
         if mp_util.has_wxpython:
             self.menu = MPMenuSubMenu(
                 'BVLOS',
@@ -60,8 +115,9 @@ class BvlosPlanModule(mp_module.MPModule):
             # 0 means take it from the vehicle parameters
             ('cruise_airspeed', float, 0.0),
             ('roll_limit', float, 0.0),
+            ('loiter_radius', float, 0.0),
             # if set, the distance either side of the mission path that the
-            # return may use, in metres, instead of the turn radius
+            # return may use, in metres, instead of the turn diameter
             ('return_path_width', float, 0.0),
             # if set, how far to one side an added return path is put, in
             # metres, instead of the turn radius
@@ -134,6 +190,24 @@ class BvlosPlanModule(mp_module.MPModule):
             return float(value) * 0.01
         return None
 
+    def loiter_radius(self):
+        '''the radius a loiter without one of its own will fly, or 0'''
+        if self.bvlos_settings.loiter_radius > 0:
+            return self.bvlos_settings.loiter_radius
+        value = self.get_mav_param('WP_LOITER_RAD', None)
+        if value is not None and value != 0:
+            return abs(float(value))
+        return 0.0
+
+    def mission_options(self):
+        '''(continue_after_land, dont_zero_counter) from MIS_OPTIONS'''
+        value = self.get_mav_param('MIS_OPTIONS', None)
+        if value is None:
+            return (False, False)
+        bits = int(value)
+        return (bits & MIS_OPTION_CONTINUE_AFTER_LAND != 0,
+                bits & MIS_OPTION_DONT_ZERO_COUNTER != 0)
+
     def mission_items(self):
         '''the loaded mission, or None with a reason printed'''
         wp = self.module('wp')
@@ -155,109 +229,214 @@ class BvlosPlanModule(mp_module.MPModule):
             return None
         return [loader.wp(i) for i in range(count)]
 
-    def run_check(self, items):
-        '''run the return path check, returning (mission, result, cruise,
-           roll) or None with a reason printed'''
-        width = self.bvlos_settings.return_path_width
-        cruise = self.cruise_airspeed()
-        roll = self.roll_limit()
-        if width <= 0 and (cruise is None or roll is None):
-            print("bvlos_plan: need cruise airspeed and bank limit for the "
-                  "turn radius. Connect to a vehicle, set them with "
-                  "'bvlos_plan set cruise_airspeed' and 'bvlos_plan set "
-                  "roll_limit', or give a fixed distance with 'bvlos_plan set "
-                  "return_path_width'")
-            return None
-        terrain_fn = self.terrain_function()
-        mission = mission_model.build_mission(items, terrain_fn=terrain_fn)
+    def check_inputs(self):
+        '''everything a check needs from the vehicle, gathered on the main
+           loop so the worker touches no MAVProxy state'''
+        (continue_after_land, dont_zero_counter) = self.mission_options()
+        return {
+            'cruise': self.cruise_airspeed(),
+            'roll': self.roll_limit(),
+            'loiter_radius': self.loiter_radius(),
+            'width': self.bvlos_settings.return_path_width,
+            'granularity': self.bvlos_settings.granularity,
+            'terrain_fn': self.terrain_function(),
+            'continue_after_land': continue_after_land,
+            'dont_zero_counter': dont_zero_counter,
+        }
+
+    def run_check(self, items, inputs):
+        '''run the return path check on a list of mission items'''
+        mission = mission_model.build_mission(
+            items, terrain_fn=inputs['terrain_fn'])
         result = return_path.check_return_path(
-            mission, cruise, roll,
-            granularity=self.bvlos_settings.granularity,
-            terrain_fn=terrain_fn, width=width)
-        return (mission, result, cruise, roll)
+            mission, inputs['cruise'], inputs['roll'],
+            granularity=inputs['granularity'],
+            terrain_fn=inputs['terrain_fn'],
+            width=inputs['width'],
+            loiter_radius=inputs['loiter_radius'],
+            dont_zero_counter=inputs['dont_zero_counter'],
+            continue_after_land=inputs['continue_after_land'])
+        return (mission, result)
+
+    def usable(self, inputs):
+        '''True if we know enough to work out a turn radius'''
+        if inputs['cruise'] and inputs['roll']:
+            return True
+        print("bvlos_plan: need the cruise airspeed and bank limit to work "
+              "out the turn the aircraft has to fly onto the return. Connect "
+              "to a vehicle, or set them with 'bvlos_plan set cruise_airspeed' "
+              "and 'bvlos_plan set roll_limit'")
+        return False
+
+    def busy(self):
+        if self.job is None:
+            return False
+        print("bvlos_plan: %s is still running" % self.job.name)
+        return True
 
     def cmd_returncheck(self):
         '''check that a DO_RETURN_PATH_START is safe'''
+        if self.busy():
+            return
         items = self.mission_items()
         if items is None:
             return
-        run = self.run_check(items)
-        if run is None:
+        inputs = self.check_inputs()
+        if not self.usable(inputs):
             return
-        (mission, result, cruise, roll) = run
-        self.report(result, mission, cruise, roll)
-        self.highlight(result, mission)
+        print("Return path check: working through the mission...")
+        self.job = Job('the return path check',
+                       lambda: ('check',) + self.run_check(items, inputs))
 
     def cmd_addreturnpaths(self):
         '''add return paths covering the parts of the mission that fail'''
+        if self.busy():
+            return
         items = self.mission_items()
         if items is None:
             return
-        # the new legs are offset by the turn radius, never by the return
-        # path width, which is only a check tolerance. return_path_sep
-        # overrides that offset
+        inputs = self.check_inputs()
+        if not self.usable(inputs):
+            return
         separation = self.bvlos_settings.return_path_sep
-        cruise = self.cruise_airspeed()
-        roll = self.roll_limit()
-        if separation <= 0 and (cruise is None or roll is None):
-            print("bvlos_plan: adding return paths needs the cruise airspeed "
-                  "and bank limit, as the new legs are offset by the turn "
-                  "radius. Connect to a vehicle, set them with 'bvlos_plan "
-                  "set cruise_airspeed' and 'bvlos_plan set roll_limit', or "
-                  "give the offset directly with 'bvlos_plan set "
-                  "return_path_sep'")
-            return
-        run = self.run_check(items)
-        if run is None:
-            return
-        (mission, result, _, _) = run
+        print("Add Return Paths: working out what to add...")
+        self.job = Job('adding return paths',
+                       lambda: self.build_paths(items, inputs, separation))
+
+    def build_paths(self, items, inputs, separation):
+        '''work out what to add, and check the mission with it before
+           offering it. Runs on the worker thread'''
+        (mission, result) = self.run_check(items, inputs)
         if len(result.errors) > 0:
-            for err in result.errors:
-                print("bvlos_plan: %s" % err)
-            return
-        if result.failed == 0:
-            print("bvlos_plan: the mission already passes, nothing to add")
-            return
-        if mission.terrain_missing:
-            print("bvlos_plan: not changing the mission while %u items need "
-                  "terrain that is not available, as the new legs would be "
-                  "placed from guessed altitudes. Try 'terrain set source "
-                  "SRTM1'" % mission.terrain_missing)
-            return
+            return ('add', mission, result, None, None, None)
+        if result.failed == 0 and result.conclusive():
+            return ('add', mission, result, None, None, 'passes')
+        if result.terrain_missing:
+            return ('add', mission, result, None, None, 'terrain')
+        if len(result.unmodelled) > 0:
+            return ('add', mission, result, None, None, 'unmodelled')
         if not mission.ends_in_landing():
-            # new navigation items after a mission that does not end at a
-            # landing would be flown as part of the mission
-            print("bvlos_plan: the mission does not end at a landing, so "
-                  "adding items to the end would change the mission as "
-                  "flown. Not changing it")
-            return
+            return ('add', mission, result, None, None, 'noland')
+        if mission.takeoff_after_landing():
+            return ('add', mission, result, None, None, 'continues')
 
-        added = add_return_paths.build(mission, items, result, cruise, roll,
-                                       separation=separation)
-        if len(added) == 0:
-            print("bvlos_plan: could not work out a return path to add")
-            return
+        # try a spread of separations and keep the best that breaks
+        # nothing, rather than making the operator guess one. Offsetting
+        # further moves the new legs away from the ground the mission covers,
+        # so more is not better and the useful range is narrow
+        if separation > 0:
+            candidates = [separation]
+        else:
+            turn = mission_model.turn_radius(inputs['cruise'], inputs['roll'],
+                                             mission.home_amsl)
+            candidates = [turn * f for f in (1.0, 1.5, 2.0, 3.0)]
+        best = None
+        for candidate in candidates:
+            added = add_return_paths.build(mission, items, result,
+                                           inputs['cruise'], inputs['roll'],
+                                           separation=candidate)
+            if len(added) == 0:
+                continue
+            new_items = []
+            for new_path in added:
+                new_items.extend(new_path.items)
+            (_, trial) = self.run_check(items + new_items, inputs)
+            broken = len(trial.failed_at - result.failed_at)
+            score = (broken > 0, trial.failed, len(trial.errors))
+            if best is None or score < best[0]:
+                best = (score, added, trial, broken)
+        if best is None:
+            return ('add', mission, result, None, None, 'nothing')
+        (_, added, trial, _) = best
+        return ('add', mission, result, added, trial, None)
 
-        # check what we are about to do before doing it, so a fix that does
-        # not help cannot be left behind in the mission
-        new_items = []
-        for new_path in added:
-            new_items.extend(new_path.items)
-        trial = self.run_check(items + new_items)
-        if trial is None:
+    def idle_task(self):
+        '''add our menu to the map, notice the map going away, and pick up a
+           finished check'''
+        if self.job is not None and self.job.done:
+            job = self.job
+            self.job = None
+            if job.error is not None:
+                print("bvlos_plan: %s failed: %s" % (job.name, job.error))
+            else:
+                self.finished(job.value)
+        if self.menu is None:
             return
-        (trial_mission, trial_result, _, _) = trial
-        if len(trial_result.errors) > 0 or trial_result.failed >= result.failed:
-            print("bvlos_plan: the return paths this would add do not improve "
-                  "the mission (%u failing points before, %u after), so it has "
-                  "not been changed" % (result.failed, trial_result.failed))
-            for err in trial_result.errors:
-                print("  would give: %s" % err)
-            if trial_result.failed >= result.failed and separation > 0:
-                print("  a smaller 'bvlos_plan set return_path_sep' may help")
-            return
+        if self.module('map') is not None:
+            if not self.menu_added_map:
+                self.menu_added_map = True
+                self.module('map').add_menu(self.menu)
+        else:
+            self.menu_added_map = False
 
-        loader = self.module('wp').wploader
+    def finished(self, value):
+        '''handle a completed job, back on the main loop'''
+        if value[0] == 'check':
+            (_, mission, result) = value
+            self.report(result, mission)
+            self.highlight(result, mission)
+            return
+        (_, mission, result, added, trial, refusal) = value
+        self.report(result, mission)
+        self.highlight(result, mission)
+        if refusal is not None:
+            print(REFUSALS[refusal] % {'n': result.terrain_missing})
+            return
+        if added is None:
+            return
+        if not self.improves(result, trial):
+            return
+        self.apply(added, trial)
+
+    def improves(self, result, trial):
+        '''only take a fix that leaves nothing newly failing.
+
+           Counting failures alone would let a fix trade many small ones for a
+           smaller number of much worse ones, which is not a fix.
+        '''
+        if len(trial.errors) > 0:
+            print("bvlos_plan: the return paths this would add give: %s. Not "
+                  "changing the mission" % '; '.join(trial.errors))
+            return False
+        if trial.terrain_missing > result.terrain_missing:
+            print("bvlos_plan: the return paths this would add reach ground "
+                  "whose terrain is not available, so they cannot be placed. "
+                  "Not changing the mission")
+            return False
+        broken = trial.failed_at - result.failed_at
+        if len(broken) > 0:
+            print("bvlos_plan: the return paths this would add break %u points "
+                  "along the mission that pass now, worst %.0fm. Not changing "
+                  "the mission" % (len(broken), trial.worst_deviation))
+            self.suggest_sep()
+            return False
+        if trial.failed >= result.failed:
+            print("bvlos_plan: the return paths this would add do not help "
+                  "(%u failing points before, %u after). Not changing the "
+                  "mission" % (result.failed, trial.failed))
+            self.suggest_sep()
+            return False
+        if trial.failed > 0:
+            print("bvlos_plan: note, %u points still fail, worst %.0fm against "
+                  "%.0fm allowed" % (trial.failed, trial.worst_deviation,
+                                     trial.worst_radius or 0))
+            self.suggest_sep()
+        return True
+
+    def suggest_sep(self):
+        if self.bvlos_settings.return_path_sep > 0:
+            print("  a different 'bvlos_plan set return_path_sep' may help")
+        else:
+            print("  'bvlos_plan set return_path_sep' chooses how far to one "
+                  "side the new legs go, which is worth trying")
+
+    def apply(self, added, trial):
+        '''put the new items into the mission, on the main loop'''
+        wp = self.module('wp')
+        if wp is None:
+            print("bvlos_plan: the wp module went away, not changing anything")
+            return
+        loader = wp.wploader
         count = 0
         for new_path in added:
             for item in new_path.items:
@@ -273,37 +452,35 @@ class BvlosPlanModule(mp_module.MPModule):
                   "side, %s, rejoining the existing return path at waypoint %u"
                   % (new_path.from_seq, new_path.to_seq, new_path.separation,
                      source, new_path.rejoin_seq))
+        print("  worst case is now %.0fm against %.0fm allowed"
+              % (trial.worst_deviation, trial.worst_radius or 0))
         print("  the mission is changed here only, use 'wp save' to keep it "
               "or 'wp list' to go back to the vehicle's copy")
 
-        # show what the mission looks like now
-        items = [loader.wp(i) for i in range(loader.count())]
-        run = self.run_check(items)
-        if run is None:
-            return
-        (mission, result, cruise, roll) = run
-        self.report(result, mission, cruise, roll)
-        self.highlight(result, mission)
-
-    def report(self, result, mission, cruise, roll):
+    def report(self, result, mission):
         '''print the outcome of a check'''
         if result.fixed_width is not None:
             print("Return path check: allowing %.0fm either side of the "
                   "mission path, sampled every %.0fm"
                   % (result.fixed_width, self.bvlos_settings.granularity))
         else:
-            print("Return path check: turn radius from cruise %.1fm/s and "
-                  "bank limit %.0fdeg, sampled every %.0fm"
-                  % (cruise, roll, self.bvlos_settings.granularity))
-        if mission.terrain_missing:
-            print("  WARNING: %u mission items need terrain that is not "
-                  "available, so their altitudes are approximate. Try "
-                  "'terrain set source SRTM1'" % mission.terrain_missing)
+            print("Return path check: allowing the turn diameter, sampled "
+                  "every %.0fm" % self.bvlos_settings.granularity)
+        if result.terrain_missing:
+            print("  INCONCLUSIVE: %u points need terrain that is not "
+                  "available, so their altitudes are guesses. Try 'terrain "
+                  "set source SRTM1'" % result.terrain_missing)
+        for reason in result.unmodelled:
+            print("  INCONCLUSIVE: %s" % reason)
         autoland = self.get_mav_param('RTL_AUTOLAND', None)
         if autoland is not None and int(autoland) != RTL_AUTOLAND_RETURN_PATH:
             print("  WARNING: RTL_AUTOLAND is %u, so an RTL will not use the "
                   "return path at all (needs %u)"
                   % (int(autoland), RTL_AUTOLAND_RETURN_PATH))
+        if result.jump_states > 1:
+            print("  note: checked against %u DO_JUMP counter states, as which "
+                  "return an RTL finds depends on how many times each loop has "
+                  "already run" % result.jump_states)
         for err in result.errors:
             print("  ERROR: %s" % err)
         if len(result.errors) > 0:
@@ -312,17 +489,20 @@ class BvlosPlanModule(mp_module.MPModule):
         print("  DO_RETURN_PATH_START at %s" %
               ', '.join(str(s) for s in result.return_path_starts))
         if result.worst_radius is not None:
-            allowed = "%.0fm allowed" % result.worst_radius
-            if result.fixed_width is None:
-                allowed = "%.0fm turn radius" % result.worst_radius
-            print("  worst case: %.0fm from the mission path against %s, on "
-                  "the leg %u->%u, rejoining at waypoint %u"
-                  % (result.worst_deviation, allowed,
+            print("  worst case: %.0fm from the mission path against %.0fm "
+                  "allowed, on the leg %u->%u, rejoining at waypoint %u"
+                  % (result.worst_deviation, result.worst_radius,
                      result.worst_leg[0], result.worst_leg[1],
                      result.worst_rejoin))
         if result.failed == 0:
-            print("  PASS: all %u points along the mission return within %s "
-                  "of the mission path" % (result.checked, self.metric_name(result)))
+            if result.conclusive():
+                print("  PASS: all %u points along the mission return within "
+                      "%s of the mission path"
+                      % (result.checked, self.metric_name(result)))
+            else:
+                print("  INCONCLUSIVE: none of the %u points checked failed, "
+                      "but the mission is not all modelled, see above"
+                      % result.checked)
             return
         print("  FAIL: %u of %u points along the mission would return outside "
               "%s of the mission path"
@@ -336,7 +516,7 @@ class BvlosPlanModule(mp_module.MPModule):
         '''how the allowed distance was arrived at, for the report'''
         if result.fixed_width is not None:
             return "the %.0fm return path width" % result.fixed_width
-        return "a turn radius"
+        return "the turn diameter"
 
     def maps(self):
         '''every loaded map instance'''
@@ -376,17 +556,6 @@ class BvlosPlanModule(mp_module.MPModule):
                     'bvlos_return_fail_%u' % i, points,
                     layer=MAP_LAYER, linewidth=FAIL_LINEWIDTH,
                     colour=FAIL_COLOUR, showcircles=False))
-
-    def idle_task(self):
-        '''add our menu to the map, and notice the map going away'''
-        if self.menu is None:
-            return
-        if self.module('map') is not None:
-            if not self.menu_added_map:
-                self.menu_added_map = True
-                self.module('map').add_menu(self.menu)
-        else:
-            self.menu_added_map = False
 
     def unload(self):
         '''unload module'''

@@ -35,11 +35,15 @@ mavlink = mavutil.mavlink
 # DO_RETURN_PATH_START candidates
 SEARCH_BUDGET = 1000
 
-# max_loops in AP_Mission::get_next_cmd()
-MAX_JUMP_LOOPS = 64
+# how many DO_JUMP counter states we are prepared to check before giving up
+# and calling the result inconclusive
+MAX_JUMP_STATES = 8
 
-# AP_MISSION_JUMP_REPEAT_FOREVER
-JUMP_REPEAT_FOREVER = -1
+# re-exported, as the walk itself lives with the mission geometry
+MAX_JUMP_LOOPS = mission_model.MAX_JUMP_LOOPS
+JUMP_REPEAT_FOREVER = mission_model.JUMP_REPEAT_FOREVER
+next_command = mission_model.next_command
+jump_tag_index = mission_model.jump_tag_index
 
 
 class ReturnPath(object):
@@ -50,53 +54,50 @@ class ReturnPath(object):
         self.points = points
 
 
-def next_command(mission, index, jump_counts):
-    '''AP_Mission::get_next_cmd(): the next non jump command at or after
-       index, following DO_JUMP. Returns None at the end of the mission or on
-       a bad jump'''
-    loops = MAX_JUMP_LOOPS
-    total = mission.count()
-    while 0 <= index < total:
-        point = mission.point(index)
-        command = point.command
-        if command == mavlink.MAV_CMD_DO_JUMP:
-            target = int(point.param1)
-        elif command == getattr(mavlink, 'MAV_CMD_DO_JUMP_TAG', -1):
-            target = jump_tag_index(mission, int(point.param1))
-        else:
-            return (point, index)
-        if loops == 0 or target is None:
-            return (None, index)
-        loops -= 1
-        # an invalid target aborts the search, as in ArduPilot
-        if target >= total or target == 0:
-            return (None, index)
-        num_times = int(point.param2)
-        run = jump_counts.get(index, 0)
-        if num_times == JUMP_REPEAT_FOREVER or run < num_times:
-            jump_counts[index] = run + 1
-            index = target
-        else:
-            # having finished a jump loop ArduPilot zeroes the counter, so
-            # coming back to it later runs the loop again
-            jump_counts[index] = 0
-            index += 1
-    return (None, index)
+def finite_jumps(mission):
+    '''sequence numbers of DO_JUMP items with a repeat count.
 
-
-def jump_tag_index(mission, tag):
-    '''index of the JUMP_TAG item carrying this tag, as
-       AP_Mission::get_index_of_jump_tag() finds it'''
-    tag_cmd = getattr(mavlink, 'MAV_CMD_JUMP_TAG', None)
-    if tag_cmd is None:
-        return None
+       Their counters carry whatever the running mission has already used up:
+       distance_to_mission_leg() backs up and restores _jump_tracking rather
+       than clearing it, so the return path depends on how far through the
+       mission the RTL happens.
+    '''
+    jumps = []
     for point in mission.points:
-        if point.command == tag_cmd and int(point.param1) == tag:
-            return point.seq
-    return None
+        if point.command != mavlink.MAV_CMD_DO_JUMP:
+            continue
+        num_times = int(point.param2)
+        if num_times != JUMP_REPEAT_FOREVER and num_times > 0:
+            jumps.append((point.seq, num_times))
+    return jumps
 
 
-def build_return_paths(mission):
+def jump_states(mission):
+    '''the DO_JUMP counter states an RTL could find, or None if there are too
+       many to check.
+
+       A jump that has been used up sends the walk past it, one that has not
+       sends it round the loop, so the two expose different return paths.
+    '''
+    jumps = finite_jumps(mission)
+    if len(jumps) == 0:
+        return [{}]
+    if 2 ** len(jumps) > MAX_JUMP_STATES:
+        return None
+    states = [{}]
+    for (seq, num_times) in jumps:
+        grown = []
+        for state in states:
+            fresh = dict(state)
+            used = dict(state)
+            used[seq] = num_times
+            grown.append(fresh)
+            grown.append(used)
+        states = grown
+    return states
+
+
+def build_return_paths(mission, jump_counts=None, dont_zero_counter=False):
     '''the return path from each DO_RETURN_PATH_START, walked the way
        AP_Mission::distance_to_mission_leg() walks it: following DO_JUMP, and
        stopping at a landing or a DO_LAND_START inclusive'''
@@ -105,12 +106,14 @@ def build_return_paths(mission):
     exhausted = False
     for start in mission.return_path_starts():
         points = []
-        jump_counts = {}
+        # ArduPilot backs the counters up and restores them around each
+        # candidate, so every candidate starts from the same live state
+        counts = dict(jump_counts or {})
         index = start
         finished = False
         while budget > 0:
-            budget -= 1
-            (point, index) = next_command(mission, index, jump_counts)
+            (point, index) = next_command(mission, index, counts,
+                                          dont_zero_counter)
             if point is None:
                 # ran off the end of the mission, which ArduPilot still
                 # accepts as a path
@@ -120,8 +123,11 @@ def build_return_paths(mission):
             if point.has_location():
                 points.append(point)
             if point.is_landing() or point.command == mavlink.MAV_CMD_DO_LAND_START:
+                # ArduPilot leaves the loop here without spending the
+                # iteration, so a landing costs nothing from the budget
                 finished = True
                 break
+            budget -= 1
         if not finished:
             # the search budget ran out part way through, which ArduPilot
             # treats as no path rather than as a truncated one
@@ -183,7 +189,113 @@ def closest_in_path(path, x, y, amsl):
     return (best_point, best_distance)
 
 
-def rejoin_target(mission, point):
+def capture_deviation(index, sample, target, granularity, radius):
+    '''how far the aircraft actually gets from the mission path flying an RTL
+       from this point, in metres.
+
+       An RTL does not teleport onto the line to the rejoin waypoint. The
+       aircraft is flying along the mission, and has to bank round onto that
+       line at the radius its airspeed and bank limit allow before it can
+       track it. A reversal is the case that matters: turning back the way it
+       came takes it a full diameter off the mission track, not none of it, so
+       measuring the straight line alone would call a manoeuvre safe that puts
+       the aircraft twice as far out as the corridor allows.
+
+       The path measured is therefore the arc from where the aircraft is,
+       tangent to its present heading, followed by the straight run to the
+       rejoin waypoint.
+    '''
+    worst = index.distance(sample.x, sample.y)
+    (ux, uy) = (sample.ux, sample.uy)
+    if radius <= 0 or (ux == 0.0 and uy == 0.0):
+        # no heading to turn from, so the straight line is all there is
+        return max(worst, straight_deviation(index, sample.x, sample.y,
+                                             target.x, target.y, granularity))
+
+    # the aircraft turns whichever way is shorter, so work out both and keep
+    # the one that gets onto the line with less turning
+    best = None
+    for direction in (1.0, -1.0):
+        turn = turn_onto(sample.x, sample.y, ux, uy, radius, direction,
+                         target.x, target.y)
+        if best is None or turn[0] < best[0]:
+            best = turn
+    (sweep, cx, cy, start, qx, qy, direction) = best
+
+    steps = max(1, int(math.ceil(radius * sweep / granularity)))
+    for step in range(steps + 1):
+        angle = start + direction * sweep * step / steps
+        d = index.distance(cx + radius * math.cos(angle),
+                           cy + radius * math.sin(angle))
+        if d > worst:
+            worst = d
+    return max(worst, straight_deviation(index, qx, qy,
+                                         target.x, target.y, granularity))
+
+
+def turn_onto(px, py, ux, uy, radius, direction, tx, ty):
+    '''the bank limited turn from (px, py) heading (ux, uy) onto the line to
+       (tx, ty), going round the circle in the given direction.
+
+       Returns how far round it has to go, where the circle is, where it
+       starts on it and where it rolls out.
+    '''
+    if direction > 0:
+        (nx, ny) = (-uy, ux)
+    else:
+        (nx, ny) = (uy, -ux)
+    (cx, cy) = (px + radius * nx, py + radius * ny)
+    start = math.atan2(py - cy, px - cx)
+    span = math.hypot(tx - cx, ty - cy)
+    if span <= radius:
+        # the waypoint is inside the turning circle, so the aircraft cannot
+        # roll straight out onto it and has to come the whole way round
+        (qx, qy) = nearest_on_circle(cx, cy, radius, tx, ty)
+        return (2.0 * math.pi, cx, cy, start, qx, qy, direction)
+    to_target = math.atan2(ty - cy, tx - cx)
+    offset = math.acos(max(-1.0, min(1.0, radius / span)))
+    # of the two tangent points, the one where continuing round this way
+    # heads at the target rather than away from it
+    angle = to_target - direction * offset
+    sweep = (direction * (angle - start)) % (2.0 * math.pi)
+    return (sweep, cx, cy, start,
+            cx + radius * math.cos(angle), cy + radius * math.sin(angle),
+            direction)
+
+
+def nearest_on_circle(cx, cy, radius, px, py):
+    '''the point of a circle closest to a point'''
+    (dx, dy) = (px - cx, py - cy)
+    length = math.hypot(dx, dy)
+    if length <= 0:
+        return (cx + radius, cy)
+    return (cx + radius * dx / length, cy + radius * dy / length)
+
+
+def straight_deviation(index, ax, ay, bx, by, granularity):
+    '''how far a straight run between two points gets from the mission path'''
+    (dx, dy) = (bx - ax, by - ay)
+    length = math.hypot(dx, dy)
+    if length <= 0:
+        return index.distance(ax, ay)
+    steps = max(1, int(math.ceil(length / granularity)))
+    worst = 0.0
+    for step in range(steps + 1):
+        frac = float(step) / steps
+        d = index.distance(ax + dx * frac, ay + dy * frac)
+        if d > worst:
+            worst = d
+    return worst
+
+
+def cut_across_deviation(index, sample, target, granularity):
+    '''how far the straight line from a point to the rejoin waypoint gets from
+       the mission path, without the turn onto it'''
+    return straight_deviation(index, sample.x, sample.y,
+                              target.x, target.y, granularity)
+
+
+def rejoin_target(mission, point, jump_counts=None, dont_zero_counter=False):
     '''where the vehicle actually flies to.
 
        set_current_cmd() runs advance_current_nav_cmd(), which walks forward
@@ -196,10 +308,11 @@ def rejoin_target(mission, point):
         return None
     if point.is_nav() and point.has_location():
         return point
-    jump_counts = {}
+    counts = dict(jump_counts or {})
     index = point.seq + 1
     for _ in range(mission.count() + 1):
-        (candidate, index) = next_command(mission, index, jump_counts)
+        (candidate, index) = next_command(mission, index, counts,
+                                          dont_zero_counter)
         if candidate is None:
             return None
         index = candidate.seq + 1
@@ -239,28 +352,49 @@ class CheckResult(object):
         self.terrain_missing = 0
         # set when a fixed width was used instead of the turn radius
         self.fixed_width = None
+        # parts of the mission whose flown path we cannot work out, which make
+        # a result inconclusive rather than a pass
+        self.unmodelled = []
+        # which samples failed, by index along the mission, so a proposed fix
+        # can be checked for making anything worse rather than just for
+        # lowering the total
+        self.failed_at = set()
+        # how many DO_JUMP counter states the check had to consider
+        self.jump_states = 1
+        self.continue_after_land = False
+
+    def conclusive(self):
+        '''False if something about the mission means a pass cannot be
+           claimed, whatever the samples said'''
+        return len(self.unmodelled) == 0 and self.terrain_missing == 0
 
     def ok(self):
-        return len(self.errors) == 0 and self.failed == 0
+        return (len(self.errors) == 0 and self.failed == 0 and
+                self.conclusive())
 
 
 def check_return_path(mission, cruise_eas, roll_limit_deg, granularity=50.0,
-                      terrain_fn=None, width=0.0):
+                      terrain_fn=None, width=0.0, loiter_radius=0.0,
+                      dont_zero_counter=False, continue_after_land=False):
     '''check that an RTL from any point on the mission returns within the
        allowed distance of the mission path.
 
        That distance is the turn radius the vehicle can achieve at the
        altitude of each point, unless width is greater than zero, in which
-       case it is used instead and the airspeed and bank limit are not
-       needed.
+       case it is used instead. The turn radius is still needed to work out
+       the arc the aircraft flies onto the return, so the airspeed and bank
+       limit are used either way when they are known.
     '''
     result = CheckResult()
     if width > 0:
         result.fixed_width = width
     result.terrain_missing = mission.terrain_missing
     result.return_path_starts = mission.return_path_starts()
+    result.unmodelled = mission.unmodelled(loiter_radius)
+    result.continue_after_land = continue_after_land
 
-    path = mission.flown_path()
+    path = mission.flown_path(dont_zero_counter=dont_zero_counter,
+                              continue_after_land=continue_after_land)
     if len(path) < 2:
         result.errors.append("mission has no flyable path")
         return result
@@ -268,14 +402,27 @@ def check_return_path(mission, cruise_eas, roll_limit_deg, granularity=50.0,
         result.errors.append("mission has no DO_RETURN_PATH_START")
         return result
 
-    paths = build_return_paths(mission)
-    if len(paths) == 0:
+    states = jump_states(mission)
+    if states is None:
+        result.errors.append(
+            "the mission has too many DO_JUMP items with a repeat count to "
+            "work out every return path an RTL could take, as which one it "
+            "picks depends on how many times each loop has already run")
+        return result
+
+    path_sets = []
+    for state in states:
+        found = build_return_paths(mission, state, dont_zero_counter)
+        if len(found) > 0:
+            path_sets.append((state, found))
+    if len(path_sets) == 0:
         result.errors.append(
             "no return path found after DO_RETURN_PATH_START")
         return result
+    result.jump_states = len(path_sets)
 
     granularity = max(float(granularity), mission_model.MIN_SPACING)
-    index = mission_model.PathIndex(path)
+    index = mission.corridor_index(loiter_radius, path)
     stats = mission_model.SampleStats()
     samples = mission_model.sample_path(path, granularity,
                                         projector=mission.projector,
@@ -284,28 +431,43 @@ def check_return_path(mission, cruise_eas, roll_limit_deg, granularity=50.0,
 
     unresolved = 0
     span = None
-    for sample in samples:
-        if width > 0:
-            radius = width
-        else:
-            radius = mission_model.turn_radius(cruise_eas, roll_limit_deg,
-                                               sample.amsl)
-        (closest, _) = closest_leg(paths, sample.x, sample.y, sample.amsl)
-        target = rejoin_target(mission, closest)
-        if target is None:
-            # ArduPilot's set_current_cmd() would fail here, so an RTL from
-            # this point does not get a return path at all
+    for (position, sample) in enumerate(samples):
+        turn = mission_model.turn_radius(cruise_eas, roll_limit_deg,
+                                         sample.amsl) if cruise_eas else 0.0
+        # a fixed wing cannot turn back onto its own track in less than a
+        # diameter, so that is the least corridor an RTL can be held to. The
+        # turn radius alone would fail every mission whose return runs back
+        # the way it came, which is all of them
+        radius = width if width > 0 else 2.0 * turn
+        # every counter state the RTL could find, as the aircraft may have
+        # already used up a jump loop by the time it happens
+        deviation = None
+        rejoin = None
+        missing = False
+        for (state, paths) in path_sets:
+            (closest, _) = closest_leg(paths, sample.x, sample.y, sample.amsl)
+            target = rejoin_target(mission, closest, state, dont_zero_counter)
+            if target is None:
+                # ArduPilot's set_current_cmd() would fail here, so an RTL
+                # from this point does not get a return path at all
+                missing = True
+                break
+            got = capture_deviation(index, sample, target, granularity, turn)
+            if deviation is None or got > deviation:
+                deviation = got
+                rejoin = target.seq
+        if missing or deviation is None:
             unresolved += 1
             continue
-        deviation = cut_across_deviation(index, sample, target, granularity)
         result.checked += 1
         if deviation > result.worst_deviation:
             result.worst_deviation = deviation
             result.worst_radius = radius
             result.worst_leg = (sample.leg_from, sample.leg_to)
-            result.worst_rejoin = target.seq
+            result.worst_rejoin = rejoin
         if deviation > radius:
             result.failed += 1
+            result.failed_at.add(position)
             if span is None:
                 span = FailSpan()
                 result.spans.append(span)
@@ -322,21 +484,3 @@ def check_return_path(mission, cruise_eas, roll_limit_deg, granularity=50.0,
         result.errors.append("no point along the mission could be checked")
 
     return result
-
-
-def cut_across_deviation(index, sample, target, granularity):
-    '''how far the direct line from a point to the rejoin waypoint gets from
-       the mission path, in metres'''
-    dx = target.x - sample.x
-    dy = target.y - sample.y
-    length = (dx * dx + dy * dy) ** 0.5
-    if length <= 0:
-        return index.distance(sample.x, sample.y)
-    steps = max(1, int(math.ceil(length / granularity)))
-    worst = 0.0
-    for step in range(steps + 1):
-        frac = float(step) / steps
-        d = index.distance(sample.x + dx * frac, sample.y + dy * frac)
-        if d > worst:
-            worst = d
-    return worst
