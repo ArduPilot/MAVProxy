@@ -88,9 +88,13 @@ LANDING_COMMANDS = frozenset([
 # zero or ask for an unbounded amount of work
 MIN_SPACING = 1.0
 
-# most samples we will take along a mission. A granularity far too small for
-# the mission is a typo, and without this it asks for hours of work
+# most samples we will take along a mission
 MAX_SAMPLES = 20000
+
+# and the most distance queries the whole check may ask for. Each sample walks
+# its own return, so halving the granularity is four times the work, and a
+# granularity far too small for the mission is a typo rather than a request
+MAX_QUERIES = 4.0e7
 
 
 def path_length(path):
@@ -102,11 +106,21 @@ def path_length(path):
     return total
 
 
-def usable_spacing(path, spacing):
+def usable_spacing(path, spacing, states=1):
     '''the given spacing, held to something that can actually be worked
-       through on the mission in hand'''
+       through on the mission in hand.
+
+       The work is one sample every spacing along the mission, each walking a
+       return that can be as long as the mission, for each counter state, so
+       it grows as the square of how fine the sampling is.
+    '''
     spacing = max(float(spacing), MIN_SPACING)
-    return max(spacing, path_length(path) / MAX_SAMPLES)
+    length = path_length(path)
+    if length <= 0:
+        return spacing
+    floor = max(length / MAX_SAMPLES,
+                length * math.sqrt(max(1, states) / MAX_QUERIES))
+    return max(spacing, floor)
 
 
 NAV_LAST = mavlink.MAV_CMD_NAV_LAST
@@ -479,8 +493,16 @@ class MissionPoint(object):
         return self.lat != 0 or self.lon != 0
 
     def loiter_radius(self, default_radius):
-        '''radius of the circle a loiter flies, or None if unknown'''
-        if self.command == mavlink.MAV_CMD_NAV_LOITER_TO_ALT:
+        '''radius of the circle a loiter flies, or None if unknown.
+
+           Which field carries it differs by command, see
+           AP_Mission::mavlink_to_mission_cmd(). NAV_LOITER_TIME has none:
+           its seconds use all sixteen bits of p1 and param3 is only the
+           direction, so verify_loiter_time() circles at WP_LOITER_RAD.
+        '''
+        if self.command == mavlink.MAV_CMD_NAV_LOITER_TIME:
+            radius = 0.0
+        elif self.command == mavlink.MAV_CMD_NAV_LOITER_TO_ALT:
             radius = self.param2
         else:
             radius = self.param3
@@ -490,6 +512,17 @@ class MissionPoint(object):
         if default_radius and default_radius > 0:
             return float(default_radius)
         return None
+
+    def loiter_ccw(self):
+        '''True if the circle is flown anticlockwise. The sign of the field
+           carrying the radius gives the direction'''
+        if self.command == mavlink.MAV_CMD_NAV_LOITER_TO_ALT:
+            return float(self.param2) < 0
+        return float(self.param3) < 0
+
+    def loiter_forever(self):
+        '''True for a loiter the mission never leaves'''
+        return self.command == mavlink.MAV_CMD_NAV_LOITER_UNLIM
 
     def __str__(self):
         return "%u:%s" % (self.seq, command_name(self.command))
@@ -657,6 +690,11 @@ class Mission(object):
             index = point.seq + 1
             if point.is_nav() and point.has_location():
                 path.append(point)
+            if point.is_nav() and point.has_location() and \
+                    point.loiter_forever():
+                # NAV_LOITER_UNLIM never completes, so nothing after it is
+                # ever flown
+                break
             if point.is_landing():
                 if not (continue_after_land and
                         self.takeoff_next(index, counts, dont_zero_counter)):
@@ -758,30 +796,42 @@ class Mission(object):
     def orbit_points(self, loiter, radius, before, after):
         '''the circle a loiter flies, as points on it.
 
-           Entered from wherever the aircraft came in and left towards
-           wherever it goes next, so the whole orbit is covered and the legs
-           either side meet it rather than its centre.
+           Joined where the aircraft arrives, which is on its way to the
+           waypoint, and left where its heading round the circle lines up with
+           where it goes next, which is what ModeLoiter::isHeadingLinedUp()
+           waits for. Leaving radially instead would put a right angle in the
+           path that the aircraft never flies.
         '''
-        def angle_towards(other, fallback):
-            if other is None:
-                return fallback
-            (dx, dy) = (other.x - loiter.x, other.y - loiter.y)
-            if dx == 0.0 and dy == 0.0:
-                return fallback
-            return math.atan2(dy, dx)
+        # in an east/north frame the angle grows anticlockwise
+        turn = 1.0 if loiter.loiter_ccw() else -1.0
 
-        entry = angle_towards(before, 0.0)
-        exit_angle = angle_towards(after, entry + math.pi)
-        points = []
-        # once round from where it joined, then along to where it leaves
-        sweep = (exit_angle - entry) % (2.0 * math.pi)
+        entry = 0.0
+        if before is not None:
+            (dx, dy) = (before.x - loiter.x, before.y - loiter.y)
+            if dx != 0.0 or dy != 0.0:
+                entry = math.atan2(dy, dx)
+
+        # where carrying on round points the aircraft at the next waypoint.
+        # Of the two tangent points it is the one this direction reaches
+        # heading towards it rather than away
+        exit_angle = entry + math.pi
+        if after is not None:
+            (dx, dy) = (after.x - loiter.x, after.y - loiter.y)
+            span = math.hypot(dx, dy)
+            if span > radius:
+                offset = math.acos(max(-1.0, min(1.0, radius / span)))
+                exit_angle = math.atan2(dy, dx) - turn * offset
+
+        angles = []
         steps = LOITER_POINTS
         for step in range(steps + 1):
-            points.append(entry + 2.0 * math.pi * step / steps)
+            angles.append(entry + turn * 2.0 * math.pi * step / steps)
+        # and on round to where it leaves
+        sweep = (turn * (exit_angle - entry)) % (2.0 * math.pi)
         extra = max(1, int(math.ceil(sweep / (2.0 * math.pi / steps))))
         for step in range(1, extra + 1):
-            points.append(entry + sweep * step / extra)
-        return [self.orbit_point(loiter, radius, angle) for angle in points]
+            angles.append(entry + turn * sweep * step / extra)
+        return [self.orbit_point(loiter, radius, angle) for angle in angles]
 
     def orbit_point(self, loiter, radius, angle):
         '''one point on a loiter orbit, as a mission point the checks can use

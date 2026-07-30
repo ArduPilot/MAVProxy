@@ -169,18 +169,23 @@ class BvlosPlanModule(mp_module.MPModule):
     def terrain_function(self):
         '''terrain lookup for a worker, or None if terrain is not available.
 
-           The elevation model is ours alone rather than the terrain module's.
-           Sharing that one would mean two threads in the same unlocked tile
-           cache, and a "terrain set" could swap it half way through a check.
+           The elevation model is ours alone rather than the terrain module's,
+           as sharing that one would put two threads in the same unlocked tile
+           cache and a "terrain set" could swap it half way through a check.
+
+           Ours is offline whatever the terrain module is set to. Downloading
+           goes through module level state in srtm.py that every model shares,
+           which is the same race one step further out. Anything not already
+           on disk is reported as terrain we do not have, which is true, and
+           says so rather than guessing.
         '''
         terrain = self.module('terrain')
         if terrain is None:
             return None
         try:
             from MAVProxy.modules.mavproxy_map import mp_elevation
-            settings = terrain.terrain_settings
-            model = mp_elevation.ElevationModel(database=settings.source,
-                                                offline=settings.offline)
+            source = terrain.terrain_settings.source
+            model = mp_elevation.ElevationModel(database=source, offline=1)
         except Exception as ex:
             print("bvlos_plan: no terrain available (%s)" % ex)
             return None

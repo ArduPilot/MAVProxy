@@ -533,6 +533,195 @@ def test_fix_generator():
               "%u vs %u" % (scores[sep][1], result.failed))
 
 
+def test_between_samples():
+    print("between one sampling point and the next")
+    # a return that is only the closest one over a short stretch of a leg.
+    # Sampling alone steps over it, and the answer then depends on the
+    # granularity, which is no answer at all
+    items = [home(-35.0, 149.0)]
+    items += waypoints([(-35.000, 149.0), (-35.001, 149.0)])
+    items.append(item(3, mavlink.MAV_CMD_DO_RETURN_PATH_START,
+                      -35.0005, 149.0))
+    items.append(item(4, mavlink.MAV_CMD_NAV_WAYPOINT, -35.0005, 149.010))
+    items.append(item(5, mavlink.MAV_CMD_NAV_LAND, -35.0, 149.0, 0.0))
+    mission = build(items)
+    verdicts = []
+    for granularity in (50.0, 10.0, 1.0):
+        result = return_path.check_return_path(mission, 20.0, 30.0,
+                                               granularity=granularity)
+        verdicts.append((result.ok(), round(result.worst_deviation)))
+    check("a coarse run agrees with a fine one about the verdict",
+          len(set(v[0] for v in verdicts)) == 1, str(verdicts))
+    check("and about how bad it is",
+          len(set(v[1] for v in verdicts)) == 1, str(verdicts))
+    check("which is that it fails", not verdicts[0][0])
+
+
+def test_work_bound():
+    print("how much work a check may ask for")
+    mission = simple_mission()
+    path = mission.flown_path()
+    length = mission_model.path_length(path)
+    spacing = mission_model.usable_spacing(path, 0.001)
+    samples = length / spacing
+    check("the number of sampling points is bounded",
+          samples <= mission_model.MAX_SAMPLES + 1, "%.0f" % samples)
+    # each sample walks its own return, so the work goes as the square
+    check("and so is the work, which grows as the square of that",
+          samples * samples <= mission_model.MAX_QUERIES * 1.01,
+          "%.3g" % (samples * samples))
+    check("more counter states to check means coarser sampling",
+          mission_model.usable_spacing(path, 0.001, 8) >
+          mission_model.usable_spacing(path, 0.001, 1))
+
+
+def test_loiter_fidelity():
+    print("loiters as ArduPilot flies them")
+    # which field carries the radius differs by command. NAV_LOITER_TIME has
+    # no room for one at all, so a sign there is a direction and nothing else
+    cases = [(mavlink.MAV_CMD_NAV_LOITER_TIME, 0.0, -1.0, 120.0, True),
+             (mavlink.MAV_CMD_NAV_LOITER_TIME, 0.0, 1.0, 120.0, False),
+             (mavlink.MAV_CMD_NAV_LOITER_TURNS, 0.0, 200.0, 200.0, False),
+             (mavlink.MAV_CMD_NAV_LOITER_TURNS, 0.0, -200.0, 200.0, True),
+             (mavlink.MAV_CMD_NAV_LOITER_UNLIM, 0.0, -150.0, 150.0, True),
+             (mavlink.MAV_CMD_NAV_LOITER_TO_ALT, 300.0, 0.0, 300.0, False)]
+    for (command, param2, param3, radius, ccw) in cases:
+        mission = build([home(), item(1, command, -35.02, 149.05,
+                                      param2=param2, param3=param3)])
+        point = mission.point(1)
+        check("%s with param2 %.0f param3 %.0f circles at %.0fm"
+              % (mission_model.command_name(command), param2, param3, radius),
+              point.loiter_radius(120.0) == radius,
+              str(point.loiter_radius(120.0)))
+        check("  and goes %s" % ("anticlockwise" if ccw else "clockwise"),
+              point.loiter_ccw() == ccw)
+
+    # the direction has to reach the orbit, not just the item
+    for ccw in (False, True):
+        sign = -1.0 if ccw else 1.0
+        mission = build([home()] + waypoints([(-35.00, 149.00)]) +
+                        [item(2, mavlink.MAV_CMD_NAV_LOITER_TURNS,
+                              -35.02, 149.05, param3=sign * 200.0)] +
+                        waypoints([(-35.04, 149.00)], start=3))
+        orbit = [p for p in mission.flown_path(loiter_radius=200.0)
+                 if p.synthetic]
+        centre = mission.point(2)
+        turned = 0.0
+        for i in range(1, len(orbit)):
+            before = math.atan2(orbit[i - 1].y - centre.y,
+                                orbit[i - 1].x - centre.x)
+            after = math.atan2(orbit[i].y - centre.y, orbit[i].x - centre.x)
+            step = (after - before + math.pi) % (2.0 * math.pi) - math.pi
+            turned += step
+        # in an east/north frame anticlockwise means the angle grows
+        check("an %s loiter is flown that way round"
+              % ("anticlockwise" if ccw else "clockwise"),
+              (turned > 0) == ccw, "%.2f rad" % turned)
+
+    # leaving radially would put a right angle in the path the aircraft never
+    # flies, so it leaves where its heading round the circle points at the
+    # next waypoint
+    mission = build([home()] + waypoints([(-35.00, 149.00)]) +
+                    [item(2, mavlink.MAV_CMD_NAV_LOITER_TURNS,
+                          -35.02, 149.05, param3=200.0)] +
+                    waypoints([(-35.04, 149.00)], start=3))
+    path = mission.flown_path(loiter_radius=200.0)
+    orbit = [p for p in path if p.synthetic]
+    following = [p for p in path if not p.synthetic and p.seq == 3][0]
+    last = orbit[-1]
+    before = orbit[-2]
+    heading = math.atan2(last.y - before.y, last.x - before.x)
+    onward = math.atan2(following.y - last.y, following.x - last.x)
+    turn = abs((onward - heading + math.pi) % (2.0 * math.pi) - math.pi)
+    check("it leaves the circle heading where it is going next",
+          turn < math.radians(20.0), "%.0f degrees out" % math.degrees(turn))
+
+    # an unlimited loiter is never left
+    forever = build([home()] + waypoints([(-35.00, 149.00)]) +
+                    [item(2, mavlink.MAV_CMD_NAV_LOITER_UNLIM,
+                          -35.02, 149.05, param3=200.0)] +
+                    waypoints([(-35.04, 149.00)], start=3) +
+                    [item(4, mavlink.MAV_CMD_NAV_LAND, -35.0, 149.0, 0.0)])
+    seqs = set(p.seq for p in forever.flown_path(loiter_radius=200.0))
+    check("nothing after a NAV_LOITER_UNLIM is ever flown",
+          3 not in seqs and 4 not in seqs, str(sorted(seqs)))
+
+
+def test_synthetic_containment():
+    print("what may be written back into a mission")
+    items = [home(-35.0, 149.0)]
+    items += waypoints([(-35.0, 149.0), (-35.10, 149.0)])
+    items.append(item(3, mavlink.MAV_CMD_NAV_LOITER_TURNS, -35.15, 149.0,
+                      param3=200.0))
+    items += waypoints([(-35.20, 149.0)], start=4)
+    items.append(item(5, mavlink.MAV_CMD_DO_RETURN_PATH_START,
+                      -35.20, 149.20))
+    items += waypoints([(-35.10, 149.20), (-35.0, 149.0)], start=6)
+    items.append(item(8, mavlink.MAV_CMD_NAV_LAND, -35.0, 149.0, 0.0))
+    mission = build(items)
+    result = return_path.check_return_path(mission, 20.0, 30.0,
+                                           loiter_radius=200.0)
+    path = mission.flown_path(loiter_radius=200.0)
+    check("the orbit really is in the path",
+          sum(1 for p in path if p.synthetic) > 10)
+    if len(result.spans) == 0:
+        check("a failing span to test with", False)
+        return
+    leaked = 0
+    for span in result.spans:
+        for vertex in add_return_paths.span_vertices(path, span):
+            if vertex.synthetic:
+                leaked += 1
+    check("no invented point can become a mission item", leaked == 0,
+          "%u leaked" % leaked)
+
+    added = add_return_paths.build(mission, items, result, 20.0, 30.0,
+                                   separation=200.0)
+    stored = set(p.seq for p in path if not p.synthetic)
+    for new_path in added:
+        check("what gets added covers stored waypoints only",
+              new_path.from_seq in stored and new_path.to_seq in stored,
+              "%u..%u" % (new_path.from_seq, new_path.to_seq))
+
+
+def test_barren_jump_state():
+    print("counter states with no way home")
+    # fresh, the jump goes back and the walk finds waypoints; once used up it
+    # falls off the end of the mission having found none
+    items = [home()]
+    items += waypoints([(-35.00, 149.0), (-35.01, 149.0)])
+    items.append(item(3, mavlink.MAV_CMD_DO_RETURN_PATH_START, 0.0, 0.0, 0.0,
+                      frame=mavlink.MAV_FRAME_GLOBAL))
+    items.append(item(4, mavlink.MAV_CMD_DO_JUMP, param1=1, param2=1))
+    mission = build(items)
+    states = return_path.jump_states(mission)
+    found = [len(return_path.build_return_paths(mission, state))
+             for state in states]
+    check("one counter state has a return path and the other has none",
+          sorted(found) == [0, 1], str(found))
+    result = return_path.check_return_path(mission, 20.0, 30.0)
+    check("a state with no way home is an error, not one state left out",
+          not result.ok() and len(result.errors) > 0, str(result.errors))
+
+
+def test_jump_tag_states():
+    print("DO_JUMP_TAG counter states")
+    tag_jump = getattr(mavlink, 'MAV_CMD_DO_JUMP_TAG', None)
+    if tag_jump is None:
+        check("this pymavlink knows about DO_JUMP_TAG", False)
+        return
+    items = [home()]
+    items += waypoints([(-35.00, 149.0), (-35.01, 149.0)])
+    items.append(item(3, tag_jump, param1=7, param2=2))
+    items.append(item(4, mavlink.MAV_CMD_NAV_LAND, -35.0, 149.0, 0.0))
+    mission = build(items)
+    check("a tag jump with a repeat count has counter states too",
+          len(return_path.finite_jumps(mission)) == 1,
+          str(return_path.finite_jumps(mission)))
+    check("so both of them get checked",
+          len(return_path.jump_states(mission)) == 2)
+
+
 def test_landing_guard():
     print("guards on changing a mission")
     check("a mission ending at a landing may be appended to",
@@ -683,7 +872,10 @@ def main():
     for test in (test_units, test_path_index, test_capture_turn,
                  test_sampling_bound, test_arduplane_walk, test_jump_states,
                  test_flown_path, test_unmodelled, test_terrain_reporting,
-                 test_fix_generator, test_landing_guard, test_module):
+                 test_fix_generator, test_between_samples, test_work_bound,
+                 test_loiter_fidelity, test_synthetic_containment,
+                 test_barren_jump_state, test_jump_tag_states,
+                 test_landing_guard, test_module):
         test()
     print("")
     if FAILURES:
