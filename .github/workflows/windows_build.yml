@@ -33,7 +33,7 @@ jobs:
         run: ./installer.exe /verysilent /allusers /dir=inst
       - name: Build MAVProxy
         run: |
-          python3 -m pip install .[recommended] --user
+          python3 -m pip install .[recommended,map3d] --user
           python3 -m pip list
       - name: Prepare installer
         run: |
