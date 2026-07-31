@@ -9,7 +9,7 @@ import queue
 import time
 
 from MAVProxy.modules.lib.wx_loader import wx
-from vtk.wx.wxVTKRenderWindowInteractor import wxVTKRenderWindowInteractor
+from vtkmodules.wx.wxVTKRenderWindowInteractor import wxVTKRenderWindowInteractor
 
 from MAVProxy.modules.mavproxy_map import mp_tile
 from MAVProxy.modules.mavproxy_map3d.camera import TerrainCamera, TerrainStyle

@@ -16,7 +16,9 @@ import warnings
 
 import numpy as np
 import vtk
-from vtk.util import numpy_support
+# import via vtkmodules, not the vtk.* aliases: vtk is a plain module that fakes
+# a package with __path__, which pyinstaller cannot follow into a frozen build
+from vtkmodules.util import numpy_support
 
 from quantized_mesh_tile import decode as qmt_decode
 from quantized_mesh_tile.global_geodetic import GlobalGeodetic
