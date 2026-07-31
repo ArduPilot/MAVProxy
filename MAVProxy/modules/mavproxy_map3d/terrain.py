@@ -25,7 +25,7 @@ from MAVProxy.modules.mavproxy_map import mp_tile
 
 R = 6378137.0
 QUANTIZED_BASE = "https://plot.ardupilot.org/quantized"
-CACHE_DIR = os.path.join(os.environ.get("HOME", "."), ".tilecache", "quantized")
+CACHE_DIR = os.path.join(mp_tile.default_cache_path(), "quantized")
 
 # ArduPilot tiles include the optional lighting extension. This decoder warns
 # when it skips that extension, but map3d computes its own VTK normals anyway.
