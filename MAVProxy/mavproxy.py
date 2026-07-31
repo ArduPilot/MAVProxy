@@ -377,6 +377,7 @@ class MPState(object):
                 # don't report an error
                 return True
         ex = None
+        ex_modpath = None
         for modpath in modpaths:
             try:
                 m = import_package(modpath)
@@ -394,10 +395,14 @@ class MPState(object):
                     ex = "%s.init did not return a MPModule instance" % modname
                     break
             except ImportError as msg:
-                # keep the first failure: the later modpaths are fallbacks, and
-                # their "No module named X" hides why the real one failed
-                if ex is None:
+                # keep the first real failure, so a fallback modpath's "No
+                # module named X" cannot hide it. A ModuleNotFoundError naming
+                # the modpath we just tried only says that path does not exist,
+                # so let a later attempt replace it with its own reason
+                if (ex is None or
+                        (isinstance(ex, ModuleNotFoundError) and ex.name == ex_modpath)):
                     ex = msg
+                    ex_modpath = modpath
                 if mpstate.settings.moddebug > 1:
                     print(get_exception_stacktrace(msg))
         help_traceback = ""
