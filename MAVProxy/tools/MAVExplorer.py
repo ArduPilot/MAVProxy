@@ -661,9 +661,15 @@ map3d_views = []
 def cmd_map3d(args):
     '''show a 3D map view: draped satellite imagery over terrain'''
     try:
-        from MAVProxy.modules.mavproxy_map3d.map3d import Map3D
+        from MAVProxy.modules.mavproxy_map3d.map3d import (
+            Map3D, missing_packages, missing_packages_message)
     except ImportError as ex:
         print("map3d needs extra packages: pip install vtk quantized-mesh-tile (%s)" % ex)
+        return
+    # map3d.py itself does not import VTK; the viewer child process does
+    missing = missing_packages()
+    if missing:
+        print(missing_packages_message(missing))
         return
 
     mlog = mestate.mlog
