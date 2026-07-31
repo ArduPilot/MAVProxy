@@ -7,13 +7,14 @@ June 2012
 '''
 
 import time
-import cv2
 
 from MAVProxy.modules.mavproxy_map import mp_tile
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import win_layout
 from MAVProxy.modules.lib import multiproc
 from MAVProxy.modules.mavproxy_map.mp_slipmap_util import *
+
+cv2 = mp_util.import_cv2()
 
 
 class MPSlipMap():
