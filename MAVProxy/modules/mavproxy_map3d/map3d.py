@@ -3,10 +3,32 @@ Parent-side handle for the 3D map. Spawns the VTK/wx viewer in a child process
 (mirrors mp_slipmap) and pushes element/camera updates over a queue.
 '''
 
+import importlib.util
 import time
 import queue
 
 from MAVProxy.modules.lib import multiproc
+
+PACKAGES = ('vtk', 'quantized_mesh_tile')
+
+
+def missing_packages():
+    '''optional 3D map packages that are not installed. The viewer imports them
+    in a child process, where an ImportError would go unseen, so callers check
+    before starting a viewer. find_spec avoids importing VTK into the parent.'''
+    missing = []
+    for name in PACKAGES:
+        try:
+            if importlib.util.find_spec(name) is None:
+                missing.append(name)
+        except Exception:
+            missing.append(name)
+    return missing
+
+
+def missing_packages_message(missing):
+    return ("map3d needs extra packages: pip install vtk quantized-mesh-tile "
+            "(missing %s)" % ', '.join(missing))
 
 
 class Map3D:
