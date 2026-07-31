@@ -14,6 +14,7 @@ path. See return_path.py.
 
 # AP_FLAKE8_CLEAN
 
+import math
 import threading
 
 from MAVProxy.modules.lib import mp_module
@@ -73,7 +74,7 @@ class MissionItem(object):
     """
 
     __slots__ = ('seq', 'command', 'frame', 'x', 'y', 'z',
-                 'param1', 'param2', 'param3',
+                 'param1', 'param2', 'param3', 'param4',
                  'target_system', 'target_component')
 
     def __init__(self, item):
@@ -166,34 +167,60 @@ class BvlosPlanModule(mp_module.MPModule):
         else:
             print(self.usage())
 
-    def terrain_function(self):
+    def terrain_function(self, items):
         '''terrain lookup for a worker, or None if terrain is not available.
 
            The elevation model is ours alone rather than the terrain module's,
            as sharing that one would put two threads in the same unlocked tile
            cache and a "terrain set" could swap it half way through a check.
 
-           Ours is offline whatever the terrain module is set to. Downloading
-           goes through module level state in srtm.py that every model shares,
-           which is the same race one step further out. Anything not already
-           on disk is reported as terrain we do not have, which is true, and
-           says so rather than guessing.
+           Downloading also goes through module level state in srtm.py that
+           every model shares, which is the same race one step further out, so
+           the tiles the mission needs are fetched here on the main loop
+           before the worker starts. It then only ever reads what is already
+           in hand, and anything missing is reported as terrain we do not
+           have rather than guessed at.
         '''
         terrain = self.module('terrain')
         if terrain is None:
             return None
         try:
             from MAVProxy.modules.mavproxy_map import mp_elevation
-            source = terrain.terrain_settings.source
-            model = mp_elevation.ElevationModel(database=source, offline=1)
+            settings = terrain.terrain_settings
+            model = mp_elevation.ElevationModel(database=settings.source,
+                                                offline=settings.offline)
         except Exception as ex:
             print("bvlos_plan: no terrain available (%s)" % ex)
             return None
+        self.warm_terrain(model, items)
 
         def lookup(lat, lon):
             return model.GetElevation(lat, lon)
 
         return lookup
+
+    def warm_terrain(self, model, items):
+        '''fetch the terrain tiles the mission covers, here on the main loop.
+
+           Tiles are a degree across, so touching each corner of the mission
+           with a degree of margin brings in everything a check can ask for,
+           and the worker never starts a download of its own.
+        '''
+        located = [it for it in items if it.x != 0 or it.y != 0]
+        if len(located) == 0:
+            return
+        lats = [it.x for it in located]
+        lons = [it.y for it in located]
+        lat = int(math.floor(min(lats))) - 1
+        while lat <= int(math.floor(max(lats))) + 1:
+            lon = int(math.floor(min(lons))) - 1
+            while lon <= int(math.floor(max(lons))) + 1:
+                try:
+                    model.GetElevation(lat + 0.5, lon + 0.5)
+                except Exception:
+                    pass
+                lon += 1
+            lat += 1
 
     def cruise_airspeed(self):
         '''cruise airspeed as EAS in m/s, or None'''
@@ -268,7 +295,7 @@ class BvlosPlanModule(mp_module.MPModule):
         loader = wp.wploader
         return (loader.count(), getattr(loader, 'last_change', None))
 
-    def check_inputs(self):
+    def check_inputs(self, items):
         '''everything a check needs from the vehicle, gathered on the main
            loop so the worker touches no MAVProxy state'''
         (continue_after_land, dont_zero_counter) = self.mission_options()
@@ -278,7 +305,7 @@ class BvlosPlanModule(mp_module.MPModule):
             'loiter_radius': self.loiter_radius(),
             'width': self.bvlos_settings.return_path_width,
             'granularity': self.bvlos_settings.granularity,
-            'terrain_fn': self.terrain_function(),
+            'terrain_fn': self.terrain_function(items),
             'continue_after_land': continue_after_land,
             'dont_zero_counter': dont_zero_counter,
         }
@@ -320,7 +347,7 @@ class BvlosPlanModule(mp_module.MPModule):
         items = self.mission_items()
         if items is None:
             return
-        inputs = self.check_inputs()
+        inputs = self.check_inputs(items)
         if not self.usable(inputs):
             return
         print("Return path check: working through the mission...")
@@ -335,7 +362,7 @@ class BvlosPlanModule(mp_module.MPModule):
         items = self.mission_items()
         if items is None:
             return
-        inputs = self.check_inputs()
+        inputs = self.check_inputs(items)
         if not self.usable(inputs):
             return
         separation = self.bvlos_settings.return_path_sep

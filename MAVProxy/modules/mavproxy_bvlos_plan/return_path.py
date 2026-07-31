@@ -47,18 +47,19 @@ SEARCH_BUDGET = 1000
 # how much finer a stretch that could cross the limit is re-measured at
 REFINE_RATIO = 0.02
 
-# how hard we look for the point between two samples where an RTL starts
-# heading somewhere else
-TRANSITION_STEPS = 6
+# how far apart two points along the mission have to be before it is worth
+# looking between them for a leg taking over, in metres
+BOUNDARY_RESOLUTION = 2.0
+
+# and how many times we will halve a gap looking for one
+BOUNDARY_DEPTH = 6
+
+# failing places are recorded to this many metres, so two runs over the same
+# mission can be compared
+KEY_QUANTUM = 1.0
 
 # a sweep this close to a whole circle is really no turn at all
 ANGLE_EPS = 1e-9
-
-# turns whose paths are within this of each other in length are both treated
-# as possible. Which way an aircraft actually goes near a reversal is down to
-# its controller, not to which Dubins path is a hair shorter, so anything this
-# close has to be allowed for
-TURN_TIE = 0.05
 
 # how many DO_JUMP counter states we are prepared to check before giving up
 # and calling the result inconclusive
@@ -179,21 +180,33 @@ def closest_leg(paths, x, y, amsl):
     '''
     best_point = None
     best_distance = None
+    runner_up = None
     for path in paths:
-        (point, distance) = closest_in_path(path, x, y, amsl)
+        (point, distance, second) = closest_in_path(path, x, y, amsl)
         if point is None:
             continue
         if best_distance is None or distance <= best_distance:
+            if best_distance is not None:
+                runner_up = best_distance if runner_up is None \
+                    else min(runner_up, best_distance)
             best_distance = distance
             best_point = point
-    return (best_point, best_distance)
+        elif runner_up is None or distance < runner_up:
+            runner_up = distance
+        if second is not None and (runner_up is None or second < runner_up):
+            if second > best_distance or point is not best_point:
+                runner_up = second
+    if best_distance is None:
+        return (None, None, None)
+    margin = None if runner_up is None else max(0.0, runner_up - best_distance)
+    return (best_point, best_distance, margin)
 
 
 def closest_in_path(path, x, y, amsl):
     '''closest point of one return path, as distance_to_mission_leg() does'''
     points = path.points
     if len(points) == 0:
-        return (None, None)
+        return (None, None, None)
     first = points[0]
     # the first point of a return path is measured as a point, not a leg
     dx = x - first.x
@@ -201,6 +214,7 @@ def closest_in_path(path, x, y, amsl):
     dz = amsl - first.amsl
     best_distance = (dx * dx + dy * dy + dz * dz) ** 0.5
     best_point = first
+    second = None
     prev = first
     for point in points[1:]:
         if point.x == prev.x and point.y == prev.y and point.amsl == prev.amsl:
@@ -212,10 +226,13 @@ def closest_in_path(path, x, y, amsl):
             point.x, point.y, point.amsl)
         # strict, so a tie keeps the earlier leg
         if distance < best_distance:
+            second = best_distance
             best_distance = distance
             best_point = point
+        elif second is None or distance < second:
+            second = distance
         prev = point
-    return (best_point, best_distance)
+    return (best_point, best_distance, second)
 
 
 def capture_deviation(index, sample, target, granularity, radius,
@@ -246,17 +263,13 @@ def capture_deviation(index, sample, target, granularity, radius,
     # the aircraft turns whichever way gets it there sooner, which is the
     # shorter path and not the smaller turn: a wider turn can roll out onto a
     # much shorter run in
-    turns = [turn_onto(sample.x, sample.y, ux, uy, radius, direction,
-                       target.x, target.y)
-             for direction in (1.0, -1.0)]
-    shortest = min(turn[7] for turn in turns)
-    allowed = shortest * (1.0 + TURN_TIE) + radius * TURN_TIE
-    for turn in turns:
-        # a reversal makes the two sides the same length, and they can cover
-        # very different ground, so anything as short as the best is flown as
-        # far as we know and has to be allowed for
-        if turn[7] > allowed:
-            continue
+    # both ways round. Which one an aircraft takes is decided by its
+    # controller from the bearing it wants, not by which Dubins path is
+    # shorter, and the two can cover very different ground, so the shorter
+    # one is not safe to assume
+    for direction in (1.0, -1.0):
+        turn = turn_onto(sample.x, sample.y, ux, uy, radius, direction,
+                         target.x, target.y)
         got = turn_deviation(index, turn, radius, target, granularity,
                              fine, limit)
         if got > worst:
@@ -369,28 +382,6 @@ def sampled_max(at, steps, spacing, fine, limit):
     return worst
 
 
-def transition(before, before_rejoin, after, after_rejoin, assess):
-    """close in on where the item an RTL heads for changes, and assess it.
-
-       Between two points that head for different items there is a boundary,
-       and either side of it is where a return is at its worst. Sampling
-       cannot find it, so it is hunted down by halving the gap.
-    """
-    found = []
-    (lo, hi) = (before, after)
-    for _ in range(TRANSITION_STEPS):
-        mid = midpoint(lo, hi)
-        (deviation, rejoin) = assess(mid)
-        if deviation is None:
-            break
-        found.append((mid, deviation, rejoin))
-        if rejoin == before_rejoin:
-            lo = mid
-        else:
-            hi = mid
-    return found
-
-
 def midpoint(a, b):
     """a sampling point half way between two, on the same leg"""
     return mission_model.PathSample(
@@ -438,11 +429,19 @@ class FailSpan(object):
         self.points = []
         self.legs = set()
         self.worst = 0.0
+        # the stretch of the flown path it covers, by position rather than by
+        # sequence number, as a mission that jumps back flies an item twice
+        self.first = None
+        self.last = None
 
     def add(self, sample, deviation):
         self.points.append((sample.x, sample.y))
         self.legs.add((sample.leg_from, sample.leg_to))
         self.worst = max(self.worst, deviation)
+        if self.first is None or sample.index < self.first:
+            self.first = sample.index
+        if self.last is None or sample.index > self.last:
+            self.last = sample.index
 
 
 class CheckResult(object):
@@ -472,11 +471,17 @@ class CheckResult(object):
         # how many DO_JUMP counter states the check had to consider
         self.jump_states = 1
         self.continue_after_land = False
+        # gaps between sampling points where we could not settle which leg an
+        # RTL would head for
+        self.unsettled = 0
+        # how many sampling points were left when the work ran out
+        self.stopped_early = 0
 
     def conclusive(self):
         '''False if something about the mission means a pass cannot be
            claimed, whatever the samples said'''
-        return len(self.unmodelled) == 0 and self.terrain_missing == 0
+        return (len(self.unmodelled) == 0 and self.terrain_missing == 0 and
+                self.unsettled == 0 and self.stopped_early == 0)
 
     def ok(self):
         return (len(self.errors) == 0 and self.failed == 0 and
@@ -548,7 +553,7 @@ def check_return_path(mission, cruise_eas, roll_limit_deg, granularity=50.0,
     result.jump_states = len(path_sets)
 
     asked = max(float(granularity), mission_model.MIN_SPACING)
-    granularity = mission_model.usable_spacing(path, asked, len(path_sets))
+    granularity = mission_model.usable_spacing(path, asked)
     if granularity > asked:
         result.warnings.append(
             "sampled every %.0fm rather than the %.0fm asked for, which would "
@@ -569,25 +574,29 @@ def check_return_path(mission, cruise_eas, roll_limit_deg, granularity=50.0,
     previous = None
 
     def assess(sample):
-        '''the worst an RTL from here does, over every counter state, and
-           which item it would head for'''
+        """the worst an RTL from here does, over every counter state, which
+           item it heads for, and how clear the winning leg was"""
         worst = None
         rejoin = None
+        clearance = None
         for (state, paths) in path_sets:
-            (closest, _) = closest_leg(paths, sample.x, sample.y, sample.amsl)
+            (closest, _, margin) = closest_leg(paths, sample.x, sample.y,
+                                               sample.amsl)
             target = rejoin_target(mission, closest, state, dont_zero_counter)
             if target is None:
                 # ArduPilot's set_current_cmd() would fail here, so an RTL
                 # from this point does not get a return path at all
-                return (None, None)
+                return (None, None, None, None)
             radius = radius_at(sample)
             got = capture_deviation(index, sample, target, granularity,
                                     turn_at(sample), fine, radius)
             got += fine * 0.5
+            if margin is not None and (clearance is None or margin < clearance):
+                clearance = margin
             if worst is None or got > worst:
                 worst = got
                 rejoin = target.seq
-        return (worst, rejoin)
+        return (worst, rejoin, clearance, None)
 
     def radius_at(sample):
         if width > 0:
@@ -600,18 +609,7 @@ def check_return_path(mission, cruise_eas, roll_limit_deg, granularity=50.0,
         return mission_model.turn_radius(cruise_eas, roll_limit_deg,
                                          sample.amsl)
 
-    def record(sample, deviation, rejoin):
-        '''fold one assessed point into the result'''
-        radius = radius_at(sample)
-        result.checked += 1
-        if deviation > result.worst_deviation:
-            result.worst_deviation = deviation
-            result.worst_radius = radius
-            result.worst_leg = (sample.leg_from, sample.leg_to)
-            result.worst_rejoin = rejoin
-        return deviation > radius
-
-    def note(sample, deviation, rejoin, position):
+    def note(sample, deviation, rejoin):
         """fold one assessed point into the result, and say if it failed"""
         nonlocal span
         radius = radius_at(sample)
@@ -624,43 +622,92 @@ def check_return_path(mission, cruise_eas, roll_limit_deg, granularity=50.0,
         if deviation <= radius:
             return False
         result.failed += 1
-        # keyed by the sampling point it belongs to, so two runs over the same
-        # mission can be compared even though where a return changes moves
-        result.failed_at.add(position)
+        # keyed by where along the mission it is rather than by which sample
+        # it came from, so two runs over the same mission line up even where
+        # they probe different places in between
+        result.failed_at.add(int(sample.distance / KEY_QUANTUM))
         if span is None:
             span = FailSpan()
             result.spans.append(span)
         span.add(sample, deviation)
         return True
 
+    def between(a, a_state, b, b_state, depth):
+        """look between two points for a leg taking over from another.
+
+           Which leg is closest decides where an RTL goes, and it can change
+           anywhere between two sampling points, taking the aircraft somewhere
+           else entirely. Distances to a leg change no faster than the
+           aircraft moves, so a leg trailing by more than twice the gap cannot
+           get in front inside it; anything closer than that has to be looked
+           at. Returns True if it was settled.
+        """
+        gap = abs(b.distance - a.distance)
+        (a_dev, a_rejoin, a_margin) = a_state
+        (b_dev, b_rejoin, b_margin) = b_state
+        clear = (a_margin is not None and a_margin > 2.0 * gap and
+                 b_margin is not None and b_margin > 2.0 * gap)
+        if clear and a_rejoin == b_rejoin:
+            return True
+        if gap <= BOUNDARY_RESOLUTION:
+            return True
+        if depth <= 0:
+            # could not pin down where it changes, so we cannot say what
+            # happens in here
+            return a_rejoin == b_rejoin and clear
+        mid = midpoint(a, b)
+        (dev, rejoin, margin, _) = assess(mid)
+        if dev is None:
+            return False
+        note(mid, dev, rejoin)
+        mid_state = (dev, rejoin, margin)
+        settled = between(a, a_state, mid, mid_state, depth - 1)
+        if not between(mid, mid_state, b, b_state, depth - 1):
+            settled = False
+        return settled
+
+    unsettled = 0
     for (position, sample) in enumerate(samples):
-        (deviation, rejoin) = assess(sample)
+        if index.query > mission_model.MAX_QUERIES:
+            # counted rather than guessed at: how much a check costs depends
+            # on how long the returns are and how much of them needs a closer
+            # look, neither of which is knowable before starting
+            result.stopped_early = len(samples) - position
+            break
+        (deviation, rejoin, margin, _) = assess(sample)
         if deviation is None:
             unresolved += 1
             previous = None
             span = None
             continue
-
-        failed = note(sample, deviation, rejoin, position)
-        # where the item an RTL heads for changes from one point to the next,
-        # the worst case is in between: a step of a few metres can put the
-        # aircraft nearer a different leg and send it somewhere else entirely,
-        # and sampling alone steps straight over it
-        if previous is not None and previous[1] != rejoin and \
-                previous[0].leg_to == sample.leg_to:
-            for (edge, edge_dev, edge_rejoin) in transition(
-                    previous[0], previous[1], sample, rejoin, assess):
-                if note(edge, edge_dev, edge_rejoin, position):
-                    failed = True
-        previous = (sample, rejoin)
+        failed = note(sample, deviation, rejoin)
+        state = (deviation, rejoin, margin)
+        if previous is not None and previous[0].leg_to == sample.leg_to:
+            if not between(previous[0], previous[1], sample, state,
+                           BOUNDARY_DEPTH):
+                unsettled += 1
+        previous = (sample, state)
         if not failed:
             span = None
+    result.unsettled = unsettled
 
     if unresolved > 0:
         result.errors.append(
             "%u of %u points along the mission have a return path that does "
             "not reach a navigation command, so an RTL there would not follow "
             "it" % (unresolved, unresolved + result.checked))
+    if result.stopped_early:
+        result.warnings.append(
+            "stopped after %u distance calculations with %u points along the "
+            "mission still to check, so this is not the whole mission. A "
+            "coarser granularity would get through it"
+            % (index.query, result.stopped_early))
+    if result.unsettled:
+        result.warnings.append(
+            "%u gaps between points along the mission could not be settled: "
+            "which leg an RTL heads for changes somewhere in there and it "
+            "could not be pinned down. A finer granularity would help"
+            % result.unsettled)
     if result.checked == 0 and len(result.errors) == 0:
         result.errors.append("no point along the mission could be checked")
 

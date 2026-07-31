@@ -106,21 +106,20 @@ def path_length(path):
     return total
 
 
-def usable_spacing(path, spacing, states=1):
-    '''the given spacing, held to something that can actually be worked
-       through on the mission in hand.
+def usable_spacing(path, spacing):
+    '''the given spacing, held to a workable number of sampling points.
 
-       The work is one sample every spacing along the mission, each walking a
-       return that can be as long as the mission, for each counter state, so
-       it grows as the square of how fine the sampling is.
+       This only bounds how many places along the mission get looked at. What
+       each of those costs depends on how long a return is and how much of it
+       needs a closer look, which is not knowable up front, so the real work
+       is counted as it happens and stopped at MAX_QUERIES rather than guessed
+       at here.
     '''
     spacing = max(float(spacing), MIN_SPACING)
     length = path_length(path)
     if length <= 0:
         return spacing
-    floor = max(length / MAX_SAMPLES,
-                length * math.sqrt(max(1, states) / MAX_QUERIES))
-    return max(spacing, floor)
+    return max(spacing, length / MAX_SAMPLES)
 
 
 NAV_LAST = mavlink.MAV_CMD_NAV_LAST
@@ -170,6 +169,17 @@ def eas2tas(alt_amsl):
     if density <= 0:
         return 1.0
     return math.sqrt(SSL_AIR_DENSITY / density)
+
+
+def loiter_radius_flown(radius, alt_amsl):
+    '''the circle L1 actually flies for a commanded radius.
+
+       AP_L1_Control::loiter_radius() scales it by EAS2TAS squared, so a
+       loiter at height is wider than the one asked for, which matters when
+       the corridor is what the mission covers.
+    '''
+    scale = eas2tas(alt_amsl)
+    return radius * scale * scale
 
 
 def turn_radius(cruise_eas, roll_limit_deg, alt_amsl):
@@ -437,7 +447,7 @@ class MissionPoint(object):
     '''a mission item reduced to what the checks need'''
 
     def __init__(self, seq, command, frame, lat, lon, alt,
-                 param1=0, param2=0, param3=0):
+                 param1=0, param2=0, param3=0, param4=0):
         self.seq = seq
         self.command = command
         self.frame = frame
@@ -450,6 +460,7 @@ class MissionPoint(object):
         self.param1 = param1
         self.param2 = param2
         self.param3 = param3
+        self.param4 = param4
         # True for a point we invented, such as one on a loiter orbit, which
         # must never be written back into a mission
         self.synthetic = False
@@ -523,6 +534,30 @@ class MissionPoint(object):
     def loiter_forever(self):
         '''True for a loiter the mission never leaves'''
         return self.command == mavlink.MAV_CMD_NAV_LOITER_UNLIM
+
+    def loiter_xtrack(self):
+        '''True if the leg away from a loiter starts from where it left the
+           circle, rather than from the middle of it.
+
+           ModeLoiter::verify_loiter_heading() only moves next_WP_loc to the
+           aircraft when loiter_xtrack is set; otherwise the leg onward is
+           measured from the loiter waypoint itself.
+        '''
+        return float(self.param4) > 0
+
+    def loiter_turns(self):
+        '''how many times round the circle, where the command says.
+
+           A NAV_LOITER_TURNS of less than one really does fly less than a
+           full circle, so counting a whole one would put ground into the
+           corridor that the aircraft never covers.
+        '''
+        if self.command != mavlink.MAV_CMD_NAV_LOITER_TURNS:
+            return None
+        turns = abs(float(self.param1))
+        if turns <= 0:
+            return None
+        return turns
 
     def __str__(self):
         return "%u:%s" % (self.seq, command_name(self.command))
@@ -758,7 +793,31 @@ class Mission(object):
             reasons.append(
                 "item %u is a loiter with no radius of its own, so its circle "
                 "is not known without the vehicle's WP_LOITER_RAD" % seq)
+        for seq in self.loiters_leaving_blind(default_radius, path):
+            reasons.append(
+                "item %u is a loiter whose next waypoint is inside its own "
+                "circle, where where it leaves from is not worked out here"
+                % seq)
         return reasons
+
+    def loiters_leaving_blind(self, default_radius=0.0, path=None):
+        '''loiters whose next waypoint is inside the circle, so there is no
+           tangent to leave on and ArduPilot uses a construction of its own'''
+        if path is None:
+            path = self.flown_path(loiter_radius=default_radius)
+        seqs = []
+        for (i, point) in enumerate(path):
+            if not point.is_loiter() or point.synthetic:
+                continue
+            radius = point.loiter_radius(default_radius)
+            if radius is None or i + 1 >= len(path):
+                continue
+            after = path[i + 1]
+            span = math.hypot(after.x - point.x, after.y - point.y)
+            if span <= loiter_radius_flown(radius, point.amsl or 0.0) and \
+                    point.seq not in seqs:
+                seqs.append(point.seq)
+        return seqs
 
     def corridor_index(self, default_radius=0.0, path=None):
         '''a PathIndex over the ground the mission covers.
@@ -788,9 +847,15 @@ class Mission(object):
                 # unknown radius, left as it was and reported by unmodelled()
                 out.append(point)
                 continue
+            radius = loiter_radius_flown(radius, point.amsl or 0.0)
             before = out[-1] if len(out) > 0 else None
             after = path[i + 1] if i + 1 < len(path) else None
             out.extend(self.orbit_points(point, radius, before, after))
+            if not point.loiter_xtrack():
+                # with loiter_xtrack clear ArduPilot leaves next_WP_loc at the
+                # loiter waypoint, so the leg onward is tracked from the middle
+                # of the circle rather than from where the aircraft left it
+                out.append(self.orbit_point(point, 0.0, 0.0))
         return out
 
     def orbit_points(self, loiter, radius, before, after):
@@ -805,10 +870,17 @@ class Mission(object):
         # in an east/north frame the angle grows anticlockwise
         turn = 1.0 if loiter.loiter_ccw() else -1.0
 
+        # joined where the aircraft rolls onto it coming from the last
+        # waypoint, which is a tangent, not the point of the circle nearest
+        # to it. Entering radially would put a corner in the path
         entry = 0.0
         if before is not None:
             (dx, dy) = (before.x - loiter.x, before.y - loiter.y)
-            if dx != 0.0 or dy != 0.0:
+            span = math.hypot(dx, dy)
+            if span > radius:
+                offset = math.acos(max(-1.0, min(1.0, radius / span)))
+                entry = math.atan2(dy, dx) + turn * offset
+            elif dx != 0.0 or dy != 0.0:
                 entry = math.atan2(dy, dx)
 
         # where carrying on round points the aircraft at the next waypoint.
@@ -822,15 +894,21 @@ class Mission(object):
                 offset = math.acos(max(-1.0, min(1.0, radius / span)))
                 exit_angle = math.atan2(dy, dx) - turn * offset
 
-        angles = []
-        steps = LOITER_POINTS
-        for step in range(steps + 1):
-            angles.append(entry + turn * 2.0 * math.pi * step / steps)
-        # and on round to where it leaves
+        # how far round it goes. A loiter of less than a full turn covers
+        # less than the whole circle, and counting a whole one would put
+        # ground in the corridor that is never flown
+        turns = loiter.loiter_turns()
         sweep = (turn * (exit_angle - entry)) % (2.0 * math.pi)
-        extra = max(1, int(math.ceil(sweep / (2.0 * math.pi / steps))))
-        for step in range(1, extra + 1):
-            angles.append(entry + turn * sweep * step / extra)
+        if turns is None:
+            total = 2.0 * math.pi + sweep
+        else:
+            total = min(turns, 1.0) * 2.0 * math.pi
+            if turns >= 1.0:
+                total += sweep
+        steps = max(2, int(math.ceil(LOITER_POINTS * total /
+                                     (2.0 * math.pi))))
+        angles = [entry + turn * total * step / steps
+                  for step in range(steps + 1)]
         return [self.orbit_point(loiter, radius, angle) for angle in angles]
 
     def orbit_point(self, loiter, radius, angle):
@@ -855,7 +933,7 @@ def build_mission(items, terrain_fn=None):
        altitude is the reference for relative frames'''
     points = [MissionPoint(it.seq, it.command, it.frame, it.x, it.y, it.z,
                            getattr(it, 'param1', 0), getattr(it, 'param2', 0),
-                           getattr(it, 'param3', 0))
+                           getattr(it, 'param3', 0), getattr(it, 'param4', 0))
               for it in items]
     if len(points) == 0:
         return Mission([], 0.0, Projector(0.0, 0.0))
@@ -904,7 +982,7 @@ class PathSample(object):
     '''a point along the mission path'''
 
     def __init__(self, x, y, amsl, leg_from, leg_to, distance,
-                 ux=0.0, uy=0.0):
+                 ux=0.0, uy=0.0, index=0):
         self.x = x
         self.y = y
         self.amsl = amsl
@@ -917,6 +995,10 @@ class PathSample(object):
         # aircraft has to turn from when an RTL starts here
         self.ux = ux
         self.uy = uy
+        # where in the flown path this leg ends. A mission that jumps back
+        # flies the same item more than once, so a sequence number does not
+        # say which time round this is
+        self.index = index
 
 
 class SampleStats(object):
@@ -939,7 +1021,7 @@ def sample_path(path, spacing, projector=None, terrain_fn=None, stats=None):
     if len(path) == 0:
         return samples
     first = PathSample(path[0].x, path[0].y, path[0].amsl,
-                       path[0].seq, path[0].seq, 0.0)
+                       path[0].seq, path[0].seq, 0.0, index=0)
     samples.append(first)
     travelled = 0.0
     for i in range(1, len(path)):
@@ -984,6 +1066,6 @@ def sample_path(path, spacing, projector=None, terrain_fn=None, stats=None):
             if amsl is None:
                 amsl = a.amsl + (b.amsl - a.amsl) * frac
             samples.append(PathSample(x, y, amsl, a.seq, b.seq,
-                                      travelled + leg * frac, ux, uy))
+                                      travelled + leg * frac, ux, uy, i))
         travelled += leg
     return samples

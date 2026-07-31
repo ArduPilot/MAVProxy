@@ -49,26 +49,25 @@ class NewPath(object):
 
 
 def span_vertices(path, span):
-    '''the stored mission points a failing span covers, in mission order.
+    '''the stored mission points a failing span covers, in the order they
+       are flown.
+
+       Taken by position along the flown path, not by a range of sequence
+       numbers: a mission that jumps back flies the same item more than once,
+       and a numeric range would either miss most of the stretch or invent a
+       leg between two items that are never flown one after the other.
 
        Points we invented, such as the ones round a loiter orbit, are not
        mission items and must never be turned back into any: a span crossing
        one loiter would otherwise be written out as dozens of waypoints
        tracing its circle.
     '''
-    legs = sorted(span.legs)
-    first = legs[0][0]
-    last = legs[-1][1]
-    seen = set()
-    vertices = []
-    for point in path:
-        if getattr(point, 'synthetic', False):
-            continue
-        if not (first <= point.seq <= last) or point.seq in seen:
-            continue
-        seen.add(point.seq)
-        vertices.append(point)
-    return vertices
+    if span.first is None:
+        return []
+    first = max(0, span.first - 1)
+    last = min(len(path) - 1, span.last)
+    return [p for p in path[first:last + 1]
+            if not getattr(p, 'synthetic', False)]
 
 
 def offset_side(points, distance):

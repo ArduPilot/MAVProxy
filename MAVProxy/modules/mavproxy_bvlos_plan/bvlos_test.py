@@ -34,11 +34,11 @@ def check(name, condition, detail=''):
 
 
 def item(seq, command, lat=0.0, lon=0.0, alt=100.0,
-         param1=0.0, param2=0.0, param3=0.0,
+         param1=0.0, param2=0.0, param3=0.0, param4=0.0,
          frame=mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT):
     return mavlink.MAVLink_mission_item_message(
         1, 1, seq, frame, command, 0, 1,
-        param1, param2, param3, 0.0, lat, lon, alt)
+        param1, param2, param3, param4, lat, lon, alt)
 
 
 def home(lat=-35.0, lon=149.0, alt=600.0):
@@ -404,8 +404,10 @@ def test_unmodelled():
     # circle goes
     loiter_items = [home()]
     loiter_items += waypoints([(-35.00, 149.00)])
+    # loiter_xtrack set, so the leg onward starts from the circle. With it
+    # clear ArduPilot tracks from the middle instead, which is its own case
     loiter_items.append(item(2, mavlink.MAV_CMD_NAV_LOITER_TURNS,
-                             -35.02, 149.05))
+                             -35.02, 149.05, param4=1.0))
     loiter_items += waypoints([(-35.04, 149.00)], start=3)
     loiter_items.append(item(4, mavlink.MAV_CMD_DO_RETURN_PATH_START,
                              -35.04, 149.00))
@@ -422,10 +424,14 @@ def test_unmodelled():
     centre = loiter.point(2)
     offsets = [math.hypot(p.x - centre.x, p.y - centre.y)
                for p in orbit if p.seq == centre.seq]
+    # the circle L1 flies, which is wider than the one commanded once the air
+    # thins, not the commanded 120m
+    flown = mission_model.loiter_radius_flown(120.0, centre.amsl)
     check("the loiter is flown as its orbit",
-          len(offsets) > 8 and all(abs(d - 120.0) < 1.0 for d in offsets),
-          "%u points, %.1f..%.1f" % (len(offsets), min(offsets),
-                                     max(offsets)) if offsets else "none")
+          len(offsets) > 8 and all(abs(d - flown) < 1.0 for d in offsets),
+          "%u points, %.1f..%.1f against %.1f"
+          % (len(offsets), min(offsets), max(offsets), flown)
+          if offsets else "none")
     check("nothing is left sitting at the centre of the circle",
           all(d > 1.0 for d in offsets))
     index = loiter.corridor_index(120.0)
@@ -556,23 +562,55 @@ def test_between_samples():
           len(set(v[1] for v in verdicts)) == 1, str(verdicts))
     check("which is that it fails", not verdicts[0][0])
 
+    # the harder shape: an island where a bad leg is closest only in the
+    # middle of a gap, so both ends agree on where they would go and nothing
+    # about the two of them says to look in between
+    island = [home(-35.0, 149.0)]
+    island += waypoints([(-35.000, 149.0), (-35.004, 149.0)])
+    island.append(item(3, mavlink.MAV_CMD_DO_RETURN_PATH_START,
+                       -35.004, 149.0))
+    island.append(item(4, mavlink.MAV_CMD_NAV_WAYPOINT, -35.002, 149.0))
+    island.append(item(5, mavlink.MAV_CMD_NAV_WAYPOINT, -35.002, 149.02))
+    island.append(item(6, mavlink.MAV_CMD_NAV_WAYPOINT, -35.000, 149.0))
+    island.append(item(7, mavlink.MAV_CMD_NAV_LAND, -35.0, 149.0, 0.0))
+    mission = build(island)
+    verdicts = []
+    for granularity in (50.0, 5.0):
+        result = return_path.check_return_path(mission, 20.0, 30.0,
+                                               granularity=granularity)
+        verdicts.append((result.ok(), round(result.worst_deviation),
+                         result.unsettled))
+    check("a coarse run finds what a fine one finds, or admits it could not",
+          verdicts[0][0] == verdicts[1][0] or verdicts[0][2] > 0,
+          str(verdicts))
+
 
 def test_work_bound():
     print("how much work a check may ask for")
     mission = simple_mission()
     path = mission.flown_path()
-    length = mission_model.path_length(path)
-    spacing = mission_model.usable_spacing(path, 0.001)
-    samples = length / spacing
+    # counted, not worked out from the same arithmetic the code uses
+    samples = mission_model.sample_path(
+        path, mission_model.usable_spacing(path, 0.000001))
     check("the number of sampling points is bounded",
-          samples <= mission_model.MAX_SAMPLES + 1, "%.0f" % samples)
-    # each sample walks its own return, so the work goes as the square
-    check("and so is the work, which grows as the square of that",
-          samples * samples <= mission_model.MAX_QUERIES * 1.01,
-          "%.3g" % (samples * samples))
-    check("more counter states to check means coarser sampling",
-          mission_model.usable_spacing(path, 0.001, 8) >
-          mission_model.usable_spacing(path, 0.001, 1))
+          len(samples) <= mission_model.MAX_SAMPLES + len(path),
+          "%u" % len(samples))
+
+    # and the work itself is counted as it happens, so a granularity far too
+    # fine stops rather than running for hours
+    real = mission_model.MAX_QUERIES
+    try:
+        mission_model.MAX_QUERIES = 20000
+        result = return_path.check_return_path(mission, 20.0, 30.0,
+                                               granularity=1.0)
+    finally:
+        mission_model.MAX_QUERIES = real
+    check("a check that would cost too much stops instead",
+          result.stopped_early > 0, "%u left" % result.stopped_early)
+    check("and having stopped, it does not claim to have checked the mission",
+          not result.conclusive() and not result.ok())
+    check("and says so", any('still to check' in w for w in result.warnings),
+          str(result.warnings))
 
 
 def test_loiter_fidelity():
@@ -621,9 +659,11 @@ def test_loiter_fidelity():
     # leaving radially would put a right angle in the path the aircraft never
     # flies, so it leaves where its heading round the circle points at the
     # next waypoint
+    # with loiter_xtrack set, so the leg onward starts where it left the
+    # circle rather than being tracked from the middle of it
     mission = build([home()] + waypoints([(-35.00, 149.00)]) +
                     [item(2, mavlink.MAV_CMD_NAV_LOITER_TURNS,
-                          -35.02, 149.05, param3=200.0)] +
+                          -35.02, 149.05, param3=200.0, param4=1.0)] +
                     waypoints([(-35.04, 149.00)], start=3))
     path = mission.flown_path(loiter_radius=200.0)
     orbit = [p for p in path if p.synthetic]
@@ -635,6 +675,56 @@ def test_loiter_fidelity():
     turn = abs((onward - heading + math.pi) % (2.0 * math.pi) - math.pi)
     check("it leaves the circle heading where it is going next",
           turn < math.radians(20.0), "%.0f degrees out" % math.degrees(turn))
+
+    # L1 flies a wider circle than commanded as the air thins
+    low = mission_model.loiter_radius_flown(200.0, 0.0)
+    high = mission_model.loiter_radius_flown(200.0, 3000.0)
+    check("the circle flown is the one commanded at sea level",
+          abs(low - 200.0) < 0.01, "%.1f" % low)
+    check("and wider up high", high > low * 1.15, "%.1f" % high)
+
+    # less than a full turn covers less than the whole circle, and counting a
+    # whole one would put ground in the corridor that is never flown
+    def orbit_span(turns):
+        mission = build([home()] + waypoints([(-35.00, 149.00)]) +
+                        [item(2, mavlink.MAV_CMD_NAV_LOITER_TURNS,
+                              -35.02, 149.05, param1=turns, param3=200.0)] +
+                        waypoints([(-35.04, 149.00)], start=3))
+        centre = mission.point(2)
+        # only the points actually on the circle: with loiter_xtrack clear
+        # there is also one at the centre, for the leg onward
+        orbit = [p for p in mission.flown_path(loiter_radius=200.0)
+                 if p.synthetic and p.seq == 2 and
+                 math.hypot(p.x - centre.x, p.y - centre.y) > 1.0]
+        angles = [math.atan2(p.y - centre.y, p.x - centre.x) for p in orbit]
+        total = 0.0
+        for i in range(1, len(angles)):
+            total += abs((angles[i] - angles[i - 1] + math.pi) %
+                         (2.0 * math.pi) - math.pi)
+        return total
+
+    half = orbit_span(0.5)
+    whole = orbit_span(3.0)
+    check("half a turn goes half way round", abs(half - math.pi) < 0.4,
+          "%.2f rad" % half)
+    check("and more than one goes all the way round and on to the exit",
+          whole > 2.0 * math.pi - 0.4, "%.2f rad" % whole)
+
+    # with loiter_xtrack clear the leg onward is tracked from the middle of
+    # the circle, which is where ArduPilot leaves next_WP_loc
+    for xtrack in (0.0, 1.0):
+        mission = build([home()] + waypoints([(-35.00, 149.00)]) +
+                        [item(2, mavlink.MAV_CMD_NAV_LOITER_TURNS,
+                              -35.02, 149.05, param3=200.0, param4=xtrack)] +
+                        waypoints([(-35.04, 149.00)], start=3))
+        centre = mission.point(2)
+        path = mission.flown_path(loiter_radius=200.0)
+        at_centre = [p for p in path
+                     if math.hypot(p.x - centre.x, p.y - centre.y) < 1.0]
+        check("param4 %.0f tracks onward from %s"
+              % (xtrack, "the tangent it left on" if xtrack else "the centre"),
+              (len(at_centre) > 0) == (xtrack == 0.0),
+              "%u at the centre" % len(at_centre))
 
     # an unlimited loiter is never left
     forever = build([home()] + waypoints([(-35.00, 149.00)]) +
@@ -684,6 +774,29 @@ def test_synthetic_containment():
               "%u..%u" % (new_path.from_seq, new_path.to_seq))
 
 
+def test_span_over_a_jump():
+    print("failing stretches on a mission that jumps back")
+    # execution order 1, 2, 3, 2, 4: a range of sequence numbers cannot
+    # describe that, and joining 3 to 4 would invent a leg never flown
+
+    class Span(object):
+        first = 1
+        last = 4
+
+    class Point(object):
+        def __init__(self, seq, synthetic=False):
+            self.seq = seq
+            self.synthetic = synthetic
+
+    path = [Point(1), Point(2), Point(3), Point(2), Point(4)]
+    got = [p.seq for p in add_return_paths.span_vertices(path, Span)]
+    check("the stretch is taken as it is flown", got == [1, 2, 3, 2, 4],
+          str(got))
+    path = [Point(1), Point(2), Point(9, True), Point(3)]
+    got = [p.seq for p in add_return_paths.span_vertices(path, Span)]
+    check("and still leaves out what we invented", 9 not in got, str(got))
+
+
 def test_barren_jump_state():
     print("counter states with no way home")
     # fresh, the jump goes back and the walk finds waypoints; once used up it
@@ -710,16 +823,28 @@ def test_jump_tag_states():
     if tag_jump is None:
         check("this pymavlink knows about DO_JUMP_TAG", False)
         return
+    tag = getattr(mavlink, 'MAV_CMD_JUMP_TAG', None)
+    if tag is None:
+        check("this pymavlink knows about JUMP_TAG", False)
+        return
     items = [home()]
-    items += waypoints([(-35.00, 149.0), (-35.01, 149.0)])
-    items.append(item(3, tag_jump, param1=7, param2=2))
-    items.append(item(4, mavlink.MAV_CMD_NAV_LAND, -35.0, 149.0, 0.0))
+    items.append(item(1, tag, param1=7))
+    items += waypoints([(-35.00, 149.0), (-35.01, 149.0)], start=2)
+    items.append(item(4, tag_jump, param1=7, param2=2))
+    items.append(item(5, mavlink.MAV_CMD_NAV_LAND, -35.0, 149.0, 0.0))
     mission = build(items)
     check("a tag jump with a repeat count has counter states too",
           len(return_path.finite_jumps(mission)) == 1,
           str(return_path.finite_jumps(mission)))
     check("so both of them get checked",
           len(return_path.jump_states(mission)) == 2)
+    # and they really do run differently
+    fresh = mission.flown_path(jump_counts={})
+    used = mission.flown_path(jump_counts={4: 2})
+    check("a fresh tag counter goes round the loop and a used one does not",
+          len(fresh) > len(used), "%u vs %u" % (len(fresh), len(used)))
+    check("and the used one still reaches the landing",
+          used[-1].is_landing(), str([p.seq for p in used]))
 
 
 def test_landing_guard():
@@ -875,6 +1000,7 @@ def main():
                  test_fix_generator, test_between_samples, test_work_bound,
                  test_loiter_fidelity, test_synthetic_containment,
                  test_barren_jump_state, test_jump_tag_states,
+                 test_span_over_a_jump,
                  test_landing_guard, test_module):
         test()
     print("")
