@@ -26,7 +26,6 @@ import os
 import pathlib
 import string
 import time
-import cv2
 import numpy as np
 
 from math import log, tan, radians, degrees, sin, cos, exp, pi, asin, atan
@@ -43,6 +42,8 @@ else:
     url_error = (RemoteDisconnected, actual_url_error)
 
 from MAVProxy.modules.lib import mp_util
+
+cv2 = mp_util.import_cv2()
 
 
 class TileException(Exception):

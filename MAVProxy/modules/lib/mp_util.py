@@ -595,3 +595,16 @@ def natural_sort_key(s):
 def sorted_natural(lst):
     '''sort using a 'natural' sort order'''
     return sorted(lst, key=natural_sort_key)
+
+def import_cv2():
+    '''import cv2, explaining the usual cause of failure. A distro opencv is
+    built against one numpy major version, so pulling in a newer numpy (some
+    packages require numpy>=2) leaves cv2 unimportable'''
+    try:
+        import cv2
+        return cv2
+    except ImportError as ex:
+        raise ImportError(
+            "opencv (cv2) is not usable: %s. If numpy was upgraded then the "
+            "installed opencv may be built for the previous numpy; try "
+            "'pip install -U opencv-python'" % ex)
