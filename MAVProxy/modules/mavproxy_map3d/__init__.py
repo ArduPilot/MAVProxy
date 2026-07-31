@@ -371,11 +371,13 @@ class Map3DModule(mp_module.MPModule):
     def idle_task(self):
         if self.map is None:
             return
-        if not self.map.is_alive():
-            self.map = None
-            return
+        # drain events before dropping a dead child, so we don't lose the
+        # reason it failed to start
+        alive = self.map.is_alive()
         for event in self.map.check_events():
-            if event[0] == 'render_settings':
+            if event[0] == 'startup_error':
+                print("map3d: the 3D view failed to start:\n%s" % event[1])
+            elif event[0] == 'render_settings':
                 (_, brightness, shading, wireframe, fpvfov) = event
                 self.map3d_settings.terrainbrightness = brightness
                 self.map3d_settings.terrainshading = shading
@@ -383,6 +385,9 @@ class Map3DModule(mp_module.MPModule):
                 self.map3d_settings.fpvfov = fpvfov
             elif event[0] == 'follow':
                 self.follow = bool(event[1])
+        if not alive:
+            self.map = None
+            return
         kml_mod = self.module('kmlread')
         if self._kml_state(kml_mod) != self.kml_change_state:
             self.send_kml(kml_mod)

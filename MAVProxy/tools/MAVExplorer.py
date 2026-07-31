@@ -664,7 +664,7 @@ def cmd_map3d(args):
         from MAVProxy.modules.mavproxy_map3d.map3d import (
             Map3D, missing_packages, missing_packages_message)
     except ImportError as ex:
-        print("map3d needs extra packages: pip install vtk quantized-mesh-tile (%s)" % ex)
+        print("map3d needs extra packages: pip install 'MAVProxy[map3d]' (%s)" % ex)
         return
     # map3d.py itself does not import VTK; the viewer child process does
     missing = missing_packages()
