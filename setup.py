@@ -98,8 +98,11 @@ on how to use MAVProxy.''',
       install_requires=requirements,
       extras_require={
         'cesium': ['tornado'],
-        # map3d module (native 3D terrain map)
-        'map3d': ['vtk', 'quantized-mesh-tile'],
+        # map3d module (native 3D terrain map). quantized-mesh-tile needs
+        # numpy>=2, which leaves a distro opencv/matplotlib built against
+        # numpy 1 unimportable, so pull in builds that match
+        'map3d': ['vtk', 'quantized-mesh-tile',
+                  'opencv-python>=4.10', 'matplotlib>=3.9'],
         # restserver module
         'server': ['flask'],
         'recommended': ['flask', 'PyYAML', 'lxml', 'wxpython',
