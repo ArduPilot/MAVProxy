@@ -700,7 +700,7 @@ def mp_icon(filename):
         with importlib.resources.open_binary(package, filename) as stream:
             raw = np.frombuffer(stream.read(), dtype=np.uint8)
     except Exception:
-        with open(os.path.join(os.path.dirname(__file__), 'data', filename)).read() as stream:
+        with open(os.path.join(os.path.dirname(__file__), 'data', filename), 'rb') as stream:
             raw = np.frombuffer(stream.read(), dtype=np.uint8)
     img = cv2.imdecode(raw, cv2.IMREAD_COLOR)
     return img
