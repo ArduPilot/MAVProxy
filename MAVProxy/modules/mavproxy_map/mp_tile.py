@@ -218,6 +218,17 @@ class TileInfoScaled(TileInfo):
         (self.dstx, self.dsty) = dst
 
 
+def default_cache_path():
+    '''default root of the on-disk tile cache. HOME is not set on native
+    Windows, where the cwd may well be unwritable (eg. Program Files)'''
+    if 'HOME' in os.environ:
+        return os.path.join(os.environ['HOME'], '.tilecache')
+    if 'LOCALAPPDATA' in os.environ:
+        return os.path.join(os.environ['LOCALAPPDATA'], '.tilecache')
+    import tempfile
+    return os.path.join(tempfile.gettempdir(), '.tilecache')
+
+
 class MPTile:
     '''map tile object'''
     def __init__(self, cache_path=None, download=True, cache_size=500,
@@ -225,14 +236,7 @@ class MPTile:
                  max_zoom=19, refresh_age=30*24*60*60):
 
         if cache_path is None:
-            try:
-                cache_path = os.path.join(os.environ['HOME'], '.tilecache')
-            except Exception:
-                if 'LOCALAPPDATA' in os.environ:
-                    cache_path = os.path.join(os.environ['LOCALAPPDATA'], '.tilecache')
-                else:
-                    import tempfile
-                    cache_path = os.path.join(tempfile.gettempdir(), '.tilecache')
+            cache_path = default_cache_path()
 
         if not os.path.exists(cache_path):
             mp_util.mkdir_p(cache_path)
