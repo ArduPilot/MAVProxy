@@ -33,7 +33,10 @@ MAVExpAny = Analysis(['.\\tools\\MAVExplorer.py'],
                             'wx.lib.embeddedimage', 'wx.lib.imageutils', 'wx.lib.agw.aquabutton', 
                             'wx.lib.agw.gradientbutton', 'FileDialog', 'Dialog',
                             ] + collect_submodules('pymavlink'),
-             datas= [ ('tools\\graphs\\*.*', 'MAVProxy\\tools\\graphs' ) ],
+             # mavproxy_map\data holds the map icons, needed by both the 2D map
+             # and the 3D map that MAVExplorer can open
+             datas= [ ('tools\\graphs\\*.*', 'MAVProxy\\tools\\graphs' ),
+                      ('modules\\mavproxy_map\\data\\*.*', 'MAVProxy\\modules\\mavproxy_map\\data' )],
              hookspath=None,
              runtime_hooks=None,
              excludes= ['sphinx', 'docutils', 'alabaster', 'FixTk', 'tcl', 'tk', 'Tkinter'])
