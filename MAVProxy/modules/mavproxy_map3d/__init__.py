@@ -13,7 +13,8 @@ import time
 
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
-from MAVProxy.modules.mavproxy_map3d.map3d import Map3D
+from MAVProxy.modules.mavproxy_map3d.map3d import (
+    Map3D, missing_packages, missing_packages_message)
 
 # fence colours as the 2D map's PolyFence layer uses them (OpenCV BGR)
 FENCE_INCLUSION_BGR = (0, 255, 0)
@@ -106,6 +107,10 @@ class Map3DModule(mp_module.MPModule):
     def start_map(self):
         if self.map is not None and self.map.is_alive():
             print("map3d already running")
+            return
+        missing = missing_packages()
+        if missing:
+            print(missing_packages_message(missing))
             return
         self.map = Map3D(title="MAVProxy 3D Map",
                          service=self.map3d_settings.service,
