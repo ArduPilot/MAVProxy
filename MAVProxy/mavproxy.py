@@ -394,9 +394,12 @@ class MPState(object):
                     ex = "%s.init did not return a MPModule instance" % modname
                     break
             except ImportError as msg:
-                ex = msg
+                # keep the first failure: the later modpaths are fallbacks, and
+                # their "No module named X" hides why the real one failed
+                if ex is None:
+                    ex = msg
                 if mpstate.settings.moddebug > 1:
-                    print(get_exception_stacktrace(ex))
+                    print(get_exception_stacktrace(msg))
         help_traceback = ""
         if mpstate.settings.moddebug < 3:
             help_traceback = " Use 'set moddebug 3' in the MAVProxy console to enable traceback"
