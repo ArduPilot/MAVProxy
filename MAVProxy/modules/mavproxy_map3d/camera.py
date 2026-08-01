@@ -3,7 +3,7 @@ Cesium-like camera and interactor for the 3D map.
 
 The camera keeps the horizon level at all times (no roll/flip): only yaw (about
 world up) and pitch (look-down angle, clamped). Default mouse drag pans; Ctrl+drag
-rotates (left-right = yaw, forward-back = pitch); wheel zooms.
+or a right drag rotates (left-right = yaw, forward-back = pitch); wheel zooms.
 '''
 
 import math
@@ -85,17 +85,22 @@ class TerrainCamera:
 
 
 class TerrainStyle(vtk.vtkInteractorStyleUser):
-    '''default drag = pan, Ctrl+drag = yaw/pitch, wheel = zoom'''
+    '''default drag = pan, Ctrl+drag or right drag = yaw/pitch, wheel = zoom'''
     def __init__(self, tc, on_change=None):
         self.tc = tc
         self.on_change = on_change
         self.last = None
         self.moved = False
+        self.rotating = False
         # Do not call this "enabled": vtkInteractorStyle exposes an enabled
         # property that attempts to enable the style immediately.
         self.interaction_enabled = True
         self.AddObserver("LeftButtonPressEvent", self._down)
         self.AddObserver("LeftButtonReleaseEvent", self._up)
+        # macOS turns Ctrl+left into a right click, so the Ctrl+drag above
+        # never reaches us there; rotate on a right drag as well
+        self.AddObserver("RightButtonPressEvent", self._down_rotate)
+        self.AddObserver("RightButtonReleaseEvent", self._up)
         self.AddObserver("MouseMoveEvent", self._move)
         self.AddObserver("MouseWheelForwardEvent", self._wf)
         self.AddObserver("MouseWheelBackwardEvent", self._wb)
@@ -108,9 +113,18 @@ class TerrainStyle(vtk.vtkInteractorStyleUser):
             return
         self.last = self.GetInteractor().GetEventPosition()
         self.moved = False
+        self.rotating = False
+
+    def _down_rotate(self, o, e):
+        if not self.interaction_enabled:
+            return
+        self.last = self.GetInteractor().GetEventPosition()
+        self.moved = False
+        self.rotating = True
 
     def _up(self, o, e):
         self.last = None
+        self.rotating = False
         if not self.interaction_enabled:
             return
         if self.moved and self.on_change:
@@ -124,7 +138,7 @@ class TerrainStyle(vtk.vtkInteractorStyleUser):
         dx, dy = x - self.last[0], y - self.last[1]
         self.last = (x, y)
         self.moved = True
-        if it.GetControlKey():
+        if self.rotating or it.GetControlKey():
             self.tc.rotate(dx, dy)
         else:
             self.tc.pan(dx, dy)
