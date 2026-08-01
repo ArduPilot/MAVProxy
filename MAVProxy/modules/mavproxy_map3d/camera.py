@@ -92,15 +92,16 @@ class TerrainStyle(vtk.vtkInteractorStyleUser):
         self.last = None
         self.moved = False
         self.rotating = False
+        self.active_button = None
         # Do not call this "enabled": vtkInteractorStyle exposes an enabled
         # property that attempts to enable the style immediately.
         self.interaction_enabled = True
-        self.AddObserver("LeftButtonPressEvent", self._down)
-        self.AddObserver("LeftButtonReleaseEvent", self._up)
+        self.AddObserver("LeftButtonPressEvent", self._down_pan)
+        self.AddObserver("LeftButtonReleaseEvent", self._up_left)
         # macOS turns Ctrl+left into a right click, so the Ctrl+drag above
         # never reaches us there; rotate on a right drag as well
         self.AddObserver("RightButtonPressEvent", self._down_rotate)
-        self.AddObserver("RightButtonReleaseEvent", self._up)
+        self.AddObserver("RightButtonReleaseEvent", self._up_right)
         self.AddObserver("MouseMoveEvent", self._move)
         self.AddObserver("MouseWheelForwardEvent", self._wf)
         self.AddObserver("MouseWheelBackwardEvent", self._wb)
@@ -108,27 +109,45 @@ class TerrainStyle(vtk.vtkInteractorStyleUser):
     def _render(self):
         self.GetInteractor().GetRenderWindow().Render()
 
-    def _down(self, o, e):
-        if not self.interaction_enabled:
-            return
-        self.last = self.GetInteractor().GetEventPosition()
+    def cancel_drag(self):
+        '''forget any drag in progress. Without this a drag left unfinished
+        (interaction disabled part way through, or a release we never saw)
+        would keep moving the camera on plain mouse motion'''
+        self.last = None
         self.moved = False
         self.rotating = False
+        self.active_button = None
+
+    def _begin(self, button, rotating):
+        # one button owns the drag: a second press must not switch pan/rotate
+        # under the first, and its release must not end the first drag
+        if not self.interaction_enabled or self.active_button is not None:
+            return
+        self.active_button = button
+        self.rotating = rotating
+        self.last = self.GetInteractor().GetEventPosition()
+        self.moved = False
+
+    def _end(self, button):
+        if self.active_button != button:
+            return
+        moved = self.moved
+        enabled = self.interaction_enabled
+        self.cancel_drag()
+        if enabled and moved and self.on_change:
+            self.on_change()
+
+    def _down_pan(self, o, e):
+        self._begin('left', False)
 
     def _down_rotate(self, o, e):
-        if not self.interaction_enabled:
-            return
-        self.last = self.GetInteractor().GetEventPosition()
-        self.moved = False
-        self.rotating = True
+        self._begin('right', True)
 
-    def _up(self, o, e):
-        self.last = None
-        self.rotating = False
-        if not self.interaction_enabled:
-            return
-        if self.moved and self.on_change:
-            self.on_change()
+    def _up_left(self, o, e):
+        self._end('left')
+
+    def _up_right(self, o, e):
+        self._end('right')
 
     def _move(self, o, e):
         if not self.interaction_enabled or self.last is None:
