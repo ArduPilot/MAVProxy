@@ -1,4 +1,8 @@
 # Optional dependencies for the 3D map module (mavproxy_map3d).
-# Install with:  pip install vtk quantized-mesh-tile
+# Install with:  pip install 'MAVProxy[map3d]'
+# quantized-mesh-tile requires numpy>=2, so the opencv and matplotlib floors
+# are needed to replace distro builds made against numpy 1
 vtk>=9.2
 quantized-mesh-tile>=0.7.0
+opencv-python>=4.10
+matplotlib>=3.9
