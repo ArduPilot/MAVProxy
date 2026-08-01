@@ -173,6 +173,7 @@ class Map3DFrame(wx.Frame):
                                    self.tc.yaw, self.tc.pitch,
                                    camera.GetViewAngle())
             self.style.interaction_enabled = False
+            self.style.cancel_drag()
             self.elements.set_vehicle_visible(False)
             camera.SetViewAngle(self.fpv_fov)
         self.terrain.update(self.tc)
@@ -239,6 +240,7 @@ class Map3DFrame(wx.Frame):
                                    self.tc.yaw, self.tc.pitch,
                                    camera.GetViewAngle())
             self.style.interaction_enabled = False
+            self.style.cancel_drag()
             camera.SetViewAngle(self.fpv_fov)
             self.update_fpv_camera()
         else:
