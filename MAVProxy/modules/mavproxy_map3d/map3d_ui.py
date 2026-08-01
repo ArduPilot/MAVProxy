@@ -135,6 +135,9 @@ class Map3DFrame(wx.Frame):
         sizer.Add(controls, 0, wx.EXPAND)
         sizer.Add(self.widget, 1, wx.EXPAND)
         self.SetSizer(sizer)
+        # without this the children keep their default position and the VTK
+        # canvas sits over the controls. Only MSW lays out on its own.
+        self.Layout()
 
         self.timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.on_timer, self.timer)
