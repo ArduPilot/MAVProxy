@@ -31,6 +31,24 @@ requirements=['pymavlink>=2.4.14',
               'numpy',
               'pynmeagps']
 
+# the map3d module needs these, and we want a plain "pip install -U MAVProxy"
+# to bring them in rather than leaving the module dead until someone finds the
+# extra. quantized-mesh-tile requires numpy>=2, which leaves a distro opencv or
+# matplotlib built against numpy 1 unimportable, so the floors are here to pull
+# in builds that match. The floors are needed because pip leaves an unpinned
+# requirement alone when the distro build already satisfies it.
+#
+# vtk only publishes wheels for 64 bit x86/arm on python 3.9 to 3.14, and has no
+# sdist, so an unguarded requirement would fail the whole MAVProxy install on
+# eg. 32 bit Raspberry Pi OS. Where the marker excludes it map3d stays dormant
+# and prints its own install message. Raise the python_version bound when vtk
+# publishes wheels for a newer python.
+MAP3D_MARKER = ('platform_machine in "x86_64 AMD64 aarch64 arm64"'
+                ' and python_version < "3.15"')
+map3d_requirements = ['vtk', 'quantized-mesh-tile',
+                      'opencv-python>=4.10', 'matplotlib>=3.9']
+requirements.extend(['%s; %s' % (r, MAP3D_MARKER) for r in map3d_requirements])
+
 if platform.system() == "Darwin":
     # on MacOS we can have a more complete requirements list
     requirements.extend(['billiard>=3.5.0',
@@ -98,11 +116,11 @@ on how to use MAVProxy.''',
       install_requires=requirements,
       extras_require={
         'cesium': ['tornado'],
-        # map3d module (native 3D terrain map). quantized-mesh-tile needs
-        # numpy>=2, which leaves a distro opencv/matplotlib built against
-        # numpy 1 unimportable, so pull in builds that match
-        'map3d': ['vtk', 'quantized-mesh-tile',
-                  'opencv-python>=4.10', 'matplotlib>=3.9'],
+        # map3d is in the base requirements now. The extra is kept so the
+        # documented MAVProxy[map3d] still works, and asks for the packages
+        # without the platform marker: someone naming it explicitly wants a
+        # loud failure rather than a silently dormant module
+        'map3d': map3d_requirements,
         # restserver module
         'server': ['flask'],
         'recommended': ['flask', 'PyYAML', 'lxml', 'wxpython',
