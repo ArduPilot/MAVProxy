@@ -260,7 +260,7 @@ class MPTile:
         # with the downloader threads, so all access is under _download_lock
         self._download_pending = {}
         self._download_active = set()
-        self._download_threads = []
+        self._download_running = 0
         self._download_lock = threading.Lock()
         self._loading = mp_icon('loading.jpg')
         self._unavailable = mp_icon('unavailable.jpg')
@@ -325,7 +325,9 @@ class MPTile:
         '''claim the next tile to fetch, or None when there is nothing left.
 
         A claimed tile stays in _download_pending until its fetch finishes, so
-        tiles_pending() keeps counting it as outstanding.
+        tiles_pending() keeps counting it as outstanding. Returning None also
+        retires the calling thread, under the same lock queue_download() takes,
+        so a tile queued as a thread gives up cannot be left with no downloader.
         '''
         with self._download_lock:
             tile_info = None
@@ -336,7 +338,9 @@ class MPTile:
                 # choose by request_time, newest first
                 if tile_info is None or pending.request_time > tile_info.request_time:
                     tile_info = pending
-            if tile_info is not None:
+            if tile_info is None:
+                self._download_running -= 1
+            else:
                 self._download_active.add(tile_info.key())
             return tile_info
 
@@ -346,15 +350,23 @@ class MPTile:
             self._download_pending.pop(key, None)
 
     def downloader(self):
-        '''the download thread'''
-        while True:
-            tile_info = self._claim_download()
-            if tile_info is None:
-                break
-            try:
-                self.download_tile(tile_info)
-            finally:
-                self._release_download(tile_info.key())
+        '''a download thread: fetch tiles until there are none left to claim'''
+        retired = False
+        try:
+            while True:
+                tile_info = self._claim_download()
+                if tile_info is None:
+                    retired = True
+                    return
+                try:
+                    self.download_tile(tile_info)
+                finally:
+                    self._release_download(tile_info.key())
+        finally:
+            if not retired:
+                # died unexpectedly; give the slot back
+                with self._download_lock:
+                    self._download_running -= 1
 
     def download_tile(self, tile_info):
         '''fetch one tile into the cache directory'''
@@ -428,11 +440,10 @@ class MPTile:
     def start_download_thread(self):
         '''start the downloaders, up to download_threads of them'''
         with self._download_lock:
-            self._download_threads = [t for t in self._download_threads
-                                      if t.is_alive()]
+            wanted = self.download_threads - self._download_running
             starting = [threading.Thread(target=self.downloader)
-                        for _ in range(self.download_threads - len(self._download_threads))]
-            self._download_threads.extend(starting)
+                        for _ in range(max(0, wanted))]
+            self._download_running += len(starting)
         for t in starting:
             t.daemon = True
             t.start()
