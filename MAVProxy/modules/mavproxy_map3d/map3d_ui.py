@@ -13,7 +13,8 @@ from vtkmodules.wx.wxVTKRenderWindowInteractor import wxVTKRenderWindowInteracto
 
 from MAVProxy.modules.mavproxy_map import mp_tile
 from MAVProxy.modules.mavproxy_map3d.camera import TerrainCamera, TerrainStyle
-from MAVProxy.modules.mavproxy_map3d.terrain import TerrainManager, R
+from MAVProxy.modules.mavproxy_map3d.terrain import (
+    TerrainManager, R, TILE_DOWNLOAD_THREADS)
 from MAVProxy.modules.mavproxy_map3d.elements import ElementManager
 
 import vtk
@@ -147,7 +148,8 @@ class Map3DFrame(wx.Frame):
     # ----------------------------------------------------------------- scene
     def init_scene(self, lat0, lon0, amsl_ref):
         self.status_actor.SetInput("Loading terrain...")
-        self.mt = mp_tile.MPTile(service=self.state.service, tile_delay=0.02)
+        self.mt = mp_tile.MPTile(service=self.state.service, tile_delay=0.02,
+                                 download_threads=TILE_DOWNLOAD_THREADS)
         self.terrain = TerrainManager(self.ren, self.mt, lat0, lon0,
                                       zexag=self.state.zexag,
                                       screen_h=self.GetClientSize()[1] or self.state.height,

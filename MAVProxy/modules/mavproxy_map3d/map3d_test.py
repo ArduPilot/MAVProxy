@@ -16,7 +16,8 @@ import vtk
 
 from pymavlink import mavutil
 from MAVProxy.modules.mavproxy_map import mp_tile
-from MAVProxy.modules.mavproxy_map3d.terrain import TerrainManager, R
+from MAVProxy.modules.mavproxy_map3d.terrain import (
+    TerrainManager, R, TILE_DOWNLOAD_THREADS)
 from MAVProxy.modules.mavproxy_map3d.elements import ElementManager
 from MAVProxy.modules.mavproxy_map3d.camera import TerrainCamera
 
@@ -86,7 +87,8 @@ def main():
     # offscreen: drive the core directly
     ren = vtk.vtkRenderer()
     ren.SetBackground(0.45, 0.62, 0.85)
-    mt = mp_tile.MPTile(service=args.service, tile_delay=0.02)
+    mt = mp_tile.MPTile(service=args.service, tile_delay=0.02,
+                        download_threads=TILE_DOWNLOAD_THREADS)
     terrain = TerrainManager(ren, mt, lat0, lon0, zexag=args.zexag,
                              fine_radius=3, screen_h=args.height)
     elements = ElementManager(ren, lat0, lon0, args.zexag)
