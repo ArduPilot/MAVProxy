@@ -234,7 +234,7 @@ class MPTile:
     '''map tile object'''
     def __init__(self, cache_path=None, download=True, cache_size=500,
                  service="MicrosoftSat", tile_delay=0.3, debug=False,
-                 max_zoom=19, refresh_age=30*24*60*60):
+                 max_zoom=19, refresh_age=30*24*60*60, download_threads=1):
 
         if cache_path is None:
             cache_path = default_cache_path()
@@ -251,13 +251,17 @@ class MPTile:
         self.service = service
         self.debug = debug
         self.refresh_age = refresh_age
+        self.download_threads = max(1, int(download_threads))
 
         if service not in TILE_SERVICES:
             raise TileException('unknown tile service %s' % service)
 
-        # _download_pending is a dictionary of TileInfo objects
+        # _download_pending is a dictionary of TileInfo objects. It is shared
+        # with the downloader threads, so all access is under _download_lock
         self._download_pending = {}
-        self._download_thread = None
+        self._download_active = set()
+        self._download_threads = []
+        self._download_lock = threading.Lock()
         self._loading = mp_icon('loading.jpg')
         self._unavailable = mp_icon('unavailable.jpg')
         self._tile_cache = collections.OrderedDict()
@@ -308,98 +312,130 @@ class MPTile:
         '''return number of tiles pending download'''
         return len(self._download_pending)
 
+    def queue_download(self, key, tile_info):
+        '''queue a tile for download, or bump its priority if already queued'''
+        with self._download_lock:
+            pending = self._download_pending.get(key)
+            if pending is not None:
+                pending.refresh_time()
+            else:
+                self._download_pending[key] = tile_info
+
+    def _claim_download(self):
+        '''claim the next tile to fetch, or None when there is nothing left.
+
+        A claimed tile stays in _download_pending until its fetch finishes, so
+        tiles_pending() keeps counting it as outstanding.
+        '''
+        with self._download_lock:
+            tile_info = None
+            for key in sorted(self._download_pending.keys()):
+                pending = self._download_pending[key]
+                if key in self._download_active:
+                    continue
+                # choose by request_time, newest first
+                if tile_info is None or pending.request_time > tile_info.request_time:
+                    tile_info = pending
+            if tile_info is not None:
+                self._download_active.add(tile_info.key())
+            return tile_info
+
+    def _release_download(self, key):
+        with self._download_lock:
+            self._download_active.discard(key)
+            self._download_pending.pop(key, None)
+
     def downloader(self):
         '''the download thread'''
-        while self.tiles_pending() > 0:
-            time.sleep(self.tile_delay)
-
-            keys = sorted(self._download_pending.keys())
-
-            # work out which one to download next, choosing by request_time
-            tile_info = self._download_pending[keys[0]]
-            for key in keys:
-                if self._download_pending[key].request_time > tile_info.request_time:
-                    tile_info = self._download_pending[key]
-
-            url = tile_info.url(self.service)
-            path = self.tile_to_path(tile_info)
-            key = tile_info.key()
-
+        while True:
+            tile_info = self._claim_download()
+            if tile_info is None:
+                break
             try:
-                if self.debug:
-                    print("Downloading %s [%u left]" % (url, len(keys)))
-                req = url_request(url)
-                req.add_header('User-Agent', 'MAVProxy')
+                self.download_tile(tile_info)
+            finally:
+                self._release_download(tile_info.key())
 
-                # try to re-use our cached data:
-                try:
-                    mtime = os.path.getmtime(path)
-                    req.add_header('If-Modified-Since', time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(mtime)))
-                except Exception:
-                    pass
+    def download_tile(self, tile_info):
+        '''fetch one tile into the cache directory'''
+        time.sleep(self.tile_delay)
 
-                if url.find('google') != -1:
-                    req.add_header('Referer', 'https://maps.google.com/')
-                resp = url_open(req)
-                headers = resp.info()
-            except url_error as e:
-                try:
-                    if e.getcode() == 304:
-                        # cache hit; touch the file to reset its refresh time
-                        pathlib.Path(path).touch()
-                        self._download_pending.pop(key)
-                        continue
-                except Exception:
-                    pass
+        url = tile_info.url(self.service)
+        path = self.tile_to_path(tile_info)
+        key = tile_info.key()
 
-                # print('Error loading %s' % url)
-                if key not in self._tile_cache:
-                    self._tile_cache[key] = self._unavailable
-                self._download_pending.pop(key)
-                if self.debug:
-                    print("Failed %s: %s" % (url, str(e)))
-                continue
-            if 'content-type' not in headers or headers['content-type'].find('image') == -1:
-                if key not in self._tile_cache:
-                    self._tile_cache[key] = self._unavailable
-                self._download_pending.pop(key)
-                if self.debug:
-                    print("non-image response %s" % url)
-                continue
-            else:
-                img = resp.read()
+        try:
+            if self.debug:
+                print("Downloading %s [%u left]" % (url, self.tiles_pending()))
+            req = url_request(url)
+            req.add_header('User-Agent', 'MAVProxy')
 
-            # see if its a blank/unavailable tile
-            md5 = hashlib.md5(img).hexdigest()
-            if md5 in BLANK_TILES:
-                if self.debug:
-                    print("blank tile %s" % url)
-                    if key not in self._tile_cache:
-                        self._tile_cache[key] = self._unavailable
-                self._download_pending.pop(key)
-                continue
-
-            mp_util.mkdir_p(os.path.dirname(path))
-            # use a unique tmp name so concurrent downloaders (eg. two
-            # MAVProxy instances sharing the cache) can't race on the rename
-            tmppath = "%s.tmp.%u.%u" % (path, os.getpid(), threading.get_ident())
+            # try to re-use our cached data:
             try:
-                with open(tmppath, 'wb') as h:
-                    h.write(img)
-                os.replace(tmppath, path)
-            except OSError:
+                mtime = os.path.getmtime(path)
+                req.add_header('If-Modified-Since', time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(mtime)))
+            except Exception:
                 pass
-            self._download_pending.pop(key)
-        self._download_thread = None
+
+            if url.find('google') != -1:
+                req.add_header('Referer', 'https://maps.google.com/')
+            resp = url_open(req)
+            headers = resp.info()
+        except url_error as e:
+            try:
+                if e.getcode() == 304:
+                    # cache hit; touch the file to reset its refresh time
+                    pathlib.Path(path).touch()
+                    return
+            except Exception:
+                pass
+
+            # print('Error loading %s' % url)
+            if key not in self._tile_cache:
+                self._tile_cache[key] = self._unavailable
+            if self.debug:
+                print("Failed %s: %s" % (url, str(e)))
+            return
+        if 'content-type' not in headers or headers['content-type'].find('image') == -1:
+            if key not in self._tile_cache:
+                self._tile_cache[key] = self._unavailable
+            if self.debug:
+                print("non-image response %s" % url)
+            return
+        else:
+            img = resp.read()
+
+        # see if its a blank/unavailable tile
+        md5 = hashlib.md5(img).hexdigest()
+        if md5 in BLANK_TILES:
+            if self.debug:
+                print("blank tile %s" % url)
+                if key not in self._tile_cache:
+                    self._tile_cache[key] = self._unavailable
+            return
+
+        mp_util.mkdir_p(os.path.dirname(path))
+        # use a unique tmp name so concurrent downloaders (eg. two
+        # MAVProxy instances sharing the cache) can't race on the rename
+        tmppath = "%s.tmp.%u.%u" % (path, os.getpid(), threading.get_ident())
+        try:
+            with open(tmppath, 'wb') as h:
+                h.write(img)
+            os.replace(tmppath, path)
+        except OSError:
+            pass
 
     def start_download_thread(self):
-        '''start the downloader'''
-        if self._download_thread and self._download_thread.is_alive():
-            return
-        t = threading.Thread(target=self.downloader)
-        t.daemon = True
-        self._download_thread = t
-        t.start()
+        '''start the downloaders, up to download_threads of them'''
+        with self._download_lock:
+            self._download_threads = [t for t in self._download_threads
+                                      if t.is_alive()]
+            starting = [threading.Thread(target=self.downloader)
+                        for _ in range(self.download_threads - len(self._download_threads))]
+            self._download_threads.extend(starting)
+        for t in starting:
+            t.daemon = True
+            t.start()
 
     def load_tile_lowres(self, tile):
         '''load a lower resolution tile from cache to fill in a
@@ -479,10 +515,7 @@ class MPTile:
             # cv2.rectangle(ret, (0,0), (TILES_WIDTH-1,TILES_WIDTH-1), (255,0,0), 1)
             # if it is an old tile, then try to refresh
             if os.path.getmtime(path) + self.refresh_age < time.time():
-                try:
-                    self._download_pending[key].refresh_time()
-                except Exception:
-                    self._download_pending[key] = tile
+                self.queue_download(key, tile)
                 self.start_download_thread()
 
             # add it to the tile cache
@@ -497,10 +530,7 @@ class MPTile:
                 img = self._unavailable
             return img
 
-        try:
-            self._download_pending[key].refresh_time()
-        except Exception:
-            self._download_pending[key] = tile
+        self.queue_download(key, tile)
         self.start_download_thread()
 
         img = self.load_tile_lowres(tile)
