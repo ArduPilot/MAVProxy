@@ -587,6 +587,41 @@ def get_gps_time(tnow):
 
     
 
+_vehicle_type_names = None
+
+
+def vehicle_type_name(mav_type):
+    '''vehicle name for a MAV_TYPE, as used to pick a map icon, or None if we
+    have no icon for that type'''
+    global _vehicle_type_names
+    if _vehicle_type_names is None:
+        from pymavlink import mavutil
+        mavlink = mavutil.mavlink
+        groups = {
+            'plane': [mavlink.MAV_TYPE_FIXED_WING,
+                      mavlink.MAV_TYPE_VTOL_DUOROTOR,
+                      mavlink.MAV_TYPE_VTOL_QUADROTOR,
+                      mavlink.MAV_TYPE_VTOL_TILTROTOR],
+            'rover': [mavlink.MAV_TYPE_GROUND_ROVER],
+            'sub': [mavlink.MAV_TYPE_SUBMARINE],
+            'boat': [mavlink.MAV_TYPE_SURFACE_BOAT],
+            'copter': [mavlink.MAV_TYPE_QUADROTOR,
+                       mavlink.MAV_TYPE_HEXAROTOR,
+                       mavlink.MAV_TYPE_OCTOROTOR,
+                       mavlink.MAV_TYPE_TRICOPTER,
+                       mavlink.MAV_TYPE_DODECAROTOR,
+                       mavlink.MAV_TYPE_DECAROTOR],
+            'singlecopter': [mavlink.MAV_TYPE_COAXIAL],
+            'heli': [mavlink.MAV_TYPE_HELICOPTER],
+            'antenna': [mavlink.MAV_TYPE_ANTENNA_TRACKER],
+            'blimp': [mavlink.MAV_TYPE_AIRSHIP],
+        }
+        _vehicle_type_names = {t: name
+                               for name, types in groups.items()
+                               for t in types}
+    return _vehicle_type_names.get(mav_type)
+
+
 def natural_sort_key(s):
     '''a sort key for natural sorting, where embedded integers are sorted separately'''
     return [int(text) if text.isdigit() else text.lower()
