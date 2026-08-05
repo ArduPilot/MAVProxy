@@ -103,6 +103,10 @@ class Map3D:
     def set_vehicle(self, lat, lon, amsl, roll=0.0, pitch=0.0, yaw=0.0):
         self._put(('vehicle', lat, lon, amsl, roll, pitch, yaw))
 
+    def set_vehicle_type(self, vehicle_type):
+        '''vehicle_type is a name from mp_util.vehicle_type_name()'''
+        self._put(('vehicletype', vehicle_type))
+
     def set_path(self, path):
         self._put(('path', list(path)))
 

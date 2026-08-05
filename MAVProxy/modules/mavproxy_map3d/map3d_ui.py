@@ -91,6 +91,7 @@ class Map3DFrame(wx.Frame):
         self.follow = bool(state.follow)
         self.last_vehicle = None
         self.last_vehicle_pose = None
+        self.vehicle_type = None
         self.kml_features = []
         self.kml_refresh_due = None
         self.overlay_mesh_revision = -1
@@ -157,6 +158,8 @@ class Map3DFrame(wx.Frame):
                                       shading=self.terrain_shading,
                                       wireframe=self.terrain_wireframe)
         self.elements = ElementManager(self.ren, lat0, lon0, self.state.zexag)
+        if self.vehicle_type is not None:
+            self.elements.set_vehicle_type(self.vehicle_type)
         self.elements.set_terrain_height(self.terrain.height_at)
         self.elements.set_home(amsl_ref)
         self.elements.set_kml(self.kml_features, self.terrain.height_at,
@@ -330,6 +333,13 @@ class Map3DFrame(wx.Frame):
             return
         if kind == 'follow':
             self.set_follow_enabled(msg[1])
+            return
+        if kind == 'vehicletype':
+            # may arrive before the scene exists, so keep it for init_scene
+            self.vehicle_type = msg[1]
+            if self.elements is not None:
+                self.elements.set_vehicle_type(self.vehicle_type)
+                self.render()
             return
         if kind == 'kml':
             self.kml_features = list(msg[1])

@@ -13,6 +13,7 @@ import time
 
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
+from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.mavproxy_map3d.map3d import (
     Map3D, missing_packages, missing_packages_message)
 
@@ -66,6 +67,7 @@ class Map3DModule(mp_module.MPModule):
         self.last_attitude = (0.0, 0.0, 0.0)
         self.home_amsl = None
         self.home_position = None
+        self.vehicle_type = None
         self.follow = True
         self.kml_change_state = None
         self.terrain_lock = threading.Lock()
@@ -143,6 +145,15 @@ class Map3DModule(mp_module.MPModule):
             messages = self.master.messages
         except Exception:
             return
+
+        # a restarted viewer child knows nothing, so push the type again
+        heartbeat = messages.get('HEARTBEAT')
+        if heartbeat is not None:
+            name = mp_util.vehicle_type_name(heartbeat.type)
+            if name is not None:
+                self.vehicle_type = name
+        if self.vehicle_type is not None:
+            self.map.set_vehicle_type(self.vehicle_type)
 
         attitude = messages.get('ATTITUDE')
         if attitude is not None:
@@ -288,6 +299,13 @@ class Map3DModule(mp_module.MPModule):
                     frame = 0
             items.append((lat, lon, z, frame, w.command, w.seq))
         self.map.set_mission(items)
+
+    def set_vehicle_type(self, vehicle_type):
+        '''vehicle type changed: the viewer picks its icon from it'''
+        if vehicle_type is None or vehicle_type == self.vehicle_type:
+            return
+        self.vehicle_type = vehicle_type
+        self.map.set_vehicle_type(vehicle_type)
 
     def set_home_position(self, lat, lon):
         '''home moved: around-home fence circles are centred on it, and a
@@ -449,7 +467,9 @@ class Map3DModule(mp_module.MPModule):
         if self.map is None or not self.map.is_alive():
             return
         mtype = m.get_type()
-        if mtype == 'HOME_POSITION':
+        if mtype in ('HEARTBEAT', 'HIGH_LATENCY2'):
+            self.set_vehicle_type(mp_util.vehicle_type_name(m.type))
+        elif mtype == 'HOME_POSITION':
             self.home_amsl = m.altitude * 1.0e-3     # AMSL (mm -> m)
             self.map.set_home(self.home_amsl)
             self.set_home_position(m.latitude * 1.0e-7, m.longitude * 1.0e-7)
