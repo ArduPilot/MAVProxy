@@ -77,26 +77,135 @@ def _polyline(points_enu, colour, width, dashed=False):
     return actor
 
 
-def _vehicle_icon():
-    '''Return an opaque aircraft glyph in the local horizontal plane.
+def _circle(cx, cy, radius, segments=20):
+    '''polygon approximating a circle'''
+    return [(cx + radius * math.sin(2 * math.pi * i / segments),
+             cy + radius * math.cos(2 * math.pi * i / segments))
+            for i in range(segments)]
 
-    Using native geometry avoids platform-dependent PNG alpha/texture issues.
-    The outline coordinates describe a unit aircraft pointing towards +Y.
-    '''
-    outline = [
+
+def _ellipse(cx, cy, rx, ry, segments=24):
+    return [(cx + rx * math.sin(2 * math.pi * i / segments),
+             cy + ry * math.cos(2 * math.pi * i / segments))
+            for i in range(segments)]
+
+
+def _bar(p0, p1, width):
+    '''rectangle of the given width running along p0 -> p1'''
+    ((x0, y0), (x1, y1)) = (p0, p1)
+    (dx, dy) = (x1 - x0, y1 - y0)
+    length = math.hypot(dx, dy)
+    (ox, oy) = (-dy / length * width * 0.5, dx / length * width * 0.5)
+    return [(x0 + ox, y0 + oy), (x1 + ox, y1 + oy),
+            (x1 - ox, y1 - oy), (x0 - ox, y0 - oy)]
+
+
+def _plane_shape():
+    return [[
         (0.00, 0.50), (-0.07, 0.24), (-0.48, 0.02), (-0.48, -0.07),
         (-0.08, 0.00), (-0.07, -0.30), (-0.22, -0.43), (-0.22, -0.50),
         (0.00, -0.42), (0.22, -0.50), (0.22, -0.43), (0.07, -0.30),
         (0.08, 0.00), (0.48, -0.07), (0.48, 0.02), (0.07, 0.24),
-    ]
+    ]]
+
+
+def _copter_shape():
+    '''motors on X arms, with a forward pointing body so heading reads'''
+    shapes = []
+    arm = 0.32
+    for (x, y) in ((-arm, arm), (arm, arm), (-arm, -arm), (arm, -arm)):
+        shapes.append(_bar((0.0, 0.0), (x, y), 0.09))
+        shapes.append(_circle(x, y, 0.16))
+    shapes.append([(0.00, 0.36), (0.15, -0.06), (0.00, -0.18), (-0.15, -0.06)])
+    return shapes
+
+
+def _singlecopter_shape():
+    '''ducted rotor with control vanes below it'''
+    return [_circle(0.0, 0.06, 0.32),
+            [(0.00, 0.50), (0.15, 0.22), (-0.15, 0.22)],
+            _bar((-0.34, -0.30), (0.34, -0.30), 0.12),
+            _bar((0.0, -0.44), (0.0, -0.16), 0.12)]
+
+
+def _heli_shape():
+    '''crossed rotor blades, cabin, and a tail boom reaching past the disc'''
+    return [_bar((-0.34, 0.46), (0.34, -0.22), 0.05),
+            _bar((-0.34, -0.22), (0.34, 0.46), 0.05),
+            _ellipse(0.0, 0.16, 0.14, 0.26),
+            _bar((0.0, 0.16), (0.0, -0.48), 0.07),
+            _bar((-0.13, -0.44), (0.13, -0.44), 0.20)]
+
+
+def _rover_shape():
+    '''car body with the wheels clear of it in silhouette'''
+    return [[(0.00, 0.46), (0.16, 0.30), (0.16, -0.44), (-0.16, -0.44),
+             (-0.16, 0.30)],
+            _bar((-0.30, 0.30), (-0.30, 0.04), 0.16),
+            _bar((0.30, 0.30), (0.30, 0.04), 0.16),
+            _bar((-0.30, -0.14), (-0.30, -0.40), 0.16),
+            _bar((0.30, -0.14), (0.30, -0.40), 0.16)]
+
+
+def _boat_shape():
+    '''pointed bow and square transom, with a beam across midships'''
+    return [[(0.00, 0.50), (0.16, 0.10), (0.16, -0.40), (-0.16, -0.40),
+             (-0.16, 0.10)],
+            _bar((-0.34, 0.02), (0.34, 0.02), 0.10)]
+
+
+def _sub_shape():
+    '''slim hull with bow planes and tail fins'''
+    return [_ellipse(0.0, 0.02, 0.12, 0.44),
+            _bar((-0.20, 0.14), (0.20, 0.14), 0.14),
+            _bar((-0.26, -0.36), (0.26, -0.36), 0.09)]
+
+
+def _antenna_shape():
+    '''a dish on a mast, pointing the way the tracker is aimed'''
+    return [[(0.00, 0.08), (0.34, 0.44), (0.20, 0.50), (-0.20, 0.50),
+             (-0.34, 0.44)],
+            _bar((0.0, 0.16), (0.0, -0.30), 0.09),
+            _bar((-0.26, -0.42), (0.26, -0.42), 0.16)]
+
+
+def _blimp_shape():
+    '''fat envelope with large tail fins'''
+    return [_ellipse(0.0, 0.06, 0.22, 0.42),
+            _bar((-0.34, -0.30), (0.34, -0.30), 0.12)]
+
+
+# keyed by the names mp_util.vehicle_type_name() returns
+VEHICLE_SHAPES = {
+    'plane': _plane_shape,
+    'copter': _copter_shape,
+    'singlecopter': _singlecopter_shape,
+    'heli': _heli_shape,
+    'rover': _rover_shape,
+    'boat': _boat_shape,
+    'sub': _sub_shape,
+    'antenna': _antenna_shape,
+    'blimp': _blimp_shape,
+}
+DEFAULT_VEHICLE_TYPE = 'plane'
+
+
+def _vehicle_icon(vehicle_type=DEFAULT_VEHICLE_TYPE):
+    '''Return an opaque vehicle glyph in the local horizontal plane.
+
+    Using native geometry avoids platform-dependent PNG alpha/texture issues.
+    The outlines describe a unit vehicle pointing towards +Y. The glyph is a
+    single colour, so overlapping shapes just merge into one silhouette.
+    '''
+    shape = VEHICLE_SHAPES.get(vehicle_type, VEHICLE_SHAPES[DEFAULT_VEHICLE_TYPE])
     points = vtk.vtkPoints()
-    polygon = vtk.vtkPolygon()
-    polygon.GetPointIds().SetNumberOfIds(len(outline))
-    for i, (x, y) in enumerate(outline):
-        points.InsertNextPoint(x, y, 0.0)
-        polygon.GetPointIds().SetId(i, i)
     cells = vtk.vtkCellArray()
-    cells.InsertNextCell(polygon)
+    for outline in shape():
+        polygon = vtk.vtkPolygon()
+        polygon.GetPointIds().SetNumberOfIds(len(outline))
+        for i, (x, y) in enumerate(outline):
+            polygon.GetPointIds().SetId(i, points.InsertNextPoint(x, y, 0.0))
+        cells.InsertNextCell(polygon)
     poly = vtk.vtkPolyData()
     poly.SetPoints(points)
     poly.SetPolys(cells)
@@ -148,6 +257,7 @@ class ElementManager:
         self.vehicle = None
         self.vehicle_pose = None
         self.vehicle_visible = True
+        self.vehicle_type = DEFAULT_VEHICLE_TYPE
         self.terrain_height = None
         self.fence = []
         self.fence_geometry = None
@@ -186,6 +296,16 @@ class ElementManager:
         self.vehicle_visible = bool(visible)
         if self.vehicle is not None:
             self.vehicle.SetVisibility(self.vehicle_visible)
+
+    def set_vehicle_type(self, vehicle_type):
+        '''vehicle_type is a name from mp_util.vehicle_type_name()'''
+        if vehicle_type not in VEHICLE_SHAPES or vehicle_type == self.vehicle_type:
+            return
+        self.vehicle_type = vehicle_type
+        if self.vehicle is not None:
+            self.ren.RemoveActor(self.vehicle)
+            self.vehicle = None
+            self.refresh_vehicle()
 
     def set_path(self, path):
         '''path: list of (lat,lon,amsl)'''
@@ -338,7 +458,7 @@ class ElementManager:
             return None
         lat, lon, amsl, roll, pitch, yaw = self.vehicle_pose
         if self.vehicle is None:
-            self.vehicle = _vehicle_icon()
+            self.vehicle = _vehicle_icon(self.vehicle_type)
             self.vehicle.SetVisibility(self.vehicle_visible)
             self.ren.AddActor(self.vehicle)
         e, n, u = self._enu(lat, lon, amsl)
