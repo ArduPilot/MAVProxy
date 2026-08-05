@@ -278,16 +278,20 @@ class Tile:
         self.tex_key = key
 
 
-def build_texture_image(mt, lock, vw, vs, ve, vn, img_zoom, tex_w):
+def build_texture_image(mt, lock, vw, vs, ve, vn, img_zoom, tex_w, priority=0.0):
     '''worker thread: assemble the draped Mercator image for a tile. Does NOT
     block on downloads (mp_tile fetches imagery on its own thread); missing
-    imagery comes back as placeholders and is refreshed once downloads settle.'''
+    imagery comes back as placeholders and is refreshed once downloads settle.
+
+    priority is the tile's rank from the camera, so the imagery queue drains
+    from the middle of the view outwards however the workers interleave.'''
     dlon = math.radians(ve - vw)
     C = tex_w / dlon
     tex_h = max(1, int(round(C * (mp_tile.mercator_y(vn) - mp_tile.mercator_y(vs)))))
     gw = R * math.cos(math.radians(vn)) * dlon
     with lock:   # mp_tile's in-memory cache is not thread-safe
-        img = mt.area_to_image(vn, vw, tex_w, tex_h, gw, zoom=img_zoom)
+        img = mt.area_to_image(vn, vw, tex_w, tex_h, gw, zoom=img_zoom,
+                               priority=priority)
     return img
 
 
@@ -342,10 +346,11 @@ class TerrainManager:
                     (z, x, y) = payload
                     self.results.put(("decode", jid, decode_terrain(z, x, y)))
                 elif kind == "texture":
-                    (_tilekey, _tkey, params) = payload
+                    (_tilekey, _tkey, params, priority) = payload
                     (vw, vs, ve, vn, img_zoom, tex_w) = params
                     img = build_texture_image(self.mt, self.tex_lock,
-                                              vw, vs, ve, vn, img_zoom, tex_w)
+                                              vw, vs, ve, vn, img_zoom, tex_w,
+                                              priority)
                     self.results.put(("texture", jid, (img, payload)))
             except Exception as e:
                 self.results.put(("error", jid, e))
@@ -412,9 +417,13 @@ class TerrainManager:
                 removed_tile = True
         if removed_tile:
             self.mesh_revision += 1
-        # request textures for present tiles (at most one outstanding per tile)
+        # request textures for present tiles (at most one outstanding per tile),
+        # nearest the camera first. The rank goes down to mp_tile so the imagery
+        # queue is ordered too: several workers fetch tiles concurrently, so the
+        # order jobs are queued in does not by itself decide the download order
         fov_deg = tc.cam.GetViewAngle()
-        for key, tile in self.tiles.items():
+        for rank, key in enumerate(sorted(self.tiles.keys(), key=tile_priority)):
+            tile = self.tiles[key]
             req = tile.texture_request(tc.pos, self.screen_h, self.mt, fov_deg)
             if req is None:
                 continue
@@ -424,7 +433,7 @@ class TerrainManager:
                 continue
             tile.want_key = tkey
             self.inflight.add(jid)
-            self.jobs.put(("texture", jid, (key, tkey, params)))
+            self.jobs.put(("texture", jid, (key, tkey, params, rank)))
 
     def process(self, tc):
         '''main thread: drain worker results, build/update VTK. Returns True if
@@ -460,7 +469,7 @@ class TerrainManager:
                 self.mesh_revision += 1
                 changed = True
             elif kind == "texture":
-                img, (tilekey, tkey, params) = payload
+                img, (tilekey, tkey, params, _priority) = payload
                 (vw, vs, ve, vn, img_zoom, tex_w) = params
                 tile = self.tiles.get(tilekey)
                 if tile is not None and tkey == tile.want_key:
