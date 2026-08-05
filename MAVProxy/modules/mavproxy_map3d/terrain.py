@@ -29,6 +29,11 @@ R = 6378137.0
 QUANTIZED_BASE = "https://plot.ardupilot.org/quantized"
 CACHE_DIR = os.path.join(mp_tile.default_cache_path(), "quantized")
 
+# a 3D view drapes hundreds of imagery tiles before it looks like anything, and
+# the fetches are latency bound rather than bandwidth bound, so run them in
+# parallel. One at a time takes minutes on a high latency link such as WSL2.
+TILE_DOWNLOAD_THREADS = 8
+
 # ArduPilot tiles include the optional lighting extension. This decoder warns
 # when it skips that extension, but map3d computes its own VTK normals anyway.
 warnings.filterwarnings(
