@@ -1181,34 +1181,8 @@ Usage: map circle <radius> <colour>
         sysid = m.get_srcSystem()
 
         if mtype == "HEARTBEAT" or mtype == "HIGH_LATENCY2":
-            vname = None
             vtype = self.vehicle_type_override.get(sysid, m.type)
-            if vtype in [mavutil.mavlink.MAV_TYPE_FIXED_WING,
-                         mavutil.mavlink.MAV_TYPE_VTOL_DUOROTOR,
-                         mavutil.mavlink.MAV_TYPE_VTOL_QUADROTOR,
-                         mavutil.mavlink.MAV_TYPE_VTOL_TILTROTOR]:
-                vname = 'plane'
-            elif vtype in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER]:
-                vname = 'rover'
-            elif vtype in [mavutil.mavlink.MAV_TYPE_SUBMARINE]:
-                vname = 'sub'
-            elif vtype in [mavutil.mavlink.MAV_TYPE_SURFACE_BOAT]:
-                vname = 'boat'
-            elif vtype in [mavutil.mavlink.MAV_TYPE_QUADROTOR,
-                           mavutil.mavlink.MAV_TYPE_HEXAROTOR,
-                           mavutil.mavlink.MAV_TYPE_OCTOROTOR,
-                           mavutil.mavlink.MAV_TYPE_TRICOPTER,
-                           mavutil.mavlink.MAV_TYPE_DODECAROTOR,
-                           mavutil.mavlink.MAV_TYPE_DECAROTOR]:
-                vname = 'copter'
-            elif vtype in [mavutil.mavlink.MAV_TYPE_COAXIAL]:
-                vname = 'singlecopter'
-            elif vtype in [mavutil.mavlink.MAV_TYPE_HELICOPTER]:
-                vname = 'heli'
-            elif vtype in [mavutil.mavlink.MAV_TYPE_ANTENNA_TRACKER]:
-                vname = 'antenna'
-            elif vtype in [mavutil.mavlink.MAV_TYPE_AIRSHIP]:
-                vname = 'blimp'
+            vname = mp_util.vehicle_type_name(vtype)
             if vname is not None:
                 self.vehicle_type_by_sysid[sysid] = vname
 
