@@ -23,6 +23,9 @@ FENCE_EXCLUSION_BGR = (255, 0, 0)
 FENCE_RETURN_BGR = (255, 127, 127)
 FENCE_RETURN_RADIUS = 10.0
 
+# takeoff items normally carry an altitude and no position
+TAKEOFF_COMMANDS = (22, 84)      # NAV_TAKEOFF, NAV_VTOL_TAKEOFF
+
 
 def bgr_to_rgb(bgr, default=(1.0, 0.0, 1.0)):
     '''SlipMap/OpenCV colours are BGR; VTK wants RGB floats'''
@@ -245,7 +248,21 @@ class Map3DModule(mp_module.MPModule):
             if resolved:
                 self.terrain_resolved = True
 
+    def mission_home(self, wploader):
+        '''lat/lon a positionless takeoff climbs from, or None'''
+        if self.home_position is not None:
+            return self.home_position
+        try:
+            home = wploader.wp(0)
+        except Exception:
+            return None
+        if home is None or (home.x == 0 and home.y == 0):
+            return None
+        return (home.x, home.y)
+
     def send_mission(self):
+        if self.map is None:
+            return
         try:
             wploader = self.module('wp').wploader
         except Exception:
@@ -253,23 +270,33 @@ class Map3DModule(mp_module.MPModule):
         items = []
         for w in wploader.wpoints:
             frame = getattr(w, 'frame', 0)
-            if w.x == 0 and w.y == 0 and w.command not in (16, 22, 82):
+            (lat, lon) = (w.x, w.y)
+            if lat == 0 and lon == 0 and w.command in TAKEOFF_COMMANDS:
+                # draw the climb from home, otherwise the takeoff altitude is
+                # dropped and the mission appears to start at the first waypoint
+                home = self.mission_home(wploader)
+                if home is None:
+                    continue
+                (lat, lon) = home
+            if lat == 0 and lon == 0:
                 continue
             z = w.z
             if frame in (10, 11):    # terrain-relative -> resolve to AMSL
-                terr = self.terrain_alt(w.x, w.y)
+                terr = self.terrain_alt(lat, lon)
                 if terr is not None:
                     z = terr + w.z
                     frame = 0
-            items.append((w.x, w.y, z, frame, w.command, w.seq))
+            items.append((lat, lon, z, frame, w.command, w.seq))
         self.map.set_mission(items)
 
     def set_home_position(self, lat, lon):
-        '''home moved: around-home fence circles are centred on it'''
+        '''home moved: around-home fence circles are centred on it, and a
+        positionless takeoff is drawn there'''
         if (lat, lon) == self.home_position:
             return
         self.home_position = (lat, lon)
         self.send_fence()
+        self.send_mission()
 
     @staticmethod
     def _fence_latlon(item):
