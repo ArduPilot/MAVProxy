@@ -156,6 +156,7 @@ class TileInfo:
         self.zoom = zoom
         self.service = service
         (self.offsetx, self.offsety) = offset
+        self.priority = 0.0     # download queue order, lowest fetched first
         self.refresh_time()
 
     def key(self):
@@ -312,13 +313,16 @@ class MPTile:
         '''return number of tiles pending download'''
         return len(self._download_pending)
 
-    def queue_download(self, key, tile_info):
-        '''queue a tile for download, or bump its priority if already queued'''
+    def queue_download(self, key, tile_info, priority=0.0):
+        '''queue a tile for download. priority orders the queue, lowest first;
+        a tile already queued keeps the most urgent priority it was asked with'''
         with self._download_lock:
             pending = self._download_pending.get(key)
             if pending is not None:
                 pending.refresh_time()
+                pending.priority = min(pending.priority, priority)
             else:
+                tile_info.priority = priority
                 self._download_pending[key] = tile_info
 
     def _claim_download(self):
@@ -331,13 +335,15 @@ class MPTile:
         '''
         with self._download_lock:
             tile_info = None
+            best = None
             for key in sorted(self._download_pending.keys()):
                 pending = self._download_pending[key]
                 if key in self._download_active:
                     continue
-                # choose by request_time, newest first
-                if tile_info is None or pending.request_time > tile_info.request_time:
-                    tile_info = pending
+                # lowest priority value first, then the newest request
+                rank = (pending.priority, -pending.request_time)
+                if best is None or rank < best:
+                    (best, tile_info) = (rank, pending)
             if tile_info is None:
                 self._download_running -= 1
             else:
@@ -504,8 +510,9 @@ class MPTile:
             return scaled
         return None
 
-    def load_tile(self, tile):
-        '''load a tile from cache or tile server'''
+    def load_tile(self, tile, priority=0.0):
+        '''load a tile from cache or tile server. priority orders any download
+        this triggers, lowest first'''
 
         # see if its in the tile cache
         key = tile.key()
@@ -526,7 +533,7 @@ class MPTile:
             # cv2.rectangle(ret, (0,0), (TILES_WIDTH-1,TILES_WIDTH-1), (255,0,0), 1)
             # if it is an old tile, then try to refresh
             if os.path.getmtime(path) + self.refresh_age < time.time():
-                self.queue_download(key, tile)
+                self.queue_download(key, tile, priority)
                 self.start_download_thread()
 
             # add it to the tile cache
@@ -541,7 +548,7 @@ class MPTile:
                 img = self._unavailable
             return img
 
-        self.queue_download(key, tile)
+        self.queue_download(key, tile, priority)
         self.start_download_thread()
 
         img = self.load_tile_lowres(tile)
@@ -666,7 +673,8 @@ class MPTile:
                                           (srcx, srcy), (dstx, dsty), self.service))
         return ret
 
-    def area_to_image(self, lat, lon, width, height, ground_width, zoom=None, ordered=True):
+    def area_to_image(self, lat, lon, width, height, ground_width, zoom=None,
+                      ordered=True, priority=0.0):
         '''return an RGB image for an area of land, with ground_width
         in meters, and width/height in pixels.
 
@@ -693,14 +701,21 @@ class MPTile:
                 tx = (tile_min.x + ix) % world_tiles
                 tiles.append((ix, iy, TileInfo((tx, ty), zoom, self.service)))
 
-        # request the tiles nearest the middle last so they get the most
-        # recent download request and are fetched first
+        # fetch the tiles nearest the middle first. The distance is folded into
+        # the fraction below the caller's priority, so a caller compositing
+        # several images still gets all of a nearer one before a further one
+        tile_priority = {}
         if ordered:
             (midlat, midlon) = self.coord_from_area(width/2, height/2, lat, lon, width, ground_width)
-            tiles.sort(key=lambda t: t[2].distance(midlat, midlon), reverse=True)
+            distances = [t[2].distance(midlat, midlon) for t in tiles]
+            furthest = max(distances) if distances else 0.0
+            scale = 1.0 / (furthest * 1.0001) if furthest > 0 else 0.0
+            for ((_, _, tinfo), distance) in zip(tiles, distances):
+                tile_priority[tinfo.key()] = priority + distance * scale
 
         for (ix, iy, tinfo) in tiles:
-            tile_img = self.load_tile(tinfo)
+            tile_img = self.load_tile(tinfo,
+                                      tile_priority.get(tinfo.key(), priority))
             if tile_img is None:
                 continue
             if tile_img.shape[0] != TILES_HEIGHT or tile_img.shape[1] != TILES_WIDTH:
