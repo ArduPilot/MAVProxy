@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 '''mode command handling'''
 
+import collections
+import math
+
 from pymavlink import mavutil
 
 from MAVProxy.modules.lib import mp_module
@@ -10,6 +13,52 @@ from MAVProxy.modules.lib import mp_util
 AP_FLAKE8_CLEAN
 '''
 
+# names for MAV_CMD_DO_ORBIT param3, ORBIT_YAW_BEHAVIOUR values; NaN
+# leaves the choice to the vehicle
+orbit_yaw_behaviours = {
+    "Default": float('NaN'),
+    "FaceCentre": mavutil.mavlink.ORBIT_YAW_BEHAVIOUR_HOLD_FRONT_TO_CIRCLE_CENTER,
+    "InitialHeading": mavutil.mavlink.ORBIT_YAW_BEHAVIOUR_HOLD_INITIAL_HEADING,
+    "Uncontrolled": mavutil.mavlink.ORBIT_YAW_BEHAVIOUR_UNCONTROLLED,
+    "Tangent": mavutil.mavlink.ORBIT_YAW_BEHAVIOUR_HOLD_FRONT_TANGENT_TO_CIRCLE,
+    "RCControlled": mavutil.mavlink.ORBIT_YAW_BEHAVIOUR_RC_CONTROLLED,
+    "Unchanged": mavutil.mavlink.ORBIT_YAW_BEHAVIOUR_UNCHANGED,
+}
+
+orbit_frames = ['AboveHome', 'AGL', 'AMSL']
+
+# single source of truth for the "orbit" command arguments: drives
+# command-line parsing, command-line help, and the map "Orbit Here" popup
+# dialog.  See MPModule.parse_key_value_spec / format_key_value_help and
+# MPMenuCallMultiTextDropdownDialog.from_arg_spec for the facets consumed.
+# Keys without a 'label' (loc/lat/lng) are command-line only: the popup
+# takes its centre from the map click.
+orbit_arg_spec = collections.OrderedDict([
+    ('radius', dict(type=float, required=True,
+                    help='metres, positive for clockwise, negative for counter-clockwise',
+                    label='Radius (m, -ve for CCW)', default=50)),
+    ('alt', dict(type=float, synonyms=['altitude'],
+                 help='orbit altitude',
+                 label='Altitude', default=lambda ctx: ctx['guidedalt'])),
+    ('velocity', dict(type=str,
+                      help="tangential velocity in m/s, 'default' for the vehicle default",
+                      label='Velocity (m/s)', default='Default')),
+    ('orbits', dict(type=float,
+                    help='number of circuits to fly, 0 to orbit forever',
+                    label='Orbits (0 for forever)', default=0)),
+    ('yaw', dict(type=str, options=list(orbit_yaw_behaviours.keys()),
+                 help='one of %s or an ORBIT_YAW_BEHAVIOUR enumeration value' %
+                      '|'.join(orbit_yaw_behaviours.keys()),
+                 label='Yaw Behaviour', default='Default')),
+    ('frame', dict(type=str, options=orbit_frames,
+                   help='altitude frame',
+                   label='Frame', default=lambda ctx: ctx['flytoframe'])),
+    ('loc', dict(type=str,
+                 help='orbit centre as LAT,LNG or LAT,LNG,ALT; defaults to the map click position')),
+    ('lat', dict(type=float, synonyms=['latitude'], help='orbit centre latitude')),
+    ('lng', dict(type=float, synonyms=['longitude', 'lon'], help='orbit centre longitude')),
+])
+
 
 class ModeModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -18,6 +67,7 @@ class ModeModule(mp_module.MPModule):
             '(MODE)'
         ])
         self.add_command('guided', self.cmd_guided, "fly to a clicked location on map")
+        self.add_command('orbit', self.cmd_orbit, "orbit around a clicked location on map")
         self.add_command('confirm', self.cmd_confirm, "confirm a command")
         self.add_completion_function('(MODE)', self.complete_available_modes)
 
@@ -135,6 +185,93 @@ class ModeModule(mp_module.MPModule):
             frame,
             mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
             2, 0, 0, 0, 0, 0,
+            int(latlon[0]*1.0e7),
+            int(latlon[1]*1.0e7),
+            altitude
+        )
+
+    def cmd_orbit_usage(self):
+        '''print usage for the orbit command'''
+        print("Usage: orbit radius=RADIUS [alt=ALTITUDE] [velocity=VELOCITY] "
+              "[orbits=ORBITS] [yaw=YAW] [frame=%s]" % '|'.join(orbit_frames))
+        print("            [loc=LAT,LNG | lat=LAT lng=LNG]")
+        for line in self.format_key_value_help(orbit_arg_spec):
+            print(line)
+
+    def cmd_orbit(self, args):
+        '''send MAV_CMD_DO_ORBIT to orbit around the clicked location'''
+        values = {}
+        if not self.parse_key_value_spec(args, orbit_arg_spec, values):
+            self.cmd_orbit_usage()
+            return
+
+        # work out the orbit centre: an explicit location if given, else the map click
+        if 'loc' in values:
+            if 'lat' in values or 'lng' in values:
+                print("specify either loc= or lat=/lng=, not both")
+                return
+            parts = values['loc'].split(',')
+            try:
+                if len(parts) not in (2, 3):
+                    raise ValueError
+                latlon = (float(parts[0]), float(parts[1]))
+                if len(parts) == 3 and 'alt' not in values:
+                    values['alt'] = float(parts[2])
+            except ValueError:
+                print("loc must be LAT,LNG or LAT,LNG,ALT")
+                return
+        elif 'lat' in values or 'lng' in values:
+            if 'lat' not in values or 'lng' not in values:
+                print("both lat and lng are required")
+                return
+            latlon = (values['lat'], values['lng'])
+        else:
+            latlon = self.mpstate.click_location
+            if latlon is None:
+                print("No map click position available")
+                return
+
+        if 'frame' in values:
+            if values['frame'] not in orbit_frames:
+                print("frame must be one of %s" % '|'.join(orbit_frames))
+                return
+            self.settings.flytoframe = values['frame']
+
+        radius = values['radius']
+        if 'alt' in values:
+            altitude = values['alt']
+        else:
+            altitude = self.mpstate.settings.guidedalt
+        altitude = self.height_convert_from_units(altitude)
+        velocity = float('NaN')  # vehicle default velocity
+        if 'velocity' in values and values['velocity'].lower() != 'default':
+            velocity = float(values['velocity'])
+        orbits = 0  # orbit forever
+        if 'orbits' in values:
+            orbits = values['orbits']
+        yaw_behaviour = float('NaN')  # vehicle default yaw behaviour
+        if 'yaw' in values:
+            behaviours_lower = {k.lower(): v for (k, v) in orbit_yaw_behaviours.items()}
+            if values['yaw'].lower() in behaviours_lower:
+                yaw_behaviour = behaviours_lower[values['yaw'].lower()]
+            else:
+                yaw_behaviour = float(values['yaw'])
+
+        frame = self.flyto_frame()
+
+        print("Orbit %s radius %.1fm alt %.1f frame %u" % (str(latlon), radius, altitude, frame))
+
+        self.master.mav.command_int_send(
+            self.settings.target_system,
+            self.settings.target_component,
+            frame,
+            mavutil.mavlink.MAV_CMD_DO_ORBIT,
+            0,  # current
+            0,  # autocontinue
+            radius,  # p1 - radius, +ve clockwise, -ve counter-clockwise
+            velocity,  # p2 - tangential velocity, NaN is use-default
+            yaw_behaviour,  # p3 - yaw behaviour, NaN is vehicle default
+            orbits * 2 * math.pi,  # p4 - angle to orbit in radians, 0 for forever
             int(latlon[0]*1.0e7),
             int(latlon[1]*1.0e7),
             altitude
