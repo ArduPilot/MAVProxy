@@ -67,7 +67,7 @@ class Map3DModule(mp_module.MPModule):
         self.last_attitude = (0.0, 0.0, 0.0)
         self.home_amsl = None
         self.home_position = None
-        self.vehicle_type = None
+        self.icon_type = None
         self.follow = True
         self.kml_change_state = None
         self.terrain_lock = threading.Lock()
@@ -151,9 +151,9 @@ class Map3DModule(mp_module.MPModule):
         if heartbeat is not None:
             name = mp_util.vehicle_type_name(heartbeat.type)
             if name is not None:
-                self.vehicle_type = name
-        if self.vehicle_type is not None:
-            self.map.set_vehicle_type(self.vehicle_type)
+                self.icon_type = name
+        if self.icon_type is not None:
+            self.map.set_vehicle_type(self.icon_type)
 
         attitude = messages.get('ATTITUDE')
         if attitude is not None:
@@ -300,12 +300,14 @@ class Map3DModule(mp_module.MPModule):
             items.append((lat, lon, z, frame, w.command, w.seq))
         self.map.set_mission(items)
 
-    def set_vehicle_type(self, vehicle_type):
-        '''vehicle type changed: the viewer picks its icon from it'''
-        if vehicle_type is None or vehicle_type == self.vehicle_type:
+    def set_icon_type(self, name):
+        '''vehicle type changed: the viewer picks its icon from it. Not named
+        vehicle_type: MPModule has a read-only property of that name, and it is
+        a coarser mapping than the icons need (no heli or boat of its own)'''
+        if name is None or name == self.icon_type:
             return
-        self.vehicle_type = vehicle_type
-        self.map.set_vehicle_type(vehicle_type)
+        self.icon_type = name
+        self.map.set_vehicle_type(name)
 
     def set_home_position(self, lat, lon):
         '''home moved: around-home fence circles are centred on it, and a
@@ -468,7 +470,7 @@ class Map3DModule(mp_module.MPModule):
             return
         mtype = m.get_type()
         if mtype in ('HEARTBEAT', 'HIGH_LATENCY2'):
-            self.set_vehicle_type(mp_util.vehicle_type_name(m.type))
+            self.set_icon_type(mp_util.vehicle_type_name(m.type))
         elif mtype == 'HOME_POSITION':
             self.home_amsl = m.altitude * 1.0e-3     # AMSL (mm -> m)
             self.map.set_home(self.home_amsl)
