@@ -319,7 +319,8 @@ class TerrainManager:
         self.jobs = queue.Queue()
         self.results = queue.Queue()
         self.tex_lock = threading.Lock()
-        self.prev_pending = 0
+        self.download_revision = mt.download_revision()
+        self.redrape_pending = False
         self.last_tc = None
         self.stop = False
         self.workers = [threading.Thread(target=self._worker, daemon=True)
@@ -440,13 +441,10 @@ class TerrainManager:
         anything changed (caller should render).'''
         self.last_tc = tc
         changed = False
-        # once imagery downloads settle, re-drape so placeholder tiles sharpen
-        pend = self.mt.tiles_pending()
-        if self.prev_pending > 0 and pend == 0:
-            for t in self.tiles.values():
-                t.tex_key = None
-            self.update(tc)
-        self.prev_pending = pend
+        revision = self.mt.download_revision()
+        if revision != self.download_revision:
+            self.download_revision = revision
+            self.redrape_pending = True
         want = self.desired_set(*self.focal_latlon(tc)) if tc is not None else None
         for _ in range(64):
             try:
@@ -475,6 +473,15 @@ class TerrainManager:
                 if tile is not None and tkey == tile.want_key:
                     tile.apply_texture(img, vw, vs, ve, vn, tex_w, tkey)
                     changed = True
+        # Do not let an old placeholder result restore tex_key after it is
+        # invalidated. Wait for every old texture job, then request fresh ones.
+        texture_inflight = any(jid[0] == "T" for jid in self.inflight)
+        if (self.redrape_pending and self.mt.tiles_pending() == 0 and
+                not texture_inflight and tc is not None):
+            self.redrape_pending = False
+            for tile in self.tiles.values():
+                tile.tex_key = None
+            self.update(tc)
         # after building new tiles, request their textures next update
         if changed and tc is not None:
             self.update(tc)
