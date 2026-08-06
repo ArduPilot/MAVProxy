@@ -37,6 +37,7 @@ class TrackerModule(mp_module.MPModule):
               ('debug', int, 0)
               ]
             )
+        self._manual_control = False
         self.add_command('tracker', self.cmd_tracker,
                          "antenna tracker control module",
                          ['<start|arm|disarm|level|mode|position|calpress|mode>',
@@ -97,6 +98,9 @@ class TrackerModule(mp_module.MPModule):
         for i in range(0, 4):
             if len(args) > i:
                 positions[i] = int(args[i]) # default values are 0
+        # manual control is released on pitch or yaw by setting them to 32767
+        # (we set the flag if either axis has not been released)
+        self._manual_control = (positions[0] != 32767 or positions[1] != 32767)
         connection.mav.manual_control_send(connection.target_system,
                                            positions[0], positions[1],
                                            positions[2], positions[3],
@@ -127,6 +131,8 @@ class TrackerModule(mp_module.MPModule):
         if mode not in mode_mapping:
             print('Unknown mode %s: ' % mode)
             return
+        if self._manual_control:
+            self.cmd_tracker_position(['32767', '32767'])
         connection.set_mode(mode_mapping[mode])
 
     def mavlink_packet(self, m):
