@@ -262,6 +262,7 @@ class MPTile:
         self._download_pending = {}
         self._download_active = set()
         self._download_running = 0
+        self._download_revision = 0
         self._download_lock = threading.Lock()
         self._loading = mp_icon('loading.jpg')
         self._unavailable = mp_icon('unavailable.jpg')
@@ -313,17 +314,32 @@ class MPTile:
         '''return number of tiles pending download'''
         return len(self._download_pending)
 
+    def download_revision(self):
+        '''return a counter that changes whenever a download finishes'''
+        with self._download_lock:
+            return self._download_revision
+
+    def _queue_download(self, key, tile_info, priority):
+        '''queue one download while holding _download_lock'''
+        pending = self._download_pending.get(key)
+        if pending is not None:
+            pending.refresh_time()
+            pending.priority = min(pending.priority, priority)
+        else:
+            tile_info.priority = priority
+            self._download_pending[key] = tile_info
+
     def queue_download(self, key, tile_info, priority=0.0):
         '''queue a tile for download. priority orders the queue, lowest first;
         a tile already queued keeps the most urgent priority it was asked with'''
         with self._download_lock:
-            pending = self._download_pending.get(key)
-            if pending is not None:
-                pending.refresh_time()
-                pending.priority = min(pending.priority, priority)
-            else:
-                tile_info.priority = priority
-                self._download_pending[key] = tile_info
+            self._queue_download(key, tile_info, priority)
+
+    def queue_downloads(self, requests):
+        '''atomically queue a list of (key, tile_info, priority) requests'''
+        with self._download_lock:
+            for key, tile_info, priority in requests:
+                self._queue_download(key, tile_info, priority)
 
     def _claim_download(self):
         '''claim the next tile to fetch, or None when there is nothing left.
@@ -354,6 +370,7 @@ class MPTile:
         with self._download_lock:
             self._download_active.discard(key)
             self._download_pending.pop(key, None)
+            self._download_revision += 1
 
     def downloader(self):
         '''a download thread: fetch tiles until there are none left to claim'''
@@ -366,6 +383,14 @@ class MPTile:
                     return
                 try:
                     self.download_tile(tile_info)
+                except Exception as e:
+                    # keep draining the queue. Deliberately not cached as
+                    # unavailable: an error out here is a dropped connection or
+                    # a read timeout rather than a verdict on the tile, so let
+                    # the next redraw ask for it again
+                    if self.debug:
+                        print("Failed %s: %s" %
+                              (tile_info.url(self.service), str(e)))
                 finally:
                     self._release_download(tile_info.key())
         finally:
@@ -510,7 +535,7 @@ class MPTile:
             return scaled
         return None
 
-    def load_tile(self, tile, priority=0.0):
+    def load_tile(self, tile, priority=0.0, download_queue=None):
         '''load a tile from cache or tile server. priority orders any download
         this triggers, lowest first'''
 
@@ -533,8 +558,11 @@ class MPTile:
             # cv2.rectangle(ret, (0,0), (TILES_WIDTH-1,TILES_WIDTH-1), (255,0,0), 1)
             # if it is an old tile, then try to refresh
             if os.path.getmtime(path) + self.refresh_age < time.time():
-                self.queue_download(key, tile, priority)
-                self.start_download_thread()
+                if download_queue is None:
+                    self.queue_download(key, tile, priority)
+                    self.start_download_thread()
+                else:
+                    download_queue.append((key, tile, priority))
 
             # add it to the tile cache
             self._tile_cache[key] = ret
@@ -548,8 +576,11 @@ class MPTile:
                 img = self._unavailable
             return img
 
-        self.queue_download(key, tile, priority)
-        self.start_download_thread()
+        if download_queue is None:
+            self.queue_download(key, tile, priority)
+            self.start_download_thread()
+        else:
+            download_queue.append((key, tile, priority))
 
         img = self.load_tile_lowres(tile)
         if img is None:
@@ -713,9 +744,20 @@ class MPTile:
             for ((_, _, tinfo), distance) in zip(tiles, distances):
                 tile_priority[tinfo.key()] = priority + distance * scale
 
+        # Load and queue in mosaic order, then start the workers once every
+        # request and its priority are visible to the claimers.
+        loaded_tiles = []
+        download_queue = []
         for (ix, iy, tinfo) in tiles:
             tile_img = self.load_tile(tinfo,
-                                      tile_priority.get(tinfo.key(), priority))
+                                      tile_priority.get(tinfo.key(), priority),
+                                      download_queue=download_queue)
+            loaded_tiles.append((ix, iy, tile_img))
+        self.queue_downloads(download_queue)
+        if self.tiles_pending() > 0:
+            self.start_download_thread()
+
+        for (ix, iy, tile_img) in loaded_tiles:
             if tile_img is None:
                 continue
             if tile_img.shape[0] != TILES_HEIGHT or tile_img.shape[1] != TILES_WIDTH:
