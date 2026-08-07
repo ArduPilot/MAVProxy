@@ -332,6 +332,9 @@ class FTPModule(mp_module.MPModule):
     def abort_listing(self):
         '''stop tracking any listing in progress, so neither a late reply nor
         the idle-task timeout fires into whatever comes next'''
+        if self.list_sent is not None:
+            # say so: a listing which just stops looks like it finished
+            print("Listing cancelled")
         self.list_sent = None
 
     def list_without_time(self):
