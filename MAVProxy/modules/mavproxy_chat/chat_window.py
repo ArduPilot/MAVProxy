@@ -90,12 +90,13 @@ class chat_window():
         # show frame
         self.frame.Show()
 
+    def start(self):
         # chat window loop (this does not return until the window is closed)
         self.app.MainLoop()
 
     # show the chat window
     def show(self):
-        wx.CallAfter(self.frame.Show())
+        wx.CallAfter(self.frame.Show)
 
     # hide the chat window
     def hide(self):
