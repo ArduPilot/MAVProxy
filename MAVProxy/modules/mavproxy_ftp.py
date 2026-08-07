@@ -142,6 +142,10 @@ class FTPModule(mp_module.MPModule):
         self.last_burst_read = None
         self.op_start = None
         self.dir_offset = 0
+        # the listing in progress: the directory being listed, and when the
+        # outstanding request went out (None when no listing is running)
+        self.list_dname = None
+        self.list_sent = None
         self.last_op_time = time.time()
         self.rtt = 0.5
         self.reached_eof = False
@@ -239,6 +243,7 @@ class FTPModule(mp_module.MPModule):
         for the status line: "cancelled" when the user or a new command ended
         it, "failed" for an error'''
         self.transfer_active = False
+        self.abort_listing()
         if self.crccmp_dest is not None:
             print("crccmp: aborted")
             self.crccmp_reset()
@@ -286,11 +291,29 @@ class FTPModule(mp_module.MPModule):
         enc_dname = bytearray(dname, 'ascii')
         self.total_size = 0
         self.dir_offset = 0
-        op = FTP_OP(self.seq, self.session, OP_ListDirectory, len(enc_dname), 0, 0, self.dir_offset, enc_dname)
+        self.list_dname = enc_dname
+        self.send_list_request()
+
+    def send_list_request(self):
+        '''request the next page of the listing in progress.  the listing is
+        built from its own state rather than from the last op sent, which may
+        by now belong to some other transfer'''
+        self.list_sent = time.time()
+        op = FTP_OP(self.seq, self.session, OP_ListDirectory, len(self.list_dname), 0, 0,
+                    self.dir_offset, self.list_dname)
         self.send(op)
+
+    def abort_listing(self):
+        '''stop tracking any listing in progress, so a late reply does not
+        fire into whatever comes next'''
+        self.list_sent = None
 
     def handle_list_reply(self, op, m):
         '''handle OP_ListDirectory reply'''
+        if self.list_sent is None:
+            # a late reply to a listing which has since been abandoned
+            return
+        self.list_sent = None
         if op.opcode == OP_Ack:
             dentries = sorted(op.payload.split(b'\x00'))
             #print(dentries)
@@ -315,9 +338,7 @@ class FTPModule(mp_module.MPModule):
                 else:
                     print(d)
             # ask for more
-            more = self.last_op
-            more.offset = self.dir_offset
-            self.send(more)
+            self.send_list_request()
         elif op.opcode == OP_Nack and len(op.payload) == 1 and op.payload[0] == ERR_EndOfFile:
             print("Total size %.2f kByte" % (self.total_size / 1024.0))
             self.total_size = 0
@@ -559,6 +580,9 @@ class FTPModule(mp_module.MPModule):
                 # skipping it leaves a stale percentage on the console
                 progress_callback(None)
             return
+        # unlike get, put does not terminate the session first, so drop any
+        # listing here rather than let it interleave with the upload
+        self.abort_listing()
         fname = args[0]
         self.fh = fh
         if self.fh is None:
@@ -819,6 +843,8 @@ class FTPModule(mp_module.MPModule):
         if self.transfer_active:
             print("FTP transfer already in progress")
             return
+        # as for put, this takes over the session without terminating it
+        self.abort_listing()
         (pattern, dest) = (args[0], args[1])
         if dest == '':
             print("crccmp: empty DESTDIR, use / for the vehicle's root")
