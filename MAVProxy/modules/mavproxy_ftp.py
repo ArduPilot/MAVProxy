@@ -331,8 +331,18 @@ class FTPModule(mp_module.MPModule):
                 if d[0] == 'D':
                     print(" D %s" % d[1:])
                 elif d[0] == 'F':
-                    (name, size) = d[1:].split('\t')
-                    size = int(size)
+                    # "F<name>\t<size>".  the size is the last field, so
+                    # count from the end - a name may itself contain a tab
+                    fields = d[1:].split('\t')
+                    if len(fields) < 2:
+                        print(d)
+                        continue
+                    name = '\t'.join(fields[:-1])
+                    try:
+                        size = int(fields[-1])
+                    except ValueError:
+                        print(d)
+                        continue
                     self.total_size += size
                     print("   %s\t%u" % (name, size))
                 else:
