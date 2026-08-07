@@ -25,6 +25,7 @@ import time
 import traceback
 
 from importlib import reload
+from queue import Empty
 
 from pymavlink import mavutil
 
@@ -67,6 +68,12 @@ if __name__ == '__main__':
 # The MAVLink version being used (None, "1.0", "2.0")
 mavversion = None
 mpstate = None
+
+
+class ShutdownRequested(Exception):
+    '''raised in the main thread by the fatal-signal handler to break it
+    out of the blocking read for user input'''
+    pass
 
 
 class MPStatus(object):
@@ -961,6 +968,48 @@ def log_writer():
             mpstate.logfile.flush()
             mpstate.logfile_raw.flush()
 
+    drain_log_queues()
+
+
+def drain_log_queues(timeout=2):
+    '''write out whatever is left in the log queues as we shut down.
+
+    These are multiprocessing queues, so each has a feeder thread which
+    will still be blocked writing into a full pipe if we stop reading
+    with data still queued.  multiprocessing's atexit handler joins
+    those feeder threads, so leaving one blocked hangs MAVProxy forever
+    at exit - after every module has already been unloaded.
+    '''
+    tend = time.time() + timeout
+    # nothing is putting to the queues any more, but a feeder thread can
+    # be part-way through pushing what it has into the pipe, so a single
+    # empty queue does not mean we are done; wait for two idle passes:
+    idle_passes = 0
+    while idle_passes < 2 and time.time() < tend:
+        wrote = False
+        for (queue, logfile) in [(mpstate.logqueue_raw, mpstate.logfile_raw),
+                                 (mpstate.logqueue, mpstate.logfile)]:
+            try:
+                logfile.write(bytearray(queue.get(block=True, timeout=0.01)))
+                wrote = True
+            except Empty:
+                pass
+        if wrote:
+            idle_passes = 0
+        else:
+            idle_passes += 1
+    mpstate.logfile.flush()
+    mpstate.logfile_raw.flush()
+
+    # a feeder thread can still be part-way through writing something
+    # the drain above did not see, so make sure exiting can never block
+    # on one:
+    for queue in [mpstate.logqueue, mpstate.logqueue_raw]:
+        try:
+            queue.cancel_join_thread()
+        except Exception:
+            pass
+
 
 # If state_basedir is NOT set then paths for logs and aircraft
 # directories are relative to mavproxy's cwd
@@ -1461,6 +1510,16 @@ if __name__ == '__main__':
             sys.exit(0)
         else:
             mpstate.status.stop_event.set()
+            if quit_handler.in_input_loop:
+                # the main thread is blocked in readline waiting for a
+                # command.  That read is simply restarted when we return
+                # from here (PEP 475), so the flag we just set would go
+                # unnoticed until the user happened to press enter -
+                # meaning we would never act on the signal at all.
+                # Raising instead aborts the read:
+                raise ShutdownRequested()
+
+    quit_handler.in_input_loop = False
 
     # Listen for kill signals to cleanly shutdown modules
     fatalsignals = [signal.SIGTERM]
@@ -1609,7 +1668,16 @@ if __name__ == '__main__':
             if opts.daemon or opts.non_interactive:
                 time.sleep(0.1)
             else:
-                input_loop()
+                quit_handler.in_input_loop = True
+                try:
+                    input_loop()
+                finally:
+                    quit_handler.in_input_loop = False
+        except ShutdownRequested:
+            # a fatal signal arrived while we were waiting for input;
+            # stop_event is already set, so fall through to the cleanup
+            # below
+            pass
         except KeyboardInterrupt:
             if mpstate.settings.requireexit:
                 print("Interrupt caught.  Use 'exit' to quit MAVProxy.")
