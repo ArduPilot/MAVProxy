@@ -158,23 +158,29 @@ class ParamState:
 
             return True
 
+        def print_failed_to_set(self, reason):
+            print(f"Failed to set {self.name} to {self.value}: {reason}")
+
         def print_expired_message(self):
             reason = ""
             if self.last_value_received is None:
-                reason = " (no PARAM_VALUE received)"
+                reason = "(no PARAM_VALUE received)"
             else:
-                reason = f" (invalid returned value {self.last_value_received})"
-            print(f"Failed to set {self.name} to {self.value}{reason}")
+                reason = f"(invalid returned value {self.last_value_received})"
+            self.print_failed_to_set(reason)
 
-    def run_parameter_set_queue(self):
-        # firstly move anything from the input queue into our
-        # collection of things to send:
+    def move_input_queue_to_collections_of_things_to_send(self):
         try:
             while True:
                 new_parameter_to_set = self.parameters_to_set_input_queue.get(block=False)
                 self.parameters_to_set[new_parameter_to_set.name] = new_parameter_to_set
         except Empty:
             pass
+
+    def run_parameter_set_queue(self):
+        # firstly move anything from the input queue into our
+        # collection of things to send:
+        self.move_input_queue_to_collections_of_things_to_send()
 
         # now send any parameter-sets which are due to be sent out,
         # either because they are new or because we need to retry:
@@ -242,6 +248,47 @@ class ParamState:
         self.param_types[m.param_id.upper()] = m.param_type
         return value
 
+    def handle_param_error(self, m):
+        # ignore any param_error not targeted at us:
+        if m.target_system != self.mpstate.settings.source_system:
+            return
+        if m.target_component != self.mpstate.settings.source_component:
+            return
+
+        try:
+            error_desc = mavutil.mavlink.enums['MAV_PARAM_ERROR'][m.error].name
+        except KeyError:
+            error_desc = m.error
+
+        # check for failed fetches
+        if self.fetch_set is not None:
+            if m.param_index in self.fetch_set:
+                self.fetch_set.discard(m.param_index)
+                self.mpstate.console.writeln(f"Parameter[{m.param_index}] fetch failed: {error_desc}")
+                return
+
+        if self.fetch_one.get(m.param_id, 0) > 0:
+            self.fetch_one[m.param_id] -= 1  # set-to-zero?
+            self.mpstate.console.writeln(f"Parameter[{m.param_id}] fetch failed: {error_desc}")
+            return
+
+        # check for failed sets
+        if m.param_id != "":
+            # firstly move anything from the input queue into our
+            # collection of things to send:
+            self.move_input_queue_to_collections_of_things_to_send()
+
+            for (key, parameter_to_set) in self.parameters_to_set.items():
+                if parameter_to_set.name != m.param_id:
+                    continue
+                try:
+                    error_desc = mavutil.mavlink.enums['MAV_PARAM_ERROR'][m.error].name
+                except KeyError:
+                    error_desc = m.error
+                parameter_to_set.print_failed_to_set(error_desc)
+                del self.parameters_to_set[key]
+                break
+
     def handle_mavlink_packet(self, master, m):
         '''handle an incoming mavlink packet'''
         if m.get_type() == 'PARAM_VALUE':
@@ -288,6 +335,9 @@ class ParamState:
             if m.get_srcComponent() == 1:
                 # remember autopilot types so we can handle PX4 parameters
                 self.autopilot_type_by_sysid[m.get_srcSystem()] = m.autopilot
+
+        elif m.get_type() == 'PARAM_ERROR':
+            self.handle_param_error(m)
 
     def fetch_check(self, master, force=False):
         '''check for missing parameters periodically'''
