@@ -36,6 +36,9 @@ OP_TruncateFile = 12
 OP_Rename = 13
 OP_CalcFileCRC32 = 14
 OP_BurstReadFile = 15
+# like OP_ListDirectory, but each file entry also carries its last
+# modification time. servers which don't implement it NAK the request
+OP_ListDirectoryWithTime = 16
 OP_Ack = 128
 OP_Nack = 129
 
@@ -118,7 +121,10 @@ class FTPModule(mp_module.MPModule):
              ('write_size', int, 80),
              ('write_qsize', int, 5),
              ('retry_time', float, 0.5),
-             ('crccmp_timeout', float, 120.0)])
+             ('crccmp_timeout', float, 120.0),
+             ('list_time', int, 1),
+             ('list_time_timeout', float, 3.0),
+             ('list_retries', int, 3)])
         self.add_completion_function('(FTPSETTING)',
                                      self.ftp_settings.completion)
         self.seq = 0
@@ -142,10 +148,16 @@ class FTPModule(mp_module.MPModule):
         self.last_burst_read = None
         self.op_start = None
         self.dir_offset = 0
-        # the listing in progress: the directory being listed, and when the
+        # state for the listing in progress: the directory being listed,
+        # whether we are asking for modification times with it, and when the
         # outstanding request went out (None when no listing is running)
         self.list_dname = None
+        self.list_with_time = False
         self.list_sent = None
+        self.list_retries = 0
+        # per-target record of whether the newer listing opcode is supported,
+        # so we probe a target which NAKs it once rather than once per listing
+        self.list_time_supported = {}
         self.last_op_time = time.time()
         self.rtt = 0.5
         self.reached_eof = False
@@ -292,28 +304,73 @@ class FTPModule(mp_module.MPModule):
         self.total_size = 0
         self.dir_offset = 0
         self.list_dname = enc_dname
+        self.list_retries = 0
+        # ask for modification times, unless the user turned that off or this
+        # target has already told us it doesn't know the opcode
+        self.list_with_time = (self.ftp_settings.list_time != 0 and
+                               self.list_time_supported.get(self.list_target_key()) is not False)
         self.send_list_request()
+
+    def list_target_key(self):
+        '''identify the target we are listing, so what we learn about it does
+        not get applied to a different vehicle'''
+        return (self.target_system, self.target_component)
 
     def send_list_request(self):
         '''request the next page of the listing in progress.  the listing is
         built from its own state rather than from the last op sent, which may
         by now belong to some other transfer'''
+        if self.list_with_time:
+            opcode = OP_ListDirectoryWithTime
+        else:
+            opcode = OP_ListDirectory
         self.list_sent = time.time()
-        op = FTP_OP(self.seq, self.session, OP_ListDirectory, len(self.list_dname), 0, 0,
+        op = FTP_OP(self.seq, self.session, opcode, len(self.list_dname), 0, 0,
                     self.dir_offset, self.list_dname)
         self.send(op)
 
     def abort_listing(self):
-        '''stop tracking any listing in progress, so a late reply does not
-        fire into whatever comes next'''
+        '''stop tracking any listing in progress, so neither a late reply nor
+        the idle-task timeout fires into whatever comes next'''
         self.list_sent = None
 
+    def list_without_time(self):
+        '''this server doesn't do OP_ListDirectoryWithTime, list it the old way'''
+        if self.ftp_settings.debug > 0:
+            print("FTP: no directory listing with time, retrying without")
+        self.list_with_time = False
+        self.list_retries = 0
+        self.dir_offset = 0
+        self.total_size = 0
+        self.send_list_request()
+
+    def list_mtime_str(self, mtime):
+        '''format an entry modification time, which is 0 when the server
+        doesn't know it. the wire value is seconds since the UNIX epoch in
+        UTC, shown here in local time as that is what the user is comparing
+        against their own files'''
+        if mtime == 0:
+            return "-"
+        try:
+            return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(mtime))
+        except (ValueError, OSError):
+            # a bogus timestamp mustn't take out the rest of the listing
+            return str(mtime)
+
     def handle_list_reply(self, op, m):
-        '''handle OP_ListDirectory reply'''
+        '''handle OP_ListDirectory and OP_ListDirectoryWithTime reply'''
         if self.list_sent is None:
             # a late reply to a listing which has since been abandoned
             return
+        with_time = op.req_opcode == OP_ListDirectoryWithTime
+        if with_time != self.list_with_time:
+            # a late reply to a request we have already given up on
+            return
         self.list_sent = None
+        self.list_retries = 0
+        if with_time and op.opcode == OP_Ack:
+            # the target does know the opcode, so don't probe again
+            self.list_time_supported[self.list_target_key()] = True
         if op.opcode == OP_Ack:
             dentries = sorted(op.payload.split(b'\x00'))
             #print(dentries)
@@ -331,20 +388,30 @@ class FTPModule(mp_module.MPModule):
                 if d[0] == 'D':
                     print(" D %s" % d[1:])
                 elif d[0] == 'F':
-                    # "F<name>\t<size>".  the size is the last field, so
-                    # count from the end - a name may itself contain a tab
+                    # "F<name>\t<size>", with "\t<mtime>" appended when the
+                    # listing was asked for with times.  the size and the time
+                    # are the last fields, so count from the end - a name may
+                    # itself contain a tab
                     fields = d[1:].split('\t')
-                    if len(fields) < 2:
+                    trailing = 2 if with_time else 1
+                    if len(fields) < trailing + 1:
                         print(d)
                         continue
-                    name = '\t'.join(fields[:-1])
+                    name = '\t'.join(fields[:-trailing])
                     try:
-                        size = int(fields[-1])
+                        size = int(fields[-trailing])
                     except ValueError:
                         print(d)
                         continue
                     self.total_size += size
-                    print("   %s\t%u" % (name, size))
+                    if with_time:
+                        try:
+                            mtime = int(fields[-1])
+                        except ValueError:
+                            mtime = 0
+                        print("   %s\t%u\t%s" % (name, size, self.list_mtime_str(mtime)))
+                    else:
+                        print("   %s\t%u" % (name, size))
                 else:
                     print(d)
             # ask for more
@@ -352,6 +419,14 @@ class FTPModule(mp_module.MPModule):
         elif op.opcode == OP_Nack and len(op.payload) == 1 and op.payload[0] == ERR_EndOfFile:
             print("Total size %.2f kByte" % (self.total_size / 1024.0))
             self.total_size = 0
+        elif (with_time and self.dir_offset == 0 and
+              op.opcode == OP_Nack and len(op.payload) >= 1 and
+              op.payload[0] in [ERR_Fail, ERR_UnknownCommand]):
+            # an older server rejecting the opcode: ArduPilot answers with
+            # Fail, PX4 with UnknownCommand.  that is a definite answer, so
+            # remember it and stop asking this target
+            self.list_time_supported[self.list_target_key()] = False
+            self.list_without_time()
         else:
             print('LIST: %s' % op)
 
@@ -1077,7 +1152,7 @@ class FTPModule(mp_module.MPModule):
 
             if op.req_opcode == self.last_op.opcode and op.seq == (self.last_op.seq + 1) % 256:
                 self.rtt = max(min(self.rtt, dt), 0.01)
-            if op.req_opcode == OP_ListDirectory:
+            if op.req_opcode in [OP_ListDirectory, OP_ListDirectoryWithTime]:
                 self.handle_list_reply(op, m)
             elif op.req_opcode == OP_OpenFileRO:
                 self.handle_open_RO_reply(op, m)
@@ -1150,6 +1225,25 @@ class FTPModule(mp_module.MPModule):
 
         # ahead of the early returns below, which skip idle transfers
         self.update_status()
+
+        # a listing has no other retransmit path, so drive it from here: an
+        # unanswered request is either a lost packet or a server which ignores
+        # the newer opcode rather than NAKing it
+        if self.list_sent is not None and \
+           now - self.list_sent > self.ftp_settings.list_time_timeout:
+            if self.list_retries < self.ftp_settings.list_retries:
+                self.list_retries += 1
+                if self.ftp_settings.debug > 0:
+                    print("FTP: retry listing at offset %u" % self.dir_offset)
+                self.send_list_request()
+            elif self.list_with_time and self.dir_offset == 0:
+                # nothing came back at all, so the opcode is the likely
+                # culprit.  a slow link is not, as we have now waited
+                # list_retries times over for it
+                self.list_without_time()
+            else:
+                print("Listing failed: no reply at offset %u" % self.dir_offset)
+                self.abort_listing()
 
         if self.crccmp_sent is not None and \
            now - self.crccmp_sent > self.ftp_settings.crccmp_timeout:
