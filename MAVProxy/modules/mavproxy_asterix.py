@@ -4,7 +4,7 @@ support for asterix SDPS data, setup for OBC 2018
 This listens for SDPS on UDP and translates to ADSB_VEHICLE messages
 '''
 
-import pickle
+import json
 from math import *
 
 from MAVProxy.modules.lib import mp_module
@@ -202,12 +202,14 @@ class AsterixModule(mp_module.MPModule):
             return
         try:
             if pkt.startswith(b'PICKLED:'):
-                pkt = pkt[8:]
-                # pickled packet
-                try:
-                    amsg = [pickle.loads(pkt)]
-                except pickle.UnpicklingError:
-                    amsg = asterix.parse(pkt)
+                print("bad packet")
+                return
+            if pkt.startswith(b'JSON:'):
+                pkt = pkt[5:]
+                decoded = json.loads(pkt.decode('utf-8'))
+                if not isinstance(decoded, dict):
+                    raise ValueError("JSON packet root is not a dictionary")
+                amsg = [decoded]
             else:
                 amsg = asterix.parse(pkt)
             self.pkt_count += 1
@@ -359,5 +361,4 @@ if __name__ == '__main__':
         sock.send(pkt)
         #amsg = asterix.parse(pkt)
         #print(amsg)
-
 
