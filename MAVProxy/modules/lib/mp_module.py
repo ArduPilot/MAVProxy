@@ -115,6 +115,10 @@ class MPModule(object):
         return self.mpstate.sitl_output
 
     @property
+    def rc_sololink_output(self):
+        return self.mpstate.rc_sololink_output
+
+    @property
     def target_system(self):
         return self.settings.target_system
 
