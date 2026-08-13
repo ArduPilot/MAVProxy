@@ -31,6 +31,7 @@ class KMLGenModule(mp_module.MPModule):
         super(KMLGenModule, self).__init__(mpstate, "kmlgen", "KML mission viewer")
 
         self.kml_settings = mp_settings.MPSettings([
+            ('bind_address', str, '127.0.0.1'),
             ('port', int, 8007),
             ('refresh_interval', int, 2),
             ('mission_filename', str, 'mission.kml'),
@@ -185,7 +186,11 @@ class KMLGenModule(mp_module.MPModule):
             self.say(f"Failed to write {path}: {e}")
 
     def write_wrapper_kml(self):
-        url = f"http://localhost:{self.kml_settings.port}/{self.kml_settings.mission_filename}"
+        host = self.kml_settings.bind_address
+        # 0.0.0.0 is a bind wildcard, not a usable destination address.
+        if host in ('127.0.0.1', '0.0.0.0'):
+            host = 'localhost'
+        url = f"http://{host}:{self.kml_settings.port}/{self.kml_settings.mission_filename}"
         content = f'''<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <NetworkLink>
@@ -201,6 +206,17 @@ class KMLGenModule(mp_module.MPModule):
         self.write_file(self.wrapper_path, content)
 
     class QuietHandler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args, allowed_path=None, **kwargs):
+            self.allowed_path = os.path.realpath(allowed_path)
+            super().__init__(*args, **kwargs)
+
+        def send_head(self):
+            requested_path = os.path.realpath(self.translate_path(self.path))
+            if requested_path != self.allowed_path:
+                self.send_error(http.HTTPStatus.NOT_FOUND)
+                return None
+            return super().send_head()
+
         def log_message(self, format, *args):
             pass  # suppress all logging
 
@@ -210,8 +226,10 @@ class KMLGenModule(mp_module.MPModule):
     def start_http_server(self):
         def run_server():
             try:
-                handler = functools.partial(self.QuietHandler, directory=self.logdir)
-                with self.ReusableTCPServer(("", self.kml_settings.port), handler) as httpd:
+                handler = functools.partial(self.QuietHandler, directory=self.logdir,
+                                            allowed_path=self.kml_path)
+                server_address = (self.kml_settings.bind_address, self.kml_settings.port)
+                with self.ReusableTCPServer(server_address, handler) as httpd:
                     httpd.serve_forever()
             except Exception as e:
                 self.say(f"HTTP server failed: {e}")
