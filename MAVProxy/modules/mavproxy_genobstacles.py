@@ -2,7 +2,7 @@
 generate dynamic obstacles for OBC 2018
 '''
 
-import time, pickle
+import time, json
 from math import *
 
 from MAVProxy.modules.lib import mp_module
@@ -196,8 +196,8 @@ class DNFZ:
     def __str__(self):
         return str(self.pkt)
 
-    def pickled(self):
-        return b'PICKLED:' + pickle.dumps(self.pkt)
+    def json_packet(self):
+        return b'JSON:' + json.dumps(self.pkt).encode('utf-8')
 
 class Aircraft(DNFZ):
     '''an aircraft that flies in a circuit'''
@@ -459,7 +459,7 @@ class GenobstaclesModule(mp_module.MPModule):
         for a in self.aircraft:
             if not gen_settings.stop:
                 a.update(1.0)
-                self.pkt_queue.append(a.pickled())
+                self.pkt_queue.append(a.json_packet())
                 while len(self.pkt_queue) > len(self.aircraft)*2:
                     self.pkt_queue.pop(0)
                     
