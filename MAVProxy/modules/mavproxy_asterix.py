@@ -60,7 +60,8 @@ class AsterixModule(mp_module.MPModule):
                          ["<start|stop>","set (ASTERIXSETTING)"])
 
         # filter_dist is distance in metres
-        self.asterix_settings = mp_settings.MPSettings([("port", int, 45454),
+        self.asterix_settings = mp_settings.MPSettings([('bind_address', str, '127.0.0.1'),
+                                                        ("port", int, 45454),
                                                         ('debug', int, 0),
                                                         ('filter_dist_xy', int, 1000),
                                                         ('filter_dist_z', int, 250),
@@ -122,7 +123,8 @@ class AsterixModule(mp_module.MPModule):
             self.sock.close()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind(('', self.asterix_settings.port))
+        self.sock.bind((self.asterix_settings.bind_address,
+                        self.asterix_settings.port))
         self.sock.setblocking(False)
         print("Started on port %u" % self.asterix_settings.port)
 
