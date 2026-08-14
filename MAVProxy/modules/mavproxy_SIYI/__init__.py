@@ -438,7 +438,64 @@ class SIYIModule(mp_module.MPModule):
     
     def cmd_siyi(self, args):
         '''siyi command parser'''
-        usage = "usage: siyi <set|rates>"
+        usage = '''usage:
+  siyi set [NAME [VALUE]]         : show/set SIYI module settings
+  siyi connect                    : (re)connect to the camera
+
+gimbal control:
+  siyi rates PAN_RATE PITCH_RATE  : set gimbal rates in deg/s
+  siyi yaw ANGLE                  : slew yaw by ANGLE degrees
+  siyi pitch ANGLE                : slew pitch by ANGLE degrees
+  siyi angle YAW PITCH            : point gimbal at an absolute angle
+  siyi center                     : centre the gimbal, clearing any target
+  siyi lock                       : lock (earth-frame) gimbal mode
+  siyi follow                     : follow (vehicle-frame) gimbal mode
+  siyi fpv                        : FPV gimbal mode
+  siyi resetattitude              : reset the gimbal attitude
+  siyi settarget                  : track the last map click position
+  siyi notarget                   : stop tracking a target
+
+camera control:
+  siyi zoom ZOOM                  : set absolute zoom level
+  siyi autofocus                  : trigger an autofocus
+  siyi photo                      : take a photo
+  siyi recording                  : toggle video recording
+  siyi imode <1-8|wide|zoom|split>: set image (lens) mode
+  siyi getconfig                  : request the gimbal configuration
+  siyi settime                    : set the camera clock from this system
+
+viewers:
+  siyi thermal                    : open the thermal view
+  siyi rawthermal                 : open the raw thermal view
+  siyi rgbview                    : open the RGB view
+
+thermal camera:
+  siyi palette <NAME|NUM>         : set thermal palette (WhiteHot, Sepia,
+                                    Ironbow, Rainbow, Night, Aurora, RedHot,
+                                    Jungle, Medical, BlackHot, GloryHot)
+  siyi tempsnap                   : request a temperature frame
+  siyi thermal_mode <0|1>         : set thermal mode
+  siyi get_thermal_mode           : get thermal mode
+  siyi thermal_gain <0|1>         : set thermal gain (0=low/high-temp,
+                                    1=high/low-temp)
+  siyi get_thermal_gain           : get thermal gain
+  siyi therm_getenv               : get thermal environment parameters
+  siyi therm_set_distance DIST    : set thermal target distance (m)
+  siyi therm_set_humidity HUM     : set thermal humidity
+  siyi therm_set_emissivity EMISS : set thermal emissivity
+  siyi therm_set_airtemp TEMP     : set thermal air temperature
+  siyi therm_set_reftemp TEMP     : set thermal reflected temperature
+  siyi therm_getswitch            : get thermal environment switch
+  siyi therm_setswitch <0|1>      : set thermal environment switch
+  siyi therm_getthresholds        : get thermal colour thresholds
+  siyi therm_setthresholds T1 R,G,B T2 R,G,B T3 R,G,B T4 : set thresholds
+  siyi therm_getthreshswitch      : get thermal threshold switch
+  siyi therm_setthreshswitch <0|1>: set thermal threshold switch
+
+autoflag:
+  siyi autoflag_clear             : clear all auto-flagged positions
+  siyi autoflag_reload            : reload auto-flagged positions from the log
+  siyi autoflag_discard           : discard the most recent auto-flag'''
         if len(args) == 0:
             print(usage)
             return
