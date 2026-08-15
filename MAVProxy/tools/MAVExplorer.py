@@ -18,6 +18,7 @@ from math import *
 os.environ['MAVLINK20'] = '1'
 
 from MAVProxy.modules.lib import multiproc
+from MAVProxy.modules.lib import grapher
 from MAVProxy.modules.lib import rline
 from MAVProxy.modules.lib import wxconsole
 from MAVProxy.modules.lib import param_help
@@ -681,7 +682,8 @@ def cmd_map3d(args):
             break
         mtype = m.get_type()
         if mtype == 'POS':
-            path.append((m.Lat, m.Lng, m.Alt))
+            path.append((m.Lat, m.Lng, m.Alt,
+                         grapher.timestamp_to_days(m._timestamp)))
         elif mtype == 'CMD' and (m.Lat != 0 or m.Lng != 0):
             mission.append((m.Lat, m.Lng, m.Alt, getattr(m, 'Frame', 3), m.CId, m.CNum))
     mlog.rewind()
@@ -696,7 +698,8 @@ def cmd_map3d(args):
     minlat = maxlat = path[0][0]
     minlon = maxlon = path[0][1]
     ground0 = path[0][2]
-    for (la, lo, al) in path:
+    for p in path:
+        la, lo, al = p[:3]
         sumlat += la
         sumlon += lo
         if al < ground0:
@@ -729,6 +732,8 @@ def cmd_map3d(args):
     m3d.set_origin(lat0, lon0, ground0)
     m3d.set_home(ground0)
     m3d.set_path(path)
+    if xlimits.last_xlim is not None and mestate.settings.sync_xmap:
+        m3d.set_time_range(xlimits.last_xlim)
     if mission:
         m3d.set_mission(mission)
     m3d.look_at(lat0, lon0, ground0, dist=1.6 * span)
@@ -1968,7 +1973,7 @@ def epoch_time(num):
 
 def main_loop():
     '''main processing loop, display graphs and maps'''
-    global grui, xlimits
+    global grui, xlimits, map3d_views
     while True:
         if mestate is None or mestate.exit:
             return
@@ -2003,6 +2008,12 @@ def main_loop():
                             p[0].send(xlim)
                         except Exception:
                             map_timelim_pipes.remove(p)
+                    for view in map3d_views[:]:
+                        if not view.is_alive():
+                            view.close()
+                            map3d_views.remove(view)
+                            continue
+                        view.set_time_range(xlim)
                 break
         if len(remlist) > 0:
             # remove stale graphs
@@ -2084,4 +2095,3 @@ if __name__ == "__main__":
         except KeyboardInterrupt:
             mestate.exit = True
             break
-

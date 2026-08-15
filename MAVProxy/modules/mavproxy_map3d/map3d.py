@@ -110,6 +110,10 @@ class Map3D:
     def set_path(self, path):
         self._put(('path', list(path)))
 
+    def set_time_range(self, trange):
+        '''Limit timestamped path points to a Matplotlib date-number range.'''
+        self._put(('time_range', None if trange is None else tuple(trange)))
+
     def set_mission(self, items):
         self._put(('mission', list(items)))
 
