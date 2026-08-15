@@ -253,6 +253,8 @@ class ElementManager:
         self.zexag = zexag
         self.home_amsl = 0.0
         self.actors = {}            # key -> list of actors
+        self.path = []              # (ENU point, optional timestamp)
+        self.path_time_range = None
         self.trail = []             # accumulated live positions (enu)
         self.vehicle = None
         self.vehicle_pose = None
@@ -308,11 +310,45 @@ class ElementManager:
             self.refresh_vehicle()
 
     def set_path(self, path):
-        '''path: list of (lat,lon,amsl)'''
-        if not path:
+        '''path: list of (lat,lon,amsl[,matplotlib_date_number])'''
+        self.path = [(self._enu(p[0], p[1], p[2] + 2.0),
+                      p[3] if len(p) > 3 else None) for p in path]
+        self.refresh_path()
+
+    def set_time_range(self, trange):
+        '''Set the graph time range used to display a timestamped path.'''
+        self.path_time_range = trange
+        self.refresh_path()
+
+    def refresh_path(self):
+        '''Rebuild the visible path, preserving the 2D map's segment rules.
+
+        The 2D map includes a segment when its first point is in the selected
+        range. Build separate actors for non-contiguous runs so filtering can
+        never join two unrelated portions of a track.
+        '''
+        if len(self.path) < 2:
+            self._replace('path', [])
             return
-        pts = [self._enu(lat, lon, a + 2.0) for (lat, lon, a) in path]
-        self._replace('path', [_polyline(pts, (1.0, 0.0, 0.7), 2.5)])
+        if (self.path_time_range is None or
+                any(timestamp is None for _, timestamp in self.path)):
+            segments = [[point for point, _ in self.path]]
+        else:
+            low, high = self.path_time_range
+            segments = []
+            current = None
+            for i in range(len(self.path) - 1):
+                point, timestamp = self.path[i]
+                if low <= timestamp <= high:
+                    if current is None:
+                        current = [point]
+                        segments.append(current)
+                    current.append(self.path[i + 1][0])
+                else:
+                    current = None
+        actors = [_polyline(segment, (1.0, 0.0, 0.7), 2.5)
+                  for segment in segments if len(segment) >= 2]
+        self._replace('path', actors)
 
     def add_trail_point(self, lat, lon, amsl):
         self.trail.append(self._enu(lat, lon, amsl))

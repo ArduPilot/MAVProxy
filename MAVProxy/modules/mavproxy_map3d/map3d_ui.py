@@ -367,6 +367,8 @@ class Map3DFrame(wx.Frame):
                 self.terrain.update(self.tc)
         elif kind == 'path':
             self.elements.set_path(msg[1])
+        elif kind == 'time_range':
+            self.elements.set_time_range(msg[1])
         elif kind == 'mission':
             self.elements.set_mission(msg[1])
         elif kind == 'fence':
