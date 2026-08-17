@@ -1,4 +1,5 @@
 import importlib.util
+import io
 from pathlib import Path
 import struct
 import types
@@ -181,6 +182,66 @@ class TestConcurrentFTP(unittest.TestCase):
         self.assertEqual(request_session(retried_packet), 0)
         self.assertEqual(worker.request_retries, 1)
         self.assertEqual(len(self.ftp.workers), 1)
+
+    def test_cumulative_write_ack_completes_contiguous_batch(self):
+        self.ftp.ftp_settings.write_size = 2
+        self.ftp.ftp_settings.write_qsize = 4
+        self.ftp.ftp_settings.write_batch_size = 2
+        completed = []
+        self.ftp.cmd_put(['unused', '/remote'], fh=io.BytesIO(b'abcdefgh'),
+                         callback=completed.append)
+
+        create = self.mpstate._master.mav.sent[0]
+        self.assertEqual(create[6], 1)
+        self.ftp.mavlink_packet(reply(0, mavproxy_ftp.OP_CreateFile))
+        worker = self.ftp.workers[0]
+        self.assertEqual(worker.write_pending, 4)
+
+        # One negotiated ACK covers blocks 0 through 3.
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_WriteFile, offset=6,
+            payload=struct.pack('<I', 0), burst_complete=1, seq=5))
+
+        self.assertEqual(completed, [8])
+        self.assertNotIn(0, self.ftp.workers)
+
+    def test_write_window_uses_server_capabilities_in_auto_mode(self):
+        self.ftp.cmd_put(['unused', '/remote'], fh=io.BytesIO(b'abc'))
+        worker = self.ftp.workers[0]
+        self.assertEqual(worker.write_qsize, 5)
+        self.assertEqual(worker.write_batch_size, 1)
+
+        capabilities = bytes([
+            mavproxy_ftp.WRITE_CAPABILITY_MAGIC, 64, 8,
+        ])
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_CreateFile, payload=capabilities))
+
+        self.assertEqual(worker.write_qsize, 64)
+        self.assertEqual(worker.write_batch_size, 8)
+        sent = len(self.mpstate._master.mav.sent)
+        for _ in range(10):
+            worker.idle_task()
+        self.assertEqual(len(self.mpstate._master.mav.sent), sent)
+
+    def test_cumulative_ack_does_not_cover_a_gap_before_its_start(self):
+        self.ftp.ftp_settings.write_size = 2
+        self.ftp.ftp_settings.write_qsize = 6
+        self.ftp.ftp_settings.write_batch_size = 6
+        self.ftp.cmd_put(['unused', '/remote'],
+                         fh=io.BytesIO(b'abcdefghijkl'))
+        self.ftp.mavlink_packet(reply(0, mavproxy_ftp.OP_CreateFile))
+        worker = self.ftp.workers[0]
+
+        # The server received and wrote only blocks 2 and 3. Blocks 0 and 1
+        # must remain queued even though the cumulative ACK ends after them.
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_WriteFile, offset=6,
+            payload=struct.pack('<I', 4), burst_complete=1, seq=5))
+
+        self.assertEqual(worker.write_list, {0, 1, 4, 5})
+        self.assertEqual(worker.write_pending, 4)
+        self.assertEqual(worker.write_acked_bytes, 4)
 
 
 if __name__ == '__main__':
