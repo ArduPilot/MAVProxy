@@ -54,6 +54,7 @@ ERR_FileNotFound = 10
 
 HDR_Len = 12
 MAX_Payload = 239
+WRITE_CAPABILITY_MAGIC = 0xA5
 
 # the server null terminates the last byte of its name buffer, so a name
 # filling the payload exactly would be silently truncated
@@ -100,6 +101,17 @@ class WriteQueue:
         self.size = size
         self.last_send = 0
 
+
+class MAVLinkBatchWriter:
+    '''Collect MAVLink packets so several FTP requests use one link write.'''
+    def __init__(self):
+        self.packets = []
+
+    def write(self, packet):
+        self.packets.append(bytes(packet))
+        return len(packet)
+
+
 class FTPWorker(mp_module.MPModule):
     '''State for one FTP operation/session.
 
@@ -145,7 +157,12 @@ class FTPWorker(mp_module.MPModule):
         self.write_idx = 0
         self.write_recv_idx = -1
         self.write_pending = 0
+        self.write_inflight = set()
         self.write_last_send = None
+        self.write_qsize = (self.ftp_settings.write_qsize
+                            if self.ftp_settings.write_qsize > 0 else 5)
+        self.write_batch_size = (self.ftp_settings.write_batch_size
+                                 if self.ftp_settings.write_batch_size > 0 else 1)
         self.warned_component = False
         # console progress is only for interactive ftp get/put, not for the
         # callback-driven transfers behind "param ftp" and "wp ftp"
@@ -190,6 +207,26 @@ class FTPWorker(mp_module.MPModule):
         if self.ftp_settings.debug > 1:
             print("> %s dt=%.2f" % (op, now - self.last_op_time))
         self.last_op_time = time.time()
+
+    def send_batch(self, ops):
+        '''send requests in one link write when supported by pymavlink'''
+        if len(ops) <= 1 or self.master is None or \
+           not hasattr(self.master.mav, 'file'):
+            for op in ops:
+                self.send(op)
+            return
+
+        mav = self.master.mav
+        link = mav.file
+        collector = MAVLinkBatchWriter()
+        mav.file = collector
+        try:
+            for op in ops:
+                self.send(op)
+        finally:
+            mav.file = link
+        if collector.packets:
+            link.write(b''.join(collector.packets))
 
     def terminate_session(self, outcome="failed"):
         '''terminate current session. outcome describes an incomplete transfer
@@ -559,6 +596,7 @@ class FTPWorker(mp_module.MPModule):
         self.write_idx = 0
         self.write_recv_idx = -1
         self.write_pending = 0
+        self.write_inflight = set()
         self.write_last_send = None
 
         self.put_callback = callback
@@ -568,7 +606,10 @@ class FTPWorker(mp_module.MPModule):
         self.read_retries = 0
         self.op_start = time.time()
         enc_fname = bytearray(self.filename, 'ascii')
-        op = FTP_OP(self.seq, self.session, OP_CreateFile, len(enc_fname), 0, 0, 0, enc_fname)
+        # burst_complete is otherwise unused for CreateFile. It opts in to
+        # cumulative ACKs from servers that can commit contiguous write
+        # requests as a batch; older servers safely ignore it.
+        op = FTP_OP(self.seq, self.session, OP_CreateFile, len(enc_fname), 0, 1, 0, enc_fname)
         self.send(op)
 
     def write_block_len(self, idx):
@@ -585,7 +626,9 @@ class FTPWorker(mp_module.MPModule):
             self.put_callback(flen)
             self.put_callback = None
         else:
-            print("Sent file of length ", flen)
+            dt = max(time.time() - self.op_start, 1.0e-6)
+            print("Sent file of length %u in %.2fs %.1fkByte/s" %
+                  (flen, dt, (flen / dt) / 1024.0))
         self.finished_status("uploading", self.filename, flen)
         
     def handle_create_file_reply(self, op, m):
@@ -594,6 +637,11 @@ class FTPWorker(mp_module.MPModule):
             self.terminate_session()
             return
         if op.opcode == OP_Ack:
+            if op.size >= 3 and op.payload[0] == WRITE_CAPABILITY_MAGIC:
+                if self.ftp_settings.write_qsize <= 0:
+                    self.write_qsize = max(1, op.payload[1])
+                if self.ftp_settings.write_batch_size <= 0:
+                    self.write_batch_size = max(1, op.payload[2])
             self.send_more_writes()
         else:
             print("Create failed")
@@ -611,22 +659,34 @@ class FTPWorker(mp_module.MPModule):
         if self.write_last_send is not None:
             if now - self.write_last_send > max(min(10*self.rtt, 1),0.2):
                 # we seem to have lost a block of replies
-                self.write_pending = max(0, self.write_pending-1)
+                self.write_inflight.clear()
+                self.write_pending = 0
+                self.write_last_send = now
 
-        n = min(self.ftp_settings.write_qsize-self.write_pending, len(self.write_list))
+        qsize = max(1, self.write_qsize)
+        batch_size = max(1, min(self.write_batch_size, qsize))
+        free_slots = qsize - self.write_pending
+        if self.write_pending > 0 and free_slots < batch_size:
+            return
+
+        unsent = len(self.write_list - self.write_inflight)
+        n = min(free_slots, unsent)
+        writes = []
         for i in range(n):
             # send in round-robin, skipping any that have been acked
             idx = self.write_idx
-            while idx not in self.write_list:
+            while idx not in self.write_list or idx in self.write_inflight:
                 idx = (idx + 1) % self.write_total
             ofs = idx * self.write_block_size
             self.fh.seek(ofs)
             data = self.fh.read(self.write_block_size)
             write = FTP_OP(self.seq, self.session, OP_WriteFile, len(data), 0, 0, ofs, bytearray(data))
-            self.send(write)
+            writes.append(write)
             self.write_idx = (idx + 1) % self.write_total
+            self.write_inflight.add(idx)
             self.write_pending += 1
             self.write_last_send = now
+        self.send_batch(writes)
 
     def handle_write_reply(self, op, m):
         '''handle OP_WriteFile reply'''
@@ -638,20 +698,44 @@ class FTPWorker(mp_module.MPModule):
             self.terminate_session()
             return
 
-        # assume the FTP server processes the blocks sequentially. This means
-        # when we receive an ack that any blocks between the last ack and this
-        # one have been lost
+        # Legacy servers ACK one block at a time. Negotiated batch ACKs carry
+        # an explicit contiguous range so gaps remain eligible for retry.
         idx = op.offset // self.write_block_size
-        count = (idx - self.write_recv_idx) % self.write_total
-
-        self.write_pending = max(0, self.write_pending - count)
+        previous_idx = self.write_recv_idx
+        acked = [idx]
+        if op.burst_complete:
+            if op.size >= 4:
+                start_offset, = struct.unpack('<I', bytes(op.payload[:4]))
+                start_idx = start_offset // self.write_block_size
+                count = ((idx - start_idx) % self.write_total) + 1
+                acked = [((start_idx + i) % self.write_total)
+                         for i in range(count)]
+            else:
+                # Compatibility with early servers that only marked the last
+                # block. The negotiated format also supplies the start offset
+                # so a dropped request cannot be mistaken for a written block.
+                count = (idx - previous_idx) % self.write_total
+                if count == 0:
+                    count = self.write_total
+                acked = [((previous_idx + i) % self.write_total)
+                         for i in range(1, count + 1)]
+        else:
+            count = (idx - previous_idx) % self.write_total
+            # An ACK jump on a legacy server means intervening requests were
+            # dropped. Mark them sendable again, while only idx is complete.
+            for i in range(1, count):
+                self.write_inflight.discard(
+                    (previous_idx + i) % self.write_total)
+        for ack_idx in acked:
+            if ack_idx in self.write_list:
+                # servers are required to resend replies to repeated requests,
+                # so only count a block the first time it is acked
+                self.write_list.discard(ack_idx)
+                self.write_acks += 1
+                self.write_acked_bytes += self.write_block_len(ack_idx)
+            self.write_inflight.discard(ack_idx)
+        self.write_pending = len(self.write_inflight)
         self.write_recv_idx = idx
-        if idx in self.write_list:
-            # servers are required to resend replies to repeated requests, so
-            # only count a block the first time it is acked
-            self.write_list.discard(idx)
-            self.write_acks += 1
-            self.write_acked_bytes += self.write_block_len(idx)
         if self.put_callback_progress:
             self.put_callback_progress(self.write_acks/float(self.write_total))
         self.send_more_writes()
@@ -1170,9 +1254,12 @@ class FTPModule(mp_module.MPModule):
              ('pkt_loss_tx', int, 0),
              ('pkt_loss_rx', int, 0),
              ('max_backlog', int, 5),
-             ('burst_read_size', int, 80),
-             ('write_size', int, 80),
-             ('write_qsize', int, 5),
+             ('burst_read_size', int, MAX_Payload),
+             ('write_size', int, MAX_Payload),
+             # zero selects the server-advertised values, with conservative
+             # fallbacks for servers predating write batching
+             ('write_qsize', int, 0),
+             ('write_batch_size', int, 0),
              ('retry_time', float, 0.5),
              ('crccmp_timeout', float, 120.0),
              # ArduPilot currently has five GCS_FTP server sessions.  Keeping
