@@ -8,6 +8,7 @@ import time
 import struct
 import random
 import zlib
+import heapq
 
 try:
     # py2
@@ -145,6 +146,9 @@ class FTPWorker(mp_module.MPModule):
         self.dir_offset = 0
         self.last_op_time = time.time()
         self.rtt = 0.5
+        self.rttvar = 0.25
+        self.rtt_valid = False
+        self.send_times = {}
         self.reached_eof = False
         self.backlog = 0
         self.burst_size = self.ftp_settings.burst_read_size
@@ -159,6 +163,7 @@ class FTPWorker(mp_module.MPModule):
         self.write_pending = 0
         self.write_inflight = set()
         self.write_last_send = None
+        self.write_open = False
         self.write_qsize = (self.ftp_settings.write_qsize
                             if self.ftp_settings.write_qsize > 0 else 5)
         self.write_batch_size = (self.ftp_settings.write_batch_size
@@ -186,47 +191,65 @@ class FTPWorker(mp_module.MPModule):
         self.last_op_reply = False
         self.request_retries = 0
 
-    def send(self, op, preserve_seq=False):
-        '''send a request'''
+    def prepare_send(self, op, preserve_seq=False):
+        '''prepare a request and update protocol state as if it was sent'''
         if not preserve_seq:
             op.seq = self.seq
         payload = op.pack()
         plen = len(payload)
         if plen < MAX_Payload + HDR_Len:
             payload.extend(bytearray([0]*((HDR_Len+MAX_Payload)-plen)))
-        if self.master is None:
-            print("FTP: Can't send request, no master...")
-            return
-        self.master.mav.file_transfer_protocol_send(self.network, self.target_system, self.target_component, payload)
+        now = time.time()
         if not preserve_seq:
             self.seq = (self.seq + 1) % 256
             self.request_retries = 0
+            self.send_times[op.seq] = now
+        else:
+            # Do not use replies to retransmitted requests as RTT samples: a
+            # reply may belong to either transmission (Karn's algorithm).
+            self.send_times[op.seq] = None
         self.last_op = op
         self.last_op_reply = False
-        now = time.time()
         if self.ftp_settings.debug > 1:
             print("> %s dt=%.2f" % (op, now - self.last_op_time))
-        self.last_op_time = time.time()
+        self.last_op_time = now
+        return payload
+
+    def send(self, op, preserve_seq=False):
+        '''send a request'''
+        if self.master is None:
+            print("FTP: Can't send request, no master...")
+            return
+        payload = self.prepare_send(op, preserve_seq=preserve_seq)
+        self.manager.send_payloads(self, [payload])
 
     def send_batch(self, ops):
         '''send requests in one link write when supported by pymavlink'''
-        if len(ops) <= 1 or self.master is None or \
-           not hasattr(self.master.mav, 'file'):
-            for op in ops:
-                self.send(op)
+        if len(ops) == 0:
             return
+        if self.master is None:
+            print("FTP: Can't send request, no master...")
+            return
+        payloads = [self.prepare_send(op) for op in ops]
+        self.manager.send_payloads(self, payloads)
 
-        mav = self.master.mav
-        link = mav.file
-        collector = MAVLinkBatchWriter()
-        mav.file = collector
-        try:
-            for op in ops:
-                self.send(op)
-        finally:
-            mav.file = link
-        if collector.packets:
-            link.write(b''.join(collector.packets))
+    def update_rtt(self, sample):
+        '''Update the smoothed RTT and variance from an unambiguous reply.'''
+        sample = max(0.001, sample)
+        if not self.rtt_valid:
+            self.rtt = sample
+            self.rttvar = sample / 2.0
+            self.rtt_valid = True
+            return
+        self.rttvar = 0.75 * self.rttvar + 0.25 * abs(self.rtt - sample)
+        self.rtt = 0.875 * self.rtt + 0.125 * sample
+
+    def retry_timeout(self):
+        '''Return an RTT-sensitive retransmission timeout.'''
+        minimum = max(0.05, self.ftp_settings.retry_time)
+        if not self.rtt_valid:
+            return max(1.0, minimum)
+        return max(minimum, min(10.0, self.rtt + 4.0 * self.rttvar))
 
     def terminate_session(self, outcome="failed"):
         '''terminate current session. outcome describes an incomplete transfer
@@ -250,6 +273,7 @@ class FTPWorker(mp_module.MPModule):
         self.fh = None
         self.filename = None
         self.write_list = None
+        self.write_open = False
         if self.callback is not None:
             # tell caller that the transfer failed
             self.callback(None)
@@ -414,11 +438,6 @@ class FTPWorker(mp_module.MPModule):
     
     def handle_burst_read(self, op, m):
         '''handle OP_BurstReadFile reply'''
-        if self.ftp_settings.pkt_loss_tx > 0:
-            if random.uniform(0,100) < self.ftp_settings.pkt_loss_tx:
-                if self.ftp_settings.debug > 0:
-                    print("FTP: dropping TX")
-                return
         if self.fh is None or self.filename is None:
             if op.session != self.session:
                 # old session
@@ -515,11 +534,11 @@ class FTPWorker(mp_module.MPModule):
                 print("FTP Unexpected read reply")
                 print(op)
             return
-        if self.backlog > 0:
-            self.backlog -= 1
         if op.opcode == OP_Ack and self.fh is not None:
             gap = (op.offset, op.size)
             if gap in self.read_gaps:
+                if self.read_gap_times[gap] > 0 and self.backlog > 0:
+                    self.backlog -= 1
                 self.read_gaps.remove(gap)
                 self.read_gap_times.pop(gap)
                 ofs = self.fh.tell()
@@ -598,6 +617,7 @@ class FTPWorker(mp_module.MPModule):
         self.write_pending = 0
         self.write_inflight = set()
         self.write_last_send = None
+        self.write_open = False
 
         self.put_callback = callback
         self.put_callback_progress = progress_callback
@@ -637,6 +657,7 @@ class FTPWorker(mp_module.MPModule):
             self.terminate_session()
             return
         if op.opcode == OP_Ack:
+            self.write_open = True
             if op.size >= 3 and op.payload[0] == WRITE_CAPABILITY_MAGIC:
                 if self.ftp_settings.write_qsize <= 0:
                     self.write_qsize = max(1, op.payload[1])
@@ -649,6 +670,8 @@ class FTPWorker(mp_module.MPModule):
 
     def send_more_writes(self):
         '''send some more writes'''
+        if not self.write_open:
+            return
         if len(self.write_list) == 0:
             # all done
             self.put_finished(self.write_file_size)
@@ -657,7 +680,7 @@ class FTPWorker(mp_module.MPModule):
 
         now = time.time()
         if self.write_last_send is not None:
-            if now - self.write_last_send > max(min(10*self.rtt, 1),0.2):
+            if now - self.write_last_send > self.retry_timeout():
                 # we seem to have lost a block of replies
                 self.write_inflight.clear()
                 self.write_pending = 0
@@ -694,7 +717,7 @@ class FTPWorker(mp_module.MPModule):
             self.terminate_session()
             return
         if op.opcode != OP_Ack:
-            print("Write failed")
+            print("Write failed: %s" % op)
             self.terminate_session()
             return
 
@@ -1083,11 +1106,11 @@ class FTPWorker(mp_module.MPModule):
             if self.ftp_settings.debug > 1:
                 print("< %s dt=%.2f" % (op, dt))
             self.last_op_time = now
-            if self.ftp_settings.pkt_loss_rx > 0:
-                if random.uniform(0,100) < self.ftp_settings.pkt_loss_rx:
-                    if self.ftp_settings.debug > 1:
-                        print("FTP: dropping packet RX")
-                    return
+
+            request_seq = (op.seq - 1) % 256
+            sent = self.send_times.pop(request_seq, None)
+            if sent is not None:
+                self.update_rtt(now - sent)
 
             if op.opcode == OP_Nack and op.payload is not None and \
                len(op.payload) == 1 and op.payload[0] == ERR_NoSessionsAvailable:
@@ -1101,9 +1124,10 @@ class FTPWorker(mp_module.MPModule):
                     self.session_wait_reported = True
                 return
 
-            if op.req_opcode == self.last_op.opcode and op.seq == (self.last_op.seq + 1) % 256:
+            if self.last_op is not None and \
+               op.req_opcode == self.last_op.opcode and \
+               op.seq == (self.last_op.seq + 1) % 256:
                 self.last_op_reply = True
-                self.rtt = max(min(self.rtt, dt), 0.01)
             if op.req_opcode == OP_ListDirectory:
                 self.handle_list_reply(op, m)
             elif op.req_opcode == OP_OpenFileRO:
@@ -1136,47 +1160,36 @@ class FTPWorker(mp_module.MPModule):
             print("Gap read of %u at %u rem=%u blog=%u" % (length, offset, len(self.read_gaps), self.backlog))
         read = FTP_OP(self.seq, self.session, OP_ReadFile, length, 0, 0, offset, None)
         self.send(read)
-        self.read_gaps.remove(g)
-        self.read_gaps.append(g)
         self.last_gap_send = time.time()
         self.read_gap_times[g] = self.last_gap_send
         self.backlog += 1
 
     def check_read_send(self):
-        '''see if we should send another gap read'''
+        '''keep a bounded window of gap reads in flight'''
         if len(self.read_gaps) == 0:
             return
-        g = self.read_gaps[0]
         now = time.time()
-        dt = now - self.read_gap_times[g]
-        if not self.reached_eof:
-            # send gap reads once
-            for g in self.read_gap_times.keys():
-                if self.read_gap_times[g] == 0:
-                    self.send_gap_read(g)
-            return
-        if self.read_gap_times[g] > 0 and dt > self.ftp_settings.retry_time:
-            if self.backlog > 0:
-                self.backlog -= 1
-            self.read_gap_times[g] = 0
+        timeout = self.retry_timeout()
+        for g in self.read_gaps:
+            sent = self.read_gap_times[g]
+            if sent > 0 and now - sent > timeout:
+                self.read_gap_times[g] = 0
+                if self.backlog > 0:
+                    self.backlog -= 1
 
-        if self.read_gap_times[g] != 0:
-            # still pending
-            return
-        if not self.reached_eof and self.backlog >= self.ftp_settings.max_backlog:
-            # don't fill queue too far until we have got past the burst
-            return
-        if now - self.last_gap_send < 0.05:
-            # don't send too fast
-            return
-        self.send_gap_read(g)
+        limit = max(1, self.ftp_settings.max_backlog)
+        for g in self.read_gaps:
+            if self.backlog >= limit:
+                break
+            if self.read_gap_times[g] == 0:
+                self.send_gap_read(g)
 
     def idle_task(self):
         '''check for file gaps and lost requests'''
         now = time.time()
 
         if self.session_waiting:
-            if now - self.last_op_time >= self.ftp_settings.retry_time:
+            if now - self.last_op_time >= self.retry_timeout():
                 self.session_waiting = False
                 if self.last_op.opcode == OP_OpenFileRO:
                     self.op_start = now
@@ -1195,7 +1208,7 @@ class FTPWorker(mp_module.MPModule):
         )
         if self.last_op is not None and not self.last_op_reply and \
            self.last_op.opcode in initial_opcodes and \
-           now - self.last_op_time > 1.0:
+           now - self.last_op_time > self.retry_timeout():
             self.request_retries += 1
             if self.request_retries > 10:
                 print("FTP: request timed out: %s" % self.last_op)
@@ -1223,7 +1236,8 @@ class FTPWorker(mp_module.MPModule):
             return
 
         # see if burst read has stalled
-        if not self.reached_eof and self.last_burst_read is not None and now - self.last_burst_read > self.ftp_settings.retry_time:
+        if not self.reached_eof and self.last_burst_read is not None and \
+           now - self.last_burst_read > self.retry_timeout():
             dt = now - self.last_burst_read
             self.last_burst_read = now
             if self.ftp_settings.debug > 0:
@@ -1253,6 +1267,11 @@ class FTPModule(mp_module.MPModule):
             [('debug', int, 0),
              ('pkt_loss_tx', int, 0),
              ('pkt_loss_rx', int, 0),
+             ('pkt_lag_tx', float, 0.0),
+             ('pkt_lag_rx', float, 0.0),
+             ('pkt_lag_jitter_tx', float, 0.0),
+             ('pkt_lag_jitter_rx', float, 0.0),
+             ('loss_seed', int, 0),
              ('max_backlog', int, 5),
              ('burst_read_size', int, MAX_Payload),
              ('write_size', int, MAX_Payload),
@@ -1269,8 +1288,96 @@ class FTPModule(mp_module.MPModule):
                                      self.ftp_settings.completion)
         self.workers = {}
         self.pending = []
-        self.next_session = 0
+        # A previous process can leave delayed packets or a cached reply on a
+        # poor link. Starting every process at session zero can then turn a
+        # stale CreateFile ACK into writes against a closed server session.
+        self.next_session = random.SystemRandom().randrange(256)
         self.warned_component = False
+        self.loss_rng = random.Random()
+        self.active_loss_seed = None
+        self.delay_sequence = 0
+        self.tx_delay_queue = []
+        self.rx_delay_queue = []
+        self.last_tx_deadline = 0.0
+        self.last_rx_deadline = 0.0
+
+    def packet_lost(self, direction):
+        '''Return true when the configured link simulator drops a packet.'''
+        seed = self.ftp_settings.loss_seed
+        if seed != self.active_loss_seed:
+            self.loss_rng.seed(None if seed == 0 else seed)
+            self.active_loss_seed = seed
+        percent = (self.ftp_settings.pkt_loss_tx if direction == 'TX'
+                   else self.ftp_settings.pkt_loss_rx)
+        lost = percent > 0 and self.loss_rng.uniform(0, 100) < percent
+        if lost and self.ftp_settings.debug > 1:
+            print("FTP: dropping packet %s" % direction)
+        return lost
+
+    def packet_delay(self, direction):
+        '''Return simulated one-way delay in seconds.
+
+        Jitter is a uniformly distributed extra delay. Delivery deadlines are
+        constrained separately per direction so jitter models FIFO
+        head-of-line blocking instead of reordering a serial telemetry link.
+        '''
+        if direction == 'TX':
+            base = self.ftp_settings.pkt_lag_tx
+            jitter = self.ftp_settings.pkt_lag_jitter_tx
+        else:
+            base = self.ftp_settings.pkt_lag_rx
+            jitter = self.ftp_settings.pkt_lag_jitter_rx
+        delay_ms = max(0.0, base)
+        if jitter > 0:
+            delay_ms += self.loss_rng.uniform(0, jitter)
+        return delay_ms * 0.001
+
+    def _transmit_payloads(self, master, network, target_system,
+                           target_component, payloads):
+        '''Serialize and transmit one logical batch of FTP requests.'''
+        mav = master.mav
+        if len(payloads) <= 1 or not hasattr(mav, 'file'):
+            for payload in payloads:
+                mav.file_transfer_protocol_send(
+                    network, target_system, target_component, payload)
+            return
+
+        link = mav.file
+        collector = MAVLinkBatchWriter()
+        mav.file = collector
+        try:
+            for payload in payloads:
+                mav.file_transfer_protocol_send(
+                    network, target_system, target_component, payload)
+        finally:
+            mav.file = link
+        if collector.packets:
+            link.write(b''.join(collector.packets))
+
+    def send_payloads(self, worker, payloads):
+        '''Apply outgoing loss/lag, preserving batches that survive.'''
+        payloads = [bytes(payload) for payload in payloads
+                    if not self.packet_lost('TX')]
+        if not payloads:
+            return
+        args = (worker.master, worker.network, worker.target_system,
+                worker.target_component, payloads)
+        lag = self.packet_delay('TX')
+        if lag == 0:
+            self._transmit_payloads(*args)
+            return
+        self.delay_sequence += 1
+        deadline = max(time.monotonic() + lag, self.last_tx_deadline)
+        self.last_tx_deadline = deadline
+        heapq.heappush(self.tx_delay_queue,
+                       (deadline, self.delay_sequence, args))
+
+    def _packet_worker(self, m):
+        try:
+            session = m.payload[2]
+        except (IndexError, TypeError):
+            return None
+        return self.workers.get(session)
 
     def cmd_ftp(self, args):
         '''FTP operations'''
@@ -1420,15 +1527,30 @@ class FTPModule(mp_module.MPModule):
                 self.warned_component = True
                 print("FTP reply for mavlink component %u" % m.target_component)
             return
-        try:
-            session = m.payload[2]
-        except (IndexError, TypeError):
+        if self.packet_lost('RX'):
             return
-        worker = self.workers.get(session)
-        if worker is not None:
+        worker = self._packet_worker(m)
+        if worker is None:
+            return
+        lag = self.packet_delay('RX')
+        if lag == 0:
             worker.mavlink_packet(m)
+            return
+        self.delay_sequence += 1
+        deadline = max(time.monotonic() + lag, self.last_rx_deadline)
+        self.last_rx_deadline = deadline
+        heapq.heappush(self.rx_delay_queue,
+                       (deadline, self.delay_sequence, worker, m))
 
     def idle_task(self):
+        now = time.monotonic()
+        while self.tx_delay_queue and self.tx_delay_queue[0][0] <= now:
+            _, _, args = heapq.heappop(self.tx_delay_queue)
+            self._transmit_payloads(*args)
+        while self.rx_delay_queue and self.rx_delay_queue[0][0] <= now:
+            _, _, worker, m = heapq.heappop(self.rx_delay_queue)
+            if self.workers.get(worker.session) is worker:
+                worker.mavlink_packet(m)
         for worker in list(self.workers.values()):
             worker.idle_task()
 
