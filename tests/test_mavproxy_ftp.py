@@ -2,6 +2,7 @@ import importlib.util
 import io
 from pathlib import Path
 import struct
+import time
 import types
 import unittest
 
@@ -84,6 +85,7 @@ class TestConcurrentFTP(unittest.TestCase):
     def setUp(self):
         self.mpstate = FakeMPState()
         self.ftp = mavproxy_ftp.FTPModule(self.mpstate)
+        self.ftp.next_session = 0
 
     def test_gets_and_list_have_independent_sessions_and_state(self):
         results = {}
@@ -160,6 +162,7 @@ class TestConcurrentFTP(unittest.TestCase):
         self.assertIs(self.ftp.workers[0], worker)
 
         self.ftp.ftp_settings.retry_time = 0
+        worker.last_op_time -= worker.retry_timeout()
         sent_before = len(self.mpstate._master.mav.sent)
         self.ftp.idle_task()
         self.assertEqual(len(self.mpstate._master.mav.sent), sent_before + 1)
@@ -211,6 +214,13 @@ class TestConcurrentFTP(unittest.TestCase):
         self.assertEqual(worker.write_qsize, 5)
         self.assertEqual(worker.write_batch_size, 1)
 
+        # A delayed or lost CreateFile must not let idle processing send file
+        # data before the remote file exists.
+        sent = len(self.mpstate._master.mav.sent)
+        for _ in range(10):
+            worker.idle_task()
+        self.assertEqual(len(self.mpstate._master.mav.sent), sent)
+
         capabilities = bytes([
             mavproxy_ftp.WRITE_CAPABILITY_MAGIC, 64, 8,
         ])
@@ -242,6 +252,108 @@ class TestConcurrentFTP(unittest.TestCase):
         self.assertEqual(worker.write_list, {0, 1, 4, 5})
         self.assertEqual(worker.write_pending, 4)
         self.assertEqual(worker.write_acked_bytes, 4)
+
+    def test_packet_loss_uses_actual_link_directions(self):
+        self.ftp.ftp_settings.pkt_loss_tx = 100
+        self.ftp.cmd_list(['/'])
+        worker = self.ftp.workers[0]
+
+        # TX loss makes the request invisible to the transport while keeping
+        # enough protocol state to retry it.
+        self.assertEqual(self.mpstate._master.mav.sent, [])
+        self.assertEqual(worker.seq, 1)
+        self.ftp.ftp_settings.pkt_loss_tx = 0
+        worker.last_op_time -= worker.retry_timeout() + 0.01
+        self.ftp.idle_task()
+        self.assertEqual(len(self.mpstate._master.mav.sent), 1)
+
+        # RX loss must likewise be invisible to the worker.
+        eof = reply(0, mavproxy_ftp.OP_ListDirectory,
+                    opcode=mavproxy_ftp.OP_Nack,
+                    payload=bytes([mavproxy_ftp.ERR_EndOfFile]))
+        self.ftp.ftp_settings.pkt_loss_rx = 100
+        self.ftp.mavlink_packet(eof)
+        self.assertIn(0, self.ftp.workers)
+        self.ftp.ftp_settings.pkt_loss_rx = 0
+        self.ftp.mavlink_packet(eof)
+        self.assertNotIn(0, self.ftp.workers)
+
+    def test_packet_lag_is_nonblocking_and_bidirectional(self):
+        self.ftp.ftp_settings.pkt_lag_tx = 100
+        self.ftp.cmd_list(['/'])
+        self.assertEqual(self.mpstate._master.mav.sent, [])
+        self.assertEqual(len(self.ftp.tx_delay_queue), 1)
+
+        deadline, sequence, args = self.ftp.tx_delay_queue[0]
+        self.ftp.tx_delay_queue[0] = (time.monotonic() - 1,
+                                      sequence, args)
+        self.ftp.idle_task()
+        self.assertEqual(len(self.mpstate._master.mav.sent), 1)
+
+        self.ftp.ftp_settings.pkt_lag_rx = 100
+        eof = reply(0, mavproxy_ftp.OP_ListDirectory,
+                    opcode=mavproxy_ftp.OP_Nack,
+                    payload=bytes([mavproxy_ftp.ERR_EndOfFile]))
+        self.ftp.mavlink_packet(eof)
+        self.assertIn(0, self.ftp.workers)
+        self.assertEqual(len(self.ftp.rx_delay_queue), 1)
+
+        deadline, sequence, worker, message = self.ftp.rx_delay_queue[0]
+        self.ftp.rx_delay_queue[0] = (time.monotonic() - 1,
+                                      sequence, worker, message)
+        self.ftp.idle_task()
+        self.assertNotIn(0, self.ftp.workers)
+
+    def test_loss_seed_replays_variable_lag(self):
+        other = mavproxy_ftp.FTPModule(FakeMPState())
+        for ftp in (self.ftp, other):
+            ftp.ftp_settings.loss_seed = 1234
+            ftp.ftp_settings.pkt_lag_tx = 100
+            ftp.ftp_settings.pkt_lag_jitter_tx = 500
+            # packet_lost initialises the private deterministic generator even
+            # when the configured loss percentage is zero.
+            ftp.packet_lost('TX')
+
+        first = [self.ftp.packet_delay('TX') for _ in range(10)]
+        second = [other.packet_delay('TX') for _ in range(10)]
+        self.assertEqual(first, second)
+        self.assertTrue(all(0.1 <= delay <= 0.6 for delay in first))
+
+    def test_delayed_reply_raises_retransmission_timeout(self):
+        self.ftp.cmd_get(['/remote'], callback=lambda fh: None)
+        worker = self.ftp.workers[0]
+        request_seq = worker.last_op.seq
+        worker.send_times[request_seq] -= 2.0
+
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_OpenFileRO, payload=struct.pack('<I', 10)))
+
+        self.assertTrue(worker.rtt_valid)
+        self.assertGreater(worker.retry_timeout(), 5.0)
+        sent = len(self.mpstate._master.mav.sent)
+        worker.last_burst_read -= 1.0
+        self.ftp.idle_task()
+        self.assertEqual(len(self.mpstate._master.mav.sent), sent)
+
+    def test_gap_reads_use_bounded_parallel_window(self):
+        self.ftp.ftp_settings.max_backlog = 2
+        self.ftp.cmd_get(['/remote'], callback=lambda fh: None)
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_OpenFileRO, payload=struct.pack('<I', 1000)))
+        worker = self.ftp.workers[0]
+        worker.read_gaps = [(0, 100), (100, 100), (200, 100)]
+        worker.read_gap_times = {gap: 0 for gap in worker.read_gaps}
+
+        sent = len(self.mpstate._master.mav.sent)
+        worker.check_read_send()
+        self.assertEqual(worker.backlog, 2)
+        self.assertEqual(len(self.mpstate._master.mav.sent), sent + 2)
+
+        for gap in worker.read_gaps[:2]:
+            worker.read_gap_times[gap] -= worker.retry_timeout() + 0.01
+        worker.check_read_send()
+        self.assertEqual(worker.backlog, 2)
+        self.assertEqual(len(self.mpstate._master.mav.sent), sent + 4)
 
 
 if __name__ == '__main__':
