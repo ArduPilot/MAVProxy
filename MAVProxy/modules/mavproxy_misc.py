@@ -80,7 +80,8 @@ class MiscModule(mp_module.MPModule):
         super(MiscModule, self).__init__(mpstate, "misc", "misc commands", public=True)
         self.add_command('alt', self.cmd_alt, "show altitude information")
         self.add_command('up', self.cmd_up, "adjust pitch trim by up to 5 degrees")
-        self.add_command('reboot', self.cmd_reboot, "reboot autopilot")
+        self.add_command('reboot', self.cmd_reboot, "reboot autopilot",
+                         ["<bootloader|massstorage|force|help>"])
         self.add_command('time', self.cmd_time, "show autopilot time")
         self.add_command('shell', self.cmd_shell, "run shell command")
         self.add_command('changealt', self.cmd_changealt, "change target altitude")
@@ -176,17 +177,30 @@ class MiscModule(mp_module.MPModule):
     def cmd_reboot(self, args):
         '''reboot autopilot'''
 
+        if "help" in args:
+            print("Usage: reboot [bootloader|massstorage] [force]")
+            print("  no option:   reboot the autopilot")
+            print("  bootloader:  reboot and stay in the bootloader")
+            print("  massstorage: reboot and export storage over USB")
+            print("  force:       allow a normal or bootloader reboot while armed")
+            return
+
         hold_in_bootloader = "bootloader" in args
+        reboot_to_mass_storage = "massstorage" in args
         force = "force" in args
 
-        # different path for force/not force to avoid dependency on
+        # different path for mass-storage/force to avoid dependency on
         # pymavlink's force-reboot support:
-        if force:
-            if hold_in_bootloader:
+        if reboot_to_mass_storage or force:
+            if reboot_to_mass_storage:
+                param1 = getattr(mavutil.mavlink,
+                                 'REBOOT_SHUTDOWN_ACTION_REBOOT_TO_MASS_STORAGE',
+                                 5)
+            elif hold_in_bootloader:
                 param1 = 3
             else:
                 param1 = 1
-            param6 = 20190226
+            param6 = 20190226 if force else 0
             self.master.mav.command_long_send(
                 self.target_system,
                 self.target_component,
