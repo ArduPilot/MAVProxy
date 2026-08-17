@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 '''mavlink file transfer support'''
 
-import io
-import time, os, sys
 import glob
+import os
+import sys
+import time
 import struct
 import random
 import zlib
-from pymavlink import mavutil
 
 try:
     # py2
@@ -100,29 +100,18 @@ class WriteQueue:
         self.size = size
         self.last_send = 0
 
-class FTPModule(mp_module.MPModule):
-    def __init__(self, mpstate):
-        super(FTPModule, self).__init__(mpstate, "ftp", public=True)
-        self.add_command('ftp', self.cmd_ftp, "file transfer",
-                         ["<list|get|rm|rmdir|rename|mkdir|crc|cancel|status>",
-                          "set (FTPSETTING)",
-                          "put (FILENAME) (FILENAME)",
-                          "crclocal (FILENAME)",
-                          "crccmp (FILENAME)"])
-        self.ftp_settings = mp_settings.MPSettings(
-            [('debug', int, 0),
-             ('pkt_loss_tx', int, 0),
-             ('pkt_loss_rx', int, 0),
-             ('max_backlog', int, 5),
-             ('burst_read_size', int, 80),
-             ('write_size', int, 80),
-             ('write_qsize', int, 5),
-             ('retry_time', float, 0.5),
-             ('crccmp_timeout', float, 120.0)])
-        self.add_completion_function('(FTPSETTING)',
-                                     self.ftp_settings.completion)
+class FTPWorker(mp_module.MPModule):
+    '''State for one FTP operation/session.
+
+    A worker deliberately isn't registered as a public MAVProxy module.  The
+    public FTPModule owns and routes to several of these at once.
+    '''
+    def __init__(self, manager, session):
+        super(FTPWorker, self).__init__(manager.mpstate, "ftp_worker")
+        self.manager = manager
+        self.ftp_settings = manager.ftp_settings
         self.seq = 0
-        self.session = 0
+        self.session = session
         self.network = 0
         self.last_op = None
         self.fh = None
@@ -174,51 +163,16 @@ class FTPModule(mp_module.MPModule):
         self.crccmp_sent = None
         self.crccmp_start = 0
         self.crccmp_expect = None
+        self.session_waiting = False
+        self.session_wait_reported = False
+        self.done = False
+        self.last_op_reply = False
+        self.request_retries = 0
 
-    def cmd_ftp(self, args):
-        '''FTP operations'''
-        usage = "Usage: ftp <list|get|put|rm|rmdir|rename|mkdir|crc|crclocal|crccmp>"
-        if len(args) < 1:
-            print(usage)
-            return
-        # these all talk to the vehicle and would have their replies consumed
-        # by a running comparison, or clobber the op it is waiting on
-        if self.crccmp_dest is not None and args[0] in (
-                'list', 'crc', 'rm', 'rmdir', 'rename', 'mkdir', 'put'):
-            print("crccmp in progress, use 'ftp cancel' to stop it")
-            return
-        if args[0] == 'list':
-            self.cmd_list(args[1:])
-        elif args[0] == "set":
-            self.ftp_settings.command(args[1:])
-        elif args[0] == 'get':
-            self.cmd_get(args[1:])
-        elif args[0] == 'put':
-            self.cmd_put(args[1:])
-        elif args[0] == 'rm':
-            self.cmd_rm(args[1:])
-        elif args[0] == 'rmdir':
-            self.cmd_rmdir(args[1:])
-        elif args[0] == 'rename':
-            self.cmd_rename(args[1:])
-        elif args[0] == 'mkdir':
-            self.cmd_mkdir(args[1:])
-        elif args[0] == 'crc':
-            self.cmd_crc(args[1:])
-        elif args[0] == 'crclocal':
-            self.cmd_crclocal(args[1:])
-        elif args[0] == 'crccmp':
-            self.cmd_crccmp(args[1:])
-        elif args[0] == 'status':
-            self.cmd_status()
-        elif args[0] == 'cancel':
-            self.cmd_cancel()
-        else:
-            print(usage)
-
-    def send(self, op):
+    def send(self, op, preserve_seq=False):
         '''send a request'''
-        op.seq = self.seq
+        if not preserve_seq:
+            op.seq = self.seq
         payload = op.pack()
         plen = len(payload)
         if plen < MAX_Payload + HDR_Len:
@@ -227,8 +181,11 @@ class FTPModule(mp_module.MPModule):
             print("FTP: Can't send request, no master...")
             return
         self.master.mav.file_transfer_protocol_send(self.network, self.target_system, self.target_component, payload)
-        self.seq = (self.seq + 1) % 256
+        if not preserve_seq:
+            self.seq = (self.seq + 1) % 256
+            self.request_retries = 0
         self.last_op = op
+        self.last_op_reply = False
         now = time.time()
         if self.ftp_settings.debug > 1:
             print("> %s dt=%.2f" % (op, now - self.last_op_time))
@@ -238,6 +195,9 @@ class FTPModule(mp_module.MPModule):
         '''terminate current session. outcome describes an incomplete transfer
         for the status line: "cancelled" when the user or a new command ended
         it, "failed" for an error'''
+        if self.done:
+            return
+        self.done = True
         self.transfer_active = False
         if self.crccmp_dest is not None:
             print("crccmp: aborted")
@@ -269,12 +229,12 @@ class FTPModule(mp_module.MPModule):
         self.read_gap_times = {}
         self.last_read = None
         self.last_burst_read = None
-        self.session = (self.session + 1) % 256
         self.reached_eof = False
         self.backlog = 0
         self.duplicates = 0
         if self.ftp_settings.debug > 0:
             print("Terminated session")
+        self.manager.worker_done(self)
 
     def cmd_list(self, args):
         '''list files'''
@@ -321,15 +281,16 @@ class FTPModule(mp_module.MPModule):
         elif op.opcode == OP_Nack and len(op.payload) == 1 and op.payload[0] == ERR_EndOfFile:
             print("Total size %.2f kByte" % (self.total_size / 1024.0))
             self.total_size = 0
+            self.terminate_session()
         else:
             print('LIST: %s' % op)
+            self.terminate_session()
 
     def cmd_get(self, args, callback=None, callback_progress=None):
         '''get file'''
         if len(args) == 0:
             print("Usage: get FILENAME <LOCALNAME>")
             return
-        self.terminate_session("cancelled")
         fname = args[0]
         if len(args) > 1:
             self.filename = args[1]
@@ -721,6 +682,7 @@ class FTPModule(mp_module.MPModule):
         '''handle remove reply'''
         if op.opcode != OP_Ack:
             print("Remove failed %s" % op)
+        self.terminate_session()
 
     def cmd_rename(self, args):
         '''rename file'''
@@ -740,6 +702,7 @@ class FTPModule(mp_module.MPModule):
         '''handle rename reply'''
         if op.opcode != OP_Ack:
             print("Rename failed %s" % op)
+        self.terminate_session()
 
     def cmd_mkdir(self, args):
         '''make directory'''
@@ -756,6 +719,7 @@ class FTPModule(mp_module.MPModule):
         '''handle mkdir reply'''
         if op.opcode != OP_Ack:
             print("Create directory failed %s" % op)
+        self.terminate_session()
 
     def cmd_crc(self, args):
         '''get crc'''
@@ -930,6 +894,7 @@ class FTPModule(mp_module.MPModule):
                results.count('MISSING'),
                results.count('ERROR') + results.count('TIMEOUT'), dt))
         self.crccmp_reset()
+        self.terminate_session()
 
     def handle_crc_reply(self, op, m):
         '''handle crc reply'''
@@ -942,6 +907,7 @@ class FTPModule(mp_module.MPModule):
             print("crc: %s 0x%08x in %.1fs" % (self.filename, crc, now - self.op_start))
         else:
             print("crc failed %s" % op)
+        self.terminate_session()
 
     def cmd_cancel(self):
         '''cancel any pending op'''
@@ -1039,7 +1005,20 @@ class FTPModule(mp_module.MPModule):
                         print("FTP: dropping packet RX")
                     return
 
+            if op.opcode == OP_Nack and op.payload is not None and \
+               len(op.payload) == 1 and op.payload[0] == ERR_NoSessionsAvailable:
+                # Another client may also be using the server, so the local
+                # concurrency cap is not sufficient on its own.  Keep this
+                # operation intact and retry instead of failing its callback.
+                self.session_waiting = True
+                self.last_op_time = now
+                if not self.session_wait_reported:
+                    print("FTP: no sessions available, waiting to retry")
+                    self.session_wait_reported = True
+                return
+
             if op.req_opcode == self.last_op.opcode and op.seq == (self.last_op.seq + 1) % 256:
+                self.last_op_reply = True
                 self.rtt = max(min(self.rtt, dt), 0.01)
             if op.req_opcode == OP_ListDirectory:
                 self.handle_list_reply(op, m)
@@ -1112,6 +1091,37 @@ class FTPModule(mp_module.MPModule):
         '''check for file gaps and lost requests'''
         now = time.time()
 
+        if self.session_waiting:
+            if now - self.last_op_time >= self.ftp_settings.retry_time:
+                self.session_waiting = False
+                if self.last_op.opcode == OP_OpenFileRO:
+                    self.op_start = now
+                self.send(self.last_op)
+            return
+
+        # ArduPilot's incoming FTP request queue has the same depth as its
+        # session table.  Under contention an initial request can therefore be
+        # dropped before the server has a chance to NACK it.  Reusing the same
+        # sequence number makes this safe whether the request or its reply was
+        # lost: the server's duplicate-request cache returns the old reply.
+        initial_opcodes = (
+            OP_ListDirectory, OP_OpenFileRO, OP_CreateFile, OP_RemoveFile,
+            OP_RemoveDirectory, OP_Rename, OP_CreateDirectory,
+            OP_CalcFileCRC32,
+        )
+        if self.last_op is not None and not self.last_op_reply and \
+           self.last_op.opcode in initial_opcodes and \
+           now - self.last_op_time > 1.0:
+            self.request_retries += 1
+            if self.request_retries > 10:
+                print("FTP: request timed out: %s" % self.last_op)
+                self.terminate_session()
+                return
+            if self.ftp_settings.debug > 0:
+                print("FTP: retry request: %s" % self.last_op)
+            self.send(self.last_op, preserve_seq=True)
+            return
+
         # ahead of the early returns below, which skip idle transfers
         self.update_status()
 
@@ -1121,23 +1131,6 @@ class FTPModule(mp_module.MPModule):
             self.crccmp_sent = None
             self.crccmp_expect = None
             self.crccmp_next()
-
-        # see if we lost an open reply
-        if self.op_start is not None and now - self.op_start > 1.0 and self.last_op.opcode == OP_OpenFileRO:
-            self.op_start = now
-            self.open_retries += 1
-            if self.open_retries > 2:
-                # fail the get
-                self.op_start = None
-                self.terminate_session()
-                return
-            if self.ftp_settings.debug > 0:
-                print("FTP: retry open")
-            send_op = self.last_op
-            self.send(FTP_OP(self.seq, self.session, OP_TerminateSession, 0, 0, 0, 0, None))
-            self.session = (self.session + 1) % 256
-            send_op.session = self.session
-            self.send(send_op)
 
         if len(self.read_gaps) == 0 and self.last_burst_read is None and self.write_list is None:
             return
@@ -1159,6 +1152,202 @@ class FTPModule(mp_module.MPModule):
 
         if self.write_list is not None:
             self.send_more_writes()
+
+
+class FTPModule(mp_module.MPModule):
+    '''Public FTP module and concurrent-session manager.'''
+
+    def __init__(self, mpstate):
+        super(FTPModule, self).__init__(mpstate, "ftp", public=True)
+        self.add_command('ftp', self.cmd_ftp, "file transfer",
+                         ["<list|get|rm|rmdir|rename|mkdir|crc|cancel|status>",
+                          "set (FTPSETTING)",
+                          "put (FILENAME) (FILENAME)",
+                          "crclocal (FILENAME)",
+                          "crccmp (FILENAME)"])
+        self.ftp_settings = mp_settings.MPSettings(
+            [('debug', int, 0),
+             ('pkt_loss_tx', int, 0),
+             ('pkt_loss_rx', int, 0),
+             ('max_backlog', int, 5),
+             ('burst_read_size', int, 80),
+             ('write_size', int, 80),
+             ('write_qsize', int, 5),
+             ('retry_time', float, 0.5),
+             ('crccmp_timeout', float, 120.0),
+             # ArduPilot currently has five GCS_FTP server sessions.  Keeping
+             # the cap configurable also supports smaller/custom servers.
+             ('max_sessions', int, 5)])
+        self.add_completion_function('(FTPSETTING)',
+                                     self.ftp_settings.completion)
+        self.workers = {}
+        self.pending = []
+        self.next_session = 0
+        self.warned_component = False
+
+    def cmd_ftp(self, args):
+        '''FTP operations'''
+        usage = "Usage: ftp <list|get|put|rm|rmdir|rename|mkdir|crc|crclocal|crccmp>"
+        if len(args) < 1:
+            print(usage)
+            return
+        command = args[0]
+        if command == 'set':
+            self.ftp_settings.command(args[1:])
+        elif command == 'status':
+            self.cmd_status()
+        elif command == 'cancel':
+            self.cmd_cancel()
+        elif command == 'crclocal':
+            self.cmd_crclocal(args[1:])
+        else:
+            method = getattr(self, 'cmd_' + command, None)
+            if method is None:
+                print(usage)
+            else:
+                method(args[1:])
+
+    def _allocate_session(self):
+        '''Return an unused client-selected uint8 session id.'''
+        for _ in range(256):
+            session = self.next_session
+            self.next_session = (self.next_session + 1) % 256
+            if session not in self.workers:
+                return session
+        return None
+
+    def _launch(self, operation):
+        session = self._allocate_session()
+        if session is None:
+            self.pending.insert(0, operation)
+            return None
+        worker = FTPWorker(self, session)
+        worker.operation_name = operation['name']
+        self.workers[session] = worker
+        method = getattr(worker, operation['method'])
+        method(*operation['args'], **operation['kwargs'])
+        # Bad arguments or a local-file error can return without sending.
+        if worker.last_op is None:
+            self.worker_done(worker)
+        return worker
+
+    def _submit(self, name, method, *args, **kwargs):
+        operation = {
+            'name': name,
+            'method': method,
+            'args': args,
+            'kwargs': kwargs,
+        }
+        limit = self._session_limit()
+        if len(self.workers) >= limit:
+            self.pending.append(operation)
+            print("FTP: queued %s (%u sessions active)" %
+                  (name, len(self.workers)))
+            return None
+        return self._launch(operation)
+
+    def worker_done(self, worker):
+        '''Forget a completed worker and start the oldest queued operation.'''
+        if self.workers.get(worker.session) is worker:
+            del self.workers[worker.session]
+        limit = self._session_limit()
+        while self.pending and len(self.workers) < limit:
+            operation = self.pending.pop(0)
+            self._launch(operation)
+
+    def _session_limit(self):
+        # Session ids are uint8.  Keep one value in reserve so allocation and
+        # queuing remain well defined even with an accidental oversized setting.
+        return min(255, max(1, int(self.ftp_settings.max_sessions)))
+
+    def cmd_list(self, args):
+        return self._submit('list', 'cmd_list', args)
+
+    def cmd_get(self, args, callback=None, callback_progress=None):
+        return self._submit('get', 'cmd_get', args,
+                            callback=callback,
+                            callback_progress=callback_progress)
+
+    def cmd_put(self, args, fh=None, callback=None, progress_callback=None):
+        return self._submit('put', 'cmd_put', args, fh=fh,
+                            callback=callback,
+                            progress_callback=progress_callback)
+
+    def cmd_rm(self, args):
+        return self._submit('rm', 'cmd_rm', args)
+
+    def cmd_rmdir(self, args):
+        return self._submit('rmdir', 'cmd_rmdir', args)
+
+    def cmd_rename(self, args):
+        return self._submit('rename', 'cmd_rename', args)
+
+    def cmd_mkdir(self, args):
+        return self._submit('mkdir', 'cmd_mkdir', args)
+
+    def cmd_crc(self, args):
+        return self._submit('crc', 'cmd_crc', args)
+
+    def cmd_crccmp(self, args):
+        return self._submit('crccmp', 'cmd_crccmp', args)
+
+    def cmd_crclocal(self, args):
+        # This operation is entirely local and consumes no server session.
+        return FTPWorker(self, 0).cmd_crclocal(args)
+
+    def cmd_cancel(self):
+        '''Cancel all active and queued operations.'''
+        pending = self.pending
+        self.pending = []
+        for operation in pending:
+            callback = operation['kwargs'].get('callback')
+            if callback is not None:
+                callback(None)
+            progress = operation['kwargs'].get('progress_callback')
+            if progress is not None:
+                progress(None)
+        for worker in list(self.workers.values()):
+            worker.terminate_session("cancelled")
+
+    def cmd_status(self):
+        if not self.workers and not self.pending:
+            print("No FTP operations in progress")
+            return
+        for session, worker in sorted(self.workers.items()):
+            status = worker.transfer_status()
+            if status is None:
+                status = worker.operation_name
+            if worker.session_waiting:
+                status += " (waiting for a server session)"
+            print("FTP session %u: %s" % (session, status))
+        if self.pending:
+            print("FTP queued: %s" %
+                  ', '.join(operation['name'] for operation in self.pending))
+
+    def mavlink_packet(self, m):
+        if m.get_type() != "FILE_TRANSFER_PROTOCOL":
+            return
+        if (m.target_system != self.settings.source_system or
+                m.target_component != self.settings.source_component):
+            if m.target_system == self.settings.source_system and not self.warned_component:
+                self.warned_component = True
+                print("FTP reply for mavlink component %u" % m.target_component)
+            return
+        try:
+            session = m.payload[2]
+        except (IndexError, TypeError):
+            return
+        worker = self.workers.get(session)
+        if worker is not None:
+            worker.mavlink_packet(m)
+
+    def idle_task(self):
+        for worker in list(self.workers.values()):
+            worker.idle_task()
+
+    def unload(self):
+        self.cmd_cancel()
+        super(FTPModule, self).unload()
 
 def init(mpstate):
     '''initialise module'''
