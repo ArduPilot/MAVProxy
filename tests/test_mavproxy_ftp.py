@@ -1,4 +1,5 @@
 import importlib.util
+import contextlib
 import io
 from pathlib import Path
 import struct
@@ -81,6 +82,10 @@ def request_session(payload):
     return payload[2]
 
 
+def request_opcode(payload):
+    return payload[3]
+
+
 class TestConcurrentFTP(unittest.TestCase):
     def setUp(self):
         self.mpstate = FakeMPState()
@@ -110,7 +115,7 @@ class TestConcurrentFTP(unittest.TestCase):
                                       payload=struct.pack('<I', 6)))
         self.ftp.mavlink_packet(reply(0, mavproxy_ftp.OP_OpenFileRO,
                                       payload=struct.pack('<I', 5)))
-        self.ftp.mavlink_packet(reply(1, mavproxy_ftp.OP_ListDirectory,
+        self.ftp.mavlink_packet(reply(1, mavproxy_ftp.OP_ListDirectoryWithTime,
                                       opcode=mavproxy_ftp.OP_Nack,
                                       payload=bytes([mavproxy_ftp.ERR_EndOfFile])))
 
@@ -137,7 +142,7 @@ class TestConcurrentFTP(unittest.TestCase):
         self.assertEqual(len(self.mpstate._master.mav.sent), 5)
 
         self.ftp.mavlink_packet(reply(
-            0, mavproxy_ftp.OP_ListDirectory,
+            0, mavproxy_ftp.OP_ListDirectoryWithTime,
             opcode=mavproxy_ftp.OP_Nack,
             payload=bytes([mavproxy_ftp.ERR_EndOfFile])))
 
@@ -176,7 +181,8 @@ class TestConcurrentFTP(unittest.TestCase):
         first_seq = struct.unpack('<H', first_packet[:2])[0]
 
         # No reply arrives, as happens when ArduPilot's request queue is full.
-        worker.last_op_time -= 2
+        worker.last_op_time -= max(
+            worker.retry_timeout(), self.ftp.ftp_settings.list_time_timeout) + 0.01
         self.ftp.idle_task()
 
         retried_packet = self.mpstate._master.mav.sent[-1]
@@ -185,6 +191,78 @@ class TestConcurrentFTP(unittest.TestCase):
         self.assertEqual(request_session(retried_packet), 0)
         self.assertEqual(worker.request_retries, 1)
         self.assertEqual(len(self.ftp.workers), 1)
+
+    def test_list_with_time_parses_names_from_the_end(self):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.ftp.cmd_list(['/'])
+            self.assertEqual(
+                request_opcode(self.mpstate._master.mav.sent[-1]),
+                mavproxy_ftp.OP_ListDirectoryWithTime)
+
+            self.ftp.mavlink_packet(reply(
+                0, mavproxy_ftp.OP_ListDirectoryWithTime,
+                payload=b'Ftab\tname\t42\t0\x00Fmalformed\x00'))
+
+        continuation = self.mpstate._master.mav.sent[-1]
+        self.assertEqual(request_opcode(continuation),
+                         mavproxy_ftp.OP_ListDirectoryWithTime)
+        self.assertEqual(struct.unpack('<I', continuation[8:12])[0], 2)
+        self.assertIn('tab\tname\t42\t-', output.getvalue())
+        self.assertIn('Fmalformed', output.getvalue())
+        self.assertTrue(self.ftp.list_time_supported[(1, 1)])
+
+    def test_list_time_nack_falls_back_and_is_cached(self):
+        self.ftp.cmd_list(['/'])
+        self.assertEqual(request_opcode(self.mpstate._master.mav.sent[-1]),
+                         mavproxy_ftp.OP_ListDirectoryWithTime)
+
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_ListDirectoryWithTime,
+            opcode=mavproxy_ftp.OP_Nack,
+            payload=bytes([mavproxy_ftp.ERR_UnknownCommand])))
+
+        fallback = self.mpstate._master.mav.sent[-1]
+        self.assertEqual(request_opcode(fallback),
+                         mavproxy_ftp.OP_ListDirectory)
+        self.assertFalse(self.ftp.list_time_supported[(1, 1)])
+
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_ListDirectory,
+            opcode=mavproxy_ftp.OP_Nack,
+            payload=bytes([mavproxy_ftp.ERR_EndOfFile]), seq=2))
+        self.ftp.cmd_list(['/other'])
+        self.assertEqual(request_opcode(self.mpstate._master.mav.sent[-1]),
+                         mavproxy_ftp.OP_ListDirectory)
+
+    def test_ignored_list_time_opcode_retries_then_falls_back(self):
+        self.ftp.ftp_settings.list_retries = 1
+        self.ftp.ftp_settings.list_time_timeout = 0
+        self.ftp.cmd_list(['/'])
+        worker = self.ftp.workers[0]
+        first_seq = struct.unpack('<H', self.mpstate._master.mav.sent[-1][:2])[0]
+
+        worker.last_op_time -= max(
+            worker.retry_timeout(), self.ftp.ftp_settings.list_time_timeout) + 0.01
+        self.ftp.idle_task()
+        retry = self.mpstate._master.mav.sent[-1]
+        self.assertEqual(request_opcode(retry),
+                         mavproxy_ftp.OP_ListDirectoryWithTime)
+        self.assertEqual(struct.unpack('<H', retry[:2])[0], first_seq)
+
+        worker.last_op_time -= worker.retry_timeout() + 0.01
+        self.ftp.idle_task()
+        self.assertEqual(request_opcode(self.mpstate._master.mav.sent[-1]),
+                         mavproxy_ftp.OP_ListDirectory)
+
+        # A late reply to the abandoned capability probe must not advance the
+        # fallback listing or be interpreted using the wrong entry format.
+        sent = len(self.mpstate._master.mav.sent)
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_ListDirectoryWithTime,
+            payload=b'Fold\t1\t0\x00', seq=1))
+        self.assertEqual(len(self.mpstate._master.mav.sent), sent)
+        self.assertEqual(worker.dir_offset, 0)
 
     def test_cumulative_write_ack_completes_contiguous_batch(self):
         self.ftp.ftp_settings.write_size = 2
@@ -263,12 +341,13 @@ class TestConcurrentFTP(unittest.TestCase):
         self.assertEqual(self.mpstate._master.mav.sent, [])
         self.assertEqual(worker.seq, 1)
         self.ftp.ftp_settings.pkt_loss_tx = 0
-        worker.last_op_time -= worker.retry_timeout() + 0.01
+        worker.last_op_time -= max(
+            worker.retry_timeout(), self.ftp.ftp_settings.list_time_timeout) + 0.01
         self.ftp.idle_task()
         self.assertEqual(len(self.mpstate._master.mav.sent), 1)
 
         # RX loss must likewise be invisible to the worker.
-        eof = reply(0, mavproxy_ftp.OP_ListDirectory,
+        eof = reply(0, mavproxy_ftp.OP_ListDirectoryWithTime,
                     opcode=mavproxy_ftp.OP_Nack,
                     payload=bytes([mavproxy_ftp.ERR_EndOfFile]))
         self.ftp.ftp_settings.pkt_loss_rx = 100
@@ -291,7 +370,7 @@ class TestConcurrentFTP(unittest.TestCase):
         self.assertEqual(len(self.mpstate._master.mav.sent), 1)
 
         self.ftp.ftp_settings.pkt_lag_rx = 100
-        eof = reply(0, mavproxy_ftp.OP_ListDirectory,
+        eof = reply(0, mavproxy_ftp.OP_ListDirectoryWithTime,
                     opcode=mavproxy_ftp.OP_Nack,
                     payload=bytes([mavproxy_ftp.ERR_EndOfFile]))
         self.ftp.mavlink_packet(eof)

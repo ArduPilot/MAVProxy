@@ -37,6 +37,9 @@ OP_TruncateFile = 12
 OP_Rename = 13
 OP_CalcFileCRC32 = 14
 OP_BurstReadFile = 15
+# Like OP_ListDirectory, with an mtime field appended to file entries.  Older
+# servers either NACK this request or ignore it, so callers must fall back.
+OP_ListDirectoryWithTime = 16
 OP_Ack = 128
 OP_Nack = 129
 
@@ -144,6 +147,8 @@ class FTPWorker(mp_module.MPModule):
         self.last_burst_read = None
         self.op_start = None
         self.dir_offset = 0
+        self.list_dname = None
+        self.list_with_time = False
         self.last_op_time = time.time()
         self.rtt = 0.5
         self.rttvar = 0.25
@@ -307,11 +312,50 @@ class FTPWorker(mp_module.MPModule):
         enc_dname = bytearray(dname, 'ascii')
         self.total_size = 0
         self.dir_offset = 0
-        op = FTP_OP(self.seq, self.session, OP_ListDirectory, len(enc_dname), 0, 0, self.dir_offset, enc_dname)
+        self.list_dname = enc_dname
+        self.list_with_time = (
+            self.ftp_settings.list_time != 0 and
+            self.manager.list_time_supported.get(self.list_target_key()) is not False)
+        self.send_list_request()
+
+    def list_target_key(self):
+        '''Return the target whose listing opcode support is being learned.'''
+        return (self.target_system, self.target_component)
+
+    def send_list_request(self):
+        '''Request the next page using state owned by this listing worker.'''
+        opcode = (OP_ListDirectoryWithTime if self.list_with_time
+                  else OP_ListDirectory)
+        op = FTP_OP(self.seq, self.session, opcode, len(self.list_dname), 0, 0,
+                    self.dir_offset, self.list_dname)
         self.send(op)
 
+    def list_without_time(self):
+        '''Restart a listing using the opcode understood by older servers.'''
+        if self.ftp_settings.debug > 0:
+            print("FTP: no directory listing with time, retrying without")
+        self.list_with_time = False
+        self.dir_offset = 0
+        self.total_size = 0
+        self.send_list_request()
+
+    def list_mtime_str(self, mtime):
+        '''Format UTC wire time in local time, or '-' when it is unknown.'''
+        if mtime == 0:
+            return '-'
+        try:
+            return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(mtime))
+        except (ValueError, OSError):
+            return str(mtime)
+
     def handle_list_reply(self, op, m):
-        '''handle OP_ListDirectory reply'''
+        '''Handle OP_ListDirectory and OP_ListDirectoryWithTime replies.'''
+        with_time = op.req_opcode == OP_ListDirectoryWithTime
+        if with_time != self.list_with_time:
+            # This is a delayed reply to the opcode used before fallback.
+            return
+        if with_time and op.opcode == OP_Ack:
+            self.manager.list_time_supported[self.list_target_key()] = True
         if op.opcode == OP_Ack:
             dentries = sorted(op.payload.split(b'\x00'))
             #print(dentries)
@@ -329,20 +373,42 @@ class FTPWorker(mp_module.MPModule):
                 if d[0] == 'D':
                     print(" D %s" % d[1:])
                 elif d[0] == 'F':
-                    (name, size) = d[1:].split('\t')
-                    size = int(size)
+                    # Names can contain tabs. Size and optional mtime are the
+                    # fields at the end of an entry, so parse from that end.
+                    fields = d[1:].split('\t')
+                    trailing = 2 if with_time else 1
+                    if len(fields) < trailing + 1:
+                        print(d)
+                        continue
+                    name = '\t'.join(fields[:-trailing])
+                    try:
+                        size = int(fields[-trailing])
+                    except ValueError:
+                        print(d)
+                        continue
                     self.total_size += size
-                    print("   %s\t%u" % (name, size))
+                    if with_time:
+                        try:
+                            mtime = int(fields[-1])
+                        except ValueError:
+                            mtime = 0
+                        print("   %s\t%u\t%s" % (
+                            name, size, self.list_mtime_str(mtime)))
+                    else:
+                        print("   %s\t%u" % (name, size))
                 else:
                     print(d)
             # ask for more
-            more = self.last_op
-            more.offset = self.dir_offset
-            self.send(more)
+            self.send_list_request()
         elif op.opcode == OP_Nack and len(op.payload) == 1 and op.payload[0] == ERR_EndOfFile:
             print("Total size %.2f kByte" % (self.total_size / 1024.0))
             self.total_size = 0
             self.terminate_session()
+        elif (with_time and self.dir_offset == 0 and
+              op.opcode == OP_Nack and len(op.payload) >= 1 and
+              op.payload[0] in [ERR_Fail, ERR_UnknownCommand]):
+            self.manager.list_time_supported[self.list_target_key()] = False
+            self.list_without_time()
         else:
             print('LIST: %s' % op)
             self.terminate_session()
@@ -1128,7 +1194,8 @@ class FTPWorker(mp_module.MPModule):
                op.req_opcode == self.last_op.opcode and \
                op.seq == (self.last_op.seq + 1) % 256:
                 self.last_op_reply = True
-            if op.req_opcode == OP_ListDirectory:
+            if op.req_opcode in [OP_ListDirectory,
+                                 OP_ListDirectoryWithTime]:
                 self.handle_list_reply(op, m)
             elif op.req_opcode == OP_OpenFileRO:
                 self.handle_open_RO_reply(op, m)
@@ -1202,13 +1269,29 @@ class FTPWorker(mp_module.MPModule):
         # sequence number makes this safe whether the request or its reply was
         # lost: the server's duplicate-request cache returns the old reply.
         initial_opcodes = (
-            OP_ListDirectory, OP_OpenFileRO, OP_CreateFile, OP_RemoveFile,
-            OP_RemoveDirectory, OP_Rename, OP_CreateDirectory,
-            OP_CalcFileCRC32,
+            OP_ListDirectory, OP_ListDirectoryWithTime, OP_OpenFileRO,
+            OP_CreateFile, OP_RemoveFile, OP_RemoveDirectory, OP_Rename,
+            OP_CreateDirectory, OP_CalcFileCRC32,
         )
+        initial_timeout = self.retry_timeout()
+        if self.last_op is not None and \
+           self.last_op.opcode == OP_ListDirectoryWithTime:
+            # Capability probing needs a generous floor: variable-lag links
+            # should not make a capable server look like an old one.
+            initial_timeout = max(
+                initial_timeout, self.ftp_settings.list_time_timeout)
         if self.last_op is not None and not self.last_op_reply and \
            self.last_op.opcode in initial_opcodes and \
-           now - self.last_op_time > self.retry_timeout():
+           now - self.last_op_time > initial_timeout:
+            if self.last_op.opcode == OP_ListDirectoryWithTime and \
+               self.dir_offset == 0 and \
+               self.request_retries >= self.ftp_settings.list_retries:
+                # Some servers silently ignore unknown FTP opcodes. After
+                # several RTT-sensitive retries, remember the old server and
+                # restart this listing using the baseline opcode.
+                self.manager.list_time_supported[self.list_target_key()] = False
+                self.list_without_time()
+                return
             self.request_retries += 1
             if self.request_retries > 10:
                 print("FTP: request timed out: %s" % self.last_op)
@@ -1281,6 +1364,9 @@ class FTPModule(mp_module.MPModule):
              ('write_batch_size', int, 0),
              ('retry_time', float, 0.5),
              ('crccmp_timeout', float, 120.0),
+             ('list_time', int, 1),
+             ('list_time_timeout', float, 3.0),
+             ('list_retries', int, 3),
              # ArduPilot currently has five GCS_FTP server sessions.  Keeping
              # the cap configurable also supports smaller/custom servers.
              ('max_sessions', int, 5)])
@@ -1288,6 +1374,8 @@ class FTPModule(mp_module.MPModule):
                                      self.ftp_settings.completion)
         self.workers = {}
         self.pending = []
+        # Cache ListDirectoryWithTime support independently for each target.
+        self.list_time_supported = {}
         # A previous process can leave delayed packets or a cached reply on a
         # poor link. Starting every process at session zero can then turn a
         # stale CreateFile ACK into writes against a closed server session.
