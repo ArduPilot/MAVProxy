@@ -9,6 +9,7 @@ import struct
 import random
 import zlib
 import heapq
+import socket
 
 try:
     # py2
@@ -58,7 +59,19 @@ ERR_FileNotFound = 10
 
 HDR_Len = 12
 MAX_Payload = 239
-WRITE_CAPABILITY_MAGIC = 0xA5
+# Four bytes make accidental capability detection from a legacy server's
+# CreateFile reply vanishingly unlikely.  The bytes on the wire spell MFQ1.
+WRITE_CAPABILITY_MAGIC = b'MFQ1'
+
+# Keep network writes below a normal Ethernet MTU.  MAVLink parsers accept
+# multiple frames in one datagram, while avoiding IP fragmentation makes the
+# whole batch much less likely to be lost on a poor link.
+MAX_NETWORK_BATCH = 1200
+
+# A retired session may still have packets in a real link's buffers.  This is
+# longer than ArduPilot's FTP session expiry and prevents a stale reply or
+# request being routed to a new operation after the uint8 session ID wraps.
+SESSION_REUSE_DELAY = 30.0
 
 # the server null terminates the last byte of its name buffer, so a name
 # filling the payload exactly would be silently truncated
@@ -274,6 +287,10 @@ class FTPWorker(mp_module.MPModule):
             self.set_progress_status("%s %s %s" % (
                 "Uploading" if self.write_list is not None else "Downloading",
                 self.filename, outcome))
+        # Requests queued by the lag simulator belong to this operation and
+        # must never run after cancellation or completion.  Queue only the
+        # final TerminateSession after removing them.
+        self.manager.discard_delayed(self)
         self.send(FTP_OP(self.seq, self.session, OP_TerminateSession, 0, 0, 0, 0, None))
         self.fh = None
         self.filename = None
@@ -724,11 +741,11 @@ class FTPWorker(mp_module.MPModule):
             return
         if op.opcode == OP_Ack:
             self.write_open = True
-            if op.size >= 3 and op.payload[0] == WRITE_CAPABILITY_MAGIC:
+            if op.size >= 6 and bytes(op.payload[:4]) == WRITE_CAPABILITY_MAGIC:
                 if self.ftp_settings.write_qsize <= 0:
-                    self.write_qsize = max(1, op.payload[1])
+                    self.write_qsize = max(1, op.payload[4])
                 if self.ftp_settings.write_batch_size <= 0:
-                    self.write_batch_size = max(1, op.payload[2])
+                    self.write_batch_size = max(1, op.payload[5])
             self.send_more_writes()
         else:
             print("Create failed")
@@ -793,6 +810,11 @@ class FTPWorker(mp_module.MPModule):
         previous_idx = self.write_recv_idx
         acked = [idx]
         if op.burst_complete:
+            if op.size >= 5 and self.ftp_settings.write_qsize <= 0:
+                # The server may enlarge this session's reservation when a
+                # competing writer closes.  Windows never shrink while
+                # requests are outstanding.
+                self.write_qsize = max(self.write_qsize, op.payload[4])
             if op.size >= 4:
                 start_offset, = struct.unpack('<I', bytes(op.payload[:4]))
                 start_idx = start_offset // self.write_block_size
@@ -1388,6 +1410,7 @@ class FTPModule(mp_module.MPModule):
         self.rx_delay_queue = []
         self.last_tx_deadline = 0.0
         self.last_rx_deadline = 0.0
+        self.retired_sessions = {}
 
     def packet_lost(self, direction):
         '''Return true when the configured link simulator drops a packet.'''
@@ -1439,8 +1462,60 @@ class FTPModule(mp_module.MPModule):
                     network, target_system, target_component, payload)
         finally:
             mav.file = link
-        if collector.packets:
-            link.write(b''.join(collector.packets))
+        if not collector.packets:
+            return
+
+        port = getattr(link, 'port', None)
+        port_type = getattr(port, 'type', None)
+        link_name = type(link).__name__
+        is_stream = (link_name in ('mavtcp', 'mavtcpin') or
+                     port_type == socket.SOCK_STREAM)
+        is_network = (link_name == 'mavudp' or
+                      port_type == socket.SOCK_DGRAM or is_stream)
+        if not is_network:
+            # Serial writes benefit substantially from being combined into a
+            # single USB transfer.
+            self._write_link_data(link, b''.join(collector.packets), False)
+            return
+
+        batch = bytearray()
+        for packet in collector.packets:
+            if batch and len(batch) + len(packet) > MAX_NETWORK_BATCH:
+                self._write_link_data(link, bytes(batch), is_stream)
+                batch = bytearray()
+            batch.extend(packet)
+        if batch:
+            self._write_link_data(link, bytes(batch), is_stream)
+
+    def _write_link_data(self, link, data, is_stream):
+        '''Write one encoded batch without ignoring partial stream writes.'''
+        if is_stream:
+            port = getattr(link, 'port', None)
+            if port is None and hasattr(link, 'reconnect'):
+                try:
+                    link.reconnect()
+                except OSError:
+                    return
+                port = getattr(link, 'port', None)
+            if port is not None and hasattr(port, 'sendall'):
+                try:
+                    port.sendall(data)
+                except OSError:
+                    if hasattr(link, 'handle_disconnect'):
+                        link.handle_disconnect()
+                return
+
+        offset = 0
+        while offset < len(data):
+            written = link.write(data[offset:])
+            # Datagram and several pymavlink wrappers return None after a
+            # complete write.  Integer-returning serial writers can be safely
+            # resumed when they accept only part of the buffer.
+            if written is None:
+                return
+            if written <= 0:
+                return
+            offset += written
 
     def send_payloads(self, worker, payloads):
         '''Apply outgoing loss/lag, preserving batches that survive.'''
@@ -1458,7 +1533,7 @@ class FTPModule(mp_module.MPModule):
         deadline = max(time.monotonic() + lag, self.last_tx_deadline)
         self.last_tx_deadline = deadline
         heapq.heappush(self.tx_delay_queue,
-                       (deadline, self.delay_sequence, args))
+                       (deadline, self.delay_sequence, worker, args))
 
     def _packet_worker(self, m):
         try:
@@ -1491,10 +1566,17 @@ class FTPModule(mp_module.MPModule):
 
     def _allocate_session(self):
         '''Return an unused client-selected uint8 session id.'''
+        now = time.monotonic()
+        self.retired_sessions = {
+            session: deadline
+            for session, deadline in self.retired_sessions.items()
+            if deadline > now
+        }
         for _ in range(256):
             session = self.next_session
             self.next_session = (self.next_session + 1) % 256
-            if session not in self.workers:
+            if session not in self.workers and \
+               session not in self.retired_sessions:
                 return session
         return None
 
@@ -1532,10 +1614,33 @@ class FTPModule(mp_module.MPModule):
         '''Forget a completed worker and start the oldest queued operation.'''
         if self.workers.get(worker.session) is worker:
             del self.workers[worker.session]
+            deadline = time.monotonic() + SESSION_REUSE_DELAY
+            # A configured lag can exceed the normal network quarantine.  Do
+            # not reuse the ID before its delayed TerminateSession is sent.
+            for queued_deadline, _, queued_worker, _ in self.tx_delay_queue:
+                if queued_worker is worker:
+                    deadline = max(deadline, queued_deadline + 1.0)
+            self.retired_sessions[worker.session] = deadline
+        self._start_pending()
+
+    def _start_pending(self):
+        '''Start queued work when both a slot and a safe session ID exist.'''
         limit = self._session_limit()
         while self.pending and len(self.workers) < limit:
             operation = self.pending.pop(0)
-            self._launch(operation)
+            if self._launch(operation) is None:
+                break
+
+    def discard_delayed(self, worker):
+        '''Discard simulated-link traffic belonging to a finished worker.'''
+        self.tx_delay_queue = [
+            item for item in self.tx_delay_queue if item[2] is not worker
+        ]
+        heapq.heapify(self.tx_delay_queue)
+        self.rx_delay_queue = [
+            item for item in self.rx_delay_queue if item[2] is not worker
+        ]
+        heapq.heapify(self.rx_delay_queue)
 
     def _session_limit(self):
         # Session ids are uint8.  Keep one value in reserve so allocation and
@@ -1634,14 +1739,19 @@ class FTPModule(mp_module.MPModule):
     def idle_task(self):
         now = time.monotonic()
         while self.tx_delay_queue and self.tx_delay_queue[0][0] <= now:
-            _, _, args = heapq.heappop(self.tx_delay_queue)
-            self._transmit_payloads(*args)
+            _, _, worker, args = heapq.heappop(self.tx_delay_queue)
+            active = self.workers.get(worker.session) is worker
+            terminal = all(payload[3] == OP_TerminateSession
+                           for payload in args[-1])
+            if active or terminal:
+                self._transmit_payloads(*args)
         while self.rx_delay_queue and self.rx_delay_queue[0][0] <= now:
             _, _, worker, m = heapq.heappop(self.rx_delay_queue)
             if self.workers.get(worker.session) is worker:
                 worker.mavlink_packet(m)
         for worker in list(self.workers.values()):
             worker.idle_task()
+        self._start_pending()
 
     def unload(self):
         self.cmd_cancel()
