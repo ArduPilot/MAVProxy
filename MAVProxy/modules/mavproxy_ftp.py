@@ -1593,7 +1593,8 @@ class FTPModule(mp_module.MPModule):
 
     def cmd_status(self):
         if not self.workers and not self.pending:
-            print("No FTP operations in progress")
+            # Keep the longstanding wording used by scripts and autotests.
+            print("No transfer in progress")
             return
         for session, worker in sorted(self.workers.items()):
             status = worker.transfer_status()
