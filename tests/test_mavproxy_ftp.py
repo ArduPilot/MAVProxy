@@ -3,6 +3,7 @@ import contextlib
 import io
 from pathlib import Path
 import struct
+import socket
 import time
 import types
 import unittest
@@ -31,6 +32,36 @@ class FakeMAV:
 class FakeMaster:
     def __init__(self):
         self.mav = FakeMAV()
+
+
+class FakeLink:
+    def __init__(self, port_type=None):
+        self.writes = []
+        self.port = types.SimpleNamespace(type=port_type)
+
+    def write(self, data):
+        self.writes.append(bytes(data))
+        return len(data)
+
+
+class FakeStreamPort:
+    type = socket.SOCK_STREAM
+
+    def __init__(self):
+        self.writes = []
+
+    def sendall(self, data):
+        self.writes.append(bytes(data))
+
+
+class FakeBatchMAV:
+    '''Minimal MAVLink encoder whose output can be collected by the module.'''
+    def __init__(self, link):
+        self.file = link
+
+    def file_transfer_protocol_send(self, network, target_system,
+                                    target_component, payload):
+        self.file.write(b'F' + bytes(payload))
 
 
 class FakeConsole:
@@ -292,6 +323,23 @@ class TestConcurrentFTP(unittest.TestCase):
         self.assertEqual(completed, [8])
         self.assertNotIn(0, self.ftp.workers)
 
+    def test_cumulative_write_ack_can_expand_server_window(self):
+        self.ftp.ftp_settings.write_size = 2
+        self.ftp.cmd_put(['unused', '/remote'], fh=io.BytesIO(b'abcdefgh'))
+        capabilities = mavproxy_ftp.WRITE_CAPABILITY_MAGIC + bytes([1, 8])
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_CreateFile, payload=capabilities))
+        worker = self.ftp.workers[0]
+        self.assertEqual(worker.write_qsize, 1)
+
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_WriteFile, offset=0,
+            payload=struct.pack('<I', 0) + bytes([60]),
+            burst_complete=1, seq=2))
+
+        self.assertEqual(worker.write_qsize, 60)
+        self.assertGreater(worker.write_pending, 1)
+
     def test_write_window_uses_server_capabilities_in_auto_mode(self):
         self.ftp.cmd_put(['unused', '/remote'], fh=io.BytesIO(b'abc'))
         worker = self.ftp.workers[0]
@@ -305,13 +353,20 @@ class TestConcurrentFTP(unittest.TestCase):
             worker.idle_task()
         self.assertEqual(len(self.mpstate._master.mav.sent), sent)
 
-        capabilities = bytes([
-            mavproxy_ftp.WRITE_CAPABILITY_MAGIC, 64, 8,
-        ])
+        # The obsolete one-byte marker is not enough to enable acceleration;
+        # a legacy server could coincidentally return these bytes.
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_CreateFile, payload=b'\xA5\x40\x08'))
+        self.assertEqual(worker.write_qsize, 5)
+        self.assertEqual(worker.write_batch_size, 1)
+
+        # Restart with an unambiguous versioned capability reply.
+        worker.write_open = False
+        capabilities = mavproxy_ftp.WRITE_CAPABILITY_MAGIC + bytes([60, 8])
         self.ftp.mavlink_packet(reply(
             0, mavproxy_ftp.OP_CreateFile, payload=capabilities))
 
-        self.assertEqual(worker.write_qsize, 64)
+        self.assertEqual(worker.write_qsize, 60)
         self.assertEqual(worker.write_batch_size, 8)
         sent = len(self.mpstate._master.mav.sent)
         for _ in range(10):
@@ -369,9 +424,9 @@ class TestConcurrentFTP(unittest.TestCase):
         self.assertEqual(self.mpstate._master.mav.sent, [])
         self.assertEqual(len(self.ftp.tx_delay_queue), 1)
 
-        deadline, sequence, args = self.ftp.tx_delay_queue[0]
+        deadline, sequence, worker, args = self.ftp.tx_delay_queue[0]
         self.ftp.tx_delay_queue[0] = (time.monotonic() - 1,
-                                      sequence, args)
+                                      sequence, worker, args)
         self.ftp.idle_task()
         self.assertEqual(len(self.mpstate._master.mav.sent), 1)
 
@@ -388,6 +443,80 @@ class TestConcurrentFTP(unittest.TestCase):
                                       sequence, worker, message)
         self.ftp.idle_task()
         self.assertNotIn(0, self.ftp.workers)
+
+    def test_cancel_discards_delayed_writes_but_sends_termination(self):
+        self.ftp.ftp_settings.pkt_lag_tx = 100
+        self.ftp.cmd_put(['unused', '/remote'], fh=io.BytesIO(b'abcdefgh'))
+
+        # Deliver CreateFile and let its ACK queue the upload writes.
+        deadline, sequence, worker, args = self.ftp.tx_delay_queue[0]
+        self.ftp.tx_delay_queue[0] = (
+            time.monotonic() - 1, sequence, worker, args)
+        self.ftp.idle_task()
+        self.ftp.mavlink_packet(reply(0, mavproxy_ftp.OP_CreateFile))
+        self.assertTrue(any(
+            payload[3] == mavproxy_ftp.OP_WriteFile
+            for _, _, _, queued_args in self.ftp.tx_delay_queue
+            for payload in queued_args[-1]))
+
+        self.ftp.cmd_cancel()
+        self.assertEqual(len(self.ftp.tx_delay_queue), 1)
+        deadline, sequence, worker, args = self.ftp.tx_delay_queue[0]
+        self.assertTrue(all(payload[3] == mavproxy_ftp.OP_TerminateSession
+                            for payload in args[-1]))
+        self.ftp.tx_delay_queue[0] = (
+            time.monotonic() - 1, sequence, worker, args)
+        self.ftp.idle_task()
+
+        opcodes = [request_opcode(packet)
+                   for packet in self.mpstate._master.mav.sent]
+        self.assertEqual(opcodes, [mavproxy_ftp.OP_CreateFile,
+                                   mavproxy_ftp.OP_TerminateSession])
+
+    def test_retired_session_ids_are_quarantined(self):
+        self.ftp.retired_sessions[0] = (
+            time.monotonic() + mavproxy_ftp.SESSION_REUSE_DELAY)
+        self.ftp.next_session = 0
+        self.assertEqual(self.ftp._allocate_session(), 1)
+
+        self.ftp.retired_sessions[0] = time.monotonic() - 1
+        self.ftp.next_session = 0
+        self.assertEqual(self.ftp._allocate_session(), 0)
+
+    def test_network_batches_stay_below_mtu(self):
+        link = FakeLink(socket.SOCK_DGRAM)
+        master = types.SimpleNamespace(mav=FakeBatchMAV(link))
+        payloads = [bytes([i]) * 251 for i in range(16)]
+
+        self.ftp._transmit_payloads(master, 0, 1, 1, payloads)
+
+        expected = b''.join(b'F' + payload for payload in payloads)
+        self.assertEqual(b''.join(link.writes), expected)
+        self.assertGreater(len(link.writes), 1)
+        self.assertTrue(all(len(write) <= mavproxy_ftp.MAX_NETWORK_BATCH
+                            for write in link.writes))
+
+    def test_serial_batch_remains_one_write(self):
+        link = FakeLink()
+        master = types.SimpleNamespace(mav=FakeBatchMAV(link))
+        payloads = [b'x' * 251 for _ in range(16)]
+
+        self.ftp._transmit_payloads(master, 0, 1, 1, payloads)
+
+        self.assertEqual(len(link.writes), 1)
+
+    def test_tcp_batches_use_complete_writes(self):
+        link = FakeLink()
+        link.port = FakeStreamPort()
+        master = types.SimpleNamespace(mav=FakeBatchMAV(link))
+        payloads = [b'x' * 251 for _ in range(16)]
+
+        self.ftp._transmit_payloads(master, 0, 1, 1, payloads)
+
+        self.assertEqual(link.writes, [])
+        self.assertGreater(len(link.port.writes), 1)
+        self.assertTrue(all(len(write) <= mavproxy_ftp.MAX_NETWORK_BATCH
+                            for write in link.port.writes))
 
     def test_loss_seed_replays_variable_lag(self):
         other = mavproxy_ftp.FTPModule(FakeMPState())
