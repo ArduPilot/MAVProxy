@@ -92,6 +92,12 @@ class TestConcurrentFTP(unittest.TestCase):
         self.ftp = mavproxy_ftp.FTPModule(self.mpstate)
         self.ftp.next_session = 0
 
+    def test_idle_status_keeps_script_compatible_wording(self):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.ftp.cmd_status()
+        self.assertEqual(output.getvalue(), "No transfer in progress\n")
+
     def test_gets_and_list_have_independent_sessions_and_state(self):
         results = {}
 
