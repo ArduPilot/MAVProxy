@@ -234,8 +234,8 @@ class FenceModule(mp_module.MPModule):
         self.fenceloader.target_system = self.target_system
         self.fenceloader.target_component = self.target_component
         self.fenceloader.reindex()
-        action = self.get_mav_param('FENCE_ACTION', mavutil.mavlink.FENCE_ACTION_NONE)
-        self.param_set('FENCE_ACTION', mavutil.mavlink.FENCE_ACTION_NONE, 3)
+        action = self.get_mav_param('FENCE_ACTION', 0)
+        self.param_set('FENCE_ACTION', 0, 3)
         self.param_set('FENCE_TOTAL', self.fenceloader.count(), 3)
         for i in range(self.fenceloader.count()):
             p = self.fenceloader.point(i)
