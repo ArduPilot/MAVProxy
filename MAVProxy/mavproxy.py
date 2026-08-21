@@ -31,6 +31,7 @@ from pymavlink import mavutil
 from MAVProxy.modules.lib import textconsole
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import rline
+from MAVProxy.modules.lib import sitl_output
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_substitute
 from MAVProxy.modules.lib import multiproc
@@ -1333,7 +1334,8 @@ if __name__ == '__main__':
                       default=[])
     parser.add_option("--baudrate", dest="baudrate", type='int',
                       help="default serial baud rate", default=57600)
-    parser.add_option("--sitl", dest="sitl", default=None, help="SITL output port")
+    parser.add_option("--sitl", dest="sitl", default=None,
+                      help="SITL RC output UDP host:port or Unix datagram uds:PATH")
     parser.add_option("--streamrate", dest="streamrate", default=4, type='int',
                       help="MAVLink stream rate")
     parser.add_option("--source-system", dest='SOURCE_SYSTEM', type='int',
@@ -1522,7 +1524,7 @@ if __name__ == '__main__':
                                                                   input=False, autoreconnect=True))
 
     if opts.sitl:
-        mpstate.sitl_output = mavutil.mavudp(opts.sitl, input=False)
+        mpstate.sitl_output = sitl_output.connection(opts.sitl)
 
     mpstate.settings.streamrate = opts.streamrate
     mpstate.settings.streamrate2 = opts.streamrate
