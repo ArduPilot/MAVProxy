@@ -392,7 +392,8 @@ def decode_devid(devid, pname):
         3: "UAVCAN",
         4: "SITL",
         5: "MSP",
-        6: "EAHRS"
+        6: "SERIAL",
+        7: "WSPI",
         }
 
     compass_types = {
@@ -504,7 +505,7 @@ def decode_devid(devid, pname):
         0x0A : "AIRSPEED_ASP5033",
         0x0B : "AIRSPEED_AUAV",
     }
-        
+
     decoded_devname = ""
 
     if pname.startswith("COMPASS"):
@@ -526,7 +527,22 @@ def decode_devid(devid, pname):
 
     if pname.startswith("ARSP"):
         decoded_devname = airspeed_types.get(devtype, "UNKNOWN")
-        
+
+    if pname.startswith("MAV"):
+        # see AP_SerialManager::UARTState::get_device_id; devtype is
+        # the port kind, address is the port index within that kind
+        # and bus distinguishes CAN driver 1 from CAN driver 2
+        if devtype == 1:
+            decoded_devname = "SERIAL" + str(address)
+        elif devtype == 2:
+            decoded_devname = "NET_P" + str(address + 1)
+        elif devtype == 3:
+            decoded_devname = "CAN_D%u_UC_S%u" % (bus + 1, address + 1)
+        elif devtype == 4:
+            decoded_devname = "SCR_SDEV" + str(address + 1)
+        else:
+            decoded_devname = "UNKNOWN"
+
     print("%s: bus_type:%s(%u)  bus:%u address:%u(0x%x) devtype:%u(0x%x) %s (%u)" % (
         pname,
         bustypes.get(bus_type,"UNKNOWN"), bus_type,
