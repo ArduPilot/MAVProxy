@@ -175,9 +175,12 @@ class DropdownCellEditor(grid.GridCellEditor):
 
 
 class MissionEditorFrame(wx.Frame):
-    def __init__(self, state, elemodel='SRTM3', *args, **kwds):
+    def __init__(self, state, elemodel='SRTM3', read_only=False,
+                 wploader=None, *args, **kwds):
         # begin wxGlade: MissionEditorFrame.__init__
         self.state = state
+        self.read_only = bool(read_only)
+        self.read_only_wploader = wploader
         kwds["style"] = wx.DEFAULT_FRAME_STYLE
         wx.Frame.__init__(self, *args, **kwds)
         self.label_sync_state = wx.StaticText(self, wx.ID_ANY, "UNSYNCED   \n", style=wx.ALIGN_CENTRE)
@@ -251,30 +254,32 @@ class MissionEditorFrame(wx.Frame):
         self.last_layout_send = time.time()
         self.Bind(wx.EVT_IDLE, self.on_idle)
 
-        delete_br = button_renderer.ButtonRenderer("Delete",70,20)
-        up_br = button_renderer.ButtonRenderer("+",20,20)
-        down_br = button_renderer.ButtonRenderer("-",1,1)
+        if not self.read_only:
+            delete_br = button_renderer.ButtonRenderer("Delete",70,20)
+            up_br = button_renderer.ButtonRenderer("+",20,20)
+            down_br = button_renderer.ButtonRenderer("-",1,1)
 
-        self.del_attr = wx.grid.GridCellAttr()
-        self.del_attr.SetReadOnly(True)
-        self.del_attr.SetRenderer(delete_br)
+            self.del_attr = wx.grid.GridCellAttr()
+            self.del_attr.SetReadOnly(True)
+            self.del_attr.SetRenderer(delete_br)
 
-        self.up_attr = wx.grid.GridCellAttr()
-        self.up_attr.SetReadOnly(True)
-        self.up_attr.SetRenderer(up_br)
+            self.up_attr = wx.grid.GridCellAttr()
+            self.up_attr.SetReadOnly(True)
+            self.up_attr.SetRenderer(up_br)
 
-        self.down_attr = wx.grid.GridCellAttr()
-        self.down_attr.SetReadOnly(True)
-        self.down_attr.SetRenderer(down_br)
-        self.read_only_attr = wx.grid.GridCellAttr()
-        self.read_only_attr.SetReadOnly(True)
+            self.down_attr = wx.grid.GridCellAttr()
+            self.down_attr.SetReadOnly(True)
+            self.down_attr.SetRenderer(down_br)
 
-        self.grid_mission.SetColAttr(ME_DELETE_COL, self.del_attr)
-        self.grid_mission.SetColAttr(ME_UP_COL, self.up_attr)
-        self.grid_mission.SetColAttr(ME_DOWN_COL, self.down_attr)
-        self.grid_mission.SetColAttr(ME_DIST_COL, self.read_only_attr)
-        self.grid_mission.SetColAttr(ME_ANGLE_COL, self.read_only_attr)
-        self.grid_mission.SetColAttr(ME_AGL_COL, self.read_only_attr)
+            self.grid_mission.SetColAttr(ME_DELETE_COL, self.del_attr)
+            self.grid_mission.SetColAttr(ME_UP_COL, self.up_attr)
+            self.grid_mission.SetColAttr(ME_DOWN_COL, self.down_attr)
+
+            self.read_only_attr = wx.grid.GridCellAttr()
+            self.read_only_attr.SetReadOnly(True)
+            self.grid_mission.SetColAttr(ME_DIST_COL, self.read_only_attr)
+            self.grid_mission.SetColAttr(ME_ANGLE_COL, self.read_only_attr)
+            self.grid_mission.SetColAttr(ME_AGL_COL, self.read_only_attr)
         self.grid_mission.SetRowLabelSize(50)
 
         #remember what mission we opened/saved last
@@ -282,6 +287,46 @@ class MissionEditorFrame(wx.Frame):
 
         #remember last map click position
         self.last_map_click_pos = None
+
+        if self.read_only:
+            self.load_wploader(wploader)
+            self.configure_read_only()
+
+    def configure_read_only(self):
+        '''Turn the mission editor into a log mission viewer.'''
+        self.SetTitle("MAVExplorer Mission")
+        self.grid_mission.EnableEditing(False)
+        for control in (self.label_sync_state,
+                        self.label_wp_radius, self.text_ctrl_wp_radius,
+                        self.label_loiter_rad, self.text_ctrl_loiter_radius,
+                        self.checkbox_loiter_dir,
+                        self.label_default_alt, self.text_ctrl_wp_default_alt,
+                        self.button_read_wps, self.button_write_wps,
+                        self.button_load_wp_file,
+                        self.button_add_wp, self.button_split):
+            control.Hide()
+        for column in (ME_DELETE_COL, ME_UP_COL, ME_DOWN_COL):
+            self.grid_mission.SetColSize(column, 0)
+        self.Layout()
+
+    def load_wploader(self, wploader):
+        '''Populate the table directly from a MAVWPLoader.'''
+        if wploader is None:
+            return
+        self.process_gui_event(MissionEditorEvent(
+            me_event.MEGE_CLEAR_MISS_TABLE))
+        if wploader.count() > 1:
+            self.process_gui_event(MissionEditorEvent(
+                me_event.MEGE_ADD_MISS_TABLE_ROWS,
+                num_rows=wploader.count() - 1))
+        for item in wploader.wpoints:
+            self.process_gui_event(MissionEditorEvent(
+                me_event.MEGE_SET_MISS_ITEM,
+                num=item.seq, command=item.command,
+                param1=item.param1, param2=item.param2,
+                param3=item.param3, param4=item.param4,
+                lat=item.x, lon=item.y, alt=item.z, frame=item.frame))
+        self.set_modified_state(False)
 
     def __set_properties(self):
         # begin wxGlade: MissionEditorFrame.__set_properties
@@ -399,6 +444,10 @@ class MissionEditorFrame(wx.Frame):
         self.close_window_semaphore = sem
 
     def time_to_process_gui_events(self, evt):
+        if self.read_only:
+            self.check_terrain_pending()
+            self.check_height_profile()
+            return
         event_processed = False
         queue_access_start_time = time.time()
         self.gui_event_queue_lock.acquire()
@@ -513,11 +562,11 @@ class MissionEditorFrame(wx.Frame):
             self.last_map_click_pos = event.get_arg("click_pos")
 
     def prep_new_row(self, row_num):
-        command_choices = sorted(list(me_defines.miss_cmds.values()))
-
-        cell_ed = DropdownCellEditor(command_choices)
-        self.grid_mission.SetCellEditor(row_num, ME_COMMAND_COL, cell_ed)
-        cell_ed.IncRef()
+        if not self.read_only:
+            command_choices = sorted(list(me_defines.miss_cmds.values()))
+            cell_ed = DropdownCellEditor(command_choices)
+            self.grid_mission.SetCellEditor(row_num, ME_COMMAND_COL, cell_ed)
+            cell_ed.IncRef()
         self.grid_mission.SetCellValue(row_num, ME_COMMAND_COL, "NAV_WAYPOINT")
 
         for i in range(1, 7):
@@ -531,8 +580,11 @@ class MissionEditorFrame(wx.Frame):
 
         #populate frm cell editor and set to default value
 
-        frame_cell_ed = wx.grid.GridCellChoiceEditor(list(me_defines.frame_enum.values()))
-        self.grid_mission.SetCellEditor(row_num, ME_FRAME_COL, frame_cell_ed)
+        if not self.read_only:
+            frame_cell_ed = wx.grid.GridCellChoiceEditor(
+                list(me_defines.frame_enum.values()))
+            self.grid_mission.SetCellEditor(
+                row_num, ME_FRAME_COL, frame_cell_ed)
 
         # default to previous rows frame
         if row_num > 0:
@@ -727,11 +779,19 @@ class MissionEditorFrame(wx.Frame):
         if (fd.ShowModal() == wx.ID_CANCEL):
             return #user change their mind...
 
-        #ask mp_misseditor module to save file
-        self.event_queue_lock.acquire()
-        self.event_queue.put(MissionEditorEvent(me_event.MEE_SAVE_WP_FILE,
-            path=fd.GetPath()))
-        self.event_queue_lock.release()
+        if self.read_only:
+            try:
+                self.read_only_wploader.save(fd.GetPath())
+            except Exception as ex:
+                wx.MessageBox("Unable to save mission: %s" % ex,
+                              "Save Mission", wx.OK | wx.ICON_ERROR)
+                return
+        else:
+            # ask mp_misseditor module to save file
+            self.event_queue_lock.acquire()
+            self.event_queue.put(MissionEditorEvent(me_event.MEE_SAVE_WP_FILE,
+                path=fd.GetPath()))
+            self.event_queue_lock.release()
 
         self.last_mission_file_path = fd.GetPath()
 
@@ -1134,6 +1194,8 @@ class MissionEditorFrame(wx.Frame):
             self.height_profile_last_draw = now
 
     def on_idle(self, event):
+        if self.read_only:
+            return
         now = time.time()
         if now - self.last_layout_send > 1:
             self.last_layout_send = now

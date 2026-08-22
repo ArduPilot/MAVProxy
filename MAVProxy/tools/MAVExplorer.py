@@ -1731,10 +1731,14 @@ def cmd_find(args):
         print("%-*s %-*s : %s" % (name_w, full, unit_w, ustr, desc))
 
 
+mission_viewers = []
+
+
 def cmd_mission(args):
     '''show mission'''
-    if (len(args) == 1):
-        print("Usage: mission <save FILENAME>")
+    if (args and args != ['--gui'] and
+            not (len(args) == 2 and args[0] == 'save')):
+        print("Usage: mission [--gui | save FILENAME]")
         return
     mestate.mlog.rewind()
     types = set(['CMD','MISSION_ITEM_INT'])
@@ -1783,6 +1787,15 @@ def cmd_mission(args):
         wp.set(m, m.seq)
     if len(args) == 2 and args[0] == 'save':
         wp.save(args[1])
+        mestate.mlog.rewind()
+        return
+    if args == ['--gui']:
+        from MAVProxy.modules.mavproxy_misseditor.mission_editor import MissionViewer
+        for old in [viewer for viewer in mission_viewers
+                    if not viewer.is_alive()]:
+            old.close()
+            mission_viewers.remove(old)
+        mission_viewers.append(MissionViewer(wp))
         mestate.mlog.rewind()
         return
     for i in range(wp.count()):

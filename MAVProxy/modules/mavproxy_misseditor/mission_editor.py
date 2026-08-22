@@ -18,6 +18,37 @@ from pymavlink import mavwp
 import time
 import threading
 
+
+class MissionViewer(object):
+    '''Read-only mission table used by MAVExplorer.'''
+    def __init__(self, wploader, elemodel='SRTM3'):
+        self.wploader = wploader
+        self.elemodel = elemodel
+        self.child = multiproc.Process(target=self.child_task)
+        self.child.start()
+
+    def child_task(self):
+        mp_util.child_close_fds()
+        from MAVProxy.modules.lib import wx_processguard  # noqa: F401
+        from ..lib.wx_loader import wx
+        from MAVProxy.modules.mavproxy_misseditor import missionEditorFrame
+
+        app = wx.App(False)
+        frame = missionEditorFrame.MissionEditorFrame(
+            None, parent=None, id=wx.ID_ANY, elemodel=self.elemodel,
+            read_only=True, wploader=self.wploader)
+        app.SetExitOnFrameDelete(True)
+        frame.Show()
+        app.MainLoop()
+
+    def is_alive(self):
+        return self.child.is_alive()
+
+    def close(self):
+        if self.child.is_alive():
+            self.child.terminate()
+        self.child.join()
+
 class MissionEditorEventThread(threading.Thread):
     def __init__(self, mp_misseditor, q, l):
         threading.Thread.__init__(self)
