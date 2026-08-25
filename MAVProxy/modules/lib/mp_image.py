@@ -13,6 +13,7 @@ import numpy as np
 import warnings
 from threading import Thread
 import math
+import subprocess
 
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_widgets
@@ -28,7 +29,7 @@ class MPImageData:
             img = np.asarray(img[:,:])
         self.width = img.shape[1]
         self.height = img.shape[0]
-        self.data = img.tostring()
+        self.data = img.tobytes()
 
 class MPImageTitle:
     '''window title to use'''
@@ -89,6 +90,15 @@ class MPImageGStreamer:
     '''request getting image feed from gstreamer pipeline'''
     def __init__(self, pipeline):
         self.pipeline = pipeline
+
+
+class MPImageFFmpeg:
+    '''request raw BGR frames from an ffmpeg command writing to stdout'''
+    def __init__(self, command, width, height):
+        self.command = command
+        self.width = width
+        self.height = height
+
 
 class MPImageVideo:
     '''request getting image feed from video file'''
@@ -317,6 +327,10 @@ class MPImage():
     def set_gstreamer(self, pipeline):
         '''set gstreamer pipeline source'''
         self.in_queue.put(MPImageGStreamer(pipeline))
+
+    def set_ffmpeg(self, command, width, height):
+        '''set an ffmpeg raw-BGR pipeline source'''
+        self.in_queue.put(MPImageFFmpeg(command, width, height))
 
     def set_video(self, filename):
         '''set video file source'''
@@ -606,6 +620,8 @@ class MPImagePanel(wx.Panel):
                 win_layout.set_wx_window_layout(state.frame, obj)
             if isinstance(obj, MPImageGStreamer):
                 self.start_gstreamer(obj.pipeline)
+            if isinstance(obj, MPImageFFmpeg):
+                self.start_ffmpeg(obj.command, obj.width, obj.height)
             if isinstance(obj, MPImageVideo):
                 self.start_video(obj.filename)
             if isinstance(obj, MPImageFPSMax):
@@ -650,6 +666,13 @@ class MPImagePanel(wx.Panel):
         thread.daemon = True
         thread.start()
 
+    def start_ffmpeg(self, command, width, height):
+        '''start an ffmpeg raw-video pipeline'''
+        thread = Thread(target=self.ffmpeg_thread,
+                        args=(command, width, height))
+        thread.daemon = True
+        thread.start()
+
     def start_video(self, filename):
         '''start a video'''
         thread = Thread(target=self.video_thread, args=(filename,0))
@@ -663,6 +686,80 @@ class MPImagePanel(wx.Panel):
     def seek_video_frame(self, frame):
         '''seek to given frame'''
         self.seek_frame = frame
+
+    def display_video_frame(self, frame, frame_count):
+        '''display one BGR video frame and publish tracking/frame events'''
+        if frame_count % 5 == 0:
+            self.state.out_queue.put(MPImageFrameCounter(frame_count))
+
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        (width, height) = (frame.shape[1], frame.shape[0])
+        if self.tracker:
+            self.tracker.update(frame)
+            pos = self.tracker.get_position()
+            if pos is not None:
+                startX = int(pos.left())
+                startY = int(pos.top())
+                endX = int(pos.right())
+                endY = int(pos.bottom())
+                if (startX >= 0
+                    and startY >= 0
+                    and endX < width
+                    and endY < height
+                    and endX > startX
+                    and endY > startY):
+                    cv2.rectangle(frame, (startX, startY), (endX, endY),
+                                  (0,255,0), 2)
+                    self.state.out_queue.put(
+                        MPImageTrackPos(int((startX+endX)/2),
+                                        int((startY+endY)/2), frame.shape))
+        self.set_image_data(frame, width, height)
+        if self.fps_max is not None:
+            while self.fps_max <= 0:
+                time.sleep(0.1)
+            now = time.time()
+            if self.last_frame_time is not None:
+                dt = now - self.last_frame_time
+                if dt < 1.0 / self.fps_max:
+                    time.sleep((1.0 / self.fps_max)-dt)
+            self.last_frame_time = now
+
+    @staticmethod
+    def read_exact(stream, length):
+        '''read exactly length bytes from a pipe, or return None at EOF'''
+        data = bytearray(length)
+        offset = 0
+        while offset < length:
+            count = stream.readinto(memoryview(data)[offset:])
+            if not count:
+                return None
+            offset += count
+        return data
+
+    def ffmpeg_thread(self, command, width, height):
+        '''decode/reconnect an HTTP video source using ffmpeg'''
+        frame_size = width * height * 3
+        frame_count = 0
+        while True:
+            try:
+                process = subprocess.Popen(command, stdout=subprocess.PIPE,
+                                           stderr=subprocess.DEVNULL,
+                                           bufsize=frame_size)
+            except Exception as ex:
+                print("ffmpeg start failed: %s" % ex)
+                return
+            while True:
+                data = self.read_exact(process.stdout, frame_size)
+                if data is None:
+                    break
+                frame_count += 1
+                frame = np.frombuffer(data, dtype=np.uint8)
+                frame = frame.reshape((height, width, 3))
+                self.display_video_frame(frame, frame_count)
+            process.wait()
+            # SupportProxy returns 503 while a publisher is absent. Retry so
+            # an already-open viewer recovers when the stream comes back.
+            time.sleep(1)
         
     def video_thread(self, url, cap_options):
         '''thread for video capture'''
@@ -689,39 +786,7 @@ class MPImagePanel(wx.Panel):
             if frame is None:
                 break
             frame_count = int(self.vcap.get(cv2.CAP_PROP_POS_FRAMES))
-            if frame_count % 5 == 0:
-                self.state.out_queue.put(MPImageFrameCounter(frame_count))
-
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            (width, height) = (frame.shape[1], frame.shape[0])
-            if self.tracker:
-                self.tracker.update(frame)
-                pos = self.tracker.get_position()
-                if pos is not None:
-                    startX = int(pos.left())
-                    startY = int(pos.top())
-                    endX = int(pos.right())
-                    endY = int(pos.bottom())
-                    if (startX >= 0
-                        and startY >= 0
-                        and endX < width
-                        and endY < height
-                        and endX > startX
-                        and endY > startY):
-                        cv2.rectangle(frame, (startX, startY), (endX, endY), (0,255,0), 2)
-                        self.state.out_queue.put(MPImageTrackPos(int((startX+endX)/2),
-                                                                 int((startY+endY)/2),
-                                                                frame.shape))
-            self.set_image_data(frame, width, height)
-            if self.fps_max is not None:
-                while self.fps_max <= 0:
-                    time.sleep(0.1)
-                now = time.time()
-                if self.last_frame_time is not None:
-                    dt = now - self.last_frame_time
-                    if dt < 1.0 / self.fps_max:
-                        time.sleep((1.0 / self.fps_max)-dt)
-                self.last_frame_time = now
+            self.display_video_frame(frame, frame_count)
 
 
     def on_recenter(self, location):

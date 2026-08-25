@@ -27,7 +27,7 @@ class RawThermal:
 
     def __init__(self, siyi, res):
         self.siyi = siyi
-        self.uri = ("192.168.144.25", 7345)
+        self.uri = (siyi.siyi_settings.therm_ip if siyi is not None else "192.168.144.25", 7345)
         self.im = None
         self.tracking = False
         self.cap = None
@@ -148,7 +148,10 @@ class RawThermal:
 
     def display_image(self, fname, data):
         '''display an image'''
-        a = np.frombuffer(data, dtype='>u2')
+        # ZT30's raw-frame service uses big endian samples.  MT11 .bin frames
+        # are little-endian uint16 Kelvin*64.
+        byte_order = '<u2' if self.siyi is not None and self.siyi.is_mt11() else '>u2'
+        a = np.frombuffer(data, dtype=byte_order)
         if len(a) != 640 * 512:
             print("Bad size %u" % len(a))
             return
