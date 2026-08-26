@@ -685,7 +685,9 @@ def cmd_map3d(args):
             path.append((m.Lat, m.Lng, m.Alt,
                          grapher.timestamp_to_days(m._timestamp)))
         elif mtype == 'CMD' and (m.Lat != 0 or m.Lng != 0):
-            mission.append((m.Lat, m.Lng, m.Alt, getattr(m, 'Frame', 3), m.CId, m.CNum))
+            params = tuple(getattr(m, 'Prm%u' % i, 0.0) for i in range(1, 5))
+            mission.append((m.Lat, m.Lng, m.Alt, getattr(m, 'Frame', 3),
+                            m.CId, m.CNum, params))
     mlog.rewind()
 
     if len(path) == 0:
@@ -739,27 +741,28 @@ def cmd_map3d(args):
     m3d.look_at(lat0, lon0, ground0, dist=1.6 * span)
 
 def resolve_mission_amsl(mission, ground0):
-    '''convert mission items to AMSL. mission items are
-    (lat, lon, z, frame, cmd, seq); returns items with frame 0 (AMSL).
+    '''convert mission items to MissionItems in AMSL (frame 0). mission items
+    are (lat, lon, z, frame, cmd, seq, params).
 
     Terrain-frame waypoints are resolved using the quantized terrain mesh (the
     same source rendered in the 3D view), which is fetched per 1-degree tile and
     cached, so it never stalls the command thread per waypoint.'''
+    from MAVProxy.modules.mavproxy_map3d.map3d import MissionItem
     # home AMSL: the home item (seq 0) altitude, else takeoff ground
     home_amsl = ground0
-    for (la, lo, z, frame, cid, seq) in mission:
-        if seq == 0:
-            home_amsl = z
+    for item in mission:
+        if item[5] == 0:
+            home_amsl = item[2]
             break
     sampler = None
-    if any(frame in (10, 11) for (_, _, _, frame, _, _) in mission):
+    if any(item[3] in (10, 11) for item in mission):
         try:
             from MAVProxy.modules.mavproxy_map3d.terrain import sample_terrain
             sampler = sample_terrain
         except Exception as ex:
             print("map3d: terrain elevation unavailable (%s)" % ex)
     out = []
-    for (la, lo, z, frame, cid, seq) in mission:
+    for (la, lo, z, frame, cid, seq, prm) in mission:
         if frame in (0, 5):
             amsl = z
         elif frame in (10, 11):
@@ -767,7 +770,8 @@ def resolve_mission_amsl(mission, ground0):
             amsl = (terr if terr is not None else home_amsl) + z
         else:
             amsl = home_amsl + z
-        out.append((la, lo, amsl, 0, cid, seq))
+        radius = mp_util.mission_circle_radius(cid, prm)
+        out.append(MissionItem(la, lo, amsl, 0, cid, seq, prm[0], radius))
     return out
 
 def cmd_set(args):
