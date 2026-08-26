@@ -188,7 +188,33 @@ def arc_points(latlon1, latlon2, arc_angle, steps=None):
     return points
 
 
-def mission_circle_radius(command, params, default_radius=None):
+# vehicles which hold position at a loiter point rather than flying a circle
+# around it.  MAVProxy's own vehicle type names are accepted as well as the
+# MAV_TYPEs, since that is what a live module has to hand
+HOVERING_VEHICLE_NAMES = ['copter', 'sub']
+HOVERING_MAV_TYPE_NAMES = [
+    'MAV_TYPE_QUADROTOR', 'MAV_TYPE_COAXIAL', 'MAV_TYPE_HELICOPTER',
+    'MAV_TYPE_HEXAROTOR', 'MAV_TYPE_OCTOROTOR', 'MAV_TYPE_TRICOPTER',
+    'MAV_TYPE_DODECAROTOR', 'MAV_TYPE_SUBMARINE',
+]
+
+
+def vehicle_hovers_to_loiter(vehicle):
+    """whether the vehicle holds position at a loiter point instead of
+    circling it.  vehicle is a MAV_TYPE or one of MAVProxy's vehicle type
+    names; None (we do not know) answers False, leaving the circle drawn"""
+    if vehicle is None:
+        return False
+    if isinstance(vehicle, str):
+        return vehicle in HOVERING_VEHICLE_NAMES
+    from pymavlink import mavutil
+    for name in HOVERING_MAV_TYPE_NAMES:
+        if getattr(mavutil.mavlink, name, None) == vehicle:
+            return True
+    return False
+
+
+def mission_circle_radius(command, params, default_radius=None, vehicle=None):
     """return the signed radius in metres of the circle a mission item flies
     about its own location -- the loiter commands and DO_ORBIT -- or None if
     the item does not fly one.
@@ -196,6 +222,9 @@ def mission_circle_radius(command, params, default_radius=None):
     A positive radius is a clockwise circle, negative counter-clockwise.
     params is the item's param1..param4.  Items which leave the radius unset
     ask for the vehicle's own default, which is default_radius here.
+
+    vehicle is the MAV_TYPE (or MAVProxy vehicle type name) flying the
+    mission, which decides the items that hold position instead of circling.
     """
     from pymavlink import mavutil
     mavlink = mavutil.mavlink
@@ -208,6 +237,14 @@ def mission_circle_radius(command, params, default_radius=None):
         mavlink.MAV_CMD_DO_ORBIT: 0,
     }.get(command)
     if index is None:
+        return None
+    if vehicle_hovers_to_loiter(vehicle) and command in (
+            mavlink.MAV_CMD_NAV_LOITER_UNLIM,
+            mavlink.MAV_CMD_NAV_LOITER_TIME,
+            mavlink.MAV_CMD_NAV_LOITER_TO_ALT):
+        # a hovering vehicle sits at the point for these, and climbs straight
+        # up for LOITER_TO_ALT.  It does fly LOITER_TURNS and DO_ORBIT as
+        # circles, so those are left alone
         return None
     radius = params[index]
     if radius is None or math.isnan(radius) or radius == 0:
@@ -232,6 +269,105 @@ def mission_circle_turns(command, params):
     if turns is None or math.isnan(turns) or turns <= 0:
         return None
     return turns
+
+
+def param_value(params, name):
+    """look one parameter up in params, which may be a mapping (a live
+    vehicle's mav_param, or a log's params) or a callable taking a name.
+    Returns None when the parameter is not there"""
+    if params is None:
+        return None
+    try:
+        if callable(params):
+            return params(name)
+        return params.get(name)
+    except Exception:
+        return None
+
+
+def _first_param(params, candidates):
+    """the value of the first parameter present, scaled by the factor beside
+    it. candidates is a sequence of (name, scale)"""
+    for (name, scale) in candidates:
+        value = param_value(params, name)
+        if value is None:
+            continue
+        value = float(value) * scale
+        if value != 0 and not math.isnan(value):
+            return value
+    return None
+
+
+# climb and descent rates as the vehicle is configured to fly them. The
+# firmware has moved these to metres per second over time, so the older
+# centimetre forms are listed after the ones that replaced them
+CLIMB_RATE_PARAMS = [
+    ('TECS_CLMB_MAX', 1.0),         # forward-flight
+    ('WP_SPD_UP', 1.0),
+    ('PILOT_SPD_UP', 1.0),
+    ('WPNAV_SPEED_UP', 0.01),
+    ('PILOT_SPEED_UP', 0.01),
+]
+DESCENT_RATE_PARAMS = [
+    # SINK_MIN is the rate a plane actually cruises down at; SINK_MAX is the
+    # limit it will not exceed, which it does not fly at in a loiter
+    ('TECS_SINK_MIN', 1.0),         # forward-flight
+    ('TECS_SINK_MAX', 1.0),
+    ('WP_SPD_DN', 1.0),
+    ('PILOT_SPD_DN', 1.0),
+    ('WPNAV_SPEED_DN', 0.01),
+    ('PILOT_SPEED_DN', 0.01),
+]
+CRUISE_SPEED_PARAMS = [
+    ('AIRSPEED_CRUISE', 1.0),       # forward-flight
+    ('TRIM_ARSPD_CM', 0.01),
+    ('WP_SPD', 1.0),
+    ('WPNAV_SPEED', 0.01),
+]
+
+
+def vehicle_climb_rate(params, descending=False):
+    """the vertical speed in m/s the vehicle is configured to climb (or
+    descend) at, or None if none of the parameters we know are present"""
+    if descending:
+        return _first_param(params, DESCENT_RATE_PARAMS)
+    return _first_param(params, CLIMB_RATE_PARAMS)
+
+
+def vehicle_cruise_speed(params):
+    """the speed in m/s the vehicle is configured to cruise at, or None"""
+    return _first_param(params, CRUISE_SPEED_PARAMS)
+
+
+def loiter_to_alt_turns(radius, alt_change, params, approach_distance=None,
+                        default_turns=1.0):
+    """how many turns a forward-moving vehicle spends circling to reach the
+    altitude a NAV_LOITER_TO_ALT item asks for.
+
+    The vehicle is already climbing on its way to the loiter point, so only
+    what is left when it arrives gets flown off on the circle.  Given the
+    distance it covers approaching, the time to make the whole altitude
+    change less the time spent approaching leaves the time spent circling,
+    and a turn takes 2*pi*radius/speed seconds.
+
+    With no configured rate or speed to go on there is nothing to compute,
+    and default_turns is the answer -- one turn draws the loiter without
+    pretending to know how long it takes.
+    """
+    if not radius or alt_change is None:
+        return default_turns
+    rate = vehicle_climb_rate(params, descending=(alt_change < 0))
+    speed = vehicle_cruise_speed(params)
+    if rate is None or speed is None or rate <= 0 or speed <= 0:
+        return default_turns
+    seconds = abs(alt_change) / abs(rate)
+    if approach_distance:
+        seconds -= abs(approach_distance) / speed
+    seconds_per_turn = 2 * pi * abs(radius) / speed
+    turns = seconds / seconds_per_turn
+    # it flies at least part of a circle however little is left to do, and an
+    # unbounded spiral is not a useful drawing either
+    return constrain(turns, 0.25, 20.0)
 
 
 def mkdir_p(dir):

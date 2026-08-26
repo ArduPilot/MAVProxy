@@ -170,6 +170,132 @@ class TestCirclingItems(object):
             m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 90, 0)) is None
 
 
+class TestHoveringVehicles(object):
+
+    def setup_method(self):
+        from pymavlink import mavutil
+        self.mavlink = mavutil.mavlink
+
+    def test_which_vehicles_hover(self):
+        m = self.mavlink
+        for vehicle in (m.MAV_TYPE_QUADROTOR, m.MAV_TYPE_HEXAROTOR,
+                        m.MAV_TYPE_HELICOPTER, m.MAV_TYPE_SUBMARINE,
+                        'copter', 'sub'):
+            assert mp_util.vehicle_hovers_to_loiter(vehicle)
+        for vehicle in (m.MAV_TYPE_FIXED_WING, m.MAV_TYPE_VTOL_QUADROTOR,
+                        m.MAV_TYPE_GROUND_ROVER, 'plane', 'rover'):
+            assert not mp_util.vehicle_hovers_to_loiter(vehicle)
+        # not knowing the vehicle leaves the circle drawn
+        assert not mp_util.vehicle_hovers_to_loiter(None)
+
+    def test_a_hovering_vehicle_only_circles_for_some_items(self):
+        m = self.mavlink
+        # it flies these as circles ...
+        for (command, params) in ((m.MAV_CMD_NAV_LOITER_TURNS, (2, 0, 60, 0)),
+                                  (m.MAV_CMD_DO_ORBIT, (80, 5, 0, 0))):
+            assert mp_util.mission_circle_radius(
+                command, params, vehicle=m.MAV_TYPE_QUADROTOR) is not None
+        # ... and holds position for these, climbing straight up rather than
+        # spiralling for LOITER_TO_ALT
+        for (command, params) in ((m.MAV_CMD_NAV_LOITER_UNLIM, (0, 0, 70, 0)),
+                                  (m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 90, 0)),
+                                  (m.MAV_CMD_NAV_LOITER_TO_ALT, (1, -65, 0, 0))):
+            assert mp_util.mission_circle_radius(
+                command, params, vehicle=m.MAV_TYPE_QUADROTOR) is None
+            # a forward-flight vehicle circles for all of them
+            assert mp_util.mission_circle_radius(
+                command, params, vehicle=m.MAV_TYPE_FIXED_WING) is not None
+
+    def test_unknown_vehicle_keeps_the_old_behaviour(self):
+        m = self.mavlink
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_TO_ALT, (1, -65, 0, 0)) == -65
+
+
+class TestVehicleRates(object):
+
+    PLANE = {'TECS_CLMB_MAX': 5.0, 'TECS_SINK_MAX': 4.0,
+             'AIRSPEED_CRUISE': 22.0, 'WP_LOITER_RAD': 90.0}
+    COPTER = {'WP_SPD_UP': 2.5, 'WP_SPD_DN': 1.5, 'WP_SPD': 10.0}
+    OLDER = {'WPNAV_SPEED_UP': 250.0, 'WPNAV_SPEED_DN': 150.0,
+             'TRIM_ARSPD_CM': 2200.0}
+
+    def test_param_value_accepts_a_mapping_or_a_callable(self):
+        assert mp_util.param_value(self.PLANE, 'TECS_CLMB_MAX') == 5.0
+        assert mp_util.param_value(self.PLANE.get, 'TECS_CLMB_MAX') == 5.0
+        assert mp_util.param_value(self.PLANE, 'NO_SUCH_PARAM') is None
+        assert mp_util.param_value(None, 'TECS_CLMB_MAX') is None
+
+    def test_rates_from_forward_flight_parameters(self):
+        assert mp_util.vehicle_climb_rate(self.PLANE) == 5.0
+        assert mp_util.vehicle_climb_rate(self.PLANE, descending=True) == 4.0
+        assert mp_util.vehicle_cruise_speed(self.PLANE) == 22.0
+
+    def test_rates_from_multicopter_parameters(self):
+        assert mp_util.vehicle_climb_rate(self.COPTER) == 2.5
+        assert mp_util.vehicle_climb_rate(self.COPTER, descending=True) == 1.5
+        assert mp_util.vehicle_cruise_speed(self.COPTER) == 10.0
+
+    def test_older_centimetre_parameters_are_scaled(self):
+        assert mp_util.vehicle_climb_rate(self.OLDER) == 2.5
+        assert mp_util.vehicle_climb_rate(self.OLDER, descending=True) == 1.5
+        assert mp_util.vehicle_cruise_speed(self.OLDER) == 22.0
+
+    def test_no_parameters_at_all(self):
+        for params in ({}, None):
+            assert mp_util.vehicle_climb_rate(params) is None
+            assert mp_util.vehicle_climb_rate(params, descending=True) is None
+            assert mp_util.vehicle_cruise_speed(params) is None
+
+
+class TestLoiterToAltTurns(object):
+
+    PLANE = TestVehicleRates.PLANE
+
+    def test_turns_follow_the_configured_rates(self):
+        # a turn at 90m radius and 22m/s takes 2*pi*90/22 = 25.7s, and climbs
+        # 5m/s * 25.7s = 128.5m, so 300m of climb is a little over two turns
+        turns = mp_util.loiter_to_alt_turns(90, 300, self.PLANE)
+        assert turns == pytest.approx(300.0 / (5.0 * 2 * math.pi * 90 / 22.0))
+        assert turns == pytest.approx(2.334, abs=0.01)
+
+    def test_descending_uses_the_sink_rate(self):
+        # TECS_SINK_MAX is 4m/s against a 5m/s climb, so descending takes
+        # proportionally longer
+        climb = mp_util.loiter_to_alt_turns(90, 300, self.PLANE)
+        sink = mp_util.loiter_to_alt_turns(90, -300, self.PLANE)
+        assert sink == pytest.approx(climb * 5.0 / 4.0)
+
+    def test_one_turn_when_the_rates_are_unknown(self):
+        assert mp_util.loiter_to_alt_turns(90, 300, {}) == 1.0
+        assert mp_util.loiter_to_alt_turns(90, 300, None) == 1.0
+        # ... and when there is nothing to work from at all
+        assert mp_util.loiter_to_alt_turns(0, 300, self.PLANE) == 1.0
+        assert mp_util.loiter_to_alt_turns(90, None, self.PLANE) == 1.0
+        assert mp_util.loiter_to_alt_turns(90, 300, {}, default_turns=3) == 3
+
+    def test_absurd_turn_counts_are_clamped(self):
+        # a huge climb should not draw a spiral of hundreds of turns, and the
+        # vehicle flies part of a circle however little is left to do
+        assert mp_util.loiter_to_alt_turns(90, 1000000, self.PLANE) == 20.0
+        assert mp_util.loiter_to_alt_turns(90, 0.001, self.PLANE) == 0.25
+
+    def test_the_approach_leg_takes_some_of_the_climb(self):
+        # the vehicle is already climbing on the way to the loiter point, so
+        # a long leg leaves less to do on the circle
+        near = mp_util.loiter_to_alt_turns(90, 300, self.PLANE, 100)
+        far = mp_util.loiter_to_alt_turns(90, 300, self.PLANE, 1000)
+        assert far < near < mp_util.loiter_to_alt_turns(90, 300, self.PLANE)
+        # a leg long enough to do all the climbing still draws part of a turn
+        assert mp_util.loiter_to_alt_turns(90, 300, self.PLANE, 100000) == 0.25
+
+    def test_a_plane_cruises_down_at_the_minimum_sink_rate(self):
+        # SINK_MAX is a limit the vehicle will not exceed rather than the rate
+        # it descends at, so SINK_MIN wins when both are set
+        params = dict(self.PLANE, TECS_SINK_MIN=2.0, TECS_SINK_MAX=5.0)
+        assert mp_util.vehicle_climb_rate(params, descending=True) == 2.0
+
+
 class TestPolygonBounds(object):
 
     def test_bounds_cover_the_arc_and_not_just_the_chord(self):
