@@ -118,3 +118,22 @@ class TestArcGeometry(object):
         # and it stays near the antimeridian rather than wandering the globe
         for (lat, lon) in points:
             assert abs(mp_util.wrap_180(lon - 180.0)) < 1.0
+
+
+class TestPolygonBounds(object):
+
+    def test_bounds_cover_the_arc_and_not_just_the_chord(self):
+        pytest.importorskip("cv2")
+        from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipPolygon
+        start = HERE
+        end = mp_util.gps_newpos(start[0], start[1], 90, 1100)
+        args = ('key', [start, end], 'layer', (255, 255, 255), 2)
+        chord = SlipPolygon(*args).bounds()
+        arc = SlipPolygon(*args, arcs={0: 270}).bounds()
+        # the chord is due east, so its box has no height at all
+        assert chord[2] == pytest.approx(0)
+        assert arc[2] > 0.01
+        # and the arc box contains every point of the arc
+        for (lat, lon) in mp_util.arc_points(start, end, 270):
+            assert arc[0] <= lat <= arc[0] + arc[2]
+            assert arc[1] <= lon <= arc[1] + arc[3]
