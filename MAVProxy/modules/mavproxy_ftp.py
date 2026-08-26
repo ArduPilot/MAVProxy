@@ -38,8 +38,9 @@ OP_TruncateFile = 12
 OP_Rename = 13
 OP_CalcFileCRC32 = 14
 OP_BurstReadFile = 15
-# Like OP_ListDirectory, with an mtime field appended to file entries.  Older
-# servers either NACK this request or ignore it, so callers must fall back.
+# Peter Barker's extension: like OP_ListDirectory, with an mtime field appended
+# to file entries.  Older servers either NACK this request or ignore it, so
+# callers must fall back.
 OP_ListDirectoryWithTime = 16
 OP_Ack = 128
 OP_Nack = 129
@@ -59,9 +60,6 @@ ERR_FileNotFound = 10
 
 HDR_Len = 12
 MAX_Payload = 239
-# Four bytes make accidental capability detection from a legacy server's
-# CreateFile reply vanishingly unlikely.  The bytes on the wire spell MFQ1.
-WRITE_CAPABILITY_MAGIC = b'MFQ1'
 
 # Keep network writes below a normal Ethernet MTU.  MAVLink parsers accept
 # multiple frames in one datagram, while avoiding IP fragmentation makes the
@@ -77,6 +75,7 @@ SESSION_REUSE_DELAY = 30.0
 # filling the payload exactly would be silently truncated
 MAX_FTP_NAME = MAX_Payload - 1
 
+
 class FTP_OP:
     def __init__(self, seq, session, opcode, size, req_opcode, burst_complete, offset, payload):
         self.seq = seq
@@ -90,7 +89,9 @@ class FTP_OP:
 
     def pack(self):
         '''pack message'''
-        ret = struct.pack("<HBBBBBBI", self.seq, self.session, self.opcode, self.size, self.req_opcode, self.burst_complete, 0, self.offset)
+        ret = struct.pack("<HBBBBBBI", self.seq, self.session, self.opcode,
+                          self.size, self.req_opcode, self.burst_complete, 0,
+                          self.offset)
         if self.payload is not None:
             ret += self.payload
         ret = bytearray(ret)
@@ -111,6 +112,7 @@ class FTP_OP:
         if plen > 0:
             ret += " [%u]" % self.payload[0]
         return ret
+
 
 class WriteQueue:
     def __init__(self, ofs, size):
@@ -182,10 +184,7 @@ class FTPWorker(mp_module.MPModule):
         self.write_inflight = set()
         self.write_last_send = None
         self.write_open = False
-        self.write_qsize = (self.ftp_settings.write_qsize
-                            if self.ftp_settings.write_qsize > 0 else 5)
-        self.write_batch_size = (self.ftp_settings.write_batch_size
-                                 if self.ftp_settings.write_batch_size > 0 else 1)
+        self.write_qsize = max(1, self.ftp_settings.write_qsize)
         self.warned_component = False
         # console progress is only for interactive ftp get/put, not for the
         # callback-driven transfers behind "param ftp" and "wp ftp"
@@ -375,7 +374,7 @@ class FTPWorker(mp_module.MPModule):
             self.manager.list_time_supported[self.list_target_key()] = True
         if op.opcode == OP_Ack:
             dentries = sorted(op.payload.split(b'\x00'))
-            #print(dentries)
+            # print(dentries)
             for d in dentries:
                 if len(d) == 0:
                     continue
@@ -518,7 +517,7 @@ class FTPWorker(mp_module.MPModule):
         self.read_total += len(op.payload)
         if self.callback_progress is not None:
             self.callback_progress(self.fh, self.read_total)
-    
+
     def handle_burst_read(self, op, m):
         '''handle OP_BurstReadFile reply'''
         if self.fh is None or self.filename is None:
@@ -575,7 +574,9 @@ class FTPWorker(mp_module.MPModule):
                     # a burst complete with non-zero size and less than burst packet size
                     # means EOF
                     if not self.reached_eof and self.ftp_settings.debug > 0:
-                        print("EOF at %u with %u gaps t=%.2f" % (self.fh.tell(), len(self.read_gaps), time.time() - self.op_start))
+                        print("EOF at %u with %u gaps t=%.2f" %
+                              (self.fh.tell(), len(self.read_gaps),
+                               time.time() - self.op_start))
                     self.reached_eof = True
                     if self.check_read_finished():
                         return
@@ -642,7 +643,7 @@ class FTPWorker(mp_module.MPModule):
             print("Read failed with %u gaps" % len(self.read_gaps), str(op))
             self.terminate_session()
         self.check_read_send()
-            
+
     def cmd_put(self, args, fh=None, callback=None, progress_callback=None):
         '''put file'''
         if len(args) == 0:
@@ -675,7 +676,7 @@ class FTPWorker(mp_module.MPModule):
             self.filename += os.path.basename(fname)
         if callback is None:
             print("Putting %s as %s" % (fname, self.filename))
-        self.fh.seek(0,2)
+        self.fh.seek(0, 2)
         file_size = self.fh.tell()
         self.fh.seek(0)
 
@@ -709,10 +710,8 @@ class FTPWorker(mp_module.MPModule):
         self.read_retries = 0
         self.op_start = time.time()
         enc_fname = bytearray(self.filename, 'ascii')
-        # burst_complete is otherwise unused for CreateFile. It opts in to
-        # cumulative ACKs from servers that can commit contiguous write
-        # requests as a batch; older servers safely ignore it.
-        op = FTP_OP(self.seq, self.session, OP_CreateFile, len(enc_fname), 0, 1, 0, enc_fname)
+        op = FTP_OP(self.seq, self.session, OP_CreateFile, len(enc_fname), 0, 0,
+                    0, enc_fname)
         self.send(op)
 
     def write_block_len(self, idx):
@@ -733,7 +732,7 @@ class FTPWorker(mp_module.MPModule):
             print("Sent file of length %u in %.2fs %.1fkByte/s" %
                   (flen, dt, (flen / dt) / 1024.0))
         self.finished_status("uploading", self.filename, flen)
-        
+
     def handle_create_file_reply(self, op, m):
         '''handle OP_CreateFile reply'''
         if self.fh is None:
@@ -741,11 +740,6 @@ class FTPWorker(mp_module.MPModule):
             return
         if op.opcode == OP_Ack:
             self.write_open = True
-            if op.size >= 6 and bytes(op.payload[:4]) == WRITE_CAPABILITY_MAGIC:
-                if self.ftp_settings.write_qsize <= 0:
-                    self.write_qsize = max(1, op.payload[4])
-                if self.ftp_settings.write_batch_size <= 0:
-                    self.write_batch_size = max(1, op.payload[5])
             self.send_more_writes()
         else:
             print("Create failed")
@@ -770,9 +764,8 @@ class FTPWorker(mp_module.MPModule):
                 self.write_last_send = now
 
         qsize = max(1, self.write_qsize)
-        batch_size = max(1, min(self.write_batch_size, qsize))
         free_slots = qsize - self.write_pending
-        if self.write_pending > 0 and free_slots < batch_size:
+        if free_slots <= 0:
             return
 
         unsent = len(self.write_list - self.write_inflight)
@@ -804,47 +797,23 @@ class FTPWorker(mp_module.MPModule):
             self.terminate_session()
             return
 
-        # Legacy servers ACK one block at a time. Negotiated batch ACKs carry
-        # an explicit contiguous range so gaps remain eligible for retry.
+        # MAVFTP servers ACK one block at a time.  An ACK jump means an earlier
+        # request was dropped, so make the intervening blocks eligible for
+        # retransmission while completing only the explicitly acknowledged
+        # block.
         idx = op.offset // self.write_block_size
         previous_idx = self.write_recv_idx
-        acked = [idx]
-        if op.burst_complete:
-            if op.size >= 5 and self.ftp_settings.write_qsize <= 0:
-                # The server may enlarge this session's reservation when a
-                # competing writer closes.  Windows never shrink while
-                # requests are outstanding.
-                self.write_qsize = max(self.write_qsize, op.payload[4])
-            if op.size >= 4:
-                start_offset, = struct.unpack('<I', bytes(op.payload[:4]))
-                start_idx = start_offset // self.write_block_size
-                count = ((idx - start_idx) % self.write_total) + 1
-                acked = [((start_idx + i) % self.write_total)
-                         for i in range(count)]
-            else:
-                # Compatibility with early servers that only marked the last
-                # block. The negotiated format also supplies the start offset
-                # so a dropped request cannot be mistaken for a written block.
-                count = (idx - previous_idx) % self.write_total
-                if count == 0:
-                    count = self.write_total
-                acked = [((previous_idx + i) % self.write_total)
-                         for i in range(1, count + 1)]
-        else:
-            count = (idx - previous_idx) % self.write_total
-            # An ACK jump on a legacy server means intervening requests were
-            # dropped. Mark them sendable again, while only idx is complete.
-            for i in range(1, count):
-                self.write_inflight.discard(
-                    (previous_idx + i) % self.write_total)
-        for ack_idx in acked:
-            if ack_idx in self.write_list:
-                # servers are required to resend replies to repeated requests,
-                # so only count a block the first time it is acked
-                self.write_list.discard(ack_idx)
-                self.write_acks += 1
-                self.write_acked_bytes += self.write_block_len(ack_idx)
-            self.write_inflight.discard(ack_idx)
+        count = (idx - previous_idx) % self.write_total
+        for i in range(1, count):
+            self.write_inflight.discard(
+                (previous_idx + i) % self.write_total)
+        if idx in self.write_list:
+            # Servers resend replies to repeated requests, so only count a
+            # block the first time it is acknowledged.
+            self.write_list.discard(idx)
+            self.write_acks += 1
+            self.write_acked_bytes += self.write_block_len(idx)
+        self.write_inflight.discard(idx)
         self.write_pending = len(self.write_inflight)
         self.write_recv_idx = idx
         if self.put_callback_progress:
@@ -1168,7 +1137,9 @@ class FTPWorker(mp_module.MPModule):
             ofs = self.fh.tell()
             dt = time.time() - self.op_start
             rate = (ofs / dt) / 1024.0
-            print("Transfer at offset %u with %u gaps %u retries %.1f kByte/sec" % (ofs, len(self.read_gaps), self.read_retries, rate))
+            print("Transfer at offset %u with %u gaps %u retries "
+                  "%.1f kByte/sec" %
+                  (ofs, len(self.read_gaps), self.read_retries, rate))
 
     def op_parse(self, m):
         '''parse a FILE_TRANSFER_PROTOCOL msg'''
@@ -1182,7 +1153,7 @@ class FTPWorker(mp_module.MPModule):
         mtype = m.get_type()
         if mtype == "FILE_TRANSFER_PROTOCOL":
             if (m.target_system != self.settings.source_system or
-                m.target_component != self.settings.source_component):
+                    m.target_component != self.settings.source_component):
                 if m.target_system == self.settings.source_system and not self.warned_component:
                     self.warned_component = True
                     print("FTP reply for mavlink component %u" % m.target_component)
@@ -1380,10 +1351,7 @@ class FTPModule(mp_module.MPModule):
              ('max_backlog', int, 5),
              ('burst_read_size', int, MAX_Payload),
              ('write_size', int, MAX_Payload),
-             # zero selects the server-advertised values, with conservative
-             # fallbacks for servers predating write batching
-             ('write_qsize', int, 0),
-             ('write_batch_size', int, 0),
+             ('write_qsize', int, 5),
              ('retry_time', float, 0.5),
              ('crccmp_timeout', float, 120.0),
              ('list_time', int, 1),
@@ -1756,6 +1724,7 @@ class FTPModule(mp_module.MPModule):
     def unload(self):
         self.cmd_cancel()
         super(FTPModule, self).unload()
+
 
 def init(mpstate):
     '''initialise module'''
