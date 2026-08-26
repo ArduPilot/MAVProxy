@@ -254,12 +254,28 @@ class SlipPolygon(SlipObject):
         # degrees swept by a circular arc joining the two points.
         # Positive angles are clockwise arcs.
         self.arcs = arcs if arcs is not None else {}
-        self._bounds = mp_util.polygon_bounds(self.points)
+        # an arc can bulge a long way outside its chord, and the map culls
+        # objects whose bounds do not overlap the view, so the bounding box
+        # has to cover the arc bodies rather than just the vertices
+        self._bounds = mp_util.polygon_bounds(self.bounds_points())
         self._pix_points = []
         self._selected_vertex = None
         self._has_timestamps = False
         self._showlines = showlines
         self._showcircles = showcircles
+
+    def bounds_points(self):
+        '''the polygon points, plus samples along any arcs, for bounding'''
+        if not self.arcs:
+            return self.points
+        points = []
+        for i in range(len(self.points)):
+            points.append(self.points[i])
+            if i in self.arcs and i+1 < len(self.points):
+                points.extend(mp_util.arc_points(self.points[i][:2],
+                                                 self.points[i+1][:2],
+                                                 self.arcs[i])[1:-1])
+        return points
 
     def set_colour(self, colour):
         self.colour = colour
@@ -283,15 +299,15 @@ class SlipPolygon(SlipObject):
         pix1 = pixmapper(pt1)
         pix2 = pixmapper(pt2)
         drawn = []
-        if self._showlines:
-            for i in range(len(arc)-1):
-                apix1 = pixmapper(arc[i])
-                apix2 = pixmapper(arc[i+1])
-                (ret, apix1, apix2) = cv2.clipLine((0, 0, width, height), apix1, apix2)
-                if ret is False:
-                    continue
+        for i in range(len(arc)-1):
+            apix1 = pixmapper(arc[i])
+            apix2 = pixmapper(arc[i+1])
+            (ret, apix1, apix2) = cv2.clipLine((0, 0, width, height), apix1, apix2)
+            if ret is False:
+                continue
+            if self._showlines:
                 cv2.line(img, apix1, apix2, colour, linewidth)
-                drawn.append((apix1, apix2))
+            drawn.append((apix1, apix2))
         if len(drawn) == 0:
             # entirely off-screen
             if len(self._pix_points) == 0:
