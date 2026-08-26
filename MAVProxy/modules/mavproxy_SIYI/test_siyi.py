@@ -5,6 +5,8 @@ import unittest
 from unittest.mock import patch
 from types import SimpleNamespace
 import struct
+import numpy as np
+from pymavlink import mavutil
 
 from MAVProxy.modules.mavproxy_SIYI import (
     ABSOLUTE_ZOOM,
@@ -24,10 +26,12 @@ from MAVProxy.modules.mavproxy_SIYI import (
     READ_GIMBAL_MODE,
     READ_THRESHOLDS,
     READ_TEMP_FULL_SCREEN,
+    REQUEST_CONTINUOUS_DATA,
     PHOTO,
     SET_ANGLE,
     SET_THERMAL_GAIN,
     SET_IMAGE_TYPE,
+    SET_LASER_STATUS,
     SIYIModule,
     SIYI_HEADER1,
     SIYI_HEADER2,
@@ -87,9 +91,10 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
             rtsp_rgb='auto',
             rtsp_thermal='auto',
             rtsp_codec='auto',
+            yaw_rate=10.0,
+            pitch_rate=10.0,
             temp_hz=5.0,
             telem_rate=4,
-            use_lidar=0,
             mode_hz=1.0,
             rates_hz=5.0,
             target_rate=10.0,
@@ -101,6 +106,7 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
             max_rate=30.0,
             therm_cap_rate=1.0,
             mt11_temp_autoswap=True,
+            track_ROI=0,
         )
         module.sent = []
         module.last_zoom = 1.0
@@ -310,8 +316,8 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
         mt11.siyi_settings.target_control = 'auto'
         mt11.setting_changed(SimpleNamespace(name='target_control',
                                              value='auto'))
-        self.assertEqual(mt11.target_control_mode(), 'attitude')
-        self.assertEqual(mt11.siyi_settings.att_control, 1)
+        self.assertEqual(mt11.target_control_mode(), 'lua')
+        self.assertEqual(mt11.siyi_settings.att_control, 0)
 
         zt30 = self.make_module(CAMERA_TYPE_ZT30)
         zt30.siyi_settings.target_control = 'auto'
@@ -319,6 +325,130 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
                                              value='auto'))
         self.assertEqual(zt30.target_control_mode(), 'rate')
         self.assertEqual(zt30.siyi_settings.att_control, 0)
+
+    def test_mt11_lua_target_sends_absolute_terrain_roi_once(self):
+        module = self.make_module(CAMERA_TYPE_MT11)
+        module.siyi_settings.target_control = 'lua'
+        sent_roi = []
+
+        class Mav:
+            def command_int_send(self, *args):
+                sent_roi.append(args)
+
+        class Map:
+            def add_object(self, obj):
+                self.obj = obj
+
+        terrain = SimpleNamespace(ElevationModel=SimpleNamespace(
+            GetElevation=lambda lat, lon: 612.75))
+        module.mpstate = SimpleNamespace(
+            click_location=(-35.1234567, 149.7654321),
+            map=Map(),
+            settings=SimpleNamespace(target_system=3, target_component=4),
+            master=lambda: SimpleNamespace(mav=Mav(), messages={}))
+        module.module = lambda name: terrain if name == 'terrain' else None
+        module.icon = np.zeros((2, 2, 3), dtype=np.uint8)
+        module.target_pos = None
+
+        module.cmd_settarget([])
+
+        self.assertIsNone(module.target_pos)
+        self.assertEqual(len(sent_roi), 1)
+        roi = sent_roi[0]
+        self.assertEqual(roi[:4], (
+            3, 4,
+            mavutil.mavlink.MAV_FRAME_GLOBAL,
+            mavutil.mavlink.MAV_CMD_DO_SET_ROI_LOCATION))
+        self.assertEqual(roi[10], -351234567)
+        self.assertEqual(roi[11], 1497654321)
+        self.assertEqual(roi[12], 612.75)
+
+        module.clear_roi_location()
+        self.assertEqual(len(sent_roi), 2)
+        self.assertEqual(sent_roi[1][:4], (
+            3, 4,
+            mavutil.mavlink.MAV_FRAME_GLOBAL,
+            mavutil.mavlink.MAV_CMD_DO_SET_ROI_NONE))
+
+    def test_clear_target_always_clears_aircraft_and_map_roi(self):
+        module = self.make_module(CAMERA_TYPE_MT11)
+        # Simulate changing away from Lua control while an aircraft-side ROI
+        # established by Lua is still active.
+        module.siyi_settings.target_control = 'rate'
+        sent_roi = []
+
+        class Mav:
+            def command_int_send(self, *args):
+                sent_roi.append(args)
+
+        class Map:
+            current_ROI = (-35.0, 149.0, 600.0)
+
+            def remove_object(self, _name):
+                pass
+
+        map_module = Map()
+        module.mpstate = SimpleNamespace(
+            map=map_module,
+            settings=SimpleNamespace(target_system=3, target_component=4),
+            master=lambda: SimpleNamespace(mav=Mav(), messages={}))
+        module.module = lambda name: map_module if name == 'map' else None
+        module.end_tracking = lambda: None
+        module.target_pos = (-35.0, 149.0, 600.0)
+        module.last_map_ROI = map_module.current_ROI
+        module.yaw_rate = 1.0
+        module.pitch_rate = 2.0
+        module.active_target_control = 'lua'
+
+        module.clear_target()
+
+        self.assertEqual(len(sent_roi), 1)
+        self.assertEqual(sent_roi[0][:4], (
+            3, 4,
+            mavutil.mavlink.MAV_FRAME_GLOBAL,
+            mavutil.mavlink.MAV_CMD_DO_SET_ROI_NONE))
+        self.assertIsNone(map_module.current_ROI)
+        self.assertIsNone(module.last_map_ROI)
+        self.assertIsNone(module.target_pos)
+        self.assertIsNone(module.yaw_rate)
+        self.assertIsNone(module.pitch_rate)
+        self.assertIsNone(module.active_target_control)
+
+    def test_manual_and_mode_commands_clear_target(self):
+        cases = (
+            ('center', lambda m: m.cmd_siyi(['center'])),
+            ('resetattitude', lambda m: m.cmd_siyi(['resetattitude'])),
+            ('lock', lambda m: m.cmd_siyi(['lock'])),
+            ('follow', lambda m: m.cmd_siyi(['follow'])),
+            ('fpv', lambda m: m.cmd_siyi(['fpv'])),
+            ('rates', lambda m: m.cmd_rates(['10', '0'])),
+            ('rates-stop', lambda m: m.cmd_rates(['0', '0'])),
+            ('yaw', lambda m: m.cmd_yaw(['5'])),
+            ('pitch', lambda m: m.cmd_pitch(['5'])),
+            ('angle', lambda m: m.cmd_angle(['10', '-20'])),
+            ('retract', lambda m: m.retract()),
+        )
+        for name, command in cases:
+            with self.subTest(command=name):
+                module = self.make_module(CAMERA_TYPE_MT11)
+                clears = []
+                module.clear_target = lambda: clears.append(True)
+                command(module)
+                self.assertEqual(clears, [True])
+
+    def test_terrain_altitude_rejects_missing_and_nonfinite_data(self):
+        module = self.make_module(CAMERA_TYPE_MT11)
+        with patch('builtins.print'):
+            module.module = lambda _name: None
+            self.assertIsNone(module.terrain_altitude(-35, 149))
+            module.module = lambda _name: SimpleNamespace(
+                ElevationModel=SimpleNamespace(
+                    GetElevation=lambda _lat, _lon: float('nan')))
+            self.assertIsNone(module.terrain_altitude(-35, 149))
+        module.module = lambda _name: SimpleNamespace(
+            ElevationModel=SimpleNamespace(
+                GetElevation=lambda _lat, _lon: 123))
+        self.assertEqual(module.terrain_altitude(-35, 149), 123.0)
 
     def test_attitude_target_is_sent_at_configured_rate(self):
         module = self.make_module(CAMERA_TYPE_MT11)
@@ -454,7 +584,6 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
         module.last_thresh_t = old
         module.last_mode_t = old
         module.last_therm_mode = old
-        module.last_laser_enable = old
         module.mt11_image_mode_user_set = False
 
     def test_mt11_telemetry_uses_mt11_commands(self):
@@ -471,6 +600,53 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
         module.request_telem()
         self.assertNotIn(READ_TEMP_FULL_SCREEN,
                          [entry[0] for entry in module.sent])
+
+    def test_mt11_telemetry_never_polls_lidar(self):
+        module = self.make_module(CAMERA_TYPE_MT11)
+        self.initialise_telemetry_state(module)
+        module.image_slots = (0, 2)
+        # Simulate a stale pre-Lua setting loaded by older code.
+        module.siyi_settings.use_lidar = 1
+        module.sent = []
+
+        module.request_telem()
+
+        self.assertNotIn((SET_LASER_STATUS, '<B', (1,)), module.sent)
+        self.assertNotIn((REQUEST_CONTINUOUS_DATA, '<BB', (2, 1)),
+                         module.sent)
+
+    def test_mt11_telemetry_does_not_steal_lua_attitude_stream(self):
+        module = self.make_module(CAMERA_TYPE_MT11)
+        self.initialise_telemetry_state(module)
+        module.image_slots = (0, 2)
+        module.sent = []
+
+        module.request_telem()
+
+        self.assertNotIn((REQUEST_CONTINUOUS_DATA, '<BB',
+                          (1, module.siyi_settings.telem_rate)), module.sent)
+
+    def test_mt11_named_attitude_updates_projection_state(self):
+        module = self.make_module(CAMERA_TYPE_MT11)
+        module.attitude = (1.0, 2.0, 3.0, 100.0, 200.0, 300.0)
+        module.last_att_t = 9.9
+        module.att_dt_lpf = 0.1
+        module.update_status = lambda: None
+        module.armed_checks = lambda: None
+
+        def named(name, value):
+            return SimpleNamespace(get_type=lambda: 'NAMED_VALUE_FLOAT',
+                                   name=name, value=value)
+
+        with patch('MAVProxy.modules.mavproxy_SIYI.time.time',
+                   return_value=10.0):
+            module.mavlink_packet(named(b'CROLL\x00\x00\x00\x00\x00', 4.0))
+            module.mavlink_packet(named('CPITCH', 5.0))
+            module.mavlink_packet(named('CYAW', 6.0))
+
+        self.assertEqual(module.attitude, (4.0, 5.0, 6.0,
+                                           0.0, 0.0, 0.0))
+        self.assertEqual(module.last_att_t, 10.0)
 
     def test_mt11_temperature_autoswap(self):
         module = self.make_module(CAMERA_TYPE_MT11)
@@ -554,6 +730,102 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
             'GLOBAL_POSITION_INT': SimpleNamespace(),
         }
         module.update_target()
+
+    def test_mt11_raw_autoflag_uses_threshold_and_correct_xy_slice(self):
+        view = RawThermal.__new__(RawThermal)
+        view.res = (640, 512)
+        view.tmax = 100.0
+        view.marker_history = []
+        # Baseline 20C with one hot pixel in the top-right slice. The old
+        # transposed slice indices did not inspect this region correctly.
+        view.last_data = np.full((512, 640), 20.0 + 273.15)
+        view.last_data[20, 600] = 100.0 + 273.15
+        flags = []
+        settings = SimpleNamespace(
+            autoflag_enable=True,
+            threshold_temp=50.0,
+            autoflag_slices=4,
+            autoflag_dist=30.0,
+            autoflag_history=50)
+        view.siyi = SimpleNamespace(
+            siyi_settings=settings,
+            have_DATA96=False,
+            module=lambda name: object() if name == 'map' else None,
+            add_thermal_flag=lambda *args: flags.append(args))
+        view.xy_to_latlon = lambda x, y: (-35.0 + y * 1.0e-6,
+                                          149.0 + x * 1.0e-6,
+                                          600.0)
+
+        view.handle_auto_flag()
+
+        self.assertEqual(len(flags), 1)
+        latlonalt, temperature, pixel_x, pixel_y = flags[0]
+        self.assertEqual((pixel_x, pixel_y), (560, 64))
+        self.assertAlmostEqual(temperature, 100.0)
+        self.assertEqual(latlonalt, (-34.999936, 149.00056, 600.0))
+
+    def test_mt11_data96_autoflag_uses_threshold_and_camera_altitude(self):
+        module = self.make_module(CAMERA_TYPE_MT11)
+        module.siyi_settings.autoflag_enable = True
+        module.siyi_settings.threshold_temp = 50.0
+        module.siyi_settings.thermal_fov = 24.2
+        module.siyi_settings.mount_alt = 1.5
+        module.siyi_settings.autoflag_radius = 100.0
+        module.last_map_ROI = None
+        module.module = lambda _name: SimpleNamespace(ElevationModel=object())
+        flags = []
+        module.add_thermal_flag = lambda *args, **_kwargs: flags.append(args)
+        projection_calls = []
+
+        class Projection:
+            def __init__(self, _params, elevation_model=None):
+                self.elevation_model = elevation_model
+
+            def get_slantrange(self, *args):
+                projection_calls.append(('slant', args))
+                return 120.0
+
+            def get_latlonalt_for_pixel(self, *args):
+                projection_calls.append(('pixel', args))
+                return (-35.0001, 149.0002, 610.0)
+
+        def data96(tmax):
+            return struct.pack(
+                '<iiifffHHffffff',
+                1234, -350000000, 1490000000, 600.0, 605.0,
+                tmax, 600, 20,
+                1.0, -20.0, 3.0, 2.0, -1.0, 10.0)
+
+        with patch(
+                'MAVProxy.modules.mavproxy_SIYI.camera_projection.CameraProjection',
+                Projection):
+            module.process_DATA96(data96(80.0))
+            module.process_DATA96(data96(49.9))
+
+        self.assertEqual(flags, [((-35.0001, 149.0002, 610.0),
+                                  80.0, 600, 20)])
+        self.assertEqual(len(projection_calls), 2)
+        self.assertAlmostEqual(projection_calls[0][1][2], 606.5)
+        self.assertAlmostEqual(projection_calls[1][1][4], 606.5)
+
+    def test_thermal_flame_marker_has_dataflash_log(self):
+        module = self.make_module(CAMERA_TYPE_MT11)
+        added = []
+        map_mock = SimpleNamespace(
+            icon=lambda _name: np.zeros((2, 2, 3), dtype=np.uint8),
+            add_object=lambda obj: added.append(obj))
+        module.mpstate = SimpleNamespace(map=map_mock)
+        module.thermal_flag_count = 0
+        logs = []
+        module.logf = SimpleNamespace(write=lambda *args: logs.append(args))
+        module.micros64 = lambda: 123456
+
+        module.add_thermal_flag((-35.25, 149.5, 601.0), 88.5, 320, 256)
+
+        self.assertEqual(len(added), 1)
+        self.assertEqual(logs, [(
+            'SIFL', 'QLLffHH', 'TimeUS,Lat,Lng,Alt,TMax,X,Y',
+            123456, -352500000, 1495000000, 601.0, 88.5, 320, 256)])
 
     def test_mt11_zero_version_is_not_a_handshake(self):
         module = self.make_parser(CAMERA_TYPE_MT11)
