@@ -59,26 +59,27 @@ def gps_distance(lat1, lon1, lat2, lon2):
     thanks to http://www.movable-type.co.uk/scripts/latlong.html
     and http://www.edwilliams.org/avform147.htm#Rhumb
     '''
+    # take the shorter way around the globe, so that a pair either side of
+    # the antimeridian is a short hop rather than most of the way around
+    dlon = radians(wrap_180(lon2 - lon1))
     lat1 = radians(lat1)
     lat2 = radians(lat2)
-    lon1 = radians(lon1)
-    lon2 = radians(lon2)
 
     if abs(lat2-lat1) < 1.0e-15:
         q = cos(lat1)
     else:
         q = (lat2-lat1)/log(tan(lat2/2+pi/4)/tan(lat1/2+pi/4))
-    d = sqrt((lat2-lat1)**2 + q**2 * (lon2-lon1)**2)
+    d = sqrt((lat2-lat1)**2 + q**2 * dlon**2)
     return d * radius_of_earth
 
 def gps_bearing(lat1, lon1, lat2, lon2):
     '''return rhumb bearing between two points in degrees, in range 0-360
     thanks to http://www.movable-type.co.uk/scripts/latlong.html'''
+    # as for gps_distance, head the short way around the antimeridian
+    dlon = radians(wrap_180(lon2 - lon1))
     lat1 = radians(lat1)
     lat2 = radians(lat2)
-    lon1 = radians(lon1)
-    lon2 = radians(lon2)
-    tc = -fmod(atan2(lon1-lon2,log(tan(lat2/2+pi/4)/tan(lat1/2+pi/4))),2*pi)
+    tc = -fmod(atan2(-dlon,log(tan(lat2/2+pi/4)/tan(lat1/2+pi/4))),2*pi)
     if tc < 0:
         tc += 2*pi
     return degrees(tc)
