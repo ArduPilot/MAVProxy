@@ -346,7 +346,7 @@ class SIYIModule(mp_module.MPModule):
                                                      MPSetting('att_control', int, 1,
                                                                range=(0, 1)),
                                                      MPSetting('target_control', str, 'auto',
-                                                               choice=['auto', 'rate', 'attitude']),
+                                                               choice=['auto', 'lua', 'rate', 'attitude']),
                                                      ('telem_rate', float, 4),
                                                      ('att_send_hz', float, 10),
                                                      ('mode_hz', float, 0),
@@ -363,7 +363,6 @@ class SIYIModule(mp_module.MPModule):
                                                      ('thermal_fov', float, 24.2),
                                                      ('zoom_fov', float, 62.0),
                                                      ('wide_fov', float, 88.0),
-                                                     ('use_lidar', int, 0),
                                                      ('use_encoders', int, 0),
                                                      ('max_rate', float, 30.0),
                                                      ('track_size_pct', float, 5.0),
@@ -463,9 +462,9 @@ class SIYIModule(mp_module.MPModule):
         self.last_therm_cap = time.time()
         self.thermal_capture_count = 0
         self.thermal_data_count = 0
+        self.thermal_flag_count = 0
         self.last_therm_mode = time.time()
         self.last_image_mode_request = 0
-        self.last_laser_enable = 0
         self.image_slots = None
         self.mt11_image_mode_user_set = False
         self.mt11_zoom_state = None
@@ -559,7 +558,7 @@ class SIYIModule(mp_module.MPModule):
             # consistent with the new descriptive setting.
             effective_mode = setting.value.lower()
             if effective_mode == 'auto':
-                effective_mode = ('attitude' if self.is_mt11()
+                effective_mode = ('lua' if self.is_mt11()
                                   else 'rate')
             self.siyi_settings.att_control = int(effective_mode == 'attitude')
             self.active_target_control = None
@@ -707,8 +706,8 @@ autoflag:
         elif args[0] == "autofocus":
             self.cmd_autofocus(args[1:])
         elif args[0] == "center":
-            self.send_packet_fmt(CENTER, "<B", 1)
             self.clear_target()
+            self.send_packet_fmt(CENTER, "<B", 1)
         elif args[0] == "zoom":
             self.cmd_zoom(args[1:])
         elif args[0] == "getconfig":
@@ -737,6 +736,7 @@ autoflag:
                 self.send_packet(FUNCTION_FEEDBACK_INFO, None)
             print("Toggled recording")
         elif args[0] == "resetattitude":
+            self.clear_target()
             if self.is_mt11():
                 self.send_packet_fmt(CENTER, "<B", 1)
             else:
@@ -1058,9 +1058,54 @@ autoflag:
             self.send_packet_fmt(GET_ZOOM_VALUE, None)
             self.mt11_zoom_last_action = now
 
+    def terrain_altitude(self, lat, lon):
+        '''return a finite terrain height above MSL for a geographic target'''
+        terrain_module = self.module('terrain')
+        elevation_model = (getattr(terrain_module, 'ElevationModel', None)
+                           if terrain_module is not None else None)
+        if elevation_model is None:
+            print("SIYI: terrain module is unavailable")
+            return None
+        try:
+            alt = elevation_model.GetElevation(lat, lon)
+        except Exception as ex:
+            print("SIYI: terrain lookup failed for %.7f %.7f: %s" %
+                  (lat, lon, ex))
+            return None
+        if alt is None or not math.isfinite(alt):
+            print("SIYI: no terrain height for %.7f %.7f" % (lat, lon))
+            return None
+        return float(alt)
+
+    def send_roi_location(self, lat, lon, alt):
+        '''send a one-shot absolute-MSL MAV_CMD_DO_SET_ROI_LOCATION'''
+        self.master.mav.command_int_send(
+            self.settings.target_system,
+            self.settings.target_component,
+            mavutil.mavlink.MAV_FRAME_GLOBAL,
+            mavutil.mavlink.MAV_CMD_DO_SET_ROI_LOCATION,
+            0, 0, 0, 0, 0, 0,
+            int(round(lat * 1.0e7)),
+            int(round(lon * 1.0e7)),
+            float(alt))
+
+    def clear_roi_location(self):
+        '''stop aircraft-side ROI pointing with the standard ROI_NONE command'''
+        self.master.mav.command_int_send(
+            self.settings.target_system,
+            self.settings.target_component,
+            mavutil.mavlink.MAV_FRAME_GLOBAL,
+            mavutil.mavlink.MAV_CMD_DO_SET_ROI_NONE,
+            0, 0, 0, 0, 0, 0,
+            0, 0, 0)
+
     def set_target(self, lat, lon, alt):
-        '''set target position'''
-        self.target_pos = (lat, lon, alt)
+        '''set target position locally or hand it to the aircraft Lua loop'''
+        if self.target_control_mode() == 'lua':
+            self.target_pos = None
+            self.send_roi_location(lat, lon, alt)
+        else:
+            self.target_pos = (lat, lon, alt)
         self.mpstate.map.add_object(mp_slipmap.SlipIcon('SIYI',
                                                         (lat, lon),
                                                         self.icon, layer='SIYI', rotation=0, follow=False))
@@ -1137,12 +1182,23 @@ autoflag:
                              1, temps[2], temps[3], *colors[2])
 
     def clear_target(self):
-        '''clear target position'''
+        '''clear all local, map and aircraft-side geographic targeting'''
         self.target_pos = None
+        # Always clear the aircraft ROI, irrespective of the currently selected
+        # target backend.  In particular, the setting may have changed after a
+        # DO_SET_ROI_LOCATION was handed to the aircraft Lua script.
+        self.clear_roi_location()
+        map_module = self.module('map')
+        if map_module is not None:
+            # Prevent update_target() from seeing a stale map ROI after a
+            # manual command and immediately reasserting it.
+            map_module.current_ROI = None
+        self.last_map_ROI = None
         self.mpstate.map.remove_object('SIYI')
         self.end_tracking()
         self.yaw_rate = None
         self.pitch_rate = None
+        self.active_target_control = None
 
     def cmd_thermal_gain(self, args):
         '''set thermal gain and confirm MT11 state by readback'''
@@ -1251,9 +1307,8 @@ autoflag:
             return
         lat = click[0]
         lon = click[1]
-        alt = self.module('terrain').ElevationModel.GetElevation(lat, lon)
+        alt = self.terrain_altitude(lat, lon)
         if alt is None:
-            print("No terrain for location")
             return
         self.set_target(lat, lon, alt)
 
@@ -1305,14 +1360,18 @@ autoflag:
             else:
                 self.last_temp_t = now
             self.send_packet_fmt(READ_TEMP_FULL_SCREEN, "<B", 2)
-        if self.last_att_t is None or now - self.last_att_t > 5:
+        # The aircraft Lua script owns the MT11's single continuous attitude
+        # stream and publishes CROLL/CPITCH/CYAW.  A direct request here can
+        # steal the stream destination from Lua, causing both logging and map
+        # projections to alternate between live and stale data.
+        if (not self.is_mt11() and
+                (self.last_att_t is None or now - self.last_att_t > 5)):
             self.last_att_t = now
             self.send_packet_fmt(REQUEST_CONTINUOUS_DATA, "<BB", 1, self.siyi_settings.telem_rate)
-        request_range = not self.is_mt11() or self.siyi_settings.use_lidar
-        if (self.is_mt11() and self.siyi_settings.use_lidar and
-            now - self.last_laser_enable > 5):
-            self.last_laser_enable = now
-            self.send_packet_fmt(SET_LASER_STATUS, "<B", 1)
+        # The aircraft Lua script owns MT11 laser enablement and polling. Do
+        # not send either request from MAVProxy, even if an old configuration
+        # still has a use_lidar attribute set.
+        request_range = not self.is_mt11()
         if request_range and (self.last_rf_t is None or now - self.last_rf_t > 10):
             self.last_rf_t = now
             self.send_packet_fmt(REQUEST_CONTINUOUS_DATA, "<BB", 2, 1)
@@ -1942,7 +2001,7 @@ autoflag:
             mode = ('attitude' if getattr(self.siyi_settings, 'att_control', 0)
                     else 'rate')
         if mode.lower() == 'auto':
-            return 'attitude' if self.is_mt11() else 'rate'
+            return 'lua' if self.is_mt11() else 'rate'
         return mode.lower()
 
     def set_target_attitude(self, yaw_deg, pitch_deg):
@@ -1956,18 +2015,36 @@ autoflag:
     
     def update_target(self):
         '''update position targetting'''
-        if not all(name in self.master.messages for name in
-                   ('GLOBAL_POSITION_INT', 'GPS_RAW_INT', 'ATTITUDE')):
-            return
-
-        # added rate of target update
-
+        target_control = self.target_control_mode()
         map_module = self.module('map')
         if self.siyi_settings.track_ROI == 1 and map_module is not None and map_module.current_ROI != self.last_map_ROI:
             self.last_map_ROI = map_module.current_ROI
-            (lat, lon, alt) = self.last_map_ROI
-            self.clear_target()
-            self.set_target(lat, lon, alt)
+            if self.last_map_ROI is None:
+                if target_control == 'lua':
+                    self.clear_roi_location()
+            else:
+                lat, lon, _ = self.last_map_ROI
+                # Always resolve the clicked point against the terrain model
+                # here. This guarantees an absolute-MSL altitude and avoids
+                # mixing relative, ellipsoid, or stale map altitudes.
+                alt = self.terrain_altitude(lat, lon)
+                if alt is not None:
+                    if target_control != 'lua':
+                        self.target_pos = None
+                    self.set_target(lat, lon, alt)
+
+        if target_control == 'lua':
+            # The aircraft Lua script now closes the pointing loop using local
+            # AHRS state. Do not race it with delayed GCS-generated angles.
+            self.target_pos = None
+            self.yaw_rate = None
+            self.pitch_rate = None
+            self.active_target_control = 'lua'
+            return
+
+        if not all(name in self.master.messages for name in
+                   ('GLOBAL_POSITION_INT', 'GPS_RAW_INT', 'ATTITUDE')):
+            return
 
         if self.target_pos is None or self.attitude is None:
             return
@@ -1977,7 +2054,6 @@ autoflag:
             return
         self.last_target_send = now
 
-        target_control = self.target_control_mode()
         if target_control != self.active_target_control:
             if target_control == 'attitude':
                 # A rate command persists in the camera until explicitly
@@ -2137,10 +2213,32 @@ autoflag:
         fname = "data_%s_%03u.dat" % (tstr, millis)
         open(os.path.join(dname, fname),'wb').write(data)
 
-    def process_DATA96(self, data):
+    def add_thermal_flag(self, latlonalt, temperature, pixel_x, pixel_y,
+                         log_event=True):
+        '''add and log one automatically detected high-temperature location'''
+        lat, lon, alt = latlonalt
+        self.thermal_flag_count += 1
+        icon = self.mpstate.map.icon('flame.png')
+        self.mpstate.map.add_object(mp_slipmap.SlipIcon(
+            'thermal flag %u' % self.thermal_flag_count,
+            (float(lat), float(lon)),
+            icon, layer='thermal_flag', rotation=0, follow=False))
+        if log_event:
+            self.logf.write('SIFL', 'QLLffHH',
+                            'TimeUS,Lat,Lng,Alt,TMax,X,Y',
+                            self.micros64(),
+                            int(round(lat * 1.0e7)),
+                            int(round(lon * 1.0e7)),
+                            float(alt), float(temperature),
+                            int(pixel_x), int(pixel_y))
+
+    def process_DATA96(self, data, log_event=True):
         '''handle data from SIYI_control.lua'''
-        msec,lat, lon, alt, gps_alt, tmax, tmax_x, tmax_y, siyi_roll, siyi_pitch, siyi_yaw, roll, pitch, yaw = struct.unpack("<iiifffHHffffff", data)
-        if not self.siyi_settings.autoflag_enable or tmax < self.siyi_settings.autoflag_temp:
+        (msec, lat, lon, alt, gps_alt, tmax, tmax_x, tmax_y,
+         siyi_roll, siyi_pitch, siyi_yaw, roll, pitch, yaw) = struct.unpack(
+             "<iiifffHHffffff", data)
+        if (not self.siyi_settings.autoflag_enable or
+                tmax < self.siyi_settings.threshold_temp):
             return
 
         lat = lat * 1.0e-7
@@ -2148,17 +2246,19 @@ autoflag:
 
         thermal_width = 640
         thermal_height = 512
-        aspect_ratio = thermal_width / float(thermal_height)
+        if tmax_x >= thermal_width or tmax_y >= thermal_height:
+            return
         FOV = self.siyi_settings.thermal_fov
         C = camera_projection.CameraParams(xresolution=thermal_width, yresolution=thermal_height, FOV=FOV)
         cproj = camera_projection.CameraProjection(C, elevation_model=self.module('terrain').ElevationModel)
         slant_range = cproj.get_slantrange(lat,lon,gps_alt+self.siyi_settings.mount_alt,siyi_roll,siyi_pitch-self.siyi_settings.mount_pitch,siyi_yaw+yaw-self.siyi_settings.mount_yaw)
         if slant_range is None:
             return
-        x = (tmax_x/thermal_width) * 2 - 1.0
-        y = (tmax_y/thermal_height) * 2 - 1.0
         fov_att = (siyi_roll, siyi_pitch-self.siyi_settings.mount_pitch, mp_util.wrap_180(siyi_yaw-self.siyi_settings.mount_yaw))
-        latlonalt = cproj.get_latlonalt_for_pixel(tmax_x, tmax_y, lat, lon, gps_alt, fov_att[0], fov_att[1], fov_att[2]+yaw)
+        camera_alt = gps_alt + self.siyi_settings.mount_alt
+        latlonalt = cproj.get_latlonalt_for_pixel(tmax_x, tmax_y, lat, lon,
+                                                  camera_alt, fov_att[0],
+                                                  fov_att[1], fov_att[2]+yaw)
         if latlonalt is None:
             return
         latlon = latlonalt[0], latlonalt[1]
@@ -2169,11 +2269,8 @@ autoflag:
                 #print("roi_dist: ", roi_dist, lat, lon, roi_lat, roi_lon)
                 return
 
-        icon = self.mpstate.map.icon('flame.png')
-        self.mpstate.map.add_object(mp_slipmap.SlipIcon(
-            'icon [%u]' % msec,
-            (float(latlon[0]),float(latlon[1])),
-            icon, layer='thermal_flag', rotation=0, follow=False))
+        self.add_thermal_flag(latlonalt, tmax, tmax_x, tmax_y,
+                              log_event=log_event)
 
     def handle_DATA96(self, m):
         '''handle data from SIYI_control.lua'''
@@ -2203,7 +2300,9 @@ autoflag:
             data = open(os.path.join(dname, d),'rb').read()
             if len(data) != 52:
                 continue
-            self.process_DATA96(data)
+            # Rebuilding the map display must not create duplicate SIFL log
+            # events for data already recorded in thermal_data.
+            self.process_DATA96(data, log_event=False)
 
     def autoflag_discard(self):
         '''discard flagged locations'''
@@ -2232,6 +2331,24 @@ autoflag:
                             self.micros64(),
                             math.degrees(m.roll), math.degrees(m.pitch), math.degrees(m.yaw),
                             math.degrees(m.rollspeed), math.degrees(m.pitchspeed), math.degrees(m.yawspeed))
+        if mtype == 'NAMED_VALUE_FLOAT' and self.is_mt11():
+            name = m.name
+            if isinstance(name, bytes):
+                name = name.decode('ascii', errors='ignore')
+            name = name.rstrip('\x00')
+            if name in ('CROLL', 'CPITCH', 'CYAW'):
+                attitude = list(self.attitude)
+                attitude[{'CROLL': 0, 'CPITCH': 1, 'CYAW': 2}[name]] = m.value
+                # Never retain or reconstruct the MT11's invalid rate fields.
+                attitude[3:] = (0.0, 0.0, 0.0)
+                self.attitude = tuple(attitude)
+                if name == 'CYAW':
+                    now = time.time()
+                    dt = now - self.last_att_t
+                    self.att_dt_lpf = (0.95 * self.att_dt_lpf +
+                                       0.05 * max(dt, 0.01))
+                    self.last_att_t = now
+                    self.update_status()
         if mtype == 'GLOBAL_POSITION_INT':
             try:
                 self.show_fov()

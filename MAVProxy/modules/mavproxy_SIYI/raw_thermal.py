@@ -112,7 +112,8 @@ class RawThermal:
     def handle_auto_flag(self):
         if not self.siyi.siyi_settings.autoflag_enable or self.siyi.have_DATA96:
             return
-        if self.tmax < self.siyi.siyi_settings.autoflag_temp:
+        threshold_temp = self.siyi.siyi_settings.threshold_temp
+        if self.tmax < threshold_temp:
             return
 
         map = self.siyi.module('map')
@@ -132,9 +133,13 @@ class RawThermal:
 
         for sx in range(slices):
             for sy in range(slices):
-                sub = data[sx*slice_width:(sx+1)*slice_width, sy*slice_height:(sy+1)*slice_height]
+                # NumPy images are indexed [row/y, column/x]. The old order
+                # tested a different part of the image from the projected
+                # marker and truncated the right-most MT11 columns.
+                sub = data[sy*slice_height:(sy+1)*slice_height,
+                           sx*slice_width:(sx+1)*slice_width]
                 maxv = sub.max() - C_TO_KELVIN
-                if maxv < self.siyi.siyi_settings.autoflag_temp:
+                if maxv < threshold_temp:
                     continue
                 X = (sx*slice_width) + slice_width//2
                 Y = (sy*slice_height) + slice_height//2
@@ -144,7 +149,7 @@ class RawThermal:
                 latlon = (latlonalt[0], latlonalt[1])
                 if self.in_history(latlon):
                     continue
-                map.cmd_map_marker(["flame"], latlon=latlon)
+                self.siyi.add_thermal_flag(latlonalt, maxv, X, Y)
 
     def display_image(self, fname, data):
         '''display an image'''
