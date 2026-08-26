@@ -150,6 +150,7 @@ class MapModule(mp_module.MPModule):
             # waypoint commands
             mavutil.mavlink.MAV_CMD_NAV_WAYPOINT: (0, 255, 255),
             mavutil.mavlink.MAV_CMD_NAV_SPLINE_WAYPOINT: (64, 255, 64),
+            mavutil.mavlink.MAV_CMD_NAV_ARC_WAYPOINT: (64, 255, 255),
 
             # other commands
             mavutil.mavlink.MAV_CMD_DO_LAND_START: (255, 127, 0),
@@ -158,6 +159,7 @@ class MapModule(mp_module.MPModule):
             mavutil.mavlink.MAV_CMD_NAV_TAKEOFF: "TOff",
             mavutil.mavlink.MAV_CMD_DO_LAND_START: "DLS",
             mavutil.mavlink.MAV_CMD_NAV_SPLINE_WAYPOINT: "SW",
+            mavutil.mavlink.MAV_CMD_NAV_ARC_WAYPOINT: "AW",
             mavutil.mavlink.MAV_CMD_NAV_VTOL_LAND: "VL",
         }
 
@@ -459,6 +461,8 @@ Usage: map circle <radius> <colour>
                     linewidth=2,
                     colour=ImageColor.getrgb(self.map_settings.mission_color),
                     arrow=self.map_settings.showdirection, popup_menu=popup,
+                    arcs=mp_slipmap.mission_arcs(
+                        self.module('wp').wploader, self.mission_list[i]),
                 ))
         labeled_wps = {}
         self.map.add_object(mp_slipmap.SlipClearLayer('LoiterCircles'))
