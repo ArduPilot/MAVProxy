@@ -137,12 +137,21 @@ class FTPWorker(mp_module.MPModule):
     A worker deliberately isn't registered as a public MAVProxy module.  The
     public FTPModule owns and routes to several of these at once.
     '''
-    def __init__(self, manager, session):
+    def __init__(self, manager, session, target_system=None,
+                 target_component=None):
         super(FTPWorker, self).__init__(manager.mpstate, "ftp_worker")
         self.manager = manager
         self.ftp_settings = manager.ftp_settings
         self.seq = 0
         self.session = session
+        # MPModule.target_system/target_component follow the live global
+        # selection.  An FTP operation must stay with the vehicle against
+        # which it was submitted, including while it waits in the queue.
+        self.ftp_target_system = (manager.target_system if target_system is None
+                                  else target_system)
+        self.ftp_target_component = (
+            manager.target_component if target_component is None
+            else target_component)
         self.network = 0
         self.last_op = None
         self.fh = None
@@ -336,7 +345,7 @@ class FTPWorker(mp_module.MPModule):
 
     def list_target_key(self):
         '''Return the target whose listing opcode support is being learned.'''
-        return (self.target_system, self.target_component)
+        return (self.ftp_target_system, self.ftp_target_component)
 
     def send_list_request(self):
         '''Request the next page using state owned by this listing worker.'''
@@ -462,10 +471,17 @@ class FTPWorker(mp_module.MPModule):
 
     def handle_open_RO_reply(self, op, m):
         '''handle OP_OpenFileRO reply'''
-        if op.opcode == OP_Ack:
+        if self.fh is not None:
+            # A preserved-sequence retry can leave more than one handshake
+            # reply in the link.  Once reading has begun, all of them are
+            # stale and must not reopen/truncate the local destination.
+            return
+        recovered_open = self.retry_found_open_session(op)
+        if op.opcode == OP_Ack or recovered_open:
             if self.filename is None:
                 return
-            if op.size == 4 and op.payload is not None and len(op.payload) >= 4:
+            if not recovered_open and op.size == 4 and \
+               op.payload is not None and len(op.payload) >= 4:
                 # servers report the file size here, giving us a progress total
                 self.remote_file_size = struct.unpack("<I", bytes(op.payload[:4]))[0]
             try:
@@ -484,6 +500,25 @@ class FTPWorker(mp_module.MPModule):
             if self.callback is None or self.ftp_settings.debug > 0:
                 print("ftp open failed")
             self.terminate_session()
+
+    def retry_found_open_session(self, op):
+        '''A retried open/create may find the first request already succeeded.
+
+        ArduPilot's duplicate-reply cache is shared by its FTP sessions.  If
+        another session evicts a lost ACK, replaying the same OpenFileRO or
+        CreateFile request reaches the existing open descriptor and returns
+        ERR_Fail.  Only accept that result after this worker actually retried;
+        an ERR_Fail reply to the first request remains a real failure.
+        '''
+        recovered = (
+            self.request_retries > 0 and
+            op.opcode == OP_Nack and
+            op.payload is not None and
+            len(op.payload) >= 1 and
+            op.payload[0] == ERR_Fail)
+        if recovered and self.ftp_settings.debug > 0:
+            print("FTP: retry found the remote session already open")
+        return recovered
 
     def check_read_finished(self):
         '''check if download has completed'''
@@ -540,6 +575,9 @@ class FTPWorker(mp_module.MPModule):
                 # writing an earlier portion, possibly remove a gap
                 gap = (op.offset, len(op.payload))
                 if gap in self.read_gaps:
+                    if self.read_gap_times.get(gap, 0) > 0 and \
+                       self.backlog > 0:
+                        self.backlog -= 1
                     self.read_gaps.remove(gap)
                     self.read_gap_times.pop(gap)
                     if self.ftp_settings.debug > 0:
@@ -620,8 +658,10 @@ class FTPWorker(mp_module.MPModule):
             return
         if op.opcode == OP_Ack and self.fh is not None:
             gap = (op.offset, op.size)
-            if gap in self.read_gaps:
-                if self.read_gap_times[gap] > 0 and self.backlog > 0:
+            requested_gap = next(
+                (g for g in self.read_gaps if g[0] == op.offset), None)
+            if requested_gap == gap:
+                if self.read_gap_times.get(gap, 0) > 0 and self.backlog > 0:
                     self.backlog -= 1
                 self.read_gaps.remove(gap)
                 self.read_gap_times.pop(gap)
@@ -632,7 +672,7 @@ class FTPWorker(mp_module.MPModule):
                     print("FTP: removed gap", gap, self.reached_eof, len(self.read_gaps))
                 if self.check_read_finished():
                     return
-            elif op.size < self.burst_size:
+            elif requested_gap is not None:
                 print("FTP: file size changed to %u" % op.offset+op.size)
                 self.terminate_session()
             else:
@@ -738,7 +778,11 @@ class FTPWorker(mp_module.MPModule):
         if self.fh is None:
             self.terminate_session()
             return
-        if op.opcode == OP_Ack:
+        if self.write_open:
+            # Ignore late ACK/NACK replies from preserved-sequence CreateFile
+            # retries after upload writes have started.
+            return
+        if op.opcode == OP_Ack or self.retry_found_open_session(op):
             self.write_open = True
             self.send_more_writes()
         else:
@@ -1259,8 +1303,9 @@ class FTPWorker(mp_module.MPModule):
         # ArduPilot's incoming FTP request queue has the same depth as its
         # session table.  Under contention an initial request can therefore be
         # dropped before the server has a chance to NACK it.  Reusing the same
-        # sequence number makes this safe whether the request or its reply was
-        # lost: the server's duplicate-request cache returns the old reply.
+        # sequence number lets the server return a cached reply when available.
+        # A different session may evict that cache entry; the OpenFileRO and
+        # CreateFile handlers also recognize the resulting already-open state.
         initial_opcodes = (
             OP_ListDirectory, OP_ListDirectoryWithTime, OP_OpenFileRO,
             OP_CreateFile, OP_RemoveFile, OP_RemoveDirectory, OP_Rename,
@@ -1491,8 +1536,8 @@ class FTPModule(mp_module.MPModule):
                     if not self.packet_lost('TX')]
         if not payloads:
             return
-        args = (worker.master, worker.network, worker.target_system,
-                worker.target_component, payloads)
+        args = (worker.master, worker.network, worker.ftp_target_system,
+                worker.ftp_target_component, payloads)
         lag = self.packet_delay('TX')
         if lag == 0:
             self._transmit_payloads(*args)
@@ -1508,7 +1553,21 @@ class FTPModule(mp_module.MPModule):
             session = m.payload[2]
         except (IndexError, TypeError):
             return None
-        return self.workers.get(session)
+        worker = self.workers.get(session)
+        if worker is None:
+            return None
+        try:
+            source_system = m.get_srcSystem()
+            source_component = m.get_srcComponent()
+        except AttributeError:
+            # Retain compatibility with synthetic/older message wrappers that
+            # do not expose source accessors.
+            return worker
+        if worker.ftp_target_system not in (0, source_system):
+            return None
+        if worker.ftp_target_component not in (0, source_component):
+            return None
+        return worker
 
     def cmd_ftp(self, args):
         '''FTP operations'''
@@ -1553,7 +1612,10 @@ class FTPModule(mp_module.MPModule):
         if session is None:
             self.pending.insert(0, operation)
             return None
-        worker = FTPWorker(self, session)
+        worker = FTPWorker(
+            self, session,
+            target_system=operation['target_system'],
+            target_component=operation['target_component'])
         worker.operation_name = operation['name']
         self.workers[session] = worker
         method = getattr(worker, operation['method'])
@@ -1569,6 +1631,8 @@ class FTPModule(mp_module.MPModule):
             'method': method,
             'args': args,
             'kwargs': kwargs,
+            'target_system': self.target_system,
+            'target_component': self.target_component,
         }
         limit = self._session_limit()
         if len(self.workers) >= limit:

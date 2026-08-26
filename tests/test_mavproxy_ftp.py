@@ -23,10 +23,12 @@ FTP_SPEC.loader.exec_module(mavproxy_ftp)
 class FakeMAV:
     def __init__(self):
         self.sent = []
+        self.targets = []
 
     def file_transfer_protocol_send(self, network, target_system,
                                     target_component, payload):
         self.sent.append(bytes(payload))
+        self.targets.append((target_system, target_component))
 
 
 class FakeMaster:
@@ -92,21 +94,32 @@ class FakeMPState:
 
 
 class FTPMessage:
-    def __init__(self, payload):
+    def __init__(self, payload, source_system=1, source_component=1):
         self.payload = payload
         self.target_system = 255
         self.target_component = 0
+        self.source_system = source_system
+        self.source_component = source_component
 
     def get_type(self):
         return "FILE_TRANSFER_PROTOCOL"
 
+    def get_srcSystem(self):
+        return self.source_system
+
+    def get_srcComponent(self):
+        return self.source_component
+
 
 def reply(session, req_opcode, opcode=mavproxy_ftp.OP_Ack, payload=b'',
-          offset=0, burst_complete=0, seq=1):
+          offset=0, burst_complete=0, seq=1, source_system=1,
+          source_component=1):
     header = struct.pack(
         '<HBBBBBBI', seq, session, opcode, len(payload), req_opcode,
         burst_complete, 0, offset)
-    return FTPMessage(bytearray(header + payload).ljust(251, b'\x00'))
+    return FTPMessage(bytearray(header + payload).ljust(251, b'\x00'),
+                      source_system=source_system,
+                      source_component=source_component)
 
 
 def request_session(payload):
@@ -170,6 +183,43 @@ class TestConcurrentFTP(unittest.TestCase):
         self.assertEqual(results, {'first': b'first', 'second': b'second'})
         self.assertEqual(self.ftp.workers, {})
 
+    def test_active_and_queued_operations_keep_submission_target(self):
+        self.ftp.ftp_settings.max_sessions = 1
+        self.ftp.cmd_list(['/'])
+        self.ftp.cmd_get(['/remote'], callback=lambda fh: None)
+        self.assertEqual(len(self.ftp.pending), 1)
+
+        # Changing MAVProxy's selected vehicle must not retarget either the
+        # active listing or the operation queued while system 1 was selected.
+        self.mpstate.settings.target_system = 2
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_ListDirectoryWithTime,
+            opcode=mavproxy_ftp.OP_Nack,
+            payload=bytes([mavproxy_ftp.ERR_EndOfFile])))
+
+        worker = self.ftp.workers[1]
+        self.assertEqual(worker.ftp_target_system, 1)
+        self.assertTrue(all(target == (1, 1)
+                            for target in self.mpstate._master.mav.targets))
+
+        self.ftp.mavlink_packet(reply(
+            1, mavproxy_ftp.OP_OpenFileRO, payload=struct.pack('<I', 10)))
+        self.assertEqual(self.mpstate._master.mav.targets[-1], (1, 1))
+
+    def test_reply_from_another_vehicle_is_not_routed_by_session_alone(self):
+        self.ftp.cmd_list(['/'])
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_ListDirectoryWithTime,
+            opcode=mavproxy_ftp.OP_Nack,
+            payload=bytes([mavproxy_ftp.ERR_EndOfFile]), source_system=2))
+        self.assertIn(0, self.ftp.workers)
+
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_ListDirectoryWithTime,
+            opcode=mavproxy_ftp.OP_Nack,
+            payload=bytes([mavproxy_ftp.ERR_EndOfFile])))
+        self.assertNotIn(0, self.ftp.workers)
+
     def test_sixth_operation_is_queued_until_a_session_finishes(self):
         for _ in range(6):
             self.ftp.cmd_list(['/'])
@@ -228,6 +278,61 @@ class TestConcurrentFTP(unittest.TestCase):
         self.assertEqual(request_session(retried_packet), 0)
         self.assertEqual(worker.request_retries, 1)
         self.assertEqual(len(self.ftp.workers), 1)
+
+    def test_retried_open_recovers_when_cached_ack_was_evicted(self):
+        self.ftp.cmd_get(['/remote'], callback=lambda fh: None)
+        worker = self.ftp.workers[0]
+        worker.last_op_time -= worker.retry_timeout() + 0.01
+        self.ftp.idle_task()
+        self.assertEqual(worker.request_retries, 1)
+
+        # A shared server reply cache can lose the original ACK to another
+        # session. Re-executing OpenFileRO then reports ERR_Fail because this
+        # session's descriptor is already open.
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_OpenFileRO, opcode=mavproxy_ftp.OP_Nack,
+            payload=bytes([mavproxy_ftp.ERR_Fail])))
+
+        self.assertIn(0, self.ftp.workers)
+        self.assertIsNotNone(worker.fh)
+        self.assertEqual(request_opcode(self.mpstate._master.mav.sent[-1]),
+                         mavproxy_ftp.OP_BurstReadFile)
+        fh = worker.fh
+        sent = len(self.mpstate._master.mav.sent)
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_OpenFileRO, opcode=mavproxy_ftp.OP_Nack,
+            payload=bytes([mavproxy_ftp.ERR_Fail]), seq=1))
+        self.assertIs(worker.fh, fh)
+        self.assertEqual(len(self.mpstate._master.mav.sent), sent)
+
+    def test_retried_create_recovers_when_cached_ack_was_evicted(self):
+        self.ftp.cmd_put(['unused', '/remote'], fh=io.BytesIO(b'abc'))
+        worker = self.ftp.workers[0]
+        worker.last_op_time -= worker.retry_timeout() + 0.01
+        self.ftp.idle_task()
+        self.assertEqual(worker.request_retries, 1)
+
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_CreateFile, opcode=mavproxy_ftp.OP_Nack,
+            payload=bytes([mavproxy_ftp.ERR_Fail])))
+
+        self.assertTrue(worker.write_open)
+        self.assertEqual(request_opcode(self.mpstate._master.mav.sent[-1]),
+                         mavproxy_ftp.OP_WriteFile)
+        sent = len(self.mpstate._master.mav.sent)
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_CreateFile, opcode=mavproxy_ftp.OP_Nack,
+            payload=bytes([mavproxy_ftp.ERR_Fail]), seq=1))
+        self.assertIn(0, self.ftp.workers)
+        self.assertEqual(len(self.mpstate._master.mav.sent), sent)
+
+    def test_initial_open_failure_is_not_treated_as_recovery(self):
+        self.ftp.cmd_get(['/remote'], callback=lambda fh: None)
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_OpenFileRO, opcode=mavproxy_ftp.OP_Nack,
+            payload=bytes([mavproxy_ftp.ERR_Fail])))
+
+        self.assertNotIn(0, self.ftp.workers)
 
     def test_list_with_time_parses_names_from_the_end(self):
         output = io.StringIO()
@@ -540,6 +645,45 @@ class TestConcurrentFTP(unittest.TestCase):
         worker.check_read_send()
         self.assertEqual(worker.backlog, 2)
         self.assertEqual(len(self.mpstate._master.mav.sent), sent + 4)
+
+    def test_burst_filling_inflight_gaps_releases_read_window(self):
+        self.ftp.ftp_settings.max_backlog = 2
+        self.ftp.cmd_get(['/remote'], callback=lambda fh: None)
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_OpenFileRO, payload=struct.pack('<I', 1000)))
+        worker = self.ftp.workers[0]
+        worker.fh.seek(300)
+        worker.read_gaps = [(0, 100), (100, 100), (200, 100)]
+        now = time.time()
+        worker.read_gap_times = {
+            (0, 100): now,
+            (100, 100): now,
+            (200, 100): 0,
+        }
+        worker.backlog = 2
+
+        # Late burst packets can fill gaps for which OP_ReadFile requests are
+        # already outstanding. Each must release its slot immediately.
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_BurstReadFile, payload=b'a' * 100,
+            offset=0, seq=3))
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_BurstReadFile, payload=b'b' * 100,
+            offset=100, seq=4))
+        self.assertEqual(worker.backlog, 0)
+        self.assertEqual(worker.read_gaps, [(200, 100)])
+
+        sent = len(self.mpstate._master.mav.sent)
+        worker.check_read_send()
+        self.assertEqual(worker.backlog, 1)
+        self.assertEqual(len(self.mpstate._master.mav.sent), sent + 1)
+
+        # A delayed short reply for a gap already filled by burst data is a
+        # duplicate, not evidence that the remote file changed.
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_ReadFile, payload=b'a' * 100,
+            offset=0, seq=5))
+        self.assertIn(0, self.ftp.workers)
 
 
 if __name__ == '__main__':
