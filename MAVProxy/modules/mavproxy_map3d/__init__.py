@@ -11,6 +11,8 @@ import queue
 import threading
 import time
 
+from pymavlink import mavutil
+
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_util
@@ -280,6 +282,7 @@ class Map3DModule(mp_module.MPModule):
             return
         items = []
         default_radius = self.default_circle_radius()
+        previous = None
         for w in wploader.wpoints:
             frame = getattr(w, 'frame', 0)
             (lat, lon) = (w.x, w.y)
@@ -301,9 +304,23 @@ class Map3DModule(mp_module.MPModule):
             circle_radius = mp_util.mission_circle_radius(
                 w.command,
                 (w.param1, w.param2, w.param3, w.param4),
-                default_radius)
+                default_radius,
+                self.vehicle_type)
+            circle_turns = None
+            if w.command == mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT:
+                # this one circles until it reaches its altitude, so what is
+                # left to climb on arrival decides how many turns to draw
+                approach = None
+                if previous is not None:
+                    approach = mp_util.gps_distance(previous[0], previous[1],
+                                                    lat, lon)
+                circle_turns = mp_util.loiter_to_alt_turns(
+                    circle_radius,
+                    z - previous[2] if previous is not None else None,
+                    self.mav_param, approach)
             items.append(MissionItem(lat, lon, z, frame, w.command, w.seq,
-                                     w.param1, circle_radius))
+                                     w.param1, circle_radius, circle_turns))
+            previous = (lat, lon, z)
         self.map.set_mission(items)
 
     def set_icon_type(self, name):

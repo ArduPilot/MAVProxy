@@ -494,7 +494,8 @@ Usage: map circle <radius> <colour>
                     if self.map_settings.loitercircle:
                         wp = self.module('wp').wploader.wp(next_list[j])
                         loiter_rad = mp_slipmap.mission_circle_radius(
-                            wp, self.default_circle_radius())
+                            wp, self.default_circle_radius(),
+                            self.vehicle_type)
                         if loiter_rad is not None:
                             self.map.add_object(mp_slipmap.SlipCircle(
                                 'Loiter Circle %u' % (next_list[j] + 1),

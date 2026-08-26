@@ -13,11 +13,13 @@ from MAVProxy.modules.lib import multiproc
 
 # one mission item as the viewer needs it.  circle_radius is the signed radius
 # of the circle the item flies about its own location (positive is clockwise),
-# or None for the items which do not fly one
+# or None for the items which do not fly one.  circle_turns is how many turns
+# to draw that circle over, which shows as a spiral for an item that changes
+# altitude while it circles
 MissionItem = collections.namedtuple(
     'MissionItem',
-    'lat lon alt frame command seq param1 circle_radius',
-    defaults=(0.0, None))
+    'lat lon alt frame command seq param1 circle_radius circle_turns',
+    defaults=(0.0, None, None))
 
 PACKAGES = ('vtk', 'quantized_mesh_tile')
 

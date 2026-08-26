@@ -26,10 +26,10 @@ FENCE_CIRCLE_SEGMENTS = 64
 MISSION_CIRCLE_SEGMENTS = 64
 
 
-def circle_latlon(centre, radius, segments=FENCE_CIRCLE_SEGMENTS):
-    '''lat/lon ring approximating a circle of radius metres about centre.
+def ring_points(centre, radius, bearings):
+    '''lat/lon points radius metres from centre at the given bearings (radians).
 
-    Great-circle destination points, so the ring stays a circle at high latitude
+    Great-circle destination points, so a ring stays a circle at high latitude
     instead of blowing up as a flat-earth 1/cos(lat) would. Longitudes are left
     unwrapped (centre longitude plus an offset) so the ring stays continuous for
     the ENU projection rather than jumping at the 180th meridian.
@@ -42,11 +42,10 @@ def circle_latlon(centre, radius, segments=FENCE_CIRCLE_SEGMENTS):
     if abs(cos_lat1) < 1.0e-12:
         # exactly on a pole the bearing terms cancel, so sweep longitude instead
         polar_lat = math.degrees(math.copysign(math.pi / 2 - delta, lat1))
-        return [(polar_lat, lon - 180.0 + 360.0 * i / segments)
-                for i in range(segments)]
+        return [(polar_lat, lon - 180.0 + math.degrees(bearing))
+                for bearing in bearings]
     points = []
-    for i in range(segments):
-        bearing = 2.0 * math.pi * i / segments
+    for bearing in bearings:
         sin_lat2 = min(1.0, max(-1.0, sin_lat1 * cos_d +
                                 cos_lat1 * sin_d * math.cos(bearing)))
         lat2 = math.asin(sin_lat2)
@@ -54,6 +53,27 @@ def circle_latlon(centre, radius, segments=FENCE_CIRCLE_SEGMENTS):
                           cos_d - sin_lat1 * sin_lat2)
         points.append((math.degrees(lat2), lon + math.degrees(dlon)))
     return points
+
+
+def circle_latlon(centre, radius, segments=FENCE_CIRCLE_SEGMENTS):
+    '''lat/lon ring approximating a circle of radius metres about centre'''
+    return ring_points(centre, radius,
+                       [2.0 * math.pi * i / segments for i in range(segments)])
+
+
+def spiral_latlon(centre, radius, turns, segments=MISSION_CIRCLE_SEGMENTS,
+                  start_bearing=0.0):
+    '''lat/lon points along turns turns about centre, from start_bearing.
+
+    A positive radius winds clockwise, negative counter-clockwise, as the
+    loiter and orbit commands define it.  Both ends are included, so the
+    caller can walk an altitude along the points
+    '''
+    count = max(2, int(round(segments * abs(turns))))
+    sweep = 2.0 * math.pi * abs(turns) * (1.0 if radius >= 0 else -1.0)
+    return ring_points(centre, abs(radius),
+                       [start_bearing + sweep * i / count
+                        for i in range(count + 1)])
 
 
 def _polyline(points_enu, colour, width, dashed=False):
@@ -363,10 +383,17 @@ class ElementManager:
             self._replace('trail', [_polyline(self.trail, (1.0, 1.0, 0.0), 2.0)])
 
     def set_mission(self, items):
-        '''items: list of MissionItem (plain tuples are accepted too)'''
+        '''items: list of MissionItem (plain tuples are accepted too).
+
+        The line drawn is the path the vehicle is expected to fly, so it is
+        continuous throughout: an arc waypoint curves, and an item which
+        circles about its location is entered from the near side of its
+        circle and left again where it comes off, rather than the line
+        running to the middle of the circle where the vehicle never goes.
+        The markers stay on the mission item locations
+        '''
         line = []
         markers = []
-        circles = []
         previous = None
         for item in items:
             item = MissionItem(*item)
@@ -384,26 +411,44 @@ class ElementManager:
                     fraction = float(i) / (len(arc) - 1)
                     line.append(self._enu(arc[i][0], arc[i][1],
                                           prev_amsl + (amsl - prev_amsl) * fraction))
-            p = self._enu(item.lat, item.lon, amsl)
-            line.append(p)
-            markers.append(p)
+            markers.append(self._enu(item.lat, item.lon, amsl))
             if item.circle_radius:
-                # the item circles about its own location; draw that circle at
-                # the item's altitude rather than draped over the terrain
-                ring = circle_latlon((item.lat, item.lon),
-                                     abs(item.circle_radius),
-                                     MISSION_CIRCLE_SEGMENTS)
-                ring = [self._enu(la, lo, amsl) for (la, lo) in ring]
-                circles.append(ring + ring[:1])
+                previous = self._append_circle(line, item, amsl, previous)
+                continue
+            line.append(self._enu(item.lat, item.lon, amsl))
             previous = ((item.lat, item.lon), amsl)
         actors = []
         if len(line) >= 2:
             actors.append(_polyline(line, (1.0, 1.0, 1.0), 2.0, dashed=True))
-        for ring in circles:
-            actors.append(_polyline(ring, (1.0, 1.0, 1.0), 2.0, dashed=True))
         if markers:
             actors.append(_points(markers, (1.0, 1.0, 1.0), 9))
         self._replace('mission', actors)
+
+    def _append_circle(self, line, item, amsl, previous):
+        '''add the turns an item flies about its own location to the line,
+        entered from whichever side of the circle the vehicle arrives on.
+        Returns where the vehicle leaves the circle'''
+        centre = (item.lat, item.lon)
+        # the vehicle joins the circle on the side it approaches from
+        start_bearing = 0.0
+        entry_amsl = amsl
+        if previous is not None:
+            ((prev_lat, prev_lon), entry_amsl) = previous
+            start_bearing = math.radians(
+                mp_util.gps_bearing(item.lat, item.lon, prev_lat, prev_lon))
+        # an item that changes altitude while it circles is a spiral; one that
+        # does not is a single turn at its own altitude
+        turns = item.circle_turns if entry_amsl != amsl else None
+        if not turns:
+            turns = 1.0
+            entry_amsl = amsl
+        ring = spiral_latlon(centre, item.circle_radius, turns,
+                             MISSION_CIRCLE_SEGMENTS, start_bearing)
+        last = len(ring) - 1
+        for (i, (la, lo)) in enumerate(ring):
+            line.append(self._enu(la, lo,
+                                  entry_amsl + (amsl - entry_amsl) * i / last))
+        return (ring[-1], amsl)
 
     def _terrain_samples(self, points, closed):
         '''Densify a lat/lon polyline so it follows terrain between vertices.'''

@@ -722,7 +722,8 @@ def cmd_map3d(args):
     # waypoints (MAV_FRAME_GLOBAL_TERRAIN_ALT = 10/11) are "z above terrain", so
     # they need the terrain elevation at the waypoint, not home + z.
     if mission:
-        mission = resolve_mission_amsl(mission, ground0)
+        mission = resolve_mission_amsl(mission, ground0, mlog.params,
+                                       getattr(mlog, 'mav_type', None))
 
     # drop views the user has already closed, so their child processes are reaped
     for old in [v for v in map3d_views if not v.is_alive()]:
@@ -740,7 +741,7 @@ def cmd_map3d(args):
         m3d.set_mission(mission)
     m3d.look_at(lat0, lon0, ground0, dist=1.6 * span)
 
-def resolve_mission_amsl(mission, ground0):
+def resolve_mission_amsl(mission, ground0, params=None, mav_type=None):
     '''convert mission items to MissionItems in AMSL (frame 0). mission items
     are (lat, lon, z, frame, cmd, seq, params).
 
@@ -761,7 +762,9 @@ def resolve_mission_amsl(mission, ground0):
             sampler = sample_terrain
         except Exception as ex:
             print("map3d: terrain elevation unavailable (%s)" % ex)
+    default_radius = mp_util.param_value(params, 'WP_LOITER_RAD')
     out = []
+    previous = None
     for (la, lo, z, frame, cid, seq, prm) in mission:
         if frame in (0, 5):
             amsl = z
@@ -770,8 +773,20 @@ def resolve_mission_amsl(mission, ground0):
             amsl = (terr if terr is not None else home_amsl) + z
         else:
             amsl = home_amsl + z
-        radius = mp_util.mission_circle_radius(cid, prm)
-        out.append(MissionItem(la, lo, amsl, 0, cid, seq, prm[0], radius))
+        radius = mp_util.mission_circle_radius(cid, prm, default_radius,
+                                               mav_type)
+        turns = None
+        if cid == mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT:
+            approach = None
+            if previous is not None:
+                approach = mp_util.gps_distance(previous[0], previous[1], la, lo)
+            turns = mp_util.loiter_to_alt_turns(
+                radius,
+                amsl - previous[2] if previous is not None else None,
+                params, approach)
+        out.append(MissionItem(la, lo, amsl, 0, cid, seq, prm[0],
+                               radius, turns))
+        previous = (la, lo, amsl)
     return out
 
 def cmd_set(args):
