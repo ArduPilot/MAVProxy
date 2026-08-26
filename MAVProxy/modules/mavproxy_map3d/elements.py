@@ -12,6 +12,7 @@ import vtk
 from pymavlink import mavutil
 
 from MAVProxy.modules.lib import mp_util
+from MAVProxy.modules.mavproxy_map3d.map3d import MissionItem
 from MAVProxy.modules.mavproxy_map3d.terrain import enu, R
 
 # MAV_FRAME altitude conventions
@@ -22,6 +23,7 @@ FENCE_CLEARANCE = 3.0
 FENCE_SAMPLE_SPACING = 20.0
 FENCE_MAX_SAMPLES_PER_EDGE = 1000
 FENCE_CIRCLE_SEGMENTS = 64
+MISSION_CIRCLE_SEGMENTS = 64
 
 
 def circle_latlon(centre, radius, segments=FENCE_CIRCLE_SEGMENTS):
@@ -361,33 +363,44 @@ class ElementManager:
             self._replace('trail', [_polyline(self.trail, (1.0, 1.0, 0.0), 2.0)])
 
     def set_mission(self, items):
-        '''items: list of (lat,lon,z,frame,command,seq[,param1])'''
+        '''items: list of MissionItem (plain tuples are accepted too)'''
         line = []
         markers = []
+        circles = []
         previous = None
         for item in items:
-            (lat, lon, z, frame, command, seq) = item[:6]
-            param1 = item[6] if len(item) > 6 else 0.0
-            if lat == 0 and lon == 0:
+            item = MissionItem(*item)
+            if item.lat == 0 and item.lon == 0:
                 continue
-            amsl = self._resolve_amsl(z, frame)
-            if (command == mavutil.mavlink.MAV_CMD_NAV_ARC_WAYPOINT and
+            amsl = self._resolve_amsl(item.alt, item.frame)
+            if (item.command == mavutil.mavlink.MAV_CMD_NAV_ARC_WAYPOINT and
                     previous is not None):
                 # the leg into an arc waypoint is a circular arc rather
                 # than a straight line; climb linearly along it
                 ((prev_lat, prev_lon), prev_amsl) = previous
-                arc = mp_util.arc_points((prev_lat, prev_lon), (lat, lon), param1)
+                arc = mp_util.arc_points((prev_lat, prev_lon),
+                                         (item.lat, item.lon), item.param1)
                 for i in range(1, len(arc) - 1):
                     fraction = float(i) / (len(arc) - 1)
                     line.append(self._enu(arc[i][0], arc[i][1],
                                           prev_amsl + (amsl - prev_amsl) * fraction))
-            p = self._enu(lat, lon, amsl)
+            p = self._enu(item.lat, item.lon, amsl)
             line.append(p)
             markers.append(p)
-            previous = ((lat, lon), amsl)
+            if item.circle_radius:
+                # the item circles about its own location; draw that circle at
+                # the item's altitude rather than draped over the terrain
+                ring = circle_latlon((item.lat, item.lon),
+                                     abs(item.circle_radius),
+                                     MISSION_CIRCLE_SEGMENTS)
+                ring = [self._enu(la, lo, amsl) for (la, lo) in ring]
+                circles.append(ring + ring[:1])
+            previous = ((item.lat, item.lon), amsl)
         actors = []
         if len(line) >= 2:
             actors.append(_polyline(line, (1.0, 1.0, 1.0), 2.0, dashed=True))
+        for ring in circles:
+            actors.append(_polyline(ring, (1.0, 1.0, 1.0), 2.0, dashed=True))
         if markers:
             actors.append(_points(markers, (1.0, 1.0, 1.0), 9))
         self._replace('mission', actors)

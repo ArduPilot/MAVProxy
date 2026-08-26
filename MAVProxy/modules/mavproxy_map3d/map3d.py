@@ -3,12 +3,21 @@ Parent-side handle for the 3D map. Spawns the VTK/wx viewer in a child process
 (mirrors mp_slipmap) and pushes element/camera updates over a queue.
 '''
 
+import collections
 import importlib.util
 import time
 import queue
 import traceback
 
 from MAVProxy.modules.lib import multiproc
+
+# one mission item as the viewer needs it.  circle_radius is the signed radius
+# of the circle the item flies about its own location (positive is clockwise),
+# or None for the items which do not fly one
+MissionItem = collections.namedtuple(
+    'MissionItem',
+    'lat lon alt frame command seq param1 circle_radius',
+    defaults=(0.0, None))
 
 PACKAGES = ('vtk', 'quantized_mesh_tile')
 

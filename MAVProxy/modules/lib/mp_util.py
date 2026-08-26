@@ -188,6 +188,52 @@ def arc_points(latlon1, latlon2, arc_angle, steps=None):
     return points
 
 
+def mission_circle_radius(command, params, default_radius=None):
+    """return the signed radius in metres of the circle a mission item flies
+    about its own location -- the loiter commands and DO_ORBIT -- or None if
+    the item does not fly one.
+
+    A positive radius is a clockwise circle, negative counter-clockwise.
+    params is the item's param1..param4.  Items which leave the radius unset
+    ask for the vehicle's own default, which is default_radius here.
+    """
+    from pymavlink import mavutil
+    mavlink = mavutil.mavlink
+    # index within params of the parameter holding the radius
+    index = {
+        mavlink.MAV_CMD_NAV_LOITER_UNLIM: 2,
+        mavlink.MAV_CMD_NAV_LOITER_TURNS: 2,
+        mavlink.MAV_CMD_NAV_LOITER_TIME: 2,
+        mavlink.MAV_CMD_NAV_LOITER_TO_ALT: 1,
+        mavlink.MAV_CMD_DO_ORBIT: 0,
+    }.get(command)
+    if index is None:
+        return None
+    radius = params[index]
+    if radius is None or math.isnan(radius) or radius == 0:
+        radius = default_radius
+    if radius is None or math.isnan(radius) or radius == 0:
+        return None
+    return radius
+
+
+def mission_circle_turns(command, params):
+    """return the number of turns a circling mission item flies, or None if
+    it circles indefinitely or the count is not part of the item"""
+    from pymavlink import mavutil
+    mavlink = mavutil.mavlink
+    if command == mavlink.MAV_CMD_NAV_LOITER_TURNS:
+        turns = params[0]
+    elif command == mavlink.MAV_CMD_DO_ORBIT:
+        # DO_ORBIT counts in radians rather than turns
+        turns = params[3] / (2 * pi)
+    else:
+        return None
+    if turns is None or math.isnan(turns) or turns <= 0:
+        return None
+    return turns
+
+
 def mkdir_p(dir):
     '''like mkdir -p'''
     if not dir:
