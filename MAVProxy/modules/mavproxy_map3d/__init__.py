@@ -15,7 +15,7 @@ from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.mavproxy_map3d.map3d import (
-    Map3D, missing_packages, missing_packages_message)
+    Map3D, MissionItem, missing_packages, missing_packages_message)
 
 # fence colours as the 2D map's PolyFence layer uses them (OpenCV BGR)
 FENCE_INCLUSION_BGR = (0, 255, 0)
@@ -279,6 +279,7 @@ class Map3DModule(mp_module.MPModule):
         except Exception:
             return
         items = []
+        default_radius = self.default_circle_radius()
         for w in wploader.wpoints:
             frame = getattr(w, 'frame', 0)
             (lat, lon) = (w.x, w.y)
@@ -297,7 +298,12 @@ class Map3DModule(mp_module.MPModule):
                 if terr is not None:
                     z = terr + w.z
                     frame = 0
-            items.append((lat, lon, z, frame, w.command, w.seq, w.param1))
+            circle_radius = mp_util.mission_circle_radius(
+                w.command,
+                (w.param1, w.param2, w.param3, w.param4),
+                default_radius)
+            items.append(MissionItem(lat, lon, z, frame, w.command, w.seq,
+                                     w.param1, circle_radius))
         self.map.set_mission(items)
 
     def set_icon_type(self, name):

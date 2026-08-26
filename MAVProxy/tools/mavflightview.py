@@ -220,6 +220,9 @@ def display_waypoints(wploader, map):
                 colour=(255, 255, 255),
                 arcs=mp_slipmap.mission_arcs(wploader, mission_list[k]),
             ))
+        for circle in mp_slipmap.mission_circles(
+                'Loiter Circle', 'Mission', wploader, mission_list[k], p):
+            map.add_object(circle)
         labeled_wps = {}
         for i in range(len(mission_list)):
             next_list = mission_list[i]
@@ -646,6 +649,8 @@ def mavflightview_show(path,
                 colour=(255, 255, 255),
                 arcs=mp_slipmap.mission_arcs(wp, vlist[i]),
             ))
+            mission_obj.extend(mp_slipmap.mission_circles(
+                'Loiter-%s' % title, 'Mission', wp, vlist[i], plist[i]))
     else:
         mission_obj = None
 

@@ -49,6 +49,41 @@ def mission_arcs(wploader, wp_indexes):
     return arcs
 
 
+def mission_circle_radius(wp, default_radius=None):
+    '''return the signed radius of the circle a mission item flies about its
+    own location, or None if it does not fly one.  A positive radius is a
+    clockwise circle, negative counter-clockwise'''
+    return mp_util.mission_circle_radius(
+        wp.command,
+        (wp.param1, wp.param2, wp.param3, wp.param4),
+        default_radius)
+
+
+def mission_circles(key_prefix, layer, wploader, wp_indexes, points,
+                    default_radius=None, colour=(255, 255, 255),
+                    linewidth=2, arrow=False):
+    '''return SlipCircle objects for those mission items which fly a circle
+    about their own location.  points are the map positions of wp_indexes'''
+    circles = []
+    for i in range(len(wp_indexes)):
+        wp = wploader.wp(wp_indexes[i])
+        if wp is None:
+            continue
+        radius = mission_circle_radius(wp, default_radius)
+        if radius is None:
+            continue
+        circles.append(SlipCircle(
+            '%s %u' % (key_prefix, wp_indexes[i]),
+            layer,
+            points[i],
+            radius,
+            colour,
+            linewidth,
+            arrow=arrow,
+        ))
+    return circles
+
+
 class SlipObject:
     '''an object to display on the map'''
     def __init__(self, key, layer, popup_menu=None):

@@ -120,6 +120,56 @@ class TestArcGeometry(object):
             assert abs(mp_util.wrap_180(lon - 180.0)) < 1.0
 
 
+class TestCirclingItems(object):
+
+    def setup_method(self):
+        from pymavlink import mavutil
+        self.mavlink = mavutil.mavlink
+
+    def test_radius_parameter_per_command(self):
+        m = self.mavlink
+        # (command, params, expected signed radius)
+        cases = [
+            (m.MAV_CMD_NAV_LOITER_UNLIM, (0, 0, 70, 0), 70),
+            (m.MAV_CMD_NAV_LOITER_TURNS, (3, 0, -55, 0), -55),
+            (m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 90, 0), 90),
+            (m.MAV_CMD_NAV_LOITER_TO_ALT, (1, -65, 0, 0), -65),
+            (m.MAV_CMD_DO_ORBIT, (80, 5, 0, 0), 80),
+        ]
+        for (command, params, expected) in cases:
+            assert mp_util.mission_circle_radius(command, params) == expected
+
+    def test_items_which_do_not_circle(self):
+        m = self.mavlink
+        for command in (m.MAV_CMD_NAV_WAYPOINT,
+                        m.MAV_CMD_NAV_ARC_WAYPOINT,
+                        m.MAV_CMD_NAV_TAKEOFF,
+                        m.MAV_CMD_DO_JUMP):
+            assert mp_util.mission_circle_radius(command, (1, 2, 3, 4)) is None
+
+    def test_unset_radius_uses_the_vehicle_default(self):
+        m = self.mavlink
+        for params in ((0, 0, 0, 0), (0, 0, float('nan'), 0)):
+            assert mp_util.mission_circle_radius(
+                m.MAV_CMD_NAV_LOITER_UNLIM, params, 42) == 42
+        # with no vehicle default there is no circle to draw
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_UNLIM, (0, 0, 0, 0)) is None
+
+    def test_turn_counts(self):
+        m = self.mavlink
+        assert mp_util.mission_circle_turns(
+            m.MAV_CMD_NAV_LOITER_TURNS, (3, 0, 60, 0)) == 3
+        # DO_ORBIT counts in radians
+        assert mp_util.mission_circle_turns(
+            m.MAV_CMD_DO_ORBIT, (80, 5, 0, math.radians(270))) == pytest.approx(0.75)
+        # circling forever, and items which do not count turns
+        assert mp_util.mission_circle_turns(
+            m.MAV_CMD_DO_ORBIT, (80, 5, 0, 0)) is None
+        assert mp_util.mission_circle_turns(
+            m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 90, 0)) is None
+
+
 class TestPolygonBounds(object):
 
     def test_bounds_cover_the_arc_and_not_just_the_chord(self):
