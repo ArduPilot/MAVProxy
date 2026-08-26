@@ -296,6 +296,119 @@ class TestLoiterToAltTurns(object):
         assert mp_util.vehicle_climb_rate(params, descending=True) == 2.0
 
 
+class TestSpiral(object):
+
+    def spiral(self, radius, turns):
+        pytest.importorskip("vtk")
+        from MAVProxy.modules.mavproxy_map3d.elements import spiral_latlon
+        return spiral_latlon(HERE, radius, turns)
+
+    def test_stays_at_the_radius(self):
+        for (la, lo) in self.spiral(90.0, 2.5):
+            assert mp_util.gps_distance(HERE[0], HERE[1], la, lo) == \
+                pytest.approx(90.0, abs=0.05)
+
+    @pytest.mark.parametrize("turns", [0.25, 1.0, 2.5])
+    def test_sweeps_the_requested_turns(self, turns):
+        for radius in (90.0, -90.0):
+            points = self.spiral(radius, turns)
+            swept = swept_angle(HERE, points)
+            expected = turns * 360.0 * (1 if radius > 0 else -1)
+            assert swept == pytest.approx(expected, abs=1.0)
+
+    def test_both_ends_are_included(self):
+        points = self.spiral(90.0, 1.0)
+        # a whole turn returns to where it started, but as a separate point so
+        # an altitude can be walked along the spiral
+        assert points[0] == pytest.approx(points[-1])
+
+    def test_circle_is_unchanged_by_the_shared_ring_maths(self):
+        pytest.importorskip("vtk")
+        from MAVProxy.modules.mavproxy_map3d.elements import circle_latlon
+        ring = circle_latlon(HERE, 100.0)
+        assert len(ring) == 64
+        for (la, lo) in ring:
+            assert mp_util.gps_distance(HERE[0], HERE[1], la, lo) == \
+                pytest.approx(100.0, abs=0.05)
+
+
+class TestContinuousTrack(object):
+    """the map3d mission line is the path the vehicle is expected to fly, so
+    it has to run through the circles rather than to their centres"""
+
+    def build(self, radius, turns, entry_alt=100.0, target_alt=100.0):
+        pytest.importorskip("vtk")
+        import vtk
+        from pymavlink import mavutil
+        from MAVProxy.modules.mavproxy_map3d.map3d import MissionItem
+        from MAVProxy.modules.mavproxy_map3d.elements import ElementManager
+        from MAVProxy.modules.mavproxy_map3d.terrain import enu
+        approach = mp_util.gps_newpos(HERE[0], HERE[1], 180, 800)
+        after = mp_util.gps_newpos(HERE[0], HERE[1], 90, 800)
+        items = [
+            MissionItem(approach[0], approach[1], entry_alt, 3,
+                        mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 1),
+            MissionItem(HERE[0], HERE[1], target_alt, 3,
+                        mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT, 2,
+                        1.0, radius, turns),
+            MissionItem(after[0], after[1], target_alt, 3,
+                        mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 3),
+        ]
+        em = ElementManager(vtk.vtkRenderer(), HERE[0], HERE[1], 1.0)
+        em.set_home(584.0)
+        em.set_mission(items)
+        actors = em.actors['mission']
+        pts = actors[0].GetMapper().GetInput().GetPoints()
+        line = [pts.GetPoint(i) for i in range(pts.GetNumberOfPoints())]
+        centre = enu(HERE[0], HERE[1], 0.0, HERE[0], HERE[1])
+        return actors, line, centre
+
+    def test_the_track_is_one_line_with_the_circle_in_it(self):
+        (actors, line, centre) = self.build(80.0, 2.0)
+        # one polyline and one set of markers: no circle drawn off on its own
+        assert len(actors) == 2
+        on_circle = [i for i, p in enumerate(line)
+                     if abs(math.hypot(p[0]-centre[0], p[1]-centre[1]) - 80.0) < 0.5]
+        # at a constant altitude it is a single turn however many were asked
+        # for, since the extra ones would be drawn on top of the first
+        assert len(on_circle) == 65
+        # and those points are a single unbroken run within the line
+        assert on_circle[-1] - on_circle[0] + 1 == len(on_circle)
+        assert on_circle[0] > 0                  # a leg comes in
+        assert on_circle[-1] < len(line) - 1     # and a leg goes out
+
+    def test_the_line_never_reaches_the_centre(self):
+        (actors, line, centre) = self.build(80.0, 2.0)
+        nearest = min(math.hypot(p[0]-centre[0], p[1]-centre[1]) for p in line)
+        # the vehicle circles the point rather than overflying it
+        assert nearest == pytest.approx(80.0, abs=0.5)
+
+    def test_the_circle_is_joined_on_the_side_it_is_approached_from(self):
+        (actors, line, centre) = self.build(80.0, 2.0)
+        on_circle = [p for p in line
+                     if abs(math.hypot(p[0]-centre[0], p[1]-centre[1]) - 80.0) < 0.5]
+        # the approach comes from due south, so the join is the south side
+        assert on_circle[0][1] - centre[1] == pytest.approx(-80.0, abs=0.5)
+        assert on_circle[0][0] - centre[0] == pytest.approx(0.0, abs=0.5)
+
+    def test_a_spiral_draws_all_of_its_turns(self):
+        (actors, line, centre) = self.build(80.0, 2.0,
+                                            entry_alt=100.0, target_alt=300.0)
+        on_circle = [i for i, p in enumerate(line)
+                     if abs(math.hypot(p[0]-centre[0], p[1]-centre[1]) - 80.0) < 0.5]
+        assert len(on_circle) == 129        # 2 turns of 64 segments, plus the end
+        assert on_circle[-1] - on_circle[0] + 1 == len(on_circle)
+
+    def test_altitude_runs_continuously_through_a_spiral(self):
+        (actors, line, centre) = self.build(80.0, 2.0,
+                                            entry_alt=100.0, target_alt=300.0)
+        zs = [p[2] for p in line]
+        assert zs[0] == pytest.approx(684.0)
+        assert zs[-1] == pytest.approx(884.0)
+        # never a step in altitude where the spiral joins the legs
+        assert max(abs(zs[i]-zs[i-1]) for i in range(1, len(zs))) < 25.0
+
+
 class TestPolygonBounds(object):
 
     def test_bounds_cover_the_arc_and_not_just_the_chord(self):
