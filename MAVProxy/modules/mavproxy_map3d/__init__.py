@@ -297,7 +297,7 @@ class Map3DModule(mp_module.MPModule):
                 if terr is not None:
                     z = terr + w.z
                     frame = 0
-            items.append((lat, lon, z, frame, w.command, w.seq))
+            items.append((lat, lon, z, frame, w.command, w.seq, w.param1))
         self.map.set_mission(items)
 
     def set_icon_type(self, name):

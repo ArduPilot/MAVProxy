@@ -218,6 +218,7 @@ def display_waypoints(wploader, map):
                 layer='Mission',
                 linewidth=2,
                 colour=(255, 255, 255),
+                arcs=mp_slipmap.mission_arcs(wploader, mission_list[k]),
             ))
         labeled_wps = {}
         for i in range(len(mission_list)):
@@ -629,8 +630,10 @@ def mavflightview_show(path,
                 showlines=(not getattr(options, "no_show_lines", False)),
                 colour=(255, 0, 180)))
     plist = []
+    vlist = []
     if options.show_waypoints:
         plist = wp.polygon_list()
+        vlist = wp.view_list()
     mission_obj = None
     if len(plist) > 0:
         mission_obj = []
@@ -641,6 +644,7 @@ def mavflightview_show(path,
                 layer='Mission',
                 linewidth=2,
                 colour=(255, 255, 255),
+                arcs=mp_slipmap.mission_arcs(wp, vlist[i]),
             ))
     else:
         mission_obj = None

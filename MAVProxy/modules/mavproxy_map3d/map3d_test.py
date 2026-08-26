@@ -35,7 +35,7 @@ def load_log(path):
         elif msg.get_type() == 'CMD':
             if msg.Lat != 0 or msg.Lng != 0:
                 mission.append((msg.Lat, msg.Lng, msg.Alt, getattr(msg, 'Frame', 3),
-                                msg.CId, msg.CNum))
+                                msg.CId, msg.CNum, getattr(msg, 'Prm1', 0.0)))
     return pts, mission
 
 

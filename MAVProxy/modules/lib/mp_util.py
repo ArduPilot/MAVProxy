@@ -132,6 +132,61 @@ def gps_offset(lat, lon, east, north):
     return gps_newpos(lat, lon, bearing, distance)
 
 
+def arc_centre_and_radius(lat1, lon1, lat2, lon2, arc_angle):
+    """return (centre_latlon, radius, start_bearing_from_centre) for a circular
+    arc running from (lat1,lon1) to (lat2,lon2) which sweeps arc_angle degrees.
+
+    Positive arc_angle is a clockwise arc, negative is counter-clockwise (as
+    per MAV_CMD_NAV_ARC_WAYPOINT).  Returns None if the arc is degenerate (a
+    zero-length sweep, or a sweep of a whole circle, neither of which define
+    a unique circle).
+    """
+    # arcs may sweep up to a full turn in either direction, so wrap into
+    # (-360, 360) rather than to +-180
+    arc_angle = fmod(arc_angle, 360.0)
+    if abs(arc_angle) < 1.0e-6:
+        return None
+    half = radians(abs(arc_angle) / 2.0)
+    if sin(half) < 1.0e-6:
+        return None
+    chord = gps_distance(lat1, lon1, lat2, lon2)
+    if chord < 1.0e-6:
+        return None
+    radius = chord / (2 * sin(half))
+    chord_bearing = gps_bearing(lat1, lon1, lat2, lon2)
+    # the centre lies 90 degrees to the right of the initial heading for a
+    # clockwise arc, 90 degrees to the left for a counter-clockwise arc:
+    if arc_angle > 0:
+        centre_bearing = chord_bearing - arc_angle/2.0 + 90
+    else:
+        centre_bearing = chord_bearing - arc_angle/2.0 - 90
+    centre = gps_newpos(lat1, lon1, centre_bearing, radius)
+    return (centre, radius, wrap_360(centre_bearing + 180))
+
+
+def arc_points(latlon1, latlon2, arc_angle, steps=None):
+    """return a list of latlon points along a circular arc from latlon1 to
+    latlon2 sweeping arc_angle degrees (positive is clockwise).  The returned
+    list includes both endpoints.  If the arc is degenerate then just the two
+    endpoints are returned."""
+    ret = arc_centre_and_radius(latlon1[0], latlon1[1],
+                                latlon2[0], latlon2[1],
+                                arc_angle)
+    if ret is None:
+        return [latlon1, latlon2]
+    (centre, radius, start_bearing) = ret
+    arc_angle = fmod(arc_angle, 360.0)
+    if steps is None:
+        # aim for roughly one segment every 3 degrees of sweep:
+        steps = int(constrain(abs(arc_angle) / 3.0, 8, 180))
+    points = [latlon1]
+    for i in range(1, steps):
+        bearing = start_bearing + arc_angle * (float(i) / steps)
+        points.append(gps_newpos(centre[0], centre[1], bearing, radius))
+    points.append(latlon2)
+    return points
+
+
 def mkdir_p(dir):
     '''like mkdir -p'''
     if not dir:

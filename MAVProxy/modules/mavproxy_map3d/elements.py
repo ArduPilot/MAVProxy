@@ -9,6 +9,9 @@ import math
 
 import vtk
 
+from pymavlink import mavutil
+
+from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.mavproxy_map3d.terrain import enu, R
 
 # MAV_FRAME altitude conventions
@@ -358,16 +361,30 @@ class ElementManager:
             self._replace('trail', [_polyline(self.trail, (1.0, 1.0, 0.0), 2.0)])
 
     def set_mission(self, items):
-        '''items: list of (lat,lon,z,frame,command,seq)'''
+        '''items: list of (lat,lon,z,frame,command,seq[,param1])'''
         line = []
         markers = []
-        for (lat, lon, z, frame, command, seq) in items:
+        previous = None
+        for item in items:
+            (lat, lon, z, frame, command, seq) = item[:6]
+            param1 = item[6] if len(item) > 6 else 0.0
             if lat == 0 and lon == 0:
                 continue
             amsl = self._resolve_amsl(z, frame)
+            if (command == mavutil.mavlink.MAV_CMD_NAV_ARC_WAYPOINT and
+                    previous is not None):
+                # the leg into an arc waypoint is a circular arc rather
+                # than a straight line; climb linearly along it
+                ((prev_lat, prev_lon), prev_amsl) = previous
+                arc = mp_util.arc_points((prev_lat, prev_lon), (lat, lon), param1)
+                for i in range(1, len(arc) - 1):
+                    fraction = float(i) / (len(arc) - 1)
+                    line.append(self._enu(arc[i][0], arc[i][1],
+                                          prev_amsl + (amsl - prev_amsl) * fraction))
             p = self._enu(lat, lon, amsl)
             line.append(p)
             markers.append(p)
+            previous = ((lat, lon), amsl)
         actors = []
         if len(line) >= 2:
             actors.append(_polyline(line, (1.0, 1.0, 1.0), 2.0, dashed=True))
