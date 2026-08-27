@@ -16,6 +16,12 @@ from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib.mp_menu import *
 from pymavlink import mavutil
 from PIL import ImageColor
+# ArduPilot 4.7 added MAV_CMD_NAV_ARC_WAYPOINT but no pymavlink release
+# has picked it up yet; mav_cmd_compat registers it into pymavlink's own
+# enum table so mavutil.mavlink.MAV_CMD_NAV_ARC_WAYPOINT and everything
+# built on the MAV_CMD enum (mission path inclusion, the mission editor)
+# works correctly regardless.
+from MAVProxy.modules.lib import mav_cmd_compat  # noqa: F401
 
 # pymavlink may not yet carry the enumeration entry for the
 # home-centred inclusion circle.  Fall back to its known value (from
@@ -150,6 +156,7 @@ class MapModule(mp_module.MPModule):
             # waypoint commands
             mavutil.mavlink.MAV_CMD_NAV_WAYPOINT: (0, 255, 255),
             mavutil.mavlink.MAV_CMD_NAV_SPLINE_WAYPOINT: (64, 255, 64),
+            mavutil.mavlink.MAV_CMD_NAV_ARC_WAYPOINT: (255, 0, 255),
 
             # other commands
             mavutil.mavlink.MAV_CMD_DO_LAND_START: (255, 127, 0),
@@ -158,6 +165,7 @@ class MapModule(mp_module.MPModule):
             mavutil.mavlink.MAV_CMD_NAV_TAKEOFF: "TOff",
             mavutil.mavlink.MAV_CMD_DO_LAND_START: "DLS",
             mavutil.mavlink.MAV_CMD_NAV_SPLINE_WAYPOINT: "SW",
+            mavutil.mavlink.MAV_CMD_NAV_ARC_WAYPOINT: "AW",
             mavutil.mavlink.MAV_CMD_NAV_VTOL_LAND: "VL",
         }
 
