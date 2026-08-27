@@ -6,6 +6,8 @@ AP_FLAKE8_CLEAN
 
 from MAVProxy.modules.lib import mission_item_protocol
 from MAVProxy.modules.lib import mp_util
+# registers MAV_CMD_NAV_ARC_WAYPOINT if this pymavlink build predates it
+from MAVProxy.modules.lib import mav_cmd_compat  # noqa: F401
 
 from pymavlink import mavutil
 from pymavlink import mavwp

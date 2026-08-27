@@ -1,4 +1,6 @@
 from pymavlink import mavutil
+# registers MAV_CMD_NAV_ARC_WAYPOINT if this pymavlink build predates it
+from MAVProxy.modules.lib import mav_cmd_compat  # noqa: F401
 import fnmatch
 
 miss_cmds = {}
@@ -31,6 +33,7 @@ description_map = [
     ('Minimum pitch*'    , 'Pitch'),
     ('Yaw*'              , 'Yaw'),
     ('Desired yaw*'      , 'Yaw'),
+    ('Arc Angle*'        , 'Angle(deg)'),
     ('Radius*'           , 'Radius'),
     ('Turns*'            , 'Turns'),
     ('Seconds*'          , 'Time(s)'),
