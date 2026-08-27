@@ -109,6 +109,7 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
             track_ROI=0,
         )
         module.sent = []
+        module.sock = object()
         module.last_zoom = 1.0
         module.rgb_lens = "wide"
         module.image_slots = None
@@ -122,6 +123,9 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
         module.last_mode_t = 0
         module.requested_control_mode = None
         module.requested_control_mode_t = 0
+        module.pending_manual_angle = None
+        module.pending_manual_angle_t = 0
+        module.pending_manual_angle_last_send = 0
         module.thermal_gain = None
         module.requested_thermal_gain = None
         module.requested_thermal_gain_t = 0
@@ -199,9 +203,9 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
                                     (0.7, -45.6, -12.3)):
             self.assertAlmostEqual(actual, expected)
         self.assertEqual(module.attitude[3:], (0.0, 0.0, 0.0))
-        self.assertEqual(named['CROLL_RT'], 0.0)
-        self.assertEqual(named['CPITCH_RT'], 0.0)
-        self.assertEqual(named['CYAW_RT'], 0.0)
+        self.assertNotIn('CROLL_RT', named)
+        self.assertNotIn('CPITCH_RT', named)
+        self.assertNotIn('CYAW_RT', named)
 
         # Also reject stale non-zero rates which predate a camera-type change.
         module.attitude = (1.0, 2.0, 3.0, 1000.0, 2000.0, 3000.0)
@@ -290,9 +294,44 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
         module.clear_target = lambda: None
         module.cmd_angle(['30', '-20'])
         self.assertEqual(module.sent, [
+            (PHOTO, '<B', (3,)),
             (GIMBAL_ROTATION, '<bb', (0, 0)),
             (SET_ANGLE, '<hh', (-300, -200)),
         ])
+
+    def test_angle_does_not_clear_roi_when_camera_is_disconnected(self):
+        module = self.make_module(CAMERA_TYPE_MT11)
+        module.sock = None
+        module.clear_target = lambda: self.fail('ROI should not be cleared')
+
+        with patch('builtins.print') as output:
+            module.cmd_angle(['30', '-20'])
+
+        self.assertEqual(module.sent, [])
+        output.assert_called_once_with(
+            "SIYI: angle not sent; camera control is disconnected (run 'siyi connect')")
+
+    def test_angle_is_resent_after_roi_clear_ack(self):
+        module = self.make_module(CAMERA_TYPE_MT11)
+        module.clear_target = lambda: None
+        module.armed_checks = lambda: None
+        module.cmd_angle(['30', '-20'])
+        module.sent = []
+
+        ack = SimpleNamespace(
+            get_type=lambda: 'COMMAND_ACK',
+            command=mavutil.mavlink.MAV_CMD_DO_SET_ROI_NONE,
+            result=mavutil.mavlink.MAV_RESULT_ACCEPTED)
+        with patch('builtins.print') as output:
+            module.mavlink_packet(ack)
+
+        self.assertEqual(module.sent, [
+            (GIMBAL_ROTATION, '<bb', (0, 0)),
+            (SET_ANGLE, '<hh', (-300, -200)),
+        ])
+        self.assertIsNone(module.pending_manual_angle)
+        output.assert_called_once_with(
+            'SIYI: ROI clear confirmed; manual angle applied')
 
     def test_target_attitude_uses_siyi_sign_and_mount_offsets(self):
         module = self.make_module(CAMERA_TYPE_MT11)
@@ -623,15 +662,17 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
 
         module.request_telem()
 
-        self.assertNotIn((REQUEST_CONTINUOUS_DATA, '<BB',
-                          (1, module.siyi_settings.telem_rate)), module.sent)
+        continuous_requests = [entry for entry in module.sent
+                               if entry[0] == REQUEST_CONTINUOUS_DATA]
+        self.assertEqual(continuous_requests, [])
 
     def test_mt11_named_attitude_updates_projection_state(self):
         module = self.make_module(CAMERA_TYPE_MT11)
         module.attitude = (1.0, 2.0, 3.0, 100.0, 200.0, 300.0)
         module.last_att_t = 9.9
         module.att_dt_lpf = 0.1
-        module.update_status = lambda: None
+        status_updates = []
+        module.update_status = lambda: status_updates.append(True)
         module.armed_checks = lambda: None
 
         def named(name, value):
@@ -647,6 +688,13 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
         self.assertEqual(module.attitude, (4.0, 5.0, 6.0,
                                            0.0, 0.0, 0.0))
         self.assertEqual(module.last_att_t, 10.0)
+        self.assertEqual(status_updates, [True])
+        self.assertEqual(module.get_direct_attitude(), (4.0, 5.0, 6.0))
+        module.get_encoder_attitude = lambda: None
+        module.siyi_settings.use_encoders = 0
+        module.siyi_settings.mount_pitch = 1.0
+        module.siyi_settings.mount_yaw = 2.0
+        self.assertEqual(module.get_fov_attitude(), (4.0, 4.0, 4.0))
 
     def test_mt11_temperature_autoswap(self):
         module = self.make_module(CAMERA_TYPE_MT11)

@@ -454,6 +454,9 @@ class SIYIModule(mp_module.MPModule):
         self.control_mode = -1
         self.requested_control_mode = None
         self.requested_control_mode_t = 0
+        self.pending_manual_angle = None
+        self.pending_manual_angle_t = 0
+        self.pending_manual_angle_last_send = 0
         self.thermal_gain = None
         self.requested_thermal_gain = None
         self.requested_thermal_gain_t = 0
@@ -1183,6 +1186,9 @@ autoflag:
 
     def clear_target(self):
         '''clear all local, map and aircraft-side geographic targeting'''
+        # A newer manual or mode command supersedes an angle waiting for an
+        # earlier ROI-clear acknowledgement.
+        self.pending_manual_angle = None
         self.target_pos = None
         # Always clear the aircraft ROI, irrespective of the currently selected
         # target backend.  In particular, the setting may have changed after a
@@ -1269,14 +1275,45 @@ autoflag:
         if len(args) < 2:
             print("Usage: siyi angle YAW PITCH")
             return
+        if self.sock is None:
+            print("SIYI: angle not sent; camera control is disconnected (run 'siyi connect')")
+            return
         yaw = -float(args[0])
         pitch = float(args[1])
         self.target_pos = None
-        self.clear_target()
+        if self.is_mt11():
+            # MT11 ignores manual angle/rate commands in Follow and FPV.  Lock
+            # mode also clears ROI, and its command is ordered ahead of the
+            # angle on the camera connection.
+            self.cmd_gimbal_mode(3, 0)
+        else:
+            self.clear_target()
+        self.pending_manual_angle = (int(yaw*10), int(pitch*10))
+        self.pending_manual_angle_t = time.time()
+        self.pending_manual_angle_last_send = 0
+        self.send_pending_manual_angle()
+
+    def send_pending_manual_angle(self):
+        '''send or resend the angle which is waiting for aircraft ROI clear'''
+        if self.pending_manual_angle is None:
+            return
         # The camera retains the last rate command until it receives an
         # explicit zero.  Stop rate control before selecting an angle.
         self.send_packet_fmt(GIMBAL_ROTATION, "<bb", 0, 0)
-        self.send_packet_fmt(SET_ANGLE, "<hh", int(yaw*10), int(pitch*10))
+        self.send_packet_fmt(SET_ANGLE, "<hh", *self.pending_manual_angle)
+        self.pending_manual_angle_last_send = time.time()
+
+    def update_pending_manual_angle(self):
+        '''keep the manual angle alive until ROI_NONE is acknowledged'''
+        if self.pending_manual_angle is None:
+            return
+        now = time.time()
+        if now - self.pending_manual_angle_t > 10:
+            print("SIYI: timed out waiting for ROI clear before manual angle")
+            self.pending_manual_angle = None
+            return
+        if now - self.pending_manual_angle_last_send >= 0.5:
+            self.send_pending_manual_angle()
         
     def send_rates(self):
         '''send rates packet'''
@@ -1360,10 +1397,10 @@ autoflag:
             else:
                 self.last_temp_t = now
             self.send_packet_fmt(READ_TEMP_FULL_SCREEN, "<B", 2)
-        # The aircraft Lua script owns the MT11's single continuous attitude
-        # stream and publishes CROLL/CPITCH/CYAW.  A direct request here can
-        # steal the stream destination from Lua, causing both logging and map
-        # projections to alternate between live and stale data.
+        # The aircraft Lua script owns MT11 attitude acquisition and publishes
+        # CROLL/CPITCH/CYAW. Do not configure an MT11 continuous stream here:
+        # firmware can leave a previously selected stream active and then fail
+        # to deliver the requested stabilized-attitude stream.
         if (not self.is_mt11() and
                 (self.last_att_t is None or now - self.last_att_t > 5)):
             self.last_att_t = now
@@ -1375,10 +1412,16 @@ autoflag:
         if request_range and (self.last_rf_t is None or now - self.last_rf_t > 10):
             self.last_rf_t = now
             self.send_packet_fmt(REQUEST_CONTINUOUS_DATA, "<BB", 2, 1)
-        if self.last_enc_t is None or now - self.last_enc_t > 5:
+        # Avoid every 0x25 stream request on MT11. In particular, a magnetic
+        # encoder stream (type 3) was observed continuing while repeated type-1
+        # attitude requests produced no attitude packets. Lua polls 0x0D
+        # directly, so map projection does not depend on this firmware state.
+        if (not self.is_mt11() and
+                (self.last_enc_t is None or now - self.last_enc_t > 5)):
             self.last_enc_t = now
             self.send_packet_fmt(REQUEST_CONTINUOUS_DATA, "<BB", 3, self.siyi_settings.telem_rate)
-        if self.last_volt_t is None or now - self.last_volt_t > 5:
+        if (not self.is_mt11() and
+                (self.last_volt_t is None or now - self.last_volt_t > 5)):
             self.last_volt_t = now
             self.send_packet_fmt(REQUEST_CONTINUOUS_DATA, "<BB", 4, self.siyi_settings.telem_rate)
         if (not self.is_mt11() and
@@ -1609,9 +1652,10 @@ autoflag:
             self.send_named_float('CROLL', self.attitude[0])
             self.send_named_float('CPITCH', self.attitude[1])
             self.send_named_float('CYAW', self.attitude[2])
-            self.send_named_float('CROLL_RT', self.attitude[3])
-            self.send_named_float('CPITCH_RT', self.attitude[4])
-            self.send_named_float('CYAW_RT', self.attitude[5])
+            if not self.is_mt11():
+                self.send_named_float('CROLL_RT', self.attitude[3])
+                self.send_named_float('CPITCH_RT', self.attitude[4])
+                self.send_named_float('CYAW_RT', self.attitude[5])
             self.update_status()
             self.logf.write('SIGA', 'Qffffffhhhhhh', 'TimeUS,Y,P,R,Yr,Pr,Rr,z,y,x,sz,sy,sx',
                             self.micros64(),
@@ -2322,6 +2366,18 @@ autoflag:
 
         self.armed_checks()
 
+        if (mtype == 'COMMAND_ACK' and
+                m.command == mavutil.mavlink.MAV_CMD_DO_SET_ROI_NONE and
+                self.pending_manual_angle is not None):
+            if m.result == mavutil.mavlink.MAV_RESULT_ACCEPTED:
+                # Lua can no longer overwrite this final send with the old ROI.
+                self.send_pending_manual_angle()
+                self.pending_manual_angle = None
+                print("SIYI: ROI clear confirmed; manual angle applied")
+            elif m.result != mavutil.mavlink.MAV_RESULT_IN_PROGRESS:
+                print("SIYI: ROI clear failed; manual angle cancelled")
+                self.pending_manual_angle = None
+
         if mtype == 'GPS_RAW_INT':
             gwk, gms = mp_util.get_gps_time(time.time())
             self.logf.write('GPS', "QBIHLLff", "TimeUS,Status,GMS,GWk,Lat,Lng,Alt,Spd",
@@ -2420,6 +2476,7 @@ autoflag:
             self.last_version_send = time.time()
             self.send_packet(ACQUIRE_FIRMWARE_VERSION, None)
         self.check_rate_end()
+        self.update_pending_manual_angle()
         self.update_target()
         self.send_rates()
         self.request_telem()
