@@ -46,6 +46,20 @@ def ffmpeg_http_command(url, filename, res):
     ]
 
 
+def ffmpeg_rtsp_command(url, filename, res):
+    '''build an FFmpeg command for a direct RTSP camera stream'''
+    width, height = res
+    return [
+        'ffmpeg', '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
+        '-rtsp_transport', 'tcp', '-i', url,
+        # Preserve the received stream in the normal SIYI flight log.
+        '-map', '0:v:0', '-c:v', 'copy', '-an', '-f', 'mpegts', filename,
+        # Decode and scale a second output for the interactive MPImage view.
+        '-map', '0:v:0', '-an', '-vf', 'scale=%u:%u' % (width, height),
+        '-pix_fmt', 'bgr24', '-f', 'rawvideo', 'pipe:1',
+    ]
+
+
 class CameraView:
     """handle camera view image"""
 
@@ -139,9 +153,9 @@ class CameraView:
             command = ffmpeg_http_command(self.rtsp_url, self.filename, self.res)
             self.im.set_ffmpeg(command, self.res[0], self.res[1])
         elif scheme == 'rtsp':
-            gst_pipeline = rtsp_gstreamer_pipeline(
-                self.rtsp_url, self.filename, codec)
-            self.im.set_gstreamer(gst_pipeline)
+            command = ffmpeg_rtsp_command(
+                self.rtsp_url, self.filename, self.res)
+            self.im.set_ffmpeg(command, self.res[0], self.res[1])
         else:
             raise ValueError("unsupported SIYI video URL scheme: %s" %
                              (scheme or '<none>'))

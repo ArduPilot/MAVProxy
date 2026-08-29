@@ -102,8 +102,10 @@ GIMBAL_MODE_NAMES = {
 }
 
 MT11_IMAGE_MODES = {
-    # (main stream, secondary stream).  These are the three combinations
-    # documented by Reebot for the MT11.
+    # (main stream, secondary stream).  Wide and zoom are distinct RGB lens
+    # selections; the absolute zoom command controls magnification and must
+    # not implicitly change the selected lens.
+    "wide": (1, 2),
     "zoom": (0, 2),
     "thermal": (2, 0),
     "split": (3, 2),
@@ -114,6 +116,21 @@ ZT30_IMAGE_MODES = {
     "zoom": 3,
     "split": 2,
 }
+
+# Commands which need the SIYI control transport established by
+# ``siyi connect``.  Check these at CLI dispatch rather than in send_packet(),
+# because send_packet() is also used by background polling and would otherwise
+# repeatedly warn while disconnected.
+CONNECTION_REQUIRED_COMMANDS = frozenset({
+    "rates", "yaw", "pitch", "angle", "center", "lock", "follow", "fpv",
+    "resetattitude", "settarget", "notarget", "zoom", "autofocus", "photo",
+    "recording", "imode", "getconfig", "settime", "palette", "tempsnap",
+    "thermal_mode", "get_thermal_mode", "thermal_gain", "get_thermal_gain",
+    "therm_getenv", "therm_set_distance", "therm_set_humidity",
+    "therm_set_emissivity", "therm_set_airtemp", "therm_set_reftemp",
+    "therm_getswitch", "therm_setswitch", "therm_getthresholds",
+    "therm_setthresholds", "therm_getthreshswitch", "therm_setthreshswitch",
+})
 
 
 def decode_firmware_versions(data):
@@ -694,6 +711,11 @@ autoflag:
         if len(args) == 0:
             print(usage)
             return
+        if args[0] in CONNECTION_REQUIRED_COMMANDS and self.sock is None:
+            command = "siyi " + " ".join(args)
+            print("SIYI: camera control is disconnected; run 'siyi connect' "
+                  "before '%s'" % command)
+            return
         if args[0] == "set":
             self.siyi_settings.command(args[1:])
         elif args[0] == "connect":
@@ -906,22 +928,16 @@ autoflag:
 
     def cmd_imode(self, args):
         '''update image mode'''
-        # MT11 exposes one hybrid RGB path. Wide/zoom selection is made with
-        # the absolute-zoom command, not by changing the two video slots.
-        # Keep RGB main and thermal secondary for the patched temperature path.
-        if self.is_mt11() and len(args) == 1 and args[0].lower() in ('wide', 'zoom'):
-            lens = args[0].lower()
-            zoom = 1.0 if lens == 'wide' else max(self.last_zoom, 2.0)
-            self.cmd_zoom([str(zoom)])
-            return
         try:
             payload, name, slots = image_mode_payload(self.siyi_settings.camera_type, args)
         except (TypeError, ValueError) as ex:
             print("SIYI: %s" % ex)
             return
-        # Track the lens label independently of the MT11 video-slot order.
         if self.is_mt11():
-            self.rgb_lens = "wide" if self.last_zoom <= 1.0 else "zoom"
+            if slots[0] == 1:
+                self.rgb_lens = "wide"
+            elif slots[0] == 0:
+                self.rgb_lens = "zoom"
         else:
             self.rgb_lens = name
         if self.is_mt11():
@@ -1597,10 +1613,9 @@ autoflag:
                 if slots is None:
                     return
                 self.image_slots = slots
-                if 0 in slots or slots[0] in (3, 5):
-                    self.rgb_lens = ('wide' if self.last_zoom <= 1.0
-                                     else 'zoom')
-                elif 1 in slots or slots[0] == 4:
+                if slots[0] == 0 or slots[0] in (3, 5):
+                    self.rgb_lens = 'zoom'
+                elif slots[0] == 1 or slots[0] == 4:
                     self.rgb_lens = 'wide'
                 names = {0: 'zoom', 1: 'wide', 2: 'thermal',
                          3: 'zoom+thermal', 4: 'wide+thermal',
@@ -1625,7 +1640,7 @@ autoflag:
                 target = self.mt11_zoom_target
                 if target is not None and abs(actual - target) <= 0.11:
                     self.last_zoom = actual
-                    self.rgb_lens = 'wide' if actual <= 1.05 else 'zoom'
+                    self.rgb_lens = 'zoom'
                     print("MT11 RGB zoom confirmed: %.1fx" % actual)
                     self.update_title()
                     self.mt11_zoom_state = None
