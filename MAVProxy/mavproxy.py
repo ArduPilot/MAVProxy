@@ -1320,6 +1320,27 @@ def run_startup_scripts():
             print("no script %s" % start_script)
 
 
+def choose_serial_port(serial_list, should_cancel=None):
+    '''ask the user to choose between multiple serial port candidates with a
+    GUI dialog. Returns the chosen SerialPort or None'''
+    choices = []
+    for p in serial_list:
+        if platform.system() == 'Windows' and p.description:
+            choices.append("%s: %s" % (p.device, p.description))
+        else:
+            choices.append(p.device)
+    try:
+        from MAVProxy.modules.lib.mp_menu import MPChoiceDialog
+        idx = MPChoiceDialog(title='MAVProxy: choose serial port',
+                             message='Choose the serial port to connect to',
+                             choices=choices).show(should_cancel=should_cancel)
+    except Exception:
+        return None
+    if idx is None:
+        return None
+    return serial_list[idx]
+
+
 if __name__ == '__main__':
     from optparse import OptionParser
     parser = OptionParser("mavproxy.py [options]")
@@ -1500,10 +1521,18 @@ if __name__ == '__main__':
         print("Connecting to %s" % serial_list[0])
         mpstate.module('link').link_add(serial_list[0].device)
     elif not opts.master and len(serial_list) > 1:
-        print("Warning: multiple possible serial ports. Use console GUI or 'link add' to add port, or restart using --master to select a single port")  # noqa:E501
         # if no display, assume running CLI mode and exit
         if platform.system() != 'Windows' and "DISPLAY" not in os.environ:
+            print("Warning: multiple possible serial ports. Use 'link add' to add a port, or restart using --master to select a single port")  # noqa:E501
             sys.exit(1)
+        port = None
+        if not opts.daemon and not opts.non_interactive:
+            port = choose_serial_port(serial_list, should_cancel=mpstate.status.stop_event.is_set)
+        if port is not None:
+            print("Connecting to %s" % port)
+            mpstate.module('link').link_add(port.device)
+        else:
+            print("Warning: multiple possible serial ports. Use console GUI or 'link add' to add port, or restart using --master to select a single port")  # noqa:E501
     elif not opts.master:
         wifi_device = '0.0.0.0:14550'
         mpstate.module('link').link_add(wifi_device)
