@@ -6,7 +6,7 @@
 import threading
 import sys, time
 
-from MAVProxy.modules.lib.wxconsole_util import Value, Text
+from MAVProxy.modules.lib.wxconsole_util import Value, Text, Title
 from MAVProxy.modules.lib import textconsole
 from MAVProxy.modules.lib import win_layout
 from MAVProxy.modules.lib import multiproc
@@ -75,6 +75,11 @@ class MessageConsole(textconsole.SimpleConsole):
         '''set a status value'''
         if self.is_alive():
             self.parent_pipe_send.send(Value(name, text, row, fg, bg))
+
+    def set_title(self, title):
+        '''set the console window title'''
+        if self.is_alive():
+            self.parent_pipe_send.send(Title(title))
 
     def set_menu(self, menu, callback):
         if self.is_alive():

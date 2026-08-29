@@ -3,7 +3,7 @@ import time
 import platform
 import socket
 from MAVProxy.modules.lib import mp_menu
-from MAVProxy.modules.lib.wxconsole_util import Value, Text
+from MAVProxy.modules.lib.wxconsole_util import Value, Text, Title
 from MAVProxy.modules.lib.wx_loader import wx
 from MAVProxy.modules.lib import win_layout
 from MAVProxy.modules.lib import icon
@@ -150,6 +150,8 @@ class ConsoleFrame(wx.Frame):
                     self.control.AppendText(p.text)
                     self.control.SetDefaultStyle(oldstyle)
                 self.pending = []
+            elif isinstance(obj, Title):
+                self.SetTitle(obj.title)
             elif isinstance(obj, mp_menu.MPMenuTop):
                 if obj is not None:
                     self.SetMenuBar(None)

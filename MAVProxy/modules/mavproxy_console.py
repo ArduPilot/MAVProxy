@@ -61,7 +61,7 @@ class ConsoleModule(mp_module.MPModule):
         self.safety_on = False
         self.unload_check_interval = 5 # seconds
         self.last_unload_check_time = time.time()
-        self.add_command('console', self.cmd_console, "console module", ['add','list','remove'])
+        self.add_command('console', self.cmd_console, "console module", ['add','list','remove','title'])
         mpstate.console = wxconsole.MessageConsole(title='Console')
 
         # setup some default status information
@@ -125,7 +125,7 @@ class ConsoleModule(mp_module.MPModule):
         self.shown_agl = False
 
     def cmd_console(self, args):
-        usage = 'usage: console <add|list|remove|menu|set>'
+        usage = 'usage: console <add|list|remove|menu|set|title>'
         if len(args) < 1:
             print(usage)
             return
@@ -155,6 +155,11 @@ class ConsoleModule(mp_module.MPModule):
             self.cmd_menu(args[1:])
         elif cmd == 'set':
             self.cmd_set(args[1:])
+        elif cmd == 'title':
+            if len(args) < 2:
+                print("usage: console title TITLE")
+                return
+            self.console.set_title(' '.join(args[1:]))
         else:
             print(usage)
 
