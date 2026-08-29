@@ -2,7 +2,7 @@
 
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from types import SimpleNamespace
 import struct
 import numpy as np
@@ -43,6 +43,7 @@ from MAVProxy.modules.mavproxy_SIYI import (
     rate_mapping,
 )
 from MAVProxy.modules.mavproxy_SIYI.camera_view import (
+    ffmpeg_rtsp_command,
     ffmpeg_http_command,
     rtsp_gstreamer_pipeline,
 )
@@ -76,8 +77,8 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
         self.assertEqual((payload, name, slots), (b'\x02\x00', 'thermal', (2, 0)))
         payload, _, slots = image_mode_payload(CAMERA_TYPE_MT11, ['3', '2'])
         self.assertEqual((payload, slots), (b'\x03\x02', (3, 2)))
-        with self.assertRaises(ValueError):
-            image_mode_payload(CAMERA_TYPE_MT11, ['wide'])
+        payload, name, slots = image_mode_payload(CAMERA_TYPE_MT11, ['wide'])
+        self.assertEqual((payload, name, slots), (b'\x01\x02', 'wide', (1, 2)))
         payload, name, slots = image_mode_payload(CAMERA_TYPE_ZT30, ['wide'])
         self.assertEqual((payload, name, slots), (b'\x05', 'wide', None))
 
@@ -310,6 +311,29 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
         self.assertEqual(module.sent, [])
         output.assert_called_once_with(
             "SIYI: angle not sent; camera control is disconnected (run 'siyi connect')")
+
+    def test_cli_control_command_warns_when_disconnected(self):
+        module = self.make_module(CAMERA_TYPE_MT11)
+        module.sock = None
+
+        with patch('builtins.print') as output:
+            module.cmd_siyi(['imode', 'wide'])
+
+        self.assertEqual(module.sent, [])
+        output.assert_called_once_with(
+            "SIYI: camera control is disconnected; run 'siyi connect' "
+            "before 'siyi imode wide'")
+
+    def test_cli_connect_is_allowed_when_disconnected(self):
+        module = self.make_module(CAMERA_TYPE_MT11)
+        module.sock = None
+        module.cmd_connect = Mock()
+
+        with patch('builtins.print') as output:
+            module.cmd_siyi(['connect'])
+
+        module.cmd_connect.assert_called_once_with()
+        output.assert_not_called()
 
     def test_angle_is_resent_after_roi_clear_ack(self):
         module = self.make_module(CAMERA_TYPE_MT11)
@@ -557,29 +581,27 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
 
         module.cmd_imode(["wide"])
         self.assertEqual(module.last_zoom, 4.0)
-        self.assertEqual(module.rgb_lens, "zoom")
-        self.assertEqual(module.sent, [(SET_IMAGE_TYPE, "<BB", (0, 2))])
+        self.assertEqual(module.rgb_lens, "wide")
+        self.assertEqual(module.sent, [(SET_IMAGE_TYPE, "<BB", (1, 2))])
 
         module.sent = []
-        module.parse_packet(self.packet(SET_IMAGE_TYPE, b'\x00\x02'))
-        self.assertEqual(module.mt11_zoom_state, 'zooming')
-        self.assertEqual(module.sent, [(ABSOLUTE_ZOOM, "<BB", (1, 0))])
-
-        module.sent = []
-        module.parse_packet(self.packet(GET_ZOOM_VALUE, b'\x01\x00'))
+        module.parse_packet(self.packet(SET_IMAGE_TYPE, b'\x01\x02'))
         self.assertIsNone(module.mt11_zoom_state)
         self.assertEqual(module.sent, [])
-        self.assertEqual(module.image_slots, (0, 2))
-        self.assertEqual(module.last_zoom, 1.0)
+        self.assertEqual(module.image_slots, (1, 2))
+        self.assertEqual(module.last_zoom, 4.0)
         self.assertEqual(module.rgb_lens, "wide")
 
         module.cmd_imode(["zoom"])
-        self.assertEqual(module.sent, [(ABSOLUTE_ZOOM, "<BB", (2, 0))])
+        self.assertEqual(module.sent, [(SET_IMAGE_TYPE, "<BB", (0, 2))])
         module.sent = []
-        module.parse_packet(self.packet(GET_ZOOM_VALUE, b'\x02\x00'))
-        self.assertIsNone(module.mt11_zoom_state)
-        self.assertEqual(module.last_zoom, 2.0)
+        module.parse_packet(self.packet(SET_IMAGE_TYPE, b'\x00\x02'))
+        self.assertEqual(module.last_zoom, 4.0)
         self.assertEqual(module.rgb_lens, "zoom")
+
+        module.sent = []
+        module.cmd_zoom(["1"])
+        self.assertEqual(module.sent, [(ABSOLUTE_ZOOM, "<BB", (1, 0))])
 
     def test_mt11_gps_packet_units(self):
         module = self.make_module(CAMERA_TYPE_MT11)
@@ -739,6 +761,18 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
         self.assertEqual(command[-1], 'pipe:1')
         self.assertIn('copy', command)
         self.assertIn('rawvideo', command)
+
+    def test_direct_rtsp_ffmpeg_command(self):
+        url = 'rtsp://192.168.144.25:8554/video1'
+        command = ffmpeg_rtsp_command(url, 'out.ts', (1280, 720))
+        self.assertEqual(command[0], 'ffmpeg')
+        self.assertIn(url, command)
+        self.assertIn('out.ts', command)
+        self.assertIn('scale=1280:720', command)
+        self.assertEqual(command[-1], 'pipe:1')
+        self.assertEqual(command[command.index('-rtsp_transport') + 1], 'tcp')
+        self.assertNotIn('-rw_timeout', command)
+        self.assertNotIn('nobuffer', command)
 
     def test_mt11_version_and_slot_responses(self):
         module = self.make_parser(CAMERA_TYPE_MT11)
