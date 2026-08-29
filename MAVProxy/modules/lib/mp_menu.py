@@ -491,6 +491,50 @@ class MPMenuConfirmDialog(object):
         if ret == wx.ID_YES and self.callback is not None:
             self.callback(self.args)
 
+class MPChoiceDialog(object):
+    '''modal single-choice dialog run in a child process.
+    show() blocks and returns the selected index, or None if cancelled'''
+    def __init__(self, title='Choose', message='', choices=None):
+        self.title = title
+        self.message = message
+        self.choices = choices if choices is not None else []
+        self.pipe_recv, self.pipe_send = multiproc.Pipe(duplex=False)
+
+    def show(self, should_cancel=None):
+        '''block until a choice is made; should_cancel is an optional callable
+        polled to allow shutdown while waiting'''
+        child = multiproc.Process(target=self.child_task)
+        child.start()
+        self.pipe_send.close()
+        ret = None
+        while True:
+            if should_cancel is not None and should_cancel():
+                child.terminate()
+                break
+            try:
+                if self.pipe_recv.poll(0.2):
+                    ret = self.pipe_recv.recv()
+                    break
+            except (EOFError, OSError):
+                break
+        child.join()
+        if ret is not None and 0 <= ret < len(self.choices):
+            return ret
+        return None
+
+    def child_task(self):
+        mp_util.child_close_fds()
+        self.pipe_recv.close()
+        from MAVProxy.modules.lib import wx_processguard  # noqa
+        from MAVProxy.modules.lib.wx_loader import wx
+        app = wx.App(False)
+        dlg = wx.SingleChoiceDialog(None, self.message, self.title, self.choices)
+        if dlg.ShowModal() == wx.ID_OK:
+            self.pipe_send.send(dlg.GetSelection())
+        else:
+            self.pipe_send.send(None)
+        dlg.Destroy()
+
 class MPMenuChildMessageDialog(object):
     '''used to create a message dialog in a child process'''
     def __init__(self, title='Information', message='', font_size=18):
