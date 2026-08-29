@@ -43,6 +43,10 @@ class SimpleConsole():
     def set_menu(self, menu, callback):
         pass
 
+    def set_title(self, title):
+        '''set console title'''
+        pass
+
 if __name__ == "__main__":
     # test the console
     import time
