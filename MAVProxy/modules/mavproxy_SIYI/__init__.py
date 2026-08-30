@@ -1,6 +1,4 @@
-'''
-control SIYI camera over UDP
-'''
+'''Control SIYI cameras over UDP or TCP.'''
 
 '''
 TODO:
@@ -41,6 +39,7 @@ from MAVProxy.modules.mavproxy_SIYI.raw_thermal import RawThermal
 SIYI_RATE_MAX_DPS = 90.0
 SIYI_HEADER1 = 0x55
 SIYI_HEADER2 = 0x66
+SIYI_MAX_PACKET = 2048
 
 ACQUIRE_FIRMWARE_VERSION = 0x01
 HARDWARE_ID = 0x02
@@ -123,7 +122,7 @@ ZT30_IMAGE_MODES = {
 # repeatedly warn while disconnected.
 CONNECTION_REQUIRED_COMMANDS = frozenset({
     "rates", "yaw", "pitch", "angle", "center", "lock", "follow", "fpv",
-    "resetattitude", "settarget", "notarget", "zoom", "autofocus", "photo",
+    "resetattitude", "settarget", "notarget", "zoom", "autofocus", "focus", "photo",
     "recording", "imode", "getconfig", "settime", "palette", "tempsnap",
     "thermal_mode", "get_thermal_mode", "thermal_gain", "get_thermal_gain",
     "therm_getenv", "therm_set_distance", "therm_set_humidity",
@@ -324,7 +323,7 @@ class SIYIModule(mp_module.MPModule):
         super(SIYIModule, self).__init__(mpstate, "SIYI", "SIYI camera support")
 
         self.add_command('siyi', self.cmd_siyi, "SIYI camera control",
-                         ["<rates|connect|autofocus|zoom|yaw|pitch|center|getconfig|angle|photo|recording|lock|follow|fpv|settarget|notarget|thermal|rgbview|tempsnap|get_thermal_mode|thermal_gain|get_thermal_gain|settime>",
+                         ["<rates|connect|autofocus|focus|zoom|yaw|pitch|center|getconfig|angle|photo|recording|lock|follow|fpv|settarget|notarget|thermal|rgbview|tempsnap|get_thermal_mode|thermal_gain|get_thermal_gain|settime>",
                           "<therm_getenv|therm_set_distance|therm_set_emissivity|therm_set_humidity|therm_set_airtemp|therm_set_reftemp|therm_getswitch|therm_setswitch>",
                           "<therm_getthresholds|therm_getthreshswitch|therm_setthresholds|therm_setthreshswitch>",
                           "set (SIYISETTING)",
@@ -339,7 +338,7 @@ class SIYIModule(mp_module.MPModule):
                                                      ("port", int, 37260),
                                                      ('ip', str, "192.168.144.25"),
                                                      ('therm_ip', str, "192.168.144.25"),
-                                                     MPSetting('transport', str, 'auto',
+                                                     MPSetting('transport', str, 'udp',
                                                                choice=['auto', 'udp', 'tcp']),
                                                      ('yaw_rate', float, 10),
                                                      ('pitch_rate', float, 10),
@@ -416,6 +415,7 @@ class SIYIModule(mp_module.MPModule):
         self.sock = None
         self.sock_is_tcp = False
         self.recv_buffer = b''
+        self.last_tcp_heartbeat = 0
         self.yaw_rate = None
         self.pitch_rate = None
         self.sequence = 0
@@ -426,6 +426,7 @@ class SIYIModule(mp_module.MPModule):
         self.console.set_status('TEMP', 'TEMP -/-', row=6)
         self.yaw_end = None
         self.pitch_end = None
+        self.focus_end = None
         self.rf_dist = 0
         self.attitude = (0,0,0,0,0,0)
         self.encoders = (0,0,0)
@@ -533,6 +534,10 @@ class SIYIModule(mp_module.MPModule):
                                      MPMenuItem('GetConfig', 'GetConfig', '# siyi getconfig '),
                                      MPMenuItem('TakePhoto', 'TakePhoto', '# siyi photo '),
                                      MPMenuItem('AutoFocus', 'AutoFocus', '# siyi autofocus '),
+                                     MPMenuSubMenu('ManualFocus',
+                                                   items=[MPMenuItem('Near', 'FocusNear', '# siyi focus near'),
+                                                          MPMenuItem('Far', 'FocusFar', '# siyi focus far'),
+                                                          MPMenuItem('Stop', 'FocusStop', '# siyi focus stop')]),
                                      MPMenuItem('ImageSplit', 'ImageSplit', '# siyi imode split '),
                                      MPMenuItem('ImageWide', 'ImageWide', '# siyi imode wide '),
                                      MPMenuItem('ImageZoom', 'ImageZoom', '# siyi imode zoom '),
@@ -673,7 +678,9 @@ gimbal control:
 
 camera control:
   siyi zoom ZOOM                  : set absolute zoom level
-  siyi autofocus [X Y]            : trigger autofocus (optional MT11 point)
+  siyi autofocus [X Y]            : trigger autofocus (optional MT11 pixel)
+  siyi focus near|far [SECONDS]   : pulse manual focus (default 0.2 seconds)
+  siyi focus stop                 : stop manual focus immediately
   siyi photo                      : take a photo
   siyi recording                  : toggle video recording
   siyi imode MODE                 : ZT30 mode or MT11 zoom/thermal/split
@@ -735,6 +742,8 @@ autoflag:
             self.cmd_imode(args[1:])
         elif args[0] == "autofocus":
             self.cmd_autofocus(args[1:])
+        elif args[0] == "focus":
+            self.cmd_focus(args[1:])
         elif args[0] == "center":
             self.clear_target()
             self.send_packet_fmt(CENTER, "<B", 1)
@@ -855,11 +864,16 @@ autoflag:
         sock_type = socket.SOCK_STREAM if sock_is_tcp else socket.SOCK_DGRAM
         sock = socket.socket(socket.AF_INET, sock_type)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        if sock_is_tcp:
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
         sock.connect((self.siyi_settings.ip, self.siyi_settings.port))
         sock.setblocking(True)
         self.recv_buffer = b''
         self.sock_is_tcp = sock_is_tcp
         self.sock = sock
+        self.last_tcp_heartbeat = 0
+        self.send_tcp_heartbeat()
         print("Connected to SIYI %s via %s" %
               (self.siyi_settings.camera_type, transport.upper()))
 
@@ -922,9 +936,9 @@ autoflag:
             if len(args) not in (0, 2):
                 print("Usage: siyi autofocus [X Y]")
                 return
-            x, y = (0, 0) if not args else (int(args[0]), int(args[1]))
-            if x < 0 or x > 65535 or y < 0 or y > 65535:
-                print("SIYI: autofocus coordinates must be 0..65535")
+            x, y = (960, 540) if not args else (int(args[0]), int(args[1]))
+            if x < 0 or x >= 1920 or y < 0 or y >= 1080:
+                print("SIYI: MT11 autofocus pixels must be X=0..1919 Y=0..1079")
                 return
             self.send_packet_fmt(AUTO_FOCUS, "<BHH", 1, x, y)
         else:
@@ -932,6 +946,30 @@ autoflag:
                 print("SIYI: ZT30 autofocus does not take coordinates")
                 return
             self.send_packet_fmt(AUTO_FOCUS, "<B", 1)
+
+    def cmd_focus(self, args):
+        '''pulse manual focus nearer or farther, or stop it immediately'''
+        if len(args) not in (1, 2):
+            print("Usage: siyi focus <near|far> [SECONDS] | stop")
+            return
+        name = args[0].lower()
+        if name == "stop":
+            if len(args) != 1:
+                print("Usage: siyi focus stop")
+                return
+            self.focus_end = None
+            self.send_packet_fmt(MANUAL_FOCUS, "<b", 0)
+            return
+        directions = {"near": -1, "far": 1}
+        if name not in directions:
+            print("SIYI: manual focus direction must be near, far, or stop")
+            return
+        duration = 0.2 if len(args) == 1 else float(args[1])
+        if not math.isfinite(duration) or duration < 0.05 or duration > 5.0:
+            print("SIYI: manual focus duration must be 0.05..5.0 seconds")
+            return
+        self.send_packet_fmt(MANUAL_FOCUS, "<b", directions[name])
+        self.focus_end = time.time() + duration
 
     def cmd_imode(self, args):
         '''update image mode'''
@@ -1530,13 +1568,20 @@ autoflag:
         sock = self.sock
         if sock is None:
             return
+        is_tcp = self.sock_is_tcp
         try:
-            if self.sock_is_tcp:
+            if is_tcp:
                 sock.sendall(buf)
             else:
                 sock.send(buf)
-        except Exception:
-            pass
+        except OSError as ex:
+            if self.sock is sock:
+                print("SIYI send failed", ex)
+                self.sock = None
+            try:
+                sock.close()
+            except OSError:
+                pass
 
     def send_packet_fmt(self, command_id, fmt, *args):
         '''send SIYI packet'''
@@ -1554,6 +1599,16 @@ autoflag:
             args = args[:8]
         args.extend([0]*(8-len(args)))
         self.logf.write('SIOU', 'QBffffffff', 'TimeUS,Cmd,P1,P2,P3,P4,P5,P6,P7,P8', self.micros64(), command_id, *args)
+
+    def send_tcp_heartbeat(self):
+        '''send the keepalive required by the vendor TCP SDK service'''
+        if self.sock is None or not self.sock_is_tcp:
+            return
+        now = time.time()
+        if now - self.last_tcp_heartbeat < 1.0:
+            return
+        self.last_tcp_heartbeat = now
+        self.send_packet(0x00, b'\x00')
 
     def unpack(self, command_id, fmt, data):
         '''unpack SIYI data and log'''
@@ -1578,6 +1633,11 @@ autoflag:
                 pkt = pkt[offset:]
                 continue
             (h1,h2,rack,plen,seq,cmd) = struct.unpack("<BBBHHB", pkt[:8])
+            if plen+10 > SIYI_MAX_PACKET:
+                # A corrupt length in a TCP stream must not indefinitely hold
+                # every valid packet which follows it.
+                pkt = pkt[1:]
+                continue
             if plen+10 > len(pkt):
                 #print("SIYI: short packet", plen+10, len(pkt))
                 break
@@ -1988,6 +2048,12 @@ autoflag:
         if self.pitch_end is not None and now >= self.pitch_end:
             self.pitch_rate = 0
             self.pitch_end = None
+
+    def check_focus_end(self):
+        '''send the stop packet at the end of a manual-focus pulse'''
+        if self.focus_end is not None and time.time() >= self.focus_end:
+            self.focus_end = None
+            self.send_packet_fmt(MANUAL_FOCUS, "<b", 0)
 
     def get_encoder_attitude(self):
         '''get attitude from encoders in vehicle frame'''
@@ -2499,11 +2565,23 @@ autoflag:
                 if self.sock is sock:
                     print("SIYI receive failed", ex)
                     self.sock = None
+                try:
+                    sock.close()
+                except OSError:
+                    pass
                 continue
             if not pkt:
                 if self.sock is sock:
                     print("SIYI connection closed")
                     self.sock = None
+                try:
+                    sock.close()
+                except OSError:
+                    pass
+                continue
+            if self.sock is not sock:
+                # A reconnect happened while recv() on the previous socket was
+                # unblocking.  Never mix bytes from two TCP connections.
                 continue
             if is_tcp:
                 self.recv_buffer += pkt
@@ -2532,10 +2610,12 @@ autoflag:
         '''called on idle'''
         if not self.sock:
             return
+        self.send_tcp_heartbeat()
         if not self.have_version and time.time() - self.last_version_send > 2.0:
             self.last_version_send = time.time()
             self.send_packet(ACQUIRE_FIRMWARE_VERSION, None)
         self.check_rate_end()
+        self.check_focus_end()
         self.update_pending_manual_angle()
         self.update_target()
         self.send_rates()
