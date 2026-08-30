@@ -114,6 +114,8 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
         module.last_zoom = 1.0
         module.rgb_lens = "wide"
         module.image_slots = None
+        module.mt11_image_mode_target = None
+        module.mt11_lens_control = None
         module.mt11_zoom_state = None
         module.mt11_zoom_target = None
         module.mt11_zoom_actual = None
@@ -583,6 +585,7 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
         self.assertEqual(module.last_zoom, 4.0)
         self.assertEqual(module.rgb_lens, "wide")
         self.assertEqual(module.sent, [(SET_IMAGE_TYPE, "<BB", (1, 2))])
+        self.assertEqual(module.mt11_image_mode_target, (1, 2))
 
         module.sent = []
         module.parse_packet(self.packet(SET_IMAGE_TYPE, b'\x01\x02'))
@@ -591,6 +594,7 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
         self.assertEqual(module.image_slots, (1, 2))
         self.assertEqual(module.last_zoom, 4.0)
         self.assertEqual(module.rgb_lens, "wide")
+        self.assertEqual(module.mt11_lens_control, 'slots')
 
         module.cmd_imode(["zoom"])
         self.assertEqual(module.sent, [(SET_IMAGE_TYPE, "<BB", (0, 2))])
@@ -602,6 +606,27 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
         module.sent = []
         module.cmd_zoom(["1"])
         self.assertEqual(module.sent, [(ABSOLUTE_ZOOM, "<BB", (1, 0))])
+
+    def test_mt11_vendor_app_uses_zoom_based_lens_selection(self):
+        module = self.make_parser(CAMERA_TYPE_MT11)
+
+        module.cmd_imode(["wide"])
+        self.assertEqual(module.sent, [(SET_IMAGE_TYPE, "<BB", (1, 2))])
+        module.parse_packet(self.packet(SET_IMAGE_TYPE, b'\x00\x02'))
+        self.assertEqual(module.mt11_lens_control, 'zoom')
+        self.assertEqual(module.rgb_lens, 'wide')
+        self.assertEqual(module.last_zoom, 1.0)
+        self.assertEqual(module.sent[-1], (ABSOLUTE_ZOOM, '<BB', (1, 0)))
+
+        module.sent = []
+        module.cmd_imode(["zoom"])
+        self.assertEqual(module.sent, [(ABSOLUTE_ZOOM, '<BB', (2, 0))])
+        self.assertEqual(module.rgb_lens, 'zoom')
+
+        module.sent = []
+        module.cmd_imode(["wide"])
+        self.assertEqual(module.sent, [(ABSOLUTE_ZOOM, '<BB', (1, 0))])
+        self.assertEqual(module.rgb_lens, 'wide')
 
     def test_mt11_gps_packet_units(self):
         module = self.make_module(CAMERA_TYPE_MT11)
