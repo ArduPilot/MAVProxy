@@ -12,11 +12,59 @@ from MAVProxy.modules.lib.mp_image import MPImageFrameCounter
 from MAVProxy.modules.mavproxy_map import mp_slipmap
 from MAVProxy.modules.lib import mp_util
 import numpy as np
+from urllib.parse import urlparse
+
+
+def rtsp_gstreamer_pipeline(rtsp_url, filename, codec):
+    '''build a recording/viewing pipeline for H.264 or H.265 RTSP video'''
+    codec = codec.lower()
+    if codec not in ('h264', 'h265'):
+        raise ValueError("RTSP codec must be h264 or h265")
+    return (
+        "rtspsrc location={url} latency=0 protocols=tcp tcp-timeout=3000000 "
+        "buffer-mode=auto ! rtp{codec}depay ! tee name=tee1 "
+        "tee1. ! queue ! {codec}parse ! avdec_{codec} ! videoconvert ! "
+        "video/x-raw,format=BGRx ! appsink "
+        "tee1. ! queue ! {codec}parse config-interval=15 ! "
+        "video/x-{codec} ! mpegtsmux ! filesink location={filename}"
+    ).format(url=rtsp_url, codec=codec, filename=filename)
+
+
+def ffmpeg_http_command(url, filename, res):
+    '''build the low-latency FFmpeg command used for SupportProxy MPEG-TS'''
+    width, height = res
+    return [
+        'ffmpeg', '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
+        '-fflags', 'nobuffer', '-flags', 'low_delay',
+        '-probesize', '500000', '-analyzeduration', '1000000',
+        '-rw_timeout', '5000000', '-i', url,
+        # Preserve the received stream in the normal SIYI flight log.
+        '-map', '0:v:0', '-c:v', 'copy', '-an', '-f', 'mpegts', filename,
+        # Decode and scale a second output for the interactive MPImage view.
+        '-map', '0:v:0', '-an', '-vf', 'scale=%u:%u' % (width, height),
+        '-pix_fmt', 'bgr24', '-f', 'rawvideo', 'pipe:1',
+    ]
+
+
+def ffmpeg_rtsp_command(url, filename, res):
+    '''build an FFmpeg command for a direct RTSP camera stream'''
+    width, height = res
+    return [
+        'ffmpeg', '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
+        '-rtsp_transport', 'tcp', '-i', url,
+        # Preserve the received stream in the normal SIYI flight log.
+        '-map', '0:v:0', '-c:v', 'copy', '-an', '-f', 'mpegts', filename,
+        # Decode and scale a second output for the interactive MPImage view.
+        '-map', '0:v:0', '-an', '-vf', 'scale=%u:%u' % (width, height),
+        '-pix_fmt', 'bgr24', '-f', 'rawvideo', 'pipe:1',
+    ]
+
 
 class CameraView:
     """handle camera view image"""
 
-    def __init__(self, siyi, rtsp_url, filename, res, thermal=False, fps=10, video_idx=-1):
+    def __init__(self, siyi, rtsp_url, filename, res, thermal=False, fps=10,
+                 video_idx=-1, codec='h265'):
         self.siyi = siyi
         self.thermal = thermal
         self.im = None
@@ -85,6 +133,10 @@ class CameraView:
                 ["Lens"], MPMenuItem("WideAngle", returnkey="Lens:wide")
             )
             popup.add_to_submenu(["Lens"], MPMenuItem("Zoom", returnkey="Lens:zoom"))
+            if self.siyi is not None and self.siyi.is_mt11():
+                popup.add_to_submenu(
+                    ["Lens"], MPMenuItem("ThermalMain", returnkey="Lens:thermal")
+                )
             popup.add_to_submenu(
                 ["Lens"], MPMenuItem("SplitScreen", returnkey="Lens:split")
             )
@@ -96,11 +148,17 @@ class CameraView:
         popup.add_to_submenu(["Marker"], MPMenuItem("Flag", returnkey="Marker:flag"))
         popup.add_to_submenu(["Marker"], MPMenuItem("Barrell", returnkey="Marker:barrell"))
 
-        gst_pipeline = "rtspsrc location={0} latency=0 protocols=tcp tcp-timeout=3000000 buffer-mode=auto ! rtph265depay !  tee name=tee1 tee1. ! queue ! h265parse ! avdec_h265  ! videoconvert ! video/x-raw,format=BGRx ! appsink tee1. ! queue ! h265parse config-interval=15 ! video/x-h265 ! mpegtsmux ! filesink location={1}".format(
-            self.rtsp_url, self.filename
-        )
-
-        self.im.set_gstreamer(gst_pipeline)
+        scheme = urlparse(self.rtsp_url).scheme.lower()
+        if scheme in ('http', 'https'):
+            command = ffmpeg_http_command(self.rtsp_url, self.filename, self.res)
+            self.im.set_ffmpeg(command, self.res[0], self.res[1])
+        elif scheme == 'rtsp':
+            command = ffmpeg_rtsp_command(
+                self.rtsp_url, self.filename, self.res)
+            self.im.set_ffmpeg(command, self.res[0], self.res[1])
+        else:
+            raise ValueError("unsupported SIYI video URL scheme: %s" %
+                             (scheme or '<none>'))
         if self.thermal:
             self.im.set_colormap(self.im_colormap)
         self.im.set_colormap("None")

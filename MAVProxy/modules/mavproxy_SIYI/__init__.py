@@ -56,7 +56,10 @@ ACQUIRE_GIMBAL_ATTITUDE = 0x0D
 SET_ANGLE = 0x0E
 RESET_ATTITUDE = 0x08
 ABSOLUTE_ZOOM = 0x0F
+GET_IMAGE_TYPE = 0x10
+GET_ZOOM_VALUE = 0x18
 READ_RANGEFINDER = 0x15
+READ_GIMBAL_MODE = 0x19
 READ_ENCODERS = 0x26
 READ_CONTROL_MODE = 0x27
 READ_THRESHOLDS = 0x28
@@ -67,7 +70,7 @@ SET_IMAGE_TYPE = 0x11
 SET_THERMAL_PALETTE = 0x1B
 REQUEST_CONTINUOUS_DATA = 0x25
 ATTITUDE_EXTERNAL = 0x22
-VELOCITY_EXTERNAL = 0x26
+GPS_EXTERNAL = 0x3E
 TEMPERATURE_BOX = 0x13
 GET_THERMAL_MODE = 0x33
 SET_THERMAL_MODE = 0x34
@@ -80,12 +83,100 @@ SET_THERMAL_PARAM = 0x3A
 GET_THERMAL_ENVSWITCH = 0x3B
 SET_THERMAL_ENVSWITCH = 0x3C
 SET_TIME = 0x30
+SET_LASER_STATUS = 0x32
 GET_THERMAL_THRESH_STATE = 0x42
 SET_THERMAL_THRESH_STATE = 0x43
 GET_THERMAL_THRESH = 0x44
 SET_THERMAL_THRESH = 0x45
 GET_THERMAL_THRESH_PREC = 0x46
 SET_THERMAL_THRESH_PREC = 0x47
+
+CAMERA_TYPE_MT11 = "MT11"
+CAMERA_TYPE_ZT30 = "ZT30"
+DEFAULT_CAMERA_TYPE = CAMERA_TYPE_MT11
+
+GIMBAL_MODE_NAMES = {
+    0: "Lock",
+    1: "Follow",
+    2: "FPV",
+}
+
+MT11_IMAGE_MODES = {
+    # (main stream, secondary stream).  Wide and zoom are distinct RGB lens
+    # selections; the absolute zoom command controls magnification and must
+    # not implicitly change the selected lens.
+    "wide": (1, 2),
+    "zoom": (0, 2),
+    "thermal": (2, 0),
+    "split": (3, 2),
+}
+
+ZT30_IMAGE_MODES = {
+    "wide": 5,
+    "zoom": 3,
+    "split": 2,
+}
+
+# Commands which need the SIYI control transport established by
+# ``siyi connect``.  Check these at CLI dispatch rather than in send_packet(),
+# because send_packet() is also used by background polling and would otherwise
+# repeatedly warn while disconnected.
+CONNECTION_REQUIRED_COMMANDS = frozenset({
+    "rates", "yaw", "pitch", "angle", "center", "lock", "follow", "fpv",
+    "resetattitude", "settarget", "notarget", "zoom", "autofocus", "photo",
+    "recording", "imode", "getconfig", "settime", "palette", "tempsnap",
+    "thermal_mode", "get_thermal_mode", "thermal_gain", "get_thermal_gain",
+    "therm_getenv", "therm_set_distance", "therm_set_humidity",
+    "therm_set_emissivity", "therm_set_airtemp", "therm_set_reftemp",
+    "therm_getswitch", "therm_setswitch", "therm_getthresholds",
+    "therm_setthresholds", "therm_getthreshswitch", "therm_setthreshswitch",
+})
+
+
+def decode_firmware_versions(data):
+    """Decode the three packed SIYI firmware version words.
+
+    Each word stores patch/minor/major followed by a product identifier byte.
+    The MT11 has no separate zoom-controller firmware, so its third word is
+    normally zero.
+    """
+    if len(data) != 12:
+        raise ValueError("firmware version response must be 12 bytes")
+    words = struct.unpack("<III", data)
+    return tuple(((word >> 16) & 0xff,
+                  (word >> 8) & 0xff,
+                  word & 0xff) for word in words)
+
+
+def image_mode_payload(camera_type, args):
+    """Return (payload, display-name, slots) for an image-mode command."""
+    if not args:
+        raise ValueError("missing image mode")
+    camera_type = camera_type.upper()
+    name = args[0].lower()
+    if camera_type == CAMERA_TYPE_MT11:
+        if name in MT11_IMAGE_MODES:
+            slots = MT11_IMAGE_MODES[name]
+        elif len(args) == 2:
+            slots = (int(args[0], 0), int(args[1], 0))
+        else:
+            raise ValueError("MT11 mode must be zoom, thermal, split, or MAIN SUB")
+        if slots not in MT11_IMAGE_MODES.values():
+            raise ValueError("unsupported MT11 main/sub stream combination")
+        name = next(mode_name for mode_name, mode_slots in MT11_IMAGE_MODES.items()
+                    if mode_slots == slots)
+        return struct.pack("<BB", *slots), name, slots
+
+    if name in ZT30_IMAGE_MODES:
+        mode = ZT30_IMAGE_MODES[name]
+    elif len(args) == 1:
+        mode = int(args[0], 0)
+    else:
+        raise ValueError("ZT30 image mode is a single value")
+    if mode < 0 or mode > 255:
+        raise ValueError("ZT30 image mode must fit in one byte")
+    return struct.pack("<B", mode), name, None
+
 
 class ThermalParameters:
     def __init__(self, distance, target_emissivity, humidity, air_temperature, reflection_temperature):
@@ -188,6 +279,10 @@ class DF_logger:
 
 def rate_mapping(desired_rate):
     '''map from a desired rate in deg/sec to a siyi SDK rate'''
+    # Zero is explicitly the protocol stop value.  The duplicate zero-rate
+    # calibration points below otherwise interpolate to command value 4.
+    if desired_rate == 0:
+        return 0.0
     drate = abs(desired_rate)
     rate_map = [
         (70, 98.0),
@@ -233,14 +328,19 @@ class SIYIModule(mp_module.MPModule):
                           "<therm_getenv|therm_set_distance|therm_set_emissivity|therm_set_humidity|therm_set_airtemp|therm_set_reftemp|therm_getswitch|therm_setswitch>",
                           "<therm_getthresholds|therm_getthreshswitch|therm_setthresholds|therm_setthreshswitch>",
                           "set (SIYISETTING)",
-                          "imode <1|2|3|4|5|6|7|8|wide|zoom|split>",
+                          "imode <wide|zoom|thermal|split|MODE|MAIN SUB>",
                           "palette <WhiteHot|GloryHot>",
                           "thermal_mode <0|1>",
                           ])
 
         # filter_dist is distance in metres
-        self.siyi_settings = mp_settings.MPSettings([("port", int, 37260),
+        self.siyi_settings = mp_settings.MPSettings([MPSetting('camera_type', str, DEFAULT_CAMERA_TYPE,
+                                                               choice=[CAMERA_TYPE_MT11, CAMERA_TYPE_ZT30]),
+                                                     ("port", int, 37260),
                                                      ('ip', str, "192.168.144.25"),
+                                                     ('therm_ip', str, "192.168.144.25"),
+                                                     MPSetting('transport', str, 'auto',
+                                                               choice=['auto', 'udp', 'tcp']),
                                                      ('yaw_rate', float, 10),
                                                      ('pitch_rate', float, 10),
                                                      ('rates_hz', float, 5),
@@ -255,13 +355,23 @@ class SIYIModule(mp_module.MPModule):
                                                      ('mount_alt', float, 0),
                                                      ('mount_yaw', float, 0),
                                                      ('lag', float, 0),
-                                                     ('target_rate', float, 10),
+                                                     MPSetting('target_rate', float, 10,
+                                                               range=(5, 50)),
+                                                     # Legacy alias for target_control.  Place it
+                                                     # first so a saved target_control setting wins
+                                                     # when both are loaded.
+                                                     MPSetting('att_control', int, 1,
+                                                               range=(0, 1)),
+                                                     MPSetting('target_control', str, 'auto',
+                                                               choice=['auto', 'lua', 'rate', 'attitude']),
                                                      ('telem_rate', float, 4),
                                                      ('att_send_hz', float, 10),
                                                      ('mode_hz', float, 0),
                                                      ('temp_hz', float, 5),
-                                                     ('rtsp_rgb', str, 'rtsp://192.168.144.25:8554/video1'),
-                                                     ('rtsp_thermal', str, 'rtsp://192.168.144.25:8554/video2'),
+                                                     ('rtsp_rgb', str, 'auto'),
+                                                     ('rtsp_thermal', str, 'auto'),
+                                                     MPSetting('rtsp_codec', str, 'auto',
+                                                               choice=['auto', 'h264', 'h265']),
                                                      #('rtsp_rgb', str, 'rtsp://127.0.0.1:8554/video1'),
                                                      #('rtsp_thermal', str, 'rtsp://127.0.0.1:8554/video2'),
                                                      ('fps_thermal', int, 20),
@@ -270,15 +380,14 @@ class SIYIModule(mp_module.MPModule):
                                                      ('thermal_fov', float, 24.2),
                                                      ('zoom_fov', float, 62.0),
                                                      ('wide_fov', float, 88.0),
-                                                     ('use_lidar', int, 0),
                                                      ('use_encoders', int, 0),
                                                      ('max_rate', float, 30.0),
                                                      ('track_size_pct', float, 5.0),
                                                      ('threshold_temp', int, 50),
                                                      ('threshold_min', int, 240),
                                                      ('los_correction', int, 0),
-                                                     ('att_control', int, 0),
                                                      ('therm_cap_rate', float, 0),
+                                                     ('mt11_temp_autoswap', bool, True),
                                                      ('show_horizon', int, 0),
                                                      ('autoflag_temp', float, 120),
                                                      ('autoflag_enable', bool, False),
@@ -302,7 +411,10 @@ class SIYIModule(mp_module.MPModule):
                                                          ])
         self.add_completion_function('(SIYISETTING)',
                                      self.siyi_settings.completion)
+        self.siyi_settings.set_callback(self.setting_changed)
         self.sock = None
+        self.sock_is_tcp = False
+        self.recv_buffer = b''
         self.yaw_rate = None
         self.pitch_rate = None
         self.sequence = 0
@@ -341,6 +453,7 @@ class SIYIModule(mp_module.MPModule):
         self.icon = self.mpstate.map.icon('camera-small-red.png')
         self.click_icon = self.mpstate.map.icon('flag.png')
         self.last_target_send = time.time()
+        self.active_target_control = None
         self.last_rate_display = time.time()
         self.yaw_controller = PI_controller(self.siyi_settings, 'yaw_gain_P', 'yaw_gain_I', 'yaw_gain_IMAX')
         self.pitch_controller = PI_controller(self.siyi_settings, 'pitch_gain_P', 'pitch_gain_I', 'pitch_gain_IMAX')
@@ -348,6 +461,7 @@ class SIYIModule(mp_module.MPModule):
         self.start_time = time.time()
         self.last_att_send_t = time.time()
         self.last_temp_t = time.time()
+        self.last_mt11_temp_request = 0
         self.thermal_view = None
         self.rawthermal_view = None
         self.rgb_view = None
@@ -355,11 +469,32 @@ class SIYIModule(mp_module.MPModule):
         self.rgb_lens = "wide"
         self.bad_crc = 0
         self.control_mode = -1
+        self.requested_control_mode = None
+        self.requested_control_mode_t = 0
+        self.pending_manual_angle = None
+        self.pending_manual_angle_t = 0
+        self.pending_manual_angle_last_send = 0
+        self.thermal_gain = None
+        self.requested_thermal_gain = None
+        self.requested_thermal_gain_t = 0
+        self.last_thermal_gain_request = 0
         self.last_SIEA = time.time()
         self.last_therm_cap = time.time()
         self.thermal_capture_count = 0
         self.thermal_data_count = 0
+        self.thermal_flag_count = 0
         self.last_therm_mode = time.time()
+        self.last_image_mode_request = 0
+        self.image_slots = None
+        self.mt11_image_mode_user_set = False
+        self.mt11_image_mode_target = None
+        self.mt11_lens_control = None
+        self.mt11_zoom_state = None
+        self.mt11_zoom_target = None
+        self.mt11_zoom_actual = None
+        self.mt11_zoom_started = 0
+        self.mt11_zoom_last_action = 0
+        self.hardware_id = None
         self.named_float_seq = 0
 
         self.recv_thread = Thread(target=self.receive_thread, name='SIYI_Receive')
@@ -435,6 +570,86 @@ class SIYIModule(mp_module.MPModule):
 
     def millis32(self):
         return int((time.time()-self.start_time)*1.0e3)
+
+    def is_mt11(self):
+        return self.siyi_settings.camera_type.upper() == CAMERA_TYPE_MT11
+
+    def setting_changed(self, setting):
+        if setting.name == 'target_control':
+            # Keep old settings files and scripts which inspect att_control
+            # consistent with the new descriptive setting.
+            effective_mode = setting.value.lower()
+            if effective_mode == 'auto':
+                effective_mode = ('lua' if self.is_mt11()
+                                  else 'rate')
+            self.siyi_settings.att_control = int(effective_mode == 'attitude')
+            self.active_target_control = None
+            self.last_target_send = 0
+            return
+        if setting.name == 'att_control':
+            # Backwards compatibility for "siyi set att_control 0|1".
+            self.siyi_settings.target_control = ('attitude' if setting.value
+                                                 else 'rate')
+            self.active_target_control = None
+            self.last_target_send = 0
+            return
+        if setting.name != 'camera_type':
+            return
+        self.have_version = False
+        self.hardware_id = None
+        self.image_slots = None
+        self.mt11_image_mode_user_set = False
+        self.mt11_image_mode_target = None
+        self.mt11_lens_control = None
+        self.last_version_send = 0
+        if self.siyi_settings.target_control == 'auto':
+            self.siyi_settings.att_control = int(self.target_control_mode() ==
+                                                 'attitude')
+            self.active_target_control = None
+            self.last_target_send = 0
+        print("SIYI camera type set to %s" % self.siyi_settings.camera_type)
+
+    def require_zt30(self, feature):
+        """Report commands which exist in the ZT30 protocol only."""
+        if not self.is_mt11():
+            return True
+        print("SIYI: %s is only supported for camera_type ZT30" % feature)
+        return False
+
+    def rtsp_codec(self):
+        codec = self.siyi_settings.rtsp_codec.lower()
+        if codec == 'auto':
+            # The MT11 used for this integration is configured for H.264.  The
+            # legacy ZT30 setup used H.265.
+            return 'h264' if self.is_mt11() else 'h265'
+        return codec
+
+    def rtsp_url(self, thermal):
+        """Resolve an automatic RTSP URL using the active MT11 stream slots."""
+        configured = (self.siyi_settings.rtsp_thermal if thermal
+                      else self.siyi_settings.rtsp_rgb)
+        if configured.lower() != 'auto':
+            return configured
+
+        stream = 2 if thermal else 1
+        if self.is_mt11():
+            slots = self.image_slots
+            if slots is None:
+                # Factory MT11 default: visible main, thermal secondary.
+                slots = MT11_IMAGE_MODES['zoom']
+            main, sub = slots
+            if thermal:
+                # Prefer a pure thermal stream over a stitched stream.
+                if sub == 2:
+                    stream = 2
+                elif main in (2, 3, 4):
+                    stream = 1
+            else:
+                if sub in (0, 1):
+                    stream = 2
+                elif main in (0, 1, 3, 4, 5):
+                    stream = 1
+        return "rtsp://%s:8554/video%u" % (self.siyi_settings.ip, stream)
     
     def cmd_siyi(self, args):
         '''siyi command parser'''
@@ -457,10 +672,11 @@ gimbal control:
 
 camera control:
   siyi zoom ZOOM                  : set absolute zoom level
-  siyi autofocus                  : trigger an autofocus
+  siyi autofocus [X Y]            : trigger autofocus (optional MT11 point)
   siyi photo                      : take a photo
   siyi recording                  : toggle video recording
-  siyi imode <1-8|wide|zoom|split>: set image (lens) mode
+  siyi imode MODE                 : ZT30 mode or MT11 zoom/thermal/split
+  siyi imode MAIN SUB             : set MT11 main/secondary stream slots
   siyi getconfig                  : request the gimbal configuration
   siyi settime                    : set the camera clock from this system
 
@@ -499,6 +715,11 @@ autoflag:
         if len(args) == 0:
             print(usage)
             return
+        if args[0] in CONNECTION_REQUIRED_COMMANDS and self.sock is None:
+            command = "siyi " + " ".join(args)
+            print("SIYI: camera control is disconnected; run 'siyi connect' "
+                  "before '%s'" % command)
+            return
         if args[0] == "set":
             self.siyi_settings.command(args[1:])
         elif args[0] == "connect":
@@ -512,10 +733,10 @@ autoflag:
         elif args[0] == "imode":
             self.cmd_imode(args[1:])
         elif args[0] == "autofocus":
-            self.send_packet_fmt(AUTO_FOCUS, "<B", 1)
+            self.cmd_autofocus(args[1:])
         elif args[0] == "center":
-            self.send_packet_fmt(CENTER, "<B", 1)
             self.clear_target()
+            self.send_packet_fmt(CENTER, "<B", 1)
         elif args[0] == "zoom":
             self.cmd_zoom(args[1:])
         elif args[0] == "getconfig":
@@ -526,29 +747,35 @@ autoflag:
         elif args[0] == "photo":
             self.send_packet_fmt(PHOTO, "<B", 0)
         elif args[0] == "tempsnap":
-            self.send_packet_fmt(GET_TEMP_FRAME, None)
+            if self.require_zt30("raw temperature snapshots"):
+                self.send_packet_fmt(GET_TEMP_FRAME, None)
         elif args[0] == "thermal_mode":
-            self.send_packet_fmt(SET_THERMAL_MODE, "<B", int(args[1]))
+            if self.require_zt30("raw thermal mode"):
+                self.send_packet_fmt(SET_THERMAL_MODE, "<B", int(args[1]))
         elif args[0] == "get_thermal_mode":
-            self.send_packet_fmt(GET_THERMAL_MODE, None)
+            if self.require_zt30("raw thermal mode"):
+                self.send_packet_fmt(GET_THERMAL_MODE, None)
         elif args[0] == "get_thermal_gain":
             self.send_packet_fmt(GET_THERMAL_GAIN, None)
         elif args[0] == "thermal_gain":
-            self.send_packet_fmt(SET_THERMAL_GAIN, "<B", int(args[1]))
+            self.cmd_thermal_gain(args[1:])
         elif args[0] == "recording":
             self.send_packet_fmt(PHOTO, "<B", 2)
-            self.send_packet(FUNCTION_FEEDBACK_INFO, None)
+            if not self.is_mt11():
+                self.send_packet(FUNCTION_FEEDBACK_INFO, None)
             print("Toggled recording")
         elif args[0] == "resetattitude":
-            self.send_packet(RESET_ATTITUDE, None)
+            self.clear_target()
+            if self.is_mt11():
+                self.send_packet_fmt(CENTER, "<B", 1)
+            else:
+                self.send_packet(RESET_ATTITUDE, None)
         elif args[0] == "lock":
-            self.send_packet_fmt(PHOTO, "<B", 3)
+            self.cmd_gimbal_mode(3, 0)
         elif args[0] == "follow":
-            self.send_packet_fmt(PHOTO, "<B", 4)
-            self.clear_target()
+            self.cmd_gimbal_mode(4, 1)
         elif args[0] == "fpv":
-            self.send_packet_fmt(PHOTO, "<B", 5)
-            self.clear_target()
+            self.cmd_gimbal_mode(5, 2)
         elif args[0] == "settarget":
             self.cmd_settarget(args[1:])
         elif args[0] == "notarget":
@@ -562,7 +789,8 @@ autoflag:
         elif args[0] == "rgbview":
             self.cmd_rgbview()
         elif args[0] == "therm_getenv":
-            self.send_packet_fmt(GET_THERMAL_PARAM, None)
+            if self.require_zt30("thermal environment commands"):
+                self.send_packet_fmt(GET_THERMAL_PARAM, None)
         elif args[0] == "therm_set_distance":
             self.therm_set_distance(float(args[1]))
         elif args[0] == "therm_set_humidity":
@@ -574,17 +802,23 @@ autoflag:
         elif args[0] == "therm_set_reftemp":
             self.therm_set_reftemp(float(args[1]))
         elif args[0] == "therm_getswitch":
-            self.send_packet_fmt(GET_THERMAL_ENVSWITCH, None)
+            if self.require_zt30("thermal environment commands"):
+                self.send_packet_fmt(GET_THERMAL_ENVSWITCH, None)
         elif args[0] == "therm_setswitch":
-            self.send_packet_fmt(SET_THERMAL_ENVSWITCH, "<B", int(args[1]))
+            if self.require_zt30("thermal environment commands"):
+                self.send_packet_fmt(SET_THERMAL_ENVSWITCH, "<B", int(args[1]))
         elif args[0] == "therm_getthreshswitch":
-            self.send_packet_fmt(GET_THERMAL_THRESH_STATE, None)
+            if self.require_zt30("thermal threshold commands"):
+                self.send_packet_fmt(GET_THERMAL_THRESH_STATE, None)
         elif args[0] == "therm_setthreshswitch":
-            self.send_packet_fmt(SET_THERMAL_THRESH_STATE, "<B", int(args[1]))
+            if self.require_zt30("thermal threshold commands"):
+                self.send_packet_fmt(SET_THERMAL_THRESH_STATE, "<B", int(args[1]))
         elif args[0] == "therm_getthresholds":
-            self.send_packet_fmt(GET_THERMAL_THRESH, None)
+            if self.require_zt30("thermal threshold commands"):
+                self.send_packet_fmt(GET_THERMAL_THRESH, None)
         elif args[0] == "therm_setthresholds":
-            self.therm_set_thresholds(args[1:])
+            if self.require_zt30("thermal threshold commands"):
+                self.therm_set_thresholds(args[1:])
         elif args[0] == "settime":
             self.cmd_settime()
         elif args[0] == "autoflag_clear":
@@ -598,22 +832,52 @@ autoflag:
 
     def cmd_connect(self):
         '''connect to the camera'''
+        old_sock = self.sock
         self.sock = None
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        if old_sock is not None:
+            try:
+                old_sock.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            old_sock.close()
+        self.have_version = False
+        self.hardware_id = None
+        self.image_slots = None
+        self.mt11_image_mode_user_set = False
+        self.mt11_image_mode_target = None
+        self.mt11_lens_control = None
+        self.last_version_send = 0
+        transport = getattr(self.siyi_settings, 'transport', 'auto').lower()
+        if transport == 'auto':
+            transport = 'tcp' if self.is_mt11() else 'udp'
+        sock_is_tcp = transport == 'tcp'
+        sock_type = socket.SOCK_STREAM if sock_is_tcp else socket.SOCK_DGRAM
+        sock = socket.socket(socket.AF_INET, sock_type)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.connect((self.siyi_settings.ip, self.siyi_settings.port))
         sock.setblocking(True)
+        self.recv_buffer = b''
+        self.sock_is_tcp = sock_is_tcp
         self.sock = sock
-        print("Connected to SIYI")
+        print("Connected to SIYI %s via %s" %
+              (self.siyi_settings.camera_type, transport.upper()))
 
     def cmd_rates(self, args):
         '''update rates'''
         if len(args) < 2:
             print("Usage: siyi rates PAN_RATE PITCH_RATE")
             return
-        self.clear_target()
-        self.yaw_rate = float(args[0])
-        self.pitch_rate = float(args[1])
+        yaw_rate = float(args[0])
+        pitch_rate = float(args[1])
+        if self.is_mt11() and (yaw_rate != 0 or pitch_rate != 0):
+            # The MT11 ignores manual rotation in Follow and FPV modes.
+            self.cmd_gimbal_mode(3, 0)
+        else:
+            self.clear_target()
+        self.yaw_rate = yaw_rate
+        self.pitch_rate = pitch_rate
+        self.last_req_send = 0
+        self.send_rates()
 
     def cmd_yaw(self, args):
         '''update yaw'''
@@ -621,10 +885,17 @@ autoflag:
             print("Usage: siyi yaw ANGLE")
             return
         angle = float(args[0])
+        if self.is_mt11():
+            self.cmd_gimbal_mode(3, 0)
+        else:
+            self.clear_target()
         self.yaw_rate = self.siyi_settings.yaw_rate
+        self.pitch_rate = 0
         self.yaw_end = time.time() + abs(angle)/self.yaw_rate
         if angle < 0:
             self.yaw_rate = -self.yaw_rate
+        self.last_req_send = 0
+        self.send_rates()
 
     def cmd_pitch(self, args):
         '''update pitch'''
@@ -632,23 +903,76 @@ autoflag:
             print("Usage: siyi pitch ANGLE")
             return
         angle = float(args[0])
+        if self.is_mt11():
+            self.cmd_gimbal_mode(3, 0)
+        else:
+            self.clear_target()
+        self.yaw_rate = 0
         self.pitch_rate = self.siyi_settings.pitch_rate
         self.pitch_end = time.time() + abs(angle)/self.pitch_rate
         if angle < 0:
             self.pitch_rate = -self.pitch_rate
+        self.last_req_send = 0
+        self.send_rates()
+
+    def cmd_autofocus(self, args):
+        '''trigger autofocus, optionally at a point in the MT11 video stream'''
+        if self.is_mt11():
+            if len(args) not in (0, 2):
+                print("Usage: siyi autofocus [X Y]")
+                return
+            x, y = (0, 0) if not args else (int(args[0]), int(args[1]))
+            if x < 0 or x > 65535 or y < 0 or y > 65535:
+                print("SIYI: autofocus coordinates must be 0..65535")
+                return
+            self.send_packet_fmt(AUTO_FOCUS, "<BHH", 1, x, y)
+        else:
+            if args:
+                print("SIYI: ZT30 autofocus does not take coordinates")
+                return
+            self.send_packet_fmt(AUTO_FOCUS, "<B", 1)
 
     def cmd_imode(self, args):
         '''update image mode'''
-        if len(args) < 1:
-            print("Usage: siyi imode MODENUM")
+        try:
+            payload, name, slots = image_mode_payload(self.siyi_settings.camera_type, args)
+        except (TypeError, ValueError) as ex:
+            print("SIYI: %s" % ex)
             return
-        imode_map = { "wide" : 5, "zoom" : 3, "split" : 2 }
-        self.rgb_lens = args[0]
-        mode = imode_map.get(self.rgb_lens,None)
-        if mode is None:
-            mode = int(args[0])
-        self.send_packet_fmt(SET_IMAGE_TYPE, "<B", mode)
-        print("Lens: %s" % args[0])
+        if self.is_mt11():
+            if slots[0] == 1:
+                self.rgb_lens = "wide"
+            elif slots[0] == 0:
+                self.rgb_lens = "zoom"
+        else:
+            self.rgb_lens = name
+        if self.is_mt11():
+            self.mt11_image_mode_user_set = True
+            # The stock MT11 app exposes only a combined RGB path: zoom 1x
+            # selects its wide sensor and zoom >=2x selects the zoom sensor.
+            # The replacement app accepts independent wide/zoom slot values.
+            # Once a rejected wide-slot response identifies the stock app,
+            # use its zoom-based lens selector for the rest of the session.
+            if self.mt11_lens_control == 'zoom' and name in ('wide', 'zoom'):
+                zoom = 1.0 if name == 'wide' else max(self.last_zoom, 2.0)
+                self.last_zoom = zoom
+                self.image_slots = (0, 2)
+                ival = int(zoom)
+                frac = int(round((zoom - ival) * 10))
+                self.send_packet_fmt(ABSOLUTE_ZOOM, "<BB", ival, frac)
+                print("MT11 vendor lens requested: %s (%.1fx)" %
+                      (name, zoom))
+                return
+            self.image_slots = slots
+            self.mt11_image_mode_target = slots
+            self.send_packet_fmt(SET_IMAGE_TYPE, "<BB", *slots)
+        else:
+            self.send_packet_fmt(SET_IMAGE_TYPE, "<B", payload[0])
+        if slots is None:
+            print("Lens: %s" % name)
+        else:
+            print("MT11 image slots: main=%u secondary=%u (%s)" %
+                  (slots[0], slots[1], name))
 
     def cmd_palette(self, args):
         '''update thermal palette'''
@@ -687,10 +1011,10 @@ autoflag:
     def cmd_thermal(self):
         '''open thermal viewer'''
         vidfile,idx = self.video_filename('thermal')
-        self.thermal_view = CameraView(self, self.siyi_settings.rtsp_thermal,
+        self.thermal_view = CameraView(self, self.rtsp_url(thermal=True),
                                        vidfile, (640,512), thermal=True,
                                        fps=self.siyi_settings.fps_thermal,
-                                       video_idx=idx)
+                                       video_idx=idx, codec=self.rtsp_codec())
 
     def cmd_rawthermal(self):
         '''open raw thermal viewer'''
@@ -699,10 +1023,10 @@ autoflag:
     def cmd_rgbview(self):
         '''open rgb viewer'''
         vidfile,idx = self.video_filename('rgb')
-        self.rgb_view = CameraView(self, self.siyi_settings.rtsp_rgb,
+        self.rgb_view = CameraView(self, self.rtsp_url(thermal=False),
                                    vidfile, (1280,720), thermal=False,
                                    fps=self.siyi_settings.fps_rgb,
-                                   video_idx=idx)
+                                   video_idx=idx, codec=self.rtsp_codec())
 
     def check_thermal_events(self):
         '''check for mouse events on thermal image'''
@@ -726,20 +1050,111 @@ autoflag:
         if len(args) < 1:
             print("Usage: siyi zoom ZOOM")
             return
-        self.last_zoom = float(args[0])
-        ival = int(self.last_zoom)
-        frac = int((self.last_zoom - ival)*10)
+        zoom = float(args[0])
+        if self.is_mt11():
+            if zoom < 1.0 or zoom > 10.0:
+                print("SIYI: MT11 RGB zoom must be 1.0 to 10.0")
+                return
+            self.mt11_zoom_target = zoom
+            self.mt11_zoom_actual = None
+            self.mt11_zoom_started = time.time()
+            self.mt11_zoom_last_action = self.mt11_zoom_started
+            if self.image_slots is not None and self.image_slots[0] == 0:
+                self.mt11_zoom_state = 'zooming'
+                self.send_mt11_zoom_target()
+            else:
+                self.mt11_zoom_state = 'select_rgb'
+                self.send_packet_fmt(SET_IMAGE_TYPE, "<BB", 0, 2)
+            print("MT11 RGB zoom requested: %.1fx" % zoom)
+            return
+        self.last_zoom = zoom
+        ival = int(zoom)
+        frac = int((zoom - ival)*10)
         self.send_packet_fmt(ABSOLUTE_ZOOM, "<BB", ival, frac)
 
+    def send_mt11_zoom_target(self):
+        '''send the pending MT11 RGB zoom while RGB is in the main slot'''
+        zoom = self.mt11_zoom_target
+        if zoom is None:
+            return
+        ival = int(zoom)
+        frac = int(round((zoom - ival) * 10))
+        self.send_packet_fmt(ABSOLUTE_ZOOM, "<BB", ival, frac)
+        self.mt11_zoom_last_action = time.time()
+
+    def update_mt11_zoom(self, now):
+        '''advance the acknowledgement-driven MT11 RGB zoom sequence'''
+        state = self.mt11_zoom_state
+        if state is None:
+            return
+        if now - self.mt11_zoom_started > 15:
+            print("SIYI: MT11 RGB zoom confirmation timed out")
+            self.mt11_zoom_state = None
+            self.mt11_zoom_target = None
+            return
+        if state == 'select_rgb' and now - self.mt11_zoom_last_action > 2:
+            self.send_packet_fmt(SET_IMAGE_TYPE, "<BB", 0, 2)
+            self.mt11_zoom_last_action = now
+        elif state == 'zooming' and now - self.mt11_zoom_last_action > 0.5:
+            self.send_packet_fmt(GET_ZOOM_VALUE, None)
+            self.mt11_zoom_last_action = now
+
+    def terrain_altitude(self, lat, lon):
+        '''return a finite terrain height above MSL for a geographic target'''
+        terrain_module = self.module('terrain')
+        elevation_model = (getattr(terrain_module, 'ElevationModel', None)
+                           if terrain_module is not None else None)
+        if elevation_model is None:
+            print("SIYI: terrain module is unavailable")
+            return None
+        try:
+            alt = elevation_model.GetElevation(lat, lon)
+        except Exception as ex:
+            print("SIYI: terrain lookup failed for %.7f %.7f: %s" %
+                  (lat, lon, ex))
+            return None
+        if alt is None or not math.isfinite(alt):
+            print("SIYI: no terrain height for %.7f %.7f" % (lat, lon))
+            return None
+        return float(alt)
+
+    def send_roi_location(self, lat, lon, alt):
+        '''send a one-shot absolute-MSL MAV_CMD_DO_SET_ROI_LOCATION'''
+        self.master.mav.command_int_send(
+            self.settings.target_system,
+            self.settings.target_component,
+            mavutil.mavlink.MAV_FRAME_GLOBAL,
+            mavutil.mavlink.MAV_CMD_DO_SET_ROI_LOCATION,
+            0, 0, 0, 0, 0, 0,
+            int(round(lat * 1.0e7)),
+            int(round(lon * 1.0e7)),
+            float(alt))
+
+    def clear_roi_location(self):
+        '''stop aircraft-side ROI pointing with the standard ROI_NONE command'''
+        self.master.mav.command_int_send(
+            self.settings.target_system,
+            self.settings.target_component,
+            mavutil.mavlink.MAV_FRAME_GLOBAL,
+            mavutil.mavlink.MAV_CMD_DO_SET_ROI_NONE,
+            0, 0, 0, 0, 0, 0,
+            0, 0, 0)
+
     def set_target(self, lat, lon, alt):
-        '''set target position'''
-        self.target_pos = (lat, lon, alt)
+        '''set target position locally or hand it to the aircraft Lua loop'''
+        if self.target_control_mode() == 'lua':
+            self.target_pos = None
+            self.send_roi_location(lat, lon, alt)
+        else:
+            self.target_pos = (lat, lon, alt)
         self.mpstate.map.add_object(mp_slipmap.SlipIcon('SIYI',
                                                         (lat, lon),
                                                         self.icon, layer='SIYI', rotation=0, follow=False))
 
     def therm_set_distance(self, distance):
         '''set thermal distance'''
+        if not self.require_zt30("thermal environment commands"):
+            return
         if self.thermal_param is None:
             print("Run therm_getenv first")
             return
@@ -749,6 +1164,8 @@ autoflag:
 
     def therm_set_emissivity(self, emissivity):
         '''set thermal emissivity'''
+        if not self.require_zt30("thermal environment commands"):
+            return
         if self.thermal_param is None:
             print("Run therm_getenv first")
             return
@@ -758,6 +1175,8 @@ autoflag:
 
     def therm_set_humidity(self, humidity):
         '''set thermal humidity'''
+        if not self.require_zt30("thermal environment commands"):
+            return
         if self.thermal_param is None:
             print("Run therm_getenv first")
             return
@@ -767,6 +1186,8 @@ autoflag:
 
     def therm_set_airtemp(self, airtemp):
         '''set thermal airtemp'''
+        if not self.require_zt30("thermal environment commands"):
+            return
         if self.thermal_param is None:
             print("Run therm_getenv first")
             return
@@ -776,6 +1197,8 @@ autoflag:
 
     def therm_set_reftemp(self, reftemp):
         '''set thermal reftemp'''
+        if not self.require_zt30("thermal environment commands"):
+            return
         if self.thermal_param is None:
             print("Run therm_getenv first")
             return
@@ -800,23 +1223,135 @@ autoflag:
                              1, temps[2], temps[3], *colors[2])
 
     def clear_target(self):
-        '''clear target position'''
+        '''clear all local, map and aircraft-side geographic targeting'''
+        # A newer manual or mode command supersedes an angle waiting for an
+        # earlier ROI-clear acknowledgement.
+        self.pending_manual_angle = None
         self.target_pos = None
+        # Always clear the aircraft ROI, irrespective of the currently selected
+        # target backend.  In particular, the setting may have changed after a
+        # DO_SET_ROI_LOCATION was handed to the aircraft Lua script.
+        self.clear_roi_location()
+        map_module = self.module('map')
+        if map_module is not None:
+            # Prevent update_target() from seeing a stale map ROI after a
+            # manual command and immediately reasserting it.
+            map_module.current_ROI = None
+        self.last_map_ROI = None
         self.mpstate.map.remove_object('SIYI')
         self.end_tracking()
         self.yaw_rate = None
         self.pitch_rate = None
+        self.active_target_control = None
+
+    def cmd_thermal_gain(self, args):
+        '''set thermal gain and confirm MT11 state by readback'''
+        if len(args) != 1:
+            print("Usage: siyi thermal_gain <0|1>")
+            return
+        try:
+            gain = int(args[0], 0)
+        except ValueError:
+            print("Usage: siyi thermal_gain <0|1>")
+            return
+        if gain not in (0, 1):
+            print("SIYI: thermal gain must be 0 (low) or 1 (high)")
+            return
+        if not self.is_mt11():
+            self.send_packet_fmt(SET_THERMAL_GAIN, "<B", gain)
+            return
+        self.requested_thermal_gain = gain
+        self.requested_thermal_gain_t = time.time()
+        self.last_thermal_gain_request = 0
+        self.send_packet_fmt(SET_THERMAL_GAIN, "<B", gain)
+        print("SIYI: requested thermal gain %s" %
+              ("High Gain" if gain else "Low Gain"))
+
+    def update_thermal_gain(self, now):
+        '''poll MT11 gain because its 0x38 set command has no ACK'''
+        if self.requested_thermal_gain is None:
+            return
+        if now - self.requested_thermal_gain_t > 5:
+            print("SIYI: thermal gain confirmation timed out")
+            self.requested_thermal_gain = None
+            self.requested_thermal_gain_t = 0
+            self.last_thermal_gain_request = 0
+            return
+        if (now - self.requested_thermal_gain_t >= 0.1 and
+            now - self.last_thermal_gain_request >= 0.5):
+            self.last_thermal_gain_request = now
+            self.send_packet_fmt(GET_THERMAL_GAIN, None)
+
+    def cmd_gimbal_mode(self, command_value, expected_mode):
+        '''select a gimbal motion mode and wait for camera readback'''
+        # An active geographic target or manual rate command would continue to
+        # steer the gimbal and make a successful mode change appear ineffective.
+        self.clear_target()
+        self.requested_control_mode = expected_mode
+        self.requested_control_mode_t = time.time()
+        self.send_packet_fmt(PHOTO, "<B", command_value)
+        # The MT11 does not ACK opcode 0x0c.  Force a readback even when the
+        # normal mode polling rate is disabled.
+        self.last_mode_t = 0
+        print("SIYI: requested gimbal mode %s" %
+              GIMBAL_MODE_NAMES.get(expected_mode, expected_mode))
+
+    def set_control_mode(self, mode):
+        '''record gimbal mode from either dedicated or config readback'''
+        self.control_mode = mode
+        self.send_named_float('CMODE', mode)
+        self.logf.write('SIMO', 'QB', 'TimeUS,Mode', self.micros64(), mode)
+        if self.requested_control_mode == mode:
+            print("SIYI: gimbal mode confirmed: %s" %
+                  GIMBAL_MODE_NAMES.get(mode, mode))
+            self.requested_control_mode = None
+            self.requested_control_mode_t = 0
+        self.update_status()
 
     def cmd_angle(self, args):
-        '''set zoom'''
-        if len(args) < 1:
+        '''set absolute gimbal angle'''
+        if len(args) < 2:
             print("Usage: siyi angle YAW PITCH")
+            return
+        if self.sock is None:
+            print("SIYI: angle not sent; camera control is disconnected (run 'siyi connect')")
             return
         yaw = -float(args[0])
         pitch = float(args[1])
         self.target_pos = None
-        self.clear_target()
-        self.send_packet_fmt(SET_ANGLE, "<hh", int(yaw*10), int(pitch*10))
+        if self.is_mt11():
+            # MT11 ignores manual angle/rate commands in Follow and FPV.  Lock
+            # mode also clears ROI, and its command is ordered ahead of the
+            # angle on the camera connection.
+            self.cmd_gimbal_mode(3, 0)
+        else:
+            self.clear_target()
+        self.pending_manual_angle = (int(yaw*10), int(pitch*10))
+        self.pending_manual_angle_t = time.time()
+        self.pending_manual_angle_last_send = 0
+        self.send_pending_manual_angle()
+
+    def send_pending_manual_angle(self):
+        '''send or resend the angle which is waiting for aircraft ROI clear'''
+        if self.pending_manual_angle is None:
+            return
+        # The camera retains the last rate command until it receives an
+        # explicit zero.  Stop rate control before selecting an angle.
+        self.send_packet_fmt(GIMBAL_ROTATION, "<bb", 0, 0)
+        self.send_packet_fmt(SET_ANGLE, "<hh", *self.pending_manual_angle)
+        self.pending_manual_angle_last_send = time.time()
+
+    def update_pending_manual_angle(self):
+        '''keep the manual angle alive until ROI_NONE is acknowledged'''
+        if self.pending_manual_angle is None:
+            return
+        now = time.time()
+        if now - self.pending_manual_angle_t > 10:
+            print("SIYI: timed out waiting for ROI clear before manual angle")
+            self.pending_manual_angle = None
+            return
+        if now - self.pending_manual_angle_last_send >= 0.5:
+            self.send_pending_manual_angle()
         
     def send_rates(self):
         '''send rates packet'''
@@ -847,37 +1382,105 @@ autoflag:
             return
         lat = click[0]
         lon = click[1]
-        alt = self.module('terrain').ElevationModel.GetElevation(lat, lon)
+        alt = self.terrain_altitude(lat, lon)
         if alt is None:
-            print("No terrain for location")
             return
         self.set_target(lat, lon, alt)
 
     def request_telem(self):
         '''request telemetry'''
         now = time.time()
-        if self.siyi_settings.temp_hz > 0 and now - self.last_temp_t >= 1.0/self.siyi_settings.temp_hz:
-            self.last_temp_t = now
+        self.update_thermal_gain(now)
+        temp_rate = self.siyi_settings.temp_hz
+        changed_image_mode = False
+        zoom_busy = False
+        if self.is_mt11():
+            self.update_mt11_zoom(now)
+            zoom_busy = self.mt11_zoom_state is not None
+            # The MT11 application has a hard-coded 500 ms delay in this
+            # worker.  Sending faster cannot produce more results.
+            temp_rate = min(temp_rate, 2.0)
+            if (not zoom_busy and self.image_slots is None and
+                now - self.last_image_mode_request > 2):
+                self.last_image_mode_request = now
+                self.send_packet_fmt(GET_IMAGE_TYPE, None)
+            elif (not zoom_busy and temp_rate > 0 and
+                  self.image_slots is not None and
+                  self.image_slots != (0, 2) and
+                  self.siyi_settings.mt11_temp_autoswap and
+                  not self.mt11_image_mode_user_set and
+                  now - self.last_image_mode_request > 2):
+                # The patched MT11 temperature handlers use slot 1.  Keep RGB
+                # main and thermal secondary unless the operator explicitly
+                # selected another image mode.
+                self.last_image_mode_request = now
+                self.send_packet_fmt(SET_IMAGE_TYPE, "<BB", 0, 2)
+                self.image_slots = (0, 2)
+                changed_image_mode = True
+        temperature_ready = not self.is_mt11() or (
+            not zoom_busy and self.image_slots is not None and
+            self.image_slots[1] == 2)
+        if self.is_mt11():
+            # Mode 2 starts the camera's one global continuous worker.  Retry
+            # only if results are stale; repeatedly starting it can overload
+            # the worker and also competes with other SDK clients.
+            temperature_due = (now - self.last_temp_t >= 2 and
+                               now - self.last_mt11_temp_request >= 2)
+        else:
+            temperature_due = now - self.last_temp_t >= 1.0/temp_rate
+        if (temp_rate > 0 and temperature_ready and not changed_image_mode and
+            temperature_due):
+            if self.is_mt11():
+                self.last_mt11_temp_request = now
+            else:
+                self.last_temp_t = now
             self.send_packet_fmt(READ_TEMP_FULL_SCREEN, "<B", 2)
-        if self.last_att_t is None or now - self.last_att_t > 5:
+        # The aircraft Lua script owns MT11 attitude acquisition and publishes
+        # CROLL/CPITCH/CYAW. Do not configure an MT11 continuous stream here:
+        # firmware can leave a previously selected stream active and then fail
+        # to deliver the requested stabilized-attitude stream.
+        if (not self.is_mt11() and
+                (self.last_att_t is None or now - self.last_att_t > 5)):
             self.last_att_t = now
             self.send_packet_fmt(REQUEST_CONTINUOUS_DATA, "<BB", 1, self.siyi_settings.telem_rate)
-        if self.last_rf_t is None or now - self.last_rf_t > 10:
+        # The aircraft Lua script owns MT11 laser enablement and polling. Do
+        # not send either request from MAVProxy, even if an old configuration
+        # still has a use_lidar attribute set.
+        request_range = not self.is_mt11()
+        if request_range and (self.last_rf_t is None or now - self.last_rf_t > 10):
             self.last_rf_t = now
             self.send_packet_fmt(REQUEST_CONTINUOUS_DATA, "<BB", 2, 1)
-        if self.last_enc_t is None or now - self.last_enc_t > 5:
+        # Avoid every 0x25 stream request on MT11. In particular, a magnetic
+        # encoder stream (type 3) was observed continuing while repeated type-1
+        # attitude requests produced no attitude packets. Lua polls 0x0D
+        # directly, so map projection does not depend on this firmware state.
+        if (not self.is_mt11() and
+                (self.last_enc_t is None or now - self.last_enc_t > 5)):
             self.last_enc_t = now
             self.send_packet_fmt(REQUEST_CONTINUOUS_DATA, "<BB", 3, self.siyi_settings.telem_rate)
-        if self.last_volt_t is None or now - self.last_volt_t > 5:
+        if (not self.is_mt11() and
+                (self.last_volt_t is None or now - self.last_volt_t > 5)):
             self.last_volt_t = now
             self.send_packet_fmt(REQUEST_CONTINUOUS_DATA, "<BB", 4, self.siyi_settings.telem_rate)
-        if self.last_thresh_t is None or now - self.last_thresh_t > 10:
+        if (not self.is_mt11() and
+            (self.last_thresh_t is None or now - self.last_thresh_t > 10)):
             self.last_thresh_t = now
             self.send_packet_fmt(READ_THRESHOLDS, None)
-        if self.siyi_settings.mode_hz > 0 and now - self.last_mode_t > 1.0/self.siyi_settings.mode_hz:
+        if (self.requested_control_mode is not None and
+            now - self.requested_control_mode_t > 10):
+            print("SIYI: gimbal mode confirmation timed out")
+            self.requested_control_mode = None
+            self.requested_control_mode_t = 0
+        mode_pending = self.requested_control_mode is not None
+        mode_period = (0.5 if mode_pending else
+                       (1.0/self.siyi_settings.mode_hz
+                        if self.siyi_settings.mode_hz > 0 else None))
+        if mode_period is not None and now - self.last_mode_t > mode_period:
             self.last_mode_t = now
-            self.send_packet_fmt(READ_CONTROL_MODE, None)
-        if self.siyi_settings.therm_cap_rate > 0 and now - self.last_therm_mode > 2:
+            mode_command = READ_GIMBAL_MODE if self.is_mt11() else READ_CONTROL_MODE
+            self.send_packet_fmt(mode_command, None)
+        if (not self.is_mt11() and self.siyi_settings.therm_cap_rate > 0 and
+            now - self.last_therm_mode > 2):
             self.last_therm_mode = now
             self.send_packet_fmt(GET_THERMAL_MODE, None)
 
@@ -890,10 +1493,28 @@ autoflag:
         att = self.master.messages.get('ATTITUDE',None)
         if att is None:
             return
+        time_boot_ms = getattr(att, 'time_boot_ms', self.millis32()) & 0xffffffff
         self.send_packet_fmt(ATTITUDE_EXTERNAL, "<Iffffff",
-                             self.millis32(),
+                             time_boot_ms,
                              att.roll, att.pitch, att.yaw,
                              att.rollspeed, att.pitchspeed, att.yawspeed)
+        if self.is_mt11():
+            self.send_gps()
+
+    def send_gps(self):
+        '''send the MT11 GPS/velocity companion packet (opcode 0x3E)'''
+        gpi = self.master.messages.get('GLOBAL_POSITION_INT', None)
+        if gpi is None:
+            return
+        gps_raw = self.master.messages.get('GPS_RAW_INT', None)
+        alt_ellipsoid_mm = getattr(gps_raw, 'alt_ellipsoid', gpi.alt)
+        self.send_packet_fmt(
+            GPS_EXTERNAL, "<Iiiiiiii",
+            getattr(gpi, 'time_boot_ms', self.millis32()) & 0xffffffff,
+            gpi.lat, gpi.lon,
+            int(round(gpi.alt * 0.1)),
+            int(round(alt_ellipsoid_mm * 0.1)),
+            int(gpi.vx * 10), int(gpi.vy * 10), int(gpi.vz * 10))
 
 
     def send_packet(self, command_id, pkt):
@@ -905,8 +1526,14 @@ autoflag:
             buf += pkt
         buf += struct.pack("<H", crc16_from_bytes(buf))
         self.sequence = (self.sequence+1) % 0xffff
+        sock = self.sock
+        if sock is None:
+            return
         try:
-            self.sock.send(buf)
+            if self.sock_is_tcp:
+                sock.sendall(buf)
+            else:
+                sock.send(buf)
         except Exception:
             pass
 
@@ -941,13 +1568,21 @@ autoflag:
 
     def parse_data(self, pkt):
         '''parse SIYI packet'''
+        header = bytes((SIYI_HEADER1, SIYI_HEADER2))
         while len(pkt) >= 10:
+            if pkt[:2] != header:
+                offset = pkt.find(header, 1)
+                if offset < 0:
+                    return pkt[-1:] if pkt[-1:] == header[:1] else b''
+                pkt = pkt[offset:]
+                continue
             (h1,h2,rack,plen,seq,cmd) = struct.unpack("<BBBHHB", pkt[:8])
             if plen+10 > len(pkt):
                 #print("SIYI: short packet", plen+10, len(pkt))
                 break
             self.parse_packet(pkt[:plen+10])
             pkt = pkt[plen+10:]
+        return pkt
 
     def parse_packet(self, pkt):
         '''parse SIYI packet'''
@@ -961,13 +1596,96 @@ autoflag:
             return
 
         if cmd == ACQUIRE_FIRMWARE_VERSION:
-            patch,minor,major,gpatch,gminor,gmajor,zpatch,zminor,zmajor,_,_,_ = self.unpack(cmd, "<BBBBBBBBBBBB", data)
-            self.have_version = True
-            print("SIYI CAM %u.%u.%u" % (major, minor, patch))
-            print("SIYI Gimbal %u.%u.%u" % (gmajor, gminor, gpatch))
-            print("SIYI Zoom %u.%u.%u" % (zmajor, zminor, zpatch))
+            try:
+                camera_version, gimbal_version, zoom_version = decode_firmware_versions(data)
+            except ValueError as ex:
+                print("SIYI: %s" % ex)
+                return
+            self.unpack(cmd, "<III", data)
+            # MT11 returns all zeroes while its camera application is starting.
+            # Keep polling instead of treating that as a successful handshake.
+            self.have_version = any(camera_version) or any(gimbal_version)
+            print("SIYI CAM %u.%u.%u" % camera_version)
+            print("SIYI Gimbal %u.%u.%u" % gimbal_version)
+            if not self.is_mt11():
+                print("SIYI Zoom %u.%u.%u" % zoom_version)
+            if not self.have_version:
+                return
+            self.send_packet_fmt(HARDWARE_ID, None)
+            if self.is_mt11():
+                self.send_packet_fmt(GET_IMAGE_TYPE, None)
             # change to white hot
             self.send_packet_fmt(SET_THERMAL_PALETTE, "<B", 0)
+
+        elif cmd == HARDWARE_ID:
+            if len(data) != 12:
+                print("HARDWARE_ID: Expected 12 bytes, got %u" % len(data))
+                return
+            self.hardware_id = data.rstrip(b'\x00').decode('ascii', errors='replace')
+            print("SIYI hardware ID %s" % self.hardware_id)
+            detected_mt11 = data[:2].upper() == b'8A'
+            if detected_mt11 != self.is_mt11():
+                detected = CAMERA_TYPE_MT11 if detected_mt11 else "non-MT11"
+                print("SIYI: configured camera_type %s but hardware reports %s" %
+                      (self.siyi_settings.camera_type, detected))
+
+        elif cmd in (GET_IMAGE_TYPE, SET_IMAGE_TYPE):
+            if self.is_mt11():
+                slots = self.unpack(cmd, "<BB", data)
+                if slots is None:
+                    return
+                target = (self.mt11_image_mode_target
+                          if cmd == SET_IMAGE_TYPE else None)
+                if target is not None:
+                    self.mt11_image_mode_target = None
+                self.image_slots = slots
+                if slots[0] == 0 or slots[0] in (3, 5):
+                    self.rgb_lens = 'zoom'
+                elif slots[0] == 1 or slots[0] == 4:
+                    self.rgb_lens = 'wide'
+                names = {0: 'zoom', 1: 'wide', 2: 'thermal',
+                         3: 'zoom+thermal', 4: 'wide+thermal',
+                         5: 'zoom+wide', 6: 'none'}
+                print("MT11 image slots: main=%s secondary=%s" %
+                      (names.get(slots[0], slots[0]), names.get(slots[1], slots[1])))
+                if target == (1, 2):
+                    if slots == target:
+                        self.mt11_lens_control = 'slots'
+                    elif slots == (0, 2):
+                        # The stock app returns its unchanged RGB/thermal
+                        # slots when asked for the replacement app's wide
+                        # slot. Select wide through the stock 1x behavior.
+                        self.mt11_lens_control = 'zoom'
+                        self.rgb_lens = 'wide'
+                        self.last_zoom = 1.0
+                        self.send_packet_fmt(ABSOLUTE_ZOOM, "<BB", 1, 0)
+                        print("MT11 vendor app uses zoom-based lens selection; "
+                              "requesting wide at 1.0x")
+                if (cmd == SET_IMAGE_TYPE and
+                    self.mt11_zoom_state == 'select_rgb' and slots[0] == 0):
+                    self.mt11_zoom_state = 'zooming'
+                    self.send_mt11_zoom_target()
+            else:
+                # ZT30 0x11 acknowledges with the selected one-byte mode.
+                self.unpack(cmd, "<B", data)
+
+        elif cmd == GET_ZOOM_VALUE:
+            values = self.unpack(cmd, "<BB", data)
+            if values is None:
+                return
+            actual = values[0] + values[1] * 0.1
+            if self.is_mt11() and self.mt11_zoom_state == 'zooming':
+                self.mt11_zoom_actual = actual
+                target = self.mt11_zoom_target
+                if target is not None and abs(actual - target) <= 0.11:
+                    self.last_zoom = actual
+                    self.rgb_lens = 'zoom'
+                    print("MT11 RGB zoom confirmed: %.1fx" % actual)
+                    self.update_title()
+                    self.mt11_zoom_state = None
+                    self.mt11_zoom_target = None
+            elif not self.is_mt11():
+                self.last_zoom = actual
 
         elif cmd == ACQUIRE_GIMBAL_ATTITUDE:
             (z,y,x,sz,sy,sx) = self.unpack(cmd, "<hhhhhh", data)
@@ -976,13 +1694,22 @@ autoflag:
             self.att_dt_lpf = 0.95 * self.att_dt_lpf + 0.05 * max(dt,0.01)
             self.last_att_t = now
             (roll,pitch,yaw) = (x*0.1, y*0.1, mp_util.wrap_180(-z*0.1))
-            self.attitude = (roll,pitch,yaw, sx*0.1, sy*0.1, -sz*0.1)
+            # MT11 v1.0.12 fills the three documented int16 angular-velocity
+            # fields with invalid data.  Values include near-int16 limits and
+            # have no correlation with angle derivatives under either byte
+            # order.  Keep the raw fields in SIGA below for diagnosis, but do
+            # not expose or use them as camera rates.  ZT30 reports valid
+            # tenths-of-a-degree-per-second values in the same fields.
+            rate_scale = 0.0 if self.is_mt11() else 0.1
+            self.attitude = (roll,pitch,yaw,
+                             sx*rate_scale, sy*rate_scale, -sz*rate_scale)
             self.send_named_float('CROLL', self.attitude[0])
             self.send_named_float('CPITCH', self.attitude[1])
             self.send_named_float('CYAW', self.attitude[2])
-            self.send_named_float('CROLL_RT', self.attitude[3])
-            self.send_named_float('CPITCH_RT', self.attitude[4])
-            self.send_named_float('CYAW_RT', self.attitude[5])
+            if not self.is_mt11():
+                self.send_named_float('CROLL_RT', self.attitude[3])
+                self.send_named_float('CPITCH_RT', self.attitude[4])
+                self.send_named_float('CYAW_RT', self.attitude[5])
             self.update_status()
             self.logf.write('SIGA', 'Qffffffhhhhhh', 'TimeUS,Y,P,R,Yr,Pr,Rr,z,y,x,sz,sy,sx',
                             self.micros64(),
@@ -993,6 +1720,10 @@ autoflag:
         elif cmd == ACQUIRE_GIMBAL_CONFIG_INFO:
             res, hdr_sta, res2, record_sta, gim_motion, gim_mount, video, x = self.unpack(cmd, "<BBBBBBBB", data)
             self.console.set_status('REC', 'REC %u' % record_sta, row=6)
+            # This reply is already requested every five seconds and includes
+            # the same motion mode as opcode 0x19.  It is the most reliable
+            # confirmation through the aircraft's single-client UDP proxy.
+            self.set_control_mode(gim_motion)
             if self.getconfig_pending:
                 self.getconfig_pending = False
                 armed = self.master.motors_armed()
@@ -1086,11 +1817,9 @@ autoflag:
                                      new_thresh[0], new_thresh[1], new_thresh[2])
                 self.send_packet_fmt(SET_WEAK_CONTROL,"<B", weak_control)
 
-        elif cmd == READ_CONTROL_MODE:
-            self.control_mode, = self.unpack(cmd, "<B", data)
-            self.send_named_float('CMODE', self.control_mode)
-            self.logf.write('SIMO', 'QB', 'TimeUS,Mode',
-                            self.micros64(), self.control_mode)
+        elif cmd in (READ_CONTROL_MODE, READ_GIMBAL_MODE):
+            control_mode, = self.unpack(cmd, "<B", data)
+            self.set_control_mode(control_mode)
 
         elif cmd == READ_TEMP_FULL_SCREEN:
             if len(data) < 12:
@@ -1127,8 +1856,15 @@ autoflag:
                 2: "HDR ON",
                 3: "HDR OFF",
                 4: "FailRecord",
+                5: "RecordingStarted",
+                6: "RecordingStopped",
             }
-            print("Feedback %s" % feedback.get(info_type, str(info_type)))
+            if self.is_mt11() and info_type == 0:
+                self.thermal_capture_count += 1
+                self.console.set_status(
+                    'TCAP', 'TCAP %u' % self.thermal_capture_count, row=6)
+            else:
+                print("Feedback %s" % feedback.get(info_type, str(info_type)))
         elif cmd == SET_THRESHOLDS:
             ok, = self.unpack(cmd, "<B", data)
             if ok != 1:
@@ -1149,9 +1885,21 @@ autoflag:
             ok, = self.unpack(cmd,"<B", data)
             print("SetThermalMode: %u" % ok)
 
-        elif cmd == SET_THERMAL_GAIN:
-            ok, = self.unpack(cmd,"<B", data)
-            print("SetThermalGain: %u" % ok)
+        elif cmd in (GET_THERMAL_GAIN, SET_THERMAL_GAIN):
+            values = self.unpack(cmd, "<B", data)
+            if values is None:
+                return
+            gain = values[0]
+            gain_name = ("High Gain (low-temperature range)" if gain else
+                         "Low Gain (high-temperature range)")
+            self.thermal_gain = gain
+            if self.requested_thermal_gain == gain:
+                print("SIYI: thermal gain confirmed: %s" % gain_name)
+                self.requested_thermal_gain = None
+                self.requested_thermal_gain_t = 0
+                self.last_thermal_gain_request = 0
+            elif self.requested_thermal_gain is None:
+                print("SIYI: thermal gain is %s" % gain_name)
 
         elif cmd == GET_TEMP_FRAME:
             ok, = self.unpack(cmd,"<B", data)
@@ -1192,10 +1940,18 @@ autoflag:
             print("ThermalThresh: %u(%d:%d %u,%u,%u) %u(%d:%d %u,%u,%u) %u(%d:%d %u,%u,%u)" % (
                 sw1,t1min,t1max,r1,g1,b1,sw2,t2min,t2max,r2,g2,b2,sw3,t3min,t3max,r3,g3,b3))
             
-        elif cmd in [SET_ANGLE, CENTER, GIMBAL_ROTATION, ABSOLUTE_ZOOM, SET_IMAGE_TYPE,
-                     REQUEST_CONTINUOUS_DATA, SET_THERMAL_PALETTE, MANUAL_ZOOM_AND_AUTO_FOCUS]:
+        elif cmd == SET_ANGLE and self.is_mt11() and len(data) == 6:
+            self.unpack(cmd, "<hhh", data)
+        elif cmd in [AUTO_FOCUS, MANUAL_FOCUS, SET_ANGLE, CENTER,
+                     GIMBAL_ROTATION, ABSOLUTE_ZOOM, REQUEST_CONTINUOUS_DATA,
+                     SET_THERMAL_PALETTE, MANUAL_ZOOM_AND_AUTO_FOCUS,
+                     ATTITUDE_EXTERNAL]:
             # an ack
             pass
+        elif cmd == SET_LASER_STATUS:
+            ok, = self.unpack(cmd, "<B", data)
+            if not ok:
+                print("SIYI: failed to enable MT11 laser rangefinder")
         else:
             print("SIYI: Unknown command 0x%02x" % cmd)
 
@@ -1247,6 +2003,13 @@ autoflag:
 
     def get_direct_attitude(self):
         '''get extrapolated gimbal attitude, returning r,p,y in degrees in vehicle frame'''
+        if self.is_mt11():
+            # Do not forward-predict from the MT11's invalid gyro fields.  This
+            # is deliberately defensive in addition to zeroing newly decoded
+            # rates, so a stale tuple cannot disturb map projections after a
+            # camera-type change.
+            return (self.attitude[0], self.attitude[1],
+                    mp_util.wrap_180(self.attitude[2]))
         now = time.time()
         dt = (now - self.last_att_t)+self.siyi_settings.lag
         dt = max(dt,0)
@@ -1290,7 +2053,7 @@ autoflag:
         fov_att = self.get_fov_attitude()
         att = self.master.messages.get('ATTITUDE',None)
         gpi = self.master.messages.get('GLOBAL_POSITION_INT',None)
-        GPS_RAW_INT = self.master.messages['GPS_RAW_INT']
+        GPS_RAW_INT = self.master.messages.get('GPS_RAW_INT', None)
         if gpi is None or att is None or GPS_RAW_INT is None:
             return None
         myalt = GPS_RAW_INT.alt*1.0e-3 + self.siyi_settings.mount_alt
@@ -1308,7 +2071,7 @@ autoflag:
         fov_att = self.get_fov_attitude()
         att = self.master.messages.get('ATTITUDE',None)
         gpi = self.master.messages.get('GLOBAL_POSITION_INT',None)
-        GPS_RAW_INT = self.master.messages['GPS_RAW_INT']
+        GPS_RAW_INT = self.master.messages.get('GPS_RAW_INT', None)
         if gpi is None or att is None or GPS_RAW_INT is None:
             return None
         myalt = GPS_RAW_INT.alt*1.0e-3 + self.siyi_settings.mount_alt
@@ -1328,20 +2091,58 @@ autoflag:
         yaw_deg = mp_util.wrap_180(math.degrees(yaw))
         pitch_deg = math.degrees(pitch)
         return yaw_deg, pitch_deg
+
+    def target_control_mode(self):
+        '''return geographic target control mode, including old configurations'''
+        mode = getattr(self.siyi_settings, 'target_control', None)
+        if mode is None:
+            mode = ('attitude' if getattr(self.siyi_settings, 'att_control', 0)
+                    else 'rate')
+        if mode.lower() == 'auto':
+            return 'lua' if self.is_mt11() else 'rate'
+        return mode.lower()
+
+    def set_target_attitude(self, yaw_deg, pitch_deg):
+        '''send a geographic target direction using the 0x0E angle command'''
+        yaw_deg = mp_util.wrap_180(yaw_deg + self.siyi_settings.mount_yaw)
+        pitch_deg += self.siyi_settings.mount_pitch
+        # SIYI yaw has the opposite sign to MAVProxy's vehicle-frame yaw.
+        self.send_packet_fmt(SET_ANGLE, "<hh",
+                             int(round(-yaw_deg * 10)),
+                             int(round(pitch_deg * 10)))
     
     def update_target(self):
         '''update position targetting'''
-        if not 'GLOBAL_POSITION_INT' in self.master.messages or not 'ATTITUDE' in self.master.messages:
-            return
-
-        # added rate of target update
-
+        target_control = self.target_control_mode()
         map_module = self.module('map')
         if self.siyi_settings.track_ROI == 1 and map_module is not None and map_module.current_ROI != self.last_map_ROI:
             self.last_map_ROI = map_module.current_ROI
-            (lat, lon, alt) = self.last_map_ROI
-            self.clear_target()
-            self.set_target(lat, lon, alt)
+            if self.last_map_ROI is None:
+                if target_control == 'lua':
+                    self.clear_roi_location()
+            else:
+                lat, lon, _ = self.last_map_ROI
+                # Always resolve the clicked point against the terrain model
+                # here. This guarantees an absolute-MSL altitude and avoids
+                # mixing relative, ellipsoid, or stale map altitudes.
+                alt = self.terrain_altitude(lat, lon)
+                if alt is not None:
+                    if target_control != 'lua':
+                        self.target_pos = None
+                    self.set_target(lat, lon, alt)
+
+        if target_control == 'lua':
+            # The aircraft Lua script now closes the pointing loop using local
+            # AHRS state. Do not race it with delayed GCS-generated angles.
+            self.target_pos = None
+            self.yaw_rate = None
+            self.pitch_rate = None
+            self.active_target_control = 'lua'
+            return
+
+        if not all(name in self.master.messages for name in
+                   ('GLOBAL_POSITION_INT', 'GPS_RAW_INT', 'ATTITUDE')):
+            return
 
         if self.target_pos is None or self.attitude is None:
             return
@@ -1350,6 +2151,18 @@ autoflag:
         if self.siyi_settings.target_rate <= 0 or now - self.last_target_send < 1.0 / self.siyi_settings.target_rate:
             return
         self.last_target_send = now
+
+        if target_control != self.active_target_control:
+            if target_control == 'attitude':
+                # A rate command persists in the camera until explicitly
+                # stopped.  Stop it once before starting 0x0E updates.
+                self.send_packet_fmt(GIMBAL_ROTATION, "<bb", 0, 0)
+                self.yaw_rate = None
+                self.pitch_rate = None
+            else:
+                self.yaw_controller.reset_I()
+                self.pitch_controller.reset_I()
+            self.active_target_control = target_control
 
         GLOBAL_POSITION_INT = self.master.messages['GLOBAL_POSITION_INT']
         GPS_RAW_INT = self.master.messages['GPS_RAW_INT']
@@ -1374,10 +2187,10 @@ autoflag:
         self.send_named_float('TYAW', yaw_deg)
         self.send_named_float('TPITCH', pitch_deg)
         
-        if self.siyi_settings.att_control == 1:
+        if target_control == 'attitude':
             self.yaw_rate = None
             self.pitch_rate = None
-            self.send_packet_fmt(SET_ANGLE, "<hh", int(-yaw_deg*10), int(pitch_deg*10))
+            self.set_target_attitude(yaw_deg, pitch_deg)
             return
 
         if self.siyi_settings.los_correction == 1:
@@ -1418,7 +2231,7 @@ autoflag:
         fov_att = self.get_fov_attitude()
         att = self.master.messages.get('ATTITUDE',None)
         gpi = self.master.messages.get('GLOBAL_POSITION_INT',None)
-        GPS_RAW_INT = self.master.messages['GPS_RAW_INT']
+        GPS_RAW_INT = self.master.messages.get('GPS_RAW_INT', None)
         if gpi is None or att is None or GPS_RAW_INT is None:
             return None
         myalt = GPS_RAW_INT.alt*1.0e-3 + self.siyi_settings.mount_alt
@@ -1471,11 +2284,13 @@ autoflag:
         if armed and not self.last_armed:
             print("Setting SIYI time")
             self.cmd_settime()
-            print("Enabling thermal capture")
-            self.siyi_settings.therm_cap_rate = 1.0
+            if not self.is_mt11():
+                print("Enabling thermal capture")
+                self.siyi_settings.therm_cap_rate = 1.0
         if not armed and self.last_armed:
-            print("Disabling thermal capture")
-            self.siyi_settings.therm_cap_rate = 0.0
+            if not self.is_mt11():
+                print("Disabling thermal capture")
+                self.siyi_settings.therm_cap_rate = 0.0
         self.last_armed = armed
         if now - self.last_getconfig > 5:
             self.getconfig_pending = True
@@ -1496,10 +2311,32 @@ autoflag:
         fname = "data_%s_%03u.dat" % (tstr, millis)
         open(os.path.join(dname, fname),'wb').write(data)
 
-    def process_DATA96(self, data):
+    def add_thermal_flag(self, latlonalt, temperature, pixel_x, pixel_y,
+                         log_event=True):
+        '''add and log one automatically detected high-temperature location'''
+        lat, lon, alt = latlonalt
+        self.thermal_flag_count += 1
+        icon = self.mpstate.map.icon('flame.png')
+        self.mpstate.map.add_object(mp_slipmap.SlipIcon(
+            'thermal flag %u' % self.thermal_flag_count,
+            (float(lat), float(lon)),
+            icon, layer='thermal_flag', rotation=0, follow=False))
+        if log_event:
+            self.logf.write('SIFL', 'QLLffHH',
+                            'TimeUS,Lat,Lng,Alt,TMax,X,Y',
+                            self.micros64(),
+                            int(round(lat * 1.0e7)),
+                            int(round(lon * 1.0e7)),
+                            float(alt), float(temperature),
+                            int(pixel_x), int(pixel_y))
+
+    def process_DATA96(self, data, log_event=True):
         '''handle data from SIYI_control.lua'''
-        msec,lat, lon, alt, gps_alt, tmax, tmax_x, tmax_y, siyi_roll, siyi_pitch, siyi_yaw, roll, pitch, yaw = struct.unpack("<iiifffHHffffff", data)
-        if not self.siyi_settings.autoflag_enable or tmax < self.siyi_settings.autoflag_temp:
+        (msec, lat, lon, alt, gps_alt, tmax, tmax_x, tmax_y,
+         siyi_roll, siyi_pitch, siyi_yaw, roll, pitch, yaw) = struct.unpack(
+             "<iiifffHHffffff", data)
+        if (not self.siyi_settings.autoflag_enable or
+                tmax < self.siyi_settings.threshold_temp):
             return
 
         lat = lat * 1.0e-7
@@ -1507,17 +2344,19 @@ autoflag:
 
         thermal_width = 640
         thermal_height = 512
-        aspect_ratio = thermal_width / float(thermal_height)
+        if tmax_x >= thermal_width or tmax_y >= thermal_height:
+            return
         FOV = self.siyi_settings.thermal_fov
         C = camera_projection.CameraParams(xresolution=thermal_width, yresolution=thermal_height, FOV=FOV)
         cproj = camera_projection.CameraProjection(C, elevation_model=self.module('terrain').ElevationModel)
         slant_range = cproj.get_slantrange(lat,lon,gps_alt+self.siyi_settings.mount_alt,siyi_roll,siyi_pitch-self.siyi_settings.mount_pitch,siyi_yaw+yaw-self.siyi_settings.mount_yaw)
         if slant_range is None:
             return
-        x = (tmax_x/thermal_width) * 2 - 1.0
-        y = (tmax_y/thermal_height) * 2 - 1.0
         fov_att = (siyi_roll, siyi_pitch-self.siyi_settings.mount_pitch, mp_util.wrap_180(siyi_yaw-self.siyi_settings.mount_yaw))
-        latlonalt = cproj.get_latlonalt_for_pixel(tmax_x, tmax_y, lat, lon, gps_alt, fov_att[0], fov_att[1], fov_att[2]+yaw)
+        camera_alt = gps_alt + self.siyi_settings.mount_alt
+        latlonalt = cproj.get_latlonalt_for_pixel(tmax_x, tmax_y, lat, lon,
+                                                  camera_alt, fov_att[0],
+                                                  fov_att[1], fov_att[2]+yaw)
         if latlonalt is None:
             return
         latlon = latlonalt[0], latlonalt[1]
@@ -1528,11 +2367,8 @@ autoflag:
                 #print("roi_dist: ", roi_dist, lat, lon, roi_lat, roi_lon)
                 return
 
-        icon = self.mpstate.map.icon('flame.png')
-        self.mpstate.map.add_object(mp_slipmap.SlipIcon(
-            'icon [%u]' % msec,
-            (float(latlon[0]),float(latlon[1])),
-            icon, layer='thermal_flag', rotation=0, follow=False))
+        self.add_thermal_flag(latlonalt, tmax, tmax_x, tmax_y,
+                              log_event=log_event)
 
     def handle_DATA96(self, m):
         '''handle data from SIYI_control.lua'''
@@ -1562,7 +2398,9 @@ autoflag:
             data = open(os.path.join(dname, d),'rb').read()
             if len(data) != 52:
                 continue
-            self.process_DATA96(data)
+            # Rebuilding the map display must not create duplicate SIFL log
+            # events for data already recorded in thermal_data.
+            self.process_DATA96(data, log_event=False)
 
     def autoflag_discard(self):
         '''discard flagged locations'''
@@ -1582,6 +2420,18 @@ autoflag:
 
         self.armed_checks()
 
+        if (mtype == 'COMMAND_ACK' and
+                m.command == mavutil.mavlink.MAV_CMD_DO_SET_ROI_NONE and
+                self.pending_manual_angle is not None):
+            if m.result == mavutil.mavlink.MAV_RESULT_ACCEPTED:
+                # Lua can no longer overwrite this final send with the old ROI.
+                self.send_pending_manual_angle()
+                self.pending_manual_angle = None
+                print("SIYI: ROI clear confirmed; manual angle applied")
+            elif m.result != mavutil.mavlink.MAV_RESULT_IN_PROGRESS:
+                print("SIYI: ROI clear failed; manual angle cancelled")
+                self.pending_manual_angle = None
+
         if mtype == 'GPS_RAW_INT':
             gwk, gms = mp_util.get_gps_time(time.time())
             self.logf.write('GPS', "QBIHLLff", "TimeUS,Status,GMS,GWk,Lat,Lng,Alt,Spd",
@@ -1591,6 +2441,24 @@ autoflag:
                             self.micros64(),
                             math.degrees(m.roll), math.degrees(m.pitch), math.degrees(m.yaw),
                             math.degrees(m.rollspeed), math.degrees(m.pitchspeed), math.degrees(m.yawspeed))
+        if mtype == 'NAMED_VALUE_FLOAT' and self.is_mt11():
+            name = m.name
+            if isinstance(name, bytes):
+                name = name.decode('ascii', errors='ignore')
+            name = name.rstrip('\x00')
+            if name in ('CROLL', 'CPITCH', 'CYAW'):
+                attitude = list(self.attitude)
+                attitude[{'CROLL': 0, 'CPITCH': 1, 'CYAW': 2}[name]] = m.value
+                # Never retain or reconstruct the MT11's invalid rate fields.
+                attitude[3:] = (0.0, 0.0, 0.0)
+                self.attitude = tuple(attitude)
+                if name == 'CYAW':
+                    now = time.time()
+                    dt = now - self.last_att_t
+                    self.att_dt_lpf = (0.95 * self.att_dt_lpf +
+                                       0.05 * max(dt, 0.01))
+                    self.last_att_t = now
+                    self.update_status()
         if mtype == 'GLOBAL_POSITION_INT':
             try:
                 self.show_fov()
@@ -1612,23 +2480,42 @@ autoflag:
         self.cmd_angle([0, 0])
 
     def receive_thread(self):
-        '''thread for receiving UDP packets from SIYI'''
+        '''thread for receiving packets from SIYI'''
         while True:
-            if self.sock is None:
+            sock = self.sock
+            if sock is None:
                 time.sleep(0.1)
                 continue
+            is_tcp = self.sock_is_tcp
             try:
-                pkt = self.sock.recv(10240)
+                pkt = sock.recv(10240)
             except Exception as ex:
-                print("SIYI receive failed", ex)
+                if self.sock is sock:
+                    print("SIYI receive failed", ex)
+                    self.sock = None
                 continue
-            self.parse_data(pkt)
+            if not pkt:
+                if self.sock is sock:
+                    print("SIYI connection closed")
+                    self.sock = None
+                continue
+            if is_tcp:
+                self.recv_buffer += pkt
+                self.recv_buffer = self.parse_data(self.recv_buffer)
+            else:
+                self.parse_data(pkt)
 
     def therm_capture(self):
         if self.siyi_settings.therm_cap_rate <= 0:
             return
         now = time.time()
         dt = now - self.last_therm_cap
+        if self.is_mt11():
+            if dt > 1.0 / self.siyi_settings.therm_cap_rate:
+                # MT11 captures the temperature frame as part of a normal photo.
+                self.send_packet_fmt(PHOTO, "<B", 0)
+                self.last_therm_cap = now
+            return
         if dt > 5:
             self.send_packet_fmt(SET_THERMAL_MODE, "<B", 1)
         if dt > 1.0 / self.siyi_settings.therm_cap_rate:
@@ -1643,6 +2530,7 @@ autoflag:
             self.last_version_send = time.time()
             self.send_packet(ACQUIRE_FIRMWARE_VERSION, None)
         self.check_rate_end()
+        self.update_pending_manual_angle()
         self.update_target()
         self.send_rates()
         self.request_telem()
@@ -1687,7 +2575,7 @@ autoflag:
             now = time.time()
             if now - self.landing_heuristics["last_warning_ms"] > 60:
                 self.landing_heuristics["last_warning_ms"] = now
-                print("SIYI: missing messages, hueristics-stow not available")
+                print("SIYI: missing messages, heuristics-stow not available")
             return
 
         # first work out whether we should "arm" the stowing; must

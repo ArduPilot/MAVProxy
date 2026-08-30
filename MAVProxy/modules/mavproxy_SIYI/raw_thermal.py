@@ -27,7 +27,7 @@ class RawThermal:
 
     def __init__(self, siyi, res):
         self.siyi = siyi
-        self.uri = ("192.168.144.25", 7345)
+        self.uri = (siyi.siyi_settings.therm_ip if siyi is not None else "192.168.144.25", 7345)
         self.im = None
         self.tracking = False
         self.cap = None
@@ -84,7 +84,7 @@ class RawThermal:
             if self.im is None:
                 break
             time.sleep(0.1)
-            ret = self.fetch_latest_compressed()
+            ret = self.fetch_latest()
             if ret is None:
                 continue
             (fname, tstamp, data) = ret
@@ -112,7 +112,8 @@ class RawThermal:
     def handle_auto_flag(self):
         if not self.siyi.siyi_settings.autoflag_enable or self.siyi.have_DATA96:
             return
-        if self.tmax < self.siyi.siyi_settings.autoflag_temp:
+        threshold_temp = self.siyi.siyi_settings.threshold_temp
+        if self.tmax < threshold_temp:
             return
 
         map = self.siyi.module('map')
@@ -132,9 +133,13 @@ class RawThermal:
 
         for sx in range(slices):
             for sy in range(slices):
-                sub = data[sx*slice_width:(sx+1)*slice_width, sy*slice_height:(sy+1)*slice_height]
+                # NumPy images are indexed [row/y, column/x]. The old order
+                # tested a different part of the image from the projected
+                # marker and truncated the right-most MT11 columns.
+                sub = data[sy*slice_height:(sy+1)*slice_height,
+                           sx*slice_width:(sx+1)*slice_width]
                 maxv = sub.max() - C_TO_KELVIN
-                if maxv < self.siyi.siyi_settings.autoflag_temp:
+                if maxv < threshold_temp:
                     continue
                 X = (sx*slice_width) + slice_width//2
                 Y = (sy*slice_height) + slice_height//2
@@ -144,11 +149,14 @@ class RawThermal:
                 latlon = (latlonalt[0], latlonalt[1])
                 if self.in_history(latlon):
                     continue
-                map.cmd_map_marker(["flame"], latlon=latlon)
+                self.siyi.add_thermal_flag(latlonalt, maxv, X, Y)
 
     def display_image(self, fname, data):
         '''display an image'''
-        a = np.frombuffer(data, dtype='>u2')
+        # ZT30's raw-frame service uses big endian samples.  MT11 .bin frames
+        # are little-endian uint16 Kelvin*64.
+        byte_order = '<u2' if self.siyi is not None and self.siyi.is_mt11() else '>u2'
+        a = np.frombuffer(data, dtype=byte_order)
         if len(a) != 640 * 512:
             print("Bad size %u" % len(a))
             return
@@ -190,8 +198,8 @@ class RawThermal:
             # Handle any errors during decompression
             return None
 
-    def fetch_latest_compressed(self):
-        '''fetch a compressed thermal image'''
+    def fetch_latest(self):
+        '''fetch a thermal image in the uncompressed or legacy zlib format'''
         tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         timeout = self.siyi.siyi_settings.fetch_timeout
         if timeout >= 0:
@@ -211,52 +219,21 @@ class RawThermal:
                 break
             buf += b
 
-        header_len = 128 + 12
-        if len(buf) < header_len:
-            return None
-
         fname = buf[:128].decode("utf-8").strip('\x00')
+        if len(buf) == 128 + 8 + EXPECTED_DATA_SIZE:
+            tstamp, = struct.unpack("<d", buf[128:128+8])
+            return fname, tstamp, buf[128+8:]
+
+        compressed_header_len = 128 + 12
+        if len(buf) < compressed_header_len:
+            return None
         compressed_size,tstamp = struct.unpack("<Id", buf[128:128+12])
-
-        compressed_data = buf[header_len:]
-
+        compressed_data = buf[compressed_header_len:]
         if compressed_size != len(compressed_data):
             return None
-
-        uncompressed_data = self.decompress_zlib_buffer(compressed_data)
-
-        if len(uncompressed_data) != EXPECTED_DATA_SIZE:
+        data = self.decompress_zlib_buffer(compressed_data)
+        if data is None or len(data) != EXPECTED_DATA_SIZE:
             return None
-
-        return fname, tstamp, uncompressed_data
-
-    def fetch_latest(self):
-        '''fetch a thermal image'''
-        tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        timeout = self.siyi.siyi_settings.fetch_timeout
-        if timeout >= 0:
-            tcp.settimeout(2)
-        try:
-            tcp.connect(self.uri)
-        except Exception:
-            return None
-        buf = bytearray()
-
-        while True:
-            try:
-                b = tcp.recv(1024)
-            except Exception:
-                break
-            if not b:
-                break
-            buf += b
-
-        if len(buf) != 128 + 8 + EXPECTED_DATA_SIZE:
-            return None
-
-        fname = buf[:128].decode("utf-8").strip('\x00')
-        tstamp, = struct.unpack("<d", buf[128:128+8])
-        data = buf[128+8:]
         return fname, tstamp, data
 
     def save_image(self, fname, tstamp, data):
