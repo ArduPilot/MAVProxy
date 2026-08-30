@@ -487,6 +487,8 @@ class SIYIModule(mp_module.MPModule):
         self.last_image_mode_request = 0
         self.image_slots = None
         self.mt11_image_mode_user_set = False
+        self.mt11_image_mode_target = None
+        self.mt11_lens_control = None
         self.mt11_zoom_state = None
         self.mt11_zoom_target = None
         self.mt11_zoom_actual = None
@@ -597,6 +599,8 @@ class SIYIModule(mp_module.MPModule):
         self.hardware_id = None
         self.image_slots = None
         self.mt11_image_mode_user_set = False
+        self.mt11_image_mode_target = None
+        self.mt11_lens_control = None
         self.last_version_send = 0
         if self.siyi_settings.target_control == 'auto':
             self.siyi_settings.att_control = int(self.target_control_mode() ==
@@ -840,6 +844,8 @@ autoflag:
         self.hardware_id = None
         self.image_slots = None
         self.mt11_image_mode_user_set = False
+        self.mt11_image_mode_target = None
+        self.mt11_lens_control = None
         self.last_version_send = 0
         transport = getattr(self.siyi_settings, 'transport', 'auto').lower()
         if transport == 'auto':
@@ -942,7 +948,23 @@ autoflag:
             self.rgb_lens = name
         if self.is_mt11():
             self.mt11_image_mode_user_set = True
+            # The stock MT11 app exposes only a combined RGB path: zoom 1x
+            # selects its wide sensor and zoom >=2x selects the zoom sensor.
+            # The replacement app accepts independent wide/zoom slot values.
+            # Once a rejected wide-slot response identifies the stock app,
+            # use its zoom-based lens selector for the rest of the session.
+            if self.mt11_lens_control == 'zoom' and name in ('wide', 'zoom'):
+                zoom = 1.0 if name == 'wide' else max(self.last_zoom, 2.0)
+                self.last_zoom = zoom
+                self.image_slots = (0, 2)
+                ival = int(zoom)
+                frac = int(round((zoom - ival) * 10))
+                self.send_packet_fmt(ABSOLUTE_ZOOM, "<BB", ival, frac)
+                print("MT11 vendor lens requested: %s (%.1fx)" %
+                      (name, zoom))
+                return
             self.image_slots = slots
+            self.mt11_image_mode_target = slots
             self.send_packet_fmt(SET_IMAGE_TYPE, "<BB", *slots)
         else:
             self.send_packet_fmt(SET_IMAGE_TYPE, "<B", payload[0])
@@ -1612,6 +1634,10 @@ autoflag:
                 slots = self.unpack(cmd, "<BB", data)
                 if slots is None:
                     return
+                target = (self.mt11_image_mode_target
+                          if cmd == SET_IMAGE_TYPE else None)
+                if target is not None:
+                    self.mt11_image_mode_target = None
                 self.image_slots = slots
                 if slots[0] == 0 or slots[0] in (3, 5):
                     self.rgb_lens = 'zoom'
@@ -1622,6 +1648,19 @@ autoflag:
                          5: 'zoom+wide', 6: 'none'}
                 print("MT11 image slots: main=%s secondary=%s" %
                       (names.get(slots[0], slots[0]), names.get(slots[1], slots[1])))
+                if target == (1, 2):
+                    if slots == target:
+                        self.mt11_lens_control = 'slots'
+                    elif slots == (0, 2):
+                        # The stock app returns its unchanged RGB/thermal
+                        # slots when asked for the replacement app's wide
+                        # slot. Select wide through the stock 1x behavior.
+                        self.mt11_lens_control = 'zoom'
+                        self.rgb_lens = 'wide'
+                        self.last_zoom = 1.0
+                        self.send_packet_fmt(ABSOLUTE_ZOOM, "<BB", 1, 0)
+                        print("MT11 vendor app uses zoom-based lens selection; "
+                              "requesting wide at 1.0x")
                 if (cmd == SET_IMAGE_TYPE and
                     self.mt11_zoom_state == 'select_rgb' and slots[0] == 0):
                     self.mt11_zoom_state = 'zooming'
