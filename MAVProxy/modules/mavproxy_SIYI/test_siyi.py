@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import Mock, patch
 from types import SimpleNamespace
 import struct
+import socket
 import numpy as np
 from pymavlink import mavutil
 
@@ -22,6 +23,7 @@ from MAVProxy.modules.mavproxy_SIYI import (
     GET_ZOOM_VALUE,
     GIMBAL_ROTATION,
     GPS_EXTERNAL,
+    MANUAL_FOCUS,
     READ_CONTROL_MODE,
     READ_GIMBAL_MODE,
     READ_THRESHOLDS,
@@ -87,6 +89,7 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
         module.siyi_settings = SimpleNamespace(
             camera_type=camera_type,
             ip='192.168.144.25',
+            port=37260,
             therm_ip='192.168.144.25',
             transport='auto',
             rtsp_rgb='auto',
@@ -115,6 +118,7 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
         module.rgb_lens = "wide"
         module.image_slots = None
         module.mt11_image_mode_target = None
+        module.mt11_image_mode_user_set = False
         module.mt11_lens_control = None
         module.mt11_zoom_state = None
         module.mt11_zoom_target = None
@@ -129,6 +133,7 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
         module.pending_manual_angle = None
         module.pending_manual_angle_t = 0
         module.pending_manual_angle_last_send = 0
+        module.focus_end = None
         module.thermal_gain = None
         module.requested_thermal_gain = None
         module.requested_thermal_gain_t = 0
@@ -336,6 +341,18 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
 
         module.cmd_connect.assert_called_once_with()
         output.assert_not_called()
+
+    def test_cli_focus_warns_when_disconnected(self):
+        module = self.make_module(CAMERA_TYPE_MT11)
+        module.sock = None
+
+        with patch('builtins.print') as output:
+            module.cmd_siyi(['focus', 'near'])
+
+        self.assertEqual(module.sent, [])
+        output.assert_called_once_with(
+            "SIYI: camera control is disconnected; run 'siyi connect' "
+            "before 'siyi focus near'")
 
     def test_angle_is_resent_after_roi_clear_ack(self):
         module = self.make_module(CAMERA_TYPE_MT11)
@@ -550,9 +567,40 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
         mt11 = self.make_module(CAMERA_TYPE_MT11)
         mt11.cmd_autofocus(['320', '256'])
         self.assertEqual(mt11.sent, [(AUTO_FOCUS, '<BHH', (1, 320, 256))])
+        mt11.sent = []
+        mt11.cmd_autofocus([])
+        self.assertEqual(mt11.sent, [(AUTO_FOCUS, '<BHH', (1, 960, 540))])
         zt30 = self.make_module(CAMERA_TYPE_ZT30)
         zt30.cmd_autofocus([])
         self.assertEqual(zt30.sent, [(AUTO_FOCUS, '<B', (1,))])
+
+    def test_manual_focus_pulse_and_stop(self):
+        module = self.make_module(CAMERA_TYPE_MT11)
+        with patch('MAVProxy.modules.mavproxy_SIYI.time.time',
+                   return_value=10.0):
+            module.cmd_focus(['near'])
+        self.assertEqual(module.sent, [(MANUAL_FOCUS, '<b', (-1,))])
+        self.assertAlmostEqual(module.focus_end, 10.2)
+
+        with patch('MAVProxy.modules.mavproxy_SIYI.time.time',
+                   return_value=10.19):
+            module.check_focus_end()
+        self.assertEqual(len(module.sent), 1)
+        with patch('MAVProxy.modules.mavproxy_SIYI.time.time',
+                   return_value=10.2):
+            module.check_focus_end()
+        self.assertEqual(module.sent[-1], (MANUAL_FOCUS, '<b', (0,)))
+        self.assertIsNone(module.focus_end)
+
+        module.sent = []
+        with patch('MAVProxy.modules.mavproxy_SIYI.time.time',
+                   return_value=20.0):
+            module.cmd_focus(['far', '0.5'])
+        self.assertEqual(module.sent, [(MANUAL_FOCUS, '<b', (1,))])
+        self.assertAlmostEqual(module.focus_end, 20.5)
+        module.cmd_focus(['stop'])
+        self.assertEqual(module.sent[-1], (MANUAL_FOCUS, '<b', (0,)))
+        self.assertIsNone(module.focus_end)
 
     def test_mt11_thermal_gain_is_confirmed_by_readback(self):
         module = self.make_module(CAMERA_TYPE_MT11)
@@ -818,6 +866,51 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
         remainder = module.parse_data(remainder + packet[5:])
         self.assertEqual(remainder, b'')
         self.assertEqual(module.image_slots, (2, 0))
+
+    def test_mt11_auto_transport_connects_with_tcp(self):
+        module = self.make_module(CAMERA_TYPE_MT11)
+        module.sock = None
+        module.sequence = 0
+        fake_socket = Mock()
+        with patch('MAVProxy.modules.mavproxy_SIYI.socket.socket',
+                   return_value=fake_socket) as socket_factory:
+            module.cmd_connect()
+            socket_factory.assert_called_once_with(socket.AF_INET,
+                                                   socket.SOCK_STREAM)
+            fake_socket.connect.assert_called_once_with(
+                ('192.168.144.25', 37260))
+            fake_socket.setsockopt.assert_any_call(
+                socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            fake_socket.sendall.assert_called_once()
+            heartbeat = fake_socket.sendall.call_args.args[0]
+            self.assertEqual((heartbeat[7], heartbeat[8]), (0x00, 0x00))
+            fake_socket.sendall.reset_mock()
+            module.send_packet(GET_IMAGE_TYPE, b'')
+            fake_socket.sendall.assert_called_once()
+        self.assertTrue(module.sock_is_tcp)
+
+    def test_zt30_auto_transport_retains_udp(self):
+        module = self.make_module(CAMERA_TYPE_ZT30)
+        module.sock = None
+        module.sequence = 0
+        fake_socket = Mock()
+        with patch('MAVProxy.modules.mavproxy_SIYI.socket.socket',
+                   return_value=fake_socket) as socket_factory:
+            module.cmd_connect()
+            socket_factory.assert_called_once_with(socket.AF_INET,
+                                                   socket.SOCK_DGRAM)
+            fake_socket.connect.assert_called_once_with(
+                ('192.168.144.25', 37260))
+            fake_socket.sendall.assert_not_called()
+        self.assertFalse(module.sock_is_tcp)
+
+    def test_tcp_parser_resyncs_after_impossible_length(self):
+        module = self.make_parser(CAMERA_TYPE_MT11)
+        malformed = struct.pack('<BBBHHB', SIYI_HEADER1, SIYI_HEADER2,
+                                1, 0xffff, 1, GET_IMAGE_TYPE)
+        valid = self.packet(GET_IMAGE_TYPE, b'\x01\x02')
+        self.assertEqual(module.parse_data(malformed + valid), b'')
+        self.assertEqual(module.image_slots, (1, 2))
 
     def test_projection_helpers_tolerate_missing_gps(self):
         module = self.make_module(CAMERA_TYPE_MT11)
