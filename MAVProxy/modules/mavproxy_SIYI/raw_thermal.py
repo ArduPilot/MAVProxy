@@ -84,7 +84,7 @@ class RawThermal:
             if self.im is None:
                 break
             time.sleep(0.1)
-            ret = self.fetch_latest_compressed()
+            ret = self.fetch_latest()
             if ret is None:
                 continue
             (fname, tstamp, data) = ret
@@ -198,8 +198,8 @@ class RawThermal:
             # Handle any errors during decompression
             return None
 
-    def fetch_latest_compressed(self):
-        '''fetch a compressed thermal image'''
+    def fetch_latest(self):
+        '''fetch a thermal image in the uncompressed or legacy zlib format'''
         tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         timeout = self.siyi.siyi_settings.fetch_timeout
         if timeout >= 0:
@@ -219,52 +219,21 @@ class RawThermal:
                 break
             buf += b
 
-        header_len = 128 + 12
-        if len(buf) < header_len:
-            return None
-
         fname = buf[:128].decode("utf-8").strip('\x00')
+        if len(buf) == 128 + 8 + EXPECTED_DATA_SIZE:
+            tstamp, = struct.unpack("<d", buf[128:128+8])
+            return fname, tstamp, buf[128+8:]
+
+        compressed_header_len = 128 + 12
+        if len(buf) < compressed_header_len:
+            return None
         compressed_size,tstamp = struct.unpack("<Id", buf[128:128+12])
-
-        compressed_data = buf[header_len:]
-
+        compressed_data = buf[compressed_header_len:]
         if compressed_size != len(compressed_data):
             return None
-
-        uncompressed_data = self.decompress_zlib_buffer(compressed_data)
-
-        if len(uncompressed_data) != EXPECTED_DATA_SIZE:
+        data = self.decompress_zlib_buffer(compressed_data)
+        if data is None or len(data) != EXPECTED_DATA_SIZE:
             return None
-
-        return fname, tstamp, uncompressed_data
-
-    def fetch_latest(self):
-        '''fetch a thermal image'''
-        tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        timeout = self.siyi.siyi_settings.fetch_timeout
-        if timeout >= 0:
-            tcp.settimeout(2)
-        try:
-            tcp.connect(self.uri)
-        except Exception:
-            return None
-        buf = bytearray()
-
-        while True:
-            try:
-                b = tcp.recv(1024)
-            except Exception:
-                break
-            if not b:
-                break
-            buf += b
-
-        if len(buf) != 128 + 8 + EXPECTED_DATA_SIZE:
-            return None
-
-        fname = buf[:128].decode("utf-8").strip('\x00')
-        tstamp, = struct.unpack("<d", buf[128:128+8])
-        data = buf[128+8:]
         return fname, tstamp, data
 
     def save_image(self, fname, tstamp, data):
