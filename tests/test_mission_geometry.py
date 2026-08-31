@@ -334,9 +334,11 @@ class TestSpiral(object):
 
 class TestContinuousTrack(object):
     """the map3d mission line is the path the vehicle is expected to fly, so
-    it has to run through the circles rather than to their centres"""
+    it has to run through the circles rather than to their centres, joining
+    and leaving them along a tangent"""
 
-    def build(self, radius, turns, entry_alt=100.0, target_alt=100.0):
+    def build(self, radius, turns, entry_alt=100.0, target_alt=100.0,
+              second_radius=None):
         pytest.importorskip("vtk")
         import vtk
         from pymavlink import mavutil
@@ -345,14 +347,17 @@ class TestContinuousTrack(object):
         from MAVProxy.modules.mavproxy_map3d.terrain import enu
         approach = mp_util.gps_newpos(HERE[0], HERE[1], 180, 800)
         after = mp_util.gps_newpos(HERE[0], HERE[1], 90, 800)
+        second_command = (mavutil.mavlink.MAV_CMD_NAV_LOITER_UNLIM
+                          if second_radius
+                          else mavutil.mavlink.MAV_CMD_NAV_WAYPOINT)
         items = [
             MissionItem(approach[0], approach[1], entry_alt, 3,
                         mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 1),
             MissionItem(HERE[0], HERE[1], target_alt, 3,
                         mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT, 2,
                         1.0, radius, turns),
-            MissionItem(after[0], after[1], target_alt, 3,
-                        mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 3),
+            MissionItem(after[0], after[1], target_alt, 3, second_command, 3,
+                        0.0, second_radius),
         ]
         em = ElementManager(vtk.vtkRenderer(), HERE[0], HERE[1], 1.0)
         em.set_home(584.0)
@@ -363,19 +368,29 @@ class TestContinuousTrack(object):
         centre = enu(HERE[0], HERE[1], 0.0, HERE[0], HERE[1])
         return actors, line, centre
 
+    def on_circle(self, line, centre, radius):
+        return [i for i, p in enumerate(line)
+                if abs(math.hypot(p[0]-centre[0], p[1]-centre[1]) - radius) < 0.5]
+
+    def join_angle(self, line, centre, outside, touch):
+        # angle between the leg and the radius at the touch point: 90 for a
+        # tangent, 0 or 180 for a leg aimed at the centre
+        leg = (line[touch][0]-line[outside][0], line[touch][1]-line[outside][1])
+        radial = (line[touch][0]-centre[0], line[touch][1]-centre[1])
+        dot = leg[0]*radial[0] + leg[1]*radial[1]
+        cosang = dot / (math.hypot(*leg) * math.hypot(*radial))
+        return math.degrees(math.acos(max(-1.0, min(1.0, cosang))))
+
     def test_the_track_is_one_line_with_the_circle_in_it(self):
         (actors, line, centre) = self.build(80.0, 2.0)
         # one polyline and one set of markers: no circle drawn off on its own
         assert len(actors) == 2
-        on_circle = [i for i, p in enumerate(line)
-                     if abs(math.hypot(p[0]-centre[0], p[1]-centre[1]) - 80.0) < 0.5]
-        # at a constant altitude it is a single turn however many were asked
-        # for, since the extra ones would be drawn on top of the first
-        assert len(on_circle) == 65
+        on = self.on_circle(line, centre, 80.0)
+        assert len(on) > 40
         # and those points are a single unbroken run within the line
-        assert on_circle[-1] - on_circle[0] + 1 == len(on_circle)
-        assert on_circle[0] > 0                  # a leg comes in
-        assert on_circle[-1] < len(line) - 1     # and a leg goes out
+        assert on[-1] - on[0] + 1 == len(on)
+        assert on[0] > 0                  # a leg comes in
+        assert on[-1] < len(line) - 1     # and a leg goes out
 
     def test_the_line_never_reaches_the_centre(self):
         (actors, line, centre) = self.build(80.0, 2.0)
@@ -383,30 +398,199 @@ class TestContinuousTrack(object):
         # the vehicle circles the point rather than overflying it
         assert nearest == pytest.approx(80.0, abs=0.5)
 
-    def test_the_circle_is_joined_on_the_side_it_is_approached_from(self):
-        (actors, line, centre) = self.build(80.0, 2.0)
-        on_circle = [p for p in line
-                     if abs(math.hypot(p[0]-centre[0], p[1]-centre[1]) - 80.0) < 0.5]
-        # the approach comes from due south, so the join is the south side
-        assert on_circle[0][1] - centre[1] == pytest.approx(-80.0, abs=0.5)
-        assert on_circle[0][0] - centre[0] == pytest.approx(0.0, abs=0.5)
+    def test_the_circle_is_joined_and_left_along_a_tangent(self):
+        for radius in (80.0, -80.0):
+            (actors, line, centre) = self.build(radius, 2.0)
+            on = self.on_circle(line, centre, 80.0)
+            joined = self.join_angle(line, centre, on[0]-1, on[0])
+            left = self.join_angle(line, centre, on[-1]+1, on[-1])
+            assert joined == pytest.approx(90.0, abs=1.0)
+            assert left == pytest.approx(90.0, abs=1.0)
 
-    def test_a_spiral_draws_all_of_its_turns(self):
+    def test_the_leg_between_two_circles_touches_both(self):
+        # the leg out of one loiter and into the next is tangent to each,
+        # whichever way the two of them turn
+        for second in (150.0, -150.0):
+            (actors, line, centre) = self.build(80.0, 2.0, second_radius=second)
+            on = self.on_circle(line, centre, 80.0)
+            left = self.join_angle(line, centre, on[-1]+1, on[-1])
+            assert left == pytest.approx(90.0, abs=1.0)
+
+    def test_a_spiral_draws_its_turns(self):
         (actors, line, centre) = self.build(80.0, 2.0,
                                             entry_alt=100.0, target_alt=300.0)
-        on_circle = [i for i, p in enumerate(line)
-                     if abs(math.hypot(p[0]-centre[0], p[1]-centre[1]) - 80.0) < 0.5]
-        assert len(on_circle) == 129        # 2 turns of 64 segments, plus the end
-        assert on_circle[-1] - on_circle[0] + 1 == len(on_circle)
+        on = self.on_circle(line, centre, 80.0)
+        bearings = [math.degrees(math.atan2(line[i][0]-centre[0],
+                                            line[i][1]-centre[1])) % 360
+                    for i in on]
+        swept = sum(mp_util.wrap_180(bearings[i]-bearings[i-1])
+                    for i in range(1, len(bearings)))
+        # the sweep is stretched to leave on the tangent to whatever follows,
+        # so it lands near the turns asked for rather than exactly on them
+        assert abs(swept) / 360.0 == pytest.approx(2.0, abs=0.5)
+        assert on[-1] - on[0] + 1 == len(on)
 
-    def test_altitude_runs_continuously_through_a_spiral(self):
+    def test_the_approach_leg_shows_its_share_of_the_climb(self):
         (actors, line, centre) = self.build(80.0, 2.0,
                                             entry_alt=100.0, target_alt=300.0)
+        on = self.on_circle(line, centre, 80.0)
         zs = [p[2] for p in line]
         assert zs[0] == pytest.approx(684.0)
         assert zs[-1] == pytest.approx(884.0)
-        # never a step in altitude where the spiral joins the legs
-        assert max(abs(zs[i]-zs[i-1]) for i in range(1, len(zs))) < 25.0
+        # the vehicle is already climbing on the way there, so the leg has
+        # done some of it by the time the circle is joined
+        assert 684.0 < zs[on[0]] < 884.0
+        # the climb runs one way throughout, with no step back at the joins
+        assert all(zs[i] >= zs[i-1] for i in range(1, len(zs)))
+        # and it is spread evenly around the spiral rather than in jumps
+        around = [abs(zs[i]-zs[i-1]) for i in range(on[0]+1, on[-1]+1)]
+        assert max(around) - min(around) < 0.5
+
+    def test_a_level_loiter_stays_level(self):
+        (actors, line, centre) = self.build(80.0, None)
+        zs = [p[2] for p in line]
+        assert max(zs) == pytest.approx(min(zs))
+
+
+class TestCrosstrackRejoin(object):
+    """ArduPlane crosstracks the leg out of a loiter against a track from the
+    loiter's centre, not from the tangent the vehicle left on, unless the item
+    asks otherwise with param4.  So the vehicle comes off the circle a radius
+    or so to one side of that track and pulls back onto it"""
+
+    PARAMS = {'NAVL1_PERIOD': 20.0, 'NAVL1_DAMPING': 0.75,
+              'AIRSPEED_CRUISE': 22.0}
+
+    def test_the_l1_distance_comes_from_the_parameters(self):
+        # 1/pi times damping, period and speed, as the controller computes it
+        assert mp_util.vehicle_track_convergence(self.PARAMS) == \
+            pytest.approx(0.3183099 * 0.75 * 20.0 * 22.0)
+        # damping has a standard value if it is not set
+        assert mp_util.vehicle_track_convergence(
+            {'NAVL1_PERIOD': 20.0, 'AIRSPEED_CRUISE': 22.0}) == \
+            pytest.approx(0.3183099 * 0.75 * 20.0 * 22.0)
+        assert mp_util.vehicle_track_convergence({}) is None
+        assert mp_util.vehicle_track_convergence(
+            {'NAVL1_PERIOD': 20.0}) is None
+
+    def build(self, converge):
+        pytest.importorskip("vtk")
+        import vtk
+        from pymavlink import mavutil
+        from MAVProxy.modules.mavproxy_map3d.map3d import MissionItem
+        from MAVProxy.modules.mavproxy_map3d.elements import ElementManager
+        from MAVProxy.modules.mavproxy_map3d.terrain import enu
+        approach = mp_util.gps_newpos(HERE[0], HERE[1], 180, 1500)
+        target = mp_util.gps_newpos(HERE[0], HERE[1], 45, 3000)
+        items = [
+            MissionItem(approach[0], approach[1], 100.0, 3,
+                        mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 1),
+            MissionItem(HERE[0], HERE[1], 100.0, 3,
+                        mavutil.mavlink.MAV_CMD_NAV_LOITER_TURNS, 2,
+                        2.0, 150.0, None, converge),
+            MissionItem(target[0], target[1], 100.0, 3,
+                        mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 3),
+        ]
+        em = ElementManager(vtk.vtkRenderer(), HERE[0], HERE[1], 1.0)
+        em.set_home(584.0)
+        em.set_mission(items)
+        pts = em.actors['mission'][0].GetMapper().GetInput().GetPoints()
+        line = [pts.GetPoint(i) for i in range(pts.GetNumberOfPoints())]
+        centre = enu(HERE[0], HERE[1], 0.0, HERE[0], HERE[1])
+        end = enu(target[0], target[1], 0.0, HERE[0], HERE[1])
+        return line, centre, end
+
+    def exit_index(self, line, centre, radius=150.0):
+        """index of the point where the drawn path leaves the circle.
+
+        The rejoin hugs the circle as it departs, so points just after the
+        exit can also sit on the radius; take the end of the longest unbroken
+        run of them, which is the arc itself
+        """
+        on = [i for i, p in enumerate(line)
+              if abs(math.hypot(p[0]-centre[0], p[1]-centre[1]) - radius) < 1.0]
+        best = (0, on[0])
+        (start, previous) = (on[0], on[0])
+        for i in on[1:] + [None]:
+            if i is None or i != previous + 1:
+                if previous - start >= best[0]:
+                    best = (previous - start, previous)
+                start = i
+            previous = i
+        return best[1]
+
+    def crosstrack(self, line, centre, end):
+        """crosstrack error of each point after the circle, against the track
+        that runs from the loiter centre to the next waypoint"""
+        (ux, uy) = (end[0]-centre[0], end[1]-centre[1])
+        length = math.hypot(ux, uy)
+        (ux, uy) = (ux/length, uy/length)
+
+        errors = []
+        for p in line[self.exit_index(line, centre):]:
+            (dx, dy) = (p[0]-centre[0], p[1]-centre[1])
+            if dx*ux + dy*uy > length:
+                break
+            errors.append(abs(dx*(-uy) + dy*ux))
+        return errors
+
+    def test_it_pulls_back_onto_the_centre_track(self):
+        converge = mp_util.vehicle_track_convergence(self.PARAMS)
+        (line, centre, end) = self.build(converge)
+        errors = self.crosstrack(line, centre, end)
+        # it leaves the circle about a radius off the track ...
+        assert errors[0] == pytest.approx(150.0, abs=5.0)
+        # ... and is back on it by the end
+        assert errors[-1] < 1.0
+        # closing steadily rather than jumping
+        assert all(errors[i] <= errors[i-1] + 1e-6
+                   for i in range(1, len(errors)))
+
+    def test_it_closes_faster_than_flying_straight_would(self):
+        converge = mp_util.vehicle_track_convergence(self.PARAMS)
+        (line, centre, end) = self.build(converge)
+        errors = self.crosstrack(line, centre, end)
+        # flying straight from the exit closes the error linearly over the
+        # leg; the controller pulls it in sooner than that
+        half = len(errors) // 2
+        assert errors[half] < errors[0] * 0.5
+
+    def test_it_leaves_along_the_tangent(self):
+        # the regression that matters: an exit that starts turning towards the
+        # track straight away kinks the path and cuts back inside the circle
+        # the vehicle has just left
+        converge = mp_util.vehicle_track_convergence(self.PARAMS)
+        (line, centre, end) = self.build(converge)
+
+        exit_index = self.exit_index(line, centre)
+
+        def radius_of(p):
+            return math.hypot(p[0]-centre[0], p[1]-centre[1])
+
+        def heading(a, b):
+            return math.degrees(math.atan2(b[0]-a[0], b[1]-a[1])) % 360
+
+        def turn_at(i):
+            change = heading(line[i], line[i+1]) - heading(line[i-1], line[i])
+            return abs(mp_util.wrap_180(change))
+        # the circle is drawn as short chords, so it turns a little at every
+        # point; leaving it should be no sharper than that
+        around_the_circle = turn_at(exit_index - 4)
+        assert turn_at(exit_index) < around_the_circle + 2.0
+        # and it barely grazes the circle it has left on the way out.  It
+        # does dip in a little, since the track it is rejoining runs through
+        # the middle, but starting off on the tangent keeps that to a metre
+        # or two rather than the tens of metres a straight-to-the-track
+        # departure cuts across
+        assert min(radius_of(p) for p in line[exit_index:]) > 145.0
+
+    def test_crosstracking_from_the_exit_flies_straight_there(self):
+        # param4 set means the leg is measured from where the circle was left,
+        # so there is nothing to pull back onto
+        (line, centre, end) = self.build(None)
+        errors = self.crosstrack(line, centre, end)
+        # just the exit point itself, then straight off to the waypoint
+        assert len(errors) == 1
 
 
 class TestPolygonBounds(object):

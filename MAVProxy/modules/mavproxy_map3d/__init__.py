@@ -318,8 +318,14 @@ class Map3DModule(mp_module.MPModule):
                     circle_radius,
                     z - previous[2] if previous is not None else None,
                     self.mav_param, approach)
+            exit_converge = None
+            if circle_radius is not None and not (w.param4 > 0):
+                # param4 == 0 asks for the next leg to be crosstracked from
+                # the loiter centre rather than from where it was left
+                exit_converge = mp_util.vehicle_track_convergence(self.mav_param)
             items.append(MissionItem(lat, lon, z, frame, w.command, w.seq,
-                                     w.param1, circle_radius, circle_turns))
+                                     w.param1, circle_radius, circle_turns,
+                                     exit_converge))
             previous = (lat, lon, z)
         self.map.set_mission(items)
 
