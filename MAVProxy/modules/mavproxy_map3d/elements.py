@@ -24,6 +24,10 @@ FENCE_SAMPLE_SPACING = 20.0
 FENCE_MAX_SAMPLES_PER_EDGE = 1000
 FENCE_CIRCLE_SEGMENTS = 64
 MISSION_CIRCLE_SEGMENTS = 64
+# roughly how many direction-of-travel arrows to spread along the mission,
+# and how many pixels each should take up on the screen
+MISSION_ARROW_COUNT = 60
+MISSION_ARROW_PIXELS = 22.0
 
 
 def ring_points(centre, radius, bearings):
@@ -295,6 +299,85 @@ def _vehicle_icon(vehicle_type=DEFAULT_VEHICLE_TYPE):
     return actor
 
 
+def _arrows(points_enu, colour, renderer=None, count=MISSION_ARROW_COUNT):
+    """cones spread along a polyline pointing the way it is travelled.
+
+    They are spaced by distance rather than by vertex, so a long leg gets as
+    many as a densely sampled spiral does.  Given a renderer they are drawn a
+    fixed size on the screen however far away they are, the way the 2D map
+    draws its arrows; without one they fall back to a size in metres taken
+    from the spacing, which only looks right at one zoom level
+    """
+    lengths = [math.dist(points_enu[i-1], points_enu[i])
+               for i in range(1, len(points_enu))]
+    total = 0.0
+    for length in lengths:
+        total += length
+    if total <= 0 or count < 1:
+        return None
+    spacing = total / count
+
+    positions = vtk.vtkPoints()
+    directions = vtk.vtkDoubleArray()
+    directions.SetNumberOfComponents(3)
+    directions.SetName('direction')
+    walked = spacing * 0.5
+    for (i, length) in enumerate(lengths):
+        if length <= 0:
+            continue
+        (a, b) = (points_enu[i], points_enu[i+1])
+        heading = [(b[j] - a[j]) / length for j in range(3)]
+        while walked < length:
+            fraction = walked / length
+            positions.InsertNextPoint(*[a[j] + (b[j] - a[j]) * fraction
+                                        for j in range(3)])
+            directions.InsertNextTuple3(*heading)
+            walked += spacing
+        walked -= length
+    if positions.GetNumberOfPoints() == 0:
+        return None
+
+    poly = vtk.vtkPolyData()
+    poly.SetPoints(positions)
+    poly.GetPointData().SetVectors(directions)
+    cone = vtk.vtkConeSource()
+    cone.SetResolution(10)
+    cone.SetHeight(1.0)
+    cone.SetRadius(0.3)
+    glyph = vtk.vtkGlyph3D()
+    glyph.SetSourceConnection(cone.GetOutputPort())
+    glyph.SetVectorModeToUseVector()
+    glyph.OrientOn()
+    if renderer is not None:
+        # scale each cone by its distance from the camera, so they hold the
+        # same size on the screen at any zoom
+        to_camera = vtk.vtkDistanceToCamera()
+        to_camera.SetInputData(poly)
+        to_camera.SetScreenSize(MISSION_ARROW_PIXELS)
+        to_camera.SetRenderer(renderer)
+        glyph.SetInputConnection(to_camera.GetOutputPort())
+        glyph.SetScaleModeToScaleByScalar()
+        glyph.SetScaleFactor(1.0)
+        # the filter's scale is not the active scalar array, so name it
+        glyph.SetInputArrayToProcess(
+            0, 0, 0, vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS,
+            'DistanceToCamera')
+    else:
+        glyph.SetInputData(poly)
+        glyph.SetScaleModeToDataScalingOff()
+        cone.SetHeight(min(max(spacing * 0.25, 1.0), 500.0))
+        cone.SetRadius(cone.GetHeight() * 0.4)
+    mapper = vtk.vtkPolyDataMapper()
+    mapper.SetInputConnection(glyph.GetOutputPort())
+    # the scale carried through the glyph is not something to colour by
+    mapper.ScalarVisibilityOff()
+    actor = vtk.vtkActor()
+    actor.SetMapper(mapper)
+    actor.GetProperty().SetColor(*colour)
+    actor.GetProperty().SetLighting(False)
+    return actor
+
+
 def _points(points_enu, colour, size):
     vpts = vtk.vtkPoints()
     verts = vtk.vtkCellArray()
@@ -335,6 +418,9 @@ class ElementManager:
         self.kml_features = []
         self.kml_geometry = None
         self.kml_height_cache = {}
+        self.mission_line = []
+        self.mission_markers = []
+        self.mission_arrows = False
 
     def _enu(self, lat, lon, amsl):
         e, n, u = enu(lat, lon, amsl, self.lat0, self.lon0)
@@ -473,11 +559,30 @@ class ElementManager:
             rejoin = None
             line.append(self._enu(item.lat, item.lon, amsl))
             previous = ((item.lat, item.lon), amsl)
+        self.mission_line = line
+        self.mission_markers = markers
+        self.refresh_mission()
+
+    def set_mission_arrows(self, enable):
+        '''show or hide the direction of travel along the mission'''
+        enable = bool(enable)
+        if enable == self.mission_arrows:
+            return
+        self.mission_arrows = enable
+        self.refresh_mission()
+
+    def refresh_mission(self):
+        '''rebuild the mission actors from the last mission drawn'''
+        line = self.mission_line
         actors = []
         if len(line) >= 2:
             actors.append(_polyline(line, (1.0, 1.0, 1.0), 2.0, dashed=True))
-        if markers:
-            actors.append(_points(markers, (1.0, 1.0, 1.0), 9))
+            if self.mission_arrows:
+                arrows = _arrows(line, (1.0, 1.0, 1.0), self.ren)
+                if arrows is not None:
+                    actors.append(arrows)
+        if self.mission_markers:
+            actors.append(_points(self.mission_markers, (1.0, 1.0, 1.0), 9))
         self._replace('mission', actors)
 
     def _append_rejoin(self, line, rejoin, target, target_amsl):

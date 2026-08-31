@@ -120,6 +120,8 @@ class MEState(object):
               MPSetting('paramdocs', bool, True, 'show param docs'),
               MPSetting('max_rate', float, 0, 'maximum display rate of graphs in Hz'),
               MPSetting('vehicle_type', str, 'Auto', 'force vehicle type for mode handling'),
+              MPSetting('showdirection', bool, False,
+                        'show direction of travel on the 3D map mission'),
               ]
             )
 
@@ -734,6 +736,7 @@ def cmd_map3d(args):
     map3d_views.append(m3d)
     m3d.set_origin(lat0, lon0, ground0)
     m3d.set_home(ground0)
+    m3d.set_mission_arrows(mestate.settings.showdirection)
     m3d.set_path(path)
     if xlimits.last_xlim is not None and mestate.settings.sync_xmap:
         m3d.set_time_range(xlimits.last_xlim)
@@ -797,6 +800,10 @@ def resolve_mission_amsl(mission, ground0, params=None, mav_type=None):
 def cmd_set(args):
     '''control MAVExporer options'''
     mestate.settings.command(args)
+    # settings the open 3D views care about
+    for view in map3d_views:
+        if view.is_alive():
+            view.set_mission_arrows(mestate.settings.showdirection)
 
 def cmd_condition(args):
     '''control MAVExporer conditions'''

@@ -452,6 +452,88 @@ class TestContinuousTrack(object):
         assert max(zs) == pytest.approx(min(zs))
 
 
+class TestDirectionArrows(object):
+    """map3d can show which way the mission is flown, toggled by a setting"""
+
+    def build(self, arrows=None):
+        pytest.importorskip("vtk")
+        import vtk
+        from pymavlink import mavutil
+        from MAVProxy.modules.mavproxy_map3d.map3d import MissionItem
+        from MAVProxy.modules.mavproxy_map3d.elements import ElementManager
+        legs = [mp_util.gps_newpos(HERE[0], HERE[1], b, d)
+                for (b, d) in ((0, 0), (0, 900), (90, 900), (180, 900))]
+        items = [MissionItem(la, lo, 100.0, 3,
+                             mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, i)
+                 for (i, (la, lo)) in enumerate(legs)]
+        em = ElementManager(vtk.vtkRenderer(), HERE[0], HERE[1], 1.0)
+        em.set_home(584.0)
+        if arrows is not None:
+            em.set_mission_arrows(arrows)
+        em.set_mission(items)
+        return em
+
+    def cones(self, em):
+        glyph = em.actors['mission'][1].GetMapper()
+        producer = glyph.GetInputConnection(0, 0).GetProducer()
+        producer.Update()
+        return producer.GetInput()
+
+    def test_off_by_default(self):
+        em = self.build()
+        # just the line and the markers
+        assert len(em.actors['mission']) == 2
+
+    def test_turning_them_on_and_off(self):
+        em = self.build()
+        em.set_mission_arrows(True)
+        assert len(em.actors['mission']) == 3
+        em.set_mission_arrows(False)
+        assert len(em.actors['mission']) == 2
+
+    def test_the_setting_is_remembered_across_a_new_mission(self):
+        # asked for before the mission arrives, they still appear
+        em = self.build(arrows=True)
+        assert len(em.actors['mission']) == 3
+
+    def test_they_sit_on_the_track_pointing_the_way_it_is_flown(self):
+        em = self.build(arrows=True)
+        source = self.cones(em)
+        line = em.mission_line
+        vectors = source.GetPointData().GetVectors()
+        assert source.GetNumberOfPoints() > 5
+
+        def distance_to_segment(p, a, b):
+            ab = [b[i]-a[i] for i in range(3)]
+            length = sum(c*c for c in ab)
+            if length == 0:
+                return math.dist(p, a)
+            t = sum((p[i]-a[i])*ab[i] for i in range(3)) / length
+            t = max(0.0, min(1.0, t))
+            return math.dist(p, [a[i] + ab[i]*t for i in range(3)])
+
+        for i in range(source.GetNumberOfPoints()):
+            point = source.GetPoint(i)
+            heading = vectors.GetTuple3(i)
+            assert math.hypot(*heading) == pytest.approx(1.0)
+            nearest = min(range(1, len(line)),
+                          key=lambda k: distance_to_segment(point, line[k-1],
+                                                            line[k]))
+            (a, b) = (line[nearest-1], line[nearest])
+            assert distance_to_segment(point, a, b) < 0.01
+            length = math.dist(a, b)
+            along = [(b[j]-a[j])/length for j in range(3)]
+            agreement = sum(along[j]*heading[j] for j in range(3))
+            assert agreement == pytest.approx(1.0, abs=1e-6)
+
+    def test_a_mission_with_nowhere_to_go_draws_none(self):
+        pytest.importorskip("vtk")
+        from MAVProxy.modules.mavproxy_map3d.elements import _arrows
+        assert _arrows([(0.0, 0.0, 0.0)], (1.0, 1.0, 1.0)) is None
+        assert _arrows([(0.0, 0.0, 0.0), (0.0, 0.0, 0.0)],
+                       (1.0, 1.0, 1.0)) is None
+
+
 class TestCrosstrackRejoin(object):
     """ArduPlane crosstracks the leg out of a loiter against a track from the
     loiter's centre, not from the tangent the vehicle left on, unless the item
