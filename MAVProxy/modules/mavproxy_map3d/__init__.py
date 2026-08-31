@@ -54,6 +54,7 @@ class Map3DModule(mp_module.MPModule):
                                   range=(0.25, 2.0)),
             ('terrainshading', bool, True),
             ('terrainwireframe', bool, False),
+            ('showdirection', bool, False),
         ])
         self.add_command('map3d', self.cmd_map3d,
                          "3D map control", ['<start|stop|follow|nofollow|center>',
@@ -104,6 +105,7 @@ class Map3DModule(mp_module.MPModule):
             self.map3d_settings.command(args[1:])
             if self.map is not None and self.map.is_alive():
                 self.map.set_fpv_fov(self.map3d_settings.fpvfov)
+                self.map.set_mission_arrows(self.map3d_settings.showdirection)
                 self.map.set_render_settings(
                     self.map3d_settings.terrainbrightness,
                     self.map3d_settings.terrainshading,
@@ -129,6 +131,7 @@ class Map3DModule(mp_module.MPModule):
                          terrain_wireframe=self.map3d_settings.terrainwireframe,
                          follow=self.follow)
         # push whatever we already know
+        self.map.set_mission_arrows(self.map3d_settings.showdirection)
         self.send_mission()
         self.send_fence()
         self.send_rally()

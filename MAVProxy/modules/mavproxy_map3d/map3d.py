@@ -144,6 +144,9 @@ class Map3D:
     def set_follow(self, enable):
         self._put(('follow', bool(enable)))
 
+    def set_mission_arrows(self, enable):
+        self._put(('mission_arrows', bool(enable)))
+
     def set_fpv_fov(self, fov):
         self._put(('fpvfov', float(fov)))
 
