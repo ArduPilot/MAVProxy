@@ -61,6 +61,50 @@ def circle_latlon(centre, radius, segments=FENCE_CIRCLE_SEGMENTS):
                        [2.0 * math.pi * i / segments for i in range(segments)])
 
 
+def leg_tangent(centre, radius, clockwise, to_centre, to_radius, to_clockwise):
+    '''the bearings at which the leg between two circles leaves the first and
+    joins the second, each measured from its own centre.
+
+    A vehicle joins and leaves a loiter along a tangent rather than flying at
+    the middle of the circle, so the leg is the line that touches both
+    circles without crossing either.  Two circles turned the same way are
+    joined by an outer tangent, with the radii to the touch points parallel;
+    turned opposite ways the leg crosses between them and the radii are
+    opposed.  A plain waypoint is a circle of no radius, which reduces to the
+    tangent from a point.
+
+    Returns (leave, join).  Circles too close together to have a tangent fall
+    back to the bearing straight between them
+    '''
+    distance = mp_util.gps_distance(centre[0], centre[1],
+                                    to_centre[0], to_centre[1])
+    bearing = mp_util.gps_bearing(centre[0], centre[1],
+                                  to_centre[0], to_centre[1])
+    if distance <= 0:
+        return (bearing, bearing + 180.0)
+    if clockwise == to_clockwise:
+        reach = (radius - to_radius) / distance
+        opposed = False
+    else:
+        reach = (radius + to_radius) / distance
+        opposed = True
+    if reach < -1.0 or reach > 1.0:
+        return (bearing, bearing + 180.0)
+    offset = math.degrees(math.acos(reach))
+    leave = bearing - offset if clockwise else bearing + offset
+    return (leave, leave + 180.0 if opposed else leave)
+
+
+def _circle_of(item, clockwise):
+    '''(centre, radius, clockwise) for a mission item, treating one that does
+    not circle as a circle of no radius'''
+    radius = item.circle_radius if item is not None else None
+    if not radius:
+        return ((item.lat, item.lon) if item is not None else (0.0, 0.0),
+                0.0, clockwise)
+    return ((item.lat, item.lon), abs(radius), radius > 0)
+
+
 def spiral_latlon(centre, radius, turns, segments=MISSION_CIRCLE_SEGMENTS,
                   start_bearing=0.0):
     '''lat/lon points along turns turns about centre, from start_bearing.
@@ -395,10 +439,10 @@ class ElementManager:
         line = []
         markers = []
         previous = None
-        for item in items:
-            item = MissionItem(*item)
-            if item.lat == 0 and item.lon == 0:
-                continue
+        rejoin = None
+        flown = [MissionItem(*item) for item in items]
+        flown = [i for i in flown if not (i.lat == 0 and i.lon == 0)]
+        for (index, item) in enumerate(flown):
             amsl = self._resolve_amsl(item.alt, item.frame)
             if (item.command == mavutil.mavlink.MAV_CMD_NAV_ARC_WAYPOINT and
                     previous is not None):
@@ -413,8 +457,20 @@ class ElementManager:
                                           prev_amsl + (amsl - prev_amsl) * fraction))
             markers.append(self._enu(item.lat, item.lon, amsl))
             if item.circle_radius:
-                previous = self._append_circle(line, item, amsl, previous)
+                previous = self._append_circle(
+                    line, item, amsl, previous,
+                    flown[index-1] if index > 0 else None,
+                    flown[index+1] if index + 1 < len(flown) else None)
+                # the leg out of a loiter is flown against a track from the
+                # loiter's own centre unless the item says otherwise, so the
+                # vehicle has to pull back onto it after leaving the circle
+                rejoin = (((item.lat, item.lon), previous[0], amsl,
+                           item.exit_converge)
+                          if item.exit_converge else None)
                 continue
+            if rejoin is not None:
+                self._append_rejoin(line, rejoin, (item.lat, item.lon), amsl)
+            rejoin = None
             line.append(self._enu(item.lat, item.lon, amsl))
             previous = ((item.lat, item.lon), amsl)
         actors = []
@@ -424,26 +480,111 @@ class ElementManager:
             actors.append(_points(markers, (1.0, 1.0, 1.0), 9))
         self._replace('mission', actors)
 
-    def _append_circle(self, line, item, amsl, previous):
-        '''add the turns an item flies about its own location to the line,
-        entered from whichever side of the circle the vehicle arrives on.
-        Returns where the vehicle leaves the circle'''
+    def _append_rejoin(self, line, rejoin, target, target_amsl):
+        """walk the vehicle from where it left a loiter back onto the track it
+        is flying against.
+
+        ArduPlane crosstracks the leg after a loiter from the loiter's centre
+        rather than from the tangent it left on, so the vehicle comes off the
+        circle a radius or so to one side of that track and pulls back onto
+        it.  The pull-back is the L1 controller's, which closes the error over
+        its own distance, so it is drawn decaying over that
+        """
+        ((clat, clon), (elat, elon), exit_amsl, converge) = rejoin
+        track = mp_util.gps_bearing(clat, clon, target[0], target[1])
+        length = mp_util.gps_distance(clat, clon, target[0], target[1])
+        exit_bearing = mp_util.gps_bearing(clat, clon, elat, elon)
+        radius = mp_util.gps_distance(clat, clon, elat, elon)
+        offset_angle = math.radians(exit_bearing - track)
+        # where the exit sits measured along the track, and to one side of it
+        along = radius * math.cos(offset_angle)
+        across = radius * math.sin(offset_angle)
+        run = length - along
+        if run <= 0 or abs(across) < 1.0:
+            return
+        # the vehicle leaves on the tangent, which already points at the next
+        # waypoint and so is closing on the track at this rate.  The curve has
+        # to start along it, or the drawn path kinks at the exit and cuts back
+        # inside the circle it has just left
+        slope = -across / run
+        # closing the rest of the way as the L1 controller does, over its own
+        # distance, while keeping that starting direction
+        rate = slope + across / converge
+        if across * rate <= 0:
+            # the tangent alone closes at least as fast as the controller
+            # would; there is nothing to pull back onto
+            return
+        # whatever error is left when the waypoint arrives has to be gone by
+        # then, since that is where the vehicle ends up; take it out with a
+        # term that starts flat, so the tangent still sets the way it leaves
+        residual = (across + rate * run) * math.exp(-run / converge)
+        step = max(converge * 0.125, 1.0)
+        distance = along + step
+        while distance < length:
+            travelled = distance - along
+            decay = math.exp(-travelled / converge)
+            remaining = (across + rate * travelled) * decay
+            remaining -= residual * (travelled / run) ** 2
+            if abs(remaining) < 0.5:
+                break
+            fraction = travelled / run
+            amsl = exit_amsl + (target_amsl - exit_amsl) * fraction
+            point = mp_util.gps_newpos(clat, clon, track, distance)
+            point = mp_util.gps_newpos(point[0], point[1],
+                                       track + 90.0, remaining)
+            line.append(self._enu(point[0], point[1], amsl))
+            distance += step
+
+    def _append_circle(self, line, item, amsl, previous, before, after):
+        '''add the turns an item flies about its own location to the line.
+
+        The circle is joined along a tangent from the item before it and left
+        along a tangent towards the item after it, and the altitude runs at a
+        steady rate over the whole of that -- the leg included, since the
+        vehicle is already climbing or descending on its way there.  Returns
+        where the vehicle leaves the circle
+        '''
         centre = (item.lat, item.lon)
-        # the vehicle joins the circle on the side it approaches from
-        start_bearing = 0.0
-        entry_amsl = amsl
+        radius = abs(item.circle_radius)
+        clockwise = item.circle_radius > 0
+        entry_bearing = 0.0
+        prev_amsl = amsl
         if previous is not None:
-            ((prev_lat, prev_lon), entry_amsl) = previous
-            start_bearing = math.radians(
-                mp_util.gps_bearing(item.lat, item.lon, prev_lat, prev_lon))
+            (_, prev_amsl) = previous
+            (_, entry_bearing) = leg_tangent(
+                *_circle_of(before, clockwise) + (centre, radius, clockwise))
         # an item that changes altitude while it circles is a spiral; one that
         # does not is a single turn at its own altitude
-        turns = item.circle_turns if entry_amsl != amsl else None
+        turns = item.circle_turns if prev_amsl != amsl else None
         if not turns:
             turns = 1.0
-            entry_amsl = amsl
+        if after is not None:
+            # come off the circle pointing at whatever is next, going round
+            # as many whole extra times as the turns asked for
+            (exit_bearing, _) = leg_tangent(
+                centre, radius, clockwise, *_circle_of(after, clockwise))
+            swept = exit_bearing - entry_bearing
+            if not clockwise:
+                swept = -swept
+            swept %= 360.0
+            laps = max(0, int(round((turns * 360.0 - swept) / 360.0)))
+            turns = (swept + 360.0 * laps) / 360.0
+        if turns <= 0:
+            turns = 1.0
         ring = spiral_latlon(centre, item.circle_radius, turns,
-                             MISSION_CIRCLE_SEGMENTS, start_bearing)
+                             MISSION_CIRCLE_SEGMENTS,
+                             math.radians(entry_bearing))
+        # spread the altitude change over the leg and the turns together, so
+        # the approach shows its share of the climb or descent
+        leg_length = 0.0
+        if previous is not None:
+            ((prev_lat, prev_lon), _) = previous
+            leg_length = mp_util.gps_distance(prev_lat, prev_lon,
+                                              ring[0][0], ring[0][1])
+        total = leg_length + turns * 2.0 * math.pi * radius
+        entry_amsl = prev_amsl
+        if total > 0:
+            entry_amsl += (amsl - prev_amsl) * leg_length / total
         last = len(ring) - 1
         for (i, (la, lo)) in enumerate(ring):
             line.append(self._enu(la, lo,

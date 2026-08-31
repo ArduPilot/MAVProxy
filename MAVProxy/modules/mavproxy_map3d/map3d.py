@@ -15,11 +15,14 @@ from MAVProxy.modules.lib import multiproc
 # of the circle the item flies about its own location (positive is clockwise),
 # or None for the items which do not fly one.  circle_turns is how many turns
 # to draw that circle over, which shows as a spiral for an item that changes
-# altitude while it circles
+# altitude while it circles.  exit_converge is the distance over which the
+# vehicle rejoins the track out of the circle's centre after leaving it, or
+# None when the item crosstracks from where it left the circle instead
 MissionItem = collections.namedtuple(
     'MissionItem',
-    'lat lon alt frame command seq param1 circle_radius circle_turns',
-    defaults=(0.0, None, None))
+    'lat lon alt frame command seq param1 circle_radius circle_turns '
+    'exit_converge',
+    defaults=(0.0, None, None, None))
 
 PACKAGES = ('vtk', 'quantized_mesh_tile')
 
