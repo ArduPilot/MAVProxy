@@ -339,6 +339,26 @@ def vehicle_cruise_speed(params):
     return _first_param(params, CRUISE_SPEED_PARAMS)
 
 
+def vehicle_track_convergence(params):
+    """the distance over which the vehicle pulls itself back onto the track
+    it is supposed to be following, or None if we cannot tell.
+
+    This is the L1 controller's own distance, which is what decides how
+    sharply it converges: 1/pi times the damping, the period and the speed
+    """
+    period = param_value(params, 'NAVL1_PERIOD')
+    damping = param_value(params, 'NAVL1_DAMPING')
+    speed = vehicle_cruise_speed(params)
+    if period is None or speed is None:
+        return None
+    if damping is None:
+        damping = 0.75
+    distance = 0.3183099 * float(damping) * float(period) * speed
+    if distance <= 0 or math.isnan(distance):
+        return None
+    return distance
+
+
 def loiter_to_alt_turns(radius, alt_change, params, approach_distance=None,
                         default_turns=1.0):
     """how many turns a forward-moving vehicle spends circling to reach the
