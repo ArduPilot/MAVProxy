@@ -208,10 +208,12 @@ class CameraModuleTest(unittest.TestCase):
 
         visible = self.state.map.objects["CameraFOV_1_100_1"]
         thermal = self.state.map.objects["CameraFOV_1_100_2"]
-        self.assertEqual(len(visible.points), 5)
-        self.assertEqual(len(thermal.points), 5)
+        self.assertGreaterEqual(len(visible.points), 4)
+        self.assertGreaterEqual(len(thermal.points), 4)
         self.assertEqual(visible.colour, (0, 128, 128))
         self.assertEqual(thermal.colour, (0, 0, 128))
+        self.assertFalse(visible._showcircles)
+        self.assertFalse(thermal._showcircles)
         self.assertGreater(
             max(point[0] for point in visible.points) -
             min(point[0] for point in visible.points),

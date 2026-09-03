@@ -127,6 +127,7 @@ class CameraModule(mp_module.MPModule):
             ("status_interval", float, 5.0),
             ("show_fov", bool, True),
             ("fov_update_interval", float, 0.2),
+            ("fov_max_range", float, 10000.0),
             ("mount_roll", float, 0.0),
             ("mount_pitch", float, 0.0),
             ("mount_yaw", float, 0.0),
@@ -684,7 +685,8 @@ class CameraModule(mp_module.MPModule):
                 projection = camera_projection.CameraProjection(
                     params, elevation_model=elevation_model)
                 points = projection.get_projection(
-                    latitude, longitude, altitude, *attitude)
+                    latitude, longitude, altitude, *attitude,
+                    max_range=self.camera_settings.fov_max_range)
             except Exception:
                 # Terrain tiles may be temporarily unavailable.  Keep MAVLink
                 # packet processing alive and retry on the next position.
@@ -700,7 +702,8 @@ class CameraModule(mp_module.MPModule):
                 mavutil.mavlink.VIDEO_STREAM_STATUS_FLAGS_THERMAL)
             colour = (0, 0, 128) if thermal else (0, 128, 128)
             map_display.add_object(mp_slipmap.SlipPolygon(
-                name, points, layer="Camera", linewidth=2, colour=colour))
+                name, points, layer="Camera", linewidth=2, colour=colour,
+                showcircles=False))
             self.fov_points[name] = points
             active.add(name)
         self.fov_objects.update(active)
