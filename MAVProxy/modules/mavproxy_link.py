@@ -734,6 +734,7 @@ class LinkModule(mp_module.MPModule):
                 mavutil.mavlink.MAV_CMD_SET_CAMERA_MODE,
                 mavutil.mavlink.MAV_CMD_SET_CAMERA_ZOOM,
                 mavutil.mavlink.MAV_CMD_SET_CAMERA_FOCUS,
+                mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE,
                 mavutil.mavlink.MAV_CMD_CAN_FORWARD,
         ]):
             # too noisy?
