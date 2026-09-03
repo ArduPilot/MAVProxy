@@ -31,6 +31,8 @@ class ConsoleFrame(wx.Frame):
 
         self.menu = None
         self.menu_callback = None
+        self.menu_open = False
+        self.pending_menu = None
         self.last_layout_send = time.time()
 
         self.control = wx.TextCtrl(self.panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_AUTO_URL)
@@ -49,6 +51,9 @@ class ConsoleFrame(wx.Frame):
         self.timer.Start(100)
 
         self.Bind(wx.EVT_IDLE, self.on_idle)
+        self.Bind(wx.EVT_MENU, self.on_menu)
+        self.Bind(wx.EVT_MENU_OPEN, self.on_menu_open)
+        self.Bind(wx.EVT_MENU_CLOSE, self.on_menu_close)
         self.Bind(wx.EVT_TEXT_URL, self.on_text_url)
 
         self.Show(True)
@@ -62,6 +67,28 @@ class ConsoleFrame(wx.Frame):
             return
         ret.call_handler()
         state.child_pipe_send.send(ret)
+
+    def on_menu_open(self, event):
+        '''prevent an asynchronous menu update replacing an open popup'''
+        self.menu_open = True
+        event.Skip()
+
+    def on_menu_close(self, event):
+        '''apply the newest deferred menu after the native popup is gone'''
+        self.menu_open = False
+        event.Skip()
+        if self.pending_menu is not None:
+            wx.CallAfter(self.apply_pending_menu)
+
+    def apply_pending_menu(self):
+        '''install the newest menu description when no popup is active'''
+        if self.menu_open or self.pending_menu is None:
+            return
+        self.menu = self.pending_menu
+        self.pending_menu = None
+        self.SetMenuBar(self.menu.wx_menu())
+        self.Refresh()
+        self.Update()
 
     def on_text_url(self, event):
         '''handle double clicks on URL text'''
@@ -153,13 +180,9 @@ class ConsoleFrame(wx.Frame):
             elif isinstance(obj, Title):
                 self.SetTitle(obj.title)
             elif isinstance(obj, mp_menu.MPMenuTop):
-                if obj is not None:
-                    self.SetMenuBar(None)
-                    self.menu = obj
-                    self.SetMenuBar(self.menu.wx_menu())
-                    self.Bind(wx.EVT_MENU, self.on_menu)
-                self.Refresh()
-                self.Update()
+                self.pending_menu = obj
+                if not self.menu_open:
+                    self.apply_pending_menu()
             elif isinstance(obj, win_layout.WinLayout):
                 win_layout.set_wx_window_layout(self, obj)
 
