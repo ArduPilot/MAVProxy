@@ -171,6 +171,8 @@ class uavxfer:
         x_p = dot(self.Rp_i, x_w)
         x_c = dot(self.Rc_i, x_p)
         x_i = dot(self.Tk, x_c)
+        if not math.isfinite(x_i[2]) or x_i[2] <= 0:
+            return None
         return x_i[:3]/x_i[2]
 
     def platformToWorld(self, north, east, down):
@@ -184,6 +186,8 @@ class uavxfer:
         v_p = dot(self.Rc, v_c)
         v_w = dot(self.Rp, v_p)
         # compute scale for z == z_earth
+        if not math.isfinite(v_w[2]) or v_w[2] == 0:
+            return self.Xp, float('inf')
         scale = (self.z_earth-self.Xp[2])/v_w[2]
         #project from platform to ground
         x_w = scale*v_w + self.Xp;
@@ -234,27 +238,33 @@ class CameraProjection:
         y = dst[0,0][1]
 
         # negative scale means camera pointing above horizon
-        # large scale means a long way away also unreliable
         (pos_w, scale) = xfer.imageToWorld(x, y)
-        if scale < 0:
-             return None
+        if not math.isfinite(scale) or scale <= 0:
+            return None
         ret = Vector3(pos_w[0], pos_w[1], height_agl)
+        if not all(math.isfinite(value) for value in (ret.x, ret.y, ret.z)):
+            return None
         return ret
 
-    def get_posned(self, x, y, clat, clon, calt_amsl, roll_deg, pitch_deg, yaw_deg):
+    def get_posned(self, x, y, clat, clon, calt_amsl, roll_deg, pitch_deg,
+                   yaw_deg, max_range=None):
         '''
         get a Vector3() NED from the camera position to project onto the ground
 
         return pos NED from camera as Vector3 or None
+        max_range is an optional slant-range limit in meters
         '''
         # get height of terrain below camera
         theight = self.elevation_model.GetElevation(clat, clon)
-        if calt_amsl <= theight:
+        if (theight is None or not math.isfinite(theight) or
+                calt_amsl <= theight):
             return None
 
         # project with flat earth
         pos_ned = self.pixel_position_flat(x, y, calt_amsl-theight, roll_deg, pitch_deg, yaw_deg)
         if pos_ned is None or pos_ned.z <= 0:
+            return None
+        if max_range is not None and max_range > 0 and pos_ned.length() > max_range:
             return None
 
         # iterate to make more accurate, accounting for difference in terrain height at this point
@@ -262,30 +272,38 @@ class CameraProjection:
 
         for i in range(3):
             ground_alt = self.elevation_model.GetElevation(latlon[0], latlon[1])
-            if ground_alt is None:
+            if ground_alt is None or not math.isfinite(ground_alt):
                 return None
             sr = pos_ned.length()
             if sr <= 1:
                 return None
             posd2 = calt_amsl - ground_alt
+            if posd2 <= 0:
+                return None
             sin_pitch = pos_ned.z / sr
             # adjust for height at this point
             sr2 = sr - (pos_ned.z - posd2) / sin_pitch
+            if not math.isfinite(sr2) or sr2 <= 0:
+                return None
             #print("SR: ", pos_ned.z, posd2, sr, sr2)
             pos_ned = pos_ned * (sr2 / sr)
+            if max_range is not None and max_range > 0 and pos_ned.length() > max_range:
+                return None
             latlon = mp_util.gps_offset(clat, clon, pos_ned.y, pos_ned.x)
             if latlon is None:
                 return None
         return pos_ned
         
-    def get_latlonalt_for_pixel(self, x, y, clat, clon, calt_amsl, roll_deg, pitch_deg, yaw_deg):
+    def get_latlonalt_for_pixel(self, x, y, clat, clon, calt_amsl,
+                                roll_deg, pitch_deg, yaw_deg, max_range=None):
         '''
         get lat,lon of projected pixel from camera.
         x,y are pixel coordinates, 0,0 is top-left corner
 
         return is (lat,lon,alt) tuple or None
         '''
-        pos_ned = self.get_posned(x, y, clat, clon, calt_amsl, roll_deg, pitch_deg, yaw_deg)
+        pos_ned = self.get_posned(x, y, clat, clon, calt_amsl, roll_deg,
+                                  pitch_deg, yaw_deg, max_range=max_range)
         if pos_ned is None or pos_ned.z <= 0:
             return None
 
@@ -305,23 +323,119 @@ class CameraProjection:
             return None
         return pos_ned.length()
     
-    def get_projection(self, clat, clon, calt_amsl, roll_deg, pitch_deg, yaw_deg):
-        '''return a list of (lat,lon) tuples drawing the camera view on the terrain'''
-        ret = []
+    def get_projection(self, clat, clon, calt_amsl, roll_deg, pitch_deg,
+                       yaw_deg, max_range=10000):
+        '''return a finite, non-intersecting camera footprint on the terrain
+
+        The default 10km slant-range limit avoids unreliable near-horizon
+        terrain intersections. Set max_range to zero or None to disable it.
+        '''
         xres = self.C.xresolution
         yres = self.C.yresolution
-        for (x,y) in [(0,0), (xres, 0), (xres, yres), (0,yres)]:
-            y0 = 0
-            while True:
-                latlonalt = self.get_latlonalt_for_pixel(x,y+y0,clat,clon,calt_amsl,roll_deg,pitch_deg,yaw_deg)
-                if latlonalt is not None:
-                    break
-                # chop off the top 10 pixels and try again
-                y0 += 10
-                if y0 >= self.C.yresolution:
-                    # give up
-                    return None
-            ret.append((latlonalt[0],latlonalt[1]))
+        range_limited = max_range is not None and max_range > 0
+        offsets = []
+
+        # Sample the actual image perimeter.  Keeping these rays in image order
+        # is insufficient for a partial-sky view because its finite boundary is
+        # set by range in the earth frame, not by a horizontal image row.
+        edge_steps = 4
+        for index in range(edge_steps):
+            fraction = index / float(edge_steps)
+            pixels = ((xres * fraction, 0),
+                      (xres, yres * fraction),
+                      (xres * (1.0 - fraction), yres),
+                      (0, yres * (1.0 - fraction)))
+            for x, y in pixels:
+                pos_ned = self.get_posned(
+                    x, y, clat, clon, calt_amsl,
+                    roll_deg, pitch_deg, yaw_deg, max_range=max_range)
+                if pos_ned is None:
+                    if not range_limited:
+                        return None
+                    continue
+                offsets.append((pos_ned.x, pos_ned.y))
+
+        if range_limited:
+            # Add the part of the earth-frame max-range circle that appears in
+            # the camera image.  This closes partial-sky and near-horizon views
+            # without skewing either image axis, and preserves nesting between
+            # cameras with the same boresight but different fields of view.
+            xfer = uavxfer()
+            xfer.setCameraMatrix(self.C.K)
+            xfer.setCameraOrientation(0.0, 0.0, pi/2)
+            xfer.setPlatformPose(
+                0, 0, -calt_amsl,
+                math.radians(roll_deg), math.radians(pitch_deg + 90),
+                math.radians(yaw_deg))
+            ground_below = self.elevation_model.GetElevation(clat, clon)
+            if ground_below is None or not math.isfinite(ground_below):
+                return None
+
+            range_steps = 72
+            for index in range(range_steps):
+                bearing = 2.0 * pi * index / range_steps
+                ground_alt = ground_below
+                radius = None
+                latlon = None
+                for _ in range(2):
+                    vertical = calt_amsl - ground_alt
+                    if abs(vertical) >= max_range:
+                        radius = None
+                        break
+                    radius = math.sqrt(max_range * max_range -
+                                       vertical * vertical)
+                    north = radius * math.cos(bearing)
+                    east = radius * math.sin(bearing)
+                    latlon = mp_util.gps_offset(clat, clon, east, north)
+                    if latlon is None:
+                        radius = None
+                        break
+                    ground_alt = self.elevation_model.GetElevation(*latlon)
+                    if ground_alt is None or not math.isfinite(ground_alt):
+                        radius = None
+                        break
+                if radius is None:
+                    continue
+                image = xfer.worldToImage(north, east, -ground_alt)
+                if image is None:
+                    continue
+                if 0 <= image[0] <= xres and 0 <= image[1] <= yres:
+                    offsets.append((north, east))
+
+        if len(offsets) < 3:
+            return None
+
+        # Terrain discontinuities can reorder individual ray intersections.
+        # An earth-frame convex hull gives SlipPolygon a stable, non-crossing
+        # envelope in clockwise/counter-clockwise order.
+        offsets = sorted(set(offsets))
+
+        def side(origin, a, b):
+            return ((a[0] - origin[0]) * (b[1] - origin[1]) -
+                    (a[1] - origin[1]) * (b[0] - origin[0]))
+
+        lower = []
+        for point in offsets:
+            while (len(lower) >= 2 and
+                   side(lower[-2], lower[-1], point) <= 0):
+                lower.pop()
+            lower.append(point)
+        upper = []
+        for point in reversed(offsets):
+            while (len(upper) >= 2 and
+                   side(upper[-2], upper[-1], point) <= 0):
+                upper.pop()
+            upper.append(point)
+        offsets = lower[:-1] + upper[:-1]
+        if len(offsets) < 3:
+            return None
+
+        ret = []
+        for north, east in offsets:
+            latlon = mp_util.gps_offset(clat, clon, east, north)
+            if latlon is None or not all(math.isfinite(value) for value in latlon):
+                return None
+            ret.append(latlon)
         ret.append(ret[0])
         return ret
 

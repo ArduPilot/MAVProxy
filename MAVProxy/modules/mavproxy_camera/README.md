@@ -34,6 +34,11 @@ a flat surface derived from `GLOBAL_POSITION_INT.relative_alt`.  Use
 `camera set show_fov false` to hide the footprints.  `mount_roll`,
 `mount_pitch`, `mount_yaw` and `mount_alt` provide installation offsets, and
 `fov_update_interval` controls the map update period (0.2 seconds by default).
+Partial-sky views are clipped against the maximum range in the earth frame,
+then ordered as a convex ground envelope. This avoids crossed footprints and
+keeps narrower streams nested inside wider streams with the same boresight.
+`fov_max_range` rejects unreliable terrain intersections beyond 10 km by
+default; set it to zero to disable this range limit.
 
 ## ArduPilot and MT11 configuration
 
