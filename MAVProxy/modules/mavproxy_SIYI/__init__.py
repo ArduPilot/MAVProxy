@@ -270,6 +270,7 @@ class SIYIModule(mp_module.MPModule):
                                                      ('thermal_fov', float, 24.2),
                                                      ('zoom_fov', float, 62.0),
                                                      ('wide_fov', float, 88.0),
+                                                     ('fov_max_range', float, 10000.0),
                                                      ('use_lidar', int, 0),
                                                      ('use_encoders', int, 0),
                                                      ('max_rate', float, 30.0),
@@ -1422,10 +1423,15 @@ autoflag:
         if gpi is None or att is None or GPS_RAW_INT is None:
             return None
         myalt = GPS_RAW_INT.alt*1.0e-3 + self.siyi_settings.mount_alt
-        points = cproj.get_projection(gpi.lat*1.0e-7,gpi.lon*1.0e-7,myalt,fov_att[0],fov_att[1],fov_att[2]+math.degrees(att.yaw))
+        points = cproj.get_projection(
+            gpi.lat*1.0e-7, gpi.lon*1.0e-7, myalt,
+            fov_att[0], fov_att[1],
+            fov_att[2]+math.degrees(att.yaw),
+            max_range=self.siyi_settings.fov_max_range)
         if points is not None:
             self.mpstate.map.add_object(mp_slipmap.SlipPolygon(name, points, layer='SIYI',
-                                                               linewidth=2, colour=color))
+                                                               linewidth=2, colour=color,
+                                                               showcircles=False))
 
     def show_fov(self):
         '''show FOV polygons'''
