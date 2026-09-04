@@ -7,7 +7,6 @@
 from ..lib.wx_loader import wx
 from wx import grid
 import traceback
-from MAVProxy.modules.lib import icon
 
 # begin wxGlade: dependencies
 # end wxGlade
@@ -216,6 +215,9 @@ class MissionEditorFrame(wx.Frame):
         self.active_read_id = None
         self.read_revision = None
         try:
+            # icon.py imports matplotlib, an optional dependency, so it is
+            # imported here rather than at module scope
+            from MAVProxy.modules.lib import icon
             self.SetIcon(icon.SimpleIcon("WP").get_ico())
         except Exception:
             pass
