@@ -6,4 +6,4 @@ Exec=bash -c 'export PATH="$PATH:~/.local/bin"; MAVExplorer.py %F'
 Name=MAVExplorer
 Icon=mavexplorer
 Comment=MAVExplorer Log Analyzer
-
+StartupWMClass=MAVExplorer.py
