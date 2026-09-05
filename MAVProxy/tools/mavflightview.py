@@ -205,7 +205,7 @@ def colourmap_for_mav_type(mav_type):
     return map
 
 
-def display_waypoints(wploader, map):
+def display_waypoints(wploader, map, default_radius=None, mav_type=None):
     '''display the waypoints'''
     mission_list = wploader.view_list()
     polygons = wploader.polygon_list()
@@ -218,7 +218,12 @@ def display_waypoints(wploader, map):
                 layer='Mission',
                 linewidth=2,
                 colour=(255, 255, 255),
+                arcs=mp_slipmap.mission_arcs(wploader, mission_list[k]),
             ))
+        for circle in mp_slipmap.mission_circles(
+                'Loiter Circle', 'Mission', wploader, mission_list[k], p,
+                default_radius=default_radius, vehicle=mav_type):
+            map.add_object(circle)
         labeled_wps = {}
         for i in range(len(mission_list)):
             next_list = mission_list[i]
@@ -387,6 +392,10 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
     wp = mavwp.MAVWPLoader()
     if options.mission is not None:
         wp.load(options.mission)
+    # the radius a loiter item without one of its own will be flown at, from
+    # the parameters the log carries
+    options.default_circle_radius = mp_util.param_value(
+        getattr(mlog, 'params', None), 'WP_LOITER_RAD')
     fen = mavwp.MAVFenceLoader()
     if options.fence is not None:
         fen.load(options.fence)
@@ -629,8 +638,10 @@ def mavflightview_show(path,
                 showlines=(not getattr(options, "no_show_lines", False)),
                 colour=(255, 0, 180)))
     plist = []
+    vlist = []
     if options.show_waypoints:
         plist = wp.polygon_list()
+        vlist = wp.view_list()
     mission_obj = None
     if len(plist) > 0:
         mission_obj = []
@@ -641,7 +652,12 @@ def mavflightview_show(path,
                 layer='Mission',
                 linewidth=2,
                 colour=(255, 255, 255),
+                arcs=mp_slipmap.mission_arcs(wp, vlist[i]),
             ))
+            mission_obj.extend(mp_slipmap.mission_circles(
+                'Loiter-%s' % title, 'Mission', wp, vlist[i], plist[i],
+                default_radius=getattr(options, 'default_circle_radius', None),
+                vehicle=mav_type))
     else:
         mission_obj = None
 
@@ -696,7 +712,9 @@ def mavflightview_show(path,
         for path_obj in path_objs:
             map.add_object(path_obj)
         if mission_obj is not None:
-            display_waypoints(wp, map)
+            display_waypoints(wp, map,
+                              getattr(options, 'default_circle_radius', None),
+                              mav_type)
         if fence_obj is not None:
             map.add_object(fence_obj)
 

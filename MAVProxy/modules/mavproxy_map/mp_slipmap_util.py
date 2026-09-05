@@ -14,6 +14,8 @@ import cv2
 import numpy as np
 import warnings
 
+from pymavlink import mavutil
+
 from MAVProxy.modules.mavproxy_map import mp_tile
 from MAVProxy.modules.lib import mp_util
 
@@ -25,6 +27,62 @@ def image_shape(img):
     if hasattr(img, 'shape'):
         return (img.shape[1], img.shape[0])
     return (img.width, img.height)
+
+
+def mission_arcs(wploader, wp_indexes):
+    '''return the arcs dict to hand to SlipPolygon for a mission polygon.
+
+    wp_indexes is the list of mission item indexes making up the polygon (as
+    returned by wploader.view_list()).  The returned dict maps the index of a
+    polygon segment to the angle in degrees swept by that segment, for those
+    segments which are MAV_CMD_NAV_ARC_WAYPOINT arcs
+    '''
+    arcs = {}
+    for i in range(1, len(wp_indexes)):
+        wp = wploader.wp(wp_indexes[i])
+        if wp is None:
+            continue
+        if wp.command != mavutil.mavlink.MAV_CMD_NAV_ARC_WAYPOINT:
+            continue
+        # the arc runs from the previous point in the mission view
+        arcs[i-1] = wp.param1
+    return arcs
+
+
+def mission_circle_radius(wp, default_radius=None, vehicle=None):
+    '''return the signed radius of the circle a mission item flies about its
+    own location, or None if it does not fly one.  A positive radius is a
+    clockwise circle, negative counter-clockwise'''
+    return mp_util.mission_circle_radius(
+        wp.command,
+        (wp.param1, wp.param2, wp.param3, wp.param4),
+        default_radius,
+        vehicle)
+
+
+def mission_circles(key_prefix, layer, wploader, wp_indexes, points,
+                    default_radius=None, colour=(255, 255, 255),
+                    linewidth=2, arrow=False, vehicle=None):
+    '''return SlipCircle objects for those mission items which fly a circle
+    about their own location.  points are the map positions of wp_indexes'''
+    circles = []
+    for i in range(len(wp_indexes)):
+        wp = wploader.wp(wp_indexes[i])
+        if wp is None:
+            continue
+        radius = mission_circle_radius(wp, default_radius, vehicle)
+        if radius is None:
+            continue
+        circles.append(SlipCircle(
+            '%s %u' % (key_prefix, wp_indexes[i]),
+            layer,
+            points[i],
+            radius,
+            colour,
+            linewidth,
+            arrow=arrow,
+        ))
+    return circles
 
 
 class SlipObject:
@@ -221,18 +279,39 @@ class SlipCircle(SlipObject):
 
 class SlipPolygon(SlipObject):
     '''a polygon to display on the map'''
-    def __init__(self, key, points, layer, colour, linewidth, arrow=False, popup_menu=None, showlines=True, showcircles=True):  # noqa:E501
+    def __init__(self, key, points, layer, colour, linewidth, arrow=False, popup_menu=None, showlines=True, showcircles=True, arcs=None):  # noqa:E501
         SlipObject.__init__(self, key, layer, popup_menu=popup_menu)
         self.points = points
         self.colour = colour
         self.linewidth = linewidth
         self.arrow = arrow
-        self._bounds = mp_util.polygon_bounds(self.points)
+        # arcs is an optional dict mapping the index of a segment (the
+        # index of the point the segment starts at) to the angle in
+        # degrees swept by a circular arc joining the two points.
+        # Positive angles are clockwise arcs.
+        self.arcs = arcs if arcs is not None else {}
+        # an arc can bulge a long way outside its chord, and the map culls
+        # objects whose bounds do not overlap the view, so the bounding box
+        # has to cover the arc bodies rather than just the vertices
+        self._bounds = mp_util.polygon_bounds(self.bounds_points())
         self._pix_points = []
         self._selected_vertex = None
         self._has_timestamps = False
         self._showlines = showlines
         self._showcircles = showcircles
+
+    def bounds_points(self):
+        '''the polygon points, plus samples along any arcs, for bounding'''
+        if not self.arcs:
+            return self.points
+        points = []
+        for i in range(len(self.points)):
+            points.append(self.points[i])
+            if i in self.arcs and i+1 < len(self.points):
+                points.extend(mp_util.arc_points(self.points[i][:2],
+                                                 self.points[i+1][:2],
+                                                 self.arcs[i])[1:-1])
+        return points
 
     def set_colour(self, colour):
         self.colour = colour
@@ -242,6 +321,48 @@ class SlipPolygon(SlipObject):
         if self.hidden:
             return None
         return self._bounds
+
+    def draw_arc(self, img, pixmapper, pt1, pt2, arc_angle, colour, linewidth):
+        '''draw a circular arc between two points on the image.  The arc
+        sweeps arc_angle degrees, positive being clockwise.  Only the
+        arc end point is added to self._pix_points so that the
+        pix-point indexes continue to match the polygon point indexes
+        '''
+        pt1 = mp_util.constrain_latlon(pt1)
+        pt2 = mp_util.constrain_latlon(pt2)
+        arc = mp_util.arc_points(pt1, pt2, arc_angle)
+        (width, height) = image_shape(img)
+        pix1 = pixmapper(pt1)
+        pix2 = pixmapper(pt2)
+        drawn = []
+        for i in range(len(arc)-1):
+            apix1 = pixmapper(arc[i])
+            apix2 = pixmapper(arc[i+1])
+            (ret, apix1, apix2) = cv2.clipLine((0, 0, width, height), apix1, apix2)
+            if ret is False:
+                continue
+            if self._showlines:
+                cv2.line(img, apix1, apix2, colour, linewidth)
+            drawn.append((apix1, apix2))
+        if len(drawn) == 0:
+            # entirely off-screen
+            if len(self._pix_points) == 0:
+                self._pix_points.append(None)
+            self._pix_points.append(None)
+            return
+        if self._showcircles:
+            cv2.circle(img, pix2, linewidth*2, colour)
+        if len(self._pix_points) == 0:
+            self._pix_points.append(pix1)
+        self._pix_points.append(pix2)
+        if self.arrow:
+            # put an arrow at the mid-point of the arc, pointing along
+            # the arc
+            (mpix1, mpix2) = drawn[len(drawn)//2]
+            xdiff = mpix2[0]-mpix1[0]
+            ydiff = mpix2[1]-mpix1[1]
+            SlipArrow(self.key, self.layer, (int(mpix1[0]+xdiff/2.0), int(mpix1[1]+ydiff/2.0)), self.colour,
+                      self.linewidth, math.atan2(ydiff, xdiff)+math.pi/2.0).draw(img)
 
     def draw_line(self, img, pixmapper, pt1, pt2, colour, linewidth):
         '''draw a line on the image'''
@@ -286,8 +407,12 @@ class SlipPolygon(SlipObject):
                 if self._timestamp_range is not None:
                     if timestamp < self._timestamp_range[0] or timestamp > self._timestamp_range[1]:
                         continue
-            self.draw_line(img, pixmapper, self.points[i], self.points[i+1],
-                           colour, self.linewidth)
+            if i in self.arcs:
+                self.draw_arc(img, pixmapper, self.points[i], self.points[i+1],
+                              self.arcs[i], colour, self.linewidth)
+            else:
+                self.draw_line(img, pixmapper, self.points[i], self.points[i+1],
+                               colour, self.linewidth)
 
     def clicked(self, px, py):
         '''see if the polygon has been clicked on.

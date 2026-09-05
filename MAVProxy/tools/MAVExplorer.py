@@ -120,6 +120,8 @@ class MEState(object):
               MPSetting('paramdocs', bool, True, 'show param docs'),
               MPSetting('max_rate', float, 0, 'maximum display rate of graphs in Hz'),
               MPSetting('vehicle_type', str, 'Auto', 'force vehicle type for mode handling'),
+              MPSetting('showdirection', bool, False,
+                        'show direction of travel on the 3D map mission'),
               ]
             )
 
@@ -685,7 +687,9 @@ def cmd_map3d(args):
             path.append((m.Lat, m.Lng, m.Alt,
                          grapher.timestamp_to_days(m._timestamp)))
         elif mtype == 'CMD' and (m.Lat != 0 or m.Lng != 0):
-            mission.append((m.Lat, m.Lng, m.Alt, getattr(m, 'Frame', 3), m.CId, m.CNum))
+            params = tuple(getattr(m, 'Prm%u' % i, 0.0) for i in range(1, 5))
+            mission.append((m.Lat, m.Lng, m.Alt, getattr(m, 'Frame', 3),
+                            m.CId, m.CNum, params))
     mlog.rewind()
 
     if len(path) == 0:
@@ -720,7 +724,8 @@ def cmd_map3d(args):
     # waypoints (MAV_FRAME_GLOBAL_TERRAIN_ALT = 10/11) are "z above terrain", so
     # they need the terrain elevation at the waypoint, not home + z.
     if mission:
-        mission = resolve_mission_amsl(mission, ground0)
+        mission = resolve_mission_amsl(mission, ground0, mlog.params,
+                                       getattr(mlog, 'mav_type', None))
 
     # drop views the user has already closed, so their child processes are reaped
     for old in [v for v in map3d_views if not v.is_alive()]:
@@ -731,6 +736,7 @@ def cmd_map3d(args):
     map3d_views.append(m3d)
     m3d.set_origin(lat0, lon0, ground0)
     m3d.set_home(ground0)
+    m3d.set_mission_arrows(mestate.settings.showdirection)
     m3d.set_path(path)
     if xlimits.last_xlim is not None and mestate.settings.sync_xmap:
         m3d.set_time_range(xlimits.last_xlim)
@@ -738,28 +744,31 @@ def cmd_map3d(args):
         m3d.set_mission(mission)
     m3d.look_at(lat0, lon0, ground0, dist=1.6 * span)
 
-def resolve_mission_amsl(mission, ground0):
-    '''convert mission items to AMSL. mission items are
-    (lat, lon, z, frame, cmd, seq); returns items with frame 0 (AMSL).
+def resolve_mission_amsl(mission, ground0, params=None, mav_type=None):
+    '''convert mission items to MissionItems in AMSL (frame 0). mission items
+    are (lat, lon, z, frame, cmd, seq, params).
 
     Terrain-frame waypoints are resolved using the quantized terrain mesh (the
     same source rendered in the 3D view), which is fetched per 1-degree tile and
     cached, so it never stalls the command thread per waypoint.'''
+    from MAVProxy.modules.mavproxy_map3d.map3d import MissionItem
     # home AMSL: the home item (seq 0) altitude, else takeoff ground
     home_amsl = ground0
-    for (la, lo, z, frame, cid, seq) in mission:
-        if seq == 0:
-            home_amsl = z
+    for item in mission:
+        if item[5] == 0:
+            home_amsl = item[2]
             break
     sampler = None
-    if any(frame in (10, 11) for (_, _, _, frame, _, _) in mission):
+    if any(item[3] in (10, 11) for item in mission):
         try:
             from MAVProxy.modules.mavproxy_map3d.terrain import sample_terrain
             sampler = sample_terrain
         except Exception as ex:
             print("map3d: terrain elevation unavailable (%s)" % ex)
+    default_radius = mp_util.param_value(params, 'WP_LOITER_RAD')
     out = []
-    for (la, lo, z, frame, cid, seq) in mission:
+    previous = None
+    for (la, lo, z, frame, cid, seq, prm) in mission:
         if frame in (0, 5):
             amsl = z
         elif frame in (10, 11):
@@ -767,12 +776,34 @@ def resolve_mission_amsl(mission, ground0):
             amsl = (terr if terr is not None else home_amsl) + z
         else:
             amsl = home_amsl + z
-        out.append((la, lo, amsl, 0, cid, seq))
+        radius = mp_util.mission_circle_radius(cid, prm, default_radius,
+                                               mav_type)
+        turns = None
+        if cid == mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT:
+            approach = None
+            if previous is not None:
+                approach = mp_util.gps_distance(previous[0], previous[1], la, lo)
+            turns = mp_util.loiter_to_alt_turns(
+                radius,
+                amsl - previous[2] if previous is not None else None,
+                params, approach)
+        converge = None
+        if radius is not None and not (prm[3] > 0):
+            # param4 == 0 asks for the next leg to be crosstracked from the
+            # loiter centre rather than from where it was left
+            converge = mp_util.vehicle_track_convergence(params)
+        out.append(MissionItem(la, lo, amsl, 0, cid, seq, prm[0],
+                               radius, turns, converge))
+        previous = (la, lo, amsl)
     return out
 
 def cmd_set(args):
     '''control MAVExporer options'''
     mestate.settings.command(args)
+    # settings the open 3D views care about
+    for view in map3d_views:
+        if view.is_alive():
+            view.set_mission_arrows(mestate.settings.showdirection)
 
 def cmd_condition(args):
     '''control MAVExporer conditions'''

@@ -150,6 +150,14 @@ class MapModule(mp_module.MPModule):
             # waypoint commands
             mavutil.mavlink.MAV_CMD_NAV_WAYPOINT: (0, 255, 255),
             mavutil.mavlink.MAV_CMD_NAV_SPLINE_WAYPOINT: (64, 255, 64),
+            mavutil.mavlink.MAV_CMD_NAV_ARC_WAYPOINT: (64, 255, 255),
+
+            # circling commands
+            mavutil.mavlink.MAV_CMD_NAV_LOITER_UNLIM: (255, 64, 255),
+            mavutil.mavlink.MAV_CMD_NAV_LOITER_TURNS: (255, 64, 255),
+            mavutil.mavlink.MAV_CMD_NAV_LOITER_TIME: (255, 64, 255),
+            mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT: (255, 64, 255),
+            mavutil.mavlink.MAV_CMD_DO_ORBIT: (255, 64, 255),
 
             # other commands
             mavutil.mavlink.MAV_CMD_DO_LAND_START: (255, 127, 0),
@@ -158,6 +166,12 @@ class MapModule(mp_module.MPModule):
             mavutil.mavlink.MAV_CMD_NAV_TAKEOFF: "TOff",
             mavutil.mavlink.MAV_CMD_DO_LAND_START: "DLS",
             mavutil.mavlink.MAV_CMD_NAV_SPLINE_WAYPOINT: "SW",
+            mavutil.mavlink.MAV_CMD_NAV_ARC_WAYPOINT: "AW",
+            mavutil.mavlink.MAV_CMD_NAV_LOITER_UNLIM: "LU",
+            mavutil.mavlink.MAV_CMD_NAV_LOITER_TURNS: "LT",
+            mavutil.mavlink.MAV_CMD_NAV_LOITER_TIME: "LTime",
+            mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT: "LAlt",
+            mavutil.mavlink.MAV_CMD_DO_ORBIT: "Orbit",
             mavutil.mavlink.MAV_CMD_NAV_VTOL_LAND: "VL",
         }
 
@@ -459,6 +473,8 @@ Usage: map circle <radius> <colour>
                     linewidth=2,
                     colour=ImageColor.getrgb(self.map_settings.mission_color),
                     arrow=self.map_settings.showdirection, popup_menu=popup,
+                    arcs=mp_slipmap.mission_arcs(
+                        self.module('wp').wploader, self.mission_list[i]),
                 ))
         labeled_wps = {}
         self.map.add_object(mp_slipmap.SlipClearLayer('LoiterCircles'))
@@ -475,28 +491,21 @@ Usage: map circle <radius> <colour>
                     self.map.add_object(mp_slipmap.SlipLabel(
                         'miss_cmd %u/%u' % (i, j), polygons[i][j], label, 'Mission', colour=colour, size=font_size))
 
-                    if (self.map_settings.loitercircle and
-                            self.module('wp').wploader.wp_is_loiter(next_list[j])):
+                    if self.map_settings.loitercircle:
                         wp = self.module('wp').wploader.wp(next_list[j])
-                        if wp.command != mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT and wp.param3 != 0:
-                            # wp radius and direction is defined by the mission
-                            loiter_rad = wp.param3
-                        elif wp.command == mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT and wp.param2 != 0:
-                            # wp radius and direction is defined by the mission
-                            loiter_rad = wp.param2
-                        else:
-                            # wp radius and direction is defined by the parameter
-                            loiter_rad = self.get_mav_param('WP_LOITER_RAD')
-
-                        self.map.add_object(mp_slipmap.SlipCircle(
-                            'Loiter Circle %u' % (next_list[j] + 1),
-                            'LoiterCircles',
-                            polygons[i][j],
-                            loiter_rad,
-                            (255, 255, 255),
-                            2,
-                            arrow=self.map_settings.showdirection,
-                        ))
+                        loiter_rad = mp_slipmap.mission_circle_radius(
+                            wp, self.default_circle_radius(),
+                            self.vehicle_type)
+                        if loiter_rad is not None:
+                            self.map.add_object(mp_slipmap.SlipCircle(
+                                'Loiter Circle %u' % (next_list[j] + 1),
+                                'LoiterCircles',
+                                polygons[i][j],
+                                loiter_rad,
+                                (255, 255, 255),
+                                2,
+                                arrow=self.map_settings.showdirection,
+                            ))
 
                     labeled_wps[next_list[j]] = (i, j)
 

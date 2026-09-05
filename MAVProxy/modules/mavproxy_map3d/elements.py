@@ -9,6 +9,10 @@ import math
 
 import vtk
 
+from pymavlink import mavutil
+
+from MAVProxy.modules.lib import mp_util
+from MAVProxy.modules.mavproxy_map3d.map3d import MissionItem
 from MAVProxy.modules.mavproxy_map3d.terrain import enu, R
 
 # MAV_FRAME altitude conventions
@@ -19,12 +23,17 @@ FENCE_CLEARANCE = 3.0
 FENCE_SAMPLE_SPACING = 20.0
 FENCE_MAX_SAMPLES_PER_EDGE = 1000
 FENCE_CIRCLE_SEGMENTS = 64
+MISSION_CIRCLE_SEGMENTS = 64
+# roughly how many direction-of-travel arrows to spread along the mission,
+# and how many pixels each should take up on the screen
+MISSION_ARROW_COUNT = 60
+MISSION_ARROW_PIXELS = 22.0
 
 
-def circle_latlon(centre, radius, segments=FENCE_CIRCLE_SEGMENTS):
-    '''lat/lon ring approximating a circle of radius metres about centre.
+def ring_points(centre, radius, bearings):
+    '''lat/lon points radius metres from centre at the given bearings (radians).
 
-    Great-circle destination points, so the ring stays a circle at high latitude
+    Great-circle destination points, so a ring stays a circle at high latitude
     instead of blowing up as a flat-earth 1/cos(lat) would. Longitudes are left
     unwrapped (centre longitude plus an offset) so the ring stays continuous for
     the ENU projection rather than jumping at the 180th meridian.
@@ -37,11 +46,10 @@ def circle_latlon(centre, radius, segments=FENCE_CIRCLE_SEGMENTS):
     if abs(cos_lat1) < 1.0e-12:
         # exactly on a pole the bearing terms cancel, so sweep longitude instead
         polar_lat = math.degrees(math.copysign(math.pi / 2 - delta, lat1))
-        return [(polar_lat, lon - 180.0 + 360.0 * i / segments)
-                for i in range(segments)]
+        return [(polar_lat, lon - 180.0 + math.degrees(bearing))
+                for bearing in bearings]
     points = []
-    for i in range(segments):
-        bearing = 2.0 * math.pi * i / segments
+    for bearing in bearings:
         sin_lat2 = min(1.0, max(-1.0, sin_lat1 * cos_d +
                                 cos_lat1 * sin_d * math.cos(bearing)))
         lat2 = math.asin(sin_lat2)
@@ -49,6 +57,71 @@ def circle_latlon(centre, radius, segments=FENCE_CIRCLE_SEGMENTS):
                           cos_d - sin_lat1 * sin_lat2)
         points.append((math.degrees(lat2), lon + math.degrees(dlon)))
     return points
+
+
+def circle_latlon(centre, radius, segments=FENCE_CIRCLE_SEGMENTS):
+    '''lat/lon ring approximating a circle of radius metres about centre'''
+    return ring_points(centre, radius,
+                       [2.0 * math.pi * i / segments for i in range(segments)])
+
+
+def leg_tangent(centre, radius, clockwise, to_centre, to_radius, to_clockwise):
+    '''the bearings at which the leg between two circles leaves the first and
+    joins the second, each measured from its own centre.
+
+    A vehicle joins and leaves a loiter along a tangent rather than flying at
+    the middle of the circle, so the leg is the line that touches both
+    circles without crossing either.  Two circles turned the same way are
+    joined by an outer tangent, with the radii to the touch points parallel;
+    turned opposite ways the leg crosses between them and the radii are
+    opposed.  A plain waypoint is a circle of no radius, which reduces to the
+    tangent from a point.
+
+    Returns (leave, join).  Circles too close together to have a tangent fall
+    back to the bearing straight between them
+    '''
+    distance = mp_util.gps_distance(centre[0], centre[1],
+                                    to_centre[0], to_centre[1])
+    bearing = mp_util.gps_bearing(centre[0], centre[1],
+                                  to_centre[0], to_centre[1])
+    if distance <= 0:
+        return (bearing, bearing + 180.0)
+    if clockwise == to_clockwise:
+        reach = (radius - to_radius) / distance
+        opposed = False
+    else:
+        reach = (radius + to_radius) / distance
+        opposed = True
+    if reach < -1.0 or reach > 1.0:
+        return (bearing, bearing + 180.0)
+    offset = math.degrees(math.acos(reach))
+    leave = bearing - offset if clockwise else bearing + offset
+    return (leave, leave + 180.0 if opposed else leave)
+
+
+def _circle_of(item, clockwise):
+    '''(centre, radius, clockwise) for a mission item, treating one that does
+    not circle as a circle of no radius'''
+    radius = item.circle_radius if item is not None else None
+    if not radius:
+        return ((item.lat, item.lon) if item is not None else (0.0, 0.0),
+                0.0, clockwise)
+    return ((item.lat, item.lon), abs(radius), radius > 0)
+
+
+def spiral_latlon(centre, radius, turns, segments=MISSION_CIRCLE_SEGMENTS,
+                  start_bearing=0.0):
+    '''lat/lon points along turns turns about centre, from start_bearing.
+
+    A positive radius winds clockwise, negative counter-clockwise, as the
+    loiter and orbit commands define it.  Both ends are included, so the
+    caller can walk an altitude along the points
+    '''
+    count = max(2, int(round(segments * abs(turns))))
+    sweep = 2.0 * math.pi * abs(turns) * (1.0 if radius >= 0 else -1.0)
+    return ring_points(centre, abs(radius),
+                       [start_bearing + sweep * i / count
+                        for i in range(count + 1)])
 
 
 def _polyline(points_enu, colour, width, dashed=False):
@@ -226,6 +299,85 @@ def _vehicle_icon(vehicle_type=DEFAULT_VEHICLE_TYPE):
     return actor
 
 
+def _arrows(points_enu, colour, renderer=None, count=MISSION_ARROW_COUNT):
+    """cones spread along a polyline pointing the way it is travelled.
+
+    They are spaced by distance rather than by vertex, so a long leg gets as
+    many as a densely sampled spiral does.  Given a renderer they are drawn a
+    fixed size on the screen however far away they are, the way the 2D map
+    draws its arrows; without one they fall back to a size in metres taken
+    from the spacing, which only looks right at one zoom level
+    """
+    lengths = [math.dist(points_enu[i-1], points_enu[i])
+               for i in range(1, len(points_enu))]
+    total = 0.0
+    for length in lengths:
+        total += length
+    if total <= 0 or count < 1:
+        return None
+    spacing = total / count
+
+    positions = vtk.vtkPoints()
+    directions = vtk.vtkDoubleArray()
+    directions.SetNumberOfComponents(3)
+    directions.SetName('direction')
+    walked = spacing * 0.5
+    for (i, length) in enumerate(lengths):
+        if length <= 0:
+            continue
+        (a, b) = (points_enu[i], points_enu[i+1])
+        heading = [(b[j] - a[j]) / length for j in range(3)]
+        while walked < length:
+            fraction = walked / length
+            positions.InsertNextPoint(*[a[j] + (b[j] - a[j]) * fraction
+                                        for j in range(3)])
+            directions.InsertNextTuple3(*heading)
+            walked += spacing
+        walked -= length
+    if positions.GetNumberOfPoints() == 0:
+        return None
+
+    poly = vtk.vtkPolyData()
+    poly.SetPoints(positions)
+    poly.GetPointData().SetVectors(directions)
+    cone = vtk.vtkConeSource()
+    cone.SetResolution(10)
+    cone.SetHeight(1.0)
+    cone.SetRadius(0.3)
+    glyph = vtk.vtkGlyph3D()
+    glyph.SetSourceConnection(cone.GetOutputPort())
+    glyph.SetVectorModeToUseVector()
+    glyph.OrientOn()
+    if renderer is not None:
+        # scale each cone by its distance from the camera, so they hold the
+        # same size on the screen at any zoom
+        to_camera = vtk.vtkDistanceToCamera()
+        to_camera.SetInputData(poly)
+        to_camera.SetScreenSize(MISSION_ARROW_PIXELS)
+        to_camera.SetRenderer(renderer)
+        glyph.SetInputConnection(to_camera.GetOutputPort())
+        glyph.SetScaleModeToScaleByScalar()
+        glyph.SetScaleFactor(1.0)
+        # the filter's scale is not the active scalar array, so name it
+        glyph.SetInputArrayToProcess(
+            0, 0, 0, vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS,
+            'DistanceToCamera')
+    else:
+        glyph.SetInputData(poly)
+        glyph.SetScaleModeToDataScalingOff()
+        cone.SetHeight(min(max(spacing * 0.25, 1.0), 500.0))
+        cone.SetRadius(cone.GetHeight() * 0.4)
+    mapper = vtk.vtkPolyDataMapper()
+    mapper.SetInputConnection(glyph.GetOutputPort())
+    # the scale carried through the glyph is not something to colour by
+    mapper.ScalarVisibilityOff()
+    actor = vtk.vtkActor()
+    actor.SetMapper(mapper)
+    actor.GetProperty().SetColor(*colour)
+    actor.GetProperty().SetLighting(False)
+    return actor
+
+
 def _points(points_enu, colour, size):
     vpts = vtk.vtkPoints()
     verts = vtk.vtkCellArray()
@@ -266,6 +418,9 @@ class ElementManager:
         self.kml_features = []
         self.kml_geometry = None
         self.kml_height_cache = {}
+        self.mission_line = []
+        self.mission_markers = []
+        self.mission_arrows = False
 
     def _enu(self, lat, lon, amsl):
         e, n, u = enu(lat, lon, amsl, self.lat0, self.lon0)
@@ -358,22 +513,188 @@ class ElementManager:
             self._replace('trail', [_polyline(self.trail, (1.0, 1.0, 0.0), 2.0)])
 
     def set_mission(self, items):
-        '''items: list of (lat,lon,z,frame,command,seq)'''
+        '''items: list of MissionItem (plain tuples are accepted too).
+
+        The line drawn is the path the vehicle is expected to fly, so it is
+        continuous throughout: an arc waypoint curves, and an item which
+        circles about its location is entered from the near side of its
+        circle and left again where it comes off, rather than the line
+        running to the middle of the circle where the vehicle never goes.
+        The markers stay on the mission item locations
+        '''
         line = []
         markers = []
-        for (lat, lon, z, frame, command, seq) in items:
-            if lat == 0 and lon == 0:
+        previous = None
+        rejoin = None
+        flown = [MissionItem(*item) for item in items]
+        flown = [i for i in flown if not (i.lat == 0 and i.lon == 0)]
+        for (index, item) in enumerate(flown):
+            amsl = self._resolve_amsl(item.alt, item.frame)
+            if (item.command == mavutil.mavlink.MAV_CMD_NAV_ARC_WAYPOINT and
+                    previous is not None):
+                # the leg into an arc waypoint is a circular arc rather
+                # than a straight line; climb linearly along it
+                ((prev_lat, prev_lon), prev_amsl) = previous
+                arc = mp_util.arc_points((prev_lat, prev_lon),
+                                         (item.lat, item.lon), item.param1)
+                for i in range(1, len(arc) - 1):
+                    fraction = float(i) / (len(arc) - 1)
+                    line.append(self._enu(arc[i][0], arc[i][1],
+                                          prev_amsl + (amsl - prev_amsl) * fraction))
+            markers.append(self._enu(item.lat, item.lon, amsl))
+            if item.circle_radius:
+                previous = self._append_circle(
+                    line, item, amsl, previous,
+                    flown[index-1] if index > 0 else None,
+                    flown[index+1] if index + 1 < len(flown) else None)
+                # the leg out of a loiter is flown against a track from the
+                # loiter's own centre unless the item says otherwise, so the
+                # vehicle has to pull back onto it after leaving the circle
+                rejoin = (((item.lat, item.lon), previous[0], amsl,
+                           item.exit_converge)
+                          if item.exit_converge else None)
                 continue
-            amsl = self._resolve_amsl(z, frame)
-            p = self._enu(lat, lon, amsl)
-            line.append(p)
-            markers.append(p)
+            if rejoin is not None:
+                self._append_rejoin(line, rejoin, (item.lat, item.lon), amsl)
+            rejoin = None
+            line.append(self._enu(item.lat, item.lon, amsl))
+            previous = ((item.lat, item.lon), amsl)
+        self.mission_line = line
+        self.mission_markers = markers
+        self.refresh_mission()
+
+    def set_mission_arrows(self, enable):
+        '''show or hide the direction of travel along the mission'''
+        enable = bool(enable)
+        if enable == self.mission_arrows:
+            return
+        self.mission_arrows = enable
+        self.refresh_mission()
+
+    def refresh_mission(self):
+        '''rebuild the mission actors from the last mission drawn'''
+        line = self.mission_line
         actors = []
         if len(line) >= 2:
             actors.append(_polyline(line, (1.0, 1.0, 1.0), 2.0, dashed=True))
-        if markers:
-            actors.append(_points(markers, (1.0, 1.0, 1.0), 9))
+            if self.mission_arrows:
+                arrows = _arrows(line, (1.0, 1.0, 1.0), self.ren)
+                if arrows is not None:
+                    actors.append(arrows)
+        if self.mission_markers:
+            actors.append(_points(self.mission_markers, (1.0, 1.0, 1.0), 9))
         self._replace('mission', actors)
+
+    def _append_rejoin(self, line, rejoin, target, target_amsl):
+        """walk the vehicle from where it left a loiter back onto the track it
+        is flying against.
+
+        ArduPlane crosstracks the leg after a loiter from the loiter's centre
+        rather than from the tangent it left on, so the vehicle comes off the
+        circle a radius or so to one side of that track and pulls back onto
+        it.  The pull-back is the L1 controller's, which closes the error over
+        its own distance, so it is drawn decaying over that
+        """
+        ((clat, clon), (elat, elon), exit_amsl, converge) = rejoin
+        track = mp_util.gps_bearing(clat, clon, target[0], target[1])
+        length = mp_util.gps_distance(clat, clon, target[0], target[1])
+        exit_bearing = mp_util.gps_bearing(clat, clon, elat, elon)
+        radius = mp_util.gps_distance(clat, clon, elat, elon)
+        offset_angle = math.radians(exit_bearing - track)
+        # where the exit sits measured along the track, and to one side of it
+        along = radius * math.cos(offset_angle)
+        across = radius * math.sin(offset_angle)
+        run = length - along
+        if run <= 0 or abs(across) < 1.0:
+            return
+        # the vehicle leaves on the tangent, which already points at the next
+        # waypoint and so is closing on the track at this rate.  The curve has
+        # to start along it, or the drawn path kinks at the exit and cuts back
+        # inside the circle it has just left
+        slope = -across / run
+        # closing the rest of the way as the L1 controller does, over its own
+        # distance, while keeping that starting direction
+        rate = slope + across / converge
+        if across * rate <= 0:
+            # the tangent alone closes at least as fast as the controller
+            # would; there is nothing to pull back onto
+            return
+        # whatever error is left when the waypoint arrives has to be gone by
+        # then, since that is where the vehicle ends up; take it out with a
+        # term that starts flat, so the tangent still sets the way it leaves
+        residual = (across + rate * run) * math.exp(-run / converge)
+        step = max(converge * 0.125, 1.0)
+        distance = along + step
+        while distance < length:
+            travelled = distance - along
+            decay = math.exp(-travelled / converge)
+            remaining = (across + rate * travelled) * decay
+            remaining -= residual * (travelled / run) ** 2
+            if abs(remaining) < 0.5:
+                break
+            fraction = travelled / run
+            amsl = exit_amsl + (target_amsl - exit_amsl) * fraction
+            point = mp_util.gps_newpos(clat, clon, track, distance)
+            point = mp_util.gps_newpos(point[0], point[1],
+                                       track + 90.0, remaining)
+            line.append(self._enu(point[0], point[1], amsl))
+            distance += step
+
+    def _append_circle(self, line, item, amsl, previous, before, after):
+        '''add the turns an item flies about its own location to the line.
+
+        The circle is joined along a tangent from the item before it and left
+        along a tangent towards the item after it, and the altitude runs at a
+        steady rate over the whole of that -- the leg included, since the
+        vehicle is already climbing or descending on its way there.  Returns
+        where the vehicle leaves the circle
+        '''
+        centre = (item.lat, item.lon)
+        radius = abs(item.circle_radius)
+        clockwise = item.circle_radius > 0
+        entry_bearing = 0.0
+        prev_amsl = amsl
+        if previous is not None:
+            (_, prev_amsl) = previous
+            (_, entry_bearing) = leg_tangent(
+                *_circle_of(before, clockwise) + (centre, radius, clockwise))
+        # an item that changes altitude while it circles is a spiral; one that
+        # does not is a single turn at its own altitude
+        turns = item.circle_turns if prev_amsl != amsl else None
+        if not turns:
+            turns = 1.0
+        if after is not None:
+            # come off the circle pointing at whatever is next, going round
+            # as many whole extra times as the turns asked for
+            (exit_bearing, _) = leg_tangent(
+                centre, radius, clockwise, *_circle_of(after, clockwise))
+            swept = exit_bearing - entry_bearing
+            if not clockwise:
+                swept = -swept
+            swept %= 360.0
+            laps = max(0, int(round((turns * 360.0 - swept) / 360.0)))
+            turns = (swept + 360.0 * laps) / 360.0
+        if turns <= 0:
+            turns = 1.0
+        ring = spiral_latlon(centre, item.circle_radius, turns,
+                             MISSION_CIRCLE_SEGMENTS,
+                             math.radians(entry_bearing))
+        # spread the altitude change over the leg and the turns together, so
+        # the approach shows its share of the climb or descent
+        leg_length = 0.0
+        if previous is not None:
+            ((prev_lat, prev_lon), _) = previous
+            leg_length = mp_util.gps_distance(prev_lat, prev_lon,
+                                              ring[0][0], ring[0][1])
+        total = leg_length + turns * 2.0 * math.pi * radius
+        entry_amsl = prev_amsl
+        if total > 0:
+            entry_amsl += (amsl - prev_amsl) * leg_length / total
+        last = len(ring) - 1
+        for (i, (la, lo)) in enumerate(ring):
+            line.append(self._enu(la, lo,
+                                  entry_amsl + (amsl - entry_amsl) * i / last))
+        return (ring[-1], amsl)
 
     def _terrain_samples(self, points, closed):
         '''Densify a lat/lon polyline so it follows terrain between vertices.'''
