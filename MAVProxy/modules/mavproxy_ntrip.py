@@ -23,7 +23,8 @@ class NtripModule(mp_module.MPModule):
              ('logfile', str, None),
              ('sendalllinks', bool, False),
              ('frag_drop_pct', float, 0),
-             ('sendmul', int, 1)])
+             ('sendmul', int, 1),
+             ('sendgga', bool, True)])
         self.add_command('ntrip', self.cmd_ntrip, 'NTRIP control',
                          ["<status>",
                           "<start>",
@@ -179,7 +180,8 @@ class NtripModule(mp_module.MPModule):
                                        mountpoint=self.ntrip_settings.mountpoint,
                                        lat=self.pos[0],
                                        lon=self.pos[1],
-                                       height=self.pos[2])
+                                       height=self.pos[2],
+                                       sendgga=self.ntrip_settings.sendgga)
         print("NTRIP started")
         self.start_pending = False
         self.last_rate = time.time()
