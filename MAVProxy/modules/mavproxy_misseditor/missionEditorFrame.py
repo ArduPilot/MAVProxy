@@ -183,6 +183,13 @@ class MissionEditorFrame(wx.Frame):
         self.read_only_wploader = wploader
         kwds["style"] = wx.DEFAULT_FRAME_STYLE
         wx.Frame.__init__(self, *args, **kwds)
+        try:
+            # icon.py imports matplotlib, an optional dependency, so it is
+            # imported here rather than at module scope
+            from MAVProxy.modules.lib import icon
+            self.SetIcon(icon.SimpleIcon("WP").get_ico())
+        except Exception:
+            pass
         self.label_sync_state = wx.StaticText(self, wx.ID_ANY, "UNSYNCED   \n", style=wx.ALIGN_CENTRE)
         self.label_wp_radius = wx.StaticText(self, wx.ID_ANY, "WP Radius")
         self.text_ctrl_wp_radius = wx.TextCtrl(self, wx.ID_ANY, "", style=wx.TE_PROCESS_ENTER | wx.TE_PROCESS_TAB)
