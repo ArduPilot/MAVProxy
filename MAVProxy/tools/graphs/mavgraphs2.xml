@@ -151,6 +151,59 @@
   <expression>PM.MaxT PM.NLon:2 PM.LogDrop:2</expression>
  </graph>
 
+ <graph name='PM/Scheduler Health/CPU Load Trend'>
+  <description>
+    CPU load as a percentage (PM.Load is logged at 10x the real percentage).
+    This is a filtered/averaged metric, so it shows the general load trend
+    rather than instantaneous spikes -- use it to spot slow drift towards
+    saturation, not single-loop overruns (see 'Loop Overrun' for that).
+  </description>
+  <expression>PM.Load*0.1</expression>
+ </graph>
+
+ <graph name='PM/Scheduler Health/Loop Overrun'>
+  <description>
+    PM.MaxT is the worst single loop time seen since the previous PM message
+    (PM is normally logged around 1Hz), so a high value here is a worst-case
+    sample, not proof of chronic overruns -- check the overrun ratio
+    (right axis) for how often it is actually happening.
+
+    The two flat reference lines are derived from the loop rate ArduPilot
+    itself measured for that PM period (PM.LR), not a hardcoded budget:
+    the lower line is the theoretical per-loop budget (1e6/LR us), the
+    upper line is ArduPilot's own 20%-over-budget threshold used to
+    increment PM.NLon. MaxT below the lower line is healthy, between the
+    two lines is within ArduPilot's accepted tolerance, above the upper
+    line is a genuine overrun.
+
+    The right-hand axis is the overrun ratio NLon/NL as a percentage --
+    the fraction of loops between PM messages that exceeded the 20%
+    threshold.
+
+    Note: motor arming commonly causes a MaxT spike (failsafe checks, EKF
+    alignment) -- this is expected and not by itself a scheduler problem.
+    Also note the scheduler only times the main loop; delays in other
+    ChibiOS threads (IO, DMA, logging) will not show up here.
+  </description>
+  <expression>PM.MaxT (1.0e6/PM.LR) (1.2e6/PM.LR) (PM.NLon/PM.NL)*100:2</expression>
+ </graph>
+
+ <graph name='PM/Scheduler Health/Overrun Root Cause'>
+  <description>
+    Overlays the loop overrun indicators (left axis) with I2C/SPI bus
+    activity counters (right axis) to help tell apart I/O-driven overruns
+    from compute-driven ones: if I2CI/I2CC/SPIC climb sharply at the same
+    time as MaxT/NLon spikes, bus contention is a likely contributor;
+    if the overrun happens with no matching bus activity increase, the
+    cause is more likely CPU-bound (e.g. EKF/attitude controller load).
+
+    These are cumulative counters, not rates, so look at the slope
+    (rate of increase) at the time of the overrun rather than the
+    absolute value.
+  </description>
+  <expression>PM.MaxT PM.NLon PM.I2CC:2 PM.I2CI:2 PM.SPIC:2</expression>
+ </graph>
+
  <graph name='Copter/Controller RMS'>
   <description></description>
   <expression>CTRL.RMSRoll CTRL.RMSPitch CTRL.RMSYaw</expression>
