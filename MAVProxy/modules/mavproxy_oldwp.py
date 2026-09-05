@@ -1004,7 +1004,12 @@ class WPModule(mp_module.MPModule):
             w = self.wp_to_mission_item_int(w)
             tlist = []
             for field in mavmsg.ordered_fieldnames:
-                tlist.append(getattr(w, field))
+                value = getattr(w, field)
+                if field == 'target_system' and value > 255:
+                    # the mission file has an 8 bit target_system field,
+                    # which the autopilot ignores on upload
+                    value = 0
+                tlist.append(value)
             tlist = tuple(tlist)
             buf = mavmsg.unpacker.pack(*tlist)
             fh.write(buf)
