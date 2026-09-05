@@ -241,12 +241,16 @@ class CameraView:
                 self.siyi.log_frame_counter(self.video_idx, self.thermal, self.frame_counter)
                 continue
 
-            if event.ClassName == "wxMouseEvent":
+            if (
+              hasattr(event, "ClassName")
+              and event.ClassName == "wxMouseEvent"
+            ):
                 if event.pixel is not None:
                     self.siyi.spot_temp = self.get_pixel_temp(event)
                     self.update_title()
             if (
-                event.ClassName == "wxMouseEvent"
+                hasattr(event, "ClassName")
+                and event.ClassName == "wxMouseEvent"
                 and event.leftIsDown
                 and event.pixel is not None
                 and self.siyi is not None
