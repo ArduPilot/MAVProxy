@@ -23,6 +23,7 @@ import copy
 import datetime
 
 import socket, time, os, struct
+import numpy as np
 
 if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import MPMenuCallTextDialog
@@ -58,6 +59,7 @@ ABSOLUTE_ZOOM = 0x0F
 GET_IMAGE_TYPE = 0x10
 GET_ZOOM_VALUE = 0x18
 READ_RANGEFINDER = 0x15
+READ_LASER_TARGET = 0x17
 READ_GIMBAL_MODE = 0x19
 READ_ENCODERS = 0x26
 READ_CONTROL_MODE = 0x27
@@ -100,6 +102,20 @@ GIMBAL_MODE_NAMES = {
     2: "FPV",
 }
 
+
+def red_cross_icon(size=21):
+    '''create a transparent-style BGR red X for a SlipMap marker'''
+    icon = np.zeros((size, size, 3), dtype=np.uint8)
+    margin = max(2, size // 10)
+    thickness = max(2, size // 7)
+    cv2.line(icon, (margin, margin),
+             (size - margin - 1, size - margin - 1),
+             (0, 0, 255), thickness)
+    cv2.line(icon, (margin, size - margin - 1),
+             (size - margin - 1, margin),
+             (0, 0, 255), thickness)
+    return icon
+
 MT11_IMAGE_MODES = {
     # (main stream, secondary stream).  Wide and zoom are distinct RGB lens
     # selections; the absolute zoom command controls magnification and must
@@ -122,7 +138,7 @@ ZT30_IMAGE_MODES = {
 # repeatedly warn while disconnected.
 CONNECTION_REQUIRED_COMMANDS = frozenset({
     "rates", "yaw", "pitch", "angle", "center", "lock", "follow", "fpv",
-    "resetattitude", "settarget", "notarget", "zoom", "autofocus", "focus", "photo",
+    "resetattitude", "settarget", "notarget", "zoom", "autofocus", "focus", "photo", "hdr",
     "recording", "imode", "getconfig", "settime", "palette", "tempsnap",
     "thermal_mode", "get_thermal_mode", "thermal_gain", "get_thermal_gain",
     "therm_getenv", "therm_set_distance", "therm_set_humidity",
@@ -323,7 +339,7 @@ class SIYIModule(mp_module.MPModule):
         super(SIYIModule, self).__init__(mpstate, "SIYI", "SIYI camera support")
 
         self.add_command('siyi', self.cmd_siyi, "SIYI camera control",
-                         ["<rates|connect|autofocus|focus|zoom|yaw|pitch|center|getconfig|angle|photo|recording|lock|follow|fpv|settarget|notarget|thermal|rgbview|tempsnap|get_thermal_mode|thermal_gain|get_thermal_gain|settime>",
+                         ["<rates|connect|autofocus|focus|zoom|yaw|pitch|center|getconfig|angle|photo|hdr|recording|lock|follow|fpv|settarget|notarget|thermal|rgbview|tempsnap|get_thermal_mode|thermal_gain|get_thermal_gain|settime>",
                           "<therm_getenv|therm_set_distance|therm_set_emissivity|therm_set_humidity|therm_set_airtemp|therm_set_reftemp|therm_getswitch|therm_setswitch>",
                           "<therm_getthresholds|therm_getthreshswitch|therm_setthresholds|therm_setthreshswitch>",
                           "set (SIYISETTING)",
@@ -388,6 +404,7 @@ class SIYIModule(mp_module.MPModule):
                                                      ('los_correction', int, 0),
                                                      ('therm_cap_rate', float, 0),
                                                      ('mt11_temp_autoswap', bool, True),
+                                                     ('show_lidar_target', bool, False),
                                                      ('show_horizon', int, 0),
                                                      ('autoflag_temp', float, 120),
                                                      ('autoflag_enable', bool, False),
@@ -442,6 +459,9 @@ class SIYIModule(mp_module.MPModule):
         self.last_att_t = time.time()
         self.att_dt_lpf = 1.0
         self.last_rf_t = None
+        self.last_lidar_target_send = 0
+        self.last_lidar_target_t = None
+        self.lidar_target = None
         self.last_enc_t = None
         self.last_enc_recv_t = time.time()
         self.last_volt_t = None
@@ -454,6 +474,7 @@ class SIYIModule(mp_module.MPModule):
         self.last_map_ROI = None
         self.icon = self.mpstate.map.icon('camera-small-red.png')
         self.click_icon = self.mpstate.map.icon('flag.png')
+        self.lidar_target_icon = red_cross_icon()
         self.last_target_send = time.time()
         self.active_target_control = None
         self.last_rate_display = time.time()
@@ -533,6 +554,7 @@ class SIYIModule(mp_module.MPModule):
                                      MPMenuItem('ModeFPV', 'ModeFPV', '# siyi fpv '),
                                      MPMenuItem('GetConfig', 'GetConfig', '# siyi getconfig '),
                                      MPMenuItem('TakePhoto', 'TakePhoto', '# siyi photo '),
+                                     MPMenuItem('ToggleHDR', 'ToggleHDR', '# siyi hdr '),
                                      MPMenuItem('AutoFocus', 'AutoFocus', '# siyi autofocus '),
                                      MPMenuSubMenu('ManualFocus',
                                                    items=[MPMenuItem('Near', 'FocusNear', '# siyi focus near'),
@@ -581,6 +603,11 @@ class SIYIModule(mp_module.MPModule):
         return self.siyi_settings.camera_type.upper() == CAMERA_TYPE_MT11
 
     def setting_changed(self, setting):
+        if setting.name == 'show_lidar_target':
+            self.last_lidar_target_send = 0
+            if not setting.value:
+                self.clear_lidar_target()
+            return
         if setting.name == 'target_control':
             # Keep old settings files and scripts which inspect att_control
             # consistent with the new descriptive setting.
@@ -601,6 +628,7 @@ class SIYIModule(mp_module.MPModule):
             return
         if setting.name != 'camera_type':
             return
+        self.clear_lidar_target()
         self.have_version = False
         self.hardware_id = None
         self.image_slots = None
@@ -682,6 +710,7 @@ camera control:
   siyi focus near|far [SECONDS]   : pulse manual focus (default 0.2 seconds)
   siyi focus stop                 : stop manual focus immediately
   siyi photo                      : take a photo
+  siyi hdr                        : toggle HDR capture mode
   siyi recording                  : toggle video recording
   siyi imode MODE                 : ZT30 mode or MT11 zoom/thermal/split
   siyi imode MAIN SUB             : set MT11 main/secondary stream slots
@@ -756,6 +785,8 @@ autoflag:
             self.cmd_angle(args[1:])
         elif args[0] == "photo":
             self.send_packet_fmt(PHOTO, "<B", 0)
+        elif args[0] == "hdr":
+            self.send_packet_fmt(PHOTO, "<B", 1)
         elif args[0] == "tempsnap":
             if self.require_zt30("raw temperature snapshots"):
                 self.send_packet_fmt(GET_TEMP_FRAME, None)
@@ -842,6 +873,8 @@ autoflag:
 
     def cmd_connect(self):
         '''connect to the camera'''
+        self.clear_lidar_target()
+        self.last_lidar_target_send = 0
         old_sock = self.sock
         self.sock = None
         if old_sock is not None:
@@ -1489,6 +1522,7 @@ autoflag:
         if request_range and (self.last_rf_t is None or now - self.last_rf_t > 10):
             self.last_rf_t = now
             self.send_packet_fmt(REQUEST_CONTINUOUS_DATA, "<BB", 2, 1)
+        self.request_lidar_target(now)
         # Avoid every 0x25 stream request on MT11. In particular, a magnetic
         # encoder stream (type 3) was observed continuing while repeated type-1
         # attitude requests produced no attitude packets. Lua polls 0x0D
@@ -1522,6 +1556,47 @@ autoflag:
             now - self.last_therm_mode > 2):
             self.last_therm_mode = now
             self.send_packet_fmt(GET_THERMAL_MODE, None)
+
+    def clear_lidar_target(self):
+        '''remove the MT11 laser target marker from the map'''
+        if getattr(self, 'lidar_target', None) is not None:
+            map_module = getattr(self.mpstate, 'map', None)
+            if map_module is not None:
+                map_module.remove_object('SIYILidarTarget')
+        self.lidar_target = None
+        self.last_lidar_target_t = None
+
+    def request_lidar_target(self, now):
+        '''poll the MT11-computed laser target while map display is enabled'''
+        if (not self.is_mt11() or
+                not self.siyi_settings.show_lidar_target):
+            self.clear_lidar_target()
+            return
+        if (self.last_lidar_target_t is not None and
+                now - self.last_lidar_target_t > 2.0):
+            self.clear_lidar_target()
+        if now - self.last_lidar_target_send >= 0.5:
+            self.last_lidar_target_send = now
+            self.send_packet_fmt(READ_LASER_TARGET, None)
+
+    def update_lidar_target(self, latitude_e7, longitude_e7):
+        '''display a valid gimbal-computed target coordinate as a red cross'''
+        if (not self.is_mt11() or not self.siyi_settings.show_lidar_target or
+                (latitude_e7 == 0 and longitude_e7 == 0) or
+                abs(latitude_e7) > 900000000 or
+                abs(longitude_e7) > 1800000000):
+            self.clear_lidar_target()
+            return
+        latitude = latitude_e7 * 1.0e-7
+        longitude = longitude_e7 * 1.0e-7
+        map_module = getattr(self.mpstate, 'map', None)
+        if map_module is not None:
+            map_module.add_object(mp_slipmap.SlipIcon(
+                'SIYILidarTarget', (latitude, longitude),
+                self.lidar_target_icon, layer='SIYI', rotation=0,
+                follow=False, label='Lidar'))
+        self.lidar_target = (latitude, longitude)
+        self.last_lidar_target_t = time.time()
 
     def send_attitude(self):
         '''send attitude to gimbal'''
@@ -1815,6 +1890,13 @@ autoflag:
                             self.micros64(),
                             self.rf_dist,
                             SR)
+
+        elif cmd == READ_LASER_TARGET:
+            values = self.unpack(cmd, "<ii", data)
+            if values is None:
+                return
+            longitude_e7, latitude_e7 = values
+            self.update_lidar_target(latitude_e7, longitude_e7)
 
         elif cmd == READ_ENCODERS:
             y,p,r, = self.unpack(cmd, "<hhh", data)
@@ -2609,6 +2691,7 @@ autoflag:
     def idle_task(self):
         '''called on idle'''
         if not self.sock:
+            self.clear_lidar_target()
             return
         self.send_tcp_heartbeat()
         if not self.have_version and time.time() - self.last_version_send > 2.0:
