@@ -26,6 +26,7 @@ from MAVProxy.modules.mavproxy_SIYI import (
     MANUAL_FOCUS,
     READ_CONTROL_MODE,
     READ_GIMBAL_MODE,
+    READ_LASER_TARGET,
     READ_THRESHOLDS,
     READ_TEMP_FULL_SCREEN,
     REQUEST_CONTINUOUS_DATA,
@@ -43,6 +44,7 @@ from MAVProxy.modules.mavproxy_SIYI import (
     decode_firmware_versions,
     image_mode_payload,
     rate_mapping,
+    red_cross_icon,
 )
 from MAVProxy.modules.mavproxy_SIYI.camera_view import (
     ffmpeg_rtsp_command,
@@ -110,6 +112,7 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
             max_rate=30.0,
             therm_cap_rate=1.0,
             mt11_temp_autoswap=True,
+            show_lidar_target=False,
             track_ROI=0,
         )
         module.sent = []
@@ -128,6 +131,10 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
         module.last_therm_cap = 0
         module.last_mt11_temp_request = 0
         module.last_mode_t = 0
+        module.last_lidar_target_send = 0
+        module.last_lidar_target_t = None
+        module.lidar_target = None
+        module.lidar_target_icon = red_cross_icon()
         module.requested_control_mode = None
         module.requested_control_mode_t = 0
         module.pending_manual_angle = None
@@ -221,6 +228,103 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
         with patch('MAVProxy.modules.mavproxy_SIYI.time.time',
                    return_value=20.0):
             self.assertEqual(module.get_direct_attitude(), (1.0, 2.0, 3.0))
+
+    def test_mt11_lidar_target_option_polls_and_draws_red_cross(self):
+        module = self.make_parser(CAMERA_TYPE_MT11)
+        added = []
+        removed = []
+        module.mpstate = SimpleNamespace(map=SimpleNamespace(
+            add_object=lambda obj: added.append(obj),
+            remove_object=lambda name: removed.append(name)))
+        module.siyi_settings.show_lidar_target = True
+
+        module.request_lidar_target(10.0)
+        self.assertEqual(module.sent, [(READ_LASER_TARGET, None, ())])
+
+        longitude_e7 = 1491234567
+        latitude_e7 = -351234567
+        with patch('MAVProxy.modules.mavproxy_SIYI.time.time',
+                   return_value=10.1):
+            module.parse_packet(self.packet(
+                READ_LASER_TARGET,
+                struct.pack('<ii', longitude_e7, latitude_e7)))
+        self.assertEqual(len(added), 1)
+        self.assertEqual(added[0].key, 'SIYILidarTarget')
+        self.assertEqual(added[0].label, 'Lidar')
+        self.assertAlmostEqual(added[0].latlon[0], latitude_e7 * 1.0e-7)
+        self.assertAlmostEqual(added[0].latlon[1], longitude_e7 * 1.0e-7)
+        self.assertGreater(module.lidar_target_icon[:, :, 2].max(), 0)
+        self.assertEqual(module.lidar_target_icon[:, :, :2].max(), 0)
+
+        module.parse_packet(self.packet(READ_LASER_TARGET, bytes(8)))
+        self.assertEqual(removed, ['SIYILidarTarget'])
+        self.assertIsNone(module.lidar_target)
+
+    def test_lidar_target_option_is_mt11_only(self):
+        module = self.make_module(CAMERA_TYPE_ZT30)
+        removed = []
+        module.mpstate = SimpleNamespace(map=SimpleNamespace(
+            remove_object=lambda name: removed.append(name)))
+        module.siyi_settings.show_lidar_target = True
+        module.lidar_target = (-35.0, 149.0)
+
+        module.request_lidar_target(10.0)
+        self.assertEqual(module.sent, [])
+        self.assertEqual(removed, ['SIYILidarTarget'])
+
+        module.update_lidar_target(-351234567, 1491234567)
+        self.assertIsNone(module.lidar_target)
+
+    def test_lidar_target_poll_interval_and_stale_marker(self):
+        module = self.make_module(CAMERA_TYPE_MT11)
+        module.mpstate = SimpleNamespace(map=Mock())
+        module.siyi_settings.show_lidar_target = True
+        with patch('MAVProxy.modules.mavproxy_SIYI.time.time',
+                   return_value=10.0):
+            module.update_lidar_target(-351234567, 1491234567)
+        module.request_lidar_target(10.0)
+        module.request_lidar_target(10.49)
+        self.assertEqual(len(module.sent), 1)
+        module.request_lidar_target(10.5)
+        self.assertEqual(len(module.sent), 2)
+        module.request_lidar_target(12.01)
+        self.assertIsNone(module.lidar_target)
+        module.mpstate.map.remove_object.assert_called_once_with('SIYILidarTarget')
+
+    def test_lidar_target_cleared_on_disable_or_disconnect(self):
+        for action in ('disable', 'disconnect', 'reconnect'):
+            with self.subTest(action=action):
+                module = self.make_module(CAMERA_TYPE_MT11)
+                module.mpstate = SimpleNamespace(map=Mock())
+                module.siyi_settings.show_lidar_target = True
+                module.update_lidar_target(-351234567, 1491234567)
+                if action == 'disable':
+                    module.siyi_settings.show_lidar_target = False
+                    module.setting_changed(SimpleNamespace(
+                        name='show_lidar_target', value=False))
+                elif action == 'disconnect':
+                    module.sock = None
+                    module.idle_task()
+                else:
+                    module.sock = None
+                    module.sequence = 0
+                    with patch('socket.socket'):
+                        module.cmd_connect()
+                self.assertIsNone(module.lidar_target)
+                self.assertIsNone(module.last_lidar_target_t)
+                module.mpstate.map.remove_object.assert_called_once_with(
+                    'SIYILidarTarget')
+
+    def test_lidar_target_rejects_invalid_coordinates_and_short_packets(self):
+        module = self.make_parser(CAMERA_TYPE_MT11)
+        module.mpstate = SimpleNamespace(map=Mock())
+        module.siyi_settings.show_lidar_target = True
+        for latitude, longitude in ((0, 0), (900000001, 0), (0, -1800000001)):
+            module.update_lidar_target(latitude, longitude)
+            self.assertIsNone(module.lidar_target)
+        with patch('builtins.print'):
+            module.parse_packet(self.packet(READ_LASER_TARGET, bytes(7)))
+        module.mpstate.map.add_object.assert_not_called()
 
     def test_zt30_preserves_reported_gimbal_rates(self):
         raw = struct.pack('<hhhhhh', 123, -456, 7, 30, -20, 10)
@@ -573,6 +677,11 @@ class TestSIYIProtocolProfiles(unittest.TestCase):
         zt30 = self.make_module(CAMERA_TYPE_ZT30)
         zt30.cmd_autofocus([])
         self.assertEqual(zt30.sent, [(AUTO_FOCUS, '<B', (1,))])
+
+    def test_hdr_toggle_command(self):
+        module = self.make_module(CAMERA_TYPE_MT11)
+        module.cmd_siyi(['hdr'])
+        self.assertEqual(module.sent, [(PHOTO, '<B', (1,))])
 
     def test_manual_focus_pulse_and_stop(self):
         module = self.make_module(CAMERA_TYPE_MT11)
