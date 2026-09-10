@@ -396,7 +396,20 @@ class FTPWorker(mp_module.MPModule):
                 except Exception:
                     continue
                 if d[0] == 'D':
-                    print(" D %s" % d[1:])
+                    # A listing with times gives a directory the same trailing
+                    # fields as a file, "D<name>\t<size>\t<mtime>", though not
+                    # every autopilot sends them. A plain listing gives just
+                    # the name, where a tab would be part of it.
+                    fields = d[1:].split('\t')
+                    if with_time and len(fields) >= 3:
+                        try:
+                            mtime = int(fields[-1])
+                        except ValueError:
+                            mtime = 0
+                        print(" D %s\t%s" % ('\t'.join(fields[:-2]),
+                                             self.list_mtime_str(mtime)))
+                    else:
+                        print(" D %s" % d[1:])
                 elif d[0] == 'F':
                     # Names can contain tabs. Size and optional mtime are the
                     # fields at the end of an entry, so parse from that end.
