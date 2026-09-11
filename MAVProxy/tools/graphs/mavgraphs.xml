@@ -54,6 +54,26 @@
     <expression>sqrt(((ATT.Roll-ATT.DesRoll)**2)+((ATT.Pitch-ATT.DesPitch)**2))</expression>
   </graph>
 
+  <graph name='Attitude/Tracking Error/Roll Tracking Error'>
+  <description>Difference between desired and actual roll angle</description>
+    <expression>ATT.DesRoll-ATT.Roll</expression>
+  </graph>
+
+  <graph name='Attitude/Tracking Error/Pitch Tracking Error'>
+  <description>Difference between desired and actual pitch angle</description>
+    <expression>ATT.DesPitch-ATT.Pitch</expression>
+  </graph>
+
+  <graph name='Attitude/Tracking Error/Yaw Tracking Error'>
+  <description>Difference between desired and actual yaw angle</description>
+    <expression>ATT.DesYaw-ATT.Yaw</expression>
+  </graph>
+
+  <graph name='Altitude/Tracking Error/Altitude Tracking Error'>
+  <description>Difference between demanded altitude and barometric altitude</description>
+    <expression>CTUN.DAlt-CTUN.BAlt</expression>
+  </graph>
+
   <graph name='Sensors/Accelerometer/Accelerometers'>
     <description>Accelerometer Output</description>
     <expression>RAW_IMU.xacc*9.81*0.001 RAW_IMU.yacc*9.81*0.001 RAW_IMU.zacc*9.81*0.001 gravity(RAW_IMU)</expression>
