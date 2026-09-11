@@ -276,7 +276,21 @@ class MissionEditorMain(object):
             if not self.child.is_alive():
                 self.close()
                 return
-        last_wp_change = self.mpstate.module('wp').loading_waypoint_lasttime
+        wp_module = self.mpstate.module('wp')
+        if wp_module is None:
+            return
+        # loading_waypoint_lasttime only moves when items go to or from the
+        # vehicle, so also watch the loader itself, which is what the map
+        # watches. Otherwise a mission changed in MAVProxy alone never
+        # reaches the editor. Ignore the loader while a download is part way
+        # through, as it changes on every item received and rebuilding the
+        # table for each one is a lot of work for nothing
+        loader = wp_module.wploader
+        loader_change = loader.last_change
+        expected = getattr(loader, 'expected_count', 0)
+        if expected and loader.count() < expected:
+            loader_change = 0
+        last_wp_change = max(wp_module.loading_waypoint_lasttime, loader_change)
         if last_wp_change > self.last_wp_change:
             self.last_wp_change = last_wp_change
             self.get_wps_from_module()
