@@ -22,7 +22,7 @@ class VideoView:
         title = "%s - %s" % (camera.label(), stream.name)
         self.image = MPImage(title=title, width=stream.resolution_h,
                              height=stream.resolution_v, auto_size=False,
-                             auto_fit=True, can_zoom=False, fps=30)
+                             auto_fit=True, can_zoom=False, fps=60)
         menu = self.image.get_popup_menu()
         menu.add(MPMenuItem("Take photo", returnkey="Camera:Photo"))
         menu.add(MPMenuItem("Toggle recording", returnkey="Camera:Record"))
