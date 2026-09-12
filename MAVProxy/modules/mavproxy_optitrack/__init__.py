@@ -16,6 +16,7 @@ class optitrack(mp_module.MPModule):
         self.optitrack_settings = mp_settings.MPSettings(
             [('server', str, '127.0.0.1'),
             ('client', str, '127.0.0.1'),
+            ('axis', str, 'y'),
             ('msg_intvl_ms', int, 75),
             ('obj_id', int, 1),
             ('print_lv', int, 0),
@@ -27,6 +28,18 @@ class optitrack(mp_module.MPModule):
         self.streaming_client.rigid_body_listener = self.receive_rigid_body_frame
         self.last_msg_time = 0
         self.started = False
+        self.axis = self._validate_axis(self.optitrack_settings.axis)
+
+    def _validate_axis(self, axis_value):
+        axis = str(axis_value).strip().lower()
+        if axis in ('y', 'z'):
+            return axis
+        warning = "Invalid optitrack axis '%s' (expected 'y' or 'z'); using 'y'" % axis_value
+        try:
+            self.console.writeln("WARNING: %s" % warning, fg='yellow')
+        except Exception:
+            print("WARNING: %s" % warning)
+        return 'y'
 
     # This is a callback function that gets connected to the NatNet client. It is called once per rigid body per frame
     def receive_rigid_body_frame(self, new_id, position, rotation):
@@ -34,7 +47,10 @@ class optitrack(mp_module.MPModule):
             now = time.time()
             if (now - self.last_msg_time) > (self.optitrack_settings.msg_intvl_ms * 0.001):
                 time_us = int(now * 1.0e6)
-                self.master.mav.att_pos_mocap_send(time_us, (rotation[3], rotation[0], rotation[2], -rotation[1]), position[0], position[2], -position[1])
+                if self.axis == 'z':
+                    self.master.mav.att_pos_mocap_send(time_us, (rotation[3], rotation[0], rotation[1], rotation[2]), position[0], -position[1], -position[2])
+                else:
+                    self.master.mav.att_pos_mocap_send(time_us, (rotation[3], rotation[0], rotation[2], -rotation[1]), position[0], position[2], -position[1])
                 self.last_msg_time = now
 
     def usage(self):
@@ -61,6 +77,7 @@ class optitrack(mp_module.MPModule):
                 self.streaming_client.shutdown()
         elif args[0] == "set":
             self.optitrack_settings.command(args[1:])
+            self.axis = self._validate_axis(self.optitrack_settings.axis)
         else:
             print(self.usage())
 
