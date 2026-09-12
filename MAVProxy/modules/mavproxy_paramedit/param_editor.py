@@ -10,8 +10,7 @@ from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import multiproc
 from MAVProxy.modules.mavproxy_paramedit import ph_event
 import threading
-from ..lib.wx_loader import wx
-from MAVProxy.modules.mavproxy_paramedit import param_editor_frame
+import queue
 from pymavlink import mavutil
 import time
 ParamEditorEvent = ph_event.ParamEditorEvent
@@ -36,7 +35,7 @@ class ParamEditorEventThread(threading.Thread):
 
     def run(self):
         while not self.time_to_quit:
-            while not self.event_queue.empty():
+            while not self.time_to_quit and not self.event_queue.empty():
                 try:
                     event = self.event_queue.get(block=False)
                     event_type = event.get_type()
@@ -81,6 +80,25 @@ class ParamEditorMain(object):
         self.param_received = {}
         self.paramchanged = {}
         self.fltmode_rc = None
+        self.mpstate = mpstate
+        self.needs_unloading = False
+        self.time_to_quit = False
+        self.child = None
+        self.event_thread = None
+        self.mavlink_thread = None
+        self.event_queue = None
+        self.gui_event_queue = None
+        self.close_window = None
+        # This queue is only used by threads in the parent process.
+        self.mavlink_message_queue = queue.Queue()
+        try:
+            self.start()
+        except Exception:
+            self.close()
+            raise
+        self.mpstate.param_editor = self
+
+    def start(self):
         self.event_queue = multiproc.Queue()
         self.event_queue_lock = multiproc.Lock()
         self.gui_event_queue = multiproc.Queue()
@@ -89,22 +107,18 @@ class ParamEditorMain(object):
         self.close_window = multiproc.Semaphore()
         self.close_window.acquire()
 
-        self.mpstate = mpstate
-        self.mpstate.param_editor = self
-        self.needs_unloading = False
-
         if platform.system() == 'Windows':
-            self.child = threading.Thread(
-                            target=self.child_task,
-                            args=(self.event_queue,
-                                  self.event_queue_lock, self.gui_event_queue,
-                                  self.gui_event_queue_lock, self.close_window))
+            child_class = threading.Thread
         else:
-            self.child = multiproc.Process(
-                                target=self.child_task,
-                                args=(self.event_queue,
-                                      self.event_queue_lock, self.gui_event_queue,
-                                      self.gui_event_queue_lock, self.close_window))
+            child_class = multiproc.Process
+        # Spawn/forkserver must not pickle the editor or the MAVProxy state.
+        self.child = child_class(
+            target=self.child_task,
+            args=(self.event_queue, self.event_queue_lock,
+                  self.gui_event_queue, self.gui_event_queue_lock,
+                  self.close_window, self.mpstate.vehicle_name,
+                  self.mpstate.settings.moddebug,
+                  dict(self.mpstate.module('param').mav_param)))
 
         self.child.start()
 
@@ -115,11 +129,9 @@ class ParamEditorMain(object):
         self.last_unload_check_time = time.time()
         self.unload_check_interval = 0.1  # seconds
 
-        self.time_to_quit = False
-        self.mavlink_message_queue = multiproc.Queue()
-        self.mavlink_message_queue_handler = threading.Thread(
+        self.mavlink_thread = threading.Thread(
             target=self.mavlink_message_queue_handler)
-        self.mavlink_message_queue_handler.start()
+        self.mavlink_thread.start()
 
     def mavlink_message_queue_handler(self):
         while not self.time_to_quit:
@@ -139,7 +151,7 @@ class ParamEditorMain(object):
 
     def unload(self):
         '''unload module'''
-        self.mpstate.param_editor.close()
+        self.close()
 
     def idle_task(self):
         now = time.time()
@@ -176,22 +188,29 @@ class ParamEditorMain(object):
                     self.gui_event_queue.put(ParamEditorEvent(
                         ph_event.PEGE_RCIN, rcin=rc_received))
 
-    def child_task(self, queue, lock, gui_queue, gui_lock, close_window_sem):
+    @staticmethod
+    def child_task(queue, lock, gui_queue, gui_lock, close_window_sem,
+                   vehicle_name, moddebug, params):
         '''child process - this holds GUI elements'''
+        from MAVProxy.modules.lib import wx_util
+        wx_util.safe = True
+        from MAVProxy.modules.lib.wx_loader import wx
+        from MAVProxy.modules.mavproxy_paramedit import param_editor_frame
+
         mp_util.child_close_fds()
-        self.app = wx.App(False)
-        self.app.frame = param_editor_frame.ParamEditorFrame(
+        app = wx.App(False)
+        app.frame = param_editor_frame.ParamEditorFrame(
             parent=None, id=wx.ID_ANY)
-        self.app.frame.set_event_queue(queue)
-        self.app.frame.set_event_queue_lock(lock)
-        self.app.frame.set_gui_event_queue(gui_queue)
-        self.app.frame.set_gui_event_queue_lock(gui_lock)
-        self.app.frame.get_vehicle_type(self.mpstate.vehicle_name)
-        self.app.frame.set_close_window_semaphore(close_window_sem)
-        self.app.frame.redirect_err(self.mpstate.settings.moddebug)
-        self.app.frame.set_param_init(self.mpstate.module('param').mav_param, self.mpstate.vehicle_name)
-        self.app.SetExitOnFrameDelete(True)
-        self.app.frame.Show()
+        app.frame.set_event_queue(queue)
+        app.frame.set_event_queue_lock(lock)
+        app.frame.set_gui_event_queue(gui_queue)
+        app.frame.set_gui_event_queue_lock(gui_lock)
+        app.frame.get_vehicle_type(vehicle_name)
+        app.frame.set_close_window_semaphore(close_window_sem)
+        app.frame.redirect_err(moddebug)
+        app.frame.set_param_init(params, vehicle_name)
+        app.SetExitOnFrameDelete(True)
+        app.frame.Show()
 
         # start a thread to monitor the "close window" semaphore:
         class CloseWindowSemaphoreWatcher(threading.Thread):
@@ -202,23 +221,57 @@ class ParamEditorMain(object):
 
             def run(self):
                 self.sem.acquire(True)
-                self.task.app.ExitMainLoop()
-        watcher_thread = CloseWindowSemaphoreWatcher(self, close_window_sem)
+                wx.CallAfter(self.task.ExitMainLoop)
+        watcher_thread = CloseWindowSemaphoreWatcher(app, close_window_sem)
         watcher_thread.start()
 
-        self.app.MainLoop()
+        app.MainLoop()
         # tell the watcher it is OK to quit:
         close_window_sem.release()
         watcher_thread.join()
 
     def close(self):
         '''close the Parameter Editor window'''
+        if self.time_to_quit:
+            return
         self.time_to_quit = True
-        self.close_window.release()
-        if platform.system() == 'Windows':
-            self.child.join()
-        else:
-            self.child.terminate()
+        if self.event_thread is not None:
+            self.event_thread.time_to_quit = True
+        for thread in (self.event_thread, self.mavlink_thread):
+            if thread is not None and thread.ident is not None:
+                thread.join()
+        if self.close_window is not None:
+            self.close_window.release()
+        if self.child is not None:
+            if platform.system() == 'Windows':
+                if self.child.ident is not None:
+                    self.child.join()
+            else:
+                if self.child.pid is not None:
+                    self.child.join(timeout=2)
+                    if self.child.is_alive():
+                        self.child.terminate()
+                        self.child.join()
+                self.child.close()
+            self.child = None
+        if any(thread is not None and thread.ident is not None
+               for thread in (self.event_thread, self.mavlink_thread)):
+            # The GUI has stopped reading. Drain all pending output so the
+            # queue's feeder can finish even if its pipe was full at shutdown.
+            self.gui_event_queue.put(None)
+            while self.gui_event_queue.get() is not None:
+                pass
+        for name in ('event_queue', 'gui_event_queue'):
+            q = getattr(self, name)
+            if q is not None:
+                q.close()
+                if hasattr(q, 'join_thread'):
+                    q.join_thread()
+                setattr(self, name, None)
+        self.event_thread = None
+        self.mavlink_thread = None
+        if getattr(self.mpstate, 'param_editor', None) is self:
+            self.mpstate.param_editor = None
 
     def set_params(self):
         for param, value in self.paramchanged.items():
