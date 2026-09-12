@@ -381,22 +381,20 @@ class MPImageFrame(wx.Frame):
         wx.Frame.__init__(self, None, wx.ID_ANY, state.title)
         self.state = state
         state.frame = self
-        self.last_layout_send = time.time()
         self.sizer = wx.BoxSizer(wx.VERTICAL)
         state.panel = MPImagePanel(self, state)
         self.sizer.Add(state.panel, 1, wx.EXPAND)
         self.SetSizer(self.sizer)
-        self.Bind(wx.EVT_IDLE, self.on_idle)
+        # Layout reporting must not block the GUI: sleeping in EVT_IDLE
+        # limits video painting to 10 Hz regardless of the redraw timer.
+        self.layout_timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.on_layout_timer, self.layout_timer)
+        self.layout_timer.Start(1000)
         self.Bind(wx.EVT_SIZE, state.panel.on_size)
 
-    def on_idle(self, event):
-        '''prevent the main loop spinning too fast'''
-        state = self.state
-        now = time.time()
-        if now - self.last_layout_send > 1:
-            self.last_layout_send = now
-            state.out_queue.put(win_layout.get_wx_window_layout(self))
-        time.sleep(0.1)
+    def on_layout_timer(self, event):
+        '''report the window layout without delaying video paint events'''
+        self.state.out_queue.put(win_layout.get_wx_window_layout(self))
 
 class MPImagePanel(wx.Panel):
     """ The image panel
