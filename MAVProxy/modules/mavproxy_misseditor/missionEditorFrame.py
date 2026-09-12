@@ -57,7 +57,17 @@ class ListCtrlComboPopup(wx.ComboPopup):
             self.curitem = item
 
     def OnLeftDown(self, evt):
-        self.value = self.curitem
+        # hit-test the click rather than trusting curitem; the wheel
+        # scrolls the list without generating motion events, so curitem
+        # can be pinned to whatever row was last hovered over
+        item, flags = self.lc.HitTest(evt.GetPosition())
+        if item < 0:
+            # not on a row (blank area, scrollbar); leave the popup open
+            # rather than committing whatever was selected beforehand
+            evt.Skip()
+            return
+        self.curitem = item
+        self.value = item
         self.Dismiss()
 
     # This is called immediately after construction finishes.  You can
@@ -82,8 +92,21 @@ class ListCtrlComboPopup(wx.ComboPopup):
     # 'select' the current item.
     def SetStringValue(self, val):
         idx = self.lc.FindItem(-1, val)
-        if idx != wx.NOT_FOUND:
-            self.lc.Select(idx)
+        if idx == wx.NOT_FOUND:
+            # a command we have no entry for, so there is nothing to
+            # highlight. Clear the selection rather than leaving indices
+            # from a previous edit behind, which would see that stale
+            # command committed if the popup is dismissed without a pick
+            self.curitem = -1
+            self.value = -1
+            return
+        self.lc.Select(idx)
+        # open the list on the current command rather than at the top,
+        # and treat it as the selection so that dismissing the popup
+        # without picking anything leaves the value alone
+        self.lc.EnsureVisible(idx)
+        self.curitem = idx
+        self.value = idx
 
     def FindString(self, val):
         idx = self.lc.FindItem(-1, val)

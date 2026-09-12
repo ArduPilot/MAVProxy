@@ -15,7 +15,9 @@ import time
 import vtk
 
 from pymavlink import mavutil
+from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.mavproxy_map import mp_tile
+from MAVProxy.modules.mavproxy_map3d.map3d import MissionItem
 from MAVProxy.modules.mavproxy_map3d.terrain import (
     TerrainManager, R, TILE_DOWNLOAD_THREADS)
 from MAVProxy.modules.mavproxy_map3d.elements import ElementManager
@@ -34,8 +36,11 @@ def load_log(path):
             pts.append((msg.Lat, msg.Lng, msg.Alt))
         elif msg.get_type() == 'CMD':
             if msg.Lat != 0 or msg.Lng != 0:
-                mission.append((msg.Lat, msg.Lng, msg.Alt, getattr(msg, 'Frame', 3),
-                                msg.CId, msg.CNum))
+                params = tuple(getattr(msg, 'Prm%u' % i, 0.0) for i in range(1, 5))
+                mission.append(MissionItem(
+                    msg.Lat, msg.Lng, msg.Alt, getattr(msg, 'Frame', 3),
+                    msg.CId, msg.CNum, params[0],
+                    mp_util.mission_circle_radius(msg.CId, params)))
     return pts, mission
 
 

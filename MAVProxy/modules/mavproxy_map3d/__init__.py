@@ -11,11 +11,13 @@ import queue
 import threading
 import time
 
+from pymavlink import mavutil
+
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.mavproxy_map3d.map3d import (
-    Map3D, missing_packages, missing_packages_message)
+    Map3D, MissionItem, missing_packages, missing_packages_message)
 
 # fence colours as the 2D map's PolyFence layer uses them (OpenCV BGR)
 FENCE_INCLUSION_BGR = (0, 255, 0)
@@ -52,6 +54,7 @@ class Map3DModule(mp_module.MPModule):
                                   range=(0.25, 2.0)),
             ('terrainshading', bool, True),
             ('terrainwireframe', bool, False),
+            ('showdirection', bool, False),
         ])
         self.add_command('map3d', self.cmd_map3d,
                          "3D map control", ['<start|stop|follow|nofollow|center>',
@@ -102,6 +105,7 @@ class Map3DModule(mp_module.MPModule):
             self.map3d_settings.command(args[1:])
             if self.map is not None and self.map.is_alive():
                 self.map.set_fpv_fov(self.map3d_settings.fpvfov)
+                self.map.set_mission_arrows(self.map3d_settings.showdirection)
                 self.map.set_render_settings(
                     self.map3d_settings.terrainbrightness,
                     self.map3d_settings.terrainshading,
@@ -127,6 +131,7 @@ class Map3DModule(mp_module.MPModule):
                          terrain_wireframe=self.map3d_settings.terrainwireframe,
                          follow=self.follow)
         # push whatever we already know
+        self.map.set_mission_arrows(self.map3d_settings.showdirection)
         self.send_mission()
         self.send_fence()
         self.send_rally()
@@ -279,6 +284,8 @@ class Map3DModule(mp_module.MPModule):
         except Exception:
             return
         items = []
+        default_radius = self.default_circle_radius()
+        previous = None
         for w in wploader.wpoints:
             frame = getattr(w, 'frame', 0)
             (lat, lon) = (w.x, w.y)
@@ -297,7 +304,32 @@ class Map3DModule(mp_module.MPModule):
                 if terr is not None:
                     z = terr + w.z
                     frame = 0
-            items.append((lat, lon, z, frame, w.command, w.seq))
+            circle_radius = mp_util.mission_circle_radius(
+                w.command,
+                (w.param1, w.param2, w.param3, w.param4),
+                default_radius,
+                self.vehicle_type)
+            circle_turns = None
+            if w.command == mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT:
+                # this one circles until it reaches its altitude, so what is
+                # left to climb on arrival decides how many turns to draw
+                approach = None
+                if previous is not None:
+                    approach = mp_util.gps_distance(previous[0], previous[1],
+                                                    lat, lon)
+                circle_turns = mp_util.loiter_to_alt_turns(
+                    circle_radius,
+                    z - previous[2] if previous is not None else None,
+                    self.mav_param, approach)
+            exit_converge = None
+            if circle_radius is not None and not (w.param4 > 0):
+                # param4 == 0 asks for the next leg to be crosstracked from
+                # the loiter centre rather than from where it was left
+                exit_converge = mp_util.vehicle_track_convergence(self.mav_param)
+            items.append(MissionItem(lat, lon, z, frame, w.command, w.seq,
+                                     w.param1, circle_radius, circle_turns,
+                                     exit_converge))
+            previous = (lat, lon, z)
         self.map.set_mission(items)
 
     def set_icon_type(self, name):

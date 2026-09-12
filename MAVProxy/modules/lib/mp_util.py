@@ -59,26 +59,27 @@ def gps_distance(lat1, lon1, lat2, lon2):
     thanks to http://www.movable-type.co.uk/scripts/latlong.html
     and http://www.edwilliams.org/avform147.htm#Rhumb
     '''
+    # take the shorter way around the globe, so that a pair either side of
+    # the antimeridian is a short hop rather than most of the way around
+    dlon = radians(wrap_180(lon2 - lon1))
     lat1 = radians(lat1)
     lat2 = radians(lat2)
-    lon1 = radians(lon1)
-    lon2 = radians(lon2)
 
     if abs(lat2-lat1) < 1.0e-15:
         q = cos(lat1)
     else:
         q = (lat2-lat1)/log(tan(lat2/2+pi/4)/tan(lat1/2+pi/4))
-    d = sqrt((lat2-lat1)**2 + q**2 * (lon2-lon1)**2)
+    d = sqrt((lat2-lat1)**2 + q**2 * dlon**2)
     return d * radius_of_earth
 
 def gps_bearing(lat1, lon1, lat2, lon2):
     '''return rhumb bearing between two points in degrees, in range 0-360
     thanks to http://www.movable-type.co.uk/scripts/latlong.html'''
+    # as for gps_distance, head the short way around the antimeridian
+    dlon = radians(wrap_180(lon2 - lon1))
     lat1 = radians(lat1)
     lat2 = radians(lat2)
-    lon1 = radians(lon1)
-    lon2 = radians(lon2)
-    tc = -fmod(atan2(lon1-lon2,log(tan(lat2/2+pi/4)/tan(lat1/2+pi/4))),2*pi)
+    tc = -fmod(atan2(-dlon,log(tan(lat2/2+pi/4)/tan(lat1/2+pi/4))),2*pi)
     if tc < 0:
         tc += 2*pi
     return degrees(tc)
@@ -130,6 +131,263 @@ def gps_offset(lat, lon, east, north):
     bearing = degrees(atan2(east, north))
     distance = sqrt(east**2 + north**2)
     return gps_newpos(lat, lon, bearing, distance)
+
+
+def arc_centre_and_radius(lat1, lon1, lat2, lon2, arc_angle):
+    """return (centre_latlon, radius, start_bearing_from_centre) for a circular
+    arc running from (lat1,lon1) to (lat2,lon2) which sweeps arc_angle degrees.
+
+    Positive arc_angle is a clockwise arc, negative is counter-clockwise (as
+    per MAV_CMD_NAV_ARC_WAYPOINT).  Returns None if the arc is degenerate (a
+    zero-length sweep, or a sweep of a whole circle, neither of which define
+    a unique circle).
+    """
+    # arcs may sweep up to a full turn in either direction, so wrap into
+    # (-360, 360) rather than to +-180
+    arc_angle = fmod(arc_angle, 360.0)
+    if abs(arc_angle) < 1.0e-6:
+        return None
+    half = radians(abs(arc_angle) / 2.0)
+    if sin(half) < 1.0e-6:
+        return None
+    chord = gps_distance(lat1, lon1, lat2, lon2)
+    if chord < 1.0e-6:
+        return None
+    radius = chord / (2 * sin(half))
+    chord_bearing = gps_bearing(lat1, lon1, lat2, lon2)
+    # the centre lies 90 degrees to the right of the initial heading for a
+    # clockwise arc, 90 degrees to the left for a counter-clockwise arc:
+    if arc_angle > 0:
+        centre_bearing = chord_bearing - arc_angle/2.0 + 90
+    else:
+        centre_bearing = chord_bearing - arc_angle/2.0 - 90
+    centre = gps_newpos(lat1, lon1, centre_bearing, radius)
+    return (centre, radius, wrap_360(centre_bearing + 180))
+
+
+def arc_points(latlon1, latlon2, arc_angle, steps=None):
+    """return a list of latlon points along a circular arc from latlon1 to
+    latlon2 sweeping arc_angle degrees (positive is clockwise).  The returned
+    list includes both endpoints.  If the arc is degenerate then just the two
+    endpoints are returned."""
+    ret = arc_centre_and_radius(latlon1[0], latlon1[1],
+                                latlon2[0], latlon2[1],
+                                arc_angle)
+    if ret is None:
+        return [latlon1, latlon2]
+    (centre, radius, start_bearing) = ret
+    arc_angle = fmod(arc_angle, 360.0)
+    if steps is None:
+        # aim for roughly one segment every 3 degrees of sweep:
+        steps = int(constrain(abs(arc_angle) / 3.0, 8, 180))
+    points = [latlon1]
+    for i in range(1, steps):
+        bearing = start_bearing + arc_angle * (float(i) / steps)
+        points.append(gps_newpos(centre[0], centre[1], bearing, radius))
+    points.append(latlon2)
+    return points
+
+
+# vehicles which hold position at a loiter point rather than flying a circle
+# around it.  MAVProxy's own vehicle type names are accepted as well as the
+# MAV_TYPEs, since that is what a live module has to hand
+HOVERING_VEHICLE_NAMES = ['copter', 'sub']
+HOVERING_MAV_TYPE_NAMES = [
+    'MAV_TYPE_QUADROTOR', 'MAV_TYPE_COAXIAL', 'MAV_TYPE_HELICOPTER',
+    'MAV_TYPE_HEXAROTOR', 'MAV_TYPE_OCTOROTOR', 'MAV_TYPE_TRICOPTER',
+    'MAV_TYPE_DODECAROTOR', 'MAV_TYPE_SUBMARINE',
+]
+
+
+def vehicle_hovers_to_loiter(vehicle):
+    """whether the vehicle holds position at a loiter point instead of
+    circling it.  vehicle is a MAV_TYPE or one of MAVProxy's vehicle type
+    names; None (we do not know) answers False, leaving the circle drawn"""
+    if vehicle is None:
+        return False
+    if isinstance(vehicle, str):
+        return vehicle in HOVERING_VEHICLE_NAMES
+    from pymavlink import mavutil
+    for name in HOVERING_MAV_TYPE_NAMES:
+        if getattr(mavutil.mavlink, name, None) == vehicle:
+            return True
+    return False
+
+
+def mission_circle_radius(command, params, default_radius=None, vehicle=None):
+    """return the signed radius in metres of the circle a mission item flies
+    about its own location -- the loiter commands and DO_ORBIT -- or None if
+    the item does not fly one.
+
+    A positive radius is a clockwise circle, negative counter-clockwise.
+    params is the item's param1..param4.  Items which leave the radius unset
+    ask for the vehicle's own default, which is default_radius here.
+
+    vehicle is the MAV_TYPE (or MAVProxy vehicle type name) flying the
+    mission, which decides the items that hold position instead of circling.
+    """
+    from pymavlink import mavutil
+    mavlink = mavutil.mavlink
+    # index within params of the parameter holding the radius
+    index = {
+        mavlink.MAV_CMD_NAV_LOITER_UNLIM: 2,
+        mavlink.MAV_CMD_NAV_LOITER_TURNS: 2,
+        mavlink.MAV_CMD_NAV_LOITER_TIME: 2,
+        mavlink.MAV_CMD_NAV_LOITER_TO_ALT: 1,
+        mavlink.MAV_CMD_DO_ORBIT: 0,
+    }.get(command)
+    if index is None:
+        return None
+    if vehicle_hovers_to_loiter(vehicle) and command in (
+            mavlink.MAV_CMD_NAV_LOITER_UNLIM,
+            mavlink.MAV_CMD_NAV_LOITER_TIME,
+            mavlink.MAV_CMD_NAV_LOITER_TO_ALT):
+        # a hovering vehicle sits at the point for these, and climbs straight
+        # up for LOITER_TO_ALT.  It does fly LOITER_TURNS and DO_ORBIT as
+        # circles, so those are left alone
+        return None
+    radius = params[index]
+    if radius is None or math.isnan(radius) or radius == 0:
+        radius = default_radius
+    if radius is None or math.isnan(radius) or radius == 0:
+        return None
+    return radius
+
+
+def mission_circle_turns(command, params):
+    """return the number of turns a circling mission item flies, or None if
+    it circles indefinitely or the count is not part of the item"""
+    from pymavlink import mavutil
+    mavlink = mavutil.mavlink
+    if command == mavlink.MAV_CMD_NAV_LOITER_TURNS:
+        turns = params[0]
+    elif command == mavlink.MAV_CMD_DO_ORBIT:
+        # DO_ORBIT counts in radians rather than turns
+        turns = params[3] / (2 * pi)
+    else:
+        return None
+    if turns is None or math.isnan(turns) or turns <= 0:
+        return None
+    return turns
+
+
+def param_value(params, name):
+    """look one parameter up in params, which may be a mapping (a live
+    vehicle's mav_param, or a log's params) or a callable taking a name.
+    Returns None when the parameter is not there"""
+    if params is None:
+        return None
+    try:
+        if callable(params):
+            return params(name)
+        return params.get(name)
+    except Exception:
+        return None
+
+
+def _first_param(params, candidates):
+    """the value of the first parameter present, scaled by the factor beside
+    it. candidates is a sequence of (name, scale)"""
+    for (name, scale) in candidates:
+        value = param_value(params, name)
+        if value is None:
+            continue
+        value = float(value) * scale
+        if value != 0 and not math.isnan(value):
+            return value
+    return None
+
+
+# climb and descent rates as the vehicle is configured to fly them. The
+# firmware has moved these to metres per second over time, so the older
+# centimetre forms are listed after the ones that replaced them
+CLIMB_RATE_PARAMS = [
+    ('TECS_CLMB_MAX', 1.0),         # forward-flight
+    ('WP_SPD_UP', 1.0),
+    ('PILOT_SPD_UP', 1.0),
+    ('WPNAV_SPEED_UP', 0.01),
+    ('PILOT_SPEED_UP', 0.01),
+]
+DESCENT_RATE_PARAMS = [
+    # SINK_MIN is the rate a plane actually cruises down at; SINK_MAX is the
+    # limit it will not exceed, which it does not fly at in a loiter
+    ('TECS_SINK_MIN', 1.0),         # forward-flight
+    ('TECS_SINK_MAX', 1.0),
+    ('WP_SPD_DN', 1.0),
+    ('PILOT_SPD_DN', 1.0),
+    ('WPNAV_SPEED_DN', 0.01),
+    ('PILOT_SPEED_DN', 0.01),
+]
+CRUISE_SPEED_PARAMS = [
+    ('AIRSPEED_CRUISE', 1.0),       # forward-flight
+    ('TRIM_ARSPD_CM', 0.01),
+    ('WP_SPD', 1.0),
+    ('WPNAV_SPEED', 0.01),
+]
+
+
+def vehicle_climb_rate(params, descending=False):
+    """the vertical speed in m/s the vehicle is configured to climb (or
+    descend) at, or None if none of the parameters we know are present"""
+    if descending:
+        return _first_param(params, DESCENT_RATE_PARAMS)
+    return _first_param(params, CLIMB_RATE_PARAMS)
+
+
+def vehicle_cruise_speed(params):
+    """the speed in m/s the vehicle is configured to cruise at, or None"""
+    return _first_param(params, CRUISE_SPEED_PARAMS)
+
+
+def vehicle_track_convergence(params):
+    """the distance over which the vehicle pulls itself back onto the track
+    it is supposed to be following, or None if we cannot tell.
+
+    This is the L1 controller's own distance, which is what decides how
+    sharply it converges: 1/pi times the damping, the period and the speed
+    """
+    period = param_value(params, 'NAVL1_PERIOD')
+    damping = param_value(params, 'NAVL1_DAMPING')
+    speed = vehicle_cruise_speed(params)
+    if period is None or speed is None:
+        return None
+    if damping is None:
+        damping = 0.75
+    distance = 0.3183099 * float(damping) * float(period) * speed
+    if distance <= 0 or math.isnan(distance):
+        return None
+    return distance
+
+
+def loiter_to_alt_turns(radius, alt_change, params, approach_distance=None,
+                        default_turns=1.0):
+    """how many turns a forward-moving vehicle spends circling to reach the
+    altitude a NAV_LOITER_TO_ALT item asks for.
+
+    The vehicle is already climbing on its way to the loiter point, so only
+    what is left when it arrives gets flown off on the circle.  Given the
+    distance it covers approaching, the time to make the whole altitude
+    change less the time spent approaching leaves the time spent circling,
+    and a turn takes 2*pi*radius/speed seconds.
+
+    With no configured rate or speed to go on there is nothing to compute,
+    and default_turns is the answer -- one turn draws the loiter without
+    pretending to know how long it takes.
+    """
+    if not radius or alt_change is None:
+        return default_turns
+    rate = vehicle_climb_rate(params, descending=(alt_change < 0))
+    speed = vehicle_cruise_speed(params)
+    if rate is None or speed is None or rate <= 0 or speed <= 0:
+        return default_turns
+    seconds = abs(alt_change) / abs(rate)
+    if approach_distance:
+        seconds -= abs(approach_distance) / speed
+    seconds_per_turn = 2 * pi * abs(radius) / speed
+    turns = seconds / seconds_per_turn
+    # it flies at least part of a circle however little is left to do, and an
+    # unbounded spiral is not a useful drawing either
+    return constrain(turns, 0.25, 20.0)
 
 
 def mkdir_p(dir):

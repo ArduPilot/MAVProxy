@@ -140,6 +140,16 @@ class MPModule(object):
     def get_mav_param(self, param_name, default=None):
         return self.mpstate.functions.get_mav_param(param_name, default)
 
+    def default_circle_radius(self):
+        '''the radius a circling mission item uses when it does not carry one
+        of its own.
+
+        This is the forward-flight loiter radius: vehicles without one (a
+        multicopter, say) sit at the point rather than circling it, so None
+        is the right answer for them and nothing should be drawn
+        '''
+        return self.get_mav_param('WP_LOITER_RAD')
+
     def param_set(self, name, value, retries=3):
         self.mpstate.functions.param_set(name, value, retries)
 
