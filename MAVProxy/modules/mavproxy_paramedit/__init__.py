@@ -28,12 +28,20 @@ class ParamEditorModule(mp_module.MPModule):
             self.pe_main.unload()
 
     def idle_task(self):
+        if self.needs_unloading:
+            return
         if not self.pe_main:
             # wait for parameter module to load
             if self.module('param') is None:
                 return
-            from MAVProxy.modules.mavproxy_paramedit import param_editor
-            self.pe_main = param_editor.ParamEditorMain(self.mpstate)
+            try:
+                from MAVProxy.modules.mavproxy_paramedit import param_editor
+                self.pe_main = param_editor.ParamEditorMain(self.mpstate)
+            except Exception:
+                # Report the original failure once, then unload instead of
+                # allocating another editor on every idle cycle.
+                self.needs_unloading = True
+                raise
         if self.pe_main:
             if self.pe_main.needs_unloading:
                 self.needs_unloading = True
