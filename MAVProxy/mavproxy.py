@@ -1457,6 +1457,9 @@ if __name__ == '__main__':
         mpstate.load_module('speech')
 
     serial_list = mavutil.auto_detect_serial(preferred_list=preferred_ports)
+    # Exclude bootloader ports from automatic connection selection.
+    serial_list = [port for port in serial_list
+                   if '-BL_' not in port.device and '_BL_' not in port.device]
     serial_list.sort(key=lambda x: x.device)
 
     # remove OTG2 ports for dual CDC
