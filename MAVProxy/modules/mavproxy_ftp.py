@@ -1638,14 +1638,15 @@ class FTPModule(mp_module.MPModule):
             self.worker_done(worker)
         return worker
 
-    def _submit(self, name, method, *args, **kwargs):
+    def _submit(self, name, method, *args, target_system=None,
+                target_component=None, **kwargs):
         operation = {
             'name': name,
             'method': method,
             'args': args,
             'kwargs': kwargs,
-            'target_system': self.target_system,
-            'target_component': self.target_component,
+            'target_system': self.target_system if target_system is None else target_system,
+            'target_component': self.target_component if target_component is None else target_component,
         }
         limit = self._session_limit()
         if len(self.workers) >= limit:
@@ -1695,10 +1696,13 @@ class FTPModule(mp_module.MPModule):
     def cmd_list(self, args):
         return self._submit('list', 'cmd_list', args)
 
-    def cmd_get(self, args, callback=None, callback_progress=None):
+    def cmd_get(self, args, callback=None, callback_progress=None,
+                target_system=None, target_component=None):
         return self._submit('get', 'cmd_get', args,
                             callback=callback,
-                            callback_progress=callback_progress)
+                            callback_progress=callback_progress,
+                            target_system=target_system,
+                            target_component=target_component)
 
     def cmd_put(self, args, fh=None, callback=None, progress_callback=None):
         return self._submit('put', 'cmd_put', args, fh=fh,

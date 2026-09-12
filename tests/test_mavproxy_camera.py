@@ -166,6 +166,68 @@ class CameraModuleTest(unittest.TestCase):
         self.assertGreaterEqual(
             len(self.commands(mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE)), 11)
 
+    def test_definition_parameters_route_to_owning_camera(self):
+        self.module.mavlink_packet(camera_information())
+        self.module.mavlink_packet(camera_information(system_id=17))
+        first = self.module.cameras[(1, 100)]
+        second = self.module.cameras[(17, 100)]
+        first.parameters = mock.Mock()
+        second.parameters = mock.Mock()
+        packet = Message("PARAM_EXT_VALUE", system_id=17,
+                         param_id="GAIN", param_type=9, param_value=b"\0" * 128)
+        self.module.mavlink_packet(packet)
+        second.parameters.packet.assert_called_once_with(packet)
+        first.parameters.packet.assert_not_called()
+        self.module.cmd_camera(["custom"])
+        first.parameters.open_dialog.assert_called_once()
+        self.module.unload()
+        first.parameters.close.assert_called_once()
+        second.parameters.close.assert_called_once()
+
+    def test_camera_component_replaces_automatic_autopilot_proxy_selection(self):
+        self.module.mavlink_packet(camera_information(component_id=1))
+        self.assertEqual(self.module.selected_camera, (1, 1))
+        self.module.mavlink_packet(camera_information())
+        self.assertEqual(self.module.selected_camera, (1, 100))
+        self.module.mavlink_packet(camera_information(component_id=1))
+        self.assertEqual(self.module.selected_camera, (1, 100))
+
+    def test_proxy_information_arriving_after_camera_information(self):
+        # Other camera messages can create the proxy before its information.
+        self.module._ensure_camera(1, 1)
+        self.module.mavlink_packet(camera_information())
+        self.assertEqual(self.module.selected_camera, (1, 1))
+        self.module.mavlink_packet(camera_information(component_id=1))
+        self.assertEqual(self.module.selected_camera, (1, 100))
+
+    def test_proxy_replacement_respects_identity_system_and_explicit_selection(self):
+        self.module.mavlink_packet(camera_information(component_id=1))
+        self.module.mavlink_packet(camera_information(system_id=17))
+        self.module.mavlink_packet(camera_information(model_name=b"Other camera"))
+        self.assertEqual(self.module.selected_camera, (1, 1))
+        self.module.cmd_select(["1:1"])
+        self.module.mavlink_packet(camera_information())
+        self.assertEqual(self.module.selected_camera, (1, 1))
+
+    def test_camera_component_setting_prevents_automatic_proxy_replacement(self):
+        self.module.camera_settings.camera_component = 1
+        self.module.mavlink_packet(camera_information(component_id=1))
+        self.module.mavlink_packet(camera_information())
+        self.assertEqual(self.module.selected_camera, (1, 1))
+
+    def test_open_proxy_dialog_follows_automatic_camera_selection(self):
+        self.module.mavlink_packet(camera_information(component_id=1))
+        proxy = self.module.cameras[(1, 1)].parameters
+        old_dialog = mock.Mock()
+        proxy.dialog = old_dialog
+        camera = self.module._ensure_camera(1, 100)
+        with mock.patch.object(camera.parameters, "open_dialog") as open_dialog:
+            self.module.mavlink_packet(camera_information())
+            open_dialog.assert_called_once()
+        old_dialog.close.assert_called_once()
+        self.assertIsNone(proxy.dialog)
+        self.assertFalse(proxy.open_when_ready)
+
     def test_stream_discovery_and_automatic_urls(self):
         self.module.mavlink_packet(camera_information())
         self.module.mavlink_packet(stream_information(1))

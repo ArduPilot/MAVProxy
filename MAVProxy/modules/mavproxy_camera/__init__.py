@@ -9,6 +9,7 @@ from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import camera_projection
+from MAVProxy.modules.mavproxy_camera.parameters import CameraParameters
 from pymavlink import mavutil
 from pymavlink.quaternion import Quaternion
 
@@ -81,6 +82,7 @@ class CameraDevice:
         self.storage = {}
         self.streams = {}
         self.definition = None
+        self.parameters = None
 
     def label(self):
         if self.information is None:
@@ -135,7 +137,7 @@ class CameraModule(mp_module.MPModule):
         ])
         self.add_command(
             "camera", self.cmd_camera, "MAVLink camera control",
-            ["<status|discover|select|info|streams|view|projection|photo|stopphotos|record|zoom|focus|mode|source|stream|mount|set>",
+            ["<status|discover|select|info|custom|definition|params|param|streams|view|projection|photo|stopphotos|record|zoom|focus|mode|source|stream|mount|set>",
              "set (CAMERASETTING)"])
         self.add_completion_function("(CAMERASETTING)",
                                      self.camera_settings.completion)
@@ -143,6 +145,7 @@ class CameraModule(mp_module.MPModule):
         self.gimbals = {}
         self.manager_attitudes = {}
         self.selected_camera = None
+        self.camera_selection_explicit = False
         self.selected_gimbal = None
         self.views = {}
         self.last_status_request = 0.0
@@ -159,6 +162,7 @@ class CameraModule(mp_module.MPModule):
             self.menu = MPMenuSubMenu("Camera", items=[
                 MPMenuItem("Status", returnkey="# camera status"),
                 MPMenuItem("Discover", returnkey="# camera discover"),
+                MPMenuItem("Custom Settings", returnkey="# camera custom"),
                 MPMenuItem("Take photo", returnkey="# camera photo"),
                 MPMenuItem("Toggle recording",
                            returnkey="# camera record toggle"),
@@ -176,6 +180,8 @@ class CameraModule(mp_module.MPModule):
         for view in self.views.values():
             view.close()
         self.views.clear()
+        for camera in self.cameras.values():
+            camera.parameters.close()
         if self.menu is not None:
             for name in self.menu_modules:
                 module = self.module(name)
@@ -189,6 +195,10 @@ class CameraModule(mp_module.MPModule):
   camera discover                     request fresh discovery information
   camera select [SYSID:]COMPID         select a camera
   camera info                          show selected camera information
+  camera custom                       open live Custom Settings dialog
+  camera definition [FILE|URL]         reload or override camera definition
+  camera params                       show custom parameter values
+  camera param NAME VALUE             set a custom camera parameter
   camera streams                       show discovered video streams
   camera view <ID|rgb|thermal|all>     open RTSP viewer(s)
   camera projection                    show/refresh map projection status
@@ -219,6 +229,7 @@ class CameraModule(mp_module.MPModule):
         camera = self.cameras.get(key)
         if camera is None:
             camera = CameraDevice(*key)
+            camera.parameters = CameraParameters(self, camera)
             self.cameras[key] = camera
         camera.last_seen = time.time()
         if self.selected_camera is None:
@@ -249,6 +260,43 @@ class CameraModule(mp_module.MPModule):
         if required:
             print("No MAVLink camera discovered; use 'camera discover'")
         return None
+
+    def _prefer_camera_component(self):
+        """Prefer a camera over the autopilot's duplicate camera advertisement.
+
+        ArduPilot publishes CAMERA_INFORMATION from component 1, but does not
+        serve the camera's PARAM_EXT parameters there. Keep explicitly chosen
+        targets and only replace an automatic choice with a matching camera.
+        """
+        if self.camera_selection_explicit or self.camera_settings.camera_component:
+            return
+        selected = self.cameras.get(self.selected_camera)
+        if (selected is None or selected.information is None or
+                selected.component_id != mavutil.mavlink.MAV_COMP_ID_AUTOPILOT1):
+            return
+        info = selected.information
+        for key, camera in self.cameras.items():
+            if (camera.system_id != selected.system_id or
+                    not mavutil.mavlink.MAV_COMP_ID_CAMERA <= camera.component_id <=
+                    mavutil.mavlink.MAV_COMP_ID_CAMERA6 or camera.information is None):
+                continue
+            if any(_text(getattr(info, field)) !=
+                   _text(getattr(camera.information, field))
+                   for field in ('vendor_name', 'model_name', 'cam_definition_uri')):
+                continue
+            self.selected_camera = key
+            print("Camera: selected %s instead of autopilot camera proxy %u:%u" %
+                  (camera.label(), selected.system_id, selected.component_id))
+            # A dialog requested before camera discovery must follow this
+            # correction, rather than remain bound to the unresponsive proxy.
+            previous = selected.parameters
+            if previous.dialog is not None or previous.open_when_ready:
+                if previous.dialog is not None:
+                    previous.dialog.close()
+                    previous.dialog = None
+                previous.open_when_ready = False
+                camera.parameters.open_dialog()
+            return
 
     def _selected_gimbal(self, required=True):
         component = self.camera_settings.gimbal_component
@@ -335,6 +383,8 @@ class CameraModule(mp_module.MPModule):
                 self.cmd_select(args[1:])
             elif command == "info":
                 self.show_info()
+            elif command in ("custom", "definition", "params", "param"):
+                self.cmd_custom(command, args[1:])
             elif command == "streams":
                 self.show_streams()
             elif command == "view":
@@ -366,6 +416,36 @@ class CameraModule(mp_module.MPModule):
         except (TypeError, ValueError) as error:
             print("Camera command error: %s" % error)
 
+    def cmd_custom(self, command, args):
+        camera = self._selected_camera()
+        if camera is None:
+            return
+        parameters = camera.parameters
+        if command == "custom":
+            parameters.open_dialog()
+            if camera.information is None:
+                self._request_camera_state(camera, full=True)
+        elif command == "definition":
+            if args:
+                uri = args[0]
+                parameters.load(uri, local="://" not in uri)
+            elif parameters.identity:
+                uri, version = parameters.identity
+                parameters.load(uri, version, local="://" not in uri)
+            else:
+                self._request_camera_state(camera, full=True)
+        elif command == "param":
+            if len(args) != 2:
+                raise ValueError("usage: camera param NAME VALUE")
+            parameters.set_value(*args)
+        elif parameters.definition is None:
+            print(parameters.status)
+        else:
+            for name, param in parameters.definition.parameters.items():
+                print("%16s %-20s %s%s" % (
+                    name, parameters.values.get(name, "(unread)"), param.description,
+                    " [pending]" if name in parameters.pending else ""))
+
     def cmd_select(self, args):
         if len(args) != 1:
             raise ValueError("usage: camera select [SYSID:]COMPID")
@@ -379,6 +459,7 @@ class CameraModule(mp_module.MPModule):
             camera = self._ensure_camera(*key)
             self._request_camera_state(camera, full=True)
         self.selected_camera = key
+        self.camera_selection_explicit = True
         print("Selected camera %s" % camera.label())
 
     def camera_command(self, command, params=()):
@@ -893,13 +974,23 @@ class CameraModule(mp_module.MPModule):
         if message_type == "CAMERA_INFORMATION":
             camera = self._ensure_camera(system_id, component_id)
             camera.information = message
+            camera.parameters.information(message)
+            self._prefer_camera_component()
             gimbal_component = getattr(message, "gimbal_device_id", 0)
             if self._is_gimbal_device_component(gimbal_component):
                 self._ensure_gimbal(system_id, gimbal_component)
             self._request_camera_state(camera)
             self._set_console_status()
+        elif message_type in ("PARAM_EXT_VALUE", "PARAM_EXT_ACK"):
+            camera = self.cameras.get((system_id, component_id))
+            if camera is not None:
+                camera.parameters.packet(message)
         elif message_type == "CAMERA_SETTINGS":
-            self._ensure_camera(system_id, component_id).settings = message
+            camera = self._ensure_camera(system_id, component_id)
+            camera.settings = message
+            parameters = camera.parameters
+            if parameters.definition is not None and "CAM_MODE" in parameters.definition.parameters:
+                parameters.request_read("CAM_MODE")
         elif message_type == "CAMERA_CAPTURE_STATUS":
             camera = self._ensure_camera(system_id, component_id)
             camera.capture_status = message
@@ -995,6 +1086,7 @@ class CameraModule(mp_module.MPModule):
                     self._request_gimbal_state(gimbal)
             self.last_discovery_request = now
         for camera in self.cameras.values():
+            camera.parameters.idle()
             if (camera.recording_verify_at != 0.0 and
                     now >= camera.recording_verify_at):
                 self._request_message(
