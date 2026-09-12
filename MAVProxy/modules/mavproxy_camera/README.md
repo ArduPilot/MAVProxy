@@ -40,6 +40,43 @@ keeps narrower streams nested inside wider streams with the same boresight.
 `fov_max_range` rejects unreliable terrain intersections beyond 10 km by
 default; set it to zero to disable this range limit.
 
+## Custom camera settings
+
+Choose **Camera → Custom Settings** in the console or map menu, or run
+`camera custom`. The dialog uses the selected camera; use
+`camera select SYSID:COMPID` when more than one camera is discovered.
+Automatic selection prefers a matching camera component over ArduPilot's
+duplicate camera information from component 1. The autopilot proxy does not
+serve the camera's extended parameters. Explicit selections are preserved.
+
+`CAMERA_INFORMATION.cam_definition_uri` supplies the camera's XML definition.
+HTTP, HTTPS and MAVFTP downloads and XZ-compressed definitions are supported.
+Load `module load ftp` for MAVFTP URLs. Downloads run without blocking camera
+telemetry. A changed URI or definition version reloads the metadata and values.
+Use `camera definition` to retry a download, or `camera definition FILE|URL` to
+load an explicit definition, such as a vendor-supplied local XML file.
+
+The dialog preserves XML order across tabs, with checkboxes for booleans,
+dropdowns for named options, sliders for bounded stepped values, and numeric
+fields for other settings. Checkboxes, dropdowns and released sliders apply
+immediately; numeric fields apply on Enter or their Apply button. Values are
+validated against the type, bounds, steps and currently allowed options.
+Read-only settings cannot be changed, and settings that have not replied to
+parameter requests remain disabled. XML defaults are metadata, not assumed
+current camera values. Vendor-specific `custom` binary types have no editor.
+
+Changes use binary `PARAM_EXT_SET` values and wait for `PARAM_EXT_ACK`.
+Pending writes, rejections and timeouts are shown in the dialog. Exclusion
+rules, conditional option ranges and dependent parameter refreshes follow the
+camera definition, including self-refreshing actions such as Workswell's NUC.
+Incoming camera values update open dialogs, and periodic reads pick up changes
+made by another controller. **Refresh** requests the full parameter list with
+`PARAM_EXT_REQUEST_LIST`, then retries missing parameters individually. Closing a
+dialog does not undo changes already applied to the camera.
+
+`camera params` lists the received values, and `camera param NAME VALUE`
+provides the same validated, acknowledged writes from the command line.
+
 ## ArduPilot and MT11 configuration
 
 For the MT11, use one `CAM1_TYPE=6` MAVLink Camera v2 backend and one

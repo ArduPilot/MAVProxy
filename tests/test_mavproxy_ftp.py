@@ -206,6 +206,20 @@ class TestConcurrentFTP(unittest.TestCase):
             1, mavproxy_ftp.OP_OpenFileRO, payload=struct.pack('<I', 10)))
         self.assertEqual(self.mpstate._master.mav.targets[-1], (1, 1))
 
+    def test_camera_download_target_survives_queue_without_changing_selection(self):
+        self.ftp.ftp_settings.max_sessions = 1
+        self.ftp.cmd_list(['/'])
+        self.ftp.cmd_get(['/camera.xml'], callback=lambda fh: None,
+                         target_system=17, target_component=100)
+        self.assertEqual(self.mpstate.settings.target_system, 1)
+        self.assertEqual(self.mpstate.settings.target_component, 1)
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_ListDirectoryWithTime,
+            opcode=mavproxy_ftp.OP_Nack,
+            payload=bytes([mavproxy_ftp.ERR_EndOfFile])))
+        self.assertEqual(self.mpstate._master.mav.targets[-1], (17, 100))
+        self.assertEqual(self.ftp.workers[1].ftp_target_component, 100)
+
     def test_reply_from_another_vehicle_is_not_routed_by_session_alone(self):
         self.ftp.cmd_list(['/'])
         self.ftp.mavlink_packet(reply(
