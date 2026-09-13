@@ -8,7 +8,7 @@ from urllib.parse import urlsplit, unquote
 
 from pymavlink import mavutil
 from MAVProxy.modules.mavproxy_camera.definition import (
-    CameraDefinition, download_definition, decode_value, equal_value)
+    CameraDefinition, download_definition, decode_value, equal_value, MAX_DEFINITION_SIZE)
 
 
 class CameraParameters:
@@ -95,8 +95,11 @@ class CameraParameters:
                     path = parsed.path
                 if not 1 <= system <= 255 or not 1 <= component <= 255:
                     raise ValueError('invalid component address')
+                from MAVProxy.modules.mavproxy_ftp import encode_filename
+                path = unquote(path, errors='strict')
+                encode_filename(path)
             except (ValueError, IndexError):
-                completed(error='Invalid MAVFTP camera definition address')
+                completed(error='Invalid MAVFTP camera definition address or filename')
                 return
             def parse_ftp(data):
                 try:
@@ -109,12 +112,14 @@ class CameraParameters:
                     completed(error='MAVFTP definition download failed')
                 else:
                     fh.seek(0)
-                    from MAVProxy.modules.mavproxy_camera.definition import MAX_DEFINITION_SIZE
                     data = fh.read(MAX_DEFINITION_SIZE + 1)
                     threading.Thread(target=parse_ftp, args=(data,),
                                      name='camera-definition', daemon=True).start()
-            ftp.cmd_get([unquote(path)], callback=ftp_done,
-                        target_system=system, target_component=component)
+            try:
+                ftp.cmd_get([path], callback=ftp_done, max_size=MAX_DEFINITION_SIZE,
+                            target_system=system, target_component=component)
+            except Exception as error:
+                completed(error='MAVFTP definition download failed: %s' % error)
             return
         if not local and scheme not in ('http', 'https'):
             completed(error='Unsupported camera definition URI scheme: %s' % scheme)
@@ -123,7 +128,6 @@ class CameraParameters:
         def worker():
             try:
                 if local:
-                    from MAVProxy.modules.mavproxy_camera.definition import MAX_DEFINITION_SIZE
                     with open(uri, 'rb') as file:
                         data = file.read(MAX_DEFINITION_SIZE + 1)
                 else:

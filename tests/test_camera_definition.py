@@ -1,5 +1,11 @@
 """Camera XML rules and extended parameter transactions (no camera or wx needed)."""
 import io
+from decimal import Decimal
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import tempfile
+import threading
+import time
+import xml.etree.ElementTree as ET
 import lzma
 import os
 from pathlib import Path
@@ -11,7 +17,8 @@ from unittest import mock
 
 os.environ.setdefault('MAVLINK20', '1')
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from MAVProxy.modules.mavproxy_camera.definition import CameraDefinition, decode_value, TYPES
+from MAVProxy.modules.mavproxy_camera.definition import (CameraDefinition, Parameter, decode_value, TYPES, equal_value,
+    definition_bytes, download_definition, MAX_DEFINITION_SIZE, _DefinitionRedirectHandler)
 from MAVProxy.modules.mavproxy_camera.parameters import CameraParameters
 from pymavlink import mavutil
 
@@ -99,6 +106,147 @@ class DefinitionTest(unittest.TestCase):
                 self.assertEqual(decoded, value)
 
 
+class DefinitionValidationTest(unittest.TestCase):
+    def parameter(self, attributes, content=''):
+        return Parameter(ET.fromstring('<parameter name="X" %s>%s</parameter>' %
+                                       (attributes, content)), lambda s: s)
+
+    def test_integer_step_uses_exact_arithmetic_at_large_values(self):
+        p = self.parameter('type="uint64" min="0" step="10"')
+        for value in [19, 10009, 100009, 999999, 2 ** 64 - 1]:
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                p.validate(value, [])
+        self.assertEqual(p.validate(2 ** 64 - 6, []), 2 ** 64 - 6)
+        self.assertEqual(p.validate(1000000, []), 1000000)
+
+    def test_all_thermal_float_slider_positions_are_accepted(self):
+        for lower, upper, step in [('-100', '100', '0.01'),
+                                   ('-273.15', '1000', '0.1'),
+                                   ('-0.3', '0.3', '0.1')]:
+            p = self.parameter('type="float" min="%s" max="%s" step="%s"' %
+                               (lower, upper, step))
+            count = int((Decimal(upper) - Decimal(lower)) / Decimal(step))
+            for i in range(count + 1):
+                # Text-entry values and wx slider arithmetic must both work.
+                text = str(Decimal(lower) + i * Decimal(step))
+                self.assertEqual(p.validate(text, []), p.convert(text))
+                p.validate(float(lower) + i * float(step), [])
+            self.assertEqual(p.minimum, float(lower))
+            self.assertEqual(p.step, float(step))
+            with self.assertRaises(ValueError):
+                p.validate(str(Decimal(lower) + Decimal(step) / 2), [])
+
+    def test_double_steps_and_wire_rounded_bounds(self):
+        p = self.parameter('type="double" min="-0.3" max="0.3" step="0.1"')
+        p.validate(0, [])
+        p.validate(-0.3 + 3 * 0.1, [])
+        with self.assertRaises(ValueError):
+            p.validate('0.05', [])
+        p = self.parameter('type="float" min="0.7" max="0.9" step="0.1"')
+        for value in ('0.7', '0.8', '0.9'):
+            p.validate(value, [])
+        for attrs in ['min="2" max="1"', 'step="0"', 'step="-1"']:
+            with self.assertRaises(ValueError):
+                self.parameter('type="float" ' + attrs)
+
+    def test_adjacent_float32_options_remain_distinct(self):
+        adjacent = struct.unpack('<f', struct.pack('<I', 0x3f800001))[0]
+        self.assertFalse(equal_value(1.0, adjacent))
+        p = self.parameter('type="float"',
+                           '<options><option name="One" value="1"/></options>')
+        with self.assertRaises(ValueError):
+            p.validate(adjacent, p.options)
+        xml = XML.replace(b'name="AUTO" type="bool"', b'name="AUTO" type="float"')
+        definition = CameraDefinition(xml)
+        controls = definition.controls({'AUTO': adjacent})
+        self.assertIn('ISO', controls)  # Only AUTO=1 excludes ISO.
+        self.assertFalse(definition.condition('AUTO=1', {'AUTO': adjacent}))
+
+    def test_custom_numeric_attributes_and_options_do_not_break_other_controls(self):
+        xml = XML.replace(b'<parameter name="DATA" type="custom">',
+                          b'<parameter name="DATA" type="custom" min="vendor" '
+                          b'max="data" step="whatever" default="opaque">'
+                          b'<options><option name="Binary" value="opaque"/></options>')
+        definition = CameraDefinition(xml)
+        custom = definition.parameters['DATA']
+        self.assertIsNone(custom.minimum)
+        self.assertFalse(custom.options)
+        self.assertIn('GAIN', definition.controls({}))
+        self.assertNotIn('DATA', definition.controls({}))
+
+    def test_dtd_and_entity_expansion_are_rejected_in_multiple_encodings(self):
+        for dtd in ['<!DOCTYPE mavlinkcamera [<!ENTITY x "' + 'A' * 1000 + '">]>',
+                    '<!DOCTYPE mavlinkcamera SYSTEM "file:///etc/passwd">',
+                    '<!DOCTYPE mavlinkcamera [<!ENTITY x SYSTEM "file:///etc/passwd">]>']:
+            xml = dtd + '<mavlinkcamera><definition><model>&x;</model></definition></mavlinkcamera>'
+            for encoding in ('utf-8', 'utf-16'):
+                with self.subTest(encoding=encoding), self.assertRaises(ValueError):
+                    CameraDefinition(xml.encode(encoding))
+
+    def test_size_limits_xz_expansion_and_truncated_streams(self):
+        with mock.patch('MAVProxy.modules.mavproxy_camera.definition.MAX_DEFINITION_SIZE', 1024):
+            for data in [b'x' * 1025, lzma.compress(b'x' * 1025), lzma.compress(b'<x/>')[:-3]]:
+                with self.assertRaises(ValueError):
+                    definition_bytes(data)
+            self.assertEqual(definition_bytes(lzma.compress(b'x' * 1024)), b'x' * 1024)
+
+    def test_custom_nonfinite_and_old_pymavlink_decoding(self):
+        self.assertEqual(decode_value(SimpleNamespace(param_type=11, _param_value_raw=b'a\0b')),
+                         b'a\0b')
+        for value in [float('nan'), float('inf'), -float('inf')]:
+            with self.assertRaises(ValueError):
+                decode_value(packet('GAIN', value, 9))
+        with self.assertRaisesRegex(ValueError, 'upgrade pymavlink'):
+            decode_value(SimpleNamespace(param_type=9, param_value='lost binary bytes'))
+
+
+class HTTPDefinitionTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                if self.path in ('/redirect', '/ftp-redirect'):
+                    self.send_response(302)
+                    self.send_header('Location', '/camera.xz' if self.path == '/redirect'
+                                     else 'ftp://127.0.0.1/unwanted.xml')
+                    self.end_headers()
+                else:
+                    self.send_response(200)
+                    self.end_headers()
+                    self.wfile.write(lzma.compress(XML) if self.path == '/camera.xz' else XML)
+
+            def log_message(self, *_args):
+                pass
+        cls.server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
+        cls.thread.start()
+        cls.url = 'http://127.0.0.1:%u' % cls.server.server_port
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+        cls.server.server_close()
+        cls.thread.join()
+
+    def test_http_xml_compression_and_allowed_redirect(self):
+        for path in ('/camera.xml', '/camera.xz', '/redirect'):
+            self.assertEqual(len(CameraDefinition(download_definition(self.url + path)).parameters), 7)
+
+    def test_http_size_cap_and_unsupported_schemes(self):
+        with mock.patch('MAVProxy.modules.mavproxy_camera.definition.MAX_DEFINITION_SIZE', 64):
+            with self.assertRaises(ValueError):
+                download_definition(self.url + '/camera.xml')
+        for uri in ['file:///etc/passwd', 'ftp://127.0.0.1/camera.xml', self.url + '/ftp-redirect']:
+            with self.assertRaises(ValueError):
+                download_definition(uri)
+
+    def test_https_redirect_is_allowed(self):
+        from urllib.request import Request
+        redirect = _DefinitionRedirectHandler().redirect_request(
+            Request(self.url), None, 302, 'Found', {}, 'https://camera.example/definition.xml')
+        self.assertEqual(redirect.full_url, 'https://camera.example/definition.xml')
+
+
 class ParameterTest(unittest.TestCase):
     def setUp(self):
         self.module = mock.Mock()
@@ -107,6 +255,40 @@ class ParameterTest(unittest.TestCase):
         self.parameters = CameraParameters(self.module, self.camera)
         self.parameters.definition = CameraDefinition(XML)
         self.parameters.values.update(AUTO=0, ISO=100, CAM_MODE=0, GAIN=1)
+
+    def wait_for_load(self):
+        deadline = time.monotonic() + 3
+        while self.parameters.loading and time.monotonic() < deadline:
+            self.parameters.idle()
+            time.sleep(0.001)
+        self.assertFalse(self.parameters.loading)
+
+    def test_invalid_ftp_names_are_rejected_before_submission(self):
+        for uri in ['mavftp:///caf%C3%A9.xml', 'mftp:///bad%00.xml',
+                    'mftp:///' + 'x' * 239, 'mftp:///bad%ff.xml']:
+            self.parameters.load(uri)
+            self.parameters.idle()
+            self.assertIn('Invalid MAVFTP', self.parameters.status)
+        self.module.module.return_value.cmd_get.assert_not_called()
+
+    def test_ftp_limit_and_submission_failure_are_reported(self):
+        self.module.module.return_value.cmd_get.side_effect = RuntimeError('failed to start')
+        self.parameters.load('mftp:///camera.xml')
+        self.parameters.idle()
+        self.assertEqual(self.module.module.return_value.cmd_get.call_args.kwargs['max_size'],
+                         MAX_DEFINITION_SIZE)
+        self.assertIn('failed to start', self.parameters.status)
+
+    def test_local_override_and_rejected_scheme(self):
+        with tempfile.TemporaryDirectory() as directory:
+            filename = Path(directory) / 'camera.xml.xz'
+            filename.write_bytes(lzma.compress(XML))
+            self.parameters.load(str(filename), local=True)
+            self.wait_for_load()
+            self.assertEqual(len(self.parameters.definition.parameters), 7)
+        self.parameters.load('file:///etc/passwd')
+        self.parameters.idle()
+        self.assertIn('Unsupported', self.parameters.status)
 
     def test_dialog_refresh_bulk_requests_the_camera_component(self):
         p = self.parameters

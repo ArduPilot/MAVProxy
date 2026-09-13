@@ -26,7 +26,8 @@ package_data.extend(package_files('MAVProxy/modules/mavproxy_cesium/app'))
 # as that breaks the pip install. It seems that pip is not smart enough to
 # use the system versions of these dependencies, so it tries to download and install
 # large numbers of modules like numpy etc which may be already installed
-requirements=['pymavlink>=2.4.14',
+requirements=['pymavlink>=2.4.38',
+              'defusedxml>=0.7.1',
               'pyserial>=3.0',
               'numpy',
               'pynmeagps']

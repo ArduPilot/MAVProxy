@@ -6,8 +6,11 @@ import math
 import operator
 import re
 import struct
-import xml.etree.ElementTree as ET
-from urllib.request import urlopen
+from urllib.parse import urlsplit
+from urllib.request import build_opener, HTTPRedirectHandler
+
+from defusedxml import ElementTree as ET
+from defusedxml.common import DefusedXmlException
 
 # MAV_PARAM_EXT_TYPE, little-endian wire representation.
 TYPES = {name: (index + 1, fmt) for index, (name, fmt) in enumerate([
@@ -25,7 +28,7 @@ def decode_value(message):
     if raw is None:
         raw = message.param_value
     if not isinstance(raw, (bytes, bytearray)):
-        raise ValueError('extended parameter has no raw binary value')
+        raise ValueError('extended parameter has no raw binary value; upgrade pymavlink to 2.4.38 or later')
     param_type = message.param_type
     if param_type == 11:
         return bytes(raw)
@@ -40,9 +43,18 @@ def decode_value(message):
 
 
 def equal_value(a, b):
-    if isinstance(a, float) or isinstance(b, float):
-        return a is not None and b is not None and math.isclose(a, b, rel_tol=1e-6, abs_tol=1e-9)
+    # Both incoming values and XML options are canonical wire values. Even
+    # adjacent float32 numbers may name different options or exclusion rules.
     return a == b
+
+
+def _ulp(value, single=False):
+    """Spacing of binary32/binary64 values, including subnormals."""
+    if value == 0:
+        return 2.0 ** (-149 if single else -1074)
+    exponent = math.frexp(value)[1]
+    return 2.0 ** max(exponent - (24 if single else 53),
+                     -149 if single else -1074)
 
 
 def definition_bytes(data):
@@ -56,9 +68,18 @@ def definition_bytes(data):
     return data
 
 
+class _DefinitionRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if urlsplit(newurl).scheme.lower() not in ('http', 'https'):
+            raise ValueError('camera definition redirects must use HTTP or HTTPS')
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def download_definition(uri):
     """Called in a worker thread, never on MAVProxy's packet-processing loop."""
-    with urlopen(uri, timeout=15) as response:
+    if urlsplit(uri).scheme.lower() not in ('http', 'https'):
+        raise ValueError('camera definition downloads must use HTTP or HTTPS')
+    with build_opener(_DefinitionRedirectHandler()).open(uri, timeout=15) as response:
         return definition_bytes(response.read(MAX_DEFINITION_SIZE + 1))
 
 
@@ -75,14 +96,30 @@ class Parameter:
         self.writeonly = element.get('writeonly', '0').lower() in ('1', 'true')
         if self.type == 'custom':
             self.control = False
-        self.default = self.convert(element.get('default', '0')) if self.fmt else None
-        self.minimum = self.convert(element.get('min')) if 'min' in element.attrib else None
-        self.maximum = self.convert(element.get('max')) if 'max' in element.attrib else None
-        self.step = self.convert(element.get('step')) if 'step' in element.attrib else None
+        self.default = None
+        self.minimum = None
+        self.maximum = None
+        self.step = None
         self.updates = [n.text.strip() for n in element.findall('updates/update') if n.text]
         self.options = []
         self.exclusions = []
         self.ranges = []
+        # Custom data has no numeric editor. Vendor-specific attributes must
+        # not prevent unrelated numeric settings from loading.
+        if self.fmt is None:
+            return
+        self.default = self.convert(element.get('default', '0'))
+        for attribute, field in (('min', 'minimum'), ('max', 'maximum'), ('step', 'step')):
+            if attribute in element.attrib:
+                raw = element.get(attribute)
+                converted = self.convert(raw)
+                # Keep XML bounds/steps at double precision for UI labels and
+                # grid calculations; only values/options use wire precision.
+                setattr(self, field, float(raw) if self.type in ('float', 'double') else converted)
+        if self.minimum is not None and self.maximum is not None and self.minimum > self.maximum:
+            raise ValueError('minimum exceeds maximum')
+        if self.step is not None and self.step <= 0:
+            raise ValueError('step must be positive')
         for option in element.findall('options/option'):
             value = self.convert(option.attrib['value'])
             self.options.append((translate(option.attrib['name']), value))
@@ -98,6 +135,8 @@ class Parameter:
             self.options = [(translate('Off'), 0), (translate('On'), 1)]
 
     def convert(self, value):
+        if self.fmt is None:
+            raise ValueError('custom parameters do not have numeric values')
         if self.type in ('float', 'double'):
             result = float(value)
             if not math.isfinite(result):
@@ -116,15 +155,27 @@ class Parameter:
 
     def validate(self, value, options):
         value = self.convert(value)
-        if self.minimum is not None and value < self.minimum:
+        if self.minimum is not None and value < self.convert(self.minimum):
             raise ValueError('minimum is %s' % self.minimum)
-        if self.maximum is not None and value > self.maximum:
+        if self.maximum is not None and value > self.convert(self.maximum):
             raise ValueError('maximum is %s' % self.maximum)
         if options and not any(equal_value(value, v) for _, v in options):
             raise ValueError('value is not an available option')
         if self.step and self.minimum is not None:
-            steps = (value - self.minimum) / self.step
-            if not math.isclose(steps, round(steps), rel_tol=1e-5, abs_tol=1e-5):
+            if self.type not in ('float', 'double'):
+                on_grid = (value - self.minimum) % self.step == 0
+            else:
+                steps = (value - self.minimum) / self.step
+                if not math.isfinite(steps):
+                    raise ValueError('step count exceeds numeric range')
+                offset = round(steps) * self.step
+                grid_value = self.minimum + offset
+                # Allow wire rounding and double-precision grid arithmetic,
+                # not a tolerance which grows with the number of steps.
+                tolerance = (0.5 * _ulp(value, self.type == 'float') +
+                             2 * (_ulp(self.minimum) + _ulp(offset)))
+                on_grid = abs(value - grid_value) <= tolerance
+            if not on_grid:
                 raise ValueError('value must use steps of %s from %s' % (self.step, self.minimum))
         return value
 
@@ -135,8 +186,8 @@ class Parameter:
 class CameraDefinition:
     def __init__(self, data, locale_name=None):
         try:
-            root = ET.fromstring(definition_bytes(data))
-        except ET.ParseError as error:
+            root = ET.fromstring(definition_bytes(data), forbid_dtd=True)
+        except (ET.ParseError, DefusedXmlException) as error:
             raise ValueError('invalid camera definition XML: %s' % error) from error
         if root.tag != 'mavlinkcamera' or root.find('definition') is None:
             raise ValueError('not a MAVLink camera definition')
@@ -164,6 +215,8 @@ class CameraDefinition:
             for _, target, _, options in param.ranges:
                 if target in self.parameters:
                     target_param = self.parameters[target]
+                    if target_param.fmt is None:
+                        continue
                     options[:] = [(label, target_param.convert(value)) for label, value in options]
 
     def condition(self, condition, values):

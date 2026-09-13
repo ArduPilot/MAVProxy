@@ -7,6 +7,7 @@ import socket
 import time
 import types
 import unittest
+from unittest import mock
 
 
 # Some developer environments have a released MAVProxy imported by a pytest
@@ -135,6 +136,83 @@ class TestConcurrentFTP(unittest.TestCase):
         self.mpstate = FakeMPState()
         self.ftp = mavproxy_ftp.FTPModule(self.mpstate)
         self.ftp.next_session = 0
+
+    def test_bad_filenames_do_not_exhaust_session_slots(self):
+        completed = []
+        for name in ['/café.xml'] * 5 + ['/bad\0.xml', '/' + 'x' * 239]:
+            self.ftp.cmd_get([name], callback=completed.append)
+            self.assertFalse(self.ftp.workers)
+        self.assertEqual(completed, [None] * 7)
+        self.ftp.cmd_get(['/good.xml'], callback=completed.append)
+        self.assertEqual(len(self.ftp.workers), 1)
+        self.assertFalse(self.ftp.pending)
+        self.assertEqual(self.mpstate._master.mav.sent[-1][3], mavproxy_ftp.OP_OpenFileRO)
+
+    def test_queued_bad_filename_does_not_block_next_download(self):
+        self.ftp.ftp_settings.max_sessions = 1
+        self.ftp.cmd_list(['/'])
+        completed = []
+        self.ftp.cmd_get(['/café.xml'], callback=completed.append)
+        self.ftp.cmd_get(['/valid.xml'], callback=completed.append)
+        self.ftp.mavlink_packet(reply(0, mavproxy_ftp.OP_ListDirectoryWithTime,
+                                     opcode=mavproxy_ftp.OP_Nack,
+                                     payload=bytes([mavproxy_ftp.ERR_EndOfFile])))
+        self.assertEqual(completed, [None])
+        self.assertFalse(self.ftp.pending)
+        self.assertEqual(len(self.ftp.workers), 1)
+        self.assertEqual(self.mpstate._master.mav.sent[-1][3], mavproxy_ftp.OP_OpenFileRO)
+
+    def test_launch_cleanup_reclaims_slot_even_if_failure_callback_raises(self):
+        def failed_callback(_fh):
+            raise RuntimeError('callback failed')
+        self.ftp.cmd_get(['/café.xml'], callback=failed_callback)
+        self.assertFalse(self.ftp.workers)
+
+    def test_download_limit_rejects_large_advertised_size_before_buffer_creation(self):
+        completed = []
+        self.ftp.cmd_get(['/camera.xml'], callback=completed.append, max_size=1024)
+        with mock.patch.object(mavproxy_ftp, 'SIO') as buffer:
+            self.ftp.mavlink_packet(reply(0, mavproxy_ftp.OP_OpenFileRO,
+                                         payload=struct.pack('<I', 1025)))
+            buffer.assert_not_called()
+        self.assertEqual(completed, [None])
+        self.assertFalse(self.ftp.workers)
+
+    def test_download_limit_handles_unreported_and_underreported_sizes(self):
+        for advertised in [b'', struct.pack('<I', 1)]:
+            completed = []
+            worker = self.ftp.cmd_get(['/camera.xml'], callback=completed.append, max_size=8)
+            self.ftp.mavlink_packet(reply(worker.session, mavproxy_ftp.OP_OpenFileRO,
+                                         payload=advertised))
+            buffer = worker.fh
+            self.ftp.mavlink_packet(reply(worker.session, mavproxy_ftp.OP_BurstReadFile,
+                                         payload=b'x' * 9))
+            self.assertEqual(len(buffer.getvalue()), 0)
+            self.assertEqual(completed, [None])
+            self.assertFalse(self.ftp.workers)
+
+    def test_download_limit_rejects_sparse_offsets_before_allocating_gaps(self):
+        completed = []
+        worker = self.ftp.cmd_get(['/camera.xml'], callback=completed.append, max_size=1024)
+        self.ftp.mavlink_packet(reply(worker.session, mavproxy_ftp.OP_OpenFileRO,
+                                     payload=struct.pack('<I', 1)))
+        buffer = worker.fh
+        self.ftp.mavlink_packet(reply(worker.session, mavproxy_ftp.OP_BurstReadFile,
+                                     offset=0xffffffff, payload=b'x'))
+        self.assertEqual(buffer.getvalue(), b'')
+        self.assertFalse(worker.read_gaps)
+        self.assertEqual(completed, [None])
+        self.assertFalse(self.ftp.workers)
+
+    def test_download_at_size_limit_completes(self):
+        completed = []
+        self.ftp.cmd_get(['/camera.xml'], callback=lambda fh: completed.append(fh.read()), max_size=8)
+        self.ftp.mavlink_packet(reply(0, mavproxy_ftp.OP_OpenFileRO,
+                                     payload=struct.pack('<I', 8)))
+        self.ftp.mavlink_packet(reply(0, mavproxy_ftp.OP_BurstReadFile,
+                                     payload=b'12345678', burst_complete=1))
+        self.assertEqual(completed, [b'12345678'])
+        self.assertFalse(self.ftp.workers)
 
     def test_idle_status_keeps_script_compatible_wording(self):
         output = io.StringIO()
