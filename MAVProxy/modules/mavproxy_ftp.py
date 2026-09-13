@@ -76,6 +76,14 @@ SESSION_REUSE_DELAY = 30.0
 MAX_FTP_NAME = MAX_Payload - 1
 
 
+def encode_filename(name):
+    """Validate names before passing them to the ASCII MAVFTP client."""
+    encoded = name.encode('ascii')
+    if not encoded or b'\0' in encoded or len(encoded) > MAX_FTP_NAME:
+        raise ValueError('FTP filename must be 1..%u ASCII bytes without NULs' % MAX_FTP_NAME)
+    return bytearray(encoded)
+
+
 class FTP_OP:
     def __init__(self, seq, session, opcode, size, req_opcode, burst_complete, offset, payload):
         self.seq = seq
@@ -200,6 +208,7 @@ class FTPWorker(mp_module.MPModule):
         self.show_progress = False
         self.last_status_time = 0
         self.remote_file_size = None
+        self.max_download_size = None
         # a get or put is running, including the open handshake before any
         # file handle exists
         self.transfer_active = False
@@ -451,7 +460,7 @@ class FTPWorker(mp_module.MPModule):
             print('LIST: %s' % op)
             self.terminate_session()
 
-    def cmd_get(self, args, callback=None, callback_progress=None):
+    def cmd_get(self, args, callback=None, callback_progress=None, max_size=None):
         '''get file'''
         if len(args) == 0:
             print("Usage: get FILENAME <LOCALNAME>")
@@ -466,6 +475,9 @@ class FTPWorker(mp_module.MPModule):
         self.op_start = time.time()
         self.callback = callback
         self.callback_progress = callback_progress
+        self.max_download_size = max_size
+        if max_size is not None and max_size < 0:
+            raise ValueError('FTP download size limit must be non-negative')
         self.show_progress = callback is None
         self.remote_file_size = None
         self.transfer_active = True
@@ -477,7 +489,7 @@ class FTPWorker(mp_module.MPModule):
             self.burst_size = 239
         elif self.burst_size > 239:
             self.burst_size = 239
-        enc_fname = bytearray(fname, 'ascii')
+        enc_fname = encode_filename(fname)
         self.open_retries = 0
         op = FTP_OP(self.seq, self.session, OP_OpenFileRO, len(enc_fname), 0, 0, 0, enc_fname)
         self.send(op)
@@ -497,6 +509,8 @@ class FTPWorker(mp_module.MPModule):
                op.payload is not None and len(op.payload) >= 4:
                 # servers report the file size here, giving us a progress total
                 self.remote_file_size = struct.unpack("<I", bytes(op.payload[:4]))[0]
+                if not self.check_download_size(self.remote_file_size):
+                    return
             try:
                 if self.callback is not None or self.filename == '-':
                     self.fh = SIO()
@@ -558,6 +572,14 @@ class FTPWorker(mp_module.MPModule):
             return True
         return False
 
+    def check_download_size(self, end_offset):
+        """Enforce caller limits before buffer writes or sparse-gap allocation."""
+        if self.max_download_size is not None and end_offset > self.max_download_size:
+            print('FTP: download exceeds size limit of %u bytes' % self.max_download_size)
+            self.terminate_session()
+            return False
+        return True
+
     def write_payload(self, op):
         '''write payload from a read op'''
         self.fh.seek(op.offset)
@@ -583,6 +605,8 @@ class FTPWorker(mp_module.MPModule):
             if self.ftp_settings.debug > 0:
                 print("Setting burst size to %u" % self.burst_size)
         if op.opcode == OP_Ack and self.fh is not None:
+            if not self.check_download_size(op.offset + len(op.payload)):
+                return
             ofs = self.fh.tell()
             if op.offset < ofs:
                 # writing an earlier portion, possibly remove a gap
@@ -670,6 +694,8 @@ class FTPWorker(mp_module.MPModule):
                 print(op)
             return
         if op.opcode == OP_Ack and self.fh is not None:
+            if not self.check_download_size(op.offset + len(op.payload)):
+                return
             gap = (op.offset, op.size)
             requested_gap = next(
                 (g for g in self.read_gaps if g[0] == op.offset), None)
@@ -1631,8 +1657,20 @@ class FTPModule(mp_module.MPModule):
             target_component=operation['target_component'])
         worker.operation_name = operation['name']
         self.workers[session] = worker
-        method = getattr(worker, operation['method'])
-        method(*operation['args'], **operation['kwargs'])
+        try:
+            method = getattr(worker, operation['method'])
+            method(*operation['args'], **operation['kwargs'])
+        except Exception as error:
+            print('FTP: unable to start %s: %s' % (operation['name'], error))
+            try:
+                worker.terminate_session()
+            except Exception as cleanup_error:
+                print('FTP: session cleanup failed: %s' % cleanup_error)
+            finally:
+                # Even a send or failure callback that raises must not retain
+                # a session slot and starve later transfers.
+                self.worker_done(worker)
+            return worker
         # Bad arguments or a local-file error can return without sending.
         if worker.last_op is None:
             self.worker_done(worker)
@@ -1697,10 +1735,11 @@ class FTPModule(mp_module.MPModule):
         return self._submit('list', 'cmd_list', args)
 
     def cmd_get(self, args, callback=None, callback_progress=None,
-                target_system=None, target_component=None):
+                target_system=None, target_component=None, max_size=None):
         return self._submit('get', 'cmd_get', args,
                             callback=callback,
                             callback_progress=callback_progress,
+                            max_size=max_size,
                             target_system=target_system,
                             target_component=target_component)
 

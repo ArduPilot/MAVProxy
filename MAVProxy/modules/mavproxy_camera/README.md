@@ -47,10 +47,17 @@ Choose **Camera → Custom Settings** in the console or map menu, or run
 `camera select SYSID:COMPID` when more than one camera is discovered.
 Automatic selection prefers a matching camera component over ArduPilot's
 duplicate camera information from component 1. The autopilot proxy does not
-serve the camera's extended parameters. Explicit selections are preserved.
+serve the camera's extended parameters. Autopilot definitions are loaded only
+when explicitly selected or requested, avoiding duplicate downloads and
+parameter requests. Explicit selections are preserved.
 
 `CAMERA_INFORMATION.cam_definition_uri` supplies the camera's XML definition.
 HTTP, HTTPS and MAVFTP downloads and XZ-compressed definitions are supported.
+Camera settings require pymavlink 2.4.38 or later and defusedxml (installed by
+MAVProxy). Definitions are limited to 4 MiB before and after XZ decompression;
+MAVFTP enforces the transfer limit before buffering data. DTDs and XML entities
+are rejected. HTTP redirects must remain HTTP/HTTPS. Camera-advertised URLs
+may refer to local or private networks, so only connect trusted MAVLink peers.
 Load `module load ftp` for MAVFTP URLs. Downloads run without blocking camera
 telemetry. A changed URI or definition version reloads the metadata and values.
 Use `camera definition` to retry a download, or `camera definition FILE|URL` to

@@ -421,6 +421,9 @@ class CameraModule(mp_module.MPModule):
         if camera is None:
             return
         parameters = camera.parameters
+        if (command != "definition" and parameters.identity is None and
+                camera.information is not None):
+            parameters.information(camera.information)
         if command == "custom":
             parameters.open_dialog()
             if camera.information is None:
@@ -460,6 +463,8 @@ class CameraModule(mp_module.MPModule):
             self._request_camera_state(camera, full=True)
         self.selected_camera = key
         self.camera_selection_explicit = True
+        if camera.information is not None and camera.parameters.identity is None:
+            camera.parameters.information(camera.information)
         print("Selected camera %s" % camera.label())
 
     def camera_command(self, command, params=()):
@@ -974,7 +979,15 @@ class CameraModule(mp_module.MPModule):
         if message_type == "CAMERA_INFORMATION":
             camera = self._ensure_camera(system_id, component_id)
             camera.information = message
-            camera.parameters.information(message)
+            # An autopilot may repeat the camera's definition URI without
+            # serving its extended parameters. Only load this endpoint when
+            # the operator explicitly selects or requests its settings.
+            if (component_id != mavutil.mavlink.MAV_COMP_ID_AUTOPILOT1 or
+                    (self.camera_settings.camera_component == component_id and
+                     system_id == (self.target_system or 1)) or
+                    (self.camera_selection_explicit and
+                     self.selected_camera == (system_id, component_id))):
+                camera.parameters.information(message)
             self._prefer_camera_component()
             gimbal_component = getattr(message, "gimbal_device_id", 0)
             if self._is_gimbal_device_component(gimbal_component):

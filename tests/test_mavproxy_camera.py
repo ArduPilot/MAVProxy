@@ -184,6 +184,63 @@ class CameraModuleTest(unittest.TestCase):
         first.parameters.close.assert_called_once()
         second.parameters.close.assert_called_once()
 
+    def test_duplicate_proxy_does_not_download_or_request_parameters(self):
+        from MAVProxy.modules.mavproxy_camera.definition import CameraDefinition
+        xml = b'<mavlinkcamera><definition/><parameters><parameter name="GAIN" type="uint8"/></parameters></mavlinkcamera>'
+        ftp = mock.Mock()
+        self.state.modules['ftp'] = ftp
+        self.state._master.mav.param_ext_request_list_send = mock.Mock()
+        self.state._master.mav.param_ext_request_read_send = mock.Mock()
+        uri = 'mftp://[;comp=100]/camera.xml'
+        # Idle between advertisements too: proxy loading must not race discovery.
+        self.module.mavlink_packet(camera_information(component_id=1, cam_definition_uri=uri))
+        self.module.idle_task()
+        ftp.cmd_get.assert_not_called()
+        self.module.mavlink_packet(camera_information(cam_definition_uri=uri))
+        self.assertEqual(ftp.cmd_get.call_count, 1)
+        parameters = self.module.cameras[(1, 100)].parameters
+        # Deliver the worker result on the same queue as a real download.
+        parameters.result_queue.put((parameters.generation, CameraDefinition(xml), None))
+        self.module.idle_task()
+        self.state._master.mav.param_ext_request_list_send.assert_called_once_with(1, 100)
+        parameters.reads['GAIN'][0] = 0
+        self.module.idle_task()
+        self.state._master.mav.param_ext_request_read_send.assert_called_once_with(1, 100, b'GAIN', -1)
+        self.assertFalse(self.module.cameras[(1, 1)].parameters.reads)
+
+    def test_explicit_autopilot_selection_can_still_load_its_definition(self):
+        ftp = mock.Mock()
+        self.state.modules['ftp'] = ftp
+        self.module.mavlink_packet(camera_information(component_id=1,
+                                  cam_definition_uri='mftp:///camera.xml'))
+        ftp.cmd_get.assert_not_called()
+        self.module.cmd_select(['1:1'])
+        ftp.cmd_get.assert_called_once()
+        self.assertEqual(ftp.cmd_get.call_args.kwargs['target_component'], 1)
+
+    def test_component_override_loads_only_the_selected_system_proxy(self):
+        ftp = mock.Mock()
+        self.state.modules['ftp'] = ftp
+        self.module.camera_settings.camera_component = 1
+        self.module.mavlink_packet(camera_information(system_id=17, component_id=1,
+                                  cam_definition_uri='mftp:///camera.xml'))
+        ftp.cmd_get.assert_not_called()
+        self.module.mavlink_packet(camera_information(component_id=1,
+                                  cam_definition_uri='mftp:///camera.xml'))
+        ftp.cmd_get.assert_called_once()
+        self.assertEqual(ftp.cmd_get.call_args.kwargs['target_system'], 1)
+
+    def test_opening_proxy_settings_preserves_local_definition_override(self):
+        self.module.mavlink_packet(camera_information(component_id=1))
+        parameters = self.module.cameras[(1, 1)].parameters
+        parameters.identity = ('/tmp/local-camera.xml', 0)
+        with mock.patch.object(parameters, 'information') as information, \
+                mock.patch.object(parameters, 'open_dialog') as open_dialog:
+            self.module.cmd_custom('custom', [])
+            self.module.cmd_select(['1:1'])
+        information.assert_not_called()
+        open_dialog.assert_called_once()
+
     def test_camera_component_replaces_automatic_autopilot_proxy_selection(self):
         self.module.mavlink_packet(camera_information(component_id=1))
         self.assertEqual(self.module.selected_camera, (1, 1))
