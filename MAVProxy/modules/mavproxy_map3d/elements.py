@@ -9,14 +9,9 @@ import math
 
 import vtk
 
-from pymavlink import mavutil
-
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.mavproxy_map3d.map3d import MissionItem
 from MAVProxy.modules.mavproxy_map3d.terrain import enu, R
-
-# Older pymavlink releases lack this common.xml command.
-MAV_CMD_NAV_ARC_WAYPOINT = getattr(mavutil.mavlink, "MAV_CMD_NAV_ARC_WAYPOINT", 36)
 
 # MAV_FRAME altitude conventions
 FRAME_GLOBAL = (0, 5)            # AMSL
@@ -533,7 +528,7 @@ class ElementManager:
         flown = [i for i in flown if not (i.lat == 0 and i.lon == 0)]
         for (index, item) in enumerate(flown):
             amsl = self._resolve_amsl(item.alt, item.frame)
-            if (item.command == MAV_CMD_NAV_ARC_WAYPOINT and
+            if (item.command == mp_util.MAV_CMD_NAV_ARC_WAYPOINT and
                     previous is not None):
                 # the leg into an arc waypoint is a circular arc rather
                 # than a straight line; climb linearly along it
