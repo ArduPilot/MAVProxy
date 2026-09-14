@@ -252,10 +252,32 @@ def mission_circle_radius(command, params, default_radius=None, vehicle=None):
         # circles, so those are left alone
         return None
     radius = params[index]
-    if radius is None or math.isnan(radius) or radius == 0:
-        radius = default_radius
-    if radius is None or math.isnan(radius) or radius == 0:
-        return None
+    if command == MAV_CMD_DO_ORBIT:
+        if radius is None or math.isnan(radius) or radius == 0:
+            radius = default_radius
+        if radius is None or math.isnan(radius) or radius == 0:
+            return None
+        return radius
+    if radius is None or math.isnan(radius):
+        radius = 0.0
+    if (command == mavlink.MAV_CMD_NAV_LOITER_TIME or abs(radius) <= 1):
+        # the vehicle's own radius.  ArduPilot has nowhere to keep a radius
+        # for LOITER_TIME -- the loiter time takes all of the storage -- so
+        # it keeps only a bit saying the item asked for counter-clockwise,
+        # and hands that back as -1 (or +1 when it did not); whatever radius
+        # the item was uploaded with, ArduPlane's update_loiter(0) flies
+        # WP_LOITER_RAD.  It takes any radius of a metre or less the same
+        # way, and flies counter-clockwise if the item asked for it, and
+        # otherwise the way WP_LOITER_RAD's sign says
+        if default_radius is None or math.isnan(default_radius):
+            return None
+        size = abs(default_radius)
+        if size <= 1:
+            # ArduPlane's LOITER_RADIUS_DEFAULT
+            size = 60.0
+        if radius < 0 or default_radius < 0:
+            return -size
+        return size
     return radius
 
 

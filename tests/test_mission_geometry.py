@@ -306,7 +306,8 @@ class TestCirclingItems(object):
         cases = [
             (m.MAV_CMD_NAV_LOITER_UNLIM, (0, 0, 70, 0), 70),
             (m.MAV_CMD_NAV_LOITER_TURNS, (3, 0, -55, 0), -55),
-            (m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 90, 0), 90),
+            # LOITER_TIME has no radius of its own: see below
+            (m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 90, 0), None),
             (m.MAV_CMD_NAV_LOITER_TO_ALT, (1, -65, 0, 0), -65),
             (mp_util.MAV_CMD_DO_ORBIT, (80, 5, 0, 0), 80),
         ]
@@ -329,6 +330,70 @@ class TestCirclingItems(object):
         # with no vehicle default there is no circle to draw
         assert mp_util.mission_circle_radius(
             m.MAV_CMD_NAV_LOITER_UNLIM, (0, 0, 0, 0)) is None
+
+    def test_a_loiter_time_radius_of_one_is_a_direction(self):
+        m = self.mavlink
+        # ArduPilot cannot store a radius for LOITER_TIME and hands back +-1
+        # to say which way round it flies, so the vehicle's own radius is the
+        # size and param3 only picks the direction
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 1, 0), 60) == 60
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_TIME, (30, 0, -1, 0), 60) == -60
+        # and one uploaded with a real radius is flown at the vehicle's all
+        # the same: ArduPlane's verify_loiter_time() calls update_loiter(0)
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_TIME, (30, 0, -90, 0), 60) == -60
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 90, 0), 60) == 60
+
+    def test_a_radius_of_a_metre_or_less_is_the_vehicles(self):
+        m = self.mavlink
+        # update_loiter() takes a radius of a metre or less as unset, for
+        # every loiter item, keeping the direction the item asked for
+        for command in (m.MAV_CMD_NAV_LOITER_UNLIM, m.MAV_CMD_NAV_LOITER_TURNS):
+            assert mp_util.mission_circle_radius(
+                command, (1, 0, 1, 0), 80) == 80
+            assert mp_util.mission_circle_radius(
+                command, (1, 0, -1, 0), 80) == -80
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_TO_ALT, (0, -0.5, 0, 0), 80) == -80
+        # and a radius which is really a radius is left alone
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_TURNS, (1, 0, -90, 0), 80) == -90
+
+    def test_a_vehicle_radius_of_a_metre_or_less_is_arduplanes_default(self):
+        m = self.mavlink
+        # with WP_LOITER_RAD a metre or less, update_loiter() flies
+        # LOITER_RADIUS_DEFAULT, 60m, the way WP_LOITER_RAD's sign says
+        for command in (m.MAV_CMD_NAV_LOITER_UNLIM, m.MAV_CMD_NAV_LOITER_TIME):
+            assert mp_util.mission_circle_radius(
+                command, (30, 0, 0, 0), 0) == 60
+            assert mp_util.mission_circle_radius(
+                command, (30, 0, 0, 0), -1) == -60
+            assert mp_util.mission_circle_radius(
+                command, (30, 0, -1, 0), 1) == -60
+
+    def test_a_loiter_time_goes_the_vehicles_way_unless_told_otherwise(self):
+        m = self.mavlink
+        # ArduPlane's update_loiter() flies counter-clockwise when the item
+        # asked for it, and otherwise the way WP_LOITER_RAD's sign says: so
+        # a vehicle whose own radius is negative circles counter-clockwise
+        # for an item handing back +1, or one uploaded with no radius at all
+        for param3 in (0, 1):
+            assert mp_util.mission_circle_radius(
+                m.MAV_CMD_NAV_LOITER_TIME, (30, 0, param3, 0), -60) == -60
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_TIME, (30, 0, -1, 0), -60) == -60
+        # and a clockwise vehicle is only turned round by the item asking
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 0, 0), 60) == 60
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_TIME, (30, 0, -1, 0), 60) == -60
+        # and with no vehicle radius to take, nothing is drawn rather than a
+        # circle a metre across
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 1, 0)) is None
 
     def test_turn_counts(self):
         m = self.mavlink
@@ -538,10 +603,10 @@ class TestHoveringVehicles(object):
                                   (m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 90, 0)),
                                   (m.MAV_CMD_NAV_LOITER_TO_ALT, (1, -65, 0, 0))):
             assert mp_util.mission_circle_radius(
-                command, params, vehicle=m.MAV_TYPE_QUADROTOR) is None
+                command, params, 60, vehicle=m.MAV_TYPE_QUADROTOR) is None
             # a forward-flight vehicle circles for all of them
             assert mp_util.mission_circle_radius(
-                command, params, vehicle=m.MAV_TYPE_FIXED_WING) is not None
+                command, params, 60, vehicle=m.MAV_TYPE_FIXED_WING) is not None
 
     def test_unknown_vehicle_keeps_the_old_behaviour(self):
         m = self.mavlink
