@@ -134,7 +134,7 @@ class TestCirclingItems(object):
             (m.MAV_CMD_NAV_LOITER_TURNS, (3, 0, -55, 0), -55),
             (m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 90, 0), 90),
             (m.MAV_CMD_NAV_LOITER_TO_ALT, (1, -65, 0, 0), -65),
-            (m.MAV_CMD_DO_ORBIT, (80, 5, 0, 0), 80),
+            (mp_util.MAV_CMD_DO_ORBIT, (80, 5, 0, 0), 80),
         ]
         for (command, params, expected) in cases:
             assert mp_util.mission_circle_radius(command, params) == expected
@@ -142,7 +142,7 @@ class TestCirclingItems(object):
     def test_items_which_do_not_circle(self):
         m = self.mavlink
         for command in (m.MAV_CMD_NAV_WAYPOINT,
-                        36,  # MAV_CMD_NAV_ARC_WAYPOINT (absent in older pymavlink)
+                        mp_util.MAV_CMD_NAV_ARC_WAYPOINT,
                         m.MAV_CMD_NAV_TAKEOFF,
                         m.MAV_CMD_DO_JUMP):
             assert mp_util.mission_circle_radius(command, (1, 2, 3, 4)) is None
@@ -162,10 +162,10 @@ class TestCirclingItems(object):
             m.MAV_CMD_NAV_LOITER_TURNS, (3, 0, 60, 0)) == 3
         # DO_ORBIT counts in radians
         assert mp_util.mission_circle_turns(
-            m.MAV_CMD_DO_ORBIT, (80, 5, 0, math.radians(270))) == pytest.approx(0.75)
+            mp_util.MAV_CMD_DO_ORBIT, (80, 5, 0, math.radians(270))) == pytest.approx(0.75)
         # circling forever, and items which do not count turns
         assert mp_util.mission_circle_turns(
-            m.MAV_CMD_DO_ORBIT, (80, 5, 0, 0)) is None
+            mp_util.MAV_CMD_DO_ORBIT, (80, 5, 0, 0)) is None
         assert mp_util.mission_circle_turns(
             m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 90, 0)) is None
 
@@ -192,7 +192,7 @@ class TestHoveringVehicles(object):
         m = self.mavlink
         # it flies these as circles ...
         for (command, params) in ((m.MAV_CMD_NAV_LOITER_TURNS, (2, 0, 60, 0)),
-                                  (m.MAV_CMD_DO_ORBIT, (80, 5, 0, 0))):
+                                  (mp_util.MAV_CMD_DO_ORBIT, (80, 5, 0, 0))):
             assert mp_util.mission_circle_radius(
                 command, params, vehicle=m.MAV_TYPE_QUADROTOR) is not None
         # ... and holds position for these, climbing straight up rather than

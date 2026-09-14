@@ -13,6 +13,11 @@ import time
 import re
 from math import cos, sin, tan, atan2, sqrt, radians, degrees, pi, log, fmod
 
+# MAVLink commands newer than some pymavlink releases know about -- 2.4.49
+# has neither -- so they are named here rather than looked up in the dialect
+MAV_CMD_DO_ORBIT = 34
+MAV_CMD_NAV_ARC_WAYPOINT = 36
+
 # Some platforms (CYGWIN and others) many not have the wx library
 # use imp to see if wx is on the path
 has_wxpython = False
@@ -234,7 +239,7 @@ def mission_circle_radius(command, params, default_radius=None, vehicle=None):
         mavlink.MAV_CMD_NAV_LOITER_TURNS: 2,
         mavlink.MAV_CMD_NAV_LOITER_TIME: 2,
         mavlink.MAV_CMD_NAV_LOITER_TO_ALT: 1,
-        mavlink.MAV_CMD_DO_ORBIT: 0,
+        MAV_CMD_DO_ORBIT: 0,
     }.get(command)
     if index is None:
         return None
@@ -261,7 +266,7 @@ def mission_circle_turns(command, params):
     mavlink = mavutil.mavlink
     if command == mavlink.MAV_CMD_NAV_LOITER_TURNS:
         turns = params[0]
-    elif command == mavlink.MAV_CMD_DO_ORBIT:
+    elif command == MAV_CMD_DO_ORBIT:
         # DO_ORBIT counts in radians rather than turns
         turns = params[3] / (2 * pi)
     else:
