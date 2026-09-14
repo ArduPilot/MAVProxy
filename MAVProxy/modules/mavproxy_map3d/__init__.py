@@ -26,9 +26,6 @@ FENCE_EXCLUSION_BGR = (255, 0, 0)
 FENCE_RETURN_BGR = (255, 127, 127)
 FENCE_RETURN_RADIUS = 10.0
 
-# takeoff items normally carry an altitude and no position
-TAKEOFF_COMMANDS = (22, 84)      # NAV_TAKEOFF, NAV_VTOL_TAKEOFF
-
 
 def bgr_to_rgb(bgr, default=(1.0, 0.0, 1.0)):
     '''SlipMap/OpenCV colours are BGR; VTK wants RGB floats'''
@@ -306,7 +303,7 @@ class Map3DModule(mp_module.MPModule):
         for w in wploader.wpoints:
             frame = getattr(w, 'frame', 0)
             (lat, lon) = (w.x, w.y)
-            if lat == 0 and lon == 0 and w.command in TAKEOFF_COMMANDS:
+            if lat == 0 and lon == 0 and w.command in mp_util.TAKEOFF_COMMANDS:
                 # draw the climb from home, otherwise the takeoff altitude is
                 # dropped and the mission appears to start at the first waypoint
                 home = self.mission_home(wploader)

@@ -462,6 +462,63 @@ class TestLogMissionItems(object):
     def item(self, seq, command, params, alt=100.0):
         return (HERE[0], HERE[1] + seq * 0.01, alt, 3, command, seq, params)
 
+    def test_a_takeoff_with_no_position_climbs_from_home(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink.MAV_CMD_NAV_TAKEOFF
+        home = (HERE[0], HERE[1], 584.0, 0,
+                mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 0, (0, 0, 0, 0))
+        takeoff = (0.0, 0.0, 30.0, 3, m, 1, (0, 0, 0, 0))
+        out = self.module().mission_items_from_cmds({0: home, 1: takeoff})
+        assert len(out) == 2
+        # the takeoff is drawn as the climb from home it is
+        assert out[1][0] == HERE[0]
+        assert out[1][1] == HERE[1]
+        assert out[1][2] == 30.0
+        assert out[1][4] == m
+
+    def test_an_item_with_nowhere_to_go_is_left_out(self):
+        from pymavlink import mavutil
+        home = (HERE[0], HERE[1], 584.0, 0,
+                mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 0, (0, 0, 0, 0))
+        # a jump carries no position and is not a takeoff, so it is not drawn
+        jump = (0.0, 0.0, 0.0, 3, mavutil.mavlink.MAV_CMD_DO_JUMP, 1,
+                (0, 0, 0, 0))
+        out = self.module().mission_items_from_cmds({0: home, 1: jump})
+        assert [i[5] for i in out] == [0]
+        # and with nowhere to climb from, nor is a takeoff
+        takeoff = (0.0, 0.0, 30.0, 3, mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 1,
+                   (0, 0, 0, 0))
+        out = self.module().mission_items_from_cmds({1: takeoff})
+        assert out == []
+
+    def test_a_mission_uploaded_before_home_was_known(self):
+        from pymavlink import mavutil
+        # the autopilot keeps its own home in item 0, so a mission uploaded
+        # before it had one leaves that item empty as well
+        home = (0.0, 0.0, 0.0, 0, mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 0,
+                (0, 0, 0, 0))
+        takeoff = (0.0, 0.0, 30.0, 3, mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 1,
+                   (0, 0, 0, 0))
+        out = self.module().mission_items_from_cmds(
+            {0: home, 1: takeoff}, started_at=HERE)
+        # the empty home is not drawn, but the takeoff climbs from where the
+        # flight started
+        assert [i[5] for i in out] == [1]
+        assert (out[0][0], out[0][1]) == HERE
+
+    def test_a_takeoff_climbs_from_where_it_was_flown(self):
+        from pymavlink import mavutil
+        # a vehicle need not take off from the home a mission was uploaded
+        # with; where the log says the takeoff began wins over home
+        home = (HERE[0], HERE[1], 584.0, 0,
+                mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 0, (0, 0, 0, 0))
+        takeoff = (0.0, 0.0, 30.0, 3, mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 1,
+                   (0, 0, 0, 0))
+        elsewhere = mp_util.gps_newpos(HERE[0], HERE[1], 45, 2000)
+        out = self.module().mission_items_from_cmds(
+            {0: home, 1: takeoff}, flown_from={1: elsewhere})
+        assert (out[1][0], out[1][1]) == elsewhere
+
     def test_the_turns_an_item_asks_for_are_carried_through(self):
         from pymavlink import mavutil
         m = mavutil.mavlink
@@ -535,6 +592,27 @@ class TestLogMissionItems(object):
             self.log(*(self.dump(HERE, 4) +
                        [self.message('MSG', Message='New mission')])))
         assert mission == []
+
+    def test_the_log_says_where_a_takeoff_began(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        moved = mp_util.gps_newpos(HERE[0], HERE[1], 45, 2000)
+
+        def cmd(seq, command, lat, lng, alt):
+            return self.message('CMD', CNum=seq, CId=command, Lat=lat,
+                                Lng=lng, Alt=alt, Frame=3, Prm1=0, Prm2=0,
+                                Prm3=0, Prm4=0)
+        (path, mission) = self.module().mission_from_log(self.log(
+            self.message('POS', Lat=HERE[0], Lng=HERE[1], Alt=584.0),
+            self.message('MSG', Message='New mission'),
+            cmd(0, m.MAV_CMD_NAV_WAYPOINT, HERE[0], HERE[1], 584.0),
+            cmd(1, m.MAV_CMD_NAV_TAKEOFF, 0.0, 0.0, 30.0),
+            # the vehicle is carried somewhere else before it flies
+            self.message('POS', Lat=moved[0], Lng=moved[1], Alt=600.0),
+            self.message('MSG', Message='Mission: 1 Takeoff'),
+            self.message('POS', Lat=moved[0], Lng=moved[1], Alt=630.0),
+        ))
+        assert (mission[1][0], mission[1][1]) == moved
 
     def test_a_log_from_before_the_logger_said_new_mission(self):
         # without the message, a mission's first item still starts it again
