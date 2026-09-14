@@ -706,14 +706,20 @@ def mission_from_log(mlog, condition=None):
     # where the vehicle was when each item began, from the "Mission: <seq>"
     # the autopilot announces as it starts one
     flown_from = {}
+    # home, as the vehicle last logged it
+    home = None
     while True:
-        m = mlog.recv_match(type=['POS', 'CMD', 'MSG'], condition=condition)
+        m = mlog.recv_match(type=['POS', 'CMD', 'MSG', 'ORGN'],
+                            condition=condition)
         if m is None:
             break
         mtype = m.get_type()
         if mtype == 'POS':
             path.append((m.Lat, m.Lng, m.Alt,
                          grapher.timestamp_to_days(m._timestamp)))
+        elif mtype == 'ORGN':
+            if m.Type == 1 and (m.Lat != 0 or m.Lng != 0):
+                home = (m.Lat, m.Lng, m.Alt)
         elif mtype == 'MSG':
             fields = m.Message.split()
             if m.Message == 'New mission':
@@ -731,6 +737,11 @@ def mission_from_log(mlog, condition=None):
             params = tuple(getattr(m, 'Prm%u' % i, 0.0) for i in range(1, 5))
             items[m.CNum] = (m.Lat, m.Lng, m.Alt, getattr(m, 'Frame', 3),
                              m.CId, m.CNum, params)
+    if (home is not None and 0 in items and
+            items[0][0] == 0 and items[0][1] == 0):
+        # a mission uploaded before the vehicle had a home carries an empty
+        # one, which everything relative to home would be measured from
+        items[0] = (home[0], home[1], home[2], 0) + items[0][4:]
     mission = mission_items_from_cmds(
         items, started_at=(path[0][0], path[0][1]) if path else None,
         flown_from=flown_from)

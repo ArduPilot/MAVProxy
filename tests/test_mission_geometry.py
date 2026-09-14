@@ -614,6 +614,33 @@ class TestLogMissionItems(object):
         ))
         assert (mission[1][0], mission[1][1]) == moved
 
+    def test_an_empty_home_is_the_one_the_log_recorded(self):
+        # a mission uploaded before the vehicle had a home logs home as
+        # nothing at all; the vehicle logs its home when it gets one.  The
+        # first positions are logged before the origin is, at nothing too
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        up = mp_util.gps_newpos(HERE[0], HERE[1], 0, 1000)
+
+        def cmd(seq, command, lat, lng, alt, frame):
+            return self.message('CMD', CNum=seq, CId=command, Lat=lat,
+                                Lng=lng, Alt=alt, Frame=frame, Prm1=0,
+                                Prm2=0, Prm3=0, Prm4=0)
+        (path, mission) = self.module().mission_from_log(self.log(
+            self.message('POS', Lat=HERE[0], Lng=HERE[1], Alt=0.1),
+            self.message('MSG', Message='New mission'),
+            cmd(0, m.MAV_CMD_NAV_WAYPOINT, 0.0, 0.0, 0.0, 0),
+            cmd(1, m.MAV_CMD_NAV_WAYPOINT, up[0], up[1], 70.0, 3),
+            self.message('ORGN', Type=0, Lat=HERE[0], Lng=HERE[1], Alt=500.0),
+            self.message('ORGN', Type=1, Lat=HERE[0], Lng=HERE[1], Alt=584.0),
+            self.message('POS', Lat=HERE[0], Lng=HERE[1], Alt=584.0),
+        ))
+        assert (mission[0][0], mission[0][1], mission[0][2]) == HERE + (584.0,)
+        ground0 = min(p[2] for p in path)
+        out = self.module().resolve_mission_amsl(mission, ground0, {})
+        # measured from the home the vehicle had, not the lowest position
+        assert out[1].alt == pytest.approx(654.0)
+
     def test_a_log_from_before_the_logger_said_new_mission(self):
         # without the message, a mission's first item still starts it again
         first = [m for m in self.dump(HERE, 4) if m.get_type() == 'CMD']
