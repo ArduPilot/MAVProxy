@@ -387,6 +387,108 @@ def pos_expressions(type_list):
     return ret
 
 
+# the messages a log carries its mission in
+MISSION_TYPES = ['MISSION_COUNT', 'MISSION_CLEAR_ALL',
+                 'MISSION_ITEM', 'MISSION_ITEM_INT', 'CMD', 'MSG']
+
+
+class LogMission(object):
+    '''the last whole mission a log holds.  A telemetry log carries the
+    missions downloaded from or uploaded to the vehicle, each a MISSION_COUNT
+    and then its items, in whatever order they were asked for, and perhaps
+    never all of them.  A dataflash log carries a CMD for each item of the
+    mission whenever the vehicle writes the whole mission out: at the start
+    of the log, and after it changes'''
+
+    def __init__(self):
+        # seq -> MISSION_ITEM, for the last mission to arrive whole
+        self.items = {}
+        # (count, {seq: MISSION_ITEM}) for one arriving, while it does.  The
+        # count is None where the log does not say how many items to expect
+        self.transfer = None
+
+    def start(self, count):
+        '''a mission of count items starts to arrive'''
+        if self.transfer is not None and self.transfer[0] is None:
+            # with no count to finish it, the last one ended where this starts
+            self.items = self.transfer[1]
+        self.transfer = (count, {})
+        if count == 0:
+            self.clear()
+
+    def clear(self):
+        self.items = {}
+        self.transfer = None
+
+    def add(self, item):
+        if self.transfer is None:
+            # an item which is not part of a mission seen to start arriving:
+            # a log which starts part way through, or a single item changed
+            self.items[item.seq] = item
+            return
+        (count, items) = self.transfer
+        if count is not None and item.seq >= count:
+            return
+        items[item.seq] = item
+        if count is not None and len(items) == count:
+            self.items = items
+            self.transfer = None
+
+    def read(self, m):
+        '''take in one of the MISSION_TYPES messages'''
+        type = m.get_type()
+        if type == 'MSG':
+            if getattr(m, 'Message', None) == 'New mission':
+                # the logger says so before it writes the mission out, and
+                # a mission cleared away is written out as nothing more
+                self.start(0)
+            return
+        if type == 'CMD':
+            if m.CNum == 0:
+                # the vehicle writes out the whole mission from home onwards
+                self.start(getattr(m, 'CTot', None))
+            self.add(mavutil.mavlink.MAVLink_mission_item_message(
+                0, 0, m.CNum, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                m.CId, 0, 1, m.Prm1, m.Prm2, m.Prm3, m.Prm4,
+                m.Lat, m.Lng, m.Alt))
+            return
+        # fence and rally points travel in the same messages.  A MAVLink1
+        # message has no mission_type, and is only ever about the mission
+        mission_type = getattr(m, 'mission_type',
+                               mavutil.mavlink.MAV_MISSION_TYPE_MISSION)
+        if type == 'MISSION_CLEAR_ALL':
+            if mission_type in (mavutil.mavlink.MAV_MISSION_TYPE_MISSION,
+                                mavutil.mavlink.MAV_MISSION_TYPE_ALL):
+                self.clear()
+            return
+        if mission_type != mavutil.mavlink.MAV_MISSION_TYPE_MISSION:
+            return
+        if type == 'MISSION_COUNT':
+            self.start(m.count)
+        elif type == 'MISSION_ITEM_INT':
+            self.add(mavutil.mavlink.MAVLink_mission_item_message(
+                0, 0, m.seq, m.frame, m.command, m.current, m.autocontinue,
+                m.param1, m.param2, m.param3, m.param4,
+                m.x / 1.0e7, m.y / 1.0e7, m.z))
+        else:
+            self.add(m)
+
+    def fill(self, wp):
+        '''add the mission to the MAVWPLoader wp, as far as it runs without
+        a gap.  Nothing is made up to stand in for an item never seen'''
+        items = self.items
+        if self.transfer is not None:
+            (count, arriving) = self.transfer
+            if count is None or not items:
+                # the last one ran to the end of the log, or it never arrived
+                # whole and nothing before it did
+                items = arriving
+        seq = 0
+        while seq in items:
+            wp.add(items[seq])
+            seq += 1
+
+
 def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
     '''create a map for a log file'''
     wp = mavwp.MAVWPLoader()
@@ -426,8 +528,9 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
         if options.ahr2:
             expressions.extend(pos_expressions(['AHR2', 'AHRS2', 'GPS']))
 
-    # find the union of message types we need from the log for all expressions
-    recv_match_types = set()
+    # find the union of message types we need from the log for all
+    # expressions, and the ones the mission is read from
+    recv_match_types = set(MISSION_TYPES)
     for e in expressions:
         recv_match_types.update(set(e.recv_match_types))
 
@@ -446,6 +549,7 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
 
     mlog.rewind()
 
+    mission = LogMission()
     while True:
         try:
             m = mlog.recv_match(type=recv_match_types)
@@ -456,60 +560,10 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
 
         type = m.get_type()
 
-        if type in ['MISSION_ITEM', 'MISSION_ITEM_INT']:
-            try:
-                new_m = m
-                if type == 'MISSION_ITEM_INT':
-                    # create a MISSION_ITEM from MISSION_ITEM_INT
-                    new_m = mavutil.mavlink.MAVLink_mission_item_message(
-                        0,
-                        0,
-                        m.seq,
-                        m.frame,
-                        m.command,
-                        m.current,
-                        m.autocontinue,
-                        m.param1,
-                        m.param2,
-                        m.param3,
-                        m.param4,
-                        m.x / 1.0e7,
-                        m.y / 1.0e7,
-                        m.z
-                    )
-                while new_m.seq > wp.count():
-                    print("Adding dummy WP %u" % wp.count())
-                    wp.set(new_m, wp.count())
-                wp.set(new_m, m.seq)
-            except Exception as e:
-                print("Exception: %s" % str(e))
-                pass
-            continue
-        elif type == 'CMD':
+        if type in MISSION_TYPES:
+            # a mission given on the command line is drawn instead
             if options.mission is None:
-                m = mavutil.mavlink.MAVLink_mission_item_message(
-                    0,
-                    0,
-                    m.CNum,
-                    mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                    m.CId,
-                    0,       # current
-                    1,       # autocontinue
-                    m.Prm1,
-                    m.Prm2,
-                    m.Prm3,
-                    m.Prm4,
-                    m.Lat,
-                    m.Lng,
-                    m.Alt
-                )
-                try:
-                    while m.seq > wp.count():
-                        print("Adding dummy WP %u" % wp.count())
-                        wp.set(m, wp.count())
-                    wp.set(m, m.seq)
-                except Exception:
-                    pass
+                mission.read(m)
             continue
 
         if not mlog.check_condition(options.condition):
@@ -575,6 +629,8 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
         instances[expressions[instance].expression] = instance
 
     path = paths2
+
+    mission.fill(wp)
 
     if len(path) == 0:
         print("No points to plot")
