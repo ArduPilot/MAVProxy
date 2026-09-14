@@ -17,7 +17,8 @@ from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.mavproxy_map3d.map3d import (
-    Map3D, MissionItem, missing_packages, missing_packages_message)
+    Map3D, MissionItem, MISSION_STYLES, missing_packages,
+    missing_packages_message)
 
 # fence colours as the 2D map's PolyFence layer uses them (OpenCV BGR)
 FENCE_INCLUSION_BGR = (0, 255, 0)
@@ -63,6 +64,9 @@ class Map3DModule(mp_module.MPModule):
             ('terrainshading', bool, True),
             ('terrainwireframe', bool, False),
             ('showdirection', bool, True),
+            # flown, geometry or plain: see Map3D.set_mission_style()
+            mp_settings.MPSetting('missionpath', str, MISSION_STYLES[0],
+                                  choice=MISSION_STYLES),
         ])
         self.add_command('map3d', self.cmd_map3d,
                          "3D map control", ['<start|stop|follow|nofollow|center>',
@@ -125,6 +129,9 @@ class Map3DModule(mp_module.MPModule):
             if self.map is not None and self.map.is_alive():
                 self.map.set_fpv_fov(self.map3d_settings.fpvfov)
                 self.map.set_mission_arrows(self.map3d_settings.showdirection)
+                self.map.set_mission_style(self.map3d_settings.missionpath)
+                # the path flown is only worked out while it is drawn
+                self.send_mission()
                 self.map.set_render_settings(
                     self.map3d_settings.terrainbrightness,
                     self.map3d_settings.terrainshading,
@@ -151,6 +158,7 @@ class Map3DModule(mp_module.MPModule):
                          follow=self.follow)
         # push whatever we already know
         self.map.set_mission_arrows(self.map3d_settings.showdirection)
+        self.map.set_mission_style(self.map3d_settings.missionpath)
         self.send_mission()
         self.send_fence()
         self.send_rally()
@@ -428,9 +436,10 @@ class Map3DModule(mp_module.MPModule):
     def flown_track(self, wploader, items, fixed_alt):
         '''the path a plane flies the mission along, where it has already
         been worked out; otherwise None, and the thread is asked to work it
-        out.  None too for any other vehicle, or where the mission cannot be
-        flown through'''
-        if self.vehicle_type != 'plane':
+        out.  None too for any other vehicle, where the mission cannot be
+        flown through, or where the map is not drawing the path flown'''
+        if (self.vehicle_type != 'plane' or
+                self.map3d_settings.missionpath != 'flown'):
             self.track_wanted = None
             return None
         home = self.mission_home(wploader)

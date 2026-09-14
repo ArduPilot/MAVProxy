@@ -10,7 +10,7 @@ import math
 import vtk
 
 from MAVProxy.modules.lib import mp_util
-from MAVProxy.modules.mavproxy_map3d.map3d import MissionItem
+from MAVProxy.modules.mavproxy_map3d.map3d import MissionItem, MISSION_STYLES
 from MAVProxy.modules.mavproxy_map3d.terrain import enu, R, wrap_longitude
 
 # MAV_FRAME altitude conventions
@@ -417,8 +417,13 @@ class ElementManager:
         self.kml_geometry = None
         self.kml_height_cache = {}
         self.mission_line = []
+        self.mission_rings = []
         self.mission_markers = []
         self.mission_arrows = False
+        # the mission last given, so it can be drawn again in another style
+        self.mission_items = []
+        self.mission_track = None
+        self.mission_style = MISSION_STYLES[0]
 
     def _enu(self, lat, lon, amsl):
         e, n, u = enu(lat, lon, amsl, self.lat0, self.lon0)
@@ -511,45 +516,88 @@ class ElementManager:
             self._replace('trail', [_polyline(self.trail, (1.0, 1.0, 0.0), 2.0)])
 
     def set_mission(self, items, track=None):
-        '''items: list of MissionItem (plain tuples are accepted too).
-
-        The line drawn is the path the vehicle is expected to fly, so it is
-        continuous throughout.  track is that path, as (lat, lon, amsl)
-        points, where the caller has flown the mission through the
-        vehicle's own navigation to find it; without one it is drawn from
-        the items: an arc waypoint curves, and an item which circles about
-        its location is joined and left along tangents, rather than the line
-        running to the middle of the circle where the vehicle never goes.
-        The markers stay on the mission item locations
+        '''items: list of MissionItem (plain tuples are accepted too).  track
+        is the path the vehicle is expected to fly them along, as (lat, lon,
+        amsl) points, where the caller has worked it out by flying the
+        mission through the vehicle's own navigation.  How the mission is
+        drawn from those is the mission style: see set_mission_style()
         '''
+        self.mission_items = [MissionItem(*item) for item in items]
+        self.mission_track = list(track) if track else None
+        self.draw_mission()
+
+    def set_mission_style(self, style):
+        '''draw the mission as one of MISSION_STYLES.  flown draws the track
+        the mission was given with, and geometry where it came without one:
+        the path worked out from the items, continuous throughout, where an
+        arc waypoint curves and an item which circles about its location is
+        joined and left along tangents rather than the line running to the
+        middle of a circle the vehicle never goes to.  plain runs the line
+        straight from item to item, arcs apart, with a ring at the altitude
+        of each item which circles'''
+        if style not in MISSION_STYLES or style == self.mission_style:
+            return
+        self.mission_style = style
+        self.draw_mission()
+
+    def draw_mission(self):
+        '''draw the mission last given in the mission style.  The markers stay
+        on the mission item locations'''
+        flown = [i for i in self.mission_items
+                 if not (i.lat == 0 and i.lon == 0)]
+        self.mission_markers = [
+            self._enu(i.lat, i.lon, self._resolve_amsl(i.alt, i.frame))
+            for i in flown]
+        self.mission_rings = []
+        if self.mission_style == 'flown' and self.mission_track:
+            self.mission_line = [self._enu(lat, lon, amsl)
+                                 for (lat, lon, amsl) in self.mission_track]
+        elif self.mission_style == 'plain':
+            self.mission_line = self._plain_line(flown)
+        else:
+            self.mission_line = self._geometry_line(flown)
+        self.refresh_mission()
+
+    def _arc_into(self, line, item, amsl, previous):
+        '''add the leg into an arc waypoint to the line: a circular arc rather
+        than a straight line, climbing linearly along it'''
+        if (item.command != mp_util.MAV_CMD_NAV_ARC_WAYPOINT or
+                previous is None):
+            return
+        ((prev_lat, prev_lon), prev_amsl) = previous
+        arc = mp_util.arc_points((prev_lat, prev_lon),
+                                 (item.lat, item.lon), item.param1)
+        for i in range(1, len(arc) - 1):
+            fraction = float(i) / (len(arc) - 1)
+            line.append(self._enu(arc[i][0], arc[i][1],
+                                  prev_amsl + (amsl - prev_amsl) * fraction))
+
+    def _plain_line(self, flown):
+        '''the line straight through the items, and a ring for each which
+        circles, at its own altitude rather than draped over the terrain'''
         line = []
-        markers = []
+        previous = None
+        for item in flown:
+            amsl = self._resolve_amsl(item.alt, item.frame)
+            self._arc_into(line, item, amsl, previous)
+            line.append(self._enu(item.lat, item.lon, amsl))
+            if item.circle_radius:
+                ring = circle_latlon((item.lat, item.lon),
+                                     abs(item.circle_radius),
+                                     MISSION_CIRCLE_SEGMENTS)
+                ring = [self._enu(la, lo, amsl) for (la, lo) in ring]
+                self.mission_rings.append(ring + ring[:1])
+            previous = ((item.lat, item.lon), amsl)
+        return line
+
+    def _geometry_line(self, flown):
+        '''the path worked out from the items alone'''
+        line = []
         previous = None
         rejoin = None
-        flown = [MissionItem(*item) for item in items]
-        flown = [i for i in flown if not (i.lat == 0 and i.lon == 0)]
-        if track:
-            self.mission_line = [self._enu(lat, lon, amsl)
-                                 for (lat, lon, amsl) in track]
-            self.mission_markers = [
-                self._enu(i.lat, i.lon, self._resolve_amsl(i.alt, i.frame))
-                for i in flown]
-            self.refresh_mission()
-            return
         for (index, item) in enumerate(flown):
             amsl = self._resolve_amsl(item.alt, item.frame)
-            if (item.command == mp_util.MAV_CMD_NAV_ARC_WAYPOINT and
-                    previous is not None):
-                # the leg into an arc waypoint is a circular arc rather
-                # than a straight line; climb linearly along it
-                ((prev_lat, prev_lon), prev_amsl) = previous
-                arc = mp_util.arc_points((prev_lat, prev_lon),
-                                         (item.lat, item.lon), item.param1)
-                for i in range(1, len(arc) - 1):
-                    fraction = float(i) / (len(arc) - 1)
-                    line.append(self._enu(arc[i][0], arc[i][1],
-                                          prev_amsl + (amsl - prev_amsl) * fraction))
-            markers.append(self._enu(item.lat, item.lon, amsl))
+            self._arc_into(line, item, amsl, previous)
             if item.circle_radius:
                 previous = self._append_circle(
                     line, item, amsl, previous,
@@ -567,9 +615,7 @@ class ElementManager:
             rejoin = None
             line.append(self._enu(item.lat, item.lon, amsl))
             previous = ((item.lat, item.lon), amsl)
-        self.mission_line = line
-        self.mission_markers = markers
-        self.refresh_mission()
+        return line
 
     def set_mission_arrows(self, enable):
         '''show or hide the direction of travel along the mission'''
@@ -589,6 +635,8 @@ class ElementManager:
                 arrows = _arrows(line, (1.0, 1.0, 1.0), self.ren)
                 if arrows is not None:
                     actors.append(arrows)
+        for ring in self.mission_rings:
+            actors.append(_polyline(ring, (1.0, 1.0, 1.0), 2.0, dashed=True))
         if self.mission_markers:
             actors.append(_points(self.mission_markers, (1.0, 1.0, 1.0), 9))
         self._replace('mission', actors)

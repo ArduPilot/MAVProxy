@@ -799,6 +799,7 @@ class TestDrawnTrack(object):
         module.home_amsl = HOME[2]
         module.home_position = None
         module.reset_flown_track()
+        module.map3d_settings = SimpleNamespace(missionpath='flown')
         module.armed = False
         module.ground_heading = None
         module.ground_heading_changed = False
@@ -1633,7 +1634,8 @@ class TestDrawnTrack(object):
         log.mav_type = mavlink.MAV_TYPE_FIXED_WING
         monkeypatch.setattr(mx, 'mestate', SimpleNamespace(
             mlog=log, settings=SimpleNamespace(
-                condition=None, showdirection=True, sync_xmap=False)),
+                condition=None, showdirection=True, sync_xmap=False,
+                missionpath='flown')),
             raising=False)
         monkeypatch.setattr(mx, 'map3d_views', [])
         mx.cmd_map3d([])
@@ -1658,3 +1660,220 @@ class TestDrawnTrack(object):
         # and without one, the items are drawn as they always were
         em.set_mission(items)
         assert em.mission_line == [em._enu(i.lat, i.lon, i.alt) for i in items]
+
+
+class TestMissionStyles(object):
+    """the 3D map draws a mission as the path flown, as the geometry of its
+    items, or plain: straight from item to item with a ring at each loiter"""
+
+    RADIUS = 150.0
+
+    def items(self):
+        from MAVProxy.modules.mavproxy_map3d.map3d import MissionItem
+        (a, b, c) = (offset(0, 0), offset(2000, 0), offset(2000, 2000))
+        return [
+            MissionItem(a[0], a[1], a[2], 0, mavlink.MAV_CMD_NAV_WAYPOINT, 1),
+            MissionItem(b[0], b[1], b[2], 0, mavlink.MAV_CMD_NAV_LOITER_TURNS,
+                        2, 1.0, self.RADIUS, 1.0),
+            MissionItem(c[0], c[1], c[2], 0, mavlink.MAV_CMD_NAV_WAYPOINT, 3),
+        ]
+
+    def track(self):
+        return [offset(0, 0), offset(1000, 30), offset(2000, 2000)]
+
+    def elements(self):
+        pytest.importorskip("vtk")
+        import vtk
+        from MAVProxy.modules.mavproxy_map3d.elements import ElementManager
+        em = ElementManager(vtk.vtkRenderer(), HOME[0], HOME[1], 1.0)
+        em.set_home(HOME[2])
+        return em
+
+    def distance_from_loiter(self, em, point):
+        centre = em._enu(*offset(2000, 0))
+        return math.hypot(point[0] - centre[0], point[1] - centre[1])
+
+    def test_the_path_flown_is_drawn_by_default(self):
+        em = self.elements()
+        em.set_mission(self.items(), self.track())
+        assert em.mission_line == [em._enu(*p) for p in self.track()]
+        assert em.mission_rings == []
+
+    def test_geometry(self):
+        em = self.elements()
+        em.set_mission(self.items(), self.track())
+        em.set_mission_style('geometry')
+        # round the circle rather than through its centre, with no ring
+        assert em.mission_rings == []
+        assert min(self.distance_from_loiter(em, p)
+                   for p in em.mission_line) > self.RADIUS - 5.0
+        # and a mission which comes with no path flown is drawn the same way
+        # in the flown style
+        geometry = em.mission_line
+        em.set_mission_style('flown')
+        em.set_mission(self.items())
+        assert em.mission_line == geometry
+
+    def test_plain(self):
+        em = self.elements()
+        items = self.items()
+        em.set_mission(items, self.track())
+        em.set_mission_style('plain')
+        assert em.mission_line == [em._enu(i.lat, i.lon, i.alt) for i in items]
+        (ring,) = em.mission_rings
+        for point in ring:
+            assert self.distance_from_loiter(em, point) == pytest.approx(
+                self.RADIUS, abs=1.0)
+            assert point[2] == pytest.approx(items[1].alt)
+        # the ring is drawn as well as the line and the markers
+        assert len(em.actors['mission']) == 3
+        # a new mission is drawn in the style last asked for
+        em.set_mission(items, self.track())
+        assert len(em.mission_rings) == 1
+        # and a style it does not know leaves it as it is
+        em.set_mission_style('fancy')
+        assert em.mission_style == 'plain'
+
+    def test_the_viewer_is_told_the_style_and_the_mission(self):
+        # from the parent's Map3D, over the queue, to the child's frame and
+        # its ElementManager: nothing but the queue stands in
+        pytest.importorskip("wx")
+        pytest.importorskip("vtk")
+        from types import SimpleNamespace
+        from MAVProxy.modules.mavproxy_map3d.map3d import Map3D
+        from MAVProxy.modules.mavproxy_map3d.map3d_ui import Map3DFrame
+        sent = []
+        viewer = Map3D.__new__(Map3D)
+        viewer.child = SimpleNamespace(is_alive=lambda: True)
+        viewer.object_queue = SimpleNamespace(put=sent.append)
+        em = self.elements()
+        frame = SimpleNamespace(terrain=object(), elements=em)
+        items = self.items()
+        viewer.set_mission_style('plain')
+        viewer.set_mission(items, self.track())
+        for msg in sent:
+            Map3DFrame.handle(frame, msg)
+        assert em.mission_style == 'plain'
+        assert len(em.mission_rings) == 1
+        sent[:] = []
+        viewer.set_mission_style('flown')
+        for msg in sent:
+            Map3DFrame.handle(frame, msg)
+        assert em.mission_line == [em._enu(*p) for p in self.track()]
+
+    def live_module(self, style):
+        module = TestDrawnTrack().live_module('plane')
+        module.map3d_settings.missionpath = style
+        return module
+
+    def test_the_live_map_only_flies_the_mission_for_the_path_flown(self, monkeypatch):
+        calls = []
+        real = plane_track.mission_track
+
+        def counting(*args, **kwargs):
+            calls.append(args)
+            return real(*args, **kwargs)
+        monkeypatch.setattr(plane_track, 'mission_track', counting)
+        for style in ('geometry', 'plain'):
+            module = self.live_module(style)
+            module.send_mission()
+            assert module.sent[-1] is None
+        assert calls == []
+        module = self.live_module('flown')
+        module.send_mission()
+        assert module.sent[-1] is not None
+
+    def test_the_live_map_setting(self):
+        from types import SimpleNamespace
+        from MAVProxy.modules.lib import mp_settings
+        from MAVProxy.modules.mavproxy_map3d.map3d import MISSION_STYLES
+        module = TestDrawnTrack().live_module('plane')
+        styles = []
+        sends = []
+        # settings of the kind the module makes, to see the choice enforced
+        module.map3d_settings = mp_settings.MPSettings([
+            ('fpvfov', float, 90.0), ('terrainbrightness', float, 1.25),
+            ('terrainshading', bool, True), ('terrainwireframe', bool, False),
+            ('showdirection', bool, True),
+            mp_settings.MPSetting('missionpath', str, MISSION_STYLES[0],
+                                  choice=MISSION_STYLES)])
+        module.map = SimpleNamespace(
+            is_alive=lambda: True, set_fpv_fov=lambda fov: None,
+            set_mission_arrows=lambda enable: None,
+            set_render_settings=lambda *args: None,
+            set_mission_style=styles.append,
+            set_mission=lambda items, track=None: sends.append(track))
+        module.cmd_map3d(['set', 'missionpath', 'plain'])
+        assert styles == ['plain']
+        assert sends == [None]
+        # back to the path flown, which is worked out again to draw
+        module.cmd_map3d(['set', 'missionpath', 'flown'])
+        assert styles == ['plain', 'flown']
+        assert sends[-1] is not None
+        # and a style there is not, is not taken
+        module.cmd_map3d(['set', 'missionpath', 'fancy'])
+        assert module.map3d_settings.missionpath == 'flown'
+
+    def test_mavexplorer_draws_the_style_asked_for(self, monkeypatch):
+        from types import SimpleNamespace
+        from MAVProxy.modules.mavproxy_map3d import map3d
+        drawn = TestDrawnTrack()
+        mx = drawn.explorer()
+        views = []
+
+        class Viewer(object):
+            def __init__(self, title=None):
+                self.styles = []
+                self.missions = []
+                views.append(self)
+
+            def is_alive(self):
+                return True
+
+            def set_mission_style(self, style):
+                self.styles.append(style)
+
+            def set_mission(self, items, track=None):
+                self.missions.append(track)
+
+            def __getattr__(self, name):
+                return lambda *args, **kwargs: None
+        monkeypatch.setattr(map3d, 'Map3D', Viewer)
+        monkeypatch.setattr(map3d, 'missing_packages', lambda: [])
+        flights = []
+        real = mx.plane_mission_track
+
+        def counting(*args, **kwargs):
+            flights.append(args)
+            return real(*args, **kwargs)
+        monkeypatch.setattr(mx, 'plane_mission_track', counting)
+        log = drawn.log(*([drawn.pos(0, 0)] + drawn.mission_dump() + [
+            drawn.message('MSG', Message='Mission: 1 Takeoff'),
+            drawn.pos(40, 0, 30), drawn.pos(80, 0, 60)]))
+        log.rewind = lambda: None
+        log.params = dict(PARAMS)
+        log.mav_type = mavlink.MAV_TYPE_FIXED_WING
+
+        class Settings(SimpleNamespace):
+            def command(self, args):
+                setattr(self, args[0], args[1])
+        settings = Settings(condition=None, showdirection=True,
+                            sync_xmap=False, missionpath='geometry')
+        monkeypatch.setattr(mx, 'mestate', SimpleNamespace(
+            mlog=log, settings=settings), raising=False)
+        monkeypatch.setattr(mx, 'map3d_views', [])
+        mx.cmd_map3d([])
+        (view,) = views
+        assert view.styles == ['geometry']
+        assert view.missions == [None]
+        # the path flown was not worked out for a map not drawing it
+        assert flights == []
+        # asked for later, it is worked out and drawn in the view open
+        mx.cmd_set(['missionpath', 'flown'])
+        assert view.styles == ['geometry', 'flown']
+        assert view.missions[-1] is not None
+        assert len(flights) == 1
+        # and only the once
+        mx.cmd_set(['missionpath', 'plain'])
+        mx.cmd_set(['missionpath', 'flown'])
+        assert len(flights) == 1

@@ -24,6 +24,13 @@ MissionItem = collections.namedtuple(
     'exit_converge',
     defaults=(0.0, None, None, None))
 
+# how the mission line is drawn.  flown is the path the vehicle is worked
+# out to fly, where the caller could work one out, and geometry where it
+# could not; geometry joins and leaves circles on tangents and walks spirals
+# round them; plain runs straight from item to item, with a ring at each
+# item which circles
+MISSION_STYLES = ('flown', 'geometry', 'plain')
+
 PACKAGES = ('vtk', 'quantized_mesh_tile')
 
 
@@ -150,6 +157,10 @@ class Map3D:
 
     def set_mission_arrows(self, enable):
         self._put(('mission_arrows', bool(enable)))
+
+    def set_mission_style(self, style):
+        '''one of MISSION_STYLES'''
+        self._put(('mission_style', str(style)))
 
     def set_fpv_fov(self, fov):
         self._put(('fpvfov', float(fov)))

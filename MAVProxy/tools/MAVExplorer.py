@@ -122,6 +122,9 @@ class MEState(object):
               MPSetting('vehicle_type', str, 'Auto', 'force vehicle type for mode handling'),
               MPSetting('showdirection', bool, True,
                         'show direction of travel on the 3D map mission'),
+              MPSetting('missionpath', str, 'flown',
+                        'draw the 3D map mission as flown, geometry or plain',
+                        choice=['flown', 'geometry', 'plain']),
               ]
             )
 
@@ -949,12 +952,17 @@ def cmd_map3d(args):
         params = mp_util.log_params(mlog)
         mav_type = getattr(mlog, 'mav_type', None)
         mission = resolve_mission_amsl(mission, ground0, params, mav_type)
+
         # a plane does not fly the lines between its items; where the log
-        # says enough to fly the mission through its navigation, draw that
-        track = plane_mission_track(cmds, mission,
-                                    (path[0][0], path[0][1], ground0),
-                                    params, mav_type, path, started,
-                                    rally, origin)
+        # says enough to fly the mission through its navigation, that path
+        # is drawn, and worked out only when it is
+        def fly():
+            return plane_mission_track(cmds, mission,
+                                       (path[0][0], path[0][1], ground0),
+                                       params, mav_type, path, started,
+                                       rally, origin)
+        if mestate.settings.missionpath == 'flown':
+            track = fly()
 
     # drop views the user has already closed, so their child processes are reaped
     for old in [v for v in map3d_views if not v.is_alive()]:
@@ -966,11 +974,14 @@ def cmd_map3d(args):
     m3d.set_origin(lat0, lon0, ground0)
     m3d.set_home(ground0)
     m3d.set_mission_arrows(mestate.settings.showdirection)
+    m3d.set_mission_style(mestate.settings.missionpath)
     m3d.set_path(path)
     if xlimits.last_xlim is not None and mestate.settings.sync_xmap:
         m3d.set_time_range(xlimits.last_xlim)
     if mission:
         m3d.set_mission(mission, track)
+        # kept, to draw the path flown if the style changes to it later
+        m3d.mission_to_fly = (mission, fly) if track is None else None
     m3d.look_at(lat0, lon0, ground0, dist=1.6 * span)
 
 def resolve_mission_amsl(mission, ground0, params=None, mav_type=None):
@@ -1036,6 +1047,12 @@ def cmd_set(args):
     for view in map3d_views:
         if view.is_alive():
             view.set_mission_arrows(mestate.settings.showdirection)
+            view.set_mission_style(mestate.settings.missionpath)
+            pending = getattr(view, 'mission_to_fly', None)
+            if mestate.settings.missionpath == 'flown' and pending is not None:
+                (mission, fly) = pending
+                view.mission_to_fly = None
+                view.set_mission(mission, fly())
 
 def cmd_condition(args):
     '''control MAVExporer conditions'''

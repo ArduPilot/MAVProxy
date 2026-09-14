@@ -51,6 +51,8 @@ def live_mission_items(wpoints, home_amsl=584.0, params=None,
         set_mission=lambda items, track=None: sent.extend(items))
     module.reset_flown_track()
     module.ground_heading = None
+    # only the items are looked at, so there is no path to fly for them
+    module.map3d_settings = SimpleNamespace(missionpath='geometry')
     module.home_amsl = home_amsl
     module.home_position = None
     module.default_circle_radius = lambda: default_radius
