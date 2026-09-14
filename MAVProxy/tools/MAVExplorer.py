@@ -120,7 +120,7 @@ class MEState(object):
               MPSetting('paramdocs', bool, True, 'show param docs'),
               MPSetting('max_rate', float, 0, 'maximum display rate of graphs in Hz'),
               MPSetting('vehicle_type', str, 'Auto', 'force vehicle type for mode handling'),
-              MPSetting('showdirection', bool, False,
+              MPSetting('showdirection', bool, True,
                         'show direction of travel on the 3D map mission'),
               ]
             )
