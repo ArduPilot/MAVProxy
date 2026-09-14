@@ -654,7 +654,7 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
     # the parameters the log carries.  A telemetry log only has those once it
     # has been read through
     options.default_circle_radius = mp_util.param_value(
-        getattr(mlog, 'params', None), 'WP_LOITER_RAD')
+        mp_util.log_params(mlog), 'WP_LOITER_RAD')
 
     if len(path) == 0:
         print("No points to plot")

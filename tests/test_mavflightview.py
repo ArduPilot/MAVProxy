@@ -22,12 +22,20 @@ def mavflightview():
 
 
 def write_tlog(path, messages):
-    '''write messages to a telemetry log, a second apart'''
+    '''write messages to a telemetry log, a second apart.  A message is
+    sent by vehicle 1's autopilot unless it is given as (component, message)
+    or (system, component, message)'''
     from pymavlink import mavutil
-    mav = mavutil.mavlink.MAVLink(None, srcSystem=1, srcComponent=1)
     usec = 1700000000 * 1000000
     with open(path, 'wb') as f:
         for m in messages:
+            (system, component) = (1, 1)
+            if isinstance(m, tuple) and len(m) == 2:
+                (component, m) = m
+            elif isinstance(m, tuple):
+                (system, component, m) = m
+            mav = mavutil.mavlink.MAVLink(None, srcSystem=system,
+                                          srcComponent=component)
             usec += 1000000
             f.write(struct.pack('>Q', usec) + m.pack(mav))
 
@@ -337,14 +345,14 @@ class TestTlogParameters(object):
     def radius(self, tmp_path, messages):
         return self.view(tmp_path, messages)[1].default_circle_radius
 
-    def log(self, params):
+    def log(self, params, with_heartbeat=True):
         from pymavlink import mavutil
         loiter = mission_item_int(
             1, HERE[0] + 0.01, HERE[1], 100,
             command=mavutil.mavlink.MAV_CMD_NAV_LOITER_TURNS,
             params=(3, 0, 0, 0))
-        return ([heartbeat(), global_position_int(HERE[0], HERE[1])] +
-                params +
+        start = [heartbeat()] if with_heartbeat else []
+        return (start + [global_position_int(HERE[0], HERE[1])] + params +
                 [mission_item_int(0, HERE[0], HERE[1], 584), loiter,
                  global_position_int(HERE[0] + 0.01, HERE[1])])
 
@@ -363,3 +371,51 @@ class TestTlogParameters(object):
         objects = mavflightview().mission_objects(wp, options, mav_type, 'T')
         circles = [o for o in objects if type(o).__name__ == 'SlipCircle']
         assert [c.radius for c in circles] == [150]
+
+    def test_parameters_mavproxy_fetched_over_ftp(self, tmp_path):
+        from pymavlink import mavutil
+        ftp = mavutil.mavlink.MAV_COMP_ID_MISSIONPLANNER
+        # the autopilot sends a few of its own too, as they change
+        log = self.log([(ftp, param_value('WP_RADIUS', 90, 2, 0)),
+                        (ftp, param_value('WP_LOITER_RAD', 150, 2, 1)),
+                        param_value('STAT_RUNTIME', 1000)])
+        assert self.radius(tmp_path, log) == 150
+
+    def test_the_autopilots_own_value_wins(self, tmp_path):
+        from pymavlink import mavutil
+        ftp = mavutil.mavlink.MAV_COMP_ID_MISSIONPLANNER
+        log = self.log([(ftp, param_value('WP_LOITER_RAD', 150)),
+                        param_value('WP_LOITER_RAD', 80)])
+        assert self.radius(tmp_path, log) == 80
+
+    def test_a_log_with_no_heartbeat(self, tmp_path):
+        from pymavlink import mavutil
+        ftp = mavutil.mavlink.MAV_COMP_ID_MISSIONPLANNER
+        log = self.log([(ftp, param_value('WP_RADIUS', 90, 2, 0)),
+                        (ftp, param_value('WP_LOITER_RAD', 150, 2, 1)),
+                        param_value('STAT_RUNTIME', 1000)],
+                       with_heartbeat=False)
+        assert self.radius(tmp_path, log) == 150
+        log = self.log([param_value('AHRS_EKF_TYPE', 3, 2, 0),
+                        param_value('WP_LOITER_RAD', 120, 2, 1)],
+                       with_heartbeat=False)
+        assert self.radius(tmp_path, log) == 120
+
+    def test_no_guessing_between_vehicles_with_no_heartbeat(self, tmp_path):
+        from pymavlink import mavutil
+        ftp = mavutil.mavlink.MAV_COMP_ID_MISSIONPLANNER
+        log = self.log([(1, ftp, param_value('WP_RADIUS', 90, 2, 0)),
+                        (1, ftp, param_value('WP_LOITER_RAD', 150, 2, 1)),
+                        (2, ftp, param_value('WP_RADIUS', 90, 2, 0)),
+                        (2, ftp, param_value('WP_LOITER_RAD', 60, 2, 1))],
+                       with_heartbeat=False)
+        assert self.radius(tmp_path, log) is None
+
+    def test_the_vehicle_the_log_follows(self, tmp_path):
+        from pymavlink import mavutil
+        ftp = mavutil.mavlink.MAV_COMP_ID_MISSIONPLANNER
+        log = self.log([(2, ftp, param_value('WP_RADIUS', 90, 2, 0)),
+                        (2, ftp, param_value('WP_LOITER_RAD', 60, 2, 1)),
+                        (1, ftp, param_value('WP_RADIUS', 90, 2, 0)),
+                        (1, ftp, param_value('WP_LOITER_RAD', 150, 2, 1))])
+        assert self.radius(tmp_path, log) == 150

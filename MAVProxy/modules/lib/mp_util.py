@@ -327,6 +327,40 @@ def mission_crosstracks_from_centre(command, params):
     return not xtrack > 0
 
 
+def log_params(mlog):
+    """the parameters a log carries.  A telemetry log's params are only the
+    PARAM_VALUEs the autopilot sent.  Where MAVProxy fetched them over FTP
+    it logged them itself, as PARAM_VALUEs from MAV_COMP_ID_MISSIONPLANNER so
+    they can be told apart, and those are left out: a log from a vehicle
+    whose parameters were fetched that way offers only the few the autopilot
+    sent as they changed.  Take both, the autopilot's own over the fetched
+    ones"""
+    params = getattr(mlog, 'params', None)
+    param_state = getattr(mlog, 'param_state', None)
+    if not param_state:
+        return params
+    from pymavlink import mavutil
+    sysid = getattr(mlog, 'sysid', 0)
+    if not sysid:
+        # the log picks the vehicle whose params it offers from its first
+        # heartbeat, and a log with none in it never picks one.  Take the
+        # vehicle the parameters came from, so long as only one did
+        systems = set(k[0] for (k, state) in param_state.items()
+                      if k[0] != 0 and state.params)
+        if len(systems) != 1:
+            return params
+        sysid = systems.pop()
+        own = param_state.get((sysid, 1))
+        params = own.params if own is not None else {}
+    fetched = param_state.get((sysid,
+                               mavutil.mavlink.MAV_COMP_ID_MISSIONPLANNER))
+    if fetched is None or not fetched.params:
+        return params
+    ret = dict(fetched.params)
+    ret.update(params or {})
+    return ret
+
+
 def param_value(params, name):
     """look one parameter up in params, which may be a mapping (a live
     vehicle's mav_param, or a log's params) or a callable taking a name.
