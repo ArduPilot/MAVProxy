@@ -276,6 +276,29 @@ def mission_circle_turns(command, params):
     return turns
 
 
+def mission_crosstracks_from_centre(command, params):
+    """whether the leg out of a circling mission item is flown against a
+    track starting at the item's own location rather than at the point the
+    vehicle leaves the circle.
+
+    ArduPlane crosstracks from the centre unless param4 asks for the exit
+    location instead, and only the loiter items which are flown until
+    something lets the vehicle go carry that choice there.  LOITER_UNLIM
+    never leaves, and DO_ORBIT counts its turns in param4, so neither is
+    asked
+    """
+    from pymavlink import mavutil
+    mavlink = mavutil.mavlink
+    if command not in (mavlink.MAV_CMD_NAV_LOITER_TURNS,
+                       mavlink.MAV_CMD_NAV_LOITER_TIME,
+                       mavlink.MAV_CMD_NAV_LOITER_TO_ALT):
+        return False
+    xtrack = params[3]
+    if xtrack is None or math.isnan(xtrack):
+        return True
+    return not xtrack > 0
+
+
 def param_value(params, name):
     """look one parameter up in params, which may be a mapping (a live
     vehicle's mav_param, or a log's params) or a callable taking a name.

@@ -324,11 +324,9 @@ class Map3DModule(mp_module.MPModule):
             # the items are drawn in whatever frames they carry, so resolve
             # the altitude before measuring anything against the item before
             amsl = self.item_amsl(z, frame)
+            params = (w.param1, w.param2, w.param3, w.param4)
             circle_radius = mp_util.mission_circle_radius(
-                w.command,
-                (w.param1, w.param2, w.param3, w.param4),
-                default_radius,
-                self.vehicle_type)
+                w.command, params, default_radius, self.vehicle_type)
             circle_turns = None
             if w.command == mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT:
                 # this one circles until it reaches its altitude, so what is
@@ -343,9 +341,10 @@ class Map3DModule(mp_module.MPModule):
                 circle_turns = mp_util.loiter_to_alt_turns(
                     circle_radius, alt_change, self.mav_param, approach)
             exit_converge = None
-            if circle_radius is not None and not (w.param4 > 0):
-                # param4 == 0 asks for the next leg to be crosstracked from
-                # the loiter centre rather than from where it was left
+            if (circle_radius is not None and
+                    mp_util.mission_crosstracks_from_centre(w.command, params)):
+                # the next leg is flown against a track from the loiter
+                # centre, so the vehicle pulls back onto it after leaving
                 exit_converge = mp_util.vehicle_track_convergence(self.mav_param)
             items.append(MissionItem(lat, lon, z, frame, w.command, w.seq,
                                      w.param1, circle_radius, circle_turns,

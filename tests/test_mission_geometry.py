@@ -343,6 +343,33 @@ class TestCirclingItems(object):
         assert mp_util.mission_circle_turns(
             m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 90, 0)) is None
 
+    def test_which_items_crosstrack_from_their_centre(self):
+        m = self.mavlink
+        # param4 of these picks the track the next leg is flown against: 0
+        # asks for one out of the loiter centre, 1 for the exit location
+        for command in (m.MAV_CMD_NAV_LOITER_TURNS,
+                        m.MAV_CMD_NAV_LOITER_TIME,
+                        m.MAV_CMD_NAV_LOITER_TO_ALT):
+            assert mp_util.mission_crosstracks_from_centre(
+                command, (1, 0, 60, 0))
+            assert not mp_util.mission_crosstracks_from_centre(
+                command, (1, 0, 60, 1))
+            # an item which does not say gets what the vehicle does by default
+            assert mp_util.mission_crosstracks_from_centre(
+                command, (1, 0, 60, float('nan')))
+
+    def test_items_whose_param4_is_not_a_crosstrack_choice(self):
+        m = self.mavlink
+        # LOITER_UNLIM is never left, and its param4 is a yaw angle; DO_ORBIT
+        # counts its turns there.  Neither is asking for a track out
+        for command in (m.MAV_CMD_NAV_LOITER_UNLIM, mp_util.MAV_CMD_DO_ORBIT):
+            for param4 in (0, 1, 90, math.radians(270)):
+                assert not mp_util.mission_crosstracks_from_centre(
+                    command, (80, 5, 60, param4))
+        # nor is an item which does not circle at all
+        assert not mp_util.mission_crosstracks_from_centre(
+            m.MAV_CMD_NAV_WAYPOINT, (0, 0, 0, 0))
+
 
 class TestLiveMissionAltitudes(object):
     """the map3d module measures the climb into a loiter itself, to work out
@@ -908,6 +935,39 @@ class TestCrosstrackRejoin(object):
         errors = self.crosstrack(line, centre, end)
         # just the exit point itself, then straight off to the waypoint
         assert len(errors) == 1
+
+
+class TestProducersCrosstrack(object):
+    """what each producer of MissionItems makes of param4.  Only the loiters
+    ArduPlane lets go of carry a crosstrack choice there; LOITER_UNLIM
+    never leaves, and DO_ORBIT counts its turns in param4, so either
+    producer reading param4 as a crosstrack choice for those would draw a
+    pull-back after a loiter the vehicle never leaves"""
+
+    PARAMS = {'NAVL1_PERIOD': 17.0, 'AIRSPEED_CRUISE': 20.0}
+
+    def cases(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        # (command, params, whether the leg out is pulled back to the centre)
+        return [
+            (m.MAV_CMD_NAV_LOITER_TURNS, (1, 0, 60, 0), True),
+            (m.MAV_CMD_NAV_LOITER_TURNS, (1, 0, 60, 1), False),
+            (m.MAV_CMD_NAV_LOITER_UNLIM, (0, 0, 60, 0), False),
+        ]
+
+    def test_the_live_module(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        at = [mp_util.gps_newpos(HERE[0], HERE[1], 90, 400 * i)
+              for i in range(3)]
+        for (command, params, pulled_back) in self.cases():
+            items = live_mission_items([
+                waypoint(0, m.MAV_CMD_NAV_WAYPOINT, at[0][0], at[0][1], 100.0),
+                waypoint(1, command, at[1][0], at[1][1], 100.0, params=params),
+                waypoint(2, m.MAV_CMD_NAV_WAYPOINT, at[2][0], at[2][1], 100.0),
+            ], params=self.PARAMS)
+            assert (items[1].exit_converge is not None) == pulled_back, command
 
 
 class TestPolygonBounds(object):

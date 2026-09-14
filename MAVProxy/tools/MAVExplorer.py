@@ -800,9 +800,10 @@ def resolve_mission_amsl(mission, ground0, params=None, mav_type=None):
                 amsl - previous[2] if previous is not None else None,
                 params, approach)
         converge = None
-        if radius is not None and not (prm[3] > 0):
-            # param4 == 0 asks for the next leg to be crosstracked from the
-            # loiter centre rather than from where it was left
+        if (radius is not None and
+                mp_util.mission_crosstracks_from_centre(cid, prm)):
+            # the next leg is flown against a track from the loiter centre,
+            # so the vehicle pulls back onto it after leaving the circle
             converge = mp_util.vehicle_track_convergence(params)
         out.append(MissionItem(la, lo, amsl, 0, cid, seq, prm[0],
                                radius, turns, converge))
