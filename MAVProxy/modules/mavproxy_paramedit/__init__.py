@@ -37,10 +37,11 @@ class ParamEditorModule(mp_module.MPModule):
             try:
                 from MAVProxy.modules.mavproxy_paramedit import param_editor
                 self.pe_main = param_editor.ParamEditorMain(self.mpstate)
-            except Exception:
+            except Exception as ex:
                 # Report the original failure once, then unload instead of
                 # allocating another editor on every idle cycle.
                 self.needs_unloading = True
+                print('Failed to start parameter editor: %s' % ex)
                 raise
         if self.pe_main:
             if self.pe_main.needs_unloading:

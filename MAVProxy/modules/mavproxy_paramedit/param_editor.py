@@ -6,6 +6,7 @@ June 2019
 '''
 
 import platform
+import os
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import multiproc
 from MAVProxy.modules.mavproxy_paramedit import ph_event
@@ -83,6 +84,7 @@ class ParamEditorMain(object):
         self.mpstate = mpstate
         self.needs_unloading = False
         self.time_to_quit = False
+        self.closed = False
         self.child = None
         self.event_thread = None
         self.mavlink_thread = None
@@ -94,20 +96,26 @@ class ParamEditorMain(object):
         try:
             self.start()
         except Exception:
-            self.close()
+            try:
+                self.close()
+            except Exception as ex:
+                print('Parameter editor cleanup failed: %s' % ex)
             raise
         self.mpstate.param_editor = self
 
     def start(self):
-        self.event_queue = multiproc.Queue()
+        # The Windows GUI runs in this process and needs no pipe feeders.
+        self.threaded = platform.system() == 'Windows'
+        queue_class = queue.Queue if self.threaded else multiproc.Queue
+        self.event_queue = queue_class()
         self.event_queue_lock = multiproc.Lock()
-        self.gui_event_queue = multiproc.Queue()
+        self.gui_event_queue = queue_class()
         self.gui_event_queue_lock = multiproc.Lock()
 
         self.close_window = multiproc.Semaphore()
         self.close_window.acquire()
 
-        if platform.system() == 'Windows':
+        if self.threaded:
             child_class = threading.Thread
         else:
             child_class = multiproc.Process
@@ -192,12 +200,12 @@ class ParamEditorMain(object):
     def child_task(queue, lock, gui_queue, gui_lock, close_window_sem,
                    vehicle_name, moddebug, params):
         '''child process - this holds GUI elements'''
-        from MAVProxy.modules.lib import wx_util
-        wx_util.safe = True
+        from MAVProxy.modules.lib import wx_processguard  # noqa: F401
         from MAVProxy.modules.lib.wx_loader import wx
         from MAVProxy.modules.mavproxy_paramedit import param_editor_frame
 
-        mp_util.child_close_fds()
+        if platform.system() != 'Windows':
+            mp_util.child_close_fds()
         app = wx.App(False)
         app.frame = param_editor_frame.ParamEditorFrame(
             parent=None, id=wx.ID_ANY)
@@ -232,7 +240,7 @@ class ParamEditorMain(object):
 
     def close(self):
         '''close the Parameter Editor window'''
-        if self.time_to_quit:
+        if self.closed:
             return
         self.time_to_quit = True
         if self.event_thread is not None:
@@ -243,7 +251,7 @@ class ParamEditorMain(object):
         if self.close_window is not None:
             self.close_window.release()
         if self.child is not None:
-            if platform.system() == 'Windows':
+            if self.threaded:
                 if self.child.ident is not None:
                     self.child.join()
             else:
@@ -251,27 +259,98 @@ class ParamEditorMain(object):
                     self.child.join(timeout=2)
                     if self.child.is_alive():
                         self.child.terminate()
-                        self.child.join()
+                        self.child.join(timeout=2)
+                    if self.child.is_alive():
+                        # A fork child can inherit MAVProxy's SIGTERM handler.
+                        self.child.kill()
+                        self.child.join(timeout=2)
+                    if self.child.is_alive():
+                        # Do not drain queues while the child may still read
+                        # them, but prevent their feeders blocking exit.
+                        for q in (self.event_queue, self.gui_event_queue):
+                            if q is not None:
+                                q.cancel_join_thread()
+                        if getattr(self.mpstate, 'param_editor', None) is self:
+                            self.mpstate.param_editor = None
+                        raise RuntimeError('Parameter editor process did not stop')
                 self.child.close()
             self.child = None
-        if any(thread is not None and thread.ident is not None
-               for thread in (self.event_thread, self.mavlink_thread)):
-            # The GUI has stopped reading. Drain all pending output so the
-            # queue's feeder can finish even if its pipe was full at shutdown.
-            self.gui_event_queue.put(None)
-            while self.gui_event_queue.get() is not None:
-                pass
+        errors = []
         for name in ('event_queue', 'gui_event_queue'):
             q = getattr(self, name)
             if q is not None:
-                q.close()
-                if hasattr(q, 'join_thread'):
-                    q.join_thread()
-                setattr(self, name, None)
+                try:
+                    if not self.threaded:
+                        self.close_queue(q)
+                    setattr(self, name, None)
+                except Exception as ex:
+                    # Still clean up the other queue; retain this one so a
+                    # later close() can retry after a slow feeder stops.
+                    errors.append(ex)
         self.event_thread = None
         self.mavlink_thread = None
         if getattr(self.mpstate, 'param_editor', None) is self:
             self.mpstate.param_editor = None
+        if errors:
+            raise errors[0]
+        self.closed = True
+
+    @staticmethod
+    def close_queue(q, timeout=2):
+        '''discard a process queue after its producers and readers stop'''
+        # Queue.get(), even with a timeout, can hang on a lock or partial
+        # message left by a terminated child. Discard raw bytes without either
+        # framing or locks. Use a duplicate fd because the feeder closes its
+        # own reader on exit. The process backend is only used on POSIX.
+        q.cancel_join_thread()
+        if q._thread is not None and not q._reader.closed:
+            drain_fd = os.dup(q._reader.fileno())
+            try:
+                os.set_blocking(drain_fd, False)
+                q.close()
+                if not ParamEditorMain.drain_queue(q, drain_fd, time.monotonic() + timeout):
+                    # A slow serializer/feeder must not hold up unloading.
+                    # Transfer the drain fd to a daemon which finishes cleanup
+                    # even when the module's caller never retries close().
+                    cleanup = threading.Thread(
+                        target=ParamEditorMain.finish_queue, args=(q, drain_fd),
+                        name='ParamEditorQueueCleanup', daemon=True)
+                    cleanup.start()
+                    drain_fd = None
+                    return cleanup
+            finally:
+                if drain_fd is not None:
+                    os.close(drain_fd)
+        q.close()
+        if q._thread is not None:
+            q._thread.join(timeout=2)
+            if q._thread.is_alive():
+                raise RuntimeError('Parameter editor queue feeder did not stop')
+        # Do not race the feeder closing its own connections. With no feeder,
+        # Queue.close() does not close them at all.
+        q._reader.close()
+        q._writer.close()
+
+    @staticmethod
+    def drain_queue(q, drain_fd, deadline=None):
+        while q._thread.is_alive():
+            if deadline is not None and time.monotonic() >= deadline:
+                return False
+            try:
+                if not os.read(drain_fd, 65536):
+                    q._thread.join(timeout=0.01)
+            except BlockingIOError:
+                q._thread.join(timeout=0.01)
+        return True
+
+    @staticmethod
+    def finish_queue(q, drain_fd):
+        try:
+            ParamEditorMain.drain_queue(q, drain_fd)
+            q._reader.close()
+            q._writer.close()
+        finally:
+            os.close(drain_fd)
 
     def set_params(self):
         for param, value in self.paramchanged.items():
