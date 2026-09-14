@@ -21,6 +21,7 @@ import os
 import zipfile
 import array
 import math
+import tempfile
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import multiproc
 
@@ -300,26 +301,23 @@ class SRTMDownloader():
 
         global childTileDownload
         mypid = os.getpid()
-        if not os.path.exists(os.path.join(self.cachedir, filename)):
-            if not mypid in childTileDownload or not childTileDownload[mypid].is_alive():
-                try:
-                    childTileDownload[mypid] = multiproc.Process(target=self.downloadTile, args=(str(continent), str(filename)))
-                    childTileDownload[mypid].start()
-                except Exception as ex:
-                    if mypid in childTileDownload:
-                        childTileDownload.pop(mypid)
-                    return 0
-                '''print("Getting Tile")'''
+        tilepath = os.path.join(self.cachedir, filename)
+        if os.path.exists(tilepath):
+            try:
+                return SRTMTile(tilepath, int(lat), int(lon))
+            except InvalidTileError:
+                # Older versions could cache HTTP error pages or interrupted
+                # downloads. Fetch a replacement instead of failing forever.
+                pass
+        if self.offline == 1:
             return 0
-        elif mypid in childTileDownload and childTileDownload[mypid].is_alive():
-            '''print("Still Getting Tile")'''
-            return 0
-        # TODO: Currently we create a new tile object each time.
-        # Caching is required for improved performance.
-        try:
-            return SRTMTile(os.path.join(self.cachedir, filename), int(lat), int(lon))
-        except InvalidTileError:
-            return 0
+        if mypid not in childTileDownload or not childTileDownload[mypid].is_alive():
+            try:
+                childTileDownload[mypid] = multiproc.Process(target=self.downloadTile, args=(str(continent), str(filename)))
+                childTileDownload[mypid].start()
+            except Exception:
+                childTileDownload.pop(mypid, None)
+        return 0
 
     def downloadTile(self, continent, filename):
         #Use HTTP
@@ -328,18 +326,28 @@ class SRTMDownloader():
             return
         filepath = "%s%s%s" % \
                      (self.directory,continent,filename)
+        tmpname = None
         try:
             data = self.getURIWithRedirect(filepath)
             if data:
-                self.ftpfile = open(os.path.join(self.cachedir, filename), 'wb')
-                self.ftpfile.write(data)
-                self.ftpfile.close()
-                self.ftpfile = None
+                # Readers in other processes must never see a partial tile.
+                # Validate before replacing even an existing bad cache entry.
+                with tempfile.NamedTemporaryFile(dir=self.cachedir,
+                                                 prefix=filename + '.',
+                                                 suffix='.tmp', delete=False) as output:
+                    tmpname = output.name
+                    output.write(data)
+                SRTMTile(tmpname, *self.parseFilename(filename))
+                os.replace(tmpname, os.path.join(self.cachedir, filename))
+                tmpname = None
         except Exception as e:
             if not self.first_failure:
                 print("SRTM Download failed %s on server %s" % (filepath, self.server))
                 self.first_failure = True
             pass
+        finally:
+            if tmpname is not None:
+                os.unlink(tmpname)
 
 
 class SRTMTile:
@@ -352,16 +360,16 @@ class SRTMTile:
         """
     def __init__(self, f, lat, lon):
         try:
-            zipf = zipfile.ZipFile(f, 'r')
+            with zipfile.ZipFile(f, 'r') as zipf:
+                names = zipf.namelist()
+                if len(names) != 1:
+                    raise InvalidTileError(lat, lon)
+                data = zipf.read(names[0])
         except Exception:
             raise InvalidTileError(lat, lon)
-        names = zipf.namelist()
-        if len(names) != 1:
-            raise InvalidTileError(lat, lon)
-        data = zipf.read(names[0])
         self.size = int(math.sqrt(len(data)/2)) # 2 bytes per sample
         # Currently only SRTM1/3 is supported
-        if self.size not in (1201, 3601):
+        if self.size not in (1201, 3601) or len(data) != 2 * self.size * self.size:
             raise InvalidTileError(lat, lon)
         self.data = array.array('h', data)
         self.data.byteswap()
