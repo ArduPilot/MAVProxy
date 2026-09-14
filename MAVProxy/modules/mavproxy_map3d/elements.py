@@ -510,13 +510,15 @@ class ElementManager:
         if len(self.trail) >= 2:
             self._replace('trail', [_polyline(self.trail, (1.0, 1.0, 0.0), 2.0)])
 
-    def set_mission(self, items):
+    def set_mission(self, items, track=None):
         '''items: list of MissionItem (plain tuples are accepted too).
 
         The line drawn is the path the vehicle is expected to fly, so it is
-        continuous throughout: an arc waypoint curves, and an item which
-        circles about its location is entered from the near side of its
-        circle and left again where it comes off, rather than the line
+        continuous throughout.  track is that path, as (lat, lon, amsl)
+        points, where the caller has flown the mission through the
+        vehicle's own navigation to find it; without one it is drawn from
+        the items: an arc waypoint curves, and an item which circles about
+        its location is joined and left along tangents, rather than the line
         running to the middle of the circle where the vehicle never goes.
         The markers stay on the mission item locations
         '''
@@ -526,6 +528,14 @@ class ElementManager:
         rejoin = None
         flown = [MissionItem(*item) for item in items]
         flown = [i for i in flown if not (i.lat == 0 and i.lon == 0)]
+        if track:
+            self.mission_line = [self._enu(lat, lon, amsl)
+                                 for (lat, lon, amsl) in track]
+            self.mission_markers = [
+                self._enu(i.lat, i.lon, self._resolve_amsl(i.alt, i.frame))
+                for i in flown]
+            self.refresh_mission()
+            return
         for (index, item) in enumerate(flown):
             amsl = self._resolve_amsl(item.alt, item.frame)
             if (item.command == mp_util.MAV_CMD_NAV_ARC_WAYPOINT and

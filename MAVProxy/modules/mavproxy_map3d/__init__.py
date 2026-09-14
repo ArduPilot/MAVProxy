@@ -25,6 +25,13 @@ FENCE_HOME_INCLUSION_BGR = (0, 255, 96)
 FENCE_EXCLUSION_BGR = (255, 0, 0)
 FENCE_RETURN_BGR = (255, 127, 127)
 FENCE_RETURN_RADIUS = 10.0
+# a plane's mission is flown again when the way it points on the ground turns
+# this far, but not more often than this
+TAKEOFF_HEADING_CHANGE = 5.0
+TAKEOFF_HEADING_REDRAW = 2.0
+# nor for home moving less than this, in metres, which it does by the GPS
+# wandering while ArduPlane keeps setting it before arming
+HOME_MOVE_CHANGE = 10.0
 
 
 def bgr_to_rgb(bgr, default=(1.0, 0.0, 1.0)):
@@ -36,6 +43,10 @@ def bgr_to_rgb(bgr, default=(1.0, 0.0, 1.0)):
 
 
 class Map3DModule(mp_module.MPModule):
+    # the EKF origin's altitude, which a rally point may be measured from,
+    # until the vehicle says where it is
+    origin_amsl = None
+
     def __init__(self, mpstate):
         # Do not register as a public "map*" module. ADS-B, AIS, KML and other
         # modules use that wildcard for the 2D SlipMap API (add_object,
@@ -67,6 +78,17 @@ class Map3DModule(mp_module.MPModule):
         self.last_attitude = (0.0, 0.0, 0.0)
         self.home_amsl = None
         self.home_position = None
+        # whether the vehicle is armed, and the way it last pointed while it
+        # was not.  A fixed-wing takeoff holds the ground course the vehicle
+        # has once it gets moving, which is not known until it does: this
+        # is the best there is before then, and wrong wherever a crosswind,
+        # a turn on the ground or a compass error has it moving some other
+        # way
+        self.armed = False
+        self.ground_heading = None
+        self.ground_heading_changed = False
+        self.ground_heading_redrawn = 0
+        self.reset_flown_track()
         self.icon_type = None
         self.follow = True
         self.kml_change_state = None
@@ -167,6 +189,10 @@ class Map3DModule(mp_module.MPModule):
                 self.last_attitude = tuple(math.radians(v) for v in
                                            (attitude.Roll, attitude.Pitch,
                                             attitude.Yaw))
+
+        origin = messages.get('GPS_GLOBAL_ORIGIN') or messages.get('ORGN')
+        if origin is not None:
+            self.mavlink_packet(origin, force=True)
 
         home = messages.get('HOME_POSITION')
         if home is not None:
@@ -298,11 +324,23 @@ class Map3DModule(mp_module.MPModule):
         except Exception:
             return
         items = []
+        # every item after home, for flying the mission through, and which
+        # of their altitudes are absolute rather than moving with home
+        flown = []
+        fixed_alt = []
         default_radius = self.default_circle_radius()
         previous = None
         for w in wploader.wpoints:
             frame = getattr(w, 'frame', 0)
             (lat, lon) = (w.x, w.y)
+            if w.seq != 0 and (lat == 0 and lon == 0 and
+                               w.command not in mp_util.TAKEOFF_COMMANDS):
+                from MAVProxy.modules.lib import plane_track
+                flown.append((w.command, 0.0, 0.0,
+                              plane_track.positionless_amsl(
+                                  w.z, getattr(w, 'frame', 0), self.home_amsl),
+                              (w.param1, w.param2, w.param3, w.param4)))
+                fixed_alt.append(frame in (0, 5))
             if lat == 0 and lon == 0 and w.command in mp_util.TAKEOFF_COMMANDS:
                 # draw the climb from home, otherwise the takeoff altitude is
                 # dropped and the mission appears to start at the first waypoint
@@ -348,8 +386,211 @@ class Map3DModule(mp_module.MPModule):
             items.append(MissionItem(lat, lon, z, frame, w.command, w.seq,
                                      w.param1, circle_radius, circle_turns,
                                      exit_converge))
+            if w.seq != 0:
+                flown.append((w.command, lat, lon, amsl, params))
+                # a terrain item resolved above has frame 0 by now: its
+                # altitude is where it is, whatever home does
+                fixed_alt.append(frame in (0, 5))
             previous = (lat, lon, amsl)
-        self.map.set_mission(items)
+        self.mission_sent = items
+        self.map.set_mission(items, self.flown_track(wploader, flown,
+                                                    fixed_alt))
+
+    def reset_flown_track(self):
+        '''forget any plane mission flown.  Flying one can take a second or
+        more, so it is done on a thread of its own rather than the main one:
+        the mission is drawn at once, and again with the path flown when the
+        thread has worked it out'''
+        self.track_lock = threading.Lock()
+        # the last path worked out, as (key, track, home), so an unchanged
+        # mission is not flown again
+        self.plane_track = (None, None, None)
+        # for the thread: the latest mission to fly, as (key, home, items,
+        # params, heading, rally), and the thread while it is running
+        self.track_request = None
+        self.track_thread = None
+        # from the thread, for the idle task to draw: (key, track, home)
+        self.track_result = None
+        # (key, flown_from, home, items) of the mission on screen while it
+        # waits for its path: the home it is being flown from, and the home
+        # and items it has now; and the MissionItems it was drawn with
+        self.track_wanted = None
+        self.mission_sent = None
+
+    @staticmethod
+    def same_home(home, other):
+        '''whether two homes are near enough to fly a mission from alike'''
+        return (other is not None and
+                mp_util.gps_distance(home[0], home[1],
+                                     other[0], other[1]) < HOME_MOVE_CHANGE and
+                abs(home[2] - other[2]) < HOME_MOVE_CHANGE)
+
+    def flown_track(self, wploader, items, fixed_alt):
+        '''the path a plane flies the mission along, where it has already
+        been worked out; otherwise None, and the thread is asked to work it
+        out.  None too for any other vehicle, or where the mission cannot be
+        flown through'''
+        if self.vehicle_type != 'plane':
+            self.track_wanted = None
+            return None
+        home = self.mission_home(wploader)
+        if home is None or self.home_amsl is None:
+            self.track_wanted = None
+            return None
+        from MAVProxy.modules.lib import plane_track
+        home = (home[0], home[1], self.home_amsl)
+        # copied here, since the thread must not read them as they change
+        params = dict((name, mp_util.param_value(self.mav_param, name))
+                      for (names, _) in plane_track.PARAMETERS.values()
+                      for (name, _) in names)
+        # the mission as it stands relative to home, so the same mission from
+        # a home which has only wandered a little is still the same mission.
+        # An altitude of its own stands as it is, since home does not move it
+        def keyed_alt(amsl, fixed):
+            if amsl is None:
+                return None
+            return round(amsl if fixed else amsl - home[2], 2)
+        relative = tuple(
+            (command,
+             'home' if (lat, lon) == home[:2] else (lat, lon),
+             keyed_alt(amsl, fixed),
+             tuple(params_of_item))
+            for ((command, lat, lon, amsl, params_of_item), fixed)
+            in zip(items, fixed_alt))
+        points = self.rally_points(home)
+        rally = [point[:3] for point in points]
+        moves = [not fixed for fixed in fixed_alt]
+        moves += [not fixed for (_, _, _, fixed) in points]
+        key = (relative, tuple(sorted(params.items())), self.ground_heading,
+               tuple((lat, lon, keyed_alt(amsl, fixed))
+                     for (lat, lon, amsl, fixed) in points))
+        if any(moves) and not all(moves):
+            # some of it moves with home and the rest does not, which the
+            # path cannot be moved to fit: it is flown again instead
+            key += (round(home[2], 2),)
+        (cached_key, cached_track, cached_home) = self.plane_track
+        if cached_key == key and self.same_home(home, cached_home):
+            self.track_wanted = None
+            return self.moved_home(cached_track, cached_home, home, items,
+                                   any(moves))
+        wanted = self.track_wanted
+        if wanted is not None and wanted[0] == key and self.same_home(home, wanted[1]):
+            # already being flown, from a home near enough: drawn, when it
+            # has been, from where home is now
+            self.track_wanted = (key, wanted[1], home, items, any(moves))
+            return None
+        self.track_wanted = (key, home, home, items, any(moves))
+        with self.track_lock:
+            self.track_request = (key, home, list(items), params,
+                                  self.ground_heading, rally)
+            if self.track_thread is None:
+                self.track_thread = threading.Thread(target=self.fly_tracks,
+                                                     daemon=True)
+                self.track_thread.start()
+        return None
+
+    def rally_points(self, home):
+        '''the vehicle's rally points, as (lat, lon, amsl, fixed_alt), for a
+        return to launch to go to.  fixed_alt is a point whose altitude is
+        its own rather than one which moves with home'''
+        from MAVProxy.modules.lib import plane_track
+        try:
+            loader = self.module('rally').rallyloader
+            points = [loader.rally_point(i) for i in range(loader.rally_count())]
+        except Exception:
+            return []
+        out = []
+        for r in points:
+            flags = getattr(r, 'flags', 0)
+            frame = plane_track.rally_alt_frame(flags)
+            (lat, lon) = (r.lat * 1.0e-7, r.lng * 1.0e-7)
+            terrain = None
+            if frame == plane_track.RALLY_ALT_ABOVE_TERRAIN:
+                terrain = self.terrain_alt(lat, lon)
+            # the EKF origin is where the vehicle first had a position, which
+            # is usually home and near enough to it until it says otherwise
+            origin = self.origin_amsl
+            fixed = plane_track.rally_alt_is_fixed(flags)
+            if frame == plane_track.RALLY_ALT_ABOVE_ORIGIN and origin is None:
+                (origin, fixed) = (home[2], False)
+            out.append((lat, lon,
+                        plane_track.rally_amsl(r.alt, flags, home[2],
+                                               origin, terrain),
+                        fixed))
+        return out
+
+    @staticmethod
+    def moved_home(track, flown_home, home, items, alt_moves=True):
+        '''a path flown from flown_home, moved to start from home, which is
+        near enough not to fly it again.  Its altitudes move with home where
+        the mission's do, and its start moves with home too, less and less
+        along the way to the first item with a position of its own, which
+        does not move'''
+        if track is None or flown_home == home:
+            return track
+        dlat = home[0] - flown_home[0]
+        dlon = (home[1] - flown_home[1] + 180.0) % 360.0 - 180.0
+        dalt = home[2] - flown_home[2] if alt_moves else 0.0
+        reach = 0.0
+        for (command, lat, lon, amsl, params) in items:
+            if (lat, lon) != (0.0, 0.0) and (lat, lon) != home[:2]:
+                reach = mp_util.gps_distance(flown_home[0], flown_home[1],
+                                             lat, lon)
+                break
+        moved = []
+        travelled = 0.0
+        previous = None
+        for (lat, lon, amsl) in track:
+            if previous is not None:
+                travelled += mp_util.gps_distance(previous[0], previous[1],
+                                                  lat, lon)
+            previous = (lat, lon)
+            weight = max(0.0, 1.0 - travelled / reach) if reach > 0 else 0.0
+            moved.append((lat + dlat * weight, lon + dlon * weight,
+                          amsl + dalt))
+        return moved
+
+    def fly_tracks(self):
+        '''the thread flying plane missions: the latest asked for, until there
+        is none left to fly'''
+        from MAVProxy.modules.lib import plane_track
+        while True:
+            with self.track_lock:
+                request = self.track_request
+                self.track_request = None
+                if request is None:
+                    self.track_thread = None
+                    return
+            (key, home, items, params, heading, rally) = request
+            try:
+                track = plane_track.mission_track(home, items, params,
+                                                  heading, rally=rally)
+            except Exception as ex:
+                # drawn from its items instead; the thread carries on
+                print("map3d: could not fly the mission: %s" % ex)
+                track = None
+            with self.track_lock:
+                self.track_result = (key, track, home)
+
+    def draw_flown_track(self):
+        '''draw the path the thread has flown, if it is for the mission on
+        screen.  Called from the idle task, on the main thread'''
+        with self.track_lock:
+            result = self.track_result
+            self.track_result = None
+        if result is None:
+            return
+        self.plane_track = result
+        (key, track, home) = result
+        wanted = self.track_wanted
+        if wanted is None or wanted[0] != key or home != wanted[1]:
+            # another mission since, which the thread has yet to fly
+            return
+        self.track_wanted = None
+        if self.map is not None and self.mission_sent is not None:
+            self.map.set_mission(self.mission_sent,
+                                 self.moved_home(track, home, wanted[2],
+                                                 wanted[3], wanted[4]))
 
     def set_icon_type(self, name):
         '''vehicle type changed: the viewer picks its icon from it. Not named
@@ -509,12 +750,41 @@ class Map3DModule(mp_module.MPModule):
             if rally_change != self.rally_change_time:
                 self.rally_change_time = rally_change
                 self.send_rally()
+                # a return to launch may go to one
+                self.send_mission()
         except Exception:
             pass
         if self.terrain_resolved:
             # a deferred terrain lookup landed: redo the terrain-frame items
             self.terrain_resolved = False
             self.send_mission()
+        self.redraw_for_ground_heading()
+        self.draw_flown_track()
+
+    def redraw_for_ground_heading(self, now=None):
+        '''fly the mission again from the way the vehicle points now, if that
+        has changed, and not too often'''
+        if not self.ground_heading_changed:
+            return
+        if now is None:
+            now = time.time()
+        if now - self.ground_heading_redrawn < TAKEOFF_HEADING_REDRAW:
+            return
+        self.ground_heading_changed = False
+        self.ground_heading_redrawn = now
+        if self.vehicle_type == 'plane':
+            self.send_mission()
+
+    def note_ground_heading(self, yaw):
+        '''the vehicle points yaw radians while disarmed.  A change of less
+        than TAKEOFF_HEADING_CHANGE is not worth flying the mission again'''
+        heading = round(math.degrees(yaw)) % 360
+        if self.ground_heading is not None:
+            change = abs((heading - self.ground_heading + 180) % 360 - 180)
+            if change < TAKEOFF_HEADING_CHANGE:
+                return
+        self.ground_heading = heading
+        self.ground_heading_changed = True
 
     def mavlink_packet(self, m, force=False):
         if self.map is None or not self.map.is_alive():
@@ -522,12 +792,30 @@ class Map3DModule(mp_module.MPModule):
         mtype = m.get_type()
         if mtype in ('HEARTBEAT', 'HIGH_LATENCY2'):
             self.set_icon_type(mp_util.vehicle_type_name(m.type))
+            if (mtype == 'HEARTBEAT' and
+                    m.autopilot != mavutil.mavlink.MAV_AUTOPILOT_INVALID):
+                self.armed = bool(m.base_mode &
+                                  mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED)
+        elif mtype == 'GPS_GLOBAL_ORIGIN':
+            # the EKF origin, which a rally point's altitude may be above
+            origin = m.altitude * 1.0e-3        # AMSL (mm -> m)
+            if origin != self.origin_amsl:
+                self.origin_amsl = origin
+                self.send_rally()
+                self.send_mission()
+        elif mtype == 'ORGN':
+            if m.Type == 0 and m.Alt != self.origin_amsl:
+                self.origin_amsl = m.Alt
+                self.send_rally()
+                self.send_mission()
         elif mtype == 'HOME_POSITION':
             self.home_amsl = m.altitude * 1.0e-3     # AMSL (mm -> m)
             self.map.set_home(self.home_amsl)
             self.set_home_position(m.latitude * 1.0e-7, m.longitude * 1.0e-7)
         elif mtype == 'ATTITUDE':
             self.last_attitude = (m.roll, m.pitch, m.yaw)
+            if not self.armed:
+                self.note_ground_heading(m.yaw)
         elif mtype == 'ATT':
             # ArduPilot DataFlash attitude is recorded in degrees.
             self.last_attitude = tuple(math.radians(v) for v in

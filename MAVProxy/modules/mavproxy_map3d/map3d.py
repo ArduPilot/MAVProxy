@@ -128,8 +128,12 @@ class Map3D:
         '''Limit timestamped path points to a Matplotlib date-number range.'''
         self._put(('time_range', None if trange is None else tuple(trange)))
 
-    def set_mission(self, items):
-        self._put(('mission', list(items)))
+    def set_mission(self, items, track=None):
+        '''items: MissionItems.  track is the path the vehicle is expected to
+        fly them along, as (lat, lon, amsl) points, where the caller can
+        work that out; otherwise the path is drawn from the items alone'''
+        self._put(('mission', list(items),
+                   None if track is None else list(track)))
 
     def set_fence(self, shapes):
         '''shapes: ('polygon', [(lat,lon), ...], rgb) / ('circle', (lat,lon), radius_m, rgb)'''

@@ -11,6 +11,7 @@ import math
 import os
 import queue
 import threading
+import time
 import urllib.request
 import warnings
 
@@ -72,13 +73,27 @@ def np_rgb_to_texture(img):
     return tex
 
 
-def fetch_terrain_tile(z, x, y):
+def fetch_terrain_tile(z, x, y, timeout=30):
     path = os.path.join(CACHE_DIR, str(z), str(x), "%d.terrain" % y)
     if not os.path.exists(path):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         url = "%s/%d/%d/%d.terrain" % (QUANTIZED_BASE, z, x, y)
         req = urllib.request.Request(url, headers={"Accept": "application/octet-stream"})
-        data = urllib.request.urlopen(req, timeout=30).read()
+        # a socket timeout is per read, so a tile dripping in a few bytes at
+        # a time would hold the caller for as long as it liked: give the
+        # whole fetch the deadline the caller asked for
+        deadline = time.time() + timeout
+        response = urllib.request.urlopen(req, timeout=timeout)
+        chunks = []
+        while True:
+            chunk = response.read(64 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            if time.time() > deadline:
+                raise TimeoutError("terrain tile took longer than %.0fs"
+                                   % timeout)
+        data = b"".join(chunks)
         # publish atomically under a unique name: the viewer child process and
         # the module share this cache, so a reader must never see a partial tile
         tmppath = "%s.tmp.%u.%u" % (path, os.getpid(), threading.get_ident())
@@ -90,11 +105,11 @@ def fetch_terrain_tile(z, x, y):
     return path, gz
 
 
-def decode_terrain(z, x, y):
+def decode_terrain(z, x, y, timeout=30):
     '''worker-safe: return dict(bbox, verts, idx) using numpy only'''
     g = GlobalGeodetic(True)
     bbox = g.TileBounds(x, y, z)
-    path, gz = fetch_terrain_tile(z, x, y)
+    path, gz = fetch_terrain_tile(z, x, y, timeout)
     tile = qmt_decode(path, bbox, gzipped=gz)
     verts = np.array(tile.getVerticesCoordinates())
     nv = len(verts)
@@ -106,14 +121,15 @@ def decode_terrain(z, x, y):
 _sample_cache = {}
 
 
-def sample_terrain(lat, lon, zoom=12, cache_only=False):
+def sample_terrain(lat, lon, zoom=12, cache_only=False, timeout=30):
     '''return terrain elevation (m AMSL) at lat/lon from the quantized mesh
     (same source we render), or None. Decoded tiles are cached. Assumes the
     regular grid mesh ArduPilot publishes; falls back to the tile mean for a
     non-grid tile.
 
     cache_only returns None rather than fetching/decoding a missing tile, so
-    callers on a latency-sensitive thread can defer the work.'''
+    callers on a latency-sensitive thread can defer the work; timeout is how
+    long a caller which does fetch waits for the whole tile.'''
     g = GlobalGeodetic(True)
     lon = wrap_longitude(lon)
     x, y = g.LonLatToTile(lon, lat, zoom)
@@ -123,7 +139,7 @@ def sample_terrain(lat, lon, zoom=12, cache_only=False):
         if cache_only:
             return None
         try:
-            dec = decode_terrain(zoom, x, y)
+            dec = decode_terrain(zoom, x, y, timeout)
         except Exception:
             return None
         _sample_cache[key] = dec

@@ -47,7 +47,10 @@ def live_mission_items(wpoints, home_amsl=584.0, params=None,
         mav_param=params or {}, vehicle_type=vehicle,
         module=lambda name: SimpleNamespace(wploader=loader))
     sent = []
-    module.map = SimpleNamespace(set_mission=sent.extend)
+    module.map = SimpleNamespace(
+        set_mission=lambda items, track=None: sent.extend(items))
+    module.reset_flown_track()
+    module.ground_heading = None
     module.home_amsl = home_amsl
     module.home_position = None
     module.default_circle_radius = lambda: default_radius
@@ -140,16 +143,81 @@ class TestProjection(object):
         from MAVProxy.modules.mavproxy_map3d import terrain
         fetched = []
 
-        def decode(z, x, y):
-            fetched.append((z, x, y))
+        def decode(z, x, y, timeout=30):
+            fetched.append((z, x, y, timeout))
             return {"bbox": (-180.0, -20.0, -170.0, -10.0),
                     "verts": np.array([(-180.0, -10.0, 1.0), (-170.0, -10.0, 1.0),
                                        (-180.0, -20.0, 1.0), (-170.0, -20.0, 1.0)])}
         monkeypatch.setattr(terrain, 'decode_terrain', decode)
         monkeypatch.setattr(terrain, '_sample_cache', {})
         assert terrain.sample_terrain(-16.5, 180.001) == pytest.approx(1.0)
-        assert fetched == [(12,) + terrain.GlobalGeodetic(True).LonLatToTile(
-            -179.999, -16.5, 12)]
+        tile = terrain.GlobalGeodetic(True).LonLatToTile(-179.999, -16.5, 12)
+        assert fetched == [(12,) + tile + (30,)]
+        # and a caller which will not wait that long says so
+        monkeypatch.setattr(terrain, '_sample_cache', {})
+        assert terrain.sample_terrain(-16.5, 180.001,
+                                      timeout=5.0) == pytest.approx(1.0)
+        assert fetched[-1] == (12,) + tile + (5.0,)
+
+    def test_a_terrain_tile_is_fetched_with_the_timeout_asked_for(
+            self, monkeypatch, tmp_path):
+        pytest.importorskip("vtk")
+        import time
+        import urllib.request
+        from MAVProxy.modules.mavproxy_map3d import terrain
+        waited = []
+
+        class Response(object):
+            def __init__(self):
+                self.left = [b'terrain ', b'tile']
+
+            def read(self, size=None):
+                return self.left.pop(0) if self.left else b''
+
+        def urlopen(request, timeout=None):
+            waited.append(timeout)
+            return Response()
+        monkeypatch.setattr(urllib.request, 'urlopen', urlopen)
+        monkeypatch.setattr(terrain, 'CACHE_DIR', str(tmp_path))
+        terrain.fetch_terrain_tile(12, 1, 2, timeout=5.0)
+        assert waited == [5.0]
+        # and the whole fetch, where nobody says how long to wait for it
+        monkeypatch.setattr(terrain, 'CACHE_DIR', str(tmp_path / 'again'))
+        terrain.fetch_terrain_tile(12, 1, 2)
+        assert waited[-1] == 30
+        # decoding a tile waits as long as it is told to as well
+
+        class Stop(Exception):
+            pass
+
+        def fetch(z, x, y, timeout=30):
+            waited.append(timeout)
+            raise Stop()
+        # a tile which drips in for ever is given up on at the deadline
+        monkeypatch.setattr(terrain, 'CACHE_DIR', str(tmp_path / 'slow'))
+
+        class Dripping(object):
+            def __init__(self):
+                self.left = 100
+
+            def read(self, size=None):
+                if self.left <= 0:
+                    return b''
+                self.left -= 1
+                time.sleep(0.01)
+                return b'.'
+        monkeypatch.setattr(urllib.request, 'urlopen',
+                            lambda request, timeout=None: Dripping())
+        with pytest.raises(Exception):
+            terrain.fetch_terrain_tile(12, 1, 2, timeout=0.05)
+        monkeypatch.setattr(terrain, 'fetch_terrain_tile', fetch)
+        for asked in (5.0, None):
+            with pytest.raises(Stop):
+                if asked is None:
+                    terrain.decode_terrain(12, 1, 2)
+                else:
+                    terrain.decode_terrain(12, 1, 2, asked)
+            assert waited[-1] == (30 if asked is None else asked)
 
     def test_the_view_is_turned_across_the_antimeridian(self):
         pytest.importorskip("vtk")
@@ -580,7 +648,7 @@ class TestLogMissionItems(object):
     def test_a_log_draws_the_last_mission_it_holds(self):
         first = HERE
         second = mp_util.gps_newpos(HERE[0], HERE[1], 0, 5000)
-        (path, mission) = self.module().mission_from_log(
+        (path, mission, _, _, _, _) = self.module().mission_from_log(
             self.log(*(self.dump(first, 4) + self.dump(second, 2))))
         # just the second mission, even though it is the shorter of the two
         assert len(mission) == 2
@@ -588,7 +656,7 @@ class TestLogMissionItems(object):
 
     def test_a_cleared_mission_draws_nothing(self):
         # clearing the mission writes the message and then no items at all
-        (path, mission) = self.module().mission_from_log(
+        (path, mission, _, _, _, _) = self.module().mission_from_log(
             self.log(*(self.dump(HERE, 4) +
                        [self.message('MSG', Message='New mission')])))
         assert mission == []
@@ -602,7 +670,7 @@ class TestLogMissionItems(object):
             return self.message('CMD', CNum=seq, CId=command, Lat=lat,
                                 Lng=lng, Alt=alt, Frame=3, Prm1=0, Prm2=0,
                                 Prm3=0, Prm4=0)
-        (path, mission) = self.module().mission_from_log(self.log(
+        (path, mission, _, _, _, _) = self.module().mission_from_log(self.log(
             self.message('POS', Lat=HERE[0], Lng=HERE[1], Alt=584.0),
             self.message('MSG', Message='New mission'),
             cmd(0, m.MAV_CMD_NAV_WAYPOINT, HERE[0], HERE[1], 584.0),
@@ -626,7 +694,7 @@ class TestLogMissionItems(object):
             return self.message('CMD', CNum=seq, CId=command, Lat=lat,
                                 Lng=lng, Alt=alt, Frame=frame, Prm1=0,
                                 Prm2=0, Prm3=0, Prm4=0)
-        (path, mission) = self.module().mission_from_log(self.log(
+        (path, mission, cmds, _, _, _) = self.module().mission_from_log(self.log(
             self.message('POS', Lat=HERE[0], Lng=HERE[1], Alt=0.1),
             self.message('MSG', Message='New mission'),
             cmd(0, m.MAV_CMD_NAV_WAYPOINT, 0.0, 0.0, 0.0, 0),
@@ -636,6 +704,7 @@ class TestLogMissionItems(object):
             self.message('POS', Lat=HERE[0], Lng=HERE[1], Alt=584.0),
         ))
         assert (mission[0][0], mission[0][1], mission[0][2]) == HERE + (584.0,)
+        assert cmds[0][:3] == HERE + (584.0,)
         ground0 = min(p[2] for p in path)
         out = self.module().resolve_mission_amsl(mission, ground0, {})
         # measured from the home the vehicle had, not the lowest position
@@ -647,7 +716,7 @@ class TestLogMissionItems(object):
         second = [m for m in self.dump(
             mp_util.gps_newpos(HERE[0], HERE[1], 0, 5000), 2)
             if m.get_type() == 'CMD']
-        (path, mission) = self.module().mission_from_log(
+        (path, mission, _, _, _, _) = self.module().mission_from_log(
             self.log(*(first + second)))
         assert len(mission) == 2
 

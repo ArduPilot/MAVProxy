@@ -759,3 +759,902 @@ class TestFlownMission(object):
         assert distances[-1] < 80.0
         after_transition = self.distances(track, data['flown'][30:])
         assert after_transition[-1] < 30.0
+
+
+class TestDrawnTrack(object):
+    """where the maps get the path from, and what they do with it"""
+
+    def items(self):
+        '''a mission in the form the wp module's loader holds it: home, a
+        speed change with no position, and two waypoints'''
+        from types import SimpleNamespace
+        wpoints = []
+        rows = [(mavlink.MAV_CMD_NAV_WAYPOINT, offset(0, 0, 0)),
+                (mavlink.MAV_CMD_DO_CHANGE_SPEED, (0, 0, 0)),
+                (mavlink.MAV_CMD_NAV_WAYPOINT, offset(3000, 0)),
+                (mavlink.MAV_CMD_NAV_WAYPOINT, offset(3000, 3000))]
+        for (seq, (command, (lat, lon, amsl))) in enumerate(rows):
+            params = (0, 30, -1, 0) if command == mavlink.MAV_CMD_DO_CHANGE_SPEED else (0, 0, 0, 0)
+            wpoints.append(SimpleNamespace(
+                seq=seq, command=command, x=lat, y=lon,
+                z=0 if seq == 0 else amsl - HOME[2], frame=0 if seq == 0 else 3,
+                param1=params[0], param2=params[1], param3=params[2],
+                param4=params[3]))
+        wpoints[0].z = HOME[2]
+        return wpoints
+
+    def live_module(self, vehicle, params=PARAMS, settle=True):
+        '''the live map3d module, with only what send_mission() reads'''
+        from types import SimpleNamespace
+        from MAVProxy.modules.mavproxy_map3d import Map3DModule
+        module = Map3DModule.__new__(Map3DModule)
+        wpoints = self.items()
+        loader = SimpleNamespace(wpoints=wpoints, wp=lambda i: wpoints[i])
+        module.mpstate = SimpleNamespace(
+            mav_param=dict(params), vehicle_type=vehicle,
+            module=lambda name: SimpleNamespace(wploader=loader))
+        module.sent = []
+        module.map = SimpleNamespace(
+            set_mission=lambda items, track=None: module.sent.append(track))
+        module.home_amsl = HOME[2]
+        module.home_position = None
+        module.reset_flown_track()
+        module.armed = False
+        module.ground_heading = None
+        module.ground_heading_changed = False
+        module.ground_heading_redrawn = 0
+        module.default_circle_radius = lambda: 80.0
+        module.terrain_alt = lambda lat, lon: None
+        if settle:
+            # the path is flown on a thread of its own, and drawn from the
+            # idle task: wait for it and draw it, wherever the module sends
+            # the mission, so these tests can look at what is drawn
+            send_mission = module.send_mission
+
+            def send_and_draw():
+                send_mission()
+                self.settle(module)
+            module.send_mission = send_and_draw
+        return module
+
+    @staticmethod
+    def settle(module, timeout=10.0):
+        '''wait for the module's thread to fly the mission, and draw it'''
+        import time
+        deadline = time.time() + timeout
+        while module.track_thread is not None:
+            assert time.time() < deadline, 'the mission was never flown'
+            time.sleep(0.001)
+        module.draw_flown_track()
+
+    def test_the_live_map_flies_a_planes_mission(self):
+        module = self.live_module('plane')
+        module.send_mission()
+        track = module.sent[-1]
+        assert track is not None
+        assert track[0][:2] == pytest.approx(HOME[:2])
+        # the speed change with no position of its own was flown too: at 30
+        # m/s rather than 22 the turn at the first waypoint swings wider
+        slow = self.live_module('plane', dict(PARAMS, AIRSPEED_CRUISE=22.0))
+        slow.mpstate.module('wp').wploader.wpoints[1].param2 = -1
+        slow.send_mission()
+        assert (max(local(p)[0] for p in track) >
+                max(local(p)[0] for p in slow.sent[-1]) + 5.0)
+
+    def test_the_live_map_does_not_fly_the_mission_again_as_home_wanders(
+            self, monkeypatch):
+        # ArduPlane keeps setting home from the GPS every few seconds before
+        # it arms, so home wanders by a metre or two each time
+        calls = []
+        real = plane_track.mission_track
+
+        def counting(*args, **kwargs):
+            calls.append(args)
+            return real(*args, **kwargs)
+        monkeypatch.setattr(plane_track, 'mission_track', counting)
+        module = self.live_module('plane')
+        # a takeoff with no position of its own is flown from home, so it
+        # wanders with it
+        loader = module.mpstate.module('wp').wploader
+        loader.wpoints[1].command = mavlink.MAV_CMD_NAV_TAKEOFF
+        loader.wpoints[1].z = 30.0
+        module.home_position = HOME[:2]
+        module.send_mission()
+        assert len(calls) == 1
+        flown = module.sent[-1]
+        (lat, lon) = mp_util.gps_newpos(HOME[0], HOME[1], 45, 3)
+        module.home_position = (lat, lon)
+        module.home_amsl = HOME[2] + 2
+        module.send_mission()
+        assert len(calls) == 1
+        # the path it was flown with is moved to start at the new home, and
+        # up with it, but still meets the waypoints, which have not moved
+        moved = module.sent[-1]
+        assert moved[0][0] == pytest.approx(lat, abs=1e-7)
+        assert moved[0][1] == pytest.approx(lon, abs=1e-7)
+        assert moved[0][2] == pytest.approx(flown[0][2] + 2)
+        far = [i for (i, p) in enumerate(flown) if local(p)[1] > 1000][0]
+        assert moved[far][:2] == pytest.approx(flown[far][:2], abs=1e-7)
+        assert moved[far][2] == pytest.approx(flown[far][2] + 2)
+        # but it moving further is a different flight
+        (lat, lon) = mp_util.gps_newpos(HOME[0], HOME[1], 45, 50)
+        module.home_position = (lat, lon)
+        module.send_mission()
+        assert len(calls) == 2
+        module.home_amsl = HOME[2] + 30
+        module.send_mission()
+        assert len(calls) == 3
+
+    def test_an_amsl_mission_is_not_flown_again_as_homes_altitude_wanders(
+            self, monkeypatch):
+        # an item at an altitude of its own does not move when home does,
+        # so the mission is the same mission as home's altitude wanders
+        calls = []
+        real = plane_track.mission_track
+
+        def counting(*args, **kwargs):
+            calls.append(args)
+            return real(*args, **kwargs)
+        monkeypatch.setattr(plane_track, 'mission_track', counting)
+        module = self.live_module('plane')
+        loader = module.mpstate.module('wp').wploader
+        for w in loader.wpoints[1:]:
+            if w.frame == 3:
+                w.z += HOME[2]
+                w.frame = 0
+        module.home_position = HOME[:2]
+        module.send_mission()
+        assert len(calls) == 1
+        for altitude in (0.3, -0.4, 0.2):
+            module.home_amsl += altitude
+            module.send_mission()
+        assert len(calls) == 1
+        # and the path it was drawn with stays where it was flown
+        flown = [track for track in module.sent if track is not None][0]
+        assert module.sent[-1][0][2] == pytest.approx(flown[0][2])
+        # while a mission above home moves up with it
+        relative = self.live_module('plane')
+        relative.home_position = HOME[:2]
+        relative.send_mission()
+        moved_from = relative.sent[-1][0][2]
+        relative.home_amsl += 0.3
+        relative.send_mission()
+        assert relative.sent[-1][0][2] == pytest.approx(moved_from + 0.3)
+        assert len(calls) == 2
+
+    def test_a_mission_at_both_kinds_of_altitude_is_flown_again(self,
+                                                                monkeypatch):
+        # a path with some altitudes moving with home and some not cannot be
+        # moved to fit a home which has, so it is flown again instead
+        calls = []
+        real = plane_track.mission_track
+
+        def counting(*args, **kwargs):
+            calls.append(args)
+            return real(*args, **kwargs)
+        monkeypatch.setattr(plane_track, 'mission_track', counting)
+        module = self.live_module('plane')
+        loader = module.mpstate.module('wp').wploader
+        # the last waypoint at an altitude of its own, the rest above home
+        loader.wpoints[-1].z += HOME[2]
+        loader.wpoints[-1].frame = 0
+        module.home_position = HOME[:2]
+        module.send_mission()
+        assert len(calls) == 1
+        flown = module.sent[-1]
+        module.home_amsl += 0.3
+        module.send_mission()
+        assert len(calls) == 2
+        # and the item with its own altitude is still drawn at it
+        assert flown[-1][2] == pytest.approx(module.sent[-1][-1][2], abs=0.05)
+        # home moving no further than before does not fly it again
+        module.send_mission()
+        assert len(calls) == 2
+
+    def test_the_live_map_takes_home_for_an_origin_it_has_not_been_told(self):
+        from types import SimpleNamespace
+        module = self.live_module('plane')
+        frame_valid = 1 << 2
+        rally = [SimpleNamespace(lat=int(HOME[0] * 1e7),
+                                 lng=int(HOME[1] * 1e7), alt=100,
+                                 flags=frame_valid | (2 << 3))]
+        module.mpstate.module = lambda name: SimpleNamespace(
+            rallyloader=SimpleNamespace(rally_count=lambda: 1,
+                                        rally_point=lambda i: rally[0]))
+        # ArduPilot logs the EKF origin and home together, and MAVProxy
+        # keeps only the last of each type, so the origin is often unknown:
+        # home stands in for it, and moves the point as home moves
+        assert module.origin_amsl is None
+        (point,) = module.rally_points((HOME[0], HOME[1], HOME[2]))
+        assert point[2] == HOME[2] + 100
+        assert point[3] is False
+
+    def test_the_live_map_takes_a_rally_points_own_altitude_frame(self):
+        from types import SimpleNamespace
+        module = self.live_module('plane')
+        frame_valid = 1 << 2
+        rally = [SimpleNamespace(lat=int(HOME[0] * 1e7),
+                                 lng=int(HOME[1] * 1e7), alt=100,
+                                 flags=frame_valid | (frame << 3))
+                 for frame in (1, 2, 3)]
+        module.mpstate.module = lambda name: SimpleNamespace(
+            wploader=module.mpstate.module('wp').wploader
+            if name == 'wp' else None,
+            rallyloader=SimpleNamespace(
+                rally_count=lambda: len(rally),
+                rally_point=lambda i: rally[i]))
+        module.origin_amsl = 500.0
+        module.terrain_alt = lambda lat, lon: 300.0
+        points = module.rally_points((HOME[0], HOME[1], HOME[2]))
+        assert [p[2] for p in points] == [HOME[2] + 100, 600.0, 400.0]
+        # only the one above home moves when home does
+        assert [p[3] for p in points] == [False, True, True]
+
+    def test_an_item_with_no_position_keeps_its_altitude(self, monkeypatch):
+        flown = []
+        real = plane_track.mission_track
+
+        def recording(home, items, *args, **kwargs):
+            flown.append(items)
+            return real(home, items, *args, **kwargs)
+        monkeypatch.setattr(plane_track, 'mission_track', recording)
+        module = self.live_module('plane')
+        loader = module.mpstate.module('wp').wploader
+        # a loiter to altitude where the aircraft is, 200m above home
+        loader.wpoints[1].command = mavlink.MAV_CMD_NAV_LOITER_TO_ALT
+        loader.wpoints[1].z = 200.0
+        loader.wpoints[1].param2 = 0
+        module.send_mission()
+        assert flown[-1][0][3] == pytest.approx(HOME[2] + 200.0)
+
+    def test_the_mission_is_flown_off_the_main_thread(self, monkeypatch):
+        import threading
+        release = threading.Event()
+        flown_on = []
+        real = plane_track.mission_track
+
+        def slow(*args, **kwargs):
+            flown_on.append(threading.current_thread())
+            assert release.wait(10)
+            return real(*args, **kwargs)
+        monkeypatch.setattr(plane_track, 'mission_track', slow)
+        module = self.live_module('plane', settle=False)
+        module.send_mission()
+        # the mission is drawn at once, while its path is still being flown
+        assert module.sent == [None]
+        module.draw_flown_track()
+        assert module.sent == [None]
+        # sent again as it is flown, it is not flown twice over
+        import time
+        deadline = time.time() + 10
+        while not flown_on:
+            assert time.time() < deadline
+            time.sleep(0.001)
+        module.send_mission()
+        release.set()
+        self.settle(module)
+        assert module.sent[-1] is not None
+        assert flown_on[0] is not threading.main_thread()
+        assert len(flown_on) == 1
+        # and drawn with it straight away the next time, without flying it
+        module.send_mission()
+        assert module.sent[-1] is not None
+        assert len(flown_on) == 1
+
+    def flying_slowly(self, monkeypatch):
+        '''plane_track.mission_track made to wait for a release, and a list
+        of the calls made to it'''
+        import threading
+        release = threading.Event()
+        calls = []
+        real = plane_track.mission_track
+
+        def slow(*args, **kwargs):
+            calls.append(args)
+            assert release.wait(10)
+            return real(*args, **kwargs)
+        monkeypatch.setattr(plane_track, 'mission_track', slow)
+        return (release, calls)
+
+    def wait_for(self, condition):
+        import time
+        deadline = time.time() + 10
+        while not condition():
+            assert time.time() < deadline
+            time.sleep(0.001)
+
+    def test_home_wandering_as_the_mission_is_flown(self, monkeypatch):
+        (release, calls) = self.flying_slowly(monkeypatch)
+        module = self.live_module('plane', settle=False)
+        module.home_position = HOME[:2]
+        module.send_mission()
+        self.wait_for(lambda: calls)
+        # home wanders a few metres while the path is being flown: the path
+        # is not flown again, and is drawn from where home is now
+        (lat, lon) = mp_util.gps_newpos(HOME[0], HOME[1], 45, 3)
+        module.home_position = (lat, lon)
+        module.send_mission()
+        release.set()
+        self.settle(module)
+        assert len(calls) == 1
+        assert module.sent[-1][0][:2] == pytest.approx((lat, lon), abs=1e-7)
+
+    def test_home_wandering_far_as_the_mission_is_flown(self, monkeypatch):
+        (release, calls) = self.flying_slowly(monkeypatch)
+        module = self.live_module('plane', settle=False)
+        module.home_position = HOME[:2]
+        module.send_mission()
+        self.wait_for(lambda: calls)
+        # a few metres at a time, but in all more than ten from the home it
+        # is being flown from: that is flown again
+        for metres in (4, 8, 13):
+            (lat, lon) = mp_util.gps_newpos(HOME[0], HOME[1], 45, metres)
+            module.home_position = (lat, lon)
+            module.send_mission()
+        release.set()
+        self.settle(module)
+        assert len(calls) == 2
+        assert module.sent[-1][0][:2] == pytest.approx((lat, lon), abs=1e-7)
+
+    def test_the_idle_task_draws_the_path_flown(self):
+        import time
+        module = self.live_module('plane', settle=False)
+        module.map.is_alive = lambda: True
+        module.map.check_events = lambda: []
+        wp_module = module.mpstate.module('wp')
+        wp_module.wploader.last_change = 1.0
+        module.mpstate.module = lambda name: wp_module
+        module.wp_change_time = 1.0
+        module.kml_change_state = module._kml_state(wp_module)
+        module.fence_change_time = module.rally_change_time = 0
+        module.terrain_resolved = False
+        module.send_mission()
+        assert module.sent == [None]
+        deadline = time.time() + 10
+        while module.track_thread is not None:
+            assert time.time() < deadline
+            time.sleep(0.001)
+        module.idle_task()
+        assert module.sent[-1] is not None
+
+    def test_a_path_for_a_mission_since_changed_is_not_drawn(self, monkeypatch):
+        import threading
+        import time
+        (first, second) = (threading.Event(), threading.Event())
+        releases = [first, second]
+        calls = []
+        real = plane_track.mission_track
+
+        def slow(*args, **kwargs):
+            calls.append(args)
+            assert releases.pop(0).wait(10)
+            return real(*args, **kwargs)
+        monkeypatch.setattr(plane_track, 'mission_track', slow)
+        module = self.live_module('plane', settle=False)
+        loader = module.mpstate.module('wp').wploader
+        module.send_mission()
+        # the mission changes while the first is being flown, rather than
+        # before the thread has taken it, which it would simply replace
+        self.wait_for(lambda: calls)
+        loader.wpoints[3].y += 0.01
+        module.send_mission()
+        assert module.sent == [None, None]
+        first.set()
+        deadline = time.time() + 10
+        while module.track_result is None:
+            assert time.time() < deadline
+            time.sleep(0.001)
+        # the first mission's path is not drawn over the second mission
+        module.draw_flown_track()
+        assert module.sent == [None, None]
+        second.set()
+        self.settle(module)
+        (lat, lon, _) = module.sent[-1][-1]
+        assert mp_util.gps_distance(lat, lon, loader.wpoints[3].x,
+                                    loader.wpoints[3].y) < 150.0
+
+    def test_the_live_map_returns_to_its_rally_points(self, monkeypatch):
+        from types import SimpleNamespace
+        module = self.live_module('plane')
+        loader = module.mpstate.module('wp').wploader
+        loader.wpoints[3].command = mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH
+        loader.wpoints[3].x = loader.wpoints[3].y = 0.0
+        (lat, lon, _) = offset(2500, 800, 0)
+        rally = SimpleNamespace(rally_points=[])
+        rally.rally_count = lambda: len(rally.rally_points)
+        rally.rally_point = lambda i: rally.rally_points[i]
+        modules = SimpleNamespace(wploader=loader, rallyloader=rally)
+        module.mpstate.module = lambda name: modules
+        module.send_mission()
+        (end_lat, end_lon, end_amsl) = module.sent[-1][-1]
+        assert mp_util.gps_distance(end_lat, end_lon, HOME[0], HOME[1]) < 150
+        # a rally point 150m above home, nearer than home is
+        rally.rally_points.append(SimpleNamespace(
+            lat=int(lat * 1e7), lng=int(lon * 1e7), alt=150, flags=0))
+        module.send_mission()
+        (end_lat, end_lon, end_amsl) = module.sent[-1][-1]
+        assert mp_util.gps_distance(end_lat, end_lon, lat, lon) < 150
+        assert end_amsl == pytest.approx(HOME[2] + 150, abs=15)
+
+    def test_a_mission_which_will_not_fly_does_not_stop_the_next(self, monkeypatch):
+        real = plane_track.mission_track
+        failures = [RuntimeError('bad mission')]
+
+        def failing(*args, **kwargs):
+            if failures:
+                raise failures.pop()
+            return real(*args, **kwargs)
+        monkeypatch.setattr(plane_track, 'mission_track', failing)
+        module = self.live_module('plane')
+        module.send_mission()
+        assert module.sent[-1] is None
+        loader = module.mpstate.module('wp').wploader
+        loader.wpoints[3].y += 0.01
+        module.send_mission()
+        assert module.sent[-1] is not None
+
+    def test_the_path_across_the_antimeridian_is_drawn_with_its_mission(self):
+        pytest.importorskip("vtk")
+        import vtk
+        from MAVProxy.modules.mavproxy_map3d.map3d import MissionItem
+        from MAVProxy.modules.mavproxy_map3d.elements import ElementManager
+        home = (10.0, 179.998, 0.0)
+        east = mp_util.gps_newpos(home[0], home[1], 90, 300)
+        track = plane_track.mission_track(
+            home, [(mavlink.MAV_CMD_NAV_WAYPOINT, east[0], east[1], 100.0,
+                    (0, 0, 0, 0))], PARAMS)
+        items = [MissionItem(home[0], home[1], 0.0, 0,
+                             mavlink.MAV_CMD_NAV_WAYPOINT, 0),
+                 MissionItem(east[0], east[1], 100.0, 0,
+                             mavlink.MAV_CMD_NAV_WAYPOINT, 1)]
+        for origin in (home, (east[0], east[1])):
+            em = ElementManager(vtk.vtkRenderer(), origin[0], origin[1], 1.0)
+            em.set_mission(items, track)
+            (end, marker) = (em.mission_line[-1], em.mission_markers[-1])
+            assert math.hypot(end[0] - marker[0], end[1] - marker[1]) < 100.0
+
+    def test_the_live_map_leaves_other_vehicles_to_the_items(self):
+        module = self.live_module('copter')
+        module.send_mission()
+        assert module.sent[-1] is None
+
+    def test_an_unchanged_mission_is_not_flown_again(self, monkeypatch):
+        calls = []
+        real = plane_track.mission_track
+
+        def counting(*args, **kwargs):
+            calls.append(args)
+            return real(*args, **kwargs)
+        monkeypatch.setattr(plane_track, 'mission_track', counting)
+        module = self.live_module('plane')
+        module.send_mission()
+        module.send_mission()
+        assert len(calls) == 1
+        module.mpstate.mav_param['WP_RADIUS'] = 30.0
+        module.send_mission()
+        assert len(calls) == 2
+
+    def test_the_live_map_takes_off_the_way_the_vehicle_points(self, monkeypatch):
+        headings = []
+        real = plane_track.mission_track
+
+        def recording(home, items, params, heading=None, **kwargs):
+            headings.append(heading)
+            return real(home, items, params, heading, **kwargs)
+        monkeypatch.setattr(plane_track, 'mission_track', recording)
+        module = self.live_module('plane')
+        module.map.is_alive = lambda: True
+        module.map.set_vehicle_type = lambda name: None
+        module.icon_type = None
+        mav = mavutil.mavlink
+
+        def heartbeat(armed):
+            return mav.MAVLink_heartbeat_message(
+                mav.MAV_TYPE_FIXED_WING, mav.MAV_AUTOPILOT_ARDUPILOTMEGA,
+                mav.MAV_MODE_FLAG_SAFETY_ARMED if armed else 0, 0, 0, 3)
+
+        def attitude(yaw):
+            return mav.MAVLink_attitude_message(0, 0, 0, yaw, 0, 0, 0)
+
+        def points(yaw, now):
+            module.mavlink_packet(attitude(math.radians(yaw)))
+            module.redraw_for_ground_heading(now)
+        # on the ground, pointing east: the best guess there is at the course
+        # it will take off on, and the mission is flown again from it without
+        # waiting for anything else to change
+        module.mavlink_packet(heartbeat(False))
+        points(90, 100.0)
+        assert headings == [90]
+        # a degree or two of wander is not worth flying it again for
+        points(92, 200.0)
+        assert headings == [90]
+        # turning round is, though not more often than every couple of seconds
+        points(180, 200.5)
+        assert headings == [90, 180]
+        points(270, 201.0)
+        assert headings == [90, 180]
+        module.redraw_for_ground_heading(203.0)
+        assert headings == [90, 180, 270]
+        # once it is armed and flying, where it points is not the takeoff's,
+        # and a ground station's heartbeat says nothing about the vehicle
+        module.mavlink_packet(heartbeat(True))
+        module.mavlink_packet(mav.MAVLink_heartbeat_message(
+            mav.MAV_TYPE_GCS, mav.MAV_AUTOPILOT_INVALID, 0, 0, 0, 3))
+        points(0, 300.0)
+        module.send_mission()
+        assert headings == [90, 180, 270]
+
+    def test_the_live_map_redraws_for_a_new_heading_on_its_own(self, monkeypatch):
+        # nothing else has to happen for the module's idle task to do it
+        headings = []
+        real = plane_track.mission_track
+
+        def recording(home, items, params, heading=None, **kwargs):
+            headings.append(heading)
+            return real(home, items, params, heading, **kwargs)
+        monkeypatch.setattr(plane_track, 'mission_track', recording)
+        module = self.live_module('plane')
+        module.send_mission()
+        assert headings == [None]
+        module.map.is_alive = lambda: True
+        module.map.check_events = lambda: []
+        wp_module = module.mpstate.module('wp')
+        wp_module.wploader.last_change = 1.0
+        module.mpstate.module = lambda name: wp_module
+        module.wp_change_time = 1.0
+        module.kml_change_state = module._kml_state(wp_module)
+        module.fence_change_time = module.rally_change_time = 0
+        module.terrain_resolved = False
+        module.note_ground_heading(math.radians(45))
+        module.idle_task()
+        assert headings == [None, 45]
+
+    def explorer(self):
+        pytest.importorskip("wx")
+        pytest.importorskip("lxml")
+        import importlib.util
+        path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                            'MAVProxy', 'tools', 'MAVExplorer.py')
+        spec = importlib.util.spec_from_file_location('mavexplorer', path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def log_mission(self, with_home=True):
+        '''a log's CMD entries, as mission_from_log() keeps them'''
+        cmds = {}
+        for w in self.items():
+            if w.seq == 0 and not with_home:
+                cmds[0] = (0.0, 0.0, 0.0, 0, w.command, 0, (0, 0, 0, 0))
+                continue
+            cmds[w.seq] = (w.x, w.y, w.z, w.frame, w.command, w.seq,
+                           (w.param1, w.param2, w.param3, w.param4))
+        return cmds
+
+    def test_mavexplorer_flies_a_planes_mission(self):
+        mx = self.explorer()
+        cmds = self.log_mission()
+        mission = mx.resolve_mission_amsl(
+            mx.mission_items_from_cmds(cmds), HOME[2], PARAMS,
+            mavlink.MAV_TYPE_FIXED_WING)
+        track = mx.plane_mission_track(cmds, mission, None, PARAMS,
+                                       mavlink.MAV_TYPE_FIXED_WING)
+        assert track is not None
+        assert track[0][:2] == pytest.approx(HOME[:2])
+        # the speed change is in the CMDs but not among the items drawn
+        slow = dict(cmds)
+        slow[1] = slow[1][:6] + ((0, -1, -1, 0),)
+        slow = mx.plane_mission_track(slow, mission, None, PARAMS,
+                                      mavlink.MAV_TYPE_FIXED_WING)
+        assert (max(local(p)[0] for p in track) >
+                max(local(p)[0] for p in slow) + 5.0)
+        assert mx.plane_mission_track(cmds, mission, None, PARAMS,
+                                      mavlink.MAV_TYPE_QUADROTOR) is None
+
+    def test_mavexplorer_draws_no_path_for_a_mission_with_an_item_missing(self):
+        # jumps, and where each item began, go by sequence number, which a
+        # gap would put out by one for every item after it
+        mx = self.explorer()
+        cmds = self.log_mission()
+        mission = mx.resolve_mission_amsl(
+            mx.mission_items_from_cmds(cmds), HOME[2], PARAMS,
+            mavlink.MAV_TYPE_FIXED_WING)
+        assert mx.plane_mission_track(cmds, mission, None, PARAMS,
+                                      mavlink.MAV_TYPE_FIXED_WING) is not None
+        del cmds[1]
+        mission = mx.resolve_mission_amsl(
+            mx.mission_items_from_cmds(cmds), HOME[2], PARAMS,
+            mavlink.MAV_TYPE_FIXED_WING)
+        assert mx.plane_mission_track(cmds, mission, None, PARAMS,
+                                      mavlink.MAV_TYPE_FIXED_WING) is None
+
+    def test_mavexplorer_keeps_the_altitude_of_an_item_with_no_position(
+            self, monkeypatch):
+        flown = []
+        real = plane_track.mission_track
+
+        def recording(home, items, *args, **kwargs):
+            flown.append(items)
+            return real(home, items, *args, **kwargs)
+        monkeypatch.setattr(plane_track, 'mission_track', recording)
+        mx = self.explorer()
+        cmds = self.log_mission()
+        cmds[1] = (0.0, 0.0, 200.0, 3, mavlink.MAV_CMD_NAV_LOITER_TO_ALT, 1,
+                   (0, 0, 0, 0))
+        mission = mx.resolve_mission_amsl(
+            mx.mission_items_from_cmds(cmds), HOME[2], PARAMS,
+            mavlink.MAV_TYPE_FIXED_WING)
+        mx.plane_mission_track(cmds, mission, None, PARAMS,
+                               mavlink.MAV_TYPE_FIXED_WING)
+        assert flown[-1][0][3] == pytest.approx(HOME[2] + 200.0)
+
+    def test_mavexplorer_starts_where_the_flight_did_with_no_home(self):
+        mx = self.explorer()
+        cmds = self.log_mission(with_home=False)
+        started = offset(-500, -500, 0)
+        mission = mx.resolve_mission_amsl(
+            mx.mission_items_from_cmds(cmds, started_at=started[:2]),
+            HOME[2], PARAMS, mavlink.MAV_TYPE_FIXED_WING)
+        track = mx.plane_mission_track(cmds, mission, started, PARAMS,
+                                       mavlink.MAV_TYPE_FIXED_WING)
+        assert track is not None
+        assert track[0][:2] == pytest.approx(started[:2])
+
+    def log(self, *messages):
+        '''a dataflash log handing back these messages in order'''
+        queue = list(messages)
+
+        class Log(object):
+            def recv_match(self, type=None, condition=None):
+                while queue:
+                    m = queue.pop(0)
+                    if type is None or m.get_type() in type:
+                        return m
+                return None
+        return Log()
+
+    def message(self, kind, **fields):
+        from types import SimpleNamespace
+        m = SimpleNamespace(_timestamp=0, **fields)
+        m.get_type = lambda: kind
+        return m
+
+    def cmd(self, seq, command, lat, lon, alt):
+        return self.message('CMD', CNum=seq, CId=command, Lat=lat, Lng=lon,
+                            Alt=alt, Frame=3, Prm1=0, Prm2=0, Prm3=0, Prm4=0)
+
+    def pos(self, north, east, alt=0.0):
+        (lat, lon, amsl) = offset(north, east, alt)
+        return self.message('POS', Lat=lat, Lng=lon, Alt=amsl)
+
+    def mission_dump(self, new_mission=True):
+        (lat, lon, _) = offset(3000, 0)
+        return (([self.message('MSG', Message='New mission')] if new_mission
+                 else []) +
+                [self.cmd(0, mavlink.MAV_CMD_NAV_WAYPOINT, HOME[0], HOME[1], HOME[2]),
+                 self.cmd(1, mavlink.MAV_CMD_NAV_TAKEOFF, 0, 0, 50),
+                 self.cmd(2, mavlink.MAV_CMD_NAV_WAYPOINT, lat, lon, 100)])
+
+    def test_mavexplorer_takes_the_takeoff_course_from_the_log(self):
+        mx = self.explorer()
+        log = self.log(*([self.pos(0, 0)] + self.mission_dump() + [
+            # taxied north a little before the mission started
+            self.pos(10, 0), self.message('MSG', Message='Mission: 1 Takeoff'),
+            self.pos(10, 10), self.pos(10, 25), self.pos(10, 45),
+            self.pos(10, 80)]))
+        (path, mission, cmds, started, _, _) = mx.mission_from_log(log)
+        # east, from where the takeoff began, not from where the log did
+        assert mx.takeoff_course(path, cmds, started) == pytest.approx(90.0, abs=1.0)
+        assert mx.takeoff_course(path, cmds, {}) is None
+
+    def test_mavexplorer_takes_the_takeoff_course_of_the_last_mission(self):
+        # a log from before the logger wrote "New mission": the first item
+        # of a mission written out again still starts it afresh, and where
+        # the items of the mission before began has to go with it
+        mx = self.explorer()
+        log = self.log(*(
+            [self.pos(0, 0)] + self.mission_dump(new_mission=False) +
+            [self.message('MSG', Message='Mission: 1 Takeoff'),
+             self.pos(0, 20), self.pos(0, 50)] +
+            self.mission_dump(new_mission=False) +
+            [self.pos(0, 60), self.message('MSG', Message='Mission: 1 Takeoff'),
+             self.pos(40, 60), self.pos(80, 60)]))
+        (path, mission, cmds, started, _, _) = mx.mission_from_log(log)
+        course = mx.takeoff_course(path, cmds, started)
+        # north, the second takeoff, not east, the first
+        assert mp_util.wrap_180(course) == pytest.approx(0.0, abs=1.0)
+
+    def test_mavexplorer_returns_to_the_rally_points_the_log_ends_with(self):
+        mx = self.explorer()
+        (lat, lon, _) = offset(2500, 800, 0)
+        (old_lat, old_lon, _) = offset(-2000, 0, 0)
+
+        def raly(seq, total, lat, lon, alt, **fields):
+            return self.message('RALY', Tot=total, Seq=seq, Lat=lat, Lng=lon,
+                                Alt=alt, **fields)
+        dump = self.mission_dump()
+        # home as the logger writes it, in absolute altitude
+        dump[1].Frame = 0
+        dump[-1] = self.cmd(2, mavlink.MAV_CMD_NAV_WAYPOINT,
+                            *offset(3000, 0)[:2], 100)
+        dump.append(self.cmd(3, mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH, 0, 0, 0))
+        log = self.log(*([self.pos(0, 0)] + dump + [
+            raly(0, 2, old_lat, old_lon, 80, Flags=0),
+            raly(1, 2, old_lat, old_lon, 80, Flags=0),
+            # written out again, as one point
+            raly(0, 1, lat, lon, 150, Flags=0)]))
+        (path, mission, cmds, started, rally, _) = mx.mission_from_log(log)
+        assert rally == [(lat, lon, 150, 0)]
+        mission = mx.resolve_mission_amsl(mission, HOME[2], PARAMS,
+                                          mavlink.MAV_TYPE_FIXED_WING)
+        track = mx.plane_mission_track(cmds, mission, None, PARAMS,
+                                       mavlink.MAV_TYPE_FIXED_WING,
+                                       rally=rally)
+        (end_lat, end_lon, end_amsl) = track[-1]
+        assert mp_util.gps_distance(end_lat, end_lon, lat, lon) < 150
+        assert end_amsl == pytest.approx(HOME[2] + 150, abs=15)
+
+    def test_mavexplorer_keeps_rally_points_a_new_one_is_appended_to(self):
+        """AP_Rally::append() logs the new point alone, with the new total"""
+        mx = self.explorer()
+        (lat, lon, _) = offset(2500, 800, 0)
+        (other_lat, other_lon, _) = offset(-2000, 0, 0)
+        log = self.log(*([self.pos(0, 0)] + self.mission_dump() + [
+            self.message('RALY', Tot=1, Seq=0, Lat=other_lat, Lng=other_lon,
+                         Alt=80, Flags=0),
+            self.message('RALY', Tot=2, Seq=1, Lat=lat, Lng=lon, Alt=150,
+                         Flags=0)]))
+        (path, mission, cmds, started, rally, _) = mx.mission_from_log(log)
+        assert rally == [(other_lat, other_lon, 80, 0), (lat, lon, 150, 0)]
+        # while a smaller table drops the points it no longer has
+        log = self.log(*([self.pos(0, 0)] + self.mission_dump() + [
+            self.message('RALY', Tot=2, Seq=0, Lat=other_lat, Lng=other_lon,
+                         Alt=80, Flags=0),
+            self.message('RALY', Tot=2, Seq=1, Lat=lat, Lng=lon, Alt=150,
+                         Flags=0),
+            self.message('RALY', Tot=1, Seq=0, Lat=lat, Lng=lon, Alt=90,
+                         Flags=0)]))
+        (path, mission, cmds, started, rally, _) = mx.mission_from_log(log)
+        assert rally == [(lat, lon, 90, 0)]
+
+    def test_mavexplorer_waits_only_so_long_for_rally_terrain(
+            self, monkeypatch):
+        mx = self.explorer()
+        from MAVProxy.modules.mavproxy_map3d import terrain
+        asked = []
+
+        def sample(lat, lon, **kwargs):
+            asked.append(kwargs)
+            return 300.0
+        monkeypatch.setattr(terrain, 'sample_terrain', sample)
+        frame_valid = 1 << 2
+        amsl = mx.rally_point_amsl(HOME[0], HOME[1], 100,
+                                   frame_valid | (3 << 3), HOME[2])
+        assert amsl == 400.0
+        assert asked == [{'timeout': mx.RALLY_TERRAIN_TIMEOUT}]
+        assert 0 < mx.RALLY_TERRAIN_TIMEOUT <= 10.0
+        # and an origin the log does not give falls back to home
+        assert mx.rally_point_amsl(HOME[0], HOME[1], 100,
+                                   frame_valid | (2 << 3),
+                                   HOME[2]) == HOME[2] + 100
+
+    def test_mavexplorer_forgets_rally_points_which_were_cleared(self):
+        """the logger writes "New rally" before the whole table, even an
+        empty one, which is all a cleared table is logged as"""
+        mx = self.explorer()
+        (lat, lon, _) = offset(2500, 800, 0)
+        log = self.log(*([self.pos(0, 0)] + self.mission_dump() + [
+            self.message('RALY', Tot=1, Seq=0, Lat=lat, Lng=lon, Alt=150,
+                         Flags=0),
+            self.message('MSG', Message='New rally')]))
+        (path, mission, cmds, started, rally, _) = mx.mission_from_log(log)
+        assert rally == []
+
+    def test_mavexplorer_measures_a_rally_point_from_the_ekf_origin(self):
+        """ORGN type 0 is the EKF origin, type 1 home"""
+        mx = self.explorer()
+        (lat, lon, _) = offset(2500, 800, 0)
+        frame_valid = 1 << 2
+        log = self.log(*([self.pos(0, 0)] + self.mission_dump() + [
+            self.message('ORGN', Type=0, Lat=HOME[0], Lng=HOME[1],
+                         Alt=HOME[2] - 50),
+            self.message('ORGN', Type=1, Lat=HOME[0], Lng=HOME[1],
+                         Alt=HOME[2]),
+            self.message('RALY', Tot=1, Seq=0, Lat=lat, Lng=lon, Alt=120,
+                         Flags=frame_valid | (2 << 3))]))
+        (path, mission, cmds, started, rally, origin) = mx.mission_from_log(log)
+        assert origin == (HOME[0], HOME[1], HOME[2] - 50)
+        assert mx.rally_point_amsl(lat, lon, 120, frame_valid | (2 << 3),
+                                   HOME[2], origin) == HOME[2] + 70
+
+    def test_mavexplorer_takes_rally_points_from_an_older_log(self):
+        """RALY had no Flags before 4.5, and one point set is logged alone"""
+        mx = self.explorer()
+        (lat, lon, _) = offset(2500, 800, 0)
+        (other_lat, other_lon, _) = offset(-2000, 0, 0)
+
+        def raly(seq, total, lat, lon, alt, **fields):
+            return self.message('RALY', Tot=total, Seq=seq, Lat=lat, Lng=lon,
+                                Alt=alt, **fields)
+        log = self.log(*([self.pos(0, 0)] + self.mission_dump() + [
+            raly(0, 2, other_lat, other_lon, 80),
+            raly(1, 2, lat, lon, 150),
+            # each point set again on its own, which is logged alone: the
+            # other points still stand, rather than being forgotten
+            raly(1, 2, lat, lon, 160),
+            raly(0, 2, other_lat, other_lon, 90)]))
+        (path, mission, cmds, started, rally, _) = mx.mission_from_log(log)
+        assert rally == [(other_lat, other_lon, 90, 0), (lat, lon, 160, 0)]
+
+    def test_mavexplorer_starts_where_the_log_says_the_mission_did(self):
+        mx = self.explorer()
+        log = self.log(*([self.pos(0, 0)] + self.mission_dump() + [
+            # carried off to the east before the mission started
+            self.pos(0, 600, 5), self.message('MSG', Message='Mission: 1 Takeoff'),
+            self.pos(40, 600, 30), self.pos(80, 600, 60)]))
+        (path, mission, cmds, started, _, _) = mx.mission_from_log(log)
+        mission = mx.resolve_mission_amsl(mission, HOME[2], PARAMS,
+                                          mavlink.MAV_TYPE_FIXED_WING)
+        track = mx.plane_mission_track(cmds, mission, None, PARAMS,
+                                       mavlink.MAV_TYPE_FIXED_WING,
+                                       path, started)
+        assert track[0] == pytest.approx(offset(0, 600, 5))
+        # and takes off on the course it was flown on: north
+        climbed = [p for p in track if p[2] >= HOME[2] + 49.5][0]
+        assert local(climbed)[1] == pytest.approx(600.0, abs=5.0)
+        # without the log to go on, it starts from home
+        track = mx.plane_mission_track(cmds, mission, None, PARAMS,
+                                       mavlink.MAV_TYPE_FIXED_WING)
+        assert track[0][:2] == pytest.approx(HOME[:2])
+
+    def test_mavexplorer_draws_the_path_from_where_the_log_started(self, monkeypatch):
+        # the 3D map command itself, with a stand-in for the viewer
+        from types import SimpleNamespace
+        from MAVProxy.modules.mavproxy_map3d import map3d
+        mx = self.explorer()
+        drawn = []
+
+        class Viewer(object):
+            def __init__(self, title=None):
+                pass
+
+            def set_mission(self, items, track=None):
+                drawn.append(track)
+
+            def __getattr__(self, name):
+                return lambda *args, **kwargs: None
+        monkeypatch.setattr(map3d, 'Map3D', Viewer)
+        monkeypatch.setattr(map3d, 'missing_packages', lambda: [])
+        log = self.log(*([self.pos(0, 0)] + self.mission_dump() + [
+            self.pos(0, 600, 5), self.message('MSG', Message='Mission: 1 Takeoff'),
+            self.pos(40, 600, 30), self.pos(80, 600, 60)]))
+        log.rewind = lambda: None
+        log.params = dict(PARAMS)
+        log.mav_type = mavlink.MAV_TYPE_FIXED_WING
+        monkeypatch.setattr(mx, 'mestate', SimpleNamespace(
+            mlog=log, settings=SimpleNamespace(
+                condition=None, showdirection=True, sync_xmap=False)),
+            raising=False)
+        monkeypatch.setattr(mx, 'map3d_views', [])
+        mx.cmd_map3d([])
+        (track,) = drawn
+        assert track[0] == pytest.approx(offset(0, 600, 5))
+        climbed = [p for p in track if p[2] >= HOME[2] + 49.5][0]
+        assert local(climbed)[1] == pytest.approx(600.0, abs=5.0)
+
+    def test_the_3d_map_draws_the_track_it_is_given(self):
+        pytest.importorskip("vtk")
+        import vtk
+        from MAVProxy.modules.mavproxy_map3d.map3d import MissionItem
+        from MAVProxy.modules.mavproxy_map3d.elements import ElementManager
+        items = [MissionItem(p[0], p[1], p[2], 0, mavlink.MAV_CMD_NAV_WAYPOINT, i)
+                 for (i, p) in enumerate((offset(0, 0), offset(3000, 0)))]
+        track = [offset(0, 0), offset(1000, 50), offset(2000, 20), offset(3000, 0)]
+        em = ElementManager(vtk.vtkRenderer(), HOME[0], HOME[1], 1.0)
+        em.set_home(HOME[2])
+        em.set_mission(items, track)
+        assert em.mission_line == [em._enu(*p) for p in track]
+        assert em.mission_markers == [em._enu(i.lat, i.lon, i.alt) for i in items]
+        # and without one, the items are drawn as they always were
+        em.set_mission(items)
+        assert em.mission_line == [em._enu(i.lat, i.lon, i.alt) for i in items]
