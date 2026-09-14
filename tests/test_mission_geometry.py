@@ -24,6 +24,38 @@ def swept_angle(centre, points):
                for i in range(1, len(bearings)))
 
 
+def waypoint(seq, command, x, y, z, frame=3, params=(0, 0, 0, 0)):
+    '''a mission item the way the wp module's loader holds one'''
+    from types import SimpleNamespace
+    return SimpleNamespace(seq=seq, command=command, x=x, y=y, z=z,
+                           frame=frame, param1=params[0], param2=params[1],
+                           param3=params[2], param4=params[3])
+
+
+def live_mission_items(wpoints, home_amsl=584.0, params=None,
+                       vehicle='plane', default_radius=60.0):
+    '''the MissionItems the live map3d module sends for a mission.
+
+    The module is built without the MAVProxy around it: only what
+    send_mission() reads is supplied, and terrain is never available
+    '''
+    from types import SimpleNamespace
+    from MAVProxy.modules.mavproxy_map3d import Map3DModule
+    module = Map3DModule.__new__(Map3DModule)
+    loader = SimpleNamespace(wpoints=wpoints, wp=lambda i: wpoints[i])
+    module.mpstate = SimpleNamespace(
+        mav_param=params or {}, vehicle_type=vehicle,
+        module=lambda name: SimpleNamespace(wploader=loader))
+    sent = []
+    module.map = SimpleNamespace(set_mission=sent.extend)
+    module.home_amsl = home_amsl
+    module.home_position = None
+    module.default_circle_radius = lambda: default_radius
+    module.terrain_alt = lambda lat, lon: None
+    module.send_mission()
+    return sent
+
+
 class TestProjection(object):
     """the local frame everything in the 3D map is drawn in"""
 
@@ -310,6 +342,67 @@ class TestCirclingItems(object):
             mp_util.MAV_CMD_DO_ORBIT, (80, 5, 0, 0)) is None
         assert mp_util.mission_circle_turns(
             m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 90, 0)) is None
+
+
+class TestLiveMissionAltitudes(object):
+    """the map3d module measures the climb into a loiter itself, to work out
+    how many turns it takes, so it has to resolve the frames first"""
+
+    def module(self, home_amsl):
+        from MAVProxy.modules.mavproxy_map3d import Map3DModule
+        # the module talks to a live MAVProxy, which is not what is under
+        # test here: only the altitude it hands the turn count
+        module = Map3DModule.__new__(Map3DModule)
+        module.home_amsl = home_amsl
+        return module
+
+    def test_frames_resolve_to_amsl(self):
+        module = self.module(584.0)
+        for frame in (0, 5):
+            assert module.item_amsl(700.0, frame) == 700.0
+        for frame in (3, 6):
+            assert module.item_amsl(100.0, frame) == 684.0
+
+    def test_a_terrain_altitude_without_terrain_is_unknown(self):
+        # send_mission() turns a terrain-frame item into AMSL when it has the
+        # terrain height; one still in frame 10 or 11 has no known height,
+        # and home is not a stand-in for the ground under it
+        module = self.module(584.0)
+        for frame in (10, 11):
+            assert module.item_amsl(100.0, frame) is None
+
+    def test_a_climb_across_two_frames(self):
+        module = self.module(584.0)
+        # 600m AMSL to 100m above a home at 584m is a climb of 84m, not the
+        # 500m descent the raw item altitudes look like
+        first = module.item_amsl(600.0, 0)
+        second = module.item_amsl(100.0, 3)
+        assert second - first == pytest.approx(84.0)
+
+    def test_send_mission_measures_the_climb_in_one_frame(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        params = {'AIRSPEED_CRUISE': 20.0, 'TECS_CLMB_MAX': 5.0,
+                  'TECS_SINK_MIN': 2.0}
+        loiter_at = mp_util.gps_newpos(HERE[0], HERE[1], 90, 300)
+        items = live_mission_items([
+            waypoint(0, m.MAV_CMD_NAV_WAYPOINT, HERE[0], HERE[1], 600.0,
+                     frame=0),
+            waypoint(1, m.MAV_CMD_NAV_LOITER_TO_ALT, loiter_at[0],
+                     loiter_at[1], 400.0, frame=3, params=(0, 60, 0, 0)),
+        ], home_amsl=584.0, params=params)
+        # 600m AMSL up to 400m above a 584m home is a climb of 384m; the raw
+        # altitudes would have it a 200m descent, which takes more turns
+        climb = mp_util.loiter_to_alt_turns(60, 384.0, params, 300.0)
+        descent = mp_util.loiter_to_alt_turns(60, -200.0, params, 300.0)
+        assert abs(climb - descent) > 0.5
+        assert items[1].circle_turns == pytest.approx(climb, rel=0.01)
+
+    def test_without_a_home_a_relative_altitude_is_unknown(self):
+        module = self.module(None)
+        assert module.item_amsl(100.0, 3) is None
+        # an AMSL item still stands on its own
+        assert module.item_amsl(700.0, 0) == 700.0
 
 
 class TestHoveringVehicles(object):

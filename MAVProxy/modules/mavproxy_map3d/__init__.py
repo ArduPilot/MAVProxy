@@ -276,6 +276,23 @@ class Map3DModule(mp_module.MPModule):
             return None
         return (home.x, home.y)
 
+    def item_amsl(self, alt, frame):
+        '''the AMSL altitude of a mission item, or None if we cannot tell.
+
+        The viewer resolves the frames itself; this is only so that the climb
+        between two items can be measured with both of them in the one frame
+        '''
+        if frame in (0, 5):          # already AMSL
+            return alt
+        if frame in (10, 11):
+            # still above terrain: send_mission() turns these into AMSL once
+            # it has the terrain height, and until then nobody knows
+            return None
+        if self.home_amsl is None:
+            # relative to a home we have not been told about yet
+            return None
+        return self.home_amsl + alt
+
     def send_mission(self):
         if self.map is None:
             return
@@ -304,6 +321,9 @@ class Map3DModule(mp_module.MPModule):
                 if terr is not None:
                     z = terr + w.z
                     frame = 0
+            # the items are drawn in whatever frames they carry, so resolve
+            # the altitude before measuring anything against the item before
+            amsl = self.item_amsl(z, frame)
             circle_radius = mp_util.mission_circle_radius(
                 w.command,
                 (w.param1, w.param2, w.param3, w.param4),
@@ -314,13 +334,14 @@ class Map3DModule(mp_module.MPModule):
                 # this one circles until it reaches its altitude, so what is
                 # left to climb on arrival decides how many turns to draw
                 approach = None
+                alt_change = None
                 if previous is not None:
                     approach = mp_util.gps_distance(previous[0], previous[1],
                                                     lat, lon)
+                    if amsl is not None and previous[2] is not None:
+                        alt_change = amsl - previous[2]
                 circle_turns = mp_util.loiter_to_alt_turns(
-                    circle_radius,
-                    z - previous[2] if previous is not None else None,
-                    self.mav_param, approach)
+                    circle_radius, alt_change, self.mav_param, approach)
             exit_converge = None
             if circle_radius is not None and not (w.param4 > 0):
                 # param4 == 0 asks for the next leg to be crosstracked from
@@ -329,7 +350,7 @@ class Map3DModule(mp_module.MPModule):
             items.append(MissionItem(lat, lon, z, frame, w.command, w.seq,
                                      w.param1, circle_radius, circle_turns,
                                      exit_converge))
-            previous = (lat, lon, z)
+            previous = (lat, lon, amsl)
         self.map.set_mission(items)
 
     def set_icon_type(self, name):
