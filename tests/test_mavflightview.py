@@ -53,6 +53,21 @@ def mission_clear_all():
     return mavutil.mavlink.MAVLink_mission_clear_all_message(1, 1)
 
 
+def heartbeat():
+    from pymavlink import mavutil
+    mavlink = mavutil.mavlink
+    return mavlink.MAVLink_heartbeat_message(
+        mavlink.MAV_TYPE_FIXED_WING, mavlink.MAV_AUTOPILOT_ARDUPILOTMEGA,
+        0, 0, 0, 3)
+
+
+def param_value(name, value, count=1, index=0):
+    from pymavlink import mavutil
+    return mavutil.mavlink.MAVLink_param_value_message(
+        name.encode(), value, mavutil.mavlink.MAV_PARAM_TYPE_REAL32,
+        count, index)
+
+
 def global_position_int(lat, lon):
     from pymavlink import mavutil
     return mavutil.mavlink.MAVLink_global_position_int_message(
@@ -167,6 +182,36 @@ class TestTlogMission(object):
         wp = self.mission(tmp_path, self.log(items), mission=str(path))
         assert self.altitudes(wp) == [584, 77]
 
+    def test_a_jump_to_nowhere_ends_the_mission_drawn(self, tmp_path):
+        from pymavlink import mavutil
+        tool = mavflightview()
+        jump = mavutil.mavlink.MAVLink_mission_item_int_message(
+            255, 0, 2, 0, mavutil.mavlink.MAV_CMD_DO_JUMP, 0, 1,
+            20, 1, 0, 0, 0, 0, 0)
+        log = [heartbeat(), global_position_int(HERE[0], HERE[1]),
+               mission_item_int(0, HERE[0], HERE[1], 584),
+               mission_item_int(1, HERE[0] + 0.01, HERE[1], 100), jump,
+               mission_item_int(3, HERE[0] + 0.01, HERE[1] + 0.01, 100),
+               global_position_int(HERE[0] + 0.01, HERE[1])]
+        (ret, options) = view(tmp_path, log)
+        (wp, mav_type) = (ret[1], ret[4])
+        assert wp.count() == 4
+        objects = tool.mission_objects(wp, options, mav_type, 'T')
+        lines = [o for o in objects if type(o).__name__ == 'SlipPolygon']
+        # the line runs to the jump and stops; the item after it, which
+        # the vehicle never reaches, is drawn apart from it
+        assert [len(line.points) for line in lines] == [2, 1]
+        # and the live map is given the same mission to draw
+        added = []
+
+        class Map(object):
+            def add_object(self, obj):
+                added.append(obj)
+        tool.display_waypoints(wp, Map())
+        assert [o for o in added if type(o).__name__ == 'SlipPolygon']
+        # the mission itself is left as it was
+        assert wp.wp(2).param1 == 20
+
 
 class TestLogMission(object):
     """the messages a log's mission is read from, one at a time: those which
@@ -280,3 +325,41 @@ class TestLogMission(object):
         options.colour_source = None
         ret = tool.mavflightview_mav(Log(), options)
         assert ret[1].count() == 0
+
+
+class TestTlogParameters(object):
+    """a loiter with no radius of its own is drawn at WP_LOITER_RAD, which a
+    telemetry log only carries in its PARAM_VALUEs"""
+
+    def view(self, tmp_path, messages):
+        return view(tmp_path, messages)
+
+    def radius(self, tmp_path, messages):
+        return self.view(tmp_path, messages)[1].default_circle_radius
+
+    def log(self, params):
+        from pymavlink import mavutil
+        loiter = mission_item_int(
+            1, HERE[0] + 0.01, HERE[1], 100,
+            command=mavutil.mavlink.MAV_CMD_NAV_LOITER_TURNS,
+            params=(3, 0, 0, 0))
+        return ([heartbeat(), global_position_int(HERE[0], HERE[1])] +
+                params +
+                [mission_item_int(0, HERE[0], HERE[1], 584), loiter,
+                 global_position_int(HERE[0] + 0.01, HERE[1])])
+
+    def test_parameters_sent_by_the_autopilot(self, tmp_path):
+        # opening a log reads the first message of each type in it, so
+        # WP_LOITER_RAD is not the first parameter, as in any real download
+        log = self.log([param_value('AHRS_EKF_TYPE', 3, 2, 0),
+                        param_value('WP_LOITER_RAD', 150, 2, 1)])
+        assert self.radius(tmp_path, log) == 150
+
+    def test_the_loiter_is_drawn_at_that_radius(self, tmp_path):
+        log = self.log([param_value('AHRS_EKF_TYPE', 3, 2, 0),
+                        param_value('WP_LOITER_RAD', 150, 2, 1)])
+        (ret, options) = self.view(tmp_path, log)
+        (wp, mav_type) = (ret[1], ret[4])
+        objects = mavflightview().mission_objects(wp, options, mav_type, 'T')
+        circles = [o for o in objects if type(o).__name__ == 'SlipCircle']
+        assert [c.radius for c in circles] == [150]
