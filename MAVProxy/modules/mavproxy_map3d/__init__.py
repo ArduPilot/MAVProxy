@@ -51,7 +51,7 @@ class Map3DModule(mp_module.MPModule):
                                   range=(0.25, 2.0)),
             ('terrainshading', bool, True),
             ('terrainwireframe', bool, False),
-            ('showdirection', bool, False),
+            ('showdirection', bool, True),
         ])
         self.add_command('map3d', self.cmd_map3d,
                          "3D map control", ['<start|stop|follow|nofollow|center>',
