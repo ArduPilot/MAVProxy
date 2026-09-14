@@ -661,6 +661,40 @@ def cmd_map(args):
 
 map3d_views = []
 
+def mission_from_log(mlog, condition=None):
+    '''the flight path in a log, and the mission the log ends with.
+
+    A log carries the whole mission again every time one is uploaded, and
+    once more when it starts, so the items are kept by sequence number and
+    the logger's "New mission" -- written before every one of them, even a
+    mission with no items at all -- starts them again.  Drawing every mission
+    the flight ever held would join them into one line
+    '''
+    path = []
+    items = {}
+    while True:
+        m = mlog.recv_match(type=['POS', 'CMD', 'MSG'], condition=condition)
+        if m is None:
+            break
+        mtype = m.get_type()
+        if mtype == 'POS':
+            path.append((m.Lat, m.Lng, m.Alt,
+                         grapher.timestamp_to_days(m._timestamp)))
+        elif mtype == 'MSG':
+            if m.Message == 'New mission':
+                items = {}
+        elif mtype == 'CMD':
+            if m.CNum == 0 and len(items) > 1:
+                # a log from before the logger said so: the first item of a
+                # mission still means whatever is held is stale
+                items = {}
+            if m.Lat != 0 or m.Lng != 0:
+                params = tuple(getattr(m, 'Prm%u' % i, 0.0) for i in range(1, 5))
+                items[m.CNum] = (m.Lat, m.Lng, m.Alt, getattr(m, 'Frame', 3),
+                                 m.CId, m.CNum, params)
+    return (path, [items[seq] for seq in sorted(items)])
+
+
 def path_view(path):
     '''where a 3D map of a flight path looks from: the middle of the path,
     its lowest altitude and how far across it is, as (lat, lon, amsl, span).
@@ -710,20 +744,7 @@ def cmd_map3d(args):
         return
 
     mlog = mestate.mlog
-    path = []
-    mission = []
-    while True:
-        m = mlog.recv_match(type=['POS', 'CMD'], condition=mestate.settings.condition)
-        if m is None:
-            break
-        mtype = m.get_type()
-        if mtype == 'POS':
-            path.append((m.Lat, m.Lng, m.Alt,
-                         grapher.timestamp_to_days(m._timestamp)))
-        elif mtype == 'CMD' and (m.Lat != 0 or m.Lng != 0):
-            params = tuple(getattr(m, 'Prm%u' % i, 0.0) for i in range(1, 5))
-            mission.append((m.Lat, m.Lng, m.Alt, getattr(m, 'Frame', 3),
-                            m.CId, m.CNum, params))
+    (path, mission) = mission_from_log(mlog, mestate.settings.condition)
     mlog.rewind()
 
     if len(path) == 0:
