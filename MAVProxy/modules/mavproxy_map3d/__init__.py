@@ -327,7 +327,9 @@ class Map3DModule(mp_module.MPModule):
             params = (w.param1, w.param2, w.param3, w.param4)
             circle_radius = mp_util.mission_circle_radius(
                 w.command, params, default_radius, self.vehicle_type)
-            circle_turns = None
+            # items which say how many turns they fly say so themselves;
+            # None is an item which circles until something else stops it
+            circle_turns = mp_util.mission_circle_turns(w.command, params)
             if w.command == mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT:
                 # this one circles until it reaches its altitude, so what is
                 # left to climb on arrival decides how many turns to draw

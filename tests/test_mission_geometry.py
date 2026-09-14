@@ -371,6 +371,81 @@ class TestCirclingItems(object):
             m.MAV_CMD_NAV_WAYPOINT, (0, 0, 0, 0))
 
 
+class TestLogMissionItems(object):
+    """what MAVExplorer hands the 3D map for the mission items in a log.
+
+    The drawing tests below build their MissionItems by hand, so they say
+    nothing about whether anything fills them in: this covers the other end
+    """
+
+    def module(self):
+        pytest.importorskip("wx")
+        pytest.importorskip("lxml")
+        import importlib.util
+        import os
+        path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                            'MAVProxy', 'tools', 'MAVExplorer.py')
+        # MAVProxy/tools is not a package, so the tool is loaded by path
+        spec = importlib.util.spec_from_file_location('mavexplorer', path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def resolve(self, mission, params=None):
+        return self.module().resolve_mission_amsl(mission, 584.0, params or {})
+
+    def item(self, seq, command, params, alt=100.0):
+        return (HERE[0], HERE[1] + seq * 0.01, alt, 3, command, seq, params)
+
+    def test_the_turns_an_item_asks_for_are_carried_through(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        out = self.resolve([
+            self.item(0, m.MAV_CMD_NAV_WAYPOINT, (0, 0, 0, 0)),
+            self.item(1, m.MAV_CMD_NAV_LOITER_TURNS, (3, 0, 60, 0)),
+            self.item(2, mp_util.MAV_CMD_DO_ORBIT, (60, 5, 0, math.radians(270))),
+            self.item(3, m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 60, 0)),
+        ])
+        assert out[1].circle_turns == 3
+        assert out[2].circle_turns == pytest.approx(0.75)
+        # circling until its time is up is not a number of turns
+        assert out[3].circle_turns is None
+
+    def test_a_loiter_to_alt_works_its_own_turns_out(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        params = {'AIRSPEED_CRUISE': 20.0, 'TECS_CLMB_MAX': 5.0}
+        out = self.resolve([
+            self.item(0, m.MAV_CMD_NAV_WAYPOINT, (0, 0, 0, 0), alt=100.0),
+            self.item(1, m.MAV_CMD_NAV_LOITER_TO_ALT, (0, 60, 0, 0),
+                      alt=700.0),
+        ], params)
+        # this one has no turn count of its own: what is left to climb on
+        # arrival decides it.  600m at 5m/s is 120s of climbing, of which
+        # the 900m approach does 45s, leaving four turns of a 60m circle
+        assert out[1].circle_turns == pytest.approx(4.0, abs=0.2)
+
+
+class TestLiveMissionTurns(object):
+    """the turns the live map3d module hands the viewer"""
+
+    def test_the_turns_an_item_asks_for_are_carried_through(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        at = [mp_util.gps_newpos(HERE[0], HERE[1], 90, 400 * i)
+              for i in range(3)]
+        items = live_mission_items([
+            waypoint(0, m.MAV_CMD_NAV_WAYPOINT, at[0][0], at[0][1], 100.0),
+            waypoint(1, m.MAV_CMD_NAV_LOITER_TURNS, at[1][0], at[1][1],
+                     300.0, params=(3, 0, 60, 0)),
+            waypoint(2, m.MAV_CMD_NAV_LOITER_TIME, at[2][0], at[2][1],
+                     300.0, params=(30, 0, 60, 0)),
+        ])
+        assert items[1].circle_turns == 3
+        # circling until its time is up is not a number of turns
+        assert items[2].circle_turns is None
+
+
 class TestLiveMissionAltitudes(object):
     """the map3d module measures the climb into a loiter itself, to work out
     how many turns it takes, so it has to resolve the frames first"""
@@ -967,6 +1042,18 @@ class TestProducersCrosstrack(object):
                 waypoint(1, command, at[1][0], at[1][1], 100.0, params=params),
                 waypoint(2, m.MAV_CMD_NAV_WAYPOINT, at[2][0], at[2][1], 100.0),
             ], params=self.PARAMS)
+            assert (items[1].exit_converge is not None) == pulled_back, command
+
+    def test_mavexplorer(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        log = TestLogMissionItems()
+        for (command, params, pulled_back) in self.cases():
+            items = log.resolve([
+                log.item(0, m.MAV_CMD_NAV_WAYPOINT, (0, 0, 0, 0)),
+                log.item(1, command, params),
+                log.item(2, m.MAV_CMD_NAV_WAYPOINT, (0, 0, 0, 0)),
+            ], self.PARAMS)
             assert (items[1].exit_converge is not None) == pulled_back, command
 
 

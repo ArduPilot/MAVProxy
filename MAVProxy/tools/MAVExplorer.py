@@ -790,7 +790,9 @@ def resolve_mission_amsl(mission, ground0, params=None, mav_type=None):
             amsl = home_amsl + z
         radius = mp_util.mission_circle_radius(cid, prm, default_radius,
                                                mav_type)
-        turns = None
+        # items which say how many turns they fly say so themselves; None is
+        # an item which circles until something else stops it
+        turns = mp_util.mission_circle_turns(cid, prm)
         if cid == mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT:
             approach = None
             if previous is not None:
