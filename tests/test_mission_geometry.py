@@ -1321,3 +1321,26 @@ class TestMissionFiles(object):
         assert True in xtrack and False in xtrack
         # AMSL, home-relative and terrain altitudes
         assert set(i[1] for i in items) >= {0, 3, 10}
+
+    def test_the_copter_mission(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        items = self.load('copter-mission-geometry.txt')
+        assert len(items) == 13
+        commands = [i[2] for i in items]
+        # ArduCopter flies arc waypoints, and no vehicle flies DO_ORBIT
+        sweeps = [i[3][0] for i in items if i[2] == mp_util.MAV_CMD_NAV_ARC_WAYPOINT]
+        assert any(s > 0 for s in sweeps)
+        assert any(s < -180 for s in sweeps)
+        assert mp_util.MAV_CMD_DO_ORBIT not in commands
+        # a takeoff with no position of its own
+        takeoff = items[commands.index(m.MAV_CMD_NAV_TAKEOFF)]
+        assert (takeoff[4], takeoff[5]) == (0.0, 0.0)
+        # circles only where a multirotor flies them, and only with a radius
+        drawn = [i[0] for i in items
+                 if mp_util.mission_circle_radius(i[2], i[3], None,
+                                                  'copter') is not None]
+        assert [commands[s] for s in drawn] == [m.MAV_CMD_NAV_LOITER_TURNS] * 2
+        for command in (m.MAV_CMD_NAV_LOITER_UNLIM, m.MAV_CMD_NAV_LOITER_TIME,
+                        m.MAV_CMD_NAV_LOITER_TO_ALT):
+            assert command in commands
