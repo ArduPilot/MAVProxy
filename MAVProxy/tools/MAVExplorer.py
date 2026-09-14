@@ -661,6 +661,37 @@ def cmd_map(args):
 
 map3d_views = []
 
+def mission_items_from_cmds(items, started_at=None, flown_from=None):
+    '''the mission items to draw, from a log's CMD entries keyed by sequence.
+
+    An item with no position of its own is a takeoff, which climbs from
+    wherever the vehicle is when it runs.  flown_from maps an item's
+    sequence to where the vehicle was when the log says the item began, and
+    that is used when there is one.  Otherwise the best guess is home, the
+    mission's own first item, since ArduPilot sets home where it arms; and a
+    mission uploaded before the vehicle had a home leaves that item empty
+    too, so started_at -- where the flight itself began -- stands in for it.
+    Anything else without a position is not something the map can place,
+    and is left out
+    '''
+    flown_from = flown_from or {}
+    home = items.get(0)
+    if home is not None and (home[0] != 0 or home[1] != 0):
+        started_at = (home[0], home[1])
+    mission = []
+    for seq in sorted(items):
+        item = items[seq]
+        if item[0] == 0 and item[1] == 0:
+            if item[4] not in mp_util.TAKEOFF_COMMANDS:
+                continue
+            where = flown_from.get(seq, started_at)
+            if where is None:
+                continue
+            item = (where[0], where[1]) + item[2:]
+        mission.append(item)
+    return mission
+
+
 def mission_from_log(mlog, condition=None):
     '''the flight path in a log, and the mission the log ends with.
 
@@ -672,6 +703,9 @@ def mission_from_log(mlog, condition=None):
     '''
     path = []
     items = {}
+    # where the vehicle was when each item began, from the "Mission: <seq>"
+    # the autopilot announces as it starts one
+    flown_from = {}
     while True:
         m = mlog.recv_match(type=['POS', 'CMD', 'MSG'], condition=condition)
         if m is None:
@@ -681,18 +715,26 @@ def mission_from_log(mlog, condition=None):
             path.append((m.Lat, m.Lng, m.Alt,
                          grapher.timestamp_to_days(m._timestamp)))
         elif mtype == 'MSG':
+            fields = m.Message.split()
             if m.Message == 'New mission':
                 items = {}
+                flown_from = {}
+            elif (len(fields) > 1 and fields[0] == 'Mission:' and
+                    fields[1].isdigit() and path):
+                flown_from.setdefault(int(fields[1]), (path[-1][0], path[-1][1]))
         elif mtype == 'CMD':
             if m.CNum == 0 and len(items) > 1:
                 # a log from before the logger said so: the first item of a
                 # mission still means whatever is held is stale
                 items = {}
-            if m.Lat != 0 or m.Lng != 0:
-                params = tuple(getattr(m, 'Prm%u' % i, 0.0) for i in range(1, 5))
-                items[m.CNum] = (m.Lat, m.Lng, m.Alt, getattr(m, 'Frame', 3),
-                                 m.CId, m.CNum, params)
-    return (path, [items[seq] for seq in sorted(items)])
+                flown_from = {}
+            params = tuple(getattr(m, 'Prm%u' % i, 0.0) for i in range(1, 5))
+            items[m.CNum] = (m.Lat, m.Lng, m.Alt, getattr(m, 'Frame', 3),
+                             m.CId, m.CNum, params)
+    mission = mission_items_from_cmds(
+        items, started_at=(path[0][0], path[0][1]) if path else None,
+        flown_from=flown_from)
+    return (path, mission)
 
 
 def path_view(path):
