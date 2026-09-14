@@ -193,6 +193,12 @@ def arc_points(latlon1, latlon2, arc_angle, steps=None):
     return points
 
 
+# takeoff items carry an altitude and often no position of their own: the
+# vehicle climbs from where it already is, which for a mission is home.
+# Numeric because mp_util does not import pymavlink at module scope
+TAKEOFF_COMMANDS = (22, 84)      # NAV_TAKEOFF, NAV_VTOL_TAKEOFF
+
+
 # vehicles which hold position at a loiter point rather than flying a circle
 # around it.  MAVProxy's own vehicle type names are accepted as well as the
 # MAV_TYPEs, since that is what a live module has to hand
