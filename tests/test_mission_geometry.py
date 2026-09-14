@@ -490,6 +490,62 @@ class TestLogMissionItems(object):
         # the 900m approach does 45s, leaving four turns of a 60m circle
         assert out[1].circle_turns == pytest.approx(4.0, abs=0.2)
 
+    def log(self, *messages):
+        '''a log which hands back these messages in order'''
+        class Log(object):
+            def __init__(self, messages):
+                self.messages = list(messages)
+
+            def recv_match(self, type=None, condition=None):
+                while self.messages:
+                    m = self.messages.pop(0)
+                    if type is None or m.get_type() in type:
+                        return m
+                return None
+        return Log(messages)
+
+    def message(self, kind, **fields):
+        from types import SimpleNamespace
+        m = SimpleNamespace(_timestamp=0, **fields)
+        m.get_type = lambda: kind
+        return m
+
+    def dump(self, where, count, command=16):
+        '''what the logger writes for a mission of count items at where'''
+        out = [self.message('MSG', Message='New mission')]
+        for seq in range(count):
+            p = mp_util.gps_newpos(where[0], where[1], 90, 100 * seq)
+            out.append(self.message('CMD', CNum=seq, CId=command, Lat=p[0],
+                                    Lng=p[1], Alt=100.0, Frame=3, Prm1=0,
+                                    Prm2=0, Prm3=0, Prm4=0))
+        return out
+
+    def test_a_log_draws_the_last_mission_it_holds(self):
+        first = HERE
+        second = mp_util.gps_newpos(HERE[0], HERE[1], 0, 5000)
+        (path, mission) = self.module().mission_from_log(
+            self.log(*(self.dump(first, 4) + self.dump(second, 2))))
+        # just the second mission, even though it is the shorter of the two
+        assert len(mission) == 2
+        assert mission[0][0] == pytest.approx(second[0])
+
+    def test_a_cleared_mission_draws_nothing(self):
+        # clearing the mission writes the message and then no items at all
+        (path, mission) = self.module().mission_from_log(
+            self.log(*(self.dump(HERE, 4) +
+                       [self.message('MSG', Message='New mission')])))
+        assert mission == []
+
+    def test_a_log_from_before_the_logger_said_new_mission(self):
+        # without the message, a mission's first item still starts it again
+        first = [m for m in self.dump(HERE, 4) if m.get_type() == 'CMD']
+        second = [m for m in self.dump(
+            mp_util.gps_newpos(HERE[0], HERE[1], 0, 5000), 2)
+            if m.get_type() == 'CMD']
+        (path, mission) = self.module().mission_from_log(
+            self.log(*(first + second)))
+        assert len(mission) == 2
+
 
 class TestLiveMissionTurns(object):
     """the turns the live map3d module hands the viewer"""
