@@ -799,7 +799,8 @@ def cmd_map3d(args):
     # waypoints (MAV_FRAME_GLOBAL_TERRAIN_ALT = 10/11) are "z above terrain", so
     # they need the terrain elevation at the waypoint, not home + z.
     if mission:
-        mission = resolve_mission_amsl(mission, ground0, mlog.params,
+        mission = resolve_mission_amsl(mission, ground0,
+                                       mp_util.log_params(mlog),
                                        getattr(mlog, 'mav_type', None))
 
     # drop views the user has already closed, so their child processes are reaped
