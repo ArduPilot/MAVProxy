@@ -1060,9 +1060,15 @@ Usage: map circle <radius> <colour>
     def cmd_set_roi(self, args):
         '''called when user selects "Set ROI" on map'''
         (lat, lon) = (self.mpstate.click_location[0], self.mpstate.click_location[1])
-        alt = self.module('terrain').ElevationModel.GetElevation(lat, lon)
+        terrain = self.module('terrain')
+        if terrain is None:
+            print("Unable to set ROI: terrain module is not loaded")
+            return
+        alt = terrain.ElevationModel.GetElevation(lat, lon)
+        if alt is None or not math.isfinite(alt):
+            print("Unable to set ROI: terrain elevation unavailable at %.7f %.7f; try again when terrain data is available" % (lat, lon))
+            return
         print("Setting ROI to: ", lat, lon, alt)
-        self.current_ROI = (lat, lon, alt)
         self.master.mav.command_int_send(
             self.settings.target_system, self.settings.target_component,
             mavutil.mavlink.MAV_FRAME_GLOBAL,
@@ -1076,6 +1082,7 @@ Usage: map circle <radius> <colour>
             int(lat*1e7), # lat
             int(lon*1e7), # lon
             alt) # param7
+        self.current_ROI = (lat, lon, alt)
 
     def cmd_set_position(self, args):
         '''called when user selects "Set Position" on map'''
