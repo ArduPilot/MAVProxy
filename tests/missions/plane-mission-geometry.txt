@@ -1,0 +1,33 @@
+QGC WPL 110
+# a plane mission for the map's loiters, spirals and tangents
+0	1	0	16	0	0	0	0	-35.3632610	149.1652300	584.000000	1
+# climb out to the north
+1	0	3	22	15.000000	0.000000	0.000000	0.000000	-35.3597223	149.1659951	100.000000	1
+# a plain leg, to settle onto a track before anything interesting
+2	0	3	16	0.000000	0.000000	0.000000	0.000000	-35.3491062	149.1682903	120.000000	1
+# plain legs out to the west.  ArduPlane has no NAV_ARC_WAYPOINT, so the arcs are in the copter mission instead
+3	0	3	16	0.000000	0.000000	0.000000	0.000000	-35.3477023	149.1780519	120.000000	1
+# turning back south
+4	0	3	16	0.000000	0.000000	0.000000	0.000000	-35.3552996	149.1814422	120.000000	1
+# and out towards the loiters
+5	0	3	16	0.000000	0.000000	0.000000	0.000000	-35.3583721	149.1917926	130.000000	1
+# switch to an AMSL altitude: the climb into the next loiter is measured across the frame change
+6	0	0	16	0.000000	0.000000	0.000000	0.000000	-35.3529821	149.2032393	750.000000	1
+# loiter to altitude, 100m clockwise, climbing 400m over a short approach: most of that is left to do on arrival, so it is drawn as a spiral of about two turns.  param4 0 leaves the next leg crosstracked from this centre, so the vehicle pulls back onto it
+7	0	0	31	0.000000	100.000000	0.000000	0.000000	-35.3483143	149.2065435	1150.000000	1
+# a long leg, so there is room to see the vehicle rejoin the track out of the loiter centre
+8	0	0	16	0.000000	0.000000	0.000000	0.000000	-35.3288651	149.1927782	1150.000000	1
+# three turns, 100m counter-clockwise (negative radius).  param4 1 crosstracks the next leg from where the circle is left instead
+9	0	0	18	3.000000	0.000000	-100.000000	1.000000	-35.3288651	149.1762618	1150.000000	1
+# two turns the other way round, close enough that the leg between the two circles is the tangent which crosses between them
+10	0	0	18	2.000000	0.000000	100.000000	0.000000	-35.3350889	149.1718573	1150.000000	1
+# loiter for 45s with no radius of its own, so it takes WP_LOITER_RAD, clockwise.  The autopilot has nowhere to keep a radius for this command and hands back +-1 for the direction alone.  Turning the same way as the loiter before it, the leg between them is the tangent which does not cross.  Back to a home-relative altitude, and a descent
+11	0	3	19	45.000000	0.000000	0.000000	0.000000	-35.3413126	149.1674524	300.000000	1
+# a terrain-frame altitude, 300m above the ground
+12	0	10	16	0.000000	0.000000	0.000000	0.000000	-35.3391287	149.1522692	300.000000	1
+# loiter to altitude descending, 100m counter-clockwise: a plane comes down at TECS_SINK_MIN, so 200m of descent is several turns of spiral.  param4 1, so no pull-back onto a track from here
+13	0	3	31	0.000000	-100.000000	0.000000	1.000000	-35.3362416	149.1480513	90.000000	1
+# a plain leg out of the descending spiral
+14	0	3	16	0.000000	0.000000	0.000000	0.000000	-35.3286443	149.1446618	90.000000	1
+# circle here forever, 80m clockwise.  The mission parks here: switch out of AUTO when there is nothing left to look at
+15	0	3	17	0.000000	0.000000	80.000000	0.000000	-35.3232543	149.1446618	90.000000	1

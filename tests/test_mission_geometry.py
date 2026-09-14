@@ -1273,3 +1273,51 @@ class TestPolygonBounds(object):
         for (lat, lon) in mp_util.arc_points(start, end, 270):
             assert arc[0] <= lat <= arc[0] + arc[2]
             assert arc[1] <= lon <= arc[1] + arc[3]
+
+
+class TestMissionFiles(object):
+    """the missions under tests/missions are flown by hand in SITL, so check
+    here that they still load and are still the missions their README says"""
+
+    def load(self, name):
+        '''(seq, frame, command, params, lat, lon, alt) for each item'''
+        import os
+        path = os.path.join(os.path.dirname(__file__), 'missions', name)
+        with open(path) as f:
+            lines = f.read().splitlines()
+        assert lines[0] == 'QGC WPL 110'
+        items = []
+        for line in lines[1:]:
+            if not line.strip() or line.startswith('#'):
+                continue
+            fields = line.split()
+            assert len(fields) == 12, line
+            items.append((int(fields[0]), int(fields[2]), int(fields[3]),
+                          tuple(float(v) for v in fields[4:8]),
+                          float(fields[8]), float(fields[9]),
+                          float(fields[10])))
+        assert [i[0] for i in items] == list(range(len(items)))
+        return items
+
+    def test_the_plane_mission(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        items = self.load('plane-mission-geometry.txt')
+        assert len(items) == 16
+        commands = set(i[2] for i in items)
+        # ArduPlane flies neither of these, so a flyable mission has neither
+        assert mp_util.MAV_CMD_NAV_ARC_WAYPOINT not in commands
+        assert mp_util.MAV_CMD_DO_ORBIT not in commands
+        for command in (m.MAV_CMD_NAV_LOITER_UNLIM, m.MAV_CMD_NAV_LOITER_TURNS,
+                        m.MAV_CMD_NAV_LOITER_TIME, m.MAV_CMD_NAV_LOITER_TO_ALT):
+            assert command in commands
+        # both ways round, and param4 both ways
+        radii = [mp_util.mission_circle_radius(i[2], i[3], 60) for i in items]
+        assert any(r is not None and r > 0 for r in radii)
+        assert any(r is not None and r < 0 for r in radii)
+        xtrack = [mp_util.mission_crosstracks_from_centre(i[2], i[3])
+                  for i in items if i[2] in (m.MAV_CMD_NAV_LOITER_TURNS,
+                                             m.MAV_CMD_NAV_LOITER_TO_ALT)]
+        assert True in xtrack and False in xtrack
+        # AMSL, home-relative and terrain altitudes
+        assert set(i[1] for i in items) >= {0, 3, 10}
