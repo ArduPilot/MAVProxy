@@ -142,7 +142,7 @@ class TestCirclingItems(object):
     def test_items_which_do_not_circle(self):
         m = self.mavlink
         for command in (m.MAV_CMD_NAV_WAYPOINT,
-                        m.MAV_CMD_NAV_ARC_WAYPOINT,
+                        36,  # MAV_CMD_NAV_ARC_WAYPOINT (absent in older pymavlink)
                         m.MAV_CMD_NAV_TAKEOFF,
                         m.MAV_CMD_DO_JUMP):
             assert mp_util.mission_circle_radius(command, (1, 2, 3, 4)) is None
