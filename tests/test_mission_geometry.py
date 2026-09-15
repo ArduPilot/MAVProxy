@@ -24,6 +24,148 @@ def swept_angle(centre, points):
                for i in range(1, len(bearings)))
 
 
+class TestProjection(object):
+    """the local frame everything in the 3D map is drawn in"""
+
+    def test_the_antimeridian_is_crossed_the_short_way(self):
+        pytest.importorskip("vtk")
+        from MAVProxy.modules.mavproxy_map3d.terrain import enu
+        lat = -16.5
+        (east, _, _) = enu(lat, -179.999, 0.0, lat, 179.998)
+        (west, _, _) = enu(lat, 179.998, 0.0, lat, -179.999)
+        metres = math.radians(0.003) * 6378137.0 * math.cos(math.radians(lat))
+        assert east == pytest.approx(metres, rel=0.01)
+        assert west == pytest.approx(-metres, rel=0.01)
+        # and away from it, as it always was
+        (e, n, u) = enu(HERE[0] + 0.01, HERE[1] + 0.01, 5.0, HERE[0], HERE[1])
+        assert e > 0 and n > 0 and u == 5.0
+
+    # an origin just west of the antimeridian, and a point just east of it
+    SEAM = (-16.5, 179.998)
+
+    def terrain(self):
+        pytest.importorskip("vtk")
+        from quantized_mesh_tile.global_geodetic import GlobalGeodetic
+        from MAVProxy.modules.mavproxy_map3d.terrain import TerrainManager
+        manager = TerrainManager.__new__(TerrainManager)
+        (manager.lat0, manager.lon0) = self.SEAM
+        manager.g = GlobalGeodetic(True)
+        (manager.zoom_fine, manager.lod_min) = (12, 8)
+        (manager.ring, manager.fine_radius) = (1, 2)
+        manager.tiles = {}
+        return manager
+
+    def test_the_camera_looks_across_the_antimeridian(self):
+        from types import SimpleNamespace
+        manager = self.terrain()
+        east = math.radians(0.003) * 6378137.0 * math.cos(math.radians(self.SEAM[0]))
+        for (focal_east, lon) in ((east, -179.999), (-east, 179.995)):
+            camera = SimpleNamespace(focal=(focal_east, 0.0, 0.0))
+            (lat, focal_lon) = manager.focal_latlon(camera)
+            assert (lat, focal_lon) == pytest.approx((self.SEAM[0], lon), abs=1e-6)
+        # and the tiles wanted about a point just east of it are those either
+        # side of it, not the ones at the western edge of the western tile row
+        (lat, lon) = manager.focal_latlon(SimpleNamespace(focal=(east, 0.0, 0.0)))
+        fine = sorted(x for (z, x, y) in manager.desired_set(lat, lon)
+                      if z == manager.zoom_fine)
+        columns = manager.g.GetNumberOfXTilesAtZoom(manager.zoom_fine)
+        assert set(fine) == {0, 1, 2, columns - 2, columns - 1}
+
+    def test_terrain_nearest_the_camera_is_fetched_first_across_the_antimeridian(self):
+        from types import SimpleNamespace
+        manager = self.terrain()
+        queued = []
+        manager.jobs = SimpleNamespace(put=queued.append)
+        (manager.inflight, manager.mesh_revision) = (set(), 0)
+        east = math.radians(0.003) * 6378137.0 * math.cos(math.radians(self.SEAM[0]))
+        manager.update(SimpleNamespace(
+            focal=(east, 0.0, 0.0), pos=(0.0, 0.0, 0.0),
+            cam=SimpleNamespace(GetViewAngle=lambda: 30.0)))
+        (x, row) = manager.g.LonLatToTile(-179.999, self.SEAM[0], manager.zoom_fine)
+        columns = manager.g.GetNumberOfXTilesAtZoom(manager.zoom_fine)
+        order = [x for (_, _, (z, x, y)) in queued
+                 if (z, y) == (manager.zoom_fine, row)]
+        # either side of the antimeridian in turn, not all of the east first
+        assert order == [0, columns - 1, 1, columns - 2, 2]
+
+    def test_terrain_heights_are_found_either_side_of_the_antimeridian(self):
+        from types import SimpleNamespace
+        manager = self.terrain()
+        west_tile = SimpleNamespace(bbox=(170.0, -20.0, 180.0, -10.0),
+                                    height_at=lambda e, n: 10.0)
+        east_tile = SimpleNamespace(bbox=(-180.0, -20.0, -170.0, -10.0),
+                                    height_at=lambda e, n: 20.0)
+        manager.tiles = {(12, 1, 0): west_tile, (12, 0, 0): east_tile}
+        # a ring about a point near it runs on past 180 rather than wrapping
+        assert manager.height_at(-16.5, 180.001) == 20.0
+        assert manager.height_at(-16.5, -180.0) == 10.0
+        assert manager.height_at(-16.5, 179.999) == 10.0
+        assert manager.height_at(-16.5, -179.999) == 20.0
+
+    def test_terrain_is_sampled_either_side_of_the_antimeridian(self, monkeypatch):
+        pytest.importorskip("vtk")
+        import numpy as np
+        from MAVProxy.modules.mavproxy_map3d import terrain
+        fetched = []
+
+        def decode(z, x, y):
+            fetched.append((z, x, y))
+            return {"bbox": (-180.0, -20.0, -170.0, -10.0),
+                    "verts": np.array([(-180.0, -10.0, 1.0), (-170.0, -10.0, 1.0),
+                                       (-180.0, -20.0, 1.0), (-170.0, -20.0, 1.0)])}
+        monkeypatch.setattr(terrain, 'decode_terrain', decode)
+        monkeypatch.setattr(terrain, '_sample_cache', {})
+        assert terrain.sample_terrain(-16.5, 180.001) == pytest.approx(1.0)
+        assert fetched == [(12,) + terrain.GlobalGeodetic(True).LonLatToTile(
+            -179.999, -16.5, 12)]
+
+    def test_the_view_is_turned_across_the_antimeridian(self):
+        pytest.importorskip("vtk")
+        pytest.importorskip("wx")
+        from types import SimpleNamespace
+        from MAVProxy.modules.mavproxy_map3d.map3d_ui import Map3DFrame
+        looked = []
+        frame = SimpleNamespace(
+            terrain=SimpleNamespace(lat0=self.SEAM[0], lon0=self.SEAM[1]),
+            tc=SimpleNamespace(look_at=lambda focal, dist=None: looked.append(focal)),
+            state=SimpleNamespace(zexag=1.0), on_camera_change=lambda: None)
+        Map3DFrame.look_at_latlon(frame, self.SEAM[0], -179.999, 0.0)
+        east = math.radians(0.003) * 6378137.0 * math.cos(math.radians(self.SEAM[0]))
+        assert looked[0] == pytest.approx((east, 0.0, 0.0), abs=1.0)
+
+    def test_draped_lines_are_sampled_the_short_way_round(self):
+        pytest.importorskip("vtk")
+        from MAVProxy.modules.mavproxy_map3d.elements import ElementManager
+        em = ElementManager.__new__(ElementManager)
+        (em.lat0, em.lon0) = self.SEAM
+        points = [(self.SEAM[0], 179.998), (self.SEAM[0], -179.998)]
+        samples = list(em._terrain_samples(points, closed=False))
+        assert len(samples) > 2
+        for (lat, lon) in samples:
+            assert 0.0 <= mp_util.wrap_180(lon - 179.998) <= 0.004 + 1e-9
+
+    def test_mavexplorer_looks_at_a_flight_across_the_antimeridian(self):
+        pytest.importorskip("wx")
+        pytest.importorskip("lxml")
+        import importlib.util
+        import os
+        path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                            'MAVProxy', 'tools', 'MAVExplorer.py')
+        spec = importlib.util.spec_from_file_location('mavexplorer', path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        # starting just east of it, and going further west than east
+        flight = [(-16.5, -179.9995, 30.0), (-16.5, 179.99, 20.0),
+                  (-16.49, -179.995, 25.0)]
+        (lat, lon, ground, span) = module.path_view(flight)
+        assert lat == pytest.approx(-16.49667, abs=1e-4)
+        assert lon == pytest.approx(179.9985, abs=1e-4)
+        assert ground == 20.0
+        east_west = math.radians(0.015) * mp_util.radius_of_earth * math.cos(
+            math.radians(-16.49))
+        assert span == pytest.approx(east_west, rel=0.01)
+
+
 class TestRhumbHelpers(object):
 
     def test_distance_takes_the_short_way_around(self):
