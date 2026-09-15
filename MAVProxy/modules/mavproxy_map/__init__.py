@@ -17,6 +17,9 @@ from MAVProxy.modules.lib.mp_menu import *
 from pymavlink import mavutil
 from PIL import ImageColor
 
+# Older pymavlink releases lack this common.xml command.
+MAV_CMD_NAV_ARC_WAYPOINT = getattr(mavutil.mavlink, "MAV_CMD_NAV_ARC_WAYPOINT", 36)
+
 # pymavlink may not yet carry the enumeration entry for the
 # home-centred inclusion circle.  Fall back to its known value (from
 # development.xml) so we don't raise AttributeError on older pymavlink:
@@ -150,7 +153,7 @@ class MapModule(mp_module.MPModule):
             # waypoint commands
             mavutil.mavlink.MAV_CMD_NAV_WAYPOINT: (0, 255, 255),
             mavutil.mavlink.MAV_CMD_NAV_SPLINE_WAYPOINT: (64, 255, 64),
-            mavutil.mavlink.MAV_CMD_NAV_ARC_WAYPOINT: (64, 255, 255),
+            MAV_CMD_NAV_ARC_WAYPOINT: (64, 255, 255),
 
             # circling commands
             mavutil.mavlink.MAV_CMD_NAV_LOITER_UNLIM: (255, 64, 255),
@@ -166,7 +169,7 @@ class MapModule(mp_module.MPModule):
             mavutil.mavlink.MAV_CMD_NAV_TAKEOFF: "TOff",
             mavutil.mavlink.MAV_CMD_DO_LAND_START: "DLS",
             mavutil.mavlink.MAV_CMD_NAV_SPLINE_WAYPOINT: "SW",
-            mavutil.mavlink.MAV_CMD_NAV_ARC_WAYPOINT: "AW",
+            MAV_CMD_NAV_ARC_WAYPOINT: "AW",
             mavutil.mavlink.MAV_CMD_NAV_LOITER_UNLIM: "LU",
             mavutil.mavlink.MAV_CMD_NAV_LOITER_TURNS: "LT",
             mavutil.mavlink.MAV_CMD_NAV_LOITER_TIME: "LTime",

@@ -19,6 +19,9 @@ from pymavlink import mavutil
 from MAVProxy.modules.mavproxy_map import mp_tile
 from MAVProxy.modules.lib import mp_util
 
+# Older pymavlink releases lack this common.xml command.
+MAV_CMD_NAV_ARC_WAYPOINT = getattr(mavutil.mavlink, "MAV_CMD_NAV_ARC_WAYPOINT", 36)
+
 font = cv2.FONT_HERSHEY_DUPLEX
 
 
@@ -42,7 +45,7 @@ def mission_arcs(wploader, wp_indexes):
         wp = wploader.wp(wp_indexes[i])
         if wp is None:
             continue
-        if wp.command != mavutil.mavlink.MAV_CMD_NAV_ARC_WAYPOINT:
+        if wp.command != MAV_CMD_NAV_ARC_WAYPOINT:
             continue
         # the arc runs from the previous point in the mission view
         arcs[i-1] = wp.param1
