@@ -14,7 +14,7 @@ from vtkmodules.wx.wxVTKRenderWindowInteractor import wxVTKRenderWindowInteracto
 from MAVProxy.modules.mavproxy_map import mp_tile
 from MAVProxy.modules.mavproxy_map3d.camera import TerrainCamera, TerrainStyle
 from MAVProxy.modules.mavproxy_map3d.terrain import (
-    TerrainManager, R, TILE_DOWNLOAD_THREADS)
+    TerrainManager, R, TILE_DOWNLOAD_THREADS, wrap_longitude)
 from MAVProxy.modules.mavproxy_map3d.elements import ElementManager
 
 import vtk
@@ -319,7 +319,8 @@ class Map3DFrame(wx.Frame):
         self.widget.GetRenderWindow().Render()
 
     def look_at_latlon(self, lat, lon, amsl, dist=None):
-        e = math.radians(lon - self.terrain.lon0) * R * math.cos(math.radians(self.terrain.lat0))
+        e = (math.radians(wrap_longitude(lon - self.terrain.lon0)) * R *
+             math.cos(math.radians(self.terrain.lat0)))
         n = math.radians(lat - self.terrain.lat0) * R
         u = amsl * self.state.zexag
         self.tc.look_at((e, n, u), dist=dist)

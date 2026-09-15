@@ -661,6 +661,40 @@ def cmd_map(args):
 
 map3d_views = []
 
+def path_view(path):
+    '''where a 3D map of a flight path looks from: the middle of the path,
+    its lowest altitude and how far across it is, as (lat, lon, amsl, span).
+    Longitudes are taken from the first point's the short way round, so a
+    flight across the antimeridian is centred on it rather than on the far
+    side of the world'''
+    # note: sum/min/max are shadowed in this namespace (mavextra import *), so
+    # accumulate explicitly
+    first_lon = path[0][1]
+    sumlat = sumlon = 0.0
+    minlat = maxlat = path[0][0]
+    minlon = maxlon = 0.0
+    ground0 = path[0][2]
+    for p in path:
+        la, lo, al = p[:3]
+        lo = mp_util.wrap_180(lo - first_lon)
+        sumlat += la
+        sumlon += lo
+        if al < ground0:
+            ground0 = al
+        minlat = la if la < minlat else minlat
+        maxlat = la if la > maxlat else maxlat
+        minlon = lo if lo < minlon else minlon
+        maxlon = lo if lo > maxlon else maxlon
+    lat0 = sumlat / len(path)
+    lon0 = mp_util.wrap_180(first_lon + sumlon / len(path))
+    span_ns = mp_util.gps_distance(minlat, 0.0, maxlat, 0.0)
+    span_ew = mp_util.gps_distance(minlat, 0.0, minlat, maxlon - minlon)
+    span = span_ns if span_ns > span_ew else span_ew
+    if span < 1000.0:
+        span = 1000.0
+    return (lat0, lon0, ground0, span)
+
+
 def cmd_map3d(args):
     '''show a 3D map view: draped satellite imagery over terrain'''
     try:
@@ -696,29 +730,7 @@ def cmd_map3d(args):
         print("No POS messages found for 3D map")
         return
 
-    # note: sum/min/max are shadowed in this namespace (mavextra import *), so
-    # accumulate explicitly
-    sumlat = sumlon = 0.0
-    minlat = maxlat = path[0][0]
-    minlon = maxlon = path[0][1]
-    ground0 = path[0][2]
-    for p in path:
-        la, lo, al = p[:3]
-        sumlat += la
-        sumlon += lo
-        if al < ground0:
-            ground0 = al
-        minlat = la if la < minlat else minlat
-        maxlat = la if la > maxlat else maxlat
-        minlon = lo if lo < minlon else minlon
-        maxlon = lo if lo > maxlon else maxlon
-    lat0 = sumlat / len(path)
-    lon0 = sumlon / len(path)
-    span_ns = mp_util.gps_distance(minlat, minlon, maxlat, minlon)
-    span_ew = mp_util.gps_distance(minlat, minlon, minlat, maxlon)
-    span = span_ns if span_ns > span_ew else span_ew
-    if span < 1000.0:
-        span = 1000.0
+    (lat0, lon0, ground0, span) = path_view(path)
 
     # resolve mission item altitudes to AMSL before sending. Terrain-frame
     # waypoints (MAV_FRAME_GLOBAL_TERRAIN_ALT = 10/11) are "z above terrain", so

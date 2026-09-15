@@ -43,8 +43,15 @@ warnings.filterwarnings(
     module=r"quantized_mesh_tile\.terrain")
 
 
+def wrap_longitude(lon):
+    '''a longitude, or a difference of two, as the one from -180 up to 180
+    it is.  Differences wrapped take the short way round, so that either side
+    of the antimeridian is next to the other rather than the world apart'''
+    return (lon + 180.0) % 360.0 - 180.0
+
+
 def enu(lat, lon, h, lat0, lon0):
-    e = math.radians(lon - lon0) * R * math.cos(math.radians(lat0))
+    e = math.radians(wrap_longitude(lon - lon0)) * R * math.cos(math.radians(lat0))
     n = math.radians(lat - lat0) * R
     return e, n, h
 
@@ -108,6 +115,7 @@ def sample_terrain(lat, lon, zoom=12, cache_only=False):
     cache_only returns None rather than fetching/decoding a missing tile, so
     callers on a latency-sensitive thread can defer the work.'''
     g = GlobalGeodetic(True)
+    lon = wrap_longitude(lon)
     x, y = g.LonLatToTile(lon, lat, zoom)
     key = (zoom, x, y)
     dec = _sample_cache.get(key)
@@ -358,7 +366,8 @@ class TerrainManager:
 
     def focal_latlon(self, tc):
         foclat = self.lat0 + math.degrees(tc.focal[1] / R)
-        foclon = self.lon0 + math.degrees(tc.focal[0] / (R * math.cos(math.radians(self.lat0))))
+        foclon = wrap_longitude(self.lon0 + math.degrees(
+            tc.focal[0] / (R * math.cos(math.radians(self.lat0)))))
         return foclat, foclon
 
     def desired_set(self, foclat, foclon):
@@ -380,6 +389,10 @@ class TerrainManager:
     def height_at(self, lat, lon):
         '''Return rendered terrain world Z at lat/lon, preferring fine tiles.'''
         e, n, _ = enu(lat, lon, 0.0, self.lat0, self.lon0)
+        lon = wrap_longitude(lon)
+        if lon == -180.0:
+            # the antimeridian is either tile's edge; 180 is the one tiles have
+            lon = 180.0
         for key, tile in sorted(self.tiles.items(), reverse=True):
             west, south, east, north = tile.bbox
             if not (west <= lon <= east and south <= lat <= north):
@@ -401,7 +414,7 @@ class TerrainManager:
             clat = 0.5 * (south + north)
             clon = 0.5 * (west + east)
             dlat = clat - foclat
-            dlon = (clon - foclon) * math.cos(math.radians(foclat))
+            dlon = wrap_longitude(clon - foclon) * math.cos(math.radians(foclat))
             return (-z, dlat * dlat + dlon * dlon)
 
         for (z, x, y) in sorted(want, key=tile_priority):

@@ -11,7 +11,7 @@ import vtk
 
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.mavproxy_map3d.map3d import MissionItem
-from MAVProxy.modules.mavproxy_map3d.terrain import enu, R
+from MAVProxy.modules.mavproxy_map3d.terrain import enu, R, wrap_longitude
 
 # MAV_FRAME altitude conventions
 FRAME_GLOBAL = (0, 5)            # AMSL
@@ -703,6 +703,8 @@ class ElementManager:
         for i in range(max(0, segment_count)):
             lat1, lon1 = points[i]
             lat2, lon2 = points[(i + 1) % len(points)]
+            # along the edge the short way round, as it is drawn
+            dlon = wrap_longitude(lon2 - lon1)
             e1, n1, _ = enu(lat1, lon1, 0.0, self.lat0, self.lon0)
             e2, n2, _ = enu(lat2, lon2, 0.0, self.lat0, self.lon0)
             distance = math.hypot(e2 - e1, n2 - n1)
@@ -711,7 +713,7 @@ class ElementManager:
             for j in range(count):
                 t = float(j) / count
                 yield (lat1 + (lat2 - lat1) * t,
-                       lon1 + (lon2 - lon1) * t)
+                       lon1 + dlon * t)
         if points:
             yield points[0] if closed else points[-1]
 
