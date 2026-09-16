@@ -929,8 +929,10 @@ class TestMissionFlight(object):
 
 class TestFlownMission(object):
     """a QuadPlane SITL flight of ArduPilot's KalaupapaCanyonRun mission,
-    which loiters up and down four times and runs a winding gorge between
-    them: the path worked out for the mission against the one flown"""
+    which loiters up and down over the sea, runs a winding gorge inland,
+    spirals up out of the head of the canyon, and comes down with the ground
+    over a ridge and along the valley beyond: the path worked out for the
+    mission against the one flown"""
 
     def fixture(self):
         path = os.path.join(os.path.dirname(__file__), 'missions',
@@ -1029,7 +1031,8 @@ class TestFlownMission(object):
         median = distances[len(distances) // 2]
         p90 = distances[int(len(distances) * 0.9)]
         # the tangent-and-circle drawing this replaced was 6m out at the
-        # median and 22m at the 90th percentile over this flight
+        # median and 22m at the 90th percentile over the flight of this
+        # mission's first version
         assert median < 2.0
         assert p90 < 8.0
         # a QuadPlane climbs out of its VTOL takeoff and transitions on the
