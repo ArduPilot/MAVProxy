@@ -109,6 +109,70 @@ class TestL1Control(object):
         assert l1.loiter_radius(100.0, 3000.0, 20.0) > 130.0
 
 
+class TestWaypointMaxRadius(object):
+    """WP_MAX_RADIUS: a waypoint is not reached until the aircraft is that
+    close to it, however far past it has flown (Plane::verify_nav_wp)"""
+
+    def waypoint(self, north, east, passby=0):
+        (lat, lon, amsl) = offset(north, east)
+        return (mavlink.MAV_CMD_NAV_WAYPOINT, lat, lon, amsl, (0, 0, passby, 0))
+
+    def corner(self, passby=0):
+        '''a right-angle turn at 1000 north, 600 east'''
+        return [self.waypoint(1000, 0), self.waypoint(1000, 600, passby),
+                self.waypoint(0, 600)]
+
+    def closest(self, track, north, east):
+        (lat, lon, _) = offset(north, east)
+        distances = [mp_util.gps_distance(p[0], p[1], lat, lon) for p in track]
+        return (min(distances), distances.index(min(distances)))
+
+    def test_the_corner_is_not_cut(self):
+        # turning early, the aircraft passes wide of the corner
+        (wide, _) = self.closest(fly(self.corner()), 1000, 600)
+        assert wide > 20.0
+        track = fly(self.corner(), dict(PARAMS, WP_MAX_RADIUS=20))
+        (near, _) = self.closest(track, 1000, 600)
+        assert near <= 20.0
+        # and the mission goes on from there
+        assert self.closest(track, 0, 600)[0] <= PARAMS['WP_RADIUS']
+
+    def test_one_it_cannot_turn_tightly_enough_for_is_not_drawn(self):
+        # a waypoint 100m to the side of one the aircraft arrives at going
+        # the other way, with a turn some 85m across: held within 60m it
+        # is reached, and within 30m it is circled for ever, as ArduPlane
+        # warns, which leaves no path to draw
+        params = dict(PARAMS, ROLL_LIMIT_DEG=30.0)
+        items = [self.waypoint(1000, 0), self.waypoint(1000, 100),
+                 self.waypoint(2000, 100)]
+        track = fly(items, dict(params, WP_MAX_RADIUS=60))
+        assert self.closest(track, 1000, 100)[0] <= 60.0
+        assert plane_track.mission_track(
+            HOME, items, dict(params, WP_MAX_RADIUS=30)) is None
+
+    def test_a_pass_by_waypoint_is_overflown(self):
+        # the finish line is past the pass-by point, so the aircraft is
+        # never taken back to the waypoint: "it will overfly badly", as
+        # ArduPlane has it
+        params = dict(PARAMS, WP_MAX_RADIUS=30)
+        items = [self.waypoint(1000, 0), self.waypoint(1000, 600, passby=100),
+                 self.waypoint(1000, 0)]
+        assert plane_track.mission_track(HOME, items, params) is None
+        assert plane_track.mission_track(HOME, items, PARAMS) is not None
+
+    def test_only_waypoints_are_held_to_it(self):
+        # a landing passed wide of the radius is still done with
+        (lat, lon, amsl) = offset(1200, 0, 0)
+        items = [loiter_turns(1000, 0, 1, 80),
+                 (mavlink.MAV_CMD_NAV_LAND, lat, lon, amsl, (0, 0, 0, 0))]
+        track = fly(items)
+        assert self.closest(track, 1200, 0)[0] > 1.0
+        assert fly(items, dict(PARAMS, WP_MAX_RADIUS=1)) == track
+        # as are loiters
+        items = [loiter_turns(1000, 0, 1, 80), loiter_turns(1000, 600, 1, 80)]
+        assert fly(items, dict(PARAMS, WP_MAX_RADIUS=1)) == fly(items)
+
+
 class TestMissionFlight(object):
     '''ArduPlane's mission logic, flown'''
 

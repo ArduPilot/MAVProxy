@@ -39,6 +39,7 @@ PARAMETERS = {
     'ROLL_LIMIT': ([('ROLL_LIMIT_DEG', 1.0), ('LIM_ROLL_CD', 0.01)], 45.0),
     'RLL2SRV_TCONST': ([('RLL2SRV_TCONST', 1.0)], 0.5),
     'WP_RADIUS': ([('WP_RADIUS', 1.0)], 90.0),
+    'WP_MAX_RADIUS': ([('WP_MAX_RADIUS', 1.0)], 0.0),
     'WP_LOITER_RAD': ([('WP_LOITER_RAD', 1.0)], 60.0),
     'AIRSPEED_CRUISE': ([('AIRSPEED_CRUISE', 1.0), ('TRIM_ARSPD_CM', 0.01)],
                         12.0),
@@ -307,6 +308,7 @@ class MissionFlight(object):
         self.roll_limit = math.radians(parameter(params, 'ROLL_LIMIT'))
         self.roll_tconst = max(parameter(params, 'RLL2SRV_TCONST'), 0.05)
         self.wp_radius = parameter(params, 'WP_RADIUS')
+        self.wp_max_radius = parameter(params, 'WP_MAX_RADIUS')
         self.loiter_radius = parameter(params, 'WP_LOITER_RAD')
         self.climb = parameter(params, 'TECS_CLMB_MAX')
         self.sink = parameter(params, 'TECS_SINK_MAX')
@@ -590,6 +592,17 @@ class MissionFlight(object):
             self.l1.update_waypoint(self.position, self.velocity(), self.yaw,
                                     track_start, end, NAV_PERIOD)
             self.update_target_altitude()
+            if (not final and self.wp_max_radius > 0 and
+                    norm(minus(self.next_wp[0], self.position)) >
+                    self.wp_max_radius):
+                # WP_MAX_RADIUS: not reached until this close, however far
+                # past it the aircraft has flown.  Having flown past, it
+                # comes back round for it along a track from where it is
+                if (passby == 0 and
+                        path_proportion(self.position, start, end) >= 1):
+                    self.prev_wp = (self.position, self.amsl)
+                self.fly(self.l1.lateral_acceleration, NAV_PERIOD)
+                continue
             if final:
                 accept = 0.0
             elif acceptance > 0:
