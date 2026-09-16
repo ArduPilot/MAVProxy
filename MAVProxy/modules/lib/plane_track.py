@@ -56,9 +56,16 @@ PARAMETERS = {
     'RALLY_INCL_HOME': ([('RALLY_INCL_HOME', 1.0)], 0.0),
     'Q_ENABLE': ([('Q_ENABLE', 1.0)], 0.0),
     'Q_OPTIONS': ([('Q_OPTIONS', 1.0)], 0.0),
+    'Q_RTL_MODE': ([('Q_RTL_MODE', 1.0)], 0.0),
+    'Q_RTL_ALT': ([('Q_RTL_ALT', 1.0)], 15.0),
 }
 # QuadPlane's Q_OPTIONS bit for flying NAV_TAKEOFF as a fixed-wing takeoff
 Q_OPTION_ALLOW_FW_TAKEOFF = 1 << 1
+# QuadPlane::RTL_MODE, what Q_RTL_MODE makes of a return to launch
+Q_RTL_DISABLED = 0
+Q_RTL_SWITCH_QRTL = 1
+Q_RTL_VTOL_APPROACH = 2
+Q_RTL_QRTL_ALWAYS = 3
 
 # how often ArduPlane navigates, and how finely the aircraft is flown
 NAV_PERIOD = 0.1
@@ -322,6 +329,8 @@ class MissionFlight(object):
         self.rally_incl_home = parameter(params, 'RALLY_INCL_HOME') > 0
         self.quadplane = parameter(params, 'Q_ENABLE') > 0
         self.q_options = int(parameter(params, 'Q_OPTIONS'))
+        self.q_rtl_mode = int(parameter(params, 'Q_RTL_MODE'))
+        self.q_rtl_alt = parameter(params, 'Q_RTL_ALT')
         # the jumps followed so far, by index
         self.jumps_taken = set()
         self.home = self.local(home[0], home[1])
@@ -541,14 +550,17 @@ class MissionFlight(object):
         limit = self.time + 120.0 + LEG_ALLOWANCE * leg / self.speed() + extra
         return min(limit, MAX_FLIGHT_TIME)
 
-    def rtl_location(self):
-        '''AP_Rally::calc_best_rally_or_home_location: home, at RTL_ALTITUDE
-        above it, or at the altitude the aircraft is at if that is negative;
-        or the rally point nearest the aircraft, at its own altitude, where
-        it is within RALLY_LIMIT_KM and, with RALLY_INCL_HOME set, nearer
-        than home.  A rally point whose altitude is not known raises, since
-        nobody can say how high the aircraft flies to it'''
-        if self.rtl_altitude < 0:
+    def rtl_location(self, home_amsl=None):
+        '''AP_Rally::calc_best_rally_or_home_location: home, at home_amsl
+        where that is given, and otherwise RTL_ALTITUDE above it, or at the
+        altitude the aircraft is at if that is negative; or the rally point
+        nearest the aircraft, at its own altitude, where it is within
+        RALLY_LIMIT_KM and, with RALLY_INCL_HOME set, nearer than home.  A
+        rally point whose altitude is not known raises, since nobody can say
+        how high the aircraft flies to it'''
+        if home_amsl is not None:
+            best = (self.home, home_amsl)
+        elif self.rtl_altitude < 0:
             best = (self.home, self.amsl)
         else:
             best = (self.home, self.home_amsl + self.rtl_altitude)
@@ -843,11 +855,8 @@ class MissionFlight(object):
                 index = self.next_nav_index(index, take=True, passed=passed)
                 continue
             if command == mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH:
-                # Plane::do_RTL: flown from wherever the aircraft is
-                self.next_wp_crosstrack = False
-                location = self.rtl_location()
-                rtl_index = len(self.items)
-            elif command in WAYPOINT_COMMANDS or command in LOITER_COMMANDS:
+                return self.fly_rtl(index)
+            if command in WAYPOINT_COMMANDS or command in LOITER_COMMANDS:
                 location = self.location(self.items[index])
             else:
                 return None
@@ -860,20 +869,46 @@ class MissionFlight(object):
                 finished = self.fly_waypoint(index)
             if not finished:
                 return None
-            if command == mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH:
-                # ModeRTL::update: the aircraft circles where it returns to,
-                # at RTL_RADIUS -- WP_LOITER_RAD where that is zero -- the
-                # way its sign says
-                self.items.append((mavlink.MAV_CMD_NAV_LOITER_UNLIM,
-                                   location[0][0], location[0][1], location[1],
-                                   (0.0, 0.0, self.rtl_radius, 0.0)))
-                self.set_next_wp(location)
-                self.fly_loiter(rtl_index)
-                break
             if command in (mavlink.MAV_CMD_NAV_LAND,
                            mavlink.MAV_CMD_NAV_VTOL_LAND):
                 break
             index = self.next_nav_index(index, take=True, passed=passed)
+        self.add_point(force=True)
+        return self.points
+
+    def fly_rtl(self, index):
+        '''a return to launch, which ArduPlane flies in RTL mode, or QRTL
+        where Q_RTL_MODE has a QuadPlane do so.  It ends the flight: the
+        path returned is the one flown'''
+        mavlink = mavutil.mavlink
+        # Plane::do_RTL: flown from wherever the aircraft is
+        self.next_wp_crosstrack = False
+        qrtl = self.quadplane and self.q_rtl_mode in (Q_RTL_SWITCH_QRTL,
+                                                      Q_RTL_QRTL_ALWAYS)
+        if self.quadplane and self.q_rtl_mode == Q_RTL_QRTL_ALWAYS:
+            # ModeRTL::_enter goes straight to QRTL, which returns at
+            # Q_RTL_ALT
+            location = self.rtl_location(self.home_amsl + self.q_rtl_alt)
+        else:
+            location = self.rtl_location()
+        self.set_next_wp(location)
+        if qrtl:
+            # the aircraft flies at the point along a track from where it
+            # turned for it (Plane::update_loiter_update_nav), and QRTL
+            # takes it the rest of the way, to land there
+            self.crosstrack = True
+            if not self.fly_waypoint(index):
+                return None
+        else:
+            # ModeRTL::update: the aircraft circles where it returns to, at
+            # RTL_RADIUS -- WP_LOITER_RAD where that is zero -- the way its
+            # sign says.  It is flown by update_loiter() from the start,
+            # with no track to follow there since do_RTL() leaves none, so
+            # it joins the circle rather than flying over its middle
+            self.items.append((mavlink.MAV_CMD_NAV_LOITER_UNLIM,
+                               location[0][0], location[0][1], location[1],
+                               (0.0, 0.0, self.rtl_radius, 0.0)))
+            self.fly_loiter(len(self.items) - 1)
         self.add_point(force=True)
         return self.points
 

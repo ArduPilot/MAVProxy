@@ -476,6 +476,36 @@ class TestMissionFlight(object):
             # a bearing from the centre grows clockwise
             assert swept > 120 if clockwise else swept < -120
 
+    def test_a_return_to_launch_joins_its_circle(self):
+        # ArduPlane circles from the start of an RTL, so the aircraft turns
+        # onto the circle rather than flying over its middle first
+        rtl = (mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH, 0, 0, None, (0, 0, 0, 0))
+
+        def closest_on_return(params):
+            distances = [math.hypot(*local(p))
+                         for p in fly([waypoint(3000, 0), rtl], params=params)]
+            return min(distances[distances.index(max(distances)):])
+        for (params, radius) in ((dict(PARAMS, RTL_RADIUS=250), 250.0),
+                                 (PARAMS, PARAMS['WP_LOITER_RAD'])):
+            assert closest_on_return(params) > radius * 0.9
+        # a plane given the parameter which only a QuadPlane takes is still
+        # one of those
+        assert closest_on_return(
+            dict(PARAMS, RTL_RADIUS=250, Q_RTL_MODE=1)) > 225.0
+
+    def test_a_quadplane_returns_to_land(self):
+        '''QRTL, which Q_RTL_MODE 1 switches to on the way home and 3 goes
+        to at once, lands where it returns to rather than circling'''
+        rtl = (mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH, 0, 0, None, (0, 0, 0, 0))
+        for (mode, alt) in ((1, 100.0), (3, 15.0)):
+            params = dict(PARAMS, RTL_RADIUS=250, Q_ENABLE=1, Q_RTL_MODE=mode)
+            track = fly([waypoint(3000, 0), rtl], params=params)
+            assert math.hypot(*local(track[-1])) < 5.0
+            # QRTL comes home at Q_RTL_ALT, and RTL at RTL_ALTITUDE
+            assert track[-1][2] == pytest.approx(HOME[2] + alt, abs=10.0)
+            # and it never went round
+            assert all(local(p)[0] > -20.0 for p in track)
+
     def test_the_first_item_navigated_to(self):
         items = [change_speed(30), self.jump(4, 1), waypoint(2000, 0),
                  waypoint(3000, 0)]
