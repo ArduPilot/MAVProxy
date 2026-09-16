@@ -913,6 +913,12 @@ class MissionFlight(object):
         return self.points
 
 
+def is_navigation_command(command):
+    '''whether ArduPlane flies command, rather than just doing it'''
+    return (command < mavutil.mavlink.MAV_CMD_NAV_LAST or
+            command in LATE_NAV_COMMANDS)
+
+
 def positionless_amsl(alt, frame, home_amsl):
     '''the AMSL altitude an item with no position of its own is flown at,
     or None for the altitude the aircraft is at.  Location::sanitize() puts

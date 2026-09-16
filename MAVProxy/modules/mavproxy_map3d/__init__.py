@@ -352,7 +352,9 @@ class Map3DModule(mp_module.MPModule):
             return
         items = []
         # every item after home, for flying the mission through, and which
-        # of their altitudes are absolute rather than moving with home
+        # of their altitudes are absolute rather than moving with home: True
+        # for one of its own, False for one above home, and None for an item
+        # whose altitude neither moves nor stays, having none to fly at
         flown = []
         fixed_alt = []
         default_radius = self.default_circle_radius()
@@ -363,11 +365,17 @@ class Map3DModule(mp_module.MPModule):
             if w.seq != 0 and (lat == 0 and lon == 0 and
                                w.command not in mp_util.TAKEOFF_COMMANDS):
                 from MAVProxy.modules.lib import plane_track
-                flown.append((w.command, 0.0, 0.0,
-                              plane_track.positionless_amsl(
-                                  w.z, getattr(w, 'frame', 0), self.home_amsl),
+                amsl = plane_track.positionless_amsl(w.z, frame,
+                                                     self.home_amsl)
+                flown.append((w.command, 0.0, 0.0, amsl,
                               (w.param1, w.param2, w.param3, w.param4)))
-                fixed_alt.append(frame in (0, 5))
+                if (amsl is None or
+                        not plane_track.is_navigation_command(w.command)):
+                    # flown at the altitude the aircraft is at, or not
+                    # flown at all
+                    fixed_alt.append(None)
+                else:
+                    fixed_alt.append(frame in (0, 5))
             if lat == 0 and lon == 0 and w.command in mp_util.TAKEOFF_COMMANDS:
                 # draw the climb from home, otherwise the takeoff altitude is
                 # dropped and the mission appears to start at the first waypoint
@@ -438,9 +446,10 @@ class Map3DModule(mp_module.MPModule):
         self.track_thread = None
         # from the thread, for the idle task to draw: (key, track, home)
         self.track_result = None
-        # (key, flown_from, home, items) of the mission on screen while it
-        # waits for its path: the home it is being flown from, and the home
-        # and items it has now; and the MissionItems it was drawn with
+        # (key, flown_from, home, items, alt_moves) of the mission on screen
+        # while it waits for its path: the home it is being flown from, the
+        # home and items it has now, and whether any of its altitudes move
+        # with home
         self.track_wanted = None
         self.mission_sent = None
         # the mission last found to have no path flown, so it is said once
@@ -487,7 +496,7 @@ class Map3DModule(mp_module.MPModule):
         # a home which has only wandered a little is still the same mission.
         # An altitude of its own stands as it is, since home does not move it
         def keyed_alt(amsl, fixed):
-            if amsl is None:
+            if amsl is None or fixed is None:
                 return None
             return round(amsl if fixed else amsl - home[2], 2)
         relative = tuple(
@@ -499,15 +508,16 @@ class Map3DModule(mp_module.MPModule):
             in zip(items, fixed_alt))
         points = self.rally_points(home)
         rally = [point[:3] for point in points]
-        moves = [not fixed for fixed in fixed_alt]
+        moves = [not fixed for fixed in fixed_alt if fixed is not None]
         moves += [not fixed for (_, _, _, fixed) in points]
+        # where some of it moves with home and the rest does not, the path
+        # cannot be moved to fit a home which has: it is moved up or down
+        # with home all the same while home is near enough to be the same
+        # one, which puts what does not move out by no more than that, and
+        # flown again beyond
         key = (relative, tuple(sorted(params.items())), self.ground_heading,
                tuple((lat, lon, keyed_alt(amsl, fixed))
                      for (lat, lon, amsl, fixed) in points))
-        if any(moves) and not all(moves):
-            # some of it moves with home and the rest does not, which the
-            # path cannot be moved to fit: it is flown again instead
-            key += (round(home[2], 2),)
         (cached_key, cached_track, cached_home) = self.plane_track
         if cached_key == key and self.same_home(home, cached_home):
             self.track_wanted = None

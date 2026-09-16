@@ -1040,10 +1040,7 @@ class TestDrawnTrack(object):
         assert relative.sent[-1][0][2] == pytest.approx(moved_from + 0.3)
         assert len(calls) == 2
 
-    def test_a_mission_at_both_kinds_of_altitude_is_flown_again(self,
-                                                                monkeypatch):
-        # a path with some altitudes moving with home and some not cannot be
-        # moved to fit a home which has, so it is flown again instead
+    def counted_flights(self, monkeypatch):
         calls = []
         real = plane_track.mission_track
 
@@ -1051,6 +1048,13 @@ class TestDrawnTrack(object):
             calls.append(args)
             return real(*args, **kwargs)
         monkeypatch.setattr(plane_track, 'mission_track', counting)
+        return calls
+
+    def test_a_mission_at_both_kinds_of_altitude(self, monkeypatch):
+        # a path with some altitudes moving with home and some not cannot be
+        # moved to fit a home which has: it is moved all the same while home
+        # stays near, and flown again once home has gone further
+        calls = self.counted_flights(monkeypatch)
         module = self.live_module('plane')
         loader = module.mpstate.module('wp').wploader
         # the last waypoint at an altitude of its own, the rest above home
@@ -1060,12 +1064,67 @@ class TestDrawnTrack(object):
         module.send_mission()
         assert len(calls) == 1
         flown = module.sent[-1]
-        module.home_amsl += 0.3
+        # ArduPlane sends home every few seconds before it arms, a few
+        # centimetres different each time
+        for altitude in (0.03, -0.02, 0.04):
+            module.home_amsl += altitude
+            module.send_mission()
+        assert len(calls) == 1
+        assert module.sent[-1][-1][2] == pytest.approx(flown[-1][2], abs=0.1)
+        # further, and it is flown again, with the item with an altitude of
+        # its own still drawn at it, rather than moved up with home
+        module.home_amsl += 30.0
         module.send_mission()
         assert len(calls) == 2
-        # and the item with its own altitude is still drawn at it
-        assert flown[-1][2] == pytest.approx(module.sent[-1][-1][2], abs=0.05)
-        # home moving no further than before does not fly it again
+        assert module.sent[-1][-1][2] == pytest.approx(flown[-1][2], abs=5.0)
+
+    def test_an_item_with_no_altitude_to_fly_at_does_not_move_with_home(
+            self, monkeypatch):
+        # a speed change is at an altitude only because every item carries
+        # one, and one with no position is flown wherever the aircraft is;
+        # whatever the frame, neither makes the mission move with home
+        speed = mavlink.MAV_CMD_DO_CHANGE_SPEED
+        for (command, frame, z) in ((speed, 3, 0), (speed, 3, 50),
+                                    (speed, 10, 0), (speed, 0, 0),
+                                    (mavlink.MAV_CMD_NAV_LOITER_UNLIM, 3, 0),
+                                    (mavlink.MAV_CMD_NAV_LOITER_UNLIM, 10, 50)):
+            calls = self.counted_flights(monkeypatch)
+            module = self.live_module('plane')
+            loader = module.mpstate.module('wp').wploader
+            for w in loader.wpoints[1:]:
+                if w.command == speed:
+                    (w.command, w.frame, w.z) = (command, frame, z)
+                    w.param1 = w.param2 = w.param3 = w.param4 = 0
+                else:
+                    (w.frame, w.z) = (0, w.z + HOME[2])
+            module.home_position = HOME[:2]
+            for i in range(4):
+                module.home_amsl = HOME[2] + 5.0 * (i % 2)
+                module.send_mission()
+            assert len(calls) == 1, (command, frame, z)
+            # nor is the path drawn moved up and down with home
+            flown = [track for track in module.sent if track is not None][0]
+            assert module.home_amsl == HOME[2] + 5.0
+            assert ([p[2] for p in module.sent[-1]] ==
+                    pytest.approx([p[2] for p in flown])), (command, frame, z)
+            monkeypatch.undo()
+
+    def test_an_item_flown_above_home_moves_with_it(self, monkeypatch):
+        # a loiter with no position of its own, above home, is flown at an
+        # altitude which moves with home, among waypoints which do not
+        calls = self.counted_flights(monkeypatch)
+        module = self.live_module('plane')
+        loader = module.mpstate.module('wp').wploader
+        for w in loader.wpoints[1:]:
+            if w.command == mavlink.MAV_CMD_DO_CHANGE_SPEED:
+                (w.command, w.frame, w.z) = (
+                    mavlink.MAV_CMD_NAV_LOITER_TURNS, 3, 50)
+                (w.param1, w.param2, w.param3, w.param4) = (1, 0, 0, 0)
+            else:
+                (w.frame, w.z) = (0, w.z + HOME[2])
+        module.home_position = HOME[:2]
+        module.send_mission()
+        module.home_amsl += 30.0
         module.send_mission()
         assert len(calls) == 2
 
