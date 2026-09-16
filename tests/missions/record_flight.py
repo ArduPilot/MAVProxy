@@ -5,13 +5,16 @@ for it against the path flown
 
     python3 tests/missions/record_flight.py LOG OUT.json --source "..."
 
-LOG is the flight's dataflash log.  OUT gets the mission and the vehicle's
-parameters, as MAVExplorer hands them to plane_track, and the path flown,
+LOG is the flight's dataflash log.  OUT gets what MAVExplorer hands
+plane_track.mission_track() for it -- home, the mission, the vehicle's
+parameters, and where there are any, the takeoff course, where the flight
+started, the rally points and the approach course -- and the path flown,
 once a second, from when the aircraft is flying as a plane -- the end of a
 QuadPlane's transition, or the first POS of anything else -- to when it
 starts to land: a QuadPlane's landing descent, a plane's flare, or the end
-of the log.  --start and --end, in seconds of the log's TimeUS, override
-either.
+of the log -- or to when anything but the mission takes over, as a test
+does to end a mission which circles for ever.  --start and --end, in
+seconds of the log's TimeUS, override either.
 
 AP_FLAKE8_CLEAN
 '''
@@ -30,6 +33,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # what the autopilot says as a flight starts and stops being fixed-wing
 STARTS = ('Transition done',)
 ENDS = ('Land descend started', 'Flare ')
+# ArduPlane's modes a mission is flown in: AUTO, and the RTL and QRTL a
+# return to launch switches to.  Anything else, or AUTO again after those,
+# is the flight being taken over
+AUTO = 10
+RETURNING = (11, 21)
 
 
 def explorer():
@@ -41,27 +49,49 @@ def explorer():
 
 
 def times(mlog):
-    '''when the aircraft starts flying as a plane, and starts to land'''
-    start = None
-    end = None
+    '''when the aircraft starts flying the mission as a plane -- the end of
+    a QuadPlane's transition, or arming -- and when it starts to land or
+    stops flying the mission'''
+    transition = None
+    armed = None
     first = None
     last = None
+    events = []
     mlog.rewind()
     while True:
-        m = mlog.recv_match(type=['MSG', 'POS'])
+        m = mlog.recv_match(type=['MSG', 'POS', 'MODE', 'ARM'])
         if m is None:
             break
         t = m.TimeUS * 1.0e-6
-        if m.get_type() == 'POS':
+        kind = m.get_type()
+        if kind == 'POS':
             if first is None:
                 first = t
             last = t
+        elif kind == 'ARM':
+            if armed is None and m.ArmState:
+                armed = t
+        elif kind == 'MODE':
+            events.append((t, m.ModeNum))
+        elif transition is None and m.Message.startswith(STARTS):
+            transition = t
+        elif m.Message.startswith(ENDS):
+            events.append((t, None))
+    start = transition
+    if start is None:
+        start = armed if armed is not None else first
+    end = last
+    returned = False
+    for (t, mode) in events:
+        if t < start:
             continue
-        if start is None and m.Message.startswith(STARTS):
-            start = t
-        if start is not None and end is None and m.Message.startswith(ENDS):
+        if mode is None or (mode != AUTO and mode not in RETURNING) or (
+                mode == AUTO and returned):
             end = t
-    return (first if start is None else start, last if end is None else end)
+            break
+        if mode in RETURNING:
+            returned = True
+    return (start, end)
 
 
 def record(log, out, source, start=None, end=None):
@@ -76,17 +106,23 @@ def record(log, out, source, start=None, end=None):
     captured = {}
     real = plane_track.mission_track
 
-    def capture(home, items, params, *args, **kwargs):
+    def capture(home, items, params, heading=None, start=None, rally=None,
+                approach=None):
         captured['home'] = list(home)
         captured['items'] = [[c, la, lo, a, list(p)]
                              for (c, la, lo, a, p) in items]
-        return real(home, items, params, *args, **kwargs)
+        # the rest where there is anything to say
+        for (name, value) in (('heading', heading), ('start', start),
+                              ('rally', rally), ('approach', approach)):
+            if value:
+                captured[name] = value
+        return real(home, items, params, heading, start, rally, approach)
     plane_track.mission_track = capture
     try:
         mx.plane_mission_track(cmds, mission,
                                (path[0][0], path[0][1], ground0), params,
-                               mlog.mav_type, rally=rally, origin=origin,
-                               approach=approach)
+                               mlog.mav_type, path, started, rally, origin,
+                               approach)
     finally:
         plane_track.mission_track = real
     if 'items' not in captured:
@@ -95,13 +131,6 @@ def record(log, out, source, start=None, end=None):
                        for (name, _) in names))
     captured['params'] = dict((name, params[name]) for name in names
                               if name in params)
-    if rally:
-        captured['rally'] = [
-            [lat, lon, mx.rally_point_amsl(lat, lon, alt, flags,
-                                           captured['home'][2], origin)]
-            for (lat, lon, alt, flags) in rally]
-    if approach is not None:
-        captured['approach'] = approach
     (flying, landing) = times(mlog)
     if start is not None:
         flying = start
