@@ -709,29 +709,7 @@ class LinkModule(mp_module.MPModule):
 
         return True
 
-    possible_plane_types = [
-        "FIXED_WING",
-        "FLAPPING_WING",
-        "VTOL_TAILSITTER_DUOROTOR",
-        "VTOL_TAILSITTER_QUADROTOR",
-        "VTOL_TILTROTOR",
-        "VTOL_FIXEDROTOR",
-        "VTOL_TAILSITTER",
-        "VTOL_TILTWING",
-
-        "VTOL_DUOROTOR",  # renamed to VTOL_TAILSITTER_DUOROTOR
-        "VTOL_QUADROTOR",  # renamed to VTOL_TAILSITTER_QUADROTOR
-        "VTOL_RESERVED2",  # renamed to VTOL_FIXEDROTOR
-        "VTOL_RESERVED3",  # renamed to VTOL_TAILSITTER
-        "VTOL_RESERVED4",  # renamed to VTOL_TILTWING
-    ]
-    mav_type_planes = []
-    for possible_plane_type in possible_plane_types:
-        t = f"MAV_TYPE_{possible_plane_type}"
-        attr = getattr(mavutil.mavlink, t, None)
-        if attr is None:
-            continue
-        mav_type_planes.append(attr)
+    mav_type_planes = mp_util.plane_mav_types()
 
     def should_show_command_ack(self, m):
         '''returns true if we should display some text on the console for m'''

@@ -260,10 +260,7 @@ class ConsoleModule(mp_module.MPModule):
 
     def vehicle_type_string(self, hb):
         '''return vehicle type string from a heartbeat'''
-        if hb.type in [mavutil.mavlink.MAV_TYPE_FIXED_WING,
-                            mavutil.mavlink.MAV_TYPE_VTOL_DUOROTOR,
-                            mavutil.mavlink.MAV_TYPE_VTOL_QUADROTOR,
-                            mavutil.mavlink.MAV_TYPE_VTOL_TILTROTOR]:
+        if hb.type in mp_util.plane_mav_types():
             return 'Plane'
         if hb.type == mavutil.mavlink.MAV_TYPE_GROUND_ROVER:
             return 'Rover'

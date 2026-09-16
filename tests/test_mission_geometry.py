@@ -182,7 +182,7 @@ class TestHoveringVehicles(object):
                         m.MAV_TYPE_HELICOPTER, m.MAV_TYPE_SUBMARINE,
                         'copter', 'sub'):
             assert mp_util.vehicle_hovers_to_loiter(vehicle)
-        for vehicle in (m.MAV_TYPE_FIXED_WING, m.MAV_TYPE_VTOL_QUADROTOR,
+        for vehicle in (*mp_util.plane_mav_types(),
                         m.MAV_TYPE_GROUND_ROVER, 'plane', 'rover'):
             assert not mp_util.vehicle_hovers_to_loiter(vehicle)
         # not knowing the vehicle leaves the circle drawn
