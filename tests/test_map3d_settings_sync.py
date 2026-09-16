@@ -55,6 +55,16 @@ def follow_on_the_view(frame):
     frame.on_follow_toggle(None)
 
 
+def render_on_the_view(frame):
+    # OK in the settings dialog
+    frame.apply_render_settings((0.5, False, True, 60.0), notify=True)
+
+
+def rendered(frame):
+    return (frame.terrain_brightness, frame.terrain_shading,
+            frame.terrain_wireframe, frame.fpv_fov)
+
+
 # for each control on the view: what the user does there, the command which
 # says otherwise, how the module and the view each hold the result, and what
 # the command sets
@@ -75,6 +85,15 @@ CONTROLS = {
                lambda module: module.follow,
                lambda frame: [frame.follow, frame.follow_button.GetValue()],
                lambda held: held is True),
+    'render': (render_on_the_view, ['set', 'terrainbrightness', '1.75'],
+               lambda module: (module.map3d_settings.terrainbrightness,
+                               module.map3d_settings.terrainshading,
+                               module.map3d_settings.terrainwireframe,
+                               module.map3d_settings.fpvfov),
+               lambda frame: [rendered(frame),
+                              frame.terrain.render_settings + (frame.fpv_fov,)],
+               # the rest are the dialog's, which the command leaves be
+               lambda held: held == (1.75, False, True, 60.0)),
 }
 
 
@@ -119,6 +138,29 @@ class TestSettingsSync(object):
         assert commanded(in_the_module(module))
         for held in in_the_view(frame):
             assert held == in_the_module(module)
+
+    def test_a_render_setting_reaches_an_open_view(self, map3d_frame,
+                                                   map3d_module):
+        (viewer, frame) = connect(map3d_frame)
+        module = map3d_module(viewer)
+        module.cmd_map3d(['set', 'terrainbrightness', '0.75'])
+        module.cmd_map3d(['set', 'terrainwireframe', 'true'])
+        module.cmd_map3d(['set', 'fpvfov', '45'])
+        deliver(viewer, frame)
+        assert rendered(frame) == (0.75, True, True, 45.0)
+        assert frame.terrain.render_settings == (0.75, True, True)
+
+    def test_render_settings_wait_for_a_scene(self, map3d_frame,
+                                              map3d_module):
+        (viewer, frame) = connect(map3d_frame)
+        frame.elements = None
+        frame.terrain = None
+        module = map3d_module(viewer)
+        module.cmd_map3d(['set', 'terrainshading', 'false'])
+        deliver(viewer, frame)
+        from MAVProxy.modules.mavproxy_map3d.map3d_ui import Map3DFrame
+        Map3DFrame.handle(frame, ('origin', HOME[0], HOME[1], HOME[2]))
+        assert frame.terrain.render_settings == (1.25, False, False)
 
     def test_mavexplorer_and_its_views_agree(self, map3d_frame, mavexplorer,
                                              monkeypatch):

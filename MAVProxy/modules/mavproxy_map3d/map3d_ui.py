@@ -405,6 +405,11 @@ class Map3DFrame(wx.Frame):
         if kind == 'follow':
             self.set_follow_enabled(msg[1])
             return
+        if kind == 'render_settings':
+            (_, brightness, shading, wireframe) = msg
+            self.apply_render_settings((brightness, shading, wireframe,
+                                        self.fpv_fov))
+            return
         if kind == 'vehicletype':
             # may arrive before the scene exists, so keep it for init_scene
             self.vehicle_type = msg[1]
