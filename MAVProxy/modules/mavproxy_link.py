@@ -721,6 +721,9 @@ class LinkModule(mp_module.MPModule):
 
         "VTOL_DUOROTOR",  # renamed to VTOL_TAILSITTER_DUOROTOR
         "VTOL_QUADROTOR",  # renamed to VTOL_TAILSITTER_QUADROTOR
+        "VTOL_RESERVED2",  # renamed to VTOL_FIXEDROTOR
+        "VTOL_RESERVED3",  # renamed to VTOL_TAILSITTER
+        "VTOL_RESERVED4",  # renamed to VTOL_TILTWING
     ]
     mav_type_planes = []
     for possible_plane_type in possible_plane_types:
