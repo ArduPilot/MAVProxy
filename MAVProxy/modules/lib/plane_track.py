@@ -67,9 +67,10 @@ NAV_PERIOD = 0.1
 POINT_SPACING = 20.0
 POINT_TURN = math.radians(4.0)
 # a mission is not flown for longer than this, and one item not for longer
-# than it takes to fly its leg this many times over, plus MAX_LAPS laps of
-# its loiter: past that the aircraft is taken to be stuck, circling a
-# waypoint it cannot turn tightly enough to reach.  Flying a mission takes
+# than it takes to fly its leg this many times over, plus the time its
+# loiter asks for -- the turns or the time, or the climb or descent -- and
+# MAX_LAPS laps more: past that the aircraft is taken to be stuck, circling
+# a waypoint it cannot turn tightly enough to reach.  Flying a mission takes
 # a second or so of work for every hour of it, so one which plainly takes
 # longer than this is not attempted
 MAX_FLIGHT_TIME = 4 * 3600.0
@@ -666,6 +667,12 @@ class MissionFlight(object):
         extra = MAX_LAPS * seconds_per_lap
         if command == mavlink.MAV_CMD_NAV_LOITER_TIME:
             extra += loiter_time
+        elif command == mavlink.MAV_CMD_NAV_LOITER_TURNS:
+            extra += turns * seconds_per_lap
+        elif command == mavlink.MAV_CMD_NAV_LOITER_TO_ALT:
+            (_, centre_amsl) = self.next_wp
+            rate = self.climb if centre_amsl > self.amsl else self.sink
+            extra += 1.5 * abs(centre_amsl - self.amsl) / max(rate, 0.1)
         limit = self.time_limit(extra)
         while self.time < limit:
             (centre, centre_amsl) = self.next_wp

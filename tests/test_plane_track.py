@@ -496,6 +496,29 @@ class TestMissionFlight(object):
         assert mp_util.gps_distance(lat, lon, east[0], east[1]) < 100.0
         assert len(track) < 100
 
+    def test_a_long_loiter_is_flown_through(self):
+        # its turns are not taken for being stuck
+        for (turns, radius) in ((100, 80), (40, 200)):
+            track = fly([loiter_turns(3000, 0, turns, radius),
+                         waypoint(3000, 3000)])
+            (lat, lon, _) = offset(3000, 3000)
+            assert mp_util.gps_distance(track[-1][0], track[-1][1],
+                                        lat, lon) < 100.0
+            circled = sum(mp_util.gps_distance(a[0], a[1], b[0], b[1])
+                          for (a, b) in zip(track, track[1:]))
+            assert circled > turns * 2 * math.pi * radius
+        # nor is a long climb, longer than the leg to it and twenty laps
+        track = fly([loiter_to_alt(500, 0, 6000, radius=80),
+                     waypoint(3000, 3000, 6000)])
+        assert max(p[2] for p in track) >= HOME[2] + 5990
+
+    def test_a_jump_which_cannot_be_counted_is_not_flown(self):
+        items = [waypoint(2000, 0),
+                 (mavlink.MAV_CMD_DO_JUMP, 0, 0, None,
+                  (float('nan'), 1, 0, 0)),
+                 waypoint(0, 2000)]
+        assert plane_track.mission_track(HOME, items, PARAMS) is None
+
     def test_a_mission_too_long_to_fly_is_not(self):
         import time
         far = offset(2000 * 1000, 0)
