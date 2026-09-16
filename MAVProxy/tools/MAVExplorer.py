@@ -31,6 +31,8 @@ from pymavlink import mavutil
 from pymavlink import mavwp
 from pymavlink import DFReader
 from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
+from MAVProxy.modules.mavproxy_map3d.map3d import (
+    MISSION_LABEL_SIZE, MISSION_LABEL_SIZES, MISSION_STYLES)
 from MAVProxy.modules.lib import wxsettings
 from MAVProxy.modules.lib.graphdefinition import GraphDefinition
 from lxml import objectify
@@ -124,12 +126,12 @@ class MEState(object):
                         'show direction of travel on the 3D map mission'),
               MPSetting('showlabels', bool, False,
                         'label the mission items on the 3D map'),
-              MPSetting('labelsize', int, 14,
+              MPSetting('labelsize', int, MISSION_LABEL_SIZE,
                         'size of the 3D map mission labels, in points',
-                        range=(6, 48)),
-              MPSetting('missionpath', str, 'flown',
-                        'draw the 3D map mission as flown, geometry or plain',
-                        choice=['flown', 'geometry', 'plain']),
+                        range=MISSION_LABEL_SIZES),
+              MPSetting('missionpath', str, MISSION_STYLES[0],
+                        'draw the 3D map mission as ' + ', '.join(MISSION_STYLES),
+                        choice=list(MISSION_STYLES)),
               ]
             )
 
@@ -882,9 +884,9 @@ def plane_mission_track(cmds, mission, started_at, params=None, mav_type=None,
         if first in started:
             (lat, lon, alt) = path[started[first]][:3]
             start = (lat, lon, alt)
-    rally_points = [(lat, lon, rally_point_amsl(
-                         lat, lon, alt, flags,
-                         home[2] if home else None, origin))
+    rally_points = [(lat, lon, rally_point_amsl(lat, lon, alt, flags,
+                                                home[2] if home else None,
+                                                origin))
                     for (lat, lon, alt, flags) in (rally or [])]
     return plane_track.mission_track(home, items, params, heading, start,
                                      rally_points)

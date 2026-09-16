@@ -10,6 +10,7 @@ import math
 import functools
 import time
 import datetime
+import types
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_module
@@ -162,8 +163,10 @@ class MapModule(mp_module.MPModule):
             # other commands
             mavutil.mavlink.MAV_CMD_DO_LAND_START: (255, 127, 0),
         }
-        # what each kind of item is called, which the 3D map labels with too
-        self._label_suffix_for_wp_command = mp_util.MISSION_LABEL_SUFFIXES
+        # what each kind of item is called, which the 3D map labels with too,
+        # so it is not to be changed from here
+        self._label_suffix_for_wp_command = types.MappingProxyType(
+            mp_util.MISSION_LABEL_SUFFIXES)
 
         self.add_menu(MPMenuSubMenu('Terrain', items=[
             MPMenuItem('Show Contours', returnkey='showTerrainContours'),

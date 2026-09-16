@@ -4,6 +4,8 @@ rendered natively with VTK. Shows the same elements as the 2D map (flight path,
 mission, fence, rally, vehicle) for both live telemetry and log review.
 
 Andrew Tridgell / CanberraUAV
+
+AP_FLAKE8_CLEAN
 '''
 
 import math
@@ -428,8 +430,8 @@ class Map3DModule(mp_module.MPModule):
                 fixed_alt.append(frame in (0, 5))
             previous = (lat, lon, amsl)
         self.mission_sent = items
-        self.map.set_mission(items, self.flown_track(wploader, flown,
-                                                    fixed_alt))
+        self.map.set_mission(
+            items, self.flown_track(wploader, flown, fixed_alt))
 
     def reset_flown_track(self):
         '''forget any plane mission flown.  Flying one can take a second or
@@ -492,6 +494,7 @@ class Map3DModule(mp_module.MPModule):
         params = dict((name, mp_util.param_value(self.mav_param, name))
                       for (names, _) in plane_track.PARAMETERS.values()
                       for (name, _) in names)
+
         # the mission as it stands relative to home, so the same mission from
         # a home which has only wandered a little is still the same mission.
         # An altitude of its own stands as it is, since home does not move it
