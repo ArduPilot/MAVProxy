@@ -199,6 +199,44 @@ HOVERING_MAV_TYPE_NAMES = [
 ]
 
 
+# MAV_TYPE names (without the MAV_TYPE_ prefix) of vehicles flown as
+# planes.  Old names are kept so we work with pymavlink from either side
+# of a rename; names pymavlink does not have are ignored
+PLANE_MAV_TYPE_NAMES = [
+    "FIXED_WING",
+    "FLAPPING_WING",
+    "VTOL_TAILSITTER_DUOROTOR",
+    "VTOL_TAILSITTER_QUADROTOR",
+    "VTOL_TILTROTOR",
+    "VTOL_FIXEDROTOR",
+    "VTOL_TAILSITTER",
+    "VTOL_TILTWING",
+
+    "VTOL_DUOROTOR",  # renamed to VTOL_TAILSITTER_DUOROTOR
+    "VTOL_QUADROTOR",  # renamed to VTOL_TAILSITTER_QUADROTOR
+    "VTOL_RESERVED2",  # renamed to VTOL_FIXEDROTOR
+    "VTOL_RESERVED3",  # renamed to VTOL_TAILSITTER
+    "VTOL_RESERVED4",  # renamed to VTOL_TILTWING
+]
+
+
+def mav_types(names):
+    """return the MAV_TYPE values for names (without the MAV_TYPE_
+    prefix), skipping any the installed pymavlink does not have"""
+    from pymavlink import mavutil
+    ret = []
+    for name in names:
+        value = getattr(mavutil.mavlink, f"MAV_TYPE_{name}", None)
+        if value is not None:
+            ret.append(value)
+    return ret
+
+
+def plane_mav_types():
+    """return the MAV_TYPE values of vehicles flown as planes"""
+    return mav_types(PLANE_MAV_TYPE_NAMES)
+
+
 def vehicle_hovers_to_loiter(vehicle):
     """whether the vehicle holds position at a loiter point instead of
     circling it.  vehicle is a MAV_TYPE or one of MAVProxy's vehicle type
@@ -872,10 +910,7 @@ def vehicle_type_name(mav_type):
         from pymavlink import mavutil
         mavlink = mavutil.mavlink
         groups = {
-            'plane': [mavlink.MAV_TYPE_FIXED_WING,
-                      mavlink.MAV_TYPE_VTOL_DUOROTOR,
-                      mavlink.MAV_TYPE_VTOL_QUADROTOR,
-                      mavlink.MAV_TYPE_VTOL_TILTROTOR],
+            'plane': plane_mav_types(),
             'rover': [mavlink.MAV_TYPE_GROUND_ROVER],
             'sub': [mavlink.MAV_TYPE_SUBMARINE],
             'boat': [mavlink.MAV_TYPE_SURFACE_BOAT],

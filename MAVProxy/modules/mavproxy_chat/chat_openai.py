@@ -17,6 +17,7 @@ from threading import Thread, Lock
 from typing_extensions import override
 import json
 import math
+from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import param_help
 
 try:
@@ -284,10 +285,7 @@ class chat_openai():
         hearbeat_msg = self.mpstate.master().messages.get('HEARTBEAT', None)
         vehicle_type_str = "unknown"
         if hearbeat_msg is not None:
-            if hearbeat_msg.type in [mavutil.mavlink.MAV_TYPE_FIXED_WING,
-                                     mavutil.mavlink.MAV_TYPE_VTOL_DUOROTOR,
-                                     mavutil.mavlink.MAV_TYPE_VTOL_QUADROTOR,
-                                     mavutil.mavlink.MAV_TYPE_VTOL_TILTROTOR]:
+            if hearbeat_msg.type in mp_util.plane_mav_types():
                 vehicle_type_str = "Plane"
             if hearbeat_msg.type == mavutil.mavlink.MAV_TYPE_GROUND_ROVER:
                 vehicle_type_str = "Rover"
