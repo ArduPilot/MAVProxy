@@ -376,6 +376,24 @@ def _arrows(points_enu, colour, renderer=None, count=MISSION_ARROW_COUNT):
     return actor
 
 
+# how big a mission item's label is drawn, in points on the screen
+MISSION_LABEL_SIZE = 14
+
+
+def _label(point_enu, text, colour, size=MISSION_LABEL_SIZE):
+    """text at a point in the world, facing the screen and the same size on
+    it however far away it is"""
+    actor = vtk.vtkBillboardTextActor3D()
+    actor.SetInput(str(text))
+    actor.SetPosition(*point_enu)
+    prop = actor.GetTextProperty()
+    prop.SetColor(*colour)
+    prop.SetFontSize(size)
+    prop.SetJustificationToLeft()
+    prop.SetVerticalJustificationToBottom()
+    return actor
+
+
 def _points(points_enu, colour, size):
     vpts = vtk.vtkPoints()
     verts = vtk.vtkCellArray()
@@ -419,7 +437,10 @@ class ElementManager:
         self.mission_line = []
         self.mission_rings = []
         self.mission_markers = []
+        # the label of each item drawn, as (marker, label)
+        self.mission_labels = []
         self.mission_arrows = False
+        self.mission_labelled = False
         # the mission last given, so it can be drawn again in another style
         self.mission_items = []
         self.mission_track = None
@@ -548,6 +569,9 @@ class ElementManager:
         self.mission_markers = [
             self._enu(i.lat, i.lon, self._resolve_amsl(i.alt, i.frame))
             for i in flown]
+        self.mission_labels = [
+            (marker, mp_util.mission_item_label(item.seq, item.command))
+            for (marker, item) in zip(self.mission_markers, flown)]
         self.mission_rings = []
         if self.mission_style == 'flown' and self.mission_track:
             self.mission_line = [self._enu(lat, lon, amsl)
@@ -625,6 +649,14 @@ class ElementManager:
         self.mission_arrows = enable
         self.refresh_mission()
 
+    def set_mission_labels(self, enable):
+        '''show or hide the label of each mission item'''
+        enable = bool(enable)
+        if enable == self.mission_labelled:
+            return
+        self.mission_labelled = enable
+        self.refresh_mission()
+
     def refresh_mission(self):
         '''rebuild the mission actors from the last mission drawn'''
         line = self.mission_line
@@ -639,6 +671,9 @@ class ElementManager:
             actors.append(_polyline(ring, (1.0, 1.0, 1.0), 2.0, dashed=True))
         if self.mission_markers:
             actors.append(_points(self.mission_markers, (1.0, 1.0, 1.0), 9))
+        if self.mission_labelled:
+            actors += [_label(marker, text, (1.0, 1.0, 1.0))
+                       for (marker, text) in self.mission_labels]
         self._replace('mission', actors)
 
     def _append_rejoin(self, line, rejoin, target, target_amsl):

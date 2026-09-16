@@ -122,6 +122,8 @@ class MEState(object):
               MPSetting('vehicle_type', str, 'Auto', 'force vehicle type for mode handling'),
               MPSetting('showdirection', bool, True,
                         'show direction of travel on the 3D map mission'),
+              MPSetting('showlabels', bool, False,
+                        'label the mission items on the 3D map'),
               MPSetting('missionpath', str, 'flown',
                         'draw the 3D map mission as flown, geometry or plain',
                         choice=['flown', 'geometry', 'plain']),
@@ -974,6 +976,7 @@ def cmd_map3d(args):
     m3d.set_origin(lat0, lon0, ground0)
     m3d.set_home(ground0)
     m3d.set_mission_arrows(mestate.settings.showdirection)
+    m3d.set_mission_labels(mestate.settings.showlabels)
     m3d.set_mission_style(mestate.settings.missionpath)
     m3d.set_path(path)
     if xlimits.last_xlim is not None and mestate.settings.sync_xmap:
@@ -1047,6 +1050,7 @@ def cmd_set(args):
     for view in map3d_views:
         if view.is_alive():
             view.set_mission_arrows(mestate.settings.showdirection)
+            view.set_mission_labels(mestate.settings.showlabels)
             view.set_mission_style(mestate.settings.missionpath)
             pending = getattr(view, 'mission_to_fly', None)
             if mestate.settings.missionpath == 'flown' and pending is not None:

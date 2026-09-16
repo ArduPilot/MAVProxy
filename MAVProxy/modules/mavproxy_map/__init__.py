@@ -162,18 +162,8 @@ class MapModule(mp_module.MPModule):
             # other commands
             mavutil.mavlink.MAV_CMD_DO_LAND_START: (255, 127, 0),
         }
-        self._label_suffix_for_wp_command = {
-            mavutil.mavlink.MAV_CMD_NAV_TAKEOFF: "TOff",
-            mavutil.mavlink.MAV_CMD_DO_LAND_START: "DLS",
-            mavutil.mavlink.MAV_CMD_NAV_SPLINE_WAYPOINT: "SW",
-            mp_util.MAV_CMD_NAV_ARC_WAYPOINT: "AW",
-            mavutil.mavlink.MAV_CMD_NAV_LOITER_UNLIM: "LU",
-            mavutil.mavlink.MAV_CMD_NAV_LOITER_TURNS: "LT",
-            mavutil.mavlink.MAV_CMD_NAV_LOITER_TIME: "LTime",
-            mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT: "LAlt",
-            mp_util.MAV_CMD_DO_ORBIT: "Orbit",
-            mavutil.mavlink.MAV_CMD_NAV_VTOL_LAND: "VL",
-        }
+        # what each kind of item is called, which the 3D map labels with too
+        self._label_suffix_for_wp_command = mp_util.MISSION_LABEL_SUFFIXES
 
         self.add_menu(MPMenuSubMenu('Terrain', items=[
             MPMenuItem('Show Contours', returnkey='showTerrainContours'),
@@ -445,10 +435,7 @@ Usage: map circle <radius> <colour>
     def label_for_waypoint(self, wp_num):
         '''return the label the waypoint which should appear on the map'''
         wp = self.module('wp').wploader.wp(wp_num)
-        command = wp.command
-        if command not in self._label_suffix_for_wp_command:
-            return str(wp_num)
-        return str(wp_num) + "(" + self._label_suffix_for_wp_command[command] + ")"
+        return mp_util.mission_item_label(wp_num, wp.command)
 
     def display_waypoints(self):
         '''display the waypoints'''

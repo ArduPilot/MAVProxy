@@ -1634,7 +1634,8 @@ class TestDrawnTrack(object):
         log.mav_type = mavlink.MAV_TYPE_FIXED_WING
         monkeypatch.setattr(mx, 'mestate', SimpleNamespace(
             mlog=log, settings=SimpleNamespace(
-                condition=None, showdirection=True, sync_xmap=False,
+                condition=None, showdirection=True, showlabels=False,
+                sync_xmap=False,
                 missionpath='flown')),
             raising=False)
         monkeypatch.setattr(mx, 'map3d_views', [])
@@ -1794,12 +1795,13 @@ class TestMissionStyles(object):
         module.map3d_settings = mp_settings.MPSettings([
             ('fpvfov', float, 90.0), ('terrainbrightness', float, 1.25),
             ('terrainshading', bool, True), ('terrainwireframe', bool, False),
-            ('showdirection', bool, True),
+            ('showdirection', bool, True), ('showlabels', bool, False),
             mp_settings.MPSetting('missionpath', str, MISSION_STYLES[0],
                                   choice=MISSION_STYLES)])
         module.map = SimpleNamespace(
             is_alive=lambda: True, set_fpv_fov=lambda fov: None,
             set_mission_arrows=lambda enable: None,
+            set_mission_labels=lambda enable: None,
             set_render_settings=lambda *args: None,
             set_mission_style=styles.append,
             set_mission=lambda items, track=None: sends.append(track))
@@ -1858,6 +1860,7 @@ class TestMissionStyles(object):
             def command(self, args):
                 setattr(self, args[0], args[1])
         settings = Settings(condition=None, showdirection=True,
+                            showlabels=False,
                             sync_xmap=False, missionpath='geometry')
         monkeypatch.setattr(mx, 'mestate', SimpleNamespace(
             mlog=log, settings=settings), raising=False)

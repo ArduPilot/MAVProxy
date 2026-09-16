@@ -64,6 +64,7 @@ class Map3DModule(mp_module.MPModule):
             ('terrainshading', bool, True),
             ('terrainwireframe', bool, False),
             ('showdirection', bool, True),
+            ('showlabels', bool, False),
             # flown, geometry or plain: see Map3D.set_mission_style()
             mp_settings.MPSetting('missionpath', str, MISSION_STYLES[0],
                                   choice=MISSION_STYLES),
@@ -129,6 +130,7 @@ class Map3DModule(mp_module.MPModule):
             if self.map is not None and self.map.is_alive():
                 self.map.set_fpv_fov(self.map3d_settings.fpvfov)
                 self.map.set_mission_arrows(self.map3d_settings.showdirection)
+                self.map.set_mission_labels(self.map3d_settings.showlabels)
                 self.map.set_mission_style(self.map3d_settings.missionpath)
                 # the path flown is only worked out while it is drawn
                 self.send_mission()
@@ -158,6 +160,7 @@ class Map3DModule(mp_module.MPModule):
                          follow=self.follow)
         # push whatever we already know
         self.map.set_mission_arrows(self.map3d_settings.showdirection)
+        self.map.set_mission_labels(self.map3d_settings.showlabels)
         self.map.set_mission_style(self.map3d_settings.missionpath)
         self.send_mission()
         self.send_fence()

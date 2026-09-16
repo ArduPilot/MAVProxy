@@ -374,6 +374,8 @@ class Map3DFrame(wx.Frame):
             self.elements.set_mission(msg[1], msg[2] if len(msg) > 2 else None)
         elif kind == 'mission_arrows':
             self.elements.set_mission_arrows(msg[1])
+        elif kind == 'mission_labels':
+            self.elements.set_mission_labels(msg[1])
         elif kind == 'mission_style':
             self.elements.set_mission_style(msg[1])
         elif kind == 'fence':

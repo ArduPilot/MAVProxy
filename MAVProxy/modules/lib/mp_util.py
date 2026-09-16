@@ -199,6 +199,32 @@ def arc_points(latlon1, latlon2, arc_angle, steps=None):
 TAKEOFF_COMMANDS = (22, 84)      # NAV_TAKEOFF, NAV_VTOL_TAKEOFF
 
 
+# what each kind of mission item is called where a map labels one, as the 2D
+# map has always labelled its waypoints.  Numeric for the same reason as
+# TAKEOFF_COMMANDS above
+MISSION_LABEL_SUFFIXES = {
+    22: "TOff",                       # NAV_TAKEOFF
+    189: "DLS",                       # DO_LAND_START
+    82: "SW",                         # NAV_SPLINE_WAYPOINT
+    MAV_CMD_NAV_ARC_WAYPOINT: "AW",
+    17: "LU",                         # NAV_LOITER_UNLIM
+    18: "LT",                         # NAV_LOITER_TURNS
+    19: "LTime",                      # NAV_LOITER_TIME
+    31: "LAlt",                       # NAV_LOITER_TO_ALT
+    MAV_CMD_DO_ORBIT: "Orbit",
+    85: "VL",                         # NAV_VTOL_LAND
+}
+
+
+def mission_item_label(seq, command):
+    """the label a map puts on a mission item: its number, and what it is
+    where that is worth saying -- "3(DLS)" for a land start"""
+    suffix = MISSION_LABEL_SUFFIXES.get(command)
+    if suffix is None:
+        return str(seq)
+    return "%s(%s)" % (seq, suffix)
+
+
 # vehicles which hold position at a loiter point rather than flying a circle
 # around it.  MAVProxy's own vehicle type names are accepted as well as the
 # MAV_TYPEs, since that is what a live module has to hand

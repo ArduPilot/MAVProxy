@@ -158,6 +158,10 @@ class Map3D:
     def set_mission_arrows(self, enable):
         self._put(('mission_arrows', bool(enable)))
 
+    def set_mission_labels(self, enable):
+        '''label each mission item with its number and what it is'''
+        self._put(('mission_labels', bool(enable)))
+
     def set_mission_style(self, style):
         '''one of MISSION_STYLES'''
         self._put(('mission_style', str(style)))
