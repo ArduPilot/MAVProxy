@@ -1846,12 +1846,13 @@ class TestDrawnTrack(object):
         (lat, lon, amsl) = offset(north, east, alt)
         return self.message('POS', Lat=lat, Lng=lon, Alt=amsl)
 
-    def mission_dump(self, new_mission=True):
+    def mission_dump(self, new_mission=True,
+                     takeoff=mavlink.MAV_CMD_NAV_TAKEOFF):
         (lat, lon, _) = offset(3000, 0)
         return (([self.message('MSG', Message='New mission')] if new_mission
                  else []) +
                 [self.cmd(0, mavlink.MAV_CMD_NAV_WAYPOINT, HOME[0], HOME[1], HOME[2]),
-                 self.cmd(1, mavlink.MAV_CMD_NAV_TAKEOFF, 0, 0, 50),
+                 self.cmd(1, takeoff, 0, 0, 50),
                  self.cmd(2, mavlink.MAV_CMD_NAV_WAYPOINT, lat, lon, 100)])
 
     def test_mavexplorer_takes_the_takeoff_course_from_the_log(self):
@@ -1865,6 +1866,19 @@ class TestDrawnTrack(object):
         # east, from where the takeoff began, not from where the log did
         assert mx.takeoff_course(path, cmds, started) == pytest.approx(90.0, abs=1.0)
         assert mx.takeoff_course(path, cmds, {}) is None
+
+    def test_mavexplorer_takes_the_course_a_vtol_takeoff_left_on(self):
+        # a QuadPlane climbs where it is, then transitions the way it
+        # points, which is nowhere in the mission either
+        mx = self.explorer()
+        log = self.log(*([self.pos(0, 0)] + self.mission_dump(
+            takeoff=mavlink.MAV_CMD_NAV_VTOL_TAKEOFF) + [
+            self.message('MSG', Message='Mission: 1 VTOLTakeoff'),
+            self.pos(0, 0, 25), self.pos(0, 0, 50),
+            self.pos(-10, -10, 50), self.pos(-30, -30, 50)]))
+        (path, mission, cmds, started, _, _, _) = mx.mission_from_log(log)
+        # south-west, away from the next waypoint, which is north
+        assert mx.takeoff_course(path, cmds, started) == pytest.approx(225.0, abs=1.0)
 
     def test_mavexplorer_takes_the_takeoff_course_of_the_last_mission(self):
         # a log from before the logger wrote "New mission": the first item

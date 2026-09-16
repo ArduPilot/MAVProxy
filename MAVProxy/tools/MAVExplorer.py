@@ -803,14 +803,16 @@ def mission_from_log(mlog, condition=None):
 
 
 def takeoff_course(path, items, started):
-    '''the course in degrees a fixed-wing takeoff in the mission was flown
-    on, or None.  ArduPlane holds the ground course it has once it gets
-    moving, which nothing in the mission says, so it is taken from the path:
-    where the aircraft was when the takeoff began, towards where it was
-    once it had gone a little way'''
+    '''the course in degrees a takeoff in the mission was flown on, or None.
+    ArduPlane holds the ground course it has once it gets moving, and a
+    QuadPlane transitions the way it was pointing, neither of which the
+    mission says, so it is taken from the path: where the aircraft was when
+    the takeoff began, towards where it was once it had gone a little way'''
     for (seq, index) in sorted(started.items()):
         item = items.get(seq)
-        if item is None or item[4] != mavutil.mavlink.MAV_CMD_NAV_TAKEOFF:
+        if item is None or item[4] not in (
+                mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
+                mavutil.mavlink.MAV_CMD_NAV_VTOL_TAKEOFF):
             continue
         (lat, lon) = path[index][:2]
         for point in path[index + 1:]:

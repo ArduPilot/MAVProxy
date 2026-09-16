@@ -821,18 +821,24 @@ class MissionFlight(object):
 
     def fly_takeoff(self, index):
         '''climb out to the takeoff altitude.  A VTOL takeoff climbs straight
-        up where the aircraft is, and sets off towards where the mission goes
-        next.  A fixed-wing one climbs away at full rate until it is past the
-        takeoff altitude, holding the ground course it had once it got
-        moving (Plane::verify_takeoff), which nothing in the mission says:
-        the heading the caller has for it, which can only be an estimate
-        until the aircraft has flown, and otherwise, as a guess, towards
-        where the mission goes next'''
+        up where the aircraft is, and sets off the way it points: the heading
+        the caller has for it, and otherwise, as a guess, towards where the
+        mission goes next.  A fixed-wing one climbs away at full rate until
+        it is past the takeoff altitude, holding the ground course it had
+        once it got moving (Plane::verify_takeoff), which nothing in the
+        mission says: the heading the caller has for it, which can only be
+        an estimate until the aircraft has flown, and otherwise, as a guess,
+        towards where the mission goes next'''
         (command, lat, lon, amsl, params) = self.items[index]
         (point, target) = self.location(self.items[index])
         if self.vtol_takeoff(command):
+            # it transitions the way it is pointing, which is the way it
+            # was pointing on the ground, where that is known
             self.amsl = max(self.amsl, target)
-            self.face(self.next_nav_index(index))
+            if self.takeoff_heading is not None:
+                self.yaw = wrap_pi(math.radians(self.takeoff_heading))
+            else:
+                self.face(self.next_nav_index(index))
             self.add_point(force=True)
         else:
             if self.takeoff_heading is not None:
@@ -1036,10 +1042,13 @@ class MissionFlight(object):
             if not self.fly_vtol_approach(location, rtl=True):
                 return None
         elif qrtl:
-            # the aircraft flies at the point along a track from where it
-            # turned for it (Plane::update_loiter_update_nav), and QRTL
-            # takes it the rest of the way, to land there
-            self.crosstrack = True
+            # with Q_RTL_MODE 1 the aircraft flies at the point in RTL, along
+            # a track from where it turned for it
+            # (Plane::update_loiter_update_nav), and QRTL takes it the rest
+            # of the way; QRTL, which 3 goes to at once, steers for it from
+            # wherever the aircraft is, do_RTL() having left no track
+            # (QuadPlane::vtol_position_controller)
+            self.crosstrack = self.q_rtl_mode == Q_RTL_SWITCH_QRTL
             if not self.fly_waypoint(index):
                 return None
         else:
