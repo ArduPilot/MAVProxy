@@ -26,6 +26,7 @@ import traceback
 
 from importlib import reload
 from queue import Empty
+from types import SimpleNamespace
 
 from pymavlink import mavutil
 
@@ -75,6 +76,15 @@ class ShutdownRequested(Exception):
     '''raised in the main thread by the fatal-signal handler to break it
     out of the blocking read for user input'''
     pass
+
+
+# a repeat fatal signal within this many seconds of the first is taken
+# as impatience rather than a request to abandon the clean shutdown:
+SHUTDOWN_GRACE = 5
+
+# sent to the main thread to interrupt it; nothing else here uses this
+# one, and its default action is to ignore it
+POKE_SIGNAL = getattr(signal, 'SIGURG', None)
 
 
 class MPStatus(object):
@@ -951,46 +961,21 @@ def mkdir_p(dir):
     os.mkdir(dir)
 
 
-def log_writer():
-    '''log writing thread'''
-    try:
-        while not mpstate.status.stop_event.is_set():
-            if not mpstate.logqueue_raw.empty():
-                bytes = mpstate.logqueue_raw.get(block=False)
-                mpstate.logfile_raw.write(bytearray(bytes))
-            time.sleep(0.001)
+class DiscardQueue(object):
+    '''stands in for a telemetry log queue once writing that log has
+    failed.  Nothing will ever read the real queue again, so producers
+    must stop putting to it or it grows without bound: this is falsy,
+    so the usual "if mpstate.logqueue:" skips it, and put() discards
+    for anyone who checked just before it was swapped in'''
+    def __bool__(self):
+        return False
 
-            # TODO consider wait() the stop event instead
-            timeout = time.time() + 10
-            while not mpstate.logqueue_raw.empty() and time.time() < timeout:
-                mpstate.logfile_raw.write(mpstate.logqueue_raw.get())
-            while not mpstate.logqueue.empty() and time.time() < timeout:
-                mpstate.logfile.write(mpstate.logqueue.get())
-            if mpstate.settings.flushlogs or time.time() >= timeout:
-                mpstate.logfile.flush()
-                mpstate.logfile_raw.flush()
-    except Exception as ex:
-        # e.g. disk full.  This must not propagate out of the thread:
-        # the drain below cancels the queue feeder-thread joins, and
-        # skipping that hangs MAVProxy at exit - which is precisely
-        # the failure this code exists to prevent:
-        print("Log writing failed, logging stopped: %s" % ex)
+    def put(self, *args, **kwargs):
+        pass
 
-    # main_loop only notices stop_event at the top of each iteration,
-    # so it can still be logging packets; give it a bounded time to
-    # finish before we decide the queues are empty.  It is created
-    # after this thread, so may not exist - or not have been started -
-    # yet on an early exit; is_alive() is False for an unstarted
-    # thread, where join() would raise:
-    main_thread = getattr(mpstate.status, 'thread', None)
-    if (main_thread is not None and
-            main_thread is not threading.current_thread() and
-            main_thread.is_alive()):
-        main_thread.join(timeout=1)
-        if main_thread.is_alive() and mpstate.status.stop_event.is_set():
-            print("main_loop still running at exit; the end of the log may be missing")
 
-    drain_log_queues()
+def log_name(logfile):
+    return getattr(logfile, 'name', 'log')
 
 
 def drain_log_queue(queue, logfile, tend):
@@ -998,8 +983,7 @@ def drain_log_queue(queue, logfile, tend):
 
     Returns a (still-working, wrote-something) tuple.  A write failure
     is reported and ends the drain of this queue only; the caller must
-    still get to the other queue, to the flushes and above all to the
-    cancel_join_thread() calls.
+    still get to the other queue.
     '''
     wrote = False
     try:
@@ -1012,75 +996,136 @@ def drain_log_queue(queue, logfile, tend):
                 return (True, wrote)
             logfile.write(bytearray(data))
             wrote = True
+        return (True, wrote)
     except Exception as ex:
         # e.g. disk full or file closed - the very conditions under
         # which a log queue backs up in the first place
-        print("Failed to drain log queue: %s" % ex)
+        print("Writing %s failed: %s" % (log_name(logfile), ex))
         return (False, wrote)
-    return (True, wrote)
 
 
-def drain_log_queues(timeout=2):
+def flush_log(logfile):
+    '''flush a log, returning False if that failed'''
+    try:
+        logfile.flush()
+        return True
+    except Exception as ex:
+        print("Flushing %s failed: %s" % (log_name(logfile), ex))
+        return False
+
+
+def write_logs(logs):
+    '''write out the log queues until shutdown is requested.
+
+    A log whose writing fails is stopped on its own, so the other one
+    carries on.  Returns the logs still working.
+    '''
+    live = logs[:]
+    while len(live) and not mpstate.status.stop_event.is_set():
+        # TODO consider wait() the stop event instead
+        tend = time.time() + 10
+        for log in live[:]:
+            (attr, queue, logfile) = log
+            (ok, wrote) = drain_log_queue(queue, logfile, tend)
+            if ok and (mpstate.settings.flushlogs or time.time() >= tend):
+                ok = flush_log(logfile)
+            if not ok:
+                setattr(mpstate, attr, DiscardQueue())
+                live.remove(log)
+                print("Logging to %s has stopped" % log_name(logfile))
+    return live
+
+
+def wait_for_main_loop():
+    '''main_loop only notices stop_event at the top of each iteration,
+    so it can still be logging packets; give it a bounded time to
+    finish before we decide the queues are empty'''
+    # it is created after this thread, so may not exist - or not have
+    # been started - yet on an early exit; is_alive() is False for an
+    # unstarted thread, where join() would raise:
+    main_thread = getattr(mpstate.status, 'thread', None)
+    if (main_thread is None or
+            main_thread is threading.current_thread() or
+            not main_thread.is_alive()):
+        return
+    main_thread.join(timeout=1)
+    if main_thread.is_alive():
+        print("main_loop still running at exit; the end of the log may be missing")
+
+
+def log_writer():
+    '''log writing thread'''
+    # (the mpstate attribute holding the queue, the queue, its file)
+    logs = [('logqueue_raw', mpstate.logqueue_raw, mpstate.logfile_raw),
+            ('logqueue', mpstate.logqueue, mpstate.logfile)]
+    try:
+        live = write_logs(logs)
+        if len(live):
+            wait_for_main_loop()
+            drain_log_queues(live)
+    finally:
+        # These are multiprocessing queues, so each has a feeder thread
+        # which will still be blocked writing into a full pipe if we
+        # stop reading with data still queued - or which can be
+        # part-way through writing something the drain did not see.
+        # multiprocessing's atexit handler joins those feeder threads,
+        # so leaving one blocked hangs MAVProxy forever at exit, after
+        # every module has already been unloaded.  So whatever happened
+        # above - a print() to a closed pipe will raise, say - this has
+        # to run:
+        for (attr, queue, logfile) in logs:
+            if not mpstate.status.stop_event.is_set():
+                # we are leaving while MAVProxy carries on, so nothing
+                # will read this queue again
+                setattr(mpstate, attr, DiscardQueue())
+            try:
+                queue.cancel_join_thread()
+            except Exception:
+                pass
+
+
+def drain_log_queues(logs, timeout=2):
     '''write out whatever is left in the log queues as we shut down.
-
-    These are multiprocessing queues, so each has a feeder thread which
-    will still be blocked writing into a full pipe if we stop reading
-    with data still queued.  multiprocessing's atexit handler joins
-    those feeder threads, so leaving one blocked hangs MAVProxy forever
-    at exit - after every module has already been unloaded.
 
     timeout bounds the time we spend entering the drain loops; a write
     or a flush onto stuck storage can still block for longer than that.
     '''
     tend = time.time() + timeout
-    try:
-        # main_loop should have stopped putting to the queues by now
-        # (module threads may still be sending; we do not wait for
-        # those), but a feeder thread can be part-way through pushing
-        # what it has into the pipe, so a single empty queue does not
-        # mean we are done; wait for two idle passes:
-        queues = [(mpstate.logqueue_raw, mpstate.logfile_raw),
-                  (mpstate.logqueue, mpstate.logfile)]
-        idle_passes = 0
-        while len(queues) and idle_passes < 2 and time.time() < tend:
-            wrote = False
-            # hand each queue an equal share of what is left of the
-            # budget, so slow writes on one can not consume all of it
-            # and leave the other never drained at all:
-            share = max(0, tend - time.time()) / len(queues)
-            for (queue, logfile) in queues[:]:
-                (ok, queue_wrote) = drain_log_queue(queue,
-                                                    logfile,
-                                                    time.time() + share)
-                wrote = wrote or queue_wrote
-                if not ok:
-                    # writing this log is failing; stop retrying it,
-                    # but keep draining the other one
-                    queues.remove((queue, logfile))
-            if wrote:
-                idle_passes = 0
-            else:
-                idle_passes += 1
-        if time.time() >= tend:
-            print("Timed out draining log queues; the end of the log may be missing")
-        for logfile in [mpstate.logfile, mpstate.logfile_raw]:
-            # a failure to flush one log must not cost us the other
-            try:
-                logfile.flush()
-            except Exception as ex:
-                print("Failed to flush log: %s" % ex)
-    except Exception as ex:
-        print("Failed to drain log queues: %s" % ex)
-    finally:
-        # a feeder thread can still be part-way through writing
-        # something the drain above did not see, so make sure exiting
-        # can never block on one.  This must run regardless of how the
-        # drain went, or the hang we are here to fix comes back:
-        for queue in [mpstate.logqueue, mpstate.logqueue_raw]:
-            try:
-                queue.cancel_join_thread()
-            except Exception:
-                pass
+    # main_loop should have stopped putting to the queues by now
+    # (module threads may still be sending; we do not wait for
+    # those), but a feeder thread can be part-way through pushing
+    # what it has into the pipe, so a single empty queue does not
+    # mean we are done; wait for two idle passes:
+    live = logs[:]
+    idle_passes = 0
+    while len(live) and idle_passes < 2 and time.time() < tend:
+        wrote = False
+        # hand each queue an equal share of what is left of the
+        # budget, so slow writes on one can not consume all of it
+        # and leave the other never drained at all:
+        share = max(0, tend - time.time()) / len(live)
+        for log in live[:]:
+            (attr, queue, logfile) = log
+            (ok, queue_wrote) = drain_log_queue(queue,
+                                                logfile,
+                                                time.time() + share)
+            wrote = wrote or queue_wrote
+            if not ok:
+                # writing this log is failing; stop retrying it,
+                # but keep draining the other one.  main_loop may
+                # not have stopped, so stop it filling this queue
+                setattr(mpstate, attr, DiscardQueue())
+                live.remove(log)
+        if wrote:
+            idle_passes = 0
+        else:
+            idle_passes += 1
+    if time.time() >= tend:
+        print("Timed out draining log queues; the end of the log may be missing")
+    for (attr, queue, logfile) in live:
+        if not flush_log(logfile):
+            # as for a write failing above
+            setattr(mpstate, attr, DiscardQueue())
 
 
 # If state_basedir is NOT set then paths for logs and aircraft
@@ -1600,23 +1645,189 @@ if __name__ == '__main__':
 
     mpstate.rl = rline.rline("MAV> ", mpstate)
 
-    def quit_handler(signum=None, frame=None):
-        # print('Signal handler called with signal', signum)
-        if mpstate.status.stop_event.is_set():
-            print('Clean shutdown impossible, forcing an exit')
-            sys.exit(0)
-        else:
-            mpstate.status.stop_event.set()
-            if quit_handler.in_input_loop:
-                # the main thread is blocked in readline waiting for a
-                # command.  That read is simply restarted when we return
-                # from here (PEP 475), so the flag we just set would go
-                # unnoticed until the user happened to press enter -
-                # meaning we would never act on the signal at all.
-                # Raising instead aborts the read:
-                raise ShutdownRequested()
+    # Signal handling.  When waiting for a command the main thread sits
+    # in readline, and getting it out of there reliably takes some care:
+    #
+    #  - a read interrupted by a signal is simply restarted once the
+    #    handler returns (PEP 475), so the handler has to raise to end
+    #    it; setting stop_event alone would go unnoticed until the user
+    #    happened to press enter
+    #  - a signal sent to the process can be delivered to any of its
+    #    threads, and Python only runs the handler once the main thread
+    #    next executes bytecode - which readline's select() does not do
+    #    unless it is itself interrupted
+    #  - CPython silently discards an exception raised while readline is
+    #    running our tab-completer
+    #  - when one handler raises, input() runs any others still pending
+    #    with that exception set, which fails with SystemError
+    #
+    # So the handlers for the signals themselves only record what was
+    # asked for, and poke_handler is the one place that raises.  A
+    # forwarder thread interrupts the main thread with POKE_SIGNAL:
+    # once when woken through the wakeup fd, which happens whichever
+    # thread took the signal, so that the handler gets to run; and then
+    # repeatedly, once the handler has recorded a request, until the
+    # main loop has acted on it.
+    signal_state = SimpleNamespace(
+        # when the first fatal signal (or other shutdown) was seen
+        shutdown_started=None,
+        # interactive Ctrl-Cs received, and how many of them the main
+        # loop has acted on.  Counts rather than a flag, so that one
+        # arriving just as the main loop takes the last can not be lost
+        interrupts=0,
+        interrupts_handled=0,
+        # 'startup', then 'running' while the main loop is (and so will
+        # act on that), then 'cleanup'
+        phase='startup',
+        # the forwarder thread's request pipe, if it is running
+        request_fd=None,
+        # how many times our handlers for the signals themselves have run
+        handler_runs=0,
+    )
 
-    quit_handler.in_input_loop = False
+    def handler_print(msg):
+        # we can have interrupted a print() on this very thread, which
+        # makes this one raise; the message is not worth dying for
+        try:
+            print(msg)
+            sys.stdout.flush()
+        except Exception:
+            pass
+
+    def in_input_loop(frame):
+        '''was the main thread interrupted inside input_loop()?  Asking
+        the stack, rather than keeping a flag, means the answer can not
+        go stale whichever bytecode the signal lands on'''
+        while frame is not None:
+            if frame.f_code is input_loop.__code__:
+                return True
+            frame = frame.f_back
+        return False
+
+    def interrupts_pending():
+        return signal_state.interrupts > signal_state.interrupts_handled
+
+    def raise_to_end_input():
+        if interrupts_pending():
+            # the main loop counts this as handled once it has caught it
+            raise KeyboardInterrupt()
+        raise ShutdownRequested()
+
+    def poke_handler(signum=None, frame=None):
+        if (in_input_loop(frame) and
+                (interrupts_pending() or mpstate.status.stop_event.is_set())):
+            raise_to_end_input()
+
+    def request_pokes():
+        '''ask the forwarder to keep interrupting the main thread until
+        what we have just recorded is acted on'''
+        try:
+            os.write(signal_state.request_fd, b'!')
+        except OSError:
+            # full, so the forwarder has a request pending already
+            pass
+
+    def start_forwarder():
+        '''start the forwarder thread, if we can'''
+        if POKE_SIGNAL is None or not hasattr(signal, 'pthread_kill'):
+            return
+        (wakeup_r, wakeup_w) = os.pipe()
+        (request_r, request_w) = os.pipe()
+        os.set_blocking(wakeup_w, False)
+        os.set_blocking(request_w, False)
+        signal.signal(POKE_SIGNAL, poke_handler)
+        signal.set_wakeup_fd(wakeup_w, warn_on_full_buffer=False)
+        main_ident = threading.get_ident()
+
+        def poke():
+            signal.pthread_kill(main_ident, POKE_SIGNAL)
+
+        def wanted():
+            if interrupts_pending():
+                # until the main loop has acted on it, wherever the
+                # main thread is now
+                return True
+            return (mpstate.status.stop_event.is_set() and
+                    in_input_loop(sys._current_frames().get(main_ident)))
+
+        def forwarder():
+            while True:
+                runs = signal_state.handler_runs
+                (ready, _, _) = select.select([wakeup_r, request_r], [], [])
+                if wakeup_r in ready:
+                    received = os.read(wakeup_r, 256)
+                    if any(s != POKE_SIGNAL for s in received):
+                        # a handler is waiting to run on the main thread.
+                        # A poke landing just before readline starts its
+                        # select() is lost, so keep on until the handler
+                        # has run - allowing for it having already run
+                        # for an earlier signal this one merged with
+                        deadline = time.monotonic() + 1
+                        while (signal_state.handler_runs == runs and
+                               time.monotonic() < deadline):
+                            poke()
+                            time.sleep(0.1)
+                if request_r in ready:
+                    os.read(request_r, 256)
+                    while wanted():
+                        poke()
+                        time.sleep(0.1)
+
+        threading.Thread(target=forwarder, name='signal_forwarder',
+                         daemon=True).start()
+        signal_state.request_fd = request_w
+
+    def interrupt_handler(signum=None, frame=None):
+        '''an interactive Ctrl-C'''
+        signal_state.handler_runs += 1
+        if signal_state.phase == 'cleanup':
+            # we are already shutting down; treat it as we would a
+            # repeated fatal signal
+            quit_handler(signum, frame)
+            return
+        if signal_state.phase == 'startup':
+            # just interrupt whatever is going on
+            raise KeyboardInterrupt()
+        signal_state.interrupts += 1
+        if signal_state.request_fd is None:
+            raise_to_end_input()
+        request_pokes()
+
+    def quit_handler(signum=None, frame=None):
+        '''a fatal signal'''
+        signal_state.handler_runs += 1
+        now = time.monotonic()
+        repeat = signal_state.shutdown_started is not None
+        if repeat and now - signal_state.shutdown_started >= SHUTDOWN_GRACE:
+            # wherever we are stuck - even still waiting for input
+            handler_print('Clean shutdown impossible, forcing an exit')
+            # not sys.exit(): SystemExit is swallowed if we have
+            # interrupted interpreter shutdown joining a thread, which
+            # is exactly where a stuck shutdown is likely to be
+            os._exit(0)
+        if not repeat:
+            signal_state.shutdown_started = now
+        mpstate.status.stop_event.set()
+        if in_input_loop(frame):
+            # stop waiting for input.  This may be a repeat because our
+            # first attempt was lost, so no message for it
+            if signal_state.request_fd is None:
+                raise_to_end_input()
+            request_pokes()
+            return
+        # otherwise the main thread checks stop_event before it next
+        # waits for input
+        if repeat:
+            handler_print("Shutdown in progress; signal again after %us to force an exit" %
+                          SHUTDOWN_GRACE)
+
+    def excepthook(*args):
+        # the main thread is dying; the other threads have to be told,
+        # as exit waits for them before multiprocessing's atexit
+        # handler runs
+        mpstate.status.stop_event.set()
+        sys.__excepthook__(*args)
+    sys.excepthook = excepthook
 
     # Listen for kill signals to cleanly shutdown modules
     fatalsignals = [signal.SIGTERM]
@@ -1627,9 +1838,12 @@ if __name__ == '__main__':
         pass
     if opts.daemon or opts.non_interactive: # SIGINT breaks readline parsing - if we are interactive, just let things die
         fatalsignals.append(signal.SIGINT)
+    else:
+        signal.signal(signal.SIGINT, interrupt_handler)
 
     for sig in fatalsignals:
         signal.signal(sig, quit_handler)
+    start_forwarder()
 
     mpstate.load_module('link', quiet=True)
 
@@ -1761,6 +1975,29 @@ if __name__ == '__main__':
     else:
         print("Note: Not saving telemetry logs")
 
+    def handle_interrupt():
+        '''act on one Ctrl-C'''
+        if interrupts_pending():
+            signal_state.interrupts_handled += 1
+        if mpstate.settings.requireexit:
+            print("Interrupt caught.  Use 'exit' to quit MAVProxy.")
+
+            # Just lost the map and console, get them back:
+            for (m, pm) in mpstate.modules:
+                if m.name in ["map", "console"]:
+                    if hasattr(m, 'unload'):
+                        try:
+                            m.unload()
+                        except Exception:
+                            pass
+                    reload(m)
+                    m.init(mpstate)
+
+        else:
+            # leave the loop through the module cleanup below, rather
+            # than skipping it
+            mpstate.status.stop_event.set()
+
     # run main loop as a thread
     mpstate.status.thread = threading.Thread(target=main_loop, name='main_loop')
     mpstate.status.thread.daemon = True
@@ -1768,39 +2005,37 @@ if __name__ == '__main__':
 
     # use main program for input. This ensures the terminal cleans
     # up on exit
+    signal_state.phase = 'running'
     while not mpstate.status.stop_event.is_set():
+        if interrupts_pending():
+            # a Ctrl-C which arrived while we were not waiting for input
+            handle_interrupt()
+            continue
         try:
             if opts.daemon or opts.non_interactive:
                 time.sleep(0.1)
             else:
-                quit_handler.in_input_loop = True
-                try:
-                    input_loop()
-                finally:
-                    quit_handler.in_input_loop = False
+                input_loop()
         except ShutdownRequested:
             # a fatal signal arrived while we were waiting for input;
             # stop_event is already set, so fall through to the cleanup
             # below
             pass
+        except SystemError as ex:
+            # a signal handler ran while our exception was on its way
+            # out of input(); see the signal handling above
+            if isinstance(ex.__cause__, KeyboardInterrupt):
+                handle_interrupt()
+            elif not isinstance(ex.__cause__, ShutdownRequested):
+                raise
         except KeyboardInterrupt:
-            if mpstate.settings.requireexit:
-                print("Interrupt caught.  Use 'exit' to quit MAVProxy.")
-
-                # Just lost the map and console, get them back:
-                for (m, pm) in mpstate.modules:
-                    if m.name in ["map", "console"]:
-                        if hasattr(m, 'unload'):
-                            try:
-                                m.unload()
-                            except Exception:
-                                pass
-                        reload(m)
-                        m.init(mpstate)
-
-            else:
-                mpstate.status.stop_event.set()
-                sys.exit(1)
+            handle_interrupt()
+    signal_state.phase = 'cleanup'
+    signal_state.interrupts_handled = signal_state.interrupts
+    if signal_state.shutdown_started is None:
+        # a shutdown by some other means - the exit command, or Ctrl-C -
+        # gets the same grace against a repeat signal
+        signal_state.shutdown_started = time.monotonic()
 
     if opts.profile:
         yappi.get_func_stats().print_all()
@@ -1810,6 +2045,11 @@ if __name__ == '__main__':
     for (m, pm) in mpstate.modules:
         if hasattr(m, 'unload'):
             print("Unloading module %s" % m.name)
-            m.unload()
+            try:
+                m.unload()
+            except Exception as ex:
+                # e.g. its child process was already killed by the
+                # same Ctrl-C; that must not cost us the other modules
+                print("Unloading module %s failed: %s" % (m.name, ex))
 
     sys.exit(1)
