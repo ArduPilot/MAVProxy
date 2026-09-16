@@ -709,13 +709,21 @@ class LinkModule(mp_module.MPModule):
 
         return True
 
-    mav_type_planes = [
-        mavutil.mavlink.MAV_TYPE_FIXED_WING,
-        mavutil.mavlink.MAV_TYPE_VTOL_QUADROTOR,
-        mavutil.mavlink.MAV_TYPE_VTOL_TILTROTOR,
+    possible_plane_types = [
+        "FIXED_WING",
+        "FLAPPING_WING",
+        "VTOL_TAILSITTER_DUOROTOR",
+        "VTOL_TAILSITTER_QUADROTOR",
+        "VTOL_TILTROTOR",
+        "VTOL_FIXEDROTOR",
+        "VTOL_TAILSITTER",
+        "VTOL_TILTWING",
+
+        "VTOL_DUOROTOR",  # renamed to VTOL_TAILSITTER_DUOROTOR
+        "VTOL_QUADROTOR",  # renamed to VTOL_TAILSITTER_QUADROTOR
     ]
-    # VTOL_DUOROTOR was renamed to VTOL_TAILSITTER_DUOROTOR
-    for possible_plane_type in "VTOL_DUOROTOR", "VTOL_TAILSITTER_DUOROTOR":
+    mav_type_planes = []
+    for possible_plane_type in possible_plane_types:
         t = f"MAV_TYPE_{possible_plane_type}"
         attr = getattr(mavutil.mavlink, t, None)
         if attr is None:
