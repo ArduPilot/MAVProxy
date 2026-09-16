@@ -427,6 +427,7 @@ class ElementManager:
         self.vehicle_type = DEFAULT_VEHICLE_TYPE
         self.terrain_height = None
         self.fence = []
+        self.rally = []
         self.fence_geometry = None
         self.kml_features = []
         self.kml_geometry = None
@@ -465,6 +466,8 @@ class ElementManager:
         self.home_amsl = amsl
         if self.fence:
             self.refresh_fence()
+        if self.rally:
+            self.refresh_rally()
         if self.kml_features:
             self.refresh_kml()
 
@@ -905,11 +908,20 @@ class ElementManager:
             self.refresh_kml()
 
     def set_rally(self, pts):
-        '''pts: list of (lat,lon,alt_rel)'''
-        if not pts:
+        '''pts: list of (lat, lon, amsl, alt): the AMSL altitude a return to
+        launch goes to the point at, or None where that is not known, and
+        the altitude the point carries, which is taken to be above home
+        where there is nothing better'''
+        self.rally = list(pts)
+        self.refresh_rally()
+
+    def refresh_rally(self):
+        if not self.rally:
             self._replace('rally', [])
             return
-        markers = [self._enu(lat, lon, self.home_amsl + alt) for (lat, lon, alt) in pts]
+        markers = [self._enu(lat, lon,
+                             self.home_amsl + alt if amsl is None else amsl)
+                   for (lat, lon, amsl, alt) in self.rally]
         self._replace('rally', [_points(markers, (0.4, 0.8, 1.0), 12)])
 
     def refresh_vehicle(self):

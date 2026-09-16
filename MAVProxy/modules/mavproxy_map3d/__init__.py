@@ -718,15 +718,18 @@ class Map3DModule(mp_module.MPModule):
         self.map.set_fence(shapes)
 
     def send_rally(self):
+        '''draw the rally points at the altitude a return to launch goes to
+        each at, where that can be worked out, and above home otherwise'''
+        if self.map is None:
+            return
         try:
-            rally_mod = self.module('rally')
-            pts = []
-            for i in range(rally_mod.rallyloader.rally_count()):
-                r = rally_mod.rallyloader.rally_point(i)
-                pts.append((r.lat * 1.0e-7, r.lng * 1.0e-7, r.alt))
+            loader = self.module('rally').rallyloader
+            raw = [loader.rally_point(i) for i in range(loader.rally_count())]
         except Exception:
             return
-        self.map.set_rally(pts)
+        resolved = self.rally_points((0.0, 0.0, self.home_amsl))
+        self.map.set_rally([(lat, lon, amsl, r.alt) for
+                            ((lat, lon, amsl, _), r) in zip(resolved, raw)])
 
     @staticmethod
     def _kml_state(kml_mod):
@@ -829,6 +832,7 @@ class Map3DModule(mp_module.MPModule):
             # a deferred terrain lookup landed: redo the terrain-frame items
             self.terrain_resolved = False
             self.send_mission()
+            self.send_rally()
         self.redraw_for_ground_heading()
         self.draw_flown_track()
 
@@ -880,7 +884,11 @@ class Map3DModule(mp_module.MPModule):
                 self.send_rally()
                 self.send_mission()
         elif mtype == 'HOME_POSITION':
-            self.home_amsl = m.altitude * 1.0e-3     # AMSL (mm -> m)
+            home_amsl = m.altitude * 1.0e-3     # AMSL (mm -> m)
+            if home_amsl != self.home_amsl:
+                self.home_amsl = home_amsl
+                # rally points above home, or the origin in its place
+                self.send_rally()
             self.map.set_home(self.home_amsl)
             self.set_home_position(m.latitude * 1.0e-7, m.longitude * 1.0e-7)
         elif mtype == 'ATTITUDE':

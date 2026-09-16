@@ -1167,6 +1167,55 @@ class TestDrawnTrack(object):
         # only the one above home moves when home does
         assert [p[3] for p in points] == [False, True, True]
 
+    def test_the_live_map_draws_rally_points_where_they_are_returned_to(
+            self):
+        pytest.importorskip("vtk")
+        import vtk
+        from types import SimpleNamespace
+        from MAVProxy.modules.mavproxy_map3d.elements import ElementManager
+        module = self.live_module('plane')
+        frame_valid = 1 << 2
+        # absolute, above home, above the EKF origin, above terrain
+        rally = [SimpleNamespace(lat=int(HOME[0] * 1e7),
+                                 lng=int(HOME[1] * 1e7), alt=100,
+                                 flags=frame_valid | (frame << 3))
+                 for frame in (0, 1, 2, 3)]
+        module.mpstate.module = lambda name: SimpleNamespace(
+            rallyloader=SimpleNamespace(rally_count=lambda: len(rally),
+                                        rally_point=lambda i: rally[i]))
+        drawn = ElementManager(vtk.vtkRenderer(), HOME[0], HOME[1], 1.0)
+        drawn.set_home(HOME[2])
+        module.map = SimpleNamespace(
+            is_alive=lambda: True, set_rally=drawn.set_rally,
+            set_home=drawn.set_home)
+        module.send_mission = lambda: None
+        module.send_fence = lambda: None
+        module.origin_amsl = 500.0
+        module.terrain_alt = lambda lat, lon: 300.0
+
+        def heights():
+            source = drawn.actors['rally'][0].GetMapper().GetInput()
+            return [source.GetPoint(i)[2]
+                    for i in range(source.GetNumberOfPoints())]
+        module.send_rally()
+        assert heights() == pytest.approx([100.0, HOME[2] + 100, 600.0, 400.0])
+
+        def message(kind, **fields):
+            m = SimpleNamespace(**fields)
+            m.get_type = lambda: kind
+            return m
+        # each drawn again as what it is above moves
+        module.mavlink_packet(message('HOME_POSITION', altitude=600 * 1000,
+                                      latitude=int(HOME[0] * 1e7),
+                                      longitude=int(HOME[1] * 1e7)))
+        assert heights() == pytest.approx([100.0, 700.0, 600.0, 400.0])
+        module.mavlink_packet(message('GPS_GLOBAL_ORIGIN', altitude=450 * 1000))
+        assert heights() == pytest.approx([100.0, 700.0, 550.0, 400.0])
+        # and where the terrain is not known yet, above home for now
+        module.terrain_alt = lambda lat, lon: None
+        module.send_rally()
+        assert heights() == pytest.approx([100.0, 700.0, 550.0, 700.0])
+
     def test_an_item_with_no_position_keeps_its_altitude(self, monkeypatch):
         flown = []
         real = plane_track.mission_track
