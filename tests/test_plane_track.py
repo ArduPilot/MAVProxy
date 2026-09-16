@@ -390,6 +390,34 @@ class TestMissionFlight(object):
         late = [p for p in leaving if 1500 < p[0] < 2500]
         assert max(abs(distance_to_line(p, centre, after)) for p in late) < 5.0
 
+    def test_a_loiter_lines_up_on_an_item_with_no_position_as_stored(self):
+        # Plane::verify_loiter_heading heads for the next item's location as
+        # the mission holds it, which is 0, 0 for one with no position: only
+        # starting that item puts it where the aircraft is.  From here that
+        # is west-north-west, as Location::get_distance_NE has it
+        here = (mavlink.MAV_CMD_NAV_LOITER_TURNS, 0.0, 0.0, HOME[2] + 100,
+                (1, 0, 80, 0))
+        (clat, clon) = offset(1000, 0)[:2]
+        scale = math.cos(math.radians(clat / 2.0))
+        towards = math.degrees(math.atan2(-clon * scale, -clat))
+        for radius in (100, -100):
+            flight = plane_track.MissionFlight(
+                (HOME[0], HOME[1]), HOME,
+                [loiter_turns(1000, 0, 1, radius, xtrack=1), here], PARAMS)
+            courses = []
+            real = flight.fly_loiter
+
+            def recording(index):
+                if index == 1:
+                    courses.append(math.degrees(flight.yaw))
+                return real(index)
+            flight.fly_loiter = recording
+            assert flight.run() is not None
+            (course,) = courses
+            # within ArduPlane's 10 degrees, and the aircraft's turn since
+            assert mp_util.wrap_180(course - towards) == pytest.approx(
+                0, abs=15)
+
     def test_param4_crosstracks_from_where_the_loiter_is_left(self):
         centre = (0.0, 3000.0)
         after = (3000.0, 3000.0)

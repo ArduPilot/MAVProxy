@@ -755,12 +755,26 @@ class MissionFlight(object):
                 if following is None:
                     return True
                 if self.lined_up(centre, flown, direction, swept,
-                                 self.location(self.items[following])[0]):
+                                 self.lineup_target(self.items[following],
+                                                    centre)):
                     if exit_from_here:
                         self.next_wp = (self.position, centre_amsl)
                     return True
             self.fly(self.l1.lateral_acceleration, NAV_PERIOD)
         return False
+
+    def lineup_target(self, item, centre):
+        '''where Plane::verify_loiter_heading lines a loiter's exit up with:
+        the next item's location as the mission holds it, which for one with
+        no position of its own is 0, 0 -- only starting it puts it where the
+        aircraft is -- as Location::get_distance_NE measures it from the
+        loiter's centre, the longitude scaled at the latitude between them'''
+        (command, lat, lon, amsl, params) = item
+        (clat, clon) = self.latlon(centre)
+        scale = max(math.cos(math.radians((lat + clat) / 2.0)), 0.01)
+        return (centre[0] + (lat - clat) * 1.0e7 * LOCATION_SCALING_FACTOR,
+                centre[1] + wrap_longitude(lon - clon) * 1.0e7 *
+                LOCATION_SCALING_FACTOR * scale)
 
     def lined_up(self, centre, radius, direction, swept, target):
         '''ModeLoiter::isHeadingLinedUp'''
