@@ -35,6 +35,10 @@ TAKEOFF_HEADING_REDRAW = 2.0
 # nor for home moving less than this, in metres, which it does by the GPS
 # wandering while ArduPlane keeps setting it before arming
 HOME_MOVE_CHANGE = 10.0
+# a VTOL landing approach is flown into the wind, whose direction the
+# vehicle's estimate wanders about: a mission landing so is flown again for
+# a change of this many degrees
+APPROACH_CHANGE = 10.0
 
 
 def bgr_to_rgb(bgr, default=(1.0, 0.0, 1.0)):
@@ -459,6 +463,11 @@ class Map3DModule(mp_module.MPModule):
         # whether the path flown has been asked for by name since it was
         # last said it could not be drawn for this vehicle
         self.flown_asked = False
+        # the course of a VTOL landing approach, into the wind the vehicle
+        # last said it estimates, to APPROACH_CHANGE; and whether the path
+        # on screen was flown with it
+        self.approach = None
+        self.approach_used = False
 
     @staticmethod
     def same_home(home, other):
@@ -521,6 +530,13 @@ class Map3DModule(mp_module.MPModule):
         key = (relative, tuple(sorted(params.items())), self.ground_heading,
                tuple((lat, lon, keyed_alt(amsl, fixed))
                      for (lat, lon, amsl, fixed) in points))
+        # only a mission which lands on a VTOL approach is flown again as
+        # the wind changes
+        approach = None
+        self.approach_used = plane_track.uses_vtol_approach(items, params)
+        if self.approach_used:
+            approach = self.approach
+            key += (approach,)
         (cached_key, cached_track, cached_home) = self.plane_track
         if cached_key == key and self.same_home(home, cached_home):
             self.track_wanted = None
@@ -535,7 +551,7 @@ class Map3DModule(mp_module.MPModule):
         self.track_wanted = (key, home, home, items, any(moves))
         with self.track_lock:
             self.track_request = (key, home, list(items), params,
-                                  self.ground_heading, rally)
+                                  self.ground_heading, rally, approach)
             if self.track_thread is None:
                 self.track_thread = threading.Thread(target=self.fly_tracks,
                                                      daemon=True)
@@ -614,10 +630,11 @@ class Map3DModule(mp_module.MPModule):
                 if request is None:
                     self.track_thread = None
                     return
-            (key, home, items, params, heading, rally) = request
+            (key, home, items, params, heading, rally, approach) = request
             try:
                 track = plane_track.mission_track(home, items, params,
-                                                  heading, rally=rally)
+                                                  heading, rally=rally,
+                                                  approach=approach)
             except Exception as ex:
                 # drawn from its items instead; the thread carries on
                 print("map3d: could not fly the mission: %s" % ex)
@@ -886,6 +903,16 @@ class Map3DModule(mp_module.MPModule):
                 self.origin_amsl = m.Alt
                 self.send_rally()
                 self.send_mission()
+        elif mtype == 'WIND':
+            # where the wind comes from, which is the course ArduPlane
+            # works out for a VTOL landing approach, by the same sum
+            approach = (round(m.direction / APPROACH_CHANGE) *
+                        APPROACH_CHANGE)
+            approach = (approach + 180.0) % 360.0 - 180.0
+            if approach != self.approach:
+                self.approach = approach
+                if self.approach_used:
+                    self.send_mission()
         elif mtype == 'HOME_POSITION':
             home_amsl = m.altitude * 1.0e-3     # AMSL (mm -> m)
             if home_amsl != self.home_amsl:

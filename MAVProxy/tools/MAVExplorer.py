@@ -702,13 +702,18 @@ def mission_items_from_cmds(items, started_at=None, flown_from=None):
     return mission
 
 
+# what ArduPlane says as it picks the course of a VTOL landing approach
+VTOL_APPROACH_MESSAGE = 'Selected an approach path of '
+
+
 def mission_from_log(mlog, condition=None):
     '''the flight path in a log, the mission the log ends with, that
     mission's CMD entries keyed by sequence -- every one of them, where the
     mission drawn has only the ones with a position -- by sequence, the
     index into the path at which the log says each of its items began, the
-    rally points the log ends with, as (lat, lon, alt, flags), and the EKF
-    origin, which a rally point's altitude may be measured from.
+    rally points the log ends with, as (lat, lon, alt, flags), the EKF
+    origin, which a rally point's altitude may be measured from, and the
+    course of the last VTOL landing approach the vehicle announced, or None.
 
     A log carries the whole mission again every time one is uploaded, and
     once more when it starts, so the items are kept by sequence number and
@@ -731,6 +736,7 @@ def mission_from_log(mlog, condition=None):
     # they are kept by sequence, and only the ones a smaller total leaves
     # out are dropped
     rally = {}
+    approach = None
     while True:
         m = mlog.recv_match(type=['POS', 'CMD', 'MSG', 'ORGN', 'RALY'],
                             condition=condition)
@@ -760,6 +766,12 @@ def mission_from_log(mlog, condition=None):
                 items = {}
                 flown_from = {}
                 started = {}
+            elif m.Message.startswith(VTOL_APPROACH_MESSAGE):
+                # the course the vehicle took into the wind it had then
+                try:
+                    approach = float(m.Message[len(VTOL_APPROACH_MESSAGE):])
+                except ValueError:
+                    pass
             elif m.Message == 'New rally':
                 # written before the whole table, even an empty one: a
                 # cleared table is this and no points at all
@@ -787,7 +799,7 @@ def mission_from_log(mlog, condition=None):
         items, started_at=(path[0][0], path[0][1]) if path else None,
         flown_from=flown_from)
     return (path, mission, items, started,
-            [rally[seq] for seq in sorted(rally)], origin)
+            [rally[seq] for seq in sorted(rally)], origin, approach)
 
 
 def takeoff_course(path, items, started):
@@ -833,7 +845,8 @@ def rally_point_amsl(lat, lon, alt, flags, home_amsl, origin=None):
 
 
 def plane_mission_track(cmds, mission, started_at, params=None, mav_type=None,
-                        path=None, started=None, rally=None, origin=None):
+                        path=None, started=None, rally=None, origin=None,
+                        approach=None):
     '''the path a plane flies a log's mission along, as (lat, lon, amsl)
     points, or None for a vehicle which is not a plane or a mission which
     cannot be flown through.
@@ -847,7 +860,11 @@ def plane_mission_track(cmds, mission, started_at, params=None, mav_type=None,
     the mission's first item beginning, the flight starts there instead,
     and a fixed-wing takeoff holds the course the log shows it flown on.
     rally is the log's rally points, which a return to launch may go to, and
-    origin the EKF origin one of them may be measured from
+    origin the EKF origin one of them may be measured from.  approach is the
+    course of a VTOL landing approach, which the vehicle flies into the wind
+    it has then: the one the log says it took, where it says so, and
+    otherwise that of still air, since the wind at some other time says
+    little about it
     '''
     if mp_util.vehicle_type_name(mav_type) != 'plane':
         return None
@@ -889,7 +906,7 @@ def plane_mission_track(cmds, mission, started_at, params=None, mav_type=None,
                                                 origin))
                     for (lat, lon, alt, flags) in (rally or [])]
     return plane_track.mission_track(home, items, params, heading, start,
-                                     rally_points)
+                                     rally_points, approach)
 
 
 def path_view(path):
@@ -941,8 +958,8 @@ def cmd_map3d(args):
         return
 
     mlog = mestate.mlog
-    (path, mission, cmds, started, rally, origin) = mission_from_log(
-        mlog, mestate.settings.condition)
+    (path, mission, cmds, started, rally, origin,
+     approach) = mission_from_log(mlog, mestate.settings.condition)
     mlog.rewind()
 
     if len(path) == 0:
@@ -967,7 +984,7 @@ def cmd_map3d(args):
             return plane_mission_track(cmds, mission,
                                        (path[0][0], path[0][1], ground0),
                                        params, mav_type, path, started,
-                                       rally, origin)
+                                       rally, origin, approach)
         if mestate.settings.missionpath == 'flown':
             track = fly()
             if (track is None and

@@ -650,7 +650,7 @@ class TestLogMissionItems(object):
     def test_a_log_draws_the_last_mission_it_holds(self):
         first = HERE
         second = mp_util.gps_newpos(HERE[0], HERE[1], 0, 5000)
-        (path, mission, _, _, _, _) = self.module().mission_from_log(
+        (path, mission, _, _, _, _, _) = self.module().mission_from_log(
             self.log(*(self.dump(first, 4) + self.dump(second, 2))))
         # just the second mission, even though it is the shorter of the two
         assert len(mission) == 2
@@ -658,7 +658,7 @@ class TestLogMissionItems(object):
 
     def test_a_cleared_mission_draws_nothing(self):
         # clearing the mission writes the message and then no items at all
-        (path, mission, _, _, _, _) = self.module().mission_from_log(
+        (path, mission, _, _, _, _, _) = self.module().mission_from_log(
             self.log(*(self.dump(HERE, 4) +
                        [self.message('MSG', Message='New mission')])))
         assert mission == []
@@ -672,7 +672,7 @@ class TestLogMissionItems(object):
             return self.message('CMD', CNum=seq, CId=command, Lat=lat,
                                 Lng=lng, Alt=alt, Frame=3, Prm1=0, Prm2=0,
                                 Prm3=0, Prm4=0)
-        (path, mission, _, _, _, _) = self.module().mission_from_log(self.log(
+        (path, mission, _, _, _, _, _) = self.module().mission_from_log(self.log(
             self.message('POS', Lat=HERE[0], Lng=HERE[1], Alt=584.0),
             self.message('MSG', Message='New mission'),
             cmd(0, m.MAV_CMD_NAV_WAYPOINT, HERE[0], HERE[1], 584.0),
@@ -696,7 +696,7 @@ class TestLogMissionItems(object):
             return self.message('CMD', CNum=seq, CId=command, Lat=lat,
                                 Lng=lng, Alt=alt, Frame=frame, Prm1=0,
                                 Prm2=0, Prm3=0, Prm4=0)
-        (path, mission, cmds, _, _, _) = self.module().mission_from_log(self.log(
+        (path, mission, cmds, _, _, _, _) = self.module().mission_from_log(self.log(
             self.message('POS', Lat=HERE[0], Lng=HERE[1], Alt=0.1),
             self.message('MSG', Message='New mission'),
             cmd(0, m.MAV_CMD_NAV_WAYPOINT, 0.0, 0.0, 0.0, 0),
@@ -718,7 +718,7 @@ class TestLogMissionItems(object):
         second = [m for m in self.dump(
             mp_util.gps_newpos(HERE[0], HERE[1], 0, 5000), 2)
             if m.get_type() == 'CMD']
-        (path, mission, _, _, _, _) = self.module().mission_from_log(
+        (path, mission, _, _, _, _, _) = self.module().mission_from_log(
             self.log(*(first + second)))
         assert len(mission) == 2
 

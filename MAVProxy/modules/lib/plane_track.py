@@ -58,9 +58,19 @@ PARAMETERS = {
     'Q_OPTIONS': ([('Q_OPTIONS', 1.0)], 0.0),
     'Q_RTL_MODE': ([('Q_RTL_MODE', 1.0)], 0.0),
     'Q_RTL_ALT': ([('Q_RTL_ALT', 1.0)], 15.0),
+    'Q_FW_LND_APR_RAD': ([('Q_FW_LND_APR_RAD', 1.0)], 0.0),
+    'Q_TRANS_DECEL': ([('Q_TRANS_DECEL', 1.0)], 2.0),
 }
 # QuadPlane's Q_OPTIONS bit for flying NAV_TAKEOFF as a fixed-wing takeoff
 Q_OPTION_ALLOW_FW_TAKEOFF = 1 << 1
+# QuadPlane's Q_OPTIONS bit for landing a mission's NAV_VTOL_LAND after a
+# fixed-wing approach, which the item's param1 can ask for too
+Q_OPTION_MISSION_LAND_FW_APPROACH = 1 << 4
+NAV_VTOL_LAND_OPTIONS_FW_SPIRAL_APPROACH = 1
+# the course of a VTOL landing approach where no wind is known: ArduPlane
+# takes it as into the wind, atan2(-wind.y, -wind.x), which a wind of zero
+# makes due south
+STILL_AIR_APPROACH = -180.0
 # QuadPlane::RTL_MODE, what Q_RTL_MODE makes of a return to launch
 Q_RTL_DISABLED = 0
 Q_RTL_SWITCH_QRTL = 1
@@ -301,7 +311,7 @@ class MissionFlight(object):
     '''ArduPlane flying a mission in AUTO, from home'''
 
     def __init__(self, origin, home, items, params, heading=None, start=None,
-                 rally=None):
+                 rally=None, approach=None):
         self.origin = origin
         self.lon_scale = math.cos(math.radians(origin[0]))
         self.params = params
@@ -331,6 +341,12 @@ class MissionFlight(object):
         self.q_options = int(parameter(params, 'Q_OPTIONS'))
         self.q_rtl_mode = int(parameter(params, 'Q_RTL_MODE'))
         self.q_rtl_alt = parameter(params, 'Q_RTL_ALT')
+        self.q_approach_radius = parameter(params, 'Q_FW_LND_APR_RAD')
+        self.q_trans_decel = parameter(params, 'Q_TRANS_DECEL')
+        # the course a VTOL landing approach is flown on
+        if approach is None:
+            approach = STILL_AIR_APPROACH
+        self.approach = math.radians(approach)
         # the jumps followed so far, by index
         self.jumps_taken = set()
         self.home = self.local(home[0], home[1])
@@ -861,6 +877,11 @@ class MissionFlight(object):
             else:
                 return None
             self.set_next_wp(location)
+            if spiral_approach(command, self.items[index][4], self.quadplane,
+                               self.q_options):
+                if not self.fly_vtol_approach(location):
+                    return None
+                break
             if command in LOITER_COMMANDS:
                 finished = self.fly_loiter(index)
                 if not finished and command == mavlink.MAV_CMD_NAV_LOITER_UNLIM:
@@ -875,6 +896,111 @@ class MissionFlight(object):
             index = self.next_nav_index(index, take=True, passed=passed)
         self.add_point(force=True)
         return self.points
+
+    def loiter_step(self, centre, radius, direction):
+        '''fly on by a step, circling centre'''
+        flown = self.l1.loiter_radius(radius, self.amsl, self.airspeed)
+        self.l1.update_loiter(self.position, self.velocity(), self.yaw,
+                              centre, flown, direction)
+        self.update_target_altitude()
+        self.fly(self.l1.lateral_acceleration, NAV_PERIOD)
+
+    def stopping_distance(self):
+        '''QuadPlane::stopping_distance_m'''
+        return self.speed() ** 2 / (2 * max(self.q_trans_decel, 0.1))
+
+    def fly_vtol_approach(self, location, rtl=False):
+        '''Plane::verify_landing_vtol_approach: circle to the altitude of
+        location, at Q_FW_LND_APR_RAD -- WP_LOITER_RAD where that is zero --
+        the way its sign says; break out of the circle square to the
+        approach course; fly the approach line through location, and land
+        there once near enough and lined up.  A return to launch, with rtl,
+        first circles where it returns to until it is on the circle, and
+        then goes down to Q_RTL_ALT.  The path ends above the landing, at
+        the altitude it was approached at.  False if the aircraft never
+        gets there'''
+        mavlink = mavutil.mavlink
+        radius = self.q_approach_radius or self.loiter_radius
+        direction = -1 if radius < 0 else 1
+        radius = abs(radius)
+        (centre, _) = location
+        lap = 2 * math.pi * max(radius, 1.0) * 1.5 / max(self.speed(), 1.0)
+        # there is no circling for ever before the approach
+        self.crosstrack = False
+        if rtl:
+            limit = self.time_limit(MAX_LAPS * lap)
+            while not self.l1.circling:
+                if self.time >= limit:
+                    return False
+                self.loiter_step(centre, radius, direction)
+            # do_RTL(): on to where a return goes, at Q_RTL_ALT above home
+            self.next_wp_crosstrack = False
+            location = self.rtl_location(self.home_amsl + self.q_rtl_alt)
+            (centre, _) = location
+            self.set_next_wp(location)
+            self.crosstrack = False
+        # LOITER_TO_ALT, flown as a loiter to altitude which nothing follows
+        (lat, lon) = self.latlon(centre)
+        self.items.append((mavlink.MAV_CMD_NAV_LOITER_TO_ALT,
+                           lat, lon, location[1],
+                           (0.0, direction * radius, 0.0, 0.0)))
+        if not self.fly_loiter(len(self.items) - 1):
+            return False
+        limit = self.time_limit(MAX_LAPS * lap)
+        # ENSURE_RADIUS: out onto the circle, if inside it
+        while True:
+            distance = norm(minus(centre, self.position))
+            if not (distance < radius and abs(distance - radius) > 5.0):
+                break
+            if self.time >= limit:
+                return False
+            self.loiter_step(centre, radius, direction)
+        # WAIT_FOR_BREAKOUT: round until heading square to the approach
+        breakout = wrap_pi(self.approach +
+                           math.radians(270.0 if direction > 0 else 90.0))
+        while abs(wrap_pi(self.yaw - breakout)) >= math.radians(5.0):
+            if self.time >= limit:
+                return False
+            self.loiter_step(centre, radius, direction)
+        # APPROACH_LINE: the line 1km either side of the landing
+        self.set_next_wp(location)
+        along = (math.cos(self.approach), math.sin(self.approach))
+
+        def back(distance):
+            return (centre[0] - along[0] * distance,
+                    centre[1] - along[1] * distance)
+        (start, end) = (back(1000.0), back(-1000.0))
+        breakout_point = back(radius)
+        limit = self.time_limit()
+        while True:
+            self.l1.update_waypoint(self.position, self.velocity(), self.yaw,
+                                    start, end, NAV_PERIOD)
+            self.update_target_altitude()
+            past = path_proportion(self.position, start,
+                                   back(self.stopping_distance())) >= 1
+            half_radius = path_proportion(self.position, breakout_point,
+                                          centre) > 0.5
+            to_centre = minus(centre, self.position)
+            velocity = self.velocity()
+            lined_up = True
+            if norm(to_centre) > 0:
+                cosine = (dot(velocity, to_centre) /
+                          (norm(velocity) * norm(to_centre)))
+                lined_up = math.degrees(
+                    math.acos(min(max(cosine, -1.0), 1.0))) < 30.0
+            if past and (lined_up or half_radius):
+                break
+            if self.time >= limit:
+                return False
+            self.fly(self.l1.lateral_acceleration, NAV_PERIOD)
+        # VTOL_LANDING: QuadPlane::do_vtol_land, whose position controller
+        # takes the aircraft from here to where it lands, drawn straight
+        # there.  How far down it goes is the ground's, which is not known
+        # here, so the path ends above the landing at the approach altitude
+        self.position = centre
+        self.amsl = location[1]
+        self.add_point(force=True)
+        return True
 
     def fly_rtl(self, index):
         '''a return to launch, which ArduPlane flies in RTL mode, or QRTL
@@ -892,7 +1018,10 @@ class MissionFlight(object):
         else:
             location = self.rtl_location()
         self.set_next_wp(location)
-        if qrtl:
+        if self.quadplane and self.q_rtl_mode == Q_RTL_VTOL_APPROACH:
+            if not self.fly_vtol_approach(location, rtl=True):
+                return None
+        elif qrtl:
             # the aircraft flies at the point along a track from where it
             # turned for it (Plane::update_loiter_update_nav), and QRTL
             # takes it the rest of the way, to land there
@@ -911,6 +1040,30 @@ class MissionFlight(object):
             self.fly_loiter(len(self.items) - 1)
         self.add_point(force=True)
         return self.points
+
+
+def spiral_approach(command, params, quadplane, q_options):
+    '''QuadPlane::landing_with_fixed_wing_spiral_approach: whether command,
+    with params, is a VTOL landing flown in on a fixed-wing approach'''
+    return (quadplane and command == mavutil.mavlink.MAV_CMD_NAV_VTOL_LAND and
+            (bool(q_options & Q_OPTION_MISSION_LAND_FW_APPROACH) or
+             params[0] == NAV_VTOL_LAND_OPTIONS_FW_SPIRAL_APPROACH))
+
+
+def uses_vtol_approach(items, params):
+    '''whether flying items takes the course of a VTOL landing approach,
+    which is into the wind: a landing flown in on a fixed-wing approach, or
+    a return to launch which Q_RTL_MODE has approach its landing so'''
+    quadplane = parameter(params, 'Q_ENABLE') > 0
+    q_options = int(parameter(params, 'Q_OPTIONS'))
+    q_rtl_mode = int(parameter(params, 'Q_RTL_MODE'))
+    for (command, _, _, _, item_params) in items:
+        if spiral_approach(command, item_params, quadplane, q_options):
+            return True
+        if (quadplane and q_rtl_mode == Q_RTL_VTOL_APPROACH and
+                command == mavutil.mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH):
+            return True
+    return False
 
 
 def is_navigation_command(command):
@@ -1012,7 +1165,8 @@ def first_navigation_item(items):
     return None if index is None else index + 1
 
 
-def mission_track(home, items, params, heading=None, start=None, rally=None):
+def mission_track(home, items, params, heading=None, start=None, rally=None,
+                  approach=None):
     '''the path an ArduPlane flies a mission along, as (lat, lon, amsl)
     points, or None where it cannot be worked out.
 
@@ -1026,7 +1180,10 @@ def mission_track(home, items, params, heading=None, start=None, rally=None):
     ground course it has once it gets moving.  start is (lat, lon, amsl)
     where the aircraft is when the mission starts, where that is not home.
     rally is the vehicle's rally points, as (lat, lon, amsl), where it has
-    any, which a return to launch may go to instead of home.
+    any, which a return to launch may go to instead of home.  approach is
+    the course in degrees of a VTOL landing approach, which ArduPlane flies
+    into the wind it estimates, as MAVLink's WIND gives where it comes from;
+    STILL_AIR_APPROACH where none is given.
 
     The aircraft sets off from home, or start, towards the first item.
     Each DO_JUMP is followed the once, so a loop is drawn once however many
@@ -1042,7 +1199,7 @@ def mission_track(home, items, params, heading=None, start=None, rally=None):
         if least_flight_time(home, items, params, start) > MAX_FLIGHT_TIME:
             return None
         flight = MissionFlight((home[0], home[1]), home, list(items), params,
-                               heading, start, rally)
+                               heading, start, rally, approach)
         return flight.run()
     except (ValueError, ZeroDivisionError, OverflowError):
         return None

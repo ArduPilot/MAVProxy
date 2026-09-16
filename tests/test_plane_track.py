@@ -173,6 +173,168 @@ class TestWaypointMaxRadius(object):
         assert fly(items, dict(PARAMS, WP_MAX_RADIUS=1)) == fly(items)
 
 
+class TestVtolApproach(object):
+    """a QuadPlane's VTOL landing flown in on a fixed-wing approach:
+    Plane::verify_landing_vtol_approach"""
+
+    QUADPLANE = dict(PARAMS, Q_ENABLE=1)
+
+    def vtol_land(self, north, east, alt=60.0, option=1):
+        (lat, lon, amsl) = offset(north, east, alt)
+        return (mavlink.MAV_CMD_NAV_VTOL_LAND, lat, lon, amsl,
+                (option, 0, 0, 0))
+
+    def items(self, **kwargs):
+        # out east and back to land at home
+        return [waypoint(0, 2000, 150), self.vtol_land(0, 0, **kwargs)]
+
+    def landed(self, track):
+        '''where the fixed-wing flight hands over to the VTOL landing, from
+        the landing, where the path ends; the course it was on there; and
+        the path before, north and east of home'''
+        points = [local(p) for p in track]
+        end = points[-1]
+        pad = [i for (i, p) in enumerate(points)
+               if i > 10 and math.hypot(p[0] - end[0], p[1] - end[1]) < 0.5][0]
+        (a, b) = (points[pad - 2], points[pad - 1])
+        course = math.degrees(math.atan2(b[1] - a[1], b[0] - a[0]))
+        handover = (b[0] - end[0], b[1] - end[1])
+        bearing = math.degrees(math.atan2(handover[1], handover[0]))
+        return (handover, bearing, course, points[:pad])
+
+    def swept(self, points):
+        '''degrees swept clockwise about the pad'''
+        total = 0.0
+        for (a, b) in zip(points, points[1:]):
+            total += mp_util.wrap_180(math.degrees(math.atan2(b[1], b[0])) -
+                                      math.degrees(math.atan2(a[1], a[0])))
+        return total
+
+    def circling(self, before, radius):
+        '''what was flown from coming back near the landing until the
+        approach'''
+        back = [i for (i, p) in enumerate(before)
+                if i > len(before) // 3 and math.hypot(*p) < radius * 1.3]
+        return before[back[0]:]
+
+    def test_the_landing_is_circled_to_and_flown_in_to(self):
+        params = dict(self.QUADPLANE, Q_FW_LND_APR_RAD=250)
+        track = plane_track.mission_track(HOME, self.items(), params,
+                                          approach=0.0)
+        (handover, bearing, course, before) = self.landed(track)
+        # the landing's altitude, come down to on the way in as ArduPlane
+        # does, and the circle round it at Q_FW_LND_APR_RAD, clockwise:
+        # from the east, a quarter of the way round to fly north
+        assert min(p[2] for p in track[len(track) // 2:]) >= HOME[2] + 55.0
+        circling = self.circling(before, 250)
+        assert self.swept(circling) == pytest.approx(90.0, abs=30.0)
+        assert max(math.hypot(*p) for p in circling) > 250
+        # into the wind: north, from south of the landing, a stopping
+        # distance or so out, and within the 30 degrees ArduPlane takes as
+        # lined up
+        assert mp_util.wrap_180(bearing - 180.0) == pytest.approx(0, abs=15)
+        assert course == pytest.approx(0.0, abs=30.0)
+        assert 100.0 < math.hypot(*handover) < 250.0
+        # and it lands where the item is, at the altitude approached at
+        assert math.hypot(*local(track[-1])) < 0.5
+        assert track[-1][2] == pytest.approx(HOME[2] + 60.0, abs=1.0)
+
+    def test_it_is_flown_into_the_wind(self):
+        params = dict(self.QUADPLANE, Q_FW_LND_APR_RAD=250)
+        for approach in (0.0, 90.0, -135.0):
+            track = plane_track.mission_track(HOME, self.items(), params,
+                                              approach=approach)
+            (_, bearing, course, _) = self.landed(track)
+            assert mp_util.wrap_180(course - approach) == pytest.approx(
+                0.0, abs=30.0)
+            assert mp_util.wrap_180(bearing - (approach + 180)) == \
+                pytest.approx(0.0, abs=20.0)
+        # with no wind to go on, ArduPlane's sum comes to due south
+        track = plane_track.mission_track(HOME, self.items(), params)
+        (_, bearing, course, _) = self.landed(track)
+        assert mp_util.wrap_180(course - 180.0) == pytest.approx(0, abs=30)
+        assert mp_util.wrap_180(bearing) == pytest.approx(0, abs=20)
+
+    def test_the_circle_is_flown_the_way_its_radius_says(self):
+        # from the east to fly east: half way round, either way
+        for (radius, clockwise) in ((250, True), (-250, False)):
+            params = dict(self.QUADPLANE, Q_FW_LND_APR_RAD=radius)
+            track = plane_track.mission_track(HOME, self.items(), params,
+                                              approach=90.0)
+            swept = self.swept(self.circling(self.landed(track)[3], 250))
+            assert swept > 150 if clockwise else swept < -150
+        # and with no radius of its own, WP_LOITER_RAD's
+        track = plane_track.mission_track(HOME, self.items(),
+                                          self.QUADPLANE, approach=90.0)
+        radius = PARAMS['WP_LOITER_RAD']
+        circling = self.circling(self.landed(track)[3], radius)
+        assert min(math.hypot(*p) for p in circling) < radius * 1.3
+        assert self.swept(circling) > 150
+
+    def test_what_asks_for_it(self):
+        def circles(items, params):
+            # coming from the east, only circling takes it west of the pad
+            track = plane_track.mission_track(HOME, items, params,
+                                              approach=0.0)
+            return any(local(p)[1] < -40 for p in track)
+        # param1, or Q_OPTIONS for every VTOL landing
+        assert circles(self.items(option=1), self.QUADPLANE)
+        assert circles(self.items(option=0),
+                       dict(self.QUADPLANE, Q_OPTIONS=1 << 4))
+        # but not a VTOL landing asked for neither way, which is flown
+        # straight in, nor anything but a QuadPlane
+        assert not circles(self.items(option=0), self.QUADPLANE)
+        assert not circles(self.items(option=1), PARAMS)
+        items = [waypoint(0, 2000, 150), self.vtol_land(0, 0, option=1)]
+        assert plane_track.uses_vtol_approach(items, self.QUADPLANE)
+        assert not plane_track.uses_vtol_approach(items, PARAMS)
+        items[-1] = self.vtol_land(0, 0, option=0)
+        assert not plane_track.uses_vtol_approach(items, self.QUADPLANE)
+        assert plane_track.uses_vtol_approach(
+            items, dict(self.QUADPLANE, Q_OPTIONS=1 << 4))
+
+    def test_a_landing_where_the_aircraft_is_goes_out_to_the_circle(self):
+        # a VTOL landing with no position of its own is where the aircraft
+        # is when it starts, so the circle is started from its middle, and
+        # the aircraft goes out to it before breaking out onto the approach
+        # -- even arriving, as here, on the course it breaks out on: east,
+        # for a clockwise circle and an approach south
+        here = (mavlink.MAV_CMD_NAV_VTOL_LAND, 0.0, 0.0, HOME[2] + 60,
+                (1, 0, 0, 0))
+        params = dict(self.QUADPLANE, Q_FW_LND_APR_RAD=250)
+        track = plane_track.mission_track(
+            HOME, [waypoint(0, 2000, 60), here], params, approach=180.0)
+        landing = local(track[-1])
+        assert landing[1] > 1800
+        points = [local(p) for p in track]
+        arrived = [i for (i, p) in enumerate(points)
+                   if math.hypot(p[0] - landing[0], p[1] - landing[1]) < 30]
+        out = [math.hypot(p[0] - landing[0], p[1] - landing[1])
+               for p in points[arrived[0]:]]
+        assert max(out) > 245.0
+        # and comes in from the north, into the wind
+        last = points[-3]
+        assert last[0] > landing[0] + 50
+
+    def test_a_return_to_launch_can_land_so(self):
+        """Q_RTL_MODE 2: circle home at RTL_ALTITUDE, go down to Q_RTL_ALT,
+        and come in on the approach"""
+        rtl = (mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH, 0, 0, None, (0, 0, 0, 0))
+        items = [waypoint(0, 2000, 150), rtl]
+        params = dict(self.QUADPLANE, Q_RTL_MODE=2, Q_FW_LND_APR_RAD=200)
+        assert plane_track.uses_vtol_approach(items, params)
+        assert not plane_track.uses_vtol_approach(items, self.QUADPLANE)
+        track = plane_track.mission_track(HOME, items, params, approach=45.0)
+        (_, bearing, course, before) = self.landed(track)
+        assert course == pytest.approx(45.0, abs=30.0)
+        assert mp_util.wrap_180(bearing - 225.0) == pytest.approx(0, abs=20)
+        # it was round home at RTL_ALTITUDE before coming down
+        assert any(150 < math.hypot(*local(p)) < 300 and
+                   p[2] > HOME[2] + 90.0 for p in track[len(track) // 2:])
+        assert track[-1][2] == pytest.approx(HOME[2] + 15.0, abs=1.0)
+        assert math.hypot(*local(track[-1])) < 0.5
+
+
 class TestMissionFlight(object):
     '''ArduPlane's mission logic, flown'''
 
@@ -1668,7 +1830,7 @@ class TestDrawnTrack(object):
             self.pos(10, 0), self.message('MSG', Message='Mission: 1 Takeoff'),
             self.pos(10, 10), self.pos(10, 25), self.pos(10, 45),
             self.pos(10, 80)]))
-        (path, mission, cmds, started, _, _) = mx.mission_from_log(log)
+        (path, mission, cmds, started, _, _, _) = mx.mission_from_log(log)
         # east, from where the takeoff began, not from where the log did
         assert mx.takeoff_course(path, cmds, started) == pytest.approx(90.0, abs=1.0)
         assert mx.takeoff_course(path, cmds, {}) is None
@@ -1685,7 +1847,7 @@ class TestDrawnTrack(object):
             self.mission_dump(new_mission=False) +
             [self.pos(0, 60), self.message('MSG', Message='Mission: 1 Takeoff'),
              self.pos(40, 60), self.pos(80, 60)]))
-        (path, mission, cmds, started, _, _) = mx.mission_from_log(log)
+        (path, mission, cmds, started, _, _, _) = mx.mission_from_log(log)
         course = mx.takeoff_course(path, cmds, started)
         # north, the second takeoff, not east, the first
         assert mp_util.wrap_180(course) == pytest.approx(0.0, abs=1.0)
@@ -1709,7 +1871,7 @@ class TestDrawnTrack(object):
             raly(1, 2, old_lat, old_lon, 80, Flags=0),
             # written out again, as one point
             raly(0, 1, lat, lon, 150, Flags=0)]))
-        (path, mission, cmds, started, rally, _) = mx.mission_from_log(log)
+        (path, mission, cmds, started, rally, _, _) = mx.mission_from_log(log)
         assert rally == [(lat, lon, 150, 0)]
         mission = mx.resolve_mission_amsl(mission, HOME[2], PARAMS,
                                           mavlink.MAV_TYPE_FIXED_WING)
@@ -1730,7 +1892,7 @@ class TestDrawnTrack(object):
                          Alt=80, Flags=0),
             self.message('RALY', Tot=2, Seq=1, Lat=lat, Lng=lon, Alt=150,
                          Flags=0)]))
-        (path, mission, cmds, started, rally, _) = mx.mission_from_log(log)
+        (path, mission, cmds, started, rally, _, _) = mx.mission_from_log(log)
         assert rally == [(other_lat, other_lon, 80, 0), (lat, lon, 150, 0)]
         # while a smaller table drops the points it no longer has
         log = self.log(*([self.pos(0, 0)] + self.mission_dump() + [
@@ -1740,7 +1902,7 @@ class TestDrawnTrack(object):
                          Flags=0),
             self.message('RALY', Tot=1, Seq=0, Lat=lat, Lng=lon, Alt=90,
                          Flags=0)]))
-        (path, mission, cmds, started, rally, _) = mx.mission_from_log(log)
+        (path, mission, cmds, started, rally, _, _) = mx.mission_from_log(log)
         assert rally == [(lat, lon, 90, 0)]
 
     def test_mavexplorer_waits_only_so_long_for_rally_terrain(
@@ -1773,7 +1935,7 @@ class TestDrawnTrack(object):
             self.message('RALY', Tot=1, Seq=0, Lat=lat, Lng=lon, Alt=150,
                          Flags=0),
             self.message('MSG', Message='New rally')]))
-        (path, mission, cmds, started, rally, _) = mx.mission_from_log(log)
+        (path, mission, cmds, started, rally, _, _) = mx.mission_from_log(log)
         assert rally == []
 
     def test_mavexplorer_measures_a_rally_point_from_the_ekf_origin(self):
@@ -1788,7 +1950,7 @@ class TestDrawnTrack(object):
                          Alt=HOME[2]),
             self.message('RALY', Tot=1, Seq=0, Lat=lat, Lng=lon, Alt=120,
                          Flags=frame_valid | (2 << 3))]))
-        (path, mission, cmds, started, rally, origin) = mx.mission_from_log(log)
+        (path, mission, cmds, started, rally, origin, _) = mx.mission_from_log(log)
         assert origin == (HOME[0], HOME[1], HOME[2] - 50)
         assert mx.rally_point_amsl(lat, lon, 120, frame_valid | (2 << 3),
                                    HOME[2], origin) == HOME[2] + 70
@@ -1809,7 +1971,7 @@ class TestDrawnTrack(object):
             # other points still stand, rather than being forgotten
             raly(1, 2, lat, lon, 160),
             raly(0, 2, other_lat, other_lon, 90)]))
-        (path, mission, cmds, started, rally, _) = mx.mission_from_log(log)
+        (path, mission, cmds, started, rally, _, _) = mx.mission_from_log(log)
         assert rally == [(other_lat, other_lon, 90, 0), (lat, lon, 160, 0)]
 
     def test_mavexplorer_starts_where_the_log_says_the_mission_did(self):
@@ -1818,7 +1980,7 @@ class TestDrawnTrack(object):
             # carried off to the east before the mission started
             self.pos(0, 600, 5), self.message('MSG', Message='Mission: 1 Takeoff'),
             self.pos(40, 600, 30), self.pos(80, 600, 60)]))
-        (path, mission, cmds, started, _, _) = mx.mission_from_log(log)
+        (path, mission, cmds, started, _, _, _) = mx.mission_from_log(log)
         mission = mx.resolve_mission_amsl(mission, HOME[2], PARAMS,
                                           mavlink.MAV_TYPE_FIXED_WING)
         track = mx.plane_mission_track(cmds, mission, None, PARAMS,
@@ -2294,3 +2456,143 @@ class TestMissionStyles(object):
         open_view(mavlink.MAV_TYPE_QUADROTOR, 'geometry')
         mx.cmd_set(['missionpath', 'flown'])
         assert 'could not work out the path' in capsys.readouterr().out
+
+
+class TestApproachCourse(object):
+    """where the course of a VTOL landing approach comes from: the wind the
+    vehicle says it estimates, live, and the course it says it took, in a
+    log"""
+
+    def live_module(self, approach_landing=True):
+        module = TestDrawnTrack().live_module(
+            'plane', params=dict(PARAMS, Q_ENABLE=1))
+        loader = module.mpstate.module('wp').wploader
+        if approach_landing:
+            last = loader.wpoints[-1]
+            (last.command, last.param1) = (mavlink.MAV_CMD_NAV_VTOL_LAND, 1)
+        module.map.is_alive = lambda: True
+        return module
+
+    def wind(self, module, direction):
+        from types import SimpleNamespace
+        m = SimpleNamespace(direction=direction, speed=5.0, speed_z=0.0)
+        m.get_type = lambda: 'WIND'
+        module.mavlink_packet(m)
+
+    def final_course(self, track):
+        # as the VTOL landing takes over, which is within 30 degrees of
+        # heading for the landing, or half a radius along the line
+        return TestVtolApproach().landed(track)[2]
+
+    def test_the_live_map_lands_into_the_wind(self, monkeypatch):
+        flights = []
+        real = plane_track.mission_track
+
+        def recording(*args, **kwargs):
+            flights.append(kwargs.get('approach'))
+            return real(*args, **kwargs)
+        monkeypatch.setattr(plane_track, 'mission_track', recording)
+        module = self.live_module()
+        module.send_mission()
+        # still air, until the vehicle says otherwise
+        assert flights == [None]
+        self.wind(module, 88.0)
+        assert flights == [None, 90.0]
+        assert mp_util.wrap_180(self.final_course(module.sent[-1]) - 90) == \
+            pytest.approx(0, abs=45)
+        # the estimate wandering is not a new flight, and a real change is
+        self.wind(module, 93.0)
+        module.send_mission()
+        assert flights == [None, 90.0]
+        self.wind(module, 130.0)
+        assert flights == [None, 90.0, 130.0]
+        # either side of due south is the one course
+        self.wind(module, 179.0)
+        self.wind(module, -176.0)
+        assert flights == [None, 90.0, 130.0, -180.0]
+
+    def test_the_wind_does_not_matter_to_a_mission_landing_otherwise(
+            self, monkeypatch):
+        flights = []
+        real = plane_track.mission_track
+
+        def recording(*args, **kwargs):
+            flights.append(kwargs.get('approach'))
+            return real(*args, **kwargs)
+        monkeypatch.setattr(plane_track, 'mission_track', recording)
+        module = self.live_module(approach_landing=False)
+        module.send_mission()
+        self.wind(module, 90.0)
+        module.send_mission()
+        self.wind(module, 200.0)
+        module.send_mission()
+        assert flights == [None]
+
+    def test_mavexplorer_takes_the_course_the_log_says(self, monkeypatch):
+        from MAVProxy.modules.mavproxy_map3d import map3d
+        drawn = TestDrawnTrack()
+        mx = drawn.explorer()
+        messages = [drawn.pos(0, 0)] + drawn.mission_dump() + [
+            drawn.pos(40, 0, 30),
+            drawn.message('MSG', Message='Selected an approach path of 45.5'),
+            drawn.message('MSG', Message='Selected an approach path of -120.0'),
+            drawn.pos(80, 0, 60)]
+        result = mx.mission_from_log(drawn.log(*messages))
+        assert result[-1] == -120.0
+        # none said, none known
+        messages = [drawn.pos(0, 0)] + drawn.mission_dump() + [
+            drawn.pos(40, 0, 30)]
+        assert mx.mission_from_log(drawn.log(*messages))[-1] is None
+        # and it is what the path is flown with
+        from types import SimpleNamespace
+        flown_with = []
+
+        class Viewer(object):
+            def __init__(self, title=None):
+                pass
+
+            def __getattr__(self, name):
+                return lambda *args, **kwargs: None
+        monkeypatch.setattr(map3d, 'Map3D', Viewer)
+        monkeypatch.setattr(map3d, 'missing_packages', lambda: [])
+        monkeypatch.setattr(
+            mx, 'plane_mission_track',
+            lambda *args, **kwargs: flown_with.append(args[-1]))
+        messages = [drawn.pos(0, 0)] + drawn.mission_dump() + [
+            drawn.message('MSG', Message='Selected an approach path of 30.0'),
+            drawn.pos(40, 0, 30), drawn.pos(80, 0, 60)]
+        log = drawn.log(*messages)
+        log.rewind = lambda: None
+        log.params = dict(PARAMS)
+        log.mav_type = mavlink.MAV_TYPE_FIXED_WING
+        monkeypatch.setattr(mx, 'mestate', SimpleNamespace(
+            mlog=log, settings=SimpleNamespace(
+                condition=None, showdirection=True, showlabels=False,
+                labelsize=14, sync_xmap=False, missionpath='flown')),
+            raising=False)
+        monkeypatch.setattr(mx, 'map3d_views', [])
+        mx.cmd_map3d([])
+        assert flown_with == [30.0]
+
+    def test_mavexplorer_flies_the_course_it_is_given(self):
+        # the log's mission, landing on an approach, flown both ways
+        mx = TestDrawnTrack().explorer()
+        land = offset(0, 0, 60)
+        far = offset(0, 2000, 150)
+        cmds = {
+            0: (HOME[0], HOME[1], HOME[2], 0,
+                mavlink.MAV_CMD_NAV_WAYPOINT, 0, (0, 0, 0, 0)),
+            1: (far[0], far[1], far[2], 0,
+                mavlink.MAV_CMD_NAV_WAYPOINT, 1, (0, 0, 0, 0)),
+            2: (land[0], land[1], land[2], 0,
+                mavlink.MAV_CMD_NAV_VTOL_LAND, 2, (1, 0, 0, 0))}
+        params = dict(PARAMS, Q_ENABLE=1, Q_FW_LND_APR_RAD=250)
+        mission = mx.resolve_mission_amsl(
+            mx.mission_items_from_cmds(cmds), HOME[2], params,
+            mavlink.MAV_TYPE_FIXED_WING)
+        for approach in (0.0, 90.0):
+            track = mx.plane_mission_track(
+                cmds, mission, None, params, mavlink.MAV_TYPE_FIXED_WING,
+                approach=approach)
+            assert mp_util.wrap_180(self.final_course(track) - approach) == \
+                pytest.approx(0, abs=45)
