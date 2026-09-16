@@ -124,6 +124,9 @@ class MEState(object):
                         'show direction of travel on the 3D map mission'),
               MPSetting('showlabels', bool, False,
                         'label the mission items on the 3D map'),
+              MPSetting('labelsize', int, 14,
+                        'size of the 3D map mission labels, in points',
+                        range=(6, 48)),
               MPSetting('missionpath', str, 'flown',
                         'draw the 3D map mission as flown, geometry or plain',
                         choice=['flown', 'geometry', 'plain']),
@@ -977,6 +980,7 @@ def cmd_map3d(args):
     m3d.set_home(ground0)
     m3d.set_mission_arrows(mestate.settings.showdirection)
     m3d.set_mission_labels(mestate.settings.showlabels)
+    m3d.set_mission_label_size(mestate.settings.labelsize)
     m3d.set_mission_style(mestate.settings.missionpath)
     m3d.set_path(path)
     if xlimits.last_xlim is not None and mestate.settings.sync_xmap:
@@ -1046,17 +1050,41 @@ def resolve_mission_amsl(mission, ground0, params=None, mav_type=None):
 def cmd_set(args):
     '''control MAVExporer options'''
     mestate.settings.command(args)
-    # settings the open 3D views care about
+    update_map3d_views()
+
+def update_map3d_views():
+    '''push the settings the open 3D views care about'''
     for view in map3d_views:
         if view.is_alive():
             view.set_mission_arrows(mestate.settings.showdirection)
             view.set_mission_labels(mestate.settings.showlabels)
+            view.set_mission_label_size(mestate.settings.labelsize)
             view.set_mission_style(mestate.settings.missionpath)
             pending = getattr(view, 'mission_to_fly', None)
             if mestate.settings.missionpath == 'flown' and pending is not None:
                 (mission, fly) = pending
                 view.mission_to_fly = None
                 view.set_mission(mission, fly())
+
+def poll_map3d_views():
+    '''take what the open 3D views' own controls have been set to.  A view
+    which has died is drained too, so we do not lose the reason it failed
+    to start'''
+    changed = False
+    for view in map3d_views:
+        for event in view.check_events():
+            if event[0] == 'startup_error':
+                print("map3d: the 3D view failed to start:\n%s" % event[1])
+            elif event[0] == 'mission_labels':
+                mestate.settings.showlabels = bool(event[1])
+                changed = True
+            elif event[0] == 'mission_style':
+                mestate.settings.missionpath = event[1]
+                changed = True
+    if changed:
+        # every view follows the setting, and the path flown is only worked
+        # out while it is drawn
+        update_map3d_views()
 
 def cmd_condition(args):
     '''control MAVExporer conditions'''
@@ -2281,6 +2309,7 @@ def main_loop():
             cmds = line.split(';')
             for c in cmds:
                 process_stdin(c)
+        poll_map3d_views()
 
         remlist = []
         for i in range(0, len(grui)):

@@ -10,7 +10,8 @@ import math
 import vtk
 
 from MAVProxy.modules.lib import mp_util
-from MAVProxy.modules.mavproxy_map3d.map3d import MissionItem, MISSION_STYLES
+from MAVProxy.modules.mavproxy_map3d.map3d import (
+    MissionItem, MISSION_LABEL_SIZE, MISSION_LABEL_SIZES, MISSION_STYLES)
 from MAVProxy.modules.mavproxy_map3d.terrain import enu, R, wrap_longitude
 
 # MAV_FRAME altitude conventions
@@ -376,10 +377,6 @@ def _arrows(points_enu, colour, renderer=None, count=MISSION_ARROW_COUNT):
     return actor
 
 
-# how big a mission item's label is drawn, in points on the screen
-MISSION_LABEL_SIZE = 14
-
-
 def _label(point_enu, text, colour, size=MISSION_LABEL_SIZE):
     """text at a point in the world, facing the screen and the same size on
     it however far away it is"""
@@ -441,6 +438,7 @@ class ElementManager:
         self.mission_labels = []
         self.mission_arrows = False
         self.mission_labelled = False
+        self.mission_label_size = MISSION_LABEL_SIZE
         # the mission last given, so it can be drawn again in another style
         self.mission_items = []
         self.mission_track = None
@@ -657,6 +655,16 @@ class ElementManager:
         self.mission_labelled = enable
         self.refresh_mission()
 
+    def set_mission_label_size(self, size):
+        '''how big those labels are drawn, in points on the screen'''
+        (smallest, largest) = MISSION_LABEL_SIZES
+        size = min(largest, max(smallest, int(size)))
+        if size == self.mission_label_size:
+            return
+        self.mission_label_size = size
+        if self.mission_labelled:
+            self.refresh_mission()
+
     def refresh_mission(self):
         '''rebuild the mission actors from the last mission drawn'''
         line = self.mission_line
@@ -672,7 +680,8 @@ class ElementManager:
         if self.mission_markers:
             actors.append(_points(self.mission_markers, (1.0, 1.0, 1.0), 9))
         if self.mission_labelled:
-            actors += [_label(marker, text, (1.0, 1.0, 1.0))
+            actors += [_label(marker, text, (1.0, 1.0, 1.0),
+                              self.mission_label_size)
                        for (marker, text) in self.mission_labels]
         self._replace('mission', actors)
 

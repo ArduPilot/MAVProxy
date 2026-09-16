@@ -1635,7 +1635,7 @@ class TestDrawnTrack(object):
         monkeypatch.setattr(mx, 'mestate', SimpleNamespace(
             mlog=log, settings=SimpleNamespace(
                 condition=None, showdirection=True, showlabels=False,
-                sync_xmap=False,
+                labelsize=14, sync_xmap=False,
                 missionpath='flown')),
             raising=False)
         monkeypatch.setattr(mx, 'map3d_views', [])
@@ -1735,7 +1735,7 @@ class TestMissionStyles(object):
         em.set_mission_style('fancy')
         assert em.mission_style == 'plain'
 
-    def test_the_viewer_is_told_the_style_and_the_mission(self):
+    def test_the_viewer_is_told_the_style_and_the_mission(self, map3d_frame):
         # from the parent's Map3D, over the queue, to the child's frame and
         # its ElementManager: nothing but the queue stands in
         pytest.importorskip("wx")
@@ -1748,7 +1748,7 @@ class TestMissionStyles(object):
         viewer.child = SimpleNamespace(is_alive=lambda: True)
         viewer.object_queue = SimpleNamespace(put=sent.append)
         em = self.elements()
-        frame = SimpleNamespace(terrain=object(), elements=em)
+        frame = map3d_frame(em)
         items = self.items()
         viewer.set_mission_style('plain')
         viewer.set_mission(items, self.track())
@@ -1761,6 +1761,8 @@ class TestMissionStyles(object):
         for msg in sent:
             Map3DFrame.handle(frame, msg)
         assert em.mission_line == [em._enu(*p) for p in self.track()]
+        # and the map's own control shows the style it is drawing
+        assert frame.style_choice.GetStringSelection() == 'flown'
 
     def live_module(self, style):
         module = TestDrawnTrack().live_module('plane')
@@ -1796,12 +1798,14 @@ class TestMissionStyles(object):
             ('fpvfov', float, 90.0), ('terrainbrightness', float, 1.25),
             ('terrainshading', bool, True), ('terrainwireframe', bool, False),
             ('showdirection', bool, True), ('showlabels', bool, False),
+            ('labelsize', int, 14),
             mp_settings.MPSetting('missionpath', str, MISSION_STYLES[0],
                                   choice=MISSION_STYLES)])
         module.map = SimpleNamespace(
             is_alive=lambda: True, set_fpv_fov=lambda fov: None,
             set_mission_arrows=lambda enable: None,
             set_mission_labels=lambda enable: None,
+            set_mission_label_size=lambda size: None,
             set_render_settings=lambda *args: None,
             set_mission_style=styles.append,
             set_mission=lambda items, track=None: sends.append(track))
@@ -1860,7 +1864,7 @@ class TestMissionStyles(object):
             def command(self, args):
                 setattr(self, args[0], args[1])
         settings = Settings(condition=None, showdirection=True,
-                            showlabels=False,
+                            showlabels=False, labelsize=14,
                             sync_xmap=False, missionpath='geometry')
         monkeypatch.setattr(mx, 'mestate', SimpleNamespace(
             mlog=log, settings=settings), raising=False)
@@ -1880,3 +1884,60 @@ class TestMissionStyles(object):
         mx.cmd_set(['missionpath', 'plain'])
         mx.cmd_set(['missionpath', 'flown'])
         assert len(flights) == 1
+
+    def test_the_control_on_the_map_draws_the_style_it_picks(self,
+                                                             map3d_frame):
+        em = self.elements()
+        em.set_mission(self.items(), self.track())
+        events = []
+        frame = map3d_frame(em, events)
+        frame.style_choice.SetStringSelection('plain')
+        frame.on_style_choice(None)
+        assert em.mission_style == 'plain'
+        assert len(em.mission_rings) == 1
+        # and the setting follows the control, so a view opened next draws
+        # the mission the same way
+        assert events == [('mission_style', 'plain')]
+
+    def test_the_live_map_takes_the_style_picked_on_it(self):
+        module = self.live_module('plain')
+        module.map.is_alive = lambda: True
+        module.map.check_events = lambda: [('mission_style', 'flown')]
+        echoed = []
+        module.map.set_mission_style = echoed.append
+        # the rest of the idle task has nothing to do here
+        module.send_kml = lambda kml_mod=None: None
+        module.kml_change_state = None
+        module.terrain_resolved = False
+        module.idle_task()
+        assert module.map3d_settings.missionpath == 'flown'
+        # the view is told the setting it now has, whatever it was told since
+        assert echoed == ['flown']
+        # and the mission goes again, with the path flown worked out for it
+        assert module.sent[-1] is not None
+
+    def test_mavexplorer_takes_the_style_picked_on_a_view(self, monkeypatch):
+        from types import SimpleNamespace
+        mx = TestDrawnTrack().explorer()
+        styles = []
+        drawn = []
+        view = SimpleNamespace(
+            is_alive=lambda: True,
+            check_events=lambda: [('mission_style', 'flown')],
+            set_mission_arrows=lambda enable: None,
+            set_mission_labels=lambda enable: None,
+            set_mission_label_size=lambda size: None,
+            set_mission_style=styles.append,
+            set_mission=lambda items, track=None: drawn.append(track),
+            mission_to_fly=(['an item'], lambda: ['a path flown']))
+        settings = SimpleNamespace(showdirection=True, showlabels=False,
+                                   labelsize=14, missionpath='geometry')
+        monkeypatch.setattr(mx, 'mestate', SimpleNamespace(settings=settings),
+                            raising=False)
+        monkeypatch.setattr(mx, 'map3d_views', [view])
+        mx.poll_map3d_views()
+        assert settings.missionpath == 'flown'
+        assert styles == ['flown']
+        # the path flown is worked out only now that it is drawn, and once
+        assert drawn == [['a path flown']]
+        assert view.mission_to_fly is None

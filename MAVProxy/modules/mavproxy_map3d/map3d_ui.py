@@ -16,6 +16,8 @@ from MAVProxy.modules.mavproxy_map3d.camera import TerrainCamera, TerrainStyle
 from MAVProxy.modules.mavproxy_map3d.terrain import (
     TerrainManager, R, TILE_DOWNLOAD_THREADS, wrap_longitude)
 from MAVProxy.modules.mavproxy_map3d.elements import ElementManager
+from MAVProxy.modules.mavproxy_map3d.map3d import (
+    MISSION_LABEL_SIZE, MISSION_STYLES)
 
 import vtk
 
@@ -97,6 +99,13 @@ class Map3DFrame(wx.Frame):
         self.overlay_mesh_revision = -1
         self.fpv_enabled = False
         self.fpv_fov = min(150.0, max(20.0, float(state.fpvfov)))
+        # how the mission is drawn, as the element manager's own defaults.
+        # The parent pushes what it wants, which may be before there is a
+        # scene to draw it in, so the frame holds it for init_scene
+        self.mission_arrows = False
+        self.mission_labelled = False
+        self.mission_label_size = MISSION_LABEL_SIZE
+        self.mission_style = MISSION_STYLES[0]
         self.terrain_brightness = min(
             2.0, max(0.25, float(state.terrain_brightness)))
         self.terrain_shading = bool(state.terrain_shading)
@@ -128,6 +137,22 @@ class Map3DFrame(wx.Frame):
         self.fpv_button.SetToolTip("Toggle level-horizon first-person view")
         self.Bind(wx.EVT_TOGGLEBUTTON, self.on_fpv_toggle, self.fpv_button)
         controls.Add(self.fpv_button, 0, wx.ALL, 4)
+        self.labels_check = wx.CheckBox(self, -1, "Labels")
+        self.labels_check.SetValue(self.mission_labelled)
+        self.labels_check.SetToolTip(
+            "Number each mission item, as the 2D map does")
+        self.Bind(wx.EVT_CHECKBOX, self.on_labels_toggle, self.labels_check)
+        controls.Add(self.labels_check, 0,
+                     wx.ALL | wx.ALIGN_CENTER_VERTICAL, 4)
+        controls.Add(wx.StaticText(self, -1, "Mission"), 0,
+                     wx.ALL | wx.ALIGN_CENTER_VERTICAL, 4)
+        self.style_choice = wx.Choice(self, -1, choices=list(MISSION_STYLES))
+        self.style_choice.SetStringSelection(self.mission_style)
+        self.style_choice.SetToolTip(
+            "Draw the mission as the path the vehicle flies, as the geometry "
+            "of its items, or as plain lines from item to item")
+        self.Bind(wx.EVT_CHOICE, self.on_style_choice, self.style_choice)
+        controls.Add(self.style_choice, 0, wx.ALL, 4)
         gear = wx.ArtProvider.GetBitmap(wx.ART_HELP_SETTINGS, wx.ART_BUTTON,
                                         (16, 16))
         self.settings_button = wx.BitmapButton(self, -1, gear)
@@ -158,6 +183,10 @@ class Map3DFrame(wx.Frame):
                                       shading=self.terrain_shading,
                                       wireframe=self.terrain_wireframe)
         self.elements = ElementManager(self.ren, lat0, lon0, self.state.zexag)
+        self.elements.set_mission_arrows(self.mission_arrows)
+        self.elements.set_mission_label_size(self.mission_label_size)
+        self.elements.set_mission_labels(self.mission_labelled)
+        self.elements.set_mission_style(self.mission_style)
         if self.vehicle_type is not None:
             self.elements.set_vehicle_type(self.vehicle_type)
         self.elements.set_terrain_height(self.terrain.height_at)
@@ -188,6 +217,47 @@ class Map3DFrame(wx.Frame):
 
     def on_follow_toggle(self, event):
         self.set_follow_enabled(self.follow_button.GetValue(), notify=True)
+
+    def on_labels_toggle(self, event):
+        self.set_mission_labels(self.labels_check.GetValue(), notify=True)
+
+    def on_style_choice(self, event):
+        self.set_mission_style(self.style_choice.GetStringSelection(),
+                               notify=True)
+
+    def set_mission_arrows(self, enable):
+        self.mission_arrows = bool(enable)
+        if self.elements is not None:
+            self.elements.set_mission_arrows(self.mission_arrows)
+
+    def set_mission_labels(self, enable, notify=False):
+        self.mission_labelled = bool(enable)
+        self.labels_check.SetValue(self.mission_labelled)
+        if self.elements is not None:
+            self.elements.set_mission_labels(self.mission_labelled)
+            self.render()
+        if notify:
+            self.state.event_queue.put(
+                ('mission_labels', self.mission_labelled))
+
+    def set_mission_label_size(self, size):
+        self.mission_label_size = int(size)
+        if self.elements is not None:
+            self.elements.set_mission_label_size(self.mission_label_size)
+            self.render()
+
+    def set_mission_style(self, style, notify=False):
+        if style not in MISSION_STYLES:
+            return
+        self.mission_style = style
+        self.style_choice.SetStringSelection(self.mission_style)
+        if self.elements is not None:
+            self.elements.set_mission_style(self.mission_style)
+            self.render()
+        if notify:
+            # the parent draws the path flown only while it is asked for, so
+            # it may send the mission again rather than just take this
+            self.state.event_queue.put(('mission_style', self.mission_style))
 
     def schedule_kml_refresh(self):
         if self.elements is None or not self.kml_features:
@@ -342,6 +412,20 @@ class Map3DFrame(wx.Frame):
                 self.elements.set_vehicle_type(self.vehicle_type)
                 self.render()
             return
+        # how the mission is drawn may arrive before there is a scene to
+        # draw it in, so the frame keeps it for init_scene
+        if kind == 'mission_arrows':
+            self.set_mission_arrows(msg[1])
+            return
+        if kind == 'mission_labels':
+            self.set_mission_labels(msg[1])
+            return
+        if kind == 'mission_label_size':
+            self.set_mission_label_size(msg[1])
+            return
+        if kind == 'mission_style':
+            self.set_mission_style(msg[1])
+            return
         if kind == 'kml':
             self.kml_features = list(msg[1])
             if self.elements is not None:
@@ -372,12 +456,6 @@ class Map3DFrame(wx.Frame):
             self.elements.set_time_range(msg[1])
         elif kind == 'mission':
             self.elements.set_mission(msg[1], msg[2] if len(msg) > 2 else None)
-        elif kind == 'mission_arrows':
-            self.elements.set_mission_arrows(msg[1])
-        elif kind == 'mission_labels':
-            self.elements.set_mission_labels(msg[1])
-        elif kind == 'mission_style':
-            self.elements.set_mission_style(msg[1])
         elif kind == 'fence':
             self.elements.set_fence(msg[1], self.terrain.height_at)
         elif kind == 'rally':

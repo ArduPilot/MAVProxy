@@ -17,8 +17,8 @@ from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.mavproxy_map3d.map3d import (
-    Map3D, MissionItem, MISSION_STYLES, missing_packages,
-    missing_packages_message)
+    Map3D, MissionItem, MISSION_LABEL_SIZE, MISSION_LABEL_SIZES,
+    MISSION_STYLES, missing_packages, missing_packages_message)
 
 # fence colours as the 2D map's PolyFence layer uses them (OpenCV BGR)
 FENCE_INCLUSION_BGR = (0, 255, 0)
@@ -43,6 +43,28 @@ def bgr_to_rgb(bgr, default=(1.0, 0.0, 1.0)):
         return default
 
 
+def make_settings():
+    '''the module's settings.  The view's own controls set some of them:
+    showlabels, missionpath, follow and the render settings'''
+    return mp_settings.MPSettings([
+        ('service', str, 'MicrosoftSat'),
+        ('zexag', float, 1.0),
+        ('debug', bool, False),
+        mp_settings.MPSetting('fpvfov', float, 90.0, range=(20.0, 150.0)),
+        mp_settings.MPSetting('terrainbrightness', float, 1.25,
+                              range=(0.25, 2.0)),
+        ('terrainshading', bool, True),
+        ('terrainwireframe', bool, False),
+        ('showdirection', bool, True),
+        ('showlabels', bool, False),
+        mp_settings.MPSetting('labelsize', int, MISSION_LABEL_SIZE,
+                              range=MISSION_LABEL_SIZES),
+        # flown, geometry or plain: see Map3D.set_mission_style()
+        mp_settings.MPSetting('missionpath', str, MISSION_STYLES[0],
+                              choice=MISSION_STYLES),
+    ])
+
+
 class Map3DModule(mp_module.MPModule):
     # the EKF origin's altitude, which a rally point may be measured from,
     # until the vehicle says where it is
@@ -54,21 +76,7 @@ class Map3DModule(mp_module.MPModule):
         # remove_object, set_position), which Map3D intentionally does not
         # implement.
         super(Map3DModule, self).__init__(mpstate, "map3d", "3D map display")
-        self.map3d_settings = mp_settings.MPSettings([
-            ('service', str, 'MicrosoftSat'),
-            ('zexag', float, 1.0),
-            ('debug', bool, False),
-            mp_settings.MPSetting('fpvfov', float, 90.0, range=(20.0, 150.0)),
-            mp_settings.MPSetting('terrainbrightness', float, 1.25,
-                                  range=(0.25, 2.0)),
-            ('terrainshading', bool, True),
-            ('terrainwireframe', bool, False),
-            ('showdirection', bool, True),
-            ('showlabels', bool, False),
-            # flown, geometry or plain: see Map3D.set_mission_style()
-            mp_settings.MPSetting('missionpath', str, MISSION_STYLES[0],
-                                  choice=MISSION_STYLES),
-        ])
+        self.map3d_settings = make_settings()
         self.add_command('map3d', self.cmd_map3d,
                          "3D map control", ['<start|stop|follow|nofollow|center>',
                                             'set (MAP3DSETTING)'])
@@ -128,16 +136,13 @@ class Map3DModule(mp_module.MPModule):
         elif cmd == "set":
             self.map3d_settings.command(args[1:])
             if self.map is not None and self.map.is_alive():
-                self.map.set_fpv_fov(self.map3d_settings.fpvfov)
                 self.map.set_mission_arrows(self.map3d_settings.showdirection)
                 self.map.set_mission_labels(self.map3d_settings.showlabels)
+                self.map.set_mission_label_size(self.map3d_settings.labelsize)
                 self.map.set_mission_style(self.map3d_settings.missionpath)
                 # the path flown is only worked out while it is drawn
                 self.send_mission()
-                self.map.set_render_settings(
-                    self.map3d_settings.terrainbrightness,
-                    self.map3d_settings.terrainshading,
-                    self.map3d_settings.terrainwireframe)
+                self.send_render_settings()
         else:
             print("unknown map3d command: %s" % cmd)
 
@@ -161,12 +166,20 @@ class Map3DModule(mp_module.MPModule):
         # push whatever we already know
         self.map.set_mission_arrows(self.map3d_settings.showdirection)
         self.map.set_mission_labels(self.map3d_settings.showlabels)
+        self.map.set_mission_label_size(self.map3d_settings.labelsize)
         self.map.set_mission_style(self.map3d_settings.missionpath)
         self.send_mission()
         self.send_fence()
         self.send_rally()
         self.send_cached_state()
         self.send_kml()
+
+    def send_render_settings(self):
+        self.map.set_fpv_fov(self.map3d_settings.fpvfov)
+        self.map.set_render_settings(
+            self.map3d_settings.terrainbrightness,
+            self.map3d_settings.terrainshading,
+            self.map3d_settings.terrainwireframe)
 
     def stop_map(self):
         if self.map is not None:
@@ -728,14 +741,29 @@ class Map3DModule(mp_module.MPModule):
         for event in self.map.check_events():
             if event[0] == 'startup_error':
                 print("map3d: the 3D view failed to start:\n%s" % event[1])
+            # what the view's own controls were set to.  Each is sent back
+            # as the setting now stands: a command given here while the
+            # event was on its way has already been sent to the view, and
+            # would otherwise be overwritten there by this older event
+            # while the setting kept it
             elif event[0] == 'render_settings':
                 (_, brightness, shading, wireframe, fpvfov) = event
                 self.map3d_settings.terrainbrightness = brightness
                 self.map3d_settings.terrainshading = shading
                 self.map3d_settings.terrainwireframe = wireframe
                 self.map3d_settings.fpvfov = fpvfov
+                self.send_render_settings()
             elif event[0] == 'follow':
                 self.follow = bool(event[1])
+                self.map.set_follow(self.follow)
+            elif event[0] == 'mission_labels':
+                self.map3d_settings.showlabels = bool(event[1])
+                self.map.set_mission_labels(self.map3d_settings.showlabels)
+            elif event[0] == 'mission_style':
+                self.map3d_settings.missionpath = event[1]
+                self.map.set_mission_style(self.map3d_settings.missionpath)
+                # the path flown is only worked out while it is drawn
+                self.send_mission()
         if not alive:
             self.map = None
             return

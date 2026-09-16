@@ -31,6 +31,11 @@ MissionItem = collections.namedtuple(
 # item which circles
 MISSION_STYLES = ('flown', 'geometry', 'plain')
 
+# how big a mission item's label is drawn, in points on the screen, and the
+# sizes worth asking for: too small to read through to filling the view
+MISSION_LABEL_SIZE = 14
+MISSION_LABEL_SIZES = (6, 48)
+
 PACKAGES = ('vtk', 'quantized_mesh_tile')
 
 
@@ -161,6 +166,10 @@ class Map3D:
     def set_mission_labels(self, enable):
         '''label each mission item with its number and what it is'''
         self._put(('mission_labels', bool(enable)))
+
+    def set_mission_label_size(self, size):
+        '''how big those labels are drawn, in points on the screen'''
+        self._put(('mission_label_size', int(size)))
 
     def set_mission_style(self, style):
         '''one of MISSION_STYLES'''
