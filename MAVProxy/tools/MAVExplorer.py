@@ -968,6 +968,9 @@ def cmd_map3d(args):
                                        rally, origin)
         if mestate.settings.missionpath == 'flown':
             track = fly()
+            if (track is None and
+                    mp_util.vehicle_type_name(mav_type) == 'plane'):
+                say_unflown()
 
     # drop views the user has already closed, so their child processes are reaped
     for old in [v for v in map3d_views if not v.is_alive()]:
@@ -988,7 +991,9 @@ def cmd_map3d(args):
     if mission:
         m3d.set_mission(mission, track)
         # kept, to draw the path flown if the style changes to it later
-        m3d.mission_to_fly = (mission, fly) if track is None else None
+        m3d.mission_to_fly = None
+        if track is None and mestate.settings.missionpath != 'flown':
+            m3d.mission_to_fly = (mission, fly)
     m3d.look_at(lat0, lon0, ground0, dist=1.6 * span)
 
 def resolve_mission_amsl(mission, ground0, params=None, mav_type=None):
@@ -1064,7 +1069,16 @@ def update_map3d_views():
             if mestate.settings.missionpath == 'flown' and pending is not None:
                 (mission, fly) = pending
                 view.mission_to_fly = None
-                view.set_mission(mission, fly())
+                track = fly()
+                if track is None:
+                    say_unflown()
+                view.set_mission(mission, track)
+
+def say_unflown():
+    print("map3d: could not work out the path this mission is flown along "
+          "-- only a plane's can be, and not one which is too long, never "
+          "finishes an item, or uses a command which cannot be flown here; "
+          "drawing its geometry")
 
 def poll_map3d_views():
     '''take what the open 3D views' own controls have been set to.  A view

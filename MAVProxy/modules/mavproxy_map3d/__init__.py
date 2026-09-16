@@ -135,6 +135,9 @@ class Map3DModule(mp_module.MPModule):
                 self.map.center_on_vehicle()
         elif cmd == "set":
             self.map3d_settings.command(args[1:])
+            if (len(args) > 1 and args[1] == 'missionpath' and
+                    self.map3d_settings.missionpath == 'flown'):
+                self.flown_asked = True
             if self.map is not None and self.map.is_alive():
                 self.map.set_mission_arrows(self.map3d_settings.showdirection)
                 self.map.set_mission_labels(self.map3d_settings.showlabels)
@@ -440,6 +443,11 @@ class Map3DModule(mp_module.MPModule):
         # and items it has now; and the MissionItems it was drawn with
         self.track_wanted = None
         self.mission_sent = None
+        # the mission last found to have no path flown, so it is said once
+        self.unflown_key = None
+        # whether the path flown has been asked for by name since it was
+        # last said it could not be drawn for this vehicle
+        self.flown_asked = False
 
     @staticmethod
     def same_home(home, other):
@@ -454,8 +462,15 @@ class Map3DModule(mp_module.MPModule):
         been worked out; otherwise None, and the thread is asked to work it
         out.  None too for any other vehicle, where the mission cannot be
         flown through, or where the map is not drawing the path flown'''
-        if (self.vehicle_type != 'plane' or
-                self.map3d_settings.missionpath != 'flown'):
+        if self.map3d_settings.missionpath != 'flown':
+            self.track_wanted = None
+            return None
+        if self.vehicle_type != 'plane':
+            if self.flown_asked and self.vehicle_type is not None:
+                # asked for by name, rather than left as it starts
+                print("map3d: only a plane's mission can be drawn as the "
+                      "path flown; drawing its geometry")
+                self.flown_asked = False
             self.track_wanted = None
             return None
         home = self.mission_home(wploader)
@@ -612,6 +627,11 @@ class Map3DModule(mp_module.MPModule):
             # another mission since, which the thread has yet to fly
             return
         self.track_wanted = None
+        if track is None and key != self.unflown_key:
+            self.unflown_key = key
+            print("map3d: could not work out the path this mission is flown "
+                  "along -- it may be too long, never finish an item, or use "
+                  "a command which cannot be flown here; drawing its geometry")
         if self.map is not None and self.mission_sent is not None:
             self.map.set_mission(self.mission_sent,
                                  self.moved_home(track, home, wanted[2],
@@ -761,6 +781,7 @@ class Map3DModule(mp_module.MPModule):
                 self.map.set_mission_labels(self.map3d_settings.showlabels)
             elif event[0] == 'mission_style':
                 self.map3d_settings.missionpath = event[1]
+                self.flown_asked = event[1] == 'flown'
                 self.map.set_mission_style(self.map3d_settings.missionpath)
                 # the path flown is only worked out while it is drawn
                 self.send_mission()

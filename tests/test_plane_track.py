@@ -2058,3 +2058,131 @@ class TestMissionStyles(object):
         # the path flown is worked out only now that it is drawn, and once
         assert drawn == [['a path flown']]
         assert view.mission_to_fly is None
+
+    def unflyable(self, module):
+        '''give the live module's mission a NAV_DELAY, which cannot be flown
+        through'''
+        from types import SimpleNamespace
+        loader = module.mpstate.module('wp').wploader
+        loader.wpoints.append(SimpleNamespace(
+            seq=len(loader.wpoints), command=mavlink.MAV_CMD_NAV_DELAY,
+            x=0, y=0, z=0, frame=3, param1=10, param2=0, param3=0, param4=0))
+
+    def test_the_live_map_says_when_a_mission_has_no_path_flown(self, capsys):
+        module = self.live_module('flown')
+        self.unflyable(module)
+        module.send_mission()
+        assert module.sent[-1] is None
+        assert 'could not work out the path' in capsys.readouterr().out
+        # once for the mission, however often it is sent, and when home
+        # has moved far enough for it to be flown again
+        module.send_mission()
+        module.home_amsl += 50.0
+        module.send_mission()
+        assert module.sent[-1] is None
+        assert capsys.readouterr().out == ''
+        # and again for another which cannot be flown either
+        module.mpstate.module('wp').wploader.wpoints[-1].param1 = 20
+        module.send_mission()
+        assert 'could not work out the path' in capsys.readouterr().out
+        # a mission which can be flown says nothing
+        module = self.live_module('flown')
+        module.send_mission()
+        assert module.sent[-1] is not None
+        assert capsys.readouterr().out == ''
+
+    def test_the_live_map_says_when_asked_for_a_path_it_cannot_draw(
+            self, capsys):
+        from types import SimpleNamespace
+        from MAVProxy.modules import mavproxy_map3d
+        module = TestDrawnTrack().live_module('copter')
+        module.map3d_settings = mavproxy_map3d.make_settings()
+        styles = []
+        module.map = SimpleNamespace(
+            is_alive=lambda: True, set_fpv_fov=lambda fov: None,
+            set_mission_arrows=lambda enable: None,
+            set_mission_labels=lambda enable: None,
+            set_mission_label_size=lambda size: None,
+            set_mission_style=styles.append,
+            set_render_settings=lambda *args: None,
+            set_mission=lambda items, track=None: module.sent.append(track))
+        # flown is where it starts, which is not asking for it
+        module.send_mission()
+        assert capsys.readouterr().out == ''
+        module.cmd_map3d(['set', 'missionpath', 'flown'])
+        assert 'only a plane' in capsys.readouterr().out
+        module.send_mission()
+        assert capsys.readouterr().out == ''
+        # nor is another style
+        module.cmd_map3d(['set', 'missionpath', 'plain'])
+        assert capsys.readouterr().out == ''
+        # and from the view's own choice
+        module.map.check_events = lambda: [('mission_style', 'flown')]
+        module.send_kml = lambda kml_mod=None: None
+        module.kml_change_state = None
+        module.terrain_resolved = False
+        module.idle_task()
+        assert 'only a plane' in capsys.readouterr().out
+
+    def test_mavexplorer_says_when_a_mission_has_no_path_flown(
+            self, monkeypatch, capsys):
+        from types import SimpleNamespace
+        from MAVProxy.modules.mavproxy_map3d import map3d
+        drawn = TestDrawnTrack()
+        mx = drawn.explorer()
+        views = []
+
+        class Viewer(object):
+            def __init__(self, title=None):
+                self.missions = []
+                views.append(self)
+
+            def is_alive(self):
+                return True
+
+            def set_mission(self, items, track=None):
+                self.missions.append(track)
+
+            def __getattr__(self, name):
+                return lambda *args, **kwargs: None
+        monkeypatch.setattr(map3d, 'Map3D', Viewer)
+        monkeypatch.setattr(map3d, 'missing_packages', lambda: [])
+        flights = []
+        monkeypatch.setattr(mx, 'plane_mission_track',
+                            lambda *args, **kwargs: flights.append(args))
+
+        class Settings(SimpleNamespace):
+            def command(self, args):
+                setattr(self, args[0], args[1])
+
+        def open_view(mav_type, style):
+            log = drawn.log(*([drawn.pos(0, 0)] + drawn.mission_dump() + [
+                drawn.message('MSG', Message='Mission: 1 Takeoff'),
+                drawn.pos(40, 0, 30), drawn.pos(80, 0, 60)]))
+            log.rewind = lambda: None
+            log.params = dict(PARAMS)
+            log.mav_type = mav_type
+            settings = Settings(condition=None, showdirection=True,
+                                showlabels=False, labelsize=14,
+                                sync_xmap=False, missionpath=style)
+            monkeypatch.setattr(mx, 'mestate', SimpleNamespace(
+                mlog=log, settings=settings), raising=False)
+            monkeypatch.setattr(mx, 'map3d_views', [])
+            mx.cmd_map3d([])
+            return views[-1]
+
+        # a plane's mission which cannot be flown through
+        view = open_view(mavlink.MAV_TYPE_FIXED_WING, 'flown')
+        assert view.missions == [None]
+        assert 'could not work out the path' in capsys.readouterr().out
+        # and which is not flown again for nothing
+        assert len(flights) == 1
+        mx.cmd_set(['showdirection', 'true'])
+        assert len(flights) == 1
+        # a copter's, left as it starts, says nothing
+        open_view(mavlink.MAV_TYPE_QUADROTOR, 'flown')
+        assert capsys.readouterr().out == ''
+        # but asked for, it does
+        open_view(mavlink.MAV_TYPE_QUADROTOR, 'geometry')
+        mx.cmd_set(['missionpath', 'flown'])
+        assert 'could not work out the path' in capsys.readouterr().out
