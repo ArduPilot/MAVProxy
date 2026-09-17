@@ -272,7 +272,7 @@ def mission_circle_radius(command, params, default_radius=None, vehicle=None):
         mavlink.MAV_CMD_NAV_LOITER_TURNS: 2,
         mavlink.MAV_CMD_NAV_LOITER_TIME: 2,
         mavlink.MAV_CMD_NAV_LOITER_TO_ALT: 1,
-        mavlink.MAV_CMD_DO_ORBIT: 0,
+        getattr(mavlink, 'MAV_CMD_DO_ORBIT', 34): 0,
     }.get(command)
     if index is None:
         return None
@@ -299,7 +299,7 @@ def mission_circle_turns(command, params):
     mavlink = mavutil.mavlink
     if command == mavlink.MAV_CMD_NAV_LOITER_TURNS:
         turns = params[0]
-    elif command == mavlink.MAV_CMD_DO_ORBIT:
+    elif command == getattr(mavlink, 'MAV_CMD_DO_ORBIT', 34):
         # DO_ORBIT counts in radians rather than turns
         turns = params[3] / (2 * pi)
     else:

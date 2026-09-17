@@ -11,8 +11,10 @@ from pymavlink import mavutil
 def arc_dialect(request, monkeypatch):
     if request.param:
         monkeypatch.setattr(mavutil.mavlink, 'MAV_CMD_NAV_ARC_WAYPOINT', 36, raising=False)
+        monkeypatch.setattr(mavutil.mavlink, 'MAV_CMD_DO_ORBIT', 34, raising=False)
     else:
         monkeypatch.delattr(mavutil.mavlink, 'MAV_CMD_NAV_ARC_WAYPOINT', raising=False)
+        monkeypatch.delattr(mavutil.mavlink, 'MAV_CMD_DO_ORBIT', raising=False)
 
 
 def test_map_loads_and_labels_arc_waypoints(arc_dialect):
@@ -29,6 +31,8 @@ def test_map_loads_and_labels_arc_waypoints(arc_dialect):
     assert state.public_modules['map'] is module
     assert module._colour_for_wp_command[36] == (64, 255, 255)
     assert module._label_suffix_for_wp_command[36] == 'AW'
+    assert module._colour_for_wp_command[34] == (255, 64, 255)
+    assert module._label_suffix_for_wp_command[34] == 'Orbit'
 
 
 def test_mission_arcs_recognizes_numeric_command(arc_dialect):
