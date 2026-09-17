@@ -59,8 +59,13 @@ class VideoView:
             if not isinstance(event, MPMenuItem):
                 continue
             if event.returnkey == "Camera:Photo":
-                self.module.cmd_photo([])
+                command = ["photo"]
             elif event.returnkey == "Camera:Record":
-                self.module.cmd_record(["toggle"])
+                command = ["record", "toggle"]
             elif event.returnkey == "Camera:Autofocus":
-                self.module.cmd_focus(["auto"])
+                command = ["focus", "auto"]
+            else:
+                continue
+            self.module.cmd_camera([
+                "for", "%u:%u" % (self.camera.system_id, self.camera.component_id)
+            ] + command)

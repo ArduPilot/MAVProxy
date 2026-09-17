@@ -126,7 +126,8 @@ class MapModule(mp_module.MPModule):
         self.add_menu(MPMenuItem('Terrain Check', 'Terrain Check', '# terrain check'))
         self.add_menu(MPMenuItem('Show Position', 'Show Position', 'showPosition'))
         self.add_menu(MPMenuItem('Google Maps Link', 'Google Maps Link', 'printGoogleMapsLink'))
-        self.add_menu(MPMenuItem('Set ROI', 'Set ROI', '# map setroi '))
+        self.camera_roi_items = None
+        self.update_roi_menu()
         self.add_menu(MPMenuItem('Set Position', 'Set Position', '# map setposition '))
         self.add_menu(MPMenuSubMenu('Home', items=[
             MPMenuItem('Set Home', 'Set Home', '# confirm "Set HOME?" map sethomepos '),
@@ -183,6 +184,20 @@ class MapModule(mp_module.MPModule):
             MPMenuItem('Hide Contours', returnkey='hideTerrainContours'),
             MPMenuItem('Remove Contours', returnkey='removeTerrainContours'),
         ]))
+
+    def update_roi_menu(self):
+        """Offer individual camera targets when multiple cameras are discovered."""
+        camera = self.module('camera')
+        items = camera.roi.menu_items() if camera is not None else []
+        if items == self.camera_roi_items:
+            return
+        self.camera_roi_items = items
+        if items:
+            menu = MPMenuSubMenu('Set ROI', items=[
+                MPMenuItem(label, returnkey=command) for label, command in items])
+        else:
+            menu = MPMenuItem('Set ROI', 'Set ROI', '# map setroi ')
+        self.add_menu(menu)
 
     def add_menu(self, menu):
         '''add to the default popup menu'''
@@ -953,6 +968,7 @@ Usage: map circle <radius> <colour>
             self.mpstate.map_functions = {}
 
     def idle_task(self):
+        self.update_roi_menu()
         now = time.time()
         if self.last_unload_check_time + self.unload_check_interval < now:
             self.last_unload_check_time = now
