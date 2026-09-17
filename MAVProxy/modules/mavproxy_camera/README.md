@@ -115,13 +115,26 @@ supplies the target's AMSL altitude. If terrain data or a required mount mapping
 is unavailable, the command reports the problem before sending any ROI commands.
 With zero or one camera, the map retains its existing **Set ROI** action.
 
-In manager mode MAVProxy uses fresh vehicle positions to update the selected
-mount's earth-frame pitch/yaw target at up to 5 Hz. This avoids ArduPilot's
-vehicle-wide ROI command, which only addresses its primary mount. MAVProxy must
-remain connected for this tracking; when position telemetry stops, it stops
-updating the angles. In direct device mode, AP_CameraGimbal receives
-`MAV_CMD_DO_SET_ROI_LOCATION` addressed to its gimbal component and tracks the
-location itself, using vehicle telemetry available to the camera.
+ROI always sends a geographic location; MAVProxy does not calculate or stream
+tracking angles. With one gimbal, manager mode sends
+`MAV_CMD_DO_SET_ROI_LOCATION` to the flight controller, retaining its normal ROI
+handling. Explicit device mode addresses the gimbal directly.
+
+With multiple distinct gimbals on a vehicle, camera ROI automatically addresses
+each gimbal directly, regardless of `mount_control`. The gimbal must advertise
+`GIMBAL_DEVICE_CAP_FLAGS_CAN_POINT_LOCATION_GLOBAL`. AP_CameraGimbal tracks the
+location itself using vehicle telemetry available to the camera. Two cameras
+sharing one gimbal count as one gimbal.
+
+For direct ROI on a multi-gimbal ArduPilot vehicle, MAVProxy reads the selected
+mount's `MNTn_TARG_RATE`, sets it to zero and waits for confirmation before
+sending the location. This stops ArduPilot's angle commands from cancelling
+onboard ROI. The original rate is restored on clear, manual mount control or
+ROI rejection. Firmware must support `MNTn_TARG_RATE`; a missing response
+cancels the request instead of starting competing control. Module unload also
+requests restoration, but cannot wait for confirmation. If MAVProxy exits
+unexpectedly during ROI, restore the affected `MNTn_TARG_RATE` manually before
+using flight-controller mount control.
 
 `camera for 1:101 roi` uses the current map click, and `camera roi all` targets
 all cameras. `camera for 1:101 roi clear` stops that camera's tracking. Manual

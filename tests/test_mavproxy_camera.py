@@ -27,6 +27,8 @@ class FakeMav:
         self.commands = []
         self.gimbal_attitudes = []
         self.int_commands = []
+        self.param_reads = []
+        self.param_sets = []
 
     def command_long_send(self, *args):
         self.commands.append(args)
@@ -36,6 +38,12 @@ class FakeMav:
 
     def command_int_send(self, *args):
         self.int_commands.append(args)
+
+    def param_request_read_send(self, *args):
+        self.param_reads.append(args)
+
+    def param_set_send(self, *args):
+        self.param_sets.append(args)
 
 
 class FakeMaster:
@@ -227,6 +235,10 @@ class CameraModuleTest(unittest.TestCase):
     def setup_camera_roi(self):
         self.module.mavlink_packet(camera_information(component_id=101, gimbal_device_id=171))
         self.module.mavlink_packet(camera_information())
+        for component in (154, 171):
+            self.module.mavlink_packet(Message(
+                "GIMBAL_DEVICE_INFORMATION", component_id=component, cap_flags=0,
+                cap_flags2=mavutil.mavlink.GIMBAL_DEVICE_CAP_FLAGS_CAN_POINT_LOCATION_GLOBAL))
         self.module.mavlink_packet(Message(
             "HEARTBEAT", component_id=1, type=mavutil.mavlink.MAV_TYPE_FIXED_WING,
             autopilot=mavutil.mavlink.MAV_AUTOPILOT_ARDUPILOTMEGA))
@@ -240,6 +252,10 @@ class CameraModuleTest(unittest.TestCase):
         self.module.mavlink_packet(position)
         self.state._master.mav.commands.clear()
         return position
+
+    def roi_parameter(self, name, value, system=1, component=1):
+        self.module.mavlink_packet(Message("PARAM_VALUE", system_id=system,
+                                          component_id=component, param_id=name, param_value=value))
 
     def test_roi_menu_updates_and_restores_single_camera_action(self):
         from MAVProxy.modules.mavproxy_map import MapModule
@@ -271,32 +287,32 @@ class CameraModuleTest(unittest.TestCase):
         self.assertEqual(len(map_module.default_popup.items), 1)
         self.assertIsInstance(map_module.default_popup.items[0], MPMenuItem)
 
-    def test_roi_targets_only_requested_mount_and_tracks_vehicle(self):
+    def test_single_gimbal_roi_sends_location_to_manager(self):
         position = self.setup_camera_roi()
+        del self.module.cameras[(1, 100)]
+        del self.module.gimbals[(1, 154)]
         self.module.cmd_camera(["for", "1:101", "roi"])
-        command = self.commands()[-1]
-        self.assertEqual(command[:3], (1, 1, mavutil.mavlink.MAV_CMD_DO_GIMBAL_MANAGER_PITCHYAW))
-        self.assertEqual(command[10], 2)
-        self.assertAlmostEqual(command[5], 0)
-        self.assertLess(command[4], -40)
-        self.assertEqual(command[8], mavutil.mavlink.GIMBAL_MANAGER_FLAGS_YAW_LOCK)
+        mav = self.state._master.mav
+        command = mav.int_commands[-1]
+        self.assertEqual(command[:4], (1, 1, mavutil.mavlink.MAV_FRAME_GLOBAL,
+                                      mavutil.mavlink.MAV_CMD_DO_SET_ROI_LOCATION))
+        self.assertEqual(command[6], 2)
+        self.assertEqual(command[10:], (-350000000, 1490000000, 600.0))
+        self.assertFalse(mav.param_reads)
         self.assertEqual(set(self.module.roi.targets), {(1, 101)})
         self.state._master.mav.commands.clear()
-        target = self.module.roi.targets[(1, 101)]
-        target.last_update = 0
         position.lat = -350020000
         self.module.mavlink_packet(position)
-        self.assertEqual(len(self.commands()), 1)
-        self.assertEqual(self.commands()[-1][10], 2)
-        self.assertGreater(self.commands()[-1][4], command[4])
         self.module.mavlink_packet(position)
-        self.assertEqual(len(self.commands()), 1)  # rate limited
-        target.last_update = 0
         position._system_id = 42
         self.module.mavlink_packet(position)
-        self.assertEqual(len(self.commands()), 1)
+        self.assertFalse(self.commands())
+        self.assertEqual(len(mav.int_commands), 1)
         position._system_id = 1
         self.module.cmd_camera(["for", "1:101", "mount", "center"])
+        self.assertEqual(mav.int_commands[-1][:4],
+                         (1, 1, mavutil.mavlink.MAV_FRAME_GLOBAL,
+                          mavutil.mavlink.MAV_CMD_DO_SET_ROI_NONE))
         self.assertFalse(self.module.roi.targets)
         self.state._master.mav.commands.clear()
         self.module.mavlink_packet(position)
@@ -305,38 +321,50 @@ class CameraModuleTest(unittest.TestCase):
     def test_roi_all_and_validation_before_commands(self):
         self.setup_camera_roi()
         self.module.cmd_camera(["roi", "all"])
-        self.assertEqual([c[10] for c in self.commands()], [1, 2])
+        mav = self.state._master.mav
+        self.assertEqual(mav.param_reads, [(1, 1, b"MNT1_TARG_RATE", -1),
+                                          (1, 1, b"MNT2_TARG_RATE", -1)])
+        self.assertFalse(mav.int_commands)
+        self.roi_parameter("MNT1_TARG_RATE", 0)
+        self.roi_parameter("MNT2_TARG_RATE", 0)
+        self.assertEqual([c[1] for c in mav.int_commands], [154, 171])
+        self.assertFalse(self.commands())
         self.assertEqual(set(self.module.roi.targets), {(1, 100), (1, 101)})
         self.module.cmd_camera(["for", "1:101", "roi", "clear"])
         self.assertEqual(set(self.module.roi.targets), {(1, 100)})
         self.state._master.mav.commands.clear()
+        mav.int_commands.clear()
         self.state.modules["terrain"].ElevationModel.GetElevation = lambda lat, lon: None
         self.module.cmd_camera(["roi", "all"])
         self.assertFalse(self.commands())
+        self.assertFalse(mav.int_commands)
         self.assertEqual(set(self.module.roi.targets), {(1, 100)})
         self.state.modules["terrain"].ElevationModel.GetElevation = lambda lat, lon: 600
         self.module.cameras[(1, 101)].information.gimbal_device_id = 0
         self.module.cmd_camera(["roi", "all"])
         self.assertFalse(self.commands())
+        self.assertFalse(mav.int_commands)
 
     def test_shared_mount_roi_does_not_issue_competing_targets(self):
         position = self.setup_camera_roi()
         self.module.cameras[(1, 101)].information.gimbal_device_id = 154
+        del self.module.gimbals[(1, 171)]
         self.module.cmd_camera(["for", "1:100", "set", "manager_gimbal_id", "0"])
         self.module.cmd_camera(["for", "1:100", "roi"])
         self.state.click_location = (-35.002, 149.001)
         self.module.cmd_camera(["for", "1:101", "roi"])
         self.assertEqual(set(self.module.roi.targets), {(1, 101)})
-        self.module.roi.targets[(1, 101)].last_update = 0
         self.state._master.mav.commands.clear()
-        self.module.roi.packet(position)
-        self.assertEqual(len(self.commands()), 1)
+        self.module.mavlink_packet(position)
+        self.assertFalse(self.commands())
         # Camera1's mount=0 and Camera2's mount=1 refer to the same gimbal.
         self.module.cmd_camera(["for", "1:100", "mount", "center"])
         self.assertFalse(self.module.roi.targets)
 
     def test_direct_camera_roi_uses_gimbal_address_and_clear(self):
         self.setup_camera_roi()
+        del self.module.cameras[(1, 100)]
+        del self.module.gimbals[(1, 154)]
         self.module.cmd_camera(["for", "1:101", "set", "mount_control", "device"])
         self.module.cmd_camera(["for", "1:101", "roi"])
         command = self.state._master.mav.int_commands[-1]
@@ -349,6 +377,155 @@ class CameraModuleTest(unittest.TestCase):
         self.assertEqual(command[:2], (1, 171))
         self.assertEqual(command[3], mavutil.mavlink.MAV_CMD_DO_SET_ROI_NONE)
         self.assertFalse(self.module.roi.targets)
+
+    def test_multiple_gimbals_roi_pauses_stream_before_direct_location(self):
+        position = self.setup_camera_roi()
+        # Direct ROI does not depend on fresh position telemetry at the GCS.
+        position._timestamp = 0
+        self.module.cmd_camera(["for", "1:101", "roi"])
+        mav = self.state._master.mav
+        self.assertEqual(mav.param_reads, [(1, 1, b"MNT2_TARG_RATE", -1)])
+        self.assertFalse(mav.int_commands)
+        self.roi_parameter("MNT2_TARG_RATE", 10, component=42)
+        self.assertFalse(mav.param_sets)
+        self.roi_parameter("MNT2_TARG_RATE", 10)
+        self.assertEqual(mav.param_sets[-1][:4], (1, 1, b"MNT2_TARG_RATE", 0))
+        self.assertFalse(mav.int_commands)
+        self.roi_parameter("MNT2_TARG_RATE", 0)
+        self.assertEqual(len(mav.int_commands), 1)
+        self.assertEqual(mav.int_commands[0][:4],
+                         (1, 171, mavutil.mavlink.MAV_FRAME_GLOBAL,
+                          mavutil.mavlink.MAV_CMD_DO_SET_ROI_LOCATION))
+        self.assertEqual(mav.int_commands[0][10:], (-350000000, 1490000000, 600.0))
+        for _ in range(5):
+            self.module.mavlink_packet(position)
+        self.assertFalse(self.commands())
+        self.assertEqual(len(mav.int_commands), 1)
+        self.module.cmd_camera(["for", "1:101", "mount", "center"])
+        self.assertEqual(mav.int_commands[-1][3], mavutil.mavlink.MAV_CMD_DO_SET_ROI_NONE)
+        self.assertEqual(mav.param_sets[-1][:4], (1, 1, b"MNT2_TARG_RATE", 10))
+        self.assertFalse(self.module.roi.targets)
+        self.roi_parameter("MNT2_TARG_RATE", 10)
+        self.assertFalse(self.module.roi.streams)
+
+    def test_direct_roi_replacement_keeps_original_stream_rate(self):
+        self.setup_camera_roi()
+        self.module.cmd_camera(["for", "1:101", "roi"])
+        self.roi_parameter("MNT2_TARG_RATE", 20)
+        self.roi_parameter("MNT2_TARG_RATE", 0)
+        mav = self.state._master.mav
+        self.state.click_location = (-35.002, 149.001)
+        self.module.cmd_camera(["for", "1:101", "roi"])
+        self.assertEqual(len(mav.param_sets), 1)
+        self.assertEqual(mav.int_commands[-1][10:], (-350020000, 1490010000, 600.0))
+        self.module.cmd_camera(["for", "1:101", "roi", "clear"])
+        self.assertEqual(mav.param_sets[-1][3], 20)
+
+    def test_roi_pause_timeout_cancels_and_restores(self):
+        self.setup_camera_roi()
+        self.module.cmd_camera(["for", "1:101", "roi"])
+        self.roi_parameter("MNT2_TARG_RATE", 10)
+        stream = self.module.roi.streams[("device", 1, 171, 0)]
+        for _ in range(3):
+            stream.sent_at = 0
+            self.module.roi.idle()
+        self.assertFalse(self.module.roi.targets)
+        self.assertEqual(stream.phase, "restore")
+        mav = self.state._master.mav
+        self.assertFalse([c for c in mav.int_commands if c[3] ==
+                          mavutil.mavlink.MAV_CMD_DO_SET_ROI_LOCATION])
+        self.assertEqual(mav.param_sets[-1][3], 10)
+        self.roi_parameter("MNT2_TARG_RATE", 10)
+        self.assertFalse(self.module.roi.streams)
+
+    def test_roi_rejection_restores_target_stream(self):
+        self.setup_camera_roi()
+        self.module.cmd_camera(["for", "1:101", "roi"])
+        self.roi_parameter("MNT2_TARG_RATE", 10)
+        self.roi_parameter("MNT2_TARG_RATE", 0)
+        self.module.mavlink_packet(Message(
+            "COMMAND_ACK", component_id=171,
+            command=mavutil.mavlink.MAV_CMD_DO_SET_ROI_LOCATION,
+            result=mavutil.mavlink.MAV_RESULT_UNSUPPORTED))
+        self.assertFalse(self.module.roi.targets)
+        self.assertEqual(self.state._master.mav.param_sets[-1][3], 10)
+
+    def test_roi_all_rejects_unsupported_gimbal_before_any_command(self):
+        self.setup_camera_roi()
+        self.module.gimbals[(1, 171)].information.cap_flags2 = 0
+        self.module.cmd_camera(["roi", "all"])
+        self.assertFalse(self.state._master.mav.param_reads)
+        self.assertFalse(self.state._master.mav.int_commands)
+        self.assertFalse(self.commands())
+
+    def test_shared_direct_roi_clear_restores_only_its_mount(self):
+        self.setup_camera_roi()
+        self.module.mavlink_packet(camera_information(component_id=102, gimbal_device_id=171))
+        self.module.cmd_camera(["for", "1:101", "roi"])
+        self.roi_parameter("MNT2_TARG_RATE", 10)
+        self.roi_parameter("MNT2_TARG_RATE", 0)
+        self.module.cmd_camera(["for", "1:102", "mount", "center"])
+        self.assertFalse(self.module.roi.targets)
+        mav = self.state._master.mav
+        self.assertEqual(mav.param_sets[-1][:4], (1, 1, b"MNT2_TARG_RATE", 10))
+        self.assertEqual(mav.int_commands[-1][1], 171)
+
+    def test_roi_clear_during_pause_cannot_start_roi_on_late_response(self):
+        self.setup_camera_roi()
+        self.module.cmd_camera(["for", "1:101", "roi"])
+        self.roi_parameter("MNT2_TARG_RATE", 10)
+        self.module.cmd_camera(["for", "1:101", "roi", "clear"])
+        self.roi_parameter("MNT2_TARG_RATE", 0)
+        mav = self.state._master.mav
+        self.assertFalse([c for c in mav.int_commands if c[3] ==
+                          mavutil.mavlink.MAV_CMD_DO_SET_ROI_LOCATION])
+        self.assertEqual(mav.param_sets[-1][3], 10)
+        self.roi_parameter("MNT2_TARG_RATE", 10)
+        self.assertFalse(self.module.roi.streams)
+
+    def test_roi_read_timeout_does_not_change_parameters(self):
+        self.setup_camera_roi()
+        self.module.cmd_camera(["for", "1:101", "roi"])
+        stream = self.module.roi.streams[("device", 1, 171, 0)]
+        for _ in range(3):
+            stream.sent_at = 0
+            self.module.roi.idle()
+        self.assertFalse(self.module.roi.targets)
+        self.assertFalse(self.module.roi.streams)
+        self.assertFalse(self.state._master.mav.param_sets)
+
+    def test_roi_ack_timeout_restores_stream(self):
+        self.setup_camera_roi()
+        self.module.cmd_camera(["for", "1:101", "roi"])
+        self.roi_parameter("MNT2_TARG_RATE", 10)
+        self.roi_parameter("MNT2_TARG_RATE", 0)
+        target = self.module.roi.targets[(1, 101)]
+        for _ in range(3):
+            target.sent_at = 0
+            self.module.roi.idle()
+        self.assertFalse(self.module.roi.targets)
+        self.assertEqual(self.state._master.mav.param_sets[-1][3], 10)
+
+    def test_roi_external_stream_change_is_not_overwritten(self):
+        self.setup_camera_roi()
+        self.module.cmd_camera(["for", "1:101", "roi"])
+        self.roi_parameter("MNT2_TARG_RATE", 10)
+        self.roi_parameter("MNT2_TARG_RATE", 0)
+        self.roi_parameter("MNT2_TARG_RATE", 5)
+        self.assertFalse(self.module.roi.targets)
+        self.assertFalse(self.module.roi.streams)
+        self.assertEqual(len(self.state._master.mav.param_sets), 1)
+
+    def test_roi_unload_requests_rate_restoration(self):
+        self.setup_camera_roi()
+        self.module.cmd_camera(["for", "1:101", "roi"])
+        self.roi_parameter("MNT2_TARG_RATE", 10)
+        self.roi_parameter("MNT2_TARG_RATE", 0)
+        self.module.unload()
+        self.assertFalse(self.module.roi.targets)
+        mav = self.state._master.mav
+        self.assertEqual(mav.param_sets[-1][3], 10)
+        self.assertEqual(mav.int_commands[-1][3], mavutil.mavlink.MAV_CMD_DO_SET_ROI_NONE)
 
     @mock.patch("MAVProxy.modules.mavproxy_camera.video_view.VideoView")
     def test_menu_video_order_when_camera_two_is_discovered_first(self, view_class):

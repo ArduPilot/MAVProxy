@@ -246,7 +246,7 @@ class CameraModule(mp_module.MPModule):
                 self.menu_modules[name] = module
 
     def unload(self):
-        self.roi.targets.clear()
+        self.roi.close()
         self.remove_command("camera")
         self._clear_fov()
         for view in self.views.values():
@@ -1332,13 +1332,15 @@ class CameraModule(mp_module.MPModule):
                     # commands. Retain each source independently for later use.
                     self.manager_attitudes[(system_id, component_id, gimbal_id)] = message
         elif message_type == "GLOBAL_POSITION_INT":
-            self.roi.packet(message)
             self._show_fov(message)
+        elif message_type == "PARAM_VALUE":
+            self.roi.parameter(message)
         elif message_type == "COMMAND_ACK":
             key = (system_id, component_id, message.command)
             pending = self.pending_commands.get(key, 0)
             if pending == 0:
                 return
+            self.roi.ack(message)
             self.last_ack[key] = message
             if message.result != mavutil.mavlink.MAV_RESULT_IN_PROGRESS:
                 if pending == 1:
@@ -1356,6 +1358,7 @@ class CameraModule(mp_module.MPModule):
     def idle_task(self):
         now = time.time()
         self.graphs.idle()
+        self.roi.idle()
         self._sync_menus()
         for key, view in list(self.views.items()):
             view.check_events()
