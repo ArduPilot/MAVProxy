@@ -13,7 +13,7 @@ MAVProxyAny = Analysis(['mavproxy.py'],
                             'wx.lib.embeddedimage', 'wx.lib.imageutils', 'wx.lib.agw.aquabutton', 
                             'wx.lib.agw.gradientbutton',
                             'packaging', 'packaging.version', 'packaging.specifiers',
-                            'requests',
+                            'requests', 'scipy',
                             ] + collect_submodules('MAVProxy.modules') + 
                             collect_submodules('pymavlink') + collect_submodules('yaml') + collect_submodules('pygame'),
              datas= [ ('modules\\mavproxy_map\\data\\*.*', 'MAVProxy\\modules\\mavproxy_map\\data' ),
@@ -31,7 +31,7 @@ MAVExpAny = Analysis(['.\\tools\\MAVExplorer.py'],
                             'prompt_toolkit', 'HTMLParser', 'wx.grid', 'wx._grid',
                             'wx.lib.agw.genericmessagedialog', 'wx.lib.wordwrap', 'wx.lib.buttons',
                             'wx.lib.embeddedimage', 'wx.lib.imageutils', 'wx.lib.agw.aquabutton', 
-                            'wx.lib.agw.gradientbutton', 'FileDialog', 'Dialog',
+                            'wx.lib.agw.gradientbutton', 'FileDialog', 'Dialog', 'scipy',
                             ] + collect_submodules('pymavlink'),
              # mavproxy_map\data holds the map icons, needed by both the 2D map
              # and the 3D map that MAVExplorer can open
