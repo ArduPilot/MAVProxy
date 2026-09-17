@@ -84,14 +84,17 @@ def fetch_terrain_tile(z, x, y, timeout=30):
         # whole fetch the deadline the caller asked for
         deadline = time.time() + timeout
         response = urllib.request.urlopen(req, timeout=timeout)
+        # read() waits to fill its buffer, however long the bytes take to
+        # come; read1() hands back what has arrived
+        read = getattr(response, 'read1', response.read)
         chunks = []
         while True:
-            chunk = response.read(64 * 1024)
+            chunk = read(64 * 1024)
             if not chunk:
                 break
             chunks.append(chunk)
             if time.time() > deadline:
-                raise TimeoutError("terrain tile took longer than %.0fs"
+                raise TimeoutError("terrain tile took longer than %gs"
                                    % timeout)
         data = b"".join(chunks)
         # publish atomically under a unique name: the viewer child process and

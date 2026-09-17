@@ -212,6 +212,23 @@ class TestProjection(object):
                             lambda request, timeout=None: Dripping())
         with pytest.raises(Exception):
             terrain.fetch_terrain_tile(12, 1, 2, timeout=0.05)
+
+        # as a real response does, whose read() waits to fill its buffer
+        # however long the bytes take, and whose read1() does not
+        class Buffering(Dripping):
+            def read(self, size=None):
+                time.sleep(0.01 * self.left)
+                (data, self.left) = (b'.' * self.left, 0)
+                return data
+
+            def read1(self, size=None):
+                return Dripping.read(self, size)
+        monkeypatch.setattr(urllib.request, 'urlopen',
+                            lambda request, timeout=None: Buffering())
+        started = time.time()
+        with pytest.raises(TimeoutError, match='longer than 0.05s'):
+            terrain.fetch_terrain_tile(12, 1, 2, timeout=0.05)
+        assert time.time() - started < 0.5
         monkeypatch.setattr(terrain, 'fetch_terrain_tile', fetch)
         for asked in (5.0, None):
             with pytest.raises(Stop):

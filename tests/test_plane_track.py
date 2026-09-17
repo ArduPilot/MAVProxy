@@ -2710,6 +2710,25 @@ class TestApproachCourse(object):
         self.wind(module, -176.0)
         assert flights == [None, 90.0, 130.0, -180.0]
 
+    def test_a_wind_with_no_estimate_changes_nothing(self, monkeypatch):
+        # an EKF with no estimate of the wind sends NaN
+        flights = []
+        real = plane_track.mission_track
+
+        def recording(*args, **kwargs):
+            flights.append(kwargs.get('approach'))
+            return real(*args, **kwargs)
+        monkeypatch.setattr(plane_track, 'mission_track', recording)
+        module = self.live_module()
+        module.send_mission()
+        self.wind(module, 88.0)
+        for direction in (float('nan'), float('inf'), -float('inf')):
+            self.wind(module, direction)
+        module.send_mission()
+        # the course stands, so the path is not drawn again
+        assert module.approach == 90.0
+        assert flights == [None, 90.0]
+
     def test_the_wind_does_not_matter_to_a_mission_landing_otherwise(
             self, monkeypatch):
         flights = []

@@ -903,9 +903,10 @@ class Map3DModule(mp_module.MPModule):
                 self.origin_amsl = m.Alt
                 self.send_rally()
                 self.send_mission()
-        elif mtype == 'WIND':
+        elif mtype == 'WIND' and math.isfinite(m.direction):
             # where the wind comes from, which is the course ArduPlane
-            # works out for a VTOL landing approach, by the same sum
+            # works out for a VTOL landing approach, by the same sum.  An
+            # EKF with no estimate sends NaN, which says nothing
             approach = (round(m.direction / APPROACH_CHANGE) *
                         APPROACH_CHANGE)
             approach = (approach + 180.0) % 360.0 - 180.0
