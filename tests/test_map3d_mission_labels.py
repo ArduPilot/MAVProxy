@@ -201,8 +201,9 @@ class TestMissionLabels(object):
     def test_a_map_with_no_scene_yet_keeps_what_it_is_told(self, map3d_frame):
         '''the live map is started before the vehicle has said where it is,
         so what it is told to draw waits for a scene to draw it in'''
-        from MAVProxy.modules.mavproxy_map3d.map3d_ui import Map3DFrame
+        # the fixture skips without wx, which the frame's module needs
         frame = map3d_frame()
+        from MAVProxy.modules.mavproxy_map3d.map3d_ui import Map3DFrame
         Map3DFrame.handle(frame, ('mission_labels', True))
         Map3DFrame.handle(frame, ('mission_label_size', 20))
         Map3DFrame.handle(frame, ('mission_style', 'plain'))

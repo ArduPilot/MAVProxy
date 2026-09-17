@@ -48,6 +48,17 @@ def explorer():
     return module
 
 
+def extras(heading, start, rally, approach):
+    '''what the drawing is given beyond the mission, where there is
+    anything to say: a course of 0 is north, which is something'''
+    out = {}
+    for (name, value) in (('heading', heading), ('start', start),
+                          ('rally', rally), ('approach', approach)):
+        if value is not None and value != []:
+            out[name] = value
+    return out
+
+
 def times(mlog):
     '''when the aircraft starts flying the mission as a plane -- the end of
     a QuadPlane's transition, or arming -- and when it starts to land or
@@ -111,11 +122,7 @@ def record(log, out, source, start=None, end=None):
         captured['home'] = list(home)
         captured['items'] = [[c, la, lo, a, list(p)]
                              for (c, la, lo, a, p) in items]
-        # the rest where there is anything to say
-        for (name, value) in (('heading', heading), ('start', start),
-                              ('rally', rally), ('approach', approach)):
-            if value:
-                captured[name] = value
+        captured.update(extras(heading, start, rally, approach))
         return real(home, items, params, heading, start, rally, approach)
     plane_track.mission_track = capture
     try:

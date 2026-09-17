@@ -1056,6 +1056,32 @@ class TestFlownMission(object):
         with open(path) as f:
             return (json.load(f), FLIGHTS[request.param])
 
+    def test_a_course_of_north_is_recorded(self):
+        import importlib.util
+        path = os.path.join(os.path.dirname(__file__), 'missions',
+                            'record_flight.py')
+        spec = importlib.util.spec_from_file_location('record_flight', path)
+        recorder = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(recorder)
+        assert recorder.extras(0.0, None, [], 0.0) == {
+            'heading': 0.0, 'approach': 0.0}
+        assert recorder.extras(None, (1, 2, 3), [(4, 5, 6)], None) == {
+            'start': (1, 2, 3), 'rally': [(4, 5, 6)]}
+
+    def test_a_loiter_to_altitude_with_no_radius_is_reached_at_the_default(
+            self):
+        # WP_LOITER_RAD 80: a point 100m from the centre is on its circle,
+        # which with 50 it is not, and one 60m off is
+        (lat, lon, amsl) = offset(1000, 0, 100)
+        items = [(mavlink.MAV_CMD_NAV_LOITER_TO_ALT, lat, lon, amsl,
+                  (0, 0, 0, 0))]
+        path = [offset(0, 0, 100), offset(500, 0, 100),
+                offset(900, 0, 100), offset(1000, 60, 100)]
+        assert self.arrivals(path, items, dict(PARAMS, WP_LOITER_RAD=80)) == \
+            [(1, 2)]
+        assert self.arrivals(path, items, dict(PARAMS, WP_LOITER_RAD=-50)) == \
+            [(1, 3)]
+
     @staticmethod
     def drawn(data):
         '''the path drawn for a recorded flight's mission, given what
@@ -1128,11 +1154,11 @@ class TestFlownMission(object):
                mavlink.MAV_CMD_NAV_LAND,
                mavlink.MAV_CMD_NAV_VTOL_LAND)
 
-    def arrivals(self, path, items):
+    def arrivals(self, path, items, flight_params):
         '''for each item flown to, in mission order, the index into path of
         the first point near it after the item before was reached: a
         waypoint's is within the distance a turn is started out, a loiter's
-        within its circle.  An item reached out of turn leaves the ones
+        within its circle, which is WP_LOITER_RAD's where it gives none.  An item reached out of turn leaves the ones
         after it unreached, as None; so does a flight which ends short.
         Items with no position, those ArduPlane skips, takeoffs, which the
         flight starts from, VTOL landings, and anything after the item which
@@ -1149,7 +1175,11 @@ class TestFlownMission(object):
                 continue
             near = 120.0
             if command == mavlink.MAV_CMD_NAV_LOITER_TO_ALT:
-                near = abs(params[1]) * 1.4
+                radius = abs(params[1] or 0.0)
+                if radius <= 1:
+                    radius = abs(plane_track.parameter(flight_params,
+                                                       'WP_LOITER_RAD'))
+                near = radius * 1.4
             index = None
             if after is not None:
                 for i in range(after, len(path)):
@@ -1171,8 +1201,8 @@ class TestFlownMission(object):
         (data, _) = flight
         (items, track) = self.drawn(data)
         flown = data['flown']
-        drawn = self.arrivals(track, items)
-        seen = self.arrivals(flown, items)
+        drawn = self.arrivals(track, items, data['params'])
+        seen = self.arrivals(flown, items, data['params'])
         # the flight kept ends short of the last waypoint
         seen = [(seq, i) for (seq, i) in seen if i is not None]
         order = [seq for (seq, i) in sorted(seen, key=lambda x: x[1])]
