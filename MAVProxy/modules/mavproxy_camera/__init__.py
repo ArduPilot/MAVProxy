@@ -86,6 +86,10 @@ class CameraDevice:
         self.recording_verify_at = 0.0
         self.storage = {}
         self.streams = {}
+        self.thermal_requested = False
+        self.thermal_interval = None
+        self.last_thermal_request = 0.0
+        self.last_thermal_update = 0.0
         self.definition = None
         self.parameters = None
         self.control_overrides = {}
@@ -135,6 +139,7 @@ class CameraModule(mp_module.MPModule):
             ("rtsp_latency", int, 100),
             ("request_interval", float, 2.0),
             ("status_interval", float, 5.0),
+            ("temperature_rate", float, 5.0),
             ("show_fov", bool, True),
             ("fov_update_interval", float, 0.2),
             ("fov_max_range", float, 10000.0),
@@ -454,7 +459,42 @@ class CameraModule(mp_module.MPModule):
         for message_id, instance in requests:
             self._request_message(camera.system_id, camera.component_id,
                                   message_id, instance)
+        self._request_thermal_state(camera)
         camera.last_request = time.time()
+
+    def _request_thermal_state(self, camera, force=False):
+        """Start thermal telemetry for logging and graphs, with a one-shot probe."""
+        message_id = getattr(mavutil.mavlink, "MAVLINK_MSG_ID_CAMERA_THERMAL_RANGE", None)
+        if message_id is None:
+            if force:
+                print("Camera temperature requires pymavlink with CAMERA_THERMAL_RANGE support")
+            return
+        capability = getattr(mavutil.mavlink, "CAMERA_CAP_FLAGS_HAS_THERMAL_RANGE", 4096)
+        supported = getattr(camera.information, "flags", 0) & capability
+        if not (force or supported or camera.thermal_requested):
+            return
+        rate = camera.control_overrides.get("temperature_rate", self.camera_settings.temperature_rate)
+        if not math.isfinite(rate) or rate <= 0:
+            interval = -1
+        else:
+            interval = max(1, round(1e6 / rate))
+        now = time.time()
+        if (camera.thermal_interval == interval and not force and
+                (interval == -1 or now - camera.last_thermal_request < 5 or
+                 now - camera.last_thermal_update < max(2, 3 * interval * 1e-6))):
+            return
+        camera.thermal_requested = True
+        camera.thermal_interval = interval
+        camera.last_thermal_request = now
+        self._send_command(camera.system_id, camera.component_id,
+                           mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL,
+                           (message_id, interval, 0, 0))
+        if interval != -1:
+            self._request_message(camera.system_id, camera.component_id, message_id)
+        if force and not supported:
+            print("Camera %u:%u does not advertise thermal-range telemetry; "
+                  "requesting it, but camera firmware support is required" %
+                  (camera.system_id, camera.component_id))
 
     def _request_gimbal_state(self, gimbal):
         self._request_message(
@@ -1282,6 +1322,9 @@ class CameraModule(mp_module.MPModule):
             parameters = camera.parameters
             if parameters.definition is not None and "CAM_MODE" in parameters.definition.parameters:
                 parameters.request_read("CAM_MODE")
+        elif message_type == "CAMERA_THERMAL_RANGE":
+            camera = self._ensure_camera(system_id, component_id)
+            camera.last_thermal_update = time.time()
         elif message_type == "CAMERA_CAPTURE_STATUS":
             camera = self._ensure_camera(system_id, component_id)
             camera.capture_status = message

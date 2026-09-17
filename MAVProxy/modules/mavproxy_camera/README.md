@@ -153,7 +153,7 @@ controlling the mount through either camera stops that tracking.
 Choose **Camera → Graphs** in the console or map menu. Graphs use MAVProxy's
 usual live graph windows and require wxPython and matplotlib. The available
 graphs are gimbal attitude, angular rates (all axes, pitch only, or yaw only),
-gimbal flags, failure flags, sample time, camera zoom, focus, capture mode,
+gimbal flags, failure flags, sample time, camera zoom, focus, capture mode, TMax,
 vehicle height above terrain, and vehicle battery voltage. `camera graph`
 lists the command names; for example, `camera graph attitude` or
 `camera graph rates`. `camera graph close` closes all camera graph windows.
@@ -168,12 +168,21 @@ helps identify frame/mode changes. Sample time is the sender's boot time in
 seconds. Capture mode is the camera photo/video enum, not SIYI's gimbal mode.
 Camera zoom/focus/mode update at the camera state polling interval.
 
+**TMax** (`camera graph tmax`) plots the thermal stream's maximum temperature
+in degrees Celsius from `CAMERA_THERMAL_RANGE.max`. Each graph is bound to its
+camera and thermal stream. Cameras advertising `CAMERA_CAP_FLAGS_HAS_THERMAL_RANGE`
+are requested to stream thermal telemetry at 5 Hz, including when no graph is
+open so that it is available in the telemetry log. Set `camera set temperature_rate N`
+to change the rate (zero disables requests for streaming). Opening TMax also
+probes cameras that do not advertise the capability, but firmware must implement
+the thermal-range message; an RTSP thermal image alone does not provide temperatures.
+
 Graphs need their corresponding MAVLink messages to arrive; unsupported or
 unknown values are not plotted. In particular, angular rates may be unavailable
 in an autopilot's forwarded status even when attitude is available. Terrain
 height and battery voltage come from the selected vehicle's autopilot. Voltage
 is the total pack voltage, without `siyi.scr`'s aircraft-specific six-cell divisor.
-SIYI's controller demand/error, encoder, motor-voltage, threshold and temperature
+SIYI's controller demand/error, encoder, motor-voltage and threshold
 graphs have no equivalent telemetry in AP_CameraGimbal and are not included.
 
 ## Custom camera settings

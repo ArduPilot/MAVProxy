@@ -6,6 +6,8 @@ mix a device's vehicle-frame yaw with an autopilot's earth-frame mount status.
 
 import math
 
+from pymavlink import mavutil
+
 
 GIMBAL_STATUS = "GIMBAL_DEVICE_ATTITUDE_STATUS"
 
@@ -23,6 +25,7 @@ PRESETS = (
     ("zoom", "Zoom", "CAMERA_SETTINGS", ("Zoom (%)",)),
     ("focus", "Focus", "CAMERA_SETTINGS", ("Focus (%)",)),
     ("mode", "Capture mode", "CAMERA_SETTINGS", ("Camera mode (enum)",)),
+    ("tmax", "TMax", "CAMERA_THERMAL_RANGE", ("Maximum temperature (degC)",)),
     ("terrain", "Terrain height", "TERRAIN_REPORT", ("Height above terrain (m)",)),
     ("voltage", "Battery voltage", "SYS_STATUS", ("Vehicle battery voltage (V)",)),
 )
@@ -53,6 +56,7 @@ class CameraGraphs:
         system = camera.system_id if camera else module.target_system or 1
         component = module.camera_settings.manager_component
         gimbal_id = None
+        stream_id = None
         if message_type == GIMBAL_STATUS:
             gimbal = module._selected_gimbal(required=False)
             if gimbal is not None:
@@ -73,11 +77,17 @@ class CameraGraphs:
                 # ArduPilot may consume targeted device reports locally and
                 # publish only its own status to the GCS.
                 gimbal_id = manager_id
-        elif message_type == "CAMERA_SETTINGS":
+        elif message_type in ("CAMERA_SETTINGS", "CAMERA_THERMAL_RANGE"):
             if camera is None:
                 print("No MAVLink camera discovered; use 'camera discover'")
                 return
             component = camera.component_id
+            if message_type == "CAMERA_THERMAL_RANGE":
+                streams = sorted(s.stream_id for s in camera.streams.values()
+                                 if s.flags & mavutil.mavlink.VIDEO_STREAM_STATUS_FLAGS_THERMAL)
+                if streams:
+                    stream_id = streams[0]
+                module._request_thermal_state(camera, force=True)
         else:
             if module.command_camera is None:
                 system = module.target_system or 1
@@ -86,10 +96,12 @@ class CameraGraphs:
         source = "%u:%u" % (system, component)
         if gimbal_id is not None:
             source += " mount %u" % gimbal_id
+        if stream_id is not None:
+            source += " stream %u" % stream_id
         from MAVProxy.modules.lib.live_graph import LiveGraph
         graph = LiveGraph(list(fields), title="Camera: %s (%s)" % (title, source))
         owner = None if camera is None else (camera.system_id, camera.component_id)
-        self.windows.append((name, message_type, system, component, gimbal_id, owner, graph))
+        self.windows.append((name, message_type, system, component, gimbal_id, stream_id, owner, graph))
         print("Camera graph: %s (%s)" % (title, source))
 
     def values(self, name, message):
@@ -106,6 +118,7 @@ class CameraGraphs:
             "zoom": ("zoomLevel", 1),
             "focus": ("focusLevel", 1),
             "mode": ("mode_id", 1),
+            "tmax": ("max", 1),
             "terrain": ("current_height", 1),
             "voltage": ("voltage_battery", 0.001),
         }[name]
@@ -115,13 +128,21 @@ class CameraGraphs:
         return [value * scale]
 
     def packet(self, message):
-        for name, message_type, system, component, gimbal_id, _owner, graph in self.windows:
+        for index, window in enumerate(self.windows):
+            name, message_type, system, component, gimbal_id, stream_id, owner, graph = window
             if (message.get_type() != message_type or
                     message.get_srcSystem() != system or
                     message.get_srcComponent() != component or
                     (gimbal_id is not None and
                      getattr(message, "gimbal_device_id", 0) != gimbal_id)):
                 continue
+            if message_type == "CAMERA_THERMAL_RANGE":
+                # A standalone camera's temperature must not be mixed with
+                # another stream or an autopilot-attached camera instance.
+                if getattr(message, "camera_device_id", 0) != 0:
+                    continue
+                if stream_id is not None and message.stream_id != stream_id:
+                    continue
             try:
                 values = self.values(name, message)
                 # MAVLink NaN means unknown. LiveGraph cannot autoscale NaNs;
@@ -130,6 +151,9 @@ class CameraGraphs:
                     continue
             except (AttributeError, TypeError, ValueError):
                 continue
+            if message_type == "CAMERA_THERMAL_RANGE" and stream_id is None:
+                self.windows[index] = (name, message_type, system, component,
+                                       gimbal_id, message.stream_id, owner, graph)
             graph.add_values(values)
 
     def idle(self):

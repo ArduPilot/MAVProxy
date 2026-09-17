@@ -757,6 +757,8 @@ class CameraModuleTest(unittest.TestCase):
             "time": (gimbal, [12]), "zoom": (settings, [25]),
             "focus": (settings, [50]), "mode": (settings, [1]),
             "terrain": (terrain, [80]), "voltage": (voltage, [24]),
+            "tmax": (Message("CAMERA_THERMAL_RANGE", stream_id=2,
+                             camera_device_id=0, max=37.25), [37.25]),
         }
         for name, _title, _message_type, _fields in PRESETS:
             with self.subTest(name=name):
@@ -771,6 +773,66 @@ class CameraModuleTest(unittest.TestCase):
                     self.assertAlmostEqual(a, b)
                 self.module.cmd_camera(["graph", "close"])
                 graph.close.assert_called_once()
+
+    @mock.patch("MAVProxy.modules.lib.mp_util.has_wxpython", True)
+    @mock.patch("MAVProxy.modules.lib.live_graph.LiveGraph")
+    def test_tmax_graph_is_bound_to_camera_and_thermal_stream(self, live_graph):
+        first, second = mock.Mock(), mock.Mock()
+        live_graph.side_effect = [first, second]
+        for component in (100, 101):
+            self.module.mavlink_packet(camera_information(component_id=component))
+            stream = stream_information(2, thermal=True)
+            stream._component_id = component
+            self.module.mavlink_packet(stream)
+            self.module.cmd_camera(["for", "1:%u" % component, "graph", "tmax"])
+        requests = self.commands(mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL)
+        self.assertEqual([c[:2] for c in requests], [(1, 100), (1, 101)])
+        for c in requests:
+            self.assertEqual(c[4:8], (mavutil.mavlink.MAVLINK_MSG_ID_CAMERA_THERMAL_RANGE,
+                                     200000, 0, 0))
+        self.assertIn("1:101 stream 2", live_graph.call_args.kwargs["title"])
+        for system, component, stream, device, value in [
+                (1, 101, 1, 0, 99), (2, 101, 2, 0, 99),
+                (1, 101, 2, 1, 99), (1, 101, 2, 0, math.nan),
+                (1, 101, 2, 0, math.inf)]:
+            self.module.mavlink_packet(Message("CAMERA_THERMAL_RANGE", system_id=system,
+                component_id=component, stream_id=stream, camera_device_id=device, max=value))
+        first.add_values.assert_not_called()
+        second.add_values.assert_not_called()
+        self.module.mavlink_packet(Message("CAMERA_THERMAL_RANGE", component_id=101,
+                                          stream_id=2, camera_device_id=0, max=-5.25))
+        second.add_values.assert_called_once_with([-5.25])
+        first.add_values.assert_not_called()
+        self.module.mavlink_packet(Message("CAMERA_THERMAL_RANGE", component_id=100,
+                                          stream_id=2, camera_device_id=0, max=42.5))
+        first.add_values.assert_called_once_with([42.5])
+
+    def test_thermal_telemetry_requested_without_open_graph(self):
+        self.module.mavlink_packet(camera_information(
+            flags=mavutil.mavlink.CAMERA_CAP_FLAGS_HAS_THERMAL_RANGE))
+        intervals = self.commands(mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL)
+        self.assertEqual(len(intervals), 1)
+        self.assertEqual(intervals[0][4:6],
+                         (mavutil.mavlink.MAVLINK_MSG_ID_CAMERA_THERMAL_RANGE, 200000))
+        camera = self.module.cameras[(1, 100)]
+        self.state._master.mav.commands.clear()
+        self.module._request_thermal_state(camera)
+        self.assertFalse(self.commands())
+        camera.last_thermal_request = 0
+        self.module._request_thermal_state(camera)
+        self.assertEqual(len(self.commands(mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL)), 1)
+        self.module.mavlink_packet(Message("CAMERA_THERMAL_RANGE", component_id=100,
+                                          stream_id=2, camera_device_id=0, max=42))
+        camera.last_thermal_request = 0
+        self.state._master.mav.commands.clear()
+        self.module._request_thermal_state(camera)
+        self.assertFalse(self.commands())
+        self.module.camera_settings.temperature_rate = 10
+        self.module._request_thermal_state(camera)
+        self.assertEqual(self.commands(mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL)[-1][5], 100000)
+        self.module.camera_settings.temperature_rate = 0
+        self.module._request_thermal_state(camera)
+        self.assertEqual(self.commands(mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL)[-1][5], -1)
 
     @mock.patch("MAVProxy.modules.lib.mp_util.has_wxpython", True)
     @mock.patch("MAVProxy.modules.lib.live_graph.LiveGraph")
