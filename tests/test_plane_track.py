@@ -1007,39 +1007,42 @@ class TestMissionFlight(object):
         assert track is not None
 
 
-# SITL flights of ArduPilot autotest missions, recorded by
+# SITL flights of ArduPilot autotest missions -- added by ArduPilot PR 34424,
+# https://github.com/ArduPilot/ardupilot/pull/34424 -- recorded by
 # missions/record_flight.py, and how near the path drawn for each has to
-# keep to it: the median and 90th percentile of the distance from each point
-# flown to the path drawn, the worst of them, and the worst after the first
-# 30s, which takes in a QuadPlane's transition and a plane's takeoff
+# keep to it: the median and 90th percentile of the distance across from
+# each point flown to the path drawn, the worst of them, and the worst after
+# the first 30s, which takes in a QuadPlane's transition and a plane's
+# takeoff; and the 90th percentile and worst of the height of each point
+# flown above or below the nearest point of the path drawn
 FLIGHTS = {
     # QuadPlane.KalaupapaCanyonRun: loiters up and down over the sea, a
     # winding gorge inland, a spiral up out of the head of the canyon, and
     # down with the ground over a ridge and along the valley beyond
-    'kalaupapa-canyon-run.json': (2.0, 8.0, 80.0, 30.0),
+    'kalaupapa-canyon-run.json': (2.0, 8.0, 80.0, 30.0, 25.0, 45.0),
     # Plane.MissionItemTypes: every kind of item a plane flies on the way,
     # and a landing
-    'sitl-plane-mission-items.json': (3.0, 16.0, 35.0, 35.0),
+    'sitl-plane-mission-items.json': (3.0, 16.0, 35.0, 35.0, 7.0, 22.0),
     # a return to launch, which a rally point is nearer than home for
-    'sitl-plane-rtl-rally.json': (10.0, 40.0, 55.0, 55.0),
+    'sitl-plane-rtl-rally.json': (10.0, 40.0, 55.0, 55.0, 11.0, 18.0),
     # a loiter for ever
-    'sitl-plane-loiter-unlimited.json': (2.0, 16.0, 30.0, 30.0),
+    'sitl-plane-loiter-unlimited.json': (2.0, 16.0, 30.0, 30.0, 12.0, 18.0),
     # QuadPlane.VTOLMissionItemTypes: a VTOL landing on a fixed-wing
     # approach, asked for by param1
-    'sitl-quadplane-vtol-land-approach.json': (7.0, 28.0, 45.0, 45.0),
+    'sitl-quadplane-vtol-land-approach.json': (7.0, 28.0, 45.0, 45.0, 7.0, 25.0),
     # a VTOL landing straight in
-    'sitl-quadplane-vtol-land.json': (2.0, 20.0, 40.0, 40.0),
+    'sitl-quadplane-vtol-land.json': (2.0, 20.0, 40.0, 40.0, 6.0, 11.0),
     # a VTOL landing on an approach, asked for by Q_OPTIONS.  The flight
     # met its circle already within the 5 degrees of the course it breaks
     # out on, and broke out at once, where the path drawn went round once
     # more: the approach is not modelled that finely
-    'sitl-quadplane-vtol-land-q-options.json': (15.0, 42.0, 90.0, 90.0),
+    'sitl-quadplane-vtol-land-q-options.json': (15.0, 42.0, 90.0, 90.0, 13.0, 16.0),
     # a return to launch with each Q_RTL_MODE: switching to QRTL near home,
     # landing on an approach, whose circle is flown a little wider than
     # drawn, and as QRTL
-    'sitl-quadplane-rtl-q-rtl-mode-1.json': (2.0, 15.0, 40.0, 40.0),
-    'sitl-quadplane-rtl-q-rtl-mode-2.json': (13.0, 35.0, 70.0, 70.0),
-    'sitl-quadplane-rtl-q-rtl-mode-3.json': (4.0, 30.0, 45.0, 45.0),
+    'sitl-quadplane-rtl-q-rtl-mode-1.json': (2.0, 15.0, 40.0, 40.0, 7.0, 12.0),
+    'sitl-quadplane-rtl-q-rtl-mode-2.json': (13.0, 35.0, 70.0, 70.0, 7.0, 22.0),
+    'sitl-quadplane-rtl-q-rtl-mode-3.json': (4.0, 30.0, 45.0, 45.0, 6.0, 11.0),
 }
 
 
@@ -1089,6 +1092,35 @@ class TestFlownMission(object):
                     best = d
             out.append(best)
         return sorted(out)
+
+    def heights(self, track, flown):
+        '''metres each flown point is above the nearest point of track,
+        nearest counting height as well, so a spiral is measured against
+        the turn of it at the height flown; below is negative'''
+        (lat0, lon0) = (track[0][0], track[0][1])
+        scale = math.cos(math.radians(lat0))
+
+        def xyz(p):
+            return ((p[0] - lat0) * 111319.5,
+                    (p[1] - lon0) * 111319.5 * scale, p[2])
+        segments = [(xyz(a), xyz(b)) for (a, b) in zip(track, track[1:])]
+        out = []
+        for p in flown:
+            q = xyz(p)
+            best = None
+            for (a, b) in segments:
+                d = [b[i] - a[i] for i in range(3)]
+                squared = sum(x * x for x in d)
+                t = 0.0
+                if squared > 0:
+                    t = sum((q[i] - a[i]) * d[i] for i in range(3)) / squared
+                    t = min(max(t, 0.0), 1.0)
+                nearest = [a[i] + t * d[i] for i in range(3)]
+                distance = math.dist(q, nearest)
+                if best is None or distance < best[0]:
+                    best = (distance, q[2] - nearest[2])
+            out.append(best[1])
+        return out
 
     # items which end a mission's flight: nothing after one is flown to
     ENDINGS = (mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH,
@@ -1165,7 +1197,8 @@ class TestFlownMission(object):
                 flown_stage, rel=0.2), (a, b)
 
     def test_the_path_is_the_one_flown(self, flight):
-        (data, (median_limit, p90_limit, worst_limit, later_limit)) = flight
+        (data, (median_limit, p90_limit, worst_limit, later_limit, _,
+                _)) = flight
         (items, track) = self.drawn(data)
         assert track is not None
         distances = self.distances(track, data['flown'])
@@ -1182,6 +1215,14 @@ class TestFlownMission(object):
         assert distances[-1] < worst_limit
         later = self.distances(track, data['flown'][30:])
         assert later[-1] < later_limit
+
+    def test_the_path_is_flown_at_the_height_flown(self, flight):
+        # the distances above are across the ground only
+        (data, (_, _, _, _, p90_limit, worst_limit)) = flight
+        (items, track) = self.drawn(data)
+        heights = sorted(abs(h) for h in self.heights(track, data['flown']))
+        assert heights[int(len(heights) * 0.9)] < p90_limit
+        assert heights[-1] < worst_limit
 
 
 class TestDrawnTrack(object):
