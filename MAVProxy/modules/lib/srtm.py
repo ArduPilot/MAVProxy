@@ -212,7 +212,8 @@ class SRTMDownloader():
                 print('continents: ', continents)
 
             for continent in continents:
-                if not continent[0].isalpha() or continent.startswith('README'):
+                if (not continent[0].isalpha() or continent.startswith('README')
+                    or continent == 'filelist_python'):
                     continue
                 if self.debug:
                     print("Downloading file list for: ", continent)
