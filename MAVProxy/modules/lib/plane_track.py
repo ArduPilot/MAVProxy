@@ -377,6 +377,10 @@ class MissionFlight(object):
         self.next_wp_crosstrack = False
         self.offset_altitude = 0.0
         self.target_amsl = self.amsl
+        # QRTL's approach: how far above where it returns to the aircraft
+        # was, and how far from it, when the approach began, once it has
+        self.qrtl = False
+        self.qrtl_start = None
 
     def local(self, lat, lon):
         return ((lat - self.origin[0]) * 1.0e7 * LOCATION_SCALING_FACTOR,
@@ -503,6 +507,9 @@ class MissionFlight(object):
 
     def update_target_altitude(self):
         '''Mode::update_target_altitude, for AUTO away from landing'''
+        if self.qrtl:
+            self.update_qrtl_target_altitude()
+            return
         (end, end_amsl) = self.next_wp
         (start, start_amsl) = self.prev_wp
         if self.l1.circling:
@@ -521,6 +528,40 @@ class MissionFlight(object):
                                    max(start_amsl, end_amsl))
         else:
             self.target_amsl = end_amsl
+
+    def update_qrtl_target_altitude(self):
+        '''ModeQRTL::update_target_altitude, for an aircraft which entered
+        QRTL flying as a plane, whose position controller is then on its
+        approach: it comes in at RTL_ALTITUDE, or down from where it started
+        towards that where the difference is worth a slope, and drops to
+        Q_RTL_ALT over the last stretch, which is as long as descending at
+        0.6 of TECS_SINK_MAX at AIRSPEED_CRUISE takes'''
+        (end, end_amsl) = self.next_wp
+        radius = max(abs(self.loiter_radius), abs(self.rtl_radius))
+        rtl_alt_delta = max(0.0, self.rtl_altitude - self.q_rtl_alt)
+        sink_time = rtl_alt_delta / max(0.6 * self.sink, 1.0)
+        sink_dist = self.cruise * sink_time
+        dist = norm(minus(end, self.position))
+        rad_min = 2 * radius
+        rad_max = 20 * radius
+        reached = max(rad_min, min(rad_max, rad_min + sink_dist))
+        if self.qrtl_start is None:
+            self.qrtl_start = (self.amsl - end_amsl, dist)
+        (start_delta, start_dist) = self.qrtl_start
+        if dist > reached:
+            if (self.alt_slope_min > 0 and
+                    start_delta - rtl_alt_delta >= self.alt_slope_min and
+                    start_dist > reached):
+                alt = linear_interpolate(rtl_alt_delta, start_delta, dist,
+                                         reached, start_dist)
+                # never back up to the slope, once below it
+                alt = min(alt, max(rtl_alt_delta, self.amsl - end_amsl))
+            else:
+                alt = rtl_alt_delta
+        else:
+            alt = linear_interpolate(0.0, rtl_alt_delta, dist, rad_min,
+                                     reached)
+        self.target_amsl = end_amsl + alt
 
     def fly(self, lateral_acceleration, dt, climb=None):
         '''move the aircraft on by dt, banking towards the controller's
@@ -902,6 +943,12 @@ class MissionFlight(object):
                 if not self.fly_vtol_approach(location):
                     return None
                 break
+            if command == mavlink.MAV_CMD_NAV_VTOL_LAND and self.quadplane:
+                # QuadPlane::do_vtol_land: flown in at the altitude the
+                # aircraft is at, which its position controller takes it
+                # down from once there.  How far down is the ground's, so
+                # the path ends above the landing at that altitude
+                self.next_wp = (self.next_wp[0], self.amsl)
             if command in LOITER_COMMANDS:
                 finished = self.fly_loiter(index)
                 if not finished and command == mavlink.MAV_CMD_NAV_LOITER_UNLIM:
@@ -1049,6 +1096,9 @@ class MissionFlight(object):
             # wherever the aircraft is, do_RTL() having left no track
             # (QuadPlane::vtol_position_controller)
             self.crosstrack = self.q_rtl_mode == Q_RTL_SWITCH_QRTL
+            # QRTL comes in on its own altitude profile, which Q_RTL_MODE 1
+            # only switches to near home, where the path ends
+            self.qrtl = self.q_rtl_mode == Q_RTL_QRTL_ALWAYS
             if not self.fly_waypoint(index):
                 return None
         else:
@@ -1149,6 +1199,20 @@ def rally_amsl(alt, flags, home_amsl, origin_amsl=None, terrain_amsl=None):
     if datum is None:
         return None
     return datum + alt
+
+
+def linear_interpolate(low_output, high_output, value, low, high):
+    '''AP_Math's linear_interpolate: output from low_output at low to
+    high_output at high, held at either end beyond them'''
+    if low > high:
+        (low, high) = (high, low)
+        (low_output, high_output) = (high_output, low_output)
+    if value <= low:
+        return low_output
+    if value >= high:
+        return high_output
+    p = (value - low) / (high - low)
+    return low_output + p * (high_output - low_output)
 
 
 def least_flight_time(home, items, params, start=None):

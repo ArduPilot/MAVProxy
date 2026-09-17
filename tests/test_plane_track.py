@@ -696,6 +696,58 @@ class TestMissionFlight(object):
             # and it never went round
             assert all(local(p)[0] > -20.0 for p in track)
 
+    def test_qrtl_comes_home_on_its_own_altitude_profile(self):
+        '''QRTL, which Q_RTL_MODE 3 goes to at once, comes in at
+        RTL_ALTITUDE, not down a slope to Q_RTL_ALT, and drops to that only
+        over the stretch its sink rate needs (ModeQRTL::
+        update_target_altitude)'''
+        rtl = (mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH, 0, 0, None, (0, 0, 0, 0))
+        params = dict(PARAMS, RTL_RADIUS=250, Q_ENABLE=1, Q_RTL_MODE=3,
+                      RTL_ALTITUDE=100, Q_RTL_ALT=15)
+
+        def heights(start_alt):
+            track = fly([waypoint(3000, 0, start_alt), rtl], params=params)
+            turned = next(i for (i, p) in enumerate(track)
+                          if local(p)[0] > 2900)
+            return [(math.hypot(*local(p)), p[2] - HOME[2])
+                    for p in track[turned:]]
+
+        def at(heights, distance):
+            return next(h for (d, h) in heights if d < distance)
+        # from RTL_ALTITUDE: 2 * RTL_RADIUS, plus 85m at 3m/s (0.6 of
+        # TECS_SINK_MAX) and AIRSPEED_CRUISE, out: 500m + 22m/s * 28.3s
+        level = heights(100)
+        assert all(h == pytest.approx(100, abs=1) for (d, h) in level
+                   if 1150 < d < 2500)
+        assert 30 < at(level, 700) < 90
+        assert at(level, 20) == pytest.approx(15, abs=5)
+        # from higher, down a slope to RTL_ALTITUDE by then
+        high = heights(300)
+        assert 150 < at(high, 2000) < 270
+        assert at(high, 1150) == pytest.approx(100, abs=20)
+        assert at(high, 20) == pytest.approx(15, abs=5)
+
+    def test_qrtl_does_not_climb_back_up_to_its_slope(self):
+        '''an aircraft which has got below QRTL's slope down to
+        RTL_ALTITUDE is followed down, not sent back up to it'''
+        params = dict(PARAMS, RTL_RADIUS=250, Q_ENABLE=1, Q_RTL_MODE=3,
+                      RTL_ALTITUDE=100, Q_RTL_ALT=15)
+        flight = plane_track.MissionFlight((HOME[0], HOME[1]), HOME, [],
+                                           params)
+        flight.qrtl = True
+        flight.next_wp = (flight.home, HOME[2] + 15)
+        # the approach began 3km out, 300m up, and the slope from there
+        # is at 200m 2km out, where the aircraft is only 150m up
+        flight.qrtl_start = (285.0, 3000.0)
+        flight.position = (flight.home[0] + 2000.0, flight.home[1])
+        flight.amsl = HOME[2] + 150
+        flight.update_target_altitude()
+        assert flight.target_amsl == pytest.approx(HOME[2] + 150)
+        # and never below RTL_ALTITUDE while out there
+        flight.amsl = HOME[2] + 50
+        flight.update_target_altitude()
+        assert flight.target_amsl == pytest.approx(HOME[2] + 100)
+
     def test_the_first_item_navigated_to(self):
         items = [change_speed(30), self.jump(4, 1), waypoint(2000, 0),
                  waypoint(3000, 0)]
