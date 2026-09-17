@@ -134,7 +134,7 @@ class TestCirclingItems(object):
             (m.MAV_CMD_NAV_LOITER_TURNS, (3, 0, -55, 0), -55),
             (m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 90, 0), 90),
             (m.MAV_CMD_NAV_LOITER_TO_ALT, (1, -65, 0, 0), -65),
-            (m.MAV_CMD_DO_ORBIT, (80, 5, 0, 0), 80),
+            (getattr(m, 'MAV_CMD_DO_ORBIT', 34), (80, 5, 0, 0), 80),
         ]
         for (command, params, expected) in cases:
             assert mp_util.mission_circle_radius(command, params) == expected
@@ -162,10 +162,10 @@ class TestCirclingItems(object):
             m.MAV_CMD_NAV_LOITER_TURNS, (3, 0, 60, 0)) == 3
         # DO_ORBIT counts in radians
         assert mp_util.mission_circle_turns(
-            m.MAV_CMD_DO_ORBIT, (80, 5, 0, math.radians(270))) == pytest.approx(0.75)
+            getattr(m, 'MAV_CMD_DO_ORBIT', 34), (80, 5, 0, math.radians(270))) == pytest.approx(0.75)
         # circling forever, and items which do not count turns
         assert mp_util.mission_circle_turns(
-            m.MAV_CMD_DO_ORBIT, (80, 5, 0, 0)) is None
+            getattr(m, 'MAV_CMD_DO_ORBIT', 34), (80, 5, 0, 0)) is None
         assert mp_util.mission_circle_turns(
             m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 90, 0)) is None
 
@@ -192,7 +192,7 @@ class TestHoveringVehicles(object):
         m = self.mavlink
         # it flies these as circles ...
         for (command, params) in ((m.MAV_CMD_NAV_LOITER_TURNS, (2, 0, 60, 0)),
-                                  (m.MAV_CMD_DO_ORBIT, (80, 5, 0, 0))):
+                                  (getattr(m, 'MAV_CMD_DO_ORBIT', 34), (80, 5, 0, 0))):
             assert mp_util.mission_circle_radius(
                 command, params, vehicle=m.MAV_TYPE_QUADROTOR) is not None
         # ... and holds position for these, climbing straight up rather than
@@ -692,3 +692,10 @@ class TestPolygonBounds(object):
         for (lat, lon) in mp_util.arc_points(start, end, 270):
             assert arc[0] <= lat <= arc[0] + arc[2]
             assert arc[1] <= lon <= arc[1] + arc[3]
+
+
+def test_orbit_geometry_without_enum(monkeypatch):
+    from pymavlink import mavutil
+    monkeypatch.delattr(mavutil.mavlink, 'MAV_CMD_DO_ORBIT', raising=False)
+    assert mp_util.mission_circle_radius(34, (80, 5, 0, 0)) == 80
+    assert mp_util.mission_circle_turns(34, (80, 5, 0, math.pi)) == pytest.approx(.5)
