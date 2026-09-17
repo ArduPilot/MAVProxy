@@ -14,7 +14,7 @@ from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import camera_projection
 from MAVProxy.modules.mavproxy_camera.parameters import CameraParameters
 from MAVProxy.modules.mavproxy_camera.graphs import CameraGraphs, PRESETS
-from MAVProxy.modules.mavproxy_camera.roi import CameraROI
+from MAVProxy.modules.mavproxy_camera.roi import CameraROI, gimbal_capabilities
 from pymavlink import mavutil
 from pymavlink.quaternion import Quaternion
 
@@ -147,10 +147,14 @@ class CameraModule(mp_module.MPModule):
             "camera", self.cmd_camera, "MAVLink camera control",
             ["<status|discover|select|for|info|custom|definition|params|param|streams|view|projection|graph|roi|photo|stopphotos|record|zoom|focus|mode|source|stream|mount|set>",
              "roi <all|clear>",
+             "projection <toggle>",
+             "for (CAMERAADDRESS)",
              "graph <%s|close>" % "|".join(p[0] for p in PRESETS),
              "set (CAMERASETTING)"])
         self.add_completion_function("(CAMERASETTING)",
                                      self.camera_settings.completion)
+        self.add_completion_function("(CAMERAADDRESS)",
+                                     lambda text: ["%u:%u" % key for key in self._camera_menu_keys()])
         self.cameras = {}
         self.gimbals = {}
         self.manager_attitudes = {}
@@ -1204,7 +1208,7 @@ class CameraModule(mp_module.MPModule):
               (gimbal.label(), _firmware_version(info.firmware_version),
                math.degrees(info.pitch_min), math.degrees(info.pitch_max),
                math.degrees(info.yaw_min), math.degrees(info.yaw_max),
-               getattr(info, "cap_flags2", 0) or info.cap_flags))
+               gimbal_capabilities(info)))
         if gimbal.attitude is not None:
             roll, pitch, yaw = _quaternion_to_euler(gimbal.attitude.q)
             print(" attitude roll=%.1f pitch=%.1f yaw=%.1f" %

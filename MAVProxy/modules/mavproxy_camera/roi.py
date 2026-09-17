@@ -3,8 +3,29 @@
 import math
 import time
 from dataclasses import dataclass
+from typing import Optional
 
 from pymavlink import mavutil
+
+
+LOCATION_GLOBAL = getattr(mavutil.mavlink,
+                          "GIMBAL_DEVICE_CAP_FLAGS_CAN_POINT_LOCATION_GLOBAL", 1 << 17)
+
+
+def gimbal_capabilities(information):
+    """Read the extension even when an older pymavlink only decodes cap_flags."""
+    extended = getattr(information, "cap_flags2", 0)
+    if not hasattr(information, "cap_flags2"):
+        # GIMBAL_DEVICE_INFORMATION has 144 base bytes, then the one-byte
+        # gimbal_device_id and uint32 cap_flags2 MAVLink 2 extensions. Parsers
+        # retain the received frame, including extensions they do not know.
+        # Old get_payload() implementations assume a MAVLink 1 header, so
+        # take the payload from the validated MAVLink 2 frame instead.
+        frame = getattr(information, "get_msgbuf", lambda: None)()
+        if frame and frame[0] == 0xfd:
+            payload = frame[10:10 + frame[1]]
+            extended = int.from_bytes(payload[145:149], "little")
+    return extended or information.cap_flags
 
 
 @dataclass
@@ -30,7 +51,7 @@ class TargetStream:
     system: int
     component: int
     parameter: str
-    original: float = None
+    original: Optional[float] = None
     phase: str = "read"
     attempts: int = 0
     sent_at: float = 0
@@ -57,7 +78,17 @@ class CameraROI:
         mode = self.module.camera_settings.mount_control.lower()
         if mode not in ("manager", "device"):
             raise ValueError("mount_control must be manager or device")
-        return "device" if self.multiple_gimbals(camera.system_id) else mode
+        if self.multiple_gimbals(camera.system_id):
+            return "device"
+        heartbeat = self.module._vehicle_message(
+            "HEARTBEAT", camera.system_id, self.module.camera_settings.manager_component)
+        if (heartbeat is not None and
+                heartbeat.autopilot == mavutil.mavlink.MAV_AUTOPILOT_ARDUPILOTMEGA and
+                self.module._manager_id() > 1):
+            # ArduPilot's geographic ROI command ignores the mount selector.
+            # A lone MAVLink gimbal can still be MNT2 behind a servo MNT1.
+            return "device"
+        return mode
 
     def menu_items(self):
         keys = self.module._camera_menu_keys()
@@ -118,27 +149,25 @@ class CameraROI:
                                          (camera.system_id, camera.component_id))
                     target = ROITarget((lat, lon, alt), mode, gimbal.system_id,
                                        gimbal.component_id, 0)
-                    if self.multiple_gimbals(camera.system_id):
-                        info = gimbal.information
-                        if info is None:
-                            module._request_gimbal_state(gimbal)
-                            raise ValueError("waiting for gimbal %u:%u capabilities; retry ROI" %
-                                             (gimbal.system_id, gimbal.component_id))
-                        flags = getattr(info, "cap_flags2", 0) or info.cap_flags
-                        if not flags & mavutil.mavlink.GIMBAL_DEVICE_CAP_FLAGS_CAN_POINT_LOCATION_GLOBAL:
-                            raise ValueError("gimbal %u:%u does not support geographic ROI" %
-                                             (gimbal.system_id, gimbal.component_id))
-                        heartbeat = module._vehicle_message(
-                            "HEARTBEAT", camera.system_id, module.camera_settings.manager_component)
-                        if (heartbeat is not None and
-                                heartbeat.autopilot == mavutil.mavlink.MAV_AUTOPILOT_ARDUPILOTMEGA):
-                            mount = module._manager_id() or 1
-                            stream = TargetStream(camera.system_id,
-                                                  module.camera_settings.manager_component,
-                                                  "MNT%u_TARG_RATE" % mount)
-                        if (target.endpoint in self.streams and
-                                self.streams[target.endpoint].phase == "restore"):
-                            raise ValueError("waiting for mount target stream restoration; retry ROI")
+                    info = gimbal.information
+                    if info is None:
+                        module._request_gimbal_state(gimbal)
+                        raise ValueError("waiting for gimbal %u:%u capabilities; retry ROI" %
+                                         (gimbal.system_id, gimbal.component_id))
+                    if not gimbal_capabilities(info) & LOCATION_GLOBAL:
+                        raise ValueError("gimbal %u:%u does not support geographic ROI" %
+                                         (gimbal.system_id, gimbal.component_id))
+                    heartbeat = module._vehicle_message(
+                        "HEARTBEAT", camera.system_id, module.camera_settings.manager_component)
+                    if (heartbeat is not None and
+                            heartbeat.autopilot == mavutil.mavlink.MAV_AUTOPILOT_ARDUPILOTMEGA):
+                        mount = module._manager_id() or 1
+                        stream = TargetStream(camera.system_id,
+                                              module.camera_settings.manager_component,
+                                              "MNT%u_TARG_RATE" % mount)
+                    if (target.endpoint in self.streams and
+                            self.streams[target.endpoint].phase == "restore"):
+                        raise ValueError("waiting for mount target stream restoration; retry ROI")
                 plans.append((camera, target, stream))
         for camera, target, stream in plans:
             self.clear(camera, target.endpoint, replacing=True)

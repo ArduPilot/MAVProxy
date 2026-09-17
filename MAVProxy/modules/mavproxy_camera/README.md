@@ -116,9 +116,12 @@ is unavailable, the command reports the problem before sending any ROI commands.
 With zero or one camera, the map retains its existing **Set ROI** action.
 
 ROI always sends a geographic location; MAVProxy does not calculate or stream
-tracking angles. With one gimbal, manager mode sends
+tracking angles. For a single primary mount, manager mode sends
 `MAV_CMD_DO_SET_ROI_LOCATION` to the flight controller, retaining its normal ROI
-handling. Explicit device mode addresses the gimbal directly.
+handling. A non-primary ArduPilot mount uses direct ROI even when it is the
+only MAVLink gimbal discovered: ArduPilot currently ignores the geographic ROI
+mount selector and otherwise redirects the command to its primary mount.
+Explicit device mode addresses the gimbal directly.
 
 With multiple distinct gimbals on a vehicle, camera ROI automatically addresses
 each gimbal directly, regardless of `mount_control`. The gimbal must advertise
@@ -126,11 +129,12 @@ each gimbal directly, regardless of `mount_control`. The gimbal must advertise
 location itself using vehicle telemetry available to the camera. Two cameras
 sharing one gimbal count as one gimbal.
 
-For direct ROI on a multi-gimbal ArduPilot vehicle, MAVProxy reads the selected
+For direct ROI on an ArduPilot vehicle, MAVProxy reads the selected
 mount's `MNTn_TARG_RATE`, sets it to zero and waits for confirmation before
 sending the location. This stops ArduPilot's angle commands from cancelling
 onboard ROI. The original rate is restored on clear, manual mount control or
-ROI rejection. Firmware must support `MNTn_TARG_RATE`; a missing response
+ROI rejection. This requires the `MNTn_TARG_RATE` firmware support proposed in
+[ArduPilot PR #34276](https://github.com/ArduPilot/ardupilot/pull/34276); a missing response
 cancels the request instead of starting competing control. Module unload also
 requests restoration, but cannot wait for confirmation. If MAVProxy exits
 unexpectedly during ROI, restore the affected `MNTn_TARG_RATE` manually before
