@@ -13,6 +13,11 @@ import time
 import re
 from math import cos, sin, tan, atan2, sqrt, radians, degrees, pi, log, fmod
 
+# MAVLink commands newer than some pymavlink releases know about -- 2.4.49
+# has neither -- so they are named here rather than looked up in the dialect
+MAV_CMD_DO_ORBIT = 34
+MAV_CMD_NAV_ARC_WAYPOINT = 36
+
 # Some platforms (CYGWIN and others) many not have the wx library
 # use imp to see if wx is on the path
 has_wxpython = False
@@ -188,6 +193,38 @@ def arc_points(latlon1, latlon2, arc_angle, steps=None):
     return points
 
 
+# takeoff items carry an altitude and often no position of their own: the
+# vehicle climbs from where it already is, which for a mission is home.
+# Numeric because mp_util does not import pymavlink at module scope
+TAKEOFF_COMMANDS = (22, 84)      # NAV_TAKEOFF, NAV_VTOL_TAKEOFF
+
+
+# what each kind of mission item is called where a map labels one, as the 2D
+# map has always labelled its waypoints.  Numeric for the same reason as
+# TAKEOFF_COMMANDS above
+MISSION_LABEL_SUFFIXES = {
+    22: "TOff",                       # NAV_TAKEOFF
+    189: "DLS",                       # DO_LAND_START
+    82: "SW",                         # NAV_SPLINE_WAYPOINT
+    MAV_CMD_NAV_ARC_WAYPOINT: "AW",
+    17: "LU",                         # NAV_LOITER_UNLIM
+    18: "LT",                         # NAV_LOITER_TURNS
+    19: "LTime",                      # NAV_LOITER_TIME
+    31: "LAlt",                       # NAV_LOITER_TO_ALT
+    MAV_CMD_DO_ORBIT: "Orbit",
+    85: "VL",                         # NAV_VTOL_LAND
+}
+
+
+def mission_item_label(seq, command):
+    """the label a map puts on a mission item: its number, and what it is
+    where that is worth saying -- "3(DLS)" for a land start"""
+    suffix = MISSION_LABEL_SUFFIXES.get(command)
+    if suffix is None:
+        return str(seq)
+    return "%s(%s)" % (seq, suffix)
+
+
 # vehicles which hold position at a loiter point rather than flying a circle
 # around it.  MAVProxy's own vehicle type names are accepted as well as the
 # MAV_TYPEs, since that is what a live module has to hand
@@ -272,7 +309,7 @@ def mission_circle_radius(command, params, default_radius=None, vehicle=None):
         mavlink.MAV_CMD_NAV_LOITER_TURNS: 2,
         mavlink.MAV_CMD_NAV_LOITER_TIME: 2,
         mavlink.MAV_CMD_NAV_LOITER_TO_ALT: 1,
-        mavlink.MAV_CMD_DO_ORBIT: 0,
+        MAV_CMD_DO_ORBIT: 0,
     }.get(command)
     if index is None:
         return None
@@ -285,10 +322,32 @@ def mission_circle_radius(command, params, default_radius=None, vehicle=None):
         # circles, so those are left alone
         return None
     radius = params[index]
-    if radius is None or math.isnan(radius) or radius == 0:
-        radius = default_radius
-    if radius is None or math.isnan(radius) or radius == 0:
-        return None
+    if command == MAV_CMD_DO_ORBIT:
+        if radius is None or math.isnan(radius) or radius == 0:
+            radius = default_radius
+        if radius is None or math.isnan(radius) or radius == 0:
+            return None
+        return radius
+    if radius is None or math.isnan(radius):
+        radius = 0.0
+    if (command == mavlink.MAV_CMD_NAV_LOITER_TIME or abs(radius) <= 1):
+        # the vehicle's own radius.  ArduPilot has nowhere to keep a radius
+        # for LOITER_TIME -- the loiter time takes all of the storage -- so
+        # it keeps only a bit saying the item asked for counter-clockwise,
+        # and hands that back as -1 (or +1 when it did not); whatever radius
+        # the item was uploaded with, ArduPlane's update_loiter(0) flies
+        # WP_LOITER_RAD.  It takes any radius of a metre or less the same
+        # way, and flies counter-clockwise if the item asked for it, and
+        # otherwise the way WP_LOITER_RAD's sign says
+        if default_radius is None or math.isnan(default_radius):
+            return None
+        size = abs(default_radius)
+        if size <= 1:
+            # ArduPlane's LOITER_RADIUS_DEFAULT
+            size = 60.0
+        if radius < 0 or default_radius < 0:
+            return -size
+        return size
     return radius
 
 
@@ -299,7 +358,7 @@ def mission_circle_turns(command, params):
     mavlink = mavutil.mavlink
     if command == mavlink.MAV_CMD_NAV_LOITER_TURNS:
         turns = params[0]
-    elif command == mavlink.MAV_CMD_DO_ORBIT:
+    elif command == MAV_CMD_DO_ORBIT:
         # DO_ORBIT counts in radians rather than turns
         turns = params[3] / (2 * pi)
     else:
@@ -307,6 +366,63 @@ def mission_circle_turns(command, params):
     if turns is None or math.isnan(turns) or turns <= 0:
         return None
     return turns
+
+
+def mission_crosstracks_from_centre(command, params):
+    """whether the leg out of a circling mission item is flown against a
+    track starting at the item's own location rather than at the point the
+    vehicle leaves the circle.
+
+    ArduPlane crosstracks from the centre unless param4 asks for the exit
+    location instead, and only the loiter items which are flown until
+    something lets the vehicle go carry that choice there.  LOITER_UNLIM
+    never leaves, and DO_ORBIT counts its turns in param4, so neither is
+    asked
+    """
+    from pymavlink import mavutil
+    mavlink = mavutil.mavlink
+    if command not in (mavlink.MAV_CMD_NAV_LOITER_TURNS,
+                       mavlink.MAV_CMD_NAV_LOITER_TIME,
+                       mavlink.MAV_CMD_NAV_LOITER_TO_ALT):
+        return False
+    xtrack = params[3]
+    if xtrack is None or math.isnan(xtrack):
+        return True
+    return not xtrack > 0
+
+
+def log_params(mlog):
+    """the parameters a log carries.  A telemetry log's params are only the
+    PARAM_VALUEs the autopilot sent.  Where MAVProxy fetched them over FTP
+    it logged them itself, as PARAM_VALUEs from MAV_COMP_ID_MISSIONPLANNER so
+    they can be told apart, and those are left out: a log from a vehicle
+    whose parameters were fetched that way offers only the few the autopilot
+    sent as they changed.  Take both, the autopilot's own over the fetched
+    ones"""
+    params = getattr(mlog, 'params', None)
+    param_state = getattr(mlog, 'param_state', None)
+    if not param_state:
+        return params
+    from pymavlink import mavutil
+    sysid = getattr(mlog, 'sysid', 0)
+    if not sysid:
+        # the log picks the vehicle whose params it offers from its first
+        # heartbeat, and a log with none in it never picks one.  Take the
+        # vehicle the parameters came from, so long as only one did
+        systems = set(k[0] for (k, state) in param_state.items()
+                      if k[0] != 0 and state.params)
+        if len(systems) != 1:
+            return params
+        sysid = systems.pop()
+        own = param_state.get((sysid, 1))
+        params = own.params if own is not None else {}
+    fetched = param_state.get((sysid,
+                               mavutil.mavlink.MAV_COMP_ID_MISSIONPLANNER))
+    if fetched is None or not fetched.params:
+        return params
+    ret = dict(fetched.params)
+    ret.update(params or {})
+    return ret
 
 
 def param_value(params, name):

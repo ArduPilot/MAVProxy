@@ -10,15 +10,13 @@ import math
 import functools
 import time
 import datetime
+import types
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib.mp_menu import *
 from pymavlink import mavutil
 from PIL import ImageColor
-
-# Older pymavlink releases lack this common.xml command.
-MAV_CMD_NAV_ARC_WAYPOINT = getattr(mavutil.mavlink, "MAV_CMD_NAV_ARC_WAYPOINT", 36)
 
 # pymavlink may not yet carry the enumeration entry for the
 # home-centred inclusion circle.  Fall back to its known value (from
@@ -70,11 +68,11 @@ class MapModule(mp_module.MPModule):
             ('showahrs3pos', int, 0),
             ('brightness', float, 1),
             ('rallycircle', bool, False),
-            ('loitercircle', bool, False),
+            ('loitercircle', bool, True),
             ('showclicktime', int, 2),
             ('showwpnum', bool, True),
             ('circle_linewidth', int, 1),
-            ('showdirection', bool, False),
+            ('showdirection', bool, True),
             ('setpos_accuracy', float, 50),
             ('mission_color', str, "white"),
             ('font_size', float, 0.5),
@@ -153,30 +151,22 @@ class MapModule(mp_module.MPModule):
             # waypoint commands
             mavutil.mavlink.MAV_CMD_NAV_WAYPOINT: (0, 255, 255),
             mavutil.mavlink.MAV_CMD_NAV_SPLINE_WAYPOINT: (64, 255, 64),
-            MAV_CMD_NAV_ARC_WAYPOINT: (64, 255, 255),
+            mp_util.MAV_CMD_NAV_ARC_WAYPOINT: (64, 255, 255),
 
             # circling commands
             mavutil.mavlink.MAV_CMD_NAV_LOITER_UNLIM: (255, 64, 255),
             mavutil.mavlink.MAV_CMD_NAV_LOITER_TURNS: (255, 64, 255),
             mavutil.mavlink.MAV_CMD_NAV_LOITER_TIME: (255, 64, 255),
             mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT: (255, 64, 255),
-            mavutil.mavlink.MAV_CMD_DO_ORBIT: (255, 64, 255),
+            mp_util.MAV_CMD_DO_ORBIT: (255, 64, 255),
 
             # other commands
             mavutil.mavlink.MAV_CMD_DO_LAND_START: (255, 127, 0),
         }
-        self._label_suffix_for_wp_command = {
-            mavutil.mavlink.MAV_CMD_NAV_TAKEOFF: "TOff",
-            mavutil.mavlink.MAV_CMD_DO_LAND_START: "DLS",
-            mavutil.mavlink.MAV_CMD_NAV_SPLINE_WAYPOINT: "SW",
-            MAV_CMD_NAV_ARC_WAYPOINT: "AW",
-            mavutil.mavlink.MAV_CMD_NAV_LOITER_UNLIM: "LU",
-            mavutil.mavlink.MAV_CMD_NAV_LOITER_TURNS: "LT",
-            mavutil.mavlink.MAV_CMD_NAV_LOITER_TIME: "LTime",
-            mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT: "LAlt",
-            mavutil.mavlink.MAV_CMD_DO_ORBIT: "Orbit",
-            mavutil.mavlink.MAV_CMD_NAV_VTOL_LAND: "VL",
-        }
+        # what each kind of item is called, which the 3D map labels with too,
+        # so it is not to be changed from here
+        self._label_suffix_for_wp_command = types.MappingProxyType(
+            mp_util.MISSION_LABEL_SUFFIXES)
 
         self.add_menu(MPMenuSubMenu('Terrain', items=[
             MPMenuItem('Show Contours', returnkey='showTerrainContours'),
@@ -448,10 +438,7 @@ Usage: map circle <radius> <colour>
     def label_for_waypoint(self, wp_num):
         '''return the label the waypoint which should appear on the map'''
         wp = self.module('wp').wploader.wp(wp_num)
-        command = wp.command
-        if command not in self._label_suffix_for_wp_command:
-            return str(wp_num)
-        return str(wp_num) + "(" + self._label_suffix_for_wp_command[command] + ")"
+        return mp_util.mission_item_label(wp_num, wp.command)
 
     def display_waypoints(self):
         '''display the waypoints'''

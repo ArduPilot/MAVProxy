@@ -9,14 +9,10 @@ import math
 
 import vtk
 
-from pymavlink import mavutil
-
 from MAVProxy.modules.lib import mp_util
-from MAVProxy.modules.mavproxy_map3d.map3d import MissionItem
-from MAVProxy.modules.mavproxy_map3d.terrain import enu, R
-
-# Older pymavlink releases lack this common.xml command.
-MAV_CMD_NAV_ARC_WAYPOINT = getattr(mavutil.mavlink, "MAV_CMD_NAV_ARC_WAYPOINT", 36)
+from MAVProxy.modules.mavproxy_map3d.map3d import (
+    MissionItem, MISSION_LABEL_SIZE, MISSION_LABEL_SIZES, MISSION_STYLES)
+from MAVProxy.modules.mavproxy_map3d.terrain import enu, R, wrap_longitude
 
 # MAV_FRAME altitude conventions
 FRAME_GLOBAL = (0, 5)            # AMSL
@@ -381,6 +377,20 @@ def _arrows(points_enu, colour, renderer=None, count=MISSION_ARROW_COUNT):
     return actor
 
 
+def _label(point_enu, text, colour, size=MISSION_LABEL_SIZE):
+    """text at a point in the world, facing the screen and the same size on
+    it however far away it is"""
+    actor = vtk.vtkBillboardTextActor3D()
+    actor.SetInput(str(text))
+    actor.SetPosition(*point_enu)
+    prop = actor.GetTextProperty()
+    prop.SetColor(*colour)
+    prop.SetFontSize(size)
+    prop.SetJustificationToLeft()
+    prop.SetVerticalJustificationToBottom()
+    return actor
+
+
 def _points(points_enu, colour, size):
     vpts = vtk.vtkPoints()
     verts = vtk.vtkCellArray()
@@ -417,13 +427,23 @@ class ElementManager:
         self.vehicle_type = DEFAULT_VEHICLE_TYPE
         self.terrain_height = None
         self.fence = []
+        self.rally = []
         self.fence_geometry = None
         self.kml_features = []
         self.kml_geometry = None
         self.kml_height_cache = {}
         self.mission_line = []
+        self.mission_rings = []
         self.mission_markers = []
+        # the label of each item drawn, as (marker, label)
+        self.mission_labels = []
         self.mission_arrows = False
+        self.mission_labelled = False
+        self.mission_label_size = MISSION_LABEL_SIZE
+        # the mission last given, so it can be drawn again in another style
+        self.mission_items = []
+        self.mission_track = None
+        self.mission_style = MISSION_STYLES[0]
 
     def _enu(self, lat, lon, amsl):
         e, n, u = enu(lat, lon, amsl, self.lat0, self.lon0)
@@ -446,6 +466,8 @@ class ElementManager:
         self.home_amsl = amsl
         if self.fence:
             self.refresh_fence()
+        if self.rally:
+            self.refresh_rally()
         if self.kml_features:
             self.refresh_kml()
 
@@ -515,36 +537,92 @@ class ElementManager:
         if len(self.trail) >= 2:
             self._replace('trail', [_polyline(self.trail, (1.0, 1.0, 0.0), 2.0)])
 
-    def set_mission(self, items):
-        '''items: list of MissionItem (plain tuples are accepted too).
-
-        The line drawn is the path the vehicle is expected to fly, so it is
-        continuous throughout: an arc waypoint curves, and an item which
-        circles about its location is entered from the near side of its
-        circle and left again where it comes off, rather than the line
-        running to the middle of the circle where the vehicle never goes.
-        The markers stay on the mission item locations
+    def set_mission(self, items, track=None):
+        '''items: list of MissionItem (plain tuples are accepted too).  track
+        is the path the vehicle is expected to fly them along, as (lat, lon,
+        amsl) points, where the caller has worked it out by flying the
+        mission through the vehicle's own navigation.  How the mission is
+        drawn from those is the mission style: see set_mission_style()
         '''
+        self.mission_items = [MissionItem(*item) for item in items]
+        self.mission_track = list(track) if track else None
+        self.draw_mission()
+
+    def set_mission_style(self, style):
+        '''draw the mission as one of MISSION_STYLES.  flown draws the track
+        the mission was given with, and geometry where it came without one:
+        the path worked out from the items, continuous throughout, where an
+        arc waypoint curves and an item which circles about its location is
+        joined and left along tangents rather than the line running to the
+        middle of a circle the vehicle never goes to.  plain runs the line
+        straight from item to item, arcs apart, with a ring at the altitude
+        of each item which circles'''
+        if style not in MISSION_STYLES or style == self.mission_style:
+            return
+        self.mission_style = style
+        self.draw_mission()
+
+    def draw_mission(self):
+        '''draw the mission last given in the mission style.  The markers stay
+        on the mission item locations'''
+        flown = [i for i in self.mission_items
+                 if not (i.lat == 0 and i.lon == 0)]
+        self.mission_markers = [
+            self._enu(i.lat, i.lon, self._resolve_amsl(i.alt, i.frame))
+            for i in flown]
+        self.mission_labels = [
+            (marker, mp_util.mission_item_label(item.seq, item.command))
+            for (marker, item) in zip(self.mission_markers, flown)]
+        self.mission_rings = []
+        if self.mission_style == 'flown' and self.mission_track:
+            self.mission_line = [self._enu(lat, lon, amsl)
+                                 for (lat, lon, amsl) in self.mission_track]
+        elif self.mission_style == 'plain':
+            self.mission_line = self._plain_line(flown)
+        else:
+            self.mission_line = self._geometry_line(flown)
+        self.refresh_mission()
+
+    def _arc_into(self, line, item, amsl, previous):
+        '''add the leg into an arc waypoint to the line: a circular arc rather
+        than a straight line, climbing linearly along it'''
+        if (item.command != mp_util.MAV_CMD_NAV_ARC_WAYPOINT or
+                previous is None):
+            return
+        ((prev_lat, prev_lon), prev_amsl) = previous
+        arc = mp_util.arc_points((prev_lat, prev_lon),
+                                 (item.lat, item.lon), item.param1)
+        for i in range(1, len(arc) - 1):
+            fraction = float(i) / (len(arc) - 1)
+            line.append(self._enu(arc[i][0], arc[i][1],
+                                  prev_amsl + (amsl - prev_amsl) * fraction))
+
+    def _plain_line(self, flown):
+        '''the line straight through the items, and a ring for each which
+        circles, at its own altitude rather than draped over the terrain'''
         line = []
-        markers = []
+        previous = None
+        for item in flown:
+            amsl = self._resolve_amsl(item.alt, item.frame)
+            self._arc_into(line, item, amsl, previous)
+            line.append(self._enu(item.lat, item.lon, amsl))
+            if item.circle_radius:
+                ring = circle_latlon((item.lat, item.lon),
+                                     abs(item.circle_radius),
+                                     MISSION_CIRCLE_SEGMENTS)
+                ring = [self._enu(la, lo, amsl) for (la, lo) in ring]
+                self.mission_rings.append(ring + ring[:1])
+            previous = ((item.lat, item.lon), amsl)
+        return line
+
+    def _geometry_line(self, flown):
+        '''the path worked out from the items alone'''
+        line = []
         previous = None
         rejoin = None
-        flown = [MissionItem(*item) for item in items]
-        flown = [i for i in flown if not (i.lat == 0 and i.lon == 0)]
         for (index, item) in enumerate(flown):
             amsl = self._resolve_amsl(item.alt, item.frame)
-            if (item.command == MAV_CMD_NAV_ARC_WAYPOINT and
-                    previous is not None):
-                # the leg into an arc waypoint is a circular arc rather
-                # than a straight line; climb linearly along it
-                ((prev_lat, prev_lon), prev_amsl) = previous
-                arc = mp_util.arc_points((prev_lat, prev_lon),
-                                         (item.lat, item.lon), item.param1)
-                for i in range(1, len(arc) - 1):
-                    fraction = float(i) / (len(arc) - 1)
-                    line.append(self._enu(arc[i][0], arc[i][1],
-                                          prev_amsl + (amsl - prev_amsl) * fraction))
-            markers.append(self._enu(item.lat, item.lon, amsl))
+            self._arc_into(line, item, amsl, previous)
             if item.circle_radius:
                 previous = self._append_circle(
                     line, item, amsl, previous,
@@ -562,9 +640,7 @@ class ElementManager:
             rejoin = None
             line.append(self._enu(item.lat, item.lon, amsl))
             previous = ((item.lat, item.lon), amsl)
-        self.mission_line = line
-        self.mission_markers = markers
-        self.refresh_mission()
+        return line
 
     def set_mission_arrows(self, enable):
         '''show or hide the direction of travel along the mission'''
@@ -573,6 +649,24 @@ class ElementManager:
             return
         self.mission_arrows = enable
         self.refresh_mission()
+
+    def set_mission_labels(self, enable):
+        '''show or hide the label of each mission item'''
+        enable = bool(enable)
+        if enable == self.mission_labelled:
+            return
+        self.mission_labelled = enable
+        self.refresh_mission()
+
+    def set_mission_label_size(self, size):
+        '''how big those labels are drawn, in points on the screen'''
+        (smallest, largest) = MISSION_LABEL_SIZES
+        size = min(largest, max(smallest, int(size)))
+        if size == self.mission_label_size:
+            return
+        self.mission_label_size = size
+        if self.mission_labelled:
+            self.refresh_mission()
 
     def refresh_mission(self):
         '''rebuild the mission actors from the last mission drawn'''
@@ -584,8 +678,14 @@ class ElementManager:
                 arrows = _arrows(line, (1.0, 1.0, 1.0), self.ren)
                 if arrows is not None:
                     actors.append(arrows)
+        for ring in self.mission_rings:
+            actors.append(_polyline(ring, (1.0, 1.0, 1.0), 2.0, dashed=True))
         if self.mission_markers:
             actors.append(_points(self.mission_markers, (1.0, 1.0, 1.0), 9))
+        if self.mission_labelled:
+            actors += [_label(marker, text, (1.0, 1.0, 1.0),
+                              self.mission_label_size)
+                       for (marker, text) in self.mission_labels]
         self._replace('mission', actors)
 
     def _append_rejoin(self, line, rejoin, target, target_amsl):
@@ -708,6 +808,8 @@ class ElementManager:
         for i in range(max(0, segment_count)):
             lat1, lon1 = points[i]
             lat2, lon2 = points[(i + 1) % len(points)]
+            # along the edge the short way round, as it is drawn
+            dlon = wrap_longitude(lon2 - lon1)
             e1, n1, _ = enu(lat1, lon1, 0.0, self.lat0, self.lon0)
             e2, n2, _ = enu(lat2, lon2, 0.0, self.lat0, self.lon0)
             distance = math.hypot(e2 - e1, n2 - n1)
@@ -716,7 +818,7 @@ class ElementManager:
             for j in range(count):
                 t = float(j) / count
                 yield (lat1 + (lat2 - lat1) * t,
-                       lon1 + (lon2 - lon1) * t)
+                       lon1 + dlon * t)
         if points:
             yield points[0] if closed else points[-1]
 
@@ -806,11 +908,20 @@ class ElementManager:
             self.refresh_kml()
 
     def set_rally(self, pts):
-        '''pts: list of (lat,lon,alt_rel)'''
-        if not pts:
+        '''pts: list of (lat, lon, amsl, alt): the AMSL altitude a return to
+        launch goes to the point at, or None where that is not known, and
+        the altitude the point carries, which is taken to be above home
+        where there is nothing better'''
+        self.rally = list(pts)
+        self.refresh_rally()
+
+    def refresh_rally(self):
+        if not self.rally:
             self._replace('rally', [])
             return
-        markers = [self._enu(lat, lon, self.home_amsl + alt) for (lat, lon, alt) in pts]
+        markers = [self._enu(lat, lon,
+                             self.home_amsl + alt if amsl is None else amsl)
+                   for (lat, lon, amsl, alt) in self.rally]
         self._replace('rally', [_points(markers, (0.4, 0.8, 1.0), 12)])
 
     def refresh_vehicle(self):

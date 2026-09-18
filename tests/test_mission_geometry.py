@@ -24,6 +24,267 @@ def swept_angle(centre, points):
                for i in range(1, len(bearings)))
 
 
+def waypoint(seq, command, x, y, z, frame=3, params=(0, 0, 0, 0)):
+    '''a mission item the way the wp module's loader holds one'''
+    from types import SimpleNamespace
+    return SimpleNamespace(seq=seq, command=command, x=x, y=y, z=z,
+                           frame=frame, param1=params[0], param2=params[1],
+                           param3=params[2], param4=params[3])
+
+
+def live_mission_items(wpoints, home_amsl=584.0, params=None,
+                       vehicle='plane', default_radius=60.0):
+    '''the MissionItems the live map3d module sends for a mission.
+
+    The module is built without the MAVProxy around it: only what
+    send_mission() reads is supplied, and terrain is never available
+    '''
+    from types import SimpleNamespace
+    from MAVProxy.modules.mavproxy_map3d import Map3DModule
+    module = Map3DModule.__new__(Map3DModule)
+    loader = SimpleNamespace(wpoints=wpoints, wp=lambda i: wpoints[i])
+    module.mpstate = SimpleNamespace(
+        mav_param=params or {}, vehicle_type=vehicle,
+        module=lambda name: SimpleNamespace(wploader=loader))
+    sent = []
+    module.map = SimpleNamespace(
+        set_mission=lambda items, track=None: sent.extend(items))
+    module.reset_flown_track()
+    module.ground_heading = None
+    # only the items are looked at, so there is no path to fly for them
+    module.map3d_settings = SimpleNamespace(missionpath='geometry')
+    module.home_amsl = home_amsl
+    module.home_position = None
+    module.default_circle_radius = lambda: default_radius
+    module.terrain_alt = lambda lat, lon: None
+    module.send_mission()
+    return sent
+
+
+class TestProjection(object):
+    """the local frame everything in the 3D map is drawn in"""
+
+    def test_the_antimeridian_is_crossed_the_short_way(self):
+        pytest.importorskip("vtk")
+        from MAVProxy.modules.mavproxy_map3d.terrain import enu
+        lat = -16.5
+        (east, _, _) = enu(lat, -179.999, 0.0, lat, 179.998)
+        (west, _, _) = enu(lat, 179.998, 0.0, lat, -179.999)
+        metres = math.radians(0.003) * 6378137.0 * math.cos(math.radians(lat))
+        assert east == pytest.approx(metres, rel=0.01)
+        assert west == pytest.approx(-metres, rel=0.01)
+        # and away from it, as it always was
+        (e, n, u) = enu(HERE[0] + 0.01, HERE[1] + 0.01, 5.0, HERE[0], HERE[1])
+        assert e > 0 and n > 0 and u == 5.0
+
+    # an origin just west of the antimeridian, and a point just east of it
+    SEAM = (-16.5, 179.998)
+
+    def terrain(self):
+        pytest.importorskip("vtk")
+        from quantized_mesh_tile.global_geodetic import GlobalGeodetic
+        from MAVProxy.modules.mavproxy_map3d.terrain import TerrainManager
+        manager = TerrainManager.__new__(TerrainManager)
+        (manager.lat0, manager.lon0) = self.SEAM
+        manager.g = GlobalGeodetic(True)
+        (manager.zoom_fine, manager.lod_min) = (12, 8)
+        (manager.ring, manager.fine_radius) = (1, 2)
+        manager.tiles = {}
+        return manager
+
+    def test_the_camera_looks_across_the_antimeridian(self):
+        from types import SimpleNamespace
+        manager = self.terrain()
+        east = math.radians(0.003) * 6378137.0 * math.cos(math.radians(self.SEAM[0]))
+        for (focal_east, lon) in ((east, -179.999), (-east, 179.995)):
+            camera = SimpleNamespace(focal=(focal_east, 0.0, 0.0))
+            (lat, focal_lon) = manager.focal_latlon(camera)
+            assert (lat, focal_lon) == pytest.approx((self.SEAM[0], lon), abs=1e-6)
+        # and the tiles wanted about a point just east of it are those either
+        # side of it, not the ones at the western edge of the western tile row
+        (lat, lon) = manager.focal_latlon(SimpleNamespace(focal=(east, 0.0, 0.0)))
+        fine = sorted(x for (z, x, y) in manager.desired_set(lat, lon)
+                      if z == manager.zoom_fine)
+        columns = manager.g.GetNumberOfXTilesAtZoom(manager.zoom_fine)
+        assert set(fine) == {0, 1, 2, columns - 2, columns - 1}
+
+    def test_terrain_nearest_the_camera_is_fetched_first_across_the_antimeridian(self):
+        from types import SimpleNamespace
+        manager = self.terrain()
+        queued = []
+        manager.jobs = SimpleNamespace(put=queued.append)
+        (manager.inflight, manager.mesh_revision) = (set(), 0)
+        east = math.radians(0.003) * 6378137.0 * math.cos(math.radians(self.SEAM[0]))
+        manager.update(SimpleNamespace(
+            focal=(east, 0.0, 0.0), pos=(0.0, 0.0, 0.0),
+            cam=SimpleNamespace(GetViewAngle=lambda: 30.0)))
+        (x, row) = manager.g.LonLatToTile(-179.999, self.SEAM[0], manager.zoom_fine)
+        columns = manager.g.GetNumberOfXTilesAtZoom(manager.zoom_fine)
+        order = [x for (_, _, (z, x, y)) in queued
+                 if (z, y) == (manager.zoom_fine, row)]
+        # either side of the antimeridian in turn, not all of the east first
+        assert order == [0, columns - 1, 1, columns - 2, 2]
+
+    def test_terrain_heights_are_found_either_side_of_the_antimeridian(self):
+        from types import SimpleNamespace
+        manager = self.terrain()
+        west_tile = SimpleNamespace(bbox=(170.0, -20.0, 180.0, -10.0),
+                                    height_at=lambda e, n: 10.0)
+        east_tile = SimpleNamespace(bbox=(-180.0, -20.0, -170.0, -10.0),
+                                    height_at=lambda e, n: 20.0)
+        manager.tiles = {(12, 1, 0): west_tile, (12, 0, 0): east_tile}
+        # a ring about a point near it runs on past 180 rather than wrapping
+        assert manager.height_at(-16.5, 180.001) == 20.0
+        assert manager.height_at(-16.5, -180.0) == 10.0
+        assert manager.height_at(-16.5, 179.999) == 10.0
+        assert manager.height_at(-16.5, -179.999) == 20.0
+
+    def test_terrain_is_sampled_either_side_of_the_antimeridian(self, monkeypatch):
+        pytest.importorskip("vtk")
+        import numpy as np
+        from MAVProxy.modules.mavproxy_map3d import terrain
+        fetched = []
+
+        def decode(z, x, y, timeout=30):
+            fetched.append((z, x, y, timeout))
+            return {"bbox": (-180.0, -20.0, -170.0, -10.0),
+                    "verts": np.array([(-180.0, -10.0, 1.0), (-170.0, -10.0, 1.0),
+                                       (-180.0, -20.0, 1.0), (-170.0, -20.0, 1.0)])}
+        monkeypatch.setattr(terrain, 'decode_terrain', decode)
+        monkeypatch.setattr(terrain, '_sample_cache', {})
+        assert terrain.sample_terrain(-16.5, 180.001) == pytest.approx(1.0)
+        tile = terrain.GlobalGeodetic(True).LonLatToTile(-179.999, -16.5, 12)
+        assert fetched == [(12,) + tile + (30,)]
+        # and a caller which will not wait that long says so
+        monkeypatch.setattr(terrain, '_sample_cache', {})
+        assert terrain.sample_terrain(-16.5, 180.001,
+                                      timeout=5.0) == pytest.approx(1.0)
+        assert fetched[-1] == (12,) + tile + (5.0,)
+
+    def test_a_terrain_tile_is_fetched_with_the_timeout_asked_for(
+            self, monkeypatch, tmp_path):
+        pytest.importorskip("vtk")
+        import time
+        import urllib.request
+        from MAVProxy.modules.mavproxy_map3d import terrain
+        waited = []
+
+        class Response(object):
+            def __init__(self):
+                self.left = [b'terrain ', b'tile']
+
+            def read(self, size=None):
+                return self.left.pop(0) if self.left else b''
+
+        def urlopen(request, timeout=None):
+            waited.append(timeout)
+            return Response()
+        monkeypatch.setattr(urllib.request, 'urlopen', urlopen)
+        monkeypatch.setattr(terrain, 'CACHE_DIR', str(tmp_path))
+        terrain.fetch_terrain_tile(12, 1, 2, timeout=5.0)
+        assert waited == [5.0]
+        # and the whole fetch, where nobody says how long to wait for it
+        monkeypatch.setattr(terrain, 'CACHE_DIR', str(tmp_path / 'again'))
+        terrain.fetch_terrain_tile(12, 1, 2)
+        assert waited[-1] == 30
+        # decoding a tile waits as long as it is told to as well
+
+        class Stop(Exception):
+            pass
+
+        def fetch(z, x, y, timeout=30):
+            waited.append(timeout)
+            raise Stop()
+        # a tile which drips in for ever is given up on at the deadline
+        monkeypatch.setattr(terrain, 'CACHE_DIR', str(tmp_path / 'slow'))
+
+        class Dripping(object):
+            def __init__(self):
+                self.left = 100
+
+            def read(self, size=None):
+                if self.left <= 0:
+                    return b''
+                self.left -= 1
+                time.sleep(0.01)
+                return b'.'
+        monkeypatch.setattr(urllib.request, 'urlopen',
+                            lambda request, timeout=None: Dripping())
+        with pytest.raises(Exception):
+            terrain.fetch_terrain_tile(12, 1, 2, timeout=0.05)
+
+        # as a real response does, whose read() waits to fill its buffer
+        # however long the bytes take, and whose read1() does not
+        class Buffering(Dripping):
+            def read(self, size=None):
+                time.sleep(0.01 * self.left)
+                (data, self.left) = (b'.' * self.left, 0)
+                return data
+
+            def read1(self, size=None):
+                return Dripping.read(self, size)
+        monkeypatch.setattr(urllib.request, 'urlopen',
+                            lambda request, timeout=None: Buffering())
+        started = time.time()
+        with pytest.raises(TimeoutError, match='longer than 0.05s'):
+            terrain.fetch_terrain_tile(12, 1, 2, timeout=0.05)
+        assert time.time() - started < 0.5
+        monkeypatch.setattr(terrain, 'fetch_terrain_tile', fetch)
+        for asked in (5.0, None):
+            with pytest.raises(Stop):
+                if asked is None:
+                    terrain.decode_terrain(12, 1, 2)
+                else:
+                    terrain.decode_terrain(12, 1, 2, asked)
+            assert waited[-1] == (30 if asked is None else asked)
+
+    def test_the_view_is_turned_across_the_antimeridian(self):
+        pytest.importorskip("vtk")
+        pytest.importorskip("wx")
+        from types import SimpleNamespace
+        from MAVProxy.modules.mavproxy_map3d.map3d_ui import Map3DFrame
+        looked = []
+        frame = SimpleNamespace(
+            terrain=SimpleNamespace(lat0=self.SEAM[0], lon0=self.SEAM[1]),
+            tc=SimpleNamespace(look_at=lambda focal, dist=None: looked.append(focal)),
+            state=SimpleNamespace(zexag=1.0), on_camera_change=lambda: None)
+        Map3DFrame.look_at_latlon(frame, self.SEAM[0], -179.999, 0.0)
+        east = math.radians(0.003) * 6378137.0 * math.cos(math.radians(self.SEAM[0]))
+        assert looked[0] == pytest.approx((east, 0.0, 0.0), abs=1.0)
+
+    def test_draped_lines_are_sampled_the_short_way_round(self):
+        pytest.importorskip("vtk")
+        from MAVProxy.modules.mavproxy_map3d.elements import ElementManager
+        em = ElementManager.__new__(ElementManager)
+        (em.lat0, em.lon0) = self.SEAM
+        points = [(self.SEAM[0], 179.998), (self.SEAM[0], -179.998)]
+        samples = list(em._terrain_samples(points, closed=False))
+        assert len(samples) > 2
+        for (lat, lon) in samples:
+            assert 0.0 <= mp_util.wrap_180(lon - 179.998) <= 0.004 + 1e-9
+
+    def test_mavexplorer_looks_at_a_flight_across_the_antimeridian(self):
+        pytest.importorskip("wx")
+        pytest.importorskip("lxml")
+        import importlib.util
+        import os
+        path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                            'MAVProxy', 'tools', 'MAVExplorer.py')
+        spec = importlib.util.spec_from_file_location('mavexplorer', path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        # starting just east of it, and going further west than east
+        flight = [(-16.5, -179.9995, 30.0), (-16.5, 179.99, 20.0),
+                  (-16.49, -179.995, 25.0)]
+        (lat, lon, ground, span) = module.path_view(flight)
+        assert lat == pytest.approx(-16.49667, abs=1e-4)
+        assert lon == pytest.approx(179.9985, abs=1e-4)
+        assert ground == 20.0
+        east_west = math.radians(0.015) * mp_util.radius_of_earth * math.cos(
+            math.radians(-16.49))
+        assert span == pytest.approx(east_west, rel=0.01)
+
+
 class TestRhumbHelpers(object):
 
     def test_distance_takes_the_short_way_around(self):
@@ -132,9 +393,10 @@ class TestCirclingItems(object):
         cases = [
             (m.MAV_CMD_NAV_LOITER_UNLIM, (0, 0, 70, 0), 70),
             (m.MAV_CMD_NAV_LOITER_TURNS, (3, 0, -55, 0), -55),
-            (m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 90, 0), 90),
+            # LOITER_TIME has no radius of its own: see below
+            (m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 90, 0), None),
             (m.MAV_CMD_NAV_LOITER_TO_ALT, (1, -65, 0, 0), -65),
-            (m.MAV_CMD_DO_ORBIT, (80, 5, 0, 0), 80),
+            (mp_util.MAV_CMD_DO_ORBIT, (80, 5, 0, 0), 80),
         ]
         for (command, params, expected) in cases:
             assert mp_util.mission_circle_radius(command, params) == expected
@@ -142,7 +404,7 @@ class TestCirclingItems(object):
     def test_items_which_do_not_circle(self):
         m = self.mavlink
         for command in (m.MAV_CMD_NAV_WAYPOINT,
-                        36,  # MAV_CMD_NAV_ARC_WAYPOINT (absent in older pymavlink)
+                        mp_util.MAV_CMD_NAV_ARC_WAYPOINT,
                         m.MAV_CMD_NAV_TAKEOFF,
                         m.MAV_CMD_DO_JUMP):
             assert mp_util.mission_circle_radius(command, (1, 2, 3, 4)) is None
@@ -156,18 +418,407 @@ class TestCirclingItems(object):
         assert mp_util.mission_circle_radius(
             m.MAV_CMD_NAV_LOITER_UNLIM, (0, 0, 0, 0)) is None
 
+    def test_a_loiter_time_radius_of_one_is_a_direction(self):
+        m = self.mavlink
+        # ArduPilot cannot store a radius for LOITER_TIME and hands back +-1
+        # to say which way round it flies, so the vehicle's own radius is the
+        # size and param3 only picks the direction
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 1, 0), 60) == 60
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_TIME, (30, 0, -1, 0), 60) == -60
+        # and one uploaded with a real radius is flown at the vehicle's all
+        # the same: ArduPlane's verify_loiter_time() calls update_loiter(0)
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_TIME, (30, 0, -90, 0), 60) == -60
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 90, 0), 60) == 60
+
+    def test_a_radius_of_a_metre_or_less_is_the_vehicles(self):
+        m = self.mavlink
+        # update_loiter() takes a radius of a metre or less as unset, for
+        # every loiter item, keeping the direction the item asked for
+        for command in (m.MAV_CMD_NAV_LOITER_UNLIM, m.MAV_CMD_NAV_LOITER_TURNS):
+            assert mp_util.mission_circle_radius(
+                command, (1, 0, 1, 0), 80) == 80
+            assert mp_util.mission_circle_radius(
+                command, (1, 0, -1, 0), 80) == -80
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_TO_ALT, (0, -0.5, 0, 0), 80) == -80
+        # and a radius which is really a radius is left alone
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_TURNS, (1, 0, -90, 0), 80) == -90
+
+    def test_a_vehicle_radius_of_a_metre_or_less_is_arduplanes_default(self):
+        m = self.mavlink
+        # with WP_LOITER_RAD a metre or less, update_loiter() flies
+        # LOITER_RADIUS_DEFAULT, 60m, the way WP_LOITER_RAD's sign says
+        for command in (m.MAV_CMD_NAV_LOITER_UNLIM, m.MAV_CMD_NAV_LOITER_TIME):
+            assert mp_util.mission_circle_radius(
+                command, (30, 0, 0, 0), 0) == 60
+            assert mp_util.mission_circle_radius(
+                command, (30, 0, 0, 0), -1) == -60
+            assert mp_util.mission_circle_radius(
+                command, (30, 0, -1, 0), 1) == -60
+
+    def test_a_loiter_time_goes_the_vehicles_way_unless_told_otherwise(self):
+        m = self.mavlink
+        # ArduPlane's update_loiter() flies counter-clockwise when the item
+        # asked for it, and otherwise the way WP_LOITER_RAD's sign says: so
+        # a vehicle whose own radius is negative circles counter-clockwise
+        # for an item handing back +1, or one uploaded with no radius at all
+        for param3 in (0, 1):
+            assert mp_util.mission_circle_radius(
+                m.MAV_CMD_NAV_LOITER_TIME, (30, 0, param3, 0), -60) == -60
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_TIME, (30, 0, -1, 0), -60) == -60
+        # and a clockwise vehicle is only turned round by the item asking
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 0, 0), 60) == 60
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_TIME, (30, 0, -1, 0), 60) == -60
+        # and with no vehicle radius to take, nothing is drawn rather than a
+        # circle a metre across
+        assert mp_util.mission_circle_radius(
+            m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 1, 0)) is None
+
     def test_turn_counts(self):
         m = self.mavlink
         assert mp_util.mission_circle_turns(
             m.MAV_CMD_NAV_LOITER_TURNS, (3, 0, 60, 0)) == 3
         # DO_ORBIT counts in radians
         assert mp_util.mission_circle_turns(
-            m.MAV_CMD_DO_ORBIT, (80, 5, 0, math.radians(270))) == pytest.approx(0.75)
+            mp_util.MAV_CMD_DO_ORBIT, (80, 5, 0, math.radians(270))) == pytest.approx(0.75)
         # circling forever, and items which do not count turns
         assert mp_util.mission_circle_turns(
-            m.MAV_CMD_DO_ORBIT, (80, 5, 0, 0)) is None
+            mp_util.MAV_CMD_DO_ORBIT, (80, 5, 0, 0)) is None
         assert mp_util.mission_circle_turns(
             m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 90, 0)) is None
+
+    def test_which_items_crosstrack_from_their_centre(self):
+        m = self.mavlink
+        # param4 of these picks the track the next leg is flown against: 0
+        # asks for one out of the loiter centre, 1 for the exit location
+        for command in (m.MAV_CMD_NAV_LOITER_TURNS,
+                        m.MAV_CMD_NAV_LOITER_TIME,
+                        m.MAV_CMD_NAV_LOITER_TO_ALT):
+            assert mp_util.mission_crosstracks_from_centre(
+                command, (1, 0, 60, 0))
+            assert not mp_util.mission_crosstracks_from_centre(
+                command, (1, 0, 60, 1))
+            # an item which does not say gets what the vehicle does by default
+            assert mp_util.mission_crosstracks_from_centre(
+                command, (1, 0, 60, float('nan')))
+
+    def test_items_whose_param4_is_not_a_crosstrack_choice(self):
+        m = self.mavlink
+        # LOITER_UNLIM is never left, and its param4 is a yaw angle; DO_ORBIT
+        # counts its turns there.  Neither is asking for a track out
+        for command in (m.MAV_CMD_NAV_LOITER_UNLIM, mp_util.MAV_CMD_DO_ORBIT):
+            for param4 in (0, 1, 90, math.radians(270)):
+                assert not mp_util.mission_crosstracks_from_centre(
+                    command, (80, 5, 60, param4))
+        # nor is an item which does not circle at all
+        assert not mp_util.mission_crosstracks_from_centre(
+            m.MAV_CMD_NAV_WAYPOINT, (0, 0, 0, 0))
+
+
+class TestLogMissionItems(object):
+    """what MAVExplorer hands the 3D map for the mission items in a log.
+
+    The drawing tests below build their MissionItems by hand, so they say
+    nothing about whether anything fills them in: this covers the other end
+    """
+
+    def module(self):
+        pytest.importorskip("wx")
+        pytest.importorskip("lxml")
+        import importlib.util
+        import os
+        path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                            'MAVProxy', 'tools', 'MAVExplorer.py')
+        # MAVProxy/tools is not a package, so the tool is loaded by path
+        spec = importlib.util.spec_from_file_location('mavexplorer', path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def resolve(self, mission, params=None):
+        return self.module().resolve_mission_amsl(mission, 584.0, params or {})
+
+    def item(self, seq, command, params, alt=100.0):
+        return (HERE[0], HERE[1] + seq * 0.01, alt, 3, command, seq, params)
+
+    def test_a_takeoff_with_no_position_climbs_from_home(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink.MAV_CMD_NAV_TAKEOFF
+        home = (HERE[0], HERE[1], 584.0, 0,
+                mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 0, (0, 0, 0, 0))
+        takeoff = (0.0, 0.0, 30.0, 3, m, 1, (0, 0, 0, 0))
+        out = self.module().mission_items_from_cmds({0: home, 1: takeoff})
+        assert len(out) == 2
+        # the takeoff is drawn as the climb from home it is
+        assert out[1][0] == HERE[0]
+        assert out[1][1] == HERE[1]
+        assert out[1][2] == 30.0
+        assert out[1][4] == m
+
+    def test_an_item_with_nowhere_to_go_is_left_out(self):
+        from pymavlink import mavutil
+        home = (HERE[0], HERE[1], 584.0, 0,
+                mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 0, (0, 0, 0, 0))
+        # a jump carries no position and is not a takeoff, so it is not drawn
+        jump = (0.0, 0.0, 0.0, 3, mavutil.mavlink.MAV_CMD_DO_JUMP, 1,
+                (0, 0, 0, 0))
+        out = self.module().mission_items_from_cmds({0: home, 1: jump})
+        assert [i[5] for i in out] == [0]
+        # and with nowhere to climb from, nor is a takeoff
+        takeoff = (0.0, 0.0, 30.0, 3, mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 1,
+                   (0, 0, 0, 0))
+        out = self.module().mission_items_from_cmds({1: takeoff})
+        assert out == []
+
+    def test_a_mission_uploaded_before_home_was_known(self):
+        from pymavlink import mavutil
+        # the autopilot keeps its own home in item 0, so a mission uploaded
+        # before it had one leaves that item empty as well
+        home = (0.0, 0.0, 0.0, 0, mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 0,
+                (0, 0, 0, 0))
+        takeoff = (0.0, 0.0, 30.0, 3, mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 1,
+                   (0, 0, 0, 0))
+        out = self.module().mission_items_from_cmds(
+            {0: home, 1: takeoff}, started_at=HERE)
+        # the empty home is not drawn, but the takeoff climbs from where the
+        # flight started
+        assert [i[5] for i in out] == [1]
+        assert (out[0][0], out[0][1]) == HERE
+
+    def test_a_takeoff_climbs_from_where_it_was_flown(self):
+        from pymavlink import mavutil
+        # a vehicle need not take off from the home a mission was uploaded
+        # with; where the log says the takeoff began wins over home
+        home = (HERE[0], HERE[1], 584.0, 0,
+                mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 0, (0, 0, 0, 0))
+        takeoff = (0.0, 0.0, 30.0, 3, mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 1,
+                   (0, 0, 0, 0))
+        elsewhere = mp_util.gps_newpos(HERE[0], HERE[1], 45, 2000)
+        out = self.module().mission_items_from_cmds(
+            {0: home, 1: takeoff}, flown_from={1: elsewhere})
+        assert (out[1][0], out[1][1]) == elsewhere
+
+    def test_the_turns_an_item_asks_for_are_carried_through(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        out = self.resolve([
+            self.item(0, m.MAV_CMD_NAV_WAYPOINT, (0, 0, 0, 0)),
+            self.item(1, m.MAV_CMD_NAV_LOITER_TURNS, (3, 0, 60, 0)),
+            self.item(2, mp_util.MAV_CMD_DO_ORBIT, (60, 5, 0, math.radians(270))),
+            self.item(3, m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 60, 0)),
+        ])
+        assert out[1].circle_turns == 3
+        assert out[2].circle_turns == pytest.approx(0.75)
+        # circling until its time is up is not a number of turns
+        assert out[3].circle_turns is None
+
+    def test_a_loiter_to_alt_works_its_own_turns_out(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        params = {'AIRSPEED_CRUISE': 20.0, 'TECS_CLMB_MAX': 5.0}
+        out = self.resolve([
+            self.item(0, m.MAV_CMD_NAV_WAYPOINT, (0, 0, 0, 0), alt=100.0),
+            self.item(1, m.MAV_CMD_NAV_LOITER_TO_ALT, (0, 60, 0, 0),
+                      alt=700.0),
+        ], params)
+        # this one has no turn count of its own: what is left to climb on
+        # arrival decides it.  600m at 5m/s is 120s of climbing, of which
+        # the 900m approach does 45s, leaving four turns of a 60m circle
+        assert out[1].circle_turns == pytest.approx(4.0, abs=0.2)
+
+    def log(self, *messages):
+        '''a log which hands back these messages in order'''
+        class Log(object):
+            def __init__(self, messages):
+                self.messages = list(messages)
+
+            def recv_match(self, type=None, condition=None):
+                while self.messages:
+                    m = self.messages.pop(0)
+                    if type is None or m.get_type() in type:
+                        return m
+                return None
+        return Log(messages)
+
+    def message(self, kind, **fields):
+        from types import SimpleNamespace
+        m = SimpleNamespace(_timestamp=0, **fields)
+        m.get_type = lambda: kind
+        return m
+
+    def dump(self, where, count, command=16):
+        '''what the logger writes for a mission of count items at where'''
+        out = [self.message('MSG', Message='New mission')]
+        for seq in range(count):
+            p = mp_util.gps_newpos(where[0], where[1], 90, 100 * seq)
+            out.append(self.message('CMD', CNum=seq, CId=command, Lat=p[0],
+                                    Lng=p[1], Alt=100.0, Frame=3, Prm1=0,
+                                    Prm2=0, Prm3=0, Prm4=0))
+        return out
+
+    def test_a_log_draws_the_last_mission_it_holds(self):
+        first = HERE
+        second = mp_util.gps_newpos(HERE[0], HERE[1], 0, 5000)
+        (path, mission, _, _, _, _, _) = self.module().mission_from_log(
+            self.log(*(self.dump(first, 4) + self.dump(second, 2))))
+        # just the second mission, even though it is the shorter of the two
+        assert len(mission) == 2
+        assert mission[0][0] == pytest.approx(second[0])
+
+    def test_a_cleared_mission_draws_nothing(self):
+        # clearing the mission writes the message and then no items at all
+        (path, mission, _, _, _, _, _) = self.module().mission_from_log(
+            self.log(*(self.dump(HERE, 4) +
+                       [self.message('MSG', Message='New mission')])))
+        assert mission == []
+
+    def test_the_log_says_where_a_takeoff_began(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        moved = mp_util.gps_newpos(HERE[0], HERE[1], 45, 2000)
+
+        def cmd(seq, command, lat, lng, alt):
+            return self.message('CMD', CNum=seq, CId=command, Lat=lat,
+                                Lng=lng, Alt=alt, Frame=3, Prm1=0, Prm2=0,
+                                Prm3=0, Prm4=0)
+        (path, mission, _, _, _, _, _) = self.module().mission_from_log(self.log(
+            self.message('POS', Lat=HERE[0], Lng=HERE[1], Alt=584.0),
+            self.message('MSG', Message='New mission'),
+            cmd(0, m.MAV_CMD_NAV_WAYPOINT, HERE[0], HERE[1], 584.0),
+            cmd(1, m.MAV_CMD_NAV_TAKEOFF, 0.0, 0.0, 30.0),
+            # the vehicle is carried somewhere else before it flies
+            self.message('POS', Lat=moved[0], Lng=moved[1], Alt=600.0),
+            self.message('MSG', Message='Mission: 1 Takeoff'),
+            self.message('POS', Lat=moved[0], Lng=moved[1], Alt=630.0),
+        ))
+        assert (mission[1][0], mission[1][1]) == moved
+
+    def test_an_empty_home_is_the_one_the_log_recorded(self):
+        # a mission uploaded before the vehicle had a home logs home as
+        # nothing at all; the vehicle logs its home when it gets one.  The
+        # first positions are logged before the origin is, at nothing too
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        up = mp_util.gps_newpos(HERE[0], HERE[1], 0, 1000)
+
+        def cmd(seq, command, lat, lng, alt, frame):
+            return self.message('CMD', CNum=seq, CId=command, Lat=lat,
+                                Lng=lng, Alt=alt, Frame=frame, Prm1=0,
+                                Prm2=0, Prm3=0, Prm4=0)
+        (path, mission, cmds, _, _, _, _) = self.module().mission_from_log(self.log(
+            self.message('POS', Lat=HERE[0], Lng=HERE[1], Alt=0.1),
+            self.message('MSG', Message='New mission'),
+            cmd(0, m.MAV_CMD_NAV_WAYPOINT, 0.0, 0.0, 0.0, 0),
+            cmd(1, m.MAV_CMD_NAV_WAYPOINT, up[0], up[1], 70.0, 3),
+            self.message('ORGN', Type=0, Lat=HERE[0], Lng=HERE[1], Alt=500.0),
+            self.message('ORGN', Type=1, Lat=HERE[0], Lng=HERE[1], Alt=584.0),
+            self.message('POS', Lat=HERE[0], Lng=HERE[1], Alt=584.0),
+        ))
+        assert (mission[0][0], mission[0][1], mission[0][2]) == HERE + (584.0,)
+        assert cmds[0][:3] == HERE + (584.0,)
+        ground0 = min(p[2] for p in path)
+        out = self.module().resolve_mission_amsl(mission, ground0, {})
+        # measured from the home the vehicle had, not the lowest position
+        assert out[1].alt == pytest.approx(654.0)
+
+    def test_a_log_from_before_the_logger_said_new_mission(self):
+        # without the message, a mission's first item still starts it again
+        first = [m for m in self.dump(HERE, 4) if m.get_type() == 'CMD']
+        second = [m for m in self.dump(
+            mp_util.gps_newpos(HERE[0], HERE[1], 0, 5000), 2)
+            if m.get_type() == 'CMD']
+        (path, mission, _, _, _, _, _) = self.module().mission_from_log(
+            self.log(*(first + second)))
+        assert len(mission) == 2
+
+
+class TestLiveMissionTurns(object):
+    """the turns the live map3d module hands the viewer"""
+
+    def test_the_turns_an_item_asks_for_are_carried_through(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        at = [mp_util.gps_newpos(HERE[0], HERE[1], 90, 400 * i)
+              for i in range(3)]
+        items = live_mission_items([
+            waypoint(0, m.MAV_CMD_NAV_WAYPOINT, at[0][0], at[0][1], 100.0),
+            waypoint(1, m.MAV_CMD_NAV_LOITER_TURNS, at[1][0], at[1][1],
+                     300.0, params=(3, 0, 60, 0)),
+            waypoint(2, m.MAV_CMD_NAV_LOITER_TIME, at[2][0], at[2][1],
+                     300.0, params=(30, 0, 60, 0)),
+        ])
+        assert items[1].circle_turns == 3
+        # circling until its time is up is not a number of turns
+        assert items[2].circle_turns is None
+
+
+class TestLiveMissionAltitudes(object):
+    """the map3d module measures the climb into a loiter itself, to work out
+    how many turns it takes, so it has to resolve the frames first"""
+
+    def module(self, home_amsl):
+        from MAVProxy.modules.mavproxy_map3d import Map3DModule
+        # the module talks to a live MAVProxy, which is not what is under
+        # test here: only the altitude it hands the turn count
+        module = Map3DModule.__new__(Map3DModule)
+        module.home_amsl = home_amsl
+        return module
+
+    def test_frames_resolve_to_amsl(self):
+        module = self.module(584.0)
+        for frame in (0, 5):
+            assert module.item_amsl(700.0, frame) == 700.0
+        for frame in (3, 6):
+            assert module.item_amsl(100.0, frame) == 684.0
+
+    def test_a_terrain_altitude_without_terrain_is_unknown(self):
+        # send_mission() turns a terrain-frame item into AMSL when it has the
+        # terrain height; one still in frame 10 or 11 has no known height,
+        # and home is not a stand-in for the ground under it
+        module = self.module(584.0)
+        for frame in (10, 11):
+            assert module.item_amsl(100.0, frame) is None
+
+    def test_a_climb_across_two_frames(self):
+        module = self.module(584.0)
+        # 600m AMSL to 100m above a home at 584m is a climb of 84m, not the
+        # 500m descent the raw item altitudes look like
+        first = module.item_amsl(600.0, 0)
+        second = module.item_amsl(100.0, 3)
+        assert second - first == pytest.approx(84.0)
+
+    def test_send_mission_measures_the_climb_in_one_frame(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        params = {'AIRSPEED_CRUISE': 20.0, 'TECS_CLMB_MAX': 5.0,
+                  'TECS_SINK_MIN': 2.0}
+        loiter_at = mp_util.gps_newpos(HERE[0], HERE[1], 90, 300)
+        items = live_mission_items([
+            waypoint(0, m.MAV_CMD_NAV_WAYPOINT, HERE[0], HERE[1], 600.0,
+                     frame=0),
+            waypoint(1, m.MAV_CMD_NAV_LOITER_TO_ALT, loiter_at[0],
+                     loiter_at[1], 400.0, frame=3, params=(0, 60, 0, 0)),
+        ], home_amsl=584.0, params=params)
+        # 600m AMSL up to 400m above a 584m home is a climb of 384m; the raw
+        # altitudes would have it a 200m descent, which takes more turns
+        climb = mp_util.loiter_to_alt_turns(60, 384.0, params, 300.0)
+        descent = mp_util.loiter_to_alt_turns(60, -200.0, params, 300.0)
+        assert abs(climb - descent) > 0.5
+        assert items[1].circle_turns == pytest.approx(climb, rel=0.01)
+
+    def test_without_a_home_a_relative_altitude_is_unknown(self):
+        module = self.module(None)
+        assert module.item_amsl(100.0, 3) is None
+        # an AMSL item still stands on its own
+        assert module.item_amsl(700.0, 0) == 700.0
 
 
 class TestHoveringVehicles(object):
@@ -192,7 +843,7 @@ class TestHoveringVehicles(object):
         m = self.mavlink
         # it flies these as circles ...
         for (command, params) in ((m.MAV_CMD_NAV_LOITER_TURNS, (2, 0, 60, 0)),
-                                  (m.MAV_CMD_DO_ORBIT, (80, 5, 0, 0))):
+                                  (mp_util.MAV_CMD_DO_ORBIT, (80, 5, 0, 0))):
             assert mp_util.mission_circle_radius(
                 command, params, vehicle=m.MAV_TYPE_QUADROTOR) is not None
         # ... and holds position for these, climbing straight up rather than
@@ -201,10 +852,10 @@ class TestHoveringVehicles(object):
                                   (m.MAV_CMD_NAV_LOITER_TIME, (30, 0, 90, 0)),
                                   (m.MAV_CMD_NAV_LOITER_TO_ALT, (1, -65, 0, 0))):
             assert mp_util.mission_circle_radius(
-                command, params, vehicle=m.MAV_TYPE_QUADROTOR) is None
+                command, params, 60, vehicle=m.MAV_TYPE_QUADROTOR) is None
             # a forward-flight vehicle circles for all of them
             assert mp_util.mission_circle_radius(
-                command, params, vehicle=m.MAV_TYPE_FIXED_WING) is not None
+                command, params, 60, vehicle=m.MAV_TYPE_FIXED_WING) is not None
 
     def test_unknown_vehicle_keeps_the_old_behaviour(self):
         m = self.mavlink
@@ -675,6 +1326,51 @@ class TestCrosstrackRejoin(object):
         assert len(errors) == 1
 
 
+class TestProducersCrosstrack(object):
+    """what each producer of MissionItems makes of param4.  Only the loiters
+    ArduPlane lets go of carry a crosstrack choice there; LOITER_UNLIM
+    never leaves, and DO_ORBIT counts its turns in param4, so either
+    producer reading param4 as a crosstrack choice for those would draw a
+    pull-back after a loiter the vehicle never leaves"""
+
+    PARAMS = {'NAVL1_PERIOD': 17.0, 'AIRSPEED_CRUISE': 20.0}
+
+    def cases(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        # (command, params, whether the leg out is pulled back to the centre)
+        return [
+            (m.MAV_CMD_NAV_LOITER_TURNS, (1, 0, 60, 0), True),
+            (m.MAV_CMD_NAV_LOITER_TURNS, (1, 0, 60, 1), False),
+            (m.MAV_CMD_NAV_LOITER_UNLIM, (0, 0, 60, 0), False),
+        ]
+
+    def test_the_live_module(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        at = [mp_util.gps_newpos(HERE[0], HERE[1], 90, 400 * i)
+              for i in range(3)]
+        for (command, params, pulled_back) in self.cases():
+            items = live_mission_items([
+                waypoint(0, m.MAV_CMD_NAV_WAYPOINT, at[0][0], at[0][1], 100.0),
+                waypoint(1, command, at[1][0], at[1][1], 100.0, params=params),
+                waypoint(2, m.MAV_CMD_NAV_WAYPOINT, at[2][0], at[2][1], 100.0),
+            ], params=self.PARAMS)
+            assert (items[1].exit_converge is not None) == pulled_back, command
+
+    def test_mavexplorer(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        log = TestLogMissionItems()
+        for (command, params, pulled_back) in self.cases():
+            items = log.resolve([
+                log.item(0, m.MAV_CMD_NAV_WAYPOINT, (0, 0, 0, 0)),
+                log.item(1, command, params),
+                log.item(2, m.MAV_CMD_NAV_WAYPOINT, (0, 0, 0, 0)),
+            ], self.PARAMS)
+            assert (items[1].exit_converge is not None) == pulled_back, command
+
+
 class TestPolygonBounds(object):
 
     def test_bounds_cover_the_arc_and_not_just_the_chord(self):
@@ -692,3 +1388,74 @@ class TestPolygonBounds(object):
         for (lat, lon) in mp_util.arc_points(start, end, 270):
             assert arc[0] <= lat <= arc[0] + arc[2]
             assert arc[1] <= lon <= arc[1] + arc[3]
+
+
+class TestMissionFiles(object):
+    """the missions under tests/missions are flown by hand in SITL, so check
+    here that they still load and are still the missions their README says"""
+
+    def load(self, name):
+        '''(seq, frame, command, params, lat, lon, alt) for each item'''
+        import os
+        path = os.path.join(os.path.dirname(__file__), 'missions', name)
+        with open(path) as f:
+            lines = f.read().splitlines()
+        assert lines[0] == 'QGC WPL 110'
+        items = []
+        for line in lines[1:]:
+            if not line.strip() or line.startswith('#'):
+                continue
+            fields = line.split()
+            assert len(fields) == 12, line
+            items.append((int(fields[0]), int(fields[2]), int(fields[3]),
+                          tuple(float(v) for v in fields[4:8]),
+                          float(fields[8]), float(fields[9]),
+                          float(fields[10])))
+        assert [i[0] for i in items] == list(range(len(items)))
+        return items
+
+    def test_the_plane_mission(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        items = self.load('plane-mission-geometry.txt')
+        assert len(items) == 16
+        commands = set(i[2] for i in items)
+        # ArduPlane flies neither of these, so a flyable mission has neither
+        assert mp_util.MAV_CMD_NAV_ARC_WAYPOINT not in commands
+        assert mp_util.MAV_CMD_DO_ORBIT not in commands
+        for command in (m.MAV_CMD_NAV_LOITER_UNLIM, m.MAV_CMD_NAV_LOITER_TURNS,
+                        m.MAV_CMD_NAV_LOITER_TIME, m.MAV_CMD_NAV_LOITER_TO_ALT):
+            assert command in commands
+        # both ways round, and param4 both ways
+        radii = [mp_util.mission_circle_radius(i[2], i[3], 60) for i in items]
+        assert any(r is not None and r > 0 for r in radii)
+        assert any(r is not None and r < 0 for r in radii)
+        xtrack = [mp_util.mission_crosstracks_from_centre(i[2], i[3])
+                  for i in items if i[2] in (m.MAV_CMD_NAV_LOITER_TURNS,
+                                             m.MAV_CMD_NAV_LOITER_TO_ALT)]
+        assert True in xtrack and False in xtrack
+        # AMSL, home-relative and terrain altitudes
+        assert set(i[1] for i in items) >= {0, 3, 10}
+
+    def test_the_copter_mission(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        items = self.load('copter-mission-geometry.txt')
+        assert len(items) == 13
+        commands = [i[2] for i in items]
+        # ArduCopter flies arc waypoints, and no vehicle flies DO_ORBIT
+        sweeps = [i[3][0] for i in items if i[2] == mp_util.MAV_CMD_NAV_ARC_WAYPOINT]
+        assert any(s > 0 for s in sweeps)
+        assert any(s < -180 for s in sweeps)
+        assert mp_util.MAV_CMD_DO_ORBIT not in commands
+        # a takeoff with no position of its own
+        takeoff = items[commands.index(m.MAV_CMD_NAV_TAKEOFF)]
+        assert (takeoff[4], takeoff[5]) == (0.0, 0.0)
+        # circles only where a multirotor flies them, and only with a radius
+        drawn = [i[0] for i in items
+                 if mp_util.mission_circle_radius(i[2], i[3], None,
+                                                  'copter') is not None]
+        assert [commands[s] for s in drawn] == [m.MAV_CMD_NAV_LOITER_TURNS] * 2
+        for command in (m.MAV_CMD_NAV_LOITER_UNLIM, m.MAV_CMD_NAV_LOITER_TIME,
+                        m.MAV_CMD_NAV_LOITER_TO_ALT):
+            assert command in commands
