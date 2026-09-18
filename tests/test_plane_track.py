@@ -1081,6 +1081,10 @@ class TestFlownMission(object):
             [(1, 2)]
         assert self.arrivals(path, items, dict(PARAMS, WP_LOITER_RAD=-50)) == \
             [(1, 3)]
+        # and one of no radius at all is ArduPlane's 60m
+        for none in (0, 1, -1):
+            assert self.arrivals(path, items,
+                                 dict(PARAMS, WP_LOITER_RAD=none)) == [(1, 3)]
 
     @staticmethod
     def drawn(data):
@@ -1158,8 +1162,9 @@ class TestFlownMission(object):
         '''for each item flown to, in mission order, the index into path of
         the first point near it after the item before was reached: a
         waypoint's is within the distance a turn is started out, a loiter's
-        within its circle, which is WP_LOITER_RAD's where it gives none.  An item reached out of turn leaves the ones
-        after it unreached, as None; so does a flight which ends short.
+        within its circle, which is ArduPlane's default where it gives
+        none.  An item reached out of turn leaves the ones after it
+        unreached, as None; so does a flight which ends short.
         Items with no position, those ArduPlane skips, takeoffs, which the
         flight starts from, VTOL landings, and anything after the item which
         ends the flight, are left out'''
@@ -1177,8 +1182,8 @@ class TestFlownMission(object):
             if command == mavlink.MAV_CMD_NAV_LOITER_TO_ALT:
                 radius = abs(params[1] or 0.0)
                 if radius <= 1:
-                    radius = abs(plane_track.parameter(flight_params,
-                                                       'WP_LOITER_RAD'))
+                    radius = plane_track.default_loiter_radius(
+                        plane_track.parameter(flight_params, 'WP_LOITER_RAD'))
                 near = radius * 1.4
             index = None
             if after is not None:

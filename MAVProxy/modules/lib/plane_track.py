@@ -535,7 +535,12 @@ class MissionFlight(object):
         approach: it comes in at RTL_ALTITUDE, or down from where it started
         towards that where the difference is worth a slope, and drops to
         Q_RTL_ALT over the last stretch, which is as long as descending at
-        0.6 of TECS_SINK_MAX at AIRSPEED_CRUISE takes'''
+        0.6 of TECS_SINK_MAX at AIRSPEED_CRUISE takes.
+
+        This is ArduPilot master's, since bd9c0285fc.  Plane 4.7 and
+        before have no slope: they go to RTL_ALTITUDE at once, so a return
+        entered well above it is flown lower than drawn here until the
+        last stretch'''
         (end, end_amsl) = self.next_wp
         radius = max(abs(self.loiter_radius), abs(self.rtl_radius))
         rtl_alt_delta = max(0.0, self.rtl_altitude - self.q_rtl_alt)
@@ -707,7 +712,7 @@ class MissionFlight(object):
         if radius <= 1:
             # Plane::update_loiter: WP_LOITER_RAD, turned the way its sign says
             # unless the item asks for counter-clockwise
-            radius = abs(self.loiter_radius) if abs(self.loiter_radius) > 1 else 60.0
+            radius = default_loiter_radius(self.loiter_radius)
             if not ccw:
                 direction = -1 if self.loiter_radius < 0 else 1
         if command == mavlink.MAV_CMD_NAV_LOITER_TURNS and radius > 255:
@@ -1199,6 +1204,15 @@ def rally_amsl(alt, flags, home_amsl, origin_amsl=None, terrain_amsl=None):
     if datum is None:
         return None
     return datum + alt
+
+
+def default_loiter_radius(wp_loiter_rad):
+    '''the radius of a loiter which gives none of its own: WP_LOITER_RAD,
+    or LOITER_RADIUS_DEFAULT where that is no radius at all
+    (Plane::update_loiter)'''
+    if abs(wp_loiter_rad) <= 1:
+        return 60.0
+    return abs(wp_loiter_rad)
 
 
 def linear_interpolate(low_output, high_output, value, low, high):
