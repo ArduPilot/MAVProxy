@@ -14,9 +14,11 @@ from math import ceil
 import wx.lib.scrolledpanel as scrolled
 from MAVProxy.modules.lib import multiproc
 from MAVProxy.modules.lib import mp_util
-import mavpicviewer_shared as mpv
-from mavpicviewer_settings import mavpicviewer_settings
-import mavpicviewer_image
+from MAVProxy.tools.mavpicviewer import mavpicviewer_image
+from MAVProxy.tools.mavpicviewer import mavpicviewer_shared as mpv
+from MAVProxy.tools.mavpicviewer.mavpicviewer_settings import (
+    mavpicviewer_settings,
+)
 if mp_util.has_wxpython:
     from MAVProxy.modules.lib.wx_loader import wx
 
