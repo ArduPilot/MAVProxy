@@ -19,6 +19,7 @@ from PIL import ImageColor
 
 # Older pymavlink releases lack this common.xml command.
 MAV_CMD_NAV_ARC_WAYPOINT = getattr(mavutil.mavlink, "MAV_CMD_NAV_ARC_WAYPOINT", 36)
+MAV_CMD_DO_ORBIT = getattr(mavutil.mavlink, "MAV_CMD_DO_ORBIT", 34)
 
 # pymavlink may not yet carry the enumeration entry for the
 # home-centred inclusion circle.  Fall back to its known value (from
@@ -160,7 +161,7 @@ class MapModule(mp_module.MPModule):
             mavutil.mavlink.MAV_CMD_NAV_LOITER_TURNS: (255, 64, 255),
             mavutil.mavlink.MAV_CMD_NAV_LOITER_TIME: (255, 64, 255),
             mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT: (255, 64, 255),
-            mavutil.mavlink.MAV_CMD_DO_ORBIT: (255, 64, 255),
+            MAV_CMD_DO_ORBIT: (255, 64, 255),
 
             # other commands
             mavutil.mavlink.MAV_CMD_DO_LAND_START: (255, 127, 0),
@@ -174,7 +175,7 @@ class MapModule(mp_module.MPModule):
             mavutil.mavlink.MAV_CMD_NAV_LOITER_TURNS: "LT",
             mavutil.mavlink.MAV_CMD_NAV_LOITER_TIME: "LTime",
             mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT: "LAlt",
-            mavutil.mavlink.MAV_CMD_DO_ORBIT: "Orbit",
+            MAV_CMD_DO_ORBIT: "Orbit",
             mavutil.mavlink.MAV_CMD_NAV_VTOL_LAND: "VL",
         }
 
