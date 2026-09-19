@@ -1,5 +1,6 @@
 """MAVLink camera definition metadata and binary extended parameter values."""
 
+import hashlib
 import locale
 import lzma
 import math
@@ -185,8 +186,10 @@ class Parameter:
 
 class CameraDefinition:
     def __init__(self, data, locale_name=None):
+        data = definition_bytes(data)
+        self.xml_hash = hashlib.sha256(data).digest()
         try:
-            root = ET.fromstring(definition_bytes(data), forbid_dtd=True)
+            root = ET.fromstring(data, forbid_dtd=True)
         except (ET.ParseError, DefusedXmlException) as error:
             raise ValueError('invalid camera definition XML: %s' % error) from error
         if root.tag != 'mavlinkcamera' or root.find('definition') is None:

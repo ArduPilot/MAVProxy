@@ -38,11 +38,11 @@ class VideoView:
                 "{codec}parse ! avdec_{codec} ! videoconvert ! "
                 "video/x-raw,format=BGRx ! appsink"
             ).format(uri=uri, latency=max(0, latency), codec=codec)
-            self.image.set_gstreamer(pipeline)
+            self.image.set_gstreamer(pipeline, reconnect=True)
         else:
             # PyPI OpenCV builds generally omit CAP_GSTREAMER. Passing the URI
             # directly lets MPImage use OpenCV's available FFmpeg backend.
-            self.image.set_video(uri)
+            self.image.set_video(uri, reconnect=True)
 
     def alive(self):
         return self.image is not None and self.image.is_alive()
@@ -59,8 +59,13 @@ class VideoView:
             if not isinstance(event, MPMenuItem):
                 continue
             if event.returnkey == "Camera:Photo":
-                self.module.cmd_photo([])
+                command = ["photo"]
             elif event.returnkey == "Camera:Record":
-                self.module.cmd_record(["toggle"])
+                command = ["record", "toggle"]
             elif event.returnkey == "Camera:Autofocus":
-                self.module.cmd_focus(["auto"])
+                command = ["focus", "auto"]
+            else:
+                continue
+            self.module.cmd_camera([
+                "for", "%u:%u" % (self.camera.system_id, self.camera.component_id)
+            ] + command)

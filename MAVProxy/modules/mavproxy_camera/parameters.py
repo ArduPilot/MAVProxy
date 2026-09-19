@@ -20,6 +20,8 @@ class CameraParameters:
         self.camera = camera
         self.definition = None
         self.identity = None
+        self.local_definition = False
+        self.refresh_fallback = None
         self.advertised_identity = None
         self.generation = 0
         self.next_read_batch = 0.0
@@ -46,13 +48,16 @@ class CameraParameters:
         self.advertised_identity = identity
         self.load(*identity)
 
-    def load(self, uri, version=0, local=False):
+    def load(self, uri, version=0, local=False, refresh=False):
         self.identity = (uri, version)
+        self.local_definition = local
+        self.refresh_fallback = self.definition if refresh else None
         self.generation += 1
         generation = self.generation
-        self.definition = None
-        self.camera.definition = None
-        self.values.clear()
+        if self.refresh_fallback is None:
+            self.definition = None
+            self.camera.definition = None
+            self.values.clear()
         self.pending.clear()
         self.reads.clear()
         self.reported_count = None
@@ -61,7 +66,7 @@ class CameraParameters:
         self.loading = bool(uri)
         self.status = 'Loading camera definition' if uri else 'Camera does not advertise a definition file'
         self.dirty = True
-        if self.dialog is not None:
+        if self.dialog is not None and self.refresh_fallback is None:
             self.dialog.close()
             self.dialog = None
             self.open_when_ready = True
@@ -139,7 +144,7 @@ class CameraParameters:
         threading.Thread(target=worker, name='camera-definition', daemon=True).start()
 
     def request_all(self):
-        if self.definition is None:
+        if self.definition is None or self.refresh_fallback is not None:
             return
         now = time.monotonic()
         self.errors.clear()
@@ -154,6 +159,8 @@ class CameraParameters:
         self.dirty = True
 
     def request_read(self, name, delay=0):
+        if self.refresh_fallback is not None:
+            return
         param = self.definition.parameters.get(name)
         if param is None or param.writeonly or name in self.pending:
             return
@@ -162,6 +169,8 @@ class CameraParameters:
         self.reads[name] = [time.monotonic() + delay, 0]
 
     def set_value(self, name, value):
+        if self.refresh_fallback is not None:
+            raise ValueError('Refresh the camera definition before changing settings')
         if self.definition is None or name not in self.definition.parameters:
             raise ValueError('unknown camera setting %s' % name)
         param = self.definition.parameters[name]
@@ -217,7 +226,7 @@ class CameraParameters:
         return 'No response; use Refresh to retry'
 
     def packet(self, message):
-        if self.definition is None:
+        if self.definition is None or self.refresh_fallback is not None:
             return
         from MAVProxy.modules.mavproxy_camera import _text
         name = _text(message.param_id)
@@ -273,7 +282,8 @@ class CameraParameters:
                              step=param.step, options=controls.get(param.name, param.options),
                              visible=param.name in controls, readonly=param.readonly,
                              value=self.values.get(param.name),
-                             enabled=(not param.readonly and param.name not in self.pending and
+                             enabled=(self.refresh_fallback is None and
+                                      not param.readonly and param.name not in self.pending and
                                       (param.name in self.values or param.writeonly)),
                              pending=param.name in self.pending,
                              error=self.errors.get(param.name, '')))
@@ -309,13 +319,29 @@ class CameraParameters:
             self.loading = False
             if error is None:
                 try:
-                    self.definition = data if isinstance(data, CameraDefinition) else CameraDefinition(data)
+                    definition = data if isinstance(data, CameraDefinition) else CameraDefinition(data)
                 except Exception as exception:
                     error = str(exception)
             if error is not None:
                 self.status = 'Definition load failed: %s' % error
                 print('Camera %s: %s' % (self.camera.label(), self.status))
+                if self.refresh_fallback is not None:
+                    # Keep a Refresh button available after a failed reload.
+                    # The old controls stay disabled until a reload succeeds.
+                    self.definition = self.refresh_fallback
+                    self.camera.definition = self.definition
+                    if self.open_when_ready:
+                        self.open_dialog()
             else:
+                if (self.refresh_fallback is not None and
+                        definition.xml_hash != self.refresh_fallback.xml_hash):
+                    self.values.clear()
+                    if self.dialog is not None:
+                        self.open_when_ready = self.dialog.is_alive()
+                        self.dialog.close()
+                        self.dialog = None
+                self.definition = definition
+                self.refresh_fallback = None
                 self.camera.definition = self.definition
                 print('Camera %s: loaded %u settings' % (self.camera.label(), len(self.definition.parameters)))
                 self.request_all()
@@ -361,6 +387,10 @@ class CameraParameters:
             else:
                 for event in self.dialog.events():
                     if event[0] == 'refresh':
+                        if self.identity is not None:
+                            # Keep the window until we know the XML changed.
+                            self.load(*self.identity, local=self.local_definition, refresh=True)
+                            return
                         self.request_all()
                     elif event[0] == 'set':
                         try:
