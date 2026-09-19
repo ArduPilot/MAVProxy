@@ -939,6 +939,11 @@ class ConsoleModule(mp_module.MPModule):
 
         fi = self.flight_information[sysid]
 
+        if not hasattr(mavutil.mavlink, 'MAVLINK_MSG_ID_FLIGHT_INFORMATION'):
+            # message not in this dialect (e.g. MAVLink1, --mav10)
+            fi.supported = False
+            return
+
         now  = time.time()
 
         if fi.supported is not False and (fi.last_seen is None or now - fi.last_seen > 10):
