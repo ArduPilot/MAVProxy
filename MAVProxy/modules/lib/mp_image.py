@@ -88,8 +88,9 @@ class MPImageRecenter:
 
 class MPImageGStreamer:
     '''request getting image feed from gstreamer pipeline'''
-    def __init__(self, pipeline):
+    def __init__(self, pipeline, reconnect=False):
         self.pipeline = pipeline
+        self.reconnect = reconnect
 
 
 class MPImageFFmpeg:
@@ -102,8 +103,9 @@ class MPImageFFmpeg:
 
 class MPImageVideo:
     '''request getting image feed from video file'''
-    def __init__(self, filename):
+    def __init__(self, filename, reconnect=False):
         self.filename = filename
+        self.reconnect = reconnect
         
 class MPImageColormap:
     '''set a colormap for display'''
@@ -324,17 +326,17 @@ class MPImage():
         '''set window layout'''
         self.in_queue.put(layout)
 
-    def set_gstreamer(self, pipeline):
-        '''set gstreamer pipeline source'''
-        self.in_queue.put(MPImageGStreamer(pipeline))
+    def set_gstreamer(self, pipeline, reconnect=False):
+        '''set gstreamer source, optionally reconnecting a live stream'''
+        self.in_queue.put(MPImageGStreamer(pipeline, reconnect))
 
     def set_ffmpeg(self, command, width, height):
         '''set an ffmpeg raw-BGR pipeline source'''
         self.in_queue.put(MPImageFFmpeg(command, width, height))
 
-    def set_video(self, filename):
-        '''set video file source'''
-        self.in_queue.put(MPImageVideo(filename))
+    def set_video(self, filename, reconnect=False):
+        '''set video source, optionally reconnecting a live stream'''
+        self.in_queue.put(MPImageVideo(filename, reconnect))
         
     def set_colormap(self, colormap):
         '''set a colormap for greyscale data'''
@@ -617,11 +619,11 @@ class MPImagePanel(wx.Panel):
             if isinstance(obj, win_layout.WinLayout):
                 win_layout.set_wx_window_layout(state.frame, obj)
             if isinstance(obj, MPImageGStreamer):
-                self.start_gstreamer(obj.pipeline)
+                self.start_gstreamer(obj.pipeline, obj.reconnect)
             if isinstance(obj, MPImageFFmpeg):
                 self.start_ffmpeg(obj.command, obj.width, obj.height)
             if isinstance(obj, MPImageVideo):
-                self.start_video(obj.filename)
+                self.start_video(obj.filename, obj.reconnect)
             if isinstance(obj, MPImageFPSMax):
                 self.fps_max = obj.fps_max
                 print("FPS_MAX: ", self.fps_max)
@@ -658,9 +660,10 @@ class MPImagePanel(wx.Panel):
         self.tracker = tracker
 
 
-    def start_gstreamer(self, pipeline):
+    def start_gstreamer(self, pipeline, reconnect=False):
         '''start a gstreamer pipeline'''
-        thread = Thread(target=self.video_thread, args=(pipeline,cv2.CAP_GSTREAMER))
+        thread = Thread(target=self.video_thread,
+                        args=(pipeline, cv2.CAP_GSTREAMER, reconnect))
         thread.daemon = True
         thread.start()
 
@@ -671,9 +674,9 @@ class MPImagePanel(wx.Panel):
         thread.daemon = True
         thread.start()
 
-    def start_video(self, filename):
+    def start_video(self, filename, reconnect=False):
         '''start a video'''
-        thread = Thread(target=self.video_thread, args=(filename,0))
+        thread = Thread(target=self.video_thread, args=(filename, 0, reconnect))
         thread.daemon = True
         thread.start()
 
@@ -759,32 +762,47 @@ class MPImagePanel(wx.Panel):
             # an already-open viewer recovers when the stream comes back.
             time.sleep(1)
         
-    def video_thread(self, url, cap_options):
+    def video_thread(self, url, cap_options, reconnect=False):
         '''thread for video capture'''
-        self.vcap = cv2.VideoCapture(url, cap_options)
-        if not self.vcap or not self.vcap.isOpened():
-            print("VideoCapture failed")
-            return
-
         while True:
-            if self.seek_percentage is not None:
-                frame_count = self.vcap.get(cv2.CAP_PROP_FRAME_COUNT)
-                if frame_count > 0:
-                    pos = int(frame_count*self.seek_percentage*0.01)
-                    self.vcap.set(cv2.CAP_PROP_POS_FRAMES, pos)
-                    self.seek_percentage = None
-            if self.seek_frame is not None:
-                self.vcap.set(cv2.CAP_PROP_POS_FRAMES, self.seek_frame)
-                self.seek_frame = None
+            capture = None
             try:
-                _, frame = self.vcap.read()
+                if reconnect:
+                    # Bound network stalls in both FFmpeg and GStreamer.
+                    capture = cv2.VideoCapture(url, cap_options, [
+                        cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 3000,
+                        cv2.CAP_PROP_READ_TIMEOUT_MSEC, 3000])
+                else:
+                    capture = cv2.VideoCapture(url, cap_options)
+                self.vcap = capture
+                if not capture.isOpened():
+                    print("VideoCapture failed")
+                while capture.isOpened():
+                    if self.seek_percentage is not None:
+                        frame_count = capture.get(cv2.CAP_PROP_FRAME_COUNT)
+                        if frame_count > 0:
+                            pos = int(frame_count*self.seek_percentage*0.01)
+                            capture.set(cv2.CAP_PROP_POS_FRAMES, pos)
+                            self.seek_percentage = None
+                    if self.seek_frame is not None:
+                        capture.set(cv2.CAP_PROP_POS_FRAMES, self.seek_frame)
+                        self.seek_frame = None
+                    ok, frame = capture.read()
+                    if not ok or frame is None:
+                        break
+                    frame_count = int(capture.get(cv2.CAP_PROP_POS_FRAMES))
+                    self.display_video_frame(frame, frame_count)
             except Exception as ex:
                 print(ex)
-                break
-            if frame is None:
-                break
-            frame_count = int(self.vcap.get(cv2.CAP_PROP_POS_FRAMES))
-            self.display_video_frame(frame, frame_count)
+            finally:
+                if capture is not None:
+                    capture.release()
+                self.vcap = None
+            if not reconnect:
+                return
+            # The daemon thread exits with the viewer process. Retry even if
+            # the camera was unavailable when this window first opened.
+            time.sleep(1)
 
 
     def on_recenter(self, location):

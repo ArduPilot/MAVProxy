@@ -301,6 +301,129 @@ class ParameterTest(unittest.TestCase):
         self.assertIn('ISO', p.reads)
         self.module.master.mav.param_ext_request_read_send.assert_not_called()
 
+    @mock.patch('MAVProxy.modules.mavproxy_camera.settings_dialog.CameraSettingsDialog')
+    @mock.patch('MAVProxy.modules.lib.mp_util.has_wxpython', True)
+    def test_dialog_refresh_refetches_xml_and_rebuilds_controls(self, dialog_class):
+        p = self.parameters
+        p.identity = ('mftp:///camera.xml', 1)
+        old_dialog = mock.Mock()
+        old_dialog.events.return_value = [('refresh',), ('set', 'AUTO', 1)]
+        p.dialog = old_dialog
+        p.idle()
+        old_dialog.events.return_value = []
+        old_dialog.close.assert_not_called()
+        self.assertIs(p.dialog, old_dialog)
+        self.assertTrue(p.loading)
+        self.module.master.mav.param_ext_set_send.assert_not_called()
+        self.module.master.mav.param_ext_request_list_send.assert_not_called()
+        request = self.module.module.return_value.cmd_get.call_args
+        self.assertEqual(request.args, (['/camera.xml'],))
+        self.assertEqual(request.kwargs['target_system'], 17)
+        self.assertEqual(request.kwargs['target_component'], 100)
+        changed = XML.replace(b'</parameters>', b'''<parameter name="NEW" type="bool">
+            <description>New control</description></parameter></parameters>''')
+        request.kwargs['callback'](io.BytesIO(changed))
+        dialog_class.return_value.events.return_value = []
+        self.wait_for_load()
+        old_dialog.close.assert_called_once()
+        self.assertIn('NEW', p.definition.parameters)
+        self.assertIn('NEW', p.reads)
+        self.module.master.mav.param_ext_request_list_send.assert_called_once_with(17, 100)
+        dialog_class.assert_called_once()
+        rows = dialog_class.call_args.args[1]['rows']
+        self.assertIn('NEW', [row['name'] for row in rows])
+
+    @mock.patch('MAVProxy.modules.mavproxy_camera.settings_dialog.CameraSettingsDialog')
+    def test_refresh_unchanged_xml_keeps_window_and_reads_values(self, dialog_class):
+        p = self.parameters
+        p.identity = ('mftp:///camera.xml', 1)
+        old_dialog = mock.Mock()
+        p.dialog = old_dialog
+        for data in (XML, lzma.compress(XML)):
+            with self.subTest(compressed=data != XML):
+                old_dialog.events.return_value = [('refresh',)]
+                p.idle()
+                old_dialog.events.return_value = []
+                self.assertIs(p.dialog, old_dialog)
+                self.assertEqual(p.values['ISO'], 100)
+                self.module.module.return_value.cmd_get.call_args.kwargs['callback'](io.BytesIO(data))
+                self.wait_for_load()
+                self.assertIs(p.dialog, old_dialog)
+                old_dialog.close.assert_not_called()
+                dialog_class.assert_not_called()
+                self.assertIsNone(p.refresh_fallback)
+                self.assertIn('ISO', p.reads)
+                self.module.master.mav.param_ext_request_list_send.assert_called_with(17, 100)
+        self.assertEqual(self.module.master.mav.param_ext_request_list_send.call_count, 2)
+
+    @mock.patch('MAVProxy.modules.mavproxy_camera.parameters.download_definition')
+    def test_refresh_preserves_local_definition_override(self, download):
+        p = self.parameters
+        with tempfile.TemporaryDirectory() as directory:
+            filename = Path(directory) / 'camera.xml'
+            filename.write_bytes(XML)
+            p.load(str(filename), local=True)
+            self.wait_for_load()
+            filename.write_bytes(XML.replace(b'<description>Gain</description>',
+                                            b'<description>Changed gain</description>'))
+            p.dialog = mock.Mock()
+            p.dialog.events.return_value = [('refresh',)]
+            with mock.patch.object(p, 'open_dialog'):
+                p.idle()
+                p.dialog.events.return_value = []
+                self.wait_for_load()
+            self.assertEqual(p.definition.parameters['GAIN'].description, 'Changed gain')
+            download.assert_not_called()
+
+    @mock.patch('MAVProxy.modules.mavproxy_camera.settings_dialog.CameraSettingsDialog')
+    @mock.patch('MAVProxy.modules.lib.mp_util.has_wxpython', True)
+    def test_failed_refresh_keeps_dialog_available_for_retry(self, dialog_class):
+        p = self.parameters
+        p.identity = ('mftp:///camera.xml', 1)
+        previous = p.definition
+        old_dialog = mock.Mock()
+        p.dialog = old_dialog
+        p.dialog.events.return_value = [('refresh',)]
+        p.idle()
+        p.dialog.events.return_value = []
+        self.module.module.return_value.cmd_get.call_args.kwargs['callback'](None)
+        dialog_class.return_value.events.return_value = []
+        p.idle()
+        self.assertIs(p.definition, previous)
+        self.assertIs(p.dialog, old_dialog)
+        p.packet(packet('AUTO', 1, 1))
+        self.assertIn('Definition load failed', p.snapshot()['status'])
+        self.assertTrue(all(not row['enabled'] for row in p.snapshot()['rows']))
+        with self.assertRaisesRegex(ValueError, 'Refresh'):
+            p.set_value('ACTION', 1)
+        p.dialog.events.return_value = [('refresh',)]
+        p.idle()
+        p.dialog.events.return_value = []
+        self.module.module.return_value.cmd_get.call_args.kwargs['callback'](io.BytesIO(XML))
+        dialog_class.return_value.events.return_value = []
+        self.wait_for_load()
+        self.assertIsNone(p.refresh_fallback)
+        self.assertIs(p.dialog, old_dialog)
+        old_dialog.close.assert_not_called()
+        dialog_class.assert_not_called()
+        self.module.master.mav.param_ext_request_list_send.assert_called_once_with(17, 100)
+
+    @mock.patch('MAVProxy.modules.mavproxy_camera.settings_dialog.CameraSettingsDialog')
+    def test_closing_dialog_during_refresh_does_not_reopen_it(self, dialog_class):
+        p = self.parameters
+        p.identity = ('mftp:///camera.xml', 1)
+        p.dialog = mock.Mock()
+        p.dialog.events.return_value = [('refresh',)]
+        p.idle()
+        p.dialog.is_alive.return_value = False
+        p.idle()
+        changed = XML.replace(b'<description>Gain</description>', b'<description>Changed gain</description>')
+        self.module.module.return_value.cmd_get.call_args.kwargs['callback'](io.BytesIO(changed))
+        self.wait_for_load()
+        self.assertIsNone(p.dialog)
+        self.assertFalse(p.open_when_ready)
+        dialog_class.assert_not_called()
+
     def test_missing_definition_parameter_in_complete_camera_list(self):
         p = self.parameters
         p.request_all()

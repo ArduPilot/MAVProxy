@@ -107,6 +107,7 @@ class ConsoleModule(mp_module.MPModule):
         self.vehicle_menu = None
         self.vehicle_name_by_sysid = {}
         self.component_name = {}
+        self.component_model = {}
         self.last_param_sysid_timestamp = None
         self.flight_information = {}
 
@@ -285,6 +286,8 @@ class ConsoleModule(mp_module.MPModule):
             return "ADSB"
         elif hb.type == mavutil.mavlink.MAV_TYPE_ODID:
             return "ODID"
+        elif hb.type == mavutil.mavlink.MAV_TYPE_CAMERA:
+            return "Camera"
         return "UNKNOWN(%u)" % hb.type
 
     def component_type_string(self, hb):
@@ -309,7 +312,8 @@ class ConsoleModule(mp_module.MPModule):
         for s in sorted(self.vehicle_list):
             clist = self.module('param').get_component_id_list(s)
             if len(clist) == 1:
-                name = 'SysID %u: %s' % (s, self.vehicle_name_by_sysid[s])
+                component = self.component_name.get(s, {}).get(clist[0], self.vehicle_name_by_sysid[s])
+                name = 'SysID %u: %s' % (s, component)
                 self.vehicle_menu.items.append(MPMenuItem(name, name, '# vehicle %u' % s))
             else:
                 for c in sorted(clist):
@@ -348,12 +352,21 @@ class ConsoleModule(mp_module.MPModule):
             self.last_sys_status_errors_announce = now
             self.say("Critical failure 0x%x sysid=%u compid=%u" % (errors, sysid, compid))
 
-    def set_component_name(self, sysid, compid, name):
+    def set_component_name(self, sysid, compid, name, override=False):
         if sysid not in self.component_name:
             self.component_name[sysid] = {}
-        if compid not in self.component_name[sysid]:
+        if (compid not in self.component_name[sysid] or
+                (override and self.component_name[sysid][compid] != name)):
             self.component_name[sysid][compid] = name
             self.update_vehicle_menu()
+
+    def update_component_model_name(self, sysid, compid):
+        '''combine advertised identification with the component heartbeat type'''
+        name = self.component_model[(sysid, compid)]
+        heartbeat = self.vehicle_heartbeats.get((sysid, compid))
+        if heartbeat is not None:
+            name += ' (%s)' % self.component_type_string(heartbeat)
+        self.set_component_name(sysid, compid, name, override=True)
 
     # this method is called when a HEARTBEAT arrives from any source:
     def handle_heartbeat_anysource(self, msg):
@@ -364,15 +377,24 @@ class ConsoleModule(mp_module.MPModule):
                 self.vehicle_heartbeats[(sysid, compid)] = msg
             if not sysid in self.vehicle_list:
                 self.add_new_vehicle(msg)
-            self.set_component_name(sysid, compid, self.component_type_string(msg))
+            if (sysid, compid) in self.component_model:
+                self.update_component_model_name(sysid, compid)
+            else:
+                self.set_component_name(sysid, compid, self.component_type_string(msg))
 
-    # this method is called when a GIMBAL_DEVICE_INFORMATION arrives
-    # from any source:
-    def handle_gimbal_device_information_anysource(self, msg):
-            sysid = msg.get_srcSystem()
-            compid = msg.get_srcComponent()
-            self.set_component_name(sysid, compid, "%s-%s" %
-                                    (msg.vendor_name, msg.model_name))
+    def handle_component_information_anysource(self, msg):
+        '''prefer camera/gimbal identification over the heartbeat type'''
+        def text(value):
+            # CAMERA_INFORMATION uses uint8 arrays; gimbal fields are char[].
+            if not isinstance(value, str):
+                value = bytes(value).decode('utf-8', errors='replace')
+            return value.split('\0', 1)[0].strip()
+
+        name = '-'.join(part for part in (text(msg.vendor_name), text(msg.model_name)) if part)
+        if name:
+            sysid, compid = msg.get_srcSystem(), msg.get_srcComponent()
+            self.component_model[(sysid, compid)] = name
+            self.update_component_model_name(sysid, compid)
 
     def handle_radio_status(self, msg):
             # handle RADIO msgs from all vehicles
@@ -855,8 +877,8 @@ class ConsoleModule(mp_module.MPModule):
         if type in frozenset(['HEARTBEAT', 'HIGH_LATENCY2']):
             self.handle_heartbeat_anysource(msg)
 
-        elif type == 'GIMBAL_DEVICE_INFORMATION':
-            self.handle_gimbal_device_information_anysource(msg)
+        elif type in ('GIMBAL_DEVICE_INFORMATION', 'CAMERA_INFORMATION'):
+            self.handle_component_information_anysource(msg)
 
         if self.last_param_sysid_timestamp != self.module('param').new_sysid_timestamp:
             '''a new component ID has appeared for parameters'''
