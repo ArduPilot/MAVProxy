@@ -11,8 +11,8 @@ AP_FLAKE8_CLEAN
 import os
 from argparse import ArgumentParser
 from MAVProxy.modules.lib import multiproc
-import mavpicviewer_image
-import mavpicviewer_mosaic
+from MAVProxy.tools.mavpicviewer import mavpicviewer_image
+from MAVProxy.tools.mavpicviewer import mavpicviewer_mosaic
 
 prefix_str = "mavpicviewer: "
 
