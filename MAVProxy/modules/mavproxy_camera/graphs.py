@@ -53,6 +53,10 @@ class CameraGraphs:
         name, title, message_type, fields = preset
         module = self.module
         camera = module._selected_camera(required=False)
+        if message_type == GIMBAL_STATUS and module.command_camera is None and camera is not None:
+            # a selected camera's manager overrides apply to its mount graphs
+            with module._camera_context(camera):
+                return self.open(args)
         system = camera.system_id if camera else module.target_system or 1
         component = module.camera_settings.manager_component
         gimbal_id = None
