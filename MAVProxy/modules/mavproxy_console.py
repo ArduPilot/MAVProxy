@@ -364,8 +364,10 @@ class ConsoleModule(mp_module.MPModule):
         if compid == mavutil.mavlink.MAV_COMP_ID_AUTOPILOT1:
             return True
         heartbeat = self.vehicle_heartbeats.get((sysid, compid))
-        return (heartbeat is not None and
-                getattr(heartbeat, 'autopilot', mavutil.mavlink.MAV_AUTOPILOT_INVALID) not in
+        if heartbeat is None or heartbeat.type in (mavutil.mavlink.MAV_TYPE_CAMERA,
+                                                   mavutil.mavlink.MAV_TYPE_GIMBAL):
+            return False
+        return (getattr(heartbeat, 'autopilot', mavutil.mavlink.MAV_AUTOPILOT_INVALID) not in
                 (mavutil.mavlink.MAV_AUTOPILOT_INVALID, mavutil.mavlink.MAV_AUTOPILOT_GENERIC))
 
     def update_component_model_name(self, sysid, compid):

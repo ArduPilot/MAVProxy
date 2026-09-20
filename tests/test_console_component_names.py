@@ -110,3 +110,11 @@ def test_flight_controller_heartbeat_reverts_camera_name(console):
     console.mavlink_packet(message('HEARTBEAT', type=mavutil.mavlink.MAV_TYPE_CAMERA,
                                    autopilot=mavutil.mavlink.MAV_AUTOPILOT_INVALID))
     assert console.component_name[1][100] == 'Siyi-ZR10 (Camera)'
+    # an advertised camera or gimbal type wins over a sloppy autopilot field
+    console.mavlink_packet(message('HEARTBEAT', type=mavutil.mavlink.MAV_TYPE_CAMERA,
+                                   autopilot=mavutil.mavlink.MAV_AUTOPILOT_ARDUPILOTMEGA))
+    assert console.component_name[1][100] == 'Siyi-ZR10 (Camera)'
+    console.mavlink_packet(message('GIMBAL_DEVICE_INFORMATION', 154, vendor_name='Siyi', model_name='ZR10'))
+    console.mavlink_packet(message('HEARTBEAT', 154, type=mavutil.mavlink.MAV_TYPE_GIMBAL,
+                                   autopilot=mavutil.mavlink.MAV_AUTOPILOT_ARDUPILOTMEGA))
+    assert console.component_name[1][154] == 'Siyi-ZR10 (Gimbal)'
