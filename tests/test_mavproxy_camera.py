@@ -435,8 +435,9 @@ class CameraModuleTest(unittest.TestCase):
                 self.module._sync_menus()
             self.assertEqual(self.module.menu_cameras, [(1, 100), (1, 101)])
             for menu, component in zip(self.module.menus, (100, 101)):
-                for label, stream_id in (("View RGB", 1), ("View thermal", 2)):
-                    item = next(item for item in menu.items if item.name == label)
+                video = next(item for item in menu.items if item.name == "Video")
+                for label, stream_id in (("Visible 1920x1080", 1), ("Thermal 1280x720", 2)):
+                    item = next(item for item in video.items if item.name == label)
                     self.module.cmd_camera(item.returnkey.split()[2:])
                     self.assertEqual(view_class.call_args.args[1].component_id, component)
                     self.assertEqual(view_class.call_args.args[3],
@@ -444,6 +445,41 @@ class CameraModuleTest(unittest.TestCase):
                 graphs = next(item for item in menu.items if item.name == "Graphs")
                 self.assertTrue(all("for 1:%u graph " % component in item.returnkey
                                     for item in graphs.items))
+
+    def test_video_menu_follows_stream_information(self):
+        console = mock.Mock()
+        self.state.modules.update(console=console)
+        with mock.patch("MAVProxy.modules.lib.mp_util.has_wxpython", True):
+            self.module.mavlink_packet(camera_information())
+            self.module._sync_menus()
+            video = next(item for item in self.module.menus[0].items if item.name == "Video")
+            self.assertEqual([item.name for item in video.items], ["No streams discovered"])
+            self.assertEqual(video.items[0].returnkey, "# camera for 1:100 streams")
+            # Stream discovery replaces the placeholder with one item per stream
+            self.module.mavlink_packet(stream_information(2, thermal=True))
+            console.reset_mock()
+            self.module._sync_menus()
+            self.assertEqual(console.remove_menu.call_count, 1)
+            self.assertEqual(console.add_menu.call_count, 1)
+            video = next(item for item in self.module.menus[0].items if item.name == "Video")
+            self.assertEqual([item.name for item in video.items], ["Thermal 1280x720"])
+            self.module.mavlink_packet(stream_information(1))
+            self.module._sync_menus()
+            video = next(item for item in self.module.menus[0].items if item.name == "Video")
+            self.assertEqual([(item.name, item.returnkey) for item in video.items], [
+                ("Visible 1920x1080", "# camera for 1:100 view 1"),
+                ("Thermal 1280x720", "# camera for 1:100 view 2")])
+            # Unchanged stream information does not churn the console menus
+            console.reset_mock()
+            self.module.mavlink_packet(stream_information(1))
+            self.module._sync_menus()
+            console.add_menu.assert_not_called()
+            # Duplicate labels stay distinct
+            self.module.mavlink_packet(stream_information(3))
+            self.module._sync_menus()
+            video = next(item for item in self.module.menus[0].items if item.name == "Video")
+            self.assertEqual([item.name for item in video.items],
+                             ["Visible 1920x1080", "Thermal 1280x720", "Visible 1920x1080 (3)"])
 
     def test_late_camera_renumbers_projection_layers_without_leftovers(self):
         self.state.map = FakeMap()

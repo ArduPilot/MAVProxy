@@ -18,8 +18,11 @@ gimbal component ID, so setting it to the discovered component ID (for example
 154) fails. The setting makes this workaround explicit and can be changed when
 the ArduPilot mapping is corrected.
 
-`camera view rgb`, `camera view thermal`, or `camera view all` opens discovered
-RTSP streams when wxPython and an RTSP-capable OpenCV backend are installed.
+`camera view ID`, `camera view rgb`, `camera view thermal`, or `camera view all`
+opens discovered RTSP streams when wxPython and an RTSP-capable OpenCV backend
+are installed. Each camera menu has a **Video** submenu with one entry per
+`VIDEO_STREAM_INFORMATION` stream, labelled by stream name and resolution (for
+example "Thermal 1920x1080"); the submenu is rebuilt as streams are discovered.
 The viewer uses the same GStreamer pipeline as `mavproxy_SIYI` when available,
 and otherwise falls back to OpenCV's FFmpeg backend. Wildcard RTSP hosts are replaced by
 `camera set rtsp_host ADDRESS`; conforming cameras should advertise an address

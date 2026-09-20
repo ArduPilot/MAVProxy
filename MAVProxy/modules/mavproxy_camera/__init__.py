@@ -176,6 +176,7 @@ class CameraModule(mp_module.MPModule):
         self.last_ack = {}
         self.pending_commands = {}
         self.menu_cameras = []
+        self.menu_streams = {}
         self.menus = [self._make_menu("Camera", None)] if mp_util.has_wxpython else []
         self.menu = self.menus[0] if self.menus else None
         self.menu_modules = {}
@@ -198,9 +199,31 @@ class CameraModule(mp_module.MPModule):
             MPMenuItem("Toggle recording", returnkey=prefix + "record toggle"),
             MPMenuItem("Autofocus", returnkey=prefix + "focus auto"),
             MPMenuItem("Center gimbal", returnkey=prefix + "mount center"),
-            MPMenuItem("View RGB", returnkey=prefix + "view rgb"),
-            MPMenuItem("View thermal", returnkey=prefix + "view thermal"),
+            MPMenuSubMenu("Video", items=self._video_menu_items(key, prefix)),
         ])
+
+    def _stream_menu_signature(self, key):
+        camera = self.cameras.get(key) if key is not None else None
+        if camera is None:
+            return ()
+        return tuple((stream_id, _text(stream.name),
+                      int(stream.resolution_h), int(stream.resolution_v))
+                     for stream_id, stream in sorted(camera.streams.items()))
+
+    def _video_menu_items(self, key, prefix):
+        # one item per VIDEO_STREAM_INFORMATION, eg "Thermal 1920x1080"
+        from MAVProxy.modules.lib.mp_menu import MPMenuItem
+        items = []
+        labels = set()
+        for stream_id, name, width, height in self._stream_menu_signature(key):
+            label = "%s %ux%u" % (name or "Stream %u" % stream_id, width, height)
+            if label in labels:
+                label += " (%u)" % stream_id
+            labels.add(label)
+            items.append(MPMenuItem(label, returnkey=prefix + "view %u" % stream_id))
+        if not items:
+            items.append(MPMenuItem("No streams discovered", returnkey=prefix + "streams"))
+        return items
 
     def _camera_menu_keys(self):
         # Only collapse autopilot proxies, never two physical cameras with
@@ -226,16 +249,21 @@ class CameraModule(mp_module.MPModule):
         if not mp_util.has_wxpython:
             return
         keys = self._camera_menu_keys()
-        changed = keys != self.menu_cameras
+        streams = {key: self._stream_menu_signature(key) for key in keys}
+        keys_changed = keys != self.menu_cameras
+        changed = keys_changed or streams != self.menu_streams
         old_menus = self.menus
-        if changed:
+        if keys_changed:
             # A late lower-address camera can change the numbered map layers.
             # Remove old names before refreshing their new names and colours.
             self._clear_fov()
+        if changed:
             self.menu_cameras = keys
+            self.menu_streams = streams
             self.menus = [self._make_menu("Camera" if i == 0 else "Camera%u" % (i + 1), key)
                           for i, key in enumerate(keys or [None])]
             self.menu = self.menus[0]
+        if keys_changed:
             self._refresh_fov()
             self._set_console_status()
         for name in ("console", "map"):
