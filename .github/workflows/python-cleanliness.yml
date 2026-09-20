@@ -25,7 +25,8 @@ jobs:
             scripts/run_flake8.py MAVProxy
 
   tests:
-    runs-on: ubuntu-22.04
+    # noble's ffmpeg 6.1 accepts the escaped SEI bitstream filter the video tests need
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
       - name: Install test dependencies
