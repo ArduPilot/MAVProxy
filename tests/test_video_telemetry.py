@@ -153,18 +153,21 @@ class RecordingTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.temp = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls.temp.cleanup)
         cls.video = str(Path(cls.temp.name) / 'bframes.mp4')
         # A real inter-frame-coded video with reordered packets and an arbitrary
         # telemetry pts90k epoch. Inject SEI using FFmpeg's own bitstream filter.
         text = json.dumps(dict(record(), hfov_deg=60), separators=(',', ':')).replace(',', '\\,').replace(':', '\\:')
         bsf = "h264_metadata=sei_user_data='" + UUID.hex() + '+' + text + "'"
-        subprocess.run(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=160x120:rate=10',
-                        '-t', '2', '-c:v', 'libx264', '-bf', '2', '-g', '5', '-bsf:v', bsf,
-                        cls.video], check=True)
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.temp.cleanup()
+        try:
+            subprocess.run(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=160x120:rate=10',
+                            '-t', '2', '-c:v', 'libx264', '-bf', '2', '-g', '5', '-bsf:v', bsf,
+                            cls.video], check=True)
+        except subprocess.CalledProcessError as error:
+            # ffmpeg before 5.0 splits the bsf list on every comma, so the
+            # escaped JSON payload cannot be injected
+            raise unittest.SkipTest('ffmpeg cannot inject the SEI bitstream filter (exit %d); '
+                                    'ffmpeg 5.0 or later is required' % error.returncode)
 
     def test_index_and_decoder_seeking(self):
         import cv2
