@@ -806,6 +806,16 @@ class CameraModuleTest(unittest.TestCase):
         self.module.cmd_camera(["select", "1:100"])
         self.module.cmd_camera(["graph", "yawrate"])
         self.assertIn("1:1 mount 1", live_graph.call_args.kwargs["title"])
+        # per-camera manager overrides also apply to the selected camera
+        self.module.cmd_camera(["for", "1:101", "set", "manager_component", "42"])
+        self.module.cmd_camera(["for", "1:101", "set", "manager_gimbal_id", "2"])
+        self.module.mavlink_packet(Message(
+            "GIMBAL_DEVICE_ATTITUDE_STATUS", system_id=1, component_id=42,
+            gimbal_device_id=2, angular_velocity_z=0))
+        self.module.cmd_camera(["select", "1:101"])
+        self.module.cmd_camera(["graph", "yawrate"])
+        self.assertIn("1:42 mount 2", live_graph.call_args.kwargs["title"])
+        self.assertIsNone(self.module.command_camera)
         # a bare close still closes every camera's graphs
         self.module.cmd_camera(["graph", "close"])
         self.assertEqual(self.module.graphs.windows, [])
