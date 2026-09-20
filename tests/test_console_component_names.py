@@ -82,3 +82,31 @@ def test_type_suffix_comes_from_heartbeat_not_information_message(console):
     assert console.component_name[1][100] == 'ArduPilot-SIYI A8 mini (Gimbal)'
     console.mavlink_packet(message('HEARTBEAT', type=mavutil.mavlink.MAV_TYPE_CAMERA))
     assert console.component_name[1][100] == 'ArduPilot-SIYI A8 mini (Camera)'
+
+
+def test_autopilot_relayed_camera_information_keeps_vehicle_name(console):
+    # ArduPilot sends CAMERA_INFORMATION for CAMn_TYPE=Mount cameras from component 1
+    console.mavlink_packet(message('HEARTBEAT', 1, type=mavutil.mavlink.MAV_TYPE_FIXED_WING,
+                                   autopilot=mavutil.mavlink.MAV_AUTOPILOT_ARDUPILOTMEGA))
+    assert console.component_name[1][1] == 'Plane'
+    with mock.patch.object(console, 'update_vehicle_menu') as update:
+        console.mavlink_packet(message('CAMERA_INFORMATION', 1, vendor_name=b'Siyi', model_name=b'ZR10'))
+        console.mavlink_packet(message('CAMERA_INFORMATION', 1, vendor_name=b'Topotek', model_name=b'KHY10'))
+        console.mavlink_packet(message('HEARTBEAT', 1, type=mavutil.mavlink.MAV_TYPE_FIXED_WING,
+                                       autopilot=mavutil.mavlink.MAV_AUTOPILOT_ARDUPILOTMEGA))
+    assert console.component_name[1][1] == 'Plane'
+    update.assert_not_called()
+
+
+def test_flight_controller_heartbeat_reverts_camera_name(console):
+    # a companion autopilot on another component is also not a camera
+    console.mavlink_packet(message('CAMERA_INFORMATION', 191, vendor_name=b'Siyi', model_name=b'ZR10'))
+    assert console.component_name[1][191] == 'Siyi-ZR10'
+    console.mavlink_packet(message('HEARTBEAT', 191, type=mavutil.mavlink.MAV_TYPE_QUADROTOR,
+                                   autopilot=mavutil.mavlink.MAV_AUTOPILOT_PX4))
+    assert console.component_name[1][191] == 'Copter'
+    # cameras report no autopilot and keep their advertised name
+    console.mavlink_packet(message('CAMERA_INFORMATION', vendor_name=b'Siyi', model_name=b'ZR10'))
+    console.mavlink_packet(message('HEARTBEAT', type=mavutil.mavlink.MAV_TYPE_CAMERA,
+                                   autopilot=mavutil.mavlink.MAV_AUTOPILOT_INVALID))
+    assert console.component_name[1][100] == 'Siyi-ZR10 (Camera)'

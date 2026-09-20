@@ -360,10 +360,25 @@ class ConsoleModule(mp_module.MPModule):
             self.component_name[sysid][compid] = name
             self.update_vehicle_menu()
 
+    def component_is_flight_controller(self, sysid, compid):
+        if compid == mavutil.mavlink.MAV_COMP_ID_AUTOPILOT1:
+            return True
+        heartbeat = self.vehicle_heartbeats.get((sysid, compid))
+        return (heartbeat is not None and
+                getattr(heartbeat, 'autopilot', mavutil.mavlink.MAV_AUTOPILOT_INVALID) not in
+                (mavutil.mavlink.MAV_AUTOPILOT_INVALID, mavutil.mavlink.MAV_AUTOPILOT_GENERIC))
+
     def update_component_model_name(self, sysid, compid):
         '''combine advertised identification with the component heartbeat type'''
-        name = self.component_model[(sysid, compid)]
         heartbeat = self.vehicle_heartbeats.get((sysid, compid))
+        if self.component_is_flight_controller(sysid, compid):
+            # ArduPilot sends CAMERA_INFORMATION for its attached mounts from
+            # its own component; keep the flight controller's own name
+            if heartbeat is not None:
+                self.set_component_name(sysid, compid, self.component_type_string(heartbeat),
+                                        override=True)
+            return
+        name = self.component_model[(sysid, compid)]
         if heartbeat is not None:
             name += ' (%s)' % self.component_type_string(heartbeat)
         self.set_component_name(sysid, compid, name, override=True)
