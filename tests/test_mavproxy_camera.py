@@ -789,6 +789,29 @@ class CameraModuleTest(unittest.TestCase):
 
     @mock.patch("MAVProxy.modules.lib.mp_util.has_wxpython", True)
     @mock.patch("MAVProxy.modules.lib.live_graph.LiveGraph")
+    def test_selected_camera_graph_binds_to_its_mount(self, live_graph):
+        self.module.mavlink_packet(camera_information())
+        self.module.mavlink_packet(camera_information(component_id=101, gimbal_device_id=171))
+        self.module.mavlink_packet(Message("HEARTBEAT", system_id=1, component_id=1,
+                                           autopilot=mavutil.mavlink.MAV_AUTOPILOT_ARDUPILOTMEGA,
+                                           type=mavutil.mavlink.MAV_TYPE_QUADROTOR))
+        # ArduPilot forwards both mounts' attitudes as its own gimbal manager
+        for mount in (1, 2):
+            self.module.mavlink_packet(Message(
+                "GIMBAL_DEVICE_ATTITUDE_STATUS", system_id=1, component_id=1,
+                gimbal_device_id=mount, angular_velocity_z=0))
+        self.module.cmd_camera(["select", "1:101"])
+        self.module.cmd_camera(["graph", "yawrate"])
+        self.assertIn("1:1 mount 2", live_graph.call_args.kwargs["title"])
+        self.module.cmd_camera(["select", "1:100"])
+        self.module.cmd_camera(["graph", "yawrate"])
+        self.assertIn("1:1 mount 1", live_graph.call_args.kwargs["title"])
+        # a bare close still closes every camera's graphs
+        self.module.cmd_camera(["graph", "close"])
+        self.assertEqual(self.module.graphs.windows, [])
+
+    @mock.patch("MAVProxy.modules.lib.mp_util.has_wxpython", True)
+    @mock.patch("MAVProxy.modules.lib.live_graph.LiveGraph")
     def test_graph_unknown_values_and_cleanup(self, live_graph):
         self.module.mavlink_packet(camera_information())
         self.module.cmd_camera(["graph", "attitude"])

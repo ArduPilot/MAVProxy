@@ -816,6 +816,13 @@ class CameraModule(mp_module.MPModule):
 
     def _manager_id(self):
         camera = self.command_camera
+        if camera is None:
+            # 'camera select' sets the selection but not the command context;
+            # resolve through it so every caller sees that camera's mount
+            camera = self._selected_camera(required=False)
+            if camera is not None:
+                with self._camera_context(camera):
+                    return self._manager_id()
         if (self.camera_settings.manager_gimbal_id != 0 or
                 (camera is not None and "manager_gimbal_id" in camera.control_overrides)):
             return self.camera_settings.manager_gimbal_id
