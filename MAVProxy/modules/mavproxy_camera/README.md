@@ -55,6 +55,48 @@ keeps narrower streams nested inside wider streams with the same boresight.
 `fov_max_range` rejects unreliable terrain intersections beyond 10 km by
 default; set it to zero to disable this range limit.
 
+## Lossless raw thermal (MT11)
+
+AP_CameraGimbal MT11 firmware advertises an additional **Raw Thermal (16-bit)**
+stream. Select it in **Camera → Video**, or run `camera view rawthermal`
+(`camera view 3` also works). It needs PyAV with packet side-data support
+(`python3 -m pip install 'av>=18.1'`; 18.1 tested), wxPython, NumPy and OpenCV.
+The two ordinary RTSP streams and `camera view thermal` keep their display behaviour.
+
+This stream uses FFV1/Matroska over HTTP, with experimental MAVLink stream type
+200 and encoding UNKNOWN. Type 200 is a private firmware/MAVProxy agreement,
+not an allocated upstream enum. Matroska identifies FFV1 and maps per-frame
+JSON BlockAdditional ID 2 to experimental FourCC APCG (`0x41504347`). The reader
+requires the `apcg.thermal.v1` schema and native 640x512 gray16le pixels.
+
+The viewer defaults to white-hot greyscale, scaled to each frame's minimum and
+maximum samples. The popup **Palette** menu offers Greyscale, Inferno and Turbo;
+it also works while paused. This display setting is independent of the camera's
+RTSP thermal palette and does not change the raw samples.
+
+A large text panel below the image shows labelled minimum and maximum
+temperatures. Hover over a pixel for its temperature on the second line; the
+reading follows that pixel as new frames arrive. The popup menu offers **Pause/resume** and
+**Save raw frame and metadata**. Saves go to `raw_thermal/` in the MAVProxy log
+directory: a 655360-byte native little-endian `.bin` plus the matching `.json`.
+All 16 bits are retained; the palette and 180-degree display rotation affect
+only a display copy. Kelvin = raw / 64; Celsius = raw / 64 - 273.15.
+
+While paused, left-click prints approximate terrain coordinates using that
+frame's embedded position and vehicle/gimbal attitude. Load `terrain` first.
+Required telemetry older than 250 ms is rejected; position and known yaw rates
+are extrapolated over their source ages. This uses nominal thermal FOV and
+receive-time timestamps, not calibrated exposure timing or lens distortion.
+The ordinary map footprint still follows live MAVLink telemetry; the saved
+frame metadata and paused pixel projection follow the captured frame.
+
+SITL-MT11 currently sends a labelled full-depth sensor test pattern, not terrain
+temperatures. The default raw stream rate is 5 Hz and port is RTSP port + 2
+(normally 8556). Hardware throughput has to be measured before increasing it.
+Use a direct network connection to the camera; support-proxy tunnelling of the
+raw stream is not implemented. Reader errors are shown in the window and the
+connection is retried automatically. Closing the window stops the receiver.
+
 ## Multiple cameras
 
 Each discovered camera has its own console and map menu: **Camera**, **Camera2**,

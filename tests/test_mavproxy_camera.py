@@ -481,6 +481,25 @@ class CameraModuleTest(unittest.TestCase):
             self.assertEqual([item.name for item in video.items],
                              ["Visible 1920x1080", "Thermal 1280x720", "Visible 1920x1080 (3)"])
 
+    @mock.patch("MAVProxy.modules.mavproxy_camera.thermal_view.ThermalView")
+    @mock.patch("MAVProxy.modules.mavproxy_camera.video_view.VideoView")
+    def test_raw_thermal_routes_to_lossless_viewer(self, video_view, thermal_view):
+        self.module.mavlink_packet(camera_information())
+        raw = stream_information(3, thermal=True, uri="http://192.168.144.25:8556/thermal.mkv")
+        raw.type, raw.encoding, raw.count = 200, 0, 3
+        raw.name = "Raw Thermal (16-bit)"
+        raw.resolution_h, raw.resolution_v = 640, 512
+        for stream in (raw, stream_information(2, thermal=True), stream_information(1)):
+            self.module.mavlink_packet(stream)
+        with mock.patch("MAVProxy.modules.lib.mp_util.has_wxpython", True):
+            self.module.cmd_camera(["view", "rawthermal"])
+            thermal_view.assert_called_once()
+            self.assertEqual(thermal_view.call_args.args[2].stream_id, 3)
+            self.module.cmd_camera(["view", "thermal"])
+            video_view.assert_called_once()
+            self.assertEqual(video_view.call_args.args[2].stream_id, 2)
+            self.assertEqual(set(self.module.views), {(1, 100, 3), (1, 100, 2)})
+
     def test_late_camera_renumbers_projection_layers_without_leftovers(self):
         self.state.map = FakeMap()
         self.module.camera_settings.fov_update_interval = 0
