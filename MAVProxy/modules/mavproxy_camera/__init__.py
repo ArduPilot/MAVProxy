@@ -15,6 +15,7 @@ from MAVProxy.modules.lib import camera_projection
 from MAVProxy.modules.mavproxy_camera.parameters import CameraParameters
 from MAVProxy.modules.mavproxy_camera.graphs import CameraGraphs, PRESETS
 from MAVProxy.modules.mavproxy_camera.roi import CameraROI, gimbal_capabilities
+from MAVProxy.modules.mavproxy_camera.thermal_stream import is_raw_thermal
 from pymavlink import mavutil
 
 if mp_util.has_wxpython:
@@ -308,7 +309,7 @@ class CameraModule(mp_module.MPModule):
   camera params                       show custom parameter values
   camera param NAME VALUE             set a custom camera parameter
   camera streams                       show discovered video streams
-  camera view <ID|rgb|thermal|all>     open RTSP viewer(s)
+  camera view <ID|rgb|thermal|rawthermal|all>     open video/raw thermal viewer(s)
   camera projection [toggle]           show/refresh or toggle this camera's projection
   camera graph [NAME|close]            list/open graphs or close camera graphs
   camera roi [all|clear]               point camera(s) at map click or stop tracking
@@ -626,7 +627,7 @@ class CameraModule(mp_module.MPModule):
                     self._refresh_fov()
             else:
                 print(self.usage())
-        except (TypeError, ValueError) as error:
+        except (TypeError, ValueError, RuntimeError) as error:
             print("Camera command error: %s" % error)
 
     def cmd_custom(self, command, args):
@@ -908,11 +909,13 @@ class CameraModule(mp_module.MPModule):
             self._mount_command(pitch_rate=first, yaw_rate=second, flags=flags)
 
     def _stream_matches(self, stream, selector):
+        if selector == "rawthermal":
+            return is_raw_thermal(stream)
         if selector == "rgb":
             return not bool(stream.flags &
                             mavutil.mavlink.VIDEO_STREAM_STATUS_FLAGS_THERMAL)
         if selector == "thermal":
-            return bool(stream.flags &
+            return not is_raw_thermal(stream) and bool(stream.flags &
                         mavutil.mavlink.VIDEO_STREAM_STATUS_FLAGS_THERMAL)
         return stream.stream_id == int(selector)
 
@@ -1198,7 +1201,7 @@ class CameraModule(mp_module.MPModule):
 
     def cmd_view(self, args):
         if len(args) != 1:
-            raise ValueError("usage: camera view <ID|rgb|thermal|all>")
+            raise ValueError("usage: camera view <ID|rgb|thermal|rawthermal|all>")
         if not mp_util.has_wxpython:
             print("Camera video viewing requires wxPython and an RTSP-capable OpenCV backend")
             return
@@ -1209,7 +1212,7 @@ class CameraModule(mp_module.MPModule):
         streams = [s for s in camera.streams.values()
                    if selector == "all" or self._stream_matches(s, selector)]
         streams.sort(key=lambda stream: stream.stream_id)
-        if selector in ("rgb", "thermal"):
+        if selector in ("rgb", "thermal", "rawthermal"):
             # Cameras can publish main and sub streams for the same sensor.
             # The menu opens the primary stream; IDs and "all" expose the rest.
             streams = streams[:1]
@@ -1225,7 +1228,11 @@ class CameraModule(mp_module.MPModule):
             if not uri:
                 print("Stream %u has no URI" % stream.stream_id)
                 continue
-            self.views[key] = VideoView(
+            viewer = VideoView
+            if is_raw_thermal(stream):
+                from MAVProxy.modules.mavproxy_camera.thermal_view import ThermalView
+                viewer = ThermalView
+            self.views[key] = viewer(
                 self, camera, stream, uri, self.camera_settings.rtsp_latency)
 
     def show_status(self):
@@ -1289,7 +1296,7 @@ class CameraModule(mp_module.MPModule):
             print("%u: %s %ux%u %.1fHz %s %s%s" %
                   (stream.stream_id, _text(stream.name), stream.resolution_h,
                    stream.resolution_v, stream.framerate,
-                   "H.265" if stream.encoding == 2 else "H.264",
+                   "FFV1 16-bit" if is_raw_thermal(stream) else ("H.265" if stream.encoding == 2 else "H.264"),
                    self._resolved_uri(camera, stream),
                    " [thermal]" if thermal else ""))
 
@@ -1470,6 +1477,7 @@ class CameraModule(mp_module.MPModule):
         for key, view in list(self.views.items()):
             view.check_events()
             if not view.alive():
+                view.close()
                 del self.views[key]
         if self.last_discovery_request == 0:
             self.discover()

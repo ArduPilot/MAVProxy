@@ -36,6 +36,11 @@ class MPImageTitle:
     def __init__(self, title):
         self.title = title
 
+class MPImageStatusText:
+    """Readable text below the image, independent of image scaling."""
+    def __init__(self, text):
+        self.text = text
+
 class MPImageBrightness:
     '''image brightness to use'''
     def __init__(self, brightness):
@@ -280,6 +285,10 @@ class MPImage():
         '''set the frame title'''
         self.in_queue.put(MPImageTitle(title))
 
+    def set_status_text(self, text):
+        """Show a readable text panel below the image."""
+        self.in_queue.put(MPImageStatusText(text))
+
     def set_brightness(self, brightness):
         '''set the image brightness'''
         self.in_queue.put(MPImageBrightness(brightness))
@@ -387,12 +396,25 @@ class MPImageFrame(wx.Frame):
         state.panel = MPImagePanel(self, state)
         self.sizer.Add(state.panel, 1, wx.EXPAND)
         self.SetSizer(self.sizer)
+        self.status_text = None
         # Layout reporting must not block the GUI: sleeping in EVT_IDLE
         # limits video painting to 10 Hz regardless of the redraw timer.
         self.layout_timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.on_layout_timer, self.layout_timer)
         self.layout_timer.Start(1000)
         self.Bind(wx.EVT_SIZE, state.panel.on_size)
+
+    def set_status_text(self, text):
+        if self.status_text is None:
+            self.status_text = wx.StaticText(self, style=wx.ST_NO_AUTORESIZE)
+            self.status_text.SetFont(wx.Font(12, wx.FONTFAMILY_TELETYPE,
+                                            wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+            self.sizer.Add(self.status_text, 0, wx.EXPAND | wx.ALL, 6)
+        self.status_text.SetLabel(text)
+        height = self.status_text.GetCharHeight() * max(1, len(text.splitlines()))
+        if self.status_text.GetMinSize().height != height:
+            self.status_text.SetMinSize((1, height))
+            self.Layout()
 
     def on_layout_timer(self, event):
         '''report the window layout without delaying video paint events'''
@@ -603,6 +625,8 @@ class MPImagePanel(wx.Panel):
                 self.set_image_data(obj.data, obj.width, obj.height)
             if isinstance(obj, MPImageTitle):
                 state.frame.SetTitle(obj.title)
+            if isinstance(obj, MPImageStatusText):
+                state.frame.set_status_text(obj.text)
             if isinstance(obj, MPImageRecenter):
                 self.on_recenter(obj.location)
             if isinstance(obj, MPImageMenu):
