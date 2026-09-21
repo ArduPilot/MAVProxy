@@ -8,7 +8,7 @@ import subprocess
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('video', help='H.264/H.265 recording with AP_CameraGimbal SEI or SIYI subtitle telemetry (first video track)')
+    parser.add_argument('video', help='H.264/H.265 recording with AP_CameraGimbal SEI or SIYI subtitle telemetry, or a thermal_to_video.py FFV1/Matroska thermal recording (first video track)')
     parser.add_argument('--tlog', help='optional MAVLink flight log for SIYI vehicle attitude, heading and speed')
     parser.add_argument('--tlog-system', type=int, help='flight-controller system ID (default: first autopilot heartbeat)')
     parser.add_argument('--tlog-offset', type=float, default=0, help='seconds to add to SIYI UTC timestamps when matching the flight log')

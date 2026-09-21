@@ -15,9 +15,16 @@ from MAVProxy.modules.mavproxy_map import mp_slipmap
 
 class FrameReader(threading.Thread):
     """Own the decoder in one worker; coalesce seeks without blocking wx."""
-    def __init__(self, filename):
+    def __init__(self, source):
         super().__init__(name='video-decoder', daemon=True)
-        self.filename = filename
+        # Accept a VideoIndex (for the thermal frame timestamps) or a bare
+        # filename for the OpenCV path used by callers and tests.
+        if isinstance(source, str):
+            self.filename, self.thermal, self.frame_pts = source, False, None
+        else:
+            self.filename = source.filename
+            self.thermal = getattr(source, 'thermal', False)
+            self.frame_pts = getattr(source, 'frame_pts', None)
         self.condition = threading.Condition()
         self.pending = None
         self.stopping = False
@@ -36,6 +43,69 @@ class FrameReader(threading.Thread):
         self.join(timeout=5)
 
     def run(self):
+        if self.thermal:
+            self._run_thermal()
+        else:
+            self._run_opencv()
+
+    @staticmethod
+    def _thermal_to_bgr(gray16):
+        """Auto-range the 16-bit radiometric frame to a grey 8-bit image, using
+        1st/99th percentiles so a few hot or cold pixels do not flatten it."""
+        data = gray16.astype(np.float32)
+        low, high = np.percentile(data, (1, 99))
+        if not high > low:
+            low, high = float(data.min()), float(data.max())
+        if not high > low:
+            high = low + 1
+        scaled = np.clip((data - low) * (255.0 / (high - low)), 0, 255).astype(np.uint8)
+        return cv2.cvtColor(scaled, cv2.COLOR_GRAY2BGR)
+
+    def _run_thermal(self):
+        import av
+        try:
+            container = av.open(self.filename)
+            stream = container.streams.video[0]
+        except Exception as error:
+            container = None
+            open_error = str(error)
+        while True:
+            with self.condition:
+                self.condition.wait_for(lambda: self.stopping or self.pending is not None)
+                if self.stopping:
+                    break
+                number, generation = self.pending
+                self.pending = None
+            try:
+                if container is None:
+                    raise ValueError('PyAV could not open the thermal video: %s' % open_error)
+                target = self.frame_pts[number]
+                container.seek(target, stream=stream, backward=True, any_frame=False)
+                image = None
+                for packet in container.demux(stream):
+                    if packet.size == 0:
+                        continue
+                    for decoded in packet.decode():
+                        if decoded.pts is not None and decoded.pts >= target:
+                            image = decoded
+                            break
+                    if image is not None:
+                        break
+                if image is None:
+                    raise ValueError('Cannot decode frame %u' % number)
+                frame = self._thermal_to_bgr(image.to_ndarray())
+                result = (number, generation, frame, None)
+            except Exception as error:
+                result = (number, generation, None, str(error))
+            try:
+                self.results.get_nowait()
+            except queue.Empty:
+                pass
+            self.results.put(result)
+        if container is not None:
+            container.close()
+
+    def _run_opencv(self):
         capture = cv2.VideoCapture(self.filename, cv2.CAP_FFMPEG)
         next_frame = 0
         try:
@@ -170,7 +240,7 @@ class Player(wx.Frame):
         self.last_map_update = 0
         self.map_dirty = True
         self.closing = False
-        self.reader = FrameReader(index.filename)
+        self.reader = FrameReader(index)
         self.panel = VideoPanel(self)
         self.slider = wx.Slider(self, minValue=0, maxValue=max(1, len(index.samples) - 1))
         self.play_button = wx.Button(self, label='Pause' if self.playing else 'Play')

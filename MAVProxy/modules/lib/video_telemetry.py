@@ -1,7 +1,9 @@
-"""Index AP_CameraGimbal SEI and SIYI subtitle telemetry on the video's presentation clock.
+"""Index AP_CameraGimbal SEI, SIYI subtitle and thermal-Matroska telemetry on the video's presentation clock.
 
 No MAVLink connection is needed. ffprobe demuxes packets without decoding video;
 MP4 packet offsets allow us to read compressed samples directly from the file.
+Lossless thermal recordings from thermal_to_video.py store their per-frame
+apcg.telemetry.v1 snapshot in Matroska block additions; those are read with PyAV.
 """
 import bisect
 from dataclasses import dataclass
@@ -10,11 +12,13 @@ import json
 import math
 import pathlib
 import re
+import statistics
 import subprocess
 import tempfile
 import xml.etree.ElementTree as ET
 
 UUID = bytes.fromhex('8d646b4e556f4a908b7c35e629510321')
+THERMAL_ADDITION_TYPE = 0x41504347  # APCG block-addition FourCC written by thermal_to_video.py
 START = re.compile(b'\x00\x00(?:\x00)?\x01')
 
 
@@ -127,14 +131,21 @@ class Sample:
 class VideoIndex:
     def __init__(self, filename):
         self.filename = str(pathlib.Path(filename).resolve(strict=True))
+        self.thermal = False
+        self.frame_pts = None
         info = json.loads(subprocess.check_output([
             'ffprobe', '-v', 'error', '-show_entries',
             'stream=index,codec_type,codec_name,width,height,avg_frame_rate,extradata:format=format_name',
             '-show_data', '-of', 'json', self.filename]))
         streams = [s for s in info.get('streams', []) if s.get('codec_type') == 'video']
         subtitle_ids = {s['index'] for s in info.get('streams', []) if s.get('codec_name') == 'mov_text'}
-        if not streams or streams[0]['codec_name'] not in ('h264', 'hevc'):
-            raise ValueError('An H.264 or H.265 video recording is required')
+        if not streams:
+            raise ValueError('An H.264/H.265 or APCG thermal Matroska recording is required')
+        if streams[0]['codec_name'] == 'ffv1':
+            self._index_thermal(streams[0])
+            return
+        if streams[0]['codec_name'] not in ('h264', 'hevc'):
+            raise ValueError('An H.264/H.265 or APCG thermal Matroska recording is required')
         stream = streams[0]
         self.codec = stream['codec_name']
         self.width, self.height = stream['width'], stream['height']
@@ -235,6 +246,82 @@ class VideoIndex:
         if not self.telemetry_count:
             detail = '; '.join(self.warnings) or 'No AP_CameraGimbal SEI or SIYI subtitle telemetry found'
             raise ValueError(detail)
+        self._speeds()
+
+    def _thermal_record(self, packet):
+        """Return the apcg.telemetry.v1 snapshot from a thermal frame's Matroska
+        block addition, or None. The thermal lens HFOV comes from the outer
+        apcg.thermal.v1 metadata when the nested telemetry does not carry one."""
+        if not hasattr(packet, 'get_sidedata'):
+            return None
+        try:
+            data = bytes(packet.get_sidedata('matroska_block_additional'))
+        except Exception:
+            return None
+        if len(data) <= 8 or int.from_bytes(data[:8], 'big') != THERMAL_ADDITION_TYPE:
+            return None
+        try:
+            meta = json.loads(data[8:])
+        except (ValueError, UnicodeError):
+            return None
+        if not isinstance(meta, dict) or meta.get('schema') != 'apcg.thermal.v1':
+            return None
+        telemetry = meta.get('telemetry')
+        if not isinstance(telemetry, dict) or telemetry.get('schema') != 'apcg.telemetry.v1':
+            return None
+        record = dict(telemetry)
+        if not finite(record.get('hfov_deg')):
+            fov = meta.get('hfov_deg')
+            if finite(fov) and 0 < fov < 180:
+                record['hfov_deg'] = fov
+        return record
+
+    def _index_thermal(self, stream_info):
+        """Index a lossless thermal recording: FFV1 in Matroska with per-frame
+        telemetry in block additions. Each frame is independently coded, so the
+        decoder can seek to any frame by presentation timestamp."""
+        try:
+            import av
+        except ImportError as error:
+            raise ValueError('Playing an APCG thermal recording needs PyAV: pip install "av>=18.1"') from error
+        self.thermal = True
+        self.codec = 'ffv1'
+        self.width, self.height = stream_info['width'], stream_info['height']
+        entries = []
+        with av.open(self.filename) as container:
+            video = container.streams.video
+            if not video or video[0].codec_context.name != 'ffv1':
+                raise ValueError('An H.264/H.265 or APCG thermal Matroska recording is required')
+            stream = video[0]
+            time_base = stream.time_base or Fraction(1, 1000)
+            for packet in container.demux(stream):
+                if packet.size == 0 or packet.pts is None:
+                    continue
+                seconds = float(packet.pts * time_base)
+                if not math.isfinite(seconds):
+                    continue
+                entries.append((int(packet.pts), Sample(seconds, 0.0, self._thermal_record(packet))))
+        if not entries:
+            raise ValueError('No thermal frames found')
+        entries.sort(key=lambda item: item[1].time)
+        self.frame_pts = [pts for pts, _ in entries]
+        self.samples = [sample for _, sample in entries]
+        self.warnings = []
+        self.siyi_count = 0
+        origin = self.samples[0].time
+        for sample in self.samples:
+            sample.time -= origin
+        self.times = [sample.time for sample in self.samples]
+        gaps = [b - a for a, b in zip(self.times, self.times[1:])]
+        interval = statistics.median(gaps) if gaps else 0.2
+        self.fps = 1 / interval if interval > 0 else 5.0
+        for i, sample in enumerate(self.samples):
+            sample.duration = gaps[i] if i < len(gaps) else (gaps[-1] if gaps else interval)
+        self.duration = self.times[-1] + (self.samples[-1].duration or interval)
+        self.telemetry_count = sum(sample.record is not None for sample in self.samples)
+        if not self.telemetry_count:
+            raise ValueError('This thermal recording has no telemetry; '
+                             're-convert with thermal_to_video.py --bin FLIGHT.bin')
         self._speeds()
 
     def frame_at(self, seconds):

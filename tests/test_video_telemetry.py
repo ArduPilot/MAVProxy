@@ -148,6 +148,52 @@ class TelemetryTests(unittest.TestCase):
         self.assertIsNone(ViewProjection(640, 480, 60, FlatElevation(550), max_range=50).pixel(rec, 320, 240))
 
 
+class ThermalMetadataTests(unittest.TestCase):
+    """Reading the apcg.telemetry.v1 snapshot from a thermal frame's Matroska
+    block addition, as thermal_to_video.py writes it (an 8-byte addition-type
+    prefix and the apcg.thermal.v1 JSON)."""
+    class Packet:
+        def __init__(self, blob):
+            self.blob = blob
+        def get_sidedata(self, name):
+            assert name == 'matroska_block_additional'
+            if self.blob is None:
+                raise KeyError(name)
+            return self.blob
+
+    def blob(self, meta):
+        return (0x41504347).to_bytes(8, 'big') + json.dumps(meta).encode()
+
+    def parse(self, meta_or_blob):
+        index = VideoIndex.__new__(VideoIndex)  # only _thermal_record is exercised
+        blob = meta_or_blob if isinstance(meta_or_blob, (bytes, type(None))) else self.blob(meta_or_blob)
+        return index._thermal_record(self.Packet(blob) if not isinstance(meta_or_blob, VideoIndex) else meta_or_blob)
+
+    def test_reads_nested_telemetry_and_fills_thermal_fov(self):
+        meta = dict(schema='apcg.thermal.v1', hfov_deg=24.2, telemetry=dict(record(), hfov_deg=None))
+        got = self.parse(meta)
+        self.assertEqual(got['position']['lat_e7'], record()['position']['lat_e7'])
+        self.assertEqual(got['gimbal_attitude']['pitch_rad'], record()['gimbal_attitude']['pitch_rad'])
+        self.assertEqual(got['hfov_deg'], 24.2)  # taken from the outer thermal metadata
+
+    def test_keeps_nested_fov_when_present(self):
+        meta = dict(schema='apcg.thermal.v1', hfov_deg=24.2, telemetry=dict(record(), hfov_deg=42.0))
+        self.assertEqual(self.parse(meta)['hfov_deg'], 42.0)
+
+    def test_rejects_unusable_metadata(self):
+        for meta in (dict(schema='other', telemetry=record()),
+                     dict(schema='apcg.thermal.v1', telemetry=None),
+                     dict(schema='apcg.thermal.v1', telemetry=dict(schema='x'))):
+            self.assertIsNone(self.parse(meta))
+        wrong_type = (1).to_bytes(8, 'big') + json.dumps(
+            dict(schema='apcg.thermal.v1', telemetry=record())).encode()
+        self.assertIsNone(self.parse(wrong_type))
+        self.assertIsNone(self.parse(b'\x00\x00'))  # too short
+        self.assertIsNone(self.parse(None))           # side data absent
+        index = VideoIndex.__new__(VideoIndex)
+        self.assertIsNone(index._thermal_record(object()))  # packet without get_sidedata
+
+
 @unittest.skipUnless(shutil.which('ffmpeg') and shutil.which('ffprobe'), 'ffmpeg required')
 class RecordingTests(unittest.TestCase):
     @classmethod
