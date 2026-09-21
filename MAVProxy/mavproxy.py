@@ -542,8 +542,12 @@ def cmd_setup(args):
 
 
 def cmd_reset(args):
+    master = mpstate.master()
+    if master is None:
+        print("No master link")
+        return
     print("Resetting master")
-    mpstate.master().reset()
+    master.reset()
 
 
 def cmd_click(args):
@@ -769,14 +773,18 @@ def process_stdin(line):
             mpstate.status.flightmode = "MAV"
             mpstate.rl.set_prompt("MAV> ")
             return
+        master = mpstate.master()
+        if master is None:
+            print("No master link, use '.' to leave setup mode")
+            return
         if line != '+++':
             line += '\r'
         for c in line:
             time.sleep(0.01)
             if sys.version_info.major >= 3:
-                mpstate.master().write(bytes(c, "ascii"))
+                master.write(bytes(c, "ascii"))
             else:
-                mpstate.master().write(c)
+                master.write(c)
         return
 
     if not line:
