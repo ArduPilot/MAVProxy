@@ -86,8 +86,12 @@ class ThermalReader:
         parsed = urlsplit(str(uri))
         if parsed.scheme not in ('http', 'https', 'file', ''):
             raise ValueError('thermal stream must be HTTP(S) or a local Matroska file')
+        # The camera omits DefaultDuration because the rate changes live, so
+        # disable fps probing: it would read up to 64 KB of frames inside the
+        # open timeout, and an interrupted probe poisons the demuxer.
         self.container = av.open(str(uri), timeout=(3, 3),
-                                 options={'probesize': '65536', 'analyzeduration': '0'})
+                                 options={'probesize': '65536', 'analyzeduration': '0',
+                                          'fpsprobesize': '0'})
         streams = self.container.streams.video
         if len(streams) != 1 or streams[0].codec_context.name != 'ffv1':
             self.close()
