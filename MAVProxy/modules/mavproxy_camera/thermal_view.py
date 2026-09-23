@@ -102,7 +102,8 @@ class ThermalView:
         m = self.shown[1]
         title = '%s - Raw Thermal%s%s' % (
             self.camera.label(), ' [paused]' if self.paused else '',
-            ' [SITL test pattern]' if m.get('simulated') else '')
+            (' [SITL terrain]' if m.get('simulation_source') == 'terrain' else
+             ' [SITL test pattern]') if m.get('simulated') else '')
         if title != self.last_title:
             self.image.set_title(title)
             self.last_title = title
