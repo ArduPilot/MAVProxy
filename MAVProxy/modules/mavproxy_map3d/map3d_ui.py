@@ -113,7 +113,7 @@ class Map3DFrame(wx.Frame):
         self.status_actor.SetPosition(20, 20)
         self.status_actor.GetTextProperty().SetFontSize(18)
         self.status_actor.GetTextProperty().SetColor(1.0, 1.0, 1.0)
-        self.ren.AddActor2D(self.status_actor)
+        self.ren.AddViewProp(self.status_actor)
         self.initial_render = True
 
         sizer = wx.BoxSizer(wx.VERTICAL)
@@ -409,7 +409,7 @@ class Map3DFrame(wx.Frame):
                 if self.fpv_enabled:
                     self.update_fpv_camera(vehicle_enu)
                 if self.status_actor is not None and self.terrain.tiles:
-                    self.ren.RemoveActor2D(self.status_actor)
+                    self.ren.RemoveViewProp(self.status_actor)
                     self.status_actor = None
                 drained = True
             if (self.kml_refresh_due is not None and
