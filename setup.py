@@ -144,7 +144,9 @@ on how to use MAVProxy.''',
         'server': ['flask'],
         'recommended': ['flask', 'PyYAML', 'lxml', 'wxpython',
                         'pymonocypher', 'openai', 'paho-mqtt',
-                        'piexif', 'pynmea2', 'Pygame', 'Pillow']
+                        'piexif', 'pynmea2', 'Pygame', 'Pillow',
+                        # PyAV: raw thermal viewing and video telemetry
+                        'av']
       },
       scripts=['MAVProxy/mavproxy.py',
                'MAVProxy/tools/mavflightview.py',
