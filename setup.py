@@ -1,7 +1,7 @@
 from setuptools import setup
 import os, platform, sys
 
-version = "1.8.74"
+version = "1.8.75"
 
 def package_files(directory):
     paths = []
