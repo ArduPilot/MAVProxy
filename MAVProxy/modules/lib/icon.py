@@ -43,6 +43,19 @@ class SimpleIcon():
             ax.plot([0, 2.5], [0, 1.25], color='red', linewidth=4)
             ax.plot([3, 5], [0, 0], color='red', linewidth=4)
             ax.axis('off')
+        if text == "WP":
+            # simple waypoint route: dashed path between numbered waypoint markers
+            wp_x = [0.3, 1.5, 2.6, 4.0, 4.7]
+            wp_y = [4.2, 2.6, 4.6, 1.4, 3.2]
+            ax.plot(wp_x, wp_y, color='black', linewidth=1.6, linestyle='--')
+            for i, (x, y) in enumerate(zip(wp_x, wp_y)):
+                circ = mpatches.Circle((x, y), 0.42, facecolor='red', edgecolor='black', linewidth=1.2, zorder=3)
+                ax.add_patch(circ)
+                ax.text(x, y, str(i + 1), ha='center', va='center', fontsize=7,
+                        weight='bold', color='white', zorder=4)
+            ax.set_xlim(-0.5, 5.5)
+            ax.set_ylim(-0.5, 5.5)
+            ax.axis('off')
         if text == "MAP":
             path_data = [
                 (mpath.Path.MOVETO, [2.5, 0]),
