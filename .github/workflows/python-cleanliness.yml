@@ -27,6 +27,9 @@ jobs:
   tests:
     # noble's ffmpeg 6.1 accepts the escaped SEI bitstream filter the video tests need
     runs-on: ubuntu-24.04
+    # these tests are about processes which fail to exit, so do not let
+    # one hang the job until the platform's own six hour limit
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
       - name: Install test dependencies
@@ -38,4 +41,25 @@ jobs:
           # Exercise the released dialect, which lacks some newer extensions.
           test-venv/bin/pip install 'pymavlink==2.4.49'
       - name: Run regression tests with released pymavlink
-        run: xvfb-run -a test-venv/bin/python -m pytest -q tests/
+        run: xvfb-run -a test-venv/bin/python -m pytest -q -rfsE tests/
+
+  tests-pymavlink-master:
+    # the job above pins the released pymavlink; this one is what
+    # developers run, and is the first to see a dialect change
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-venv python3-wxgtk4.0 xvfb ffmpeg
+          python3 -m venv --system-site-packages test-venv
+          test-venv/bin/pip install pytest 'numpy<2' 'opencv-python-headless<4.12' matplotlib defusedxml pyserial pynmeagps pexpect PyYAML requests
+      - name: Install pymavlink from the mavlink repository
+        run: |
+          git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/ArduPilot/mavlink.git "$RUNNER_TEMP/mavlink"
+          cd "$RUNNER_TEMP/mavlink/pymavlink"
+          MDEF="$RUNNER_TEMP/mavlink/message_definitions" "$GITHUB_WORKSPACE/test-venv/bin/pip" install .
+      - name: Run regression tests with pymavlink master
+        run: xvfb-run -a test-venv/bin/python -m pytest -q -rfsE tests/
