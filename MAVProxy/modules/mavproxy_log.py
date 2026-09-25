@@ -254,7 +254,7 @@ class LogModule(mp_module.MPModule):
 
         elif args[0] == "download":
             if len(args) < 2:
-                print("usage: log download all | log download <lognumber> <filename> | log download from <lognumber>|log download range FIRST LAST") # noqa:E501
+                print("usage: log download sync | log download all | log download <lognumber> <filename> | log download from <lognumber>|log download range FIRST LAST") # noqa:E501
                 return
             if args[1] == 'all':
                 self.log_download_all()
@@ -269,6 +269,18 @@ class LogModule(mp_module.MPModule):
                     print("Usage: log download range FIRST LAST")
                     return
                 self.log_download_range(int(args[2]), int(args[3]))
+                return
+            if args[1] == "sync":
+                if len(self.entries.keys()) == 0:
+                    print("Please use log list first")
+                    return
+                log_num = sorted(self.entries, key=lambda id: self.entries[id].time_utc)[-1]
+                filename = self.default_log_filename(log_num)
+                if self.mpstate.aircraft_dir is None or self.logdir is None:
+                    print("log download sync requires --aircraft to be set")
+                    return
+                filename = os.path.join(self.logdir, filename)
+                self.log_download(log_num, filename)
                 return
             if args[1] == 'latest':
                 if len(self.entries.keys()) == 0:
