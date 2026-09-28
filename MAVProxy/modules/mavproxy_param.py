@@ -82,15 +82,16 @@ class ParamState:
 
     class ParamSet():
         '''class to hold information about a parameter set being attempted'''
-        def __init__(self, master, name, value, param_type=None, attempts=None):
+        def __init__(self, master, name, value, param_type=None, attempts=None, extended_type=None):
             self.master = master
             self.name = name
             self.value = value
             self.param_type = param_type
-            self.extended_type = None
-            if param_type in (mavutil.mavlink.MAV_PARAM_TYPE_INT64, mavutil.mavlink.MAV_PARAM_TYPE_UINT64):
+            self.extended_type = extended_type
+            if param_type in (mavutil.mavlink.MAV_PARAM_TYPE_INT64, mavutil.mavlink.MAV_PARAM_TYPE_UINT64,
+                              mavutil.mavlink.MAV_PARAM_TYPE_REAL64):
                 self.param_type = ParamState.EXTENDED
-                self.extended_type = 1 if param_type == mavutil.mavlink.MAV_PARAM_TYPE_INT64 else 2
+                self.extended_type = {8: 1, 7: 2, 10: 3}[param_type]
             self.attempts_remaining = attempts
             self.retry_interval = 1  # seconds
             self.last_value_received = None
@@ -105,6 +106,10 @@ class ParamState:
 
         def target_value(self):
             '''the requested value, retaining exact integers'''
+            if self.param_type == ParamState.EXTENDED and self.extended_type in (3, 4):
+                if self.extended_type == 4:
+                    return mavutil.encode_param_extended(self.value, 4)
+                return float(self.value)
             if self.param_type in (11, 12, 13):
                 return mavutil.param_integer_value(self.value)
             if isinstance(self.value, str) and self.value.lower().startswith('0x'):
@@ -121,9 +126,10 @@ class ParamState:
             self.parm_raw = None
             if param_type == ParamState.EXTENDED:
                 try:
-                    self.extended_data = struct.pack('<q' if self.extended_type == 1 else '<Q',
-                                                     mavutil.param_integer_value(value))
-                except (ValueError, OverflowError, ArithmeticError, struct.error) as e:
+                    if self.extended_type == 4 and isinstance(value, str) and value.startswith('hex:'):
+                        value = bytes.fromhex(value[4:])
+                    self.extended_data = mavutil.encode_param_extended(value, self.extended_type)
+                except (TypeError, ValueError, OverflowError, ArithmeticError, struct.error) as e:
                     print("can't send %s: %s" % (name, e))
                     return None
                 return float('nan')
@@ -167,7 +173,7 @@ class ParamState:
 
         def send_set(self):
             if self.param_type == ParamState.EXTENDED and not self.master.mavlink20():
-                print("can't send %s: 64-bit parameters require MAVLink2" % self.name)
+                print("can't send %s: extended parameters require MAVLink2" % self.name)
                 self.attempts_remaining = 0
                 return
             numeric_value = self.normalize_parameter_for_param_set_send(self.name, self.value, self.param_type)
@@ -212,6 +218,9 @@ class ParamState:
             manipulated from the packet
             '''
             self.last_value_received = value
+            if self.param_type == ParamState.EXTENDED:
+                return (m.param_type == ParamState.EXTENDED and m.extended_type == self.extended_type and
+                        bytes(m.extended_data) == self.extended_data.ljust(128, b'\x00'))
             if isinstance(value, float) and math.isnan(value):
                 # undecodable extended ack (unknown extended type or old
                 # pymavlink); never treat as a successful set
@@ -313,7 +322,10 @@ class ParamState:
                         13: mavutil.mavlink.MAV_PARAM_TYPE_UINT32}.get(m.param_type)
         if m.param_type == self.EXTENDED:
             logical_type = {1: mavutil.mavlink.MAV_PARAM_TYPE_INT64,
-                            2: mavutil.mavlink.MAV_PARAM_TYPE_UINT64}.get(m.extended_type)
+                            2: mavutil.mavlink.MAV_PARAM_TYPE_UINT64,
+                            3: mavutil.mavlink.MAV_PARAM_TYPE_REAL64,
+                            4: self.EXTENDED}.get(m.extended_type)
+            self.mav_param.param_extended_types[m.param_id.upper()] = m.extended_type
         if logical_type is not None:
             self.supports_bytewise_by_sysid[m.get_srcSystem()] = True
             self.update_mavparm_bytewise_support()
@@ -343,6 +355,20 @@ class ParamState:
 
     def handle_mavlink_packet(self, master, m):
         '''handle an incoming mavlink packet'''
+        if m.get_type() == 'PARAM_ERROR' or (m.get_type() == 'PARAM_VALUE' and m.param_type == 14):
+            name = m.param_id.upper()
+            pending = self.parameters_to_set.get(name)
+            if m.get_type() == 'PARAM_ERROR' and (
+                    m.target_system not in (0, master.mav.srcSystem) or
+                    m.target_component not in (0, master.mav.srcComponent)):
+                return
+            if pending is not None and pending.request_sent and (m.get_srcSystem(), m.get_srcComponent()) == self.sysid:
+                if m.get_type() == 'PARAM_ERROR':
+                    print("Failed to set %s: PARAM_ERROR %s" % (name, m.error))
+                    del self.parameters_to_set[name]
+                else:
+                    pending.request_sent = time.time()
+            return
         if m.get_type() == 'PARAM_VALUE':
             if m.param_type in (self.EXTENDED, self.BYTEWISE_INT32, self.BYTEWISE_UINT32):
                 value = self.handle_bytewise_param_value(m)
@@ -582,6 +608,13 @@ class ParamState:
         else:
             self.ftp_start()
 
+    def format_param_value(self, name, value):
+        if isinstance(value, bytes):
+            return 'hex:' + value.hex()
+        if isinstance(value, int) or self.param_types.get(name) == mavutil.mavlink.MAV_PARAM_TYPE_REAL64:
+            return str(value)
+        return "%f" % value
+
     def param_diff(self, args):
         '''handle param diff'''
         wildcard = '*'
@@ -609,8 +642,8 @@ class ParamState:
             if self.mav_param[p] == defaults[p]:
                 continue
             if fnmatch.fnmatch(p, wildcard.upper()):
-                s1 = "%f" % self.mav_param[p]
-                s2 = "%f" % defaults[p]
+                s1 = self.format_param_value(p, self.mav_param[p])
+                s2 = self.format_param_value(p, defaults[p])
                 if s1 == s2:
                     continue
                 s = "%-16.16s %s %s" % (str(p), s1, s2)
@@ -641,8 +674,8 @@ class ParamState:
                 continue
             if self.mav_param[p] == defaults[p]:
                 continue
-            s1 = "%f" % self.mav_param[p]
-            s2 = "%f" % defaults[p]
+            s1 = self.format_param_value(p, self.mav_param[p])
+            s2 = self.format_param_value(p, defaults[p])
             if s1 == s2:
                 continue
             s = "%-16.16s %s" % (str(p), s1)
@@ -823,6 +856,7 @@ class ParamState:
             value,
             attempts=attempts,
             param_type=param_type,
+            extended_type=getattr(self.mav_param, 'param_extended_types', {}).get(name),
         ))
 
     def param_revert(self, master, args):
@@ -844,8 +878,8 @@ class ParamState:
                 continue
             if self.mav_param[p] == defaults[p]:
                 continue
-            s1 = "%f" % self.mav_param[p]
-            s2 = "%f" % defaults[p]
+            s1 = self.format_param_value(p, self.mav_param[p])
+            s2 = self.format_param_value(p, defaults[p])
             if s1 == s2:
                 continue
             print("Reverting %-16.16s  %s -> %s" % (p, s1, s2))
