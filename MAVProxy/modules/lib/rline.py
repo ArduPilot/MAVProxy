@@ -266,19 +266,17 @@ def complete_rule(rule, cmd):
     if len(cmd) == 0:
         return rule_expand(rule_components[0], "")
 
+    # a rule with fewer components than the command has nothing to offer
+    if len(cmd) > len(rule_components):
+        return []
+
     # check it matches so far
     for i in range(len(cmd)-1):
         if not rule_match(rule_components[i], cmd[i]):
             return []
 
     # expand the next rule component
-    expanded = []
-    if platform.system() == 'Windows' and sys.version_info >= (3, 0):
-        if len(rule_components) >= len(cmd):
-            expanded = rule_expand(rule_components[len(cmd)-1], cmd[-1])
-    else:
-        expanded = rule_expand(rule_components[len(cmd)-1], cmd[-1])
-    return expanded
+    return rule_expand(rule_components[len(cmd)-1], cmd[-1])
 
 
 def complete_rules(rules, cmd):
