@@ -55,7 +55,7 @@ class ParamState:
         self.ftp_failed = False
         self.ftp_started = False
         self.ftp_count = None
-        self.ftp_send_param = None
+        self.fetch_use_ftp = None
         self.mpstate = mpstate
         self.sysid = sysid
         self.param_help = param_help.ParamHelp()
@@ -202,6 +202,8 @@ class ParamState:
         '''return true if we should try ftp for download'''
         if self.ftp_failed:
             return False
+        if self.fetch_use_ftp is not None:
+            return self.fetch_use_ftp
         return self.mpstate.settings.param_ftp
 
     def handle_px4_param_value(self, m):
@@ -320,19 +322,21 @@ class ParamState:
     def status(self, master, mpstate):
         return (len(self.mav_param_set), self.mav_param_count)
 
-    def ftp_start(self):
+    def ftp_start(self, callback=None):
         '''start a ftp download of parameters'''
         ftp = self.mpstate.module('ftp')
         if ftp is None:
             self.ftp_failed = True
             self.ftp_started = False
+            if callback is not None:
+                callback(None)
             return
         self.ftp_started = True
         self.ftp_count = None
         ftp.cmd_get([
             "@PARAM/param.pck?withdefaults=1",
         ],
-            callback=self.ftp_callback,
+            callback=lambda fh: self.ftp_callback(fh, callback),
             callback_progress=self.ftp_callback_progress,
         )
 
@@ -383,19 +387,28 @@ class ParamState:
             done = min(int(total_size / per_entry_size), self.ftp_count-1)
             self.mpstate.console.set_status('Params', 'Param %u/%u' % (done, self.ftp_count))
 
-    def ftp_callback(self, fh):
+    def ftp_callback(self, fh, callback=None):
         '''callback from ftp fetch of parameters'''
         self.ftp_started = False
         if fh is None:
             # the fetch failed
             self.ftp_failed = True
+            if callback is not None:
+                callback(None)
             return
 
         # magic = 0x671b
         # magic_defaults = 0x671c
         data = fh.read()
-        pdata = param_ftp.ftp_param_decode(data)
+        try:
+            pdata = param_ftp.ftp_param_decode(data)
+        except (ValueError, struct.error) as ex:
+            print("Invalid parameter download: %s" % ex)
+            pdata = None
         if pdata is None or len(pdata.params) == 0:
+            self.ftp_failed = True
+            if callback is not None:
+                callback(None)
             return
         with_defaults = pdata.defaults is not None
 
@@ -433,13 +446,20 @@ class ParamState:
                 self.default_params.save(defaults_path, '*', verbose=False)
                 print("Saved %u defaults to %s" % (len(pdata.defaults), defaults_path))
 
-    def fetch_all(self, master):
+        if callback is not None:
+            callback(self.mav_param)
+
+    def fetch_all(self, master, use_ftp=None, callback=None):
         '''force refetch of parameters'''
-        if not self.use_ftp():
+        # Keep retries on the transport explicitly selected for this fetch.
+        self.fetch_use_ftp = use_ftp
+        if use_ftp is None:
+            use_ftp = self.use_ftp()
+        if not use_ftp:
             master.param_fetch_all()
             self.mav_param_set = set()
         else:
-            self.ftp_start()
+            self.ftp_start(callback)
 
     def param_diff(self, args):
         '''handle param diff'''
@@ -840,16 +860,12 @@ class ParamState:
                         s = "%-28.28s # %s" % (s, info)
                 print(s)
 
-    def ftp_upload_callback(self, dlen):
+    def ftp_upload_callback(self, dlen, params):
         '''callback on ftp put completion'''
         if dlen is None:
             print("Failed to send parameters")
         else:
-            if self.ftp_send_param is not None:
-                for k in mp_util.sorted_natural(self.ftp_send_param.keys()):
-                    v = self.ftp_send_param.get(k)
-                    self.mav_param[k] = v
-                self.ftp_send_param = None
+            self.mav_param.update(params)
             print("Parameter upload done")
 
     def ftp_upload_progress(self, proportion):
@@ -880,12 +896,21 @@ class ParamState:
 
     def ftp_load(self, filename, param_wildcard, master):
         '''load parameters with ftp'''
+        newparm = mavparm.MAVParmDict()
+        newparm.load(filename, param_wildcard, check=False)
+        self.ftp_upload(newparm)
+
+    def ftp_upload(self, params, callback=None):
+        '''upload changed parameters; callback receives params or None on failure'''
         ftp = self.mpstate.module('ftp')
         if ftp is None:
             print("Need ftp module")
+            if callback is not None:
+                callback(None)
             return
         newparm = mavparm.MAVParmDict()
-        newparm.load(filename, param_wildcard, check=False)
+        newparm.update({k: float(v) for k, v in params.items()})
+        requested = dict(newparm)
         fh = SIO()
         for k in mp_util.sorted_natural(newparm.keys()):
             v = newparm.get(k)
@@ -896,6 +921,8 @@ class ParamState:
         count = len(newparm.keys())
         if count == 0:
             print("No parameter changes")
+            if callback is not None:
+                callback({k: self.mav_param[k] for k in requested})
             return
 
         fh.write(struct.pack("<HHH", 0x671b, count, count))
@@ -923,10 +950,15 @@ class ParamState:
         fh.seek(0)
         fh.write(struct.pack("<HHH", 0x671b, count, file_len))
         fh.seek(0)
-        self.ftp_send_param = newparm
         print("Sending %u params" % count)
+
+        def upload_done(dlen):
+            self.ftp_upload_callback(dlen, newparm)
+            if callback is not None:
+                callback({k: self.mav_param[k] for k in requested} if dlen is not None else None)
+
         ftp.cmd_put(["-", "@PARAM/param.pck"],
-                    fh=fh, callback=self.ftp_upload_callback, progress_callback=self.ftp_upload_progress)
+                    fh=fh, callback=upload_done, progress_callback=self.ftp_upload_progress)
 
 
 class ParamModule(mp_module.MPModule):
@@ -1020,6 +1052,11 @@ class ParamModule(mp_module.MPModule):
         pset, pcount = self.pstate[sysid].status(self.master, self.mpstate)
         return (pset, pcount)
 
+    def get_default_params(self):
+        '''return defaults for the selected vehicle, or None until available'''
+        state = self.pstate.get(self.get_sysid())
+        return state.default_params if state is not None else None
+
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         sysid = (m.get_srcSystem(), m.get_srcComponent())
@@ -1052,11 +1089,16 @@ class ParamModule(mp_module.MPModule):
         sysid = self.get_sysid()
         self.pstate[sysid].handle_command(self.master, self.mpstate, args)
 
-    def fetch_all(self):
+    def fetch_all(self, use_ftp=None, callback=None):
         '''force fetch of all parameters'''
         self.check_new_target_system()
         sysid = self.get_sysid()
-        self.pstate[sysid].fetch_all(self.master)
+        self.pstate[sysid].fetch_all(self.master, use_ftp=use_ftp, callback=callback)
+
+    def ftp_upload(self, params, callback=None):
+        '''upload a parameter subset using FTP'''
+        self.check_new_target_system()
+        self.pstate[self.get_sysid()].ftp_upload(params, callback=callback)
 
 
 def init(mpstate, **kwargs):

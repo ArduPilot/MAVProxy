@@ -37,6 +37,7 @@ class ParamEditorEventThread(threading.Thread):
     def run(self):
         while not self.time_to_quit:
             while not self.time_to_quit and not self.event_queue.empty():
+                event = None
                 try:
                     event = self.event_queue.get(block=False)
                     event_type = event.get_type()
@@ -62,16 +63,22 @@ class ParamEditorEventThread(threading.Thread):
 
                     elif event_type == ph_event.PEE_WRITE_PARAM:
                         self.mp_paramedit.paramchanged = event.get_arg("modparam")
-                        self.mp_paramedit.set_params()
+                        self.mp_paramedit.set_params(event.get_arg("use_ftp"))
 
                     elif event_type == ph_event.PEE_RESET:
                         master = self.mp_paramedit.mpstate.mav_master[0]
                         master.mav.command_long_send(master.target_system, master.target_component, mavutil.mavlink.MAV_CMD_PREFLIGHT_STORAGE, 0, 2.0, 0, 0, 0, 0, 0, 0)
 
                     elif event_type == ph_event.PEE_FETCH:
-                        self.module('param').fetch_all()
+                        self.module('param').fetch_all(
+                            use_ftp=event.get_arg("use_ftp"),
+                            callback=self.mp_paramedit.ftp_fetch_done)
 
-                except Exception:
+                except Exception as ex:
+                    if (event is not None and event.arg_dict.get('use_ftp') and
+                            event.get_type() in (ph_event.PEE_FETCH, ph_event.PEE_WRITE_PARAM)):
+                        operation = 'Read' if event.get_type() == ph_event.PEE_FETCH else 'Write'
+                        self.mp_paramedit.ftp_transfer_done('%s failed: %s' % (operation, ex))
                     time.sleep(0.2)
             time.sleep(0.01)
 
@@ -80,6 +87,7 @@ class ParamEditorMain(object):
     def __init__(self, mpstate):
         self.param_received = {}
         self.paramchanged = {}
+        self.default_params = None
         self.fltmode_rc = None
         self.mpstate = mpstate
         self.needs_unloading = False
@@ -120,13 +128,15 @@ class ParamEditorMain(object):
         else:
             child_class = multiproc.Process
         # Spawn/forkserver must not pickle the editor or the MAVProxy state.
+        self.default_params = self.mpstate.module('param').get_default_params()
         self.child = child_class(
             target=self.child_task,
             args=(self.event_queue, self.event_queue_lock,
                   self.gui_event_queue, self.gui_event_queue_lock,
                   self.close_window, self.mpstate.vehicle_name,
                   self.mpstate.settings.moddebug,
-                  dict(self.mpstate.module('param').mav_param)))
+                  dict(self.mpstate.module('param').mav_param),
+                  dict(self.default_params or {})))
 
         self.child.start()
 
@@ -167,6 +177,16 @@ class ParamEditorMain(object):
             self.last_unload_check_time = now
             if not self.child.is_alive():
                 self.needs_unloading = True
+            else:
+                self.update_default_params()
+
+    def update_default_params(self):
+        defaults = self.mpstate.module('param').get_default_params()
+        # FTP replaces the defaults dictionary when a fresh set arrives.
+        if defaults is not self.default_params:
+            self.default_params = defaults
+            self.gui_event_queue.put(ParamEditorEvent(
+                ph_event.PEGE_DEFAULTS, defaults=dict(defaults or {})))
 
     def mavlink_packet(self, m):
         if m.get_type() in ['PARAM_VALUE', 'RC_CHANNELS', 'RC_CHANNELS_RAW']:
@@ -198,7 +218,7 @@ class ParamEditorMain(object):
 
     @staticmethod
     def child_task(queue, lock, gui_queue, gui_lock, close_window_sem,
-                   vehicle_name, moddebug, params):
+                   vehicle_name, moddebug, params, defaults):
         '''child process - this holds GUI elements'''
         from MAVProxy.modules.lib import wx_processguard  # noqa: F401
         from MAVProxy.modules.lib.wx_loader import wx
@@ -216,7 +236,7 @@ class ParamEditorMain(object):
         app.frame.get_vehicle_type(vehicle_name)
         app.frame.set_close_window_semaphore(close_window_sem)
         app.frame.redirect_err(moddebug)
-        app.frame.set_param_init(params, vehicle_name)
+        app.frame.set_param_init(params, vehicle_name, defaults)
         app.SetExitOnFrameDelete(True)
         app.frame.Show()
 
@@ -352,7 +372,46 @@ class ParamEditorMain(object):
         finally:
             os.close(drain_fd)
 
-    def set_params(self):
+    def ftp_fetch_done(self, params):
+        '''refresh the editor after a successful FTP download'''
+        if self.time_to_quit:
+            return
+        if params is None:
+            self.ftp_transfer_done("Read failed")
+            return
+        self.update_default_params()
+        self.gui_event_queue.put(ParamEditorEvent(
+            ph_event.PEGE_READ_PARAM, param=dict(params),
+            vehicle=self.mpstate.vehicle_name, pstatus=(len(params), len(params))))
+        self.ftp_transfer_done("Read succeeded (%u parameters)" % len(params))
+
+    def ftp_write_done(self, params, submitted):
+        '''acknowledge the subset successfully uploaded with FTP'''
+        if self.time_to_quit:
+            return
+        if params is None:
+            self.ftp_transfer_done("Write failed; changes are still pending")
+            return
+        status = self.mpstate.module('param').param_status()
+        for name, value in params.items():
+            if self.paramchanged.get(name) == submitted[name]:
+                self.paramchanged.pop(name, None)
+            self.gui_event_queue.put(ParamEditorEvent(
+                ph_event.PEGE_WRITE_SUCC, paramid=name, paramvalue=value,
+                pstatus=status, submitted=submitted[name]))
+        self.ftp_transfer_done("Write succeeded" if submitted else "No parameter changes to write")
+
+    def ftp_transfer_done(self, message):
+        if not self.time_to_quit:
+            self.gui_event_queue.put(ParamEditorEvent(
+                ph_event.PEGE_FTP_TRANSFER, message="MAVFTP: " + message))
+
+    def set_params(self, use_ftp=False):
+        if use_ftp:
+            submitted = dict(self.paramchanged)
+            self.mpstate.module('param').ftp_upload(
+                submitted, callback=lambda params: self.ftp_write_done(params, submitted))
+            return
         for param, value in self.paramchanged.items():
             self.mpstate.mav_master[0].param_set_send(param, float(value))
 

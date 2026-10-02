@@ -56,6 +56,7 @@ class MissionEditorEventThread(threading.Thread):
         self.event_queue = q
         self.event_queue_lock = l
         self.time_to_quit = False
+        self.write_use_ftp = False
 
     def module(self, name):
         '''access another module'''
@@ -76,36 +77,20 @@ class MissionEditorEventThread(threading.Thread):
                 if isinstance(event, win_layout.WinLayout):
                     win_layout.set_layout(event, self.mp_misseditor.set_layout)
                 elif isinstance(event, mavwp.MAVWPLoader):
-                    self.mp_misseditor.gui_event_queue_lock.acquire()
-                    self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
-                        me_event.MEGE_CLEAR_MISS_TABLE))
-                    self.mp_misseditor.gui_event_queue_lock.release()
-                    if event.count() > 0:
-                        self.mp_misseditor.gui_event_queue_lock.acquire()
-                        self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
-                            me_event.MEGE_ADD_MISS_TABLE_ROWS,num_rows=event.count()-1))
-                        self.mp_misseditor.gui_event_queue_lock.release()
-
-                    for m in event.wpoints:
-                        self.mp_misseditor.gui_event_queue_lock.acquire()
-                        self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
-                            me_event.MEGE_SET_MISS_ITEM,
-                            num=m.seq,command=m.command,param1=m.param1,
-                            param2=m.param2,param3=m.param3,param4=m.param4,
-                            lat=m.x,lon=m.y,alt=m.z,frame=m.frame))
-                        self.mp_misseditor.gui_event_queue_lock.release()
+                    self.send_wploader(event)
                 else:
                     event_type = event.get_type()
 
                     if event_type == me_event.MEE_READ_WPS:
-                        self.module('wp').cmd_wp(['list'])
-                        #list the rally points while I'm add it:
-                        #TODO: DON'T KNOW WHY THIS DOESN'T WORK
-                        #self.module('rally').cmd_rally(['list'])
-
-                        #means I'm doing a read & don't know how many wps to expect:
-                        self.mp_misseditor.num_wps_expected = -1
-                        self.wps_received = {}
+                        if event.get_arg("use_ftp"):
+                            self.mp_misseditor.num_wps_expected = 0
+                            self.start_ftp('Read', self.module('wp').wp_ftp_download,
+                                           self.ftp_read_done)
+                        else:
+                            # A MAVLink read has an initially unknown count.
+                            self.mp_misseditor.num_wps_expected = -1
+                            self.mp_misseditor.wps_received = {}
+                            self.module('wp').cmd_wp(['list'])
 
                     elif event_type == me_event.MEE_TIME_TO_QUIT:
                         self.time_to_quit = True
@@ -154,9 +139,11 @@ class MissionEditorEventThread(threading.Thread):
                         self.mp_misseditor.mpstate.settings.command(["wpalt",event.get_arg("alt")])
 
                     elif event_type == me_event.MEE_WRITE_WPS:
+                        self.write_use_ftp = event.get_arg("use_ftp")
                         self.module('wp').wploader.clear()
                         self.module('wp').wploader.expected_count = event.get_arg("count")
-                        self.master().waypoint_count_send(event.get_arg("count"))
+                        if not self.write_use_ftp:
+                            self.master().waypoint_count_send(event.get_arg("count"))
                         self.mp_misseditor.num_wps_expected = event.get_arg("count")
                         self.mp_misseditor.wps_received = {}
                     elif event_type == me_event.MEE_WRITE_WP_NUM:
@@ -173,6 +160,14 @@ class MissionEditorEventThread(threading.Thread):
                             event.get_arg("alt"))
 
                         self.module('wp').wploader.add(w)
+                        if self.write_use_ftp:
+                            # Wait until every GUI row has reached the loader.
+                            loader = self.module('wp').wploader
+                            if loader.count() == loader.expected_count:
+                                self.start_ftp('Write', self.module('wp').wp_ftp_upload,
+                                               self.ftp_write_done)
+                                self.mp_misseditor.num_wps_expected = 0
+                            continue
                         wsend = self.module('wp').wploader.wp(w.seq)
                         if self.mp_misseditor.mpstate.settings.wp_use_mission_int:
                             wsend = self.module('wp').wp_to_mission_item_int(w)
@@ -200,6 +195,46 @@ class MissionEditorEventThread(threading.Thread):
             #DON'T NEED TO! -- wp module already doing this
 
             time.sleep(0.2)
+
+    def ftp_read_done(self, wploader):
+        '''populate the table before reporting a successful download'''
+        if self.time_to_quit:
+            return
+        if wploader is None:
+            self.ftp_transfer_done(False, "Read failed")
+            return
+        self.send_wploader(wploader)
+        self.ftp_transfer_done(True, "Read succeeded (%u waypoints)" % wploader.count())
+
+    def send_wploader(self, wploader):
+        with self.mp_misseditor.gui_event_queue_lock:
+            self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
+                me_event.MEGE_CLEAR_MISS_TABLE))
+            if wploader.count() > 1:
+                self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
+                    me_event.MEGE_ADD_MISS_TABLE_ROWS, num_rows=wploader.count()-1))
+            for m in wploader.wpoints:
+                self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
+                    me_event.MEGE_SET_MISS_ITEM,
+                    num=m.seq, command=m.command, param1=m.param1,
+                    param2=m.param2, param3=m.param3, param4=m.param4,
+                    lat=m.x, lon=m.y, alt=m.z, frame=m.frame))
+
+    def start_ftp(self, operation, transfer, callback):
+        try:
+            transfer([], callback=callback)
+        except Exception as ex:
+            self.ftp_transfer_done(False, '%s failed: %s' % (operation, ex))
+
+    def ftp_write_done(self, dlen):
+        self.ftp_transfer_done(dlen is not None,
+                               "Write succeeded" if dlen is not None else "Write failed")
+
+    def ftp_transfer_done(self, success, message):
+        if not self.time_to_quit:
+            with self.mp_misseditor.gui_event_queue_lock:
+                self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
+                    me_event.MEGE_FTP_TRANSFER, success=success, message="MAVFTP: " + message))
 
 class MissionEditorMain(object):
     def __init__(self, mpstate, elemodel):

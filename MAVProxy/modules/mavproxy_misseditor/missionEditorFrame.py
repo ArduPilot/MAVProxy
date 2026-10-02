@@ -206,6 +206,9 @@ class MissionEditorFrame(wx.Frame):
         self.read_only_wploader = wploader
         kwds["style"] = wx.DEFAULT_FRAME_STYLE
         wx.Frame.__init__(self, *args, **kwds)
+        self.CreateStatusBar()
+        self.mission_revision = 0
+        self.ftp_revision = None
         self.label_sync_state = wx.StaticText(self, wx.ID_ANY, "UNSYNCED   \n", style=wx.ALIGN_CENTRE)
         self.label_wp_radius = wx.StaticText(self, wx.ID_ANY, "WP Radius")
         self.text_ctrl_wp_radius = wx.TextCtrl(self, wx.ID_ANY, "", style=wx.TE_PROCESS_ENTER | wx.TE_PROCESS_TAB)
@@ -225,6 +228,8 @@ class MissionEditorFrame(wx.Frame):
         self.label_home_alt_value = wx.StaticText(self, wx.ID_ANY, "0.0")
         self.button_read_wps = wx.Button(self, wx.ID_ANY, "Read WPs")
         self.button_write_wps = wx.Button(self, wx.ID_ANY, "Write WPs")
+        self.checkbox_mavftp = wx.CheckBox(self, wx.ID_ANY, "MAVFTP")
+        self.checkbox_mavftp.SetValue(True)
         self.button_load_wp_file = wx.Button(self, wx.ID_ANY, "Load WP File")
         self.button_save_wp_file = wx.Button(self, wx.ID_ANY, "Save WP File")
         self.grid_mission = wx.grid.Grid(self, wx.ID_ANY, size=(1, 1))
@@ -325,6 +330,7 @@ class MissionEditorFrame(wx.Frame):
                         self.checkbox_loiter_dir,
                         self.label_default_alt, self.text_ctrl_wp_default_alt,
                         self.button_read_wps, self.button_write_wps,
+                        self.checkbox_mavftp,
                         self.button_load_wp_file,
                         self.button_add_wp, self.button_split):
             control.Hide()
@@ -402,7 +408,10 @@ class MissionEditorFrame(wx.Frame):
         sizer_9 = wx.BoxSizer(wx.VERTICAL)
         sizer_5 = wx.BoxSizer(wx.VERTICAL)
         sizer_15 = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_4.Add(self.label_sync_state, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL, 10)
+        sizer_sync = wx.BoxSizer(wx.VERTICAL)
+        sizer_sync.Add(self.label_sync_state, 0, wx.BOTTOM, 5)
+        sizer_sync.Add(self.checkbox_mavftp, 0, 0, 0)
+        sizer_4.Add(sizer_sync, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL, 10)
         sizer_4.Add((10, 0), 0, 0, 0)
         sizer_5.Add(self.label_wp_radius, 0, 0, 0)
         sizer_5.Add(self.text_ctrl_wp_radius, 0, 0, 0)
@@ -493,7 +502,13 @@ class MissionEditorFrame(wx.Frame):
         self.check_height_profile()
 
     def process_gui_event(self, event):
-        if event.get_type() == me_event.MEGE_CLEAR_MISS_TABLE:
+        if event.get_type() == me_event.MEGE_FTP_TRANSFER:
+            self.SetStatusText(event.get_arg("message"))
+            self.button_read_wps.Enable()
+            self.button_write_wps.Enable()
+            if event.get_arg("success") and self.mission_revision == self.ftp_revision:
+                self.set_modified_state(False)
+        elif event.get_type() == me_event.MEGE_CLEAR_MISS_TABLE:
             self.grid_mission.ClearGrid()
             if (self.grid_mission.GetNumberRows() > 0):
                 self.grid_mission.DeleteRows(0,
@@ -632,6 +647,7 @@ class MissionEditorFrame(wx.Frame):
 
     def set_modified_state(self, modified):
         if (modified):
+            self.mission_revision += 1
             self.set_grad_dist()
             self.set_agl()
             self.label_sync_state.SetLabel("MODIFIED")
@@ -641,8 +657,11 @@ class MissionEditorFrame(wx.Frame):
             self.label_sync_state.SetForegroundColour(wx.Colour(12, 152, 26))
 
     def read_wp_pushed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
+        if self.checkbox_mavftp.GetValue():
+            self.ftp_transfer_started("Reading waypoints")
         self.event_queue_lock.acquire()
-        self.event_queue.put(MissionEditorEvent(me_event.MEE_READ_WPS))
+        self.event_queue.put(MissionEditorEvent(
+            me_event.MEE_READ_WPS, use_ftp=self.checkbox_mavftp.GetValue()))
 
         #sneak in some queries about a few other items as well:
         self.event_queue.put(MissionEditorEvent(me_event.MEE_GET_WP_RAD))
@@ -652,13 +671,22 @@ class MissionEditorFrame(wx.Frame):
         self.event_queue_lock.release()
         event.Skip()
 
-        #TODO: the read actually has to succeed before I can say this:
-        self.set_modified_state(False)
+        if not self.checkbox_mavftp.GetValue():
+            self.set_modified_state(False)
+
+    def ftp_transfer_started(self, message):
+        self.ftp_revision = self.mission_revision
+        self.SetStatusText("MAVFTP: %s..." % message)
+        self.button_read_wps.Disable()
+        self.button_write_wps.Disable()
 
     def write_wp_pushed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
+        if self.checkbox_mavftp.GetValue():
+            self.ftp_transfer_started("Writing waypoints")
         self.event_queue_lock.acquire()
         self.event_queue.put(MissionEditorEvent(me_event.MEE_WRITE_WPS,count=
-            self.grid_mission.GetNumberRows()+1))
+            self.grid_mission.GetNumberRows()+1,
+            use_ftp=self.checkbox_mavftp.GetValue()))
 
         #home point first:
         lat = float(self.label_home_lat_value.GetLabel())
@@ -711,7 +739,8 @@ class MissionEditorFrame(wx.Frame):
 
         self.event_queue_lock.release()
 
-        self.set_modified_state(False)
+        if not self.checkbox_mavftp.GetValue():
+            self.set_modified_state(False)
 
         event.Skip()
 

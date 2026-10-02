@@ -31,9 +31,10 @@ def run_headless_gui(target, args, ready, write_on_exit=False):
         def set_gui_event_queue(self, queue):
             self.gui_event_queue = queue
 
-        def set_param_init(self, params, vehicle):
+        def set_param_init(self, params, vehicle, defaults):
             assert params == {'TEST_PARAM': 1}
             assert vehicle == 'ArduCopter'
+            assert defaults == {'TEST_PARAM': 0}
 
         def __getattr__(self, name):
             return lambda *args: None
@@ -61,10 +62,11 @@ def run_headless_gui(target, args, ready, write_on_exit=False):
 
     wx = types.SimpleNamespace(App=App, ID_ANY=-1,
                                CallAfter=lambda fn: fn())
-    with mock.patch.dict(sys.modules, {
+    fake_frame_module = types.SimpleNamespace(ParamEditorFrame=Frame)
+    with mock.patch.object(mavproxy_paramedit, 'param_editor_frame', fake_frame_module, create=True), \
+            mock.patch.dict(sys.modules, {
         'MAVProxy.modules.lib.wx_loader': types.SimpleNamespace(wx=wx),
-        'MAVProxy.modules.mavproxy_paramedit.param_editor_frame':
-            types.SimpleNamespace(ParamEditorFrame=Frame),
+        'MAVProxy.modules.mavproxy_paramedit.param_editor_frame': fake_frame_module,
     }):
         target(*args)
 
@@ -95,7 +97,8 @@ def make_state():
     closed_pipe, other_pipe = multiprocessing.Pipe()
     closed_pipe.close()
     other_pipe.close()
-    param = types.SimpleNamespace(mav_param={'TEST_PARAM': 1})
+    param = types.SimpleNamespace(mav_param={'TEST_PARAM': 1},
+                                  get_default_params=lambda: {'TEST_PARAM': 0})
     return types.SimpleNamespace(
         public_modules={}, vehicle_name='ArduCopter',
         settings=types.SimpleNamespace(moddebug=0),

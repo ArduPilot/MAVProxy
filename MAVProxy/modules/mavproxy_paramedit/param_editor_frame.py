@@ -25,22 +25,26 @@ PE_VALUE = 1
 PE_UNITS = 3
 PE_OPTION = 2
 PE_DESC = 4
+DEFAULTS_UNAVAILABLE = 'Defaults unavailable; use Fetch all with MAVFTP enabled.'
 
 
 class ParamEditorFrame(wx.Frame):
     def __init__(self, *args, **kwds):
         # begin wxGlade: ParamEditor.__init__
         wx.Frame.__init__(self, *args, **kwds)
+        self.CreateStatusBar()
         self.read_file = wx.Button(self, wx.ID_ANY, ("Read From File"))
         self.write_file = wx.Button(self, wx.ID_ANY, ("Write To File"))
         self.reset_params = wx.Button(self, wx.ID_ANY, ("Reset To Default"))
         self.read_params = wx.Button(self, wx.ID_ANY, ("Discard Changes"))
         self.fetch_params = wx.Button(self, wx.ID_ANY, ("Fetch all"))
         self.write_params = wx.Button(self, wx.ID_ANY, ("Write"))
+        self.checkbox_mavftp = wx.CheckBox(self, wx.ID_ANY, "MAVFTP")
+        self.checkbox_mavftp.SetValue(True)
         self.search_key = wx.TextCtrl(self, wx.ID_ANY, "")
         self.param_status = (0,0)
         self.param_label = wx.StaticText(self, wx.ID_ANY, "Status: " + str(self.param_status[0]) + "/ " + str(self.param_status[1]), style=wx.ALIGN_CENTRE)
-        self.search_choices = ['All:', 'Actions:TMODE_',
+        self.search_choices = ['All:', 'Non Default:', 'Actions:TMODE_',
         'Tuning:PILOT_,ATC_,MOT_,ANGLE_,RC_',
         'PosControl:VEL_,POS_,WPNAV_,RTL_',
         'Radio:BRD_RADIO_',
@@ -65,6 +69,7 @@ class ParamEditorFrame(wx.Frame):
         self.__set_properties()
         self.__do_layout()
         self.param_received = {}
+        self.default_params = {}
         self.modified_param = {}
         self.requires_redraw = False
         self.last_grid_update = time.time()
@@ -160,6 +165,8 @@ class ParamEditorFrame(wx.Frame):
         sizer_5.Add((10, 10), 0, 0, 0)
         sizer_5.Add(self.write_params, 0, 0, 0)
         sizer_5.Add((10, 10), 0, 0, 0)
+        sizer_5.Add(self.checkbox_mavftp, 0, wx.ALIGN_CENTER_VERTICAL, 0)
+        sizer_5.Add((10, 10), 0, 0, 0)
         sizer_5.Add(self.search_key, 0, 0, 0)
         sizer_5.Add((10, 10), 0, 0, 0)
         sizer_5.Add(self.search_list, 0, 0, 0)
@@ -191,9 +198,10 @@ class ParamEditorFrame(wx.Frame):
             wx.CallAfter(self.display_list.EnableCellEditControl)
         event.Skip()
 
-    def set_param_init(self, params, vehicle):
+    def set_param_init(self, params, vehicle, defaults=None):
         self.vehicle_name = vehicle
         self.param_received = params
+        self.default_params = dict(defaults or {})
         self.get_vehicle_type(vehicle)
         self.redraw_grid(params)
 
@@ -269,16 +277,34 @@ class ParamEditorFrame(wx.Frame):
             self.set_row_size(row)
 
     def process_gui_event(self, event):
-        if event.get_type() == ph_event.PEGE_READ_PARAM:
+        if event.get_type() == ph_event.PEGE_DEFAULTS:
+            self.default_params = event.get_arg("defaults")
+            self.requires_redraw = True
+        elif event.get_type() == ph_event.PEGE_FTP_TRANSFER:
+            self.SetStatusText(event.get_arg("message"))
+            self.fetch_params.Enable()
+            self.write_params.Enable()
+        elif event.get_type() == ph_event.PEGE_READ_PARAM:
             self.param_received.clear()
             self.param_received = event.get_arg("param")
             if self.vehicle_name is None or len(self.htree) == 0:
                 self.get_vehicle_type(event.get_arg("vehicle"))
+            if 'pstatus' in event.arg_dict:
+                self.param_status = event.get_arg("pstatus")
+                self.param_label.SetLabel("Status: %u/ %u" % self.param_status)
             self.requires_redraw = True
         elif event.get_type() == ph_event.PEGE_WRITE_SUCC:
+            if self.search_list.GetStringSelection() == 'Non Default':
+                self.requires_redraw = True
             self.param_status = event.get_arg("pstatus")
             self.param_label.SetLabel("Status: " + str(self.param_status[0]) + "/ " + str(self.param_status[1]))
+            name = event.get_arg("paramid")
+            if ('submitted' in event.arg_dict and name in self.modified_param and
+                    self.modified_param[name] != event.get_arg("submitted")):
+                # Preserve edits made while the FTP upload was in flight.
+                return
             if event.get_arg("paramid") in self.param_received.keys():
+                self.param_received[name] = event.get_arg("paramvalue")
                 if event.get_arg("paramid") in self.modified_param.keys():
                     del self.modified_param[event.get_arg("paramid")]
                 for row in range(self.display_list.GetNumberRows()):
@@ -445,7 +471,15 @@ class ParamEditorFrame(wx.Frame):
         self.event_queue.put(ParamEditorEvent(ph_event.PEE_RESET))
 
     def fetch_param(self, event):
-        self.event_queue.put(ParamEditorEvent(ph_event.PEE_FETCH))
+        if self.checkbox_mavftp.GetValue():
+            self.ftp_transfer_started("Reading parameters")
+        self.event_queue.put(ParamEditorEvent(
+            ph_event.PEE_FETCH, use_ftp=self.checkbox_mavftp.GetValue()))
+
+    def ftp_transfer_started(self, message):
+        self.SetStatusText("MAVFTP: %s..." % message)
+        self.fetch_params.Disable()
+        self.write_params.Disable()
 
     def reset_param(self, event):  # wxGlade: ParamEditor.<event_handler>
         dlg = wx.MessageDialog(self, "Are you sure you want to reset all parameters to default values?", "Reset to default", wx.YES_NO | wx.ICON_QUESTION)
@@ -470,9 +504,12 @@ class ParamEditorFrame(wx.Frame):
         event.Skip()
 
     def write_param(self, event):  # wxGlade: ParamEditor.<event_handler>
+        if self.checkbox_mavftp.GetValue():
+            self.ftp_transfer_started("Writing changed parameters")
         param = [param for param, value in self.modified_param.items()]
         self.event_queue.put(ParamEditorEvent(ph_event.PEE_WRITE_PARAM,
-                                              modparam=self.modified_param))
+                                              modparam=dict(self.modified_param),
+                                              use_ftp=self.checkbox_mavftp.GetValue()))
         for row in range(self.display_list.GetNumberRows()):
             if self.display_list.GetCellValue(row, PE_PARAM) in param:
                 self.display_list.SetCellBackgroundColour(row, PE_VALUE,
@@ -488,6 +525,10 @@ class ParamEditorFrame(wx.Frame):
         event.Skip()
 
     def category_change(self, event):
+        self.key_redraw()
+        event.Skip()
+
+    def key_redraw(self):
         key = self.search_choices[self.search_list.GetSelection()]
         key = key.split(':')[1]
         self.categorical_list = {}
@@ -503,13 +544,15 @@ class ParamEditorFrame(wx.Frame):
                         self.categorical_list[param] = value
                 except Exception:
                     pass
-        self.key_redraw()
-        event.Skip()
-
-    def key_redraw(self):
+        if self.search_list.GetStringSelection() == 'Non Default':
+            self.categorical_list = {
+                name: value for name, value in self.param_received.items()
+                if name in self.default_params and value != self.default_params[name]}
+        if self.search_list.GetStringSelection() == 'Non Default' and not self.default_params:
+            self.SetStatusText(DEFAULTS_UNAVAILABLE)
+        elif self.GetStatusBar().GetStatusText() == DEFAULTS_UNAVAILABLE:
+            self.SetStatusText('')
         key = self.search_key.GetValue()
-        if self.search_list.GetString(self.search_list.GetSelection()) == 'All':
-            self.categorical_list = self.param_received
         temp = {}
         for param, value in self.categorical_list.items():
             if isinstance(param,str) and key.lower() in param.lower():
@@ -544,6 +587,8 @@ class ParamEditorFrame(wx.Frame):
                 row_changed, PE_PARAM)] = newval
             self.param_received[self.display_list.GetCellValue(
                 row_changed, PE_PARAM)] = newval
+            if self.search_list.GetStringSelection() == 'Non Default':
+                self.requires_redraw = True
         event.Skip()
 
     def param_help_download(self):
