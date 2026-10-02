@@ -165,7 +165,8 @@ class OpenDroneIDModule(mp_module.MPModule):
         return self.to_bytes("", 20)
 
     def timestamp_2019(self):
-        jan_1_2019_s = 1546261200
+        # 00:00:00 UTC on 2019-01-01, the epoch of the OpenDroneID timestamps
+        jan_1_2019_s = 1546300800
         return int(time.time() - jan_1_2019_s)
 
     def idle_task(self):
