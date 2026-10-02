@@ -1506,6 +1506,31 @@ class CameraModuleTest(unittest.TestCase):
         self.assertEqual(self.commands()[-1][:2], (1, 1))
         self.assertEqual(self.commands()[-1][4], 2)
 
+    def test_survey_count_is_quiet_and_per_camera(self):
+        self.module.mavlink_packet(camera_information())
+        self.module.mavlink_packet(camera_information(component_id=101))
+        self.module.mavlink_packet(Message("CAMERA_SETTINGS",mode_id=2))
+        self.assertIn("Survey: 0",self.state.console.status["CAMERA"])
+        def geometry(component, stamp):
+            return Message("CAMERA_FOV_STATUS",component_id=component,time_boot_ms=stamp,
+                q=[math.sqrt(.5),0,-math.sqrt(.5),0],hfov=24.2,vfov=19.4,
+                alt_camera=1000000,alt_image=600000,lat_camera=-350000000,lon_camera=1490000000)
+        def capture(component, stamp, result=1):
+            return Message("CAMERA_IMAGE_CAPTURED",component_id=component,time_boot_ms=stamp,
+                time_utc=1000000+stamp,image_index=stamp,capture_result=result,file_url=b"image.bin")
+        output=io.StringIO()
+        with contextlib.redirect_stdout(output):
+            for _ in range(2):  # retransmission does not increment the count
+                self.module.mavlink_packet(geometry(100,1))
+                self.module.mavlink_packet(capture(100,1))
+            self.module.mavlink_packet(capture(101,2))  # geometry may arrive later
+            self.module.mavlink_packet(geometry(101,2))
+            self.module.mavlink_packet(geometry(100,3))
+            self.module.mavlink_packet(capture(100,3,0))
+        self.assertEqual(output.getvalue(),"")
+        self.assertIn("Survey: 1",self.state.console.status["CAMERA"])
+        self.assertIn("Survey: 1",self.state.console.status["CAMERA2"])
+
     def test_camera_controls(self):
         self.module.mavlink_packet(camera_information())
         cases = [
@@ -1519,6 +1544,7 @@ class CameraModuleTest(unittest.TestCase):
             (["focus", "auto"], mavutil.mavlink.MAV_CMD_SET_CAMERA_FOCUS),
             (["focus", "25"], mavutil.mavlink.MAV_CMD_SET_CAMERA_FOCUS),
             (["mode", "video"], mavutil.mavlink.MAV_CMD_SET_CAMERA_MODE),
+            (["mode", "survey"], mavutil.mavlink.MAV_CMD_SET_CAMERA_MODE),
             (["source", "thermal"], mavutil.mavlink.MAV_CMD_SET_CAMERA_SOURCE),
             (["stream", "stop", "2"], mavutil.mavlink.MAV_CMD_VIDEO_STOP_STREAMING),
         ]
@@ -1528,6 +1554,7 @@ class CameraModuleTest(unittest.TestCase):
             self.assertEqual(len(self.commands()), before + 1, args)
             sent = self.commands()[-1]
             self.assertEqual(sent[:3], (1, 100, command))
+        self.assertEqual(self.commands(mavutil.mavlink.MAV_CMD_SET_CAMERA_MODE)[-1][5], 2)
         zoom = self.commands(mavutil.mavlink.MAV_CMD_SET_CAMERA_ZOOM)[0]
         self.assertEqual(zoom[4], mavutil.mavlink.ZOOM_TYPE_RANGE)
         self.assertEqual(zoom[5], 63.0)

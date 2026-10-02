@@ -169,6 +169,7 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
 
         ret.update({
             'add': self.cmd_add,
+            'cameramode': self.cmd_cameramode,
             "changealt": self.cmd_changealt,
             "changeframe": self.cmd_changeframe,
             'draw': self.cmd_draw,
@@ -367,6 +368,26 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
                 0,
                 wp_num, p2, 0, 0, 0, 0, 0
             )
+
+    def cmd_cameramode(self, args):
+        """Append a camera mode mission item: wp cameramode survey [CAMERA_ID]."""
+        modes = {'photo': 0, 'video': 1, 'survey': 2}
+        if not 1 <= len(args) <= 2 or args[0] not in modes:
+            print('usage: wp cameramode <photo|video|survey> [CAMERA_ID]')
+            return
+        try:
+            camera_id = int(args[1]) if len(args) == 2 else 0
+        except ValueError:
+            print('Camera ID must be 0..255')
+            return
+        if not 0 <= camera_id <= 255 or not self.check_have_list():
+            return
+        item = mavutil.mavlink.MAVLink_mission_item_int_message(
+            self.target_system, self.target_component, 0,
+            mavutil.mavlink.MAV_FRAME_MISSION, mavutil.mavlink.MAV_CMD_SET_CAMERA_MODE,
+            0, 1, camera_id, modes[args[0]], 0, 0, 0, 0, 0, self.mav_mission_type())
+        self.append(item)
+        self.send_all_items()
 
     def cmd_add(self, args):
         '''add a NAV waypoint at the last map click position'''
