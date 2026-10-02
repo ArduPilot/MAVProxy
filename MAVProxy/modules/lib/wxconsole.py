@@ -19,6 +19,7 @@ class MessageConsole(textconsole.SimpleConsole):
                  title='MAVProxy: console'):
         textconsole.SimpleConsole.__init__(self)
         self.title = title
+        self.closed = False
         self.menu_callback = None
         self.parent_pipe_recv,self.child_pipe_send = multiproc.Pipe(duplex=False)
         self.child_pipe_recv,self.parent_pipe_send = multiproc.Pipe(duplex=False)
@@ -57,15 +58,18 @@ class MessageConsole(textconsole.SimpleConsole):
                 elif self.menu_callback is not None:
                     self.menu_callback(msg)
                 time.sleep(0.1)
-        except EOFError:
+        except (EOFError, OSError):
             pass
 
     def set_layout(self, layout):
         '''set window layout'''
-        self.parent_pipe_send.send(layout)
+        if not self.closed:
+            self.parent_pipe_send.send(layout)
         
     def write(self, text, fg='black', bg='white'):
         '''write to the console'''
+        if self.closed:
+            return
         try:
             self.parent_pipe_send.send(Text(text, fg, bg))
         except Exception:
@@ -88,13 +92,28 @@ class MessageConsole(textconsole.SimpleConsole):
 
     def close(self):
         '''close the console'''
+        if self.closed:
+            return
+        self.closed = True
         self.close_event.set()
-        if self.is_alive():
+        self.child.join(2)
+        if self.child.is_alive():
+            self.child.terminate()
             self.child.join(2)
+        if self.child.is_alive():
+            # A forked GUI may inherit MAVProxy's non-exiting SIGTERM handler.
+            self.child.kill()
+            self.child.join(2)
+        if self.child.is_alive():
+            self.closed = False
+            raise RuntimeError('Console process did not stop')
+        self.child.close()
+        self.parent_pipe_send.close()
+        self.parent_pipe_recv.close()
 
     def is_alive(self):
         '''check if child is still going'''
-        return self.child.is_alive()
+        return not self.closed and self.child.is_alive()
 
 if __name__ == "__main__":
     # test the console

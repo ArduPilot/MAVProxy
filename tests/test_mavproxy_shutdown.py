@@ -185,6 +185,39 @@ class ShutdownTest(unittest.TestCase):
         self.process.send_signal(signal.SIGINT)
         self.assert_clean_exit()
 
+    def test_sigint_reaps_unresponsive_console(self):
+        self.start()
+        with open(os.path.join(self.tmp, 'stuckconsole.py'), 'w') as f:
+            f.write(textwrap.dedent('''
+                import os
+                import signal
+                import time
+                from MAVProxy.modules.lib import mp_module, wxconsole
+
+                class StuckConsole(wxconsole.MessageConsole):
+                    def child_task(self):
+                        signal.signal(signal.SIGINT, signal.SIG_IGN)
+                        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+                        open(os.path.join(os.environ['SLOW_MARKERS'], 'console-ready'), 'w').close()
+                        time.sleep(60)
+
+                class ConsoleModule(mp_module.MPModule):
+                    def __init__(self, mpstate):
+                        super().__init__(mpstate, 'stuckconsole')
+                        self.message_console = StuckConsole()
+
+                    def unload(self):
+                        self.message_console.close()
+
+                def init(mpstate):
+                    return ConsoleModule(mpstate)
+            '''))
+        os.write(self.pty, b'module load stuckconsole\n')
+        self.wait_for(lambda: self.marked('console-ready'), 10, 'console child')
+        self.process.send_signal(signal.SIGINT)
+        output = self.assert_clean_exit()
+        self.assertIn('Unloading module stuckconsole', output)
+
     def test_sigint_during_tab_completion(self):
         self.start(slow_complete=1)
         os.write(self.pty, b'slowcomplete \t')
