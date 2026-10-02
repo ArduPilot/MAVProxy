@@ -91,6 +91,15 @@
                                         <flag>wxALIGN_CENTER</flag>
                                         <border>0</border>
                                         <option>0</option>
+                                        <object class="wxCheckBox" name="checkbox_mavftp" base="EditCheckBox">
+                                            <label>MAVFTP</label>
+                                            <checked>1</checked>
+                                        </object>
+                                    </object>
+                                    <object class="sizeritem">
+                                        <flag>wxALIGN_CENTER</flag>
+                                        <border>0</border>
+                                        <option>0</option>
                                         <object class="wxButton" name="refresh" base="EditButton">
                                             <label>Refresh</label>
                                             <events>
