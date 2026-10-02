@@ -515,6 +515,11 @@ class TestConcurrentFTP(unittest.TestCase):
             self.ftp.mavlink_packet(reply(
                 0, mavproxy_ftp.OP_WriteFile, offset=offset, seq=seq))
 
+        self.assertEqual(completed, [])
+        self.assertIn(0, self.ftp.workers)
+        self.assertEqual(worker.last_op.opcode, mavproxy_ftp.OP_TerminateSession)
+        self.ftp.mavlink_packet(reply(0, mavproxy_ftp.OP_TerminateSession,
+                                      seq=(worker.last_op.seq + 1) % 256))
         self.assertEqual(completed, [8])
         self.assertNotIn(0, self.ftp.workers)
 
@@ -528,6 +533,62 @@ class TestConcurrentFTP(unittest.TestCase):
         worker = self.ftp.workers[0]
         self.assertEqual(worker.write_qsize, 3)
         self.assertEqual(worker.write_pending, 3)
+
+    def begin_upload_close(self, completed, data=b'abc'):
+        self.ftp.cmd_put(['unused', '/remote'], fh=io.BytesIO(data), callback=completed.append)
+        worker = next(iter(self.ftp.workers.values()))
+        self.ftp.mavlink_packet(reply(worker.session, mavproxy_ftp.OP_CreateFile))
+        if data:
+            self.ftp.mavlink_packet(reply(worker.session, mavproxy_ftp.OP_WriteFile, seq=2))
+        self.assertTrue(worker.write_closing)
+        self.assertFalse(completed)
+        return worker
+
+    def test_upload_close_rejection_is_a_failure(self):
+        completed = []
+        worker = self.begin_upload_close(completed)
+        self.ftp.mavlink_packet(reply(worker.session, mavproxy_ftp.OP_TerminateSession,
+                                      opcode=mavproxy_ftp.OP_Nack,
+                                      payload=bytes([mavproxy_ftp.ERR_Fail]),
+                                      seq=(worker.last_op.seq + 1) % 256))
+        self.assertEqual(completed, [None])
+        self.assertFalse(self.ftp.workers)
+
+    def test_close_retry_preserves_sequence_and_ignores_late_write_ack(self):
+        completed = []
+        worker = self.begin_upload_close(completed)
+        seq = worker.last_op.seq
+        sent = len(self.mpstate._master.mav.sent)
+        self.ftp.mavlink_packet(reply(worker.session, mavproxy_ftp.OP_WriteFile, seq=2))
+        self.assertEqual(len(self.mpstate._master.mav.sent), sent)
+        worker.last_op_time -= worker.retry_timeout() + 0.01
+        self.ftp.idle_task()
+        self.assertEqual(worker.last_op.seq, seq)
+        self.assertEqual(worker.request_retries, 1)
+        self.ftp.mavlink_packet(reply(worker.session, mavproxy_ftp.OP_TerminateSession,
+                                      seq=(seq + 1) % 256))
+        self.assertEqual(completed, [3])
+        self.assertFalse(self.ftp.workers)
+
+    def test_close_timeout_and_cancel_report_failure_once(self):
+        for cancel in (False, True):
+            completed = []
+            worker = self.begin_upload_close(completed)
+            if cancel:
+                self.ftp.cmd_cancel()
+            else:
+                for _ in range(11):
+                    worker.last_op_time -= worker.retry_timeout() + 0.01
+                    self.ftp.idle_task()
+            self.assertEqual(completed, [None])
+            self.assertFalse(self.ftp.workers)
+
+    def test_empty_upload_waits_for_close_ack(self):
+        completed = []
+        worker = self.begin_upload_close(completed, b'')
+        self.ftp.mavlink_packet(reply(worker.session, mavproxy_ftp.OP_TerminateSession,
+                                      seq=(worker.last_op.seq + 1) % 256))
+        self.assertEqual(completed, [0])
 
     def test_upload_waits_for_create_reply(self):
         self.ftp.cmd_put(['unused', '/remote'], fh=io.BytesIO(b'abc'))

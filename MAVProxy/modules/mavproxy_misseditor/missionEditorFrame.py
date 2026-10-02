@@ -502,7 +502,16 @@ class MissionEditorFrame(wx.Frame):
         self.check_height_profile()
 
     def process_gui_event(self, event):
-        if event.get_type() == me_event.MEGE_FTP_TRANSFER:
+        if event.get_type() == me_event.MEGE_FTP_MISSION:
+            self.button_read_wps.Enable()
+            self.button_write_wps.Enable()
+            if self.mission_revision != self.ftp_revision:
+                self.SetStatusText('MAVFTP: Read completed; local edits kept. Read again to replace them.')
+                return
+            loader = event.get_arg('wploader')
+            self.load_wploader(loader)
+            self.SetStatusText('MAVFTP: Read succeeded (%u waypoints)' % loader.count())
+        elif event.get_type() == me_event.MEGE_FTP_TRANSFER:
             self.SetStatusText(event.get_arg("message"))
             self.button_read_wps.Enable()
             self.button_write_wps.Enable()

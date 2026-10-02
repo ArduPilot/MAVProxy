@@ -1022,9 +1022,19 @@ on'''
                 callback(None)
             return
         self.ftp_count = None
+        target = (self.target_system, self.target_component)
+
+        def download_done(fh):
+            if target != (self.target_system, self.target_component):
+                if callback is not None:
+                    callback(None)
+                return
+            self.ftp_callback(fh, callback)
+
         ftp.cmd_get([self.mission_ftp_name()],
-                    callback=lambda fh: self.ftp_callback(fh, callback),
-                    callback_progress=self.ftp_callback_progress)
+                    callback=download_done,
+                    callback_progress=self.ftp_callback_progress,
+                    target_system=target[0], target_component=target[1])
 
     def ftp_callback_progress(self, fh, total_size):
         '''progress callback from ftp fetch of mission items'''
@@ -1110,7 +1120,12 @@ on'''
             print("Saved %s to %s" % (self.itemstype(), waytxt))
 
     def wp_ftp_upload(self, args, callback=None):
-        '''upload a file, or the current loader when args is empty, with ftp'''
+        '''upload a mission file with ftp; the CLI must name a file'''
+        if not args:
+            print("Usage: %s ftpload FILENAME" % self.command_name())
+            if callback is not None:
+                callback(None)
+            return
         ftp = self.mpstate.module('ftp')
         if ftp is None:
             print("Need ftp module")
@@ -1119,24 +1134,33 @@ on'''
             return
         self.wploader.target_system = self.target_system
         self.wploader.target_component = self.target_component
-        if args:
-            filename = args[0]
-            try:
-                # need to remove the leading and trailing quotes in filename
-                self.wploader.load(filename.strip('"'))
-            except Exception as msg:
-                print("Unable to load %s - %s" % (filename, msg))
-                if callback is not None:
-                    callback(None)
-                return
-            print("Loaded %u %s from %s" % (self.wploader.count(), self.itemstype(), filename))
+        filename = args[0]
+        try:
+            # need to remove the leading and trailing quotes in filename
+            self.wploader.load(filename.strip('"'))
+        except Exception as msg:
+            print("Unable to load %s - %s" % (filename, msg))
+            if callback is not None:
+                callback(None)
+            return
+        print("Loaded %u %s from %s" % (self.wploader.count(), self.itemstype(), filename))
+        self.ftp_upload(self.wploader, callback=callback)
+
+    def ftp_upload(self, loader, callback=None):
+        '''upload an explicitly supplied loader (including an empty mission)'''
+        ftp = self.mpstate.module('ftp')
+        if ftp is None:
+            print("Need ftp module")
+            if callback is not None:
+                callback(None)
+            return
         print("Sending %s with ftp" % self.itemstype())
 
         fh = SIO()
-        fh.write(struct.pack("<HHHHH", 0x763d, self.mav_mission_type(), 0, 0, self.wploader.count()))
+        fh.write(struct.pack("<HHHHH", 0x763d, self.mav_mission_type(), 0, 0, loader.count()))
         mavmsg = mavutil.mavlink.MAVLink_mission_item_int_message
-        for i in range(self.wploader.count()):
-            w = self.wploader.wp(i)
+        for i in range(loader.count()):
+            w = loader.wp(i)
             w = self.wp_to_mission_item_int(w)
             tlist = []
             for field in mavmsg.ordered_fieldnames:

@@ -10,6 +10,8 @@ from MAVProxy.modules.lib import multiproc
 from MAVProxy.modules.lib import win_layout
 
 from MAVProxy.modules.mavproxy_misseditor import me_event
+import queue
+import copy
 MissionEditorEvent = me_event.MissionEditorEvent
 
 from pymavlink import mavutil
@@ -57,6 +59,7 @@ class MissionEditorEventThread(threading.Thread):
         self.event_queue_lock = l
         self.time_to_quit = False
         self.write_use_ftp = False
+        self.ftp_requests = queue.Queue()
 
     def module(self, name):
         '''access another module'''
@@ -85,7 +88,7 @@ class MissionEditorEventThread(threading.Thread):
                         if event.get_arg("use_ftp"):
                             self.mp_misseditor.num_wps_expected = 0
                             self.start_ftp('Read', self.module('wp').wp_ftp_download,
-                                           self.ftp_read_done)
+                                           self.ftp_read_done, [])
                         else:
                             # A MAVLink read has an initially unknown count.
                             self.mp_misseditor.num_wps_expected = -1
@@ -164,8 +167,8 @@ class MissionEditorEventThread(threading.Thread):
                             # Wait until every GUI row has reached the loader.
                             loader = self.module('wp').wploader
                             if loader.count() == loader.expected_count:
-                                self.start_ftp('Write', self.module('wp').wp_ftp_upload,
-                                               self.ftp_write_done)
+                                self.start_ftp('Write', self.module('wp').ftp_upload,
+                                               self.ftp_write_done, copy.deepcopy(loader))
                                 self.mp_misseditor.num_wps_expected = 0
                             continue
                         wsend = self.module('wp').wploader.wp(w.seq)
@@ -203,8 +206,11 @@ class MissionEditorEventThread(threading.Thread):
         if wploader is None:
             self.ftp_transfer_done(False, "Read failed")
             return
-        self.send_wploader(wploader)
-        self.ftp_transfer_done(True, "Read succeeded (%u waypoints)" % wploader.count())
+        # Deliver the whole result atomically so the GUI can reject it if
+        # the user edited the mission during the download.
+        with self.mp_misseditor.gui_event_queue_lock:
+            self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
+                me_event.MEGE_FTP_MISSION, wploader=copy.deepcopy(wploader)))
 
     def send_wploader(self, wploader):
         with self.mp_misseditor.gui_event_queue_lock:
@@ -220,11 +226,34 @@ class MissionEditorEventThread(threading.Thread):
                     param2=m.param2, param3=m.param3, param4=m.param4,
                     lat=m.x, lon=m.y, alt=m.z, frame=m.frame))
 
-    def start_ftp(self, operation, transfer, callback):
-        try:
-            transfer([], callback=callback)
-        except Exception as ex:
-            self.ftp_transfer_done(False, '%s failed: %s' % (operation, ex))
+    def ftp_target(self):
+        settings = self.mp_misseditor.mpstate.settings
+        return settings.target_system, settings.target_component
+
+    def start_ftp(self, operation, transfer, callback, data):
+        self.ftp_requests.put((operation, self.ftp_target(), transfer, callback, data))
+
+    def process_ftp_requests(self):
+        '''called only by the MAVProxy main loop'''
+        while not self.time_to_quit:
+            try:
+                operation, target, transfer, callback, data = self.ftp_requests.get_nowait()
+            except queue.Empty:
+                return
+            if target != self.ftp_target():
+                self.ftp_transfer_done(False, '%s cancelled: vehicle changed' % operation)
+                continue
+
+            def completed(result, target=target, callback=callback, operation=operation):
+                if target != self.ftp_target():
+                    self.ftp_transfer_done(False, '%s result discarded: vehicle changed' % operation)
+                else:
+                    callback(result)
+
+            try:
+                transfer(data, callback=completed)
+            except Exception as ex:
+                self.ftp_transfer_done(False, '%s failed: %s' % (operation, ex))
 
     def ftp_write_done(self, dlen):
         self.ftp_transfer_done(dlen is not None,
@@ -238,6 +267,7 @@ class MissionEditorEventThread(threading.Thread):
 
 class MissionEditorMain(object):
     def __init__(self, mpstate, elemodel):
+        self.mpstate = mpstate
         self.num_wps_expected = 0 #helps me to know if all my waypoints I'm expecting have arrived
         self.wps_received = {}
 
@@ -305,6 +335,7 @@ class MissionEditorMain(object):
         self.event_queue_lock.release()
 
     def idle_task(self):
+        self.event_thread.process_ftp_requests()
         now = time.time()
         if self.last_unload_check_time + self.unload_check_interval < now:
             self.last_unload_check_time = now
