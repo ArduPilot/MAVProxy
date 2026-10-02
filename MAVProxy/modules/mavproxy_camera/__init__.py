@@ -14,6 +14,7 @@ from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import camera_projection
 from MAVProxy.modules.mavproxy_camera.parameters import CameraParameters
 from MAVProxy.modules.mavproxy_camera.graphs import CameraGraphs, PRESETS
+from MAVProxy.modules.mavproxy_camera.survey import SurveyCoverage
 from MAVProxy.modules.mavproxy_camera.roi import CameraROI, gimbal_capabilities
 from MAVProxy.modules.mavproxy_camera.thermal_stream import is_raw_thermal
 from pymavlink import mavutil
@@ -149,7 +150,7 @@ class CameraModule(mp_module.MPModule):
         ])
         self.add_command(
             "camera", self.cmd_camera, "MAVLink camera control",
-            ["<status|discover|select|for|info|custom|definition|params|param|streams|view|projection|graph|roi|photo|stopphotos|record|zoom|focus|mode|source|stream|mount|set>",
+            ["<status|discover|select|for|info|custom|definition|params|param|streams|view|projection|graph|roi|coverage|photo|stopphotos|record|zoom|focus|mode|source|stream|mount|set>",
              "roi <all|clear>",
              "projection <toggle>",
              "for (CAMERAADDRESS)",
@@ -169,6 +170,7 @@ class CameraModule(mp_module.MPModule):
         self.views = {}
         self.graphs = CameraGraphs(self, _quaternion_to_euler)
         self.roi = CameraROI(self)
+        self.coverage = SurveyCoverage(self)
         self.last_status_request = 0.0
         self.last_discovery_request = 0.0
         self.vehicle_messages = {}
@@ -196,6 +198,15 @@ class CameraModule(mp_module.MPModule):
                 MPMenuItem(title, returnkey=prefix + "graph " + graph_name)
                 for graph_name, title, _message_type, _fields in PRESETS
             ]),
+            MPMenuSubMenu("Mode", items=[
+                MPMenuItem(mode.title(), returnkey=prefix + "mode " + mode)
+                for mode in ("photo", "video", "survey")]),
+            MPMenuItem("Stop survey / photos", returnkey=prefix + "stopphotos"),
+            MPMenuSubMenu("Survey coverage", items=[
+                MPMenuItem(action.title(), returnkey=prefix + "coverage " + action)
+                for action in ("show", "hide", "clear", "status")] + [
+                MPMenuItem("Opacity %u%%" % percent, returnkey=prefix + "coverage alpha %.2f" % (percent/100.0))
+                for percent in (10, 25, 50)]),
             MPMenuItem("Take photo", returnkey=prefix + "photo"),
             MPMenuItem("Toggle recording", returnkey=prefix + "record toggle"),
             MPMenuItem("Autofocus", returnkey=prefix + "focus auto"),
@@ -318,7 +329,8 @@ class CameraModule(mp_module.MPModule):
   camera record <start|stop|toggle>    control recording
   camera zoom <PERCENT|in|out|stop>    control optical zoom
   camera focus <auto|PERCENT|in|out|stop>
-  camera mode <photo|video>            set capture mode
+  camera mode <photo|video|survey>            set capture mode
+  camera coverage <show|hide|clear|status|alpha 0..1|load LOG.tlog>  captured image footprints
   camera source <rgb|thermal>          select the primary image source
   camera stream <start|stop> [ID]      set logical streaming state
   camera mount info
@@ -604,6 +616,9 @@ class CameraModule(mp_module.MPModule):
                 self.cmd_zoom(args[1:])
             elif command == "focus":
                 self.cmd_focus(args[1:])
+            elif command == "coverage":
+                self.coverage.command(args[1:])
+                self._set_console_status()
             elif command == "mode":
                 self.cmd_mode(args[1:])
             elif command == "source":
@@ -790,11 +805,11 @@ class CameraModule(mp_module.MPModule):
         self.camera_command(mavutil.mavlink.MAV_CMD_SET_CAMERA_FOCUS, params)
 
     def cmd_mode(self, args):
-        if len(args) != 1 or args[0].lower() not in ("photo", "video"):
-            raise ValueError("usage: camera mode <photo|video>")
-        mode = (mavutil.mavlink.CAMERA_MODE_IMAGE
-                if args[0].lower() == "photo"
-                else mavutil.mavlink.CAMERA_MODE_VIDEO)
+        if len(args) != 1 or args[0].lower() not in ("photo", "video", "survey"):
+            raise ValueError("usage: camera mode <photo|video|survey>")
+        mode = {'photo': mavutil.mavlink.CAMERA_MODE_IMAGE,
+                'video': mavutil.mavlink.CAMERA_MODE_VIDEO,
+                'survey': mavutil.mavlink.CAMERA_MODE_IMAGE_SURVEY}[args[0].lower()]
         self.camera_command(mavutil.mavlink.MAV_CMD_SET_CAMERA_MODE, (0, mode))
 
     def cmd_source(self, args):
@@ -1341,9 +1356,14 @@ class CameraModule(mp_module.MPModule):
                                  camera.capture_status.video_status != 0)
                 text = "%s %s %s" % (name, _text(camera.information.model_name),
                                       "REC" if recording else "READY")
+            count = self.coverage.counts[key]
+            if count or getattr(camera.settings, "mode_id", None) == mavutil.mavlink.CAMERA_MODE_IMAGE_SURVEY:
+                text += " Survey: %u" % count
             self.console.set_status(name, text, row=6 + index)
 
     def mavlink_packet(self, message):
+        if self.coverage.packet(message):
+            self._set_console_status()
         self.graphs.packet(message)
         message_type = message.get_type()
         system_id = message.get_srcSystem()
@@ -1385,6 +1405,7 @@ class CameraModule(mp_module.MPModule):
         elif message_type == "CAMERA_SETTINGS":
             camera = self._ensure_camera(system_id, component_id)
             camera.settings = message
+            self._set_console_status()
             parameters = camera.parameters
             if parameters.definition is not None and "CAM_MODE" in parameters.definition.parameters:
                 parameters.request_read("CAM_MODE")
@@ -1421,12 +1442,6 @@ class CameraModule(mp_module.MPModule):
             stream = camera.streams.get(message.stream_id)
             if stream is not None:
                 stream.flags = message.flags
-        elif message_type == "CAMERA_IMAGE_CAPTURED":
-            result = "captured" if message.capture_result == 1 else "failed"
-            print("Camera %u image %u %s%s" %
-                  (component_id, message.image_index, result,
-                   " at %s" % _text(message.file_url)
-                   if _text(message.file_url) else ""))
         elif message_type == "GIMBAL_DEVICE_INFORMATION":
             if self._is_gimbal_device_component(component_id):
                 gimbal = self._ensure_gimbal(system_id, component_id)
@@ -1471,6 +1486,7 @@ class CameraModule(mp_module.MPModule):
 
     def idle_task(self):
         now = time.time()
+        self.coverage.idle()
         self.graphs.idle()
         self.roi.idle()
         self._sync_menus()

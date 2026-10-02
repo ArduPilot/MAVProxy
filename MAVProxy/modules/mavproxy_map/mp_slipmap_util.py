@@ -277,7 +277,7 @@ class SlipCircle(SlipObject):
 
 class SlipPolygon(SlipObject):
     '''a polygon to display on the map'''
-    def __init__(self, key, points, layer, colour, linewidth, arrow=False, popup_menu=None, showlines=True, showcircles=True, arcs=None):  # noqa:E501
+    def __init__(self, key, points, layer, colour, linewidth, arrow=False, popup_menu=None, showlines=True, showcircles=True, arcs=None, fill_alpha=0):  # noqa:E501
         SlipObject.__init__(self, key, layer, popup_menu=popup_menu)
         self.points = points
         self.colour = colour
@@ -297,6 +297,7 @@ class SlipPolygon(SlipObject):
         self._has_timestamps = False
         self._showlines = showlines
         self._showcircles = showcircles
+        self.fill_alpha = max(0.0, min(1.0, fill_alpha))
 
     def bounds_points(self):
         '''the polygon points, plus samples along any arcs, for bounding'''
@@ -393,6 +394,18 @@ class SlipPolygon(SlipObject):
         '''draw a polygon on the image'''
         if self.hidden:
             return
+        if self.fill_alpha and len(self.points) >= 3:
+            # Clip allocation to the viewport, regardless of offscreen footprint size.
+            polygon = np.array([pixmapper(p[:2]) for p in self.points], dtype=np.int32)
+            x0 = max(0, int(polygon[:, 0].min()))
+            y0 = max(0, int(polygon[:, 1].min()))
+            x1 = min(img.shape[1], int(polygon[:, 0].max())+1)
+            y1 = min(img.shape[0], int(polygon[:, 1].max())+1)
+            if x1 > x0 and y1 > y0:
+                region = img[y0:y1, x0:x1]
+                overlay = region.copy()
+                cv2.fillPoly(overlay, [polygon - (x0, y0)], self.colour)
+                cv2.addWeighted(overlay, self.fill_alpha, region, 1-self.fill_alpha, 0, dst=region)
         self._has_timestamps = len(self.points) > 0 and len(self.points[0]) > 3
         self._pix_points = []
         for i in range(len(self.points)-1):
