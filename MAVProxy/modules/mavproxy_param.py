@@ -62,6 +62,7 @@ class ParamState:
         self.param_help.vehicle_name = vehicle_name
         self.default_params = None
         self.watch_patterns = set()
+        self.ftp_readbacks = []
 
         # dictionary of ParamSet objects we are processing:
         self.parameters_to_set = {}
@@ -263,6 +264,10 @@ class ParamState:
             if m.param_count != -1:
                 self.mav_param_count = m.param_count
             self.mav_param[str(param_id)] = value
+            for readback in self.ftp_readbacks:
+                if param_id in readback['pending'] and readback['pending'][param_id][0] > 0:
+                    readback['values'][param_id] = value
+                    del readback['pending'][param_id]
             if param_id in self.fetch_one and self.fetch_one[param_id] > 0:
                 self.fetch_one[param_id] -= 1
                 if isinstance(value, float):
@@ -338,6 +343,7 @@ class ParamState:
         ],
             callback=lambda fh: self.ftp_callback(fh, callback),
             callback_progress=self.ftp_callback_progress,
+            target_system=self.sysid[0], target_component=self.sysid[1],
         )
 
     def log_params(self, params):
@@ -364,7 +370,9 @@ class ParamState:
                 buf = p.pack(mav)
                 self.mpstate.logqueue.put(bytearray(struct.pack('>Q', usec) + buf))
                 # also give to param editor so it can update for changes
-                if editor:
+                selected = (self.mpstate.settings.target_system,
+                            self.mpstate.settings.target_component or 1)
+                if editor and self.sysid == selected:
                     editor.mavlink_packet(p)
             except Exception:
                 pass
@@ -860,14 +868,6 @@ class ParamState:
                         s = "%-28.28s # %s" % (s, info)
                 print(s)
 
-    def ftp_upload_callback(self, dlen, params):
-        '''callback on ftp put completion'''
-        if dlen is None:
-            print("Failed to send parameters")
-        else:
-            self.mav_param.update(params)
-            print("Parameter upload done")
-
     def ftp_upload_progress(self, proportion):
         '''callback from ftp put of parameters'''
         if proportion is None:
@@ -900,8 +900,30 @@ class ParamState:
         newparm.load(filename, param_wildcard, check=False)
         self.ftp_upload(newparm)
 
+    def check_ftp_readbacks(self):
+        '''verify only uploaded parameters, with bounded retries on the original vehicle'''
+        now = time.monotonic()
+        remaining = 10
+        for readback in list(self.ftp_readbacks):
+            for name, (attempts, sent) in list(readback['pending'].items()):
+                if attempts and now - sent < 1:
+                    continue
+                if attempts >= 3:
+                    del readback['pending'][name]
+                    continue
+                if remaining == 0:
+                    continue
+                self.mpstate.master().mav.param_request_read_send(
+                    self.sysid[0], self.sysid[1], name.encode('utf-8'), -1)
+                readback['pending'][name] = (attempts + 1, now)
+                remaining -= 1
+            if not readback['pending']:
+                self.ftp_readbacks.remove(readback)
+                if readback['callback'] is not None:
+                    readback['callback'](readback['values'])
+
     def ftp_upload(self, params, callback=None):
-        '''upload changed parameters; callback receives params or None on failure'''
+        '''upload changes; callback receives readback values (missing on timeout), or None on upload failure'''
         ftp = self.mpstate.module('ftp')
         if ftp is None:
             print("Need ftp module")
@@ -953,12 +975,25 @@ class ParamState:
         print("Sending %u params" % count)
 
         def upload_done(dlen):
-            self.ftp_upload_callback(dlen, newparm)
-            if callback is not None:
-                callback({k: self.mav_param[k] for k in requested} if dlen is not None else None)
+            if dlen is None:
+                print("Failed to send parameters")
+                if callback is not None:
+                    callback(None)
+                return
+
+            # A successful upload can still skip read-only/locked parameters.
+            # Read back just the uploaded names, not the entire parameter file.
+            print("Parameter upload done; verifying %u parameters" % count)
+            self.ftp_readbacks.append({
+                'pending': {name: (0, 0) for name in newparm},
+                'values': {name: self.mav_param[name] for name in requested if name not in newparm},
+                'callback': callback,
+            })
+            self.check_ftp_readbacks()
 
         ftp.cmd_put(["-", "@PARAM/param.pck"],
-                    fh=fh, callback=upload_done, progress_callback=self.ftp_upload_progress)
+                    fh=fh, callback=upload_done, progress_callback=self.ftp_upload_progress,
+                    target_system=self.sysid[0], target_component=self.sysid[1])
 
 
 class ParamModule(mp_module.MPModule):
@@ -1082,6 +1117,7 @@ class ParamModule(mp_module.MPModule):
     def run_parameter_set_queues(self):
         for pstate in self.pstate.values():
             pstate.run_parameter_set_queue()
+            pstate.check_ftp_readbacks()
 
     def cmd_param(self, args):
         '''control parameters'''

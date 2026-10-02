@@ -201,6 +201,7 @@ class FTPWorker(mp_module.MPModule):
         self.write_inflight = set()
         self.write_last_send = None
         self.write_open = False
+        self.write_closing = False
         self.write_qsize = max(1, self.ftp_settings.write_qsize)
         self.warned_component = False
         # console progress is only for interactive ftp get/put, not for the
@@ -286,7 +287,7 @@ class FTPWorker(mp_module.MPModule):
             return max(1.0, minimum)
         return max(minimum, min(10.0, self.rtt + 4.0 * self.rttvar))
 
-    def terminate_session(self, outcome="failed"):
+    def terminate_session(self, outcome="failed", send_termination=True):
         '''terminate current session. outcome describes an incomplete transfer
         for the status line: "cancelled" when the user or a new command ended
         it, "failed" for an error'''
@@ -308,7 +309,8 @@ class FTPWorker(mp_module.MPModule):
         # must never run after cancellation or completion.  Queue only the
         # final TerminateSession after removing them.
         self.manager.discard_delayed(self)
-        self.send(FTP_OP(self.seq, self.session, OP_TerminateSession, 0, 0, 0, 0, None))
+        if send_termination:
+            self.send(FTP_OP(self.seq, self.session, OP_TerminateSession, 0, 0, 0, 0, None))
         self.fh = None
         self.filename = None
         self.write_list = None
@@ -800,12 +802,14 @@ class FTPWorker(mp_module.MPModule):
 
     def put_finished(self, flen):
         '''finish a put'''
-        if self.put_callback_progress:
-            self.put_callback_progress(1.0)
-            self.put_callback_progress = None
-        if self.put_callback is not None:
-            self.put_callback(flen)
-            self.put_callback = None
+        callback = self.put_callback
+        progress = self.put_callback_progress
+        self.put_callback = None
+        self.put_callback_progress = None
+        if progress:
+            progress(1.0)
+        if callback is not None:
+            callback(flen)
         else:
             dt = max(time.time() - self.op_start, 1.0e-6)
             print("Sent file of length %u in %.2fs %.1fkByte/s" %
@@ -830,12 +834,14 @@ class FTPWorker(mp_module.MPModule):
 
     def send_more_writes(self):
         '''send some more writes'''
-        if not self.write_open:
+        if not self.write_open or self.write_closing:
             return
         if len(self.write_list) == 0:
-            # all done
-            self.put_finished(self.write_file_size)
-            self.terminate_session()
+            # ArduPilot validates and commits virtual files at close, so the
+            # final WriteFile ACK alone does not mean the upload succeeded.
+            self.write_closing = True
+            self.request_retries = 0
+            self.send(FTP_OP(self.seq, self.session, OP_TerminateSession, 0, 0, 0, 0, None))
             return
 
         now = time.time()
@@ -902,6 +908,18 @@ class FTPWorker(mp_module.MPModule):
         if self.put_callback_progress:
             self.put_callback_progress(self.write_acks/float(self.write_total))
         self.send_more_writes()
+
+    def handle_terminate_reply(self, op):
+        '''complete an upload only after its matching close acknowledgement'''
+        if not self.write_closing or op.seq != (self.last_op.seq + 1) % 256:
+            return
+        try:
+            if op.opcode == OP_Ack:
+                self.put_finished(self.write_file_size)
+            else:
+                print("FTP: upload rejected at close: %s" % op)
+        finally:
+            self.terminate_session(send_termination=False)
 
     def cmd_rm(self, args):
         '''remove file'''
@@ -1243,6 +1261,11 @@ class FTPWorker(mp_module.MPModule):
                 return
 
             op = self.op_parse(m)
+            if self.write_closing and (op.req_opcode != OP_TerminateSession or
+                                       op.seq != (self.last_op.seq + 1) % 256):
+                # Late data replies must not restart writes or postpone the
+                # close timeout while the server is validating the file.
+                return
             now = time.time()
             dt = now - self.last_op_time
             if self.ftp_settings.debug > 1:
@@ -1278,7 +1301,7 @@ class FTPWorker(mp_module.MPModule):
             elif op.req_opcode == OP_BurstReadFile:
                 self.handle_burst_read(op, m)
             elif op.req_opcode == OP_TerminateSession:
-                pass
+                self.handle_terminate_reply(op)
             elif op.req_opcode == OP_CreateFile:
                 self.handle_create_file_reply(op, m)
             elif op.req_opcode == OP_WriteFile:
@@ -1349,6 +1372,7 @@ class FTPWorker(mp_module.MPModule):
             OP_ListDirectory, OP_ListDirectoryWithTime, OP_OpenFileRO,
             OP_CreateFile, OP_RemoveFile, OP_RemoveDirectory, OP_Rename,
             OP_CreateDirectory, OP_CalcFileCRC32,
+            OP_TerminateSession,
         )
         initial_timeout = self.retry_timeout()
         if self.last_op is not None and \
@@ -1743,10 +1767,13 @@ class FTPModule(mp_module.MPModule):
                             target_system=target_system,
                             target_component=target_component)
 
-    def cmd_put(self, args, fh=None, callback=None, progress_callback=None):
+    def cmd_put(self, args, fh=None, callback=None, progress_callback=None,
+                target_system=None, target_component=None):
         return self._submit('put', 'cmd_put', args, fh=fh,
                             callback=callback,
-                            progress_callback=progress_callback)
+                            progress_callback=progress_callback,
+                            target_system=target_system,
+                            target_component=target_component)
 
     def cmd_rm(self, args):
         return self._submit('rm', 'cmd_rm', args)
