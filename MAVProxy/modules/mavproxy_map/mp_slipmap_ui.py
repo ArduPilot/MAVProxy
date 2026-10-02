@@ -233,6 +233,11 @@ class MPSlipMapFrame(wx.Frame):
 
     def on_idle(self, event):
         '''prevent the main loop spinning too fast'''
+        if not self.process_pending():
+            time.sleep(0.05)
+
+    def process_pending(self):
+        '''receive map updates, even when redraw events leave no idle time'''
         state = self.state
 
         if state.close_window.acquire(False):
@@ -246,7 +251,9 @@ class MPSlipMapFrame(wx.Frame):
         # receive any display objects from the parent
         obj = None
 
-        while not state.object_queue.empty():
+        # Bound each batch so a stream of overlays cannot starve menu/key events.
+        deadline = time.monotonic() + 0.02
+        while not state.object_queue.empty() and time.monotonic() < deadline:
             obj = state.object_queue.get()
 
             if isinstance(obj, win_layout.WinLayout):
@@ -340,8 +347,7 @@ class MPSlipMapFrame(wx.Frame):
                         state.layers[layer][key].set_time_range(obj)
                 state.need_redraw = True
 
-        if obj is None:
-            time.sleep(0.05)
+        return obj is not None
 
 
 class MPSlipMapPanel(wx.Panel):
@@ -663,6 +669,10 @@ class MPSlipMapPanel(wx.Panel):
     def on_redraw_timer(self, event):
         '''the redraw timer ensures we show new map tiles as they
         are downloaded'''
+        # Dense survey coverage can take longer to draw than the timer period.
+        # wx then keeps delivering timers without EVT_IDLE, which used to leave
+        # aircraft positions and follow updates stuck in the parent queue.
+        self.state.frame.process_pending()
         self.redraw_map()
 
     def on_size(self, event):
