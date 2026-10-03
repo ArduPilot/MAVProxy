@@ -16,6 +16,7 @@ from pymavlink import mavutil
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_util
+from MAVProxy.modules.mavproxy_misseditor import get_mission_for_map
 from MAVProxy.modules.mavproxy_map3d.map3d import (
     Map3D, MissionItem, missing_packages, missing_packages_message)
 
@@ -280,8 +281,10 @@ class Map3DModule(mp_module.MPModule):
         if self.map is None:
             return
         try:
-            wploader = self.module('wp').wploader
+            wploader = get_mission_for_map(self.mpstate)
         except Exception:
+            return
+        if wploader is None:
             return
         items = []
         default_radius = self.default_circle_radius()
@@ -472,7 +475,7 @@ class Map3DModule(mp_module.MPModule):
             self.send_kml(kml_mod)
         # poll change times like the 2D map / cesium modules
         try:
-            wp_change = self.module('wp').wploader.last_change
+            wp_change = get_mission_for_map(self.mpstate).last_change
             if wp_change != self.wp_change_time:
                 self.wp_change_time = wp_change
                 self.send_mission()

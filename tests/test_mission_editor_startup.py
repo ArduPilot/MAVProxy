@@ -40,7 +40,8 @@ def run_headless_gui(target, args, started, loaded):
 
         def MainLoop(self):
             event = self.frame.gui_event_queue.get(timeout=5)
-            assert event.get_type() == me_event.MEGE_CLEAR_MISS_TABLE
+            assert event.get_type() == me_event.MEGE_LOAD_MISSION
+            assert event.get_arg('wploader').count() == 0
             assert self.frame.state.object_queue.get(timeout=5) == 'layout'
             loaded.set()
             if not stopped.wait(10):

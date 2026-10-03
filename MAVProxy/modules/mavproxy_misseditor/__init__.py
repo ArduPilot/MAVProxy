@@ -7,6 +7,18 @@ June 2104
 
 from MAVProxy.modules.lib import mp_module
 
+
+def get_mission_for_map(mpstate):
+    '''Use the editor's draft for display without changing vehicle transfers.'''
+    editor = mpstate.module('misseditor')
+    if editor is not None:
+        draft = editor.me_main.get_map_mission()
+        if draft is not None:
+            return draft
+    wp = mpstate.module('wp')
+    return wp.wploader if wp is not None else None
+
+
 class MissionEditorModule(mp_module.MPModule):
     '''
     A Mission Editor for use with MAVProxy
