@@ -1,0 +1,27 @@
+QGC WPL 110
+# a copter mission for the map's arcs, loiters and spirals
+0	1	0	16	0	0	0	0	-35.3632610	149.1652300	584.000000	1
+# straight up.  This one carries no position of its own, which the map draws as the climb from where it is flown
+1	0	3	22	0.000000	0.000000	0.000000	0.000000	0.0000000	0.0000000	30.000000	1
+# a plain leg, to give the first arc something to leave from
+2	0	3	16	0.000000	0.000000	0.000000	0.000000	-35.3619135	149.1652300	30.000000	1
+# arc waypoint, 90 degrees clockwise (positive sweep)
+3	0	3	36	90.000000	0.000000	0.000000	0.000000	-35.3619135	149.1674331	30.000000	1
+# arc waypoint sweeping more than half a turn counter-clockwise: the arc bulges a long way outside its chord
+4	0	3	36	-270.000000	0.000000	0.000000	0.000000	-35.3635015	149.1693804	40.000000	1
+# two turns, 50m clockwise.  A multirotor does fly this one as a circle, so the map draws it
+5	0	3	18	2.000000	0.000000	50.000000	0.000000	-35.3654072	149.1670436	40.000000	1
+# one turn the other way round, near enough that the leg between the two circles is the tangent which crosses between them
+6	0	3	18	1.000000	0.000000	-50.000000	1.000000	-35.3638191	149.1650962	40.000000	1
+# turns with no radius of its own.  A multirotor has no WP_LOITER_RAD to fall back on, so there is no circle to draw: the item is drawn as the point it is (the vehicle flies its CIRCLE_RADIUS_M, or CIRCLE_RADIUS in centimetres on older firmware)
+7	0	3	18	1.000000	0.000000	0.000000	0.000000	-35.3621676	149.1671214	40.000000	1
+# a multirotor holds position for LOITER_TIME, so no circle is drawn here either.  It carries no radius: the autopilot has nowhere to keep one for this command, and hands back 0 whatever is uploaded
+8	0	3	19	20.000000	0.000000	0.000000	0.000000	-35.3628435	149.1693987	40.000000	1
+# a multirotor climbs straight up for LOITER_TO_ALT rather than spiralling, so again no circle
+9	0	3	31	0.000000	40.000000	0.000000	0.000000	-35.3649995	149.1693987	70.000000	1
+# an AMSL altitude, to mix the frames
+10	0	0	16	0.000000	0.000000	0.000000	0.000000	-35.3656754	149.1671213	654.000000	1
+# a terrain-frame altitude, 50m above the ground
+11	0	10	16	0.000000	0.000000	0.000000	0.000000	-35.3642991	149.1657052	50.000000	1
+# hold here forever.  A multirotor sits on the point, so no circle. The mission parks here: switch out of AUTO when done
+12	0	3	17	0.000000	0.000000	40.000000	0.000000	-35.3627797	149.1663833	50.000000	1
