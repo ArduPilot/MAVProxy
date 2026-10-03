@@ -217,3 +217,92 @@ class TestMissionLabels(object):
         assert label_sizes(em) == [20] * len(LABELS)
         assert em.mission_style == 'plain'
         assert em.mission_arrows is True
+
+    def test_mavexplorer_labels_a_view_it_opens(self, monkeypatch, mavexplorer):
+        mx = mavexplorer
+        from types import SimpleNamespace
+        from MAVProxy.modules.mavproxy_map3d import map3d
+        labelled = []
+
+        class Viewer(object):
+            def __init__(self, title=None):
+                pass
+
+            def is_alive(self):
+                return True
+
+            def set_mission_labels(self, enable):
+                labelled.append(enable)
+
+            def __getattr__(self, name):
+                return lambda *args, **kwargs: None
+        monkeypatch.setattr(map3d, 'Map3D', Viewer)
+        monkeypatch.setattr(map3d, 'missing_packages', lambda: [])
+
+        def message(kind, **fields):
+            m = SimpleNamespace(_timestamp=0, **fields)
+            m.get_type = lambda: kind
+            return m
+        rows = [message('POS', Lat=HOME[0], Lng=HOME[1], Alt=HOME[2]),
+                message('POS', Lat=HOME[0] + 0.01, Lng=HOME[1],
+                        Alt=HOME[2] + 50)]
+        log = SimpleNamespace(rewind=lambda: None, mav_type=None)
+        log.recv_match = lambda **kwargs: rows.pop(0) if rows else None
+        monkeypatch.setattr(mx, 'mestate', SimpleNamespace(
+            mlog=log, settings=SimpleNamespace(
+                condition=None, showdirection=True, showlabels=True,
+                labelsize=20, sync_xmap=False, missionpath='geometry')),
+            raising=False)
+        monkeypatch.setattr(mx, 'map3d_views', [])
+        mx.cmd_map3d([])
+        assert labelled == [True]
+
+    def test_mavexplorer_labels_a_mission_it_draws(self, monkeypatch, mavexplorer):
+        from types import SimpleNamespace
+        mx = mavexplorer
+        labelled = []
+        sizes = []
+        view = SimpleNamespace(
+            is_alive=lambda: True,
+            set_mission_arrows=lambda enable: None,
+            set_mission_labels=labelled.append,
+            set_mission_label_size=sizes.append,
+            set_mission_style=lambda style: None,
+            mission_to_fly=None)
+        settings = SimpleNamespace(showdirection=True, showlabels=True,
+                                   labelsize=20, missionpath='geometry',
+                                   command=lambda args: None)
+        monkeypatch.setattr(mx, 'mestate', SimpleNamespace(settings=settings),
+                            raising=False)
+        monkeypatch.setattr(mx, 'map3d_views', [view])
+        mx.cmd_set(['showlabels', 'true'])
+        assert labelled == [True]
+        assert sizes == [20]
+
+    def test_mavexplorer_takes_the_checkbox_on_a_view(self, monkeypatch, mavexplorer):
+        '''a view labelled from its own checkbox sets the setting, so every
+        view is labelled and one opened later is too'''
+        from types import SimpleNamespace
+        mx = mavexplorer
+        labelled = []
+        other = SimpleNamespace(
+            is_alive=lambda: True, check_events=lambda: [],
+            set_mission_arrows=lambda enable: None,
+            set_mission_labels=labelled.append,
+            set_mission_label_size=lambda size: None,
+            set_mission_style=lambda style: None, mission_to_fly=None)
+        view = SimpleNamespace(
+            is_alive=lambda: True,
+            check_events=lambda: [('mission_labels', True)],
+            set_mission_arrows=lambda enable: None,
+            set_mission_labels=lambda enable: None,
+            set_mission_label_size=lambda size: None,
+            set_mission_style=lambda style: None, mission_to_fly=None)
+        settings = SimpleNamespace(showdirection=True, showlabels=False,
+                                   labelsize=14, missionpath='geometry')
+        monkeypatch.setattr(mx, 'mestate', SimpleNamespace(settings=settings),
+                            raising=False)
+        monkeypatch.setattr(mx, 'map3d_views', [view, other])
+        mx.poll_map3d_views()
+        assert settings.showlabels is True
+        assert labelled == [True]
