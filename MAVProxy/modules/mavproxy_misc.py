@@ -110,6 +110,7 @@ class MiscModule(mp_module.MPModule):
         self.add_command('deadlock', self.cmd_deadlock, "trigger deadlock")
         self.add_command('nullptr_read', self.cmd_nullptr_read, "read from a very low address")
         self.add_command('nullptr_write', self.cmd_nullptr_write, "write to a very low address")
+        self.add_command('isrstorm', self.cmd_isrstorm, "create an interrupt storm")
         self.add_command('batreset', self.cmd_battery_reset, "reset battery remaining")
         self.add_command('setorigin', self.cmd_setorigin, "set global origin")
         self.add_command('magsetfield', self.cmd_magset_field, "set expected mag field by field")
@@ -297,6 +298,10 @@ class MiscModule(mp_module.MPModule):
     def cmd_nullptr_read(self, args):
         '''read from a low address (nullptr-deref)'''
         self.cmd_dosomethingreallynastyto_autopilot(args, 'nullptr-deref-read', 103)
+
+    def cmd_isrstorm(self, args):
+        '''create a never ending interrupt storm, for crash dump testing'''
+        self.cmd_dosomethingreallynastyto_autopilot(args, 'interrupt-storm', 104)
 
     def cmd_battery_reset(self, args):
         '''reset battery remaining'''
