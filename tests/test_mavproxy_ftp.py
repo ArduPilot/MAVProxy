@@ -9,6 +9,8 @@ import types
 import unittest
 from unittest import mock
 
+from pymavlink import mavftp as pymavftp
+
 
 # Some developer environments have a released MAVProxy imported by a pytest
 # plugin before collection begins.  Load the worktree file explicitly so the
@@ -148,6 +150,13 @@ class TestConcurrentFTP(unittest.TestCase):
         self.assertFalse(self.ftp.pending)
         self.assertEqual(self.mpstate._master.mav.sent[-1][3], mavproxy_ftp.OP_OpenFileRO)
 
+    def test_encode_filename_remains_available_for_camera_validation(self):
+        self.assertEqual(mavproxy_ftp.encode_filename('/camera.xml'),
+                         bytearray(b'/camera.xml'))
+        for name in ('', '/café.xml', '/bad\0.xml', '/' + 'x' * 239):
+            with self.assertRaises(ValueError):
+                mavproxy_ftp.encode_filename(name)
+
     def test_queued_bad_filename_does_not_block_next_download(self):
         self.ftp.ftp_settings.max_sessions = 1
         self.ftp.cmd_list(['/'])
@@ -171,7 +180,7 @@ class TestConcurrentFTP(unittest.TestCase):
     def test_download_limit_rejects_large_advertised_size_before_buffer_creation(self):
         completed = []
         self.ftp.cmd_get(['/camera.xml'], callback=completed.append, max_size=1024)
-        with mock.patch.object(mavproxy_ftp, 'SIO') as buffer:
+        with mock.patch.object(pymavftp, 'SIO') as buffer:
             self.ftp.mavlink_packet(reply(0, mavproxy_ftp.OP_OpenFileRO,
                                          payload=struct.pack('<I', 1025)))
             buffer.assert_not_called()
@@ -186,7 +195,7 @@ class TestConcurrentFTP(unittest.TestCase):
                                          payload=advertised))
             buffer = worker.fh
             self.ftp.mavlink_packet(reply(worker.session, mavproxy_ftp.OP_BurstReadFile,
-                                         payload=b'x' * 9))
+                                         payload=b'x' * 9, seq=2))
             self.assertEqual(len(buffer.getvalue()), 0)
             self.assertEqual(completed, [None])
             self.assertFalse(self.ftp.workers)
@@ -198,7 +207,7 @@ class TestConcurrentFTP(unittest.TestCase):
                                      payload=struct.pack('<I', 1)))
         buffer = worker.fh
         self.ftp.mavlink_packet(reply(worker.session, mavproxy_ftp.OP_BurstReadFile,
-                                     offset=0xffffffff, payload=b'x'))
+                                     offset=0xffffffff, payload=b'x', seq=2))
         self.assertEqual(buffer.getvalue(), b'')
         self.assertFalse(worker.read_gaps)
         self.assertEqual(completed, [None])
@@ -210,9 +219,38 @@ class TestConcurrentFTP(unittest.TestCase):
         self.ftp.mavlink_packet(reply(0, mavproxy_ftp.OP_OpenFileRO,
                                      payload=struct.pack('<I', 8)))
         self.ftp.mavlink_packet(reply(0, mavproxy_ftp.OP_BurstReadFile,
-                                     payload=b'12345678', burst_complete=1))
+                                     payload=b'12345678', burst_complete=1, seq=2))
         self.assertEqual(completed, [b'12345678'])
         self.assertFalse(self.ftp.workers)
+
+    def test_download_progress_keeps_mavproxy_file_and_size_signature(self):
+        completed = []
+        progress = []
+        self.ftp.cmd_get(
+            ['/mission.dat'],
+            callback=lambda fh: completed.append(fh.read()),
+            callback_progress=lambda fh, size: progress.append((fh.getvalue(), size)))
+
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_OpenFileRO, payload=struct.pack('<I', 3)))
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_BurstReadFile,
+            payload=b'abc', burst_complete=1, seq=2))
+
+        self.assertEqual(progress, [(b'abc', 3)])
+        self.assertEqual(completed, [b'abc'])
+        self.assertFalse(self.ftp.workers)
+
+    def test_interactive_upload_updates_console_status(self):
+        self.ftp.cmd_put(['unused', '/remote'], fh=io.BytesIO(b'abc'))
+        self.ftp.idle_task()
+
+        status, row = self.mpstate.console.status['FTP']
+        self.assertEqual(row, 4)
+        self.assertTrue(status.startswith('Uploading /remote - 0/3 bytes'))
+
+        self.ftp.cmd_cancel()
+        self.assertEqual(self.mpstate.console.status['FTP'], ('', 4))
 
     def test_idle_status_keeps_script_compatible_wording(self):
         output = io.StringIO()
@@ -253,10 +291,10 @@ class TestConcurrentFTP(unittest.TestCase):
 
         self.ftp.mavlink_packet(reply(
             0, mavproxy_ftp.OP_BurstReadFile, payload=b'first',
-            burst_complete=1))
+            burst_complete=1, seq=2))
         self.ftp.mavlink_packet(reply(
             2, mavproxy_ftp.OP_BurstReadFile, payload=b'second',
-            burst_complete=1))
+            burst_complete=1, seq=2))
 
         self.assertEqual(results, {'first': b'first', 'second': b'second'})
         self.assertEqual(self.ftp.workers, {})
@@ -351,7 +389,28 @@ class TestConcurrentFTP(unittest.TestCase):
         self.ftp.idle_task()
         self.assertEqual(len(self.mpstate._master.mav.sent), sent_before + 1)
         self.assertEqual(request_session(self.mpstate._master.mav.sent[-1]), 0)
-        self.assertEqual(callbacks, [])
+
+    @mock.patch.object(pymavftp.os.path, 'isfile', return_value=True)
+    @mock.patch.object(pymavftp.glob, 'glob', return_value=['local.bin'])
+    @mock.patch.object(mavproxy_ftp.MAVFTP, 'local_file_crc', return_value=0x12345678)
+    def test_crccmp_is_serviced_by_the_event_loop(
+            self, _crc, _glob, _isfile):
+        """The wrapper must not block while a core CRC batch is in flight."""
+        worker = self.ftp.cmd_crccmp(['*.bin', '/remote'])
+        self.assertIsNotNone(worker)
+        self.assertIn(worker.session, self.ftp.workers)
+        self.assertEqual(request_opcode(self.mpstate._master.mav.sent[-1]),
+                         mavproxy_ftp.OP_CalcFileCRC32)
+
+        self.ftp.mavlink_packet(reply(
+            worker.session, mavproxy_ftp.OP_CalcFileCRC32,
+            payload=struct.pack('<I', 0x12345678)))
+
+        self.assertFalse(self.ftp.workers)
+        self.assertIn(
+            mavproxy_ftp.OP_TerminateSession,
+            [request_opcode(packet) for packet in self.mpstate._master.mav.sent],
+        )
 
     def test_silently_dropped_initial_request_is_retried_idempotently(self):
         self.ftp.cmd_list(['/'])
