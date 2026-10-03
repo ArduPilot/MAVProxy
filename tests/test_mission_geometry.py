@@ -48,7 +48,12 @@ def live_mission_items(wpoints, home_amsl=584.0, params=None,
         module=lambda name: (SimpleNamespace(wploader=loader)
                              if name == 'wp' else None))
     sent = []
-    module.map = SimpleNamespace(set_mission=sent.extend)
+    module.map = SimpleNamespace(
+        set_mission=lambda items, track=None: sent.extend(items))
+    module.reset_flown_track()
+    module.ground_heading = None
+    # only the items are looked at, so there is no path to fly for them
+    module.map3d_settings = SimpleNamespace(missionpath='geometry')
     module.home_amsl = home_amsl
     module.home_position = None
     module.default_circle_radius = lambda: default_radius
@@ -141,16 +146,98 @@ class TestProjection(object):
         from MAVProxy.modules.mavproxy_map3d import terrain
         fetched = []
 
-        def decode(z, x, y):
-            fetched.append((z, x, y))
+        def decode(z, x, y, timeout=30):
+            fetched.append((z, x, y, timeout))
             return {"bbox": (-180.0, -20.0, -170.0, -10.0),
                     "verts": np.array([(-180.0, -10.0, 1.0), (-170.0, -10.0, 1.0),
                                        (-180.0, -20.0, 1.0), (-170.0, -20.0, 1.0)])}
         monkeypatch.setattr(terrain, 'decode_terrain', decode)
         monkeypatch.setattr(terrain, '_sample_cache', {})
         assert terrain.sample_terrain(-16.5, 180.001) == pytest.approx(1.0)
-        assert fetched == [(12,) + terrain.GlobalGeodetic(True).LonLatToTile(
-            -179.999, -16.5, 12)]
+        tile = terrain.GlobalGeodetic(True).LonLatToTile(-179.999, -16.5, 12)
+        assert fetched == [(12,) + tile + (30,)]
+        # and a caller which will not wait that long says so
+        monkeypatch.setattr(terrain, '_sample_cache', {})
+        assert terrain.sample_terrain(-16.5, 180.001,
+                                      timeout=5.0) == pytest.approx(1.0)
+        assert fetched[-1] == (12,) + tile + (5.0,)
+
+    def test_a_terrain_tile_is_fetched_with_the_timeout_asked_for(
+            self, monkeypatch, tmp_path):
+        pytest.importorskip("vtk")
+        import time
+        import urllib.request
+        from MAVProxy.modules.mavproxy_map3d import terrain
+        waited = []
+
+        class Response(object):
+            def __init__(self):
+                self.left = [b'terrain ', b'tile']
+
+            def read(self, size=None):
+                return self.left.pop(0) if self.left else b''
+
+        def urlopen(request, timeout=None):
+            waited.append(timeout)
+            return Response()
+        monkeypatch.setattr(urllib.request, 'urlopen', urlopen)
+        monkeypatch.setattr(terrain, 'CACHE_DIR', str(tmp_path))
+        terrain.fetch_terrain_tile(12, 1, 2, timeout=5.0)
+        assert waited == [5.0]
+        # and the whole fetch, where nobody says how long to wait for it
+        monkeypatch.setattr(terrain, 'CACHE_DIR', str(tmp_path / 'again'))
+        terrain.fetch_terrain_tile(12, 1, 2)
+        assert waited[-1] == 30
+        # decoding a tile waits as long as it is told to as well
+
+        class Stop(Exception):
+            pass
+
+        def fetch(z, x, y, timeout=30):
+            waited.append(timeout)
+            raise Stop()
+        # a tile which drips in for ever is given up on at the deadline
+        monkeypatch.setattr(terrain, 'CACHE_DIR', str(tmp_path / 'slow'))
+
+        class Dripping(object):
+            def __init__(self):
+                self.left = 100
+
+            def read(self, size=None):
+                if self.left <= 0:
+                    return b''
+                self.left -= 1
+                time.sleep(0.01)
+                return b'.'
+        monkeypatch.setattr(urllib.request, 'urlopen',
+                            lambda request, timeout=None: Dripping())
+        with pytest.raises(Exception):
+            terrain.fetch_terrain_tile(12, 1, 2, timeout=0.05)
+
+        # as a real response does, whose read() waits to fill its buffer
+        # however long the bytes take, and whose read1() does not
+        class Buffering(Dripping):
+            def read(self, size=None):
+                time.sleep(0.01 * self.left)
+                (data, self.left) = (b'.' * self.left, 0)
+                return data
+
+            def read1(self, size=None):
+                return Dripping.read(self, size)
+        monkeypatch.setattr(urllib.request, 'urlopen',
+                            lambda request, timeout=None: Buffering())
+        started = time.time()
+        with pytest.raises(TimeoutError, match='longer than 0.05s'):
+            terrain.fetch_terrain_tile(12, 1, 2, timeout=0.05)
+        assert time.time() - started < 0.5
+        monkeypatch.setattr(terrain, 'fetch_terrain_tile', fetch)
+        for asked in (5.0, None):
+            with pytest.raises(Stop):
+                if asked is None:
+                    terrain.decode_terrain(12, 1, 2)
+                else:
+                    terrain.decode_terrain(12, 1, 2, asked)
+            assert waited[-1] == (30 if asked is None else asked)
 
     def test_the_view_is_turned_across_the_antimeridian(self):
         pytest.importorskip("vtk")
