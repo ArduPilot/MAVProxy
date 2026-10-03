@@ -13,6 +13,7 @@ import fnmatch
 import threading
 import shlex
 import traceback
+from types import SimpleNamespace
 from math import *
 
 os.environ['MAVLINK20'] = '1'
@@ -23,6 +24,7 @@ from MAVProxy.modules.lib import rline
 from MAVProxy.modules.lib import wxconsole
 from MAVProxy.modules.lib import param_help
 from MAVProxy.modules.lib import param_ftp
+from MAVProxy.modules.lib import log_mission
 from MAVProxy.modules.lib.graph_ui import Graph_UI
 from pymavlink.mavextra import *
 from MAVProxy.modules.lib.mp_menu import *
@@ -31,6 +33,8 @@ from pymavlink import mavutil
 from pymavlink import mavwp
 from pymavlink import DFReader
 from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
+from MAVProxy.modules.mavproxy_map3d.map3d import (
+    MISSION_LABEL_SIZE, MISSION_LABEL_SIZES, MISSION_STYLES)
 from MAVProxy.modules.lib import wxsettings
 from MAVProxy.modules.lib.graphdefinition import GraphDefinition
 from lxml import objectify
@@ -122,6 +126,14 @@ class MEState(object):
               MPSetting('vehicle_type', str, 'Auto', 'force vehicle type for mode handling'),
               MPSetting('showdirection', bool, True,
                         'show direction of travel on the 3D map mission'),
+              MPSetting('showlabels', bool, False,
+                        'label the mission items on the 3D map'),
+              MPSetting('labelsize', int, MISSION_LABEL_SIZE,
+                        'size of the 3D map mission labels, in points',
+                        range=MISSION_LABEL_SIZES),
+              MPSetting('missionpath', str, MISSION_STYLES[0],
+                        'draw the 3D map mission as ' + ', '.join(MISSION_STYLES),
+                        choice=list(MISSION_STYLES)),
               ]
             )
 
@@ -661,6 +673,212 @@ def cmd_map(args):
 
 map3d_views = []
 
+# the mission and rally protocol's messages, which a telemetry log carries
+# as the ground station and the vehicle sent them
+MISSION_PROTOCOL = ('MISSION_COUNT', 'MISSION_ITEM', 'MISSION_ITEM_INT',
+                    'MISSION_CLEAR_ALL')
+
+
+def rally_points(rally_log):
+    '''a LogMission's rally table as mission_from_log() gives it, by
+    sequence: where each point is, and the flags AP_Rally keeps the frame
+    of its altitude in'''
+    out = {}
+    for (seq, item) in rally_log.whole().items():
+        if item.command == mavutil.mavlink.MAV_CMD_NAV_RALLY_POINT:
+            out[seq] = (item.x, item.y, item.z,
+                        rally_flags_for_frame(item.frame))
+    return out
+
+
+# how far apart two of a mission's items can be and still be the one item.
+# AP_Mission keeps a position in 1e-7 degrees, but turns a float
+# MISSION_ITEM's into that in float32, which is up to 6.4e-6 degrees out at
+# longitudes past 128; and it gives a float MISSION_ITEM back by turning the
+# integer into float32 and then multiplying it in float32, which is out by
+# up to 1.6e-5 degrees
+SAME_POSITION = 2.0e-5      # degrees, about 2m
+SAME_ALTITUDE = 0.1         # metres
+
+# the commands AP_Mission keeps a position for (stored_in_location()); the
+# rest go back with no position, and frame 0, whatever they came in with
+LOCATION_COMMANDS = frozenset((
+    mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
+    mavutil.mavlink.MAV_CMD_NAV_LOITER_UNLIM,
+    mavutil.mavlink.MAV_CMD_NAV_LOITER_TURNS,
+    mavutil.mavlink.MAV_CMD_NAV_LOITER_TIME,
+    mavutil.mavlink.MAV_CMD_NAV_LAND,
+    mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
+    mavutil.mavlink.MAV_CMD_NAV_CONTINUE_AND_CHANGE_ALT,
+    mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT,
+    mavutil.mavlink.MAV_CMD_NAV_SPLINE_WAYPOINT,
+    mavutil.mavlink.MAV_CMD_NAV_GUIDED_ENABLE,
+    mavutil.mavlink.MAV_CMD_DO_SET_HOME,
+    mavutil.mavlink.MAV_CMD_DO_RETURN_PATH_START,
+    mavutil.mavlink.MAV_CMD_DO_LAND_START,
+    mavutil.mavlink.MAV_CMD_DO_GO_AROUND,
+    mavutil.mavlink.MAV_CMD_DO_SET_ROI_LOCATION,
+    mavutil.mavlink.MAV_CMD_DO_SET_ROI,
+    mavutil.mavlink.MAV_CMD_NAV_VTOL_TAKEOFF,
+    mavutil.mavlink.MAV_CMD_NAV_VTOL_LAND,
+    mavutil.mavlink.MAV_CMD_NAV_PAYLOAD_PLACE,
+    mp_util.MAV_CMD_NAV_ARC_WAYPOINT,
+))
+
+# the frame AP_Mission gives an item with a position back in: it keeps only
+# whether the altitude is above home or terrain, and never says _INT.  An
+# item uploaded in MISSION, the frame for one with no position, is kept as
+# absolute (AP_Mission::mavlink_int_to_mission_cmd)
+RETURNED_FRAME = {
+    mavutil.mavlink.MAV_FRAME_MISSION: mavutil.mavlink.MAV_FRAME_GLOBAL,
+    mavutil.mavlink.MAV_FRAME_GLOBAL_INT: mavutil.mavlink.MAV_FRAME_GLOBAL,
+    mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT:
+        mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+    mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT_INT:
+        mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT,
+}
+
+
+def kept_whole(value):
+    '''a parameter as AP_Mission keeps it in an integer'''
+    return int(value) if isfinite(value) else 0
+
+
+def kept_signed(value):
+    '''a radius or an angle AP_Mission keeps as a whole number and a
+    direction'''
+    return copysign(kept_whole(abs(value)), value)
+
+
+def kept_float(value):
+    '''a parameter AP_Mission keeps as it came, where NaN is NaN again'''
+    return value if isfinite(value) else None
+
+
+def kept_turns(value):
+    '''the turns of NAV_LOITER_TURNS: fewer than one in 256ths, and at most
+    255 of them'''
+    if 0 < value < 1:
+        return kept_whole(value * 256) / 256.0
+    return min(255, max(0, kept_whole(value)))
+
+
+def kept_loiter_radius(value):
+    '''the radius of NAV_LOITER_TURNS: past 255m it is kept in tens of
+    metres, and at most 2550m'''
+    radius = abs(value)
+    if radius > 255:
+        radius = min(255, kept_whole(radius * 0.1)) * 10
+    return copysign(kept_whole(radius), value)
+
+
+def kept_ccw(value):
+    return value < 0
+
+
+def kept_xtrack(value):
+    return value > 0
+
+
+# the parameters of an item AP_Mission sends back as they were sent to it,
+# every vehicle alike, as it keeps each of them.  Another parameter goes
+# back as 0, or packed up, or only on some vehicles -- NAV_WAYPOINT's are
+# its delay on a copter and its acceptance radii on a plane -- so is no sign
+# of another mission
+RETURNED_PARAMS = {
+    mavutil.mavlink.MAV_CMD_NAV_LOITER_UNLIM:
+        (None, None, kept_signed, None),
+    mavutil.mavlink.MAV_CMD_NAV_LOITER_TURNS:
+        (kept_turns, None, kept_loiter_radius, kept_xtrack),
+    mavutil.mavlink.MAV_CMD_NAV_LOITER_TIME:
+        (kept_whole, None, kept_ccw, kept_xtrack),
+    mavutil.mavlink.MAV_CMD_NAV_LOITER_TO_ALT:
+        (None, kept_signed, None, kept_xtrack),
+    mp_util.MAV_CMD_NAV_ARC_WAYPOINT:
+        (kept_signed, None, None, None),
+    mavutil.mavlink.MAV_CMD_NAV_TAKEOFF:
+        (kept_whole, None, None, None),
+    mavutil.mavlink.MAV_CMD_NAV_VTOL_LAND:
+        (kept_whole, None, None, None),
+    mavutil.mavlink.MAV_CMD_CONDITION_DELAY:
+        (kept_float, None, None, None),
+    mavutil.mavlink.MAV_CMD_DO_JUMP:
+        (kept_whole, kept_whole, None, None),
+    mavutil.mavlink.MAV_CMD_DO_JUMP_TAG:
+        (kept_whole, kept_whole, None, None),
+    mavutil.mavlink.MAV_CMD_JUMP_TAG:
+        (kept_whole, None, None, None),
+    mavutil.mavlink.MAV_CMD_DO_CHANGE_SPEED:
+        (kept_whole, kept_float, kept_float, None),
+}
+
+
+def returned_item(item):
+    '''a mission item as AP_Mission sends it back: what of it would come
+    back from the vehicle whichever way it was sent there'''
+    (lat, lon, alt, frame, command, _, params) = item
+    kept = RETURNED_PARAMS.get(command, (None,) * 4)
+    params = tuple(k(p) for (k, p) in zip(kept, params) if k is not None)
+    if command not in LOCATION_COMMANDS:
+        return (command, None, params, None)
+    return (command, RETURNED_FRAME.get(frame, frame), params, (lat, lon, alt))
+
+
+def same_mission(before, after):
+    '''whether a mission a log has just seen is the one it held, rather than
+    another.  Item 0 is left out of it: that is home, the vehicle's own and
+    not the mission's -- an uploaded one is never stored
+    (AP_Mission::replace_cmd) and a downloaded one is wherever home is now,
+    which the vehicle keeps setting while it is disarmed -- so a mission
+    downloaded to see what the vehicle holds differs there from the upload
+    of it every time.  The rest are compared as AP_Mission keeps them, since
+    a download gives back only that'''
+    if sorted(before) != sorted(after):
+        return False
+    for seq in before:
+        if seq == 0:
+            continue
+        (command, frame, params, where) = returned_item(before[seq])
+        (was_command, was_frame, was_params, was_where) = \
+            returned_item(after[seq])
+        if (command, frame, params) != (was_command, was_frame, was_params):
+            return False
+        if where is None:
+            continue
+        (lat, lon, alt) = where
+        (was_lat, was_lon, was_alt) = was_where
+        if (abs(lat - was_lat) > SAME_POSITION or
+                abs(lon - was_lon) > SAME_POSITION or
+                abs(alt - was_alt) > SAME_ALTITUDE):
+            return False
+    return True
+
+
+class RallyPoints(list):
+    '''a log's rally points in order, and whether the table they are of
+    arrived whole: the points of one a log ends part way through are points
+    to draw, and not a table to work a return out from, since the one it
+    would go to may be among those which never arrived'''
+    whole = True
+
+
+class MissionCmds(dict):
+    '''a log's CMD entries keyed by sequence, which is how this reads a
+    mission, and whether the mission they are arrived whole: the items of one
+    a log ends part way through are a mission to draw and not one to fly'''
+    whole = True
+
+
+def mission_cmds(mission_log):
+    '''a LogMission's mission as a log's CMD entries keyed by sequence'''
+    out = MissionCmds()
+    out.whole = not mission_log.partial()
+    for (seq, item) in mission_log.whole().items():
+        out[seq] = (item.x, item.y, item.z, item.frame, item.command, seq,
+                    (item.param1, item.param2, item.param3, item.param4))
+    return out
+
+
 def mission_items_from_cmds(items, started_at=None, flown_from=None):
     '''the mission items to draw, from a log's CMD entries keyed by sequence.
 
@@ -692,51 +910,189 @@ def mission_items_from_cmds(items, started_at=None, flown_from=None):
     return mission
 
 
+# what ArduPlane says as it picks the course of a VTOL landing approach
+VTOL_APPROACH_MESSAGE = 'Selected an approach path of '
+
+# a rally point's altitude frame, as its flags carry it (Location::AltFrame),
+# for each MAVLink frame a rally item in the mission protocol can be in
+RALLY_FRAME_FLAGS = {
+    mavutil.mavlink.MAV_FRAME_GLOBAL: 0,
+    mavutil.mavlink.MAV_FRAME_GLOBAL_INT: 0,
+    mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT: 1,
+    mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT: 1,
+    mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT: 3,
+    mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT_INT: 3,
+}
+
+
+def rally_flags_for_frame(frame):
+    '''the flags of a rally point in frame, as AP_Rally keeps them: the
+    frame, and the bit which says the flags carry one'''
+    return (1 << 2) | (RALLY_FRAME_FLAGS.get(frame, 1) << 3)
+
+
 def mission_from_log(mlog, condition=None):
-    '''the flight path in a log, and the mission the log ends with.
+    '''the flight path in a log, the mission the log ends with, that
+    mission's CMD entries keyed by sequence -- every one of them, where the
+    mission drawn has only the ones with a position -- by sequence, the
+    index into the path at which the log says each of its items began, the
+    rally points the log ends with, as (lat, lon, alt, flags), the EKF
+    origin, which a rally point's altitude may be measured from, the
+    course of the last VTOL landing approach the vehicle announced, or None.
 
     A log carries the whole mission again every time one is uploaded, and
     once more when it starts, so the items are kept by sequence number and
     the logger's "New mission" -- written before every one of them, even a
     mission with no items at all -- starts them again.  Drawing every mission
-    the flight ever held would join them into one line
+    the flight ever held would join them into one line.
+
+    A telemetry log carries the same things as the MAVLink messages the
+    vehicle sent: its position, home and origin, what it said, and the
+    mission and rally points as they were downloaded or uploaded while the
+    log was kept.  Only a transfer which arrives whole replaces what was
+    held, so one the log ends part way through leaves the table before it,
+    and a log which starts part way through one holds no mission at all
     '''
     path = []
+    # the mission and the rally points, as whatever kind of log this is
+    # carries them: a table which never arrives whole says nothing about the
+    # one the vehicle holds, so the one before it stands
+    mission_log = log_mission.LogMission()
+    rally_log = log_mission.LogMission(
+        mavutil.mavlink.MAV_MISSION_TYPE_RALLY)
     items = {}
     # where the vehicle was when each item began, from the "Mission: <seq>"
-    # the autopilot announces as it starts one
+    # the autopilot announces as it starts one, and how far along the path
     flown_from = {}
-    # home, as the vehicle last logged it
+    started = {}
+    # home, and the EKF origin, as the vehicle last logged them
     home = None
+    origin = None
+    # the rally points, by sequence.  The logger writes the whole table out
+    # when one is uploaded, and a single point when just that one is set --
+    # appending one is logged as that one alone, with the new total -- so
+    # they are kept by sequence, and only the ones a smaller total leaves
+    # out are dropped
+    rally = {}
+    # whether the points held are the whole of the table they are of
+    rally_whole = True
+    approach = None
+    # the vehicle, in a telemetry log: its first heartbeat says which it is
+    vehicle = None
     while True:
-        m = mlog.recv_match(type=['POS', 'CMD', 'MSG', 'ORGN'],
+        m = mlog.recv_match(type=['POS', 'CMD', 'MSG', 'ORGN', 'RALY',
+                                  'HEARTBEAT', 'GLOBAL_POSITION_INT',
+                                  'HOME_POSITION', 'GPS_GLOBAL_ORIGIN',
+                                  'STATUSTEXT', 'MISSION_COUNT',
+                                  'MISSION_ITEM', 'MISSION_ITEM_INT',
+                                  'MISSION_CLEAR_ALL', 'RALLY_POINT'],
                             condition=condition)
         if m is None:
             break
         mtype = m.get_type()
+        if mtype == 'HEARTBEAT':
+            if (vehicle is None and
+                    m.autopilot != mavutil.mavlink.MAV_AUTOPILOT_INVALID and
+                    m.type != mavutil.mavlink.MAV_TYPE_GCS):
+                vehicle = m.get_srcSystem()
+            continue
+        if mtype in MISSION_PROTOCOL:
+            # downloaded from the vehicle, or uploaded to it
+            if vehicle not in (m.get_srcSystem(), m.target_system):
+                continue
+        elif (mtype in ('GLOBAL_POSITION_INT', 'HOME_POSITION',
+                        'GPS_GLOBAL_ORIGIN', 'STATUSTEXT', 'RALLY_POINT') and
+                m.get_srcSystem() != vehicle):
+            continue
+        if mtype == 'GLOBAL_POSITION_INT':
+            if m.lat == 0 and m.lon == 0:
+                continue
+            m = SimpleNamespace(Lat=m.lat * 1.0e-7, Lng=m.lon * 1.0e-7,
+                                Alt=m.alt * 0.001, _timestamp=m._timestamp)
+            mtype = 'POS'
+        elif mtype == 'HOME_POSITION':
+            m = SimpleNamespace(Type=1, Lat=m.latitude * 1.0e-7,
+                                Lng=m.longitude * 1.0e-7,
+                                Alt=m.altitude * 0.001)
+            mtype = 'ORGN'
+        elif mtype == 'GPS_GLOBAL_ORIGIN':
+            m = SimpleNamespace(Type=0, Lat=m.latitude * 1.0e-7,
+                                Lng=m.longitude * 1.0e-7,
+                                Alt=m.altitude * 0.001)
+            mtype = 'ORGN'
+        elif mtype == 'STATUSTEXT':
+            m = SimpleNamespace(Message=m.text)
+            mtype = 'MSG'
+        elif mtype == 'RALLY_POINT':
+            # the old rally protocol's, which carry AP_Rally's own flags
+            m = SimpleNamespace(Seq=m.idx, Tot=m.count, Lat=m.lat * 1.0e-7,
+                                Lng=m.lng * 1.0e-7, Alt=m.alt, Flags=m.flags)
+            mtype = 'RALY'
+        elif mtype in MISSION_PROTOCOL:
+            # a rally table downloaded or uploaded, whose points are carried
+            # as a mission's items are.  One which arrives whole is what the
+            # vehicle holds, even where the table was that already: the
+            # points the old protocol set may not be there any more
+            before = rally_points(rally_log)
+            arrivals = rally_log.arrivals
+            rally_log.read(m, mtype)
+            after = rally_points(rally_log)
+            if after != before or rally_log.arrivals != arrivals:
+                rally = after
+                # a table which never arrived whole is what is known of the
+                # one the vehicle holds, and all that is known: the points
+                # the old protocol set before it are gone
+                rally_whole = not rally_log.partial()
+        if mtype in log_mission.MISSION_TYPES:
+            # the mission itself, which LogMission keeps: only the last one
+            # to arrive whole, so a download which stops part way through
+            # leaves the one before it as it was
+            before = mission_cmds(mission_log)
+            mission_log.read(m, mtype)
+            if not same_mission(before, mission_cmds(mission_log)):
+                # a mission other than the one flown so far: where the
+                # flight had got to in that one says nothing about this
+                flown_from = {}
+                started = {}
+            if mtype != 'MSG':
+                continue
         if mtype == 'POS':
             path.append((m.Lat, m.Lng, m.Alt,
                          grapher.timestamp_to_days(m._timestamp)))
+        elif mtype == 'RALY':
+            if any(seq >= m.Tot for seq in rally):
+                rally = dict((seq, point) for (seq, point) in rally.items()
+                             if seq < m.Tot)
+            if m.Seq < m.Tot:
+                # RALY only carries the altitude frame from 4.5; before that
+                # a rally point's altitude is above home, which is flags 0
+                rally[m.Seq] = (m.Lat, m.Lng, m.Alt, getattr(m, 'Flags', 0))
+            # the logger writes the whole table out, so the points held are
+            # the table once there are as many of them as it says
+            rally_whole = len(rally) == m.Tot
         elif mtype == 'ORGN':
+            # AP_AHRS: type 0 is the EKF origin, type 1 home
             if m.Type == 1 and (m.Lat != 0 or m.Lng != 0):
                 home = (m.Lat, m.Lng, m.Alt)
+            elif m.Type == 0 and (m.Lat != 0 or m.Lng != 0):
+                origin = (m.Lat, m.Lng, m.Alt)
         elif mtype == 'MSG':
             fields = m.Message.split()
-            if m.Message == 'New mission':
-                items = {}
-                flown_from = {}
+            if m.Message.startswith(VTOL_APPROACH_MESSAGE):
+                # the course the vehicle took into the wind it had then
+                try:
+                    approach = float(m.Message[len(VTOL_APPROACH_MESSAGE):])
+                except ValueError:
+                    pass
+            elif m.Message == 'New rally':
+                # written before the whole table, even an empty one: a
+                # cleared table is this and no points at all
+                rally = {}
             elif (len(fields) > 1 and fields[0] == 'Mission:' and
                     fields[1].isdigit() and path):
                 flown_from.setdefault(int(fields[1]), (path[-1][0], path[-1][1]))
-        elif mtype == 'CMD':
-            if m.CNum == 0 and len(items) > 1:
-                # a log from before the logger said so: the first item of a
-                # mission still means whatever is held is stale
-                items = {}
-                flown_from = {}
-            params = tuple(getattr(m, 'Prm%u' % i, 0.0) for i in range(1, 5))
-            items[m.CNum] = (m.Lat, m.Lng, m.Alt, getattr(m, 'Frame', 3),
-                             m.CId, m.CNum, params)
+                started.setdefault(int(fields[1]), len(path) - 1)
+    items = mission_cmds(mission_log)
     if (home is not None and 0 in items and
             items[0][0] == 0 and items[0][1] == 0):
         # a mission uploaded before the vehicle had a home carries an empty
@@ -745,7 +1101,146 @@ def mission_from_log(mlog, condition=None):
     mission = mission_items_from_cmds(
         items, started_at=(path[0][0], path[0][1]) if path else None,
         flown_from=flown_from)
-    return (path, mission)
+    points = RallyPoints(rally[seq] for seq in sorted(rally))
+    points.whole = rally_whole
+    return (path, mission, items, started, points, origin, approach)
+
+
+def takeoff_flown(path, items, started):
+    '''the takeoff of the mission the log shows flown, as its CMD entry, and
+    the course in degrees it was flown on; (None, None) where the log shows
+    none.  ArduPlane holds the ground course it has once it gets moving, and
+    a QuadPlane transitions the way it was pointing, neither of which the
+    mission says, so the course is taken from the path: where the aircraft
+    was when the takeoff began, towards where it was once it had gone a
+    little way'''
+    for (seq, index) in sorted(started.items()):
+        item = items.get(seq)
+        if item is None or item[4] not in (
+                mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
+                mavutil.mavlink.MAV_CMD_NAV_VTOL_TAKEOFF):
+            continue
+        (lat, lon) = path[index][:2]
+        for point in path[index + 1:]:
+            if mp_util.gps_distance(lat, lon, point[0], point[1]) >= 30.0:
+                return (item, mp_util.gps_bearing(lat, lon, point[0],
+                                                  point[1]))
+    return (None, None)
+
+
+def takeoff_course(path, items, started):
+    '''the course in degrees the mission's takeoff was flown on, or None'''
+    return takeoff_flown(path, items, started)[1]
+
+
+# a rally point is one point of one view: wait only so long for the terrain
+# under it, rather than the whole fetch the tiles drawn are worth waiting for
+RALLY_TERRAIN_TIMEOUT = 5.0
+
+
+def rally_point_amsl(lat, lon, alt, flags, home_amsl, origin=None):
+    '''the AMSL altitude of a rally point from a log.  A point above the
+    terrain is resolved through the same quantized mesh the 3D view draws;
+    one above the EKF origin falls back to home, which the origin is
+    usually near, where the log does not say where the origin was'''
+    from MAVProxy.modules.lib import plane_track
+    frame = plane_track.rally_alt_frame(flags)
+    terrain = None
+    if frame == plane_track.RALLY_ALT_ABOVE_TERRAIN:
+        try:
+            from MAVProxy.modules.mavproxy_map3d.terrain import sample_terrain
+            terrain = sample_terrain(lat, lon, timeout=RALLY_TERRAIN_TIMEOUT)
+        except Exception as ex:
+            print("map3d: terrain elevation unavailable (%s)" % ex)
+    origin_amsl = origin[2] if origin else None
+    if frame == plane_track.RALLY_ALT_ABOVE_ORIGIN and origin_amsl is None:
+        origin_amsl = home_amsl
+    return plane_track.rally_amsl(alt, flags, home_amsl, origin_amsl, terrain)
+
+
+def plane_mission_track(cmds, mission, started_at, params=None, mav_type=None,
+                        path=None, started=None, rally=None, origin=None,
+                        approach=None):
+    '''the path a plane flies a log's mission along, as (lat, lon, amsl)
+    points, or None for a vehicle which is not a plane or a mission which
+    cannot be flown through.
+
+    cmds are the mission's CMD entries keyed by sequence, and mission the
+    MissionItems resolve_mission_amsl() made of them, which carry the
+    positions and AMSL altitudes worked out for the ones drawn.  The flight
+    starts from home, or from started_at where the log's mission has no home
+    of its own.  path and started are the flight path and where along it
+    each item began, as mission_from_log() gives them: where the log shows
+    the mission's first item beginning, the flight starts there instead,
+    and a takeoff is flown as the course measured over the start of it says:
+    a fixed-wing one on that course, and a VTOL one transitioning onto it.
+    rally is the log's rally points, which a return to launch may go to, and
+    origin the EKF origin one of them may be measured from.  approach is the
+    course of a VTOL landing approach, which the vehicle flies into the wind
+    it has then: the one the log says it took, where it says so, and
+    otherwise that of still air, since the wind at some other time says
+    little about it
+    '''
+    if mp_util.vehicle_type_name(mav_type) != 'plane':
+        return None
+    if sorted(cmds) != list(range(len(cmds))):
+        # an item is missing from the log.  The flight is numbered by
+        # sequence -- jumps go to one, and where each began is kept by one --
+        # so there is no flying it with a gap, and no guessing what was there
+        return None
+    if not getattr(cmds, 'whole', True):
+        # the log ends part way through the only transfer of this mission:
+        # flying what arrived would end it with a return to launch, or a
+        # landing, which whatever was still to come may say nothing of
+        return None
+    if not getattr(rally, 'whole', True):
+        # nor is a mission flown whose return may go to a rally point among
+        # those the log ends part way through the table of
+        return None
+    from MAVProxy.modules.lib import plane_track
+    placed = {item.seq: item for item in mission}
+    home = placed.get(0)
+    if home is not None:
+        home = (home.lat, home.lon, home.alt)
+    elif started_at is not None:
+        home = tuple(started_at)
+    items = []
+    for seq in sorted(cmds):
+        if seq == 0:
+            continue
+        (lat, lon, alt, frame, command, _, prm) = cmds[seq]
+        item = placed.get(seq)
+        if item is not None:
+            items.append((command, item.lat, item.lon, item.alt, prm))
+        else:
+            items.append((command, 0.0, 0.0,
+                          plane_track.positionless_amsl(
+                              alt, frame, home[2] if home else None),
+                          prm))
+    heading = None
+    course = None
+    start = None
+    if path and started:
+        # the course measured over the start of the takeoff, which is the way
+        # a QuadPlane pointed as it transitioned, and for a fixed-wing
+        # takeoff the course it held: nothing but a flight of one says either
+        (takeoff, measured) = takeoff_flown(path, cmds, started)
+        if takeoff is not None:
+            if plane_track.takeoff_is_vtol(takeoff[4], params or {}):
+                heading = measured
+            else:
+                course = measured
+        first = plane_track.first_navigation_item(items)
+        if first in started:
+            (lat, lon, alt) = path[started[first]][:3]
+            start = (lat, lon, alt)
+    rally_points = [(lat, lon, rally_point_amsl(lat, lon, alt, flags,
+                                                home[2] if home else None,
+                                                origin))
+                    for (lat, lon, alt, flags) in (rally or [])]
+    return plane_track.mission_track(home, items, params, heading, start,
+                                     rally_points, approach,
+                                     takeoff_course=course)
 
 
 def path_view(path):
@@ -797,11 +1292,12 @@ def cmd_map3d(args):
         return
 
     mlog = mestate.mlog
-    (path, mission) = mission_from_log(mlog, mestate.settings.condition)
+    (path, mission, cmds, started, rally, origin,
+     approach) = mission_from_log(mlog, mestate.settings.condition)
     mlog.rewind()
 
     if len(path) == 0:
-        print("No POS messages found for 3D map")
+        print("No POS or GLOBAL_POSITION_INT messages found for 3D map")
         return
 
     (lat0, lon0, ground0, span) = path_view(path)
@@ -809,10 +1305,25 @@ def cmd_map3d(args):
     # resolve mission item altitudes to AMSL before sending. Terrain-frame
     # waypoints (MAV_FRAME_GLOBAL_TERRAIN_ALT = 10/11) are "z above terrain", so
     # they need the terrain elevation at the waypoint, not home + z.
+    track = None
     if mission:
-        mission = resolve_mission_amsl(mission, ground0,
-                                       mp_util.log_params(mlog),
-                                       getattr(mlog, 'mav_type', None))
+        params = mp_util.log_params(mlog)
+        mav_type = getattr(mlog, 'mav_type', None)
+        mission = resolve_mission_amsl(mission, ground0, params, mav_type)
+
+        # a plane does not fly the lines between its items; where the log
+        # says enough to fly the mission through its navigation, that path
+        # is drawn, and worked out only when it is
+        def fly():
+            return plane_mission_track(cmds, mission,
+                                       (path[0][0], path[0][1], ground0),
+                                       params, mav_type, path, started,
+                                       rally, origin, approach)
+        if mestate.settings.missionpath == 'flown':
+            track = fly()
+            if (track is None and
+                    mp_util.vehicle_type_name(mav_type) == 'plane'):
+                say_unflown()
 
     # drop views the user has already closed, so their child processes are reaped
     for old in [v for v in map3d_views if not v.is_alive()]:
@@ -824,11 +1335,18 @@ def cmd_map3d(args):
     m3d.set_origin(lat0, lon0, ground0)
     m3d.set_home(ground0)
     m3d.set_mission_arrows(mestate.settings.showdirection)
+    m3d.set_mission_labels(mestate.settings.showlabels)
+    m3d.set_mission_label_size(mestate.settings.labelsize)
+    m3d.set_mission_style(mestate.settings.missionpath)
     m3d.set_path(path)
     if xlimits.last_xlim is not None and mestate.settings.sync_xmap:
         m3d.set_time_range(xlimits.last_xlim)
     if mission:
-        m3d.set_mission(mission)
+        m3d.set_mission(mission, track)
+        # kept, to draw the path flown if the style changes to it later
+        m3d.mission_to_fly = None
+        if track is None and mestate.settings.missionpath != 'flown':
+            m3d.mission_to_fly = (mission, fly)
     m3d.look_at(lat0, lon0, ground0, dist=1.6 * span)
 
 def resolve_mission_amsl(mission, ground0, params=None, mav_type=None):
@@ -890,10 +1408,50 @@ def resolve_mission_amsl(mission, ground0, params=None, mav_type=None):
 def cmd_set(args):
     '''control MAVExporer options'''
     mestate.settings.command(args)
-    # settings the open 3D views care about
+    update_map3d_views()
+
+def update_map3d_views():
+    '''push the settings the open 3D views care about'''
     for view in map3d_views:
         if view.is_alive():
             view.set_mission_arrows(mestate.settings.showdirection)
+            view.set_mission_labels(mestate.settings.showlabels)
+            view.set_mission_label_size(mestate.settings.labelsize)
+            view.set_mission_style(mestate.settings.missionpath)
+            pending = getattr(view, 'mission_to_fly', None)
+            if mestate.settings.missionpath == 'flown' and pending is not None:
+                (mission, fly) = pending
+                view.mission_to_fly = None
+                track = fly()
+                if track is None:
+                    say_unflown()
+                view.set_mission(mission, track)
+
+def say_unflown():
+    print("map3d: could not work out the path this mission is flown along "
+          "-- only a plane's can be, and not one which is too long, never "
+          "finishes an item, uses a command which cannot be flown here, or "
+          "which the log does not hold all of; drawing its geometry")
+
+def poll_map3d_views():
+    '''take what the open 3D views' own controls have been set to.  A view
+    which has died is drained too, so we do not lose the reason it failed
+    to start'''
+    changed = False
+    for view in map3d_views:
+        for event in view.check_events():
+            if event[0] == 'startup_error':
+                print("map3d: the 3D view failed to start:\n%s" % event[1])
+            elif event[0] == 'mission_labels':
+                mestate.settings.showlabels = bool(event[1])
+                changed = True
+            elif event[0] == 'mission_style':
+                mestate.settings.missionpath = event[1]
+                changed = True
+    if changed:
+        # every view follows the setting, and the path flown is only worked
+        # out while it is drawn
+        update_map3d_views()
 
 def cmd_condition(args):
     '''control MAVExporer conditions'''
@@ -2118,6 +2676,7 @@ def main_loop():
             cmds = line.split(';')
             for c in cmds:
                 process_stdin(c)
+        poll_map3d_views()
 
         remlist = []
         for i in range(0, len(grui)):

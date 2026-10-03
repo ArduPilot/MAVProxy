@@ -162,6 +162,36 @@ class TestSettingsSync(object):
         Map3DFrame.handle(frame, ('origin', HOME[0], HOME[1], HOME[2]))
         assert frame.terrain.render_settings == (1.25, False, False)
 
+    def test_mavexplorer_and_its_views_agree(self, map3d_frame, mavexplorer,
+                                             monkeypatch):
+        '''MAVExplorer has the same crossing, between a view's checkbox and
+        its own set command'''
+        from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
+        settings = MPSettings([
+            MPSetting('showdirection', bool, True),
+            MPSetting('showlabels', bool, False),
+            MPSetting('labelsize', int, 14),
+            MPSetting('missionpath', str, 'flown',
+                      choice=['flown', 'geometry', 'plain'])])
+        monkeypatch.setattr(mavexplorer, 'mestate',
+                            SimpleNamespace(settings=settings), raising=False)
+        views = [connect(map3d_frame), connect(map3d_frame)]
+        monkeypatch.setattr(mavexplorer, 'map3d_views',
+                            [viewer for (viewer, _) in views])
+        labels_on_the_view(views[0][1])
+        style_on_the_view(views[0][1])
+        mavexplorer.cmd_set(['showlabels', 'false'])
+        mavexplorer.poll_map3d_views()
+        for (viewer, frame) in views:
+            deliver(viewer, frame)
+        for (viewer, frame) in views:
+            assert viewer.event_queue.empty()
+            assert CONTROLS['labels'][3](frame) == [settings.showlabels] * 3
+            assert CONTROLS['style'][3](frame) == [settings.missionpath] * 3
+        # where the two crossed, what MAVExplorer heard last stands: the
+        # view's, which it read after the command
+        assert settings.showlabels is True
+
 
 def display():
     return bool(os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY'))
