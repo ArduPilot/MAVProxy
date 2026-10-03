@@ -24,6 +24,18 @@ MissionItem = collections.namedtuple(
     'exit_converge',
     defaults=(0.0, None, None, None))
 
+# how the mission line is drawn.  flown is the path the vehicle is worked
+# out to fly, where the caller could work one out, and geometry where it
+# could not; geometry joins and leaves circles on tangents and walks spirals
+# round them; plain runs straight from item to item, with a ring at each
+# item which circles
+MISSION_STYLES = ('flown', 'geometry', 'plain')
+
+# how big a mission item's label is drawn, in points on the screen, and the
+# sizes worth asking for: too small to read through to filling the view
+MISSION_LABEL_SIZE = 14
+MISSION_LABEL_SIZES = (6, 48)
+
 PACKAGES = ('vtk', 'quantized_mesh_tile')
 
 
@@ -128,8 +140,12 @@ class Map3D:
         '''Limit timestamped path points to a Matplotlib date-number range.'''
         self._put(('time_range', None if trange is None else tuple(trange)))
 
-    def set_mission(self, items):
-        self._put(('mission', list(items)))
+    def set_mission(self, items, track=None):
+        '''items: MissionItems.  track is the path the vehicle is expected to
+        fly them along, as (lat, lon, amsl) points, where the caller can
+        work that out; otherwise the path is drawn from the items alone'''
+        self._put(('mission', list(items),
+                   None if track is None else list(track)))
 
     def set_fence(self, shapes):
         '''shapes: ('polygon', [(lat,lon), ...], rgb) / ('circle', (lat,lon), radius_m, rgb)'''
@@ -146,6 +162,18 @@ class Map3D:
 
     def set_mission_arrows(self, enable):
         self._put(('mission_arrows', bool(enable)))
+
+    def set_mission_labels(self, enable):
+        '''label each mission item with its number and what it is'''
+        self._put(('mission_labels', bool(enable)))
+
+    def set_mission_label_size(self, size):
+        '''how big those labels are drawn, in points on the screen'''
+        self._put(('mission_label_size', int(size)))
+
+    def set_mission_style(self, style):
+        '''one of MISSION_STYLES'''
+        self._put(('mission_style', str(style)))
 
     def set_fpv_fov(self, fov):
         self._put(('fpvfov', float(fov)))
