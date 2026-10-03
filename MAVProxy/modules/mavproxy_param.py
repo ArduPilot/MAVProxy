@@ -5,6 +5,7 @@ param command handling
 AP_FLAKE8_CLEAN
 '''
 
+import math
 import time
 import os
 import fnmatch
@@ -52,6 +53,12 @@ class ParamState:
         self.new_sysid_timestamp = time.time()
         self.autopilot_type_by_sysid = {}
         self.param_types = {}
+        # params known to use PX4-style byte-wise encoding for plain
+        # int types (from handle_px4_param_value)
+        self.px4_style_params = set()
+        # whether each sysid advertises MAV_PROTOCOL_CAPABILITY_PARAM_BYTEWISE
+        self.supports_bytewise_by_sysid = {}
+        self.autopilot_version_requests = {}
         self.ftp_failed = False
         self.ftp_started = False
         self.ftp_count = None
@@ -69,21 +76,45 @@ class ParamState:
         # thread-safe manner:
         self.parameters_to_set_input_queue = Queue.Queue()
 
+    EXTENDED = 11
+    BYTEWISE_INT32 = 12
+    BYTEWISE_UINT32 = 13
+
     class ParamSet():
         '''class to hold information about a parameter set being attempted'''
-        def __init__(self, master, name, value, param_type=None, attempts=None):
+        def __init__(self, master, name, value, param_type=None, attempts=None, extended_type=None):
             self.master = master
             self.name = name
             self.value = value
             self.param_type = param_type
+            self.extended_type = extended_type
+            if param_type in (mavutil.mavlink.MAV_PARAM_TYPE_INT64, mavutil.mavlink.MAV_PARAM_TYPE_UINT64,
+                              mavutil.mavlink.MAV_PARAM_TYPE_REAL64):
+                self.param_type = ParamState.EXTENDED
+                self.extended_type = {8: 1, 7: 2, 10: 3}[param_type]
             self.attempts_remaining = attempts
             self.retry_interval = 1  # seconds
             self.last_value_received = None
+            # extended encoding fields for values that don't fit exactly
+            # in the float param_value
+            self.extended_data = None
 
             if self.attempts_remaining is None:
                 self.attempts_remaining = 3
 
             self.request_sent = 0  # this is a timestamp
+
+        def target_value(self):
+            '''the requested value, retaining exact integers'''
+            if self.param_type == ParamState.EXTENDED and self.extended_type in (3, 4):
+                if self.extended_type == 4:
+                    return mavutil.encode_param_extended(self.value, 4)
+                return float(self.value)
+            if self.param_type in (11, 12, 13):
+                return mavutil.param_integer_value(self.value)
+            if isinstance(self.value, str) and self.value.lower().startswith('0x'):
+                return int(self.value[2:], 16)
+            return float(self.value)
 
         def normalize_parameter_for_param_set_send(self, name, value, param_type):
             '''uses param_type to convert value into a value suitable for passing
@@ -91,6 +122,25 @@ class ParamState:
             is a copy of a method in pymavlink, in case the user has
             an older version of that library.
             '''
+            self.extended_data = None
+            self.parm_raw = None
+            if param_type == ParamState.EXTENDED:
+                try:
+                    if self.extended_type == 4 and isinstance(value, str) and value.startswith('hex:'):
+                        value = bytes.fromhex(value[4:])
+                    self.extended_data = mavutil.encode_param_extended(value, self.extended_type)
+                except (TypeError, ValueError, OverflowError, ArithmeticError, struct.error) as e:
+                    print("can't send %s: %s" % (name, e))
+                    return None
+                return float('nan')
+            if param_type in (ParamState.BYTEWISE_INT32, ParamState.BYTEWISE_UINT32):
+                try:
+                    self.parm_raw = struct.pack('<i' if param_type == 12 else '<I',
+                                                mavutil.param_integer_value(value))
+                except (ValueError, OverflowError, ArithmeticError, struct.error) as e:
+                    print("can't send %s: %s" % (name, e))
+                    return None
+                return 0.0
             if param_type is not None and param_type != mavutil.mavlink.MAV_PARAM_TYPE_REAL32:
                 # need to encode as a float for sending
                 if param_type == mavutil.mavlink.MAV_PARAM_TYPE_UINT8:
@@ -122,12 +172,27 @@ class ParamState:
             return numeric_value
 
         def send_set(self):
+            if self.param_type == ParamState.EXTENDED and not self.master.mavlink20():
+                print("can't send %s: extended parameters require MAVLink2" % self.name)
+                self.attempts_remaining = 0
+                return
             numeric_value = self.normalize_parameter_for_param_set_send(self.name, self.value, self.param_type)
             if numeric_value is None:
                 print(f"can't send {self.name} of type {self.param_type}")
                 self.attempts_remaining = 0
                 return
             # print(f"Sending set attempts-remaining={self.attempts_remaining}")
+            if self.parm_raw is not None or self.extended_data is not None:
+                # FTP downloads do not negotiate PARAM_VALUE encoding. Advertise
+                # support before the set so its acknowledgement can be exact.
+                self.master.param_fetch_one(self.name.upper())
+                kwargs = {'parm_raw': self.parm_raw} if self.parm_raw is not None else {
+                    'extended_type': self.extended_type, 'extended_data': self.extended_data}
+                self.master.param_set_send(self.name.upper(), numeric_value,
+                                           parm_type=self.param_type, **kwargs)
+                self.request_sent = time.time()
+                self.attempts_remaining -= 1
+                return
             self.master.param_set_send(
                 self.name.upper(),
                 numeric_value,
@@ -153,7 +218,14 @@ class ParamState:
             manipulated from the packet
             '''
             self.last_value_received = value
-            if abs(value - float(self.value)) > 0.00001:
+            if self.param_type == ParamState.EXTENDED:
+                return (m.param_type == ParamState.EXTENDED and m.extended_type == self.extended_type and
+                        bytes(m.extended_data) == self.extended_data.ljust(128, b'\x00'))
+            if isinstance(value, float) and math.isnan(value):
+                # undecodable extended ack (unknown extended type or old
+                # pymavlink); never treat as a successful set
+                return math.isnan(self.target_value())
+            if abs(value - self.target_value()) > 0.00001:
                 return False
 
             return True
@@ -240,13 +312,75 @@ class ParamState:
 
         # remember type for param set
         self.param_types[m.param_id.upper()] = m.param_type
+        self.px4_style_params.add(m.param_id.upper())
         return value
+
+    def handle_bytewise_param_value(self, m):
+        """Decode explicit bytewise types without passing integers through float."""
+        value = mavutil.decode_param_value(m)
+        logical_type = {12: mavutil.mavlink.MAV_PARAM_TYPE_INT32,
+                        13: mavutil.mavlink.MAV_PARAM_TYPE_UINT32}.get(m.param_type)
+        if m.param_type == self.EXTENDED:
+            logical_type = {1: mavutil.mavlink.MAV_PARAM_TYPE_INT64,
+                            2: mavutil.mavlink.MAV_PARAM_TYPE_UINT64,
+                            3: mavutil.mavlink.MAV_PARAM_TYPE_REAL64,
+                            4: self.EXTENDED}.get(m.extended_type)
+            self.mav_param.param_extended_types[m.param_id.upper()] = m.extended_type
+        if logical_type is not None:
+            self.supports_bytewise_by_sysid[m.get_srcSystem()] = True
+            self.update_mavparm_bytewise_support()
+            self.record_logical_type(m.param_id.upper(), logical_type)
+        return value
+
+    def is_cast_encoded_vehicle(self):
+        '''true unless the target uses PX4-style byte-wise param encoding'''
+        return self.autopilot_type_by_sysid.get(self.sysid[0], -1) != mavutil.mavlink.MAV_AUTOPILOT_PX4
+
+    def update_mavparm_bytewise_support(self):
+        '''keep MAVParmDict informed so that direct mavset() callers
+        (param load, scripts) also use bytewise encoding when appropriate'''
+        self.mav_param.target_supports_bytewise = (
+            self.is_cast_encoded_vehicle() and
+            self.supports_bytewise_by_sysid.get(self.sysid[0], False))
+
+    def record_logical_type(self, uname, ptype):
+        '''remember the logical type of an int32/uint32 parameter on a
+        C-cast vehicle, both for our own sends and for direct mavset()'''
+        if uname in self.px4_style_params or not self.is_cast_encoded_vehicle():
+            return
+        self.param_types[uname] = ptype
+        if not hasattr(self.mav_param, 'param_types'):
+            self.mav_param.param_types = {}
+        self.mav_param.param_types[uname] = ptype
 
     def handle_mavlink_packet(self, master, m):
         '''handle an incoming mavlink packet'''
+        if m.get_type() == 'PARAM_ERROR' or (m.get_type() == 'PARAM_VALUE' and m.param_type == 14):
+            name = m.param_id.upper()
+            pending = self.parameters_to_set.get(name)
+            if m.get_type() == 'PARAM_ERROR' and (
+                    m.target_system not in (0, master.mav.srcSystem) or
+                    m.target_component not in (0, master.mav.srcComponent)):
+                return
+            if pending is not None and pending.request_sent and (m.get_srcSystem(), m.get_srcComponent()) == self.sysid:
+                if m.get_type() == 'PARAM_ERROR':
+                    print("Failed to set %s: PARAM_ERROR %s" % (name, m.error))
+                    del self.parameters_to_set[name]
+                else:
+                    pending.request_sent = time.time()
+            return
         if m.get_type() == 'PARAM_VALUE':
-            self.handle_mavlink_watch_param_value(master, m)
-            value = self.handle_px4_param_value(m)
+            if m.param_type in (self.EXTENDED, self.BYTEWISE_INT32, self.BYTEWISE_UINT32):
+                value = self.handle_bytewise_param_value(m)
+            else:
+                value = self.handle_px4_param_value(m)
+                if (m.param_type == mavutil.mavlink.MAV_PARAM_TYPE_INT32 and
+                        m.get_srcComponent() != mavutil.mavlink.MAV_COMP_ID_UDP_BRIDGE):
+                    # C-cast vehicles report honest types with cast float
+                    # values; remember the logical type so a later set of
+                    # a large value can use bytewise encoding
+                    self.record_logical_type(m.param_id.upper(), m.param_type)
+            self.handle_mavlink_watch_param_value(master, m, value)
             param_id = "%.16s" % m.param_id
             # Note: the xml specifies param_index is a uint16, so -1 in that field will show as 65535
             # We accept both -1 and 65535 as 'unknown index' to future proof us against someday having that
@@ -289,11 +423,26 @@ class ParamState:
                 # remember autopilot types so we can handle PX4 parameters
                 self.autopilot_type_by_sysid[m.get_srcSystem()] = m.autopilot
 
+        elif m.get_type() == 'AUTOPILOT_VERSION':
+            cap = getattr(mavutil.mavlink, 'MAV_PROTOCOL_CAPABILITY_PARAM_BYTEWISE', 2097152)
+            self.supports_bytewise_by_sysid[m.get_srcSystem()] = (m.capabilities & cap) != 0
+            self.update_mavparm_bytewise_support()
+
     def fetch_check(self, master, force=False):
         '''check for missing parameters periodically'''
         if self.param_period.trigger() or force:
             if master is None:
                 return
+            sysid = self.sysid[0]
+            if sysid not in self.supports_bytewise_by_sysid and self.autopilot_version_requests.get(sysid, 0) < 3:
+                # learn whether the vehicle supports explicit bytewise param
+                # encoding; if this never arrives we stay lossy (safe)
+                self.autopilot_version_requests[sysid] = self.autopilot_version_requests.get(sysid, 0) + 1
+                master.mav.command_long_send(
+                    sysid, 1,
+                    mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE, 0,
+                    mavutil.mavlink.MAVLINK_MSG_ID_AUTOPILOT_VERSION,
+                    0, 0, 0, 0, 0, 0)
             if len(self.mav_param_set) == 0 and not self.ftp_started:
                 if not self.use_ftp():
                     master.param_fetch_all()
@@ -345,11 +494,17 @@ class ParamState:
         mav = self.mpstate.master().mav
         editor = self.mpstate.module('paramedit')
         for (name, v, ptype) in params:
-            p = mavutil.mavlink.MAVLink_param_value_message(name,
-                                                            float(v),
-                                                            mavutil.mavlink.MAV_PARAM_TYPE_REAL32,
-                                                            len(params),
-                                                            idx)
+            p = None
+            if ptype == 3 and hasattr(mavutil.mavlink, 'MAV_PARAM_TYPE_BYTEWISE_INT32'):
+                p = mavutil.mavlink.MAVLink_param_value_message(
+                    name, 0.0, self.BYTEWISE_INT32, len(params), idx)
+                p.set_raw_field_bytes(0, struct.pack('<i', int(v)))
+            if p is None:
+                p = mavutil.mavlink.MAVLink_param_value_message(name,
+                                                                float(v),
+                                                                mavutil.mavlink.MAV_PARAM_TYPE_REAL32,
+                                                                len(params),
+                                                                idx)
             idx += 1
             # log PARAM_VALUE using the source vehicles sysid but MAV_COMP_ID_MISSIONPLANNER, to allow
             # us to tell that it came from the GCS, but to not corrupt the sequence numbers
@@ -407,14 +562,26 @@ class ParamState:
         total_params = len(pdata.params)
         self.mav_param_count = total_params
 
+        # rebuild the exported logical-type map from scratch
+        self.mav_param.param_types = {}
         idx = 0
         for (name, v, ptype) in pdata.params:
-            # we need to set it to REAL32 to ensure we use write value for param_set
             name = str(name.decode('utf-8'))
-            self.param_types[name] = mavutil.mavlink.MAV_PARAM_TYPE_REAL32
+            if ptype == 3:
+                # int32 (@PARAM/param.pck type code): remember the
+                # logical type so param set can use the extended
+                # encoding for values that don't fit exactly in a float
+                self.record_logical_type(name, mavutil.mavlink.MAV_PARAM_TYPE_INT32)
+                if name not in self.param_types:
+                    # PX4-style entry took precedence
+                    self.param_types[name] = mavutil.mavlink.MAV_PARAM_TYPE_REAL32
+            else:
+                # we need to set it to REAL32 to ensure we use write value for param_set
+                self.param_types[name] = mavutil.mavlink.MAV_PARAM_TYPE_REAL32
             self.mav_param_set.add(idx)
             self.mav_param[name] = v
             idx += 1
+        self.update_mavparm_bytewise_support()
 
         self.ftp_failed = False
         self.mpstate.console.set_status('Params', 'Param %u/%u' % (total_params, total_params))
@@ -440,6 +607,13 @@ class ParamState:
             self.mav_param_set = set()
         else:
             self.ftp_start()
+
+    def format_param_value(self, name, value):
+        if isinstance(value, bytes):
+            return 'hex:' + value.hex()
+        if isinstance(value, int) or self.param_types.get(name) == mavutil.mavlink.MAV_PARAM_TYPE_REAL64:
+            return str(value)
+        return "%f" % value
 
     def param_diff(self, args):
         '''handle param diff'''
@@ -468,8 +642,8 @@ class ParamState:
             if self.mav_param[p] == defaults[p]:
                 continue
             if fnmatch.fnmatch(p, wildcard.upper()):
-                s1 = "%f" % self.mav_param[p]
-                s2 = "%f" % defaults[p]
+                s1 = self.format_param_value(p, self.mav_param[p])
+                s2 = self.format_param_value(p, defaults[p])
                 if s1 == s2:
                     continue
                 s = "%-16.16s %s %s" % (str(p), s1, s2)
@@ -500,8 +674,8 @@ class ParamState:
                 continue
             if self.mav_param[p] == defaults[p]:
                 continue
-            s1 = "%f" % self.mav_param[p]
-            s2 = "%f" % defaults[p]
+            s1 = self.format_param_value(p, self.mav_param[p])
+            s2 = self.format_param_value(p, defaults[p])
             if s1 == s2:
                 continue
             s = "%-16.16s %s" % (str(p), s1)
@@ -510,11 +684,14 @@ class ParamState:
         f.close()
         print("Saved %u parameters to %s" % (count, filename))
 
-    def handle_mavlink_watch_param_value(self, master, m):
+    def handle_mavlink_watch_param_value(self, master, m, value):
         param_id = "%.16s" % m.param_id
         for pattern in self.watch_patterns:
             if fnmatch.fnmatch(param_id, pattern):
-                self.mpstate.console.writeln("> %s=%f" % (param_id, m.param_value))
+                if isinstance(value, float):
+                    self.mpstate.console.writeln("> %s=%f" % (param_id, value))
+                else:
+                    self.mpstate.console.writeln("> %s=%s" % (param_id, str(value)))
 
     def param_watch(self, master, args):
         '''command to allow addition of watches for parameter changes'''
@@ -646,11 +823,32 @@ class ParamState:
         # Update the parameter
         self.set_parameter(master, uname, value, attempts=3, param_type=ptype)
 
+    def wire_param_type(self, master, name, value, param_type):
+        '''choose the wire param_type for setting a parameter. Plain
+        INT32/UINT32 means byte-wise encoding on PX4-style systems; on
+        C-cast systems (ArduPilot) those are logical types only and the
+        value goes as a plain float, using explicit bytewise encoding
+        when the vehicle supports it'''
+        if param_type not in (mavutil.mavlink.MAV_PARAM_TYPE_INT32, mavutil.mavlink.MAV_PARAM_TYPE_UINT32):
+            return param_type
+        uname = str(name).upper()
+        sysid = self.sysid[0]
+        if self.autopilot_type_by_sysid.get(sysid, -1) == mavutil.mavlink.MAV_AUTOPILOT_PX4:
+            return param_type
+        if uname in self.px4_style_params:
+            return param_type
+        if (self.supports_bytewise_by_sysid.get(sysid, False) and
+                master is not None and master.mavlink20()):
+            return self.BYTEWISE_INT32 if param_type == mavutil.mavlink.MAV_PARAM_TYPE_INT32 else self.BYTEWISE_UINT32
+        # plain C-cast float
+        return None
+
     def set_parameter(self, master, name, value, attempts=None, param_type=None):
         '''convenient intermediate method which determines parameter type for
         lazy callers'''
         if param_type is None:
             param_type = self.param_types.get(name, None)
+        param_type = self.wire_param_type(master, name, value, param_type)
 
         self.parameters_to_set_input_queue.put(ParamState.ParamSet(
             master,
@@ -658,6 +856,7 @@ class ParamState:
             value,
             attempts=attempts,
             param_type=param_type,
+            extended_type=getattr(self.mav_param, 'param_extended_types', {}).get(name),
         ))
 
     def param_revert(self, master, args):
@@ -679,8 +878,8 @@ class ParamState:
                 continue
             if self.mav_param[p] == defaults[p]:
                 continue
-            s1 = "%f" % self.mav_param[p]
-            s2 = "%f" % defaults[p]
+            s1 = self.format_param_value(p, self.mav_param[p])
+            s2 = self.format_param_value(p, defaults[p])
             if s1 == s2:
                 continue
             print("Reverting %-16.16s  %s -> %s" % (p, s1, s2))
@@ -1051,6 +1250,13 @@ class ParamModule(mp_module.MPModule):
         self.check_new_target_system()
         sysid = self.get_sysid()
         self.pstate[sysid].handle_command(self.master, self.mpstate, args)
+
+    def set_parameter(self, name, value, attempts=None):
+        '''set a parameter on the current target system through the
+        parameter-set queue, choosing the best wire encoding'''
+        self.check_new_target_system()
+        sysid = self.get_sysid()
+        self.pstate[sysid].set_parameter(self.master, str(name).upper(), value, attempts=attempts)
 
     def fetch_all(self):
         '''force fetch of all parameters'''
