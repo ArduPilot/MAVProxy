@@ -884,6 +884,7 @@ on'''
             print("usage: wp show <filename>")
             return
         self.wploader.load(args[0])
+        self.wploader.expected_count = self.wploader.count()
 
     def cmd_update(self, args):
         if not self.check_have_list():
@@ -1070,6 +1071,9 @@ on'''
             w = mavmsg(*t)
             w = self.wp_from_mission_item_int(w)
             self.wploader.add(w)
+        # the whole of it arrived, however many a MAVLink download before it
+        # was expecting
+        self.wploader.expected_count = self.wploader.count()
         self.show_and_save(self.target_system)
 
     def show_and_save(self, source_system):
@@ -1104,6 +1108,7 @@ on'''
             print("Unable to load %s - %s" % (filename, msg))
             return
         print("Loaded %u %s from %s" % (self.wploader.count(), self.itemstype(), filename))
+        self.wploader.expected_count = self.wploader.count()
         print("Sending %s with ftp" % self.itemstype())
 
         fh = SIO()

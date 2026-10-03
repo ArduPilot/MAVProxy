@@ -1689,6 +1689,56 @@ class TestDrawnTrack(object):
         module.idle_task()
         assert module.sent[-1] is not None
 
+    def wp_module(self):
+        """the wp module, with only what loading a mission into it reads"""
+        from types import SimpleNamespace
+        from MAVProxy.modules import mavproxy_wp
+        from pymavlink import mavwp
+        module = mavproxy_wp.WPModule.__new__(mavproxy_wp.WPModule)
+        module.wploader_by_sysid = {1: mavwp.MAVWPLoader()}
+        module.mpstate = SimpleNamespace(
+            settings=SimpleNamespace(target_system=1, target_component=1),
+            status=SimpleNamespace(logdir=None))
+        return module
+
+    def test_the_wp_module_expects_the_mission_it_is_given(self):
+        """whatever fills the loader says how many items to expect, so what
+        it holds is not taken for part of a download which stopped: that
+        would have the 3D map wait for the rest of it for ever, and the wp
+        module ask the vehicle for items it has"""
+        import struct
+        module = self.wp_module()
+        loader = module.wploader
+        # a download of four items, which three of arrive
+        loader.expected_count = 4
+        for seq in range(3):
+            (lat, lon, _) = offset(seq * 100, 0)
+            loader.add(mavlink.MAVLink_mission_item_message(
+                1, 1, seq, 3, mavlink.MAV_CMD_NAV_WAYPOINT, 0, 1, 0, 0, 0, 0,
+                lat, lon, 100))
+        assert loader.count() < loader.expected_count
+        # and then the whole of one fetched over ftp, which is shorter
+        items = b''
+        for seq in range(2):
+            (lat, lon, _) = offset(seq * 100, 0)
+            item = mavlink.MAVLink_mission_item_int_message(
+                1, 1, seq, 3, mavlink.MAV_CMD_NAV_WAYPOINT, 0, 1, 0, 0, 0, 0,
+                int(lat * 1e7), int(lon * 1e7), 100)
+            item.mission_type = 0
+            ordered = [None] * len(item.fieldnames)
+            for (i, order) in enumerate(item.orders):
+                ordered[order] = getattr(item, item.fieldnames[i])
+            items += item.unpacker.pack(*ordered)
+        # the items are taken as they come: turning one into a waypoint of
+        # its own reads a field only a MAVLink2 dialect carries, which these
+        # tests do not load
+        module.wp_from_mission_item_int = lambda item: item
+        from io import BytesIO
+        module.ftp_callback(BytesIO(struct.pack(
+            "<HHHHH", 0x763d, 0, 0, 0, 2) + items))
+        assert loader.count() == 2
+        assert loader.expected_count == 2
+
     def test_the_live_map_redraws_for_a_home_which_moves_up(self):
         """home moving up or down takes the mission with it, as much as home
         moving along does: everything above home is as high as home is, and
