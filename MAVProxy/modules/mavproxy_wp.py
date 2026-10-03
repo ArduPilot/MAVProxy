@@ -14,6 +14,7 @@ import time
 
 if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import MPMenuCallTextDialog
+    from MAVProxy.modules.lib.mp_menu import MPMenuCallTextDropdownDialog
     from MAVProxy.modules.lib.mp_menu import MPMenuItem
 
 
@@ -22,6 +23,7 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
         super(WPModule, self).__init__(mpstate, "wp", "waypoint handling", public=True)
         # support for setting mission waypoint via command
         self.accepts_DO_SET_MISSION_CURRENT = {}  # keyed by (sysid/compid)
+        self.draw_frame = None
 
     def gui_menu_items(self):
         ret = super(WPModule, self).gui_menu_items()
@@ -29,9 +31,13 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
             MPMenuItem('Editor', 'Editor', '# wp editor'),
             MPMenuItem(
                 'Draw', 'Draw', '# wp draw ',
-                handler=MPMenuCallTextDialog(
+                handler=MPMenuCallTextDropdownDialog(
                     title='Mission Altitude (m)',
-                    default=100)),
+                    default=self.settings.wpalt,
+                    dropdown_label='Frame',
+                    dropdown_options=['AboveHome', 'AGL', 'AMSL'],
+                    default_dropdown=('AGL' if self.get_default_frame() ==
+                                      mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT else 'AboveHome'))),
             MPMenuItem('Loop', 'Loop', '# wp loop'),
             MPMenuItem(
                 'Add Takeoff', 'Add Takeoff', '# wp add_takeoff ',
@@ -281,26 +287,43 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
                 return
             self.wploader.clear()
             self.wploader.add(home)
-        if self.get_default_frame() == mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT:
-            use_terrain = True
-        else:
-            use_terrain = False
         for p in points:
-            self.wploader.add_latlonalt(p[0], p[1], self.settings.wpalt, terrain_alt=use_terrain)
+            self.wploader.add(mavutil.mavlink.MAVLink_mission_item_message(
+                self.target_system, self.target_component, 0,
+                self.draw_frame, mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
+                0, 0, 0, 0, 0, 0, p[0], p[1], self.settings.wpalt))
         self.send_all_waypoints()
 
     def cmd_draw(self, args):
+        usage = 'usage: wp draw [altitude] [AboveHome|AGL|AMSL]'
+        frames = {
+            'AboveHome': mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+            'AGL': mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT,
+            'AMSL': mavutil.mavlink.MAV_FRAME_GLOBAL,
+        }
+        if len(args) > 2:
+            print(usage)
+            return
+        try:
+            altitude = int(args[0]) if args else self.settings.wpalt
+            frame = frames[args[1]] if len(args) > 1 else self.draw_frame
+        except (ValueError, KeyError):
+            print(usage)
+            return
+        if frame is None:
+            frame = self.get_default_frame()
         if 'draw_lines' not in self.mpstate.map_functions:
             print("No map drawing available")
             return
         if self.get_WP0() is None:
             print("Need home location - please run gethome")
             return
-        if len(args) > 1:
-            self.settings.wpalt = int(args[1])
+        self.settings.wpalt = altitude
+        self.draw_frame = frame
         self.mpstate.map_functions['draw_lines'](self.wp_draw_callback)
-        print("Drawing %s on map at altitude %d" %
-              (self.itemstype(), self.settings.wpalt))
+        frame_name = next(name for name, value in frames.items() if value == frame)
+        print("Drawing %s on map at altitude %d (%s)" %
+              (self.itemstype(), self.settings.wpalt, frame_name))
 
     def cmd_editor(self, args):
         if self.module('misseditor'):
