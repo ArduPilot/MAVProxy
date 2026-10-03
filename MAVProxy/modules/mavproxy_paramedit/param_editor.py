@@ -63,11 +63,8 @@ class ParamEditorEventThread(threading.Thread):
                                 event.get_arg("path"), verbose=True)
 
                     elif event_type == ph_event.PEE_WRITE_PARAM:
-                        if event.get_arg("use_ftp"):
-                            self.mp_paramedit.queue_ftp('Write', dict(event.get_arg("modparam")))
-                        else:
-                            self.mp_paramedit.paramchanged = event.get_arg("modparam")
-                            self.mp_paramedit.set_params(False)
+                        self.mp_paramedit.paramchanged = event.get_arg("modparam")
+                        self.mp_paramedit.set_params()
 
                     elif event_type == ph_event.PEE_RESET:
                         master = self.mp_paramedit.mpstate.mav_master[0]
@@ -75,15 +72,14 @@ class ParamEditorEventThread(threading.Thread):
 
                     elif event_type == ph_event.PEE_FETCH:
                         if event.get_arg("use_ftp"):
-                            self.mp_paramedit.queue_ftp('Read')
+                            self.mp_paramedit.queue_ftp_fetch()
                         else:
                             self.module('param').fetch_all(use_ftp=False)
 
                 except Exception as ex:
                     if (event is not None and event.arg_dict.get('use_ftp') and
-                            event.get_type() in (ph_event.PEE_FETCH, ph_event.PEE_WRITE_PARAM)):
-                        operation = 'Read' if event.get_type() == ph_event.PEE_FETCH else 'Write'
-                        self.mp_paramedit.ftp_transfer_done('%s failed: %s' % (operation, ex))
+                            event.get_type() == ph_event.PEE_FETCH):
+                        self.mp_paramedit.ftp_transfer_done('Read failed: %s' % ex)
                     time.sleep(0.2)
             time.sleep(0.01)
 
@@ -94,7 +90,6 @@ class ParamEditorMain(object):
         self.paramchanged = {}
         self.default_params = None
         self.ftp_requests = queue.Queue()
-        self.ftp_write_pending = set()
         self.fltmode_rc = None
         self.mpstate = mpstate
         self.needs_unloading = False
@@ -196,37 +191,28 @@ class ParamEditorMain(object):
             self.gui_event_queue.put(ParamEditorEvent(
                 ph_event.PEGE_DEFAULTS, defaults=dict(defaults or {})))
 
-    def queue_ftp(self, operation, params=None):
+    def queue_ftp_fetch(self):
         target = self.mpstate.module('param').get_sysid()
-        self.ftp_requests.put((operation, target, params))
+        self.ftp_requests.put(target)
 
     def process_ftp_requests(self):
         '''start transfers on MAVProxy's main loop, alongside FTP replies'''
         while not self.time_to_quit:
             try:
-                operation, target, params = self.ftp_requests.get_nowait()
+                target = self.ftp_requests.get_nowait()
             except queue.Empty:
                 return
             param = self.mpstate.module('param')
             if target != param.get_sysid():
-                self.ftp_transfer_done('%s cancelled: vehicle changed' % operation)
+                self.ftp_transfer_done('Read cancelled: vehicle changed')
                 continue
             try:
-                if operation == 'Read':
-                    param.fetch_all(use_ftp=True, callback=lambda values, target=target:
-                                    self.ftp_fetch_done(values, target))
-                else:
-                    self.paramchanged = params
-                    self.set_params(True, target)
+                param.fetch_all(use_ftp=True, callback=lambda values, target=target:
+                                self.ftp_fetch_done(values, target))
             except Exception as ex:
-                self.ftp_transfer_done('%s failed: %s' % (operation, ex))
+                self.ftp_transfer_done('Read failed: %s' % ex)
 
     def mavlink_packet(self, m):
-        # FTP verification completes on the main loop after PARAM_VALUE dispatch.
-        # Its callback alone acknowledges edits, including partially rejected writes.
-        if (m.get_type() == 'PARAM_VALUE' and
-                (m.get_srcSystem(), m.get_srcComponent(), m.param_id.upper()) in self.ftp_write_pending):
-            return
         if m.get_type() in ['PARAM_VALUE', 'RC_CHANNELS', 'RC_CHANNELS_RAW']:
             self.mavlink_message_queue.put(m)
 
@@ -429,55 +415,12 @@ class ParamEditorMain(object):
             vehicle=self.mpstate.vehicle_name, pstatus=(len(params), len(params))))
         self.ftp_transfer_done("Read succeeded (%u parameters)" % len(params))
 
-    def ftp_write_done(self, params, submitted, target=None):
-        '''acknowledge the subset successfully uploaded with FTP'''
-        if target is not None:
-            self.ftp_write_pending.difference_update((target[0], target[1], name) for name in submitted)
-        if self.time_to_quit:
-            return
-        if target is not None and target != self.mpstate.module('param').get_sysid():
-            self.ftp_transfer_done("Write completed for previous vehicle; fetch current parameters")
-            return
-        if params is None:
-            self.ftp_transfer_done("Write failed; changes are still pending")
-            return
-        status = self.mpstate.module('param').param_status()
-        rejected = []
-        for name, requested in submitted.items():
-            # PARAM_VALUE represents both integer and real parameters as float32.
-            expected = struct.unpack('<f', struct.pack('<f', float(requested)))[0]
-            if name not in params or struct.unpack('<f', struct.pack('<f', params[name]))[0] != expected:
-                rejected.append(name)
-                continue
-            value = params[name]
-            if self.paramchanged.get(name) == submitted[name]:
-                self.paramchanged.pop(name, None)
-            self.gui_event_queue.put(ParamEditorEvent(
-                ph_event.PEGE_WRITE_SUCC, paramid=name, paramvalue=value,
-                pstatus=status, submitted=submitted[name]))
-        if rejected:
-            self.ftp_transfer_done("Write verification failed; changes still pending: %s" % ', '.join(rejected))
-        else:
-            self.ftp_transfer_done("Write succeeded" if submitted else "No parameter changes to write")
-
     def ftp_transfer_done(self, message):
         if not self.time_to_quit:
             self.gui_event_queue.put(ParamEditorEvent(
                 ph_event.PEGE_FTP_TRANSFER, message="MAVFTP: " + message))
 
-    def set_params(self, use_ftp=False, target=None):
-        if use_ftp:
-            submitted = dict(self.paramchanged)
-            if target is None:
-                target = self.mpstate.module('param').get_sysid()
-            self.ftp_write_pending.update((target[0], target[1], name) for name in submitted)
-            try:
-                self.mpstate.module('param').ftp_upload(
-                    submitted, callback=lambda params: self.ftp_write_done(params, submitted, target))
-            except Exception:
-                self.ftp_write_pending.difference_update((target[0], target[1], name) for name in submitted)
-                raise
-            return
+    def set_params(self):
         for param, value in self.paramchanged.items():
             self.mpstate.mav_master[0].param_set_send(param, float(value))
 
